@@ -63,6 +63,10 @@ private struct GalleryRuntimeBridge: View {
         CounterTab()
       }
 
+      Tab("Life", value: GalleryView.GalleryTab.life) {
+        LifeTab()
+      }
+
       Tab("Todo", value: GalleryView.GalleryTab.todo) {
         TodoTab()
       }
@@ -105,48 +109,44 @@ private struct GalleryRuntimeBridge: View {
       modifiers: .ctrl,
       action: { openPalette() }
     )
-    // Tab switching is palette-driven: open with ⌃K, fuzzy-filter the
-    // list. No per-tab keybindings — the palette is the discovery
-    // surface.
     .paletteCommand(
-      name: "Switch to Counter",
+      name: "Counter",
       action: { selection = .counter }
     )
     .paletteCommand(
-      name: "Switch to Todo",
+      name: "Life",
+      action: { selection = .life }
+    )
+    .paletteCommand(
+      name: "Todo",
       action: { selection = .todo }
     )
     .paletteCommand(
-      name: "Switch to Calculator",
+      name: "Calculator",
       action: { selection = .calculator }
     )
     .paletteCommand(
-      name: "Switch to Borders & Shapes",
+      name: "Borders & Shapes",
       action: { selection = .bordersAndShapes }
     )
     .paletteCommand(
-      name: "Switch to Images",
+      name: "Images",
       action: { selection = .images }
     )
     .paletteCommand(
-      name: "Switch to Animations",
+      name: "Animations",
       action: { selection = .animations }
     )
     .paletteCommand(
-      name: "Switch to File Drop",
+      name: "File Drop",
       action: { selection = .fileDrop }
     )
     .paletteCommand(
-      name: "Switch to Physics",
+      name: "Physics",
       action: { selection = .physics }
     )
-    .toolbar(style: DefaultBottomToolbarStyle())
+    .toolbar(style: .defaultBottom)
     .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
-      // Read from the class holder at sheet-content construction
-      // time. Because we mutated holder.commands earlier in this
-      // same body pass (inside the EnvironmentReader closure), the
-      // read here sees the freshest value — not whatever was there
-      // before.
       CommandPaletteList(
         commands: paletteHolder.commands,
         dismiss: { isPaletteOpen = false }
@@ -155,16 +155,13 @@ private struct GalleryRuntimeBridge: View {
   }
 
   private func openPalette() {
-    // Nothing to snapshot at this point — the class-backed
-    // `paletteHolder.commands` is kept up-to-date continuously by
-    // the EnvironmentReader above. Opening the sheet is enough;
-    // the palette owns its own query/focus state now.
     isPaletteOpen = true
   }
 }
 
 extension GalleryView {
   enum GalleryTab: Hashable {
+    case life
     case counter
     case todo
     case calculator
@@ -176,6 +173,7 @@ extension GalleryView {
 
     init?(environmentName: String) {
       switch environmentName.lowercased() {
+        case "life", "conway": self = .life
       case "counter": self = .counter
       case "todo": self = .todo
       case "calculator", "calc": self = .calculator
