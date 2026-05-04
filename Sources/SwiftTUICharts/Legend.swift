@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A compact legend that pairs labels with semantic tones.
 public struct Legend<Label: View>: View, ResolvableView {

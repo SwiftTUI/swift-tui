@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 import Testing
 
 @testable import TermUIPerf

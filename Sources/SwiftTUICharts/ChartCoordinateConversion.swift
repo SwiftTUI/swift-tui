@@ -1,4 +1,4 @@
-import Core
+import SwiftTUICore
 
 enum ChartCoordinateAxis: Equatable, Sendable {
   case horizontal

@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUI
 
 #if canImport(Darwin)

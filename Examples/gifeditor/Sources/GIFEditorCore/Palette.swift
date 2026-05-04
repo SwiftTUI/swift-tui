@@ -3,8 +3,8 @@ import Foundation
 /// An sRGB color stored as 8-bit-per-channel RGBA.
 ///
 /// `GIFEditorCore` deliberately avoids depending on the framework's much
-/// richer `Core.Color` so the model layer stays platform-neutral. The UI
-/// layer converts between this and `Core.Color` at the boundary.
+/// richer `SwiftTUICore.Color` so the model layer stays platform-neutral. The UI
+/// layer converts between this and `SwiftTUICore.Color` at the boundary.
 public struct EditorColor: Hashable, Sendable, Codable {
   public var red: UInt8
   public var green: UInt8

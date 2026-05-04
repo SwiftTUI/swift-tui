@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A gauge that changes tone across authored threshold bands.
 public struct ThresholdGauge<Label: View, Summary: View>: View, ResolvableView {

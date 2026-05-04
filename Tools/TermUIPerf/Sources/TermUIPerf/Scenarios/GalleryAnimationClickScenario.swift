@@ -1,5 +1,5 @@
 import GalleryDemoViews
-@_spi(Runners) import TerminalUI
+@_spi(Runners) import SwiftTUI
 
 public struct GalleryAnimationClickScenario: PerfScenario {
   public let name: PerfScenarioName = .galleryAnimationClick

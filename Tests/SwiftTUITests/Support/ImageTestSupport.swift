@@ -1,6 +1,6 @@
 import PNG
 
-@testable import Core
+@testable import SwiftTUICore
 
 /// Builds a minimal RGBA8 PNG bytestream from `pixels` arranged in
 /// row-major order. Used by tests that need real PNG bytes flowing

@@ -15,7 +15,7 @@ Historically `GeometryProxy.size` was read from
 `EnvironmentValues.terminalSize`; layout-dependent content realization moved the
 proxy to placement geometry so `terminalSize` can remain host-surface metadata.
 
-`Size`, `Point`, `Rect`, and `EdgeInsets` in `Sources/Core/GeometryTypes.swift` are all integer-cell types. The `Layout` protocol, placement algorithm, and alignment guides are all cell-denominated. This is a deliberate stance: integer-cell geometry is one of the "terminal-specific differences" `docs/VISION.md` explicitly endorses, on the grounds that it keeps layout predictable and the rasterizer simple.
+`Size`, `Point`, `Rect`, and `EdgeInsets` in `Sources/SwiftTUICore/GeometryTypes.swift` are all integer-cell types. The `Layout` protocol, placement algorithm, and alignment guides are all cell-denominated. This is a deliberate stance: integer-cell geometry is one of the "terminal-specific differences" `docs/VISION.md` explicitly endorses, on the grounds that it keeps layout predictable and the rasterizer simple.
 
 ### What the runtime already knows about pixels
 

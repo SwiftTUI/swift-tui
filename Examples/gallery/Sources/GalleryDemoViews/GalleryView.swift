@@ -100,6 +100,7 @@ public struct GalleryView: View {
       action: { selection = .physics }
     )
     .toolbar(style: .defaultBottom)
+    .paletteSheet("Open...", isPresented: $showPalette, content: {Text("...")})
   }
 }
 

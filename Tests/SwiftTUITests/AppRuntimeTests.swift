@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import Core
+@_spi(Testing) @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 @MainActor
 @Suite

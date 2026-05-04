@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 @MainActor
 func isEmptyView<V: View>(

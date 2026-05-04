@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 
 public struct PerfTerminalSize: Codable, Equatable, Sendable {
   public var columns: Int

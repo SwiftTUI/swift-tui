@@ -1,5 +1,5 @@
 import Testing
-import View
+import SwiftTUIViews
 
 @_spi(Runners) @testable import SwiftTUI
 

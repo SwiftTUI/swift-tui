@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A bullet chart that compares a current value against a target or range.
 public struct BulletChart<Label: View, Summary: View>: View, ResolvableView {
