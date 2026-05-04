@@ -7,9 +7,9 @@ sources:
   - docs/proposals/ACCESSIBILITY.md
   - docs/proposals/SUBSTRATE_AUDIT.md
   - docs/proposals/EMBEDDED_WEB_HOST.md
-  - Sources/Core/Semantics.swift
-  - Sources/Core/RenderTreeAndSemanticsTypes.swift
-  - Sources/Core/FocusTracker.swift
+  - Sources/SwiftTUICore/Semantics/Semantics.swift
+  - Sources/SwiftTUICore/Resolve/ResolvedNode.swift
+  - Sources/SwiftTUICore/Semantics/FocusTracker.swift
 ---
 
 # ADR-0012: AccessibilityNode shape
@@ -21,7 +21,7 @@ Phase 3b of the accessibility plan
 phasing") extends `SemanticSnapshot` with a new collection of
 `AccessibilityNode` records, populated by `SemanticExtractor` during
 the existing depth-first walk over the placed tree
-([`Sources/Core/Semantics.swift`](../../Sources/Core/Semantics.swift)).
+([`Sources/SwiftTUICore/Semantics/Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift)).
 
 The shape of `AccessibilityNode` flows downstream into:
 
@@ -294,13 +294,13 @@ the wire format.
 - Depends on ADR-0011 (`AccessibilityRole` rename) for the role
   field type.
 - The extractor changes are localized to
-  [`Sources/Core/Semantics.swift`](../../Sources/Core/Semantics.swift).
+  [`Sources/SwiftTUICore/Semantics/Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift).
   The walk already exists; we add a per-node emission step inside
   the existing `preVisit` / `postVisit` callbacks.
 - `SemanticSnapshot` gains one new field. All existing call sites
   that construct it with the explicit init pick up the default
   empty array.
-- New tests under `Tests/CoreTests/Accessibility/` exercise the
+- New tests under `Tests/SwiftTUICoreTests/Accessibility/` exercise the
   pruning rule, the role inference, the label inference, and the
   parent-identity reconstruction.
 
