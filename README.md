@@ -86,11 +86,15 @@ struct MyApp: @preconcurrency SwiftTUIApp {
 }
 ```
 
-> **Note:** This phase ships parsing and resolution — the `RuntimeConfiguration`
-> value is plumbed through to the runner but rendering decisions (color
-> profile, glyph fallback, motion suppression, accessible-mode strategy) do
-> not yet consult it. Flags parse cleanly today; their behavioral effects
-> will land in a follow-up plan. See
+> **Note on flag-to-behavior wiring:** `--no-color`, `--force-color`, `--ascii`,
+> and `--plain` (which expands to `--no-color --ascii --reduce-motion`) now
+> affect the rendered output: they override the auto-detected
+> `TerminalCapabilityProfile` and reach the `TerminalHost` directly. Flags
+> still pending behavior wiring: `--reduce-motion` (animation scheduler),
+> `--accessible` (linear append-only renderer), `--json` (alternative output
+> mode), `--web`/`--port`/`--bind`/`--no-open` (embedded web host),
+> `--linear`, `--no-progress`, `--debug`, and `--start-in`. All flags parse
+> cleanly today; the unwired ones land in follow-up plans. See
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.
 

@@ -1856,6 +1856,16 @@ by theme:
   rather than reimplement parsing. The `SWIFTTUI_*` family,
   `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI` are new and
   remain owned by `SwiftTUIOptions`.
+- 2026-05-05: Color/glyphs flag-to-rendering wiring landed.
+  `TerminalCapabilityProfile.applying(_ configuration:)` overlays the
+  user's `RuntimeConfiguration.color` and `RuntimeConfiguration.glyphs`
+  on top of the env-detected profile; `SceneRuntime` and
+  `TerminalRunner.launchApp` thread the configuration through to
+  `TerminalHost(capabilityProfile:)`. So `--no-color`, `--force-color`,
+  `--ascii`, and `--plain` (which expands to `--no-color --ascii
+  --reduce-motion`) now affect the actual render. Other fields
+  (`motion`, `output`, `web`, `linear`, `noProgress`, `debug`, `startIn`)
+  remain parsed-but-unwired and are tracked as follow-up plans.
 - 2026-05-05: Phases 1–5 landed via plan
   [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
   `RuntimeConfiguration` value type + `Builder` + `detect(...)` factory in
