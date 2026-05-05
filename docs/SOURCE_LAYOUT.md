@@ -73,6 +73,7 @@ Sources/SwiftTUI/
 ### Run loop and event dispatch
 
 - `Accessibility/AccessibilityRuntimePolicy.swift`: terminal-runtime policy helpers that consume `SemanticSnapshot.accessibilityNodes`
+- `Accessibility/LinearAccessibilityRenderer.swift`: semantic linear renderer for accessible CLI output
 - `RunLoop/RunLoop.swift`: runtime coordinator and shared runtime state
 - `RunLoop/RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
 - `RunLoop/RunLoop+PointerHandling.swift`: pointer routing, activation, hover, capture, and scroll-wheel handling

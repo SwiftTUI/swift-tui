@@ -1,5 +1,5 @@
-@_spi(Runners) import SwiftTUI
 import Foundation
+@_spi(Runners) import SwiftTUI
 import UnixSignals
 
 #if canImport(Darwin)
@@ -60,7 +60,8 @@ final class SceneRuntime {
         presentationSurface: TerminalHost(capabilityProfile: capabilityProfile),
         terminalInputReader: InputReader(),
         signalReader: defaultSignalReader(),
-        diagnosticsLogger: diagnosticsLogger
+        diagnosticsLogger: diagnosticsLogger,
+        runtimeConfiguration: configuration
       )
     } else {
       let pty = try ScenePty()
@@ -78,7 +79,8 @@ final class SceneRuntime {
           outputFileDescriptor: pty.masterFD,
           capabilityProfile: capabilityProfile
         ),
-        terminalInputReader: InputReader(fileDescriptor: pty.masterFD)
+        terminalInputReader: InputReader(fileDescriptor: pty.masterFD),
+        runtimeConfiguration: configuration
       )
     }
 

@@ -12,6 +12,7 @@ import SwiftTUIViews
   @_spi(Runners) public let surfaceName: String
   @_spi(Runners) public let environmentValues: [String: String]
   @_spi(Runners) public let diagnosticsLogger: FrameDiagnosticsLogger?
+  @_spi(Runners) public let runtimeConfiguration: RuntimeConfiguration
   @_spi(Runners) public let focusPresentationHandler:
     (@MainActor @Sendable (FocusPresentation) -> Void)?
 
@@ -23,6 +24,7 @@ import SwiftTUIViews
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
     diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    runtimeConfiguration: RuntimeConfiguration = .default,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
     self.presentationSurface = presentationSurface
@@ -32,6 +34,7 @@ import SwiftTUIViews
     self.surfaceName = surfaceName
     self.environmentValues = environmentValues
     self.diagnosticsLogger = diagnosticsLogger
+    self.runtimeConfiguration = runtimeConfiguration
     self.focusPresentationHandler = focusPresentationHandler
   }
 }
@@ -60,7 +63,7 @@ import SwiftTUIViews
       environmentSnapshot.values["windowTitle"] = title
     }
 
-    let runLoop = RunLoop(
+    let runLoop = RunLoop<SceneSessionState, WindowHostView<ScopedBuilder<Content>>>(
       rootIdentity: configuration.rootIdentity,
       presentationSurface: resources.presentationSurface,
       terminalInputReader: resources.terminalInputReader,
@@ -71,8 +74,9 @@ import SwiftTUIViews
       focusPresentationHandler: resources.focusPresentationHandler,
       environment: environmentSnapshot,
       environmentValues: environmentValues,
+      runtimeConfiguration: resources.runtimeConfiguration,
       exitKeyBindings: configuration.exitKeyBindings,
-      viewBuilder: { (_: SceneSessionState, _: Identity?) in
+      viewBuilder: ScopedMapper { _ in
         WindowHostView(content: configuration.makeScopedRootView())
       }
     )

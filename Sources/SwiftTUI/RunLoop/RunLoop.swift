@@ -1,6 +1,6 @@
 import SwiftTUICore
-import Synchronization
 import SwiftTUIViews
+import Synchronization
 
 package typealias ViewBuilderInput<State: Equatable & Sendable> = (
   state: State,
@@ -168,6 +168,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let viewBuilder: DeferredStateBodyBuilder<State, Content>
   package let environment: EnvironmentSnapshot
   package let environmentValues: EnvironmentValues
+  package let runtimeConfiguration: RuntimeConfiguration
   package let proposalOverride: ProposedSize?
   package let exitKeyBindings: ExitKeyBindings
   package let localActionRegistry = LocalActionRegistry()
@@ -247,6 +248,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     keyHandler: StateKeyHandler<State>? = nil,
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
+    runtimeConfiguration: RuntimeConfiguration = .default,
     proposal: ProposedSize? = nil,
     exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: DeferredStateBodyBuilder<State, Content>
@@ -263,6 +265,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.keyHandler = keyHandler
     self.environment = environment
     self.environmentValues = environmentValues
+    self.runtimeConfiguration = runtimeConfiguration
     self.proposalOverride = proposal
     self.exitKeyBindings = exitKeyBindings
     self.viewBuilder = viewBuilder
@@ -293,6 +296,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     keyHandler: StateKeyHandler<State>? = nil,
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
+    runtimeConfiguration: RuntimeConfiguration = .default,
     proposal: ProposedSize? = nil,
     exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: DeferredStateBodyBuilder<State, Content>
@@ -310,6 +314,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       keyHandler: keyHandler,
       environment: environment,
       environmentValues: environmentValues,
+      runtimeConfiguration: runtimeConfiguration,
       proposal: proposal,
       exitKeyBindings: exitKeyBindings,
       viewBuilder: viewBuilder
@@ -415,11 +420,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     focusTracker.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
 
-    try presentationSurface.enableRawMode()
-    synchronizeInputCapabilities()
+    let usesRawTerminalMode = runtimeConfiguration.output != .accessible
+    if usesRawTerminalMode {
+      try presentationSurface.enableRawMode()
+      synchronizeInputCapabilities()
+    }
     defer {
       lifecycleCoordinator.shutdown()
-      try? presentationSurface.disableRawMode()
+      if usesRawTerminalMode {
+        try? presentationSurface.disableRawMode()
+      }
     }
 
     scheduler.requestInvalidation(of: [rootIdentity])
