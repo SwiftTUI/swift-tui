@@ -128,16 +128,16 @@ Resolved by
 
 ## Stage 3: Add Cursor-As-Focus
 
-- [ ] Add a runtime policy value that turns `AccessibilityNode.cursorAnchor`
+- [x] Add a runtime policy value that turns `AccessibilityNode.cursorAnchor`
   plus `FocusTracker.currentFocusIdentity` into an optional `CellPoint`.
-- [ ] Keep the cursor point absolute in surface coordinates.
-- [ ] Wire the point into terminal presentation after a committed frame, without
+- [x] Keep the cursor point absolute in surface coordinates.
+- [x] Wire the point into terminal presentation after a committed frame, without
   changing pointer, key, or focus routing. The policy applies to normal
   terminal TUI output when a focused accessibility node exists; JSON and web
   output do not use it.
-- [ ] Cover focused controls, missing anchors, hidden nodes, and unfocused
+- [x] Cover focused controls, missing anchors, hidden nodes, and unfocused
   frames with Swift tests.
-- [ ] Run `swiftly run swift test --filter SwiftTUITests.FocusTransitionTests`
+- [x] Run `swiftly run swift test --filter SwiftTUITests.FocusTransitionTests`
   and the new cursor policy tests.
 
 ## Stage 4: Add Linear Accessible Output

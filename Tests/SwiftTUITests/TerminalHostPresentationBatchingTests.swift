@@ -128,6 +128,38 @@ struct TerminalHostPresentationBatchingTests {
     #expect(incrementalWrites == ["\u{001B}[1;3HX\u{001B}[3CY"])
   }
 
+  @Test("terminal host queues accessibility cursor focus behind pending presentation")
+  func accessibilityCursorFocusQueuesBehindPendingPresentation() throws {
+    let controller = BlockingPresentationWriteController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["ABCD"]
+      )
+    )
+    #expect(controller.waitForBlockedWriteToStart())
+
+    try host.presentAccessibilityCursorFocus(at: .init(x: 2, y: 0))
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    #expect(
+      controller.writes == [
+        "\u{001B}[2J\u{001B}[1;1HABCD",
+        "\u{001B}[1;3H\u{001B}[?25h",
+      ]
+    )
+  }
+
   @Test("terminal host damage-aware presentation batches only hinted rows")
   func damageAwareUpdatesBatchOnlyHintedRows() throws {
     let controller = PresentationWriteCountingController(isTTY: true)

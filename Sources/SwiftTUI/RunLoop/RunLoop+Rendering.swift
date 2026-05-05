@@ -259,6 +259,7 @@ extension RunLoop {
       } else {
         presentationMetrics = try presentationSurface.present(artifacts.rasterSurface)
       }
+      try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
       let presentationDuration: Duration =
         if let presentStart, let presentClock {
           presentStart.duration(to: presentClock.now)
@@ -956,6 +957,7 @@ extension RunLoop {
       } else {
         presentationMetrics = try presentationSurface.present(artifacts.rasterSurface)
       }
+      try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
       let presentationDuration: Duration =
         if let presentStart, let presentClock {
           presentStart.duration(to: presentClock.now)
@@ -1192,7 +1194,8 @@ extension RunLoop {
     } else {
       effectiveEnvironmentValues.cellPixelMetrics = .estimated
     }
-    effectiveEnvironmentValues.pointerInputCapabilities = presentationSurface.pointerInputCapabilities
+    effectiveEnvironmentValues.pointerInputCapabilities =
+      presentationSurface.pointerInputCapabilities
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
@@ -1333,5 +1336,22 @@ extension RunLoop {
     case .animate:
       "animate"
     }
+  }
+
+  private func applyTerminalCursorFocusPolicy(
+    semanticSnapshot: SemanticSnapshot
+  ) throws {
+    guard
+      let terminalSurface = presentationSurface as? any TerminalCursorFocusPresentationSurface
+    else {
+      return
+    }
+
+    let policy = AccessibilityRuntimePolicy()
+    let cursorPoint = policy.focusedCursorPoint(
+      in: semanticSnapshot,
+      focusedIdentity: focusTracker.currentFocusIdentity
+    )
+    try terminalSurface.presentAccessibilityCursorFocus(at: cursorPoint)
   }
 }

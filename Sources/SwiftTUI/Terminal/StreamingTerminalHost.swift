@@ -1,7 +1,7 @@
 import Synchronization
 
 package final class StreamingTerminalHost: PresentationSurface, DamageAwarePresentationSurface,
-  TerminalInputCapabilityProviding, Sendable
+  TerminalInputCapabilityProviding, TerminalCursorFocusPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
