@@ -45,11 +45,11 @@ extension RuntimeConfiguration {
     if let v = environment["SWIFTTUI_ASCII"], !v.isEmpty, v != "0" {
       glyphsResolved = .ascii
     }
-    if let v = environment["SWIFTTUI_REDUCE_MOTION"], !v.isEmpty, v != "0" {
-      motion = .reduced
+    if let v = environment["SWIFTTUI_REDUCE_MOTION"], !v.isEmpty {
+      motion = (v != "0") ? .reduced : .normal
     }
-    if let v = environment["SWIFTTUI_NO_PROGRESS"], !v.isEmpty, v != "0" {
-      noProgress = true
+    if let v = environment["SWIFTTUI_NO_PROGRESS"], !v.isEmpty {
+      noProgress = (v != "0")
     }
     var linear = false
     if let v = environment["SWIFTTUI_LINEAR"], !v.isEmpty, v != "0" {

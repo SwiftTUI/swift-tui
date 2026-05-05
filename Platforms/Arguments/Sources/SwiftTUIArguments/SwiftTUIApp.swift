@@ -17,7 +17,7 @@ public import Foundation
 ///   - env-var honoring via `SwiftTUIOptions.runtimeConfiguration(...)`;
 ///   - failure-before-TTY-setup: bad flags exit with `EX_USAGE` in cooked mode,
 ///     never corrupting the terminal;
-///   - `--help` and `--version` for free.
+///   - `--help` (with the SWIFTTUI OPTIONS section rendered separately) for free.
 ///
 /// Conformers MUST declare a `swiftTUIOptions` stored property:
 ///

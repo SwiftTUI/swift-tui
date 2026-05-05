@@ -2,6 +2,16 @@ public import ArgumentParser
 
 /// Subcommand for managing shell completion scripts.
 ///
+/// **Status:** Surface defined; runtime wiring is deferred. Invoking
+/// `myapp completions print <shell>` currently errors with a redirect to
+/// `myapp --generate-completion-script <shell>` (which IS available — every
+/// `ParsableCommand` gets it from swift-argument-parser by default).
+///
+/// Wiring this subcommand to actually emit the script requires
+/// `SwiftTUIApp.main()` to detect `CompletionsCommand.Print` after parse and
+/// call `Self._generateCompletionScript(...)`. That's a few lines but lives
+/// in a follow-up plan.
+///
 /// Add this to a `SwiftTUIApp` (or any `AsyncParsableCommand`) by extending
 /// its `CommandConfiguration.subcommands` to include `CompletionsCommand.self`.
 ///
@@ -34,14 +44,19 @@ public struct CompletionsCommand: ParsableCommand {
     public init() {}
 
     public mutating func run() throws {
-      // The actual generation is delegated to swift-argument-parser's
-      // existing --generate-completion-script <shell> machinery on the root
-      // command. Consumers wire this by handling the shell name and printing
-      // the result; the framework documents the integration but does not
-      // execute the codegen here (it requires access to the root command).
-      // For now we error if invoked directly; SwiftTUIApp's main() intercepts.
+      // Note: SwiftTUIApp.main() does not yet intercept this subcommand to emit
+      // a completion script. Until that wiring lands, fall back to swift-argument-
+      // parser's standard --generate-completion-script flag, which is auto-provided
+      // on every command:
+      //
+      //   myapp --generate-completion-script \(shell)
+      //
+      // The friendlier "completions print <shell>" surface is reserved for a
+      // follow-up plan; see docs/plans/2026-05-04-002-argument-parsing-plan.md
+      // § Follow-up plans.
       throw CleanExit.message(
-        "Run with the parent command attached: e.g., `myapp completions print \(shell)`."
+        "completions subcommand wiring is deferred. For now, use:\n"
+        + "  \(CommandLine.arguments[0]) --generate-completion-script \(shell)"
       )
     }
   }

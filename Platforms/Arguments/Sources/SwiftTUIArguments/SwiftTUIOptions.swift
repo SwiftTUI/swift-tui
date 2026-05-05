@@ -1,4 +1,4 @@
-import ArgumentParser
+public import ArgumentParser
 
 /// The framework-owned option group flattened into every `SwiftTUIApp`'s command.
 ///
