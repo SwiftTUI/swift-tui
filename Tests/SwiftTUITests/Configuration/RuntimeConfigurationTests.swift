@@ -13,6 +13,8 @@ struct RuntimeConfigurationTests {
     #expect(configuration.web == nil)
     #expect(configuration.startIn == nil)
     #expect(configuration.debug == false)
+    #expect(configuration.noProgress == false)
+    #expect(configuration.linear == false)
   }
 
   @Test("Configuration is Sendable across actor boundaries")
@@ -20,5 +22,6 @@ struct RuntimeConfigurationTests {
     let configuration = RuntimeConfiguration.default
     let captured: RuntimeConfiguration = await Task.detached { configuration }.value
     #expect(captured.color == .auto)
+    #expect(captured == configuration)
   }
 }
