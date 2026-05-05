@@ -1,7 +1,7 @@
 ---
 title: "fix: make AnyView resilient across retained view-graph updates"
 type: fix
-status: planned
+status: completed
 date: 2026-05-05
 depends_on:
   - "../PUBLIC_SURFACE_POLICY.md"
@@ -169,23 +169,24 @@ except for the identity boundary needed to make erasure observable.
 - `Tests/SwiftTUITests/AnyViewResilienceTests.swift`
   - Renderer-level behavior tests for state, lifecycle, tasks, focus, actions,
     nested erasure, explicit IDs, and `ForEach`.
-- `Tests/SwiftTUITests/Support/AnyViewResilienceFixtures.swift`
-  - Shared fixtures only if the resilience tests become too large to keep
-    readable in one file.
 
 ### Modified
 
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+  - Add a package-private pre-resolution structural-child preparation hook so
+    changed `AnyView` payloads prune old explicit-ID descendants before the new
+    payload resolves.
 - `Sources/SwiftTUIViews/Foundation/AnyView.swift`
   - Replace closure-only forwarding with wrapper + payload resolution.
 - `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift`
   - Keep `scopedAnyView(...)` aligned with the new storage model.
-- `Sources/SwiftTUI/SwiftTUI.swift`
-  - Add package-only testing access to the renderer's retained view graph
-    checkpoint or snapshot if the red tests need assertions beyond
-    `resolvedTree` and `commitPlan`.
 - `Tests/SwiftTUIViewsTests/ViewResolutionTests.swift`
   - Update shape-sensitive expectations for the new `AnyView` wrapper/payload
     graph.
+- `Tests/SwiftTUIViewsTests/TextFigureResolutionTests.swift`
+  - Inspect the concrete payload content through the `AnyView` wrapper.
+- `Tests/SwiftTUITests/PanelTests.swift`
+  - Inspect the concrete payload content through the `AnyView` wrapper.
 - `Tests/SwiftTUITests/RegistrationAliasFindingsTests.swift`
   - Keep alias assertions current and preserve the intent of the AnyView cases.
 - `docs/PUBLIC_SURFACE_POLICY.md`
@@ -442,6 +443,13 @@ more precise graph/lifecycle assertion before changing production code.
   - payload type discriminator: `storage.typeID.typeDiscriminator`
   - payload child: concrete content resolved through `resolveView(...)`
 
+- [x] Prune stale payload children before resolving a changed payload.
+
+  `AnyView` prepares the wrapper's structural child diff with a payload shell
+  before it resolves the concrete content. This keeps authored explicit IDs
+  externally stable while still letting changed erased static payload types tear
+  down incompatible descendants through `ViewGraph` removal.
+
 - [x] Preserve specialized package initializers:
 
   - `package init<V: View & ResolvableView>(resolving view: V)`
@@ -564,31 +572,31 @@ ownership, state slots, lifecycle events, actions, and focus.
 
 ### Stage 7: Full Validation
 
-- [ ] Format Swift changes:
+- [x] Format Swift changes:
 
   ```bash
   swift format format -i --configuration .swift-format.json Sources/ Tests/
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   swiftly run swift build
   ```
 
-- [ ] Run the root Swift test suite:
+- [x] Run the root Swift test suite:
 
   ```bash
   swiftly run swift test
   ```
 
-- [ ] Run the authoritative repo gate:
+- [x] Run the authoritative repo gate:
 
   ```bash
   bun run test
   ```
 
-- [ ] Inspect the final diff:
+- [x] Inspect the final diff:
 
   ```bash
   git diff --check
@@ -621,8 +629,10 @@ stateful descendants under that payload.
 
 Explicit `.id(...)` inside the erased payload should continue to work within the
 payload subtree. It must not bridge incompatible erased static payload types.
-The payload type component sits above any inner explicit ID, so type changes
-replace the subtree first.
+Authored explicit identities remain the external identities for focus and
+action lookup, so `AnyView` prepares the parent wrapper's structural child diff
+before resolving a changed payload. That removes stale payload-owned graph nodes
+before any same explicit ID in the new payload can be resolved.
 
 ### ForEach
 
@@ -660,8 +670,8 @@ The main risks are:
   non-trivial aliases. Mitigation: keep the AnyView alias tests focused and
   investigate any count increase before accepting it.
 - **Over-preserving state:** explicit IDs inside different erased static types
-  could keep incompatible state alive if the payload type component is placed
-  too low. Mitigation: explicit-ID type-swap test.
+  could keep incompatible state alive if the old payload subtree is not pruned
+  before resolving the new payload. Mitigation: explicit-ID type-swap test.
 - **Under-preserving state:** if the payload type ID is unstable across renders,
   same-type `AnyView` will reset state. Mitigation: `ErasedViewTypeIDTests` and
   same-type state test.

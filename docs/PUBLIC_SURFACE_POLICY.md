@@ -144,9 +144,10 @@ but it is not the default authoring model for this package.
 - `AnyView` is type-aware in the retained graph: the same erased static payload
   type preserves the payload subtree, while a changed erased static payload type
   replaces that subtree through normal `ViewGraph` structural removal.
-- Explicit `.id(...)` values inside an `AnyView` payload are scoped under the
-  payload content identity, so local explicit IDs remain useful but cannot keep
-  incompatible state alive across erased static type swaps.
+- Explicit `.id(...)` values inside an `AnyView` payload remain authored
+  identities for focus, actions, and user-directed lookup. When the erased
+  static payload type changes, `ViewGraph` prunes the old payload subtree before
+  resolving new content so an explicit ID cannot keep incompatible state alive.
 - Do not add public APIs that expose `[AnyView]`, builder closures returning `AnyView`, or direct node-erasure construction seams.
 - Internal `AnyView` storage is acceptable only for heterogeneous child storage, deferred authored-content capture, or local branch unification when concrete view types genuinely diverge.
 - If authored content is stored for later evaluation, capture it with `scopedAnyView(...)`, not plain `AnyView(...)`, so dynamic-property scope and identity-bound state continue to behave correctly.

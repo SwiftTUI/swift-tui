@@ -7,11 +7,12 @@ import Testing
 @Suite
 struct TextFigureResolutionTests {
   @Test("TextFigure resolves as a single leaf node")
-  func textFigureResolvesAsSingleLeafNode() {
-    let resolved = Resolver().resolve(
+  func textFigureResolvesAsSingleLeafNode() throws {
+    let wrapper = Resolver().resolve(
       AnyView(TextFigure("Hi")),
       in: .init(identity: testIdentity("Root"))
     )
+    let resolved = try #require(wrapper.anyViewPayloadContent)
 
     #expect(resolved.kind == .view("TextFigure"))
     #expect(resolved.children.isEmpty)
@@ -33,5 +34,18 @@ struct TextFigureResolutionTests {
     #expect(fontNames.contains("standard"))
     #expect(fontNames.contains("slant"))
     #expect(fontNames.contains("ansi-shadow"))
+  }
+}
+
+extension ResolvedNode {
+  fileprivate var anyViewPayloadContent: ResolvedNode? {
+    guard kind == .view("AnyView"),
+      children.count == 1,
+      children[0].kind == .view("AnyViewPayload"),
+      children[0].children.count == 1
+    else {
+      return nil
+    }
+    return children[0].children[0]
   }
 }

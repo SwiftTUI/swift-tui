@@ -137,10 +137,11 @@ content: action follow-up invalidation remains pointed at the owner
 that authored the action, while the concrete payload participates in
 the retained graph at its payload identity.
 
-Explicit `.id(...)` values inside an `AnyView` payload are scoped
-under the payload content identity. This keeps explicit IDs useful for
-local row/control continuity, but prevents an explicit ID from keeping
-incompatible state alive after the erased static payload type changes.
+Explicit `.id(...)` values inside an `AnyView` payload remain authored
+identities for focus, actions, and user-directed lookup. To keep those
+external identities stable without preserving incompatible state, the
+resolver asks `ViewGraph` to prune the old payload subtree before it
+resolves content for a changed erased static payload type.
 
 This refinement does **not** make `AnyView` the preferred storage type.
 Typed builders and generic `Content: View` storage remain the default;

@@ -45,6 +45,17 @@ public struct AnyView: View, ResolvableView {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let payloadContext = context.child(component: storage.typeID.identityComponent)
+    let payloadShell = ResolvedNode(
+      identity: payloadContext.identity,
+      kind: .view("AnyViewPayload"),
+      typeDiscriminator: storage.typeID.typeDiscriminator,
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction
+    )
+    context.viewGraph?.prepareStructuralChildren(
+      for: context.identity,
+      children: [payloadShell]
+    )
     let payload = ResolvedNode(
       identity: payloadContext.identity,
       kind: .view("AnyViewPayload"),
@@ -104,8 +115,7 @@ private struct AnyViewPayload: View, ResolvableView {
   }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var contentContext = context.child(component: .named("Content"))
-    contentContext.explicitIdentityNamespace = contentContext.identity
+    let contentContext = context.child(component: .named("Content"))
     return [
       storage.resolve(contentContext)
     ]

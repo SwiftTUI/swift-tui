@@ -547,6 +547,22 @@ package final class ViewGraph {
     )
   }
 
+  package func prepareStructuralChildren(
+    for identity: Identity,
+    children: [ResolvedNode]
+  ) {
+    guard let node = nodesByIdentity[identity] else {
+      return
+    }
+
+    var resolved = node.snapshot()
+    resolved.children = children
+    applyStructuralChildDiff(
+      for: node,
+      resolved: resolved
+    )
+  }
+
   private func resolvedPreservingLayoutDependentChildren(
     _ resolved: ResolvedNode,
     for node: ViewNode

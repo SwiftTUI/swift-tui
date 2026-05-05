@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -231,8 +231,22 @@ private func extractFocusRegionsForTest<V: View>(_ view: V) -> [FocusRegion] {
 @MainActor
 private func resolveForTest<V: View>(_ view: V) -> ResolvedNode {
   let resolver = Resolver()
-  return resolver.resolve(
+  let resolved = resolver.resolve(
     AnyView(view),
     in: ResolveContext(identity: testIdentity("panel-test-root"))
   )
+  return resolved.anyViewPayloadContent ?? resolved
+}
+
+extension ResolvedNode {
+  fileprivate var anyViewPayloadContent: ResolvedNode? {
+    guard kind == .view("AnyView"),
+      children.count == 1,
+      children[0].kind == .view("AnyViewPayload"),
+      children[0].children.count == 1
+    else {
+      return nil
+    }
+    return children[0].children[0]
+  }
 }
