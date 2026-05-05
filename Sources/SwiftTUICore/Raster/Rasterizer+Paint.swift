@@ -479,6 +479,37 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip
         )
+      case .foreignSurface(let bounds, let payload):
+        guard bounds.size.width > 0, bounds.size.height > 0 else {
+          continue
+        }
+
+        let grid = payload.grid
+        let effectiveClip = frame.clip ?? bounds
+        for row in 0..<min(grid.size.height, bounds.size.height) {
+          let y = bounds.origin.y + row
+          if y < effectiveClip.origin.y || y >= effectiveClip.origin.y + effectiveClip.size.height {
+            continue
+          }
+          guard row < grid.cells.count else {
+            break
+          }
+          let sourceRow = grid.cells[row]
+          for col in 0..<min(grid.size.width, bounds.size.width) {
+            let x = bounds.origin.x + col
+            if x < effectiveClip.origin.x || x >= effectiveClip.origin.x + effectiveClip.size.width
+            {
+              continue
+            }
+            guard col < sourceRow.count else {
+              break
+            }
+            guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
+              continue
+            }
+            cells[y][x] = sourceRow[col]
+          }
+        }
       }
     }
   }
