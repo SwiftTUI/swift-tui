@@ -538,16 +538,17 @@ correction (2026-05-04)" to find them in place.
    if we need to break later, we can.
 
 5. **Where does the "show cursor at focused anchor" gate live?
-   Always-on, or behind reduce-motion / accessible-mode?** Still
-   open. Lean: always-on. Showing the cursor at the focused widget
-   is good UX for sighted users too; it's only the "hide cursor
-   entirely" default that's wrong for screen readers. Decide at
-   Phase 2 implementation time.
+   Always-on, or behind reduce-motion / accessible-mode?** Resolved by
+   [ADR-0013](../decisions/0013-accessibility-runtime-policy.md):
+   terminal TUI output shows and moves the cursor whenever a focused
+   accessibility node exists. JSON and web output do not use terminal
+   cursor policy.
 
 6. **Should `CI=true` enable accessible mode or just reduce-motion?**
-   Still open. Lean: reduce-motion only. CI users want clean output,
-   not sequential prompts. Decide at Phase 1 / Phase 4 implementation
-   time.
+   Resolved by
+   [ADR-0013](../decisions/0013-accessibility-runtime-policy.md):
+   CI implies reduced motion and no progress by default, but not
+   accessible output.
 
 The two foundational questions (rename + node shape) are now
 ADR-locked and implemented in the shared substrate; the wire-format
@@ -573,3 +574,8 @@ path for the substrate.
   record of what was found before implementation; current source now
   has `AccessibilityRole`, authoring metadata/modifiers, and
   `SemanticSnapshot.accessibilityNodes`.
+- 2026-05-05: Runtime policy questions for CLI follow-up work resolved
+  in [ADR-0013](../decisions/0013-accessibility-runtime-policy.md):
+  output precedence, accessible-mode implications, cursor-as-focus gate,
+  reduce-motion/no-progress semantics, linear renderer format, and CLI
+  live-region destination.

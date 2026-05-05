@@ -726,6 +726,14 @@ and thinner in one place**. Specifically:
   The embedded web host, WASM web target, and SwiftUI host bridge also
   do not yet consume the new snapshot records.
 
+  **Runtime policy note (2026-05-05):**
+  [`ADR-0013`](../decisions/0013-accessibility-runtime-policy.md)
+  now resolves the CLI policy before implementation: JSON beats
+  accessible within the same precedence layer, accessible mode implies
+  ASCII/reduced-motion/no-progress/linear output, cursor-as-focus is
+  enabled for terminal TUI output when focus exists, and CLI live
+  regions announce only in accessible linear output in v1.
+
 - **The `WebSurfaceFrameEncoder` wire format is raster-level, not
   semantic.**
   [`WebSurfaceTransport.swift:664-961`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)
@@ -1624,8 +1632,9 @@ WebSocket transport landed).)
    `--no-color`, `--force-color`, `--ascii`, and `--plain` reach
    `TerminalHost` rendering. Remaining Phase 1 work is behavior-side:
    grow the glyph fallback coverage where built-ins still use Unicode
-   directly and decide whether `--accessible` should imply ASCII and
-   reduce-motion.
+   directly. ADR-0013 decides that `--accessible` and
+   `SWIFTTUI_ACCESSIBLE=1` imply ASCII, reduced motion, no progress,
+   and linear output.
 
 2. **Phase 2 — Cursor-as-focus.** **(Same effort as drafted.)** The
    mechanism (`moveCursor`, `hideCursor`, `showCursor`) and the data
@@ -1633,8 +1642,10 @@ WebSocket transport landed).)
    already exist; the new work is the policy: after each commit,
    look up the focused widget and call `moveCursor` to its anchor.
    ADR-0012 puts `cursorAnchor` on `AccessibilityNode`; the remaining
-   open question is the behavior gate (always-on vs accessible-mode)
-   and the exact public modifier argument type.
+   behavior gate is now resolved by ADR-0013: terminal TUI output
+   shows and moves the cursor when a focused accessibility node
+   exists. The public modifier argument type remains deferred; v1 uses
+   built-in package-only anchors plus node-origin fallback.
 
 3. **Phase 3a — Accessibility authoring modifiers.** **(Substrate
    landed, cursor-anchor modifier deferred.)** Added
@@ -1658,13 +1669,17 @@ WebSocket transport landed).)
 5. **Phase 4 — Reduce-motion + accessible mode.** † Spinner rewrite,
    accessible-mode linear render, append-only status,
    `SWIFTTUI_ACCESSIBLE=1`. Cross-cuts with `ARGUMENT_PARSING.md` for
-   the `--accessible` / `--reduce-motion` flag surface.
+   the `--accessible` / `--reduce-motion` flag surface. ADR-0013 pins
+   the output precedence, reduced-motion behavior, no-progress
+   behavior, and the accessible linear renderer format.
 
 6. **Phase 5 — Live regions + announcer.** `accessibilityLiveRegion`
    modifier (Phase 3a wires the field; Phase 5 wires the runtime).
-   `AccessibilityAnnouncer.announce(_:)` API. CLI side appends to a
-   status region; web/SwiftUI sides forward to their respective
-   live-region machinery in later phases.
+   `AccessibilityAnnouncer.announce(_:)` API. ADR-0013 scopes CLI v1
+   announcements to accessible linear output only; normal TUI mode
+   does not write live-region text to stderr or another side channel.
+   Web/SwiftUI sides forward to their respective live-region machinery
+   in later phases.
 
 7. **Phase 6 — Embedded-host ARIA mapping.** ‡ **(Bigger than first
    drafted.)** Three sub-steps:
