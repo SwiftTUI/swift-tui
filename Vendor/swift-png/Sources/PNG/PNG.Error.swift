@@ -32,6 +32,8 @@ extension PNG {
     /// The zlib stream's Adler-32 checksum did not match the inflated
     /// data.
     case invalidAdler32
+    /// The image or DEFLATE stream exceeded the decoder's safety limits.
+    case resourceLimitExceeded(reason: String)
 
     public var description: String {
       switch self {
@@ -60,6 +62,8 @@ extension PNG {
         return "PNG: invalid DEFLATE stream: \(reason)"
       case .invalidAdler32:
         return "PNG: zlib Adler-32 checksum mismatch"
+      case .resourceLimitExceeded(let reason):
+        return "PNG: resource limit exceeded: \(reason)"
       }
     }
   }
