@@ -11,10 +11,11 @@
 ///   ``StrokeStyle/Placement/inset``), and which `BorderSet` to use.
 ///
 /// The framework's canonical default (``StrokeStyle/init(lineWidth:borderSet:placement:)``
-/// with no arguments) selects ``outerHalfBlock``. Callers who want
-/// the legacy single-line look pass ``single`` explicitly. There is
-/// *no* implicit transformation between `BorderSet`s — what you ask
-/// for is what you get drawn.
+/// with no arguments) selects ``rounded``. Callers who want the legacy
+/// single-line look pass ``single`` explicitly, and callers who want
+/// half-block chrome pass ``outerHalfBlock`` explicitly. There is *no*
+/// implicit transformation between `BorderSet`s — what you ask for is
+/// what you get drawn.
 public struct BorderSet: Equatable, Sendable {
   public var top: String
   public var bottom: String

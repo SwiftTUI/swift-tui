@@ -508,12 +508,13 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
 ///   cells of the content frame).
 ///
 /// The default (``init(lineWidth:borderSet:placement:)`` with no
-/// arguments) produces ``BorderSet/outerHalfBlock`` glyphs in
-/// `.outset` placement. Use this for the framework-canonical look.
+/// arguments) produces ``BorderSet/rounded`` glyphs in `.outset`
+/// placement. Use this for the framework-canonical look.
 ///
 /// For a single-line look matching pre-2026-04 framework defaults,
-/// pass `borderSet: .single` explicitly. For curved corners on a
-/// radiused rectangle, pass `borderSet: .rounded` — there is no
+/// pass `borderSet: .single` explicitly. For the half-block look
+/// matching the previous framework default, pass
+/// `borderSet: .outerHalfBlock` — there is no
 /// implicit upgrade; what you ask for is what you get drawn.
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
@@ -527,7 +528,7 @@ public struct StrokeStyle: Equatable, Sendable {
 
   public init(
     lineWidth: Int = 1,
-    borderSet: BorderSet = .outerHalfBlock,
+    borderSet: BorderSet = .rounded,
     placement: Placement = .outset
   ) {
     self.lineWidth = max(1, lineWidth)
