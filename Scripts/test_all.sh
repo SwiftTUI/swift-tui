@@ -149,11 +149,13 @@ Runs the full checked-in repo verification surface:
   - public-API baseline freshness check
   - root SwiftPM tests
   - Platforms/CLI tests
+  - Platforms/Embedding tests
   - Platforms/WASI tests
   - Platforms/SwiftUI tests
   - Platforms/Web Bun tests
   - Examples/gallery tests
   - Examples/layouts tests
+  - Examples/file-previewer tests
   - Tools/TermUIPerf tests
   - Examples/WebExample Bun tests
   - Examples/WebExample browser integration test
@@ -525,6 +527,11 @@ run_function_step \
   run_swift test --package-path Platforms/CLI
 
 run_function_step \
+  "Run Platforms/Embedding tests" \
+  "$(swift_command_text test --package-path Platforms/Embedding)" \
+  run_swift test --package-path Platforms/Embedding
+
+run_function_step \
   "Run Platforms/WASI tests" \
   "$(swift_command_text test --package-path Platforms/WASI)" \
   run_swift test --package-path Platforms/WASI
@@ -555,6 +562,11 @@ run_function_step \
   "Run Examples/layouts tests" \
   "$(swift_command_text test --package-path Examples/layouts)" \
   run_swift test --package-path Examples/layouts
+
+run_function_step \
+  "Run Examples/file-previewer tests" \
+  "$(swift_command_text test --package-path Examples/file-previewer)" \
+  run_swift test --package-path Examples/file-previewer
 
 run_function_step \
   "Run Tools/TermUIPerf tests" \

@@ -53,6 +53,11 @@ Confirmed deviations today:
 
 - **Tree-forward collection presentation.** Hierarchical list and outline presentation is more central in TUI software than it is in common SwiftUI app design. SwiftTUI supports tree-style collection display as a first-class authoring pattern while still staying close to SwiftUI’s `OutlineGroup` and `children` vocabulary.
 - **Repo-owned `@Bindable`.** The package ships its own bindable wrapper to keep observable editing on the same invalidation path as `@State` and the rest of the runtime.
+- **Terminal-program embedding as authored content.** SwiftUI has no direct
+  equivalent for hosting a running terminal program inside a `View`, but the
+  terminal workspace model needs that verb. SwiftTUI supports it through the
+  peer `Platforms/Embedding` package and `TerminalView`; the design is captured
+  in [proposals/TERMINAL_EMBEDDING.md](proposals/TERMINAL_EMBEDDING.md).
 - **Terminal-native reinterpretation of defaults.** Automatic chrome, app shell
   composition, and navigation-oriented surfaces may intentionally diverge from
   desktop SwiftUI precedent when modern terminal UX has a clearly better answer.
