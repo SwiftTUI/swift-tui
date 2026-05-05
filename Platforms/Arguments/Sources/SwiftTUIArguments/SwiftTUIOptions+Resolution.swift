@@ -25,27 +25,28 @@ extension SwiftTUIOptions {
     var noProgress = baseline.noProgress
     var linear = baseline.linear
 
-    // --plain is resolved first so explicit per-flag settings can override its implications.
-    if plain {
-      color = .never
-      glyphs = .ascii
-      motion = .reduced
-    }
+    // --plain expands to --no-color --ascii --reduce-motion. The "effective"
+    // values are the union of the explicit flag and --plain's implication, so
+    // a per-flag override (e.g. --force-color in combination with --plain)
+    // still produces the documented result via the precedence rules below.
+    let effectiveNoColor = noColor || plain
+    let effectiveAscii = ascii || plain
+    let effectiveReduceMotion = reduceMotion || plain
 
-    // Color: --no-color > --force-color, both override baseline.
-    if noColor {
+    // Color: --no-color (or --plain) > --force-color, both override baseline.
+    if effectiveNoColor {
       color = .never
     } else if forceColor {
       color = .always
     }
 
-    // Glyphs: --ascii overrides baseline.
-    if ascii {
+    // Glyphs: --ascii (or --plain) overrides baseline.
+    if effectiveAscii {
       glyphs = .ascii
     }
 
-    // Motion: --reduce-motion overrides baseline.
-    if reduceMotion {
+    // Motion: --reduce-motion (or --plain) overrides baseline.
+    if effectiveReduceMotion {
       motion = .reduced
     }
 
