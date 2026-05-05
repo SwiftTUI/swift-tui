@@ -3,11 +3,14 @@ adr: "0005"
 title: "AnyView and AnyScene as escape hatches, not defaults"
 status: accepted
 date: 2026-04-29
+refined: 2026-05-04
 sources:
   - docs/PUBLIC_SURFACE_POLICY.md
   - docs/PUBLIC_API_INVENTORY.md
   - AGENTS.md
   - docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md
+  - docs/proposals/TERMINAL_EMBEDDING.md
+  - docs/plans/2026-05-04-001-terminal-embedding-plan.md
 ---
 
 # ADR-0005: AnyView and AnyScene as escape hatches, not defaults
@@ -101,3 +104,35 @@ remaining-work tracker.
 The bet: authored apps that lean on typed builders write less code
 that silently disables runtime correctness, and SwiftTUI's
 incremental-rendering invariants stay intact across ordinary edits.
+
+## What this ADR does not decide (refined 2026-05-04)
+
+Two related questions are deliberately *out of scope* here, surfaced by
+the terminal-embedding planning discussion:
+
+1. **Identity-preserving erasure as a mechanism.** The framework
+   provides none today. `AnyView` is structurally erasing — identity
+   does not flow through it, lifecycle metadata bound below is at
+   risk, and the resolve phase treats it as a leaf. This is a missing
+   capability, not a deliberate stance. It has not bitten hard enough
+   yet to motivate the substrate work.
+
+2. **Whether this ADR holds if that capability is added.** It does.
+   `AnyView` would remain a smell signal regardless: typed views stay
+   preferred for compile-time clarity, refactor safety, and
+   legibility — concerns inherited from SwiftUI culture and
+   independent of the runtime's identity story. But future
+   load-bearing surfaces — particularly an in-process plugin system
+   wanting third-party `View`s to participate in the host's lifecycle
+   — would need identity-preserving erasure. That work should propose
+   a *separate* mechanism distinct from `AnyView` (e.g.
+   `IdentityPreservingErasure<Subtree>`). As a side effect, the
+   substrate would let `AnyView` lose its identity-loss bug class
+   without changing its public role.
+
+The pseudo-symmetry: the substrate work an ambitious plugin system
+needs is structurally the same work that would make `AnyView`
+non-broken. See
+[plans/2026-05-04-001-terminal-embedding-plan.md](../plans/2026-05-04-001-terminal-embedding-plan.md)
+"Future Stages (Speculative)" for the long-form discussion and the
+conditions under which the substrate becomes worth scheduling.
