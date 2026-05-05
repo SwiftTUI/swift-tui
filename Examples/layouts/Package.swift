@@ -21,6 +21,7 @@ let package = Package(
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
     .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
+    .package(name: "SwiftTUIArguments", path: "../../Platforms/Arguments"),
   ],
   targets: [
     .executableTarget(
@@ -29,6 +30,7 @@ let package = Package(
         "Layouts",
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
+        .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
       ]
     ),
     .target(

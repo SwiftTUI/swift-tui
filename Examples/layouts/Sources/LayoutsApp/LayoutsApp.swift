@@ -1,9 +1,14 @@
 import Layouts
 import SwiftTUI
 import SwiftTUICLI
+import SwiftTUIArguments
 
 @main
-struct LayoutsApp: App {
+@MainActor
+struct LayoutsApp: @preconcurrency SwiftTUIApp {
+  @OptionGroup(title: "SwiftTUI Options")
+  var swiftTUIOptions: SwiftTUIOptions
+
   var body: some Scene {
     WindowGroup {
       LayoutsRoot()
