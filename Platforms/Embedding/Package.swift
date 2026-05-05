@@ -31,6 +31,9 @@ let package = Package(
   targets: [
     .target(
       name: "SwiftTUIPTYPrimitives",
+      dependencies: [
+        .product(name: "SwiftTUI", package: "swift-tui")
+      ],
       swiftSettings: swiftSettings()
     ),
     .target(
@@ -45,6 +48,14 @@ let package = Package(
     .testTarget(
       name: "SwiftTUITerminalTests",
       dependencies: ["SwiftTUITerminal"],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUIPTYPrimitivesTests",
+      dependencies: [
+        "SwiftTUIPTYPrimitives",
+        .product(name: "SwiftTUI", package: "swift-tui"),
+      ],
       swiftSettings: swiftSettings()
     ),
   ],
