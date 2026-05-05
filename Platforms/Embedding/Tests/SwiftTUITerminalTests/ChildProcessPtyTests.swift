@@ -10,7 +10,7 @@ import Testing
   import Glibc
 #endif
 
-@Suite("ChildProcessPty")
+@Suite("ChildProcessPty", .serialized)
 struct ChildProcessPtyTests {
   @Test("spawn /bin/echo and read its output through the shared pair")
   func spawnEcho() async throws {
