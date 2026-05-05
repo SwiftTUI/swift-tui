@@ -27,6 +27,7 @@ let package = Package(
     .package(name: "swift-tui", path: "../.."),
     .package(path: "../Embedding"),
     .package(path: "../../Vendor/UnixSignals"),
+    .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
   ],
   targets: [
     .target(
@@ -35,6 +36,7 @@ let package = Package(
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTUIPTYPrimitives", package: "Embedding"),
         .product(name: "UnixSignals", package: "UnixSignals"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       swiftSettings: swiftSettings()
     ),
