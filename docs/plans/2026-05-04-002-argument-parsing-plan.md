@@ -1766,12 +1766,10 @@ public struct CompletionsCommand: ParsableCommand {
 }
 ```
 
-> **Note for engineers:** Wiring the actual completion-script emission requires
-> reaching the *root* command, which the subcommand doesn't see. The clean
-> approach is for `SwiftTUIApp.main()` to detect `completions print <shell>`
-> in argv before dispatch and invoke `Self._generateCompletionScript(...)`.
-> That's a few extra lines in `SwiftTUIApp.main()`; it's deferred to a follow-up
-> if the integration test below passes against the basic surface.
+> **2026-05-05 update:** Actual completion-script emission is now wired in
+> `SwiftTUIApp.main()`. The root command detects `completions print <shell>`
+> after parsing and writes `Self.completionScript(for:)` to stdout, so generated
+> scripts include both app-defined options and SwiftTUI framework options.
 
 - [ ] **Step 4: Run test to verify it passes**
 

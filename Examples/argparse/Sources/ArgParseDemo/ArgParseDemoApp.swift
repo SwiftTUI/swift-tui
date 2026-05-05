@@ -1,13 +1,14 @@
 import SwiftTUI
-import SwiftTUICLI
 import SwiftTUIArguments
+import SwiftTUICLI
 
 @main
 @MainActor
 struct ArgParseDemoApp: @preconcurrency SwiftTUIApp {
   static let configuration = CommandConfiguration(
     commandName: "argparse-demo",
-    abstract: "Demonstrates consumer flags + SwiftTUI framework flags coexisting."
+    abstract: "Demonstrates consumer flags + SwiftTUI framework flags coexisting.",
+    subcommands: [CompletionsCommand.self]
   )
 
   @OptionGroup(title: "SwiftTUI Options")
