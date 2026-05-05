@@ -40,14 +40,20 @@ let package = Package(
       name: "SwiftTUITerminal",
       dependencies: [
         "SwiftTUIPTYPrimitives",
+        "SwiftTUIPTYCPrimitives",
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTerm", package: "SwiftTerm"),
       ],
       swiftSettings: swiftSettings()
     ),
+    .target(name: "SwiftTUIPTYCPrimitives"),
     .testTarget(
       name: "SwiftTUITerminalTests",
-      dependencies: ["SwiftTUITerminal"],
+      dependencies: [
+        "SwiftTUITerminal",
+        "SwiftTUIPTYPrimitives",
+        .product(name: "SwiftTUI", package: "swift-tui"),
+      ],
       swiftSettings: swiftSettings()
     ),
     .testTarget(
