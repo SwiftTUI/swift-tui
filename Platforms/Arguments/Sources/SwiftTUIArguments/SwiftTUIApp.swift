@@ -23,12 +23,19 @@ public import Foundation
 ///
 /// ```swift
 /// @main
-/// struct MyApp: SwiftTUIApp {
+/// @MainActor
+/// struct MyApp: @preconcurrency SwiftTUIApp {
 ///   @OptionGroup public var swiftTUIOptions: SwiftTUIOptions
 ///   @Option public var widgets: Int = 10
 ///   var body: some Scene { WindowGroup { ContentView() } }
 /// }
 /// ```
+///
+/// The `@MainActor` annotation and `@preconcurrency` conformance are required:
+/// `App` requires a `@MainActor`-isolated `init()`, while `ParsableArguments`
+/// (parent of `AsyncParsableCommand`) requires a nonisolated `init()`.
+/// `@preconcurrency` lets the main-actor `init()` satisfy the nonisolated
+/// requirement. A future macro (`@SwiftTUIMain`) could absorb both modifiers.
 public protocol SwiftTUIApp: App, AsyncParsableCommand {
   /// The framework option group. Conformers MUST declare:
   /// `@OptionGroup public var swiftTUIOptions: SwiftTUIOptions`.
