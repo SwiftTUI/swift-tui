@@ -213,12 +213,15 @@
   // MARK: - Legacy deprecation warning
 
   /// Set after the first legacy-flag invocation in this process so we only
-  /// nag once per run.
+  /// nag once per run. Accesses are wrapped in `unsafe` blocks because the
+  /// `nonisolated(unsafe)` storage opts out of strict-concurrency tracking;
+  /// races would only result in the warning being printed an extra time,
+  /// which is harmless.
   private nonisolated(unsafe) var didEmitLegacyDeprecationWarning = false
 
   private func emitLegacyDeprecationWarningIfNeeded() {
-    guard !didEmitLegacyDeprecationWarning else { return }
-    didEmitLegacyDeprecationWarning = true
+    guard unsafe !didEmitLegacyDeprecationWarning else { return }
+    unsafe didEmitLegacyDeprecationWarning = true
     let message = """
       warning: SwiftTUI runner-internal flags (--instances, --scenes, --attach, \
       --pid, --instance) are deprecated. Use subcommand form instead:
