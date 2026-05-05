@@ -30,6 +30,7 @@ The repository [README.md](../README.md) is the public landing page.
 - [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md) — guardrails for public API additions, `AnyView` / `AnyScene` policy
 - [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md) — fixture, determinism, regression, and test-topology rules
 - [PERFORMANCE_EVALUATION.md](PERFORMANCE_EVALUATION.md) — local CPU-versus-latency scenario runs, artifacts, and comparison workflow
+- [EMBEDDING.md](EMBEDDING.md) — terminal-program embedding through `TerminalView` and `TerminalProcessSession`
 - [FOCUS.md](FOCUS.md) — focus traversal, focused values, default-focus behavior
 - [STATE_KEYING.md](STATE_KEYING.md) — retained-graph state-keying rules and authored-view identity
 

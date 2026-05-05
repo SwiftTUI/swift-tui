@@ -31,6 +31,10 @@ platform integration lives in peer packages: executable runner packages
 packages `Platforms/SwiftUI`, `Platforms/Web`, and `GUI/XtermWebHost`.
 `SwiftTUI` itself is library-only.
 
+Pointer input policy types such as `TerminalMouseInputResolution`,
+`TerminalMouseInputTrustPolicy`, and `TerminalMouseInputCompatibilityMatrix`
+are re-exported from the core pipeline layer.
+
 ## Topics
 
 ### Rendering
@@ -45,9 +49,6 @@ packages `Platforms/SwiftUI`, `Platforms/Web`, and `GUI/XtermWebHost`.
 - ``RunLoopResult``
 - ``RunLoopExitReason``
 - ``SignalReader``
-- ``TerminalMouseInputResolution``
-- ``TerminalMouseInputTrustPolicy``
-- ``TerminalMouseInputCompatibilityMatrix``
 
 ### App And Scene Declarations
 
@@ -64,3 +65,4 @@ packages `Platforms/SwiftUI`, `Platforms/Web`, and `GUI/XtermWebHost`.
 - <doc:Vision>
 - <doc:Host-Integration>
 - <doc:Running-Apps>
+- <doc:TerminalEmbedding>

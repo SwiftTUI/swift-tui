@@ -34,6 +34,8 @@ future file moves.
   - embedded host packages:
     - `Platforms/SwiftUI`
     - `Platforms/Web`
+  - embedded terminal-program package:
+    - `Platforms/Embedding`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
@@ -135,7 +137,8 @@ Sources/SwiftTUI/
 - `SceneInfoRegistry.swift`: scene discovery snapshots for running instances
 - `SocketServer.swift` and `SocketClient.swift`: Unix-domain-socket discovery and attach plumbing
 - `AttachProxy.swift`: terminal attach forwarding
-- `PtyPair.swift`: native pty support
+- `ScenePty.swift`: pty-backed secondary-scene wrapper over
+  `SwiftTUIPTYPrimitives.PTYPair`
 
 ## `Platforms/WASI`
 
@@ -154,6 +157,22 @@ The package ships two library targets:
 
 - `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`
 - `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
+
+## `Platforms/Embedding`
+
+The package ships two public library targets plus one internal C support
+target:
+
+- `SwiftTUIPTYPrimitives` — shared pty creation, fd lifecycle, read/write, and
+  resize support used by `Platforms/CLI` scene attachment and terminal-program
+  embedding.
+- `SwiftTUITerminal` — SwiftTerm-backed emulator wrapper, child-process pty
+  driver, `TerminalSession`, `TerminalProcessSession`, `TerminalView`, and
+  terminal metadata modifiers.
+
+`Platforms/Embedding` is a peer package. Root `SwiftTUI` does not depend on it;
+apps and examples opt in when they need external terminal programs inside an
+authored SwiftTUI view tree.
 
 ## `SwiftTUICore`
 

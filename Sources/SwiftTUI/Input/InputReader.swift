@@ -86,7 +86,7 @@ public struct MouseEvent: Equatable, Sendable {
 
   /// Builds a cell-only fallback event for the cell containing `location`.
   ///
-  /// Callers with fractional input should pass a ``PointerLocation`` directly.
+  /// Callers with fractional input should pass a `PointerLocation` directly.
   public init(
     kind: Kind,
     location: Point,
