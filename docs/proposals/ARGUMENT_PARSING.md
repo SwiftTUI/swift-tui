@@ -1856,6 +1856,18 @@ by theme:
   rather than reimplement parsing. The `SWIFTTUI_*` family,
   `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI` are new and
   remain owned by `SwiftTUIOptions`.
+- 2026-05-05: Phase 6 (partial) landed. `CLIMode.parse` is now backed by an
+  ArgumentParser command tree (`RunnerCLI` with `Instances` / `Scenes` /
+  `Attach` subcommands). Both forms work in bare-mode `App.main()`:
+    - Modern: `myapp instances`, `myapp scenes [--pid N | --instance NAME]`,
+      `myapp attach <scene-id> [--pid N | --instance NAME]`
+    - Legacy: `--instances`, `--scenes`, `--attach`, `--pid`, `--instance`
+      still work but emit a one-shot deprecation warning to stderr.
+  The `CLIMode` enum and `CLIMode.parse(_:)` signature are unchanged.
+  Discoverability via `myapp --help` for `SwiftTUIApp` consumers is NOT
+  in scope here — their parser owns argv first; surfacing the runner
+  subcommands through their `--help` requires deeper integration that
+  remains a follow-up.
 - 2026-05-05: Color/glyphs flag-to-rendering wiring landed.
   `TerminalCapabilityProfile.applying(_ configuration:)` overlays the
   user's `RuntimeConfiguration.color` and `RuntimeConfiguration.glyphs`
