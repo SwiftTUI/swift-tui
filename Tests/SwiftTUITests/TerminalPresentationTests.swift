@@ -261,6 +261,34 @@ struct TerminalPresentationTests {
     #expect(rendered == "\u{001B}[38;2;86;182;194;48;2;17;34;51mHi\u{001B}[0m")
   }
 
+  @Test("renderer sanitizes terminal control characters in unicode mode")
+  func rendererSanitizesControlCharactersInUnicodeMode() {
+    let rendered = TerminalSurfaceRenderer(
+      capabilityProfile: .trueColor
+    ).render(
+      RasterSurface(
+        size: .init(width: 3, height: 1),
+        lines: ["A\u{001B}B"]
+      )
+    )
+
+    #expect(rendered == "A�B")
+  }
+
+  @Test("renderer sanitizes terminal control characters in ascii mode")
+  func rendererSanitizesControlCharactersInASCIIMode() {
+    let rendered = TerminalSurfaceRenderer(
+      capabilityProfile: .ascii
+    ).render(
+      RasterSurface(
+        size: .init(width: 3, height: 1),
+        lines: ["A\u{001B}B"]
+      )
+    )
+
+    #expect(rendered == "A?B")
+  }
+
   @Test("ascii renderer degrades rounded borders and wide glyphs deterministically")
   func asciiRendererDegradesUnicodeDrawing() {
     let rendered = TerminalSurfaceRenderer(
