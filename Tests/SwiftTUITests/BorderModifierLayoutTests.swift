@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 /// Layout-only assertions for the rewritten `.border(...)` view modifier.
@@ -52,16 +52,15 @@ struct BorderModifierLayoutTests {
     #expect(artifacts.rasterSurface.size.height == 1)
   }
 
-  @Test("public .border default uses .outerHalfBlock (decorative placement)")
-  func borderDefaultIsOuterHalfBlock() {
+  @Test("public .border default uses .rounded")
+  func borderDefaultIsRounded() {
     let artifacts = DefaultRenderer().render(
       Text("hi").border(),
       context: .init(identity: testIdentity("BorderDefault"))
     )
 
-    // `.outerHalfBlock` is `.decorative` with 1-cell widths on every
-    // side, so the default grows the frame by 1 on each edge: "hi" is
-    // 2x1, output is 4x3.
+    // `.rounded` uses 1-cell widths on every side, so the default grows
+    // the frame by 1 on each edge: "hi" is 2x1, output is 4x3.
     #expect(artifacts.rasterSurface.size.width == 4)
     #expect(artifacts.rasterSurface.size.height == 3)
   }

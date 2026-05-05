@@ -21,16 +21,16 @@ struct PaddingBorderOrderingBehaviourTests {
   /// Observed raster at 60×12 viewport:
   ///
   /// ```
-  /// [3]| ▛▀▀▀▜|
-  /// [4]| ▌   ▐     ▛▀▜|
-  /// [5]| ▌ A ▐     ▌A▐|
-  /// [6]| ▌   ▐     ▙▄▟|
-  /// [7]| ▙▄▄▄▟|
+  /// [3]| ╭───╮|
+  /// [4]| │   │     ╭─╮|
+  /// [5]| │ A │     │A│|
+  /// [6]| │   │     ╰─╯|
+  /// [7]| ╰───╯|
   /// ```
   ///
   /// On the row containing both `A` glyphs, the left-box border run
-  /// (`▌ A ▐` → 5 non-space cells) is wider than the right-box border
-  /// run (`▌A▐` → 3 non-space cells).
+  /// (`│ A │` → 5 non-space cells) is wider than the right-box border
+  /// run (`│A│` → 3 non-space cells).
   @Test("padding-inside-border yields a wider ring than border-inside-padding")
   func leftBoxIsWiderThanRightBox() {
     let raster = render(PaddingBorderOrdering(), width: 60, height: 12).rasterSurface
@@ -45,21 +45,19 @@ struct PaddingBorderOrderingBehaviourTests {
     guard let line = raster.row(at: aRow) else { return }
     let cells = Array(line)
 
-    // The vertical wall glyphs from `.border(.separator)` are `▌`
-    // (left wall) and `▐` (right wall). Each box contributes one of
-    // each — so the row should hold exactly two left walls and two
-    // right walls. The box-span is `right_wall - left_wall + 1`.
-    let leftWalls = cells.enumerated().compactMap { $0.element == "▌" ? $0.offset : nil }
-    let rightWalls = cells.enumerated().compactMap { $0.element == "▐" ? $0.offset : nil }
+    // The vertical wall glyph from `.border(.separator)` is `│`.
+    // Each box contributes two walls, so the row should hold exactly
+    // four wall columns. The box-span is `right_wall - left_wall + 1`.
+    let walls = cells.enumerated().compactMap { $0.element == "│" ? $0.offset : nil }
 
     #expect(
-      leftWalls.count == 2 && rightWalls.count == 2,
-      "expected exactly 2 left walls and 2 right walls; got leftWalls=\(leftWalls), rightWalls=\(rightWalls)\nrow: '\(line)'"
+      walls.count == 4,
+      "expected exactly 4 border walls; got walls=\(walls)\nrow: '\(line)'"
     )
-    guard leftWalls.count == 2, rightWalls.count == 2 else { return }
+    guard walls.count == 4 else { return }
 
-    let leftBoxSpan = rightWalls[0] - leftWalls[0] + 1
-    let rightBoxSpan = rightWalls[1] - leftWalls[1] + 1
+    let leftBoxSpan = walls[1] - walls[0] + 1
+    let rightBoxSpan = walls[3] - walls[2] + 1
 
     // Padding-inside-border (left) box is WIDER than
     // border-inside-padding (right) box because the padding adds

@@ -9,11 +9,11 @@ import Testing
 /// See `docs/plans/2026-04-26-003-border-stroke-simplification-plan.md`
 /// and `docs/proposals/BORDERS_AND_STROKES.md` for the migration
 /// history that established these defaults.
-@Test("StrokeStyle.init produces outerHalfBlock by default")
-func strokeStyleInitDefaultIsOuterHalfBlock() {
+@Test("StrokeStyle.init produces rounded by default")
+func strokeStyleInitDefaultIsRounded() {
   let style = StrokeStyle()
-  // Canonical default: outerHalfBlock with .outset placement.
-  #expect(style.borderSet == .outerHalfBlock)
+  // Canonical default: rounded with .outset placement.
+  #expect(style.borderSet == .rounded)
 }
 
 @Test("StrokeStyle.init defaults placement to .outset")

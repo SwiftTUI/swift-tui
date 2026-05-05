@@ -152,7 +152,7 @@ extension View {
 
   /// Draws a border around this view.
   ///
-  /// The default chrome is ``BorderSet/outerHalfBlock`` in
+  /// The default chrome is ``BorderSet/rounded`` in
   /// ``StrokeStyle/Placement/outset`` placement — the wrapped view's
   /// frame grows by the border set's per-side display widths so that
   /// content is never occluded.
@@ -161,11 +161,12 @@ extension View {
   /// cells of the content frame instead of reserving extra space; use
   /// this with inset-style border sets like ``BorderSet/innerHalfBlock``.
   ///
-  /// For other glyph palettes (single-line, double-line, heavy, etc.)
-  /// pass an explicit `set:`. See ``BorderSet`` for the full catalog.
+  /// For other glyph palettes (single-line, half-block, double-line,
+  /// heavy, etc.) pass an explicit `set:`. See ``BorderSet`` for the
+  /// full catalog.
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
-    set: BorderSet = .outerHalfBlock,
+    set: BorderSet = .rounded,
     placement: StrokeStyle.Placement = .outset,
     sides: Edge.Set = .all
   ) -> some View {
@@ -183,7 +184,7 @@ extension View {
   /// Draws a border around this view using a per-side foreground style.
   public func border(
     _ style: BorderEdgeStyle,
-    set: BorderSet = .outerHalfBlock,
+    set: BorderSet = .rounded,
     placement: StrokeStyle.Placement = .outset,
     sides: Edge.Set = .all
   ) -> some View {
@@ -210,7 +211,7 @@ extension View {
   /// frame.
   public func border(
     blend: BorderBlend,
-    set: BorderSet = .outerHalfBlock,
+    set: BorderSet = .rounded,
     placement: StrokeStyle.Placement = .outset,
     sides: Edge.Set = .all,
     phase: Double = 0

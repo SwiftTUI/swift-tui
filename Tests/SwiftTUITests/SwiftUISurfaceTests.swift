@@ -1,8 +1,8 @@
 import SwiftTUICharts
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 private struct PaletteRow: Identifiable {
@@ -697,7 +697,8 @@ struct SwiftUISurfaceTests {
         ),
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .taskStart(.init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .userInitiated))
+          operation: .taskStart(
+            .init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .userInitiated))
         ),
       ]
     )
@@ -1266,9 +1267,9 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "▛▀▀▜",
-        "▌  ▐",
-        "▙▄▄▟",
+        "╭──╮",
+        "│  │",
+        "╰──╯",
       ])
     #expect(
       artifacts.rasterSurface.cells[0][0].style
@@ -1297,9 +1298,9 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "▛▀▀▀▜",
-        "▌   ▐",
-        "▙▄▄▄▟",
+        "╭───╮",
+        "│   │",
+        "╰───╯",
       ])
     #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == nil)
     #expect(artifacts.rasterSurface.cells[1][2].style?.backgroundColor != nil)
@@ -1320,9 +1321,9 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "▛▀▀▀▜",
-        "▌   ▐",
-        "▙▄▄▄▟",
+        "╭───╮",
+        "│   │",
+        "╰───╯",
       ])
     #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == nil)
     #expect(artifacts.rasterSurface.cells[1][2].style?.backgroundColor != nil)
@@ -1343,11 +1344,11 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "▛▀▀▀▀▀▜",
-        "▌     ▐",
-        "▌     ▐",
-        "▌     ▐",
-        "▙▄▄▄▄▄▟",
+        "╭─────╮",
+        "│     │",
+        "│     │",
+        "│     │",
+        "╰─────╯",
       ])
     #expect(artifacts.rasterSurface.cells[1][1].style?.backgroundColor == nil)
     #expect(artifacts.rasterSurface.cells[1][5].style?.backgroundColor == nil)
@@ -1368,9 +1369,9 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "▛▀▀▀▜",
-        "▌   ▐",
-        "▙▄▄▄▟",
+        "╭───╮",
+        "│   │",
+        "╰───╯",
       ])
     #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor != nil)
     #expect(artifacts.rasterSurface.cells[1][2].style == nil)
@@ -1386,7 +1387,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("PublicBorderBackground"))
     )
 
-    #expect(artifacts.rasterSurface.lines == ["▛▀▀▀▜", "▌   ▐", "▙▄▄▄▟"])
+    #expect(artifacts.rasterSurface.lines == ["╭───╮", "│   │", "╰───╯"])
     #expect(artifacts.rasterSurface.cells[0][2].style?.backgroundColor == Color.yellow)
     #expect(artifacts.rasterSurface.cells[1][0].style?.backgroundColor == Color.yellow)
     #expect(artifacts.rasterSurface.cells[1][2].style == nil)
@@ -1410,7 +1411,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("DirectionalBorderBackground"))
     )
 
-    #expect(artifacts.rasterSurface.lines == ["▛▀▀▀▜", "▌   ▐", "▌   ▐", "▙▄▄▄▟"])
+    #expect(artifacts.rasterSurface.lines == ["╭───╮", "│   │", "│   │", "╰───╯"])
     #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == Color.yellow)
     #expect(artifacts.rasterSurface.cells[1][0].style?.backgroundColor == Color.red)
     #expect(artifacts.rasterSurface.cells[1][4].style?.backgroundColor == Color.blue)
@@ -2173,8 +2174,8 @@ struct SwiftUISurfaceTests {
     let lines = artifacts.rasterSurface.lines
     #expect(lines.count == 3)
     #expect(lines.allSatisfy { $0.count == 12 || $0.isEmpty })
-    #expect(lines.joined(separator: "\n").contains("▛"))
-    #expect(lines.joined(separator: "\n").contains("▜"))
+    #expect(lines.joined(separator: "\n").contains("╭"))
+    #expect(lines.joined(separator: "\n").contains("╮"))
   }
 
   @Test("DisclosureGroup toggles expansion through the local action path and reveals its content")
@@ -4416,10 +4417,10 @@ struct SwiftUISurfaceTests {
     #expect(
       artifacts.rasterSurface.lines == [
         "Panel",
-        "▛▀▀▀▀▜",
-        "▌One ▐",
-        "▌Two ▐",
-        "▙▄▄▄▄▟",
+        "╭────╮",
+        "│One │",
+        "│Two │",
+        "╰────╯",
       ])
     #expect(artifacts.rasterSurface.cells[1][0].style?.backgroundColor == nil)
   }
@@ -4437,10 +4438,10 @@ struct SwiftUISurfaceTests {
     #expect(
       artifacts.rasterSurface.lines == [
         "Panel",
-        "▛▀▀▀▜",
-        "▌One▐",
-        "▌Two▐",
-        "▙▄▄▄▟",
+        "╭───╮",
+        "│One│",
+        "│Two│",
+        "╰───╯",
       ])
   }
 
@@ -5310,7 +5311,7 @@ struct SwiftUISurfaceTests {
       (StrokeStyle.double, ["╔══╗", "║Hi║", "╚══╝"]),
       (StrokeStyle.ascii, ["+--+", "|Hi|", "+--+"]),
       (StrokeStyle.block, ["████", "█Hi█", "████"]),
-      (StrokeStyle(), ["▛▀▀▜", "▌Hi▐", "▙▄▄▟"]),
+      (StrokeStyle(), ["╭──╮", "│Hi│", "╰──╯"]),
       (StrokeStyle.innerHalfBlock, ["▗▄▄▖", "▐Hi▌", "▝▀▀▘"]),
       (StrokeStyle.hidden, ["    ", " Hi ", "    "]),
       (StrokeStyle.markdown, ["|--|", "|Hi|", "|--|"]),
@@ -5612,9 +5613,9 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.measuredTree.measuredSize == .init(width: 8, height: 3))
     #expect(
       artifacts.rasterSurface.lines == [
-        "▛▀▀▀▀▀▀▜",
-        "▌  BG  ▐",
-        "▙▄▄▄▄▄▄▟",
+        "╭──────╮",
+        "│  BG  │",
+        "╰──────╯",
       ])
   }
 
@@ -5726,9 +5727,9 @@ struct SwiftUISurfaceTests {
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(artifacts.measuredTree.measuredSize == .init(width: 18, height: 8))
     #expect(artifacts.rasterSurface.lines.count > 8)
-    #expect(surface.contains("▛▀▀▀▀▀▀▜"))
-    #expect(surface.contains("▌  BG  ▐"))
-    #expect(surface.contains("▙▄▄▄▄▄▄▟"))
+    #expect(surface.contains("╭──────╮"))
+    #expect(surface.contains("│  BG  │"))
+    #expect(surface.contains("╰──────╯"))
   }
 
   @Test("ViewThatFits chooses the first candidate whose ideal width fits")

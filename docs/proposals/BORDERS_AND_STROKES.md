@@ -22,8 +22,8 @@ intentional widget-specific palettes (out of the
 
 `StrokeStyle()` and `View.border(...)` both default to:
 
-- `borderSet: .outerHalfBlock` — top `▀`, bottom `▄`, sides `▌`/`▐`,
-  corners `▛▜▙▟`. Internally consistent half-block palette.
+- `borderSet: .rounded` — top/bottom `─`, sides `│`, corners
+  `╭╮╰╯`. This is the framework-canonical container chrome.
 - `placement: .outset` — the border lives in a cell on each side of the
   content; the layout engine reserves space for it.
 - `lineWidth: 1` — currently the only supported value.
@@ -31,7 +31,7 @@ intentional widget-specific palettes (out of the
 If you write `Rectangle().stroke(.red)` or `Rectangle().border(.red)`,
 this is what you get.
 
-## Opting into single-line chrome
+## Opting into other chrome
 
 For the legacy `─│┌┐└┘` look, pass `borderSet: .single` explicitly:
 
@@ -40,12 +40,12 @@ Rectangle()
   .stroke(.foreground, style: StrokeStyle(borderSet: .single))
 ```
 
-For curved corners on a `RoundedRectangle`, pass `borderSet: .rounded`
+For the previous half-block chrome, pass `borderSet: .outerHalfBlock`
 explicitly:
 
 ```swift
-RoundedRectangle(cornerRadius: 1)
-  .stroke(.foreground, style: StrokeStyle(borderSet: .rounded))
+Rectangle()
+  .stroke(.foreground, style: StrokeStyle(borderSet: .outerHalfBlock))
 ```
 
 There is **no** implicit transformation — the rasterizer draws exactly
