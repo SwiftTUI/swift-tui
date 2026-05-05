@@ -261,6 +261,13 @@ extension DrawExtractor {
           foregroundStyle: drawMetadata.foregroundStyle ?? .semantic(.foreground)
         )
       )
+    case .foreignSurface(let payload):
+      commands.append(
+        .foreignSurface(
+          bounds: bounds,
+          payload: payload
+        )
+      )
     }
 
     commands.append(
@@ -495,6 +502,8 @@ extension DrawExtractor {
           inheritedBorderMask: inheritedBorderMask
         )
       )
+    case .foreignSurface:
+      return command
     default:
       return command
     }

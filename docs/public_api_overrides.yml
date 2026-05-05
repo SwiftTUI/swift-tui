@@ -39,6 +39,7 @@ classifications:
     - SwiftTUI.RunLoop
     - SwiftTUI.RunLoopExitReason
     - SwiftTUI.RunLoopResult
+    - SwiftTUI.RuntimeConfiguration
     - SwiftTUI.RuntimeRenderMode
     - SwiftTUI.Scene
     - SwiftTUI.SceneBuilder
@@ -80,6 +81,7 @@ classifications:
     - SwiftTUIViews.FocusedValues
     - SwiftTUIViews.FocusInteractions
     - SwiftTUIViews.FocusState
+    - SwiftTUIViews.ForeignSurface
     - SwiftTUIViews.GeometryReader
     - SwiftTUIViews.Group
     - SwiftTUIViews.GroupBox
@@ -460,6 +462,8 @@ classifications:
     - SwiftTUICore.FocusPresentation
     - SwiftTUICore.FocusRegion
     - SwiftTUICore.FocusTracker
+    - SwiftTUICore.ForeignGrid
+    - SwiftTUICore.ForeignSurfacePayload
     - SwiftTUICore.FrameArtifacts
     - SwiftTUICore.FrameContext
     - SwiftTUICore.FrameDiagnostics

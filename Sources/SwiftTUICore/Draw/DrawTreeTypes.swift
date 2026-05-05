@@ -114,7 +114,161 @@ public indirect enum DrawCommand: Equatable, Sendable {
     payload: CanvasPayload,
     foregroundStyle: AnyShapeStyle
   )
+  case foreignSurface(bounds: CellRect, payload: any ForeignSurfacePayload)
   case clip(bounds: CellRect, child: DrawCommand)
+}
+
+extension DrawCommand {
+  public static func == (lhs: DrawCommand, rhs: DrawCommand) -> Bool {
+    switch (lhs, rhs) {
+    case (.group(let lhsBounds, let lhsChildren), .group(let rhsBounds, let rhsChildren)):
+      return lhsBounds == rhsBounds && lhsChildren == rhsChildren
+    case (
+      .text(
+        let lhsBounds,
+        let lhsContent,
+        let lhsStyle,
+        let lhsLineLimit,
+        let lhsTruncationMode,
+        let lhsWrappingStrategy
+      ),
+      .text(
+        let rhsBounds,
+        let rhsContent,
+        let rhsStyle,
+        let rhsLineLimit,
+        let rhsTruncationMode,
+        let rhsWrappingStrategy
+      )
+    ):
+      return lhsBounds == rhsBounds
+        && lhsContent == rhsContent
+        && lhsStyle == rhsStyle
+        && lhsLineLimit == rhsLineLimit
+        && lhsTruncationMode == rhsTruncationMode
+        && lhsWrappingStrategy == rhsWrappingStrategy
+    case (
+      .preformattedText(let lhsBounds, let lhsLines, let lhsStyle),
+      .preformattedText(let rhsBounds, let rhsLines, let rhsStyle)
+    ):
+      return lhsBounds == rhsBounds && lhsLines == rhsLines && lhsStyle == rhsStyle
+    case (
+      .styledPreformattedText(let lhsBounds, let lhsLines, let lhsStyle),
+      .styledPreformattedText(let rhsBounds, let rhsLines, let rhsStyle)
+    ):
+      return lhsBounds == rhsBounds && lhsLines == rhsLines && lhsStyle == rhsStyle
+    case (
+      .richText(
+        let lhsBounds,
+        let lhsPayload,
+        let lhsLineLimit,
+        let lhsTruncationMode,
+        let lhsWrappingStrategy
+      ),
+      .richText(
+        let rhsBounds,
+        let rhsPayload,
+        let rhsLineLimit,
+        let rhsTruncationMode,
+        let rhsWrappingStrategy
+      )
+    ):
+      return lhsBounds == rhsBounds
+        && lhsPayload == rhsPayload
+        && lhsLineLimit == rhsLineLimit
+        && lhsTruncationMode == rhsTruncationMode
+        && lhsWrappingStrategy == rhsWrappingStrategy
+    case (
+      .image(let lhsBounds, let lhsIdentity, let lhsPayload),
+      .image(let rhsBounds, let rhsIdentity, let rhsPayload)
+    ):
+      return lhsBounds == rhsBounds && lhsIdentity == rhsIdentity && lhsPayload == rhsPayload
+    case (
+      .fill(let lhsBounds, let lhsGeometry, let lhsInsetAmount, let lhsStyle, let lhsMode),
+      .fill(let rhsBounds, let rhsGeometry, let rhsInsetAmount, let rhsStyle, let rhsMode)
+    ):
+      return lhsBounds == rhsBounds
+        && lhsGeometry == rhsGeometry
+        && lhsInsetAmount == rhsInsetAmount
+        && lhsStyle == rhsStyle
+        && lhsMode == rhsMode
+    case (
+      .stroke(
+        let lhsBounds,
+        let lhsGeometry,
+        let lhsInsetAmount,
+        let lhsStyle,
+        let lhsStrokeStyle,
+        let lhsStrokeBorder,
+        let lhsBackgroundStyle
+      ),
+      .stroke(
+        let rhsBounds,
+        let rhsGeometry,
+        let rhsInsetAmount,
+        let rhsStyle,
+        let rhsStrokeStyle,
+        let rhsStrokeBorder,
+        let rhsBackgroundStyle
+      )
+    ):
+      return lhsBounds == rhsBounds
+        && lhsGeometry == rhsGeometry
+        && lhsInsetAmount == rhsInsetAmount
+        && lhsStyle == rhsStyle
+        && lhsStrokeStyle == rhsStrokeStyle
+        && lhsStrokeBorder == rhsStrokeBorder
+        && lhsBackgroundStyle == rhsBackgroundStyle
+    case (
+      .rule(let lhsBounds, let lhsStyle, let lhsStrokeStyle, let lhsStackAxis),
+      .rule(let rhsBounds, let rhsStyle, let rhsStrokeStyle, let rhsStackAxis)
+    ):
+      return lhsBounds == rhsBounds
+        && lhsStyle == rhsStyle
+        && lhsStrokeStyle == rhsStrokeStyle
+        && lhsStackAxis == rhsStackAxis
+    case (
+      .border(
+        let lhsBounds,
+        let lhsSet,
+        let lhsForeground,
+        let lhsBackground,
+        let lhsBlend,
+        let lhsBlendPhase,
+        let lhsSides
+      ),
+      .border(
+        let rhsBounds,
+        let rhsSet,
+        let rhsForeground,
+        let rhsBackground,
+        let rhsBlend,
+        let rhsBlendPhase,
+        let rhsSides
+      )
+    ):
+      return lhsBounds == rhsBounds
+        && lhsSet == rhsSet
+        && lhsForeground == rhsForeground
+        && lhsBackground == rhsBackground
+        && lhsBlend == rhsBlend
+        && lhsBlendPhase == rhsBlendPhase
+        && lhsSides == rhsSides
+    case (
+      .canvas(let lhsBounds, let lhsPayload, let lhsForegroundStyle),
+      .canvas(let rhsBounds, let rhsPayload, let rhsForegroundStyle)
+    ):
+      return lhsBounds == rhsBounds
+        && lhsPayload == rhsPayload
+        && lhsForegroundStyle == rhsForegroundStyle
+    case (.foreignSurface(let lhsBounds, _), .foreignSurface(let rhsBounds, _)):
+      return lhsBounds == rhsBounds
+    case (.clip(let lhsBounds, let lhsChild), .clip(let rhsBounds, let rhsChild)):
+      return lhsBounds == rhsBounds && lhsChild == rhsChild
+    default:
+      return false
+    }
+  }
 }
 
 /// A node in the draw tree emitted before rasterization.

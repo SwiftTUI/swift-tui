@@ -1,9 +1,9 @@
 # Terminal Embedding
 
-**Status:** Proposed. No code lands from this document; it is a planning artifact
-that should be reviewed against [VISION.md](../VISION.md),
-[PUBLIC_SURFACE_POLICY.md](../PUBLIC_SURFACE_POLICY.md), and
-[HOST_PACKAGES.md](../HOST_PACKAGES.md) before any implementation.
+**Status:** Implemented for v1 by
+[plans/2026-05-04-001-terminal-embedding-plan.md](../plans/2026-05-04-001-terminal-embedding-plan.md).
+This document remains the design record for the capability and the deferred
+v2 edges.
 
 **Reproposes:** the latent "embed external terminal applications inside a
 SwiftTUI scene" capability that
@@ -605,20 +605,28 @@ Worth saying out loud since the question asks for a rewrite, not a port:
 
 ## Open Questions
 
-- Should `TerminalSession` be `Observable` directly, or expose state
-  through a wrapped `@Observable` projection? The `@Observable` macro
-  imposes class semantics; sessions are naturally actors. A bridge
-  type may be cleaner.
-- Does `DrawCommand.foreignSurface` need a per-cell *blend* (e.g.
-  authored padding/tint applied to a child's output)? v1 says no;
-  an authored frame just renders on top via normal SwiftUI overlay
-  composition.
-- Is `Platforms/Embedding` the right package name, or should it be
-  `Platforms/Terminal` to parallel `Platforms/Web`? The latter risks
-  confusion with `Platforms/CLI` (which *is* the terminal runner).
-  Working name `Platforms/Embedding`; bikeshed before landing.
-- Should `TerminalView` ship in v1 with selection/copy at all, or
-  defer to a `.terminalSelection(...)` modifier? Lean toward defer.
+Decisions made during implementation:
+
+- `TerminalSession` is not `Observable` in v1. It is a class-bound
+  `Sendable` protocol with synchronous `cachedSnapshot`, async control
+  methods, and an `events()` stream. `TerminalProcessSession` owns its
+  mutable state internally, while `TerminalView` invalidates from session
+  events.
+- `DrawCommand.foreignSurface` does not have per-cell blend in v1. The
+  rasterizer blits the foreign grid into the normal cell surface; authored
+  tinting, framing, and overlays remain ordinary SwiftTUI composition around
+  the terminal view.
+- The package name is `Platforms/Embedding`. Its public products are
+  `SwiftTUIPTYPrimitives` and `SwiftTUITerminal`; root `SwiftTUI` remains
+  independent of the peer package.
+- Selection and copy are deferred. v1 does not ship a
+  `.terminalSelection(...)` modifier and does not intercept OSC 52 clipboard
+  writes for embedded children.
+- Render-diff validation is covered by the landed `TerminalView` large-output
+  byte-budget test and latency-injected presentation test, plus the repo's
+  TermUIPerf smoke and layout-scroll-burst comparisons. A dedicated live SSH
+  transport scenario remains future validation work rather than v1 API
+  surface.
 
 ## What This Reproposal Is Not Saying
 

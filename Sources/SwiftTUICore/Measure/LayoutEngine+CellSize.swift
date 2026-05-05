@@ -48,9 +48,9 @@ extension LayoutEngine {
         )
       case .shape:
         return measuredShapeSize(for: proposal)
-      case .canvas:
-        // Canvas fills any proposed size, the same as a raw shape
-        // primitive: the drawing is always resolved to the final cell
+      case .canvas, .foreignSurface:
+        // Canvas and foreign surfaces fill any proposed size, the same
+        // as raw shape primitives: drawing is resolved to the final cell
         // frame at paint time, so there's no intrinsic size.
         return measuredShapeSize(for: proposal)
       case .rule:

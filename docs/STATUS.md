@@ -68,6 +68,14 @@ Current async presentation and frame-tail worker ownership is summarized in
 - `AnimatedImage`, `AnimatedImageSequence`, `AnimatedImageFrame`,
   `AnimatedImagePixel`, and `AnimatedGIF`
 
+### Terminal embedding (peer package)
+
+- `TerminalView<Session>`, `TerminalSession` protocol, and
+  `TerminalProcessSession` for spawned children
+- Mouse mode translation (X10 / 1000 / 1002 / SGR), bracketed paste, OSC 0/2
+  title changes, OSC 7 working-directory changes, and OSC 8 hyperlinks
+- Lives in `Platforms/Embedding`; macOS and Linux only
+
 ## Current Constraints
 
 - The core `SwiftTUI` runtime renders one active scene into one active host per session. Multi-scene apps are supported, but only one scene is on screen at a time per host.
@@ -81,6 +89,11 @@ Current async presentation and frame-tail worker ownership is summarized in
   all common chroma subsamplings). GIF import/export and finite animated image
   playback live in `AnimatedImage`; progressive JPEG and broader media formats
   remain deferred.
+- Sixel and Kitty graphics inside an embedded pane are not supported; only
+  full-screen child graphics work today.
+- Kitty keyboard protocol, OSC 52 clipboard, and OSC 99 notifications are not
+  intercepted for embedded children in v1.
+- `Platforms/Embedding` does not build for iOS or WASI.
 - WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Platforms/WASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
 - Some focus surfaces remain missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`

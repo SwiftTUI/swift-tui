@@ -25,6 +25,7 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
+    .package(path: "../Embedding"),
     .package(path: "../../Vendor/UnixSignals"),
   ],
   targets: [
@@ -32,6 +33,7 @@ let package = Package(
       name: "SwiftTUICLI",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIPTYPrimitives", package: "Embedding"),
         .product(name: "UnixSignals", package: "UnixSignals"),
       ],
       swiftSettings: swiftSettings()
@@ -40,6 +42,7 @@ let package = Package(
       name: "SwiftTUICLITests",
       dependencies: [
         "SwiftTUICLI",
+        .product(name: "SwiftTUIPTYPrimitives", package: "Embedding"),
         .product(name: "SwiftTUI", package: "swift-tui"),
       ],
       swiftSettings: swiftSettings()
