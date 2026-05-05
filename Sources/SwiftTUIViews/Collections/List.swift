@@ -96,7 +96,7 @@ extension Section {
       transactionSnapshot: context.transaction,
       semanticMetadata: .init(
         sectionRole: .section,
-        presentationRole: .section
+        accessibilityRole: .section
       )
     )
   }
@@ -322,7 +322,7 @@ extension List {
         isFocusable: rows.isEmpty ? nil : false,
         focusInteractions: .edit,
         scrollRole: .list,
-        presentationRole: .list
+        accessibilityRole: .list
       ),
       drawPayload: .list(payload)
     )

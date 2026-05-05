@@ -237,7 +237,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
             clipsToBounds: true
           ),
           semanticMetadata: scrollViewMetadata(
-            presentationRole: indicatorVisibility == .visible
+            accessibilityRole: indicatorVisibility == .visible
               ? .scrollViewWithIndicators : .scrollView
           )
         )

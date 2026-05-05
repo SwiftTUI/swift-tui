@@ -88,7 +88,7 @@ extension SecureField {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
-        presentationRole: .textField
+        accessibilityRole: .secureField
       )
     )
   }

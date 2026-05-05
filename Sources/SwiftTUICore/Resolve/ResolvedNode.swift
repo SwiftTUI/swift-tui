@@ -48,7 +48,12 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var allowsHitTesting: Bool
   public var scrollRole: ScrollRole?
   public var sectionRole: SectionRole?
-  public var presentationRole: PresentationRole?
+  public var accessibilityRole: AccessibilityRole?
+  public var accessibilityLabel: String?
+  public var accessibilityHint: String?
+  public var accessibilityHidden: Bool
+  public var accessibilityLiveRegion: AccessibilityPoliteness?
+  package var accessibilityCursorAnchor: CellPoint?
   public var selectionTag: SelectionTag?
   public var tabItemLabel: TabItemLabel?
   public var explicitInteractionRect: CellRect?
@@ -80,7 +85,11 @@ public struct SemanticMetadata: Equatable, Sendable {
     allowsHitTesting: Bool = true,
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
-    presentationRole: PresentationRole? = nil,
+    accessibilityRole: AccessibilityRole? = nil,
+    accessibilityLabel: String? = nil,
+    accessibilityHint: String? = nil,
+    accessibilityHidden: Bool = false,
+    accessibilityLiveRegion: AccessibilityPoliteness? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
     explicitInteractionRect: CellRect? = nil,
@@ -99,7 +108,11 @@ public struct SemanticMetadata: Equatable, Sendable {
       allowsHitTesting: allowsHitTesting,
       scrollRole: scrollRole,
       sectionRole: sectionRole,
-      presentationRole: presentationRole,
+      accessibilityRole: accessibilityRole,
+      accessibilityLabel: accessibilityLabel,
+      accessibilityHint: accessibilityHint,
+      accessibilityHidden: accessibilityHidden,
+      accessibilityLiveRegion: accessibilityLiveRegion,
       selectionTag: selectionTag,
       tabItemLabel: tabItemLabel,
       explicitInteractionRect: explicitInteractionRect,
@@ -120,7 +133,12 @@ public struct SemanticMetadata: Equatable, Sendable {
     allowsHitTesting: Bool = true,
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
-    presentationRole: PresentationRole? = nil,
+    accessibilityRole: AccessibilityRole? = nil,
+    accessibilityLabel: String? = nil,
+    accessibilityHint: String? = nil,
+    accessibilityHidden: Bool = false,
+    accessibilityLiveRegion: AccessibilityPoliteness? = nil,
+    accessibilityCursorAnchor: CellPoint? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
     explicitInteractionRect: CellRect? = nil,
@@ -139,7 +157,12 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.allowsHitTesting = allowsHitTesting
     self.scrollRole = scrollRole
     self.sectionRole = sectionRole
-    self.presentationRole = presentationRole
+    self.accessibilityRole = accessibilityRole
+    self.accessibilityLabel = accessibilityLabel
+    self.accessibilityHint = accessibilityHint
+    self.accessibilityHidden = accessibilityHidden
+    self.accessibilityLiveRegion = accessibilityLiveRegion
+    self.accessibilityCursorAnchor = accessibilityCursorAnchor
     self.selectionTag = selectionTag
     self.tabItemLabel = tabItemLabel
     self.explicitInteractionRect = explicitInteractionRect
@@ -164,7 +187,12 @@ public struct SemanticMetadata: Equatable, Sendable {
       allowsHitTesting: other.allowsHitTesting && allowsHitTesting,
       scrollRole: other.scrollRole ?? scrollRole,
       sectionRole: other.sectionRole ?? sectionRole,
-      presentationRole: other.presentationRole ?? presentationRole,
+      accessibilityRole: other.accessibilityRole ?? accessibilityRole,
+      accessibilityLabel: other.accessibilityLabel ?? accessibilityLabel,
+      accessibilityHint: other.accessibilityHint ?? accessibilityHint,
+      accessibilityHidden: other.accessibilityHidden || accessibilityHidden,
+      accessibilityLiveRegion: other.accessibilityLiveRegion ?? accessibilityLiveRegion,
+      accessibilityCursorAnchor: other.accessibilityCursorAnchor ?? accessibilityCursorAnchor,
       selectionTag: other.selectionTag ?? selectionTag,
       tabItemLabel: other.tabItemLabel ?? tabItemLabel,
       explicitInteractionRect: other.explicitInteractionRect ?? explicitInteractionRect,
@@ -764,4 +792,3 @@ extension ResolvedNode {
       && lhs.supportsRetainedReuse == rhs.supportsRetainedReuse
   }
 }
-

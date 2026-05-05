@@ -164,7 +164,7 @@ extension Button {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
-        presentationRole: .button
+        accessibilityRole: .button
       )
     )
   }

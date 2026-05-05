@@ -393,6 +393,9 @@ classifications:
 
     # ─── SwiftTUICore (pipeline + supporting types) ───────────────────────
     - SwiftTUICore.ActionScope
+    - SwiftTUICore.AccessibilityNode
+    - SwiftTUICore.AccessibilityPoliteness
+    - SwiftTUICore.AccessibilityRole
     - "SwiftTUICore.adapt(_:to:method:)"
     - SwiftTUICore.Alignment
     - SwiftTUICore.AlignmentID
@@ -548,7 +551,6 @@ classifications:
     - SwiftTUICore.PreformattedTextLine
     - SwiftTUICore.PreformattedTextRun
     - SwiftTUICore.PresentationDamageDiagnostics
-    - SwiftTUICore.PresentationRole
     - SwiftTUICore.ProposedDimension
     - SwiftTUICore.ProposedSize
     - SwiftTUICore.RadialGradient

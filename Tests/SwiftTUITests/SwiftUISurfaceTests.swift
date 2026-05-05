@@ -1674,7 +1674,7 @@ struct SwiftUISurfaceTests {
         Text("Scroll")
           .id(testIdentity("scroll"))
           .disabled(true)
-          .semanticMetadata(.init(scrollRole: .scrollView, presentationRole: .scrollView))
+          .semanticMetadata(.init(scrollRole: .scrollView, accessibilityRole: .scrollView))
       },
       context: .init(identity: testIdentity("Semantics"))
     )
@@ -3620,7 +3620,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("HiddenScrollViewport"))
     )
 
-    #expect(visibleArtifacts.resolvedTree.semanticMetadata.presentationRole == nil)
+    #expect(visibleArtifacts.resolvedTree.semanticMetadata.accessibilityRole == nil)
     #expect(visibleArtifacts.semanticSnapshot.scrollRoutes.count == 1)
     #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("▼"))
     #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("▼"))

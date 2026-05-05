@@ -11,6 +11,15 @@ been updated with corrections that point back here.
 
 **Owner:** unassigned. Tracking branch: `accessibility-investigation`.
 
+**Implementation status (2026-05-05):** This remains a historical audit of
+the pre-substrate state. The unambiguous substrate work called out below has
+now landed: `PresentationRole` was renamed to `AccessibilityRole`,
+`SemanticMetadata` gained label/hint/hidden/live-region fields,
+`View` gained the matching authoring modifiers, and `SemanticExtractor`
+emits `SemanticSnapshot.accessibilityNodes`. Target behavior remains open:
+cursor-as-focus policy, linear accessible rendering, live announcements,
+embedded-host / WASM ARIA, and SwiftUI host bridging.
+
 ---
 
 ## Why this exists
@@ -508,9 +517,10 @@ correction (2026-05-04)" to find them in place.
 2. ~~**Should `SemanticMetadata.cursorAnchor` be added?**~~ **Resolved
    by [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
    yes; the field lives on `AccessibilityNode` in absolute surface
-   coordinates. Built-in TextField populates it; nil means "use
-   the node's origin"; the `accessibilityCursorAnchor(_:)` modifier
-   is the escape hatch.
+   coordinates. Nil means "use the node's origin"; built-in
+   caret-anchor population and the public
+   `accessibilityCursorAnchor(_:)` modifier shape remain follow-up
+   work under the cursor-as-focus plan.
 
 3. ~~**Flat list with parent identity, or recursive tree?**~~
    **Resolved by [ADR-0012](../decisions/0012-accessibility-node-shape.md)**
@@ -540,8 +550,9 @@ correction (2026-05-04)" to find them in place.
    time.
 
 The two foundational questions (rename + node shape) are now
-ADR-locked; the wire-format and runtime-policy questions remain
-open but are not on the critical path.
+ADR-locked and implemented in the shared substrate; the wire-format
+and runtime-policy questions remain open but are not on the critical
+path for the substrate.
 
 ---
 
@@ -557,3 +568,8 @@ open but are not on the critical path.
   [ADR-0012](../decisions/0012-accessibility-node-shape.md).
   Open-questions section updated to mark them resolved with
   cross-references.
+- 2026-05-05: Added implementation-status note after the shared
+  accessibility substrate landed. The audit remains the historical
+  record of what was found before implementation; current source now
+  has `AccessibilityRole`, authoring metadata/modifiers, and
+  `SemanticSnapshot.accessibilityNodes`.

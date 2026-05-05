@@ -257,7 +257,7 @@ extension Stepper {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
-        presentationRole: .stepper
+        accessibilityRole: .stepper
       )
     )
   }
@@ -557,7 +557,7 @@ extension Slider {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
-        presentationRole: .slider
+        accessibilityRole: .slider
       )
     )
   }

@@ -1,7 +1,7 @@
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 extension ResolvedNode {
@@ -157,8 +157,8 @@ struct TabViewSurfaceTests {
     #expect(surface.contains("Home · 3"))
     #expect(surface.contains("Settings"))
     #expect(homeNode.semanticMetadata.tabItemLabel == TabItemLabel("Home", detail: "3"))
-    #expect(homeNode.semanticMetadata.presentationRole == nil)
-    #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == .tabView)
+    #expect(homeNode.semanticMetadata.accessibilityRole == nil)
+    #expect(artifacts.resolvedTree.semanticMetadata.accessibilityRole == .tabView)
   }
 
   @Test("TabView badge initializer preserves badge text in chrome and semantics")

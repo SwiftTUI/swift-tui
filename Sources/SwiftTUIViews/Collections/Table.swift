@@ -31,7 +31,7 @@ extension TableRow {
       ),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: .init(presentationRole: .tableRow)
+      semanticMetadata: .init(accessibilityRole: .tableRow)
     )
   }
 }
@@ -202,7 +202,7 @@ extension Table {
         isFocusable: isSelectable ? nil : false,
         focusInteractions: isSelectable ? .edit : .automatic,
         scrollRole: .table,
-        presentationRole: .table
+        accessibilityRole: .table
       ),
       drawPayload: .table(payload)
     )
@@ -226,7 +226,7 @@ extension Table {
     into rows: inout [TableRowPayload]
   ) {
     for node in nodes {
-      if node.semanticMetadata.presentationRole == .tableRow {
+      if node.semanticMetadata.accessibilityRole == .tableRow {
         rows.append(
           .init(
             tag: node.semanticMetadata.selectionTag,

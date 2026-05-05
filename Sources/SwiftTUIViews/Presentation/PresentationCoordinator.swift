@@ -476,7 +476,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   }
 
   package var alignment: Alignment
-  package var presentationRole: PresentationRole
+  package var accessibilityRole: AccessibilityRole
   package var backdropOpacity: Double
   package var defaultDismissTitle: String
   package var headerTone: TerminalTone
@@ -491,7 +491,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
 
   package init(
     alignment: Alignment,
-    presentationRole: PresentationRole,
+    accessibilityRole: AccessibilityRole,
     backdropOpacity: Double,
     defaultDismissTitle: String,
     headerTone: TerminalTone,
@@ -505,7 +505,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     contentSizing: PromptPresentationContentSizing = .fillAvailable
   ) {
     self.alignment = alignment
-    self.presentationRole = presentationRole
+    self.accessibilityRole = accessibilityRole
     self.backdropOpacity = backdropOpacity
     self.defaultDismissTitle = defaultDismissTitle
     self.headerTone = headerTone

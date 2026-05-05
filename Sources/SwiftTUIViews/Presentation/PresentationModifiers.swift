@@ -31,7 +31,7 @@ package func alertPromptPresentationSpec() -> PromptPresentationSpec {
     token: "alert",
     descriptor: .init(
       alignment: .center,
-      presentationRole: .alert,
+      accessibilityRole: .alert,
       backdropOpacity: 0,
       defaultDismissTitle: "Dismiss",
       headerTone: .neutral,
@@ -56,7 +56,7 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
     token: "confirmationDialog",
     descriptor: .init(
       alignment: .bottomLeading,
-      presentationRole: .confirmationDialog,
+      accessibilityRole: .confirmationDialog,
       backdropOpacity: 0,
       defaultDismissTitle: "Cancel",
       headerTone: .accent,
@@ -85,7 +85,7 @@ package func menuPromptPresentationSpec() -> PromptPresentationSpec {
     token: "menu",
     descriptor: .init(
       alignment: .topLeading,
-      presentationRole: .menu,
+      accessibilityRole: .menu,
       backdropOpacity: 0,
       defaultDismissTitle: "Close",
       headerTone: .accent,
@@ -134,7 +134,7 @@ package func sheetPromptPresentationSpec(
     token: "sheet",
     descriptor: .init(
       alignment: alignment,
-      presentationRole: .sheet,
+      accessibilityRole: .sheet,
       backdropOpacity: backdropOpacity,
       defaultDismissTitle: "Close",
       headerTone: .accent,
@@ -564,7 +564,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         .focusScope()
         .semanticMetadata(
           .init(
-            presentationRole: item.descriptor.presentationRole
+            accessibilityRole: item.descriptor.accessibilityRole
           )
         )
     case .menu:
@@ -586,7 +586,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         .focusScope()
         .semanticMetadata(
           .init(
-            presentationRole: item.descriptor.presentationRole
+            accessibilityRole: item.descriptor.accessibilityRole
           )
         )
     case .dropdown:
@@ -609,7 +609,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         .focusScope()
         .semanticMetadata(
           .init(
-            presentationRole: item.descriptor.presentationRole
+            accessibilityRole: item.descriptor.accessibilityRole
           )
         )
     }

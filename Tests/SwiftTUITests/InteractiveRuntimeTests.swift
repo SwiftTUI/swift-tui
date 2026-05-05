@@ -665,9 +665,9 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(listNode.drawPayload != .none)
-    #expect(menuNode.semanticMetadata.presentationRole == .picker)
-    #expect(inputNode.semanticMetadata.presentationRole == .textField)
-    #expect(selectionModeNode.semanticMetadata.presentationRole == .picker)
+    #expect(menuNode.semanticMetadata.accessibilityRole == .picker)
+    #expect(inputNode.semanticMetadata.accessibilityRole == .textField)
+    #expect(selectionModeNode.semanticMetadata.accessibilityRole == .picker)
     #expect(inputNode.descendant(withText: "12_") != nil)
     #expect(resolved.descendant(withText: "Live Metrics") != nil)
     #expect(resolved.descendant(withText: "Preset Sync") != nil)

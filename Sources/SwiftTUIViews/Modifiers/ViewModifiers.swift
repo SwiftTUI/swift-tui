@@ -73,6 +73,28 @@ extension View {
     modifier(SemanticMetadataModifier(metadata: metadata))
   }
 
+  public func accessibilityRole(_ role: AccessibilityRole) -> some View {
+    semanticMetadata(.init(accessibilityRole: role))
+  }
+
+  public func accessibilityLabel(_ label: String) -> some View {
+    semanticMetadata(.init(accessibilityLabel: label))
+  }
+
+  public func accessibilityHint(_ hint: String) -> some View {
+    semanticMetadata(.init(accessibilityHint: hint))
+  }
+
+  public func accessibilityHidden(_ hidden: Bool = true) -> some View {
+    semanticMetadata(.init(accessibilityHidden: hidden))
+  }
+
+  public func accessibilityLiveRegion(
+    _ politeness: AccessibilityPoliteness
+  ) -> some View {
+    semanticMetadata(.init(accessibilityLiveRegion: politeness))
+  }
+
   public func onAppear(
     perform action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
@@ -454,26 +476,26 @@ package func focusableControlMetadata(
   isFocusable: Bool? = nil,
   focusInteractions: FocusInteractions = .automatic,
   scrollRole: ScrollRole? = nil,
-  presentationRole: PresentationRole? = nil
+  accessibilityRole: AccessibilityRole? = nil
 ) -> SemanticMetadata {
   .init(
     isFocusable: isFocusable,
     focusInteractions: focusInteractions,
     participatesInPointerHitTesting: true,
     scrollRole: scrollRole,
-    presentationRole: presentationRole
+    accessibilityRole: accessibilityRole
   )
 }
 
 package func scrollViewMetadata(
-  presentationRole: PresentationRole
+  accessibilityRole: AccessibilityRole
 ) -> SemanticMetadata {
   .init(
     isFocusable: true,
     focusInteractions: .edit,
     participatesInPointerHitTesting: true,
     scrollRole: .scrollView,
-    presentationRole: presentationRole
+    accessibilityRole: accessibilityRole
   )
 }
 
