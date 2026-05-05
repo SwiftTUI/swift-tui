@@ -1,7 +1,7 @@
 public import ArgumentParser
+public import Foundation
 public import SwiftTUI
 import SwiftTUICLI
-public import Foundation
 
 #if canImport(Darwin)
   import Darwin
@@ -50,6 +50,10 @@ public protocol SwiftTUIApp: App, AsyncParsableCommand {
 }
 
 extension SwiftTUIApp {
+  public static var configuration: CommandConfiguration {
+    CommandConfiguration(subcommands: [CompletionsCommand.self])
+  }
+
   public func runtimeConfiguration(
     environment: [String: String] = ProcessInfo.processInfo.environment,
     isStdoutTTY: Bool = isatty(STDOUT_FILENO) != 0
@@ -57,9 +61,21 @@ extension SwiftTUIApp {
     swiftTUIOptions.runtimeConfiguration(environment: environment, isStdoutTTY: isStdoutTTY)
   }
 
-  public func run() async throws {
+  @MainActor func runSwiftTUIApp() async throws {
     let configuration = runtimeConfiguration()
     try await TerminalRunner.run(self, configuration: configuration)
+  }
+
+  @MainActor public func run() async throws {
+    try await runSwiftTUIApp()
+  }
+
+  nonisolated static func completionScript(forParsedCommand command: any ParsableCommand) -> String?
+  {
+    guard let printCommand = command as? CompletionsCommand.Print else {
+      return nil
+    }
+    return completionScript(for: printCommand.shell.completionShell)
   }
 
   /// Default entry point. Disambiguates between the `static main()` provided
@@ -68,20 +84,24 @@ extension SwiftTUIApp {
   /// the compiler refuses to pick one without a tie-breaker. This extension
   /// on the more-refined `SwiftTUIApp` protocol is the tie-breaker.
   ///
-  /// Behavior: parse argv via `parseAsRoot(_:)`, then call `run()` on the
-  /// parsed instance. `run()` resolves the `RuntimeConfiguration` and invokes
-  /// `TerminalRunner.run(_:configuration:)`. Inlined rather than delegated to
+  /// Behavior: parse argv via `parseAsRoot(_:)`, intercept framework subcommands
+  /// that must operate on the root command type, then launch the parsed
+  /// `SwiftTUIApp` instance on the main actor. Inlined rather than delegated to
   /// `AsyncParsableCommand.main(_:)` because dispatch from a `SwiftTUIApp`
   /// context can resolve to the synchronous `ParsableCommand.main(_:)`
   /// overload, which would bypass the async `run()` path.
   public static func main() async {
     do {
       var command = try parseAsRoot(nil)
-      if var asyncCommand = command as? any AsyncParsableCommand {
-        try await asyncCommand.run()
-      } else {
-        try command.run()
+      if let script = completionScript(forParsedCommand: command) {
+        FileHandle.standardOutput.write(Data(script.utf8))
+        return
       }
+      if let appCommand = command as? Self {
+        try await appCommand.runSwiftTUIApp()
+        return
+      }
+      try command.run()
     } catch {
       exit(withError: error)
     }

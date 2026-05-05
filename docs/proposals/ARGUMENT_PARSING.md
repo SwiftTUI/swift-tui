@@ -3,12 +3,12 @@
 **Status:** Phases 1–5 implemented per
 [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
 The `SwiftTUIArguments` peer package ships `SwiftTUIOptions` (power mode),
-the `SwiftTUIApp` protocol (easy mode), and a `CompletionsCommand` subcommand
-surface. `RuntimeConfiguration` lives in `SwiftTUI` core. Bare-mode apps
-honor framework env vars via the default `App.main()` extension. Phase 6
-(runner-internal-flag migration to subcommands), Phase 7 (web subcommand
-wiring, blocked on `EMBEDDED_WEB_HOST.md`), and the broader
-runtime-configuration → rendering wiring are tracked as follow-up plans.
+the `SwiftTUIApp` protocol (easy mode), and `CompletionsCommand.Print` for
+zsh/bash/fish completion script emission. `RuntimeConfiguration` lives in
+`SwiftTUI` core. Bare-mode apps honor framework env vars via the default
+`App.main()` extension. Phase 6 (runner-internal-flag migration to subcommands),
+Phase 7 (web subcommand wiring, blocked on `EMBEDDED_WEB_HOST.md`), and the
+broader runtime-configuration → rendering wiring are tracked as follow-up plans.
 
 The remainder of this document captures the design space for how SwiftTUI
 consumers declare their command line, which flags the framework reserves
@@ -1360,7 +1360,6 @@ swift-argument-parser ships completion-script generation for zsh,
 bash, and fish out of the box. The `myapp completions` subcommand:
 
 ```
-myapp completions install [zsh|bash|fish]    # writes to standard locations
 myapp completions print zsh                  # prints to stdout
 myapp completions print bash > /etc/...      # for manual install
 ```
@@ -1368,7 +1367,8 @@ myapp completions print bash > /etc/...      # for manual install
 Cost: nearly free. swift-argument-parser does the work; we just
 expose the existing
 `myapp --generate-completion-script <shell>` machinery via a friendly
-subcommand.
+subcommand. An `install` helper that writes to standard completion locations
+remains future work; the shipped command intentionally prints to stdout.
 
 Consumer opt-in: any consumer using `SwiftTUIApp` gets completions
 automatically. Consumers using bare `AsyncParsableCommand` already
