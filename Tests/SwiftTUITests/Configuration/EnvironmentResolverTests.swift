@@ -127,4 +127,32 @@ struct EnvironmentResolverTests {
     let configuration = RuntimeConfiguration.detect(environment: ["SWIFTTUI_START_IN": "panel-id"], isStdoutTTY: true)
     #expect(configuration.startIn == "panel-id")
   }
+
+  @Test("SWIFTTUI_JSON=1 sets output to .json")
+  func swiftTUIJson() {
+    let configuration = RuntimeConfiguration.detect(environment: ["SWIFTTUI_JSON": "1"], isStdoutTTY: true)
+    #expect(configuration.output == .json)
+  }
+
+  @Test("SWIFTTUI_LINEAR=1 sets linear=true")
+  func swiftTUILinear() {
+    let configuration = RuntimeConfiguration.detect(environment: ["SWIFTTUI_LINEAR": "1"], isStdoutTTY: true)
+    #expect(configuration.linear == true)
+  }
+
+  @Test("SWIFTTUI_NO_PROGRESS=1 sets noProgress=true without CI")
+  func swiftTUINoProgressWithoutCI() {
+    let configuration = RuntimeConfiguration.detect(environment: ["SWIFTTUI_NO_PROGRESS": "1"], isStdoutTTY: true)
+    #expect(configuration.noProgress == true)
+  }
+
+  @Test("SWIFTTUI_JSON wins over SWIFTTUI_ACCESSIBLE when both set")
+  func swiftTUIJsonBeatsAccessible() {
+    // Documents the current behavior: JSON is checked AFTER accessible in the
+    // resolver, so it overrides. If the precedence ever needs to flip, this test
+    // is the canary.
+    let configuration = RuntimeConfiguration.detect(
+      environment: ["SWIFTTUI_ACCESSIBLE": "1", "SWIFTTUI_JSON": "1"], isStdoutTTY: true)
+    #expect(configuration.output == .json)
+  }
 }
