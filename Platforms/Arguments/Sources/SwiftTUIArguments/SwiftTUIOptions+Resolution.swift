@@ -1,4 +1,4 @@
-import SwiftTUI
+public import SwiftTUI
 public import Foundation
 
 extension SwiftTUIOptions {

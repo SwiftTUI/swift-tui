@@ -86,6 +86,14 @@ struct MyApp: @preconcurrency SwiftTUIApp {
 }
 ```
 
+> **Note:** This phase ships parsing and resolution — the `RuntimeConfiguration`
+> value is plumbed through to the runner but rendering decisions (color
+> profile, glyph fallback, motion suppression, accessible-mode strategy) do
+> not yet consult it. Flags parse cleanly today; their behavioral effects
+> will land in a follow-up plan. See
+> [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
+> for the full roadmap.
+
 Bare-mode apps (no `SwiftTUIArguments` import) still honor `NO_COLOR`,
 `LANG=C`, and the `SWIFTTUI_*` environment variables automatically. The
 full design is in

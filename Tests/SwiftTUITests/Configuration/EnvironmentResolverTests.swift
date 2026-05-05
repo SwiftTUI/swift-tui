@@ -146,6 +146,20 @@ struct EnvironmentResolverTests {
     #expect(configuration.noProgress == true)
   }
 
+  @Test("CI=true SWIFTTUI_REDUCE_MOTION=0 turns motion back on (explicit env override)")
+  func ciWithExplicitMotionOff() {
+    let configuration = RuntimeConfiguration.detect(
+      environment: ["CI": "true", "SWIFTTUI_REDUCE_MOTION": "0"], isStdoutTTY: true)
+    #expect(configuration.motion == .normal)
+  }
+
+  @Test("CI=true SWIFTTUI_NO_PROGRESS=0 re-enables progress (explicit env override)")
+  func ciWithExplicitProgressOn() {
+    let configuration = RuntimeConfiguration.detect(
+      environment: ["CI": "true", "SWIFTTUI_NO_PROGRESS": "0"], isStdoutTTY: true)
+    #expect(configuration.noProgress == false)
+  }
+
   @Test("SWIFTTUI_JSON wins over SWIFTTUI_ACCESSIBLE when both set")
   func swiftTUIJsonBeatsAccessible() {
     // Documents the current behavior: JSON is checked AFTER accessible in the
