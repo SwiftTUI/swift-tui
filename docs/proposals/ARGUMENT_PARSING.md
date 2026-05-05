@@ -1,13 +1,23 @@
 # Argument Parsing
 
-**Status:** Draft. Exploratory research + proposal. No code; this document
-captures the design space for how SwiftTUI consumers declare their command
-line, which flags the framework reserves for itself, and how flags interact
-with environment variables, runners, and downstream proposals (accessibility,
-embedded web host). Long by intent — argument parsing sits at the seam
-between consumer entry points (decision 0008: runners own `App.main()`) and
-several cross-cutting features (color, accessibility, motion, web-serve)
-that all want to ride on the same flag surface.
+**Status:** Phases 1–5 implemented per
+[`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
+The `SwiftTUIArguments` peer package ships `SwiftTUIOptions` (power mode),
+the `SwiftTUIApp` protocol (easy mode), and a `CompletionsCommand` subcommand
+surface. `RuntimeConfiguration` lives in `SwiftTUI` core. Bare-mode apps
+honor framework env vars via the default `App.main()` extension. Phase 6
+(runner-internal-flag migration to subcommands), Phase 7 (web subcommand
+wiring, blocked on `EMBEDDED_WEB_HOST.md`), and the broader
+runtime-configuration → rendering wiring are tracked as follow-up plans.
+
+The remainder of this document captures the design space for how SwiftTUI
+consumers declare their command line, which flags the framework reserves
+for itself, and how flags interact with environment variables, runners,
+and downstream proposals (accessibility, embedded web host). Long by
+intent — argument parsing sits at the seam between consumer entry points
+(decision 0008: runners own `App.main()`) and several cross-cutting
+features (color, accessibility, motion, web-serve) that all want to ride
+on the same flag surface.
 
 **Owner:** unassigned. Tracking branch: `accessibility-investigation`.
 
@@ -1846,3 +1856,23 @@ by theme:
   rather than reimplement parsing. The `SWIFTTUI_*` family,
   `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI` are new and
   remain owned by `SwiftTUIOptions`.
+- 2026-05-05: Phases 1–5 landed via plan
+  [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
+  `RuntimeConfiguration` value type + `Builder` + `detect(...)` factory in
+  `SwiftTUI` core; `TerminalRunner.run(_:configuration:)` overload and
+  env-var-aware default `App.main()` in `SwiftTUICLI`; new
+  `Platforms/Arguments/` peer package shipping `SwiftTUIOptions:
+  ParsableArguments`, `SwiftTUIOptions.runtimeConfiguration(...)`,
+  `SwiftTUIApp` protocol with default `static func main()` (disambiguating
+  `App.main` vs `AsyncParsableCommand.main`), and `CompletionsCommand`
+  subcommand surface. `Examples/gallery` migrated; `Examples/argparse`
+  added as the canonical consumer-flag + framework-flag demo;
+  `Examples/minimal` documented as the bare-mode rendering reference.
+  Two implementation refinements emerged during the plan: (1) the
+  `--plain` precedence had a code-vs-doc mismatch that was resolved by
+  treating `--plain` as a flag-expander rather than a direct mutator
+  (so `--plain --force-color` yields `noColor` per proposal §Precedence
+  rules item 5); and (2) consumers must annotate `@MainActor` and use
+  `@preconcurrency SwiftTUIApp` because `App.init()` is `@MainActor` and
+  `ParsableArguments.init()` is nonisolated — a future macro could
+  absorb both modifiers.

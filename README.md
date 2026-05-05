@@ -59,6 +59,40 @@ want an explicit launcher instead of `@main`, call:
 try await TerminalRunner.run(DemoApp.self)
 ```
 
+### Argument parsing
+
+Apps that want CLI flags plus the framework's standard flag surface
+(`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--web`,
+`-v`, `--debug`, `--start-in`, ...) import `SwiftTUIArguments` and conform
+to `SwiftTUIApp`:
+
+```swift
+import SwiftTUI
+import SwiftTUICLI
+import SwiftTUIArguments
+
+@main
+@MainActor
+struct MyApp: @preconcurrency SwiftTUIApp {
+  @OptionGroup(title: "SwiftTUI Options")
+  var swiftTUIOptions: SwiftTUIOptions
+
+  @Option(name: .shortAndLong, help: "How many widgets to show.")
+  var widgets: Int = 5
+
+  var body: some Scene {
+    WindowGroup { ContentView(widgets: widgets) }
+  }
+}
+```
+
+Bare-mode apps (no `SwiftTUIArguments` import) still honor `NO_COLOR`,
+`LANG=C`, and the `SWIFTTUI_*` environment variables automatically. The
+full design is in
+[docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md);
+see [Examples/argparse](Examples/argparse) for a working consumer-flags +
+framework-flags demo.
+
 The same authored `App` and `Scene` declarations can then flow into three
 execution modes:
 
