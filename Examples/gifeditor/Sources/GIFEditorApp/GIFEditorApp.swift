@@ -1,15 +1,16 @@
 import Foundation
 import GIFEditor
 import SwiftTUI
-import SwiftTUICLI
 import SwiftTUIArguments
+import SwiftTUICLI
 
 @main
 @MainActor
 struct GIFEditorApp: @preconcurrency SwiftTUIApp {
   static let configuration = CommandConfiguration(
     commandName: "gifeditor",
-    abstract: "Edit a GIF in the terminal."
+    abstract: "Edit a GIF in the terminal.",
+    subcommands: [CompletionsCommand.self]
   )
 
   @OptionGroup(title: "SwiftTUI Options")

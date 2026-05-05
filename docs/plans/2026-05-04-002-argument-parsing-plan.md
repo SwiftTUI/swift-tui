@@ -1770,6 +1770,12 @@ public struct CompletionsCommand: ParsableCommand {
 > `SwiftTUIApp.main()`. The root command detects `completions print <shell>`
 > after parsing and writes `Self.completionScript(for:)` to stdout, so generated
 > scripts include both app-defined options and SwiftTUI framework options.
+> `completions install <shell>` also installs the generated root script to a
+> user-writable shell-specific default path, with `--output <path>` for explicit
+> targets.
+> The root app now detects `completions` before ordinary root parsing so apps
+> with optional root positional arguments, such as `gifeditor [path]`, do not
+> consume `completions` as user input.
 
 - [ ] **Step 4: Run test to verify it passes**
 
