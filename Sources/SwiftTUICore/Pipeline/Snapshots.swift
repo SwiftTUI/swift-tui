@@ -362,6 +362,9 @@ extension SnapshotRenderer {
         "table(style=\(payload.style),rows=\(payload.rows.count),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
     case .canvas(let payload):
       return "canvas(drawing=\(type(of: payload.drawing)))"
+    case .foreignSurface(let payload):
+      let grid = payload.grid
+      return "foreignSurface(grid=\(grid.size.width)x\(grid.size.height))"
     }
   }
 

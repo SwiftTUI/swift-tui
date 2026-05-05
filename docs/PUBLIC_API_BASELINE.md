@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 48 | 511 |
-| `SwiftTUIViews` | 239 | 8490 |
+| `SwiftTUIViews` | 240 | 8607 |
 | `SwiftTUIAnimatedImage` | 5 | 145 |
 | `SwiftTUICharts` | 17 | 1365 |
 | `SwiftTUICore` | 256 | 2541 |
@@ -78,7 +78,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (239)
+### Canonical surface (240)
 
 - `ActivePaletteCommand` — struct — 4 members
 - `AnchorPreferenceTransformModifier` — struct — 2 members
@@ -154,6 +154,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FocusedValueWritingModifier` — struct — 2 members
 - `FocusState` — struct — 7 members
 - `ForEach` — struct — 119 members
+- `ForeignSurface` — struct — 116 members
 - `FrameModifier` — struct — 2 members
 - `GeometryProxy` — struct — 9 members
 - `GeometryReader` — struct — 115 members

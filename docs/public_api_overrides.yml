@@ -81,6 +81,7 @@ classifications:
     - SwiftTUIViews.FocusedValues
     - SwiftTUIViews.FocusInteractions
     - SwiftTUIViews.FocusState
+    - SwiftTUIViews.ForeignSurface
     - SwiftTUIViews.GeometryReader
     - SwiftTUIViews.Group
     - SwiftTUIViews.GroupBox
