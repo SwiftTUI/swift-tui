@@ -1856,14 +1856,19 @@ by theme:
   rather than reimplement parsing. The `SWIFTTUI_*` family,
   `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI` are new and
   remain owned by `SwiftTUIOptions`.
-- 2026-05-05: Phase 6 (partial) landed. `CLIMode.parse` is now backed by an
-  ArgumentParser command tree (`RunnerCLI` with `Instances` / `Scenes` /
-  `Attach` subcommands). Both forms work in bare-mode `App.main()`:
-    - Modern: `myapp instances`, `myapp scenes [--pid N | --instance NAME]`,
-      `myapp attach <scene-id> [--pid N | --instance NAME]`
-    - Legacy: `--instances`, `--scenes`, `--attach`, `--pid`, `--instance`
-      still work but emit a one-shot deprecation warning to stderr.
-  The `CLIMode` enum and `CLIMode.parse(_:)` signature are unchanged.
+- 2026-05-05: Phase 6 landed. `CLIMode.parse` is now fully backed by an
+  ArgumentParser command tree (`RunnerCLI` with `Run` / `Instances` /
+  `Scenes` / `Attach` subcommands). `Run` is the default subcommand, so
+  bare `myapp` and `myapp --instance NAME` invocations route to it
+  naturally. Surface in bare-mode `App.main()`:
+    - `myapp` / `myapp --instance NAME` — `.app(instanceName: ...)`
+    - `myapp instances` — `.listInstances`
+    - `myapp scenes [--pid N | --instance NAME]` — `.listScenes(...)`
+    - `myapp attach <scene-id> [--pid N | --instance NAME]` — `.attach(...)`
+  The pre-production cleanup pass removed the legacy hand-rolled flag
+  parser, the `CLIModeError` enum, and the one-shot deprecation warning
+  (the framework has no consumers yet, so a deprecation cycle would be
+  pure overhead). `CLIMode.parse(_:)` is no longer throwing.
   Discoverability via `myapp --help` for `SwiftTUIApp` consumers is NOT
   in scope here — their parser owns argv first; surfacing the runner
   subcommands through their `--help` requires deeper integration that

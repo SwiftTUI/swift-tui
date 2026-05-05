@@ -48,7 +48,7 @@ public enum TerminalRunner {
 
     let sessionName = String(reflecting: A.self)
     let appName = appNameFromType(A.self)
-    let mode = try CLIMode.parse(CommandLine.arguments)
+    let mode = CLIMode.parse(CommandLine.arguments)
 
     switch mode {
     case .app(let instanceName):
