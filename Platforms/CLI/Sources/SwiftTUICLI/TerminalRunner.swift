@@ -304,7 +304,8 @@ public enum TerminalRunner {
   }
 
   /// Strips ASCII whitespace and newlines from both ends of a string.
-  /// Foundation-free alternative to `.trimmingCharacters(in: .whitespacesAndNewlines)`.
+  /// Hand-rolled trim helper kept for symmetry with parseSceneList. Foundation is imported in this
+  /// file but the helper predates the import and works fine; not worth churning.
   private static func trimmed(_ s: String) -> String {
     var chars = Array(s.unicodeScalars)
     while let first = chars.first, isAsciiWhitespace(first) { chars.removeFirst() }
@@ -323,7 +324,8 @@ public enum TerminalRunner {
   ///
   /// Expected format: `[{"id":"...","title":...,"ptyPath":...,"isAttached":...}, ...]`
   ///
-  /// This is a minimal hand-rolled parser — no Foundation required.
+  /// Minimal hand-rolled JSON parser. Foundation is imported in this file (for ProcessInfo) and
+  /// JSONDecoder could replace this, but the parser is small and tested; deferred to avoid scope creep.
   private static func parseSceneList(_ json: String) -> [SceneInfo] {
     // Tokenise the JSON into a flat stream of tokens, then extract objects.
     var scenes: [SceneInfo] = []
