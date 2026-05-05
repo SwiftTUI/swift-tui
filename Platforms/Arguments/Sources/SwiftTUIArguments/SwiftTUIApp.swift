@@ -78,6 +78,25 @@ extension SwiftTUIApp {
     return completionScript(for: printCommand.shell.completionShell)
   }
 
+  nonisolated static func installCompletionScript(
+    forParsedCommand command: any ParsableCommand
+  ) throws -> URL? {
+    guard let installCommand = command as? CompletionsCommand.Install else {
+      return nil
+    }
+    let script = completionScript(for: installCommand.shell.completionShell)
+    return try installCommand.install(script: script, commandName: _commandName)
+  }
+
+  nonisolated static func completionCommand(
+    forRawArguments arguments: [String]
+  ) throws -> (any ParsableCommand)? {
+    guard arguments.first == CompletionsCommand.configuration.commandName else {
+      return nil
+    }
+    return try CompletionsCommand.parseAsRoot(Array(arguments.dropFirst()))
+  }
+
   /// Default entry point. Disambiguates between the `static main()` provided
   /// by `SwiftTUICLI`'s `extension App` and `swift-argument-parser`'s
   /// `extension AsyncParsableCommand` — both have the same signature, so
@@ -92,9 +111,30 @@ extension SwiftTUIApp {
   /// overload, which would bypass the async `run()` path.
   public static func main() async {
     do {
+      if var completionsCommand = try completionCommand(
+        forRawArguments: Array(CommandLine.arguments.dropFirst())
+      ) {
+        if let script = completionScript(forParsedCommand: completionsCommand) {
+          FileHandle.standardOutput.write(Data(script.utf8))
+          return
+        }
+        if let installedURL = try installCompletionScript(forParsedCommand: completionsCommand) {
+          let message = "Installed completion script at \(installedURL.path)\n"
+          FileHandle.standardOutput.write(Data(message.utf8))
+          return
+        }
+        try completionsCommand.run()
+        return
+      }
+
       var command = try parseAsRoot(nil)
       if let script = completionScript(forParsedCommand: command) {
         FileHandle.standardOutput.write(Data(script.utf8))
+        return
+      }
+      if let installedURL = try installCompletionScript(forParsedCommand: command) {
+        let message = "Installed completion script at \(installedURL.path)\n"
+        FileHandle.standardOutput.write(Data(message.utf8))
         return
       }
       if let appCommand = command as? Self {
