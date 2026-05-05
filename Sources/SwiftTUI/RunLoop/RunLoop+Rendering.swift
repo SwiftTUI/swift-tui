@@ -251,15 +251,10 @@ extension RunLoop {
         presentClock = nil
         presentStart = nil
       }
-      if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
-        presentationMetrics = try damageAwareHost.present(
-          artifacts.rasterSurface,
-          damage: presentationDamage
-        )
-      } else {
-        presentationMetrics = try presentationSurface.present(artifacts.rasterSurface)
-      }
-      try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
+      presentationMetrics = try presentCommittedFrame(
+        artifacts,
+        damage: presentationDamage
+      )
       let presentationDuration: Duration =
         if let presentStart, let presentClock {
           presentStart.duration(to: presentClock.now)
@@ -949,15 +944,10 @@ extension RunLoop {
         presentClock = nil
         presentStart = nil
       }
-      if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
-        presentationMetrics = try damageAwareHost.present(
-          artifacts.rasterSurface,
-          damage: presentationDamage
-        )
-      } else {
-        presentationMetrics = try presentationSurface.present(artifacts.rasterSurface)
-      }
-      try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
+      presentationMetrics = try presentCommittedFrame(
+        artifacts,
+        damage: presentationDamage
+      )
       let presentationDuration: Duration =
         if let presentStart, let presentClock {
           presentStart.duration(to: presentClock.now)
@@ -1353,5 +1343,49 @@ extension RunLoop {
       focusedIdentity: focusTracker.currentFocusIdentity
     )
     try terminalSurface.presentAccessibilityCursorFocus(at: cursorPoint)
+  }
+
+  private func presentCommittedFrame(
+    _ artifacts: FrameArtifacts,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
+    if runtimeConfiguration.output == .accessible {
+      return try presentLinearAccessibilityFrame(
+        semanticSnapshot: artifacts.semanticSnapshot
+      )
+    }
+
+    let metrics: TerminalPresentationMetrics
+    if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
+      metrics = try damageAwareHost.present(
+        artifacts.rasterSurface,
+        damage: damage
+      )
+    } else {
+      metrics = try presentationSurface.present(artifacts.rasterSurface)
+    }
+    try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
+    return metrics
+  }
+
+  private func presentLinearAccessibilityFrame(
+    semanticSnapshot: SemanticSnapshot
+  ) throws -> TerminalPresentationMetrics {
+    let output = LinearAccessibilityRenderer().render(semanticSnapshot)
+    guard !output.isEmpty else {
+      return TerminalPresentationMetrics()
+    }
+
+    try presentationSurface.write(output)
+    let bytesWritten = output.utf8.count
+    let linesTouched = output.utf8.reduce(0) { partial, byte in
+      partial + (byte == 0x0A ? 1 : 0)
+    }
+    return TerminalPresentationMetrics(
+      bytesWritten: bytesWritten,
+      linesTouched: linesTouched,
+      cellsChanged: max(0, bytesWritten - linesTouched),
+      strategy: .fullRepaint
+    )
   }
 }

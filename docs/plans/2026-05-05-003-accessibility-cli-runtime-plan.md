@@ -142,15 +142,15 @@ Resolved by
 
 ## Stage 4: Add Linear Accessible Output
 
-- [ ] Add a renderer that turns `SemanticSnapshot.accessibilityNodes` into the
+- [x] Add a renderer that turns `SemanticSnapshot.accessibilityNodes` into the
   ADR-approved linear text format: layout reading order, ASCII, one logical
   node per line, two-space indentation by parent depth, `role: label`, optional
   ` - hint`, and role-only fallback for unlabeled relevant nodes.
-- [ ] Use authored labels first, then inferred labels already stored on
+- [x] Use authored labels first, then inferred labels already stored on
   `AccessibilityNode`, then role-only fallback text only if the ADR allows it.
-- [ ] Route `RuntimeConfiguration.output == .accessible` through the linear
+- [x] Route `RuntimeConfiguration.output == .accessible` through the linear
   renderer instead of the raster terminal renderer.
-- [ ] Cover reading order, nested groups, controls without labels, and hidden
+- [x] Cover reading order, nested groups, controls without labels, and hidden
   subtrees.
 
 ## Stage 5: Add Motion And Progress Policy
