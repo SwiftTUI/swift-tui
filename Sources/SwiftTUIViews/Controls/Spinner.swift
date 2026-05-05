@@ -11,28 +11,48 @@ public struct Spinner: View {
   @State var iteration: Int = 0
 
   public var body: some View {
+    EnvironmentReader(\.reducesMotion) { reducesMotion in
+      spinnerBody(reducesMotion: reducesMotion)
+    }
+  }
+
+  @ViewBuilder
+  private func spinnerBody(reducesMotion: Bool) -> some View {
+    if reducesMotion {
+      spinnerText(reducesMotion: true)
+    } else {
+      spinnerText(reducesMotion: false)
+        .task(id: Pair(a: set, b: stage)) {
+          switch stage {
+          case .active:
+            while !Task.isCancelled {
+              try? await Task.sleep(for: .milliseconds(64))
+              let max = set.body.count
+              var newIteration = iteration + 1
+              newIteration %= max
+              iteration = newIteration
+            }
+          case .finished, .inactive:
+            break
+          }
+        }
+    }
+  }
+
+  @ViewBuilder
+  private func spinnerText(reducesMotion: Bool) -> some View {
     Group {
       switch stage {
       case .active:
-        Text(set.body[iteration])
+        if reducesMotion {
+          Text(set.body.first ?? set.head)
+        } else {
+          Text(set.body[iteration])
+        }
       case .finished:
         Text(set.tail)
       case .inactive:
         Text(set.head)
-      }
-    }
-    .task(id: Pair(a: set, b: stage)) {
-      switch stage {
-      case .active:
-        while !Task.isCancelled {
-          try? await Task.sleep(for: .milliseconds(64))
-          let max = set.body.count
-          var newIteration = iteration + 1
-          newIteration %= max
-          iteration = newIteration
-        }
-      case .finished, .inactive:
-        break
       }
     }
   }

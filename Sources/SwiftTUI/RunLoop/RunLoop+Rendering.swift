@@ -291,7 +291,8 @@ extension RunLoop {
       // dirty-region calculation; only the wake-up decision is
       // unconditional now.
       let animationTick = renderer.internalAnimationController.lastTickResult
-      if animationTick.hasPendingWork,
+      if runtimeConfiguration.motion == .normal,
+        animationTick.hasPendingWork,
         let nextDeadline = animationTick.nextDeadline
       {
         let now = MonotonicInstant.now()
@@ -984,7 +985,8 @@ extension RunLoop {
       // dirty-region calculation; only the wake-up decision is
       // unconditional now.
       let animationTick = renderer.internalAnimationController.lastTickResult
-      if animationTick.hasPendingWork,
+      if runtimeConfiguration.motion == .normal,
+        animationTick.hasPendingWork,
         let nextDeadline = animationTick.nextDeadline
       {
         let now = MonotonicInstant.now()
@@ -1190,12 +1192,19 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
     effectiveEnvironmentValues.activePaletteCommands = latestActivePaletteCommands
+    effectiveEnvironmentValues.reducesMotion = runtimeConfiguration.motion == .reduced
+    effectiveEnvironmentValues.suppressesProgress = runtimeConfiguration.noProgress
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
-    transactionSnapshot.animationRequest = scheduledFrame.animationRequest
-    transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
+    if runtimeConfiguration.motion == .reduced {
+      transactionSnapshot.animationRequest = .disabled
+      transactionSnapshot.animationBatchID = nil
+    } else {
+      transactionSnapshot.animationRequest = scheduledFrame.animationRequest
+      transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
+    }
     // Phase 3's ``diffAndEnqueue`` retargets in-flight animations
     // correctly via ``sample(existing, at:)`` + ``effectiveFrom``, so
     // the previous re-injection of the controller's "dominant active
