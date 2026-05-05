@@ -393,6 +393,28 @@ struct TerminalPresentationTests {
     )
   }
 
+  @Test("renderer strips control scalars from OSC 8 hyperlink destinations")
+  func rendererStripsControlScalarsFromHyperlinkDestinations() {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: .trueColor
+    )
+    let surface = RasterSurface(
+      size: .init(width: 1, height: 1),
+      cells: [
+        [
+          RasterCell(
+            character: "X",
+            hyperlink: "https://safe.example/\u{001B}\\\u{0007}ok"
+          )
+        ]
+      ]
+    )
+
+    #expect(
+      renderer.render(surface) == "\u{001B}]8;;https://safe.example/ok\u{001B}\\X\u{001B}]8;;\u{001B}\\"
+    )
+  }
+
   @Test("renderer omits hyperlink escapes when hyperlink support is disabled")
   func rendererOmitsHyperlinksWhenUnsupported() {
     let renderer = TerminalSurfaceRenderer(
