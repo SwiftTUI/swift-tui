@@ -1080,7 +1080,13 @@ extension TerminalSurfaceRenderer {
   private func openHyperlinkSequence(
     for destination: LinkDestination
   ) -> String {
-    "\u{001B}]8;;\(destination.rawValue)\u{001B}\\"
+    "\u{001B}]8;;\(sanitizedHyperlinkDestination(destination.rawValue))\u{001B}\\"
+  }
+
+  private func sanitizedHyperlinkDestination(
+    _ destination: String
+  ) -> String {
+    String(destination.unicodeScalars.filter { !$0.properties.isControl })
   }
 
   private func closeHyperlinkSequence() -> String {
