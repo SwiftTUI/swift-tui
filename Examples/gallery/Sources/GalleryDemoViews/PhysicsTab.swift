@@ -139,8 +139,8 @@ struct FullScreenToyPhysics {
   static let floorBounceNumerator = 3
   static let floorBounceDenominator = 4
   static let settleVelocity = 2
-  static let fieldHeightInset = 6
-  static let fieldWidthInset = 2
+  static let fieldHeightInset = 0
+  static let fieldWidthInset = 0
   static let initialLaunchX = 0
   static let initialLaunchY = -10
 
