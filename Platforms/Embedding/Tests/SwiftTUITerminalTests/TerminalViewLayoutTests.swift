@@ -95,6 +95,8 @@ private final class StubTerminalSession: TerminalSession {
 
   func send(paste _: String) async {}
 
+  func send(mouse _: TerminalEmulatorMouse) async {}
+
   func resize(_ size: CellSize) async throws {
     snapshotStorage.withLock { grid in
       grid.size = size

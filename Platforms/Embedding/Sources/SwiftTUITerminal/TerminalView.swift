@@ -17,35 +17,40 @@ public struct TerminalView<Session: TerminalSession>: View {
   }
 
   public var body: some View {
-    GeometryReader { proxy in
-      ForeignSurface(payload: SessionGridPayload(session: session))
-        .focusable(true)
-        .onKeyPress { keyPress in
-          guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
-            return .ignored
+    EnvironmentReader(\.terminalEventHandlers) { terminalEventHandlers in
+      GeometryReader { proxy in
+        ForeignSurface(payload: SessionGridPayload(session: session))
+          .focusable(true)
+          .onKeyPress { keyPress in
+            guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
+              return .ignored
+            }
+            Task {
+              await session.send(key: key)
+            }
+            return .handled
           }
-          Task {
-            await session.send(key: key)
-          }
-          return .handled
-        }
-        .task(id: TerminalViewLifecycleID(session: ObjectIdentifier(session), size: proxy.size)) {
-          try? await session.start()
-          try? await session.resize(proxy.size)
+          .task(id: TerminalViewLifecycleID(session: ObjectIdentifier(session), size: proxy.size)) {
+            try? await session.start()
+            try? await session.resize(proxy.size)
 
-          for await event in session.events() {
-            switch event {
-            case .titleChanged(let title):
-              onTitleChange?(title)
-            default:
-              break
+            for await event in session.events() {
+              switch event {
+              case .titleChanged(let title):
+                onTitleChange?(title)
+                terminalEventHandlers.titleChanged?(title)
+              case .workingDirectoryChanged(let directory):
+                terminalEventHandlers.workingDirectoryChanged?(directory)
+              default:
+                break
+              }
+            }
+
+            if case .exited(let reason) = await session.currentLifecycle() {
+              onExit?(reason)
             }
           }
-
-          if case .exited(let reason) = await session.currentLifecycle() {
-            onExit?(reason)
-          }
-        }
+      }
     }
   }
 }

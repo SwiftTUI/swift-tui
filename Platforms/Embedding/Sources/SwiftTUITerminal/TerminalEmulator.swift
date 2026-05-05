@@ -17,7 +17,9 @@ public actor TerminalEmulator {
 
   public func feed(_ bytes: [UInt8]) -> [TerminalEmulatorEvent] {
     terminal.feed(byteArray: bytes)
-    return delegate.drainEvents()
+    var events = delegate.drainEvents()
+    events.append(contentsOf: Self.mouseProtocolEvents(in: bytes))
+    return events
   }
 
   public func snapshot() -> ForeignGrid {
@@ -49,6 +51,110 @@ public actor TerminalEmulator {
 
   public func encode(key: TerminalEmulatorKey) -> [UInt8] {
     key.legacyByteSequence
+  }
+
+  public func encode(paste: String) -> [UInt8] {
+    let bytes = Array(paste.utf8)
+    guard terminal.bracketedPasteMode else {
+      return bytes
+    }
+    return EscapeSequences.bracketedPasteStart + bytes + EscapeSequences.bracketedPasteEnd
+  }
+
+  public func send(mouse: TerminalEmulatorMouse) -> [UInt8] {
+    switch mouse.kind {
+    case .down(let button):
+      terminal.sendEvent(
+        buttonFlags: buttonFlags(for: button, release: false, modifiers: mouse.modifiers),
+        x: mouse.cell.x,
+        y: mouse.cell.y
+      )
+    case .up(let button):
+      terminal.sendEvent(
+        buttonFlags: buttonFlags(for: button, release: true, modifiers: mouse.modifiers),
+        x: mouse.cell.x,
+        y: mouse.cell.y
+      )
+    case .dragged(let button):
+      terminal.sendMotion(
+        buttonFlags: buttonFlags(for: button, release: false, modifiers: mouse.modifiers),
+        x: mouse.cell.x,
+        y: mouse.cell.y,
+        pixelX: mouse.cell.x,
+        pixelY: mouse.cell.y
+      )
+    case .moved:
+      terminal.sendMotion(
+        buttonFlags: buttonFlags(for: .primary, release: true, modifiers: mouse.modifiers),
+        x: mouse.cell.x,
+        y: mouse.cell.y,
+        pixelX: mouse.cell.x,
+        pixelY: mouse.cell.y
+      )
+    case .scrolled(let deltaX, let deltaY):
+      guard deltaX != 0 || deltaY != 0 else {
+        return []
+      }
+      let button = scrollButton(deltaX: deltaX, deltaY: deltaY)
+      terminal.sendEvent(
+        buttonFlags: buttonFlags(for: button, release: false, modifiers: mouse.modifiers),
+        x: mouse.cell.x,
+        y: mouse.cell.y
+      )
+    }
+
+    return delegate.drainClientReplyBytes()
+  }
+
+  private func buttonFlags(
+    for button: TerminalEmulatorMouse.Button,
+    release: Bool,
+    modifiers: EventModifiers
+  ) -> Int {
+    terminal.encodeButton(
+      button: buttonNumber(for: button),
+      release: release,
+      shift: modifiers.contains(.shift),
+      meta: modifiers.contains(.alt),
+      control: modifiers.contains(.ctrl)
+    )
+  }
+
+  private func buttonNumber(for button: TerminalEmulatorMouse.Button) -> Int {
+    switch button {
+    case .primary:
+      return 0
+    case .middle:
+      return 1
+    case .secondary:
+      return 2
+    case .wheelUp:
+      return 4
+    case .wheelDown:
+      return 5
+    }
+  }
+
+  private func scrollButton(deltaX: Int, deltaY: Int) -> TerminalEmulatorMouse.Button {
+    if deltaY < 0 || deltaX < 0 {
+      return .wheelUp
+    }
+    return .wheelDown
+  }
+
+  private static func mouseProtocolEvents(in bytes: [UInt8]) -> [TerminalEmulatorEvent] {
+    guard let text = String(bytes: bytes, encoding: .utf8) else {
+      return []
+    }
+
+    var events: [TerminalEmulatorEvent] = []
+    if text.contains("\u{1B}[?1006h") || text.contains("\u{1B}[?1016h") {
+      events.append(.mouseModeChanged(.sgr))
+    }
+    if text.contains("\u{1B}[?1006l") || text.contains("\u{1B}[?1016l") {
+      events.append(.mouseModeChanged(.disabled))
+    }
+    return events
   }
 
   private static func rasterCell(
@@ -180,6 +286,18 @@ private final class EmulatorDelegate: TerminalDelegate {
     let drained = events
     events.removeAll(keepingCapacity: true)
     return drained
+  }
+
+  func drainClientReplyBytes() -> [UInt8] {
+    var bytes: [UInt8] = []
+    events.removeAll { event in
+      guard case .clientReply(let replyBytes) = event else {
+        return false
+      }
+      bytes.append(contentsOf: replyBytes)
+      return true
+    }
+    return bytes
   }
 
   func setTerminalTitle(source: Terminal, title: String) {

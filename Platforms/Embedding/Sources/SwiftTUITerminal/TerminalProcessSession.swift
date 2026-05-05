@@ -101,7 +101,15 @@ public final class TerminalProcessSession: TerminalSession {
   }
 
   public func send(paste: String) async {
-    let bytes = Array(paste.utf8)
+    let bytes = await emulator.encode(paste: paste)
+    guard !bytes.isEmpty, let pair = await pty.pair else {
+      return
+    }
+    try? await pair.write(bytes)
+  }
+
+  public func send(mouse: TerminalEmulatorMouse) async {
+    let bytes = await emulator.send(mouse: mouse)
     guard !bytes.isEmpty, let pair = await pty.pair else {
       return
     }
