@@ -495,6 +495,8 @@ extension DrawExtractor {
           inheritedBorderMask: inheritedBorderMask
         )
       )
+    case .foreignSurface:
+      return command
     default:
       return command
     }

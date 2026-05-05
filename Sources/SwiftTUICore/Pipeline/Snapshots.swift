@@ -512,6 +512,10 @@ extension SnapshotRenderer {
     case .canvas(let bounds, let payload, let foregroundStyle):
       return
         "canvas[\(describe(bounds)) drawing=\(type(of: payload.drawing)) style=\(describe(foregroundStyle))]"
+    case .foreignSurface(let bounds, let payload):
+      let grid = payload.grid
+      return
+        "foreignSurface[\(describe(bounds)) grid=\(grid.size.width)x\(grid.size.height)]"
     case .clip(let bounds, _):
       return "clip[\(describe(bounds))]"
     }
