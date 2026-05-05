@@ -135,4 +135,15 @@ struct SwiftTUIOptionsResolutionTests {
     let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.startIn == "search")
   }
+
+  @Test("--plain combined with --force-color: plain's no-color still wins")
+  func cliPlainBeatsForceColor() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.plain = true
+    options.forceColor = true
+    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    #expect(configuration.color == .never)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+  }
 }
