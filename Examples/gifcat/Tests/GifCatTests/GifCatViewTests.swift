@@ -24,7 +24,7 @@ struct GifCatViewTests {
     }
 
     let items = GifCatInput.items(
-      from: ["gifcat", "first.gif", "nested/second.gif"],
+      paths: ["first.gif", "nested/second.gif"],
       currentDirectory: root.path
     )
 
@@ -58,7 +58,7 @@ struct GifCatViewTests {
     }
 
     let items = GifCatInput.items(
-      from: ["gifcat", "first.gif", "second.gif"],
+      paths: ["first.gif", "second.gif"],
       currentDirectory: root.path
     )
     let artifacts = render(GifCatView(items: items), width: 80, height: 24)
@@ -108,7 +108,7 @@ struct GifCatViewTests {
     }
 
     let items = GifCatInput.items(
-      from: ["gifcat"] + gifSpecs.map(\.0),
+      paths: gifSpecs.map(\.0),
       currentDirectory: root.path
     )
     let expectedSecondFrameReferences = try items.map { item in
