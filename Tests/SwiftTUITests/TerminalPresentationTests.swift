@@ -1,8 +1,8 @@
 import Dispatch
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 
 #if canImport(Darwin)
   import Darwin
@@ -278,7 +278,7 @@ struct TerminalPresentationTests {
   @Test("renderer sanitizes terminal control characters in ascii mode")
   func rendererSanitizesControlCharactersInASCIIMode() {
     let rendered = TerminalSurfaceRenderer(
-      capabilityProfile: .ascii
+      capabilityProfile: .previewASCII
     ).render(
       RasterSurface(
         size: .init(width: 3, height: 1),
@@ -439,7 +439,8 @@ struct TerminalPresentationTests {
     )
 
     #expect(
-      renderer.render(surface) == "\u{001B}]8;;https://safe.example/ok\u{001B}\\X\u{001B}]8;;\u{001B}\\"
+      renderer.render(surface)
+        == "\u{001B}]8;;https://safe.example/ok\u{001B}\\X\u{001B}]8;;\u{001B}\\"
     )
   }
 

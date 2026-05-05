@@ -12,15 +12,14 @@ private struct GestureStateLocation<Value> {
 
 /// Storage for a `@GestureState` cell. Structurally mirrors `StateBox`:
 /// a slot-ordinal-keyed store with a seed, a remembered ViewNode-scoped
-/// location when bound, and a fallback local value for out-of-context
-/// access (tests, construction-time reads).
+/// or graph-scoped location when bound, and a fallback local value for
+/// out-of-context access (tests, construction-time reads).
 @MainActor
 public final class GestureStateBox<Value> {
   public let slotOrdinal: Int
   private let seed: Value
   private var localValue: Value
   private var boundLocationsByIdentity: [Identity: GestureStateLocation<Value>] = [:]
-  private var lastBoundIdentity: Identity?
 
   public init(seed: Value, slotOrdinal: Int) {
     self.seed = seed
@@ -60,10 +59,17 @@ public final class GestureStateBox<Value> {
 
   fileprivate func remember(
     _ location: GestureStateLocation<Value>,
-    for identity: Identity
+    for identity: Identity,
+    graphID: ViewGraphScopeID?
   ) {
     boundLocationsByIdentity[identity] = location
-    lastBoundIdentity = identity
+    if let graphID {
+      GestureStateGraphBindingRegistry.shared.remember(
+        identity,
+        for: ObjectIdentifier(self),
+        graphID: graphID
+      )
+    }
   }
 
   fileprivate func rememberedLocation(
@@ -72,18 +78,36 @@ public final class GestureStateBox<Value> {
     boundLocationsByIdentity[identity]
   }
 
-  fileprivate func currentLocation() -> GestureStateLocation<Value>? {
-    guard let lastBoundIdentity else { return nil }
-    return boundLocationsByIdentity[lastBoundIdentity]
+  fileprivate func currentLocation(
+    in viewGraphID: ViewGraphScopeID
+  ) -> GestureStateLocation<Value>? {
+    guard
+      let identity = GestureStateGraphBindingRegistry.shared.currentIdentity(
+        for: ObjectIdentifier(self),
+        graphID: viewGraphID
+      )
+    else {
+      return nil
+    }
+    return boundLocationsByIdentity[identity]
   }
 
   private func scopedLocation() -> GestureStateLocation<Value>? {
-    if let context = AuthoringContextStorage.current,
-      let existing = rememberedLocation(for: context.viewIdentity)
-    {
+    guard let context = AuthoringContextStorage.current else {
+      return nil
+    }
+    let graphID = graphScopeID(for: context) ?? graphScopeID(from: context.viewIdentity)
+    let storageIdentity = stateStorageIdentity(
+      for: context.viewIdentity,
+      graphID: graphScopeID(for: context)
+    )
+    if let existing = rememberedLocation(for: storageIdentity) {
       return existing
     }
-    return currentLocation()
+    if let graphID {
+      return currentLocation(in: graphID)
+    }
+    return nil
   }
 
   /// Produces a type-erased binding for registration with the runtime.
@@ -95,6 +119,28 @@ public final class GestureStateBox<Value> {
     )
   }
 
+}
+
+@MainActor
+private final class GestureStateGraphBindingRegistry {
+  static let shared = GestureStateGraphBindingRegistry()
+
+  private var currentIdentityByBoxAndGraph: [ObjectIdentifier: [ViewGraphScopeID: Identity]] = [:]
+
+  func remember(
+    _ identity: Identity,
+    for boxID: ObjectIdentifier,
+    graphID: ViewGraphScopeID
+  ) {
+    currentIdentityByBoxAndGraph[boxID, default: [:]][graphID] = identity
+  }
+
+  func currentIdentity(
+    for boxID: ObjectIdentifier,
+    graphID: ViewGraphScopeID
+  ) -> Identity? {
+    currentIdentityByBoxAndGraph[boxID]?[graphID]
+  }
 }
 
 /// Narrow binding type accepted by `Gesture.updating(_:body:)`.
@@ -120,6 +166,9 @@ public struct GestureStateBinding<Value> {
 /// Structurally parallels `@State`: slot-ordinal storage keyed by
 /// source location, lazy-bound to the current `ViewNode` during body
 /// evaluation so reads/writes participate in the dependency tracker.
+/// Bound locations are graph-scoped for imperative gesture updates so reusing
+/// the same gesture-state box in another live render graph starts from that
+/// graph's own seed and reset lifecycle.
 @propertyWrapper
 @MainActor
 public struct GestureState<Value> {
@@ -169,19 +218,33 @@ public struct GestureState<Value> {
   ///      not-in-resolve-pass) or nil.
   @discardableResult
   private func activeLocation() -> GestureStateLocation<Value>? {
-    if let context = AuthoringContextStorage.current {
-      if ViewNodeContext.current != nil {
-        let location = makeLocation(for: context)
-        box.remember(location, for: context.viewIdentity)
-        _ = location.getValue()  // triggers dependency tracking
-        return location
-      }
-      // Not in a resolve pass -- action/lifecycle closure.
-      if let existing = box.rememberedLocation(for: context.viewIdentity) {
-        return existing
-      }
+    guard let context = AuthoringContextStorage.current else {
+      return nil
     }
-    return box.currentLocation()
+    let graphID = graphScopeID(for: context) ?? graphScopeID(from: context.viewIdentity)
+    let storageIdentity = stateStorageIdentity(
+      for: context.viewIdentity,
+      graphID: graphScopeID(for: context)
+    )
+
+    if ViewNodeContext.current != nil {
+      let location = makeLocation(for: context)
+      box.remember(
+        location,
+        for: storageIdentity,
+        graphID: graphID
+      )
+      _ = location.getValue()  // triggers dependency tracking
+      return location
+    }
+    // Not in a resolve pass -- action/lifecycle closure.
+    if let existing = box.rememberedLocation(for: storageIdentity) {
+      return existing
+    }
+    if let graphID {
+      return box.currentLocation(in: graphID)
+    }
+    return nil
   }
 
   private func makeLocation(

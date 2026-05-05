@@ -4,6 +4,10 @@ Stub Astro site that frames the
 [`Examples/WebExample`](../Examples/WebExample) WASI demo in an iframe.
 Deployed at <https://swifttui.io>.
 
+The site copy is the public marketing layer for the framework. Keep state,
+runtime, capability negotiation, and terminal-presentation safety claims
+aligned with the repo docs and DocC catalogs.
+
 The deploy workflow (`.github/workflows/cloudflare-pages.yml`) composes a
 single Cloudflare Pages artifact:
 

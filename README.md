@@ -36,6 +36,13 @@ let output = await MainActor.run {
 print(output)
 ```
 
+`DefaultRenderer` is intentionally snapshot-friendly. Reusing the same
+stateful view instance in no-invalidator tests or previews can carry
+imperative writes into later snapshots of that instance. Interactive
+`RunLoop` sessions scope those same dynamic-property writes to the runtime
+view graph that registered the callback, so reused view values do not leak
+state across live sessions.
+
 For full interactive applications, choose a platform integration package. For
 terminal-native executable apps, import `SwiftTUICLI`:
 
@@ -204,7 +211,8 @@ Common entry points:
 
 - [docs/STATUS.md](docs/STATUS.md): shipped surface and current constraints
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): target boundaries and frame pipeline
-- [docs/RUNTIME.md](docs/RUNTIME.md): lifecycle, state, and incremental rendering behavior
+- [docs/RUNTIME.md](docs/RUNTIME.md): lifecycle, graph-scoped state,
+  terminal presentation safety, and incremental rendering behavior
 - [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work
 - [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md): CPU and input-latency evaluation workflow
 - [Examples/README.md](Examples/README.md): maintained example apps

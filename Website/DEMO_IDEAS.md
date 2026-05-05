@@ -35,8 +35,12 @@ Order of importance for the **marketing / docs hybrid** the website is becoming:
 1. **It really runs in the browser.** No emulator shim. SwiftUI-shaped Swift, compiled to `wasm32-wasi`, drawing into integer cells.
 2. **The authoring story matches SwiftUI.** Anyone who has written SwiftUI should look at the source and say "yes, that is what I expected."
 3. **Layout is real.** Stacks, frames, lazy collections, custom layouts — not a textbox with absolute coordinates.
-4. **State is real.** `@State`, `@FocusState`, `@Binding`, `withAnimation`, `.task` all fire.
-5. **Capability negotiation is visible.** Toggle a theme, watch the truecolor / 256-color / 16-color fallback. Toggle Kitty graphics on/off.
+4. **State is real and session-scoped.** `@State`, `@FocusState`,
+   `@Binding`, `withAnimation`, `.task` all fire without leaking across
+   retained runtime graphs.
+5. **Capability negotiation is visible.** Toggle a theme, watch the truecolor
+   / 256-color / 16-color fallback. Toggle Kitty graphics on/off; links and
+   text still pass through the sanitized terminal presentation boundary.
 6. **Multi-scene works.** Show that one `App` declaration owns more than one `WindowGroup` and the browser host can switch between them.
 
 A demo that hits 3 of these will already be more compelling than a counter.

@@ -12,6 +12,25 @@ the framework must reconnect each `@State` declaration to the correct
 persisted value. The strategies differ in *how* they identify "the correct
 value."
 
+SwiftTUI's current implementation uses source-location slots under the
+authored view identity, then scopes live imperative callbacks to the runtime
+view graph that registered them. That means:
+
+- a surviving owner reconnects to state by `(view identity path,
+  source-location slot)`
+- the same stateful view value rendered into two different live graphs gets
+  separate graph-scoped storage
+- button actions, key-command handlers, projected bindings, and gesture updates
+  mutate the graph that registered the callback rather than whichever graph
+  most recently resolved the same view value
+- no-invalidator `DefaultRenderer` snapshots keep the same-instance fallback
+  used by tests and previews: reusing the same view instance can carry an
+  imperative write into a later snapshot of that instance
+
+The graph scope is an implementation detail of dynamic-property storage. It is
+not a new public identity namespace, and it does not change the owner-placement
+rule later in this document.
+
 ---
 
 ## The problem

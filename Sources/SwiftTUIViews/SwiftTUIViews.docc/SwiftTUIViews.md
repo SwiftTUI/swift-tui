@@ -12,7 +12,7 @@ It provides:
 - first-class public modifier algebra through ``ViewModifier``,
   ``View/modifier(_:)``, and ``ModifiedContent``
 - typed builders through ``ViewBuilder``
-- state and data flow through ``State``, ``Binding``, and ``Bindable``
+- graph-scoped state and data flow through ``State``, ``Binding``, and ``Bindable``
 - environment and focused-value access through ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
 - geometry-bound preferences through `Anchor`, `AnchorSource`, and
   ``GeometryProxy``

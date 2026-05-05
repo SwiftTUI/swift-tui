@@ -18,7 +18,8 @@ The repository [README.md](../README.md) is the public landing page.
 
 - [STATUS.md](STATUS.md) — shipped surface, current constraints, and short-term gaps
 - [ARCHITECTURE.md](ARCHITECTURE.md) — package boundaries and the frame pipeline
-- [RUNTIME.md](RUNTIME.md) — lifecycle, state, observation, and incremental rendering
+- [RUNTIME.md](RUNTIME.md) — lifecycle, graph-scoped state, observation,
+  presentation safety, and incremental rendering
 - [ASYNC_RENDERING.md](ASYNC_RENDERING.md) — async presentation and frame-tail offload
 - [VISION.md](VISION.md) — philosophy, scope, and deferred work
 - [TOOLCHAINS.md](TOOLCHAINS.md) — Swift, wasm, Bun, Xcode, Android toolchain story
@@ -32,7 +33,8 @@ The repository [README.md](../README.md) is the public landing page.
 - [PERFORMANCE_EVALUATION.md](PERFORMANCE_EVALUATION.md) — local CPU-versus-latency scenario runs, artifacts, and comparison workflow
 - [EMBEDDING.md](EMBEDDING.md) — terminal-program embedding through `TerminalView` and `TerminalProcessSession`
 - [FOCUS.md](FOCUS.md) — focus traversal, focused values, default-focus behavior
-- [STATE_KEYING.md](STATE_KEYING.md) — retained-graph state-keying rules and authored-view identity
+- [STATE_KEYING.md](STATE_KEYING.md) — graph-scoped state-keying rules,
+  snapshot fallback behavior, and authored-view identity
 
 ## Platform Packaging
 

@@ -14,7 +14,16 @@ That gives the framework a few important properties:
 
 Use ``State`` for local value ownership and ``Binding`` for projection into child views.
 
-`@State` storage is keyed by view identity path plus source location, not by reference identity. That means moving a stateful view to a different identity path creates a distinct state slot, which matches SwiftUI-style expectations.
+`@State` storage is keyed by view identity path plus source location, not by
+reference identity. That means moving a stateful view to a different identity
+path creates a distinct state slot, which matches SwiftUI-style expectations.
+
+Interactive runtime callbacks are additionally scoped to the view graph that
+registered them. Projected bindings, button actions, key commands, dismiss
+closures, and gesture updates therefore keep mutating the runtime graph they
+came from even when the same view value is reused elsewhere. No-invalidator
+`DefaultRenderer` snapshots preserve test ergonomics by letting a reused view
+instance carry imperative writes into a later snapshot of that same instance.
 
 ## Observation
 

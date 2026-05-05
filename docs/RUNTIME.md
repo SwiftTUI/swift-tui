@@ -186,6 +186,9 @@ The shipped ownership model is split into three categories:
 ### State Model
 
 - `@State` persistence is keyed by view identity path plus source location
+- Live runtime writes are additionally scoped to the `ViewGraph` that
+  registered the callback, so the same stateful view instance can be mounted
+  in another live graph without inheriting the first graph's imperative writes
 - Rebinding the same view instance into a different identity path creates a different state slot
 - Keying only preserves state while the owning identity survives. State that
   must outlive active-tab bodies, deferred content, or presentation churn
@@ -197,10 +200,18 @@ The shipped ownership model is split into three categories:
   alone should not force the same reset
 - `StateContainer` invalidates only when an `Equatable` state change actually changes value
 - Projected bindings and local actions route through the same invalidation path
-- Direct local actions restore the dynamic-property scope they were registered under so mutations remain bound to the right runtime scope
+- Direct local actions restore the dynamic-property scope they were registered
+  under so mutations remain bound to the right runtime graph
 - Button actions, key-command handlers, dismiss closures, projected bindings,
   and other imperative paths must preserve that same authoring and
   dynamic-property scope so each path invalidates the same owner
+- `@GestureState` follows the same graph-scoped binding lookup for imperative
+  gesture updates, while still resetting to its construction-time seed when
+  the gesture ends
+- No-invalidator `DefaultRenderer` snapshots preserve same-instance test and
+  preview ergonomics: if a reused view instance receives an imperative write,
+  a later snapshot of that same instance can observe it even when no live
+  invalidator exists
 
 ### Environment Model
 
@@ -247,6 +258,9 @@ The runtime is materially incremental in common steady-state paths, but it is no
 - `WindowGroup` roots render through a full-canvas window host that sizes itself to the current terminal proposal and clips drawing to terminal bounds
 - `TerminalHost` keeps the previous `RasterSurface`
 - `TerminalPresentationPlanner` emits row-batched incremental text updates when the previous and current surfaces are compatible
+- `TerminalSurfaceRenderer` is the terminal-safety boundary: authored text and
+  OSC 8 hyperlink destinations are sanitized during presentation so raster
+  content cannot inject terminal control sequences into the output stream
 - Kitty-backed image presentation is planned separately from text diffing: dirty text rows trigger targeted re-placement, while attachment-layout changes fall back to a graphics-only full replay without forcing a text full repaint
 - Row batches preserve logical span metadata, normalize around continuation cells, and share style/hyperlink state across disjoint edits on the same row
 - Tail-only text shrink can lower to terminal-native erase-to-end-of-line when the host is running on

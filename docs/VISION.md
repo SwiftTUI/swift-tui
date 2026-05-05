@@ -15,7 +15,7 @@ The package aims to match SwiftUI semantics as closely as the terminal domain al
 - Layout is recursive parent-child negotiation, not global constraint solving
 - A parent proposes a size, a child chooses, and the parent places the child
 - Modifier order matters because modifiers participate in layout and semantics
-- State drives rendering, not the reverse
+- Graph-scoped state drives rendering, not the reverse
 - `Layout` is the public surface of custom layout participation
 - Focus should belong to authored controls rather than incidental containers, and explicit focus modifiers should remain authoritative
 
@@ -30,7 +30,8 @@ SwiftTUI is intentionally not implementing every SwiftUI concept.
 What that means in practice:
 
 - Layout primitives come first: stacks, frames, padding, overlays, scrolling, and custom layouts
-- State and environment come next: `@State`, `@Binding`, `@Observable`, focused values, and focus bindings
+- State and environment come next: graph-scoped `@State`, `@Binding`,
+  `@Observable`, focused values, and focus bindings
 - Runtime correctness comes next: lifecycle ownership, task staging, and incremental terminal presentation
 - Broader orchestration APIs such as stack navigation, sheets, and popovers arrive only after the foundation is firm
 - Terminal-only chrome that would bend the public authoring story away from SwiftUI does not belong in the core library

@@ -11,7 +11,8 @@ Use it when you want to:
 - resolve or render a `View` into inspectable frame artifacts
 - run an interactive terminal session with `RunLoop`
 - parse terminal input and signals
-- present rasterized output with capability-aware ANSI rendering
+- present rasterized output with capability-aware ANSI rendering and
+  presentation-boundary terminal sanitization
 
 `SwiftTUI` re-exports `View` and `Core`, so importing `SwiftTUI` is the normal entry point for most applications and examples.
 

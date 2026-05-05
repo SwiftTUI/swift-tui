@@ -1,5 +1,17 @@
 package import SwiftTUICore
 
+struct ViewGraphScopeID: Hashable, Sendable {
+  fileprivate let rawValue: UInt
+
+  package init(_ viewGraph: SwiftTUICore.ViewGraph) {
+    rawValue = UInt(bitPattern: ObjectIdentifier(viewGraph))
+  }
+
+  package init(rawValue: UInt) {
+    self.rawValue = rawValue
+  }
+}
+
 @MainActor
 package struct AuthoringContext {
   /// Owner identity — used for invalidation routing, `@State` ownership,
@@ -48,6 +60,48 @@ package func currentAuthoringContext() -> AuthoringContext? {
 }
 
 @MainActor
+func graphScopeID(for context: AuthoringContext?) -> ViewGraphScopeID? {
+  context?.viewNode?.ownerGraph.map(ViewGraphScopeID.init)
+}
+
+// Graph-scoped identities are internal storage identities. Public invalidation
+// and authored structural identities continue to use the base view identity.
+let stateGraphIdentityPrefix = "__SwiftTUIStateGraph["
+let stateGraphIdentitySuffix = "]"
+
+func stateStorageIdentity(
+  for viewIdentity: Identity,
+  graphID: ViewGraphScopeID?
+) -> Identity {
+  guard let graphID else {
+    return viewIdentity
+  }
+  return viewIdentity.child(
+    "\(stateGraphIdentityPrefix)\(graphID.rawValue)\(stateGraphIdentitySuffix)")
+}
+
+func graphScopeID(from identity: Identity) -> ViewGraphScopeID? {
+  guard
+    let component = identity.lastComponent,
+    component.hasPrefix(stateGraphIdentityPrefix),
+    component.hasSuffix(stateGraphIdentitySuffix)
+  else {
+    return nil
+  }
+
+  let start = component.index(component.startIndex, offsetBy: stateGraphIdentityPrefix.count)
+  let end = component.index(component.endIndex, offsetBy: -stateGraphIdentitySuffix.count)
+  guard let rawValue = UInt(component[start..<end]) else {
+    return nil
+  }
+  return ViewGraphScopeID(rawValue: rawValue)
+}
+
+func baseStateStorageIdentity(from identity: Identity) -> Identity {
+  graphScopeID(from: identity) == nil ? identity : identity.parent ?? identity
+}
+
+@MainActor
 package func makeAuthoringContext(
   for context: ResolveContext,
   viewNode: SwiftTUICore.ViewNode? = ViewNodeContext.current
@@ -93,6 +147,7 @@ package func makeDeferredAuthoringContext(
   ordinalTracker.freeze()
   return AuthoringContext(
     viewIdentity: context.viewIdentity,
+    structuralIdentity: context.structuralIdentity,
     focusedValues: context.focusedValues,
     viewNode: context.viewNode,
     ordinalTracker: ordinalTracker
@@ -119,8 +174,12 @@ package func withAuthoringContext<Result>(
   }
 }
 
-/// A sendable snapshot of the authoring identity an imperative callback should
-/// mutate through when it fires outside a resolve pass.
+/// A sendable snapshot of the graph-scoped authoring identity an imperative
+/// callback should mutate through when it fires outside a resolve pass.
+///
+/// The snapshot intentionally stores identity and focused values only. It must
+/// not retain the `ViewNode`; callbacks recover the current graph-bound state
+/// location through the identity captured at registration time.
 package struct ImperativeAuthoringContextSnapshot: Sendable {
   package let viewIdentity: Identity
   package let focusedValues: FocusedValues
@@ -130,7 +189,10 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
     guard let context else {
       return nil
     }
-    viewIdentity = context.viewIdentity
+    viewIdentity = stateStorageIdentity(
+      for: context.viewIdentity,
+      graphID: graphScopeID(for: context)
+    )
     focusedValues = context.focusedValues
   }
 
@@ -237,6 +299,7 @@ private struct DynamicStateLocation<Value> {
 private final class StateBox<Value> {
   private let slotOrdinal: Int
   private var seedValue: Value
+  private var boundLocationsByIdentity: [Identity: DynamicStateLocation<Value>]
   private var retainedValuesByIdentity: [Identity: Value]
 
   init(
@@ -245,6 +308,7 @@ private final class StateBox<Value> {
   ) {
     self.slotOrdinal = slotOrdinal
     self.seedValue = seedValue
+    boundLocationsByIdentity = [:]
     retainedValuesByIdentity = [:]
   }
 
@@ -256,6 +320,38 @@ private final class StateBox<Value> {
     seedValue = newValue
   }
 
+  func remember(
+    _ location: DynamicStateLocation<Value>,
+    for identity: Identity,
+    graphID: ViewGraphScopeID?
+  ) {
+    boundLocationsByIdentity[identity] = location
+    if let graphID {
+      StateGraphBindingRegistry.shared.remember(
+        identity,
+        for: ObjectIdentifier(self),
+        graphID: graphID
+      )
+    }
+  }
+
+  func rememberedLocation(for identity: Identity) -> DynamicStateLocation<Value>? {
+    boundLocationsByIdentity[identity]
+  }
+
+  func currentLocation(
+    in viewGraphID: ViewGraphScopeID
+  ) -> DynamicStateLocation<Value>? {
+    guard
+      let identity = StateGraphBindingRegistry.shared.currentIdentity(
+        for: ObjectIdentifier(self),
+        graphID: viewGraphID
+      )
+    else {
+      return nil
+    }
+    return boundLocationsByIdentity[identity]
+  }
 
   func retainedValue(
     for identity: Identity
@@ -275,12 +371,41 @@ private final class StateBox<Value> {
   }
 }
 
+@MainActor
+private final class StateGraphBindingRegistry {
+  static let shared = StateGraphBindingRegistry()
+
+  private var currentIdentityByBoxAndGraph: [ObjectIdentifier: [ViewGraphScopeID: Identity]] = [:]
+
+  func remember(
+    _ identity: Identity,
+    for boxID: ObjectIdentifier,
+    graphID: ViewGraphScopeID
+  ) {
+    currentIdentityByBoxAndGraph[boxID, default: [:]][graphID] = identity
+  }
+
+  func currentIdentity(
+    for boxID: ObjectIdentifier,
+    graphID: ViewGraphScopeID
+  ) -> Identity? {
+    currentIdentityByBoxAndGraph[boxID]?[graphID]
+  }
+}
+
 @propertyWrapper
 @MainActor
-/// Local value storage owned by a view identity.
+/// Local value storage owned by a view identity within a runtime graph.
 ///
 /// `@State` persistence is keyed by the view's identity path plus source
-/// location within that view.
+/// location within that view. Interactive runtime callbacks, bindings, and
+/// local actions use a graph-scoped storage identity so reusing the same view
+/// value in a different live graph does not leak mutations across sessions.
+///
+/// Snapshot-style renders without an invalidating runtime graph retain the
+/// same-instance fallback used by one-shot tests and previews: if you reuse the
+/// same stateful view instance with `DefaultRenderer`, imperative writes can
+/// feed a later snapshot of that same instance.
 public struct State<Value> {
   private let box: StateBox<Value>
 
@@ -338,31 +463,81 @@ public struct State<Value> {
     guard let context = AuthoringContextStorage.current else {
       return nil
     }
+    let graphID = graphScopeID(for: context) ?? graphScopeID(from: context.viewIdentity)
+    let storageIdentity = stateStorageIdentity(
+      for: context.viewIdentity,
+      graphID: graphScopeID(for: context)
+    )
 
-    let location = makeLocation(for: context)
     if ViewNodeContext.current != nil {
+      let location = makeLocation(
+        for: context,
+        storageIdentity: storageIdentity
+      )
+      box.remember(
+        location,
+        for: storageIdentity,
+        graphID: graphID
+      )
       _ = location.getValue()
+      return location
     }
-    return location
+
+    if let location = box.rememberedLocation(for: storageIdentity) {
+      return location
+    }
+
+    if let viewGraphID = graphID,
+      let location = box.currentLocation(in: viewGraphID)
+    {
+      return location
+    }
+    return nil
   }
 
   private func makeLocation(
-    for context: AuthoringContext
+    for context: AuthoringContext,
+    storageIdentity: Identity
   ) -> DynamicStateLocation<Value> {
     let ordinal = box.currentOrdinal
-    let retainedSeed = box.retainedValue(for: context.viewIdentity) ?? box.currentSeedValue()
+    let baseIdentity = baseStateStorageIdentity(from: storageIdentity)
+    let baseRetainedSeed =
+      baseIdentity == storageIdentity ? nil : box.retainedValue(for: baseIdentity)
+    let retainedSeed =
+      box.retainedValue(for: storageIdentity) ?? baseRetainedSeed ?? box.currentSeedValue()
 
     if let viewNode = context.viewNode {
       return DynamicStateLocation(
-        getValue: {
-          viewNode.stateSlot(
+        getValue: { [weak viewNode, weak box] in
+          guard let viewNode else {
+            if let retainedValue = box?.retainedValue(for: storageIdentity) {
+              return retainedValue
+            }
+            if baseIdentity != storageIdentity,
+              let retainedValue = box?.retainedValue(for: baseIdentity)
+            {
+              return retainedValue
+            }
+            return retainedSeed
+          }
+          return viewNode.stateSlot(
             ordinal: ordinal,
             seed: retainedSeed
           )
         },
-        setValue: { newValue in
-          viewNode.setStateSlot(ordinal: ordinal, value: newValue)
-          box.storeRetainedValue(newValue, for: context.viewIdentity)
+        setValue: { [weak viewNode, weak box] newValue in
+          if let viewNode {
+            viewNode.setStateSlot(ordinal: ordinal, value: newValue)
+            box?.storeRetainedValue(newValue, for: storageIdentity)
+            if baseIdentity != storageIdentity, viewNode.invalidator == nil {
+              box?.storeRetainedValue(newValue, for: baseIdentity)
+            }
+          } else {
+            box?.storeRetainedValue(newValue, for: storageIdentity)
+            if baseIdentity != storageIdentity {
+              box?.storeRetainedValue(newValue, for: baseIdentity)
+            }
+          }
         }
       )
     }

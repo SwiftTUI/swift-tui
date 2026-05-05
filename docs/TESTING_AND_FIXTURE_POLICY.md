@@ -46,6 +46,13 @@ not as the default place for every new assertion.
 - When behavior depends on input dispatch, selective invalidation, or
   presentation timing, reproduce and assert through the real runtime path
   instead of only invoking direct handlers.
+- For same-view-instance state behavior, choose the host intentionally:
+  no-invalidator `DefaultRenderer` snapshots preserve same-instance test
+  ergonomics, while `RunLoop` or invalidator-backed render graphs prove live
+  graph isolation.
+- For terminal-presentation safety, assert the emitted byte stream at the
+  presentation boundary, including both authored text control scalars and
+  OSC 8 hyperlink destinations.
 - Add composed-path regressions for wrapper-hosted, scene-hosted, or
   otherwise nested runtime bugs; plain inner-content canaries often miss
   host-reconciliation failures.

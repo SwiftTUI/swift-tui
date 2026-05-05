@@ -223,6 +223,11 @@ extension TerminalCapabilityProfile {
 
 /// Renders a raster surface into terminal text for a specific capability
 /// profile.
+///
+/// This is the terminal presentation boundary. It adapts glyphs, style, color,
+/// and hyperlink support for the selected profile, and sanitizes authored text
+/// and OSC 8 link destinations so raster content cannot inject terminal control
+/// sequences into the output stream.
 public struct TerminalSurfaceRenderer {
   public let capabilityProfile: TerminalCapabilityProfile
 
@@ -1151,7 +1156,27 @@ extension TerminalSurfaceRenderer {
   private func sanitizedHyperlinkDestination(
     _ destination: String
   ) -> String {
-    String(destination.unicodeScalars.filter { !$0.properties.isControl })
+    var sanitized = String()
+    sanitized.reserveCapacity(destination.count)
+
+    var shouldDropStringTerminator = false
+    for scalar in destination.unicodeScalars {
+      if scalar.value == 0x1B {
+        shouldDropStringTerminator = true
+        continue
+      }
+      if scalar.isTerminalControlScalar {
+        continue
+      }
+      if shouldDropStringTerminator && scalar.value == 0x5C {
+        shouldDropStringTerminator = false
+        continue
+      }
+
+      shouldDropStringTerminator = false
+      sanitized.unicodeScalars.append(scalar)
+    }
+    return sanitized
   }
 
   private func closeHyperlinkSequence() -> String {
@@ -1256,4 +1281,10 @@ extension TerminalSurfaceRenderer {
     return 16 + (36 * red) + (6 * green) + blue
   }
 
+}
+
+extension Unicode.Scalar {
+  fileprivate var isTerminalControlScalar: Bool {
+    value < 0x20 || (value >= 0x7F && value <= 0x9F)
+  }
 }

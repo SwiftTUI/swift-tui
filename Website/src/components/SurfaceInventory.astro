@@ -18,7 +18,7 @@ const authoring: Group[] = [
     title: "Controls & primitives",
     rows: [
       { name: "Text · TextFigure", note: "FIGlet rendering that respects the proposed size, with embedded fonts" },
-      { name: "Button · Link · Label", note: "OSC 8 hyperlink emission when supported" },
+      { name: "Button · Link · Label", note: "sanitized OSC 8 hyperlinks when supported" },
       { name: "Toggle · Stepper · Slider", note: "" },
       { name: "TextField · TextEditor · SecureField", note: "" },
       { name: "Picker · Menu · DisclosureGroup", note: "" },
@@ -39,7 +39,7 @@ const authoring: Group[] = [
   {
     title: "Environment · observation · focus",
     rows: [
-      { name: "@State · @Binding · @Bindable", note: "@Bindable integrated with the @State invalidation path" },
+      { name: "@State · @Binding · @Bindable", note: "graph-scoped invalidation and observation path" },
       { name: "@FocusState · FocusedValues · @FocusedValue · @FocusedBinding", note: "" },
       { name: "PreferenceKey · anchor preferences", note: "subtree readers, OpenLinkAction, .task(...)" },
     ],
@@ -50,7 +50,7 @@ const runtime: Group[] = [
   {
     title: "Runtime surface",
     rows: [
-      { name: "DefaultRenderer", note: "single-frame rendering and main-actor pipeline inspection" },
+      { name: "DefaultRenderer", note: "snapshot rendering and main-actor pipeline inspection" },
       { name: "RunLoop", note: "interactive terminal sessions" },
       { name: "TerminalHost · TerminalRenderStyle", note: "capability-aware presentation, theme swap" },
       { name: "Keyboard · mouse · signals", note: "Unix signal handling and runtime scheduling" },

@@ -25,6 +25,12 @@ It gives you:
 
 That makes it useful for snapshot tests, previews, and deep debugging.
 
+When there is no invalidating runtime graph, `DefaultRenderer` keeps snapshot
+tests ergonomic: reusing the same stateful view instance can carry imperative
+writes into later snapshots of that instance. In an interactive ``RunLoop``
+session, the same callback paths are scoped to the view graph that registered
+them so reused view values do not leak state across live sessions.
+
 ## `RunLoop`
 
 `RunLoop` is the interactive runtime. It coordinates:

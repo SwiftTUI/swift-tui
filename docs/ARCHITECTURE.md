@@ -122,6 +122,9 @@ an integer cell as a fallback.
 
 - `Rasterizer` converts draw commands into a cell surface with styled runs
 - Terminal capability adaptation is not part of layout; it happens later during presentation
+- Raster cells are data, not terminal bytes. The presentation layer is
+  responsible for sanitizing control scalars and hyperlink destinations before
+  writing to a terminal stream.
 
 ### Commit
 
@@ -223,6 +226,9 @@ itself remains library-only.
   host and can synthesize the default semantic theme when no explicit host theme
   is provided
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
+- Presentation sanitizes authored text and OSC 8 hyperlink destinations before
+  emitting terminal bytes; layout, semantics, and raster artifacts never need to
+  encode terminal-control safety rules themselves
 - Terminal capability affects presentation, not layout semantics
 
 ## Transitional Seams

@@ -4,8 +4,8 @@ const points = [
     n: "01",
     title: "SwiftUI semantics, not a clone",
     body:
-      "Recursive parent-child layout. State drives rendering, not the reverse. Modifier order matters because modifiers participate in layout and semantics. The terminal target does not bend the authoring story.",
-    sym: "@MainActor · View · Layout",
+      "Recursive parent-child layout. Graph-scoped state drives rendering, not the reverse. Modifier order matters because modifiers participate in layout and semantics. The terminal target does not bend the authoring story.",
+    sym: "@MainActor · View · @State · Layout",
   },
   {
     n: "02",
@@ -25,7 +25,7 @@ const points = [
     n: "04",
     title: "Capability-aware, not lowest-common-denominator",
     body:
-      "ANSI, OSC 8 hyperlinks, Kitty graphics, Sixel, truecolor, and mouse reporting are negotiated per session against a live capability profile. PNG and baseline JPEG decode in pure Swift; GIF playback ships in the AnimatedImage peer product.",
+      "ANSI, sanitized OSC 8 hyperlinks, Kitty graphics, Sixel, truecolor, and mouse reporting are negotiated per session against a live capability profile. PNG and baseline JPEG decode in pure Swift; GIF playback ships in the AnimatedImage peer product.",
     sym: "TerminalCapabilityProfile",
   },
   {

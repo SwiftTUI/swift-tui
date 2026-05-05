@@ -98,7 +98,8 @@ Sources/SwiftTUI/
 
 - `Terminal/TerminalHost.swift`: defines the `PresentationSurface` protocol (the `RunLoop`'s pluggable presentation target) plus the fd-backed `TerminalHost` and WASI-facing `WebTerminalHost` implementations
 - `Terminal/StreamingTerminalHost.swift`: closure-backed `PresentationSurface` for embedded hosts that don't own a file descriptor
-- `Terminal/TerminalPresentation.swift`: capability-aware surface diffing and text presentation
+- `Terminal/TerminalPresentation.swift`: capability-aware surface diffing,
+  sanitized text presentation, and OSC 8 hyperlink lowering
 - `Terminal/TerminalAppearanceDetection.swift`: appearance probing
 - `Terminal/TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability detection
 - `Terminal/TerminalImageRendering.swift`: image protocol emitters and cell fallback rendering
@@ -348,7 +349,9 @@ Sources/SwiftTUICore/
 
 - `Foundation/AnyView.swift`, `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`, `Foundation/ViewCompositionHelpers.swift`, `Foundation/ViewFoundation.swift`, and `Foundation/ViewModifier.swift`: `View`, `ViewModifier`, `ModifiedContent`, `Resolver`, `AnyView`, style primitives, and internal composition helpers
 - `ViewBuilder/ViewBuilder.swift`, `ViewBuilder/TupleView.swift`, `ViewBuilder/ConditionalContentView.swift`, `ViewBuilder/VariadicView.swift`, and `ViewBuilder/EmptyView.swift`: typed builder artifacts and builder machinery
-- `State/State.swift`, `State/FocusState.swift`, and `State/FocusedValue.swift`: `@State`, focus bindings, and focused-value projections
+- `State/State.swift`, `State/GestureState.swift`, `State/FocusState.swift`,
+  and `State/FocusedValue.swift`: graph-scoped dynamic state, gesture state,
+  focus bindings, and focused-value projections
 - `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
 - `Focus/DefaultFocus.swift`: default-focus modifiers and focus defaults
 - `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
