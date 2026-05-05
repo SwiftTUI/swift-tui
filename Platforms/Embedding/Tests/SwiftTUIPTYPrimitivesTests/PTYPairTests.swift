@@ -9,7 +9,7 @@ import Testing
   import Glibc
 #endif
 
-@Suite("PTYPair")
+@Suite("PTYPair", .serialized)
 struct PTYPairTests {
   @Test("init from handles exposes masterFD and slavePath")
   func initFromHandles() async throws {
