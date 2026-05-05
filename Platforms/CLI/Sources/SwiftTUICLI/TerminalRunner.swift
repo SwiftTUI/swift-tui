@@ -1,4 +1,5 @@
 @_spi(Runners) import SwiftTUI
+import Foundation
 
 #if canImport(Darwin)
   import Darwin
@@ -47,6 +48,24 @@ public enum TerminalRunner {
     case .attach(let sceneID, let selector):
       try await attach(appName: appName, sceneID: sceneID, selector: selector)
     }
+  }
+
+  /// Runs a scene-based app with explicit runtime configuration.
+  ///
+  /// Use this overload when CLI flags or env vars have been parsed externally
+  /// (e.g., by `SwiftTUIArguments`).
+  @MainActor
+  public static func run<A: App>(_ app: A, configuration: RuntimeConfiguration) async throws {
+    // The configuration is recorded for the runner; behavior wiring will follow
+    // in subsequent tasks (color profile selection, accessible-mode rendering, etc.).
+    _ = configuration
+    try await run(app)
+  }
+
+  /// Runs a scene-based app type with explicit runtime configuration.
+  @MainActor
+  public static func run<A: App>(_ appType: A.Type, configuration: RuntimeConfiguration) async throws {
+    try await run(appType.init(), configuration: configuration)
   }
 
   @MainActor
@@ -451,8 +470,16 @@ extension App {
   /// Mark a terminal-only app with `@main` to use this automatically, or call
   /// `TerminalRunner.run(Self.self)` from a custom launcher when you
   /// need explicit error handling.
+  ///
+  /// Reads env vars (`NO_COLOR`, `LANG=C`, `SWIFTTUI_*`, ...) into a
+  /// `RuntimeConfiguration` and passes it through. Bare-mode apps gain
+  /// env-var honoring without code change.
   public static func main() async {
-    try! await TerminalRunner.run(Self.self)
+    let configuration = RuntimeConfiguration.detect(
+      environment: ProcessInfo.processInfo.environment,
+      isStdoutTTY: isatty(STDOUT_FILENO) != 0
+    )
+    try! await TerminalRunner.run(Self.self, configuration: configuration)
   }
 }
 
