@@ -71,7 +71,8 @@ extension RuntimeConfiguration {
       guard let v = environment["SWIFTTUI_WEB"], !v.isEmpty, v != "0" else { return nil }
       let port = environment["SWIFTTUI_PORT"].flatMap(Int.init) ?? 0
       let bind = environment["SWIFTTUI_BIND"] ?? "127.0.0.1"
-      let openBrowser = !((environment["SWIFTTUI_NO_OPEN"].map { !$0.isEmpty && $0 != "0" }) ?? false)
+      let isNoOpen = environment["SWIFTTUI_NO_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
+      let openBrowser = !isNoOpen
       return WebConfig(port: port, bind: bind, openBrowser: openBrowser)
     }()
 
