@@ -873,13 +873,35 @@ extension TerminalSurfaceRenderer {
   private func renderedCharacter(
     for cell: RasterCell
   ) -> String {
+    let sanitizedCharacter = sanitizedTerminalCharacter(cell.character)
     if capabilityProfile.glyphLevel == .ascii {
       return degradedASCIIText(
-        character: cell.character,
+        character: sanitizedCharacter,
         spanWidth: max(1, cell.spanWidth)
       )
     }
-    return String(cell.character)
+    return String(sanitizedCharacter)
+  }
+
+  private func sanitizedTerminalCharacter(
+    _ character: Character
+  ) -> Character {
+    let scalars = character.unicodeScalars
+    if scalars.allSatisfy(isUnsafeTerminalControlScalar) {
+      return "�"
+    }
+    return character
+  }
+
+  private func isUnsafeTerminalControlScalar(
+    _ scalar: UnicodeScalar
+  ) -> Bool {
+    switch scalar.value {
+    case 0x00...0x1F, 0x7F...0x9F:
+      return true
+    default:
+      return false
+    }
   }
 
   /// Builds the SGR escape sequence for `style` directly into a String,
