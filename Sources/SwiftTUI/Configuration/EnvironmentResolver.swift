@@ -8,8 +8,10 @@ extension RuntimeConfiguration {
   /// Precedence within env-var resolution:
   /// 1. `NO_COLOR` always wins over `FORCE_COLOR`
   /// 2. `CLICOLOR=0` disables color; `CLICOLOR_FORCE` forces it
-  /// 3. `SWIFTTUI_PLAIN=1` implies `--no-color --ascii --reduce-motion`
-  /// 4. CLI flags (in `SwiftTUIArguments`) layer on top of this result
+  /// 3. `SWIFTTUI_JSON=1` wins over `SWIFTTUI_ACCESSIBLE=1`
+  /// 4. Accessible output implies ASCII, reduced motion, no progress, and linear output
+  /// 5. `SWIFTTUI_PLAIN=1` implies `--no-color --ascii --reduce-motion`
+  /// 6. CLI flags (in `SwiftTUIArguments`) layer on top of this result
   public static func detect(
     environment: [String: String],
     isStdoutTTY: Bool
@@ -64,6 +66,13 @@ extension RuntimeConfiguration {
       colorResolved = .never
       glyphsResolved = .ascii
       motion = .reduced
+    }
+
+    if output == .accessible {
+      glyphsResolved = .ascii
+      motion = .reduced
+      noProgress = true
+      linear = true
     }
 
     // Web config.
