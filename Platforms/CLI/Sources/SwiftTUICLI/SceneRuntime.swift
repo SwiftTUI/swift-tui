@@ -20,7 +20,7 @@ final class SceneRuntime {
   let selection: SelectedWindowScene
   let isPrimary: Bool
   private(set) var lifecycle: SceneLifecycle
-  private let ptyPair: PtyPair?
+  private let ptyPair: ScenePty?
   private let resources: SceneSessionResources
   private let stateContainer: StateContainer<SceneSessionState>
   private let focusTracker: FocusTracker
@@ -63,7 +63,7 @@ final class SceneRuntime {
         diagnosticsLogger: diagnosticsLogger
       )
     } else {
-      let pty = try PtyPair()
+      let pty = try ScenePty()
       ptyPair = pty
       let environment = ProcessInfo.processInfo.environment
       let isTTY = isatty(pty.masterFD) != 0
@@ -142,7 +142,10 @@ final class SceneRuntime {
   }
 
   func shutdown() {
-    ptyPair?.close()
+    guard let ptyPair else { return }
+    Task {
+      await ptyPair.close()
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -216,7 +219,7 @@ final class SceneRuntime {
     guard let pty = ptyPair else { return true }
 
     while !Task.isCancelled {
-      if pty.hasAttachedClient() {
+      if await pty.hasAttachedClient() {
         if lifecycle.clientAttached() {
           onAttachmentChanged(true)
         }

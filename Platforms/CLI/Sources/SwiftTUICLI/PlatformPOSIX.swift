@@ -191,18 +191,4 @@
     return clientFileDescriptor
   }
 
-  @inline(__always)
-  func sceneTTYName(
-    _ fileDescriptor: Int32
-  ) -> String? {
-    var buffer = [CChar](repeating: 0, count: 1024)
-    let result = unsafe ttyname_r(fileDescriptor, &buffer, buffer.count)
-    guard result == 0 else {
-      return nil
-    }
-    return String(
-      decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) },
-      as: UTF8.self
-    )
-  }
 #endif
