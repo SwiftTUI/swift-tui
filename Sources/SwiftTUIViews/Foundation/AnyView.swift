@@ -5,7 +5,8 @@ package import SwiftTUICore
 /// Use `AnyView` when a call site must store heterogeneous view values while
 /// still participating in the normal authored `View` surface. Prefer typed
 /// `@ViewBuilder` composition and generic `Content: View` storage when those
-/// are practical.
+/// are practical. See the ``AnyView`` article for usage examples and identity
+/// behavior.
 public struct AnyView: View, ResolvableView {
   private let storage: AnyViewStorage
 

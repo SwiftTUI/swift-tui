@@ -140,7 +140,15 @@ Checked-in Swift sources should stay inside the structured concurrency model.
 `AnyView` remains part of the supported surface as a narrow type-erasure escape hatch,
 but it is not the default authoring model for this package.
 
+Consumer examples live in
+[`Sources/SwiftTUIViews/SwiftTUIViews.docc/AnyView.md`](../Sources/SwiftTUIViews/SwiftTUIViews.docc/AnyView.md).
+Maintainer examples and review guidance live in
+[`ANYVIEW_INTERNALS.md`](ANYVIEW_INTERNALS.md).
+
 - Prefer typed `@ViewBuilder` closures and generic `Content: View` storage.
+- Do not approve `AnyView` usage solely because the same shape is common in
+  SwiftUI examples. SwiftTUI documents a real retained-graph payload boundary,
+  and terminal rendering makes unnecessary structural churn more expensive.
 - `AnyView` is type-aware in the retained graph: the same erased static payload
   type preserves the payload subtree, while a changed erased static payload type
   replaces that subtree through normal `ViewGraph` structural removal.
