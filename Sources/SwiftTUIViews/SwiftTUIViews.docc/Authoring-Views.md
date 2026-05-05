@@ -33,6 +33,17 @@ The core container and control surface is already broad enough for many dashboar
 
 Use built-in containers first. Reach for custom ``Layout`` only when the authored structure genuinely has a reusable layout rule that stacks and frames cannot express clearly.
 
+## Type Erasure
+
+Prefer typed `@ViewBuilder` composition, `some View` helpers, and generic
+`Content: View` storage. Use ``AnyView`` only at deliberate boundaries where a
+call site must store or transport heterogeneous view values.
+
+`AnyView` participates in the retained graph, but it still hides concrete
+structure from the surrounding API. State that must survive a change between
+different erased payload types should be owned above the erased boundary and
+passed down through bindings or model references.
+
 ## Modifiers
 
 Most familiar modifier categories are available:
@@ -57,4 +68,5 @@ See also:
 
 - <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>
+- ``AnyView``
 - ``Resolver``

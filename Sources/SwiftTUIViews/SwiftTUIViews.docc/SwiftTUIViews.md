@@ -89,6 +89,7 @@ Lowering helpers remain package-only implementation details.
 ### Guides
 
 - <doc:Authoring-Views>
+- ``AnyView``
 - <doc:Geometry-And-Preferences>
 - <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>

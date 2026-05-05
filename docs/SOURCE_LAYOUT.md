@@ -347,7 +347,12 @@ Sources/SwiftTUICore/
 
 ## `SwiftTUIViews`
 
-- `Foundation/AnyView.swift`, `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`, `Foundation/ViewCompositionHelpers.swift`, `Foundation/ViewFoundation.swift`, and `Foundation/ViewModifier.swift`: `View`, `ViewModifier`, `ModifiedContent`, `Resolver`, `AnyView`, style primitives, and internal composition helpers
+- `Foundation/AnyView.swift`, `Foundation/ErasedViewTypeID.swift`,
+  `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`,
+  `Foundation/ViewCompositionHelpers.swift`, `Foundation/ViewFoundation.swift`,
+  and `Foundation/ViewModifier.swift`: `View`, `ViewModifier`,
+  `ModifiedContent`, `Resolver`, `AnyView`, payload type identity, style
+  primitives, and internal composition helpers
 - `ViewBuilder/ViewBuilder.swift`, `ViewBuilder/TupleView.swift`, `ViewBuilder/ConditionalContentView.swift`, `ViewBuilder/VariadicView.swift`, and `ViewBuilder/EmptyView.swift`: typed builder artifacts and builder machinery
 - `State/State.swift`, `State/GestureState.swift`, `State/FocusState.swift`,
   and `State/FocusedValue.swift`: graph-scoped dynamic state, gesture state,

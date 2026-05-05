@@ -6,6 +6,7 @@ date: 2026-04-29
 refined: 2026-05-05
 sources:
   - docs/PUBLIC_SURFACE_POLICY.md
+  - docs/ANYVIEW_INTERNALS.md
   - docs/PUBLIC_API_INVENTORY.md
   - AGENTS.md
   - docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md
@@ -112,6 +113,12 @@ incremental-rendering invariants stay intact across ordinary edits.
 view boundary in the retained graph without changing its role as an
 escape hatch.
 
+This is a SwiftTUI contract, not a claim that SwiftUI's private
+`AnyView` runtime has the same behavior. SwiftTUI intentionally exposes
+different trade-offs: an inspectable retained graph, terminal
+incremental-paint reuse, package-owned lifecycle cleanup, and explicit
+authoring-context capture for deferred content.
+
 The resolver lowers an `AnyView` into a wrapper node and a
 type-stamped payload node:
 
@@ -147,3 +154,9 @@ This refinement does **not** make `AnyView` the preferred storage type.
 Typed builders and generic `Content: View` storage remain the default;
 new public `[AnyView]`, `() -> AnyView`, or builder-returning-`AnyView`
 APIs still require explicit policy justification.
+
+Practical examples for framework consumers are documented in the
+`SwiftTUIViews` DocC article for `AnyView`. Maintainer-specific examples,
+including acceptable test fixtures, builder-backbone compatibility, deferred
+content capture, and dangerous internal erasure patterns, are documented in
+[ANYVIEW_INTERNALS.md](../ANYVIEW_INTERNALS.md).

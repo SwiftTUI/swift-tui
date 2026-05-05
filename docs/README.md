@@ -29,6 +29,8 @@ The repository [README.md](../README.md) is the public landing page.
 - [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) — ownership map across targets and key files
 - [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) — canonical public surface, removed surface, and package-only seams
 - [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md) — guardrails for public API additions, `AnyView` / `AnyScene` policy
+- [ANYVIEW_INTERNALS.md](ANYVIEW_INTERNALS.md) — maintainer guide for
+  `AnyView` graph behavior, acceptable internal erasure, and dangerous patterns
 - [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md) — fixture, determinism, regression, and test-topology rules
 - [PERFORMANCE_EVALUATION.md](PERFORMANCE_EVALUATION.md) — local CPU-versus-latency scenario runs, artifacts, and comparison workflow
 - [EMBEDDING.md](EMBEDDING.md) — terminal-program embedding through `TerminalView` and `TerminalProcessSession`
@@ -58,13 +60,13 @@ Active design proposals that are still shaping decisions:
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
 - [plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md) — staged implementation plan for same-binary CPU and input-latency evaluation tooling
-- [plans/2026-05-05-001-resilient-anyview-plan.md](plans/2026-05-05-001-resilient-anyview-plan.md) — planned resilient `AnyView` implementation with upfront targeted test and graph-inspection infrastructure
 - [plans/2026-05-02-002-composed-presentation-primitives-plan.md](plans/2026-05-02-002-composed-presentation-primitives-plan.md) — planned migration from presentation-specific overlay hoisting to portal, overlay-stack, interaction-gate, and dismiss-stack primitives
 - [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md) — active notes and red/green regression guard for gallery one-shot animation transactions snapping after async Option 3
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-05-001-resilient-anyview-plan.md](plans/2026-05-05-001-resilient-anyview-plan.md) — shipped resilient `AnyView` implementation with targeted graph, lifecycle, and runtime verification
 - [plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md](plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md) — shipped Option 3 implementation for draft frame-head transactions, prepared-frame abort proof, and queued-tail cancellation
 - [plans/2026-05-01-005-async-rendering-r0-inventory.md](plans/2026-05-01-005-async-rendering-r0-inventory.md) — R0 diagnostics and composed-runtime coverage checkpoint for restarting async cancellation work
 - [plans/2026-05-01-004-layout-dependent-container-hardening-plan.md](plans/2026-05-01-004-layout-dependent-container-hardening-plan.md) — shipped hardening record for layout-dependent container geometry tests and docs
