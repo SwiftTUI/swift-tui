@@ -361,7 +361,7 @@ Sources/SwiftTUICore/
 - `State/State.swift`, `State/GestureState.swift`, `State/FocusState.swift`,
   and `State/FocusedValue.swift`: graph-scoped dynamic state, gesture state,
   focus bindings, and focused-value projections
-- `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
+- `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, `Environment/RuntimePolicyEnvironment.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, runtime policy values, and style environment plumbing
 - `Focus/DefaultFocus.swift`: default-focus modifiers and focus defaults
 - `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
 - `Canvas.swift`: public Canvas view construction over `CanvasDrawing` and dense

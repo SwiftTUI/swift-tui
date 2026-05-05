@@ -91,11 +91,25 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: View, Resolvab
     in context: ResolveContext
   ) -> [ResolvedNode] {
     if isIndeterminate {
+      if context.environmentValues.reducesMotion || context.environmentValues.suppressesProgress {
+        return progressStatusView(
+          label: label,
+          summary: EmptyView()
+        ).resolveElements(in: context)
+      }
+
       return indeterminateProgressView(
         label: label,
         barWidth: barWidth,
         phaseSeed: context.transaction.debugSignature,
         accentStyle: AnyShapeStyle(.tint)
+      ).resolveElements(in: context)
+    }
+
+    if context.environmentValues.suppressesProgress {
+      return progressStatusView(
+        label: label,
+        summary: currentValueLabel
       ).resolveElements(in: context)
     }
 
@@ -107,6 +121,14 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: View, Resolvab
       accentStyle: AnyShapeStyle(.tint)
     ).resolveElements(in: context)
   }
+}
+
+@MainActor
+private func progressStatusView<Label: View, Summary: View>(
+  label: Label,
+  summary: Summary
+) -> some View {
+  metricChartHeader(label: label, summary: summary)
 }
 
 @MainActor

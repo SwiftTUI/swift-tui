@@ -155,12 +155,12 @@ Resolved by
 
 ## Stage 5: Add Motion And Progress Policy
 
-- [ ] Apply `configuration.motion == .reduced` and `configuration.noProgress`
+- [x] Apply `configuration.motion == .reduced` and `configuration.noProgress`
   at the lowest shared runtime/control boundary that satisfies the ADR.
   Reduced motion suppresses non-essential ticks and transition intermediates;
   `noProgress` removes progress ornament and keeps status text.
-- [ ] Keep normal-mode output unchanged.
-- [ ] Cover progress views, spinners, repeated animations, and static controls
+- [x] Keep normal-mode output unchanged.
+- [x] Cover progress views, spinners, repeated animations, and static controls
   with focused tests.
 
 ## Stage 6: Add Live-Region Announcements
