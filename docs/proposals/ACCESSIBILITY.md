@@ -635,20 +635,22 @@ and thinner in one place**. Specifically:
 
 ### Already populated and flowing (better than expected)
 
-- **Presentation roles are already authored on built-in widgets.**
+- **Accessibility roles are authored on built-in widgets and flow through
+  the shared snapshot.**
   [`Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift`](../../Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift)
-  defines `PresentationRole` with 20 cases (`button`, `toggle`,
-  `slider`, `textField`, `secureField`, `textEditor`, `link`,
-  `picker`, `disclosureGroup`, `alert`, `confirmationDialog`, `menu`,
-  `scrollView`, `scrollViewWithIndicators`, `section`, `sheet`,
-  `stepper`, `table`, `tableRow`, `tabView`). Built-in widgets
-  populate it: `Toggle` → `.toggle`
+  now defines `AccessibilityRole`, the ADR-0011 successor to the old
+  `PresentationRole`, with built-in cases plus the added accessibility
+  cases (`secureField`, `checkbox`, `image`, `progressBar`, `timer`,
+  `heading(level:)`, `status`, `region`, `separator`, `columnHeader`,
+  `rowHeader`, `cell`, `menuItem`, `tab`, `tabPanel`, `group`, and
+  `custom(String)`). Built-in widgets populate
+  `SemanticMetadata.accessibilityRole`: `Toggle` → `.toggle`
   ([`ValueControls.swift:88`](../../Sources/SwiftTUIViews/Controls/ValueControls.swift)),
   `TextField` → `.textField`
   ([`ValueControls.swift:261`](../../Sources/SwiftTUIViews/Controls/ValueControls.swift)),
   `TextEditor` → `.textEditor`
   ([`TextEditor.swift:70`](../../Sources/SwiftTUIViews/Input/TextEditor.swift)),
-  `SecureField` → `.textField`
+  `SecureField` → `.secureField`
   ([`SecureField.swift:91`](../../Sources/SwiftTUIViews/Input/SecureField.swift)),
   `Picker` → `.picker`
   ([`Picker.swift:154`](../../Sources/SwiftTUIViews/Controls/Picker.swift)),
@@ -660,8 +662,10 @@ and thinner in one place**. Specifically:
   ([`TabView.swift:227`](../../Sources/SwiftTUIViews/NavigationViews/TabView.swift)),
   `ScrollView` → `.scrollView` / `.scrollViewWithIndicators`
   ([`ScrollView.swift:240`](../../Sources/SwiftTUIViews/ScrollView/ScrollView.swift)).
-  Approximately **15 of the ~28 cases the proposed `AccessibilityRole`
-  enum needs are already wired up** end-to-end.
+  `SemanticExtractor` now emits sparse
+  `SemanticSnapshot.accessibilityNodes` records for roles, authored
+  labels/hints/live regions, focus-chain nodes, and structural
+  ancestors.
 
 - **Tab item labels are already structured.**
   `SemanticMetadata.tabItemLabel` is a `TabItemLabel(title, detail?,
@@ -671,14 +675,23 @@ and thinner in one place**. Specifically:
   in this codebase. The `accessibilityLabel(_:)` modifier should
   follow the same pattern.
 
-- **Env-var detection is partly wired.**
+- **Env-var and flag parsing is partly landed.**
   [`TerminalPresentation.swift:84-135`](../../Sources/SwiftTUI/Terminal/TerminalPresentation.swift)'s
   `TerminalCapabilityProfile.detect(environment:isTTY:)` already
   reads `NO_COLOR`, `TERM` (incl. `dumb`/`*256color`), `COLORTERM`
   (incl. `truecolor`/`24bit`), `LC_ALL`/`LC_CTYPE`/`LANG` (drives
   ASCII glyph fallback automatically), and `isTTY` (drops to no
-  color when stdout is not a TTY). What's **missing**: `FORCE_COLOR`,
-  `CLICOLOR`, `CLICOLOR_FORCE`, `CI`, and the `SWIFTTUI_*` family.
+  color when stdout is not a TTY). Since the audit,
+  `RuntimeConfiguration.detect(environment:isStdoutTTY:)` and the
+  `SwiftTUIArguments` peer package have landed. They add parsing and
+  precedence for `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`,
+  and the `SWIFTTUI_*` family, plus framework flags such as
+  `--accessible`, `--ascii`, `--reduce-motion`, `--plain`,
+  `--linear`, `--no-progress`, `--json`, and `--web`. Current
+  behavior wiring is narrower than the parse surface:
+  `--no-color`, `--force-color`, `--ascii`, and `--plain` now reach
+  terminal rendering; `--accessible`, `--reduce-motion`, `--linear`,
+  `--no-progress`, `--json`, and `--web` remain behavior follow-ups.
 
 - **Cursor positioning mechanism exists.**
   [`TerminalHost.swift`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)
@@ -703,19 +716,15 @@ and thinner in one place**. Specifically:
 
 ### Missing or thin (worse than expected)
 
-- **`SemanticMetadata` has no accessibility-specific fields.** No
-  `accessibilityLabel`, no `accessibilityHint`, no
-  `accessibilityHidden`, no `accessibilityLiveRegion`. These need to
-  be added as new fields, parallel to the existing `presentationRole`
-  / `tabItemLabel`.
-
-- **`SemanticSnapshot` does not carry role data downstream.** The
-  `SemanticExtractor` walk visits every node and reads
-  `node.semanticMetadata.presentationRole`, but only emits hit-test /
-  focus / scroll / selection routes from the snapshot. The role
-  data does not propagate. **The extractor needs an additional
-  collection** — call it `accessibilityNodes: [AccessibilityNode]` —
-  populated during the same walk. Cost: small.
+- **Target-specific accessibility consumption is still unwired.** The
+  shared substrate now carries `accessibilityLabel`,
+  `accessibilityHint`, `accessibilityHidden`,
+  `accessibilityLiveRegion`, `accessibilityRole`, and
+  `SemanticSnapshot.accessibilityNodes`, but the terminal runtime does
+  not yet use those records for cursor-as-focus, linear accessible
+  rendering, reduce-motion behavior, or live-region announcements.
+  The embedded web host, WASM web target, and SwiftUI host bridge also
+  do not yet consume the new snapshot records.
 
 - **The `WebSurfaceFrameEncoder` wire format is raster-level, not
   semantic.**
@@ -726,22 +735,33 @@ and thinner in one place**. Specifically:
   accessibility tree alongside the raster grid. See Finding 3 in the
   audit and Phase 6 in the updated phasing.
 
+- **Cursor-anchor policy is still split from the substrate.**
+  `AccessibilityNode.cursorAnchor` exists as the shared output field,
+  and nil means consumers should fall back to the node origin. The
+  public `accessibilityCursorAnchor(_:)` modifier shape, built-in
+  caret anchors, and the runtime policy for showing the hardware
+  cursor at the focused anchor remain follow-up work.
+
 ### Implication
 
 The proposal split is sharper than the first draft implied:
 
-- **What this proposal *does*:** add accessibility-specific fields to
+- **What is now landed:** accessibility-specific fields on
   `SemanticMetadata` (`accessibilityLabel`, `accessibilityHint`,
-  `accessibilityHidden`, `accessibilityLiveRegion`,
-  `accessibilityCursorAnchor`); extend `PresentationRole` with the
-  ~13 missing cases (renaming to `AccessibilityRole` is an open
-  question); extend `SemanticExtractor` to emit
-  `AccessibilityNode` records; add a per-target render strategy that
-  consumes them.
+  `accessibilityHidden`, `accessibilityLiveRegion`), the
+  `AccessibilityRole` rename and expanded role set from ADR-0011,
+  SwiftUI-shaped authoring modifiers for those fields, and
+  `SemanticExtractor` emission of sparse `AccessibilityNode` records
+  on `SemanticSnapshot`.
+
+- **What remains:** add per-target render strategies that consume
+  the snapshot records: CLI cursor-as-focus and linear output, live
+  announcements, embedded-host / WASM ARIA, and SwiftUI host bridging.
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
-  invent env-var detection (it partly exists; we extend it).
+  invent env-var detection (the shared resolver and standard flag
+  package now exist; remaining work is behavior wiring).
 
 - **What this proposal *requires from sibling proposals*:** the
   embedded-host wire format must be extended with an
@@ -1485,9 +1505,9 @@ to be argued with, not accepted.)
    geometry?** **Resolved by
    [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
    the field exists on `AccessibilityNode` (in absolute surface
-   coordinates); built-in TextField populates it for caret tracking;
-   nil means "use the node's origin" and the modifier is the escape
-   hatch for consumer-authored views.
+   coordinates); nil means "use the node's origin." The public
+   modifier argument shape and built-in caret-anchor population remain
+   follow-up work under the cursor-as-focus plan.
 
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
@@ -1505,12 +1525,13 @@ to be argued with, not accepted.)
    [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) exists, the
    question is whether the accessibility ARIA mapping rides on its v1
    or waits for v2. Argument for v1: it's the strongest a11y story we
-   have and the embedded-host wire format already carries semantic
-   data, so it's mostly a browser-side bind. Argument against:
-   embedded host has its own scope; coupling slows both. Lean: ship
-   ARIA mapping in embedded-host v1, but keep the per-target render
-   strategy gated behind a feature flag so we can ship the CLI side
-   independently.
+   have, and the required semantic source data will exist once
+   Phase 3b lands. Argument against: embedded host has its own scope,
+   and the audited `web-surface` format still needs a v2
+   `accessibilityTree` extension plus browser-side DOM mounting.
+   Lean: ship ARIA mapping in embedded-host v1, but keep the
+   per-target render strategy gated behind a feature flag so we can
+   ship the CLI side independently.
 
    The original v1-vs-v2 question for the **WASM** web target stands
    separately: it's the deploy-as-website story and is less urgent
@@ -1552,6 +1573,13 @@ to be argued with, not accepted.)
     summary that takes over in accessible mode, similar to
     `<figcaption>` + `aria-describedby` in HTML.
 
+15. **Output-mode precedence between JSON and accessible output.**
+    CLI flags currently resolve `--accessible` before `--json`, while
+    environment detection lets `SWIFTTUI_JSON=1` override
+    `SWIFTTUI_ACCESSIBLE=1`. Before wiring either output mode to
+    behavior, pick one precedence rule and align code, tests, and
+    `ARGUMENT_PARSING.md`.
+
 ---
 
 ## Out of scope (this version)
@@ -1589,38 +1617,38 @@ with † depend on `ARGUMENT_PARSING.md` reaching at least Phase 1
 `EMBEDDED_WEB_HOST.md` reaching at least Phase 1 (basic runner +
 WebSocket transport landed).)
 
-1. **Phase 1 — Env contract + ASCII mode.** † **(Smaller than first
-   drafted.)** *Extend* the existing
-   `TerminalCapabilityProfile.detect`
-   ([`TerminalPresentation.swift:84`](../../Sources/SwiftTUI/Terminal/TerminalPresentation.swift))
-   with `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`. Add
-   `SWIFTTUI_ASCII`, `SWIFTTUI_REDUCE_MOTION`, `SWIFTTUI_ACCESSIBLE`
-   reads. Build the glyph-fallback table. The ASCII glyph mode is
-   *already* automatic when locale is non-UTF-8; this phase gives it
-   an explicit override and grows the fallback coverage. Pairs with
-   `ARGUMENT_PARSING.md` Phase 1 because flag parsing lives there.
+1. **Phase 1 — Env contract + ASCII mode.** † **(Partly landed.)**
+   `RuntimeConfiguration`, `RuntimeConfiguration.detect(...)`,
+   `SwiftTUIOptions`, and `SwiftTUIOptions.runtimeConfiguration(...)`
+   now cover the env/flag surface from `ARGUMENT_PARSING.md`.
+   `--no-color`, `--force-color`, `--ascii`, and `--plain` reach
+   `TerminalHost` rendering. Remaining Phase 1 work is behavior-side:
+   grow the glyph fallback coverage where built-ins still use Unicode
+   directly and decide whether `--accessible` should imply ASCII and
+   reduce-motion.
 
 2. **Phase 2 — Cursor-as-focus.** **(Same effort as drafted.)** The
    mechanism (`moveCursor`, `hideCursor`, `showCursor`) and the data
    (`FocusTracker.currentFocusIdentity` → `FocusRegion.rect`)
    already exist; the new work is the policy: after each commit,
    look up the focused widget and call `moveCursor` to its anchor.
-   Open question: built-in `cursorAnchor: CellPoint?` on
-   `SemanticMetadata` (text-field caret) vs derive-from-bounds.
+   ADR-0012 puts `cursorAnchor` on `AccessibilityNode`; the remaining
+   open question is the behavior gate (always-on vs accessible-mode)
+   and the exact public modifier argument type.
 
-3. **Phase 3a — Accessibility authoring modifiers.** Add
+3. **Phase 3a — Accessibility authoring modifiers.** **(Substrate
+   landed, cursor-anchor modifier deferred.)** Added
    `accessibilityLabel`, `accessibilityHint`, `accessibilityHidden`,
-   `accessibilityLiveRegion`, `accessibilityCursorAnchor`,
-   `accessibilityRole(_:)` modifiers. Add the corresponding fields
-   to `SemanticMetadata`. Either rename `PresentationRole` to
-   `AccessibilityRole` and add the missing 13 cases, or introduce a
-   sibling type — **decide this before starting Phase 3a**. No
-   rendering changes; downstream targets read the new fields when
-   ready.
+   `accessibilityLiveRegion`, and `accessibilityRole(_:)` modifiers
+   plus the corresponding fields on `SemanticMetadata`. ADR-0011 is
+   implemented: `PresentationRole` is now `AccessibilityRole`, with
+   the missing accessibility cases added. The public
+   `accessibilityCursorAnchor(_:)` shape remains deferred.
 
-4. **Phase 3b — `SemanticExtractor` accessibility records.** Extend
+4. **Phase 3b — `SemanticExtractor` accessibility records.**
+   **(Landed.)** Extends
    `SemanticSnapshot` with `accessibilityNodes:
-   [AccessibilityNode]`. Populate during the existing walk in
+   [AccessibilityNode]`. It populates during the existing walk in
    [`Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift). Skip
    transient and `accessibilityHidden(true)` subtrees. Output is a
    flat list with parent-identity references (matches existing
@@ -1857,3 +1885,20 @@ in this document. The primary sources, grouped by theme:
   `TerminalHost.swift:1382-1440`) were preserved by the refactor;
   no semantic claims changed. The `TabItemLabel` line range shifted
   from `1-31` to `2-31` due to the file split.
+- 2026-05-05: Current-state pass after argument-parsing implementation.
+  `RuntimeConfiguration.detect(...)`, `SwiftTUIOptions`, and the
+  `SwiftTUIArguments` peer package now parse the env/flag surface;
+  color/glyph flags (`--no-color`, `--force-color`, `--ascii`,
+  `--plain`) reach rendering. Marked the remaining behavior wiring
+  explicitly, noted that ADR-0011/ADR-0012 are accepted but not yet
+  implemented in source, and linked the new remaining-work plan
+  [`2026-05-05-002-accessibility-remaining-work-plan.md`](../plans/2026-05-05-002-accessibility-remaining-work-plan.md).
+- 2026-05-05: Shared accessibility substrate implementation landed.
+  Source now uses `AccessibilityRole`, `SemanticMetadata.accessibilityRole`,
+  and `accessibilityRole(_:)`; `SemanticMetadata` carries label,
+  hint, hidden, and live-region fields; `View` exposes the matching
+  authoring modifiers; `SemanticSnapshot` includes sparse
+  `accessibilityNodes`. The remaining work is target-specific
+  consumption: cursor-as-focus, linear accessible output,
+  live-region announcements, embedded-host / WASM ARIA, and SwiftUI
+  host bridging.

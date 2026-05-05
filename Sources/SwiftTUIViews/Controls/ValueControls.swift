@@ -85,7 +85,7 @@ extension Toggle {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
-        presentationRole: .toggle
+        accessibilityRole: .toggle
       )
     )
   }
@@ -258,7 +258,7 @@ extension TextField {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
-        presentationRole: .textField
+        accessibilityRole: .textField
       )
     )
   }
@@ -353,7 +353,7 @@ extension DisclosureGroup {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
-        presentationRole: .disclosureGroup
+        accessibilityRole: .disclosureGroup
       )
     )
   }

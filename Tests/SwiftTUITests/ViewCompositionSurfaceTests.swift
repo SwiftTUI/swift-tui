@@ -28,7 +28,7 @@ struct ViewCompositionSurfaceTests {
       .drawMetadata(.init(foregroundStyle: .semantic(.foreground)))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
       .id(testIdentity("Explicit", "Button"))
-      .semanticMetadata(.init(isFocusable: true, presentationRole: .button))
+      .semanticMetadata(.init(isFocusable: true, accessibilityRole: .button))
       .drawMetadata(
         .init(
           borderShapeStyle: .semantic(.separator),
@@ -53,6 +53,6 @@ struct ViewCompositionSurfaceTests {
     #expect(resolved.drawMetadata.borderStrokeStyle == .init(borderSet: .rounded))
     #expect(resolved.semanticMetadata.participatesInPointerHitTesting)
     #expect(resolved.semanticMetadata.isFocusable == true)
-    #expect(resolved.semanticMetadata.presentationRole == .button)
+    #expect(resolved.semanticMetadata.accessibilityRole == .button)
   }
 }

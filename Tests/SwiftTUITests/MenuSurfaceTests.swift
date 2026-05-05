@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 extension ResolvedNode {
@@ -32,15 +32,15 @@ struct MenuSurfaceTests {
   func plainTextStaysNonFocusableByDefault() {
     let text = Text("Hello")
     let explicitText = Text("Hello", semanticMetadata: SemanticMetadata())
-    #expect(SemanticMetadata().presentationRole == nil)
-    #expect(text.semanticMetadata.presentationRole == nil)
-    #expect(explicitText.semanticMetadata.presentationRole == nil)
+    #expect(SemanticMetadata().accessibilityRole == nil)
+    #expect(text.semanticMetadata.accessibilityRole == nil)
+    #expect(explicitText.semanticMetadata.accessibilityRole == nil)
     let artifacts = DefaultRenderer().render(
       text,
       context: .init(identity: testIdentity("TextRoot"))
     )
 
-    #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == nil)
+    #expect(artifacts.resolvedTree.semanticMetadata.accessibilityRole == nil)
     #expect(artifacts.semanticSnapshot.focusRegions.isEmpty)
   }
 
@@ -70,7 +70,7 @@ struct MenuSurfaceTests {
     #expect(surface.contains("Actions"))
     #expect(surface.contains("▾"))
     #expect(!surface.contains("Open"))
-    #expect(menuNode?.semanticMetadata.presentationRole == .menu)
+    #expect(menuNode?.semanticMetadata.accessibilityRole == .menu)
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
         testIdentity("Menu")

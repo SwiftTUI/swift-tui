@@ -5,13 +5,14 @@ package enum FocusParticipation: Equatable, Sendable {
 }
 
 package enum AutomaticFocusPolicy {
-  private static let focusablePresentationRoles: Set<PresentationRole> = [
+  private static let focusableAccessibilityRoles: Set<AccessibilityRole> = [
     .button,
     .disclosureGroup,
     .link,
     .list,
     .menu,
     .picker,
+    .secureField,
     .slider,
     .stepper,
     .table,
@@ -25,8 +26,8 @@ package enum AutomaticFocusPolicy {
     kind: NodeKind,
     metadata: SemanticMetadata
   ) -> Bool {
-    if let presentationRole = metadata.presentationRole {
-      return focusablePresentationRoles.contains(presentationRole)
+    if let accessibilityRole = metadata.accessibilityRole {
+      return focusableAccessibilityRoles.contains(accessibilityRole)
     }
 
     guard case .view(let name) = kind else {
@@ -34,8 +35,8 @@ package enum AutomaticFocusPolicy {
     }
 
     switch name {
-    case "Button", "DisclosureGroup", "Link", "List", "Picker", "Slider", "Stepper",
-      "Table", "TextEditor", "TextField", "Toggle", "Menu":
+    case "Button", "DisclosureGroup", "Link", "List", "Picker", "SecureField", "Slider",
+      "Stepper", "Table", "TextEditor", "TextField", "Toggle", "Menu":
       return true
     default:
       return false

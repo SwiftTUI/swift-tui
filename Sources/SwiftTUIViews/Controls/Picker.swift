@@ -151,7 +151,7 @@ extension Picker {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
-        presentationRole: .picker
+        accessibilityRole: .picker
       )
     )
   }

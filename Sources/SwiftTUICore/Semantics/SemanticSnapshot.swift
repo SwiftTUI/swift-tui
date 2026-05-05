@@ -91,6 +91,41 @@ public struct NavigationRoute: Equatable, Sendable {
   }
 }
 
+/// Accessibility metadata extracted for assistive-technology consumers.
+public struct AccessibilityNode: Equatable, Sendable {
+  public var identity: Identity
+  public var parentIdentity: Identity?
+  public var rect: CellRect
+  public var role: AccessibilityRole
+  public var label: String?
+  public var hint: String?
+  public var hidden: Bool
+  public var liveRegion: AccessibilityPoliteness?
+  public var cursorAnchor: CellPoint?
+
+  public init(
+    identity: Identity,
+    parentIdentity: Identity? = nil,
+    rect: CellRect,
+    role: AccessibilityRole,
+    label: String? = nil,
+    hint: String? = nil,
+    hidden: Bool = false,
+    liveRegion: AccessibilityPoliteness? = nil,
+    cursorAnchor: CellPoint? = nil
+  ) {
+    self.identity = identity
+    self.parentIdentity = parentIdentity
+    self.rect = rect
+    self.role = role
+    self.label = label
+    self.hint = hint
+    self.hidden = hidden
+    self.liveRegion = liveRegion
+    self.cursorAnchor = cursorAnchor
+  }
+}
+
 /// The complete semantic extraction result for a frame.
 public struct SemanticSnapshot: Equatable, Sendable {
   public var interactionRegions: [InteractionRegion]
@@ -99,6 +134,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var scrollRoutes: [ScrollRoute]
   public var selectionRoutes: [SelectionRoute]
   public var namedCoordinateSpaces: [String: CellRect]
+  public var accessibilityNodes: [AccessibilityNode]
 
   public init(
     interactionRegions: [InteractionRegion] = [],
@@ -106,7 +142,8 @@ public struct SemanticSnapshot: Equatable, Sendable {
     navigationRoutes: [NavigationRoute] = [],
     scrollRoutes: [ScrollRoute] = [],
     selectionRoutes: [SelectionRoute] = [],
-    namedCoordinateSpaces: [String: CellRect] = [:]
+    namedCoordinateSpaces: [String: CellRect] = [:],
+    accessibilityNodes: [AccessibilityNode] = []
   ) {
     self.interactionRegions = interactionRegions
     self.focusRegions = focusRegions
@@ -114,6 +151,6 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.scrollRoutes = scrollRoutes
     self.selectionRoutes = selectionRoutes
     self.namedCoordinateSpaces = namedCoordinateSpaces
+    self.accessibilityNodes = accessibilityNodes
   }
 }
-

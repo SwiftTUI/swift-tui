@@ -46,7 +46,7 @@ extension Link {
       drawMetadata: .init(),
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
-        presentationRole: .link
+        accessibilityRole: .link
       ),
       drawPayload: .richText(
         resolvedRichTextPayload(

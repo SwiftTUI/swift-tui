@@ -67,7 +67,7 @@ extension TextEditor {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
-        presentationRole: .textEditor
+        accessibilityRole: .textEditor
       )
     )
   }

@@ -224,7 +224,7 @@ extension TabView {
       semanticMetadata: focusableControlMetadata(
         isFocusable: true,
         focusInteractions: .activate,
-        presentationRole: .tabView
+        accessibilityRole: .tabView
       )
     )
   }

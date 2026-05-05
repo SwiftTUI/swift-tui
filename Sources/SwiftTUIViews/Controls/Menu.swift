@@ -118,7 +118,7 @@ extension Menu {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
-        presentationRole: .menu
+        accessibilityRole: .menu
       )
     )
   }
