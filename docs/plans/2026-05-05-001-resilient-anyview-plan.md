@@ -217,13 +217,13 @@ except for the identity boundary needed to make erasure observable.
 
 ### Stage 0: Baseline Inventory
 
-- [ ] Confirm the worktree is clean or record unrelated dirty files:
+- [x] Confirm the worktree is clean or record unrelated dirty files:
 
   ```bash
   git status --short
   ```
 
-- [ ] Read the current implementation and policy anchors:
+- [x] Read the current implementation and policy anchors:
 
   ```bash
   sed -n '1,220p' Sources/SwiftTUIViews/Foundation/AnyView.swift
@@ -233,7 +233,7 @@ except for the identity boundary needed to make erasure observable.
   sed -n '1,220p' docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md
   ```
 
-- [ ] Run the current focused baseline before adding red tests:
+- [x] Run the current focused baseline before adding red tests:
 
   ```bash
   swiftly run swift test --filter SwiftTUIViewsTests.ViewResolutionTests
@@ -249,7 +249,7 @@ should be captured in the implementation notes before proceeding.
 
 This stage should be behavior-neutral.
 
-- [ ] Create `Sources/SwiftTUIViews/Foundation/ErasedViewTypeID.swift`.
+- [x] Create `Sources/SwiftTUIViews/Foundation/ErasedViewTypeID.swift`.
 
   Shape:
 
@@ -278,7 +278,7 @@ This stage should be behavior-neutral.
   the sendability issue explicit instead of papering over it with
   `@unchecked Sendable`.
 
-- [ ] Create `Tests/SwiftTUIViewsTests/ErasedViewTypeIDTests.swift`.
+- [x] Create `Tests/SwiftTUIViewsTests/ErasedViewTypeIDTests.swift`.
 
   Required assertions:
 
@@ -312,7 +312,7 @@ This stage should be behavior-neutral.
   - fixtures that can render the same content as typed content, `Group`, and
     `AnyView`
 
-- [ ] Verify infrastructure before behavior changes:
+- [x] Verify infrastructure before behavior changes:
 
   ```bash
   swiftly run swift test --filter SwiftTUIViewsTests.ErasedViewTypeIDTests
