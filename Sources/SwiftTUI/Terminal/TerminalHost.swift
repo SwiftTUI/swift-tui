@@ -602,6 +602,38 @@ extension PresentationSurface {
       }
     }
 
+    func submitSupplementalOutput(_ output: String) {
+      guard !output.isEmpty else {
+        return
+      }
+
+      let shouldStart = state.withLock { state in
+        guard state.pendingError == nil else {
+          return false
+        }
+        if state.pending != nil {
+          state.pending?.output.append(output)
+        } else {
+          state.pending = .init(output: output)
+        }
+
+        guard !state.isWriting else {
+          return false
+        }
+
+        state.isWriting = true
+        return true
+      }
+
+      guard shouldStart else {
+        return
+      }
+
+      queue.async { [self] in
+        writePendingFrames()
+      }
+    }
+
     func consumeDropFlag() -> Bool {
       state.withLock { state in
         let didDropFrame = state.didDropFrame
@@ -671,7 +703,7 @@ extension PresentationSurface {
 
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: PresentationSurface, DamageAwarePresentationSurface,
-    TerminalInputCapabilityProviding
+    TerminalInputCapabilityProviding, TerminalCursorFocusPresentationSurface
   {
     private struct CapabilityProbeState {
       var hasProbedAppearance = false
@@ -990,6 +1022,12 @@ extension PresentationSurface {
 
     public func moveCursor(to point: CellPoint) throws {
       try write(cursorSequence(to: point))
+    }
+
+    package func presentAccessibilityCursorFocus(at point: CellPoint?) throws {
+      let presentationWriter = presentationWriterIfNeeded()
+      try presentationWriter.consumePendingError()
+      presentationWriter.submitSupplementalOutput(cursorFocusSequence(to: point))
     }
 
     public func setPointerHoverEnabled(_ enabled: Bool) throws {
@@ -1781,6 +1819,13 @@ extension PresentationSurface {
       return "\u{001B}[\(row);\(column)H"
     }
 
+    private func cursorFocusSequence(to point: CellPoint?) -> String {
+      guard let point else {
+        return hideCursorSequence()
+      }
+      return cursorSequence(to: point) + showCursorSequence()
+    }
+
     private func wrappedPresentationOutput(
       _ output: String,
       strategy: TerminalPresentationPlan.Strategy
@@ -1799,7 +1844,9 @@ extension PresentationSurface {
 
   }
 #else
-  public final class WebTerminalHost: PresentationSurface, Sendable {
+  public final class WebTerminalHost: PresentationSurface, TerminalCursorFocusPresentationSurface,
+    Sendable
+  {
     private struct State {
       var surfaceSize: CellSize
       var renderStyle: TerminalRenderStyle

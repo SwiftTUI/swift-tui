@@ -58,6 +58,7 @@ around runtime feature concerns:
 
 ```
 Sources/SwiftTUI/
+  Accessibility/ — runtime accessibility policy adapters for terminal targets
   RunLoop/      — runtime coordinator, event dispatch, pointer routing, render scheduling
   Lifecycle/    — post-present lifecycle staging, task running, animation control
   Scenes/       — App protocol, scene traversal, scene manifest, hosted scene sessions
@@ -71,6 +72,7 @@ Sources/SwiftTUI/
 
 ### Run loop and event dispatch
 
+- `Accessibility/AccessibilityRuntimePolicy.swift`: terminal-runtime policy helpers that consume `SemanticSnapshot.accessibilityNodes`
 - `RunLoop/RunLoop.swift`: runtime coordinator and shared runtime state
 - `RunLoop/RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
 - `RunLoop/RunLoop+PointerHandling.swift`: pointer routing, activation, hover, capture, and scroll-wheel handling
@@ -97,6 +99,7 @@ Sources/SwiftTUI/
 ### Terminal
 
 - `Terminal/TerminalHost.swift`: defines the `PresentationSurface` protocol (the `RunLoop`'s pluggable presentation target) plus the fd-backed `TerminalHost` and WASI-facing `WebTerminalHost` implementations
+- `Terminal/TerminalCursorFocusPresentationSurface.swift`: terminal-only cursor focus marker and cursor visibility helpers
 - `Terminal/StreamingTerminalHost.swift`: closure-backed `PresentationSurface` for embedded hosts that don't own a file descriptor
 - `Terminal/TerminalPresentation.swift`: capability-aware surface diffing,
   sanitized text presentation, and OSC 8 hyperlink lowering
