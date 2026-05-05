@@ -482,7 +482,7 @@ extension SemanticExtractor {
         )
         nextHitTestOrder += 1
       }
-    case .none, .rule, .shape, .text, .image, .canvas:
+    case .none, .rule, .shape, .text, .image, .canvas, .foreignSurface:
       break
     }
   }

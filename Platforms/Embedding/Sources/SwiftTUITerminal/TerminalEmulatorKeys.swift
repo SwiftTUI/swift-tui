@@ -1,3 +1,5 @@
+import SwiftTUICore
+
 public struct TerminalEmulatorKey: Sendable, Equatable, Hashable {
   public enum Code: Sendable, Equatable, Hashable {
     case character(Character)
@@ -34,6 +36,23 @@ public struct TerminalEmulatorKey: Sendable, Equatable, Hashable {
   public init(code: Code, modifiers: Modifiers = []) {
     self.code = code
     self.modifiers = modifiers
+  }
+
+  public init?(
+    event: KeyEvent,
+    modifiers: EventModifiers = []
+  ) {
+    self.init(keyPress: KeyPress(event, modifiers: modifiers))
+  }
+
+  public init?(keyPress: KeyPress) {
+    guard let code = Code(event: keyPress.key) else {
+      return nil
+    }
+    self.init(
+      code: code,
+      modifiers: Modifiers(eventModifiers: keyPress.modifiers)
+    )
   }
 
   public var legacyByteSequence: [UInt8] {
@@ -79,5 +98,52 @@ public struct TerminalEmulatorKey: Sendable, Equatable, Hashable {
       ]
       return [0x1B, 0x5B] + (codes[number] ?? [])
     }
+  }
+}
+
+extension TerminalEmulatorKey.Code {
+  fileprivate init?(event: KeyEvent) {
+    switch event {
+    case .character(let character):
+      self = .character(character)
+    case .return:
+      self = .enter
+    case .space:
+      self = .character(" ")
+    case .tab:
+      self = .tab
+    case .arrowLeft:
+      self = .arrowLeft
+    case .arrowRight:
+      self = .arrowRight
+    case .arrowUp:
+      self = .arrowUp
+    case .arrowDown:
+      self = .arrowDown
+    case .backspace:
+      self = .backspace
+    case .escape:
+      self = .escape
+    case .home:
+      self = .home
+    case .end:
+      self = .end
+    }
+  }
+}
+
+extension TerminalEmulatorKey.Modifiers {
+  fileprivate init(eventModifiers: EventModifiers) {
+    var modifiers: Self = []
+    if eventModifiers.contains(.ctrl) {
+      modifiers.insert(.control)
+    }
+    if eventModifiers.contains(.alt) {
+      modifiers.insert(.option)
+    }
+    if eventModifiers.contains(.shift) {
+      modifiers.insert(.shift)
+    }
+    self = modifiers
   }
 }
