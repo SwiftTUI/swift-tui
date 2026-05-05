@@ -39,7 +39,7 @@ const phases = [
   {
     n: "07",
     name: "commit",
-    one: "Diffs against the last frame and streams ANSI/OSC.",
+    one: "Diffs against the last frame and streams sanitized terminal output.",
     sym: "CommitPlan",
   },
 ];
@@ -51,7 +51,7 @@ const phases = [
       <h2>Seven phases. Strict order. No collapsing.</h2>
       <p class="lede">
         Layout is recursive parent-child negotiation, not a global solver.
-        State drives rendering, not the reverse. The phase order is enforced
+        Graph-scoped state drives rendering, not the reverse. The phase order is enforced
         by <span class="mono">DefaultRenderer</span>, <span class="mono">FrameArtifacts</span>,
         and the regression suites — every phase has a typed artifact you
         can snapshot, diff, or assert against in tests.

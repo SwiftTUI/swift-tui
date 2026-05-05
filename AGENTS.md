@@ -57,11 +57,17 @@ Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
   If state must survive lazy tab, deferred-content, or presentation churn,
   hoist ownership above that seam. Do not over-hoist: tab-local state may be
   intentionally ephemeral across tab switches, but palette open/close should
-  be transparent unless the palette itself changes selection. See
+  be transparent unless the palette itself changes selection. For same view
+  instance bugs, distinguish live graph isolation (`RunLoop` / invalidator-
+  backed) from no-invalidator `DefaultRenderer` snapshot behavior; do not
+  replace graph-scoped imperative state with a last-bound global fallback. See
   [docs/RUNTIME.md](docs/RUNTIME.md) and
   [docs/STATE_KEYING.md](docs/STATE_KEYING.md).
 - For wrapper-hosted or scene-hosted regressions, reproduce and test the
   composed runtime path, not just the inner view in isolation.
+- For terminal presentation fixes, keep sanitization at the presentation
+  boundary and cover both text control scalars and OSC 8 hyperlink
+  destinations.
 
 ## Code Style
 

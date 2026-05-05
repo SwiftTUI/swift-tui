@@ -41,6 +41,9 @@ Important public-surface rules after the lowering migration:
 - `View`, `Scene`, and `App` are `@MainActor` authoring protocols.
 - APIs that evaluate authored `body` trees, including `Resolver.resolve(...)` and `DefaultRenderer.render(...)`, are `@MainActor`.
 - Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
+- Dynamic-property callbacks preserve the graph-scoped state identity captured
+  at registration time. `DefaultRenderer` still preserves same-instance
+  snapshot behavior when no invalidating runtime graph exists.
 - `ViewBuilder` no longer exposes `[AnyView]` in public closure signatures.
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
 - Anchor preferences are ordinary reduced preferences that carry opaque
@@ -138,7 +141,8 @@ The runtime-facing public surface is also canonical:
 - `DefaultRenderer`
 - `RunLoop`
 - `ResolveContext` as external renderer or resolver configuration only
-- terminal host, graphics-capability, and input or signal integration types that support the runtime
+- terminal host, sanitized presentation, graphics-capability, and input or
+  signal integration types that support the runtime
 - app and scene entry points, including `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `WindowIdentifier`, and the typed scene builder artifacts
 - `AnyScene` as the explicit scene-erasure escape hatch
 - `SceneDescriptor`

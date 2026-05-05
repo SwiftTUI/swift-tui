@@ -4,9 +4,26 @@ How `@State` storage is keyed across re-evaluations, and what owner placement to
 
 ## Overview
 
-SwiftTUI keys `@State` storage by view identity path plus source location. As long as the owning view's identity path is stable, each `@State` declaration reconnects to the same persisted slot across re-evaluations. Move a stateful view to a different identity path and you get a fresh state slot; the old slot is orphaned and reclaimed.
+SwiftTUI keys `@State` storage by view identity path plus source location. As
+long as the owning view's identity path is stable, each `@State` declaration
+reconnects to the same persisted slot across re-evaluations. Move a stateful
+view to a different identity path and you get a fresh state slot; the old slot
+is orphaned and reclaimed.
 
-Keying only protects the reconnection step. It does not recover state when the owning view *itself* is recreated under a different identity path.
+Live runtime callbacks add one more internal scope: the view graph that
+registered the callback. Button actions, key-command handlers, projected
+bindings, and gesture updates mutate the graph-scoped state location captured
+when the handler was authored. Reusing the same stateful view value in another
+live graph therefore starts with that graph's own storage instead of leaking
+writes through a last-bound global fallback.
+
+`DefaultRenderer` remains snapshot-friendly when there is no invalidating
+runtime graph. If a test or preview reuses the same stateful view instance
+across no-invalidator snapshots, imperative writes can still feed a later
+snapshot of that same instance.
+
+Keying only protects the reconnection step. It does not recover state when the
+owning view *itself* is recreated under a different identity path.
 
 ## Practical Owner Placement Guidance
 

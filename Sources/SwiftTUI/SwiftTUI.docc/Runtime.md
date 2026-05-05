@@ -125,13 +125,24 @@ The shipped ownership model is split into three categories:
 ### State Model
 
 - `@State` persistence is keyed by view identity path plus source location
+- Live runtime writes are additionally scoped to the view graph that registered
+  the callback, so the same stateful view instance can be mounted in another
+  live graph without inheriting the first graph's imperative writes
 - Rebinding the same view instance into a different identity path creates a different state slot
 - Keying only preserves state while the owning identity survives. State that must outlive active-tab bodies, deferred content, or presentation churn should be owned above those lazy seams and threaded down through bindings or explicit model state
 - Active-tab local state may still be intentionally ephemeral across tab selection changes because `TabView` resolves only the selected body. Hoist only the state that must survive that tab churn; presentation open and close alone should not force the same reset
 - The state container invalidates only when an `Equatable` state change actually changes value
 - Projected bindings and local actions route through the same invalidation path
-- Direct local actions restore the dynamic-property scope they were registered under so mutations remain bound to the right runtime scope
+- Direct local actions restore the dynamic-property scope they were registered
+  under so mutations remain bound to the right runtime graph
 - Button actions, key-command handlers, dismiss closures, projected bindings, and other imperative paths must preserve that same authoring and dynamic-property scope so each path invalidates the same owner
+- `@GestureState` follows the same graph-scoped binding lookup for imperative
+  gesture updates, while still resetting to its construction-time seed when
+  the gesture ends
+- No-invalidator `DefaultRenderer` snapshots preserve same-instance test and
+  preview ergonomics: if a reused view instance receives an imperative write,
+  a later snapshot of that same instance can observe it even when no live
+  invalidator exists
 
 For the deeper keying tradeoffs, see the `State-Keying` article in the `View` module.
 
@@ -158,7 +169,15 @@ Supported scenarios include body-driven reads, environment-driven observable rea
 
 ## Incremental Delivery
 
-The runtime is materially incremental in common steady-state paths: idle rerenders reuse measured and placed work and write no bytes, localized subtree updates keep work concentrated on the dirty path, and focused-button or single-character-text-input frames remain incremental relative to the initial paint. Full repaints still occur on first frame, surface resize, raster attachment changes, and raster metadata changes. `SIGWINCH` schedules a fresh frame and re-reads terminal size without exiting the run loop.
+The runtime is materially incremental in common steady-state paths: idle
+rerenders reuse measured and placed work and write no bytes, localized subtree
+updates keep work concentrated on the dirty path, and focused-button or
+single-character-text-input frames remain incremental relative to the initial
+paint. Full repaints still occur on first frame, surface resize, raster
+attachment changes, and raster metadata changes. Terminal text and OSC 8
+hyperlink destinations are sanitized at the presentation boundary before bytes
+are written to the host. `SIGWINCH` schedules a fresh frame and re-reads
+terminal size without exiting the run loop.
 
 ## Crash Recovery
 

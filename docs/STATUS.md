@@ -33,7 +33,8 @@ Current async presentation and frame-tail worker ownership is summarized in
   `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`,
   `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference
   readers, anchor preferences, `OpenLinkAction`, actor-context-aware
-  `.task(...)`, and default-focus modifiers
+  `.task(...)`, default-focus modifiers, and graph-scoped imperative state
+  writes for live runtime callbacks
 - Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`
 
 ### Runtime surface
@@ -41,7 +42,9 @@ Current async presentation and frame-tail worker ownership is summarized in
 - `DefaultRenderer` for one-shot rendering, async runtime rendering, and pipeline
   inspection from the main actor
 - `RunLoop` for interactive terminal sessions
-- `TerminalHost`, terminal appearance detection, graphics-capability probing, capability-aware presentation, and OSC 8 hyperlink emission when supported
+- `TerminalHost`, terminal appearance detection, graphics-capability probing,
+  capability-aware presentation, sanitized text emission, and sanitized OSC 8
+  hyperlinks when the terminal advertises support
 - host-owned `Theme` and paired `TerminalRenderStyle` updates so hosted
   sessions and browser/WASI runtimes can switch semantic themes at runtime
 - Keyboard parsing, mouse input parsing, Unix signal handling, and runtime scheduling
