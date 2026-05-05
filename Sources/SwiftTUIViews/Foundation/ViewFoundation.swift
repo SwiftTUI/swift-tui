@@ -337,6 +337,19 @@ package func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> ResolvedNode {
+  resolveView(
+    view,
+    in: context,
+    authoringContextOverride: nil
+  )
+}
+
+@MainActor
+func resolveView<V: View>(
+  _ view: V,
+  in context: ResolveContext,
+  authoringContextOverride: AuthoringContext?
+) -> ResolvedNode {
   // When a shared FrameResolveState is available, refresh the per-frame
   // invalidation set so evaluator closures captured on prior frames see
   // the current frame's dirty identities.
@@ -386,16 +399,34 @@ package func resolveView<V: View>(
   let resolved = ViewUpdateGuard.withViewUpdate {
     ViewNodeContext.withValue(graphNode) {
       if erased is any ResolvableView {
-        return normalizeResolvedElements(
-          resolveViewElements(view, in: context),
-          in: context
+        let resolve = {
+          normalizeResolvedElements(
+            resolveViewElements(view, in: context),
+            in: context
+          )
+        }
+
+        guard let authoringContextOverride else {
+          return resolve()
+        }
+
+        let authoringContext = rebasedAuthoringContext(
+          authoringContextOverride,
+          viewNode: graphNode
         )
+        return withAuthoringContext(authoringContext) {
+          resolve()
+        }
       }
 
-      let authoringContext = makeAuthoringContext(
-        for: context,
-        viewNode: graphNode
-      )
+      let authoringContext =
+        authoringContextOverride.map {
+          rebasedAuthoringContext($0, viewNode: graphNode)
+        }
+        ?? makeAuthoringContext(
+          for: context,
+          viewNode: graphNode
+        )
       return withAuthoringContext(authoringContext) {
         let resolved = normalizeResolvedElements(
           resolveViewElements(view, in: context),
@@ -414,4 +445,18 @@ package func resolveView<V: View>(
     )
   }
   return resolved
+}
+
+@MainActor
+private func rebasedAuthoringContext(
+  _ authoringContext: AuthoringContext,
+  viewNode: SwiftTUICore.ViewNode?
+) -> AuthoringContext {
+  AuthoringContext(
+    viewIdentity: authoringContext.viewIdentity,
+    structuralIdentity: authoringContext.structuralIdentity,
+    focusedValues: authoringContext.focusedValues,
+    viewNode: viewNode,
+    ordinalTracker: authoringContext.ordinalTracker
+  )
 }

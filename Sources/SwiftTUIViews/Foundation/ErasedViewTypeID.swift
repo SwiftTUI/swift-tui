@@ -6,6 +6,10 @@ package struct ErasedViewTypeID: Hashable, Sendable, CustomStringConvertible {
   package let displayName: String
 
   package init<V: View>(_ type: V.Type) {
+    self.init(erasing: type)
+  }
+
+  package init(erasing type: Any.Type) {
     let reflectedName = String(reflecting: type)
     displayName = reflectedName
     typeDiscriminator = ObjectIdentifier(type)

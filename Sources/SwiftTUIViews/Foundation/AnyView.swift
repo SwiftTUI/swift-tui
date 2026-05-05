@@ -7,44 +7,17 @@ package import SwiftTUICore
 /// `@ViewBuilder` composition and generic `Content: View` storage when those
 /// are practical.
 public struct AnyView: View, ResolvableView {
-  private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
-
-  private static func resolveWithAuthoringContext(
-    _ authoringContext: AuthoringContext?,
-    _ apply: @escaping @MainActor (ResolveContext) -> [ResolvedNode]
-  ) -> @MainActor (ResolveContext) -> [ResolvedNode] {
-    guard let authoringContext else {
-      return apply
-    }
-
-    return { context in
-      withAuthoringContext(authoringContext) {
-        apply(context)
-      }
-    }
-  }
+  private let storage: AnyViewStorage
 
   package init<V: View & ResolvableView>(resolving view: V) {
-    resolveElementsClosure = { context in
-      view.resolveElements(in: context)
-    }
+    storage = Self.makeStorage(view, authoringContext: nil)
   }
 
   package init<V: View>(
     scoped view: V,
     authoringContext: AuthoringContext?
   ) {
-    let erased: Any = view
-    if let resolvable = erased as? any ResolvableView {
-      resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
-        resolvable.resolveElements(in: context)
-      }
-      return
-    }
-
-    resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
-      resolveViewElements(view, in: context)
-    }
+    storage = Self.makeStorage(view, authoringContext: authoringContext)
   }
 
   /// Erases the concrete type of `view`.
@@ -53,23 +26,17 @@ public struct AnyView: View, ResolvableView {
   /// evaluation, because that helper also restores the original
   /// dynamic-property scope.
   public init<V: View>(_ view: V) {
-    let erased: Any = view
-    if let resolvable = erased as? any ResolvableView {
-      resolveElementsClosure = { context in
-        resolvable.resolveElements(in: context)
-      }
-      return
-    }
-
-    resolveElementsClosure = { context in
-      resolveViewElements(view, in: context)
-    }
+    storage = Self.makeStorage(view, authoringContext: nil)
   }
 
-  package init(erasing view: some ViewNode) {
-    resolveElementsClosure = { context in
-      [view.resolve(in: context)]
-    }
+  package init<Node: ViewNode>(erasing view: Node) {
+    storage = .init(
+      typeID: .init(erasing: Node.self),
+      authoringContext: nil,
+      resolve: { context in
+        view.resolve(in: context)
+      }
+    )
   }
 
   public var body: Never {
@@ -77,12 +44,70 @@ public struct AnyView: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveElementsClosure(context)
+    let payloadContext = context.child(component: storage.typeID.identityComponent)
+    let payload = ResolvedNode(
+      identity: payloadContext.identity,
+      kind: .view("AnyViewPayload"),
+      typeDiscriminator: storage.typeID.typeDiscriminator,
+      children: AnyViewPayload(storage: storage).resolveElements(in: payloadContext),
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction
+    )
+
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("AnyView"),
+        typeDiscriminator: ObjectIdentifier(AnyView.self),
+        children: [payload],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+    ]
+  }
+
+  private static func makeStorage<V: View>(
+    _ view: V,
+    authoringContext: AuthoringContext?
+  ) -> AnyViewStorage {
+    AnyViewStorage(
+      typeID: .init(V.self),
+      authoringContext: authoringContext,
+      resolve: { context in
+        resolveView(
+          view,
+          in: context,
+          authoringContextOverride: authoringContext
+        )
+      }
+    )
   }
 }
 
 extension AnyView: ViewNode {
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     resolveView(self, in: context)
+  }
+}
+
+private struct AnyViewStorage {
+  let typeID: ErasedViewTypeID
+  let authoringContext: AuthoringContext?
+  let resolve: @MainActor (ResolveContext) -> ResolvedNode
+}
+
+private struct AnyViewPayload: View, ResolvableView {
+  let storage: AnyViewStorage
+
+  var body: Never {
+    fatalError("AnyViewPayload is resolved directly.")
+  }
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var contentContext = context.child(component: .named("Content"))
+    contentContext.explicitIdentityNamespace = contentContext.identity
+    return [
+      storage.resolve(contentContext)
+    ]
   }
 }

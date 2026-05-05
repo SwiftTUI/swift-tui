@@ -7,27 +7,37 @@ import Testing
 @Suite
 struct ViewResolutionTests {
   @Test("Text view resolves to a single node")
-  func textViewResolvesToSingleNode() {
+  func textViewResolvesToSingleNode() throws {
     let resolver = Resolver()
     let view = Text("Hello")
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let payload = try #require(resolved.anyViewPayload)
+    let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
+    #expect(resolved.kind == .view("AnyView"))
+    #expect(payload.kind == .view("AnyViewPayload"))
+    #expect(payload.identity.lastComponent?.contains("Text") == true)
+    #expect(content.identity == testIdentity("root", payload.identity.lastComponent!, "Content"))
+    #expect(content.kind == .view("Text"))
   }
 
   @Test("EmptyView resolves with no draw payload")
-  func emptyViewResolvesCleanly() {
+  func emptyViewResolvesCleanly() throws {
     let resolver = Resolver()
     let view = EmptyView()
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
+    #expect(resolved.kind == .view("AnyView"))
+    #expect(content.kind == .view("EmptyView"))
   }
 
   @Test("HStack resolves children")
-  func hstackResolvesChildren() {
+  func hstackResolvesChildren() throws {
     let resolver = Resolver()
     let view = HStack {
       Text("A")
@@ -35,12 +45,15 @@ struct ViewResolutionTests {
     }
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(!resolved.children.isEmpty)
+    #expect(resolved.kind == .view("AnyView"))
+    #expect(content.kind == .view("HStack"))
+    #expect(!content.children.isEmpty)
   }
 
   @Test("LazyVStack resolves children")
-  func lazyVStackResolvesChildren() {
+  func lazyVStackResolvesChildren() throws {
     let resolver = Resolver()
     let view = LazyVStack(alignment: .leading, spacing: 2) {
       Text("A")
@@ -48,12 +61,14 @@ struct ViewResolutionTests {
     }
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("LazyVStack"))
-    #expect(resolved.children.count == 2)
+    #expect(resolved.kind == .view("AnyView"))
+    #expect(content.kind == .view("LazyVStack"))
+    #expect(content.children.count == 2)
     #expect(
-      resolved.layoutBehavior
+      content.layoutBehavior
         == .lazyStack(
           axis: .vertical,
           spacing: 2,
@@ -64,7 +79,7 @@ struct ViewResolutionTests {
   }
 
   @Test("LazyHStack resolves children")
-  func lazyHStackResolvesChildren() {
+  func lazyHStackResolvesChildren() throws {
     let resolver = Resolver()
     let view = LazyHStack(alignment: .top, spacing: 1) {
       Text("A")
@@ -72,12 +87,14 @@ struct ViewResolutionTests {
     }
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("LazyHStack"))
-    #expect(resolved.children.count == 2)
+    #expect(resolved.kind == .view("AnyView"))
+    #expect(content.kind == .view("LazyHStack"))
+    #expect(content.children.count == 2)
     #expect(
-      resolved.layoutBehavior
+      content.layoutBehavior
         == .lazyStack(
           axis: .horizontal,
           spacing: 1,
@@ -88,7 +105,7 @@ struct ViewResolutionTests {
   }
 
   @Test("LazyVStack with a single ForEach defers eager child resolution")
-  func lazyVStackWithSingleForEachDefersChildResolution() {
+  func lazyVStackWithSingleForEachDefersChildResolution() throws {
     let counter = ResolveInvocationCounter()
     let resolver = Resolver()
     let view = LazyVStack(alignment: .leading, spacing: 1) {
@@ -102,13 +119,14 @@ struct ViewResolutionTests {
 
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(resolved.kind == .view("LazyVStack"))
+    #expect(content.kind == .view("LazyVStack"))
     #expect(counter.count == 0)
   }
 
   @Test("LazyHStack with a single ForEach defers eager child resolution")
-  func lazyHStackWithSingleForEachDefersChildResolution() {
+  func lazyHStackWithSingleForEachDefersChildResolution() throws {
     let counter = ResolveInvocationCounter()
     let resolver = Resolver()
     let view = LazyHStack(alignment: .center, spacing: 1) {
@@ -120,13 +138,14 @@ struct ViewResolutionTests {
 
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(resolved.kind == .view("LazyHStack"))
+    #expect(content.kind == .view("LazyHStack"))
     #expect(counter.count == 0)
   }
 
   @Test("LazyVStack with mixed static siblings still resolves ForEach eagerly")
-  func lazyVStackWithMixedStaticSiblingsResolvesForEachEagerly() {
+  func lazyVStackWithMixedStaticSiblingsResolvesForEachEagerly() throws {
     let counter = ResolveInvocationCounter()
     let resolver = Resolver()
     let view = LazyVStack(alignment: .leading, spacing: 1) {
@@ -142,14 +161,15 @@ struct ViewResolutionTests {
 
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(resolved.kind == .view("LazyVStack"))
-    #expect(resolved.children.count == 5)
+    #expect(content.kind == .view("LazyVStack"))
+    #expect(content.children.count == 5)
     #expect(counter.count == 3)
   }
 
   @Test("overlay and background builders tolerate implicit EmptyView branches")
-  func overlayAndBackgroundImplicitEmptyBranchesResolve() {
+  func overlayAndBackgroundImplicitEmptyBranchesResolve() throws {
     let resolver = Resolver()
     let view = Text("Hello")
       .background {
@@ -165,16 +185,39 @@ struct ViewResolutionTests {
 
     let resolved = resolver.resolve(
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+    let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("Overlay"))
-    #expect(resolved.children.count == 2)
-    #expect(resolved.children[0].kind == .view("Background"))
-    #expect(resolved.children[1].kind == .view("EmptyView"))
+    #expect(resolved.kind == .view("AnyView"))
+    #expect(content.kind == .view("Overlay"))
+    #expect(content.children.count == 2)
+    #expect(content.children[0].kind == .view("Background"))
+    #expect(content.children[1].kind == .view("EmptyView"))
   }
 }
 
 @MainActor
 private final class ResolveInvocationCounter {
   var count = 0
+}
+
+extension ResolvedNode {
+  fileprivate var anyViewPayload: ResolvedNode? {
+    guard kind == .view("AnyView"),
+      children.count == 1,
+      children[0].kind == .view("AnyViewPayload")
+    else {
+      return nil
+    }
+    return children[0]
+  }
+
+  fileprivate var anyViewPayloadContent: ResolvedNode? {
+    guard let payload = anyViewPayload,
+      payload.children.count == 1
+    else {
+      return nil
+    }
+    return payload.children[0]
+  }
 }

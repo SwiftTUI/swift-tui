@@ -237,6 +237,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var imageAssetResolver: ImageAssetResolver?
   package var frameState: FrameResolveState?
   package var suppressesStructuralLifecycle: Bool
+  package var explicitIdentityNamespace: Identity?
   /// Forwards deadline requests to the frame scheduler.
   /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
   package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
@@ -337,6 +338,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.imageAssetResolver = imageAssetResolver
     childContext.frameState = frameState
     childContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
+    childContext.explicitIdentityNamespace = explicitIdentityNamespace
     childContext.requestDeadline = requestDeadline
     return childContext
   }
@@ -350,8 +352,12 @@ public struct ResolveContext: Equatable, Sendable {
   }
 
   package func replacingIdentity(with identity: Identity) -> Self {
+    let resolvedIdentity =
+      explicitIdentityNamespace.map {
+        $0.explicitID(identity.path)
+      } ?? identity
     var replacedContext = Self(
-      identity: identity,
+      identity: resolvedIdentity,
       environment: environment,
       environmentValues: environmentValues,
       transaction: transaction,
@@ -381,6 +387,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.imageAssetResolver = imageAssetResolver
     replacedContext.frameState = frameState
     replacedContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
+    replacedContext.explicitIdentityNamespace = explicitIdentityNamespace
     replacedContext.requestDeadline = requestDeadline
     return replacedContext
   }
@@ -539,6 +546,7 @@ extension ResolveContext {
     viewGraph = nil
     imageAssetResolver = nil
     suppressesStructuralLifecycle = false
+    explicitIdentityNamespace = nil
     requestDeadline = nil
   }
 }
