@@ -287,8 +287,11 @@ This stage should be behavior-neutral.
   - Different static types produce different `typeDiscriminator` values.
   - The display name is deterministic enough for readable test failures.
 
-- [ ] Add a package-only renderer graph inspection hook only if the resilience
+- [x] Add a package-only renderer graph inspection hook only if the resilience
   tests need direct graph access beyond `resolvedTree` and `commitPlan`.
+
+  Not needed; the resilience suite asserts through `resolvedTree`,
+  `semanticSnapshot`, action registries, and `commitPlan`.
 
   Preferred minimal shape in `Sources/SwiftTUI/SwiftTUI.swift`:
 
@@ -302,7 +305,7 @@ This stage should be behavior-neutral.
   Do not expose this publicly. Do not add a broader graph debugging API unless
   a specific test requires it.
 
-- [ ] Add small test-only helpers in
+- [x] Add small test-only helpers in
   `Tests/SwiftTUITests/AnyViewResilienceTests.swift` or
   `Tests/SwiftTUITests/Support/AnyViewResilienceFixtures.swift`:
 
@@ -325,58 +328,58 @@ Add `Tests/SwiftTUITests/AnyViewResilienceTests.swift`. These tests should fail
 against the current closure-forwarding implementation where the current
 behavior is deficient.
 
-- [ ] `sameErasedTypePreservesStateAcrossRerenders`
+- [x] `sameErasedTypePreservesStateAcrossRerenders`
 
   Render `AnyView(AnyViewStateCounter(kind: .text))`, dispatch an increment
   action, rerender with the same erased static type, and assert the count
   remains incremented.
 
-- [ ] `erasedTypeSwapDestroysOldStateAndStartsNewState`
+- [x] `erasedTypeSwapDestroysOldStateAndStartsNewState`
 
   Render an erased stateful `Text`-backed fixture, mutate state through an
   action, then render an erased stateful `VStack`-backed fixture under the same
   `AnyView` identity. Assert the old state is absent and the new fixture starts
   from its initial state.
 
-- [ ] `erasedTypeSwapCancelsTaskAndFiresDisappear`
+- [x] `erasedTypeSwapCancelsTaskAndFiresDisappear`
 
   Render an erased fixture with `.task(id:)`, `.onAppear`, and `.onDisappear`.
   Swap to a different erased static type under the same `AnyView` identity.
   Assert the update commit plan contains `taskCancel` and `disappear` for the
   removed descendant identity.
 
-- [ ] `actionInsideAnyViewInvalidatesOriginalOwner`
+- [x] `actionInsideAnyViewInvalidatesOriginalOwner`
 
   Store erased content through `scopedAnyView(...)` in a deferred or captured
   path. Dispatch a `Button` action inside the erased subtree. Assert the
   original owner invalidates and the next render observes the mutation.
 
-- [ ] `focusableDescendantInsideAnyViewRemainsReachable`
+- [x] `focusableDescendantInsideAnyViewRemainsReachable`
 
   Render focusable/button content inside `AnyView`. Assert a focus region exists
   for the descendant, dispatching the focused action works, and the action still
   works after a rerender with the same erased static type.
 
-- [ ] `nestedAnyViewUsesEachErasedTypeBoundary`
+- [x] `nestedAnyViewUsesEachErasedTypeBoundary`
 
   Render `AnyView(AnyView(StatefulLeaf()))`, mutate the leaf, rerender the same
   nested erased type, then swap only the inner erased type. Assert the outer
   wrapper remains stable while the inner payload subtree is replaced.
 
-- [ ] `explicitIDInsideAnyViewDoesNotDefeatTypeSwapTeardown`
+- [x] `explicitIDInsideAnyViewDoesNotDefeatTypeSwapTeardown`
 
   Render `AnyView(StatefulLeaf().id("stable"))`, mutate it, then swap the erased
   static type while keeping the same explicit ID string inside the new payload.
   Assert type-swap teardown wins; the explicit ID must not keep incompatible
   state alive across different erased static payload types.
 
-- [ ] `forEachInsideAnyViewKeepsElementIdentities`
+- [x] `forEachInsideAnyViewKeepsElementIdentities`
 
   Render `AnyView(ForEach(items, id: \.self) { ... })`, mutate per-row state or
   dispatch row actions, reorder stable IDs, and assert row identity behavior is
   unchanged except for the new wrapper/payload ancestors.
 
-- [ ] Run the red suite and record which tests fail before implementation:
+- [x] Run the red suite and record which tests fail before implementation:
 
   ```bash
   swiftly run swift test --filter SwiftTUITests.AnyViewResilienceTests
@@ -388,7 +391,7 @@ more precise graph/lifecycle assertion before changing production code.
 
 ### Stage 3: Implement Wrapper + Type-Stamped Payload
 
-- [ ] Replace `AnyView`'s closure-only storage with typed payload storage in
+- [x] Replace `AnyView`'s closure-only storage with typed payload storage in
   `Sources/SwiftTUIViews/Foundation/AnyView.swift`.
 
   Required storage behavior:
@@ -405,7 +408,7 @@ more precise graph/lifecycle assertion before changing production code.
   `resolveView(view, in: context)` inside the captured authored context when
   one exists.
 
-- [ ] Introduce a package-private payload view in `AnyView.swift`.
+- [x] Introduce a package-private payload view in `AnyView.swift`.
 
   Shape:
 
@@ -426,7 +429,7 @@ more precise graph/lifecycle assertion before changing production code.
   Use a non-public component for the concrete content child if `.named("Content")`
   is too collision-prone for readable identity output. Keep it stable.
 
-- [ ] Make `AnyView.resolveElements(in:)` return the wrapper node with one
+- [x] Make `AnyView.resolveElements(in:)` return the wrapper node with one
   payload child.
 
   Required properties:
@@ -439,7 +442,7 @@ more precise graph/lifecycle assertion before changing production code.
   - payload type discriminator: `storage.typeID.typeDiscriminator`
   - payload child: concrete content resolved through `resolveView(...)`
 
-- [ ] Preserve specialized package initializers:
+- [x] Preserve specialized package initializers:
 
   - `package init<V: View & ResolvableView>(resolving view: V)`
   - `package init<V: View>(scoped view: V, authoringContext: AuthoringContext?)`
@@ -448,7 +451,7 @@ more precise graph/lifecycle assertion before changing production code.
   The `ViewNode` initializer may need its own storage path because it erases an
   already-node-shaped value. It still needs a stable payload type key.
 
-- [ ] Ensure all paths that store authored content for later still use
+- [x] Ensure all paths that store authored content for later still use
   `scopedAnyView(...)`, not plain `AnyView(...)`.
 
   Search before and after:
@@ -457,7 +460,7 @@ more precise graph/lifecycle assertion before changing production code.
   rg -n "AnyView\\(|scopedAnyView|\\[AnyView\\]|-> AnyView|\\(\\) -> AnyView" Sources Tests
   ```
 
-- [ ] Run the red suite:
+- [x] Run the red suite:
 
   ```bash
   swiftly run swift test --filter SwiftTUITests.AnyViewResilienceTests
@@ -468,7 +471,7 @@ shape changes in `ViewFoundation.swift`.
 
 ### Stage 4: Align Resolution, Alias, and Shape-Sensitive Tests
 
-- [ ] Update `Tests/SwiftTUIViewsTests/ViewResolutionTests.swift` for the new
+- [x] Update `Tests/SwiftTUIViewsTests/ViewResolutionTests.swift` for the new
   wrapper/payload resolved tree.
 
   Expected shape for `Resolver().resolve(AnyView(Text("A")), in: rootContext)`:
@@ -483,13 +486,13 @@ shape changes in `ViewFoundation.swift`.
   Assert stable behavior without overfitting to incidental generic spelling
   unless `ErasedViewTypeIDTests` deliberately pins that spelling.
 
-- [ ] Update `Tests/SwiftTUITests/RegistrationAliasFindingsTests.swift`.
+- [x] Update `Tests/SwiftTUITests/RegistrationAliasFindingsTests.swift`.
 
   The ordinary AnyView cases should still report zero non-trivial aliases. If a
   non-trivial alias appears, investigate whether wrapper/payload resolution is
   bypassing normal `resolveView(...)` before changing the expected count.
 
-- [ ] Run related focused suites:
+- [x] Run related focused suites:
 
   ```bash
   swiftly run swift test --filter SwiftTUIViewsTests.ViewResolutionTests
