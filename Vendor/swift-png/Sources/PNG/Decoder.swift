@@ -73,6 +73,10 @@ extension PNG {
   /// then unfilters and (if interlaced) reassembles Adam7 sub-images
   /// into a flat row-major byte plane.
   struct Decoder {
+    private static let maxDimension = 16_384
+    private static let maxPixelCount = 67_108_864
+    private static let maxIDATBytes = 64 * 1024 * 1024
+
     var bytes: [UInt8]
 
     init(bytes: [UInt8]) {
@@ -99,6 +103,16 @@ extension PNG {
           | UInt32(ihdr.data[6]) << 8 | UInt32(ihdr.data[7]))
       guard width > 0, height > 0 else {
         throw .emptyImage
+      }
+      guard width <= Self.maxDimension, height <= Self.maxDimension else {
+        throw .resourceLimitExceeded(reason: "image dimensions exceed decoder limit")
+      }
+      let (pixelCount, pixelOverflow) = width.multipliedReportingOverflow(by: height)
+      guard !pixelOverflow else {
+        throw .resourceLimitExceeded(reason: "image dimensions overflow pixel count")
+      }
+      guard pixelCount <= Self.maxPixelCount else {
+        throw .resourceLimitExceeded(reason: "image pixel count exceeds decoder limit")
       }
       let bitDepth = ihdr.data[8]
       let colorTypeRaw = ihdr.data[9]
@@ -148,6 +162,9 @@ extension PNG {
           palette = p
 
         case [0x49, 0x44, 0x41, 0x54]:  // IDAT
+          guard idatBuffer.count <= Self.maxIDATBytes - chunk.data.count else {
+            throw .resourceLimitExceeded(reason: "compressed IDAT exceeds decoder limit")
+          }
           idatBuffer.append(contentsOf: chunk.data)
 
         case [0x74, 0x52, 0x4E, 0x53]:  // tRNS
@@ -174,15 +191,37 @@ extension PNG {
       }
       guard !idatBuffer.isEmpty else { throw .missingChunk(type: "IDAT") }
 
-      // ---- inflate IDAT ----
-      let inflated = try PNG.zlibInflate(idatBuffer)
-
-      // ---- unfilter (and de-interlace if needed) ----
+      // ---- size validation and inflate ----
       let bitsPerPixel = Int(bitDepth) * colorType.samples
       let bpp = max(1, (bitsPerPixel + 7) / 8)
-      let rowBytes = (width * bitsPerPixel + 7) / 8
+      let (rowBits, rowBitsOverflow) = width.multipliedReportingOverflow(by: bitsPerPixel)
+      guard !rowBitsOverflow else {
+        throw .resourceLimitExceeded(reason: "row size overflow")
+      }
+      let rowBytes = (rowBits + 7) / 8
 
-      var samples = [UInt8](repeating: 0, count: rowBytes * height)
+      let (sampleByteCount, sampleOverflow) = rowBytes.multipliedReportingOverflow(by: height)
+      guard !sampleOverflow else {
+        throw .resourceLimitExceeded(reason: "sample buffer size overflow")
+      }
+      let (filterByteCount, filterOverflow) = height.multipliedReportingOverflow(by: 8)
+      guard !filterOverflow else {
+        throw .resourceLimitExceeded(reason: "filter overhead overflow")
+      }
+      let (maxInflatedBytes, maxInflatedOverflow) = sampleByteCount.multipliedReportingOverflow(by: 2)
+      guard !maxInflatedOverflow else {
+        throw .resourceLimitExceeded(reason: "inflate limit overflow")
+      }
+      let (scanlineInflateLimit, scanlineOverflow) =
+        sampleByteCount.addingReportingOverflow(filterByteCount)
+      guard !scanlineOverflow else {
+        throw .resourceLimitExceeded(reason: "inflate limit overflow")
+      }
+      let inflateLimit = max(maxInflatedBytes, scanlineInflateLimit)
+      let inflated = try PNG.zlibInflate(idatBuffer, maxOutputBytes: inflateLimit)
+
+      // ---- unfilter (and de-interlace if needed) ----
+      var samples = [UInt8](repeating: 0, count: sampleByteCount)
 
       if interlace == 0 {
         var inOffset = 0

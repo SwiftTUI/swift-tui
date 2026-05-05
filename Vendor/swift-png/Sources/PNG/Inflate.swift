@@ -259,7 +259,8 @@ extension PNG {
   /// trailing four-byte big-endian Adler-32 is verified against the
   /// inflated bytes.
   static func zlibInflate(
-    _ bytes: [UInt8]
+    _ bytes: [UInt8],
+    maxOutputBytes: Int? = nil
   ) throws(PNG.DecodingError) -> [UInt8] {
     guard bytes.count >= 6 else {
       throw .invalidDeflateStream(reason: "stream too short for zlib wrapper")
@@ -284,7 +285,8 @@ extension PNG {
     // Adler-32 trailer.
     let deflateEnd = bytes.count - 4
     let inflated = try rawInflate(
-      bytes: Array(bytes[2..<deflateEnd])
+      bytes: Array(bytes[2..<deflateEnd]),
+      maxOutputBytes: maxOutputBytes
     )
 
     // Verify Adler-32. Stored big-endian per zlib (RFC 1950 §2.2).
@@ -305,7 +307,8 @@ extension PNG {
   /// so the test target can exercise it directly without round-tripping
   /// the zlib envelope.
   static func rawInflate(
-    bytes: [UInt8]
+    bytes: [UInt8],
+    maxOutputBytes: Int? = nil
   ) throws(PNG.DecodingError) -> [UInt8] {
     var reader = BitReader(bytes: bytes)
     var output: [UInt8] = []
@@ -316,13 +319,14 @@ extension PNG {
       let btype = try reader.readBits(2)
       switch btype {
       case 0:
-        try inflateStoredBlock(reader: &reader, output: &output)
+        try inflateStoredBlock(reader: &reader, output: &output, maxOutputBytes: maxOutputBytes)
       case 1:
         try inflateHuffmanBlock(
           reader: &reader,
           litTree: fixedLitTree,
           distTree: fixedDistTree,
-          output: &output
+          output: &output,
+          maxOutputBytes: maxOutputBytes
         )
       case 2:
         let (lit, dist) = try readDynamicTrees(reader: &reader)
@@ -330,12 +334,16 @@ extension PNG {
           reader: &reader,
           litTree: lit,
           distTree: dist,
-          output: &output
+          output: &output,
+          maxOutputBytes: maxOutputBytes
         )
       default:
         throw .invalidDeflateStream(reason: "reserved block type 3")
       }
       if bfinal == 1 { break blocks }
+      if let maxOutputBytes, output.count > maxOutputBytes {
+        throw .resourceLimitExceeded(reason: "inflated stream exceeds decoder limit")
+      }
     }
 
     return output
@@ -343,7 +351,8 @@ extension PNG {
 
   private static func inflateStoredBlock(
     reader: inout BitReader,
-    output: inout [UInt8]
+    output: inout [UInt8],
+    maxOutputBytes: Int?
   ) throws(PNG.DecodingError) {
     reader.alignToByte()
     let lenBytes = try reader.readBytes(4)
@@ -354,18 +363,25 @@ extension PNG {
     }
     let payload = try reader.readBytes(len)
     output.append(contentsOf: payload)
+    if let maxOutputBytes, output.count > maxOutputBytes {
+      throw .resourceLimitExceeded(reason: "inflated stream exceeds decoder limit")
+    }
   }
 
   private static func inflateHuffmanBlock(
     reader: inout BitReader,
     litTree: HuffmanTree,
     distTree: HuffmanTree,
-    output: inout [UInt8]
+    output: inout [UInt8],
+    maxOutputBytes: Int?
   ) throws(PNG.DecodingError) {
     while true {
       let symbol = try litTree.decode(&reader)
       if symbol < 256 {
         output.append(UInt8(symbol))
+        if let maxOutputBytes, output.count > maxOutputBytes {
+          throw .resourceLimitExceeded(reason: "inflated stream exceeds decoder limit")
+        }
         continue
       }
       if symbol == 256 { return }
@@ -400,6 +416,9 @@ extension PNG {
       let start = output.count - distance
       for k in 0..<length {
         output.append(output[start + k])
+        if let maxOutputBytes, output.count > maxOutputBytes {
+          throw .resourceLimitExceeded(reason: "inflated stream exceeds decoder limit")
+        }
       }
     }
   }
