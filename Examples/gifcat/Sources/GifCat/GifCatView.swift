@@ -30,11 +30,15 @@ public struct GifCatItem: Equatable, Hashable, Identifiable, Sendable {
 }
 
 public enum GifCatInput {
+  /// Loads `paths` (raw file paths, no argv[0] convention) into `GifCatItem`s.
+  ///
+  /// Each entry is normalized against `currentDirectory`, checked for
+  /// existence, and decoded as an `AnimatedGIF` when present.
   public static func items(
-    from arguments: [String],
+    paths: [String],
     currentDirectory: String = FileManager.default.currentDirectoryPath
   ) -> [GifCatItem] {
-    arguments.dropFirst().enumerated().map { offset, rawPath in
+    paths.enumerated().map { offset, rawPath in
       let path = normalizedPath(rawPath, currentDirectory: currentDirectory)
       let exists = FileManager.default.fileExists(atPath: path)
       return GifCatItem(

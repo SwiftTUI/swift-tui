@@ -40,6 +40,7 @@ let package = Package(
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
     .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
+    .package(name: "SwiftTUIArguments", path: "../../Platforms/Arguments"),
     .package(path: "../../Vendor/swift-gif"),
   ],
   targets: [
@@ -70,6 +71,7 @@ let package = Package(
         "GIFEditor",
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
+        .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
       ]
     ),
     .testTarget(
