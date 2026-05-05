@@ -1,4 +1,5 @@
 @_exported import EmbeddedFonts
+import DequeModule
 import SwiftFiglet
 import Synchronization
 
@@ -67,8 +68,26 @@ package struct TextFigureRenderResult: Equatable, Sendable {
 }
 
 package enum TextFigureSupport {
+
+  private struct MetricsCacheEntry: Sendable {
+    var metrics: TextFigureLayoutMetrics
+    var generation: UInt64
+  }
+
+  private struct MetricsCacheAccessRecord: Sendable {
+    var payload: TextFigurePayload
+    var generation: UInt64
+  }
+
+  private struct MetricsCacheStorage: Sendable {
+    var entries: [TextFigurePayload: MetricsCacheEntry] = [:]
+    var order: Deque<MetricsCacheAccessRecord> = []
+    var nextGeneration: UInt64 = 0
+  }
+
   private static let fontCache = Mutex<[TextFigureFont: FigletFont]>([:])
-  private static let metricsCache = Mutex<[TextFigurePayload: TextFigureLayoutMetrics]>([:])
+  private static let metricsCacheCapacity = 256
+  private static let metricsCache = Mutex<MetricsCacheStorage>(.init())
 
   package static var availableFonts: [TextFigureFont] {
     TextFigureFont.allCases
@@ -81,7 +100,15 @@ package enum TextFigureSupport {
       return .init(minimumWidth: 0, idealSize: .zero)
     }
 
-    if let cached = metricsCache.withLock({ $0[payload] }) {
+    if let cached = metricsCache.withLock({ storage -> TextFigureLayoutMetrics? in
+      guard var cached = storage.entries[payload] else {
+        return nil
+      }
+      cached.generation = nextMetricsCacheGeneration(in: &storage)
+      storage.entries[payload] = cached
+      storage.order.append(.init(payload: payload, generation: cached.generation))
+      return cached.metrics
+    }) {
       return cached
     }
 
@@ -101,8 +128,18 @@ package enum TextFigureSupport {
       resolvedMetrics = fallbackLayoutMetrics(for: payload.content)
     }
 
-    metricsCache.withLock {
-      $0[payload] = resolvedMetrics
+    metricsCache.withLock { storage in
+      if var cached = storage.entries[payload] {
+        cached.generation = nextMetricsCacheGeneration(in: &storage)
+        storage.entries[payload] = cached
+        storage.order.append(.init(payload: payload, generation: cached.generation))
+        return
+      }
+
+      let generation = nextMetricsCacheGeneration(in: &storage)
+      storage.entries[payload] = .init(metrics: resolvedMetrics, generation: generation)
+      storage.order.append(.init(payload: payload, generation: generation))
+      evictMetricsCacheIfNeeded(in: &storage)
     }
     return resolvedMetrics
   }
@@ -202,6 +239,30 @@ package enum TextFigureSupport {
     return resolvedFont
   }
 
+
+  private static func nextMetricsCacheGeneration(
+    in storage: inout MetricsCacheStorage
+  ) -> UInt64 {
+    storage.nextGeneration &+= 1
+    return storage.nextGeneration
+  }
+
+  private static func evictMetricsCacheIfNeeded(
+    in storage: inout MetricsCacheStorage
+  ) {
+    while storage.entries.count > metricsCacheCapacity {
+      guard let victim = storage.order.popFirst() else {
+        break
+      }
+      guard let entry = storage.entries[victim.payload] else {
+        continue
+      }
+      guard entry.generation == victim.generation else {
+        continue
+      }
+      storage.entries.removeValue(forKey: victim.payload)
+    }
+  }
   private static func renderedLines(
     from surface: FigletSurface,
     colorMode: TextFigureColorMode,
