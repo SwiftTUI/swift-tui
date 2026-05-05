@@ -178,6 +178,49 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   }
 }
 
+extension TerminalCapabilityProfile {
+  /// Returns a new profile with the user's explicit `RuntimeConfiguration`
+  /// preferences applied on top of the detected profile.
+  ///
+  /// - `RuntimeConfiguration.color`:
+  ///   - `.never`: forces `colorLevel = .none` and disables style escape
+  ///     sequences. Wins regardless of TTY status.
+  ///   - `.always`: forces `colorLevel` to at least `.ansi16` even when
+  ///     the detected profile would have disabled color (non-TTY, etc.).
+  ///   - `.auto`: no override; the detected level stands.
+  /// - `RuntimeConfiguration.glyphs`:
+  ///   - `.ascii`: forces `glyphLevel = .ascii`.
+  ///   - `.unicode`: no override (unicode is the strict superset; if
+  ///     detection picked ascii because of locale, the user's `.unicode`
+  ///     preference is treated as a "don't restrict me" hint rather than
+  ///     a "force unicode glyphs" override).
+  ///
+  /// Other `RuntimeConfiguration` fields (motion, output, web, debug,
+  /// start-in) are not yet wired; this method ignores them.
+  public func applying(_ configuration: RuntimeConfiguration) -> Self {
+    var result = self
+    switch configuration.color {
+    case .never:
+      result.colorLevel = .none
+      result.emitsStyleEscapeSequences = false
+    case .always:
+      if result.colorLevel == .none {
+        result.colorLevel = .ansi16
+        result.emitsStyleEscapeSequences = true
+      }
+    case .auto:
+      break
+    }
+    switch configuration.glyphs {
+    case .ascii:
+      result.glyphLevel = .ascii
+    case .unicode:
+      break
+    }
+    return result
+  }
+}
+
 /// Renders a raster surface into terminal text for a specific capability
 /// profile.
 public struct TerminalSurfaceRenderer {

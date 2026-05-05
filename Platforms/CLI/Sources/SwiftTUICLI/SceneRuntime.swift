@@ -1,4 +1,5 @@
 @_spi(Runners) import SwiftTUI
+import Foundation
 import UnixSignals
 
 #if canImport(Darwin)
@@ -28,6 +29,7 @@ final class SceneRuntime {
   init(
     selection: SelectedWindowScene,
     isPrimary: Bool,
+    configuration: RuntimeConfiguration = .default,
     resources: SceneSessionResources? = nil,
     sessionRunner: SessionRunner? = nil
   ) throws {
@@ -47,8 +49,15 @@ final class SceneRuntime {
       self.resources = resources
     } else if isPrimary {
       ptyPair = nil
+      let environment = ProcessInfo.processInfo.environment
+      let isTTY = isatty(STDOUT_FILENO) != 0
+      let capabilityProfile = TerminalCapabilityProfile.detect(
+        environment: environment,
+        isTTY: isTTY
+      )
+      .applying(configuration)
       self.resources = SceneSessionResources(
-        presentationSurface: TerminalHost(),
+        presentationSurface: TerminalHost(capabilityProfile: capabilityProfile),
         terminalInputReader: InputReader(),
         signalReader: defaultSignalReader(),
         diagnosticsLogger: diagnosticsLogger
@@ -56,10 +65,18 @@ final class SceneRuntime {
     } else {
       let pty = try PtyPair()
       ptyPair = pty
+      let environment = ProcessInfo.processInfo.environment
+      let isTTY = isatty(pty.masterFD) != 0
+      let capabilityProfile = TerminalCapabilityProfile.detect(
+        environment: environment,
+        isTTY: isTTY
+      )
+      .applying(configuration)
       self.resources = SceneSessionResources(
         presentationSurface: TerminalHost(
           inputFileDescriptor: pty.masterFD,
-          outputFileDescriptor: pty.masterFD
+          outputFileDescriptor: pty.masterFD,
+          capabilityProfile: capabilityProfile
         ),
         terminalInputReader: InputReader(fileDescriptor: pty.masterFD)
       )

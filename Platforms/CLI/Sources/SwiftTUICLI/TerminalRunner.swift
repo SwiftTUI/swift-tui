@@ -24,6 +24,23 @@ public enum TerminalRunner {
   /// Runs a scene-based app. Call this from your app type's `main()`.
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
+    try await launch(app, configuration: .default)
+  }
+
+  /// Runs a scene-based app with explicit runtime configuration.
+  ///
+  /// Use this overload when CLI flags or env vars have been parsed externally
+  /// (e.g., by `SwiftTUIArguments`).
+  @MainActor
+  public static func run<A: App>(_ app: A, configuration: RuntimeConfiguration) async throws {
+    try await launch(app, configuration: configuration)
+  }
+
+  @MainActor
+  private static func launch<A: App>(
+    _ app: A,
+    configuration: RuntimeConfiguration
+  ) async throws {
     let selections = collectWindowSceneSelections(from: app.body)
     guard !selections.isEmpty else {
       throw AppLaunchError.noScenes
@@ -39,7 +56,8 @@ public enum TerminalRunner {
         selections: selections,
         sessionName: sessionName,
         appName: appName,
-        instanceName: instanceName
+        instanceName: instanceName,
+        configuration: configuration
       )
     case .listInstances:
       listInstances(appName: appName)
@@ -48,18 +66,6 @@ public enum TerminalRunner {
     case .attach(let sceneID, let selector):
       try await attach(appName: appName, sceneID: sceneID, selector: selector)
     }
-  }
-
-  /// Runs a scene-based app with explicit runtime configuration.
-  ///
-  /// Use this overload when CLI flags or env vars have been parsed externally
-  /// (e.g., by `SwiftTUIArguments`).
-  @MainActor
-  public static func run<A: App>(_ app: A, configuration: RuntimeConfiguration) async throws {
-    // The configuration is recorded for the runner; behavior wiring will follow
-    // in subsequent tasks (color profile selection, accessible-mode rendering, etc.).
-    _ = configuration
-    try await run(app)
   }
 
   /// Runs a scene-based app type with explicit runtime configuration.
@@ -109,14 +115,16 @@ public enum TerminalRunner {
     selections: [SelectedWindowScene],
     sessionName: String,
     appName: String,
-    instanceName: String?
+    instanceName: String?,
+    configuration: RuntimeConfiguration
   ) async throws {
     // Create scene runtimes
     var sceneRuntimes: [SceneRuntime] = []
     for (index, selection) in selections.enumerated() {
       let runtime = try SceneRuntime(
         selection: selection,
-        isPrimary: index == 0
+        isPrimary: index == 0,
+        configuration: configuration
       )
       sceneRuntimes.append(runtime)
     }
