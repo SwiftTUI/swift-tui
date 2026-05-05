@@ -61,4 +61,29 @@ extension SwiftTUIApp {
     let configuration = runtimeConfiguration()
     try await TerminalRunner.run(self, configuration: configuration)
   }
+
+  /// Default entry point. Disambiguates between the `static main()` provided
+  /// by `SwiftTUICLI`'s `extension App` and `swift-argument-parser`'s
+  /// `extension AsyncParsableCommand` — both have the same signature, so
+  /// the compiler refuses to pick one without a tie-breaker. This extension
+  /// on the more-refined `SwiftTUIApp` protocol is the tie-breaker.
+  ///
+  /// Behavior: parse argv via `parseAsRoot(_:)`, then call `run()` on the
+  /// parsed instance. `run()` resolves the `RuntimeConfiguration` and invokes
+  /// `TerminalRunner.run(_:configuration:)`. Inlined rather than delegated to
+  /// `AsyncParsableCommand.main(_:)` because dispatch from a `SwiftTUIApp`
+  /// context can resolve to the synchronous `ParsableCommand.main(_:)`
+  /// overload, which would bypass the async `run()` path.
+  public static func main() async {
+    do {
+      var command = try parseAsRoot(nil)
+      if var asyncCommand = command as? any AsyncParsableCommand {
+        try await asyncCommand.run()
+      } else {
+        try command.run()
+      }
+    } catch {
+      exit(withError: error)
+    }
+  }
 }
