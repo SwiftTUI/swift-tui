@@ -111,7 +111,7 @@ Resolved by
 
 ## Stage 2: Normalize Runtime Configuration
 
-- [ ] Add or update tests for env-var and CLI precedence in
+- [x] Add or update tests for env-var and CLI precedence in
   `Tests/SwiftTUITests/Configuration/EnvironmentResolverTests.swift` and
   `Platforms/Arguments/Tests/SwiftTUIArgumentsTests/SwiftTUIOptionsResolutionTests.swift`.
   Required expectation changes:
@@ -121,10 +121,10 @@ Resolved by
   - `--json` beats `SWIFTTUI_ACCESSIBLE=1`.
   - accessible output implies ASCII, reduced motion, no progress, and linear.
   - `CI=true` does not imply accessible output.
-- [ ] Implement the ADR's precedence and implication rules in
+- [x] Implement the ADR's precedence and implication rules in
   `RuntimeConfiguration.detect(...)` and `SwiftTUIOptions.runtimeConfiguration(...)`.
-- [ ] Add focused tests for explicit opt-in and explicit opt-out cases.
-- [ ] Run the configuration and arguments test suites.
+- [x] Add focused tests for explicit opt-in and explicit opt-out cases.
+- [x] Run the configuration and arguments test suites.
 
 ## Stage 3: Add Cursor-As-Focus
 

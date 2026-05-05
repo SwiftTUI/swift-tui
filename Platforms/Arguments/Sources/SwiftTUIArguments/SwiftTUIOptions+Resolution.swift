@@ -1,5 +1,5 @@
-public import SwiftTUI
 public import Foundation
+public import SwiftTUI
 
 extension SwiftTUIOptions {
   /// Resolves parsed flags + env vars into a `RuntimeConfiguration`.
@@ -13,8 +13,14 @@ extension SwiftTUIOptions {
     environment: [String: String] = ProcessInfo.processInfo.environment,
     isStdoutTTY: Bool = isatty(STDOUT_FILENO) != 0
   ) -> RuntimeConfiguration {
-    // Step 1: Establish env-var-derived baseline.
-    let baseline = RuntimeConfiguration.detect(environment: environment, isStdoutTTY: isStdoutTTY)
+    // Step 1: Establish env-var-derived baseline. `--json` is the CLI escape hatch
+    // from env-requested accessible mode, including accessible mode's implied policy.
+    var baselineEnvironment = environment
+    if json {
+      baselineEnvironment["SWIFTTUI_ACCESSIBLE"] = nil
+    }
+    let baseline = RuntimeConfiguration.detect(
+      environment: baselineEnvironment, isStdoutTTY: isStdoutTTY)
 
     // Step 2: Apply CLI flags on top of baseline. CLI flags shadow env vars
     //         only when they are non-default; default values pass through to baseline.
@@ -60,11 +66,19 @@ extension SwiftTUIOptions {
       linear = true
     }
 
-    // Output: --accessible > --json > baseline.
+    // Output: CLI flags override env vars, and JSON wins within the CLI layer.
     if accessible {
       output = .accessible
-    } else if json {
+    }
+    if json {
       output = .json
+    }
+
+    if output == .accessible {
+      glyphs = .ascii
+      motion = .reduced
+      noProgress = true
+      linear = true
     }
 
     // Web: present iff --web or env var set; CLI values override env var values.

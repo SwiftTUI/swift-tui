@@ -1,5 +1,6 @@
-import Testing
 import SwiftTUI
+import Testing
+
 @testable import SwiftTUIArguments
 
 struct SwiftTUIOptionsResolutionTests {
@@ -8,7 +9,7 @@ struct SwiftTUIOptionsResolutionTests {
     let options = try SwiftTUIOptions.parse([])
     let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.color == .auto)
-    #expect(configuration.glyphs == .ascii) // No UTF-8 in locale
+    #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale
     #expect(configuration.motion == .normal)
   }
 
@@ -48,12 +49,17 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.motion == .reduced)
   }
 
-  @Test("--accessible sets output mode to .accessible")
+  @Test("--accessible sets output mode and implied accessible policy")
   func cliAccessibleSetsOutput() throws {
     var options = try SwiftTUIOptions.parse([])
     options.accessible = true
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    let configuration = options.runtimeConfiguration(
+      environment: ["LANG": "en_US.UTF-8"], isStdoutTTY: true)
     #expect(configuration.output == .accessible)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.noProgress == true)
+    #expect(configuration.linear == true)
   }
 
   @Test("--json sets output mode to .json")
@@ -64,13 +70,61 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.output == .json)
   }
 
-  @Test("--accessible takes priority over --json when both set")
-  func cliAccessibleBeatsJson() throws {
+  @Test("--json takes priority over --accessible when both set")
+  func cliJsonBeatsAccessible() throws {
     var options = try SwiftTUIOptions.parse([])
     options.accessible = true
     options.json = true
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    let configuration = options.runtimeConfiguration(
+      environment: ["LANG": "en_US.UTF-8"], isStdoutTTY: true)
+    #expect(configuration.output == .json)
+    #expect(configuration.glyphs == .unicode)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.noProgress == false)
+    #expect(configuration.linear == false)
+  }
+
+  @Test("--accessible beats SWIFTTUI_JSON=1")
+  func cliAccessibleBeatsEnvJson() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.accessible = true
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_JSON": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
     #expect(configuration.output == .accessible)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.noProgress == true)
+    #expect(configuration.linear == true)
+  }
+
+  @Test("--accessible implications ignore env opt-outs")
+  func cliAccessibleIgnoresEnvOptOuts() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.accessible = true
+    let configuration = options.runtimeConfiguration(
+      environment: [
+        "SWIFTTUI_REDUCE_MOTION": "0",
+        "SWIFTTUI_NO_PROGRESS": "0",
+        "LANG": "en_US.UTF-8",
+      ], isStdoutTTY: true)
+    #expect(configuration.output == .accessible)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.noProgress == true)
+    #expect(configuration.linear == true)
+  }
+
+  @Test("--json beats SWIFTTUI_ACCESSIBLE=1")
+  func cliJsonBeatsEnvAccessible() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.json = true
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_ACCESSIBLE": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
+    #expect(configuration.output == .json)
+    #expect(configuration.glyphs == .unicode)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.noProgress == false)
+    #expect(configuration.linear == false)
   }
 
   @Test("--web --port 9000 --bind 0.0.0.0 produces WebConfig")
