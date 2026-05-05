@@ -29,6 +29,44 @@ struct EmulatorWrapperTests {
     #expect(events.contains(.titleChanged("hello-world")))
   }
 
+  @Test("OSC 7 working directory changes are reported as events")
+  func workingDirectoryEvent() async {
+    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+    let oscDirectory = Array("\u{1B}]7;file:///tmp/swift-tui\u{07}".utf8)
+    let events = await emulator.feed(oscDirectory)
+    #expect(events.contains(.workingDirectoryChanged("file:///tmp/swift-tui")))
+  }
+
+  @Test("SGR mouse protocol encodes terminal-coordinate button presses")
+  func sgrMousePress() async {
+    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+    let events = await emulator.feed(Array("\u{1B}[?1006h".utf8))
+
+    let bytes = await emulator.send(
+      mouse: TerminalEmulatorMouse(
+        kind: .down(.primary),
+        cell: CellPoint(x: 4, y: 2)
+      )
+    )
+
+    #expect(events.contains(.mouseModeChanged(.sgr)))
+    #expect(bytes == Array("\u{1B}[<0;5;3M".utf8))
+  }
+
+  @Test("paste is bracketed when the child requests bracketed-paste")
+  func bracketedPaste() async {
+    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+
+    #expect(await emulator.encode(paste: "hello") == Array("hello".utf8))
+
+    _ = await emulator.feed(Array("\u{1B}[?2004h".utf8))
+
+    #expect(
+      await emulator.encode(paste: "hello")
+        == Array("\u{1B}[200~hello\u{1B}[201~".utf8)
+    )
+  }
+
   @Test("plain ASCII has nil style")
   func plainCharStyle() async {
     let emulator = TerminalEmulator(size: CellSize(width: 5, height: 1))

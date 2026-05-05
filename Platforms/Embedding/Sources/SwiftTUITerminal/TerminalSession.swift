@@ -10,6 +10,7 @@ public protocol TerminalSession: AnyObject, Sendable {
   func currentLifecycle() async -> TerminalLifecycle
   func send(key: TerminalEmulatorKey) async
   func send(paste: String) async
+  func send(mouse: TerminalEmulatorMouse) async
   func resize(_ size: CellSize) async throws
   func events() -> AsyncStream<TerminalEmulatorEvent>
 }
