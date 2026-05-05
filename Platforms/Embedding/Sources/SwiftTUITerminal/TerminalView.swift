@@ -2,6 +2,8 @@ import SwiftTUI
 import SwiftTUICore
 
 public struct TerminalView<Session: TerminalSession>: View {
+  @State private var updateGeneration: UInt64 = 0
+
   private let session: Session
   private let onTitleChange: (@MainActor @Sendable (String) -> Void)?
   private let onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)?
@@ -17,6 +19,7 @@ public struct TerminalView<Session: TerminalSession>: View {
   }
 
   public var body: some View {
+    let _ = updateGeneration
     EnvironmentReader(\.terminalEventHandlers) { terminalEventHandlers in
       GeometryReader { proxy in
         ForeignSurface(payload: SessionGridPayload(session: session))
@@ -31,10 +34,12 @@ public struct TerminalView<Session: TerminalSession>: View {
             return .handled
           }
           .task(id: TerminalViewLifecycleID(session: ObjectIdentifier(session), size: proxy.size)) {
+            let events = session.events()
             try? await session.start()
             try? await session.resize(proxy.size)
 
-            for await event in session.events() {
+            for await event in events {
+              updateGeneration &+= 1
               switch event {
               case .titleChanged(let title):
                 onTitleChange?(title)
