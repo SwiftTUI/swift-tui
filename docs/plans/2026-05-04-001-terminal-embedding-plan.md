@@ -2209,3 +2209,252 @@ The proposal's claim — that SwiftTUI can host external terminal
 programs as ordinary `View`s, on a foundation that does not preclude
 multiplexer-grade features later — is now backed by code, tests, and
 a working example.
+
+---
+
+# Future Stages (Speculative)
+
+The plan above ships terminal embedding as a self-contained capability
+and stops there. This section sketches what *could* come next, why
+those stages aren't in the current plan, and what would have to be
+true for them to be scheduled.
+
+These stages are **not commitments**. They are decision artifacts
+preserved here so the next person to think about plugins or about
+`AnyView`'s identity story can see what was already considered, what
+was deliberately deferred, and on what conditions the deferral
+should be revisited. Cross-reference:
+[decisions/0005-anyview-anyscene-as-escape-hatches.md](../decisions/0005-anyview-anyscene-as-escape-hatches.md).
+
+## The pseudo-symmetry that motivates these stages
+
+A core observation surfaced during the embedding planning discussion:
+the infrastructure required to make `AnyView` a first-class identity-
+preserving citizen of the pipeline is *structurally the same* as the
+infrastructure required for a `View`-level plugin system to work.
+Both need:
+
+- a stable identity stamp that survives a transparent wrapper at
+  resolve time
+- lifecycle metadata bound to inner identity, not to the wrapper
+- resolve-phase awareness that the wrapper is opaque-but-identified,
+  not a leaf
+- a way to distinguish identity-preserving erasure from
+  intentionally-erasing erasure
+
+The current framework provides none of these. `AnyView` is a leaf
+from the resolver's perspective. That has been *acceptable* up to now
+because authored code mostly avoids `AnyView`, and the typed-view
+authoring path keeps identity intact through ordinary structure.
+
+Plugins are the place this stops being acceptable. A plugin boundary
+is, by definition, a transparent wrapper: the host can't see the
+plugin's internal type tree, but it must continue to track identity,
+lifecycle, and focus across the boundary. Any serious plugin system
+runs into the same wall `AnyView` runs into — and the path through
+that wall is the same regardless of which problem motivates it.
+
+This section captures what work that path consists of and what
+gating conditions justify undertaking it.
+
+## Stage 10: In-process view-plugin experiment
+
+**Goal:** Answer whether `View` is a viable plugin ABI by adding a
+typed previewer registry to TerminalFinder, with one in-tree
+implementation that exercises the host's lifecycle, focus, and
+ActionScope features.
+
+**Approach:** A `FilePreviewer` protocol; a `PreviewerRegistry`
+parameterized over a variadic-generic plugin pack so no `AnyView`
+is needed; one concrete implementation (likely a JSON tree viewer
+with collapse/expand, scroll-position retention, and syntax styling).
+
+**What it proves (the four questions from the prior discussion):**
+
+1. Does a typed registry survive the `AnyView` policy?
+2. Does composition with the host actually deliver felt value?
+3. Does the runtime contract hold across plugin instantiation churn?
+4. What dependency surface does a useful plugin actually need?
+
+**Scope of work:** Modest. A new protocol, one example
+implementation, integration into the existing TerminalFinder
+registry, tests for plugin lifecycle. Probably 2 weeks.
+
+**When to schedule:** After Stages 1–9 ship and TerminalFinder is
+real. Before any plugin distribution, sandboxing, or out-of-process
+work — those questions don't have meaningful answers until Stage 10
+has answered the four above.
+
+**What this stage explicitly does *not* tackle:** distribution,
+sandboxing, hot reload, runtime loading, third-party authoring,
+flexible (non-compile-time-known) registries, wire-format design.
+All of those are downstream of Stage 10's outcome.
+
+**Possible Stage 10 outcomes:**
+
+- *The protocol shape is workable.* The variadic-generic registry
+  composes, the JSON viewer feels meaningfully better than `jq |
+  bat`, lifecycle holds. Justifies further plugin work; opens the
+  door to Stage 11 if flexibility becomes the bottleneck.
+- *The protocol shape is workable but the value is marginal.* The
+  registry composes, but the JSON viewer doesn't justify the
+  authoring cost over a shell command. Stage 11 is not justified;
+  the existing `TerminalProcessSession` (the "ANSI plugin" path
+  inherited from this plan) handles real demand. Stop here.
+- *The protocol shape doesn't work.* `AnyView` leaks despite the
+  variadic-generic approach, or the registry can't be expressed
+  ergonomically, or lifecycle has unfixable seams. Document the
+  negative result; do not pursue Stage 11; treat this as evidence
+  that view-level plugins are not a fit for this framework today.
+
+## Stage 11: Identity-preserving erasure substrate
+
+**Goal:** Build the resolve-phase capability for transparent
+wrappers to preserve identity continuity. This is the substrate
+both flexible plugin registries and `AnyView`'s identity story
+depend on.
+
+**Approach:** Introduce a new type along the lines of
+`IdentityPreservingErasure<Subtree>` (name TBD) that is structurally
+erasing at the type level but carries an identity stamp through
+resolution. Update the resolve phase to treat such wrappers as
+opaque-but-identified rather than as leaves. Update lifecycle
+metadata binding so `.task`, `.onAppear`, `.onDisappear`, focus
+participation, and action scope membership track the inner
+identity through the wrapper. Add test fixtures that prove
+transparent wrappers preserve `.task` continuity, focus chain
+membership, and action scope inheritance across renders.
+
+`AnyView` itself does *not* need to consume the substrate
+immediately. The substrate exists alongside `AnyView`; load-bearing
+surfaces (plugins, future framework internals) opt in. As a side
+effect — or as a deliberate later step — `AnyView` could be migrated
+onto the substrate and quietly lose its identity-loss bug class
+without changing public role.
+
+**Scope of work:** Substantial. The resolve phase is one of the most
+heavily-tested parts of the codebase. The lifecycle-selective-
+evaluation work (see [plans/2026-05-03-001-lifecycle-selective-
+evaluation-plan.md](2026-05-03-001-lifecycle-selective-evaluation-plan.md))
+already addresses *one* class of transparent-wrapper identity bug
+for `Group`; this stage generalizes that pattern to a public
+mechanism. Probably 4–6 weeks, including the test surface and a
+characterization pass against existing transparent-wrapper sites.
+
+**When to schedule:** Conditional on *all* of:
+
+- Stage 10 lands and proves the protocol shape is workable
+- Real demand surfaces for *flexible* plugin registries — sets of
+  plugins not known at compile time, third-party plugins added
+  after build, etc. (Stage 10's typed-registry approach is
+  sufficient for many real use cases; only commit to the substrate
+  when its absence is the actual blocker, not just a theoretical
+  limitation.)
+- The pseudo-symmetry argument (above) is accepted as load-bearing,
+  not as one-time observation. The substrate is a real change to
+  the framework's identity story; the doctrine should evolve to
+  match.
+
+**What this stage explicitly does *not* tackle:** out-of-process
+plugin transport, sandboxing, distribution, hot reload, plugin
+discovery. Those are Stage 12 territory.
+
+**Side effects of landing Stage 11:**
+
+- `AnyView` becomes migratable onto the substrate — separate
+  follow-up, not part of the stage itself.
+- `AnyView` retains its policy role as a smell signal regardless
+  of whether it is migrated. The SwiftUI-cultural rationale for
+  preferring typed views — compile-time clarity, refactor safety,
+  legibility — is independent of the runtime identity story.
+- ADR-0005's "What this ADR does not decide" section becomes
+  resolvable; the ADR may need a successor noting which questions
+  are now answered.
+- `Group` and other transparent wrappers can be re-evaluated against
+  the substrate, potentially superseding parts of the lifecycle-
+  selective-evaluation work.
+
+## Stage 12: Out-of-process plugin tier (deeply speculative)
+
+**Goal:** Wire-format plugin authoring. Plugins author SwiftTUI views;
+the host runs `resolve` on the plugin's tree; the resolved tree is
+serialized across a process boundary; events round-trip via stable
+closure handles. Plugins can be sandboxed (WASM) or trusted
+(subprocess) per the deployment model.
+
+**Approach:** A wire format derived from the resolve-phase output
+(probably the post-resolve `DrawNode` graph plus serializable
+identity stamps). A closure-handle registry: every event handler
+in the plugin's authored tree gets a stable ID; events on the host
+side dispatch by ID via RPC; plugin runs the closure, emits a
+new tree (or a tree diff). The pattern resembles React Server
+Components, Phoenix LiveView, and Jetpack Compose's HTML target.
+
+**Scope of work:** Very large. New peer package. Wire format
+specification. Closure-handle registry. RPC protocol. Cross-
+language (or at least cross-process) testing surface. A plugin
+runtime — likely WASM via `wasmtime` for sandboxing.
+Realistically 3+ months of focused work.
+
+**When to schedule:** Only after Stages 10 *and* 11 land *and*
+there is a concrete product motivation. Specifically, *all* of:
+
+- A security-sensitive use case requiring plugin sandboxing (the
+  in-process model gives plugins host-equivalent privilege; if
+  third-party plugin authors are real, that's not acceptable)
+- A distribution model — registry, marketplace, install/uninstall
+  flow — that justifies the wire-format work over the "compile
+  plugins in" model that Stage 10 enables
+- A non-Swift plugin author audience, or a hot-reload requirement
+  that the in-process model cannot satisfy
+
+If those don't exist, Stage 12 doesn't either. The existing
+`TerminalProcessSession` (which plays the "ANSI plugin" role from
+the Zellij comparison in
+[../proposals/TERMINAL_EMBEDDING.md](../proposals/TERMINAL_EMBEDDING.md))
+already handles the use cases that don't need view-level plugin
+participation — file previewers shelling out to `bat`, `glow`,
+`chafa`, etc. View-level out-of-process is a strictly more
+expensive answer to a question the byte-level path already answers
+adequately for many scenarios.
+
+**Important property of this stage:** it is the only stage where
+SwiftTUI would offer something Zellij cannot. The Zellij plugin
+model is byte-level — view participation in the host is impossible
+by construction. A SwiftTUI Stage 12 plugin tier would let
+sandboxed third-party code participate in the host's layout, focus,
+action scopes, and state — the strongest possible version of "views,
+not bytes." Whether that property is worth the work is a product
+question, not an engineering question, and the answer is unknowable
+before Stages 10 and 11 settle.
+
+## Sequencing summary
+
+```
+Stages 0–9 (this plan)         ──→  embedding capability ships
+       │
+       ├──(if there's appetite for plugins)──→
+       │
+Stage 10  in-process view-plugin experiment  ──→  answer "is View a viable plugin ABI?"
+       │
+       ├──(if Stage 10 succeeds AND flexibility is the bottleneck)──→
+       │
+Stage 11  identity-preserving erasure substrate
+       │   └─ side effect: AnyView's identity story can be fixed
+       │
+       ├──(if Stages 10+11 land AND there's a real distribution/sandboxing case)──→
+       │
+Stage 12  out-of-process plugin tier
+```
+
+Each transition is a *decision*, not a deliverable. The plan
+deliberately preserves the option to stop at any node. The most
+expensive mistake would be undertaking Stage 11 or Stage 12 without
+the gating evidence — at which point the framework has paid for
+infrastructure with no real consumer.
+
+The least expensive mistake is failing to undertake Stage 10 when
+plugin demand is real. Stage 10 is small, isolated, and produces a
+binary answer; deferring it once embedding ships is a reasonable
+default but should not become permanent if real authoring needs
+push against the limits of the in-tree previewer registry.
