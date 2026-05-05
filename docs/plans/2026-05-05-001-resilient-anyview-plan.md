@@ -505,7 +505,7 @@ shape changes in `ViewFoundation.swift`.
 Run focused suites that exercise the risk surface around retained graph
 ownership, state slots, lifecycle events, actions, and focus.
 
-- [ ] State and lifecycle:
+- [x] State and lifecycle:
 
   ```bash
   swiftly run swift test --filter SwiftTUITests.StatePersistenceTests
@@ -513,28 +513,28 @@ ownership, state slots, lifecycle events, actions, and focus.
   swiftly run swift test --filter SwiftTUITests.Phase4StateReliabilityTests
   ```
 
-- [ ] Focus and command/action routing:
+- [x] Focus and command/action routing:
 
   ```bash
   swiftly run swift test --filter SwiftTUITests.FocusTransitionTests
   swiftly run swift test --filter SwiftTUITests.KeyCommandTests
   ```
 
-- [ ] Core graph behavior:
+- [x] Core graph behavior:
 
   ```bash
   swiftly run swift test --filter SwiftTUICoreTests.ViewGraphTests
   swiftly run swift test --filter SwiftTUICoreTests.RegistrationAliasDiagnosticsTests
   ```
 
-- [ ] If any failure shows a real wrapper/payload regression, fix production
+- [x] If any failure shows a real wrapper/payload regression, fix production
   code rather than weakening the test. If a failure is only an intentional
   resolved-tree shape change, update the shape-sensitive assertion with a
   comment that names this plan.
 
 ### Stage 6: Documentation and Policy Update
 
-- [ ] Update `docs/PUBLIC_SURFACE_POLICY.md`.
+- [x] Update `docs/PUBLIC_SURFACE_POLICY.md`.
 
   Add a short note under the `AnyView` policy:
 
@@ -544,13 +544,13 @@ ownership, state slots, lifecycle events, actions, and focus.
   - The API remains an escape hatch; public collection/builder APIs should stay
     generic unless a policy exception is documented.
 
-- [ ] Update
+- [x] Update
   `docs/decisions/0005-anyview-anyscene-as-escape-hatches.md`.
 
   Record the implementation decision: `AnyView` uses wrapper + type-stamped
   payload rather than hidden graph erasure or manual state cleanup.
 
-- [ ] If implementation changes package or public API inventory output, refresh
+- [x] If implementation changes package or public API inventory output, refresh
   it with the repo script and commit the resulting baseline:
 
   ```bash
@@ -559,6 +559,8 @@ ownership, state slots, lifecycle events, actions, and focus.
 
   This should not be necessary for a purely package-private helper and behavior
   change. Run it if the compiler forces a public/package surface adjustment.
+  `./Scripts/generate_public_api_inventory.sh --check` reported the baseline is
+  current, so no inventory files changed.
 
 ### Stage 7: Full Validation
 

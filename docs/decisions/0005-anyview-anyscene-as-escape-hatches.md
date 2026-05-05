@@ -3,7 +3,7 @@ adr: "0005"
 title: "AnyView and AnyScene as escape hatches, not defaults"
 status: accepted
 date: 2026-04-29
-refined: 2026-05-04
+refined: 2026-05-05
 sources:
   - docs/PUBLIC_SURFACE_POLICY.md
   - docs/PUBLIC_API_INVENTORY.md
@@ -11,6 +11,7 @@ sources:
   - docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md
   - docs/proposals/TERMINAL_EMBEDDING.md
   - docs/plans/2026-05-04-001-terminal-embedding-plan.md
+  - docs/plans/2026-05-05-001-resilient-anyview-plan.md
 ---
 
 # ADR-0005: AnyView and AnyScene as escape hatches, not defaults
@@ -105,34 +106,43 @@ The bet: authored apps that lean on typed builders write less code
 that silently disables runtime correctness, and SwiftTUI's
 incremental-rendering invariants stay intact across ordinary edits.
 
-## What this ADR does not decide (refined 2026-05-04)
+## Runtime refinement (refined 2026-05-05)
 
-Two related questions are deliberately *out of scope* here, surfaced by
-the terminal-embedding planning discussion:
+`AnyView` is now resilient enough to behave like a real type-erased
+view boundary in the retained graph without changing its role as an
+escape hatch.
 
-1. **Identity-preserving erasure as a mechanism.** The framework
-   provides none today. `AnyView` is structurally erasing — identity
-   does not flow through it, lifecycle metadata bound below is at
-   risk, and the resolve phase treats it as a leaf. This is a missing
-   capability, not a deliberate stance. It has not bitten hard enough
-   yet to motivate the substrate work.
+The resolver lowers an `AnyView` into a wrapper node and a
+type-stamped payload node:
 
-2. **Whether this ADR holds if that capability is added.** It does.
-   `AnyView` would remain a smell signal regardless: typed views stay
-   preferred for compile-time clarity, refactor safety, and
-   legibility — concerns inherited from SwiftUI culture and
-   independent of the runtime's identity story. But future
-   load-bearing surfaces — particularly an in-process plugin system
-   wanting third-party `View`s to participate in the host's lifecycle
-   — would need identity-preserving erasure. That work should propose
-   a *separate* mechanism distinct from `AnyView` (e.g.
-   `IdentityPreservingErasure<Subtree>`). As a side effect, the
-   substrate would let `AnyView` lose its identity-loss bug class
-   without changing its public role.
+```text
+AnyView identity
++-- AnyViewPayload<ErasedStaticType> identity
+    +-- concrete content
+```
 
-The pseudo-symmetry: the substrate work an ambitious plugin system
-needs is structurally the same work that would make `AnyView`
-non-broken. See
-[plans/2026-05-04-001-terminal-embedding-plan.md](../plans/2026-05-04-001-terminal-embedding-plan.md)
-"Future Stages (Speculative)" for the long-form discussion and the
-conditions under which the substrate becomes worth scheduling.
+The wrapper identity stays stable for a stable authored `AnyView`
+position. The payload identity includes the erased static payload type.
+If the erased static type is unchanged, the payload subtree keeps its
+retained state, lifecycle registrations, focus/action registrations,
+and measurement reuse. If the erased static type changes, the payload
+subtree is structurally replaced and normal `ViewGraph` removal
+cancels tasks, runs disappear handlers, and drops the removed state
+slots.
+
+Concrete payload content is resolved through the normal `resolveView`
+path so custom views receive ordinary retained graph ownership.
+`scopedAnyView(...)` still restores the authored owner for deferred
+content: action follow-up invalidation remains pointed at the owner
+that authored the action, while the concrete payload participates in
+the retained graph at its payload identity.
+
+Explicit `.id(...)` values inside an `AnyView` payload are scoped
+under the payload content identity. This keeps explicit IDs useful for
+local row/control continuity, but prevents an explicit ID from keeping
+incompatible state alive after the erased static payload type changes.
+
+This refinement does **not** make `AnyView` the preferred storage type.
+Typed builders and generic `Content: View` storage remain the default;
+new public `[AnyView]`, `() -> AnyView`, or builder-returning-`AnyView`
+APIs still require explicit policy justification.
