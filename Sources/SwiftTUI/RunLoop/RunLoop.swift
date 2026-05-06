@@ -186,6 +186,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let commandRegistry = CommandRegistry()
   package let dropDestinationRegistry = DropDestinationRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
+  package var liveRegionAnnouncer = LiveRegionAnnouncer()
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
 
