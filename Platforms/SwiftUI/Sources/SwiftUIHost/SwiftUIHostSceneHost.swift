@@ -12,6 +12,8 @@ public final class SwiftUIHostSceneHost {
   public private(set) var focusPresentation: FocusPresentation = .none
   public private(set) var manualKeyboardPresentationRequested = false
   public private(set) var latestSurface: RasterSurface?
+  public private(set) var latestSemanticSnapshot: SemanticSnapshot?
+  public private(set) var focusedAccessibilityIdentity: Identity?
   public private(set) var style: SwiftUIHostTerminalStyle
 
   @ObservationIgnored
@@ -19,6 +21,9 @@ public final class SwiftUIHostSceneHost {
 
   @ObservationIgnored
   private var startTask: Task<Void, Never>?
+
+  @ObservationIgnored
+  private var accessibilityAnnouncer = HostedAccessibilityAnnouncer()
 
   public init<A: SwiftTUI.App>(
     app: A,
@@ -41,6 +46,13 @@ public final class SwiftUIHostSceneHost {
       theme: initialRenderStyle.theme,
       onSurface: { [weak self] surface in
         self?.receiveSurface(surface)
+      },
+      onSemanticFrame: { [weak self] surface, semanticSnapshot, focusedIdentity in
+        self?.receiveSemanticFrame(
+          surface: surface,
+          semanticSnapshot: semanticSnapshot,
+          focusedIdentity: focusedIdentity
+        )
       },
       onFocusPresentationChange: { [weak self] presentation in
         self?.updateFocusPresentation(presentation)
@@ -77,6 +89,8 @@ public final class SwiftUIHostSceneHost {
     startTask = nil
     bridge.stopSession()
     focusPresentation = .none
+    focusedAccessibilityIdentity = nil
+    accessibilityAnnouncer.reset()
     manualKeyboardPresentationRequested = false
     bridge.updateKeyboardPresentation(
       focusPresentation: focusPresentation,
@@ -123,6 +137,19 @@ public final class SwiftUIHostSceneHost {
     _ surface: RasterSurface
   ) {
     latestSurface = surface
+  }
+
+  private func receiveSemanticFrame(
+    surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?
+  ) {
+    latestSurface = surface
+    latestSemanticSnapshot = semanticSnapshot
+    focusedAccessibilityIdentity = focusedIdentity
+    NativeAccessibilityAnnouncementPoster.post(
+      accessibilityAnnouncer.announcements(for: semanticSnapshot)
+    )
   }
 
   private func updateFocusPresentation(

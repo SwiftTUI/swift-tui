@@ -147,6 +147,14 @@ private struct SceneTerminalSurface: SwiftUI.View {
     Group {
       if let host {
         TerminalSurfaceHost(host: host)
+          .accessibilityHidden(true)
+          .overlay(alignment: .topLeading) {
+            HostedAccessibilityOverlay(
+              semanticSnapshot: host.latestSemanticSnapshot,
+              focusedIdentity: host.focusedAccessibilityIdentity,
+              cellSize: NativeTerminalMetrics(style: host.style).cellSize
+            )
+          }
           .id(host.descriptor.id)
           #if canImport(UIKit) && !targetEnvironment(macCatalyst)
             .overlay(alignment: .topTrailing) {

@@ -124,7 +124,7 @@ SwiftTUI.HostedSceneSession
 SwiftTUI.HostedSceneSession.currentFocusPresentation
 SwiftTUI.HostedSceneSession.descriptor
 SwiftTUI.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onOutput:onFocusPresentationChange:)
-SwiftTUI.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onSurface:onFocusPresentationChange:)
+SwiftTUI.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onSurface:onSemanticFrame:onFocusPresentationChange:)
 SwiftTUI.HostedSceneSession.resize(to:)
 SwiftTUI.HostedSceneSession.resize(to:cellPixelSize:)
 SwiftTUI.HostedSceneSession.resize(to:cellPixelSize:pointerInputCapabilities:)
