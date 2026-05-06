@@ -124,10 +124,10 @@ diagnostics all pull from the same surface.
 >
 > - [ACCESSIBILITY.md](./ACCESSIBILITY.md) — env-var contract; this
 >   proposal must stay consistent with it.
-> - `EMBEDDED_WEB_HOST.md` — TODO: cross-reference once it lands. Today the
->   parallel investigation has not produced a doc; this proposal reasons
->   from first principles for the web-related flags and notes where the
->   embedded-host proposal can override.
+> - [EMBEDDED_WEB_HOST.md](./EMBEDDED_WEB_HOST.md) — embedded HTTP/WebSocket
+>   runner plan. This proposal owns the shared parse/config surface; the
+>   embedded-host proposal owns the server, transport, browser bundle, and
+>   lifecycle policy.
 > - [ADR-0008](../decisions/0008-swifttui-library-only-runners-own-main.md)
 >   — runners own `main()`. Argument parsing must live where `main()` lives.
 > - [ADR-0003](../decisions/0003-action-scopes-not-global-hotkeys.md) —
@@ -1548,20 +1548,25 @@ This flag is intentionally minimal. We do not propose:
 
 ## Interaction with the embedded web host
 
-> **TODO: cross-reference EMBEDDED_WEB_HOST.md once it lands.** The
-> parallel investigation for the embedded web host is in progress.
-> The flags this proposal defines (`--web`, `--port`, `--bind`,
-> `--no-open`, env vars `SWIFTTUI_WEB`, `SWIFTTUI_PORT`,
-> `SWIFTTUI_BIND`, `SWIFTTUI_NO_OPEN`) anticipate that proposal's
-> needs. If the embedded-host proposal converges on different
-> defaults (e.g., `--bind 0.0.0.0` instead of `127.0.0.1`, or
-> additional flags like `--tls-cert`, `--basic-auth`), this
-> proposal updates to match.
+[`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) is the server/transport
+plan for this parse surface. The flags this proposal defines (`--web`,
+`--port`, `--bind`, `--no-open`, env vars `SWIFTTUI_WEB`,
+`SWIFTTUI_PORT`, `SWIFTTUI_BIND`, `SWIFTTUI_NO_OPEN`) now resolve into
+`RuntimeConfiguration.web`, but no runner consumes that value yet. The
+server remains a compile-time opt-in: parsing this value must not make
+`SwiftTUICLI` depend on `SwiftTUIWebHost`, FlyingFox, or browser resources.
+
+One policy mismatch remains open before server behavior ships: the
+embedded-host proposal leans toward manual browser open by default with an
+explicit `--open`, while the landed parser exposes `--no-open` and defaults
+`RuntimeConfiguration.WebConfig.openBrowser` to `true` when `--web` is set.
+Resolve that mismatch in the parser/config layer before wiring `--web` to
+an actual HTTP server.
 
 Sketched expectations:
 
-- `myapp web` (subcommand) or `myapp --web` (flag) starts an HTTP
-  server that surfaces the SwiftTUI app to a browser via the
+- `myapp web` (subcommand, future) or `myapp --web` (flag, parsed today)
+  starts an HTTP server that surfaces the SwiftTUI app to a browser via the
   WASI-WebHost path.
 - Port `0` means auto-assign; the chosen port is printed to stderr
   ("Listening on http://127.0.0.1:54321") so the user can connect.
@@ -1859,8 +1864,9 @@ by theme:
   shipping `SwiftTUIOptions: ParsableArguments` (power mode) and
   `SwiftTUIApp: AsyncParsableCommand & App` (easy mode), layered on
   top of swift-argument-parser. Web-host flag specifics
-  (`--web` / `--port` / `--bind` / `--no-open`) are sketched and will
-  be reconciled with EMBEDDED_WEB_HOST.md once it lands.
+  (`--web` / `--port` / `--bind` / `--no-open`) have landed as parse
+  surface; the embedded-host proposal now records the remaining
+  server-consumption work and the open browser-launch policy mismatch.
 - 2026-05-04: Substrate-audit correction applied. See
   [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md). The existing
   `TerminalCapabilityProfile.detect` already reads `NO_COLOR`,

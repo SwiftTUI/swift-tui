@@ -104,17 +104,17 @@ all driven from the same `semantics` phase output:
 | Target | Delivery shape | Strategy | A11y ceiling |
 |---|---|---|---|
 | **CLI** | Local binary, terminal output | Cursor-as-focus, env-var contract, ASCII fallback, reduce-motion, append-only status, optional linear "drop the TUI" mode | Bound by what the user's terminal + screen reader can do |
-| **Embedded web host** | Local binary, browser at `localhost` | Same binary opens an HTTP/WebSocket server; the browser renders DOM with real ARIA from the semantic stream. `myapp --web` and you're in the browser. | Full WCAG 2.2 AA achievable. **The strongest accessibility delivery vehicle for any compiled SwiftTUI binary.** |
+| **Embedded web host** | Local binary composed with the opt-in WebHost runner, browser at `localhost` | A WebHost-composed binary opens an HTTP/WebSocket server; the browser renders DOM with real ARIA from the semantic stream. `myapp --web` and you're in the browser. | Full WCAG 2.2 AA achievable. **The strongest accessibility delivery vehicle for binaries that opt into it.** |
 | **WASM web** | Compile to WASM, deploy to web | View tree runs entirely in the browser; same ARIA mapping. The "deploy your TUI as a website" story. | Full WCAG 2.2 AA achievable |
 | **SwiftUI host** | Local binary, native macOS / iOS window | Bridge semantic data to SwiftUI's `.accessibilityLabel` / `.accessibilityRole` / `.accessibilityHidden` modifiers. | Full UIKit/AppKit accessibility |
 
 The CLI target is the hardest and the most novel. The **embedded web
 host** is the most important addition since the first draft of this
-proposal: it gives every compiled SwiftTUI binary a "view this in the
-browser" capability without needing a separate WASM build, which makes
-it our credible accessibility answer for users on platforms where
-terminal screen reader support is weak (notably blind macOS users —
-VoiceOver-on-Terminal.app is structurally poor; see
+proposal: it gives any SwiftTUI binary that composes the WebHost runner a
+"view this in the browser" capability without needing a separate WASM
+build, which makes it our credible accessibility answer for users on
+platforms where terminal screen reader support is weak (notably blind macOS
+users — VoiceOver-on-Terminal.app is structurally poor; see
 [the landscape](#screen-reader-support-per-platform)).
 
 The embedded web host architecture is investigated in detail in the
@@ -1385,18 +1385,19 @@ realize it.
 This is the strongest accessibility delivery vehicle in the framework
 and the single most consequential update to this proposal since v1.
 
-The user has a compiled SwiftTUI binary. They run `myapp --web`. The
-binary opens an HTTP/WebSocket server bound to `127.0.0.1`, prints a
-URL with a per-launch auth token, and waits. The user opens the URL in
-their browser. The browser renders the same view tree using real DOM
-elements with real ARIA roles, labels, and live regions, driven by the
-semantic stream the binary is sending over the WebSocket.
+The user has a SwiftTUI binary compiled with the opt-in WebHost runner.
+They run `myapp --web`. The binary opens an HTTP/WebSocket server bound
+to `127.0.0.1`, prints a URL with a per-launch auth token, and waits. The
+user opens the URL in their browser. The browser renders the same view
+tree using real DOM elements with real ARIA roles, labels, and live
+regions, driven by the semantic stream the binary is sending over the
+WebSocket.
 
 For accessibility this is transformational because:
 
-1. **Zero recompile.** The same binary that runs as a TUI runs as a
-   web server. No WASM toolchain, no separate build, no deploy step.
-   The accessibility mode is a flag away.
+1. **No WASM rebuild or deploy.** For binaries that intentionally compose
+   the WebHost runner, the same binary that runs as a TUI can run as a
+   web server. Terminal-only binaries do not embed the server.
 2. **The browser is a known-accessible target.** macOS VoiceOver works
    well in browsers; NVDA works well in browsers; Orca works well in
    Firefox/Chromium. We do not need to fight terminal-AT integration —
@@ -1488,7 +1489,7 @@ authority and they cross-reference rather than duplicate:
 | Proposal | Owns |
 |---|---|
 | [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) (this doc) | The semantic API surface (`accessibilityLabel`, `accessibilityRole`, `accessibilityHidden`, `accessibilityLiveRegion`, `AccessibilityAnnouncer`), per-target render strategies (cursor-as-focus, ASCII fallback, reduce-motion, ARIA mapping), and the env-var contract for accessibility-related toggles. |
-| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, wire format, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Recommends a `Platforms/WebHost/` runner peer using FlyingFox + the existing WASISurfaceBridge encoder *extended* with an `accessibilityTree` field (per the audit). |
+| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Recommends a `Platforms/WebHost/` runner peer using FlyingFox plus the already-landed `web-surface` v2 `accessibilityTree` wire format. |
 | [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md) | The framework-reserved flag namespace, the `SwiftTUIOptions` `OptionGroup` and `SwiftTUIApp` protocol, and the precedence rules between CLI flags, env vars, and TTY auto-detection. Recommends layering on `swift-argument-parser` and shipping as a peer to the existing `SwiftTUICLI` runner. |
 | [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) | The factual record of what's already in the codebase. Read this *first* if any of the other proposals' "what we already have" claims feel surprising — the audit corrected a few of them. |
 
@@ -1504,13 +1505,15 @@ form the accessibility plan; this proposal alone is incomplete.
   are *defined* here (semantic meaning) but *implemented* in
   `ARGUMENT_PARSING.md`'s `SwiftTUIOptions` (parsing, precedence, env
   var alignment). Don't duplicate the parsing rules here.
-- The `--web` flag and its sub-flags (`--port`, `--bind`, `--no-open`,
-  `--web-token`) are implemented in `EMBEDDED_WEB_HOST.md` and surfaced
-  in `ARGUMENT_PARSING.md`'s standard flags table. This proposal
-  references them only to note their accessibility role.
-- The "ARIA mapping" half of Phase 6 in this proposal's phasing
-  depends on the embedded web host runner shipping (or the WASM web
-  target maturing). Both feed off the same semantic record.
+- The `--web` flag and its current sub-flags (`--port`, `--bind`,
+  `--no-open`) are parsed by `SwiftTUIArguments` and surfaced in
+  `ARGUMENT_PARSING.md`'s standard flags table. `EMBEDDED_WEB_HOST.md`
+  owns the still-unimplemented server behavior, token/security flags, and
+  lifecycle policy.
+- The shared Web/WASI ARIA mapping half of Phase 6 has landed through
+  `web-surface` v2 `accessibilityTree` frames and the browser ARIA
+  mounter. The embedded web host runner can reuse that path when it ships
+  its HTTP/WebSocket transport.
 
 ---
 
@@ -1567,18 +1570,15 @@ to be argued with, not accepted.)
    or a parallel one? Lean: parallel (semantic tokens are *theme*
    intent; accessibility roles are *AT* intent; conflating risks both).
 
-8. **Embedded web host: do we ship the ARIA mapping in v1, or is it a
-   follow-up?** Now that
-   [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) exists, the
-   question is whether the accessibility ARIA mapping rides on its v1
-   or waits for v2. Argument for v1: it's the strongest a11y story we
-   have, and the required semantic source data will exist once
-   Phase 3b lands. Argument against: embedded host has its own scope,
-   and the audited `web-surface` format still needs a v2
-   `accessibilityTree` extension plus browser-side DOM mounting.
-   Lean: ship ARIA mapping in embedded-host v1, but keep the
-   per-target render strategy gated behind a feature flag so we can
-   ship the CLI side independently.
+8. **Embedded web host: does v1 reuse the landed Web/WASI ARIA path?**
+   The `web-surface` v2 `accessibilityTree` extension and browser-side
+   DOM mounting have landed for Web/WASI. The remaining question is not
+   whether to design ARIA for the embedded host, but whether its first
+   runner release consumes the already-landed path. Lean: yes. The
+   embedded host is primarily justified as an accessibility delivery
+   vehicle, so a browser transport that omits the existing ARIA tree would
+   be a preview-only transport, not the accessibility feature described
+   here.
 
    The original v1-vs-v2 question for the **WASM** web target stands
    separately: it's the deploy-as-website story and is less urgent
@@ -1893,10 +1893,11 @@ in this document. The primary sources, grouped by theme:
   expanded from three to four targets to recognize that the embedded
   web host (run-locally, view-in-browser-at-localhost) is a separate
   delivery vehicle from the WASM web target and is the **strongest
-  accessibility delivery vehicle** for any compiled SwiftTUI binary
-  because it requires no recompile and gives blind users on weak
-  terminal-AT platforms (notably macOS) a credible browser-based
-  workflow. Added "Relationship to other proposals" section. Renamed
+  accessibility delivery vehicle** for SwiftTUI binaries that opt into
+  the WebHost runner at compile time because it requires no WASM rebuild
+  or deploy step and gives blind users on weak terminal-AT platforms
+  (notably macOS) a credible browser-based workflow. Added
+  "Relationship to other proposals" section. Renamed
   "What the Web and SwiftUI targets unlock" to "What the non-CLI
   targets unlock" and added an embedded-web-host subsection.
   Updated Q8 to reflect the new architecture. Phasing expanded from
