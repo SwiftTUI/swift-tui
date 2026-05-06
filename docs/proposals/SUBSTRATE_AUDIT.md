@@ -19,9 +19,12 @@ now landed: `PresentationRole` was renamed to `AccessibilityRole`,
 emits `SemanticSnapshot.accessibilityNodes`. CLI target behavior has also
 landed through ADR-0013: cursor-as-focus, accessible linear rendering,
 motion/progress policy, and accessible-mode live-region announcements.
-The remaining target behavior is embedded-host / WASM ARIA and SwiftUI host
-bridging, plus the deferred public cursor-anchor modifier, imperative
-announcer API, and listening/lint work.
+Web/WASI ARIA target behavior has also landed through ADR-0014: the
+shared `web-surface` v2 encoder carries `accessibilityTree` data and
+the browser runtime mounts that tree as ARIA beside the raster canvas.
+The remaining platform target behavior is SwiftUI host bridging, plus
+the deferred public cursor-anchor modifier, imperative announcer API,
+and listening/lint work.
 
 ---
 
@@ -470,7 +473,7 @@ Because of these findings, the proposed phasing becomes:
 | 5 | Live regions + announcer | Same |
 | 6 | Embedded-host ARIA mapping | **Larger** — wire-format extension required |
 | 7 | WASM web ARIA mapping | Same — rides on Phase 6 wire-format work |
-| 8 | SwiftUI host bridge | **Smaller** — `AccessibilityNode` already structured for it |
+| 8 | SwiftUI host bridge | **Smaller** — `AccessibilityNode` already structured for it; native policy in ADR-0015 |
 | 9 | Tests + lint | Same |
 
 Net: **earlier phases are smaller and faster than implied; the
@@ -588,3 +591,9 @@ path for the substrate.
   accessible-mode live-region announcements. The remaining target
   consumption is Web/WASI ARIA and SwiftUI host bridging, with public
   cursor-anchor, imperative announcer, and listening/lint work deferred.
+- 2026-05-06: Web/WASI ARIA consumption landed. ADR-0014 is implemented
+  by the shared `web-surface` v2 `accessibilityTree` encoder, browser
+  ARIA mounter, and WebExample smoke coverage. SwiftUI host bridging is
+  the remaining first-class platform target; its role/focus/hit-testing
+  and announcement policy is locked in
+  [ADR-0015](../decisions/0015-accessibility-swiftui-host-policy.md).

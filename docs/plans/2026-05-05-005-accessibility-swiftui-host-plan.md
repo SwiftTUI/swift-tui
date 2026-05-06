@@ -9,6 +9,7 @@ depends_on:
   - "../proposals/ACCESSIBILITY.md"
   - "../proposals/SUBSTRATE_AUDIT.md"
   - "../decisions/0012-accessibility-node-shape.md"
+  - "../decisions/0015-accessibility-swiftui-host-policy.md"
 ---
 
 # Accessibility SwiftUI Host Implementation Plan
@@ -20,7 +21,7 @@ depends_on:
 
 **Goal:** Make `Platforms/SwiftUI` expose hosted SwiftTUI content to native
 Apple accessibility APIs by translating `AccessibilityNode` records into
-SwiftUI accessibility modifiers, focus state, and announcements.
+SwiftUI accessibility modifiers, semantic focus metadata, and announcements.
 
 **Architecture:** Keep hosted rendering raster-based, but carry semantic data
 beside `RasterSurface` through `HostedSceneSession` into `SwiftUIHostSceneHost`.
@@ -34,7 +35,28 @@ Testing, `HostedSceneSession`, `SwiftUIHostSceneHost`,
 
 ---
 
-## Open Questions To Resolve First
+## Resolved Native Host Policy
+
+[`ADR-0015`](../decisions/0015-accessibility-swiftui-host-policy.md)
+answers the initial open questions for this tranche:
+
+1. **Native focus mapping:** v1 marks the matching accessibility node as
+   the focused semantic target, but does not programmatically move global
+   VoiceOver focus.
+2. **Announcement mapping:** the host uses the same identity-based
+   live-region diff as CLI and Web/WASI: first-frame suppression,
+   assertive before polite, `.off` ignored, then platform announcements.
+3. **Role mapping:** map every `AccessibilityRole` into a host-owned
+   trait/value model before applying SwiftUI modifiers; custom roles keep
+   their string as a role description without invented native traits.
+4. **Hit testing:** native accessibility frames come from `CellRect`
+   converted through the current native cell size; zero or invalid rects
+   are skipped.
+5. **Visual-only content policy:** expose unlabeled nodes with their
+   role/trait when they exist in the semantic snapshot, but do not guess
+   labels for content absent from `SemanticSnapshot.accessibilityNodes`.
+
+## Original Open Questions
 
 1. **Native focus mapping:** decide whether the host exposes a single focused
    accessibility element, per-node focus bindings, or only labels/traits in v1.
@@ -68,12 +90,12 @@ Testing, `HostedSceneSession`, `SwiftUIHostSceneHost`,
 
 ## Stage 1: Resolve Native Host Policy
 
-- [ ] Create an ADR under `docs/decisions/` that answers every question in
-  [Open Questions To Resolve First](#open-questions-to-resolve-first).
-- [ ] Update this plan's role, focus, hit-testing, and live-region expectations
+- [x] Create an ADR under `docs/decisions/` that answers every question in
+  [Original Open Questions](#original-open-questions).
+- [x] Update this plan's role, focus, hit-testing, and live-region expectations
   to match the ADR.
-- [ ] Update `docs/proposals/ACCESSIBILITY.md` with a SwiftUI-host status note.
-- [ ] Run `swiftly run swift test --package-path Platforms/SwiftUI`.
+- [x] Update `docs/proposals/ACCESSIBILITY.md` with a SwiftUI-host status note.
+- [x] Run `swiftly run swift test --package-path Platforms/SwiftUI`.
 
 ## Stage 2: Carry Semantic Snapshots Into The Host
 
