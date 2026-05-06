@@ -66,6 +66,32 @@ want an explicit launcher instead of `@main`, call:
 try await TerminalRunner.run(DemoApp.self)
 ```
 
+For binaries that intentionally support `--web`, import the opt-in combined
+runner package instead:
+
+```swift
+import SwiftTUIWebHostCLI
+
+@main
+@MainActor
+struct DemoApp: App {
+  var body: some Scene {
+    WindowGroup("Deploy Dashboard") {
+      BuildSummary()
+    }
+  }
+
+  static func main() async throws {
+    try await WebHostCLIRunner.run(Self.self)
+  }
+}
+```
+
+`SwiftTUIWebHostCLI` routes normal launches to the terminal runner and routes
+`--web` launches to the embedded localhost HTTP/WebSocket host. Apps that
+import only `SwiftTUICLI` do not compile or link the web server, FlyingFox, or
+browser bundle; `--web` is rejected before terminal raw-mode setup.
+
 ### Argument parsing
 
 Apps that want CLI flags plus the framework's standard flag surface
@@ -95,11 +121,11 @@ struct MyApp: @preconcurrency SwiftTUIApp {
 
 > **Note on flag-to-behavior wiring:** `--no-color`, `--force-color`, `--ascii`,
 > `--plain`, `--accessible`, `--reduce-motion`, `--no-progress`, and
-> `--cursor-follows-focus` now affect runtime behavior. Flags still pending
-> behavior wiring: `--json` (alternative output mode),
-> `--web`/`--port`/`--bind`/`--no-open` (embedded web host), `--linear`,
-> `--debug`, and `--start-in`. All flags parse cleanly today; the unwired ones
-> land in follow-up plans. See
+> `--cursor-follows-focus` now affect runtime behavior. `--web`, `--port`,
+> `--bind`, and `--open` are consumed by the opt-in `SwiftTUIWebHostCLI`
+> runner. Flags still pending behavior wiring: `--json` (alternative output
+> mode), `--linear`, `--debug`, and `--start-in`. All flags parse cleanly
+> today; the unwired ones land in follow-up plans. See
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.
 
@@ -110,10 +136,12 @@ full design is in
 see [Examples/argparse](Examples/argparse) for a working consumer-flags +
 framework-flags demo.
 
-The same authored `App` and `Scene` declarations can then flow into three
+The same authored `App` and `Scene` declarations can then flow into these
 execution modes:
 
 - terminal-native execution via the executable runner package `Platforms/CLI`
+- terminal plus embedded-localhost web execution via the opt-in runner package
+  `Platforms/WebHost`
 - WASI execution via the executable runner package `Platforms/WASI`
 - host-managed embedding via the embedded host packages `Platforms/SwiftUI`
   and `Platforms/Web`

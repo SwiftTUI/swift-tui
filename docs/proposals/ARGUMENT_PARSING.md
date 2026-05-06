@@ -99,9 +99,9 @@ Two problems compound from this:
    `CLICOLOR`, `COLORTERM`, `TERM=dumb`, `LANG=C`, `CI`,
    `SWIFTTUI_ACCESSIBLE`, `SWIFTTUI_ASCII`, `SWIFTTUI_REDUCE_MOTION`) and
    suggests the matching CLI flags `--accessible`, `--ascii`, `--no-color`,
-   `--no-progress`, `--plain`, `--linear`, `--json`. The forthcoming
-   embedded-web-host proposal will add `--web`, `--port`, `--bind`,
-   `--no-open`, etc. None of those show up consistently across consumers
+   `--no-progress`, `--plain`, `--linear`, `--json`. The embedded
+   WebHost runner adds `--web`, `--port`, `--bind`, `--open`, etc. None
+   of those show up consistently across consumers
    today because nothing arranges for them.
 
 2. **No standard parser.** Consumers reach for `swift-argument-parser` on
@@ -872,10 +872,10 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   public var bind: String = "127.0.0.1"
 
   @Flag(
-    name: .customLong("no-open"),
-    help: "Don't auto-open the browser when serving with --web."
+    name: .customLong("open"),
+    help: "Open the browser when serving with --web. [env: SWIFTTUI_OPEN]"
   )
-  public var noOpen: Bool = false
+  public var open: Bool = false
 
   // ─── Logging / diagnostics ────────────────────────────────────
 
@@ -949,7 +949,7 @@ The decision is laid out per-feature:
 | `--ascii` | Flag | Same app, glyph table switch. |
 | `--cursor-follows-focus` | Flag | Same TUI, opt-in accessibility cursor policy. |
 | `--no-color` | Flag | Standard convention. |
-| `--web` / `myapp web` | **Either, leaning subcommand** | Mode switch with its own options (`--port`, `--bind`, `--no-open`). Subcommand groups them; flag flattens them into the same `--help`. See open question. |
+| `--web` / `myapp web` | **Either, leaning subcommand** | Mode switch with its own options (`--port`, `--bind`, `--open`). Subcommand groups them; flag flattens them into the same `--help`. See open question. |
 | `myapp scenes list` | Subcommand | Runner-internal; sibling of `--instances` from the existing CLIMode. |
 | `myapp completions install` | Subcommand | Per swift-argument-parser convention. |
 | `myapp doctor` | Subcommand | Diagnostic dump; sibling of `--debug`. |
@@ -1104,7 +1104,7 @@ swift-argument-parser registration error at parse time.
 | `--web` | — | Bool | `false` | Web-host mode. (Or use `myapp web` subcommand.) |
 | `--port <n>` | — | Int | `0` | Port for `--web`. `0` = auto-assign. |
 | `--bind <addr>` | — | String | `"127.0.0.1"` | Bind address for `--web`. |
-| `--no-open` | — | Bool | `false` | Don't auto-open browser with `--web`. |
+| `--open` | — | Bool | `false` | Open the browser with `--web`. |
 | `--verbose` | `-v` | Int | `0` | Repeat-count verbosity (`-v`, `-vv`, `-vvv`). |
 | `--quiet` | — | Bool | `false` | Suppress non-error logs. |
 | `--debug` | — | Bool | `false` | Framework-internal debug instrumentation. |
@@ -1190,7 +1190,8 @@ truth for which env vars exist. This table extends it.
 | `SWIFTTUI_WEB=1` | `--web` | Framework | Web-host mode. |
 | `SWIFTTUI_PORT=<n>` | `--port` | Framework | Port for `--web`. |
 | `SWIFTTUI_BIND=<addr>` | `--bind` | Framework | Bind address for `--web`. |
-| `SWIFTTUI_NO_OPEN=1` | `--no-open` | Framework | Don't open browser. |
+| `SWIFTTUI_OPEN=1` | `--open` | Framework | Open the browser. |
+| `SWIFTTUI_NO_OPEN=1` | — | Framework | Compatibility env var that explicitly disables browser opening. |
 | `SWIFTTUI_VERBOSE=<n>` | `-v` × n | Framework | Verbosity level (0–3). |
 | `SWIFTTUI_QUIET=1` | `--quiet` | Framework | Suppress non-error logs. |
 | `SWIFTTUI_DEBUG=1` | `--debug` | Framework | Framework debug instrumentation. |
@@ -1277,7 +1278,7 @@ Special cases:
 ```
 --accessible            --plain                 --port
 --ascii                 --linear                --bind
---reduce-motion         --cursor-follows-focus  --no-open
+--reduce-motion         --cursor-follows-focus  --open
 --no-color              --json                  --start-in
 --force-color           --web                   --debug
 --no-progress           --verbose               --help-all
@@ -1550,18 +1551,16 @@ This flag is intentionally minimal. We do not propose:
 
 [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) is the server/transport
 plan for this parse surface. The flags this proposal defines (`--web`,
-`--port`, `--bind`, `--no-open`, env vars `SWIFTTUI_WEB`,
-`SWIFTTUI_PORT`, `SWIFTTUI_BIND`, `SWIFTTUI_NO_OPEN`) now resolve into
-`RuntimeConfiguration.web`, but no runner consumes that value yet. The
-server remains a compile-time opt-in: parsing this value must not make
-`SwiftTUICLI` depend on `SwiftTUIWebHost`, FlyingFox, or browser resources.
+`--port`, `--bind`, `--open`, env vars `SWIFTTUI_WEB`, `SWIFTTUI_PORT`,
+`SWIFTTUI_BIND`, `SWIFTTUI_OPEN`, plus compatibility `SWIFTTUI_NO_OPEN`) now
+resolve into `RuntimeConfiguration.web`. The server remains a compile-time
+opt-in: parsing this value must not make `SwiftTUICLI` depend on
+`SwiftTUIWebHost`, FlyingFox, or browser resources.
 
-One policy mismatch remains open before server behavior ships: the
-embedded-host proposal leans toward manual browser open by default with an
-explicit `--open`, while the landed parser exposes `--no-open` and defaults
-`RuntimeConfiguration.WebConfig.openBrowser` to `true` when `--web` is set.
-Resolve that mismatch in the parser/config layer before wiring `--web` to
-an actual HTTP server.
+The browser-open policy is resolved as manual by default. `--web` prints the
+URL without launching a browser; `--web --open` or `SWIFTTUI_OPEN=1` requests
+browser launch. `SWIFTTUI_NO_OPEN=1` remains an env-only explicit false so old
+environments do not accidentally open a browser.
 
 Sketched expectations:
 
@@ -1570,7 +1569,7 @@ Sketched expectations:
   WASI-WebHost path.
 - Port `0` means auto-assign; the chosen port is printed to stderr
   ("Listening on http://127.0.0.1:54321") so the user can connect.
-- `--no-open` suppresses the auto-open-browser convenience.
+- `--open` requests the auto-open-browser convenience.
 - `--bind` defaults to `127.0.0.1` (loopback only) for safety. Users
   who want LAN access pass `--bind 0.0.0.0` explicitly. This matches
   Textual's `textual serve` and Jupyter's `jupyter notebook`.
@@ -1589,7 +1588,7 @@ Lean; lean is meant to be argued with, not committed.)
 
 1. **Should `--web` be a flag or a subcommand (or both)?**
    Flag-only: simpler, one entry point. Subcommand-only: groups
-   web-specific options (`--port`, `--bind`, `--no-open`) under one
+   web-specific options (`--port`, `--bind`, `--open`) under one
    verb. Both: most flexible, slightly redundant. **Lean: both,
    document subcommand as primary.** Consumers and shell scripts
    often prefer flags; subcommands help discoverability and group
@@ -1864,9 +1863,9 @@ by theme:
   shipping `SwiftTUIOptions: ParsableArguments` (power mode) and
   `SwiftTUIApp: AsyncParsableCommand & App` (easy mode), layered on
   top of swift-argument-parser. Web-host flag specifics
-  (`--web` / `--port` / `--bind` / `--no-open`) have landed as parse
-  surface; the embedded-host proposal now records the remaining
-  server-consumption work and the open browser-launch policy mismatch.
+  (`--web` / `--port` / `--bind` / `--open`) have landed as parse
+  surface with manual browser-open by default; the embedded-host proposal
+  records the compile-time opt-in server and runner behavior.
 - 2026-05-04: Substrate-audit correction applied. See
   [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md). The existing
   `TerminalCapabilityProfile.detect` already reads `NO_COLOR`,

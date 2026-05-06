@@ -1,7 +1,7 @@
 ---
 title: "feat: accessibility semantic substrate and current-state plan"
-type: feat
-status: completed
+type: feature
+status: shipped
 date: 2026-05-05
 depends_on:
   - "../proposals/ACCESSIBILITY.md"

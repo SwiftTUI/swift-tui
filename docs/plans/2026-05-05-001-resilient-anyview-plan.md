@@ -1,7 +1,7 @@
 ---
 title: "fix: make AnyView resilient across retained view-graph updates"
 type: fix
-status: completed
+status: shipped
 date: 2026-05-05
 depends_on:
   - "../PUBLIC_SURFACE_POLICY.md"

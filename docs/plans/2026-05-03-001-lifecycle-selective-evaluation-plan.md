@@ -1,7 +1,7 @@
 ---
 title: "fix: keep lifecycle modifiers stable across selective evaluation"
 type: fix
-status: implemented
+status: shipped
 date: 2026-05-03
 depends_on:
   - "../RUNTIME.md"

@@ -174,12 +174,24 @@ package surface:
 - executable runner packages:
   - `Platforms/CLI` exposes `TerminalRunner` plus the default terminal-native `App.main()` story
   - `Platforms/WASI` exposes `WASIRunner` plus the default WASI `App.main()` story
+  - `Platforms/WebHost` exposes `WebHostRunner`, `WebHostConfig`, and
+    `WebHostRunnerError` for web-only localhost launch
+  - `Platforms/WebHost` also exposes the `SwiftTUIWebHostCLI` product with
+    `WebHostCLIRunner` for binaries that intentionally combine terminal and
+    embedded-web behavior
 - embedded host packages:
   - `Platforms/SwiftUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
   - `Platforms/Web` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
+  - `Platforms/WebHost` serves a bundled browser runtime from the native
+    process and drives it over the shared `web-surface` v2 WebSocket protocol
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.
+
+The WebHost surface is compile-time opt-in. A terminal-only app that imports
+only `SwiftTUICLI` links no WebHost server, FlyingFox dependency, or browser
+bundle, and web mode is rejected before raw-mode setup. A web-capable app must
+depend on `SwiftTUIWebHost` or `SwiftTUIWebHostCLI` explicitly.
 
 ### `Core`
 

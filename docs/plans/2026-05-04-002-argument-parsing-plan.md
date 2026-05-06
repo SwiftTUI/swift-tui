@@ -1,3 +1,15 @@
+---
+title: "feat: argument parsing"
+type: feature
+status: shipped
+date: 2026-05-04
+depends_on:
+  - "../proposals/ARGUMENT_PARSING.md"
+  - "../proposals/ACCESSIBILITY.md"
+  - "../proposals/EMBEDDED_WEB_HOST.md"
+  - "../decisions/0008-swifttui-library-only-runners-own-main.md"
+---
+
 # Argument Parsing Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
