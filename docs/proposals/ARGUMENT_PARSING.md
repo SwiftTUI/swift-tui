@@ -837,6 +837,12 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   )
   public var linear: Bool = false
 
+  @Flag(
+    name: .customLong("cursor-follows-focus"),
+    help: "Move the terminal cursor to focus in TUI output."
+  )
+  public var cursorFollowsFocus: Bool = false
+
   // ─── Output mode ──────────────────────────────────────────────
 
   @Flag(
@@ -941,6 +947,7 @@ The decision is laid out per-feature:
 |---|---|---|
 | `--accessible` | Flag | Same app, render strategy switch. |
 | `--ascii` | Flag | Same app, glyph table switch. |
+| `--cursor-follows-focus` | Flag | Same TUI, opt-in accessibility cursor policy. |
 | `--no-color` | Flag | Standard convention. |
 | `--web` / `myapp web` | **Either, leaning subcommand** | Mode switch with its own options (`--port`, `--bind`, `--no-open`). Subcommand groups them; flag flattens them into the same `--help`. See open question. |
 | `myapp scenes list` | Subcommand | Runner-internal; sibling of `--instances` from the existing CLIMode. |
@@ -994,6 +1001,7 @@ SWIFTTUI OPTIONS:
   --force-color           Force color output. [env: FORCE_COLOR]
   --plain                 Plain text only: --no-color --ascii --reduce-motion.
   --linear                Linearize side-by-side layouts.
+  --cursor-follows-focus  Move the terminal cursor to focus in TUI output.
   --json                  Output JSON instead of a TUI.
   --web                   Serve over HTTP instead of a local terminal.
   -v, --verbose           Verbose logging (-v, -vv, -vvv).
@@ -1091,6 +1099,7 @@ swift-argument-parser registration error at parse time.
 | `--no-progress` | — | Bool | `false` | Static status instead of progress bars. |
 | `--plain` | — | Bool | `false` | Implies `--no-color --ascii --reduce-motion`. |
 | `--linear` | — | Bool | `false` | Linearize HStack layouts. |
+| `--cursor-follows-focus` | — | Bool | `false` | Move the terminal cursor to focus in TUI output. |
 | `--json` | — | Bool | `false` | JSON output (where the app supports it). |
 | `--web` | — | Bool | `false` | Web-host mode. (Or use `myapp web` subcommand.) |
 | `--port <n>` | — | Int | `0` | Port for `--web`. `0` = auto-assign. |
@@ -1176,6 +1185,7 @@ truth for which env vars exist. This table extends it.
 | `SWIFTTUI_NO_PROGRESS=1` | `--no-progress` | Framework | No progress bars. |
 | `SWIFTTUI_PLAIN=1` | `--plain` | Framework | Combined plain mode. |
 | `SWIFTTUI_LINEAR=1` | `--linear` | Framework | Linearize layouts. |
+| `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` | `--cursor-follows-focus` | Framework | Move the terminal cursor to focus in TUI output. |
 | `SWIFTTUI_JSON=1` | `--json` | Framework | JSON output. |
 | `SWIFTTUI_WEB=1` | `--web` | Framework | Web-host mode. |
 | `SWIFTTUI_PORT=<n>` | `--port` | Framework | Port for `--web`. |
@@ -1267,12 +1277,13 @@ Special cases:
 ```
 --accessible            --plain                 --port
 --ascii                 --linear                --bind
---reduce-motion         --json                  --no-open
---no-color              --web                   --start-in
---force-color           --verbose               --debug
---no-progress           --quiet                 --help-all
---theme                 --config                --cwd
---dry-run               --profile               --version
+--reduce-motion         --cursor-follows-focus  --no-open
+--no-color              --json                  --start-in
+--force-color           --web                   --debug
+--no-progress           --verbose               --help-all
+--quiet                 --theme                 --config
+--cwd                   --dry-run               --profile
+--version
 --help                  --generate-completion-script
 ```
 

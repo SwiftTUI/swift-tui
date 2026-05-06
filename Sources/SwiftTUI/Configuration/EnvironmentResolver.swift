@@ -10,8 +10,9 @@ extension RuntimeConfiguration {
   /// 2. `CLICOLOR=0` disables color; `CLICOLOR_FORCE` forces it
   /// 3. `SWIFTTUI_JSON=1` wins over `SWIFTTUI_ACCESSIBLE=1`
   /// 4. Accessible output implies ASCII, reduced motion, no progress, and linear output
-  /// 5. `SWIFTTUI_PLAIN=1` implies `--no-color --ascii --reduce-motion`
-  /// 6. CLI flags (in `SwiftTUIArguments`) layer on top of this result
+  /// 5. `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` enables terminal cursor focus-following
+  /// 6. `SWIFTTUI_PLAIN=1` implies `--no-color --ascii --reduce-motion`
+  /// 7. CLI flags (in `SwiftTUIArguments`) layer on top of this result
   public static func detect(
     environment: [String: String],
     isStdoutTTY: Bool
@@ -56,6 +57,10 @@ extension RuntimeConfiguration {
     var linear = false
     if let v = environment["SWIFTTUI_LINEAR"], !v.isEmpty, v != "0" {
       linear = true
+    }
+    var cursorFollowsFocus = false
+    if let v = environment["SWIFTTUI_CURSOR_FOLLOWS_FOCUS"], !v.isEmpty, v != "0" {
+      cursorFollowsFocus = true
     }
     if let v = environment["SWIFTTUI_JSON"], !v.isEmpty, v != "0" {
       output = .json
@@ -107,7 +112,8 @@ extension RuntimeConfiguration {
       startIn: startIn,
       debug: debug,
       noProgress: noProgress,
-      linear: linear
+      linear: linear,
+      cursorFollowsFocus: cursorFollowsFocus
     )
   }
 }

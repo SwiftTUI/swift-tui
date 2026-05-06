@@ -70,8 +70,8 @@ try await TerminalRunner.run(DemoApp.self)
 
 Apps that want CLI flags plus the framework's standard flag surface
 (`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--web`,
-`-v`, `--debug`, `--start-in`, ...) import `SwiftTUIArguments` and conform
-to `SwiftTUIApp`:
+`--cursor-follows-focus`, `-v`, `--debug`, `--start-in`, ...) import
+`SwiftTUIArguments` and conform to `SwiftTUIApp`:
 
 ```swift
 import SwiftTUI
@@ -94,14 +94,12 @@ struct MyApp: @preconcurrency SwiftTUIApp {
 ```
 
 > **Note on flag-to-behavior wiring:** `--no-color`, `--force-color`, `--ascii`,
-> and `--plain` (which expands to `--no-color --ascii --reduce-motion`) now
-> affect the rendered output: they override the auto-detected
-> `TerminalCapabilityProfile` and reach the `TerminalHost` directly. Flags
-> still pending behavior wiring: `--reduce-motion` (animation scheduler),
-> `--accessible` (linear append-only renderer), `--json` (alternative output
-> mode), `--web`/`--port`/`--bind`/`--no-open` (embedded web host),
-> `--linear`, `--no-progress`, `--debug`, and `--start-in`. All flags parse
-> cleanly today; the unwired ones land in follow-up plans. See
+> `--plain`, `--accessible`, `--reduce-motion`, `--no-progress`, and
+> `--cursor-follows-focus` now affect runtime behavior. Flags still pending
+> behavior wiring: `--json` (alternative output mode),
+> `--web`/`--port`/`--bind`/`--no-open` (embedded web host), `--linear`,
+> `--debug`, and `--start-in`. All flags parse cleanly today; the unwired ones
+> land in follow-up plans. See
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.
 

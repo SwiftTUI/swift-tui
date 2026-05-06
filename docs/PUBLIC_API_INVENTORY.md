@@ -140,6 +140,8 @@ The runtime-facing public surface is also canonical:
 
 - `DefaultRenderer`
 - `RunLoop`
+- `RuntimeConfiguration`, including output, glyph/color/motion policy, web
+  serving configuration, and opt-in `cursorFollowsFocus` behavior
 - `ResolveContext` as external renderer or resolver configuration only
 - terminal host, sanitized presentation, graphics-capability, and input or
   signal integration types that support the runtime

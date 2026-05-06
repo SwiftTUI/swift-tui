@@ -1,4 +1,5 @@
 import Testing
+
 @testable import SwiftTUI
 
 struct RuntimeConfigurationTests {
@@ -15,6 +16,7 @@ struct RuntimeConfigurationTests {
     #expect(configuration.debug == false)
     #expect(configuration.noProgress == false)
     #expect(configuration.linear == false)
+    #expect(configuration.cursorFollowsFocus == false)
   }
 
   @Test("Configuration is Sendable across actor boundaries")

@@ -70,6 +70,22 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.output == .json)
   }
 
+  @Test("--cursor-follows-focus enables terminal cursor focus-following")
+  func cliCursorFollowsFocus() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.cursorFollowsFocus = true
+    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    #expect(configuration.cursorFollowsFocus == true)
+  }
+
+  @Test("SWIFTTUI_CURSOR_FOLLOWS_FOCUS is honored when CLI flag is default")
+  func envCursorFollowsFocusHonoredWhenCLIDefault() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_CURSOR_FOLLOWS_FOCUS": "1"], isStdoutTTY: true)
+    #expect(configuration.cursorFollowsFocus == true)
+  }
+
   @Test("--json takes priority over --accessible when both set")
   func cliJsonBeatsAccessible() throws {
     var options = try SwiftTUIOptions.parse([])

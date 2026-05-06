@@ -1340,6 +1340,11 @@ extension RunLoop {
   private func applyTerminalCursorFocusPolicy(
     semanticSnapshot: SemanticSnapshot
   ) throws {
+    guard runtimeConfiguration.output == .tui,
+      runtimeConfiguration.cursorFollowsFocus
+    else {
+      return
+    }
     guard
       let terminalSurface = presentationSurface as? any TerminalCursorFocusPresentationSurface
     else {

@@ -32,7 +32,8 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
 
   @Flag(
     name: .customLong("accessible"),
-    help: "Accessible mode: drop the TUI for a linear, append-only render. [env: SWIFTTUI_ACCESSIBLE]"
+    help:
+      "Accessible mode: drop the TUI for a linear, append-only render. [env: SWIFTTUI_ACCESSIBLE]"
   )
   public var accessible: Bool = false
 
@@ -65,6 +66,12 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
     help: "Linearize HStack-side-by-side layouts top-to-bottom. [env: SWIFTTUI_LINEAR]"
   )
   public var linear: Bool = false
+
+  @Flag(
+    name: .customLong("cursor-follows-focus"),
+    help: "Move the terminal cursor to focus in TUI output. [env: SWIFTTUI_CURSOR_FOLLOWS_FOCUS]"
+  )
+  public var cursorFollowsFocus: Bool = false
 
   // ─── Output mode ────────────────────────────────────────────────
 

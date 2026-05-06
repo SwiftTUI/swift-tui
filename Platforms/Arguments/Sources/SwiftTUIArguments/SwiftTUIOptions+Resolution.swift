@@ -30,6 +30,7 @@ extension SwiftTUIOptions {
     var output = baseline.output
     var noProgress = baseline.noProgress
     var linear = baseline.linear
+    var cursorFollowsFocus = baseline.cursorFollowsFocus
 
     // --plain expands to --no-color --ascii --reduce-motion. The "effective"
     // values are the union of the explicit flag and --plain's implication, so
@@ -64,6 +65,11 @@ extension SwiftTUIOptions {
     // Linear: --linear overrides baseline.
     if self.linear {
       linear = true
+    }
+
+    // Cursor focus-following: opt-in for TUI output.
+    if self.cursorFollowsFocus {
+      cursorFollowsFocus = true
     }
 
     // Output: CLI flags override env vars, and JSON wins within the CLI layer.
@@ -116,7 +122,8 @@ extension SwiftTUIOptions {
       startIn: startInResolved,
       debug: debug,
       noProgress: noProgress,
-      linear: linear
+      linear: linear,
+      cursorFollowsFocus: cursorFollowsFocus
     )
   }
 }

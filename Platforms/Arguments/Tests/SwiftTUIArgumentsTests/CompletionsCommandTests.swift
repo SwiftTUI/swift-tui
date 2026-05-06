@@ -82,6 +82,7 @@ struct CompletionsCommandTests {
     let command = try TestSwiftTUIApp.parseAsRoot(["completions", "print", "zsh"])
     let script = try #require(TestSwiftTUIApp.completionScript(forParsedCommand: command))
     #expect(script.contains("--accessible"))
+    #expect(script.contains("--cursor-follows-focus"))
     #expect(script.contains("--widgets"))
     #expect(script.contains("completions"))
   }

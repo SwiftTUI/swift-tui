@@ -164,6 +164,13 @@ struct EnvironmentResolverTests {
     #expect(configuration.linear == true)
   }
 
+  @Test("SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1 sets cursorFollowsFocus=true")
+  func swiftTUICursorFollowsFocus() {
+    let configuration = RuntimeConfiguration.detect(
+      environment: ["SWIFTTUI_CURSOR_FOLLOWS_FOCUS": "1"], isStdoutTTY: true)
+    #expect(configuration.cursorFollowsFocus == true)
+  }
+
   @Test("SWIFTTUI_NO_PROGRESS=1 sets noProgress=true without CI")
   func swiftTUINoProgressWithoutCI() {
     let configuration = RuntimeConfiguration.detect(

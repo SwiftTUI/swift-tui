@@ -87,6 +87,8 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var noProgress: Bool
   /// Linearize side-by-side layouts (e.g., HStacks) top-to-bottom for narrow terminals or screen readers.
   public var linear: Bool
+  /// Move the terminal hardware cursor to the focused accessibility node after each TUI commit.
+  public var cursorFollowsFocus: Bool
 
   public init(
     color: ColorMode = .auto,
@@ -98,7 +100,8 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     startIn: String? = nil,
     debug: Bool = false,
     noProgress: Bool = false,
-    linear: Bool = false
+    linear: Bool = false,
+    cursorFollowsFocus: Bool = false
   ) {
     self.color = color
     self.glyphs = glyphs
@@ -110,6 +113,7 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     self.debug = debug
     self.noProgress = noProgress
     self.linear = linear
+    self.cursorFollowsFocus = cursorFollowsFocus
   }
 
   /// The framework's documented defaults: unicode, normal motion, auto color, TUI output.
