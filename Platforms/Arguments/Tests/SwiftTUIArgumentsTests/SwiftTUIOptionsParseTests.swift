@@ -1,5 +1,6 @@
-import Testing
 import ArgumentParser
+import Testing
+
 @testable import SwiftTUIArguments
 
 struct SwiftTUIOptionsParseTests {
@@ -14,6 +15,7 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.noProgress == false)
     #expect(options.plain == false)
     #expect(options.linear == false)
+    #expect(options.cursorFollowsFocus == false)
     #expect(options.json == false)
     #expect(options.web == false)
     #expect(options.port == 0)
@@ -39,9 +41,17 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.plain == true)
   }
 
+  @Test("Parses --cursor-follows-focus")
+  func parsesCursorFollowsFocus() throws {
+    let options = try SwiftTUIOptions.parse(["--cursor-follows-focus"])
+    #expect(options.cursorFollowsFocus == true)
+  }
+
   @Test("Parses --web --port 9000 --bind 0.0.0.0 --no-open")
   func parsesWebFlags() throws {
-    let options = try SwiftTUIOptions.parse(["--web", "--port", "9000", "--bind", "0.0.0.0", "--no-open"])
+    let options = try SwiftTUIOptions.parse([
+      "--web", "--port", "9000", "--bind", "0.0.0.0", "--no-open",
+    ])
     #expect(options.web == true)
     #expect(options.port == 9000)
     #expect(options.bind == "0.0.0.0")

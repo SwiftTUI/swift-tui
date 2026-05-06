@@ -233,6 +233,7 @@ SwiftTUI.RuntimeConfiguration.!=(_:_:)
 SwiftTUI.RuntimeConfiguration.Builder
 SwiftTUI.RuntimeConfiguration.Builder.build()
 SwiftTUI.RuntimeConfiguration.Builder.color(_:)
+SwiftTUI.RuntimeConfiguration.Builder.cursorFollowsFocus(_:)
 SwiftTUI.RuntimeConfiguration.Builder.debug(_:)
 SwiftTUI.RuntimeConfiguration.Builder.glyphs(_:)
 SwiftTUI.RuntimeConfiguration.Builder.init()
@@ -287,11 +288,12 @@ SwiftTUI.RuntimeConfiguration.WebConfig.openBrowser
 SwiftTUI.RuntimeConfiguration.WebConfig.port
 SwiftTUI.RuntimeConfiguration.builder()
 SwiftTUI.RuntimeConfiguration.color
+SwiftTUI.RuntimeConfiguration.cursorFollowsFocus
 SwiftTUI.RuntimeConfiguration.debug
 SwiftTUI.RuntimeConfiguration.default
 SwiftTUI.RuntimeConfiguration.detect(environment:isStdoutTTY:)
 SwiftTUI.RuntimeConfiguration.glyphs
-SwiftTUI.RuntimeConfiguration.init(color:glyphs:motion:output:verbosity:web:startIn:debug:noProgress:linear:)
+SwiftTUI.RuntimeConfiguration.init(color:glyphs:motion:output:verbosity:web:startIn:debug:noProgress:linear:cursorFollowsFocus:)
 SwiftTUI.RuntimeConfiguration.linear
 SwiftTUI.RuntimeConfiguration.motion
 SwiftTUI.RuntimeConfiguration.noProgress

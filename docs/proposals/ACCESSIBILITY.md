@@ -135,10 +135,11 @@ env-var-precedence implementation details belong in `ARGUMENT_PARSING.md`.
 1. **The `semantics` phase is the single source of truth.** Every target
    reads from the same per-node role/label/state record. There is no
    parallel "accessibility tree" maintained alongside the view tree.
-2. **Cursor position is focus.** The hardware terminal cursor must sit at
-   the focused widget's interaction point in CLI output, even when
-   visually hidden. This is the single highest-ROI accessibility move in
-   a TUI.
+2. **Cursor position can expose focus.** When cursor-following is enabled,
+   the hardware terminal cursor must sit at the focused widget's
+   interaction point in CLI TUI output, even when visually hidden. This is
+   a high-ROI accessibility move, but it is visually disruptive enough that
+   it defaults off for ordinary TUI output.
 3. **Diff-only commits.** The rasterizer never emits a full-screen
    repaint when nothing changed. (Already true; this proposal preserves
    it.) Decorative animations are gated by reduce-motion.
@@ -687,11 +688,12 @@ and thinner in one place**. Specifically:
   precedence for `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`,
   and the `SWIFTTUI_*` family, plus framework flags such as
   `--accessible`, `--ascii`, `--reduce-motion`, `--plain`,
-  `--linear`, `--no-progress`, `--json`, and `--web`. Current
-  behavior wiring is narrower than the parse surface:
-  `--no-color`, `--force-color`, `--ascii`, and `--plain` now reach
-  terminal rendering; `--accessible`, `--reduce-motion`, `--linear`,
-  `--no-progress`, `--json`, and `--web` remain behavior follow-ups.
+  `--linear`, `--cursor-follows-focus`, `--no-progress`, `--json`, and
+  `--web`. Current behavior wiring is narrower than the parse surface:
+  `--no-color`, `--force-color`, `--ascii`, `--plain`,
+  `--cursor-follows-focus`, `--accessible`, `--reduce-motion`, and
+  `--no-progress` now reach runtime behavior. `--linear`, `--json`, and
+  `--web` remain behavior follow-ups.
 
 - **Cursor positioning mechanism exists.**
   [`TerminalHost.swift`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)
@@ -700,8 +702,10 @@ and thinner in one place**. Specifically:
   1961/1965). The runtime hides the cursor at startup
   ([line 1894](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)) and shows
   it at teardown ([line 1908](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)).
-  What's missing: a *policy* that, after each commit, places the
-  cursor at the focused widget's anchor.
+  The runtime policy is now opt-in through
+  `RuntimeConfiguration.cursorFollowsFocus`,
+  `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, or `--cursor-follows-focus`; when
+  disabled, normal TUI output leaves cursor placement alone after commits.
 
 - **Focus engine exposes the data we need.**
   [`FocusTracker`](../../Sources/SwiftTUICore/Semantics/FocusTracker.swift) has
@@ -720,7 +724,7 @@ and thinner in one place**. Specifically:
   shared substrate carries `accessibilityLabel`, `accessibilityHint`,
   `accessibilityHidden`, `accessibilityLiveRegion`,
   `accessibilityRole`, and `SemanticSnapshot.accessibilityNodes`. The
-  terminal runtime now consumes those records for cursor-as-focus,
+  terminal runtime now consumes those records for opt-in cursor-as-focus,
   accessible linear output, reduce-motion/no-progress behavior, and
   accessible-mode live-region announcements. The Web/WASI surface now
   consumes those records through the `web-surface` v2
@@ -732,9 +736,10 @@ and thinner in one place**. Specifically:
   [`ADR-0013`](../decisions/0013-accessibility-runtime-policy.md)
   now resolves the CLI policy before implementation: JSON beats
   accessible within the same precedence layer, accessible mode implies
-  ASCII/reduced-motion/no-progress/linear output, cursor-as-focus is
-  enabled for terminal TUI output when focus exists, and CLI live
-  regions announce only in accessible linear output in v1.
+  ASCII/reduced-motion/no-progress/linear output, cursor-as-focus defaults
+  off and can be enabled with `--cursor-follows-focus` or
+  `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and CLI live regions announce only in
+  accessible linear output in v1.
 
 - **The `WebSurfaceFrameEncoder` wire format is raster-level, not
   semantic.**
@@ -871,16 +876,18 @@ Concrete patterns from successful CLIs:
   *more than color* — use a `>` caret, reverse-video, brackets
   `[ Item ]`, or underline. **Reverse-video is the most universally
   rendered.**
-- **Cursor position IS focus for screen readers.** This is the single
+- **Cursor position can expose focus for screen readers.** This is the single
   most important TUI rule. From Mario Lang:
   > "The most important bit of metadata for a terminal screen reader
   > is actually the cursor location."
 
-  Always position the hardware cursor where logical focus lives, even
-  if visually hidden. Distinguish "hidden cursor" (still positioned,
-  screen-reader-tracked) from "absent cursor" (broken). Brick's lesson:
-  implement both `putCursor` (invisible, positioned) and `showCursor`
-  (visible).
+  When the accessibility cursor-following policy is enabled, position the
+  hardware cursor where logical focus lives, even if visually hidden.
+  Distinguish "hidden cursor" (still positioned, screen-reader-tracked)
+  from "absent cursor" (broken). Brick's lesson: implement both `putCursor`
+  (invisible, positioned) and `showCursor` (visible). SwiftTUI defaults
+  this policy off for normal TUI output because always-on cursor motion is
+  distracting during ordinary keyboard navigation.
 
 - **Escape always cancels.** Modal dialogs MUST close on `Esc` and
   return focus to the prior location ([Sarah Higley, "Escaping 101"](https://sarahmhigley.com/writing/escaping-101/)).
@@ -1251,9 +1258,10 @@ rules, edit `ARGUMENT_PARSING.md`. If you're changing what a flag
 | `SWIFTTUI_ACCESSIBLE=1` | Enable accessible mode (linear render, no alt-screen, no spinners, append-only status). |
 | `SWIFTTUI_ASCII=1` | Force ASCII glyph fallback. |
 | `SWIFTTUI_REDUCE_MOTION=1` | Suppress animations and spinners. |
+| `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` | Opt in to moving the terminal cursor to the focused accessibility node in TUI output. |
 
-CLI flags (suggested, not final): `--accessible`, `--ascii`,
-`--no-color`, `--no-progress`, `--plain`, `--linear`, `--json`.
+CLI flags: `--accessible`, `--ascii`, `--no-color`, `--no-progress`,
+`--plain`, `--linear`, `--cursor-follows-focus`, `--json`.
 
 ### Glyph fallback table
 
@@ -1278,19 +1286,29 @@ accessible mode.
 
 ### Cursor placement
 
-Implemented in the rasterizer / commit phase: at the end of every
-commit, position the hardware terminal cursor at the focused
-interaction point.
+Implemented in the commit phase behind an explicit runtime policy: when
+`RuntimeConfiguration.cursorFollowsFocus` is true, at the end of every TUI
+commit, position the hardware terminal cursor at the focused interaction
+point. This policy defaults off for normal TUI output.
 
-- **Text fields:** at the caret.
+- **Text fields:** deferred until all text input surfaces have real caret
+  tracking and caret anchors.
 - **List rows:** at the start of the selected row's text.
 - **Buttons:** at the first character of the label.
 - **Custom focus targets:** configurable via `accessibilityCursorAnchor`,
   defaulting to the view's origin if unspecified.
 
-When no widget is focused, the cursor sits at a stable, predictable
-location (e.g., bottom-left or end of last appended status line),
-**not** wherever the renderer last drew. This is the Brick lesson.
+When no widget is focused and the policy is enabled, the runtime hides the
+cursor rather than leaving it wherever the renderer last drew. Longer term,
+the best screen-reader behavior is a stable parked cursor location (e.g.,
+bottom-left or end of last appended status line). This is the Brick lesson.
+
+**Deferred caret-tracking work:** `TextField`, `SecureField`, and
+`TextEditor` currently render a synthetic trailing caret and do not publish a
+real caret index or cursor anchor. Before enabling any text-input-specific
+hardware cursor policy, add caret tracking and accessibility cursor anchors
+to every text input surface, then suppress the synthetic caret when hardware
+cursor-following is active.
 
 ### Reduce-motion behavior
 
@@ -1531,7 +1549,10 @@ to be argued with, not accepted.)
    the field exists on `AccessibilityNode` (in absolute surface
    coordinates); nil means "use the node's origin." The public
    modifier argument shape and built-in caret-anchor population remain
-   follow-up work under the cursor-as-focus plan.
+   follow-up work under the cursor-as-focus plan. Text input controls also
+   need real caret tracking across `TextField`, `SecureField`, and
+   `TextEditor` before the hardware cursor can reliably follow their editing
+   caret.
 
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
@@ -1658,10 +1679,11 @@ WebSocket transport landed).)
    already exist; the new work is the policy: after each commit,
    look up the focused widget and call `moveCursor` to its anchor.
    ADR-0012 puts `cursorAnchor` on `AccessibilityNode`; the remaining
-   behavior gate is now resolved by ADR-0013: terminal TUI output
-   shows and moves the cursor when a focused accessibility node
-   exists. The public modifier argument type remains deferred; v1 uses
-   built-in package-only anchors plus node-origin fallback.
+   behavior gate is now resolved by ADR-0013: terminal TUI output shows and
+   moves the cursor only when `RuntimeConfiguration.cursorFollowsFocus` is
+   enabled and a focused accessibility node exists. The public modifier
+   argument type remains deferred; v1 uses built-in package-only anchors plus
+   node-origin fallback.
 
 3. **Phase 3a — Accessibility authoring modifiers.** **(Substrate
    landed, cursor-anchor modifier deferred.)** Added

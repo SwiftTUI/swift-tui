@@ -47,15 +47,19 @@ is the explicit escape hatch from accessible mode. `CI=true` does not
 imply accessible output; it continues to imply reduced motion and no
 progress by default.
 
-Cursor-as-focus is enabled for terminal TUI output, not just accessible
-mode. After each committed frame, the runtime cross-references
-`FocusTracker.currentFocusIdentity` with
-`SemanticSnapshot.accessibilityNodes`. If a focused node exists, the
-terminal cursor is shown and moved to `cursorAnchor ?? rect.origin`.
+Cursor-as-focus is an opt-in accessibility feature for terminal TUI
+output. It is disabled by default because a hardware cursor jumping
+across ordinary focus movement is visually distracting in common TUI
+workflows. When `RuntimeConfiguration.cursorFollowsFocus` is true
+(`--cursor-follows-focus` or `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`), each
+committed TUI frame cross-references `FocusTracker.currentFocusIdentity`
+with `SemanticSnapshot.accessibilityNodes`. If a focused node exists,
+the terminal cursor is shown and moved to `cursorAnchor ?? rect.origin`.
 If no focused accessibility node exists, the visual TUI may keep the
-cursor hidden. JSON and web output do not use terminal cursor policy.
-The public cursor-anchor modifier remains deferred; v1 uses built-in
-package-only anchors and the node-origin fallback.
+cursor hidden. JSON, web output, and accessible linear output do not use
+terminal cursor policy. The public cursor-anchor modifier remains
+deferred; v1 uses built-in package-only anchors and the node-origin
+fallback.
 
 Reduced motion suppresses non-essential frame churn. Repeating
 animations, spinners, blink, and transition intermediates do not tick
@@ -81,7 +85,9 @@ by identity. `.assertive` announcements are ordered before `.polite`;
 
 ## Status
 
-Accepted on 2026-05-05. Stage 1 of
+Accepted on 2026-05-05. Amended on 2026-05-05 to make cursor-as-focus
+default-off after visual TUI testing showed always-on cursor movement was
+too distracting for ordinary keyboard navigation. Stage 1 of
 `2026-05-05-003-accessibility-cli-runtime-plan.md` depends on this ADR.
 
 ## Consequences
@@ -89,8 +95,8 @@ Accepted on 2026-05-05. Stage 1 of
 Runtime configuration tests must change so JSON beats accessible in
 both CLI and env-var resolution. Accessible mode now has mandatory
 ASCII, reduced-motion, no-progress, and linear implications. The CLI
-cursor policy becomes useful for all interactive TUI users, while the
-linear renderer and live-region announcer remain accessible-mode-only
+cursor policy is available to interactive TUI users who opt in, while
+the linear renderer and live-region announcer remain accessible-mode-only
 behavior. Web and SwiftUI host work should follow these semantics when
 serializing or bridging focus and live regions, but they remain free to
 use native ARIA or platform announcement APIs.

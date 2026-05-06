@@ -387,11 +387,10 @@ What's missing:
 **Implication for [`ACCESSIBILITY.md`](./ACCESSIBILITY.md):** Phase 2
 (cursor-as-focus) is a policy + anchor patch in `RunLoop+Rendering`
 or wherever the commit phase finalizes output. The pieces exist.
-Estimated cost: small (a day of focused work). The biggest gotcha is
-that the runtime currently hides the cursor by default for visual
-reasons; we want a switch that *shows* it at the focused anchor in
-accessible mode (or always, if the cursor-as-focus policy turns out
-to also be visually fine).
+Estimated cost: small (a day of focused work). The policy now keeps the
+runtime's visually quiet default and adds a switch that *shows* it at the
+focused anchor when `RuntimeConfiguration.cursorFollowsFocus` is true
+(`--cursor-follows-focus` / `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`).
 
 ---
 
@@ -546,11 +545,13 @@ correction (2026-05-04)" to find them in place.
    if we need to break later, we can.
 
 5. **Where does the "show cursor at focused anchor" gate live?
-   Always-on, or behind reduce-motion / accessible-mode?** Resolved by
+   Always-on, or behind reduce-motion / accessible-mode?** Resolved and
+   later amended by
    [ADR-0013](../decisions/0013-accessibility-runtime-policy.md):
-   terminal TUI output shows and moves the cursor whenever a focused
-   accessibility node exists. JSON and web output do not use terminal
-   cursor policy.
+   terminal TUI output shows and moves the cursor only when
+   `RuntimeConfiguration.cursorFollowsFocus` is true and a focused
+   accessibility node exists. JSON, web output, and accessible linear output
+   do not use terminal cursor policy.
 
 6. **Should `CI=true` enable accessible mode or just reduce-motion?**
    Resolved by

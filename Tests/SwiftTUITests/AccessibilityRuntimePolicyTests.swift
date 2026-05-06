@@ -91,8 +91,8 @@ struct AccessibilityRuntimePolicyTests {
     #expect(point == nil)
   }
 
-  @Test("run loop moves and shows terminal cursor after presenting focused control")
-  func runLoopMovesCursorForFocusedControl() throws {
+  @Test("run loop leaves terminal cursor untouched by default after presenting focused control")
+  func runLoopLeavesCursorUntouchedByDefault() throws {
     let terminalSize = CellSize(width: 24, height: 6)
     let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("CursorFocusRoot")
@@ -103,6 +103,35 @@ struct AccessibilityRuntimePolicyTests {
       terminal: terminal,
       terminalSize: terminalSize,
       focusTracker: focusTracker
+    ) {
+      Button("Run") {}
+        .id(buttonID)
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(focusTracker.currentFocusIdentity == buttonID)
+    #expect(terminal.movedCursorPoints.isEmpty)
+    #expect(!terminal.writes.contains("\u{001B}[?25h"))
+    #expect(!terminal.writes.contains("\u{001B}[?25l"))
+  }
+
+  @Test("run loop moves and shows terminal cursor when cursor focus-following is enabled")
+  func runLoopMovesCursorWhenFocusFollowingEnabled() throws {
+    let terminalSize = CellSize(width: 24, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("EnabledCursorFocusRoot")
+    let buttonID = testIdentity("EnabledCursorFocusButton")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
     ) {
       Button("Run") {}
         .id(buttonID)
@@ -125,6 +154,35 @@ struct AccessibilityRuntimePolicyTests {
     #expect(terminal.writes.contains("\u{001B}[?25h"))
   }
 
+  @Test("run loop skips cursor focus-following outside TUI output")
+  func runLoopSkipsCursorFocusFollowingOutsideTUIOutput() throws {
+    let terminalSize = CellSize(width: 24, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("JSONCursorFocusRoot")
+    let buttonID = testIdentity("JSONCursorFocusButton")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(output: .json, cursorFollowsFocus: true)
+    ) {
+      Button("Run") {}
+        .id(buttonID)
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(focusTracker.currentFocusIdentity == buttonID)
+    #expect(terminal.movedCursorPoints.isEmpty)
+    #expect(!terminal.writes.contains("\u{001B}[?25h"))
+    #expect(!terminal.writes.contains("\u{001B}[?25l"))
+  }
+
   @Test("run loop hides cursor when focused control is accessibility hidden")
   func runLoopHidesCursorForHiddenFocusedControl() throws {
     let terminalSize = CellSize(width: 24, height: 6)
@@ -136,7 +194,8 @@ struct AccessibilityRuntimePolicyTests {
       rootIdentity: rootIdentity,
       terminal: terminal,
       terminalSize: terminalSize,
-      focusTracker: focusTracker
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
     ) {
       Button("Hidden") {}
         .id(hiddenID)
@@ -169,7 +228,8 @@ struct AccessibilityRuntimePolicyTests {
       rootIdentity: rootIdentity,
       terminal: terminal,
       terminalSize: terminalSize,
-      focusTracker: focusTracker
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
     ) {
       Text("Static")
     }
@@ -191,13 +251,14 @@ private func cursorFocusRunLoop<Content: View>(
   terminal: CursorFocusTestTerminalHost,
   terminalSize: CellSize,
   focusTracker: FocusTracker,
+  runtimeConfiguration: RuntimeConfiguration = .default,
   @ViewBuilder view: @escaping () -> Content
 ) -> RunLoop<Int, Content> {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalAppearance = terminal.appearance
   environmentValues.terminalSize = terminalSize
 
-  return RunLoop(
+  let runLoop = RunLoop<Int, Content>(
     rootIdentity: rootIdentity,
     presentationSurface: terminal,
     terminalInputReader: CursorFocusTestInputReader(),
@@ -206,9 +267,11 @@ private func cursorFocusRunLoop<Content: View>(
     stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
     focusTracker: focusTracker,
     environmentValues: environmentValues,
+    runtimeConfiguration: runtimeConfiguration,
     proposal: .init(width: terminalSize.width, height: terminalSize.height),
-    viewBuilder: { _, _ in view() }
+    viewBuilder: ScopedMapper { _ in view() }
   )
+  return runLoop
 }
 
 private final class CursorFocusTestTerminalHost: PresentationSurface,

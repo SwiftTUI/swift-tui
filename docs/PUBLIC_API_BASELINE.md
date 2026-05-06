@@ -17,7 +17,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 | Module | Top-level | All public |
 |---|---:|---:|
-| `SwiftTUI` | 48 | 513 |
+| `SwiftTUI` | 48 | 515 |
 | `SwiftTUIViews` | 240 | 8917 |
 | `SwiftTUIAnimatedImage` | 5 | 150 |
 | `SwiftTUICharts` | 17 | 1420 |
@@ -52,7 +52,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RunLoop` — class — 5 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 5 members
-- `RuntimeConfiguration` — struct — 70 members
+- `RuntimeConfiguration` — struct — 72 members
 - `RuntimeRenderMode` — enum — 12 members
 - `Scene` — protocol — 2 members
 - `SceneBuilder` — enum — 10 members

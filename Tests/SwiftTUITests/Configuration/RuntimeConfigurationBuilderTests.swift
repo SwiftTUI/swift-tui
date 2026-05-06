@@ -1,4 +1,5 @@
 import Testing
+
 @testable import SwiftTUI
 
 struct RuntimeConfigurationBuilderTests {
@@ -11,6 +12,7 @@ struct RuntimeConfigurationBuilderTests {
       .output(.accessible)
       .verbosity(.verbose(level: 2))
       .debug(true)
+      .cursorFollowsFocus(true)
       .build()
 
     #expect(configuration.color == .never)
@@ -19,6 +21,7 @@ struct RuntimeConfigurationBuilderTests {
     #expect(configuration.output == .accessible)
     #expect(configuration.verbosity == .verbose(level: 2))
     #expect(configuration.debug == true)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
   @Test("Builder defaults match RuntimeConfiguration.default")
