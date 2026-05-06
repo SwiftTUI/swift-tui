@@ -317,6 +317,7 @@ extension SemanticExtractor {
     focusRegions: [FocusRegion]
   ) -> [AccessibilityNode] {
     let focusIdentities = accessibilityFocusIdentities(from: focusRegions)
+    let textInputCursorAnchors = textInputAccessibilityCursorAnchors(from: root)
     var emittedSubtrees: Set<Identity> = []
     var hiddenDescendantSubtrees: Set<Identity> = []
     var stack: [(node: PlacedNode, isExit: Bool)] = [(root, false)]
@@ -370,7 +371,8 @@ extension SemanticExtractor {
           parentIdentity: frame.emittedParentIdentity,
           hasEmittedChild: childSummary.hasEmittedChild,
           hasHiddenDescendant: childSummary.hasHiddenDescendant,
-          focusIdentities: focusIdentities
+          focusIdentities: focusIdentities,
+          textInputCursorAnchors: textInputCursorAnchors
         ) {
           nodes.append(accessibilityNode)
           childParentIdentity = node.identity
@@ -422,13 +424,15 @@ extension SemanticExtractor {
 
   private func accessibilitySelfIsRelevant(
     _ node: PlacedNode,
-    focusIdentities: Set<Identity>
+    focusIdentities: Set<Identity>,
+    textInputCursorAnchors: [Identity: CellPoint] = [:]
   ) -> Bool {
     node.semanticMetadata.accessibilityRole != nil
       || node.semanticMetadata.accessibilityLabel != nil
       || node.semanticMetadata.accessibilityHint != nil
       || node.semanticMetadata.accessibilityLiveRegion != nil
       || node.semanticMetadata.accessibilityCursorAnchor != nil
+      || textInputCursorAnchors[node.identity] != nil
       || focusIdentities.contains(node.identity)
   }
 
@@ -437,11 +441,13 @@ extension SemanticExtractor {
     parentIdentity: Identity?,
     hasEmittedChild: Bool,
     hasHiddenDescendant: Bool,
-    focusIdentities: Set<Identity>
+    focusIdentities: Set<Identity>,
+    textInputCursorAnchors: [Identity: CellPoint]
   ) -> AccessibilityNode? {
     let selfIsRelevant = accessibilitySelfIsRelevant(
       node,
-      focusIdentities: focusIdentities
+      focusIdentities: focusIdentities,
+      textInputCursorAnchors: textInputCursorAnchors
     )
     guard
       let role = accessibilityRole(
@@ -462,8 +468,35 @@ extension SemanticExtractor {
       hint: node.semanticMetadata.accessibilityHint,
       hidden: hasHiddenDescendant,
       liveRegion: node.semanticMetadata.accessibilityLiveRegion,
-      cursorAnchor: accessibilityCursorAnchor(for: node)
+      cursorAnchor: textInputCursorAnchors[node.identity] ?? accessibilityCursorAnchor(for: node)
     )
+  }
+
+  private func textInputAccessibilityCursorAnchors(
+    from root: PlacedNode
+  ) -> [Identity: CellPoint] {
+    var anchors: [Identity: CellPoint] = [:]
+    var stack = [root]
+
+    while let node = stack.popLast() {
+      if node.isTransient || node.semanticMetadata.accessibilityHidden {
+        continue
+      }
+
+      if let route = node.semanticMetadata.textInputAccessibilityCursorAnchor {
+        let bounds = semanticBounds(for: node)
+        anchors[route.ownerIdentity] = CellPoint(
+          x: bounds.origin.x + route.anchor.x,
+          y: bounds.origin.y + route.anchor.y
+        )
+      }
+
+      for child in node.children.reversed() {
+        stack.append(child)
+      }
+    }
+
+    return anchors
   }
 
   private func accessibilityRole(

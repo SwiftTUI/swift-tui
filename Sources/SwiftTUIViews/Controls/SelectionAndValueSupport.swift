@@ -688,16 +688,22 @@ package func mutateTextEntryBinding(
 @MainActor
 package func textEditorBody(
   displayText: String,
+  ownerIdentity: Identity? = nil,
+  caretAnchor: CellPoint? = nil,
   chrome: ControlChrome,
   scrollPosition: Binding<ScrollPosition>,
   focusActive: Bool = false
 ) -> some View {
   ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
     VStack(alignment: .leading, spacing: 0) {
-      TextInputContent(displayText: displayText)
-        .fixedSize(horizontal: false, vertical: true)
-        .foregroundStyle(chrome.foregroundStyle)
-        .drawMetadata(.init(opacity: chrome.opacity))
+      TextInputContent(
+        displayText: displayText,
+        ownerIdentity: ownerIdentity,
+        caretAnchor: caretAnchor
+      )
+      .fixedSize(horizontal: false, vertical: true)
+      .foregroundStyle(chrome.foregroundStyle)
+      .drawMetadata(.init(opacity: chrome.opacity))
     }
     .padding(.init(horizontal: 1, vertical: 1))
   }

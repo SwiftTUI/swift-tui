@@ -190,7 +190,8 @@ extension RunLoop {
         let scrollPositionChanged = localScrollPositionRegistry.sync(
           focusedIdentity: focusTracker.currentFocusIdentity,
           focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
-          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes
+          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+          accessibilityNodes: renderedArtifacts.semanticSnapshot.accessibilityNodes
         )
         focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
         focusBindingChangedDuringFrame =
@@ -884,7 +885,8 @@ extension RunLoop {
         let scrollPositionChanged = localScrollPositionRegistry.sync(
           focusedIdentity: focusTracker.currentFocusIdentity,
           focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
-          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes
+          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+          accessibilityNodes: renderedArtifacts.semanticSnapshot.accessibilityNodes
         )
         focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
         focusBindingChangedDuringFrame =
@@ -1194,6 +1196,7 @@ extension RunLoop {
     effectiveEnvironmentValues.activePaletteCommands = latestActivePaletteCommands
     effectiveEnvironmentValues.reducesMotion = runtimeConfiguration.motion == .reduced
     effectiveEnvironmentValues.suppressesProgress = runtimeConfiguration.noProgress
+    effectiveEnvironmentValues.cursorFollowsFocus = runtimeConfiguration.cursorFollowsFocus
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }

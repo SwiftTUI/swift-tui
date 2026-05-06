@@ -106,4 +106,47 @@ struct LocalScrollPositionRegistryTests {
     #expect(!changed)
     #expect(offset == .init(x: 0, y: 2))
   }
+
+  @Test("focused text input cursor anchor can reveal a descendant scroll route")
+  func focusedTextInputCursorAnchorRevealsDescendantScrollRoute() {
+    let registry = LocalScrollPositionRegistry()
+    let focusedIdentity = testIdentity("TextEditor")
+    let scrollIdentity = testIdentity("TextEditor", "ScrollView")
+    var offset = ScrollOffset.zero
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+
+    let changed = registry.sync(
+      focusedIdentity: focusedIdentity,
+      focusRegions: [
+        FocusRegion(
+          identity: focusedIdentity,
+          rect: .init(origin: .zero, size: .init(width: 12, height: 5)),
+          focusInteractions: .edit
+        )
+      ],
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: .init(origin: .zero, size: .init(width: 12, height: 4)),
+          contentBounds: .init(origin: .zero, size: .init(width: 12, height: 12))
+        )
+      ],
+      accessibilityNodes: [
+        AccessibilityNode(
+          identity: focusedIdentity,
+          rect: .init(origin: .zero, size: .init(width: 12, height: 5)),
+          role: .textEditor,
+          cursorAnchor: CellPoint(x: 1, y: 8)
+        )
+      ]
+    )
+
+    #expect(changed)
+    #expect(offset == .init(x: 0, y: 5))
+  }
 }

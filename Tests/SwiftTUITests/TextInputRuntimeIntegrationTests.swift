@@ -154,6 +154,26 @@ struct TextInputRuntimeIntegrationTests {
     #expect(box.setCount == 1)
   }
 
+  @Test("TextEditor runtime scrolls to keep the caret visible")
+  func textEditorRuntimeScrollsToKeepCaretVisible() throws {
+    let box = PasteTextBox()
+    box.value = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6"
+    let identity = testIdentity("CaretVisibleTextEditor")
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 18, height: 5)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+    try renderPending(runLoop.runLoop)
+
+    let surface = surfaceText(runLoop.host)
+    #expect(!surface.contains("Line 1"))
+    #expect(surface.contains("Line 6"))
+  }
+
   @Test("Paste falls back to scalar key presses for non-text focused handlers")
   func pasteFallsBackToScalarKeyPressesForNonTextHandlers() throws {
     final class Recorder {

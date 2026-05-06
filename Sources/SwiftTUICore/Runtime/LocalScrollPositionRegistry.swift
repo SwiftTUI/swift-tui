@@ -60,7 +60,8 @@ package final class LocalScrollPositionRegistry: Equatable {
   package func sync(
     focusedIdentity: Identity?,
     focusRegions: [FocusRegion],
-    scrollRoutes: [ScrollRoute]
+    scrollRoutes: [ScrollRoute],
+    accessibilityNodes: [AccessibilityNode] = []
   ) -> Bool {
     guard let focusedIdentity,
       let focusedRegion = focusRegions.first(where: { $0.identity == focusedIdentity })
@@ -68,8 +69,22 @@ package final class LocalScrollPositionRegistry: Equatable {
       return false
     }
 
+    let focusedCursorRect =
+      accessibilityNodes
+      .first(where: { $0.identity == focusedIdentity })?
+      .cursorAnchor
+      .map {
+        CellRect(
+          origin: $0,
+          size: CellSize(width: 1, height: 1)
+        )
+      }
+    let revealRect = focusedCursorRect ?? focusedRegion.rect
+
     for route in scrollRoutes.reversed()
-    where route.identity.isAncestor(of: focusedIdentity) {
+    where route.identity.isAncestor(of: focusedIdentity)
+      || (focusedCursorRect != nil && route.identity.isDescendant(of: focusedIdentity))
+    {
       guard let registration = registrations[route.identity] else {
         continue
       }
@@ -77,7 +92,7 @@ package final class LocalScrollPositionRegistry: Equatable {
       let currentOffset = registration.currentOffset()
       let adjustedOffset = adjustedOffset(
         currentOffset,
-        revealing: focusedRegion.rect,
+        revealing: revealRect,
         in: route
       )
       guard adjustedOffset != currentOffset else {

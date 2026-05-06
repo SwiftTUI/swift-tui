@@ -243,6 +243,113 @@ struct AccessibilityRuntimePolicyTests {
     #expect(terminal.movedCursorPoints.isEmpty)
     #expect(terminal.writes.contains("\u{001B}[?25l"))
   }
+
+  @Test("run loop anchors cursor-following to a TextField caret")
+  func runLoopAnchorsCursorFollowingToTextFieldCaret() throws {
+    let terminalSize = CellSize(width: 32, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("TextFieldCursorRoot")
+    let textFieldID = testIdentity("TextFieldCursor")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
+    ) {
+      TextField("Name", text: .constant("abc"))
+        .id(textFieldID)
+        .frame(width: 14)
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let node = try #require(
+      runLoop.latestSemanticSnapshot.accessibilityNodes.first { $0.identity == textFieldID }
+    )
+    let cursorAnchor = try #require(node.cursorAnchor)
+
+    #expect(focusTracker.currentFocusIdentity == textFieldID)
+    #expect(cursorAnchor != node.rect.origin)
+    #expect(terminal.movedCursorPoints.last == cursorAnchor)
+    #expect(!(terminal.latestSurface?.lines.joined(separator: "\n").contains("abc_") ?? false))
+  }
+
+  @Test("run loop anchors cursor-following to a SecureField caret without exposing value")
+  func runLoopAnchorsCursorFollowingToSecureFieldCaret() throws {
+    let terminalSize = CellSize(width: 32, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("SecureFieldCursorRoot")
+    let secureFieldID = testIdentity("SecureFieldCursor")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
+    ) {
+      SecureField("Password", text: .constant("secret"))
+        .id(secureFieldID)
+        .frame(width: 16)
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let node = try #require(
+      runLoop.latestSemanticSnapshot.accessibilityNodes.first { $0.identity == secureFieldID }
+    )
+    let cursorAnchor = try #require(node.cursorAnchor)
+    let surface = terminal.latestSurface?.lines.joined(separator: "\n") ?? ""
+
+    #expect(focusTracker.currentFocusIdentity == secureFieldID)
+    #expect(terminal.movedCursorPoints.last == cursorAnchor)
+    #expect(!surface.contains("secret"))
+    #expect(
+      !String(describing: runLoop.latestSemanticSnapshot.accessibilityNodes).contains("secret"))
+  }
+
+  @Test("run loop anchors cursor-following to a TextEditor caret")
+  func runLoopAnchorsCursorFollowingToTextEditorCaret() throws {
+    let terminalSize = CellSize(width: 32, height: 8)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("TextEditorCursorRoot")
+    let textEditorID = testIdentity("TextEditorCursor")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
+    ) {
+      TextEditor(text: .constant("a\nbc"))
+        .id(textEditorID)
+        .frame(width: 16, height: 5)
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let node = try #require(
+      runLoop.latestSemanticSnapshot.accessibilityNodes.first { $0.identity == textEditorID }
+    )
+    let cursorAnchor = try #require(node.cursorAnchor)
+
+    #expect(focusTracker.currentFocusIdentity == textEditorID)
+    #expect(cursorAnchor != node.rect.origin)
+    #expect(terminal.movedCursorPoints.last == cursorAnchor)
+    #expect(!(terminal.latestSurface?.lines.joined(separator: "\n").contains("bc_") ?? false))
+  }
 }
 
 @MainActor

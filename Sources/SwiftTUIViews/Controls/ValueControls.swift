@@ -221,6 +221,7 @@ extension TextField {
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let textFieldStyle = context.environmentValues.textFieldStyle
+    let cursorFollowsFocus = context.environmentValues.cursorFollowsFocus
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
@@ -240,11 +241,24 @@ extension TextField {
       traits: .singleLine,
       prompt: prompt?.content,
       isFocused: isFocused,
+      cursorFollowsFocus: cursorFollowsFocus,
+      width: nil
+    )
+    let fallbackPresentation = TextInputPresentation(
+      value: synchronizedValue,
+      traits: .singleLine,
+      prompt: prompt?.content,
+      isFocused: isFocused,
       cursorFollowsFocus: false,
       width: nil
     )
     let configuration = TextFieldStyleConfiguration(
-      displayText: presentation.displayText,
+      displayText: fallbackPresentation.displayText,
+      fieldContent: .init(
+        displayText: presentation.displayText,
+        ownerIdentity: context.identity,
+        caretAnchor: presentation.caretAnchor
+      ),
       isShowingPrompt: presentation.isShowingPrompt,
       label: .init(authoringContext: authoringScope) { label },
       showsLabel: showsLabel,
