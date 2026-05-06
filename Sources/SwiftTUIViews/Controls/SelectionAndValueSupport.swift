@@ -694,7 +694,7 @@ package func textEditorBody(
 ) -> some View {
   ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
     VStack(alignment: .leading, spacing: 0) {
-      Text(displayText)
+      TextInputContent(displayText: displayText)
         .fixedSize(horizontal: false, vertical: true)
         .foregroundStyle(chrome.foregroundStyle)
         .drawMetadata(.init(opacity: chrome.opacity))

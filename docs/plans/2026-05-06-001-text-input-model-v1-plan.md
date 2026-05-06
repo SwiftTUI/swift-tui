@@ -466,19 +466,19 @@ git commit -m "feat: route paste to focused text inputs"
 
 ## Stage 6: TextEditor Runtime Integration
 
-- [ ] Add `@State private var textInputValue` to `TextEditor`.
-- [ ] Keep the existing `@State private var scrollPosition` as companion state.
-- [ ] Build multiline presentation and layout map during resolve.
-- [ ] Translate key events through the same reducer with `isMultiline == true`.
-- [ ] Make return insert `\n`.
-- [ ] Make up/down move caret through the layout map and preferred visual
+- [x] Add `@State private var textInputValue` to `TextEditor`.
+- [x] Keep the existing `@State private var scrollPosition` as companion state.
+- [x] Build multiline presentation and layout map during resolve.
+- [x] Translate key events through the same reducer with `isMultiline == true`.
+- [x] Make return insert `\n`.
+- [x] Make up/down move caret through the layout map and preferred visual
   column.
 - [ ] Apply caret-visible scroll adjustment after reducer mutations. Clamp
   scroll so the caret remains inside the visible editor content rect when the
   content is taller than the viewport.
-- [ ] Make bracketed paste insert the whole pasted string, preserving newlines.
+- [x] Make bracketed paste insert the whole pasted string, preserving newlines.
 - [ ] Update `TextEditorSurfaceTests` for caret movement and scrolling.
-- [ ] Run focused multiline tests.
+- [x] Run focused multiline tests.
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.TextEditorSurfaceTests

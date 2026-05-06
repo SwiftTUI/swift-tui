@@ -4,6 +4,7 @@ package import SwiftTUICore
 public struct TextEditor: View, ResolvableView {
   public var text: Binding<String>
   @State private var scrollPosition = ScrollPosition.zero
+  @State private var textInputValue = TextInputValue()
   private let authoringScope: AuthoringContext?
 
   public init(text: Binding<String>) {
@@ -29,29 +30,45 @@ extension TextEditor {
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
-    let fieldText = text.wrappedValue
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
+    let synchronizedValue = textInputValue.synchronized(with: text.wrappedValue)
+    if synchronizedValue != textInputValue {
+      textInputValue = synchronizedValue
+    }
 
-    registerMultilineTextEntryBinding(
+    registerTextInputBinding(
       text,
-      scrollPosition: $scrollPosition,
+      value: $textInputValue,
+      traits: .multiline,
+      layout: { value in
+        TextInputPresentation(
+          value: value,
+          traits: .multiline,
+          prompt: nil,
+          isFocused: isFocused,
+          cursorFollowsFocus: false,
+          width: nil
+        ).layoutMap
+      },
       authoringContext: currentImperativeAuthoringContextSnapshot()
         ?? ImperativeAuthoringContextSnapshot(authoringScope),
       in: context
     )
 
-    let entryText = textEntryDisplayText(
-      text: fieldText,
-      promptText: nil,
-      isActiveNavigation: isFocused,
-      masked: false
+    let presentation = TextInputPresentation(
+      value: synchronizedValue,
+      traits: .multiline,
+      prompt: nil,
+      isFocused: isFocused,
+      cursorFollowsFocus: false,
+      width: nil
     )
 
     let child = textEditorBody(
-      displayText: entryText.displayText,
+      displayText: presentation.displayText,
       chrome: chrome,
       scrollPosition: $scrollPosition,
       focusActive: isFocused && showsFocusEffect
