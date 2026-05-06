@@ -1,7 +1,7 @@
 ---
 title: "feat: text input model v1"
 type: feat
-status: planned
+status: active
 date: 2026-05-06
 depends_on:
   - "../proposals/TEXT_INPUT_MODEL.md"
@@ -194,9 +194,9 @@ for caret movement or accessibility cursor positioning:
 
 ## Stage 0: Baseline And Red Tests
 
-- [ ] Read `docs/proposals/TEXT_INPUT_MODEL.md` and this plan in the same
+- [x] Read `docs/proposals/TEXT_INPUT_MODEL.md` and this plan in the same
   checkout before changing source.
-- [ ] Run the current focused surface tests so failures caused by this work are
+- [x] Run the current focused surface tests so failures caused by this work are
   distinguishable from pre-existing failures.
 
 ```bash
@@ -206,7 +206,7 @@ swiftly run swift test --filter SwiftTUITests.TextEditorSurfaceTests
 swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
 ```
 
-- [ ] Add reducer and layout-map test files with failing tests for the V1
+- [x] Add reducer and layout-map test files with failing tests for the V1
   behaviors below. The first run should fail because the new types do not
   exist yet.
 
@@ -247,17 +247,17 @@ git commit -m "test: define text input model v1 behavior"
 
 ## Stage 1: Pure Model And Reducer
 
-- [ ] Create `TextInputTypes.swift`.
-- [ ] Create `TextInputStringMetrics.swift`.
-- [ ] Create `TextInputReducer.swift`.
-- [ ] Implement `TextInputValue.synchronized(with:)` so external binding
+- [x] Create `TextInputTypes.swift`.
+- [x] Create `TextInputStringMetrics.swift`.
+- [x] Create `TextInputReducer.swift`.
+- [x] Implement `TextInputValue.synchronized(with:)` so external binding
   changes update text, clamp selection, clear composing range, and keep
   preferred visual column only when the caret remains on the same visual line.
-- [ ] Implement reducer commands for insertion, replacement, backspace,
+- [x] Implement reducer commands for insertion, replacement, backspace,
   forward deletion, left/right, home/end, document start/end, and up/down.
-- [ ] Keep modifier-specific runtime shortcuts out of the reducer. The reducer
+- [x] Keep modifier-specific runtime shortcuts out of the reducer. The reducer
   should only see `TextInputCommand`.
-- [ ] Run the pure focused tests.
+- [x] Run the pure focused tests.
 
 ```bash
 swiftly run swift test --filter SwiftTUIViewsTests.TextInputReducerTests
@@ -282,19 +282,19 @@ git commit -m "feat: add text input value reducer"
 
 ## Stage 2: Layout Map And Presentation
 
-- [ ] Create `TextInputLayoutMap.swift`.
-- [ ] Create `TextInputPresentation.swift`.
-- [ ] Build layout from grapheme clusters and source ranges. Do not derive
+- [x] Create `TextInputLayoutMap.swift`.
+- [x] Create `TextInputPresentation.swift`.
+- [x] Build layout from grapheme clusters and source ranges. Do not derive
   caret positions by scanning the rendered display string after masking or
   appending a synthetic caret.
-- [ ] Reuse `cellWidth(of:)` for terminal width. Keep all terminal geometry in
+- [x] Reuse `cellWidth(of:)` for terminal width. Keep all terminal geometry in
   `CellPoint`, `CellRect`, and `CellSize`.
-- [ ] Preserve explicit newlines.
-- [ ] Preserve source ranges through wrapping.
-- [ ] For secure fields, mask each grapheme in display while keeping source
+- [x] Preserve explicit newlines.
+- [x] Preserve source ranges through wrapping.
+- [x] For secure fields, mask each grapheme in display while keeping source
   ranges tied to the original text.
-- [ ] Return selection rectangles even if V1 only paints collapsed carets.
-- [ ] Run the layout and presentation tests.
+- [x] Return selection rectangles even if V1 only paints collapsed carets.
+- [x] Run the layout and presentation tests.
 
 ```bash
 swiftly run swift test --filter SwiftTUIViewsTests.TextInputLayoutMapTests
