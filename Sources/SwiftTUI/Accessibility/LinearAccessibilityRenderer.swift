@@ -4,23 +4,39 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
   package init() {}
 
   package func render(_ snapshot: SemanticSnapshot) -> String {
-    render(snapshot.accessibilityNodes)
+    render(
+      snapshot.accessibilityNodes,
+      warnings: snapshot.accessibilityWarnings
+    )
   }
 
   package func render(_ nodes: [AccessibilityNode]) -> String {
-    guard !nodes.isEmpty else {
+    render(nodes, warnings: [])
+  }
+
+  private func render(
+    _ nodes: [AccessibilityNode],
+    warnings: [AccessibilityWarning]
+  ) -> String {
+    guard !nodes.isEmpty || !warnings.isEmpty else {
       return ""
     }
 
     let nodesByIdentity = Dictionary(uniqueKeysWithValues: nodes.map { ($0.identity, $0) })
     var lines: [String] = []
-    lines.reserveCapacity(nodes.count)
+    lines.reserveCapacity(nodes.count + warnings.count)
 
     for node in nodes {
       guard let line = line(for: node) else {
         continue
       }
       lines.append(String(repeating: " ", count: depth(for: node, in: nodesByIdentity) * 2) + line)
+    }
+
+    for warning in warnings {
+      if let message = sanitized(warning.message) {
+        lines.append("warning: \(message)")
+      }
     }
 
     guard !lines.isEmpty else {

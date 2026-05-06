@@ -9,6 +9,7 @@ public struct Meter<Label: View, CurrentValueLabel: View>: View, ResolvableView 
   public var barWidth: Int
   private let label: Label
   private let currentValueLabel: CurrentValueLabel
+  private let accessibilitySummary: String?
 
   public init(
     value: Double,
@@ -18,12 +19,33 @@ public struct Meter<Label: View, CurrentValueLabel: View>: View, ResolvableView 
     @ViewBuilder label: () -> Label,
     @ViewBuilder currentValueLabel: () -> CurrentValueLabel
   ) {
+    self.init(
+      value: value,
+      total: total,
+      tone: tone,
+      barWidth: barWidth,
+      accessibilitySummary: nil,
+      label: label,
+      currentValueLabel: currentValueLabel
+    )
+  }
+
+  private init(
+    value: Double,
+    total: Double,
+    tone: BannerTone,
+    barWidth: Int,
+    accessibilitySummary: String?,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder currentValueLabel: () -> CurrentValueLabel
+  ) {
     self.tone = tone
     self.value = value
     self.total = total
     self.barWidth = barWidth
     self.label = label()
     self.currentValueLabel = currentValueLabel()
+    self.accessibilitySummary = accessibilitySummary
   }
 
   package func resolveElements(
@@ -44,7 +66,13 @@ public struct Meter<Label: View, CurrentValueLabel: View>: View, ResolvableView 
             Text(track.empty)
               .foregroundStyle(.separator)
           }
-        },
+        }
+        .semanticMetadata(
+          chartAccessibilityMetadata(
+            kind: "Meter",
+            label: accessibilitySummary
+          )
+        ),
         in: context
       )
     ]
@@ -58,13 +86,15 @@ extension Meter where Label == EmptyView, CurrentValueLabel == Text {
     tone: BannerTone = .automatic,
     barWidth: Int = 12
   ) {
+    let summary = meterSummaryText(value: value, total: total)
     self.init(
       value: value,
       total: total,
       tone: tone,
       barWidth: barWidth,
+      accessibilitySummary: summary,
       label: { EmptyView() },
-      currentValueLabel: { Text(meterSummaryText(value: value, total: total)) }
+      currentValueLabel: { Text(summary) }
     )
   }
 }
@@ -77,13 +107,16 @@ extension Meter where Label == Text, CurrentValueLabel == Text {
     tone: BannerTone = .automatic,
     barWidth: Int = 12
   ) {
+    let title = String(title)
+    let summary = meterSummaryText(value: value, total: total)
     self.init(
       value: value,
       total: total,
       tone: tone,
       barWidth: barWidth,
-      label: { Text(String(title)) },
-      currentValueLabel: { Text(meterSummaryText(value: value, total: total)) }
+      accessibilitySummary: chartAccessibilityLabel(title: title, summary: summary),
+      label: { Text(title) },
+      currentValueLabel: { Text(summary) }
     )
   }
 }

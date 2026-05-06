@@ -200,6 +200,70 @@ struct AccessibilityNodeExtractionTests {
 
     #expect(node.cursorAnchor == CellPoint(x: 7, y: 3))
   }
+
+  @Test("Unlabeled visual content is skipped and reported as an accessibility warning")
+  func unlabeledVisualContentIsSkippedAndWarned() {
+    let imageID = testIdentity("Image")
+    let placed = placedNode(
+      identity: imageID,
+      semanticMetadata: .init(
+        accessibilityRole: .image,
+        accessibilityVisualContent: .init(kind: "Image")
+      )
+    )
+
+    let snapshot = SemanticExtractor().extract(from: placed)
+
+    #expect(snapshot.accessibilityNodes.isEmpty)
+    #expect(
+      snapshot.accessibilityWarnings == [
+        AccessibilityWarning(
+          identity: imageID,
+          kind: "Image",
+          message:
+            "Image omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true)."
+        )
+      ])
+  }
+
+  @Test("Labeled visual content emits an image node without a warning")
+  func labeledVisualContentEmitsImageNode() throws {
+    let canvasID = testIdentity("Canvas")
+    let placed = placedNode(
+      identity: canvasID,
+      semanticMetadata: .init(
+        accessibilityRole: .image,
+        accessibilityLabel: "CPU sparkline",
+        accessibilityVisualContent: .init(kind: "Canvas")
+      )
+    )
+
+    let snapshot = SemanticExtractor().extract(from: placed)
+    let node = try #require(snapshot.accessibilityNodes.first)
+
+    #expect(node.identity == canvasID)
+    #expect(node.role == .image)
+    #expect(node.label == "CPU sparkline")
+    #expect(snapshot.accessibilityWarnings.isEmpty)
+  }
+
+  @Test("Hidden visual content is skipped without warning")
+  func hiddenVisualContentIsSkippedWithoutWarning() {
+    let imageID = testIdentity("HiddenImage")
+    let placed = placedNode(
+      identity: imageID,
+      semanticMetadata: .init(
+        accessibilityRole: .image,
+        accessibilityHidden: true,
+        accessibilityVisualContent: .init(kind: "Image")
+      )
+    )
+
+    let snapshot = SemanticExtractor().extract(from: placed)
+
+    #expect(snapshot.accessibilityNodes.isEmpty)
+    #expect(snapshot.accessibilityWarnings.isEmpty)
+  }
 }
 
 private func placedNode(

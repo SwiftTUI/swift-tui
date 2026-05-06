@@ -90,23 +90,27 @@ Follow-up target behavior completed after this substrate plan:
   - `docs/plans/2026-05-05-004-accessibility-web-aria-plan.md`
 - SwiftUI host bridging landed in:
   - `docs/plans/2026-05-05-005-accessibility-swiftui-host-plan.md`
+- Public cursor-anchor authoring, imperative announcements, listening/lint
+  guardrails, and visual-only content policy landed as follow-up accessibility
+  tranches on 2026-05-06.
 
-Still follow-up work:
+Still follow-up work outside the already-scoped tranches:
 
-- Imperative announcement authoring.
-- Listening/lint coverage.
+- Reduce-motion animation semantics for transitions and animated content
+  changes.
+- Modal presentation focus trapping and focus restoration.
+- Documentation migration from proposal/current-state notes into durable
+  reference docs.
 
 ## Implementation Boundary
 
-This plan deliberately implemented the shared substrate only. It did not
-decide or implement:
+This plan deliberately implemented the shared substrate only. Later follow-up
+tranches resolved several policy questions that were originally deferred. The
+remaining intentionally deferred areas are:
 
-- whether cursor-as-focus is always on or accessible-mode only;
-- whether `--accessible` implies ASCII and reduce-motion;
 - exact reduce-motion animation suppression rules;
-- exact linear renderer format;
-- embedded web host ARIA timing;
-- visual-only content lint policy.
+- modal focus trapping and restoration;
+- documentation home after implementation.
 
 Those are listed in [Open Questions](#open-questions). Do not smuggle policy
 answers into this substrate patch.
@@ -441,20 +445,16 @@ Each follow-up plan must start by resolving the relevant open questions below.
 These questions are intentionally outside the unambiguous substrate plan. They
 must be resolved before implementing target-specific behavior.
 
-1. **Output precedence for env vars.** CLI flags currently resolve
-   `--accessible` before `--json`, but `RuntimeConfiguration.detect` lets
-   `SWIFTTUI_JSON=1` override `SWIFTTUI_ACCESSIBLE=1`. Pick one rule before
-   wiring either output mode to behavior.
+1. ~~**Output precedence for env vars.**~~ **Resolved.** ADR-0013 sets the
+   runtime precedence: JSON beats accessible output within the same precedence
+   layer.
 
-2. **Does accessible mode imply ASCII and reduce-motion?** Current code sets
-   only `output = .accessible`. Decide whether `--accessible` and
-   `SWIFTTUI_ACCESSIBLE=1` should also imply ASCII, reduced motion, no
-   progress, and linear layout, and decide whether explicit overrides can
-   opt back out.
+2. ~~**Does accessible mode imply ASCII and reduce-motion?**~~ **Resolved.**
+   ADR-0013 makes accessible mode imply ASCII, reduced motion, no progress, and
+   linear output unless a higher-precedence explicit override applies.
 
-3. **Cursor-as-focus gate.** Decide whether the terminal cursor should always
-   be parked at the focused anchor, only in accessible mode, or only when a
-   dedicated cursor policy is enabled.
+3. ~~**Cursor-as-focus gate.**~~ **Resolved.** Cursor-following is default-off
+   and enabled only by the explicit `cursorFollowsFocus` runtime policy.
 
 4. ~~**Public cursor-anchor modifier shape.**~~ **Resolved.**
    ADR-0012 locks the node field as absolute `CellPoint?`; the public
@@ -467,22 +467,22 @@ must be resolved before implementing target-specific behavior.
    would otherwise animate. The replacement cadence for progress updates must
    be explicit.
 
-6. **Linear renderer format.** Decide whether linear mode follows layout
-   reading order or source order, how it represents side-by-side layout, and
-   whether it is a renderer, a semantic snapshot serializer, or a separate
-   output mode.
+6. ~~**Linear renderer format.**~~ **Resolved.** ADR-0013 chose semantic
+   reading order and the runtime now emits `LinearAccessibilityRenderer`
+   output in accessible linear mode.
 
-7. **Live-region destination in normal TUI mode.** Decide whether live-region
-   announcements are dropped, appended to a status region, written to stderr,
-   or only enabled under accessible mode.
+7. ~~**Live-region destination in normal TUI mode.**~~ **Resolved for v1.**
+   CLI live-region and imperative announcements are emitted in accessible
+   linear output; normal raster TUI mode does not invent a side channel.
 
-8. **Embedded web host ARIA timing.** Decide whether `accessibilityTree` is
-   required for the first usable embedded host or lands immediately after the
-   basic browser renderer. The substrate plan only makes the data available.
+8. ~~**Embedded web host ARIA timing.**~~ **Resolved for the shipped web
+   surface.** ADR-0014 added the `web-surface` v2 `accessibilityTree`; the
+   WASI/web runtime mounts it as ARIA beside the raster canvas.
 
-9. **Visual-only content policy.** Decide how `Canvas`, images, braille art,
-   and `SwiftTUICharts` are exposed when they lack labels or textual
-   summaries: hidden, lint error, runtime warning, or fallback text.
+9. ~~**Visual-only content policy.**~~ **Resolved.** `Canvas`, `Image`, and
+   animated-image frames require an author label or explicit hiding.
+   Default `SwiftTUICharts` summaries are emitted as image labels; custom
+   unlabeled visual charts are skipped and warned in accessible output.
 
 10. **Documentation home after implementation.** Decide whether
     `ACCESSIBILITY.md` remains a proposal or whether shipped substrate details

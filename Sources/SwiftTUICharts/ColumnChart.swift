@@ -8,6 +8,7 @@ public struct ColumnChart<Label: View, Summary: View>: View, ResolvableView {
   public var columnWidth: Int
   private let label: Label
   private let summary: Summary
+  private let accessibilitySummary: String?
 
   public init(
     entries: [BarChartEntry],
@@ -16,11 +17,30 @@ public struct ColumnChart<Label: View, Summary: View>: View, ResolvableView {
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    self.init(
+      entries: entries,
+      chartHeight: chartHeight,
+      columnWidth: columnWidth,
+      accessibilitySummary: nil,
+      label: label,
+      summary: summary
+    )
+  }
+
+  private init(
+    entries: [BarChartEntry],
+    chartHeight: Int,
+    columnWidth: Int,
+    accessibilitySummary: String?,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder summary: () -> Summary
+  ) {
     self.entries = entries
     self.chartHeight = chartHeight
     self.columnWidth = columnWidth
     self.label = label()
     self.summary = summary()
+    self.accessibilitySummary = accessibilitySummary
   }
 
   package func resolveElements(
@@ -38,7 +58,13 @@ public struct ColumnChart<Label: View, Summary: View>: View, ResolvableView {
             chartHeight: chartHeight,
             columnWidth: columnWidth
           )
-        },
+        }
+        .semanticMetadata(
+          chartAccessibilityMetadata(
+            kind: "ColumnChart",
+            label: accessibilitySummary
+          )
+        ),
         in: context
       )
     ]
@@ -51,12 +77,14 @@ extension ColumnChart where Label == EmptyView, Summary == Text {
     chartHeight: Int = 4,
     columnWidth: Int = 2
   ) {
+    let summary = columnChartSummaryText(entries)
     self.init(
       entries: entries,
       chartHeight: chartHeight,
       columnWidth: columnWidth,
+      accessibilitySummary: summary,
       label: { EmptyView() },
-      summary: { Text(columnChartSummaryText(entries)) }
+      summary: { Text(summary) }
     )
   }
 }
@@ -68,12 +96,15 @@ extension ColumnChart where Label == Text, Summary == Text {
     chartHeight: Int = 4,
     columnWidth: Int = 2
   ) {
+    let title = String(title)
+    let summary = columnChartSummaryText(entries)
     self.init(
       entries: entries,
       chartHeight: chartHeight,
       columnWidth: columnWidth,
-      label: { Text(String(title)) },
-      summary: { Text(columnChartSummaryText(entries)) }
+      accessibilitySummary: chartAccessibilityLabel(title: title, summary: summary),
+      label: { Text(title) },
+      summary: { Text(summary) }
     )
   }
 }

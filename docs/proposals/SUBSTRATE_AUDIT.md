@@ -26,7 +26,10 @@ SwiftUI host bridging has landed through ADR-0015: hosted sessions carry
 semantic snapshots beside raster frames, and the native host mounts
 those records through a SwiftUI accessibility overlay. Listening/lint
 guardrails now exist for manual listening docs, raw glyphs, color-state
-styling, and visual-content call sites.
+styling, and visual-content call sites. Visual-only runtime policy now also
+exists: unlabeled `Canvas`, `Image`, animated-image frames, and custom chart
+surfaces are skipped from accessible output and reported as semantic warnings,
+while default chart summary initializers publish image labels.
 Text input caret anchoring has also landed through the text input V1 plan:
 `TextField`, `SecureField`, and `TextEditor` publish built-in caret anchors for
 cursor-following while keeping secure values redacted.
@@ -622,3 +625,7 @@ path for the substrate.
   runs `Scripts/check_accessibility_guardrails.sh`, which validates listening
   docs and reviewed source manifests for raw glyphs, color-state styling, and
   visual-content call sites.
+- 2026-05-06: Visual-only content policy landed. Semantic extraction skips and
+  warns for unlabeled visual content instead of guessing labels; `Canvas`,
+  `Image`, animated images, and common chart surfaces now participate in that
+  policy.

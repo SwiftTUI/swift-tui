@@ -8,6 +8,7 @@ public struct StackedBarChart<Label: View, Summary: View>: View, ResolvableView 
   public var barWidth: Int
   private let label: Label
   private let summary: Summary
+  private let accessibilitySummary: String?
 
   public init(
     entries: [BarChartEntry],
@@ -16,11 +17,30 @@ public struct StackedBarChart<Label: View, Summary: View>: View, ResolvableView 
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    self.init(
+      entries: entries,
+      total: total,
+      barWidth: barWidth,
+      accessibilitySummary: nil,
+      label: label,
+      summary: summary
+    )
+  }
+
+  private init(
+    entries: [BarChartEntry],
+    total: Double?,
+    barWidth: Int,
+    accessibilitySummary: String?,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder summary: () -> Summary
+  ) {
     self.entries = entries
     self.total = total
     self.barWidth = barWidth
     self.label = label()
     self.summary = summary()
+    self.accessibilitySummary = accessibilitySummary
   }
 
   package func resolveElements(
@@ -37,7 +57,13 @@ public struct StackedBarChart<Label: View, Summary: View>: View, ResolvableView 
             total: effectiveTotal,
             barWidth: barWidth
           )
-        },
+        }
+        .semanticMetadata(
+          chartAccessibilityMetadata(
+            kind: "StackedBarChart",
+            label: accessibilitySummary
+          )
+        ),
         in: context
       )
     ]
@@ -50,12 +76,14 @@ extension StackedBarChart where Label == EmptyView, Summary == Text {
     total: Double? = nil,
     barWidth: Int = 16
   ) {
+    let summary = stackedBarSummaryText(entries, total: total)
     self.init(
       entries: entries,
       total: total,
       barWidth: barWidth,
+      accessibilitySummary: summary,
       label: { EmptyView() },
-      summary: { Text(stackedBarSummaryText(entries, total: total)) }
+      summary: { Text(summary) }
     )
   }
 }
@@ -67,12 +95,15 @@ extension StackedBarChart where Label == Text, Summary == Text {
     total: Double? = nil,
     barWidth: Int = 16
   ) {
+    let title = String(title)
+    let summary = stackedBarSummaryText(entries, total: total)
     self.init(
       entries: entries,
       total: total,
       barWidth: barWidth,
-      label: { Text(String(title)) },
-      summary: { Text(stackedBarSummaryText(entries, total: total)) }
+      accessibilitySummary: chartAccessibilityLabel(title: title, summary: summary),
+      label: { Text(title) },
+      summary: { Text(summary) }
     )
   }
 }

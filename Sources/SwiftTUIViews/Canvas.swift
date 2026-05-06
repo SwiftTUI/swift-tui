@@ -49,6 +49,10 @@ public struct Canvas<Drawing: CanvasDrawing>: View, ResolvableView {
     [
       resolveLeafNode(
         kindName: "Canvas",
+        semanticMetadata: .init(
+          accessibilityRole: .image,
+          accessibilityVisualContent: .init(kind: "Canvas")
+        ),
         drawPayload: .canvas(CanvasPayload(drawing: drawing, grid: grid)),
         in: context
       )

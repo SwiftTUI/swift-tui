@@ -137,6 +137,7 @@ public struct SemanticExtractor: Sendable {
       from: placed,
       focusRegions: focusRegions
     )
+    let accessibilityWarnings = accessibilityWarnings(from: placed)
 
     return SemanticSnapshot(
       interactionRegions: interactionRegions,
@@ -144,7 +145,8 @@ public struct SemanticExtractor: Sendable {
       scrollRoutes: scrollRoutes,
       selectionRoutes: selectionRoutes,
       namedCoordinateSpaces: namedCoordinateSpaces,
-      accessibilityNodes: accessibilityNodes
+      accessibilityNodes: accessibilityNodes,
+      accessibilityWarnings: accessibilityWarnings
     )
   }
 }
@@ -427,7 +429,11 @@ extension SemanticExtractor {
     focusIdentities: Set<Identity>,
     textInputCursorAnchors: [Identity: CellPoint] = [:]
   ) -> Bool {
-    node.semanticMetadata.accessibilityRole != nil
+    if accessibilityVisualContentIsUnlabeled(node) {
+      return false
+    }
+
+    return node.semanticMetadata.accessibilityRole != nil
       || node.semanticMetadata.accessibilityLabel != nil
       || node.semanticMetadata.accessibilityHint != nil
       || node.semanticMetadata.accessibilityLiveRegion != nil
@@ -585,6 +591,63 @@ extension SemanticExtractor {
       x: bounds.origin.x + anchor.x,
       y: bounds.origin.y + anchor.y
     )
+  }
+
+  private func accessibilityWarnings(
+    from root: PlacedNode
+  ) -> [AccessibilityWarning] {
+    var warnings: [AccessibilityWarning] = []
+    var stack = [root]
+
+    while let node = stack.popLast() {
+      if node.isTransient || node.semanticMetadata.accessibilityHidden {
+        continue
+      }
+
+      if let visualContent = node.semanticMetadata.accessibilityVisualContent,
+        accessibilityVisualContentIsUnlabeled(node)
+      {
+        warnings.append(
+          AccessibilityWarning(
+            identity: node.identity,
+            kind: visualContent.kind,
+            message:
+              "\(visualContent.kind) omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true)."
+          )
+        )
+      }
+
+      for child in node.children.reversed() {
+        stack.append(child)
+      }
+    }
+
+    return warnings
+  }
+
+  private func accessibilityVisualContentIsUnlabeled(
+    _ node: PlacedNode
+  ) -> Bool {
+    guard node.semanticMetadata.accessibilityVisualContent != nil else {
+      return false
+    }
+    return !hasNonEmptyAccessibilityLabel(node.semanticMetadata.accessibilityLabel)
+  }
+
+  private func hasNonEmptyAccessibilityLabel(
+    _ label: String?
+  ) -> Bool {
+    guard let label else {
+      return false
+    }
+    return label.unicodeScalars.contains { scalar in
+      switch scalar.value {
+      case 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20:
+        false
+      default:
+        true
+      }
+    }
   }
 
   private func transformedExplicitInteractionRect(

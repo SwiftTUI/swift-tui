@@ -8,6 +8,7 @@ public struct ComparisonChart<Label: View, Summary: View>: View, ResolvableView 
   public var labelWidth: Int
   private let label: Label
   private let summary: Summary
+  private let accessibilitySummary: String?
 
   public init(
     entries: [ComparisonEntry],
@@ -16,11 +17,30 @@ public struct ComparisonChart<Label: View, Summary: View>: View, ResolvableView 
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    self.init(
+      entries: entries,
+      barWidth: barWidth,
+      labelWidth: labelWidth,
+      accessibilitySummary: nil,
+      label: label,
+      summary: summary
+    )
+  }
+
+  private init(
+    entries: [ComparisonEntry],
+    barWidth: Int,
+    labelWidth: Int,
+    accessibilitySummary: String?,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder summary: () -> Summary
+  ) {
     self.entries = entries
     self.barWidth = barWidth
     self.labelWidth = labelWidth
     self.label = label()
     self.summary = summary()
+    self.accessibilitySummary = accessibilitySummary
   }
 
   package func resolveElements(
@@ -40,7 +60,13 @@ public struct ComparisonChart<Label: View, Summary: View>: View, ResolvableView 
               labelWidth: labelWidth
             )
           }
-        },
+        }
+        .semanticMetadata(
+          chartAccessibilityMetadata(
+            kind: "ComparisonChart",
+            label: accessibilitySummary
+          )
+        ),
         in: context
       )
     ]
@@ -53,12 +79,14 @@ extension ComparisonChart where Label == EmptyView, Summary == Text {
     barWidth: Int = 12,
     labelWidth: Int = 8
   ) {
+    let summary = comparisonChartSummaryText(entries)
     self.init(
       entries: entries,
       barWidth: barWidth,
       labelWidth: labelWidth,
+      accessibilitySummary: summary,
       label: { EmptyView() },
-      summary: { Text(comparisonChartSummaryText(entries)) }
+      summary: { Text(summary) }
     )
   }
 }
@@ -70,12 +98,15 @@ extension ComparisonChart where Label == Text, Summary == Text {
     barWidth: Int = 12,
     labelWidth: Int = 8
   ) {
+    let title = String(title)
+    let summary = comparisonChartSummaryText(entries)
     self.init(
       entries: entries,
       barWidth: barWidth,
       labelWidth: labelWidth,
-      label: { Text(String(title)) },
-      summary: { Text(comparisonChartSummaryText(entries)) }
+      accessibilitySummary: chartAccessibilityLabel(title: title, summary: summary),
+      label: { Text(title) },
+      summary: { Text(summary) }
     )
   }
 }

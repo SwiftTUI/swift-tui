@@ -176,7 +176,10 @@ let package = Package(
     .testTarget(
       name: "SwiftTUITests",
       dependencies: swiftTUITestDependencies,
-      exclude: ["Fixtures"],
+      exclude: [
+        "Accessibility/README.md",
+        "Fixtures",
+      ],
       swiftSettings: swiftSettings()
     ),
     .testTarget(
