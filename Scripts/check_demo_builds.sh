@@ -20,6 +20,7 @@ input harnesses against the terminal examples:
   - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
+  - Platforms/WebHost
   - Platforms/SwiftUI
   - Examples/SwiftUIExample/SwiftUIExample.xcodeproj
   - Examples/WebExample (Bun build)
@@ -116,6 +117,7 @@ if [ "$skip_clean" -eq 0 ]; then
     "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
+    "Platforms/WebHost" \
     "Platforms/SwiftUI"; do
     run_step \
       "Clean $package_path" \
@@ -177,6 +179,11 @@ run_step \
   "Build Examples/WebExample/TerminalApp" \
   "$repo_root" \
   swift build --package-path Examples/WebExample/TerminalApp
+
+run_step \
+  "Build Platforms/WebHost" \
+  "$repo_root" \
+  swift build --package-path Platforms/WebHost
 
 run_step \
   "Build Platforms/SwiftUI" \
