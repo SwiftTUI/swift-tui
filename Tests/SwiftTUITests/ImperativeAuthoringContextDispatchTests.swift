@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -319,6 +319,26 @@ struct ImperativeAuthoringContextDispatchTests {
     try renderPending(secondary.runLoop)
 
     #expect(surfaceText(primary.host).contains("value:x"))
+    #expect(surfaceText(secondary.host).contains("value:-"))
+  }
+
+  @Test(
+    "text field paste handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func textFieldPasteHandlerTargetsDispatchingGraph() throws {
+    let sharedView = TextFieldScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedTextFieldPastePrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedTextFieldPasteSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+    _ = primary.runLoop.focusTracker.setFocus(to: testIdentity("ScopedTextField"))
+
+    primary.runLoop.handlePaste(PasteEvent(content: "pasted"))
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("value:pasted"))
     #expect(surfaceText(secondary.host).contains("value:-"))
   }
 

@@ -168,9 +168,8 @@ extension RunLoop {
 
   /// Routes a bracketed-paste burst either to a registered drop
   /// destination (when the payload parses into one or more
-  /// path-shaped tokens and some scope on the focus chain claims it)
-  /// or falls through to the character-key pipeline so text inputs
-  /// like `TextEditor`/`SecureField` keep receiving pasted text.
+  /// path-shaped tokens and some scope on the focus chain claims it),
+  /// a focused text-input paste handler, or the character-key pipeline.
   ///
   /// Leafmost-first bubbling is handled inside
   /// ``DropDestinationRegistry.dispatch(paths:along:)``; this method
@@ -185,6 +184,15 @@ extension RunLoop {
         along: currentFocusScopePath()
       )
       if consumed { return }
+    }
+    if let focusedIdentity = focusTracker.currentFocusIdentity,
+      localKeyHandlerRegistry.dispatchPaste(
+        identity: focusedIdentity,
+        content: pasteEvent.content
+      )
+    {
+      scheduler.requestInvalidation(of: [rootIdentity])
+      return
     }
     // Fall through: re-emit the paste content as a sequence of
     // character key events so text-input views (TextEditor,

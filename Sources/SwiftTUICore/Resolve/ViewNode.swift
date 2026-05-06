@@ -390,6 +390,16 @@ package final class ViewNode {
     )
   }
 
+  package func recordPasteHandlerRegistration(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.PasteHandler
+  ) {
+    registeredHandlers.recordPasteHandler(
+      identity: identity,
+      handler: handler
+    )
+  }
+
   package func recordTerminationHandlerRegistration(
     identity: Identity,
     handler: @escaping LocalTerminationRegistry.Handler

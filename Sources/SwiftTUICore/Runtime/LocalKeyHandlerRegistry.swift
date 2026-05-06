@@ -49,9 +49,11 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
 package final class LocalKeyHandlerRegistry: Equatable {
   package typealias Handler = @MainActor (KeyEvent) -> Bool
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
+  package typealias PasteHandler = @MainActor (String) -> Bool
 
   private var handlers: [Identity: Handler] = [:]
   private var keyPressHandlers: [Identity: [KeyPressHandler]] = [:]
+  private var pasteHandlers: [Identity: [PasteHandler]] = [:]
 
   package init() {}
 
@@ -83,6 +85,17 @@ package final class LocalKeyHandlerRegistry: Equatable {
     )
   }
 
+  package func register(
+    identity: Identity,
+    pasteHandler: @escaping PasteHandler
+  ) {
+    pasteHandlers[identity, default: []].append(pasteHandler)
+    ViewNodeContext.current?.recordPasteHandlerRegistration(
+      identity: identity,
+      handler: pasteHandler
+    )
+  }
+
   @discardableResult
   package func dispatch(
     identity: Identity,
@@ -106,15 +119,39 @@ package final class LocalKeyHandlerRegistry: Equatable {
     return handlers[identity]?(keyPress.key) ?? false
   }
 
+  @discardableResult
+  package func dispatchPaste(
+    identity: Identity,
+    content: String
+  ) -> Bool {
+    guard let handlers = pasteHandlers[identity] else {
+      return false
+    }
+
+    for handler in handlers.reversed() {
+      if handler(content) {
+        return true
+      }
+    }
+    return false
+  }
+
   package func hasHandler(
     identity: Identity
   ) -> Bool {
     handlers[identity] != nil || keyPressHandlers[identity]?.isEmpty == false
   }
 
+  package func hasPasteHandler(
+    identity: Identity
+  ) -> Bool {
+    pasteHandlers[identity]?.isEmpty == false
+  }
+
   package func reset() {
     handlers.removeAll(keepingCapacity: true)
     keyPressHandlers.removeAll(keepingCapacity: true)
+    pasteHandlers.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -134,6 +171,11 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }) {
       keyPressHandlers.removeValue(forKey: identity)
     }
+    for identity in pasteHandlers.keys.filter({
+      identityMatchesAnySubtreeRoot($0, roots: roots)
+    }) {
+      pasteHandlers.removeValue(forKey: identity)
+    }
   }
 
   package func snapshot() -> [Identity: Handler] {
@@ -142,6 +184,10 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
   package func snapshotKeyPressHandlers() -> [Identity: [KeyPressHandler]] {
     keyPressHandlers
+  }
+
+  package func snapshotPasteHandlers() -> [Identity: [PasteHandler]] {
+    pasteHandlers
   }
 
   package func restore(_ snapshot: [Identity: Handler]) {
@@ -161,6 +207,16 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
     for (identity, handlers) in snapshot {
       keyPressHandlers[identity] = handlers
+    }
+  }
+
+  package func restorePasteHandlers(_ snapshot: [Identity: [PasteHandler]]) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (identity, handlers) in snapshot {
+      pasteHandlers[identity] = handlers
     }
   }
 }
