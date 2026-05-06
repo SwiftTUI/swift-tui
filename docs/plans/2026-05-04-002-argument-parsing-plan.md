@@ -42,7 +42,7 @@ The proposal lists 15 open questions. The plan resolves them as follows; if any 
 Explicitly **not** delivered here. Each is a viable follow-up plan.
 
 - **Phase 6:** Migration of `--instances`, `--scenes`, `--attach`, `--pid`, `--instance` from `CLIMode.parse` into `myapp instances list` / `myapp scenes list` / `myapp attach <id>` subcommands. The hand-rolled state machine in `Platforms/CLI/Sources/SwiftTUICLI/CLIMode.swift` continues to consume those flags first; they don't reach the new parser.
-- **Phase 7:** Wiring `--web` to an actual embedded web host. The flag, env var (`SWIFTTUI_WEB`), and config field (`RuntimeConfiguration.web`) are defined and parsed; the runner just records the request. When `EMBEDDED_WEB_HOST.md` lands, a follow-up plan attaches behavior.
+- **Phase 7:** Wiring `--web` to an actual embedded web host. The flag, env var (`SWIFTTUI_WEB`), and config field (`RuntimeConfiguration.web`) are defined and parsed; the runner just records the request. The server/transport work is tracked in `docs/proposals/EMBEDDED_WEB_HOST.md`, with the browser-open policy mismatch called out as a prerequisite decision.
 - **Phase 8 (most):** Migrating every example to `SwiftTUIApp`. This plan migrates only `Examples/gallery` and `Examples/minimal` as proof-of-life. Other examples migrate when their owners touch them.
 - **Logging substrate.** This plan parses `--verbose` / `--quiet` / `--debug` and surfaces them on `RuntimeConfiguration.verbosity`. It does not introduce a logger.
 - **Config-file loading** (`--config`), **completions install paths** beyond default, **man-page generation**, **localization** of help text, **negotiated flag aliases**.
@@ -2147,9 +2147,13 @@ After this plan lands, the following work is tracked as separate plans:
    deprecated for one release.
 
 3. **Plan: Wire `--web` to the embedded web host** (Phase 7 of the
-   proposal, blocked on `EMBEDDED_WEB_HOST.md` finalizing). Add a
-   `myapp web` subcommand alongside the flag, and route to the embedded
-   HTTP server.
+   proposal, now tracked in `docs/proposals/EMBEDDED_WEB_HOST.md`). Before
+   routing to the embedded HTTP server, reconcile the browser-open policy:
+   this plan landed `--no-open` / `openBrowser: true`, while the
+   embedded-host proposal leans toward manual-open by default with an
+   explicit `--open`. Preserve the compile-time opt-in boundary:
+   terminal-only `SwiftTUICLI` must not depend on or weak-link the web-host
+   package; a combined web-capable runner product owns server behavior.
 
 4. **Plan: Crash guard reads `RuntimeConfiguration.debug`** (Q14 of the
    proposal). The crash guard introduced by ADR-0010 should write a

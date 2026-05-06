@@ -53,6 +53,9 @@ The repository [README.md](../README.md) is the public landing page.
 Active design proposals that are still shaping decisions:
 
 - [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — text input value, selection, reducer, layout-map, and caret-anchor foundation for `TextField`, `SecureField`, and `TextEditor`
+- [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — current accessibility substrate, target-consumption status, runtime policy, and remaining behavior questions
+- [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — proposed compile-time opt-in `Platforms/WebHost/` runner for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
+- [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the parsed-but-not-yet-consumed `--web` configuration surface
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy
 - [proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](proposals/CPU_LATENCY_EVALUATION_PIPELINE.md) — CPU-versus-latency measurement system for async rendering and future runtime optimizations
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
@@ -60,6 +63,7 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
+- [plans/2026-05-06-002-embedded-web-host-compile-time-plan.md](plans/2026-05-06-002-embedded-web-host-compile-time-plan.md) — design-approved staged implementation plan for the compile-time opt-in embedded WebHost runner, browser bundle, WebSocket transport, and package-boundary guardrails
 - [plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md) — staged implementation plan for same-binary CPU and input-latency evaluation tooling
 - [plans/2026-05-02-002-composed-presentation-primitives-plan.md](plans/2026-05-02-002-composed-presentation-primitives-plan.md) — planned migration from presentation-specific overlay hoisting to portal, overlay-stack, interaction-gate, and dismiss-stack primitives
 - [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md) — active notes and red/green regression guard for gallery one-shot animation transactions snapping after async Option 3
