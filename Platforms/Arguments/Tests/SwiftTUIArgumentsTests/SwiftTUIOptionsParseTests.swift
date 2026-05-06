@@ -20,7 +20,7 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.web == false)
     #expect(options.port == 0)
     #expect(options.bind == "127.0.0.1")
-    #expect(options.noOpen == false)
+    #expect(options.open == false)
     #expect(options.verbose == 0)
     #expect(options.quiet == false)
     #expect(options.debug == false)
@@ -47,15 +47,15 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.cursorFollowsFocus == true)
   }
 
-  @Test("Parses --web --port 9000 --bind 0.0.0.0 --no-open")
+  @Test("Parses --web --port 9000 --bind 0.0.0.0 --open")
   func parsesWebFlags() throws {
     let options = try SwiftTUIOptions.parse([
-      "--web", "--port", "9000", "--bind", "0.0.0.0", "--no-open",
+      "--web", "--port", "9000", "--bind", "0.0.0.0", "--open",
     ])
     #expect(options.web == true)
     #expect(options.port == 9000)
     #expect(options.bind == "0.0.0.0")
-    #expect(options.noOpen == true)
+    #expect(options.open == true)
   }
 
   @Test("Parses -v -v -v as verbose level 3")

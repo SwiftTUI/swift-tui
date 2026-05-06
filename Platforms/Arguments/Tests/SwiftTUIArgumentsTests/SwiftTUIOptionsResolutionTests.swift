@@ -149,10 +149,58 @@ struct SwiftTUIOptionsResolutionTests {
     options.web = true
     options.port = 9000
     options.bind = "0.0.0.0"
-    options.noOpen = true
     let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.web?.port == 9000)
     #expect(configuration.web?.bind == "0.0.0.0")
+    #expect(configuration.web?.openBrowser == false)
+  }
+
+  @Test("--web --open produces WebConfig with browser open enabled")
+  func cliWebOpenProducesWebConfigWithOpenEnabled() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.web = true
+    options.open = true
+    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    #expect(configuration.web?.openBrowser == true)
+  }
+
+  @Test("SWIFTTUI_WEB and SWIFTTUI_OPEN produce WebConfig with browser open enabled")
+  func envWebOpenProducesWebConfigWithOpenEnabled() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_OPEN": "1"],
+      isStdoutTTY: true
+    )
+    #expect(configuration.web?.openBrowser == true)
+  }
+
+  @Test("SWIFTTUI_WEB defaults browser open to false")
+  func envWebDefaultsBrowserOpenToFalse() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_WEB": "1"],
+      isStdoutTTY: true
+    )
+    #expect(configuration.web?.openBrowser == false)
+  }
+
+  @Test("SWIFTTUI_OPEN=0 keeps browser open disabled")
+  func envOpenZeroKeepsBrowserOpenDisabled() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_OPEN": "0"],
+      isStdoutTTY: true
+    )
+    #expect(configuration.web?.openBrowser == false)
+  }
+
+  @Test("SWIFTTUI_NO_OPEN explicitly disables browser open")
+  func envNoOpenOverridesOpen() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_OPEN": "1", "SWIFTTUI_NO_OPEN": "1"],
+      isStdoutTTY: true
+    )
     #expect(configuration.web?.openBrowser == false)
   }
 

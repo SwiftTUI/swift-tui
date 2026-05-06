@@ -1,5 +1,5 @@
-@_spi(Runners) import SwiftTUI
 import Foundation
+@_spi(Runners) import SwiftTUI
 
 #if canImport(Darwin)
   import Darwin
@@ -41,6 +41,10 @@ public enum TerminalRunner {
     _ app: A,
     configuration: RuntimeConfiguration
   ) async throws {
+    if configuration.web != nil {
+      throw TerminalRunnerError.webHostNotLinked
+    }
+
     let selections = collectWindowSceneSelections(from: app.body)
     guard !selections.isEmpty else {
       throw AppLaunchError.noScenes
@@ -70,7 +74,9 @@ public enum TerminalRunner {
 
   /// Runs a scene-based app type with explicit runtime configuration.
   @MainActor
-  public static func run<A: App>(_ appType: A.Type, configuration: RuntimeConfiguration) async throws {
+  public static func run<A: App>(_ appType: A.Type, configuration: RuntimeConfiguration)
+    async throws
+  {
     try await run(appType.init(), configuration: configuration)
   }
 
@@ -490,6 +496,18 @@ extension App {
       isStdoutTTY: isatty(STDOUT_FILENO) != 0
     )
     try! await TerminalRunner.run(Self.self, configuration: configuration)
+  }
+}
+
+public enum TerminalRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
+  case webHostNotLinked
+
+  public var description: String {
+    switch self {
+    case .webHostNotLinked:
+      return "--web was requested, but this binary was not compiled with SwiftTUI" + "WebHost. "
+        + "Add the SwiftTUI" + "WebHostCLI product or use a WebHost runner."
+    }
   }
 }
 
