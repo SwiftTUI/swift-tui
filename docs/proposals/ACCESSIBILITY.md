@@ -722,9 +722,11 @@ and thinner in one place**. Specifically:
   `accessibilityRole`, and `SemanticSnapshot.accessibilityNodes`. The
   terminal runtime now consumes those records for cursor-as-focus,
   accessible linear output, reduce-motion/no-progress behavior, and
-  accessible-mode live-region announcements. The embedded web host,
-  WASM web target, and SwiftUI host bridge do not yet consume the new
-  snapshot records.
+  accessible-mode live-region announcements. The Web/WASI surface now
+  consumes those records through the `web-surface` v2
+  `accessibilityTree` field and browser-side ARIA mounting. The SwiftUI
+  host bridge is the remaining first-class platform consumer that does
+  not yet expose the snapshot records to native accessibility APIs.
 
   **Runtime policy note (2026-05-05):**
   [`ADR-0013`](../decisions/0013-accessibility-runtime-policy.md)
@@ -766,10 +768,11 @@ The proposal split is sharper than the first draft implied:
   and accessible-mode live-region announcements.
 
 - **What remains:** add per-target render strategies that consume
-  the snapshot records outside the terminal runtime: embedded-host /
-  WASM ARIA and SwiftUI host bridging. The public cursor-anchor
-  modifier, imperative `AccessibilityAnnouncer.announce(_:)` API, and
-  listening/lint work also remain follow-ups.
+  the snapshot records outside the terminal runtime for the SwiftUI
+  host. Web/WASI ARIA mapping now has the shared wire/browser path.
+  The public cursor-anchor modifier, imperative
+  `AccessibilityAnnouncer.announce(_:)` API, and listening/lint work
+  also remain follow-ups.
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
@@ -1433,8 +1436,15 @@ consume, parameterized over the transport.
 
 ### SwiftUI host (`Platforms/SwiftUI/`)
 
-The SwiftUI host can bridge swift-tui's semantic record directly to
-SwiftUI's accessibility modifiers. Sketched (deferred):
+The SwiftUI host can bridge swift-tui's semantic record to native
+Apple accessibility by mounting a nonvisual SwiftUI overlay above the
+raster terminal surface. The policy is now recorded in
+[`ADR-0015`](../decisions/0015-accessibility-swiftui-host-policy.md):
+v1 uses semantic focus metadata rather than imperative VoiceOver focus
+movement, converts `CellRect` through the host's native cell metrics for
+accessibility frames, diffs live regions by identity before posting
+platform announcements, and never invents labels for visual-only
+content.
 
 | swift-tui | SwiftUI |
 |---|---|
@@ -1690,8 +1700,8 @@ WebSocket transport landed).)
    SwiftUI sides forward to their respective live-region machinery in
    later phases.
 
-7. **Phase 6 — Embedded-host ARIA mapping.** ‡ **(Bigger than first
-   drafted.)** Three sub-steps:
+7. **Phase 6 — Embedded-host / Web/WASI ARIA mapping.** ‡ **(Landed
+   for the shared WASI/web-surface path.)** Three sub-steps:
 
    1. **Wire-format extension.** Bump `WebSurfaceFrameEncoder`'s
       version field from `1` to `2`. Add an `accessibilityTree`
@@ -1715,19 +1725,24 @@ WebSocket transport landed).)
 
    **This is the strongest single accessibility ship the framework
    can make** because it gives every binary a first-class accessible
-   viewer in the browser. Depends on the embedded host runner.
+   viewer in the browser. The shared WASI/web-surface encoder and
+   browser bundle now implement the v2 tree and ARIA mounter; a
+   separate embedded host runner can reuse that path when it conforms
+   its transport.
 
-8. **Phase 7 — WASM web ARIA mapping.** Same code path as Phase 6,
-   different transport. Strictly less urgent for accessibility (the
-   embedded host already serves the blind-user story); valuable for
-   the deploy-as-website story.
+8. **Phase 7 — WASM web ARIA mapping.** **(Landed.)** Same code path
+   as Phase 6, different transport. The WASI package emits
+   `accessibilityTree` data and the browser runtime mounts it as
+   offscreen ARIA beside the painted canvas.
 
 9. **Phase 8 — SwiftUI host bridge.** **(Smaller than first
-   drafted.)** Map `AccessibilityNode` records (Phase 3b) to SwiftUI
-   accessibility modifiers in the SwiftUI host. Lights up
-   VoiceOver/AT on Apple platforms. The flat-list-with-parent-IDs
-   shape from Phase 3b is already what AppKit/UIKit accessibility
-   trees look like, so this is mostly a translation pass.
+   drafted; active next tranche.)** Map `AccessibilityNode` records
+   (Phase 3b) to a native SwiftUI accessibility overlay in the SwiftUI
+   host. Lights up VoiceOver/AT on Apple platforms. The
+   flat-list-with-parent-IDs shape from Phase 3b is already what
+   AppKit/UIKit accessibility trees look like, so this is mostly a
+   translation pass plus host-owned role, focus, hit-testing, and
+   announcement policy from ADR-0015.
 
 10. **Phase 9 — Tests + lint.** Snapshot tests for accessible-mode
     output; prek hooks for raw-glyph and color-only-state detection;
@@ -1926,3 +1941,10 @@ in this document. The primary sources, grouped by theme:
   consumption: cursor-as-focus, linear accessible output,
   live-region announcements, embedded-host / WASM ARIA, and SwiftUI
   host bridging.
+- 2026-05-06: Web/WASI accessibility consumption landed. The
+  `web-surface` encoder emits v2 frames with `accessibilityTree` data,
+  the browser runtime mounts ARIA beside the canvas, and the WebExample
+  browser smoke test now asserts the details scene exposes an accessible
+  button. SwiftUI host bridging is the active remaining platform-target
+  tranche, with native policy recorded in
+  [ADR-0015](../decisions/0015-accessibility-swiftui-host-policy.md).
