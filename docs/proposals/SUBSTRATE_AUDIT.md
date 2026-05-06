@@ -11,14 +11,17 @@ been updated with corrections that point back here.
 
 **Owner:** unassigned. Tracking branch: `accessibility-investigation`.
 
-**Implementation status (2026-05-05):** This remains a historical audit of
+**Implementation status (2026-05-06):** This remains a historical audit of
 the pre-substrate state. The unambiguous substrate work called out below has
 now landed: `PresentationRole` was renamed to `AccessibilityRole`,
 `SemanticMetadata` gained label/hint/hidden/live-region fields,
 `View` gained the matching authoring modifiers, and `SemanticExtractor`
-emits `SemanticSnapshot.accessibilityNodes`. Target behavior remains open:
-cursor-as-focus policy, linear accessible rendering, live announcements,
-embedded-host / WASM ARIA, and SwiftUI host bridging.
+emits `SemanticSnapshot.accessibilityNodes`. CLI target behavior has also
+landed through ADR-0013: cursor-as-focus, accessible linear rendering,
+motion/progress policy, and accessible-mode live-region announcements.
+The remaining target behavior is embedded-host / WASM ARIA and SwiftUI host
+bridging, plus the deferred public cursor-anchor modifier, imperative
+announcer API, and listening/lint work.
 
 ---
 
@@ -579,3 +582,9 @@ path for the substrate.
   output precedence, accessible-mode implications, cursor-as-focus gate,
   reduce-motion/no-progress semantics, linear renderer format, and CLI
   live-region destination.
+- 2026-05-06: CLI runtime accessibility consumption landed. ADR-0013 now has
+  source coverage for normalized accessible configuration, terminal
+  cursor-as-focus, accessible linear output, motion/progress policy, and
+  accessible-mode live-region announcements. The remaining target
+  consumption is Web/WASI ARIA and SwiftUI host bridging, with public
+  cursor-anchor, imperative announcer, and listening/lint work deferred.

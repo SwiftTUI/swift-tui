@@ -716,15 +716,15 @@ and thinner in one place**. Specifically:
 
 ### Missing or thin (worse than expected)
 
-- **Target-specific accessibility consumption is still unwired.** The
-  shared substrate now carries `accessibilityLabel`,
-  `accessibilityHint`, `accessibilityHidden`,
-  `accessibilityLiveRegion`, `accessibilityRole`, and
-  `SemanticSnapshot.accessibilityNodes`, but the terminal runtime does
-  not yet use those records for cursor-as-focus, linear accessible
-  rendering, reduce-motion behavior, or live-region announcements.
-  The embedded web host, WASM web target, and SwiftUI host bridge also
-  do not yet consume the new snapshot records.
+- **Target-specific accessibility consumption is now partly wired.** The
+  shared substrate carries `accessibilityLabel`, `accessibilityHint`,
+  `accessibilityHidden`, `accessibilityLiveRegion`,
+  `accessibilityRole`, and `SemanticSnapshot.accessibilityNodes`. The
+  terminal runtime now consumes those records for cursor-as-focus,
+  accessible linear output, reduce-motion/no-progress behavior, and
+  accessible-mode live-region announcements. The embedded web host,
+  WASM web target, and SwiftUI host bridge do not yet consume the new
+  snapshot records.
 
   **Runtime policy note (2026-05-05):**
   [`ADR-0013`](../decisions/0013-accessibility-runtime-policy.md)
@@ -760,11 +760,16 @@ The proposal split is sharper than the first draft implied:
   `AccessibilityRole` rename and expanded role set from ADR-0011,
   SwiftUI-shaped authoring modifiers for those fields, and
   `SemanticExtractor` emission of sparse `AccessibilityNode` records
-  on `SemanticSnapshot`.
+  on `SemanticSnapshot`. CLI target behavior from ADR-0013 has also
+  landed: normalized accessible runtime configuration, terminal
+  cursor-as-focus, accessible linear output, motion/progress policy,
+  and accessible-mode live-region announcements.
 
 - **What remains:** add per-target render strategies that consume
-  the snapshot records: CLI cursor-as-focus and linear output, live
-  announcements, embedded-host / WASM ARIA, and SwiftUI host bridging.
+  the snapshot records outside the terminal runtime: embedded-host /
+  WASM ARIA and SwiftUI host bridging. The public cursor-anchor
+  modifier, imperative `AccessibilityAnnouncer.announce(_:)` API, and
+  listening/lint work also remain follow-ups.
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
@@ -1666,20 +1671,24 @@ WebSocket transport landed).)
    `interactionRegions` / `focusRegions` shape); tree reconstruction
    happens at the consumer.
 
-5. **Phase 4 — Reduce-motion + accessible mode.** † Spinner rewrite,
-   accessible-mode linear render, append-only status,
-   `SWIFTTUI_ACCESSIBLE=1`. Cross-cuts with `ARGUMENT_PARSING.md` for
-   the `--accessible` / `--reduce-motion` flag surface. ADR-0013 pins
-   the output precedence, reduced-motion behavior, no-progress
-   behavior, and the accessible linear renderer format.
+5. **Phase 4 — Reduce-motion + accessible mode.** † **(CLI runtime
+   landed.)** Spinner/progress controls honor reduced-motion and
+   no-progress policy, `SWIFTTUI_ACCESSIBLE=1` and `--accessible`
+   imply ASCII/reduced-motion/no-progress/linear output, and the
+   accessible linear renderer consumes `SemanticSnapshot.accessibilityNodes`.
+   ADR-0013 pins the output precedence, reduced-motion behavior,
+   no-progress behavior, and the accessible linear renderer format.
 
-6. **Phase 5 — Live regions + announcer.** `accessibilityLiveRegion`
-   modifier (Phase 3a wires the field; Phase 5 wires the runtime).
-   `AccessibilityAnnouncer.announce(_:)` API. ADR-0013 scopes CLI v1
-   announcements to accessible linear output only; normal TUI mode
-   does not write live-region text to stderr or another side channel.
-   Web/SwiftUI sides forward to their respective live-region machinery
-   in later phases.
+6. **Phase 5 — Live regions + announcer.** **(CLI live-region behavior
+   landed; imperative announcer deferred.)** `accessibilityLiveRegion`
+   is wired into the semantic substrate and the terminal runtime
+   announces changed live-region labels in accessible linear output.
+   ADR-0013 scopes CLI v1 announcements to accessible linear output
+   only; normal TUI mode does not write live-region text to stderr or
+   another side channel. The public
+   `AccessibilityAnnouncer.announce(_:)` API remains deferred. Web and
+   SwiftUI sides forward to their respective live-region machinery in
+   later phases.
 
 7. **Phase 6 — Embedded-host ARIA mapping.** ‡ **(Bigger than first
    drafted.)** Three sub-steps:

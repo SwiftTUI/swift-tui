@@ -10,14 +10,15 @@ depends_on:
   - "../proposals/SUBSTRATE_AUDIT.md"
   - "../proposals/EMBEDDED_WEB_HOST.md"
   - "../decisions/0012-accessibility-node-shape.md"
+  - "../decisions/0014-accessibility-web-aria-wire-policy.md"
 ---
 
 # Accessibility Web ARIA Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to
 > implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
-> tracking. Do not implement stages after Stage 1 until the ARIA timing and
-> wire-format decisions are written down.
+> tracking. Stage 1 resolved the ARIA timing and wire-format decisions in
+> ADR-0014; later stages must match that policy.
 
 **Goal:** Carry `SemanticSnapshot.accessibilityNodes` through the shared
 `web-surface` protocol and mount a browser-side accessibility tree with ARIA
@@ -39,17 +40,21 @@ the same encoder and browser mounter.
 
 1. **ARIA timing:** decide whether `accessibilityTree` is required for the first
    usable embedded host or can land immediately after the basic browser
-   renderer.
+   renderer. Decision: required for the first usable accessibility web bridge.
 2. **Wire-format versioning:** decide whether adding `accessibilityTree`
    increments `web-surface` from version 1 to version 2 and how old clients
-   ignore the field.
+   ignore the field. Decision: semantic frames use `version: 2`;
+   raster-only frames remain accepted, and unknown fields are ignored.
 3. **Focus serialization:** decide whether Swift encodes `isFocused` directly
    or the browser computes it from a separate focused identity field.
+   Decision: Swift encodes per-node `isFocused`.
 4. **Live-region mounting:** decide whether live regions are represented as
    hidden sibling nodes, attributes on visible nodes, or a dedicated announcer
-   region.
+   region. Decision: a dedicated offscreen browser announcer owns
+   announcements; tree nodes still carry `liveRegion` for semantics.
 5. **Visual-only content policy:** decide the browser behavior for unlabeled
-   canvas, images, charts, and braille art.
+   canvas, images, charts, and braille art. Decision: do not guess labels in
+   v1; expose only semantic facts the snapshot carries.
 
 ## Files
 
@@ -73,13 +78,13 @@ the same encoder and browser mounter.
 
 ## Stage 1: Resolve ARIA And Wire Policy
 
-- [ ] Create an ADR under `docs/decisions/` that answers every question in
+- [x] Create an ADR under `docs/decisions/` that answers every question in
   [Open Questions To Resolve First](#open-questions-to-resolve-first).
-- [ ] Update `docs/proposals/EMBEDDED_WEB_HOST.md` so Phase 6 references the
+- [x] Update `docs/proposals/EMBEDDED_WEB_HOST.md` so Phase 6 references the
   accepted wire-format and ARIA strategy.
-- [ ] Update this plan's encoding and TypeScript test expectations to match the
+- [x] Update this plan's encoding and TypeScript test expectations to match the
   ADR.
-- [ ] Run `(cd Platforms/Web && bun run test)` and
+- [x] Run `(cd Platforms/Web && bun run test)` and
   `swiftly run swift test --package-path Platforms/WASI`.
 
 ## Stage 2: Encode Accessibility In `web-surface`
@@ -90,7 +95,9 @@ the same encoder and browser mounter.
   `SemanticSnapshot` and focused identity context.
 - [ ] Encode `AccessibilityNode` fields with stable JSON names:
   `id`, `parentId`, `rect`, `role`, `label`, `hint`, `liveRegion`,
-  `cursorAnchor`, and the ADR-approved focus field.
+  `cursorAnchor`, and `isFocused`.
+- [ ] Emit `version: 2` when `accessibilityTree` is present, while accepting
+  raster-only v1 frames.
 - [ ] Keep the existing raster-only `encode(_ surface:)` overload working for
   callers that do not have semantic data.
 
@@ -100,6 +107,8 @@ the same encoder and browser mounter.
   `accessibilityTree`.
 - [ ] Create `AccessibilityTree.ts` to map Swift role strings to ARIA roles and
   attributes.
+- [ ] Use one dedicated offscreen announcer for live-region announcements
+  rather than relying on visible raster cells.
 - [ ] Mount accessibility DOM nodes beside the rendered surface without changing
   raster cell layout.
 - [ ] Preserve parent-child order from the flat array and ignore missing parent
