@@ -56,8 +56,8 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
    `accessibilityTree` and announcement data as Web/WASI. Do not invent an
    alternate accessibility wire format.
 6. **Manual browser open by default.** Resolve the current parser mismatch by
-   making browser launch opt-in via `--open`; keep `--no-open` accepted as a
-   compatibility spelling that forces the safe value.
+   making browser launch opt-in via `--open`; Remove `--no-open`, as there are
+   no backwards compatibility concerns in this codebase.
 7. **Localhost and token by default.** The server binds to `127.0.0.1` and
    emits a per-launch token unless explicitly configured otherwise.
 
@@ -143,9 +143,9 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
 - `Sources/SwiftTUI/Configuration/EnvironmentResolver.swift`
   - Add `SWIFTTUI_OPEN=1`; keep `SWIFTTUI_NO_OPEN=1` as an explicit false.
 - `Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift`
-  - Add `--open`; keep `--no-open`.
+  - Add `--open`; Remove `--no-open`.
 - `Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions+Resolution.swift`
-  - Resolve `openBrowser` with `--no-open` winning over `--open`.
+  - Resolve `openBrowser` with `--open`.
 - `Platforms/Arguments/Tests/SwiftTUIArgumentsTests/`
   - Update parser/resolution tests for manual-open default.
 - `Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift`
@@ -250,30 +250,26 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
   }
   ```
 
-- [ ] Add `--open` to `SwiftTUIOptions` and keep `--no-open`.
+- [ ] Add `--open` to `SwiftTUIOptions` and remove `--no-open`.
 
   Resolution rule:
 
   ```swift
-  let openBrowser = open && !noOpen
+  let openBrowser = open
   ```
 
   Environment rule:
 
   ```swift
-  let envOpen = environment["SWIFTTUI_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
-  let envNoOpen = environment["SWIFTTUI_NO_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
-  let openBrowser = envOpen && !envNoOpen
+  let openBrowser = environment["SWIFTTUI_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
   ```
 
 - [ ] Add parser/resolution tests:
 
   - `--web` produces `openBrowser == false`.
   - `--web --open` produces `openBrowser == true`.
-  - `--web --open --no-open` produces `openBrowser == false`.
   - `SWIFTTUI_WEB=1 SWIFTTUI_OPEN=1` produces `openBrowser == true`.
-  - `SWIFTTUI_WEB=1 SWIFTTUI_OPEN=1 SWIFTTUI_NO_OPEN=1` produces
-    `openBrowser == false`.
+  - `SWIFTTUI_WEB=1`, and `SWIFTTUI_WEB=1 SWIFTTUI_OPEN=0` produce `openBrowser == false`.
 
 - [ ] Add a `TerminalRunner` error for web mode in terminal-only binaries.
 
