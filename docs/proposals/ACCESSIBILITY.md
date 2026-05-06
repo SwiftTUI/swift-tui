@@ -725,8 +725,8 @@ and thinner in one place**. Specifically:
   accessible-mode live-region announcements. The Web/WASI surface now
   consumes those records through the `web-surface` v2
   `accessibilityTree` field and browser-side ARIA mounting. The SwiftUI
-  host bridge is the remaining first-class platform consumer that does
-  not yet expose the snapshot records to native accessibility APIs.
+  host now consumes those records through a native accessibility overlay
+  and platform live-region announcements.
 
   **Runtime policy note (2026-05-05):**
   [`ADR-0013`](../decisions/0013-accessibility-runtime-policy.md)
@@ -767,10 +767,9 @@ The proposal split is sharper than the first draft implied:
   cursor-as-focus, accessible linear output, motion/progress policy,
   and accessible-mode live-region announcements.
 
-- **What remains:** add per-target render strategies that consume
-  the snapshot records outside the terminal runtime for the SwiftUI
-  host. Web/WASI ARIA mapping now has the shared wire/browser path.
-  The public cursor-anchor modifier, imperative
+- **What remains:** the first-class target consumers are now wired for
+  CLI, Web/WASI, and SwiftUI host paths. The public cursor-anchor
+  modifier, imperative
   `AccessibilityAnnouncer.announce(_:)` API, and listening/lint work
   also remain follow-ups.
 
@@ -1436,15 +1435,17 @@ consume, parameterized over the transport.
 
 ### SwiftUI host (`Platforms/SwiftUI/`)
 
-The SwiftUI host can bridge swift-tui's semantic record to native
-Apple accessibility by mounting a nonvisual SwiftUI overlay above the
-raster terminal surface. The policy is now recorded in
+The SwiftUI host bridges swift-tui's semantic record to native Apple
+accessibility by mounting a nonvisual SwiftUI overlay above the raster
+terminal surface. The policy is recorded in
 [`ADR-0015`](../decisions/0015-accessibility-swiftui-host-policy.md):
 v1 uses semantic focus metadata rather than imperative VoiceOver focus
 movement, converts `CellRect` through the host's native cell metrics for
 accessibility frames, diffs live regions by identity before posting
 platform announcements, and never invents labels for visual-only
-content.
+content. This implementation is tracked by
+[`2026-05-05-005-accessibility-swiftui-host-plan.md`](../plans/2026-05-05-005-accessibility-swiftui-host-plan.md),
+now marked completed.
 
 | swift-tui | SwiftUI |
 |---|---|
@@ -1735,14 +1736,12 @@ WebSocket transport landed).)
    `accessibilityTree` data and the browser runtime mounts it as
    offscreen ARIA beside the painted canvas.
 
-9. **Phase 8 — SwiftUI host bridge.** **(Smaller than first
-   drafted; active next tranche.)** Map `AccessibilityNode` records
-   (Phase 3b) to a native SwiftUI accessibility overlay in the SwiftUI
-   host. Lights up VoiceOver/AT on Apple platforms. The
-   flat-list-with-parent-IDs shape from Phase 3b is already what
-   AppKit/UIKit accessibility trees look like, so this is mostly a
-   translation pass plus host-owned role, focus, hit-testing, and
-   announcement policy from ADR-0015.
+9. **Phase 8 — SwiftUI host bridge.** **(Landed.)** Maps
+   `AccessibilityNode` records (Phase 3b) to a native SwiftUI
+   accessibility overlay in the SwiftUI host. Lights up VoiceOver/AT on
+   Apple platforms. The flat-list-with-parent-IDs shape from Phase 3b is
+   consumed through host-owned role, focus, hit-testing, and announcement
+   policy from ADR-0015.
 
 10. **Phase 9 — Tests + lint.** Snapshot tests for accessible-mode
     output; prek hooks for raw-glyph and color-only-state detection;
@@ -1945,6 +1944,14 @@ in this document. The primary sources, grouped by theme:
   `web-surface` encoder emits v2 frames with `accessibilityTree` data,
   the browser runtime mounts ARIA beside the canvas, and the WebExample
   browser smoke test now asserts the details scene exposes an accessible
-  button. SwiftUI host bridging is the active remaining platform-target
-  tranche, with native policy recorded in
-  [ADR-0015](../decisions/0015-accessibility-swiftui-host-policy.md).
+  button. SwiftUI host bridging was the next platform-target tranche,
+  with native policy recorded in
+  [ADR-0015](../decisions/0015-accessibility-swiftui-host-policy.md)
+  before implementation.
+- 2026-05-06: SwiftUI host accessibility consumption landed. Hosted
+  sessions can publish semantic snapshots beside raster frames,
+  `SwiftUIHostSceneHost` stores the latest snapshot and focused identity,
+  and the host mounts a native accessibility overlay with role mapping,
+  focus metadata, and live-region announcement handling. Remaining
+  accessibility follow-ups are public cursor-anchor authoring,
+  imperative announcements, and listening/lint work.

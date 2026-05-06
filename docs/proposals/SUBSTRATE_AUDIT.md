@@ -22,9 +22,11 @@ motion/progress policy, and accessible-mode live-region announcements.
 Web/WASI ARIA target behavior has also landed through ADR-0014: the
 shared `web-surface` v2 encoder carries `accessibilityTree` data and
 the browser runtime mounts that tree as ARIA beside the raster canvas.
-The remaining platform target behavior is SwiftUI host bridging, plus
-the deferred public cursor-anchor modifier, imperative announcer API,
-and listening/lint work.
+SwiftUI host bridging has landed through ADR-0015: hosted sessions carry
+semantic snapshots beside raster frames, and the native host mounts
+those records through a SwiftUI accessibility overlay. The remaining
+accessibility follow-ups are the public cursor-anchor modifier,
+imperative announcer API, and listening/lint work.
 
 ---
 
@@ -593,7 +595,14 @@ path for the substrate.
   cursor-anchor, imperative announcer, and listening/lint work deferred.
 - 2026-05-06: Web/WASI ARIA consumption landed. ADR-0014 is implemented
   by the shared `web-surface` v2 `accessibilityTree` encoder, browser
-  ARIA mounter, and WebExample smoke coverage. SwiftUI host bridging is
-  the remaining first-class platform target; its role/focus/hit-testing
-  and announcement policy is locked in
-  [ADR-0015](../decisions/0015-accessibility-swiftui-host-policy.md).
+  ARIA mounter, and WebExample smoke coverage. SwiftUI host bridging was
+  the next first-class platform target; its role/focus/hit-testing and
+  announcement policy was locked in
+  [ADR-0015](../decisions/0015-accessibility-swiftui-host-policy.md)
+  before implementation.
+- 2026-05-06: SwiftUI host accessibility consumption landed. ADR-0015 is
+  implemented by hosted-session semantic callbacks,
+  `SwiftUIHostSceneHost` semantic state, native role/frame mapping, the
+  accessibility overlay, and platform live-region announcement hooks.
+  The remaining accessibility follow-ups are public cursor-anchor
+  authoring, imperative announcements, and listening/lint work.
