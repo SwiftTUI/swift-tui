@@ -18,10 +18,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 48 | 515 |
-| `SwiftTUIViews` | 240 | 9101 |
+| `SwiftTUIViews` | 241 | 9103 |
 | `SwiftTUIAnimatedImage` | 5 | 151 |
 | `SwiftTUICharts` | 17 | 1431 |
-| `SwiftTUICore` | 258 | 2581 |
+| `SwiftTUICore` | 259 | 2587 |
 
 ## SwiftTUI
 
@@ -78,8 +78,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (240)
+### Canonical surface (241)
 
+- `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
 - `AnchorPreferenceTransformModifier` — struct — 2 members
 - `AnchorPreferenceWritingModifier` — struct — 2 members
@@ -359,8 +360,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (258)
+### Canonical surface (259)
 
+- `AccessibilityAnnouncement` — struct — 4 members
 - `AccessibilityNode` — struct — 11 members
 - `AccessibilityPoliteness` — enum — 5 members
 - `AccessibilityRole` — enum — 39 members
@@ -556,7 +558,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SemanticMetadata` — struct — 20 members
 - `SemanticRole` — enum — 9 members
 - `SemanticShapeStyle` — struct — 19 members
-- `SemanticSnapshot` — struct — 10 members
+- `SemanticSnapshot` — struct — 11 members
 - `SemanticStyleRole` — enum — 18 members
 - `ShapeFillMode` — enum — 3 members
 - `ShapeGeometry` — enum — 6 members

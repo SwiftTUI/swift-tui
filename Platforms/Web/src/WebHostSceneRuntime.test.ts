@@ -208,6 +208,9 @@ test("runtime mounts accessibility tree and announces live-region changes", asyn
           isFocused: false,
         },
       ],
+      accessibilityAnnouncements: [
+        { message: "Ready", politeness: "polite" },
+      ],
     })));
 
     const tree = childWithClass(runtime.terminalMount, "webhost-scene__accessibility-tree");
@@ -227,7 +230,7 @@ test("runtime mounts accessibility tree and announces live-region changes", asyn
     expect(status.getAttribute("aria-live")).toBe("polite");
     expect(status.style.left).toBe("0px");
     expect(status.style.top).toBe("27px");
-    expect(announcer.textContent).toBe("");
+    expect(announcer.textContent).toBe("Ready");
 
     bridge.stdout.write(encoder.encode(surfaceRecord({
       version: 2,
@@ -264,6 +267,21 @@ test("runtime mounts accessibility tree and announces live-region changes", asyn
       height: 2,
       styles: [null],
       rows: [[], []],
+      accessibilityAnnouncements: [
+        { message: "Published", politeness: "assertive" },
+        { message: "Queued", politeness: "polite" },
+      ],
+    })));
+
+    expect(announcer.getAttribute("aria-live")).toBe("assertive");
+    expect(announcer.textContent).toBe("Published\nQueued");
+
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 2,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
       accessibilityTree: [
         {
           id: "root/status",
@@ -276,7 +294,7 @@ test("runtime mounts accessibility tree and announces live-region changes", asyn
       ],
     })));
 
-    expect(announcer.textContent).toBe("Failed\nSaved");
+    expect(announcer.textContent).toBe("Published\nQueued");
   } finally {
     dom.restore();
   }

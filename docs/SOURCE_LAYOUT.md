@@ -73,6 +73,8 @@ Sources/SwiftTUI/
 ### Run loop and event dispatch
 
 - `Accessibility/AccessibilityRuntimePolicy.swift`: terminal-runtime policy helpers that consume `SemanticSnapshot.accessibilityNodes`
+- `Accessibility/AccessibilityAnnouncementRuntime.swift`: runtime sink for
+  author-triggered `AccessibilityAnnouncer` messages
 - `Accessibility/LinearAccessibilityRenderer.swift`: semantic linear renderer for accessible CLI output
 - `Accessibility/LiveRegionAnnouncer.swift`: accessible-mode live-region change tracker and announcement renderer
 - `RunLoop/RunLoop.swift`: runtime coordinator and shared runtime state
@@ -352,6 +354,8 @@ Sources/SwiftTUICore/
 
 ## `SwiftTUIViews`
 
+- `AccessibilityAnnouncer.swift`: public imperative accessibility
+  announcement API plus package-local sink storage used by runtimes
 - `Foundation/AnyView.swift`, `Foundation/ErasedViewTypeID.swift`,
   `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`,
   `Foundation/ViewCompositionHelpers.swift`, `Foundation/ViewFoundation.swift`,

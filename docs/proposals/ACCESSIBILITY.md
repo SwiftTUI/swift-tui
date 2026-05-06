@@ -775,9 +775,8 @@ The proposal split is sharper than the first draft implied:
   motion/progress policy, and accessible-mode live-region announcements.
 
 - **What remains:** the first-class target consumers are now wired for
-  CLI, Web/WASI, and SwiftUI host paths. Imperative
-  `AccessibilityAnnouncer.announce(_:)` API and listening/lint work remain
-  follow-ups.
+  CLI, Web/WASI, and SwiftUI host paths. Listening/lint work remains the
+  accessibility follow-up.
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
@@ -1225,9 +1224,8 @@ public enum AccessibilityAnnouncer {
 
 Per-target behavior:
 
-- **CLI:** appends a line to a dedicated status region (or stderr in
-  linear mode). No-op in non-accessible mode unless the app has opted
-  in.
+- **CLI:** appends sanitized lines to accessible linear output. Normal TUI
+  mode does not write an announcement side-channel.
 - **Web:** writes to a hidden `aria-live` element with matching
   politeness.
 - **SwiftUI:** posts `UIAccessibility.post(.announcement, …)` /
@@ -1712,16 +1710,18 @@ WebSocket transport landed).)
    ADR-0013 pins the output precedence, reduced-motion behavior,
    no-progress behavior, and the accessible linear renderer format.
 
-6. **Phase 5 — Live regions + announcer.** **(CLI live-region behavior
-   landed; imperative announcer deferred.)** `accessibilityLiveRegion`
+6. **Phase 5 — Live regions + announcer.** **(Landed.)**
+   `accessibilityLiveRegion`
    is wired into the semantic substrate and the terminal runtime
    announces changed live-region labels in accessible linear output.
    ADR-0013 scopes CLI v1 announcements to accessible linear output
    only; normal TUI mode does not write live-region text to stderr or
-   another side channel. The public
-   `AccessibilityAnnouncer.announce(_:)` API remains deferred. Web and
-   SwiftUI sides forward to their respective live-region machinery in
-   later phases.
+   another side channel. The public `AccessibilityAnnouncer.announce(_:)`
+   API queues app-triggered `SemanticSnapshot.accessibilityAnnouncements`
+   for the committed frame. CLI accessible output renders them as sanitized
+   announcement lines; Web/WASI frames encode them for the hidden ARIA live
+   region; SwiftUI host sessions post them through the platform announcement
+   API.
 
 7. **Phase 6 — Embedded-host / Web/WASI ARIA mapping.** ‡ **(Landed
    for the shared WASI/web-surface path.)** Three sub-steps:
@@ -1984,3 +1984,7 @@ in this document. The primary sources, grouped by theme:
 - 2026-05-06: Public cursor-anchor authoring landed.
   `accessibilityCursorAnchor(_:)` accepts a local `CellPoint` for custom focus
   targets and writes the shared `AccessibilityNode.cursorAnchor` metadata.
+- 2026-05-06: Imperative accessibility announcements landed.
+  `AccessibilityAnnouncer.announce(_:)` queues
+  `SemanticSnapshot.accessibilityAnnouncements` for CLI accessible output,
+  Web/WASI ARIA, and SwiftUI host announcements.

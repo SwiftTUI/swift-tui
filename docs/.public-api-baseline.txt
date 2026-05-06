@@ -2095,6 +2095,11 @@ SwiftTUICharts.TimelineEntry.detail
 SwiftTUICharts.TimelineEntry.init(_:detail:tone:)
 SwiftTUICharts.TimelineEntry.title
 SwiftTUICharts.TimelineEntry.tone
+SwiftTUICore.AccessibilityAnnouncement
+SwiftTUICore.AccessibilityAnnouncement.!=(_:_:)
+SwiftTUICore.AccessibilityAnnouncement.init(message:politeness:)
+SwiftTUICore.AccessibilityAnnouncement.message
+SwiftTUICore.AccessibilityAnnouncement.politeness
 SwiftTUICore.AccessibilityNode
 SwiftTUICore.AccessibilityNode.!=(_:_:)
 SwiftTUICore.AccessibilityNode.cursorAnchor
@@ -3988,10 +3993,11 @@ SwiftTUICore.SemanticShapeStyle.warning
 SwiftTUICore.SemanticShapeStyle.windowBackground
 SwiftTUICore.SemanticSnapshot
 SwiftTUICore.SemanticSnapshot.!=(_:_:)
+SwiftTUICore.SemanticSnapshot.accessibilityAnnouncements
 SwiftTUICore.SemanticSnapshot.accessibilityNodes
 SwiftTUICore.SemanticSnapshot.focusPresentation(for:)
 SwiftTUICore.SemanticSnapshot.focusRegions
-SwiftTUICore.SemanticSnapshot.init(interactionRegions:focusRegions:navigationRoutes:scrollRoutes:selectionRoutes:namedCoordinateSpaces:accessibilityNodes:)
+SwiftTUICore.SemanticSnapshot.init(interactionRegions:focusRegions:navigationRoutes:scrollRoutes:selectionRoutes:namedCoordinateSpaces:accessibilityNodes:accessibilityAnnouncements:)
 SwiftTUICore.SemanticSnapshot.interactionRegions
 SwiftTUICore.SemanticSnapshot.namedCoordinateSpaces
 SwiftTUICore.SemanticSnapshot.navigationRoutes
@@ -4682,6 +4688,8 @@ SwiftTUIViews.ASCIIOutlineStyle.debugDescription
 SwiftTUIViews.ASCIIOutlineStyle.description
 SwiftTUIViews.ASCIIOutlineStyle.init()
 SwiftTUIViews.ASCIIOutlineStyle.makeOutlineStylePresentation()
+SwiftTUIViews.AccessibilityAnnouncer
+SwiftTUIViews.AccessibilityAnnouncer.announce(_:politeness:)
 SwiftTUIViews.ActivePaletteCommand
 SwiftTUIViews.ActivePaletteCommand.action
 SwiftTUIViews.ActivePaletteCommand.description

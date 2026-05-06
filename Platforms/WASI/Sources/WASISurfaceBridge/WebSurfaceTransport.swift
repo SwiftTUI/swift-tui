@@ -760,7 +760,11 @@ package enum WebSurfaceFrameEncoder {
         focusedIdentity: focusedIdentity
       )
     }
-    let version = accessibilityTree?.isEmpty == false ? 2 : 1
+    let accessibilityAnnouncements = semanticSnapshot.map {
+      encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
+    }
+    let version =
+      accessibilityTree?.isEmpty == false || accessibilityAnnouncements?.isEmpty == false ? 2 : 1
 
     var json = "\u{001E}surface:{"
     json += "\"version\":\(version)"
@@ -781,6 +785,11 @@ package enum WebSurfaceFrameEncoder {
     if let accessibilityTree, !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
       json += accessibilityTree.joined(separator: ",")
+      json += "]"
+    }
+    if let accessibilityAnnouncements, !accessibilityAnnouncements.isEmpty {
+      json += ",\"accessibilityAnnouncements\":["
+      json += accessibilityAnnouncements.joined(separator: ",")
       json += "]"
     }
     json += "}\n"
@@ -835,6 +844,17 @@ package enum WebSurfaceFrameEncoder {
         fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
       }
       return "{" + fields.joined(separator: ",") + "}"
+    }
+  }
+
+  private static func encodeAccessibilityAnnouncements(
+    _ announcements: [AccessibilityAnnouncement]
+  ) -> [String] {
+    announcements.map { announcement in
+      "{"
+        + "\"message\":\(jsonString(announcement.message)),"
+        + "\"politeness\":\(jsonString(announcement.politeness.description))"
+        + "}"
     }
   }
 
