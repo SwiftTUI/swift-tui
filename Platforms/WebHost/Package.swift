@@ -38,6 +38,7 @@ let package = Package(
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "WASISurfaceBridge", package: "SwiftTUIWASI"),
         .product(name: "FlyingFox", package: "FlyingFox"),
+        .product(name: "FlyingSocks", package: "FlyingFox"),
       ],
       swiftSettings: swiftSettings()
     ),
