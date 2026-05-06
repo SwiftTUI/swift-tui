@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 48 | 515 |
-| `SwiftTUIViews` | 240 | 8917 |
+| `SwiftTUIViews` | 240 | 9038 |
 | `SwiftTUIAnimatedImage` | 5 | 150 |
 | `SwiftTUICharts` | 17 | 1420 |
 | `SwiftTUICore` | 258 | 2581 |
@@ -282,7 +282,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TextEditor` — struct — 121 members
 - `TextField` — struct — 123 members
 - `TextFieldStyle` — protocol — 4 members
-- `TextFieldStyleConfiguration` — struct — 128 members
+- `TextFieldStyleConfiguration` — struct — 249 members
 - `TextFigure` — struct — 127 members
 - `ToastModifier` — struct — 2 members
 - `ToastStyle` — protocol — 3 members

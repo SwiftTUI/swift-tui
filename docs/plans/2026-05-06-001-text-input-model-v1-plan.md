@@ -318,20 +318,20 @@ git commit -m "feat: map text input offsets to terminal cells"
 
 ## Stage 3: Field Content And Built-In Style Integration
 
-- [ ] Create `TextInputContent.swift`.
-- [ ] Add `TextFieldStyleConfiguration.FieldContent`.
-- [ ] Add `public var fieldContent: FieldContent` to
+- [x] Create `TextInputContent.swift`.
+- [x] Add `TextFieldStyleConfiguration.FieldContent`.
+- [x] Add `public var fieldContent: FieldContent` to
   `TextFieldStyleConfiguration`.
-- [ ] Keep `public var displayText: String` unchanged for source
+- [x] Keep `public var displayText: String` unchanged for source
   compatibility.
-- [ ] Update `PlainTextFieldStyleBody` and `RoundedBorderTextFieldStyleBody`
+- [x] Update `PlainTextFieldStyleBody` and `RoundedBorderTextFieldStyleBody`
   to render `configuration.fieldContent` instead of
   `Text(configuration.displayText)`.
-- [ ] Ensure `fieldContent` accepts foreground style, opacity metadata, and
+- [x] Ensure `fieldContent` accepts foreground style, opacity metadata, and
   layout constraints from the surrounding style exactly as `Text(...)` did.
-- [ ] Add style-surface tests proving built-in styles render the same visible
+- [x] Add style-surface tests proving built-in styles render the same visible
   chrome and that a custom style using `displayText` still compiles.
-- [ ] Run focused text field style tests.
+- [x] Run focused text field style tests.
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/plainTextFieldStyleRemovesChrome

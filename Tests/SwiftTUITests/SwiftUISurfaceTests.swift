@@ -2163,6 +2163,26 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.lines == ["Ada_"])
   }
 
+  @Test("custom TextFieldStyle can render field content")
+  func customTextFieldStyleCanRenderFieldContent() {
+    let identity = testIdentity("CustomFieldContent")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    let artifacts = DefaultRenderer().render(
+      TextField("Name", text: .constant("Ada"))
+        .id(identity)
+        .textFieldStyle(FieldContentProbeStyle()),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(artifacts.rasterSurface.lines == ["Ada_"])
+  }
+
   @Test("roundedBorder TextField expands to fill an explicit frame width")
   func roundedBorderTextFieldFillsFrameWidth() {
     let artifacts = DefaultRenderer().render(
@@ -6132,6 +6152,20 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(recorder.placedValues == [1, 4])
+  }
+}
+
+private struct FieldContentProbeStyle: TextFieldStyle {
+  @MainActor
+  func makeBody(
+    configuration: TextFieldStyleConfiguration
+  ) -> some View {
+    if configuration.displayText.isEmpty {
+      Text("")
+    } else {
+      configuration.fieldContent
+        .fixedSize(horizontal: true, vertical: false)
+    }
   }
 }
 
