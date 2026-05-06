@@ -781,6 +781,10 @@ private struct GallerySelectionRuntimeBridge: View {
         TodoTab()
       }
 
+      Tab("Text Input", value: GalleryView.GalleryTab.textInput) {
+        TextInputTab()
+      }
+
       Tab("Calculator", value: GalleryView.GalleryTab.calculator) {
         CalculatorTab()
       }
@@ -826,6 +830,10 @@ private struct GallerySelectionRuntimeBridge: View {
     .paletteCommand(
       name: "Switch to Todo",
       action: { selection = .todo }
+    )
+    .paletteCommand(
+      name: "Switch to Text Input",
+      action: { selection = .textInput }
     )
     .paletteCommand(
       name: "Switch to Calculator",

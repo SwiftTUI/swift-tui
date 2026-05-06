@@ -1,7 +1,6 @@
 import Foundation
 import SwiftTUI
 
-
 public struct GalleryView: View {
   public init() {}
 
@@ -23,6 +22,10 @@ public struct GalleryView: View {
 
       Tab("Todo", value: GalleryView.GalleryTab.todo) {
         TodoTab()
+      }
+
+      Tab("Text Input", value: GalleryView.GalleryTab.textInput) {
+        TextInputTab()
       }
 
       Tab("Calculator", value: GalleryView.GalleryTab.calculator) {
@@ -76,6 +79,10 @@ public struct GalleryView: View {
       action: { selection = .todo }
     )
     .paletteCommand(
+      name: "Text Input",
+      action: { selection = .textInput }
+    )
+    .paletteCommand(
       name: "Calculator",
       action: { selection = .calculator }
     )
@@ -100,16 +107,16 @@ public struct GalleryView: View {
       action: { selection = .physics }
     )
     .toolbar(style: .defaultBottom)
-    .paletteSheet("Open...", isPresented: $showPalette, content: {Text("...")})
+    .paletteSheet("Open...", isPresented: $showPalette, content: { Text("...") })
   }
 }
-
 
 extension GalleryView {
   enum GalleryTab: Hashable {
     case life
     case counter
     case todo
+    case textInput
     case calculator
     case bordersAndShapes
     case images
@@ -122,6 +129,8 @@ extension GalleryView {
       case "life", "conway": self = .life
       case "counter": self = .counter
       case "todo": self = .todo
+      case "text", "input", "inputs", "textinput", "text-input", "text-inputs":
+        self = .textInput
       case "calculator", "calc": self = .calculator
       case "borders", "bordersandshapes", "borders-and-shapes", "shapes":
         self = .bordersAndShapes
