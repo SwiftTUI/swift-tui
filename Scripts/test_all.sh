@@ -518,6 +518,12 @@ run_step \
   ./Scripts/check_accessibility_guardrails.sh
 
 run_step \
+  "Check WebHost package boundary" \
+  "$repo_root" \
+  "./Scripts/check_webhost_package_boundary.sh" \
+  ./Scripts/check_webhost_package_boundary.sh
+
+run_step \
   "Check public-API baseline" \
   "$repo_root" \
   "./Scripts/generate_public_api_inventory.sh --check" \

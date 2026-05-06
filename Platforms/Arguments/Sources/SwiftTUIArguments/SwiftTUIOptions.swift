@@ -102,10 +102,10 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   public var bind: String = "127.0.0.1"
 
   @Flag(
-    name: .customLong("no-open"),
-    help: "Don't auto-open the browser when serving with --web. [env: SWIFTTUI_NO_OPEN]"
+    name: .customLong("open"),
+    help: "Open the browser when serving with --web. [env: SWIFTTUI_OPEN]"
   )
-  public var noOpen: Bool = false
+  public var open: Bool = false
 
   // ─── Logging / diagnostics ─────────────────────────────────────
 

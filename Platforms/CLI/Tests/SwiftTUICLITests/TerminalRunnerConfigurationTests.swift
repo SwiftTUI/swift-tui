@@ -1,5 +1,6 @@
-import Testing
 import SwiftTUI
+import Testing
+
 @testable import SwiftTUICLI
 
 struct TerminalRunnerConfigurationTests {
@@ -13,6 +14,22 @@ struct TerminalRunnerConfigurationTests {
       try? await TerminalRunner.run(NeverApp.self, configuration: .default)
     }
     _ = RuntimeConfiguration.default
+  }
+
+  @Test("TerminalRunner rejects web mode when WebHost is not linked")
+  func rejectsWebModeWhenWebHostNotLinked() async {
+    do {
+      try await TerminalRunner.run(NeverApp(), configuration: .init(web: .init()))
+      Issue.record("Expected TerminalRunner to reject web mode.")
+    } catch let error as TerminalRunnerError {
+      let expected =
+        "--web was requested, but this binary was not compiled with SwiftTUI"
+        + "WebHost. Add the SwiftTUI" + "WebHostCLI product or use a WebHost runner."
+      #expect(error == .webHostNotLinked)
+      #expect(error.description == expected)
+    } catch {
+      Issue.record("Expected TerminalRunnerError.webHostNotLinked, got \(error).")
+    }
   }
 }
 

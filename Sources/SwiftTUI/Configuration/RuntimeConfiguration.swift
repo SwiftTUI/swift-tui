@@ -60,7 +60,7 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     /// Whether the runner should auto-open the user's browser when serving.
     public let openBrowser: Bool
 
-    public init(port: Int = 0, bind: String = "127.0.0.1", openBrowser: Bool = true) {
+    public init(port: Int = 0, bind: String = "127.0.0.1", openBrowser: Bool = false) {
       self.port = port
       self.bind = bind
       self.openBrowser = openBrowser

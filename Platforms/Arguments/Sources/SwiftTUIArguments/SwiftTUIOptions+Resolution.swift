@@ -93,7 +93,7 @@ extension SwiftTUIOptions {
         return RuntimeConfiguration.WebConfig(
           port: port,
           bind: bind,
-          openBrowser: !noOpen
+          openBrowser: open
         )
       }
       return baseline.web
