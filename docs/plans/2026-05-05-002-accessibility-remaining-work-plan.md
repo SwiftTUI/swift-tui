@@ -93,7 +93,8 @@ Follow-up target behavior completed after this substrate plan:
 
 Still follow-up work:
 
-- Public cursor-anchor authoring.
+- Public cursor-anchor authoring for custom anchors outside the built-in text
+  input controls.
 - Imperative announcement authoring.
 - Listening/lint coverage.
 
@@ -460,7 +461,9 @@ must be resolved before implementing target-specific behavior.
    absolute `CellPoint?`, but the public modifier argument is not fully
    specified. Decide between `CellPoint`, an enum such as
    `AccessibilityCursorAnchor`, or role-specific built-in anchors plus no
-   public modifier in v1.
+   public modifier in v1. Current status: built-in text input caret anchors
+   for `TextField`, `SecureField`, and `TextEditor` landed in the text input
+   V1 plan; only the public custom-anchor authoring shape remains unresolved.
 
 5. **Reduce-motion semantics.** Decide what "reduced" means for
    `Animation`, spinners, progress bars, transitions, and content changes that

@@ -118,59 +118,6 @@ extension Toggle {
   }
 }
 
-/// Edits a string binding using keyboard input.
-@MainActor
-package func registerTextEntryBinding(
-  _ binding: Binding<String>,
-  authoringContext: ImperativeAuthoringContextSnapshot?,
-  in context: ResolveContext
-) {
-  guard context.environmentValues.isEnabled else {
-    return
-  }
-
-  guard let keyHandlerRegistry = context.localKeyHandlerRegistry else {
-    return
-  }
-
-  keyHandlerRegistry.register(identity: context.identity) { event in
-    withImperativeAuthoringContext(authoringContext) {
-      mutateTextEntryBinding(
-        binding,
-        event: event,
-        allowsNewlines: false,
-        scrollPosition: nil
-      )
-    }
-  }
-}
-
-package func textEntryDisplayText(
-  text: String,
-  promptText: String?,
-  isActiveNavigation: Bool,
-  masked: Bool = false
-) -> (displayText: String, isShowingPrompt: Bool) {
-  let visibleText =
-    masked
-    ? String(repeating: "•", count: text.count)
-    : text
-
-  let displayText =
-    if text.isEmpty {
-      isActiveNavigation ? "_" : (promptText ?? "")
-    } else if isActiveNavigation {
-      "\(visibleText)_"
-    } else {
-      visibleText
-    }
-
-  return (
-    displayText: displayText,
-    isShowingPrompt: text.isEmpty && !isActiveNavigation && promptText != nil
-  )
-}
-
 public struct TextField<Label: View>: View, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?

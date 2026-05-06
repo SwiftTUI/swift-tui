@@ -58,8 +58,9 @@ the terminal cursor is shown and moved to `cursorAnchor ?? rect.origin`.
 If no focused accessibility node exists, the visual TUI may keep the
 cursor hidden. JSON, web output, and accessible linear output do not use
 terminal cursor policy. The public cursor-anchor modifier remains
-deferred; v1 uses built-in package-only anchors and the node-origin
-fallback.
+deferred; v1 uses built-in package-only anchors, including text-input caret
+anchors for `TextField`, `SecureField`, and `TextEditor`, plus the node-origin
+fallback for nodes without an anchor.
 
 Reduced motion suppresses non-essential frame churn. Repeating
 animations, spinners, blink, and transition intermediates do not tick
@@ -87,7 +88,9 @@ by identity. `.assertive` announcements are ordered before `.polite`;
 
 Accepted on 2026-05-05. Amended on 2026-05-05 to make cursor-as-focus
 default-off after visual TUI testing showed always-on cursor movement was
-too distracting for ordinary keyboard navigation. Stage 1 of
+too distracting for ordinary keyboard navigation. Updated on 2026-05-06 after
+text input V1 added built-in caret anchors for `TextField`, `SecureField`, and
+`TextEditor`. Stage 1 of
 `2026-05-05-003-accessibility-cli-runtime-plan.md` depends on this ADR.
 
 ## Consequences

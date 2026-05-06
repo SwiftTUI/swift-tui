@@ -1,7 +1,7 @@
 ---
 title: "feat: accessibility web and WASM ARIA bridge"
 type: feat
-status: proposed
+status: completed
 date: 2026-05-05
 depends_on:
   - "2026-05-05-002-accessibility-remaining-work-plan.md"

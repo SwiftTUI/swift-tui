@@ -1,18 +1,16 @@
 # Text Input Model
 
-**Status:** Active implementation. Stages 0-7 of the linked V1 plan have
-landed: the package-private value model, reducer, layout map, presentation
-projection, field-content view, reducer-backed `TextField` / `SecureField`,
-focused paste dispatch, reducer-backed `TextEditor`, caret-visible runtime
-scrolling, and text-input caret anchors in accessibility semantics are in
-place. Cleanup, source-layout/docs finalization, and the final repo-wide gate
-remain open.
+**Status:** V1 shipped. The linked V1 plan landed the package-private value
+model, reducer, layout map, presentation projection, field-content view,
+reducer-backed `TextField` / `SecureField`, focused paste dispatch,
+reducer-backed `TextEditor`, caret-visible runtime scrolling, and text-input
+caret anchors in accessibility semantics.
 
 **Owner:** unassigned.
 
 **Related docs:**
 
-- [ACCESSIBILITY.md](./ACCESSIBILITY.md) - cursor-following and deferred caret tracking
+- [ACCESSIBILITY.md](./ACCESSIBILITY.md) - cursor-following and text-input caret anchors
 - [2026-05-06-001-text-input-model-v1-plan.md](../plans/2026-05-06-001-text-input-model-v1-plan.md)
   - staged V1 implementation plan
 - [0013-accessibility-runtime-policy.md](../decisions/0013-accessibility-runtime-policy.md)
