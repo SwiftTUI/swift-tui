@@ -7,6 +7,7 @@ public struct HeatStrip<Label: View, Summary: View>: View, ResolvableView {
   public var cellWidth: Int
   private let label: Label
   private let summary: Summary
+  private let accessibilitySummary: String?
 
   public init(
     entries: [BarChartEntry],
@@ -14,10 +15,27 @@ public struct HeatStrip<Label: View, Summary: View>: View, ResolvableView {
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    self.init(
+      entries: entries,
+      cellWidth: cellWidth,
+      accessibilitySummary: nil,
+      label: label,
+      summary: summary
+    )
+  }
+
+  private init(
+    entries: [BarChartEntry],
+    cellWidth: Int,
+    accessibilitySummary: String?,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder summary: () -> Summary
+  ) {
     self.entries = entries
     self.cellWidth = cellWidth
     self.label = label()
     self.summary = summary()
+    self.accessibilitySummary = accessibilitySummary
   }
 
   package func resolveElements(
@@ -34,7 +52,13 @@ public struct HeatStrip<Label: View, Summary: View>: View, ResolvableView {
             maximumValue: maximumValue,
             cellWidth: cellWidth
           )
-        },
+        }
+        .semanticMetadata(
+          chartAccessibilityMetadata(
+            kind: "HeatStrip",
+            label: accessibilitySummary
+          )
+        ),
         in: context
       )
     ]
@@ -46,11 +70,13 @@ extension HeatStrip where Label == EmptyView, Summary == Text {
     entries: [BarChartEntry],
     cellWidth: Int = 2
   ) {
+    let summary = heatStripSummaryText(entries)
     self.init(
       entries: entries,
       cellWidth: cellWidth,
+      accessibilitySummary: summary,
       label: { EmptyView() },
-      summary: { Text(heatStripSummaryText(entries)) }
+      summary: { Text(summary) }
     )
   }
 }
@@ -61,11 +87,14 @@ extension HeatStrip where Label == Text, Summary == Text {
     entries: [BarChartEntry],
     cellWidth: Int = 2
   ) {
+    let title = String(title)
+    let summary = heatStripSummaryText(entries)
     self.init(
       entries: entries,
       cellWidth: cellWidth,
-      label: { Text(String(title)) },
-      summary: { Text(heatStripSummaryText(entries)) }
+      accessibilitySummary: chartAccessibilityLabel(title: title, summary: summary),
+      label: { Text(title) },
+      summary: { Text(summary) }
     )
   }
 }

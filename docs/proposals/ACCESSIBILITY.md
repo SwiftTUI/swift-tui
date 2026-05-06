@@ -775,8 +775,11 @@ The proposal split is sharper than the first draft implied:
   motion/progress policy, and accessible-mode live-region announcements.
 
 - **What remains:** the first-class target consumers are now wired for
-  CLI, Web/WASI, and SwiftUI host paths. Listening/lint work remains the
-  accessibility follow-up.
+  CLI, Web/WASI, and SwiftUI host paths. Public cursor anchors,
+  imperative announcements, listening/lint guardrails, and visual-only
+  content policy are also wired. Remaining proposal-level follow-up is now
+  limited to broader behavior policy such as reduce-motion animation semantics
+  and modal focus handling.
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
@@ -1584,9 +1587,15 @@ to be argued with, not accepted.)
    semantic-record-to-DOM translation.
 
 9. **How do we handle `Canvas` / `BrailleCanvas` / image rendering?**
-   These are visual-only by nature. Lean: require an
-   `accessibilityLabel` and treat as `accessibilityHidden` if absent in
-   accessible mode (skip-and-warn at lint time).
+   **Resolved in source (2026-05-06).** Visual-only view surfaces require an
+   accessibility label or an explicit `accessibilityHidden(true)` choice.
+   `Canvas` and `Image` mark themselves as image-like visual content.
+   `AnimatedImage` inherits the `Image(data:)` policy. Common
+   `SwiftTUICharts` views publish built-in textual summaries as image labels
+   when using their default summary initializers; custom builder-based charts
+   warn unless authors add `accessibilityLabel(...)` or hide the chart.
+   Unlabeled visual content is omitted from accessible linear output and emits
+   a semantic warning in accessible output instead of guessing a label.
 
 10. **Modal presentations** (`.sheet`, `.alert`, `.confirmationDialog`).
     They need focus trapping and `Esc` to dismiss; what happens to
@@ -1765,12 +1774,14 @@ WebSocket transport landed).)
    consumed through host-owned role, focus, hit-testing, and announcement
    policy from ADR-0015.
 
-10. **Phase 9 — Tests + lint.** **(Landed for guardrails and listening
-    docs.)** Snapshot tests cover accessible-mode output, Web/WASI ARIA
-    transport, and SwiftUI host mapping. `Scripts/check_accessibility_guardrails.sh`
-    now pins reviewed raw-glyph, color-state, and visual-content source
-    manifests so new risk surfaces require explicit review. Listening tests
-    under VoiceOver/NVDA/Orca are documented in
+10. **Phase 9 — Tests + lint.** **(Landed for guardrails, listening docs,
+    and visual-only policy.)** Snapshot tests cover accessible-mode output,
+    Web/WASI ARIA transport, SwiftUI host mapping, imperative announcements,
+    cursor anchors, and visual-only warning behavior.
+    `Scripts/check_accessibility_guardrails.sh` now pins reviewed raw-glyph,
+    color-state, and visual-content source manifests so new risk surfaces
+    require explicit review. Listening tests under VoiceOver/NVDA/Orca are
+    documented in
     `Tests/SwiftTUITests/Accessibility/README.md`. The browser-target
     listening tests are the easiest wins because the browser AT story is
     mature.
@@ -1995,3 +2006,8 @@ in this document. The primary sources, grouped by theme:
   `Scripts/check_accessibility_guardrails.sh` validates listening-test docs and
   source manifests for raw glyphs, color-state styling, and visual-only content
   call sites.
+- 2026-05-06: Visual-only content policy landed. `Canvas`, `Image`, and
+  image-backed animated content require author labels or explicit hiding;
+  default `SwiftTUICharts` summaries become image labels, while custom
+  unlabeled visual charts are skipped in accessible output and reported as
+  semantic warnings.

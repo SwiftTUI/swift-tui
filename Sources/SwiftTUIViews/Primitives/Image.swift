@@ -68,6 +68,10 @@ public struct Image: View, ResolvableView {
       resolveLeafNode(
         kindName: "Image",
         intrinsicSize: resolvedAsset?.intrinsicCellSize ?? .zero,
+        semanticMetadata: .init(
+          accessibilityRole: .image,
+          accessibilityVisualContent: .init(kind: "Image")
+        ),
         drawPayload: .image(
           .init(
             source: source,

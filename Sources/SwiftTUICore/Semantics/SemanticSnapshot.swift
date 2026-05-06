@@ -141,6 +141,23 @@ public struct AccessibilityAnnouncement: Equatable, Sendable {
   }
 }
 
+/// A visual-only accessibility policy warning emitted during semantic extraction.
+package struct AccessibilityWarning: Equatable, Sendable {
+  package var identity: Identity
+  package var kind: String
+  package var message: String
+
+  package init(
+    identity: Identity,
+    kind: String,
+    message: String
+  ) {
+    self.identity = identity
+    self.kind = kind
+    self.message = message
+  }
+}
+
 /// The complete semantic extraction result for a frame.
 public struct SemanticSnapshot: Equatable, Sendable {
   public var interactionRegions: [InteractionRegion]
@@ -151,6 +168,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var namedCoordinateSpaces: [String: CellRect]
   public var accessibilityNodes: [AccessibilityNode]
   public var accessibilityAnnouncements: [AccessibilityAnnouncement]
+  package var accessibilityWarnings: [AccessibilityWarning]
 
   public init(
     interactionRegions: [InteractionRegion] = [],
@@ -170,5 +188,28 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.namedCoordinateSpaces = namedCoordinateSpaces
     self.accessibilityNodes = accessibilityNodes
     self.accessibilityAnnouncements = accessibilityAnnouncements
+    self.accessibilityWarnings = []
+  }
+
+  package init(
+    interactionRegions: [InteractionRegion] = [],
+    focusRegions: [FocusRegion] = [],
+    navigationRoutes: [NavigationRoute] = [],
+    scrollRoutes: [ScrollRoute] = [],
+    selectionRoutes: [SelectionRoute] = [],
+    namedCoordinateSpaces: [String: CellRect] = [:],
+    accessibilityNodes: [AccessibilityNode] = [],
+    accessibilityAnnouncements: [AccessibilityAnnouncement] = [],
+    accessibilityWarnings: [AccessibilityWarning]
+  ) {
+    self.interactionRegions = interactionRegions
+    self.focusRegions = focusRegions
+    self.navigationRoutes = navigationRoutes
+    self.scrollRoutes = scrollRoutes
+    self.selectionRoutes = selectionRoutes
+    self.namedCoordinateSpaces = namedCoordinateSpaces
+    self.accessibilityNodes = accessibilityNodes
+    self.accessibilityAnnouncements = accessibilityAnnouncements
+    self.accessibilityWarnings = accessibilityWarnings
   }
 }

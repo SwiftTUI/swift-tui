@@ -30,6 +30,15 @@ public struct TabItemLabel: Equatable, Sendable, CustomStringConvertible {
   }
 }
 
+/// Marker for visual-only content that needs an accessibility label or hidden policy.
+package struct AccessibilityVisualContent: Equatable, Sendable {
+  package var kind: String
+
+  package init(kind: String) {
+    self.kind = kind
+  }
+}
+
 /// Semantic and interaction metadata attached to a resolved node.
 public struct SemanticMetadata: Equatable, Sendable {
   private var flags: UInt16
@@ -46,6 +55,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var accessibilityLabel: String?
   public var accessibilityHint: String?
   public var accessibilityLiveRegion: AccessibilityPoliteness?
+  package var accessibilityVisualContent: AccessibilityVisualContent?
   package var accessibilityCursorAnchor: CellPoint?
   package var textInputAccessibilityCursorAnchor: TextInputAccessibilityCursorAnchor?
   public var selectionTag: SelectionTag?
@@ -185,6 +195,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     accessibilityHint: String? = nil,
     accessibilityHidden: Bool = false,
     accessibilityLiveRegion: AccessibilityPoliteness? = nil,
+    accessibilityVisualContent: AccessibilityVisualContent? = nil,
     accessibilityCursorAnchor: CellPoint? = nil,
     textInputAccessibilityCursorAnchor: TextInputAccessibilityCursorAnchor? = nil,
     selectionTag: SelectionTag? = nil,
@@ -212,6 +223,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.accessibilityLabel = accessibilityLabel
     self.accessibilityHint = accessibilityHint
     self.accessibilityLiveRegion = accessibilityLiveRegion
+    self.accessibilityVisualContent = accessibilityVisualContent
     self.accessibilityCursorAnchor = accessibilityCursorAnchor
     self.textInputAccessibilityCursorAnchor = textInputAccessibilityCursorAnchor
     self.selectionTag = selectionTag
@@ -243,6 +255,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       accessibilityHint: other.accessibilityHint ?? accessibilityHint,
       accessibilityHidden: other.accessibilityHidden || accessibilityHidden,
       accessibilityLiveRegion: other.accessibilityLiveRegion ?? accessibilityLiveRegion,
+      accessibilityVisualContent: other.accessibilityVisualContent ?? accessibilityVisualContent,
       accessibilityCursorAnchor: other.accessibilityCursorAnchor ?? accessibilityCursorAnchor,
       textInputAccessibilityCursorAnchor: other.textInputAccessibilityCursorAnchor
         ?? textInputAccessibilityCursorAnchor,

@@ -9,6 +9,7 @@ public struct ThresholdGauge<Label: View, Summary: View>: View, ResolvableView {
   public var barWidth: Int
   private let label: Label
   private let summary: Summary
+  private let accessibilitySummary: String?
 
   public init(
     value: Double,
@@ -18,12 +19,33 @@ public struct ThresholdGauge<Label: View, Summary: View>: View, ResolvableView {
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    self.init(
+      value: value,
+      total: total,
+      bands: bands,
+      barWidth: barWidth,
+      accessibilitySummary: nil,
+      label: label,
+      summary: summary
+    )
+  }
+
+  private init(
+    value: Double,
+    total: Double,
+    bands: [ThresholdBand],
+    barWidth: Int,
+    accessibilitySummary: String?,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder summary: () -> Summary
+  ) {
     self.value = value
     self.total = total
     self.bands = bands
     self.barWidth = barWidth
     self.label = label()
     self.summary = summary()
+    self.accessibilitySummary = accessibilitySummary
   }
 
   package func resolveElements(
@@ -39,7 +61,13 @@ public struct ThresholdGauge<Label: View, Summary: View>: View, ResolvableView {
             bands: bands,
             barWidth: barWidth
           )
-        },
+        }
+        .semanticMetadata(
+          chartAccessibilityMetadata(
+            kind: "ThresholdGauge",
+            label: accessibilitySummary
+          )
+        ),
         in: context
       )
     ]
@@ -53,13 +81,15 @@ extension ThresholdGauge where Label == EmptyView, Summary == Text {
     bands: [ThresholdBand],
     barWidth: Int = 12
   ) {
+    let summary = progressSummaryText(value: value, total: total)
     self.init(
       value: value,
       total: total,
       bands: bands,
       barWidth: barWidth,
+      accessibilitySummary: summary,
       label: { EmptyView() },
-      summary: { Text(progressSummaryText(value: value, total: total)) }
+      summary: { Text(summary) }
     )
   }
 }
@@ -72,13 +102,16 @@ extension ThresholdGauge where Label == Text, Summary == Text {
     bands: [ThresholdBand],
     barWidth: Int = 12
   ) {
+    let title = String(title)
+    let summary = progressSummaryText(value: value, total: total)
     self.init(
       value: value,
       total: total,
       bands: bands,
       barWidth: barWidth,
-      label: { Text(String(title)) },
-      summary: { Text(progressSummaryText(value: value, total: total)) }
+      accessibilitySummary: chartAccessibilityLabel(title: title, summary: summary),
+      label: { Text(title) },
+      summary: { Text(summary) }
     )
   }
 }

@@ -30,6 +30,30 @@ func chartHeader<Label: View, Summary: View>(
   }
 }
 
+func chartAccessibilityMetadata(
+  kind: String,
+  label: String?
+) -> SemanticMetadata {
+  .init(
+    accessibilityRole: .image,
+    accessibilityLabel: label,
+    accessibilityVisualContent: .init(kind: kind)
+  )
+}
+
+func chartAccessibilityLabel(
+  title: String? = nil,
+  summary: String
+) -> String {
+  guard let title, !title.isEmpty else {
+    return summary
+  }
+  guard !summary.isEmpty else {
+    return title
+  }
+  return "\(title): \(summary)"
+}
+
 @MainActor
 @ViewBuilder
 func timelineEntryView(
