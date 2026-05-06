@@ -416,24 +416,24 @@ git commit -m "feat: use text input model in single-line fields"
 
 ## Stage 5: Paste Dispatch Foundation
 
-- [ ] Extend `LocalKeyHandlerRegistry` with a package `PasteHandler` type:
+- [x] Extend `LocalKeyHandlerRegistry` with a package `PasteHandler` type:
   `@MainActor (String) -> Bool`.
-- [ ] Add paste-handler registration, dispatch, snapshot, restore, reset, and
+- [x] Add paste-handler registration, dispatch, snapshot, restore, reset, and
   subtree-removal support.
-- [ ] Record paste-handler registrations in `NodeHandlers` and `ViewNode`.
-- [ ] Restore paste-handler registrations from `RuntimeRegistrationSet`.
-- [ ] Register `TextField` and `SecureField` paste handlers that translate the
+- [x] Record paste-handler registrations in `NodeHandlers` and `ViewNode`.
+- [x] Restore paste-handler registrations from `RuntimeRegistrationSet`.
+- [x] Register `TextField` and `SecureField` paste handlers that translate the
   whole pasted string into `.insertText(content)`.
-- [ ] Update `RunLoop.handlePaste(...)` so the order is:
+- [x] Update `RunLoop.handlePaste(...)` so the order is:
   1. Try path-shaped drop dispatch.
   2. If the focused identity has a paste handler, dispatch the whole content.
   3. Fall back to the existing character-key fanout.
-- [ ] Preserve current drop-destination behavior for path-like paste.
-- [ ] Add single-line paste integration tests proving paste mutates the text
+- [x] Preserve current drop-destination behavior for path-like paste.
+- [x] Add single-line paste integration tests proving paste mutates the text
   binding once, not once per scalar.
-- [ ] Add runtime tests proving paste mutates the dispatching graph when the
+- [x] Add runtime tests proving paste mutates the dispatching graph when the
   same text input view instance is hosted twice.
-- [ ] Run paste and imperative-context tests.
+- [x] Run paste and imperative-context tests.
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.DropDestinationDispatchTests

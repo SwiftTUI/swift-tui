@@ -163,6 +163,7 @@ package struct RuntimeRegistrationSet {
     keyHandlerRegistry?.restoreKeyPressHandlers(
       handlers.keyPressHandlerRegistrations
     )
+    keyHandlerRegistry?.restorePasteHandlers(handlers.pasteHandlerRegistrations)
     terminationRegistry?.restore(handlers.terminationHandlerRegistrations)
     pointerHandlerRegistry?.restore(pointerHandlerRegistrations)
     pointerHandlerRegistry?.restoreHover(handlers.pointerHoverHandlerRegistrations)
@@ -196,6 +197,7 @@ package struct RuntimeRegistrationSet {
     var blockers: Set<FrameDropEligibility.Blocker> = []
     if actionRegistry?.snapshot().isEmpty == false
       || keyHandlerRegistry?.snapshot().isEmpty == false
+      || keyHandlerRegistry?.snapshotPasteHandlers().isEmpty == false
       || terminationRegistry?.snapshot().isEmpty == false
       || pointerHandlerRegistry?.snapshot().isEmpty == false
       || pointerHandlerRegistry?.snapshotHover().isEmpty == false

@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 /// End-to-end drop-dispatch tests. Unlike `DropDestinationTests` (which
@@ -178,6 +178,39 @@ struct DropDestinationDispatchTests {
 
     runLoop.handlePaste(PasteEvent(content: "plain typed text, not a path"))
     #expect(fired.value == 0)
+  }
+
+  @Test("Path paste routes to drop destination before focused text input paste handling")
+  func pathPasteRoutesToDropDestinationBeforeFocusedTextInput() throws {
+    final class TextBox {
+      var value = ""
+    }
+
+    let box = TextBox()
+    let received = Box<[DroppedPath]>([])
+    let runLoop = makeDropRunLoop {
+      Panel(id: "editor") {
+        TextField(
+          "Name",
+          text: Binding(
+            get: { box.value },
+            set: { box.value = $0 }
+          )
+        )
+        .id(testIdentity("PathPasteTextField"))
+      }
+      .dropDestination { paths in
+        received.value = paths
+        return true
+      }
+    }
+    try renderInitial(runLoop)
+    _ = runLoop.focusTracker.setFocus(to: testIdentity("PathPasteTextField"))
+
+    runLoop.handlePaste(PasteEvent(content: "/tmp/file.txt"))
+
+    #expect(received.value == [DroppedPath("/tmp/file.txt")])
+    #expect(box.value.isEmpty)
   }
 }
 

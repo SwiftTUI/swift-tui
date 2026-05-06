@@ -21,29 +21,57 @@ package func registerTextInputBinding(
       return false
     }
 
-    return withImperativeAuthoringContext(authoringContext) {
-      let currentValue = value.wrappedValue.synchronized(with: binding.wrappedValue)
-      let mutation = TextInputReducer().reduce(
-        currentValue,
-        command: command,
-        traits: traits,
-        layout: nil
-      )
-      guard mutation.value != currentValue || mutation.shouldWriteBinding else {
-        return false
-      }
-
-      value.wrappedValue = mutation.value
-      if mutation.shouldWriteBinding {
-        binding.wrappedValue = mutation.value.text
-      }
-      return mutation.shouldRequestFrame || mutation.shouldWriteBinding
-    }
+    return applyTextInputCommand(
+      command,
+      binding: binding,
+      value: value,
+      traits: traits,
+      authoringContext: authoringContext
+    )
   }
 
   keyHandlerRegistry.register(identity: context.identity, keyPressHandler: handle)
   keyHandlerRegistry.register(identity: context.identity) { event in
     handle(KeyPress(event))
+  }
+  keyHandlerRegistry.register(
+    identity: context.identity,
+    pasteHandler: { content in
+      applyTextInputCommand(
+        .insertText(content),
+        binding: binding,
+        value: value,
+        traits: traits,
+        authoringContext: authoringContext
+      )
+    })
+}
+
+@MainActor
+private func applyTextInputCommand(
+  _ command: TextInputCommand,
+  binding: Binding<String>,
+  value: Binding<TextInputValue>,
+  traits: TextInputTraits,
+  authoringContext: ImperativeAuthoringContextSnapshot?
+) -> Bool {
+  withImperativeAuthoringContext(authoringContext) {
+    let currentValue = value.wrappedValue.synchronized(with: binding.wrappedValue)
+    let mutation = TextInputReducer().reduce(
+      currentValue,
+      command: command,
+      traits: traits,
+      layout: nil
+    )
+    guard mutation.value != currentValue || mutation.shouldWriteBinding else {
+      return false
+    }
+
+    value.wrappedValue = mutation.value
+    if mutation.shouldWriteBinding {
+      binding.wrappedValue = mutation.value.text
+    }
+    return mutation.shouldRequestFrame || mutation.shouldWriteBinding
   }
 }
 
