@@ -89,45 +89,46 @@ the same encoder and browser mounter.
 
 ## Stage 2: Encode Accessibility In `web-surface`
 
-- [ ] Add Swift tests that encode a raster surface with an accessibility tree
+- [x] Add Swift tests that encode a raster surface with an accessibility tree
   containing a button, a labeled group, a live region, and a focused node.
-- [ ] Extend `WebSurfaceFrameEncoder.encode(...)` with an overload that accepts
+- [x] Extend `WebSurfaceFrameEncoder.encode(...)` with an overload that accepts
   `SemanticSnapshot` and focused identity context.
-- [ ] Encode `AccessibilityNode` fields with stable JSON names:
+- [x] Encode `AccessibilityNode` fields with stable JSON names:
   `id`, `parentId`, `rect`, `role`, `label`, `hint`, `liveRegion`,
   `cursorAnchor`, and `isFocused`.
-- [ ] Emit `version: 2` when `accessibilityTree` is present, while accepting
+- [x] Emit `version: 2` when `accessibilityTree` is present, while accepting
   raster-only v1 frames.
-- [ ] Keep the existing raster-only `encode(_ surface:)` overload working for
+- [x] Keep the existing raster-only `encode(_ surface:)` overload working for
   callers that do not have semantic data.
 
 ## Stage 3: Decode And Mount Browser Accessibility
 
-- [ ] Add TypeScript tests for parsing frames with and without
+- [x] Add TypeScript tests for parsing frames with and without
   `accessibilityTree`.
-- [ ] Create `AccessibilityTree.ts` to map Swift role strings to ARIA roles and
+- [x] Create `AccessibilityTree.ts` to map Swift role strings to ARIA roles and
   attributes.
-- [ ] Use one dedicated offscreen announcer for live-region announcements
+- [x] Use one dedicated offscreen announcer for live-region announcements
   rather than relying on visible raster cells.
-- [ ] Mount accessibility DOM nodes beside the rendered surface without changing
+- [x] Mount accessibility DOM nodes beside the rendered surface without changing
   raster cell layout.
-- [ ] Preserve parent-child order from the flat array and ignore missing parent
+- [x] Preserve parent-child order from the flat array and ignore missing parent
   references defensively.
 
 ## Stage 4: Sync Focus And Live Regions
 
-- [ ] Update browser runtime focus state when a new frame identifies a focused
+- [x] Update browser runtime focus state when a new frame identifies a focused
   accessibility node.
-- [ ] Apply live-region politeness according to the ADR.
-- [ ] Cover focus movement, node removal, first-frame live-region behavior, and
+- [x] Apply live-region politeness according to the ADR.
+- [x] Cover focus movement, node removal, first-frame live-region behavior, and
   repeated unchanged announcements.
 
 ## Stage 5: Wire Embedded Host And WASI Examples
 
-- [ ] Route committed semantic snapshots to the web-surface encoder in the
-  embedded host and WASI runner paths.
-- [ ] Update `Examples/WebExample` to mount the browser accessibility tree.
-- [ ] Add one end-to-end test fixture that proves a rendered button produces a
+- [x] Route committed semantic snapshots to the web-surface encoder through the
+  shared `SemanticPresentationSurface` path used by the WASI runner; the future
+  embedded host gets the same frames by conforming its surface transport.
+- [x] Update `Examples/WebExample` to mount the browser accessibility tree.
+- [x] Add one end-to-end test fixture that proves a rendered button produces a
   browser-side role and label.
 
 ## Final Verification

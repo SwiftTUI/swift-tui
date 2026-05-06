@@ -90,6 +90,22 @@ test("WebExample renders WASI surface frames into a nonblank canvas", async () =
       opaqueSamples: expect.any(Number),
       differingSamples: expect.any(Number),
     });
+
+    await page.click(".scene-select-trigger");
+    await page.click('.scene-select-option[data-scene-id="details"]');
+    const buttonAccessibleNode = await page.waitForFunction(() => {
+      const activeScene = document.querySelector(".webhost-scene:not([hidden])");
+      const buttons = activeScene?.querySelectorAll(
+        '.webhost-scene__accessibility-tree [role="button"]',
+      ) ?? [];
+      return Array.from(buttons).some(
+        (button) => button.getAttribute("aria-label") === "Refresh status",
+      );
+    }, undefined, {
+      polling: 250,
+      timeout: 30_000,
+    });
+    expect(await buttonAccessibleNode.jsonValue()).toBe(true);
     expect(runtimeErrors).toEqual([]);
   } finally {
     await page.close();

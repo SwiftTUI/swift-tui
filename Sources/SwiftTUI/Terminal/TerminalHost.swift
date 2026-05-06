@@ -321,6 +321,15 @@ package protocol DamageAwarePresentationSurface: PresentationSurface {
   ) throws -> TerminalPresentationMetrics
 }
 
+@_spi(Runners) public protocol SemanticPresentationSurface: PresentationSurface {
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?
+  ) throws -> TerminalPresentationMetrics
+}
+
 extension PresentationSurface {
   public var theme: Theme? {
     nil

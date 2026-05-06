@@ -9,6 +9,7 @@ import {
   canRenderBoxDrawing,
   drawBoxDrawing,
 } from "./BoxDrawingRenderer.ts";
+import { AccessibilityTreeMounter } from "./AccessibilityTree.ts";
 import {
   encodeKeyInputMessage,
   encodeMouseInputMessage,
@@ -45,6 +46,7 @@ export class WebHostSceneRuntime {
   private readonly imageCache = new Map<string, CachedWebHostImage>();
   private currentStyle: ResolvedWebHostTerminalStyle;
   private canvas?: HTMLCanvasElement;
+  private accessibilityTree?: AccessibilityTreeMounter;
   private diagnosticText?: HTMLElement;
   private resizeObserver?: ResizeObserver;
   private detachInputHandlers?: () => void;
@@ -92,8 +94,14 @@ export class WebHostSceneRuntime {
 
     const canvas = document.createElement("canvas");
     canvas.className = "webhost-scene__surface";
+    canvas.setAttribute("aria-hidden", "true");
     this.canvas = canvas;
-    this.terminalMount.replaceChildren(canvas);
+    this.accessibilityTree = new AccessibilityTreeMounter();
+    this.terminalMount.replaceChildren(
+      canvas,
+      this.accessibilityTree.element,
+      this.accessibilityTree.announcerElement
+    );
     this.installInputHandlers();
     this.installResizeObserver();
 
@@ -107,6 +115,7 @@ export class WebHostSceneRuntime {
     this.measureCells();
     this.resizeToMount();
     this.draw();
+    this.syncAccessibilityTree();
   }
 
   setVisible(
@@ -129,6 +138,7 @@ export class WebHostSceneRuntime {
     this.measureCells();
     this.resizeToMount();
     this.draw();
+    this.syncAccessibilityTree();
   }
 
   resize(
@@ -139,6 +149,7 @@ export class WebHostSceneRuntime {
     this.rows = Math.max(1, Math.round(rows));
     this.resizeCanvas();
     this.draw();
+    this.syncAccessibilityTree();
   }
 
   writeOutput(
@@ -173,6 +184,7 @@ export class WebHostSceneRuntime {
     this.rows = Math.max(1, Math.round(frame.height));
     this.resizeCanvas();
     this.draw();
+    this.syncAccessibilityTree();
   }
 
   private applyStyle(
@@ -422,6 +434,18 @@ export class WebHostSceneRuntime {
     }
 
     this.drawImages(context, frame.images ?? []);
+  }
+
+  private syncAccessibilityTree(): void {
+    const tree = this.accessibilityTree;
+    if (!tree || !this.currentFrame) {
+      return;
+    }
+
+    tree.present(this.currentFrame.accessibilityTree ?? [], {
+      cellWidth: this.cellWidth,
+      cellHeight: this.cellHeight,
+    });
   }
 
   private drawImages(

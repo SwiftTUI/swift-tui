@@ -18,6 +18,8 @@ public struct WebExampleApp: App {
           Text("compiled to wasm32-wasi and rendered into terminal cells.")
           Text("Scene switching is owned by the web host.")
           Text("Resize updates flow through the synthetic SIGWINCH control message path.")
+          Button("Refresh status") {}
+            .accessibilityLabel("Refresh status")
         }
         .padding(1)
         .frame(maxHeight: .infinity)
