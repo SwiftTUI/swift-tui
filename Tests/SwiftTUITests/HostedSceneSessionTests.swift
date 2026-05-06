@@ -1,6 +1,6 @@
+import SwiftTUIViews
 import Synchronization
 import Testing
-import SwiftTUIViews
 
 @testable import SwiftTUI
 
@@ -27,6 +27,15 @@ struct HostedSceneSessionTests {
           Text("Edit")
             .focusable(true, interactions: .edit)
         }
+      }
+    }
+  }
+
+  private struct AccessibilitySurfaceApp: App {
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        Button("Primary") {}
+          .accessibilityLabel("Primary action")
       }
     }
   }
@@ -91,6 +100,48 @@ struct HostedSceneSessionTests {
     let exitReason = try await task.value
 
     #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+  }
+
+  @Test("hosted surface session publishes semantic snapshots beside raster surfaces")
+  func hostedSurfaceSessionPublishesSemanticSnapshotsBesideRasterSurfaces() async throws {
+    let surfaceRecorder = SurfaceRecorder()
+    let semanticRecorder = SemanticFrameRecorder()
+    let session = try HostedSceneSession(
+      for: AccessibilitySurfaceApp(),
+      sceneID: WindowIdentifier("primary"),
+      initialSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onSurface: { surface in
+        surfaceRecorder.record(surface)
+      },
+      onSemanticFrame: { surface, semanticSnapshot, focusedIdentity in
+        semanticRecorder.record(
+          surface: surface,
+          semanticSnapshot: semanticSnapshot,
+          focusedIdentity: focusedIdentity
+        )
+      }
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    try await waitUntil("semantic frame") {
+      surfaceRecorder.surfaceCount >= 1
+        && semanticRecorder.frameCount >= 1
+        && semanticRecorder.latestSnapshot?.accessibilityNodes.contains {
+          $0.label == "Primary action"
+        } == true
+    }
+
+    #expect(surfaceRecorder.latestSurface == semanticRecorder.latestSurface)
+
+    let stopExitReason = try await session.stopAndWait()
+    let taskExitReason = try await task.value
+
+    #expect(stopExitReason == .inputEnded)
+    #expect(taskExitReason == .inputEnded)
   }
 
   @Test("hosted surface session rerenders on resize")
@@ -379,6 +430,39 @@ private final class SurfaceRecorder {
     _ surface: RasterSurface
   ) {
     surfaces.append(surface)
+  }
+}
+
+@MainActor
+private final class SemanticFrameRecorder {
+  private(set) var frames:
+    [(surface: RasterSurface, snapshot: SemanticSnapshot, focused: Identity?)] =
+      []
+
+  var frameCount: Int {
+    frames.count
+  }
+
+  var latestSurface: RasterSurface? {
+    frames.last?.surface
+  }
+
+  var latestSnapshot: SemanticSnapshot? {
+    frames.last?.snapshot
+  }
+
+  func record(
+    surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?
+  ) {
+    frames.append(
+      (
+        surface: surface,
+        snapshot: semanticSnapshot,
+        focused: focusedIdentity
+      )
+    )
   }
 }
 

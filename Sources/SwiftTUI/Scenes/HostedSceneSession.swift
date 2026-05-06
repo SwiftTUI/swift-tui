@@ -1,5 +1,5 @@
-import Synchronization
 import SwiftTUIViews
+import Synchronization
 
 public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringConvertible {
   case sceneNotFound(WindowIdentifier)
@@ -19,7 +19,9 @@ package typealias HostedSceneRunner =
     FocusTracker
   ) async throws -> RunLoopResult<SceneSessionState>
 
-private protocol HostedScenePresentationSurface: PresentationSurface, DamageAwarePresentationSurface, Sendable {
+private protocol HostedScenePresentationSurface: PresentationSurface,
+  DamageAwarePresentationSurface, Sendable
+{
   func updateSurfaceSize(_ surfaceSize: CellSize)
   func updateAppearance(_ appearance: TerminalAppearance)
   func updateTheme(_ theme: Theme?)
@@ -124,6 +126,8 @@ public final class HostedSceneSession {
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     onSurface: @escaping @MainActor @Sendable (RasterSurface) -> Void,
+    onSemanticFrame:
+      (@MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void)? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
@@ -153,6 +157,13 @@ public final class HostedSceneSession {
       ) { surface in
         Task { @MainActor in
           onSurface(surface)
+        }
+      } semanticFrameHandler: { surface, semanticSnapshot, focusedIdentity in
+        guard let onSemanticFrame else {
+          return
+        }
+        Task { @MainActor in
+          onSemanticFrame(surface, semanticSnapshot, focusedIdentity)
         }
       },
       runScene: selection.runScene,
@@ -327,7 +338,9 @@ public final class HostedSceneSession {
   }
 }
 
-private final class HostedRasterSurface: HostedScenePresentationSurface, Sendable {
+private final class HostedRasterSurface:
+  HostedScenePresentationSurface, SemanticPresentationSurface, Sendable
+{
   private struct State: Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
@@ -338,6 +351,7 @@ private final class HostedRasterSurface: HostedScenePresentationSurface, Sendabl
 
   private let state: Mutex<State>
   private let surfaceHandler: @Sendable (RasterSurface) -> Void
+  private let semanticFrameHandler: @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void
 
   let capabilityProfile: TerminalCapabilityProfile
 
@@ -366,10 +380,12 @@ private final class HostedRasterSurface: HostedScenePresentationSurface, Sendabl
     appearance: TerminalAppearance,
     theme: Theme?,
     capabilityProfile: TerminalCapabilityProfile,
-    surfaceHandler: @escaping @Sendable (RasterSurface) -> Void
+    surfaceHandler: @escaping @Sendable (RasterSurface) -> Void,
+    semanticFrameHandler: @escaping @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void
   ) {
     self.capabilityProfile = capabilityProfile
     self.surfaceHandler = surfaceHandler
+    self.semanticFrameHandler = semanticFrameHandler
     state = Mutex(
       State(
         surfaceSize: surfaceSize,
@@ -452,8 +468,38 @@ private final class HostedRasterSurface: HostedScenePresentationSurface, Sendabl
     _ surface: RasterSurface,
     damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics {
-    let previousSurface = state.withLock(\.lastSubmittedSurface)
+    submit(surface)
+    return presentationMetrics(
+      for: surface,
+      damage: damage
+    )
+  }
+
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?
+  ) throws -> TerminalPresentationMetrics {
+    submit(surface)
+    semanticFrameHandler(surface, semanticSnapshot, focusedIdentity)
+    return presentationMetrics(
+      for: surface,
+      damage: nil
+    )
+  }
+
+  private func submit(
+    _ surface: RasterSurface
+  ) {
     surfaceHandler(surface)
+  }
+
+  private func presentationMetrics(
+    for surface: RasterSurface,
+    damage: PresentationDamage?
+  ) -> TerminalPresentationMetrics {
+    let previousSurface = state.withLock(\.lastSubmittedSurface)
     state.withLock { state in
       state.lastSubmittedSurface = surface
     }

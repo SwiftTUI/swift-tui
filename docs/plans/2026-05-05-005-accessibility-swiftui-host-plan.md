@@ -1,7 +1,7 @@
 ---
 title: "feat: accessibility SwiftUI host bridge"
 type: feat
-status: proposed
+status: completed
 date: 2026-05-05
 depends_on:
   - "2026-05-05-002-accessibility-remaining-work-plan.md"
@@ -85,8 +85,11 @@ answers the initial open questions for this tranche:
 
 - `Platforms/SwiftUI/Sources/SwiftUIHost/AccessibilityNodeMapping.swift`
 - `Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift`
+- `Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityAnnouncer.swift`
 - `Platforms/SwiftUI/Tests/SwiftUIHostTests/AccessibilityNodeMappingTests.swift`
+- `Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedAccessibilityAnnouncerTests.swift`
 - `Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedAccessibilityOverlayTests.swift`
+- `Platforms/SwiftUI/Tests/SwiftUIHostTests/SwiftUIHostAccessibilityTests.swift`
 
 ## Stage 1: Resolve Native Host Policy
 
@@ -99,34 +102,34 @@ answers the initial open questions for this tranche:
 
 ## Stage 2: Carry Semantic Snapshots Into The Host
 
-- [ ] Extend `HostedSceneSession` callbacks so host packages receive committed
+- [x] Extend `HostedSceneSession` callbacks so host packages receive committed
   `SemanticSnapshot` data beside the raster surface.
-- [ ] Preserve the existing `onSurface` callback for callers that only need
+- [x] Preserve the existing `onSurface` callback for callers that only need
   raster output.
-- [ ] Add tests that prove `SwiftUIHostSceneHost` stores the latest semantic
+- [x] Add tests that prove `SwiftUIHostSceneHost` stores the latest semantic
   snapshot and updates it when new frames commit.
 
 ## Stage 3: Map Roles, Labels, Hints, And Hidden State
 
-- [ ] Create `AccessibilityNodeMapping.swift` with pure mapping functions from
+- [x] Create `AccessibilityNodeMapping.swift` with pure mapping functions from
   `AccessibilityNode` to SwiftUI-host accessibility values.
-- [ ] Cover every `AccessibilityRole` case with tests.
-- [ ] Ensure `accessibilityHidden(true)` subtrees remain absent because the
+- [x] Cover every `AccessibilityRole` case with tests.
+- [x] Ensure `accessibilityHidden(true)` subtrees remain absent because the
   extractor already prunes them.
 
 ## Stage 4: Build The Hosted Accessibility Overlay
 
-- [ ] Create an overlay view that positions native accessibility elements over
+- [x] Create an overlay view that positions native accessibility elements over
   the raster terminal view using cell rects and current cell-pixel metrics.
-- [ ] Keep visual rendering unchanged.
-- [ ] Cover resize, node removal, group nesting, and empty trees.
+- [x] Keep visual rendering unchanged.
+- [x] Cover resize, node removal, group nesting, and empty trees.
 
 ## Stage 5: Sync Native Focus And Announcements
 
-- [ ] Cross-reference the host's focused identity with the latest accessibility
+- [x] Cross-reference the host's focused identity with the latest accessibility
   nodes according to the ADR's native-focus rule.
-- [ ] Add live-region announcement handling using the ADR-approved mapping.
-- [ ] Cover focus movement, removed focused nodes, polite/assertive live
+- [x] Add live-region announcement handling using the ADR-approved mapping.
+- [x] Cover focus movement, removed focused nodes, polite/assertive live
   regions, and unchanged live-region labels.
 
 ## Final Verification
@@ -134,5 +137,5 @@ answers the initial open questions for this tranche:
 ```bash
 swiftly run swift test --package-path Platforms/SwiftUI
 swiftly run swift test
-bun run test
+bun run test --skip-bun-install
 ```
