@@ -60,7 +60,6 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md) — staged V1 implementation plan for shared text input value, reducer, layout map, paste routing, and caret-anchor semantics
 - [plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md) — staged implementation plan for same-binary CPU and input-latency evaluation tooling
 - [plans/2026-05-02-002-composed-presentation-primitives-plan.md](plans/2026-05-02-002-composed-presentation-primitives-plan.md) — planned migration from presentation-specific overlay hoisting to portal, overlay-stack, interaction-gate, and dismiss-stack primitives
 - [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md) — active notes and red/green regression guard for gallery one-shot animation transactions snapping after async Option 3
@@ -68,6 +67,10 @@ Dated, agent-executable implementation plans live in [`plans/`](plans/), front-m
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md) — shipped V1 text input value, reducer, layout map, paste routing, and caret-anchor semantics
+- [plans/2026-05-05-003-accessibility-cli-runtime-plan.md](plans/2026-05-05-003-accessibility-cli-runtime-plan.md) — shipped CLI accessibility runtime behavior: cursor-as-focus, linear output, motion/progress policy, and live regions
+- [plans/2026-05-05-004-accessibility-web-aria-plan.md](plans/2026-05-05-004-accessibility-web-aria-plan.md) — shipped Web/WASI accessibility tree encoding and browser ARIA mounting
+- [plans/2026-05-05-005-accessibility-swiftui-host-plan.md](plans/2026-05-05-005-accessibility-swiftui-host-plan.md) — shipped SwiftUI host accessibility overlay and live-region bridging
 - [plans/2026-05-05-001-resilient-anyview-plan.md](plans/2026-05-05-001-resilient-anyview-plan.md) — shipped resilient `AnyView` implementation with targeted graph, lifecycle, and runtime verification
 - [plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md](plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md) — shipped Option 3 implementation for draft frame-head transactions, prepared-frame abort proof, and queued-tail cancellation
 - [plans/2026-05-01-005-async-rendering-r0-inventory.md](plans/2026-05-01-005-async-rendering-r0-inventory.md) — R0 diagnostics and composed-runtime coverage checkpoint for restarting async cancellation work

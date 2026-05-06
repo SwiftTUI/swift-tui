@@ -1,7 +1,7 @@
 ---
 title: "feat: text input model v1"
 type: feat
-status: active
+status: shipped
 date: 2026-05-06
 depends_on:
   - "../proposals/TEXT_INPUT_MODEL.md"
@@ -36,10 +36,10 @@ tests, public API inventory tooling, and the repo-wide `bun run test` gate.
 
 ---
 
-## Current State Snapshot
+## Starting State Snapshot
 
-The current text input path is intentionally small and is not a stable base
-for caret movement or accessibility cursor positioning:
+This was the text input state before the V1 implementation. It is retained as
+the baseline the plan replaced:
 
 - `TextField` lives in `Sources/SwiftTUIViews/Controls/ValueControls.swift`.
   It registers `registerTextEntryBinding(...)`, renders `displayText`, and
@@ -58,8 +58,8 @@ for caret movement or accessibility cursor positioning:
   `Sources/SwiftTUI/RunLoop/RunLoop+EventDispatch.swift` falls through from
   non-drop paste into repeated character key events.
 - `SemanticMetadata.accessibilityCursorAnchor` and
-  `AccessibilityNode.cursorAnchor` already exist in `SwiftTUICore`, but text
-  controls do not publish real caret anchors.
+  `AccessibilityNode.cursorAnchor` already existed in `SwiftTUICore`, but text
+  controls did not publish real caret anchors.
 - `RuntimeConfiguration.cursorFollowsFocus` is default-off and currently moves
   the hardware cursor to the focused accessibility node's `cursorAnchor` when
   one exists.
@@ -555,21 +555,21 @@ git commit -m "feat: anchor accessibility cursor to text carets"
 
 ## Stage 8: Cleanup, Docs, And Public Surface
 
-- [ ] Remove obsolete text-entry mutation helpers after all call sites move to
+- [x] Remove obsolete text-entry mutation helpers after all call sites move to
   the reducer. If any helper remains, rename it so it is clearly a reducer
   adapter rather than the model owner.
-- [ ] Update `docs/SOURCE_LAYOUT.md` with the new input-model files.
-- [ ] Update `docs/proposals/TEXT_INPUT_MODEL.md` with a V1 implementation
+- [x] Update `docs/SOURCE_LAYOUT.md` with the new input-model files.
+- [x] Update `docs/proposals/TEXT_INPUT_MODEL.md` with a V1 implementation
   status note and decisions settled by this plan.
-- [ ] Update this plan's frontmatter `status:` to `active` when execution
+- [x] Update this plan's frontmatter `status:` to `active` when execution
   begins and to `shipped` only after the final repo-wide gate passes.
-- [ ] Run formatting on touched Swift files.
+- [x] Run formatting on touched Swift files.
 
 ```bash
 swift format format -i --configuration .swift-format.json Sources/ Tests/
 ```
 
-- [ ] Run focused tests one final time.
+- [x] Run focused tests one final time.
 
 ```bash
 swiftly run swift test --filter SwiftTUIViewsTests.TextInputReducerTests
@@ -580,7 +580,7 @@ swiftly run swift test --filter SwiftTUITests.SecureFieldSurfaceTests
 swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
 ```
 
-- [ ] Run public-surface and repo-wide gates.
+- [x] Run public-surface and repo-wide gates.
 
 ```bash
 ./Scripts/generate_public_api_inventory.sh --check
@@ -602,6 +602,15 @@ Final checkpoint:
 git add Sources Tests docs
 git commit -m "docs: mark text input model v1 shipped"
 ```
+
+Verification result on 2026-05-06:
+
+- Focused text input, accessibility runtime, and semantic extraction tests
+  passed.
+- `./Scripts/generate_public_api_inventory.sh --check` passed.
+- `bun run test --skip-bun-install` passed after clearing stale SwiftPM build
+  products from the public struct-layout change.
+- Full log: `/tmp/swift-tui-test-all-20260506-010612-10943.log`.
 
 ## Follow-Up Work Outside V1
 

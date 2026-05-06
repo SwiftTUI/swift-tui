@@ -27,6 +27,9 @@ semantic snapshots beside raster frames, and the native host mounts
 those records through a SwiftUI accessibility overlay. The remaining
 accessibility follow-ups are the public cursor-anchor modifier,
 imperative announcer API, and listening/lint work.
+Text input caret anchoring has also landed through the text input V1 plan:
+`TextField`, `SecureField`, and `TextEditor` publish built-in caret anchors for
+cursor-following while keeping secure values redacted.
 
 ---
 
@@ -525,9 +528,10 @@ correction (2026-05-04)" to find them in place.
    by [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
    yes; the field lives on `AccessibilityNode` in absolute surface
    coordinates. Nil means "use the node's origin"; built-in
-   caret-anchor population and the public
-   `accessibilityCursorAnchor(_:)` modifier shape remain follow-up
-   work under the cursor-as-focus plan.
+  public `accessibilityCursorAnchor(_:)` modifier shape remains follow-up
+  work under the cursor-as-focus plan. Built-in caret-anchor population for
+  `TextField`, `SecureField`, and `TextEditor` has landed through the text
+  input V1 plan.
 
 3. ~~**Flat list with parent identity, or recursive tree?**~~
    **Resolved by [ADR-0012](../decisions/0012-accessibility-node-shape.md)**
@@ -607,3 +611,6 @@ path for the substrate.
   accessibility overlay, and platform live-region announcement hooks.
   The remaining accessibility follow-ups are public cursor-anchor
   authoring, imperative announcements, and listening/lint work.
+- 2026-05-06: Built-in text input caret anchoring landed. The cursor-following
+  policy now uses real caret anchors for `TextField`, `SecureField`, and
+  `TextEditor`; the public custom cursor-anchor modifier remains deferred.

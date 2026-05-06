@@ -1,10 +1,11 @@
 # Accessibility
 
-**Status:** Draft. Exploratory research + proposal. No code; this document
-captures the full research findings from the `accessibility-investigation`
-branch and proposes a shape for what an accessibility story for swift-tui
-could look like, so we have a place to iterate. Long by intent — the goal
-is to keep the context here rather than scattered across session notes.
+**Status:** Living proposal and implementation record. The original research
+from the `accessibility-investigation` branch remains here for context, but
+the shared substrate and first target consumers have now shipped: CLI
+accessible output, Web/WASI ARIA, SwiftUI host bridging, and text-input caret
+anchors for cursor-following. Long by intent — the goal is to keep the
+context here rather than scattered across session notes.
 
 **Owner:** unassigned. Tracking branch: `accessibility-investigation`.
 
@@ -692,8 +693,9 @@ and thinner in one place**. Specifically:
   `--web`. Current behavior wiring is narrower than the parse surface:
   `--no-color`, `--force-color`, `--ascii`, `--plain`,
   `--cursor-follows-focus`, `--accessible`, `--reduce-motion`, and
-  `--no-progress` now reach runtime behavior. `--linear`, `--json`, and
-  `--web` remain behavior follow-ups.
+  `--no-progress` now reach runtime behavior. Accessible output uses the
+  linear renderer. Standalone `--linear`, `--json`, and `--web` behavior
+  remain follow-ups.
 
 - **Cursor positioning mechanism exists.**
   [`TerminalHost.swift`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)
@@ -718,7 +720,7 @@ and thinner in one place**. Specifically:
   WASI-surface encoder, however, currently emits a full surface per
   commit; see Finding 6 in the audit.
 
-### Missing or thin (worse than expected)
+### Current follow-up state
 
 - **Target-specific accessibility consumption is now partly wired.** The
   shared substrate carries `accessibilityLabel`, `accessibilityHint`,
@@ -741,21 +743,20 @@ and thinner in one place**. Specifically:
   `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and CLI live regions announce only in
   accessible linear output in v1.
 
-- **The `WebSurfaceFrameEncoder` wire format is raster-level, not
-  semantic.**
-  [`WebSurfaceTransport.swift:664-961`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)
-  encodes `[x, character, spanWidth, styleIndex]` per cell. There's
-  no role/label/hint data in the protocol today. To do real ARIA in
-  the browser target we need to **extend the wire format** with an
-  accessibility tree alongside the raster grid. See Finding 3 in the
-  audit and Phase 6 in the updated phasing.
+- **The `WebSurfaceFrameEncoder` now carries accessibility data.**
+  The Web/WASI surface uses the `web-surface` v2 frame shape with an
+  `accessibilityTree` alongside the raster grid. Browser-side mounting turns
+  those `AccessibilityNode` records into ARIA nodes and live-region
+  announcements without changing the raster canvas.
 
-- **Cursor-anchor policy is still split from the substrate.**
-  `AccessibilityNode.cursorAnchor` exists as the shared output field,
-  and nil means consumers should fall back to the node origin. The
-  public `accessibilityCursorAnchor(_:)` modifier shape, built-in
-  caret anchors, and the runtime policy for showing the hardware
-  cursor at the focused anchor remain follow-up work.
+- **Cursor-anchor policy is partially shipped.**
+  `AccessibilityNode.cursorAnchor` exists as the shared output field, and nil
+  means consumers should fall back to the node origin. CLI cursor-following is
+  default-off and opt-in through `cursorFollowsFocus`. Built-in `TextField`,
+  `SecureField`, and `TextEditor` now publish real caret anchors and suppress
+  their synthetic caret when hardware cursor-following is active. The public
+  `accessibilityCursorAnchor(_:)` modifier shape remains follow-up work for
+  custom focus targets.
 
 ### Implication
 
@@ -765,16 +766,16 @@ The proposal split is sharper than the first draft implied:
   `SemanticMetadata` (`accessibilityLabel`, `accessibilityHint`,
   `accessibilityHidden`, `accessibilityLiveRegion`), the
   `AccessibilityRole` rename and expanded role set from ADR-0011,
-  SwiftUI-shaped authoring modifiers for those fields, and
+  SwiftUI-shaped authoring modifiers for those fields,
   `SemanticExtractor` emission of sparse `AccessibilityNode` records
-  on `SemanticSnapshot`. CLI target behavior from ADR-0013 has also
-  landed: normalized accessible runtime configuration, terminal
-  cursor-as-focus, accessible linear output, motion/progress policy,
-  and accessible-mode live-region announcements.
+  on `SemanticSnapshot`, and built-in text-input caret anchors. CLI target
+  behavior from ADR-0013 has also landed: normalized accessible runtime
+  configuration, terminal cursor-as-focus, accessible linear output,
+  motion/progress policy, and accessible-mode live-region announcements.
 
 - **What remains:** the first-class target consumers are now wired for
   CLI, Web/WASI, and SwiftUI host paths. The public cursor-anchor
-  modifier, imperative
+  modifier for custom anchors, imperative
   `AccessibilityAnnouncer.announce(_:)` API, and listening/lint work
   also remain follow-ups.
 
@@ -783,11 +784,11 @@ The proposal split is sharper than the first draft implied:
   invent env-var detection (the shared resolver and standard flag
   package now exist; remaining work is behavior wiring).
 
-- **What this proposal *requires from sibling proposals*:** the
-  embedded-host wire format must be extended with an
-  `accessibilityTree` field to carry `AccessibilityNode` records to
-  the browser. See [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md)
-  Audit correction.
+- **What this proposal *required from sibling proposals*:** the
+  Web/WASI surface format has been extended with an `accessibilityTree`
+  field to carry `AccessibilityNode` records to the browser. See
+  [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) Audit correction and
+  [`ADR-0014`](../decisions/0014-accessibility-web-aria-wire-policy.md).
 
 ### Relevant prior decisions
 
@@ -1291,8 +1292,10 @@ Implemented in the commit phase behind an explicit runtime policy: when
 commit, position the hardware terminal cursor at the focused interaction
 point. This policy defaults off for normal TUI output.
 
-- **Text fields:** deferred until all text input surfaces have real caret
-  tracking and caret anchors.
+- **Text fields:** built-in `TextField`, `SecureField`, and `TextEditor`
+  publish real caret anchors. Custom `TextFieldStyle` implementations should
+  render `fieldContent` to preserve precise caret anchoring; styles that only
+  render `displayText` fall back to the owning node's origin.
 - **List rows:** at the start of the selected row's text.
 - **Buttons:** at the first character of the label.
 - **Custom focus targets:** configurable via `accessibilityCursorAnchor`,
@@ -1303,13 +1306,11 @@ cursor rather than leaving it wherever the renderer last drew. Longer term,
 the best screen-reader behavior is a stable parked cursor location (e.g.,
 bottom-left or end of last appended status line). This is the Brick lesson.
 
-**Deferred caret-tracking work:** `TextField`, `SecureField`, and
-`TextEditor` currently render a synthetic trailing caret and do not publish a
-real caret index or cursor anchor. Before enabling any text-input-specific
-hardware cursor policy, add caret tracking and accessibility cursor anchors
-to every text input surface, then suppress the synthetic caret when hardware
-cursor-following is active. The proposed model for that work is
-[`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
+**Text-input caret tracking status:** `TextField`, `SecureField`, and
+`TextEditor` now use the shared text input model to compute a caret anchor from
+layout. When `cursorFollowsFocus` is enabled, they suppress the synthetic `_`
+caret and publish the real caret anchor through accessibility semantics. Secure
+fields publish only location metadata; their secret value remains redacted.
 
 ### Reduce-motion behavior
 
@@ -1549,11 +1550,10 @@ to be argued with, not accepted.)
    [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
    the field exists on `AccessibilityNode` (in absolute surface
    coordinates); nil means "use the node's origin." The public
-   modifier argument shape and built-in caret-anchor population remain
-   follow-up work under the cursor-as-focus plan. Text input controls also
-   need real caret tracking across `TextField`, `SecureField`, and
-   `TextEditor` before the hardware cursor can reliably follow their editing
-   caret; see [`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
+   modifier argument shape remains follow-up work for custom focus targets.
+   Built-in caret-anchor population for `TextField`, `SecureField`, and
+   `TextEditor` has landed through the text input V1 plan; see
+   [`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
 
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
@@ -1651,9 +1651,9 @@ to be argued with, not accepted.)
 > **Audit correction (2026-05-04):** Phase 1 is smaller than first
 > drafted (env detection partly exists; we extend rather than build).
 > Phase 3 splits cleanly into 3a (authoring fields/modifiers) and 3b
-> (extractor changes). Phase 6 is bigger than first drafted because
-> the embedded-host wire format must be extended with an
-> `accessibilityTree` field — the existing encoder is raster-only.
+> (extractor changes). Phase 6 was bigger than first drafted because
+> the embedded-host wire format had to be extended with an
+> `accessibilityTree` field; that Web/WASI v2 encoding has now landed.
 > See [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) for the cost-delta
 > reasoning per phase.
 
@@ -1683,8 +1683,8 @@ WebSocket transport landed).)
    behavior gate is now resolved by ADR-0013: terminal TUI output shows and
    moves the cursor only when `RuntimeConfiguration.cursorFollowsFocus` is
    enabled and a focused accessibility node exists. The public modifier
-   argument type remains deferred; v1 uses built-in package-only anchors plus
-   node-origin fallback.
+   argument type remains deferred; v1 uses built-in package-only anchors for
+   text input controls plus node-origin fallback for other nodes.
 
 3. **Phase 3a — Accessibility authoring modifiers.** **(Substrate
    landed, cursor-anchor modifier deferred.)** Added
@@ -1976,5 +1976,9 @@ in this document. The primary sources, grouped by theme:
   `SwiftUIHostSceneHost` stores the latest snapshot and focused identity,
   and the host mounts a native accessibility overlay with role mapping,
   focus metadata, and live-region announcement handling. Remaining
-  accessibility follow-ups are public cursor-anchor authoring,
-  imperative announcements, and listening/lint work.
+  accessibility follow-ups are public cursor-anchor authoring for custom
+  anchors, imperative announcements, and listening/lint work.
+- 2026-05-06: Text input caret anchoring landed. `TextField`,
+  `SecureField`, and `TextEditor` publish real caret anchors into
+  accessibility semantics, suppress their synthetic caret when
+  `cursorFollowsFocus` is active, and keep secure values redacted.
