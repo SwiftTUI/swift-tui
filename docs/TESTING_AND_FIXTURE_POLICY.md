@@ -12,6 +12,9 @@ hooks instead of the Swift test suite:
 - `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the Foundation-free `Core`, `View`, and `SwiftTUI` library layers
 - `Scripts/check_public_surface_policies.sh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
 - `Scripts/check_concurrency_safety_policies.sh`: forbids `@unchecked Sendable` and `nonisolated(unsafe)` in checked-in Swift sources so concurrency-safety regressions fail before test execution
+- `Scripts/check_accessibility_guardrails.sh`: pins reviewed raw-glyph,
+  color-state, and visual-content source files and requires manual listening
+  docs under `Tests/SwiftTUITests/Accessibility/`
 
 Keep runtime, integration, and behavioral guarantees in tests. Move pure
 repository-shape or text-pattern checks into hooks when they can fail earlier

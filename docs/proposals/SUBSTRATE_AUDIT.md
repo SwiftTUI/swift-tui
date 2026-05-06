@@ -24,8 +24,9 @@ shared `web-surface` v2 encoder carries `accessibilityTree` data and
 the browser runtime mounts that tree as ARIA beside the raster canvas.
 SwiftUI host bridging has landed through ADR-0015: hosted sessions carry
 semantic snapshots beside raster frames, and the native host mounts
-those records through a SwiftUI accessibility overlay. The remaining
-accessibility follow-up is listening/lint work.
+those records through a SwiftUI accessibility overlay. Listening/lint
+guardrails now exist for manual listening docs, raw glyphs, color-state
+styling, and visual-content call sites.
 Text input caret anchoring has also landed through the text input V1 plan:
 `TextField`, `SecureField`, and `TextEditor` publish built-in caret anchors for
 cursor-following while keeping secure values redacted.
@@ -617,3 +618,7 @@ path for the substrate.
   `AccessibilityAnnouncer.announce(_:)` API queues committed-frame semantic
   announcements for CLI accessible output, Web/WASI ARIA, and SwiftUI host
   platform announcements.
+- 2026-05-06: Accessibility listening/lint guardrails landed. The test gate now
+  runs `Scripts/check_accessibility_guardrails.sh`, which validates listening
+  docs and reviewed source manifests for raw glyphs, color-state styling, and
+  visual-content call sites.
