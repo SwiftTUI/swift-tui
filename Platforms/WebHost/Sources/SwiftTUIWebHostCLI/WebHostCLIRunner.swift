@@ -6,7 +6,7 @@ import SwiftTUIWebHost
 public enum WebHostCLIRunner {
   @MainActor
   public static func run<A: App>(_ appType: A.Type) async throws {
-    try await run(appType.init(), configuration: .default)
+    try await run(appType.init())
   }
 
   @MainActor
@@ -19,7 +19,8 @@ public enum WebHostCLIRunner {
 
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
-    try await run(app, configuration: .default)
+    let options = try SwiftTUIOptions.parse(Array(CommandLine.arguments.dropFirst()))
+    try await run(app, configuration: options.runtimeConfiguration())
   }
 
   @MainActor
@@ -27,11 +28,35 @@ public enum WebHostCLIRunner {
     _ app: A,
     configuration: RuntimeConfiguration
   ) async throws {
+    try await run(
+      app,
+      configuration: configuration,
+      webRunner: WebHostRunner.run,
+      terminalRunner: TerminalRunner.run
+    )
+  }
+
+  @MainActor
+  package static func run<A: App>(
+    _ app: A,
+    configuration: RuntimeConfiguration,
+    webRunner: @MainActor (A, RuntimeConfiguration) async throws -> Void,
+    terminalRunner: @MainActor (A, RuntimeConfiguration) async throws -> Void
+  ) async throws {
     if configuration.web != nil {
-      try await WebHostRunner.run(app, configuration: configuration)
+      try await webRunner(app, configuration)
       return
     }
 
-    try await TerminalRunner.run(app, configuration: configuration)
+    try await terminalRunner(app, configuration)
+  }
+
+  package static func runtimeConfiguration(
+    arguments: [String],
+    environment: [String: String],
+    isStdoutTTY: Bool
+  ) throws -> RuntimeConfiguration {
+    try SwiftTUIOptions.parse(arguments)
+      .runtimeConfiguration(environment: environment, isStdoutTTY: isStdoutTTY)
   }
 }

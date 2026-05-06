@@ -60,6 +60,7 @@ let package = Package(
       dependencies: [
         "SwiftTUIWebHost",
         "SwiftTUIWebHostCLI",
+        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
       ],
       swiftSettings: swiftSettings()
     ),
