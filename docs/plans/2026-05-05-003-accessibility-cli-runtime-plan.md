@@ -165,13 +165,13 @@ Resolved by
 
 ## Stage 6: Add Live-Region Announcements
 
-- [ ] Track prior live-region content by accessibility identity across committed
+- [x] Track prior live-region content by accessibility identity across committed
   frames.
-- [ ] Emit announcements only for changed live-region labels according to the
+- [x] Emit announcements only for changed live-region labels according to the
   ADR's destination and politeness rules. CLI v1 emits only in accessible
   linear output; normal TUI mode does not write live regions to stderr or a side
   channel.
-- [ ] Cover first-frame suppression, polite/assertive ordering, removed nodes,
+- [x] Cover first-frame suppression, polite/assertive ordering, removed nodes,
   and normal TUI behavior.
 
 ## Final Verification

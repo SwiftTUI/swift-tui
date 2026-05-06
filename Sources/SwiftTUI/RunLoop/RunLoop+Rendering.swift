@@ -1380,7 +1380,9 @@ extension RunLoop {
   private func presentLinearAccessibilityFrame(
     semanticSnapshot: SemanticSnapshot
   ) throws -> TerminalPresentationMetrics {
-    let output = LinearAccessibilityRenderer().render(semanticSnapshot)
+    let output =
+      LinearAccessibilityRenderer().render(semanticSnapshot)
+      + liveRegionAnnouncer.renderAnnouncements(for: semanticSnapshot)
     guard !output.isEmpty else {
       return TerminalPresentationMetrics()
     }

@@ -74,6 +74,7 @@ Sources/SwiftTUI/
 
 - `Accessibility/AccessibilityRuntimePolicy.swift`: terminal-runtime policy helpers that consume `SemanticSnapshot.accessibilityNodes`
 - `Accessibility/LinearAccessibilityRenderer.swift`: semantic linear renderer for accessible CLI output
+- `Accessibility/LiveRegionAnnouncer.swift`: accessible-mode live-region change tracker and announcement renderer
 - `RunLoop/RunLoop.swift`: runtime coordinator and shared runtime state
 - `RunLoop/RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
 - `RunLoop/RunLoop+PointerHandling.swift`: pointer routing, activation, hover, capture, and scroll-wheel handling
