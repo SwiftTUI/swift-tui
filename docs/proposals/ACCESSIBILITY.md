@@ -1308,7 +1308,8 @@ bottom-left or end of last appended status line). This is the Brick lesson.
 real caret index or cursor anchor. Before enabling any text-input-specific
 hardware cursor policy, add caret tracking and accessibility cursor anchors
 to every text input surface, then suppress the synthetic caret when hardware
-cursor-following is active.
+cursor-following is active. The proposed model for that work is
+[`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
 
 ### Reduce-motion behavior
 
@@ -1552,7 +1553,7 @@ to be argued with, not accepted.)
    follow-up work under the cursor-as-focus plan. Text input controls also
    need real caret tracking across `TextField`, `SecureField`, and
    `TextEditor` before the hardware cursor can reliably follow their editing
-   caret.
+   caret; see [`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
 
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
