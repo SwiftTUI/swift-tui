@@ -93,6 +93,32 @@ public struct TextFieldStyleConfiguration: Sendable {
   }
 }
 
+package func textInputChrome(
+  styleEnvironment: StyleEnvironmentSnapshot,
+  isEnabled: Bool,
+  isFocused: Bool
+) -> ControlChrome {
+  let contentChrome = styleEnvironment.controlChrome(
+    isEnabled: isEnabled,
+    isFocused: false
+  )
+  guard isEnabled, isFocused else {
+    return contentChrome
+  }
+
+  let focusChrome = styleEnvironment.controlChrome(
+    isEnabled: true,
+    isFocused: true
+  )
+  return ControlChrome(
+    foregroundStyle: contentChrome.foregroundStyle,
+    contentBackgroundStyle: contentChrome.contentBackgroundStyle,
+    borderForegroundStyle: focusChrome.borderForegroundStyle,
+    borderBackgroundStyle: focusChrome.borderBackgroundStyle,
+    opacity: contentChrome.opacity
+  )
+}
+
 public struct AnyTextFieldStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   private let box: any AnyTextFieldStyleBox

@@ -31,7 +31,8 @@ extension TextEditor {
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let cursorFollowsFocus = context.environmentValues.cursorFollowsFocus
-    let chrome = styleEnvironment.controlChrome(
+    let chrome = textInputChrome(
+      styleEnvironment: styleEnvironment,
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )

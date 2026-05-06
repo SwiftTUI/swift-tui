@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 /// Tests that focus transitions between controls (Tab/Shift-Tab) produce
@@ -169,6 +169,41 @@ struct FocusTransitionTests {
     let unfocusedLines = unfocused.rasterSurface.lines
     let unfocusedHasHeavy = unfocusedLines.contains { $0.contains("┏") || $0.contains("┗") }
     #expect(!unfocusedHasHeavy, "Unfocused TextField should not use heavy border")
+  }
+
+  @Test("focused TextField keeps content background untinted")
+  func focusedTextFieldKeepsContentBackgroundUntinted() throws {
+    var env = EnvironmentValues()
+    env.focusedIdentity = testIdentity("Field")
+
+    let field =
+      TextField("Name", text: .constant("hello"))
+      .textFieldStyle(.roundedBorder)
+      .id(testIdentity("Field"))
+
+    let focused = DefaultRenderer().render(
+      field,
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 20, height: 4)
+    )
+    let unfocused = DefaultRenderer().render(
+      field,
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 20, height: 4)
+    )
+
+    let focusedTextCell = try #require(
+      focused.rasterSurface.cells.first(where: { row in
+        row.contains { $0.character == "h" }
+      })?.first { $0.character == "h" }
+    )
+    let unfocusedTextCell = try #require(
+      unfocused.rasterSurface.cells.first(where: { row in
+        row.contains { $0.character == "h" }
+      })?.first { $0.character == "h" }
+    )
+
+    #expect(focusedTextCell.style?.backgroundColor == unfocusedTextCell.style?.backgroundColor)
   }
 
   @Test("focused plain button shows focus rail")
