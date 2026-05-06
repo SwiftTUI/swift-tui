@@ -1,5 +1,9 @@
 import { BrowserWASIBridge } from "./wasi/BrowserWASIBridge.ts";
 import {
+  WebSocketSceneBridge,
+  type WebSocketSceneBridgeOptions,
+} from "./WebSocketSceneBridge.ts";
+import {
   loadWebHostSceneManifest,
   normalizeWebHostSceneManifest,
   type WebHostSceneDescriptor,
@@ -12,7 +16,26 @@ import {
   type ResolvedWebHostTerminalStyle,
   type WebHostTerminalStyle,
 } from "./WebHostTerminalStyle.ts";
-import { WebHostSceneRuntime, type WebHostSceneRuntimeOptions } from "./WebHostSceneRuntime.ts";
+import {
+  WebHostSceneRuntime,
+  type WebHostSceneBridge,
+  type WebHostSceneRuntimeOptions,
+} from "./WebHostSceneRuntime.ts";
+
+export interface WebHostEmbeddedHostConfig {
+  token: string;
+  webSocketBaseURL?: string | URL;
+  webSocketFactory?: WebSocketSceneBridgeOptions["webSocketFactory"];
+}
+
+export interface WebHostBridgeFactoryOptions {
+  sceneId: string;
+  descriptor: WebHostSceneDescriptor;
+  style: WebHostTerminalStyle;
+  environment?: Record<string, string>;
+}
+
+export type WebHostBridgeFactory = (options: WebHostBridgeFactoryOptions) => WebHostSceneBridge;
 
 export interface WebHostAppOptions {
   mount: HTMLElement;
@@ -21,6 +44,8 @@ export interface WebHostAppOptions {
   initialSceneId?: string;
   style?: WebHostTerminalStyle;
   environment?: Record<string, string>;
+  embeddedHost?: WebHostEmbeddedHostConfig;
+  bridgeFactory?: WebHostBridgeFactory;
   createElement?: (tagName: string) => HTMLElement;
   sceneRuntimeFactory?: (options: WebHostSceneRuntimeOptions) => WebHostSceneRuntime;
 }
@@ -44,6 +69,8 @@ export async function createWebHostApp(
     manifest,
     style: options.style,
     environment: options.environment,
+    embeddedHost: options.embeddedHost,
+    bridgeFactory: options.bridgeFactory,
     initialSceneId: options.initialSceneId,
     createElement: options.createElement,
     sceneRuntimeFactory: options.sceneRuntimeFactory ?? ((runtimeOptions) => new WebHostSceneRuntime(runtimeOptions)),
@@ -60,15 +87,19 @@ class InternalWebHostAppController implements WebHostAppController {
   private readonly sceneRoot: HTMLElement;
   private style: ResolvedWebHostTerminalStyle;
   private readonly environment?: Record<string, string>;
+  private readonly embeddedHost?: WebHostEmbeddedHostConfig;
+  private readonly bridgeFactory?: WebHostBridgeFactory;
   private readonly sceneRuntimeFactory: RuntimeFactory;
   private readonly runtimes = new Map<string, WebHostSceneRuntime>();
-  private readonly bridges = new Map<string, BrowserWASIBridge>();
+  private readonly bridges = new Map<string, WebHostSceneBridge>();
 
   constructor(options: {
     mount: HTMLElement;
     manifest: WebHostSceneManifest;
     style?: WebHostTerminalStyle;
     environment?: Record<string, string>;
+    embeddedHost?: WebHostEmbeddedHostConfig;
+    bridgeFactory?: WebHostBridgeFactory;
     initialSceneId?: string;
     createElement?: (tagName: string) => HTMLElement;
     sceneRuntimeFactory: RuntimeFactory;
@@ -76,6 +107,8 @@ class InternalWebHostAppController implements WebHostAppController {
     this.mount = options.mount;
     this.style = normalizeWebHostTerminalStyle(options.style ?? {});
     this.environment = options.environment;
+    this.embeddedHost = options.embeddedHost;
+    this.bridgeFactory = options.bridgeFactory;
     this.sceneRuntimeFactory = options.sceneRuntimeFactory;
     this.scenes = options.manifest.scenes;
     this.selectedSceneId =
@@ -150,13 +183,7 @@ class InternalWebHostAppController implements WebHostAppController {
       throw new Error(`Unknown scene: ${id}`);
     }
 
-    const bridge = new BrowserWASIBridge({
-      sceneId: id,
-      columns: 80,
-      rows: 24,
-      environment: this.environment,
-      renderStyle: this.style,
-    });
+    const bridge = this.makeBridge(id, descriptor);
     const runtime = this.sceneRuntimeFactory({
       mount: this.sceneRoot,
       descriptor,
@@ -170,6 +197,37 @@ class InternalWebHostAppController implements WebHostAppController {
     await runtime.mount();
     runtime.setVisible(id === this.selectedSceneId);
     return runtime;
+  }
+
+  private makeBridge(
+    sceneId: string,
+    descriptor: WebHostSceneDescriptor
+  ): WebHostSceneBridge {
+    if (this.bridgeFactory) {
+      return this.bridgeFactory({
+        sceneId,
+        descriptor,
+        style: this.style,
+        environment: this.environment,
+      });
+    }
+
+    if (this.embeddedHost) {
+      return new WebSocketSceneBridge({
+        sceneId,
+        token: this.embeddedHost.token,
+        baseURL: this.embeddedHost.webSocketBaseURL,
+        webSocketFactory: this.embeddedHost.webSocketFactory,
+      });
+    }
+
+    return new BrowserWASIBridge({
+      sceneId,
+      columns: 80,
+      rows: 24,
+      environment: this.environment,
+      renderStyle: this.style,
+    });
   }
 
   private applyHostFrameStyle(): void {

@@ -14,6 +14,7 @@ import {
   encodeKeyInputMessage,
   encodeMouseInputMessage,
   encodePasteInputMessage,
+  type WebHostOutputSink,
   type WebHostKeyInput,
   type WebHostSurfaceFrame,
   type WebHostSurfaceImage,
@@ -21,13 +22,20 @@ import {
   type WebHostSurfaceStyle,
 } from "./WebHostSurfaceTransport.ts";
 import type { WebHostSceneDescriptor } from "./WebHostSceneManifest.ts";
-import { BrowserWASIBridge } from "./wasi/BrowserWASIBridge.ts";
+
+export interface WebHostSceneBridge {
+  bindOutput(sink: WebHostOutputSink): void;
+  resize(columns: number, rows: number, cellWidth?: number, cellHeight?: number): void;
+  updateRenderStyle(style: WebHostTerminalStyle): void;
+  sendInput(chunk: Uint8Array): void;
+  dispose(): void;
+}
 
 export interface WebHostSceneRuntimeOptions {
   mount: HTMLElement;
   descriptor: WebHostSceneDescriptor;
   style: WebHostTerminalStyle;
-  bridge?: BrowserWASIBridge;
+  bridge?: WebHostSceneBridge;
   onInput(chunk: Uint8Array): void;
 }
 
@@ -41,7 +49,7 @@ export class WebHostSceneRuntime {
   readonly element: HTMLElement;
   readonly terminalMount: HTMLElement;
 
-  private readonly bridge?: BrowserWASIBridge;
+  private readonly bridge?: WebHostSceneBridge;
   private readonly onInput: (chunk: Uint8Array) => void;
   private readonly imageCache = new Map<string, CachedWebHostImage>();
   private currentStyle: ResolvedWebHostTerminalStyle;

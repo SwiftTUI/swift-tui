@@ -40,6 +40,9 @@ let package = Package(
         .product(name: "FlyingFox", package: "FlyingFox"),
         .product(name: "FlyingSocks", package: "FlyingFox"),
       ],
+      resources: [
+        .copy("Resources/browser")
+      ],
       swiftSettings: swiftSettings()
     ),
     .target(

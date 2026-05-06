@@ -7,7 +7,7 @@ import {
   WebHostOutputDecoder,
   encodeRenderStyleControlMessage,
   encodeResizeControlMessage,
-  type WebHostSurfaceFrame,
+  type WebHostOutputSink,
 } from "../WebHostSurfaceTransport.ts";
 
 export interface BrowserWASIBridgeOptions {
@@ -18,11 +18,7 @@ export interface BrowserWASIBridgeOptions {
   renderStyle?: WebHostTerminalStyle;
 }
 
-export interface BrowserWASIOutputSink {
-  presentSurface(frame: WebHostSurfaceFrame): void;
-  writeOutput?(text: string): void;
-  writeError?(text: string): void;
-}
+export type BrowserWASIOutputSink = WebHostOutputSink;
 
 export class BrowserWASIBridge {
   readonly stdin = new StdIOPipe();
