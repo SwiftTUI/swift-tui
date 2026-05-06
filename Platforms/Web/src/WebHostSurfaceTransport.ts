@@ -36,6 +36,25 @@ export type WebHostSurfaceSize = [
   height: number,
 ];
 
+export type WebHostAccessibilityPoint = [
+  x: number,
+  y: number,
+];
+
+export type WebHostAccessibilityLiveRegion = "off" | "polite" | "assertive";
+
+export interface WebHostAccessibilityNode {
+  id: string;
+  parentId?: string;
+  rect: WebHostSurfaceRect;
+  role: string;
+  label?: string;
+  hint?: string;
+  liveRegion?: WebHostAccessibilityLiveRegion;
+  cursorAnchor?: WebHostAccessibilityPoint;
+  isFocused?: boolean;
+}
+
 export type WebHostSurfaceImageFormat = "png" | "jpeg" | "gif";
 
 export interface WebHostSurfaceImage {
@@ -49,12 +68,13 @@ export interface WebHostSurfaceImage {
 }
 
 export interface WebHostSurfaceFrame {
-  version: 1;
+  version: 1 | 2;
   width: number;
   height: number;
   styles: Array<WebHostSurfaceStyle | null>;
   rows: WebHostSurfaceCell[][];
   images?: WebHostSurfaceImage[];
+  accessibilityTree?: WebHostAccessibilityNode[];
 }
 
 export type WebHostOutputRecord =
@@ -222,12 +242,53 @@ function isWebHostSurfaceFrame(
     return false;
   }
   const frame = value as Partial<WebHostSurfaceFrame>;
-  return frame.version === 1
+  return (frame.version === 1 || frame.version === 2)
     && typeof frame.width === "number"
     && typeof frame.height === "number"
     && Array.isArray(frame.styles)
     && Array.isArray(frame.rows)
-    && (frame.images === undefined || isWebHostSurfaceImages(frame.images));
+    && (frame.images === undefined || isWebHostSurfaceImages(frame.images))
+    && (
+      frame.accessibilityTree === undefined
+        || isWebHostAccessibilityNodes(frame.accessibilityTree)
+    );
+}
+
+function isWebHostAccessibilityNodes(
+  value: unknown
+): value is WebHostAccessibilityNode[] {
+  return Array.isArray(value) && value.every(isWebHostAccessibilityNode);
+}
+
+function isWebHostAccessibilityNode(
+  value: unknown
+): value is WebHostAccessibilityNode {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const node = value as Partial<WebHostAccessibilityNode>;
+  return typeof node.id === "string"
+    && (node.parentId === undefined || typeof node.parentId === "string")
+    && isWebHostSurfaceRect(node.rect)
+    && typeof node.role === "string"
+    && (node.label === undefined || typeof node.label === "string")
+    && (node.hint === undefined || typeof node.hint === "string")
+    && (
+      node.liveRegion === undefined
+        || node.liveRegion === "off"
+        || node.liveRegion === "polite"
+        || node.liveRegion === "assertive"
+    )
+    && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor))
+    && (node.isFocused === undefined || typeof node.isFocused === "boolean");
+}
+
+function isWebHostAccessibilityPoint(
+  value: unknown
+): value is WebHostAccessibilityPoint {
+  return Array.isArray(value)
+    && value.length === 2
+    && value.every((entry) => typeof entry === "number");
 }
 
 function isWebHostSurfaceImages(

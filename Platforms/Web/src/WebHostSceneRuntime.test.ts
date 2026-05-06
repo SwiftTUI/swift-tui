@@ -141,6 +141,147 @@ test("runtime draws decoded surface frames into the canvas", async () => {
   }
 });
 
+test("runtime mounts accessibility tree and announces live-region changes", async () => {
+  const dom = installFakeDOM();
+  try {
+    const bridge = new BrowserWASIBridge({
+      sceneId: "main",
+      columns: 4,
+      rows: 2,
+    });
+    const mount = new FakeElement("div");
+    const runtime = new WebHostSceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: {
+        fontSize: 20,
+        fontFamily: "Test Mono",
+      },
+      bridge,
+      onInput: () => {},
+    });
+
+    await runtime.mount();
+
+    const canvas = dom.canvases[0]!;
+    expect(canvas.getAttribute("aria-hidden")).toBe("true");
+
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 2,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
+      accessibilityTree: [
+        {
+          id: "root",
+          rect: [0, 0, 4, 2],
+          role: "group",
+          label: "Root",
+          isFocused: false,
+        },
+        {
+          id: "root/button",
+          parentId: "root",
+          rect: [0, 0, 2, 1],
+          role: "button",
+          label: "Save",
+          hint: "Writes the file",
+          isFocused: true,
+        },
+        {
+          id: "root/status",
+          parentId: "root",
+          rect: [0, 1, 2, 1],
+          role: "status",
+          label: "Idle",
+          liveRegion: "polite",
+          isFocused: false,
+        },
+        {
+          id: "root/error",
+          parentId: "root",
+          rect: [2, 1, 2, 1],
+          role: "alert",
+          label: "Ready",
+          liveRegion: "assertive",
+          isFocused: false,
+        },
+      ],
+    })));
+
+    const tree = childWithClass(runtime.terminalMount, "webhost-scene__accessibility-tree");
+    const announcer = childWithClass(
+      runtime.terminalMount,
+      "webhost-scene__accessibility-announcer"
+    );
+    const root = childWithData(tree, "accessibilityId", "root");
+    const button = childWithData(root, "accessibilityId", "root/button");
+    const status = childWithData(root, "accessibilityId", "root/status");
+
+    expect(button.getAttribute("role")).toBe("button");
+    expect(button.getAttribute("aria-label")).toBe("Save");
+    expect(button.getAttribute("aria-description")).toBe("Writes the file");
+    expect(button.focused).toBe(true);
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(status.style.left).toBe("0px");
+    expect(status.style.top).toBe("27px");
+    expect(announcer.textContent).toBe("");
+
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 2,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
+      accessibilityTree: [
+        {
+          id: "root/status",
+          rect: [0, 1, 2, 1],
+          role: "status",
+          label: "Saved",
+          liveRegion: "polite",
+          isFocused: false,
+        },
+        {
+          id: "root/error",
+          rect: [2, 1, 2, 1],
+          role: "alert",
+          label: "Failed",
+          liveRegion: "assertive",
+          isFocused: false,
+        },
+      ],
+    })));
+
+    expect(announcer.getAttribute("aria-live")).toBe("assertive");
+    expect(announcer.textContent).toBe("Failed\nSaved");
+
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 2,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
+      accessibilityTree: [
+        {
+          id: "root/status",
+          rect: [0, 1, 2, 1],
+          role: "status",
+          label: "Saved",
+          liveRegion: "polite",
+          isFocused: false,
+        },
+      ],
+    })));
+
+    expect(announcer.textContent).toBe("Failed\nSaved");
+  } finally {
+    dom.restore();
+  }
+});
+
 test("runtime decodes surface images once and reuses the cached image", async () => {
   const decodedBlobs: Blob[] = [];
   const dom = installFakeDOM({
@@ -606,6 +747,29 @@ function drawImageOperations(
   return context.operations.filter((operation) => operation.type === "drawImage");
 }
 
+function childWithClass(
+  element: FakeElement,
+  className: string
+): FakeElement {
+  const child = element.children.find((child) => child.className === className);
+  if (!child) {
+    throw new Error(`missing child with class ${className}`);
+  }
+  return child;
+}
+
+function childWithData(
+  element: FakeElement,
+  key: string,
+  value: string
+): FakeElement {
+  const child = element.children.find((child) => child.dataset[key] === value);
+  if (!child) {
+    throw new Error(`missing child with data-${key} ${value}`);
+  }
+  return child;
+}
+
 async function flushPromises(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -702,9 +866,12 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   readonly children: FakeElement[] = [];
   private readonly eventListeners = new Map<string, Set<(event: Record<string, unknown>) => void>>();
+  private readonly attributes = new Map<string, string>();
 
   className = "";
+  id = "";
   hidden = false;
+  focused = false;
   tabIndex = 0;
   textContent = "";
   rect = {
@@ -740,9 +907,24 @@ class FakeElement {
   }
 
   remove(): void {}
-  focus(): void {}
+  focus(): void {
+    this.focused = true;
+  }
   setPointerCapture(): void {}
   releasePointerCapture(): void {}
+
+  setAttribute(
+    name: string,
+    value: string
+  ): void {
+    this.attributes.set(name, value);
+  }
+
+  getAttribute(
+    name: string
+  ): string | null {
+    return this.attributes.get(name) ?? null;
+  }
 
   getBoundingClientRect(): typeof this.rect {
     return this.rect;

@@ -67,6 +67,54 @@ test("decoder preserves typed image records", () => {
   ]);
 });
 
+test("decoder accepts v2 accessibility trees", () => {
+  const decoder = new WebHostOutputDecoder();
+  const records = decoder.feed(encoder.encode(
+    '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'
+      + '"accessibilityTree":[{"id":"root/button","parentId":"root","rect":[0,0,2,1],'
+      + '"role":"button","label":"Save","hint":"Writes the file",'
+      + '"cursorAnchor":[1,0],"isFocused":true},'
+      + '{"id":"root/status","rect":[0,1,2,1],"role":"status","label":"Saved",'
+      + '"liveRegion":"polite","isFocused":false}]}\n'
+  ));
+
+  const frame = surfaceFrame(records[0]);
+  expect(frame.version).toBe(2);
+  expect(frame.accessibilityTree).toEqual([
+    {
+      id: "root/button",
+      parentId: "root",
+      rect: [0, 0, 2, 1],
+      role: "button",
+      label: "Save",
+      hint: "Writes the file",
+      cursorAnchor: [1, 0],
+      isFocused: true,
+    },
+    {
+      id: "root/status",
+      rect: [0, 1, 2, 1],
+      role: "status",
+      label: "Saved",
+      liveRegion: "polite",
+      isFocused: false,
+    },
+  ]);
+});
+
+test("decoder rejects malformed accessibility trees as diagnostic text", () => {
+  const decoder = new WebHostOutputDecoder();
+  const line = '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'
+    + '"accessibilityTree":[{"id":"missing-rect","role":"button"}]}\n';
+
+  expect(decoder.feed(encoder.encode(line))).toEqual([
+    {
+      type: "text",
+      text: line,
+    },
+  ]);
+});
+
 test("decoder keeps malformed surface output visible as text", () => {
   const decoder = new WebHostOutputDecoder();
   const records = decoder.feed(encoder.encode('\u001Esurface:{"version":1,"width":2}\n'));

@@ -121,7 +121,8 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
   }
 #endif
 
-package final class WebSurfaceTransport: PresentationSurface, Sendable {
+package final class WebSurfaceTransport: PresentationSurface, SemanticPresentationSurface, Sendable
+{
   private struct State: Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
@@ -238,6 +239,33 @@ package final class WebSurfaceTransport: PresentationSurface, Sendable {
       Array(
         WebSurfaceFrameEncoder.encode(
           surface,
+          knownImageIDs: &state.transmittedImageIDs
+        ).utf8
+      )
+    }
+    try writeBytes(bytes)
+    return TerminalPresentationMetrics(
+      bytesWritten: bytes.count,
+      linesTouched: max(0, surface.size.height),
+      cellsChanged: max(0, surface.size.width) * max(0, surface.size.height),
+      strategy: .fullRepaint,
+      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
+      graphicsAttachmentsReplayed: surface.imageAttachments.count
+    )
+  }
+
+  @discardableResult
+  package func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?
+  ) throws -> TerminalPresentationMetrics {
+    let bytes = state.withLock { state in
+      Array(
+        WebSurfaceFrameEncoder.encode(
+          surface,
+          semanticSnapshot: semanticSnapshot,
+          focusedIdentity: focusedIdentity,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
@@ -676,6 +704,48 @@ package enum WebSurfaceFrameEncoder {
     _ surface: RasterSurface,
     knownImageIDs: inout Set<String>
   ) -> String {
+    encode(
+      surface,
+      semanticSnapshot: nil,
+      focusedIdentity: nil,
+      knownImageIDs: &knownImageIDs
+    )
+  }
+
+  package static func encode(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity? = nil
+  ) -> String {
+    var knownImageIDs: Set<String> = []
+    return encode(
+      surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      knownImageIDs: &knownImageIDs
+    )
+  }
+
+  package static func encode(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity? = nil,
+    knownImageIDs: inout Set<String>
+  ) -> String {
+    encode(
+      surface,
+      semanticSnapshot: Optional(semanticSnapshot),
+      focusedIdentity: focusedIdentity,
+      knownImageIDs: &knownImageIDs
+    )
+  }
+
+  private static func encode(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot?,
+    focusedIdentity: Identity?,
+    knownImageIDs: inout Set<String>
+  ) -> String {
     var styles: [ResolvedTextStyle?] = [nil]
     let rows = surface.cells.enumerated().map { y, row in
       encodeRow(
@@ -684,9 +754,16 @@ package enum WebSurfaceFrameEncoder {
         styles: &styles
       )
     }
+    let accessibilityTree = semanticSnapshot.map {
+      encodeAccessibilityTree(
+        $0.accessibilityNodes,
+        focusedIdentity: focusedIdentity
+      )
+    }
+    let version = accessibilityTree?.isEmpty == false ? 2 : 1
 
     var json = "\u{001E}surface:{"
-    json += "\"version\":1"
+    json += "\"version\":\(version)"
     json += ",\"width\":\(max(0, surface.size.width))"
     json += ",\"height\":\(max(0, surface.size.height))"
     json += ",\"styles\":["
@@ -701,6 +778,11 @@ package enum WebSurfaceFrameEncoder {
       knownImageIDs: &knownImageIDs
     ).joined(separator: ",")
     json += "]"
+    if let accessibilityTree, !accessibilityTree.isEmpty {
+      json += ",\"accessibilityTree\":["
+      json += accessibilityTree.joined(separator: ",")
+      json += "]"
+    }
     json += "}\n"
     return json
   }
@@ -724,6 +806,36 @@ package enum WebSurfaceFrameEncoder {
     }
 
     return "[" + encodedCells.joined(separator: ",") + "]"
+  }
+
+  private static func encodeAccessibilityTree(
+    _ nodes: [AccessibilityNode],
+    focusedIdentity: Identity?
+  ) -> [String] {
+    nodes.map { node in
+      var fields = [
+        "\"id\":\(jsonString(node.identity.path))",
+        "\"rect\":\(encodeRect(node.rect))",
+        "\"role\":\(jsonString(node.role.description))",
+        "\"isFocused\":\(node.identity == focusedIdentity ? "true" : "false")",
+      ]
+      if let parentIdentity = node.parentIdentity {
+        fields.append("\"parentId\":\(jsonString(parentIdentity.path))")
+      }
+      if let label = node.label {
+        fields.append("\"label\":\(jsonString(label))")
+      }
+      if let hint = node.hint {
+        fields.append("\"hint\":\(jsonString(hint))")
+      }
+      if let liveRegion = node.liveRegion {
+        fields.append("\"liveRegion\":\(jsonString(liveRegion.description))")
+      }
+      if let cursorAnchor = node.cursorAnchor {
+        fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
+      }
+      return "{" + fields.joined(separator: ",") + "}"
+    }
   }
 
   private static func encodeImages(
@@ -818,6 +930,12 @@ package enum WebSurfaceFrameEncoder {
     _ size: PixelSize
   ) -> String {
     "[\(size.width),\(size.height)]"
+  }
+
+  private static func encodePoint(
+    _ point: CellPoint
+  ) -> String {
+    "[\(point.x),\(point.y)]"
   }
 
   private static func webImageID(

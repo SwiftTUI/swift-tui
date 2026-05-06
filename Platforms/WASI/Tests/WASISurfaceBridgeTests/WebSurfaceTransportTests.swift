@@ -40,6 +40,89 @@ struct WebSurfaceTransportTests {
     #expect(metrics.strategy == .fullRepaint)
   }
 
+  @Test("encoder emits v2 accessibility tree with focus and live-region fields")
+  func encoderEmitsAccessibilityTree() throws {
+    let root = Identity(components: ["root"])
+    let group = root.child("group")
+    let button = group.child("button")
+    let live = group.child("live")
+    let mixed = group.child("mixed")
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.basicSurface(),
+        semanticSnapshot: SemanticSnapshot(
+          accessibilityNodes: [
+            AccessibilityNode(
+              identity: group,
+              parentIdentity: root,
+              rect: .init(origin: .zero, size: .init(width: 2, height: 2)),
+              role: .group,
+              label: "Actions"
+            ),
+            AccessibilityNode(
+              identity: button,
+              parentIdentity: group,
+              rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
+              role: .button,
+              label: "Save",
+              hint: "Writes the file",
+              cursorAnchor: .init(x: 1, y: 0)
+            ),
+            AccessibilityNode(
+              identity: live,
+              parentIdentity: group,
+              rect: .init(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1)),
+              role: .status,
+              label: "Saved",
+              liveRegion: .polite
+            ),
+            AccessibilityNode(
+              identity: mixed,
+              parentIdentity: group,
+              rect: .init(origin: .zero, size: .init(width: 1, height: 1)),
+              role: .group,
+              label: "Mixed",
+              hidden: true
+            ),
+          ]
+        ),
+        focusedIdentity: button
+      )
+    )
+
+    #expect(frame["version"] as? Int == 2)
+    let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
+    #expect(tree.count == 4)
+
+    let groupNode = try #require(tree.first)
+    #expect(groupNode["id"] as? String == "root/group")
+    #expect(groupNode["parentId"] as? String == "root")
+    #expect(groupNode["rect"] as? [Int] == [0, 0, 2, 2])
+    #expect(groupNode["role"] as? String == "group")
+    #expect(groupNode["label"] as? String == "Actions")
+    #expect(groupNode["isFocused"] as? Bool == false)
+
+    let buttonNode = try #require(tree.dropFirst().first)
+    #expect(buttonNode["id"] as? String == "root/group/button")
+    #expect(buttonNode["parentId"] as? String == "root/group")
+    #expect(buttonNode["role"] as? String == "button")
+    #expect(buttonNode["label"] as? String == "Save")
+    #expect(buttonNode["hint"] as? String == "Writes the file")
+    #expect(buttonNode["cursorAnchor"] as? [Int] == [1, 0])
+    #expect(buttonNode["isFocused"] as? Bool == true)
+
+    let liveNode = try #require(tree.dropFirst(2).first)
+    #expect(liveNode["id"] as? String == "root/group/live")
+    #expect(liveNode["role"] as? String == "status")
+    #expect(liveNode["liveRegion"] as? String == "polite")
+    #expect(liveNode["isFocused"] as? Bool == false)
+
+    let mixedNode = try #require(tree.dropFirst(3).first)
+    #expect(mixedNode["id"] as? String == "root/group/mixed")
+    #expect(mixedNode["role"] as? String == "group")
+    #expect(mixedNode["hidden"] == nil)
+  }
+
   @Test("encoder emits image data once and then reuses the cached image id")
   func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
     var knownImageIDs: Set<String> = []
