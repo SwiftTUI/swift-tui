@@ -36,7 +36,20 @@ public struct TextFieldStyleConfiguration: Sendable {
     }
   }
 
+  public struct FieldContent: View, Sendable {
+    package var displayText: String
+
+    nonisolated package init(displayText: String) {
+      self.displayText = displayText
+    }
+
+    public var body: some View {
+      TextInputContent(displayText: displayText)
+    }
+  }
+
   public var displayText: String
+  public var fieldContent: FieldContent
   public var isShowingPrompt: Bool
   public var label: Label
   public var showsLabel: Bool
@@ -47,6 +60,7 @@ public struct TextFieldStyleConfiguration: Sendable {
 
   package init(
     displayText: String,
+    fieldContent: FieldContent? = nil,
     isShowingPrompt: Bool,
     label: Label,
     showsLabel: Bool,
@@ -56,6 +70,7 @@ public struct TextFieldStyleConfiguration: Sendable {
     styleEnvironment: StyleEnvironmentSnapshot
   ) {
     self.displayText = displayText
+    self.fieldContent = fieldContent ?? FieldContent(displayText: displayText)
     self.isShowingPrompt = isShowingPrompt
     self.label = label
     self.showsLabel = showsLabel
@@ -191,7 +206,7 @@ package struct PlainTextFieldStyleBody: View {
       ? configuration.placeholderStyle
       : configuration.chrome.foregroundStyle
     let field =
-      Text(configuration.displayText)
+      configuration.fieldContent
       .fixedSize(horizontal: true, vertical: false)
       .foregroundStyle(textStyle)
       .drawMetadata(.init(opacity: configuration.chrome.opacity))
@@ -219,7 +234,7 @@ package struct RoundedBorderTextFieldStyleBody: View {
       ? configuration.placeholderStyle
       : configuration.chrome.foregroundStyle
     let baseField =
-      Text(configuration.displayText)
+      configuration.fieldContent
       .fixedSize(horizontal: true, vertical: false)
       .foregroundStyle(textStyle)
       .drawMetadata(.init(opacity: configuration.chrome.opacity))
