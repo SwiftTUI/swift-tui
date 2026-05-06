@@ -93,8 +93,6 @@ Follow-up target behavior completed after this substrate plan:
 
 Still follow-up work:
 
-- Public cursor-anchor authoring for custom anchors outside the built-in text
-  input controls.
 - Imperative announcement authoring.
 - Listening/lint coverage.
 
@@ -230,9 +228,10 @@ git commit -m "feat: rename presentation roles to accessibility roles"
 
 ## Stage 2: Add Authoring Metadata And Modifiers
 
-This is ACCESSIBILITY.md Phase 3a minus the public cursor-anchor modifier. The
-cursor-anchor node field is in ADR-0012; the exact public modifier argument
-type is still an open question.
+This is ACCESSIBILITY.md Phase 3a as originally scoped before public
+cursor-anchor authoring landed. The cursor-anchor node field is in ADR-0012;
+custom focus targets can now publish local anchors with
+`accessibilityCursorAnchor(_:)`.
 
 ### Task 2.1: Add metadata storage tests
 
@@ -457,13 +456,11 @@ must be resolved before implementing target-specific behavior.
    be parked at the focused anchor, only in accessible mode, or only when a
    dedicated cursor policy is enabled.
 
-4. **Public cursor-anchor modifier shape.** ADR-0012 locks the node field as
-   absolute `CellPoint?`, but the public modifier argument is not fully
-   specified. Decide between `CellPoint`, an enum such as
-   `AccessibilityCursorAnchor`, or role-specific built-in anchors plus no
-   public modifier in v1. Current status: built-in text input caret anchors
-   for `TextField`, `SecureField`, and `TextEditor` landed in the text input
-   V1 plan; only the public custom-anchor authoring shape remains unresolved.
+4. ~~**Public cursor-anchor modifier shape.**~~ **Resolved.**
+   ADR-0012 locks the node field as absolute `CellPoint?`; the public
+   `accessibilityCursorAnchor(_:)` modifier accepts a local `CellPoint` for
+   custom focus targets. Built-in text input caret anchors for `TextField`,
+   `SecureField`, and `TextEditor` landed in the text input V1 plan.
 
 5. **Reduce-motion semantics.** Decide what "reduced" means for
    `Animation`, spinners, progress bars, transitions, and content changes that

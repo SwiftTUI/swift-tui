@@ -518,6 +518,7 @@ SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)
 SwiftTUIAnimatedImage.AnimatedGIF.decode(data:)
 SwiftTUIAnimatedImage.AnimatedGIF.encode(_:loopCount:)
 SwiftTUIAnimatedImage.AnimatedImage
+SwiftTUIAnimatedImage.AnimatedImage.accessibilityCursorAnchor(_:)
 SwiftTUIAnimatedImage.AnimatedImage.accessibilityHidden(_:)
 SwiftTUIAnimatedImage.AnimatedImage.accessibilityHint(_:)
 SwiftTUIAnimatedImage.AnimatedImage.accessibilityLabel(_:)
@@ -671,6 +672,7 @@ SwiftTUICharts.BannerTone.info
 SwiftTUICharts.BannerTone.success
 SwiftTUICharts.BannerTone.warning
 SwiftTUICharts.BarChart
+SwiftTUICharts.BarChart.accessibilityCursorAnchor(_:)
 SwiftTUICharts.BarChart.accessibilityHidden(_:)
 SwiftTUICharts.BarChart.accessibilityHint(_:)
 SwiftTUICharts.BarChart.accessibilityLabel(_:)
@@ -803,6 +805,7 @@ SwiftTUICharts.BarChartEntry.label
 SwiftTUICharts.BarChartEntry.tone
 SwiftTUICharts.BarChartEntry.value
 SwiftTUICharts.BulletChart
+SwiftTUICharts.BulletChart.accessibilityCursorAnchor(_:)
 SwiftTUICharts.BulletChart.accessibilityHidden(_:)
 SwiftTUICharts.BulletChart.accessibilityHint(_:)
 SwiftTUICharts.BulletChart.accessibilityLabel(_:)
@@ -931,6 +934,7 @@ SwiftTUICharts.BulletChart.underline(_:color:)
 SwiftTUICharts.BulletChart.underline(_:pattern:color:)
 SwiftTUICharts.BulletChart.value
 SwiftTUICharts.ColumnChart
+SwiftTUICharts.ColumnChart.accessibilityCursorAnchor(_:)
 SwiftTUICharts.ColumnChart.accessibilityHidden(_:)
 SwiftTUICharts.ColumnChart.accessibilityHint(_:)
 SwiftTUICharts.ColumnChart.accessibilityLabel(_:)
@@ -1057,6 +1061,7 @@ SwiftTUICharts.ColumnChart.truncationMode(_:)
 SwiftTUICharts.ColumnChart.underline(_:color:)
 SwiftTUICharts.ColumnChart.underline(_:pattern:color:)
 SwiftTUICharts.ComparisonChart
+SwiftTUICharts.ComparisonChart.accessibilityCursorAnchor(_:)
 SwiftTUICharts.ComparisonChart.accessibilityHidden(_:)
 SwiftTUICharts.ComparisonChart.accessibilityHint(_:)
 SwiftTUICharts.ComparisonChart.accessibilityLabel(_:)
@@ -1191,6 +1196,7 @@ SwiftTUICharts.ComparisonEntry.label
 SwiftTUICharts.ComparisonEntry.tone
 SwiftTUICharts.ComparisonEntry.total
 SwiftTUICharts.HeatStrip
+SwiftTUICharts.HeatStrip.accessibilityCursorAnchor(_:)
 SwiftTUICharts.HeatStrip.accessibilityHidden(_:)
 SwiftTUICharts.HeatStrip.accessibilityHint(_:)
 SwiftTUICharts.HeatStrip.accessibilityLabel(_:)
@@ -1316,6 +1322,7 @@ SwiftTUICharts.HeatStrip.truncationMode(_:)
 SwiftTUICharts.HeatStrip.underline(_:color:)
 SwiftTUICharts.HeatStrip.underline(_:pattern:color:)
 SwiftTUICharts.Legend
+SwiftTUICharts.Legend.accessibilityCursorAnchor(_:)
 SwiftTUICharts.Legend.accessibilityHidden(_:)
 SwiftTUICharts.Legend.accessibilityHint(_:)
 SwiftTUICharts.Legend.accessibilityLabel(_:)
@@ -1446,6 +1453,7 @@ SwiftTUICharts.LegendItem.init(_:tone:)
 SwiftTUICharts.LegendItem.label
 SwiftTUICharts.LegendItem.tone
 SwiftTUICharts.Meter
+SwiftTUICharts.Meter.accessibilityCursorAnchor(_:)
 SwiftTUICharts.Meter.accessibilityHidden(_:)
 SwiftTUICharts.Meter.accessibilityHint(_:)
 SwiftTUICharts.Meter.accessibilityLabel(_:)
@@ -1573,6 +1581,7 @@ SwiftTUICharts.Meter.underline(_:color:)
 SwiftTUICharts.Meter.underline(_:pattern:color:)
 SwiftTUICharts.Meter.value
 SwiftTUICharts.Sparkline
+SwiftTUICharts.Sparkline.accessibilityCursorAnchor(_:)
 SwiftTUICharts.Sparkline.accessibilityHidden(_:)
 SwiftTUICharts.Sparkline.accessibilityHint(_:)
 SwiftTUICharts.Sparkline.accessibilityLabel(_:)
@@ -1698,6 +1707,7 @@ SwiftTUICharts.Sparkline.underline(_:color:)
 SwiftTUICharts.Sparkline.underline(_:pattern:color:)
 SwiftTUICharts.Sparkline.values
 SwiftTUICharts.StackedBarChart
+SwiftTUICharts.StackedBarChart.accessibilityCursorAnchor(_:)
 SwiftTUICharts.StackedBarChart.accessibilityHidden(_:)
 SwiftTUICharts.StackedBarChart.accessibilityHint(_:)
 SwiftTUICharts.StackedBarChart.accessibilityLabel(_:)
@@ -1829,6 +1839,7 @@ SwiftTUICharts.ThresholdBand.init(upTo:tone:)
 SwiftTUICharts.ThresholdBand.tone
 SwiftTUICharts.ThresholdBand.upperBound
 SwiftTUICharts.ThresholdGauge
+SwiftTUICharts.ThresholdGauge.accessibilityCursorAnchor(_:)
 SwiftTUICharts.ThresholdGauge.accessibilityHidden(_:)
 SwiftTUICharts.ThresholdGauge.accessibilityHint(_:)
 SwiftTUICharts.ThresholdGauge.accessibilityLabel(_:)
@@ -1956,6 +1967,7 @@ SwiftTUICharts.ThresholdGauge.underline(_:color:)
 SwiftTUICharts.ThresholdGauge.underline(_:pattern:color:)
 SwiftTUICharts.ThresholdGauge.value
 SwiftTUICharts.Timeline
+SwiftTUICharts.Timeline.accessibilityCursorAnchor(_:)
 SwiftTUICharts.Timeline.accessibilityHidden(_:)
 SwiftTUICharts.Timeline.accessibilityHint(_:)
 SwiftTUICharts.Timeline.accessibilityLabel(_:)
@@ -4800,6 +4812,7 @@ SwiftTUIViews.AnyTransition.opacity
 SwiftTUIViews.AnyTransition.push(from:)
 SwiftTUIViews.AnyTransition.slide
 SwiftTUIViews.AnyView
+SwiftTUIViews.AnyView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.AnyView.accessibilityHidden(_:)
 SwiftTUIViews.AnyView.accessibilityHint(_:)
 SwiftTUIViews.AnyView.accessibilityLabel(_:)
@@ -5004,6 +5017,7 @@ SwiftTUIViews.BuiltinSheetPresentationModifier
 SwiftTUIViews.BuiltinSheetPresentationModifier.body(content:)
 SwiftTUIViews.BuiltinSheetPresentationModifier.concat(_:)
 SwiftTUIViews.Button
+SwiftTUIViews.Button.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Button.accessibilityHidden(_:)
 SwiftTUIViews.Button.accessibilityHint(_:)
 SwiftTUIViews.Button.accessibilityLabel(_:)
@@ -5138,6 +5152,7 @@ SwiftTUIViews.ButtonStyle.snapshotLabel
 SwiftTUIViews.ButtonStyle.snapshotLabel
 SwiftTUIViews.ButtonStyleConfiguration
 SwiftTUIViews.ButtonStyleConfiguration.Label
+SwiftTUIViews.ButtonStyleConfiguration.Label.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ButtonStyleConfiguration.Label.accessibilityHidden(_:)
 SwiftTUIViews.ButtonStyleConfiguration.Label.accessibilityHint(_:)
 SwiftTUIViews.ButtonStyleConfiguration.Label.accessibilityLabel(_:)
@@ -5268,6 +5283,7 @@ SwiftTUIViews.ButtonStyleConfiguration.role
 SwiftTUIViews.ButtonStyleConfiguration.showsFocusEffect
 SwiftTUIViews.ButtonStyleConfiguration.styleEnvironment
 SwiftTUIViews.Canvas
+SwiftTUIViews.Canvas.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Canvas.accessibilityHidden(_:)
 SwiftTUIViews.Canvas.accessibilityHint(_:)
 SwiftTUIViews.Canvas.accessibilityLabel(_:)
@@ -5392,6 +5408,7 @@ SwiftTUIViews.Canvas.truncationMode(_:)
 SwiftTUIViews.Canvas.underline(_:color:)
 SwiftTUIViews.Canvas.underline(_:pattern:color:)
 SwiftTUIViews.Capsule
+SwiftTUIViews.Capsule.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Capsule.accessibilityHidden(_:)
 SwiftTUIViews.Capsule.accessibilityHint(_:)
 SwiftTUIViews.Capsule.accessibilityLabel(_:)
@@ -5527,6 +5544,7 @@ SwiftTUIViews.ChangeLifecycleModifier
 SwiftTUIViews.ChangeLifecycleModifier.body(content:)
 SwiftTUIViews.ChangeLifecycleModifier.concat(_:)
 SwiftTUIViews.Circle
+SwiftTUIViews.Circle.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Circle.accessibilityHidden(_:)
 SwiftTUIViews.Circle.accessibilityHint(_:)
 SwiftTUIViews.Circle.accessibilityLabel(_:)
@@ -5662,6 +5680,7 @@ SwiftTUIViews.ConditionalContent
 SwiftTUIViews.ConditionalContent.Storage
 SwiftTUIViews.ConditionalContent.Storage.falseContent(_:)
 SwiftTUIViews.ConditionalContent.Storage.trueContent(_:)
+SwiftTUIViews.ConditionalContent.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ConditionalContent.accessibilityHidden(_:)
 SwiftTUIViews.ConditionalContent.accessibilityHint(_:)
 SwiftTUIViews.ConditionalContent.accessibilityLabel(_:)
@@ -5785,6 +5804,7 @@ SwiftTUIViews.ContentShapeModifier
 SwiftTUIViews.ContentShapeModifier.body(content:)
 SwiftTUIViews.ContentShapeModifier.concat(_:)
 SwiftTUIViews.ControlGroup
+SwiftTUIViews.ControlGroup.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ControlGroup.accessibilityHidden(_:)
 SwiftTUIViews.ControlGroup.accessibilityHint(_:)
 SwiftTUIViews.ControlGroup.accessibilityLabel(_:)
@@ -5943,6 +5963,7 @@ SwiftTUIViews.DisappearLifecycleModifier
 SwiftTUIViews.DisappearLifecycleModifier.body(content:)
 SwiftTUIViews.DisappearLifecycleModifier.concat(_:)
 SwiftTUIViews.DisclosureGroup
+SwiftTUIViews.DisclosureGroup.accessibilityCursorAnchor(_:)
 SwiftTUIViews.DisclosureGroup.accessibilityHidden(_:)
 SwiftTUIViews.DisclosureGroup.accessibilityHint(_:)
 SwiftTUIViews.DisclosureGroup.accessibilityLabel(_:)
@@ -6066,6 +6087,7 @@ SwiftTUIViews.DisclosureGroup.truncationMode(_:)
 SwiftTUIViews.DisclosureGroup.underline(_:color:)
 SwiftTUIViews.DisclosureGroup.underline(_:pattern:color:)
 SwiftTUIViews.Divider
+SwiftTUIViews.Divider.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Divider.accessibilityHidden(_:)
 SwiftTUIViews.Divider.accessibilityHint(_:)
 SwiftTUIViews.Divider.accessibilityLabel(_:)
@@ -6217,6 +6239,7 @@ SwiftTUIViews.DropDestinationRegistrationModifier
 SwiftTUIViews.DropDestinationRegistrationModifier.body(content:)
 SwiftTUIViews.DropDestinationRegistrationModifier.concat(_:)
 SwiftTUIViews.Ellipse
+SwiftTUIViews.Ellipse.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Ellipse.accessibilityHidden(_:)
 SwiftTUIViews.Ellipse.accessibilityHint(_:)
 SwiftTUIViews.Ellipse.accessibilityLabel(_:)
@@ -6349,6 +6372,7 @@ SwiftTUIViews.Ellipse.truncationMode(_:)
 SwiftTUIViews.Ellipse.underline(_:color:)
 SwiftTUIViews.Ellipse.underline(_:pattern:color:)
 SwiftTUIViews.EmptyView
+SwiftTUIViews.EmptyView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.EmptyView.accessibilityHidden(_:)
 SwiftTUIViews.EmptyView.accessibilityHint(_:)
 SwiftTUIViews.EmptyView.accessibilityLabel(_:)
@@ -6473,6 +6497,7 @@ SwiftTUIViews.EnvironmentKey
 SwiftTUIViews.EnvironmentKey.Value
 SwiftTUIViews.EnvironmentKey.defaultValue
 SwiftTUIViews.EnvironmentReader
+SwiftTUIViews.EnvironmentReader.accessibilityCursorAnchor(_:)
 SwiftTUIViews.EnvironmentReader.accessibilityHidden(_:)
 SwiftTUIViews.EnvironmentReader.accessibilityHint(_:)
 SwiftTUIViews.EnvironmentReader.accessibilityLabel(_:)
@@ -6670,6 +6695,7 @@ SwiftTUIViews.FocusedValueWritingModifier
 SwiftTUIViews.FocusedValueWritingModifier.body(content:)
 SwiftTUIViews.FocusedValueWritingModifier.concat(_:)
 SwiftTUIViews.ForEach
+SwiftTUIViews.ForEach.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ForEach.accessibilityHidden(_:)
 SwiftTUIViews.ForEach.accessibilityHint(_:)
 SwiftTUIViews.ForEach.accessibilityLabel(_:)
@@ -6795,6 +6821,7 @@ SwiftTUIViews.ForEach.truncationMode(_:)
 SwiftTUIViews.ForEach.underline(_:color:)
 SwiftTUIViews.ForEach.underline(_:pattern:color:)
 SwiftTUIViews.ForeignSurface
+SwiftTUIViews.ForeignSurface.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ForeignSurface.accessibilityHidden(_:)
 SwiftTUIViews.ForeignSurface.accessibilityHint(_:)
 SwiftTUIViews.ForeignSurface.accessibilityLabel(_:)
@@ -6930,6 +6957,7 @@ SwiftTUIViews.GeometryProxy.size
 SwiftTUIViews.GeometryProxy.subscript(_:)
 SwiftTUIViews.GeometryProxy.subscript(_:)
 SwiftTUIViews.GeometryReader
+SwiftTUIViews.GeometryReader.accessibilityCursorAnchor(_:)
 SwiftTUIViews.GeometryReader.accessibilityHidden(_:)
 SwiftTUIViews.GeometryReader.accessibilityHint(_:)
 SwiftTUIViews.GeometryReader.accessibilityLabel(_:)
@@ -7123,6 +7151,7 @@ SwiftTUIViews.GestureStateGesture.state
 SwiftTUIViews.GestureStateGesture.updater
 SwiftTUIViews.GestureStateGesture.updating(_:body:)
 SwiftTUIViews.Group
+SwiftTUIViews.Group.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Group.accessibilityHidden(_:)
 SwiftTUIViews.Group.accessibilityHint(_:)
 SwiftTUIViews.Group.accessibilityLabel(_:)
@@ -7244,6 +7273,7 @@ SwiftTUIViews.Group.truncationMode(_:)
 SwiftTUIViews.Group.underline(_:color:)
 SwiftTUIViews.Group.underline(_:pattern:color:)
 SwiftTUIViews.GroupBox
+SwiftTUIViews.GroupBox.accessibilityCursorAnchor(_:)
 SwiftTUIViews.GroupBox.accessibilityHidden(_:)
 SwiftTUIViews.GroupBox.accessibilityHint(_:)
 SwiftTUIViews.GroupBox.accessibilityLabel(_:)
@@ -7367,6 +7397,7 @@ SwiftTUIViews.GroupBox.truncationMode(_:)
 SwiftTUIViews.GroupBox.underline(_:color:)
 SwiftTUIViews.GroupBox.underline(_:pattern:color:)
 SwiftTUIViews.HStack
+SwiftTUIViews.HStack.accessibilityCursorAnchor(_:)
 SwiftTUIViews.HStack.accessibilityHidden(_:)
 SwiftTUIViews.HStack.accessibilityHint(_:)
 SwiftTUIViews.HStack.accessibilityLabel(_:)
@@ -7508,6 +7539,7 @@ SwiftTUIViews.IgnoreSafeAreaModifier
 SwiftTUIViews.IgnoreSafeAreaModifier.body(content:)
 SwiftTUIViews.IgnoreSafeAreaModifier.concat(_:)
 SwiftTUIViews.Image
+SwiftTUIViews.Image.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Image.accessibilityHidden(_:)
 SwiftTUIViews.Image.accessibilityHint(_:)
 SwiftTUIViews.Image.accessibilityLabel(_:)
@@ -7653,6 +7685,7 @@ SwiftTUIViews.InsetGroupedListStyle.description
 SwiftTUIViews.InsetGroupedListStyle.init()
 SwiftTUIViews.InsetGroupedListStyle.makeCollectionStylePresentation()
 SwiftTUIViews.InsetShape
+SwiftTUIViews.InsetShape.accessibilityCursorAnchor(_:)
 SwiftTUIViews.InsetShape.accessibilityHidden(_:)
 SwiftTUIViews.InsetShape.accessibilityHint(_:)
 SwiftTUIViews.InsetShape.accessibilityLabel(_:)
@@ -7800,6 +7833,7 @@ SwiftTUIViews.KeyPressModifier
 SwiftTUIViews.KeyPressModifier.body(content:)
 SwiftTUIViews.KeyPressModifier.concat(_:)
 SwiftTUIViews.Label
+SwiftTUIViews.Label.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Label.accessibilityHidden(_:)
 SwiftTUIViews.Label.accessibilityHint(_:)
 SwiftTUIViews.Label.accessibilityLabel(_:)
@@ -7923,6 +7957,7 @@ SwiftTUIViews.Label.truncationMode(_:)
 SwiftTUIViews.Label.underline(_:color:)
 SwiftTUIViews.Label.underline(_:pattern:color:)
 SwiftTUIViews.LabeledContent
+SwiftTUIViews.LabeledContent.accessibilityCursorAnchor(_:)
 SwiftTUIViews.LabeledContent.accessibilityHidden(_:)
 SwiftTUIViews.LabeledContent.accessibilityHint(_:)
 SwiftTUIViews.LabeledContent.accessibilityLabel(_:)
@@ -8074,6 +8109,7 @@ SwiftTUIViews.LayoutValueModifier
 SwiftTUIViews.LayoutValueModifier.body(content:)
 SwiftTUIViews.LayoutValueModifier.concat(_:)
 SwiftTUIViews.LazyHStack
+SwiftTUIViews.LazyHStack.accessibilityCursorAnchor(_:)
 SwiftTUIViews.LazyHStack.accessibilityHidden(_:)
 SwiftTUIViews.LazyHStack.accessibilityHint(_:)
 SwiftTUIViews.LazyHStack.accessibilityLabel(_:)
@@ -8197,6 +8233,7 @@ SwiftTUIViews.LazyHStack.truncationMode(_:)
 SwiftTUIViews.LazyHStack.underline(_:color:)
 SwiftTUIViews.LazyHStack.underline(_:pattern:color:)
 SwiftTUIViews.LazyVStack
+SwiftTUIViews.LazyVStack.accessibilityCursorAnchor(_:)
 SwiftTUIViews.LazyVStack.accessibilityHidden(_:)
 SwiftTUIViews.LazyVStack.accessibilityHint(_:)
 SwiftTUIViews.LazyVStack.accessibilityLabel(_:)
@@ -8320,6 +8357,7 @@ SwiftTUIViews.LazyVStack.truncationMode(_:)
 SwiftTUIViews.LazyVStack.underline(_:color:)
 SwiftTUIViews.LazyVStack.underline(_:pattern:color:)
 SwiftTUIViews.Link
+SwiftTUIViews.Link.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Link.accessibilityHidden(_:)
 SwiftTUIViews.Link.accessibilityHint(_:)
 SwiftTUIViews.Link.accessibilityLabel(_:)
@@ -8449,6 +8487,7 @@ SwiftTUIViews.LinkButtonStyle.makeBody(configuration:)
 SwiftTUIViews.LinkButtonStyle.resolvedProminence(base:)
 SwiftTUIViews.LinkButtonStyle.snapshotLabel
 SwiftTUIViews.List
+SwiftTUIViews.List.accessibilityCursorAnchor(_:)
 SwiftTUIViews.List.accessibilityHidden(_:)
 SwiftTUIViews.List.accessibilityHint(_:)
 SwiftTUIViews.List.accessibilityLabel(_:)
@@ -8604,6 +8643,7 @@ SwiftTUIViews.MatchedGeometryModifier
 SwiftTUIViews.MatchedGeometryModifier.body(content:)
 SwiftTUIViews.MatchedGeometryModifier.concat(_:)
 SwiftTUIViews.Menu
+SwiftTUIViews.Menu.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Menu.accessibilityHidden(_:)
 SwiftTUIViews.Menu.accessibilityHint(_:)
 SwiftTUIViews.Menu.accessibilityLabel(_:)
@@ -8736,6 +8776,7 @@ SwiftTUIViews.ModifiedContent.!=(_:_:)
 SwiftTUIViews.ModifiedContent.==(_:_:)
 SwiftTUIViews.ModifiedContent.AnimatableData
 SwiftTUIViews.ModifiedContent.ID
+SwiftTUIViews.ModifiedContent.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ModifiedContent.accessibilityHidden(_:)
 SwiftTUIViews.ModifiedContent.accessibilityHint(_:)
 SwiftTUIViews.ModifiedContent.accessibilityLabel(_:)
@@ -8895,6 +8936,7 @@ SwiftTUIViews.OptionalFocusBindingModifier
 SwiftTUIViews.OptionalFocusBindingModifier.body(content:)
 SwiftTUIViews.OptionalFocusBindingModifier.concat(_:)
 SwiftTUIViews.OutlineGroup
+SwiftTUIViews.OutlineGroup.accessibilityCursorAnchor(_:)
 SwiftTUIViews.OutlineGroup.accessibilityHidden(_:)
 SwiftTUIViews.OutlineGroup.accessibilityHint(_:)
 SwiftTUIViews.OutlineGroup.accessibilityLabel(_:)
@@ -9030,6 +9072,7 @@ SwiftTUIViews.PaletteCommandRegistrationModifier
 SwiftTUIViews.PaletteCommandRegistrationModifier.body(content:)
 SwiftTUIViews.PaletteCommandRegistrationModifier.concat(_:)
 SwiftTUIViews.Panel
+SwiftTUIViews.Panel.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Panel.accessibilityHidden(_:)
 SwiftTUIViews.Panel.accessibilityHint(_:)
 SwiftTUIViews.Panel.accessibilityLabel(_:)
@@ -9158,6 +9201,7 @@ SwiftTUIViews.Panel.truncationMode(_:)
 SwiftTUIViews.Panel.underline(_:color:)
 SwiftTUIViews.Panel.underline(_:pattern:color:)
 SwiftTUIViews.PhaseAnimator
+SwiftTUIViews.PhaseAnimator.accessibilityCursorAnchor(_:)
 SwiftTUIViews.PhaseAnimator.accessibilityHidden(_:)
 SwiftTUIViews.PhaseAnimator.accessibilityHint(_:)
 SwiftTUIViews.PhaseAnimator.accessibilityLabel(_:)
@@ -9280,6 +9324,7 @@ SwiftTUIViews.PhaseAnimator.truncationMode(_:)
 SwiftTUIViews.PhaseAnimator.underline(_:color:)
 SwiftTUIViews.PhaseAnimator.underline(_:pattern:color:)
 SwiftTUIViews.Picker
+SwiftTUIViews.Picker.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Picker.accessibilityHidden(_:)
 SwiftTUIViews.Picker.accessibilityHint(_:)
 SwiftTUIViews.Picker.accessibilityLabel(_:)
@@ -9413,6 +9458,7 @@ SwiftTUIViews.PickerStyle.wantsTriggerPointerRoute
 SwiftTUIViews.PickerStyle.wantsTriggerPointerRoute
 SwiftTUIViews.PickerStyleConfiguration
 SwiftTUIViews.PickerStyleConfiguration.Label
+SwiftTUIViews.PickerStyleConfiguration.Label.accessibilityCursorAnchor(_:)
 SwiftTUIViews.PickerStyleConfiguration.Label.accessibilityHidden(_:)
 SwiftTUIViews.PickerStyleConfiguration.Label.accessibilityHint(_:)
 SwiftTUIViews.PickerStyleConfiguration.Label.accessibilityLabel(_:)
@@ -9691,6 +9737,7 @@ SwiftTUIViews.PresentationChrome.dropdown
 SwiftTUIViews.PresentationChrome.menu
 SwiftTUIViews.PresentationChrome.surface
 SwiftTUIViews.ProgressView
+SwiftTUIViews.ProgressView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ProgressView.accessibilityHidden(_:)
 SwiftTUIViews.ProgressView.accessibilityHint(_:)
 SwiftTUIViews.ProgressView.accessibilityLabel(_:)
@@ -9828,6 +9875,7 @@ SwiftTUIViews.RadioGroupPickerStyle.selectionDelta(for:)
 SwiftTUIViews.RadioGroupPickerStyle.snapshotLabel
 SwiftTUIViews.RadioGroupPickerStyle.wantsTriggerPointerRoute
 SwiftTUIViews.Rectangle
+SwiftTUIViews.Rectangle.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Rectangle.accessibilityHidden(_:)
 SwiftTUIViews.Rectangle.accessibilityHint(_:)
 SwiftTUIViews.Rectangle.accessibilityLabel(_:)
@@ -9984,6 +10032,7 @@ SwiftTUIViews.RoundedOutlineStyle.description
 SwiftTUIViews.RoundedOutlineStyle.init()
 SwiftTUIViews.RoundedOutlineStyle.makeOutlineStylePresentation()
 SwiftTUIViews.RoundedRectangle
+SwiftTUIViews.RoundedRectangle.accessibilityCursorAnchor(_:)
 SwiftTUIViews.RoundedRectangle.accessibilityHidden(_:)
 SwiftTUIViews.RoundedRectangle.accessibilityHint(_:)
 SwiftTUIViews.RoundedRectangle.accessibilityLabel(_:)
@@ -10132,6 +10181,7 @@ SwiftTUIViews.ScrollPosition.x
 SwiftTUIViews.ScrollPosition.y
 SwiftTUIViews.ScrollPosition.zero
 SwiftTUIViews.ScrollView
+SwiftTUIViews.ScrollView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ScrollView.accessibilityHidden(_:)
 SwiftTUIViews.ScrollView.accessibilityHint(_:)
 SwiftTUIViews.ScrollView.accessibilityLabel(_:)
@@ -10257,6 +10307,7 @@ SwiftTUIViews.ScrollView.truncationMode(_:)
 SwiftTUIViews.ScrollView.underline(_:color:)
 SwiftTUIViews.ScrollView.underline(_:pattern:color:)
 SwiftTUIViews.Section
+SwiftTUIViews.Section.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Section.accessibilityHidden(_:)
 SwiftTUIViews.Section.accessibilityHint(_:)
 SwiftTUIViews.Section.accessibilityLabel(_:)
@@ -10380,6 +10431,7 @@ SwiftTUIViews.Section.truncationMode(_:)
 SwiftTUIViews.Section.underline(_:color:)
 SwiftTUIViews.Section.underline(_:pattern:color:)
 SwiftTUIViews.SecureField
+SwiftTUIViews.SecureField.accessibilityCursorAnchor(_:)
 SwiftTUIViews.SecureField.accessibilityHidden(_:)
 SwiftTUIViews.SecureField.accessibilityHint(_:)
 SwiftTUIViews.SecureField.accessibilityLabel(_:)
@@ -10530,6 +10582,7 @@ SwiftTUIViews.Shape.strokeBorder(_:style:)
 SwiftTUIViews.Shape.strokeBorder(_:style:background:)
 SwiftTUIViews.Shape.strokeBorder(_:style:background:)
 SwiftTUIViews.Slider
+SwiftTUIViews.Slider.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Slider.accessibilityHidden(_:)
 SwiftTUIViews.Slider.accessibilityHint(_:)
 SwiftTUIViews.Slider.accessibilityLabel(_:)
@@ -10654,6 +10707,7 @@ SwiftTUIViews.Slider.truncationMode(_:)
 SwiftTUIViews.Slider.underline(_:color:)
 SwiftTUIViews.Slider.underline(_:pattern:color:)
 SwiftTUIViews.Spacer
+SwiftTUIViews.Spacer.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Spacer.accessibilityHidden(_:)
 SwiftTUIViews.Spacer.accessibilityHint(_:)
 SwiftTUIViews.Spacer.accessibilityLabel(_:)
@@ -10798,6 +10852,7 @@ SwiftTUIViews.Spinner.SpinnerSet.Progression
 SwiftTUIViews.Spinner.SpinnerSet.Progression.!=(_:_:)
 SwiftTUIViews.Spinner.SpinnerSet.Progression.bounce
 SwiftTUIViews.Spinner.SpinnerSet.Progression.repeat
+SwiftTUIViews.Spinner.SpinnerSet.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Spinner.SpinnerSet.accessibilityHidden(_:)
 SwiftTUIViews.Spinner.SpinnerSet.accessibilityHint(_:)
 SwiftTUIViews.Spinner.SpinnerSet.accessibilityLabel(_:)
@@ -10961,6 +11016,7 @@ SwiftTUIViews.Spinner.Stage.active
 SwiftTUIViews.Spinner.Stage.description
 SwiftTUIViews.Spinner.Stage.finished
 SwiftTUIViews.Spinner.Stage.inactive
+SwiftTUIViews.Spinner.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Spinner.accessibilityHidden(_:)
 SwiftTUIViews.Spinner.accessibilityHint(_:)
 SwiftTUIViews.Spinner.accessibilityLabel(_:)
@@ -11100,6 +11156,7 @@ SwiftTUIViews.State.init(wrappedValue:line:column:)
 SwiftTUIViews.State.projectedValue
 SwiftTUIViews.State.wrappedValue
 SwiftTUIViews.Stepper
+SwiftTUIViews.Stepper.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Stepper.accessibilityHidden(_:)
 SwiftTUIViews.Stepper.accessibilityHint(_:)
 SwiftTUIViews.Stepper.accessibilityLabel(_:)
@@ -11228,6 +11285,7 @@ SwiftTUIViews.SuccessToastStyle.init()
 SwiftTUIViews.SuccessToastStyle.resolvePresentation(for:)
 SwiftTUIViews.SuccessToastStyle.snapshotLabel
 SwiftTUIViews.Tab
+SwiftTUIViews.Tab.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Tab.accessibilityHidden(_:)
 SwiftTUIViews.Tab.accessibilityHint(_:)
 SwiftTUIViews.Tab.accessibilityLabel(_:)
@@ -11349,6 +11407,7 @@ SwiftTUIViews.Tab.truncationMode(_:)
 SwiftTUIViews.Tab.underline(_:color:)
 SwiftTUIViews.Tab.underline(_:pattern:color:)
 SwiftTUIViews.TabView
+SwiftTUIViews.TabView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TabView.accessibilityHidden(_:)
 SwiftTUIViews.TabView.accessibilityHint(_:)
 SwiftTUIViews.TabView.accessibilityLabel(_:)
@@ -11534,6 +11593,7 @@ SwiftTUIViews.TabViewStylePresentation.overflowMenu
 SwiftTUIViews.TabViewStylePresentation.stripHeight
 SwiftTUIViews.TabViewStylePresentation.visibleOptionIndices
 SwiftTUIViews.Table
+SwiftTUIViews.Table.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Table.accessibilityHidden(_:)
 SwiftTUIViews.Table.accessibilityHint(_:)
 SwiftTUIViews.Table.accessibilityLabel(_:)
@@ -11664,6 +11724,7 @@ SwiftTUIViews.TableColumn.title
 SwiftTUIViews.TableColumn.titleAlignment
 SwiftTUIViews.TableColumn.width
 SwiftTUIViews.TableRow
+SwiftTUIViews.TableRow.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TableRow.accessibilityHidden(_:)
 SwiftTUIViews.TableRow.accessibilityHint(_:)
 SwiftTUIViews.TableRow.accessibilityLabel(_:)
@@ -11820,6 +11881,7 @@ SwiftTUIViews.Text.StringInterpolation.appendLiteral(_:)
 SwiftTUIViews.Text.StringInterpolation.init(literalCapacity:interpolationCount:)
 SwiftTUIViews.Text.TruncationMode
 SwiftTUIViews.Text.WrappingStrategy
+SwiftTUIViews.Text.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Text.accessibilityHidden(_:)
 SwiftTUIViews.Text.accessibilityHint(_:)
 SwiftTUIViews.Text.accessibilityLabel(_:)
@@ -11955,6 +12017,7 @@ SwiftTUIViews.Text.truncationMode(_:)
 SwiftTUIViews.Text.underline(_:color:)
 SwiftTUIViews.Text.underline(_:pattern:color:)
 SwiftTUIViews.TextEditor
+SwiftTUIViews.TextEditor.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TextEditor.accessibilityHidden(_:)
 SwiftTUIViews.TextEditor.accessibilityHint(_:)
 SwiftTUIViews.TextEditor.accessibilityLabel(_:)
@@ -12077,6 +12140,7 @@ SwiftTUIViews.TextEditor.truncationMode(_:)
 SwiftTUIViews.TextEditor.underline(_:color:)
 SwiftTUIViews.TextEditor.underline(_:pattern:color:)
 SwiftTUIViews.TextField
+SwiftTUIViews.TextField.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TextField.accessibilityHidden(_:)
 SwiftTUIViews.TextField.accessibilityHint(_:)
 SwiftTUIViews.TextField.accessibilityLabel(_:)
@@ -12207,6 +12271,7 @@ SwiftTUIViews.TextFieldStyle.snapshotLabel
 SwiftTUIViews.TextFieldStyle.snapshotLabel
 SwiftTUIViews.TextFieldStyleConfiguration
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent
+SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.accessibilityHidden(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.accessibilityHint(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.accessibilityLabel(_:)
@@ -12327,6 +12392,7 @@ SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.truncationMode(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.underline(_:color:)
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.underline(_:pattern:color:)
 SwiftTUIViews.TextFieldStyleConfiguration.Label
+SwiftTUIViews.TextFieldStyleConfiguration.Label.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.Label.accessibilityHidden(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.Label.accessibilityHint(_:)
 SwiftTUIViews.TextFieldStyleConfiguration.Label.accessibilityLabel(_:)
@@ -12458,6 +12524,7 @@ SwiftTUIViews.TextFieldStyleConfiguration.styleEnvironment
 SwiftTUIViews.TextFigure
 SwiftTUIViews.TextFigure.ColorMode
 SwiftTUIViews.TextFigure.Font
+SwiftTUIViews.TextFigure.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TextFigure.accessibilityHidden(_:)
 SwiftTUIViews.TextFigure.accessibilityHint(_:)
 SwiftTUIViews.TextFigure.accessibilityLabel(_:)
@@ -12605,6 +12672,7 @@ SwiftTUIViews.ToastStylePresentation.maxWidth
 SwiftTUIViews.ToastStylePresentation.minHeight
 SwiftTUIViews.ToastStylePresentation.minWidth
 SwiftTUIViews.Toggle
+SwiftTUIViews.Toggle.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Toggle.accessibilityHidden(_:)
 SwiftTUIViews.Toggle.accessibilityHint(_:)
 SwiftTUIViews.Toggle.accessibilityLabel(_:)
@@ -12783,6 +12851,7 @@ SwiftTUIViews.TransitionRegistrationModifier
 SwiftTUIViews.TransitionRegistrationModifier.body(content:)
 SwiftTUIViews.TransitionRegistrationModifier.concat(_:)
 SwiftTUIViews.TupleView
+SwiftTUIViews.TupleView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.TupleView.accessibilityHidden(_:)
 SwiftTUIViews.TupleView.accessibilityHint(_:)
 SwiftTUIViews.TupleView.accessibilityLabel(_:)
@@ -12911,6 +12980,7 @@ SwiftTUIViews.UnderlineTabViewStyle.makeTabBody(configuration:item:)
 SwiftTUIViews.UnderlineTabViewStyle.presentation(for:)
 SwiftTUIViews.UnderlineTabViewStyle.snapshotLabel
 SwiftTUIViews.VStack
+SwiftTUIViews.VStack.accessibilityCursorAnchor(_:)
 SwiftTUIViews.VStack.accessibilityHidden(_:)
 SwiftTUIViews.VStack.accessibilityHint(_:)
 SwiftTUIViews.VStack.accessibilityLabel(_:)
@@ -13046,6 +13116,7 @@ SwiftTUIViews.ValueAnimationModifier
 SwiftTUIViews.ValueAnimationModifier.body(content:)
 SwiftTUIViews.ValueAnimationModifier.concat(_:)
 SwiftTUIViews.VariadicView
+SwiftTUIViews.VariadicView.accessibilityCursorAnchor(_:)
 SwiftTUIViews.VariadicView.accessibilityHidden(_:)
 SwiftTUIViews.VariadicView.accessibilityHint(_:)
 SwiftTUIViews.VariadicView.accessibilityLabel(_:)
@@ -13172,6 +13243,7 @@ SwiftTUIViews.VerticalEdge
 SwiftTUIViews.VerticalEdge.Set
 SwiftTUIViews.View
 SwiftTUIViews.View.Body
+SwiftTUIViews.View.accessibilityCursorAnchor(_:)
 SwiftTUIViews.View.accessibilityHidden(_:)
 SwiftTUIViews.View.accessibilityHint(_:)
 SwiftTUIViews.View.accessibilityLabel(_:)
@@ -13318,6 +13390,7 @@ SwiftTUIViews.ViewModifier.body(content:)
 SwiftTUIViews.ViewModifier.body(content:)
 SwiftTUIViews.ViewModifier.concat(_:)
 SwiftTUIViews.ViewModifierContent
+SwiftTUIViews.ViewModifierContent.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ViewModifierContent.accessibilityHidden(_:)
 SwiftTUIViews.ViewModifierContent.accessibilityHint(_:)
 SwiftTUIViews.ViewModifierContent.accessibilityLabel(_:)
@@ -13444,6 +13517,7 @@ SwiftTUIViews.ViewSpacing.horizontal
 SwiftTUIViews.ViewSpacing.init(horizontal:vertical:)
 SwiftTUIViews.ViewSpacing.vertical
 SwiftTUIViews.ViewThatFits
+SwiftTUIViews.ViewThatFits.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ViewThatFits.accessibilityHidden(_:)
 SwiftTUIViews.ViewThatFits.accessibilityHint(_:)
 SwiftTUIViews.ViewThatFits.accessibilityLabel(_:)
@@ -13570,6 +13644,7 @@ SwiftTUIViews.WarningToastStyle.init()
 SwiftTUIViews.WarningToastStyle.resolvePresentation(for:)
 SwiftTUIViews.WarningToastStyle.snapshotLabel
 SwiftTUIViews.ZStack
+SwiftTUIViews.ZStack.accessibilityCursorAnchor(_:)
 SwiftTUIViews.ZStack.accessibilityHidden(_:)
 SwiftTUIViews.ZStack.accessibilityHint(_:)
 SwiftTUIViews.ZStack.accessibilityLabel(_:)
