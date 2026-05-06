@@ -1,6 +1,10 @@
 # Text Input Model
 
-**Status:** Draft proposal. No implementation has landed.
+**Status:** Active implementation. Stages 0-4 of the linked V1 plan have
+landed: the package-private value model, reducer, layout map, presentation
+projection, field-content view, and reducer-backed `TextField` / `SecureField`
+key handling are in place. `TextEditor`, paste dispatch, and caret-anchor
+semantics remain planned work.
 
 **Owner:** unassigned.
 

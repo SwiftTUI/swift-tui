@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -78,6 +78,62 @@ struct SecureFieldSurfaceTests {
     #expect(updatedSurface.contains("•"))
     #expect(!updatedSurface.contains("h"))
     #expect(!updatedSurface.contains("Password"))
+  }
+
+  @Test("SecureField edits at the moved caret while keeping rendered text masked")
+  func secureFieldEditsAtMovedCaretWhileMasked() {
+    final class SecretBox {
+      var value = "ac"
+    }
+
+    let box = SecretBox()
+    let identity = testIdentity("MovedCaretSecretField")
+    let registry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      SecureField(
+        "Password",
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .textFieldStyle(.plain),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
+    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(box.value == "abc")
+
+    let updatedArtifacts = DefaultRenderer().render(
+      SecureField(
+        "Password",
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .textFieldStyle(.plain),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        applyEnvironmentValues: true
+      )
+    )
+    let surface = updatedArtifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("•"))
+    #expect(!surface.contains("abc"))
+    #expect(!surface.contains("Password"))
   }
 
   @Test("SecureField builder labels remain visible while the secret stays masked")

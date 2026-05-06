@@ -174,6 +174,7 @@ package func textEntryDisplayText(
 public struct TextField<Label: View>: View, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?
+  @State private var textInputValue = TextInputValue()
   private var label: Label
   private var showsLabel: Bool
   private let authoringScope: AuthoringContext?
@@ -204,7 +205,10 @@ public struct TextField<Label: View>: View, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+    let dynamicPropertyScope = dynamicPropertyAuthoringContext(for: context)
+    return withAuthoringContext(dynamicPropertyScope) {
+      [resolvedNode(in: context)]
+    }
   }
 }
 
@@ -216,28 +220,35 @@ extension TextField {
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
-    let fieldText = text.wrappedValue
     let textFieldStyle = context.environmentValues.textFieldStyle
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
+    let synchronizedValue = textInputValue.synchronized(with: text.wrappedValue)
+    if synchronizedValue != textInputValue {
+      textInputValue = synchronizedValue
+    }
 
-    registerTextEntryBinding(
+    registerTextInputBinding(
       text,
+      value: $textInputValue,
+      traits: .singleLine,
       authoringContext: currentImperativeAuthoringContextSnapshot()
         ?? ImperativeAuthoringContextSnapshot(authoringScope),
       in: context
     )
-    let entryText = textEntryDisplayText(
-      text: fieldText,
-      promptText: prompt?.content,
-      isActiveNavigation: isFocused,
-      masked: false
+    let presentation = TextInputPresentation(
+      value: synchronizedValue,
+      traits: .singleLine,
+      prompt: prompt?.content,
+      isFocused: isFocused,
+      cursorFollowsFocus: false,
+      width: nil
     )
     let configuration = TextFieldStyleConfiguration(
-      displayText: entryText.displayText,
-      isShowingPrompt: entryText.isShowingPrompt,
+      displayText: presentation.displayText,
+      isShowingPrompt: presentation.isShowingPrompt,
       label: .init(authoringContext: authoringScope) { label },
       showsLabel: showsLabel,
       chrome: chrome,

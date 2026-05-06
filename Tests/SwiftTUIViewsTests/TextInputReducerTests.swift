@@ -196,4 +196,14 @@ struct TextInputReducerTests {
     #expect(synchronized.composingRange == nil)
     #expect(synchronized.preferredVisualColumn == nil)
   }
+
+  @Test("initial external binding update places caret at end")
+  func initialExternalBindingUpdatePlacesCaretAtEnd() {
+    let value = TextInputValue()
+
+    let synchronized = value.synchronized(with: "abc")
+
+    #expect(synchronized.text == "abc")
+    #expect(synchronized.selection == .caret(at: TextOffset(3)))
+  }
 }

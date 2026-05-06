@@ -140,6 +140,8 @@ for caret movement or accessibility cursor positioning:
     decision, selection rectangles, and caret anchor calculation.
 - `Sources/SwiftTUIViews/Input/TextInputContent.swift`
   - Package-owned view rendered by text field styles and `TextEditor`.
+- `Sources/SwiftTUIViews/Input/TextInputControlSupport.swift`
+  - Shared reducer-backed key dispatch adapter for text input controls.
 - `Tests/SwiftTUIViewsTests/TextInputReducerTests.swift`
   - Pure reducer coverage.
 - `Tests/SwiftTUIViewsTests/TextInputLayoutMapTests.swift`
@@ -372,21 +374,21 @@ git commit -m "feat: add text field input content"
 
 ## Stage 4: TextField And SecureField Key Integration
 
-- [ ] Add `@State private var textInputValue` to `TextField`.
-- [ ] Wrap `TextField.resolveElements(...)` in
+- [x] Add `@State private var textInputValue` to `TextField`.
+- [x] Wrap `TextField.resolveElements(...)` in
   `dynamicPropertyAuthoringContext(for:)`, matching the existing `TextEditor`
   dynamic-property pattern.
-- [ ] Synchronize `textInputValue` from `text.wrappedValue` during resolve.
-- [ ] Register focused key handlers that translate `KeyPress` into
+- [x] Synchronize `textInputValue` from `text.wrappedValue` during resolve.
+- [x] Register focused key handlers that translate `KeyPress` into
   `TextInputCommand`.
-- [ ] Write reducer mutations back through the original `Binding<String>`
+- [x] Write reducer mutations back through the original `Binding<String>`
   inside the current imperative authoring context.
-- [ ] Repeat the same integration for `SecureField`.
-- [ ] Keep secure display masked and keep secure semantic value redacted.
-- [ ] Add surface tests for caret insertion in the middle of text, left/right
+- [x] Repeat the same integration for `SecureField`.
+- [x] Keep secure display masked and keep secure semantic value redacted.
+- [x] Add surface tests for caret insertion in the middle of text, left/right
   movement, backspace before caret, home/end, and secure masking after caret
   movement.
-- [ ] Run the focused single-line tests.
+- [x] Run the focused single-line tests.
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/textFieldHandlesPromptCursorAndKeyInput
