@@ -1,7 +1,7 @@
 ---
 title: "feat: terminal-program embedding via TerminalView, with file-previewer example"
-type: feat
-status: proposed
+type: feature
+status: design-approved
 date: 2026-05-04
 depends_on:
   - "../proposals/TERMINAL_EMBEDDING.md"

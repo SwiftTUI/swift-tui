@@ -1,7 +1,7 @@
 ---
 title: "feat: accessibility SwiftUI host bridge"
-type: feat
-status: completed
+type: feature
+status: shipped
 date: 2026-05-05
 depends_on:
   - "2026-05-05-002-accessibility-remaining-work-plan.md"

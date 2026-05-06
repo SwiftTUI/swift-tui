@@ -1,17 +1,13 @@
 # Embedded Web Host
 
-**Status:** Draft, refreshed 2026-05-06. The embedded HTTP/WebSocket
-runner has **not** shipped: there is no `Platforms/WebHost/` package and no
-compiled-app HTTP server in the repo today. Since the first draft, two
-important prerequisites have landed and should now be treated as baseline:
-`SwiftTUIArguments` parses `--web` / `SWIFTTUI_WEB` into
-`RuntimeConfiguration.web`, and the shared Web/WASI `web-surface` path emits
-v2 frames with `accessibilityTree` data that the browser runtime mounts as
-ARIA. This document now scopes the remaining work to an explicitly
-compile-time opt-in runner/server, WebSocket transport, browser-bundle
-packaging, lifecycle policy, security hardening, and package-graph
-guardrails that prove terminal-only binaries do not compile or link any
-web-server functionality.
+**Status:** Shipped implementation record, refreshed 2026-05-06. The
+compile-time opt-in embedded HTTP/WebSocket runner now lives in
+`Platforms/WebHost/` with `SwiftTUIWebHost` and `SwiftTUIWebHostCLI`
+products. Terminal-only binaries still compile and link no WebHost server,
+FlyingFox dependency, WebSocket adapter, or bundled browser resources; they
+reject `--web` before raw-mode setup. The runner reuses the shared
+`web-surface` v2 frame/input protocol and the browser runtime that mounts
+accessibility trees as ARIA.
 
 **Owner:** unassigned. Sister proposal: [`ACCESSIBILITY.md`](./ACCESSIBILITY.md)
 — accessibility is the headline motivator but not the only one.
@@ -49,7 +45,7 @@ web-server functionality.
 14. [Headless rendering and CI](#headless-rendering-and-ci)
 15. [Performance and throughput](#performance-and-throughput)
 16. [Embedding cost](#embedding-cost)
-17. [Proposed design](#proposed-design)
+17. [Implemented design](#implemented-design)
     1. [Package layout](#package-layout)
     2. [Public API](#public-api)
     3. [Wire protocol sketch](#wire-protocol-sketch)
@@ -127,41 +123,36 @@ target. The two are complements:
 
 ### Current repository state (2026-05-06)
 
-The remaining work is narrower than the original research draft implied:
+The v1 runner has shipped:
 
-- **No embedded server exists yet.** `Sources/` and `Platforms/` do not
-  contain an HTTP listener, WebSocket listener, `Platforms/WebHost/`
-  package, or runner that serves a compiled SwiftTUI app at `localhost`.
-- **The server must remain compile-time opt-in.** A consumer must add and
-  select a web-host composition target before the server, WebSocket stack,
-  browser bundle, or server dependency is compiled into their app. Root
-  `SwiftTUI`, `SwiftTUIViews`, `SwiftTUICore`, and terminal-only
-  `SwiftTUICLI` builds must not depend on `SwiftTUIWebHost`, FlyingFox, or
-  the bundled browser resources.
+- **The embedded server is opt-in.** `Platforms/WebHost/` contains the
+  HTTP/WebSocket server, WebSocket transport, browser bundle, WebHost runner,
+  and combined terminal/web runner. A consumer must depend on
+  `SwiftTUIWebHost` or `SwiftTUIWebHostCLI` before any of that code is
+  compiled into their binary.
+- **The root and terminal-only boundaries are guarded.** Root `SwiftTUI`,
+  `SwiftTUIViews`, `SwiftTUICore`, and terminal-only `SwiftTUICLI` builds do
+  not depend on `SwiftTUIWebHost`, FlyingFox, or bundled browser resources.
+  `Scripts/check_webhost_package_boundary.sh` enforces that boundary, and
+  `SwiftTUICLI` rejects `RuntimeConfiguration.web` before terminal raw mode.
 - **The shared config surface exists.**
   [`RuntimeConfiguration.WebConfig`](../../Sources/SwiftTUI/Configuration/RuntimeConfiguration.swift)
   and `RuntimeConfiguration.web` model a web-serving request without putting
   HTTP machinery in the root library.
 - **The standard flag parser exists.**
   [`SwiftTUIOptions`](../../Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift)
-  parses `--web`, `--port`, `--bind`, and `--no-open`, with matching
+  parses `--web`, `--port`, `--bind`, and `--open`, with matching
   `SWIFTTUI_WEB`, `SWIFTTUI_PORT`, `SWIFTTUI_BIND`, and
-  `SWIFTTUI_NO_OPEN` env-var resolution.
-- **The browser accessibility substrate exists.** The shared
+  `SWIFTTUI_OPEN` env-var resolution. `SWIFTTUI_NO_OPEN=1` remains an
+  env-only explicit false.
+- **The browser accessibility substrate is reused.** The shared
   `web-surface` encoder emits v2 frames with `accessibilityTree`, and the
-  `Platforms/Web/` browser runtime mounts that tree as hidden ARIA beside
-  the painted surface.
+  bundled `Platforms/Web/` browser runtime mounts that tree as hidden ARIA
+  beside the painted surface.
 - **The CLI socket server is not this feature.**
   `Platforms/CLI/Sources/SwiftTUICLI/SocketServer.swift` is a Unix-domain
   socket scene-discovery/attach mechanism, not an HTTP server and not a
   browser transport.
-
-One current-state mismatch needs a decision before implementation:
-`SwiftTUIOptions` currently models `--no-open`, so `RuntimeConfiguration.web`
-defaults `openBrowser` to `true` when `--web` is set. The older lifecycle
-section below argued for the opposite policy: do not auto-open by default,
-and require an explicit `--open`. The implementation plan should reconcile
-that now, before user-visible web-host behavior ships.
 
 The core insight that makes this cheap to build is that
 [`WASISurfaceBridge`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)
@@ -180,12 +171,12 @@ feature hidden inside every SwiftTUI or SwiftTUICLI binary.
 | Layer | What it is | Where it lives |
 |---|---|---|
 | **Wire format** | The existing `WASISurfaceBridge` `web-surface` JSON encoding for output, the same input-parser command stream for input | `Platforms/WASI/Sources/WASISurfaceBridge/` (already shipped) |
-| **Transport** | HTTP for the static page, WebSocket for the surface/input stream | New: `Platforms/WebHost/` |
-| **Server** | An embeddable HTTP+WS host that the runner package starts on a localhost port | New: `Platforms/WebHost/` |
-| **Browser bundle** | The same `webhost` TS package used by `Platforms/Web/`, served from the binary; already consumes `web-surface` v2 `accessibilityTree` data | New static asset bundle, derived from `Platforms/Web/dist/` |
+| **Transport** | HTTP for the static page, WebSocket for the surface/input stream | `Platforms/WebHost/` |
+| **Server** | An embeddable HTTP+WS host that the runner package starts on a localhost port | `Platforms/WebHost/` |
+| **Browser bundle** | The same `webhost` TS package used by `Platforms/Web/`, served from the binary; consumes `web-surface` v2 `accessibilityTree` data | Static asset bundle under `Platforms/WebHost/Sources/SwiftTUIWebHost/Resources/browser/`, regenerated by `Scripts/build-webhost-bundle.sh` |
 | **Runner glue** | `WebHostRunner.run(MyApp.self)` — the analog of `TerminalRunner.run` for browser-targeted launch | `Platforms/WebHost/Sources/SwiftTUIWebHost/` |
-| **Compile-time composition** | Terminal-only apps import `SwiftTUICLI` and do not link the web host; web-capable apps explicitly depend on `SwiftTUIWebHost` or a combined `SwiftTUIWebHostCLI` product | New opt-in products; no weak link from `SwiftTUICLI` |
-| **CLI integration** | `myapp --web`, `--port`, `--bind`, and `--no-open` parse into `RuntimeConfiguration.web`; runner behavior still missing | `Platforms/Arguments/` landed; `Platforms/CLI/` or `Platforms/WebHost/` must consume it |
+| **Compile-time composition** | Terminal-only apps import `SwiftTUICLI` and do not link the web host; web-capable apps explicitly depend on `SwiftTUIWebHost` or a combined `SwiftTUIWebHostCLI` product | Opt-in products; no weak link from `SwiftTUICLI` |
+| **CLI integration** | `myapp --web`, `--port`, `--bind`, and `--open` parse into `RuntimeConfiguration.web`; `SwiftTUIWebHostCLI` consumes web mode and `SwiftTUICLI` rejects it | `Platforms/Arguments/`, `Platforms/CLI/`, `Platforms/WebHost/` |
 
 The crucial reuse:
 
@@ -620,24 +611,12 @@ proposal builds on:
 - **ADR [`0007-host-packages-are-peers`](../decisions/0007-host-packages-are-peers.md)**.
   Reaffirms the layout convention.
 
-The implication: the wire format exists, the encoder exists, the parser
-exists, the browser bundle exists, and the runner pattern exists. The
-*missing pieces* are:
-
-1. An HTTP+WebSocket server in Swift, embeddable in a runner.
-2. A `PresentationSurface` / input adapter whose underlying byte stream is
-   a WebSocket, not stdin/stdout.
-3. A way for the runner package to ship the `webhost` TS bundle as a
-   resource served by its embedded HTTP server.
-4. Runner lifecycle and security policy that consumes
-   `RuntimeConfiguration.web`, including token handling, URL printing,
-   origin checks, and shutdown behavior.
-5. Compile-time composition products and guardrails so `--web` reaches the
-   web-host runner only in binaries that explicitly opt into
-   `SwiftTUIWebHost`, while terminal-only binaries do not compile or link
-   any server implementation.
-
-That's a sharply-defined work area, not an open-ended re-architecture.
+The implication: the wire format, encoder, parser, browser bundle, runner
+pattern, HTTP/WebSocket server, WebSocket presentation/input adapters, static
+resource packaging, lifecycle policy, token/cookie auth, and package-graph
+guardrails all exist. The remaining work is now v2 polish: multi-scene browser
+chrome, multi-viewer control transfer, TLS, QR output, recording, and
+headless screenshot tooling.
 
 ---
 
@@ -656,10 +635,15 @@ web-only binary import:
 
 ```swift
 import SwiftTUI
-import SwiftTUIWebHost   // <-- provides the `--web` mode + App.main()
+import SwiftTUIWebHost   // <-- provides WebHostRunner
 
 @main
-struct MyApp: App { ... }
+@MainActor
+struct MyApp: App {
+  static func main() async throws {
+    try await WebHostRunner.run(Self.self)
+  }
+}
 ```
 
 Authors who want one binary that can run either terminal or web mode opt into
@@ -670,7 +654,12 @@ import SwiftTUI
 import SwiftTUIWebHostCLI   // depends on SwiftTUICLI + SwiftTUIWebHost
 
 @main
-struct MyApp: App { ... }
+@MainActor
+struct MyApp: App {
+  static func main() async throws {
+    try await WebHostCLIRunner.run(Self.self)
+  }
+}
 ```
 
 Terminal-only authors keep the existing composition:
@@ -698,10 +687,10 @@ Pros:
 
 Cons:
 
-- Several packages now ship `App.main()` defaults (`SwiftTUICLI`,
-  `SwiftTUIWASI`, `SwiftTUIWebHost`, plus the composed
-  `SwiftTUIWebHostCLI`). Authors choose one runner composition
-  explicitly. ADR-0008 already imposes this; it just gets one more.
+- Authors choose one runner composition explicitly. `SwiftTUICLI` and
+  `SwiftTUIWASI` provide default `App.main()` entry points today; WebHost apps
+  call `WebHostRunner` or `WebHostCLIRunner` from their own `@main` entry
+  point.
 - New surface to maintain.
 
 ### Option B: Capability built into every binary
@@ -1052,15 +1041,14 @@ A user runs `myapp` and gets a TUI in their terminal. They run `myapp
 | Invocation | Terminal output | Browser behavior |
 |---|---|---|
 | `myapp` | Full TUI | none |
-| `myapp --web` | Status line: `[swifttui] http://127.0.0.1:9123/?token=...` + log | Policy needs reconciliation; original proposal says manual, current parser defaults `openBrowser` true |
-| `myapp --web --open` | Same as above | Auto-launches default browser to URL if we change the parser to opt-in open |
-| `myapp --web --no-open` | Same as above | Suppresses auto-open if we keep the parser's current default-open model |
-| `myapp --web --no-banner` | Just the URL on stdout, nothing else | Manual |
-| `myapp --web --terminal` | TUI in terminal **and** WS server (mirrored) | Connect manually |
+| `myapp --web` | Status line: `[swifttui] http://127.0.0.1:9123/?token=...` + log | Manual browser open |
+| `myapp --web --open` | Same as above | Auto-launches default browser to URL |
+| `myapp --web --no-banner` | Follow-up | Manual |
+| `myapp --web --terminal` | Follow-up mirrored terminal mode | Connect manually |
 | `myapp --web --port 4567` | URL with that port; if taken, fail with error | — |
 | `myapp --web --bind 0.0.0.0` | URL + a warning banner about exposing the binary | — |
-| `myapp --web --no-token` | URL + a warning banner about no auth | — |
-| `myapp --web --record session.cast` | Same as `--web` plus on-disk asciicast | — |
+| `myapp --web --no-token` | Follow-up unauthenticated mode | — |
+| `myapp --web --record session.cast` | Follow-up asciicast recording | — |
 
 A few subtle decisions in this matrix worth pulling out:
 
@@ -1074,15 +1062,11 @@ the answer is "the browser." If `--terminal` is set, the terminal
 keyboard is read too and merged with browser input. (See
 [Multiple connections](#multiple-connections-sessions-and-scenes).)
 
-**Resolve the auto-open policy before shipping.** Users who SSH'd in or
-are running inside tmux do not want a browser to launch on the server
-side. The proposal's product lean remains "manual by default, `--open`
-to opt in." The current parsed surface is the inverse (`--no-open`,
-`openBrowser == true` when `--web` is set). Because there is no web-host
-runtime behavior yet, implementation can still either change the parser
-before release or intentionally keep the shipped parse surface and update
-this policy. Do not let the first server implementation silently inherit
-the mismatch.
+**Browser opening is manual by default.** Users who SSH'd in or are running
+inside tmux do not want a browser to launch on the server side. `--web`
+prints the URL; `--web --open` opts into browser launch. `SWIFTTUI_OPEN=1`
+has the same effect, and `SWIFTTUI_NO_OPEN=1` remains an env-only explicit
+false for old environments.
 
 **Print the URL in the most copy-pasteable form possible.** No color,
 no boxes, no bold. Single line, single token, ideally on its own
@@ -1480,7 +1464,7 @@ FlyingFox, or the browser resource bundle.
 
 ---
 
-## Proposed design
+## Implemented design
 
 ### Package layout
 
@@ -1491,11 +1475,13 @@ Platforms/WebHost/
 │   ├── SwiftTUIWebHost/
 │   │   ├── SwiftTUIWebHost.swift         # @_exported import SwiftTUI
 │   │   ├── WebHostRunner.swift           # public entry point
-│   │   ├── WebHostMode.swift             # CLI flag parsing for --web*
+│   │   ├── WebHostConfig.swift           # bind/port/open policy
 │   │   ├── WebHostServer.swift           # HTTP+WS server abstraction
 │   │   ├── WebHostFlyingFoxServer.swift  # FlyingFox impl
+│   │   ├── WebHostToken.swift            # per-launch token
+│   │   ├── WebHostOriginPolicy.swift     # origin checks
 │   │   ├── WebSocketSurfaceTransport.swift # PresentationSurface
-│   │   ├── WebSocketInputAdapter.swift   # TerminalInputReading
+│   │   ├── WebSocketInputReader.swift    # TerminalInputReading
 │   │   ├── WebHostBrowserBundle.swift    # served static resources
 │   │   ├── WebHostBanner.swift           # URL/QR/banner printing
 │   │   ├── BrowserOpener.swift           # cross-platform `open`
@@ -1507,17 +1493,16 @@ Platforms/WebHost/
 │   ├── SwiftTUIWebHostCLI/
 │   │   ├── SwiftTUIWebHostCLI.swift      # @_exported imports for opt-in combined runner
 │   │   └── WebHostCLIRunner.swift        # --web => WebHostRunner, else TerminalRunner
-│   └── SwiftTUIWebHostBundleBuilder/
-│       └── (build-time helper to refresh Resources/browser/)
 └── Tests/
     └── SwiftTUIWebHostTests/
         ├── WebHostRunnerTests.swift
         ├── WebHostCLIRunnerTests.swift
-        ├── WebHostModeTests.swift
         ├── WebHostServerTests.swift          # end-to-end with a test client
+        ├── WebHostSecurityTests.swift
+        ├── WebHostBrowserBundleTests.swift
         ├── WebSocketSurfaceTransportTests.swift
         ├── PackageGraphIsolationTests.swift
-        └── WebSocketInputAdapterTests.swift
+        └── WebSocketInputReaderTests.swift
 ```
 
 `Package.swift` (sketch — Foundation may be allowed in this runner;
@@ -1538,7 +1523,8 @@ let package = Package(
     .package(name: "swift-tui", path: "../.."),
     .package(name: "SwiftTUICLI", path: "../CLI"),
     .package(name: "SwiftTUIWASI", path: "../WASI"),
-    .package(url: "https://github.com/swhitty/FlyingFox", from: "0.20.0"),
+    .package(name: "SwiftTUIArguments", path: "../Arguments"),
+    .package(url: "https://github.com/swhitty/FlyingFox.git", from: "0.26.0"),
   ],
   targets: [
     .target(
@@ -1547,6 +1533,7 @@ let package = Package(
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "WASISurfaceBridge", package: "SwiftTUIWASI"),
         .product(name: "FlyingFox", package: "FlyingFox"),
+        .product(name: "FlyingSocks", package: "FlyingFox"),
       ],
       resources: [.copy("Resources/browser")]
     ),
@@ -1554,7 +1541,9 @@ let package = Package(
       name: "SwiftTUIWebHostCLI",
       dependencies: [
         "SwiftTUIWebHost",
+        .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
+        .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
       ]
     ),
     .testTarget(
@@ -1580,13 +1569,6 @@ Web-only composition:
 import SwiftTUIWebHost
 @_exported import SwiftTUI
 
-/// User-facing default `App.main()` for web-hosted SwiftTUI apps.
-extension App {
-  public static func main() async throws {
-    try await WebHostRunner.run(Self.self)
-  }
-}
-
 /// Public runner entry point.
 public enum WebHostRunner {
   @MainActor
@@ -1594,10 +1576,6 @@ public enum WebHostRunner {
 
   @MainActor
   public static func run<A: App>(_ app: A) async throws
-
-  /// Used by the opt-in `SwiftTUIWebHostCLI` product to decide whether
-  /// to run web mode or fall through to the terminal runner.
-  public static func shouldHandle(_ args: [String]) -> Bool
 }
 ```
 
@@ -1606,14 +1584,6 @@ Combined terminal + web composition:
 ```swift
 import SwiftTUIWebHostCLI
 @_exported import SwiftTUI
-
-/// User-facing default `App.main()` for binaries that intentionally embed
-/// the web host and still want normal terminal behavior when `--web` is absent.
-extension App {
-  public static func main() async throws {
-    try await WebHostCLIRunner.run(Self.self)
-  }
-}
 
 public enum WebHostCLIRunner {
   @MainActor
@@ -1626,20 +1596,9 @@ Shared web-host API:
 ```swift
 /// Configuration plucked from CLI args + env vars.
 public struct WebHostConfig: Sendable {
-  public var bindHost: String = "127.0.0.1"
+  public var bind: String = "127.0.0.1"
   public var port: Int = 9123
-  public var token: String? = WebHostConfig.generateToken()
   public var openBrowser: Bool = false
-  public var mirrorTerminal: Bool = false
-  public var qrCode: Bool = false
-  public var headless: Bool = false
-  public var allowedOrigins: [String] = []
-  public var recordPath: String? = nil
-}
-
-/// Flags handled (returns `true` if the args trigger web-host mode).
-public enum WebHostMode {
-  public static func parse(_ args: [String]) -> WebHostConfig?
 }
 ```
 
@@ -1654,7 +1613,7 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
   // WebSurfaceFrameEncoder; writes to the WS write side.
 }
 
-package final class WebSocketInputAdapter: TerminalInputReading,
+package final class WebSocketInputReader: TerminalInputReading,
   Sendable
 {
   // Reads from a per-scene WS read side; parses with
@@ -1706,11 +1665,11 @@ existing format. The `command:version:...` shape extends naturally.
 
 1. The binary must already be composed with `SwiftTUIWebHost` or
    `SwiftTUIWebHostCLI`; otherwise this code is not present in the binary.
-2. `WebHostRunner.run` receives a `WebHostConfig` from `WebHostMode.parse`
-   or from `RuntimeConfiguration.web`.
+2. `WebHostRunner.run` receives a `WebHostConfig` from
+   `RuntimeConfiguration.web` or its default configuration.
 3. Collect `WindowSceneSelection`s from the app's body (same as
    `WASIRunner`).
-4. Bind the HTTP server (FlyingFox) on `bindHost:port`. On collision,
+4. Bind the HTTP server (FlyingFox) on `bind:port`. On collision,
    try `port+1...port+9`; fail if all collide.
 5. Generate token if not disabled. Compute URL.
 6. Print URL banner to stdout, optionally with QR code.
@@ -1738,8 +1697,8 @@ existing format. The `command:version:...` shape extends naturally.
 
 ## Open questions
 
-(Things to decide before implementation. These aren't accepted positions; each
-includes a "Lean" indicating where the proposal currently sits.)
+(Historical decision log. Items marked "Resolved in source" are v1 decisions;
+the rest remain follow-up scope.)
 
 1. **FlyingFox vs Hummingbird 2 as the server.** Argued above for
    FlyingFox on dependency-cost grounds.
@@ -1847,16 +1806,11 @@ includes a "Lean" indicating where the proposal currently sits.)
     `WebHostTerminalStyle` machinery in `Platforms/Web/` already
     handles this; we reuse it.
 
-16. **Auto-open flag shape.** The original proposal preferred manual
-    browser open by default, with `--open` as an explicit opt-in. The
-    landed parse surface currently exposes `--no-open` and maps
-    `--web` to `RuntimeConfiguration.WebConfig(openBrowser: true)`.
-    **Lean:** change the parse surface before behavior ships so
-    `--web` prints a URL without launching a browser and `--open` opts
-    in. If compatibility with the already-landed parser is considered
-    more important, keep `--no-open` but update this proposal, the
-    argument-parsing proposal, and `RuntimeConfiguration.WebConfig` docs
-    to make default auto-open an explicit accepted policy.
+16. **Auto-open flag shape.** **Resolved in source (2026-05-06).**
+    Browser opening is manual by default. `--web` prints the tokenized URL
+    without launching a browser; `--web --open` and `SWIFTTUI_OPEN=1` opt
+    into browser launch. `SWIFTTUI_NO_OPEN=1` remains an env-only explicit
+    false for environments that already set it.
 
 ---
 
@@ -1887,15 +1841,16 @@ includes a "Lean" indicating where the proposal currently sits.)
 
 ## Suggested phasing
 
-(Sketch only — order is argued for, not committed to.)
+(Historical sketch. The v1 phases below have shipped; later phases remain
+follow-up scope.)
 
 0. **Phase 0 — Shared prerequisites.** **Landed before this runner.**
    `RuntimeConfiguration.web`, the `SwiftTUIArguments` parse surface,
    `web-surface` v2 `accessibilityTree`, browser ARIA mounting, and
-   shared Web/WASI fixtures are in place. Before writing server code,
-   reconcile the auto-open policy mismatch called out above and add the
-   package-graph guard that proves terminal-only products do not depend on
-   `SwiftTUIWebHost`, FlyingFox, or browser resources.
+   shared Web/WASI fixtures are in place. The implementation resolved
+   browser opening as manual by default and added the package-graph guard that
+   proves terminal-only products do not depend on `SwiftTUIWebHost`,
+   FlyingFox, or browser resources.
 
 1. **Phase 1 — Plumbing.** Stand up `Platforms/WebHost/` with a
    `SwiftTUIWebHost` product and an opt-in `SwiftTUIWebHostCLI` combined
@@ -1920,8 +1875,8 @@ includes a "Lean" indicating where the proposal currently sits.)
 
 4. **Phase 4 — Lifecycle and CLI.** Consume
    `RuntimeConfiguration.web`, add port collision handling, token
-   generation, URL printing, banner output, `--no-token`, and the
-   accepted browser-open policy (`--open` or the existing `--no-open`).
+   generation, URL printing, banner output, and the accepted
+   browser-open policy (`--open`).
    Keep `--bind` as the public bind-address spelling unless the
    argument-parsing proposal is deliberately revised.
 
@@ -2112,17 +2067,23 @@ The full research archive is in this document. Primary sources by theme.
   serialized per node as `isFocused`, live-region announcements use a
   dedicated browser announcer, and visual-only labels are not guessed.
 - 2026-05-06: Current-state refresh after confirming the embedded HTTP
-  server has not shipped. Marked the landed prerequisites as baseline:
+  server had not shipped. Marked the landed prerequisites as baseline:
   `RuntimeConfiguration.web`, `SwiftTUIArguments` parsing for
   `--web` / `SWIFTTUI_WEB`, and Web/WASI `web-surface` v2 ARIA
   mounting. Narrowed the missing work to the `Platforms/WebHost/`
   runner, HTTP/WebSocket transport, bundled browser assets, security,
-  and runner composition. Also recorded the open policy mismatch between
-  the proposal's manual-open default and the parser's current
-  `--no-open` / `openBrowser: true` shape.
+  and runner composition. Also recorded the open policy mismatch that
+  was later resolved as manual browser open by default.
 - 2026-05-06: Tightened the compile-time opt-in contract. The web server,
   WebSocket stack, FlyingFox dependency, and browser bundle must be present
   only in binaries that explicitly depend on `SwiftTUIWebHost` or the
   combined `SwiftTUIWebHostCLI` product. `SwiftTUICLI` must not weak-link,
   probe, or depend on the web host; terminal-only products should reject
   `--web` clearly without compiling any server functionality.
+- 2026-05-06: Shipped `Platforms/WebHost/` with `SwiftTUIWebHost` and
+  `SwiftTUIWebHostCLI`, the FlyingFox-backed server, WebSocket
+  surface/input adapters, token and cookie authorization, external-bind
+  warning, bundled browser runtime, combined runner, WebHost example, and
+  package-boundary guard. Resolved browser launch as `--open` /
+  `SWIFTTUI_OPEN=1` opt-in while keeping `SWIFTTUI_NO_OPEN=1` as an
+  env-only explicit false.

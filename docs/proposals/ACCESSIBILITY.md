@@ -3,8 +3,9 @@
 **Status:** Living proposal and implementation record. The original research
 from the `accessibility-investigation` branch remains here for context, but
 the shared substrate and first target consumers have now shipped: CLI
-accessible output, Web/WASI ARIA, SwiftUI host bridging, and text-input caret
-anchors for cursor-following. Long by intent — the goal is to keep the
+accessible output, Web/WASI ARIA, embedded WebHost ARIA delivery, SwiftUI host
+bridging, and text-input caret anchors for cursor-following. Long by intent —
+the goal is to keep the
 context here rather than scattered across session notes.
 
 **Owner:** unassigned. Tracking branch: `accessibility-investigation`.
@@ -39,7 +40,7 @@ context here rather than scattered across session notes.
 9. [Proposed API surface](#proposed-api-surface)
 10. [Anti-patterns this proposal commits us to avoiding](#anti-patterns-this-proposal-commits-us-to-avoiding)
 11. [What the non-CLI targets unlock](#what-the-non-cli-targets-unlock)
-    1. [Embedded web host](#embedded-web-host-platformswebhost-proposed)
+    1. [Embedded web host](#embedded-web-host-platformswebhost)
     2. [WASM web target](#wasm-web-target-platformsweb)
     3. [SwiftUI host](#swiftui-host-platformsswiftui)
 12. [Relationship to other proposals](#relationship-to-other-proposals)
@@ -1380,7 +1381,7 @@ realize it.
 
 ## What the non-CLI targets unlock
 
-### Embedded web host (`Platforms/WebHost/`, proposed)
+### Embedded web host (`Platforms/WebHost/`)
 
 This is the strongest accessibility delivery vehicle in the framework
 and the single most consequential update to this proposal since v1.
@@ -1414,7 +1415,8 @@ For accessibility this is transformational because:
    on this target with no extra authoring work.
 
 The architecture, wire format, server choice, security model, and CLI
-shape are designed in [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md).
+shape are implemented and recorded in
+[`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md).
 For accessibility's purposes the contract is:
 
 | Authoring | Wire | Browser DOM |
@@ -1489,7 +1491,7 @@ authority and they cross-reference rather than duplicate:
 | Proposal | Owns |
 |---|---|
 | [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) (this doc) | The semantic API surface (`accessibilityLabel`, `accessibilityRole`, `accessibilityHidden`, `accessibilityLiveRegion`, `AccessibilityAnnouncer`), per-target render strategies (cursor-as-focus, ASCII fallback, reduce-motion, ARIA mapping), and the env-var contract for accessibility-related toggles. |
-| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Recommends a `Platforms/WebHost/` runner peer using FlyingFox plus the already-landed `web-surface` v2 `accessibilityTree` wire format. |
+| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Records the shipped `Platforms/WebHost/` runner peer using FlyingFox plus the already-landed `web-surface` v2 `accessibilityTree` wire format. |
 | [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md) | The framework-reserved flag namespace, the `SwiftTUIOptions` `OptionGroup` and `SwiftTUIApp` protocol, and the precedence rules between CLI flags, env vars, and TTY auto-detection. Recommends layering on `swift-argument-parser` and shipping as a peer to the existing `SwiftTUICLI` runner. |
 | [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) | The factual record of what's already in the codebase. Read this *first* if any of the other proposals' "what we already have" claims feel surprising — the audit corrected a few of them. |
 
@@ -1506,14 +1508,12 @@ form the accessibility plan; this proposal alone is incomplete.
   `ARGUMENT_PARSING.md`'s `SwiftTUIOptions` (parsing, precedence, env
   var alignment). Don't duplicate the parsing rules here.
 - The `--web` flag and its current sub-flags (`--port`, `--bind`,
-  `--no-open`) are parsed by `SwiftTUIArguments` and surfaced in
+  `--open`) are parsed by `SwiftTUIArguments` and surfaced in
   `ARGUMENT_PARSING.md`'s standard flags table. `EMBEDDED_WEB_HOST.md`
-  owns the still-unimplemented server behavior, token/security flags, and
-  lifecycle policy.
+  owns the server behavior, token/security policy, and lifecycle policy.
 - The shared Web/WASI ARIA mapping half of Phase 6 has landed through
   `web-surface` v2 `accessibilityTree` frames and the browser ARIA
-  mounter. The embedded web host runner can reuse that path when it ships
-  its HTTP/WebSocket transport.
+  mounter. The embedded web host runner reuses that path over HTTP/WebSocket.
 
 ---
 
@@ -1571,14 +1571,10 @@ to be argued with, not accepted.)
    intent; accessibility roles are *AT* intent; conflating risks both).
 
 8. **Embedded web host: does v1 reuse the landed Web/WASI ARIA path?**
-   The `web-surface` v2 `accessibilityTree` extension and browser-side
-   DOM mounting have landed for Web/WASI. The remaining question is not
-   whether to design ARIA for the embedded host, but whether its first
-   runner release consumes the already-landed path. Lean: yes. The
-   embedded host is primarily justified as an accessibility delivery
-   vehicle, so a browser transport that omits the existing ARIA tree would
-   be a preview-only transport, not the accessibility feature described
-   here.
+   **Resolved in source (2026-05-06).** The embedded host uses the same
+   `web-surface` v2 `accessibilityTree` extension and browser-side DOM
+   mounting as Web/WASI. It serves the bundled browser runtime over
+   localhost HTTP and carries frames/input over WebSocket.
 
    The original v1-vs-v2 question for the **WASM** web target stands
    separately: it's the deploy-as-website story and is less urgent

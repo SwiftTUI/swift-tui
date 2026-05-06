@@ -29,7 +29,7 @@ The browser target is the preferred repeatable listening path because it mounts
 the semantic stream as ARIA beside the raster canvas.
 
 1. Start the gallery web surface:
-   `swiftly run swift run --package-path Examples/gallery gallery-demo --web --no-open --port 8080`
+   `swiftly run swift run --package-path Examples/gallery gallery-demo --web --port 8080`
 2. Open `http://127.0.0.1:8080` and use the browser accessibility inspector to
    confirm roles, names, focus, and live regions.
 3. Listen with VoiceOver, NVDA, or Orca depending on host platform.

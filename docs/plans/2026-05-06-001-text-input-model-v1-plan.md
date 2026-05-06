@@ -1,6 +1,6 @@
 ---
 title: "feat: text input model v1"
-type: feat
+type: feature
 status: shipped
 date: 2026-05-06
 depends_on:

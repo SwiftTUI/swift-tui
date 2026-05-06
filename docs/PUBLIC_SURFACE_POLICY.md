@@ -27,6 +27,20 @@ In this repo, an executable runner package owns top-level execution and the
 default `App.main()` story, while an embedded host package retains
 `HostedSceneSession` values inside another app or runtime shell.
 
+Runner and host composition is explicit:
+
+- terminal-only apps depend on `SwiftTUICLI`
+- WASI apps depend on `SwiftTUIWASI`
+- web-only localhost apps depend on `SwiftTUIWebHost` and call
+  `WebHostRunner`
+- apps that intentionally support both terminal-native and localhost-browser
+  launch depend on `SwiftTUIWebHostCLI` and call `WebHostCLIRunner`
+
+`SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
+that may link the embedded HTTP/WebSocket server, FlyingFox, and bundled
+browser resources. `SwiftTUICLI` must keep rejecting web mode without probing
+or weak-linking the WebHost package.
+
 If a feature can be expressed naturally on that surface, it should be documented there first.
 
 ## Compatibility Tier

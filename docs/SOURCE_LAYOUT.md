@@ -9,7 +9,10 @@ future file moves.
 - `Sources/`: root Swift package targets (`SwiftTUICore`, `SwiftTUIViews`, `SwiftTUIAnimatedImage`,
   `SwiftTUICharts`, and `SwiftTUI`)
 - `Tests/`: root Swift package tests for the package products
-- `Platforms/`: peer SwiftPM platform-integration packages — runners (`CLI`, `WASI`) that own `App.main()`, plus embedded hosts (`SwiftUI`, `Web`) that retain `HostedSceneSession` values inside another app's runtime
+- `Platforms/`: peer SwiftPM platform-integration packages — runners (`CLI`, `WASI`,
+  `WebHost`) that own `App.main()` or launch routing, plus embedded hosts
+  (`SwiftUI`, `Web`, `WebHost`) that retain `HostedSceneSession` values inside
+  another app or runtime shell
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
   `swift-hash`, `swift-png`, `swift-jpeg`, and `swift-gif`
@@ -34,6 +37,7 @@ future file moves.
   - embedded host packages:
     - `Platforms/SwiftUI`
     - `Platforms/Web`
+    - `Platforms/WebHost`
   - embedded terminal-program package:
     - `Platforms/Embedding`
 
@@ -161,10 +165,44 @@ The package ships two library targets:
     `WebSurfaceInputParser` for the resize/style/key/mouse stdin protocol that
     `Platforms/Web`'s `BrowserWASIBridge` consumes
 
+## `Platforms/WebHost`
+
+The package ships two public library targets:
+
+- `SwiftTUIWebHost` — opt-in embedded HTTP/WebSocket launcher. App authors
+  `import SwiftTUIWebHost` for web-only binaries that serve a local browser
+  view from the native process.
+  - `SwiftTUIWebHost.swift`: re-export surface for `SwiftTUI`
+  - `WebHostConfig.swift`: bind, port, browser-open, and candidate-port policy
+  - `WebHostRunner.swift`: single-scene WebHost launch path built on
+    `HostedSceneSession` / `SceneSessionResources`
+  - `WebHostServer.swift`: package-internal server and channel protocol
+  - `WebHostFlyingFoxServer.swift`: FlyingFox-backed HTTP/WebSocket adapter,
+    token/cookie validation, static bundle serving, and close-frame handling
+  - `WebHostToken.swift` and `WebHostOriginPolicy.swift`: auth token and
+    origin-boundary helpers
+  - `WebSocketSurfaceTransport.swift`: `PresentationSurface` implementation
+    that writes `web-surface` frames over a WebHost channel
+  - `WebSocketInputReader.swift`: `TerminalInputReading` implementation that
+    parses browser input/control records from the WebHost channel
+  - `WebHostBrowserBundle.swift`: SwiftPM resource lookup and content-type
+    mapping for the bundled browser runtime
+  - `WebHostBanner.swift`: copy-pasteable URL/banner output and external-bind
+    warning text
+  - `BrowserOpener.swift`: opt-in browser launch for `--open`
+- `SwiftTUIWebHostCLI` — compile-time composition package for binaries that
+  intentionally support both terminal-native execution and WebHost mode.
+  - `SwiftTUIWebHostCLI.swift`: re-export surface for `SwiftTUI` and
+    `SwiftTUIWebHost`
+  - `WebHostCLIRunner.swift`: routes `RuntimeConfiguration.web != nil` to
+    `WebHostRunner` and otherwise calls `TerminalRunner`
+
 ## Embedded Host Packages
 
 - `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`
 - `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
+- `Platforms/WebHost`: opt-in localhost HTTP/WebSocket host for native
+  binaries, using the same browser bundle and `web-surface` v2 protocol
 
 ## `Platforms/Embedding`
 
@@ -414,6 +452,9 @@ Sources/SwiftTUICore/
 - `Platforms/CLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
 - `Platforms/WASI/Tests/SwiftTUIWASITests`: launcher tests (manifest mode, transport-mode resolution)
 - `Platforms/WASI/Tests/WASISurfaceBridgeTests`: surface-bridge tests (frame encoder, input parser, transport)
+- `Platforms/WebHost/Tests/SwiftTUIWebHostTests`: WebHost package-boundary,
+  runner, server, security, browser-bundle, WebSocket transport, and input
+  tests
 - `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules
