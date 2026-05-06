@@ -38,4 +38,12 @@ struct RuntimeConfigurationBuilderTests {
     #expect(configuration.web?.bind == "0.0.0.0")
     #expect(configuration.web?.openBrowser == false)
   }
+
+  @Test("Builder web() defaults browser open to false")
+  func builderWebConfigDefaultsBrowserOpenToFalse() {
+    let configuration = RuntimeConfiguration.builder()
+      .web()
+      .build()
+    #expect(configuration.web?.openBrowser == false)
+  }
 }

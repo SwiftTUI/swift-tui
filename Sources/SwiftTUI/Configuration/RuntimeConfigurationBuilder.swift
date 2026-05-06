@@ -76,7 +76,9 @@ extension RuntimeConfiguration {
       return copy
     }
 
-    public func web(port: Int = 0, bind: String = "127.0.0.1", openBrowser: Bool = true) -> Self {
+    public func web(port: Int = 0, bind: String = "127.0.0.1", openBrowser: Bool = false)
+      -> Self
+    {
       var copy = self
       copy.configuration.web = WebConfig(port: port, bind: bind, openBrowser: openBrowser)
       return copy
