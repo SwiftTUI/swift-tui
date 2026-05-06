@@ -2144,6 +2144,114 @@ struct SwiftUISurfaceTests {
     #expect(box.value == "A")
   }
 
+  @Test("TextField inserts typed characters at the moved caret")
+  func textFieldInsertsAtMovedCaret() {
+    final class TextBox {
+      var value = "ac"
+    }
+
+    let box = TextBox()
+    let identity = testIdentity("MovedCaretNameField")
+    let registry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      TextField(
+        "Name",
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .textFieldStyle(.plain),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
+    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(box.value == "abc")
+  }
+
+  @Test("TextField backspace deletes before the moved caret")
+  func textFieldBackspaceDeletesBeforeMovedCaret() {
+    final class TextBox {
+      var value = "abc"
+    }
+
+    let box = TextBox()
+    let identity = testIdentity("BackspaceMovedCaretNameField")
+    let registry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      TextField(
+        "Name",
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .textFieldStyle(.plain),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
+    #expect(registry.dispatch(identity: identity, event: .backspace))
+    #expect(box.value == "ac")
+  }
+
+  @Test("TextField home and end move the caret within the line")
+  func textFieldHomeAndEndMoveCaret() {
+    final class TextBox {
+      var value = "ac"
+    }
+
+    let box = TextBox()
+    let identity = testIdentity("HomeEndNameField")
+    let registry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      TextField(
+        "Name",
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .textFieldStyle(.plain),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, event: .home))
+    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(box.value == "bac")
+    #expect(registry.dispatch(identity: identity, event: .end))
+    #expect(registry.dispatch(identity: identity, event: .character("d")))
+    #expect(box.value == "bacd")
+  }
+
   @Test("plain TextFieldStyle removes chrome while keeping active text entry visible")
   func plainTextFieldStyleRemovesChrome() {
     let artifacts = DefaultRenderer().render(

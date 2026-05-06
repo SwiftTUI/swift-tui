@@ -86,6 +86,10 @@ package struct TextInputValue: Equatable, Sendable {
       return clampingSelection()
     }
 
+    if text.isEmpty && selection == .caret(at: TextOffset(0)) {
+      return TextInputValue(text: externalText)
+    }
+
     let upperBound = TextOffset(externalText.count)
     let clampedRange = selection.range.clamped(to: upperBound)
     return TextInputValue(
