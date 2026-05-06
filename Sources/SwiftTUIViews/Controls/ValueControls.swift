@@ -169,7 +169,8 @@ extension TextField {
     let isEnabled = context.environmentValues.isEnabled
     let textFieldStyle = context.environmentValues.textFieldStyle
     let cursorFollowsFocus = context.environmentValues.cursorFollowsFocus
-    let chrome = styleEnvironment.controlChrome(
+    let chrome = textInputChrome(
+      styleEnvironment: styleEnvironment,
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
