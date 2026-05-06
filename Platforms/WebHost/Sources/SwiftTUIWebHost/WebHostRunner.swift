@@ -75,7 +75,7 @@ public enum WebHostRunner {
       scene: scene
     )
 
-    bannerWriter.write(WebHostBanner.message(for: session))
+    bannerWriter.write(WebHostBanner.message(for: session, configuration: webConfiguration))
     if webConfiguration.openBrowser {
       try browserOpener.open(session.url(path: "/"))
     }

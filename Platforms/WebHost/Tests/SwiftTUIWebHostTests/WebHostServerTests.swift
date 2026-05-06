@@ -4,6 +4,12 @@ import Testing
 @testable import SwiftTUIWebHost
 
 struct WebHostServerTests {
+  @Test("default port policy uses preferred range while explicit zero is kernel assigned")
+  func defaultPortPolicyUsesPreferredRangeWhileExplicitZeroIsKernelAssigned() {
+    #expect(WebHostConfig().candidatePorts == Array(9123...9132))
+    #expect(WebHostConfig(port: 0).candidatePorts == [0])
+  }
+
   @Test("binding to port 0 produces a reachable loopback URL")
   func bindingToPortZeroProducesReachableLoopbackURL() async throws {
     try await withServer { session in
@@ -60,6 +66,20 @@ struct WebHostServerTests {
 
       webSocket.cancel(with: .normalClosure, reason: nil)
     }
+  }
+
+  @Test("WebSocket close messages preserve close code and reason")
+  func webSocketCloseMessagesPreserveCloseCodeAndReason() async throws {
+    let channel = WebHostSceneChannel()
+    let output = await channel.attach(
+      client: AsyncStream { continuation in
+        continuation.yield(.close(code: 1009, reason: "too large"))
+        continuation.finish()
+      }
+    )
+    var iterator = output.makeAsyncIterator()
+
+    #expect(await iterator.next() == .close(code: 1009, reason: "too large"))
   }
 }
 

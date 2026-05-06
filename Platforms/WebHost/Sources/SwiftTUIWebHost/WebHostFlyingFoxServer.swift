@@ -3,6 +3,8 @@ import FlyingSocks
 import Foundation
 
 package struct WebHostFlyingFoxServer: WebHostServer {
+  package static let maxMessageBytes = 8 * 1024 * 1024
+
   package init() {}
 
   package func start(
@@ -10,7 +12,32 @@ package struct WebHostFlyingFoxServer: WebHostServer {
     token: WebHostToken,
     scene: WebHostSceneDescriptor
   ) async throws -> WebHostServerSession {
-    let requestedPort = try UInt16(webHostPort: configuration.port)
+    var lastError: (any Error)?
+    for port in configuration.candidatePorts {
+      do {
+        return try await start(
+          configuration: configuration,
+          requestedPort: port,
+          token: token,
+          scene: scene
+        )
+      } catch {
+        lastError = error
+        if configuration.candidatePorts.count == 1 {
+          throw error
+        }
+      }
+    }
+    throw lastError ?? WebHostServerError.unableToDetermineListeningPort
+  }
+
+  private func start(
+    configuration: WebHostConfig,
+    requestedPort: Int,
+    token: WebHostToken,
+    scene: WebHostSceneDescriptor
+  ) async throws -> WebHostServerSession {
+    let requestedPort = try UInt16(webHostPort: requestedPort)
     let address = try sockaddr_in.inet(ip4: configuration.bind, port: requestedPort)
     let channel = WebHostSceneChannel()
     let server = HTTPServer(address: address, logger: .disabled)
@@ -59,7 +86,12 @@ package struct WebHostFlyingFoxServer: WebHostServer {
 
       return
         try await WebSocketHTTPHandler
-        .webSocket(WebHostFlyingFoxWebSocketHandler(channel: channel))
+        .webSocket(
+          WebHostFlyingFoxWebSocketHandler(
+            channel: channel,
+            maxMessageBytes: Self.maxMessageBytes
+          )
+        )
         .handleRequest(request)
     }
     await server.appendRoute("GET /*") { request in
@@ -115,6 +147,8 @@ package struct WebHostFlyingFoxServer: WebHostServer {
 }
 
 private struct RouteContext: Sendable {
+  static let cookieName = "SwiftTUIWebHostToken"
+
   var bind: String
   var token: WebHostToken
   var scene: WebHostSceneDescriptor
@@ -123,7 +157,10 @@ private struct RouteContext: Sendable {
   func isAuthorized(
     _ request: HTTPRequest
   ) -> Bool {
-    request.query["token"] == token.rawValue
+    if let queryToken = request.query["token"] {
+      return queryToken == token.rawValue
+    }
+    return cookieToken(from: request) == token.rawValue
   }
 
   func authorizedResponse(
@@ -133,12 +170,38 @@ private struct RouteContext: Sendable {
     guard isAuthorized(request) else {
       return forbiddenResponse()
     }
-    return response()
+    var response = response()
+    if request.query["token"] == token.rawValue {
+      response.headers[.setCookie] = cookieValue()
+    }
+    return response
+  }
+
+  func cookieValue() -> String {
+    "\(Self.cookieName)=\(token.rawValue); Path=/; SameSite=Strict; HttpOnly"
+  }
+
+  private func cookieToken(
+    from request: HTTPRequest
+  ) -> String? {
+    guard let cookie = request.headers[.cookie] else {
+      return nil
+    }
+    for field in cookie.split(separator: ";") {
+      let parts = field.split(separator: "=", maxSplits: 1).map {
+        $0.trimmingCharacters(in: .whitespaces)
+      }
+      if parts.count == 2, parts[0] == Self.cookieName {
+        return parts[1]
+      }
+    }
+    return nil
   }
 }
 
 private struct WebHostFlyingFoxWebSocketHandler: WSMessageHandler {
   var channel: WebHostSceneChannel
+  var maxMessageBytes: Int
 
   func makeMessages(
     for client: AsyncStream<WSMessage>
@@ -146,7 +209,9 @@ private struct WebHostFlyingFoxWebSocketHandler: WSMessageHandler {
     let mappedClient = AsyncStream<WebHostSocketMessage> { continuation in
       let task = Task {
         for await message in client {
-          continuation.yield(webHostMessage(from: message))
+          continuation.yield(
+            webHostMessage(from: message, maxMessageBytes: maxMessageBytes)
+          )
         }
         continuation.finish()
       }
@@ -170,15 +235,22 @@ private struct WebHostFlyingFoxWebSocketHandler: WSMessageHandler {
 }
 
 private func webHostMessage(
-  from message: WSMessage
+  from message: WSMessage,
+  maxMessageBytes: Int
 ) -> WebHostSocketMessage {
   switch message {
   case .text(let text):
+    guard text.utf8.count <= maxMessageBytes else {
+      return .messageTooBig(maxMessageBytes: maxMessageBytes)
+    }
     return .text(text)
   case .data(let data):
+    guard data.count <= maxMessageBytes else {
+      return .messageTooBig(maxMessageBytes: maxMessageBytes)
+    }
     return .data(Array(data))
   case .close:
-    return .close
+    return .normalClose
   }
 }
 
@@ -190,8 +262,19 @@ private func flyingFoxMessage(
     return .text(text)
   case .data(let bytes):
     return .data(Data(bytes))
-  case .close:
-    return .close()
+  case .close(let code, let reason):
+    return .close(WSCloseCode(code, reason: reason))
+  }
+}
+
+extension WebHostSocketMessage {
+  fileprivate static func messageTooBig(
+    maxMessageBytes: Int
+  ) -> WebHostSocketMessage {
+    .close(
+      code: 1009,
+      reason: "WebHost WebSocket message exceeded \(maxMessageBytes) bytes."
+    )
   }
 }
 

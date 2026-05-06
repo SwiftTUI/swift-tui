@@ -146,7 +146,8 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
       inputContinuation.yield(Array(text.utf8))
     case .data(let bytes):
       inputContinuation.yield(bytes)
-    case .close:
+    case .close(let code, let reason):
+      outputContinuation?.yield(.close(code: code, reason: reason))
       inputContinuation.finish()
       outputContinuation?.finish()
     }
@@ -165,5 +166,9 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
 package enum WebHostSocketMessage: Equatable, Sendable {
   case text(String)
   case data([UInt8])
-  case close
+  case close(code: UInt16, reason: String)
+
+  package static var normalClose: WebHostSocketMessage {
+    .close(code: 1000, reason: "")
+  }
 }
