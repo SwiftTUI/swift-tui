@@ -148,6 +148,58 @@ struct AccessibilityNodeExtractionTests {
 
     #expect(identities == [rootID, leftID, rightID])
   }
+
+  @Test("Text input caret anchors hoist onto the owning accessibility node")
+  func textInputCaretAnchorHoistsToOwnerNode() throws {
+    let ownerID = testIdentity("TextField")
+    let contentID = testIdentity("TextField", "Content")
+    let root = placedNode(
+      identity: testIdentity("Root"),
+      children: [
+        placedNode(
+          identity: ownerID,
+          semanticMetadata: .init(accessibilityRole: .textField),
+          children: [
+            placedNode(
+              identity: contentID,
+              bounds: rect(x: 4, y: 2, width: 8, height: 1),
+              semanticMetadata: .init(
+                textInputAccessibilityCursorAnchor: .init(
+                  ownerIdentity: ownerID,
+                  anchor: CellPoint(x: 3, y: 0)
+                )
+              ),
+              drawPayload: .text("abc")
+            )
+          ]
+        )
+      ]
+    )
+
+    let nodes = SemanticExtractor().extract(from: root).accessibilityNodes
+    let ownerNode = try #require(nodes.first { $0.identity == ownerID })
+
+    #expect(ownerNode.cursorAnchor == CellPoint(x: 7, y: 2))
+    #expect(!nodes.contains { $0.identity == contentID })
+  }
+
+  @Test("Explicit accessibility cursor anchors still apply to their own node")
+  func explicitCursorAnchorStillAppliesToOwnNode() throws {
+    let identity = testIdentity("Custom")
+    let placed = placedNode(
+      identity: identity,
+      bounds: rect(x: 2, y: 3, width: 8, height: 1),
+      semanticMetadata: .init(
+        accessibilityRole: .button,
+        accessibilityCursorAnchor: CellPoint(x: 5, y: 0)
+      ),
+      drawPayload: .text("Run")
+    )
+
+    let node = try #require(SemanticExtractor().extract(from: placed).accessibilityNodes.first)
+
+    #expect(node.cursorAnchor == CellPoint(x: 7, y: 3))
+  }
 }
 
 private func placedNode(

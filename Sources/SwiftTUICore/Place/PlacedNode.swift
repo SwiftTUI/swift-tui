@@ -24,7 +24,28 @@ public struct PlacedNode: Equatable, Sendable {
   public var semanticRole: SemanticRole
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
-  public var semanticMetadata: SemanticMetadata
+  private var _semanticMetadata: Boxed<SemanticMetadata>?
+  public var semanticMetadata: SemanticMetadata {
+    get { _semanticMetadata?.value ?? SemanticMetadata() }
+    set {
+      if newValue == SemanticMetadata() {
+        _semanticMetadata = nil
+      } else {
+        _semanticMetadata = Boxed(newValue)
+      }
+    }
+    _modify {
+      if _semanticMetadata == nil {
+        _semanticMetadata = Boxed(SemanticMetadata())
+      }
+      defer {
+        if _semanticMetadata?.value == SemanticMetadata() {
+          _semanticMetadata = nil
+        }
+      }
+      yield &_semanticMetadata!.value
+    }
+  }
   public var lifecycleMetadata: LifecycleMetadata
   @_spi(Testing) public var drawPayload: DrawPayload
   /// Mirror of ``ResolvedNode/layoutBehavior`` for cases that need to
@@ -91,7 +112,11 @@ public struct PlacedNode: Equatable, Sendable {
     self.semanticRole = semanticRole
     self.layoutMetadata = layoutMetadata
     self.drawMetadata = drawMetadata
-    self.semanticMetadata = semanticMetadata
+    if semanticMetadata == SemanticMetadata() {
+      _semanticMetadata = nil
+    } else {
+      _semanticMetadata = Boxed(semanticMetadata)
+    }
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
     if case .intrinsic = layoutBehavior {
@@ -137,4 +162,3 @@ public struct PlacedNode: Equatable, Sendable {
     }
   }
 }
-

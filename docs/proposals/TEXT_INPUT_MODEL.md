@@ -1,11 +1,12 @@
 # Text Input Model
 
-**Status:** Active implementation. Stages 0-5 of the linked V1 plan have
+**Status:** Active implementation. Stages 0-7 of the linked V1 plan have
 landed: the package-private value model, reducer, layout map, presentation
-projection, field-content view, and reducer-backed `TextField` / `SecureField`
-key and paste handling are in place. `TextEditor` now uses the same reducer for
-caret movement, newline insertion, and whole-string paste; caret-visible
-scroll adjustment and caret-anchor semantics remain planned work.
+projection, field-content view, reducer-backed `TextField` / `SecureField`,
+focused paste dispatch, reducer-backed `TextEditor`, caret-visible runtime
+scrolling, and text-input caret anchors in accessibility semantics are in
+place. Cleanup, source-layout/docs finalization, and the final repo-wide gate
+remain open.
 
 **Owner:** unassigned.
 
@@ -35,8 +36,8 @@ The current implementation is intentionally small:
 - The text mutation function appends printable input, removes the last
   character on backspace, appends `\n` for multiline return, scrolls
   `TextEditor` on up/down, and consumes left/right without moving anything.
-- Accessibility nodes can carry `cursorAnchor`, but text inputs do not publish
-  a real caret anchor.
+- Accessibility nodes can carry `cursorAnchor`, and built-in text inputs now
+  publish real caret anchors for cursor-following and caret-visible scroll sync.
 
 That is not a stable foundation for the next tranche. A proper text model
 needs to distinguish text storage, editing state, command reduction, layout,

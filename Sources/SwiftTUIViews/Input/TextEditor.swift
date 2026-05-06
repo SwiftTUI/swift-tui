@@ -30,6 +30,7 @@ extension TextEditor {
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
+    let cursorFollowsFocus = context.environmentValues.cursorFollowsFocus
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
@@ -46,7 +47,7 @@ extension TextEditor {
           traits: .multiline,
           prompt: nil,
           isFocused: isFocused,
-          cursorFollowsFocus: false,
+          cursorFollowsFocus: cursorFollowsFocus,
           width: nil
         ).layoutMap
       },
@@ -60,12 +61,14 @@ extension TextEditor {
       traits: .multiline,
       prompt: nil,
       isFocused: isFocused,
-      cursorFollowsFocus: false,
+      cursorFollowsFocus: cursorFollowsFocus,
       width: nil
     )
 
     let child = textEditorBody(
       displayText: presentation.displayText,
+      ownerIdentity: context.identity,
+      caretAnchor: presentation.caretAnchor,
       chrome: chrome,
       scrollPosition: $scrollPosition,
       focusActive: isFocused && showsFocusEffect

@@ -473,11 +473,12 @@ git commit -m "feat: route paste to focused text inputs"
 - [x] Make return insert `\n`.
 - [x] Make up/down move caret through the layout map and preferred visual
   column.
-- [ ] Apply caret-visible scroll adjustment after reducer mutations. Clamp
+- [x] Apply caret-visible scroll adjustment after reducer mutations. Clamp
   scroll so the caret remains inside the visible editor content rect when the
   content is taller than the viewport.
 - [x] Make bracketed paste insert the whole pasted string, preserving newlines.
-- [ ] Update `TextEditorSurfaceTests` for caret movement and scrolling.
+- [x] Update `TextEditorSurfaceTests` for caret movement and add runtime
+  coverage for caret-visible scrolling.
 - [x] Run focused multiline tests.
 
 ```bash
@@ -506,22 +507,22 @@ git commit -m "feat: use text input model in text editor"
 
 ## Stage 7: Caret Semantics And Cursor-Follows-Focus
 
-- [ ] Add package `cursorFollowsFocus` to
+- [x] Add package `cursorFollowsFocus` to
   `EnvironmentValues` in `RuntimePolicyEnvironment.swift`.
-- [ ] Set `effectiveEnvironmentValues.cursorFollowsFocus` from
+- [x] Set `effectiveEnvironmentValues.cursorFollowsFocus` from
   `runtimeConfiguration.cursorFollowsFocus` in `RunLoop+Rendering.swift`.
-- [ ] Add package-only text-input caret-anchor metadata to `SemanticMetadata`.
+- [x] Add package-only text-input caret-anchor metadata to `SemanticMetadata`.
   The metadata must include the owning text-control identity and a local
   caret point inside the placed `TextInputContent` node.
-- [ ] Update semantic extraction to hoist the placed text-input caret anchor
+- [x] Update semantic extraction to hoist the placed text-input caret anchor
   onto the owner's `AccessibilityNode.cursorAnchor`.
-- [ ] Keep explicit `accessibilityCursorAnchor` behavior intact for non-text
+- [x] Keep explicit `accessibilityCursorAnchor` behavior intact for non-text
   custom focus targets.
-- [ ] Suppress synthetic caret drawing when `cursorFollowsFocus` is true and a
+- [x] Suppress synthetic caret drawing when `cursorFollowsFocus` is true and a
   text input has a real caret anchor.
-- [ ] Add tests proving `AccessibilityRuntimePolicy` places the hardware
+- [x] Add tests proving `AccessibilityRuntimePolicy` places the hardware
   cursor at the text caret for `TextField`, `SecureField`, and `TextEditor`.
-- [ ] Add tests proving secure field accessibility nodes do not expose the
+- [x] Add tests proving secure field accessibility nodes do not expose the
   secret value while still publishing a caret anchor.
 
 ```bash

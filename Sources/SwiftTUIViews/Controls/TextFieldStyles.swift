@@ -38,13 +38,25 @@ public struct TextFieldStyleConfiguration: Sendable {
 
   public struct FieldContent: View, Sendable {
     package var displayText: String
+    package var ownerIdentity: Identity?
+    package var caretAnchor: CellPoint?
 
-    nonisolated package init(displayText: String) {
+    nonisolated package init(
+      displayText: String,
+      ownerIdentity: Identity? = nil,
+      caretAnchor: CellPoint? = nil
+    ) {
       self.displayText = displayText
+      self.ownerIdentity = ownerIdentity
+      self.caretAnchor = caretAnchor
     }
 
     public var body: some View {
-      TextInputContent(displayText: displayText)
+      TextInputContent(
+        displayText: displayText,
+        ownerIdentity: ownerIdentity,
+        caretAnchor: caretAnchor
+      )
     }
   }
 
