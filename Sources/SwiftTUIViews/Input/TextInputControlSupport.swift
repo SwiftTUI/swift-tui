@@ -5,6 +5,7 @@ package func registerTextInputBinding(
   _ binding: Binding<String>,
   value: Binding<TextInputValue>,
   traits: TextInputTraits,
+  layout: @escaping @MainActor (TextInputValue) -> TextInputLayoutMap? = { _ in nil },
   authoringContext: ImperativeAuthoringContextSnapshot?,
   in context: ResolveContext
 ) {
@@ -26,6 +27,7 @@ package func registerTextInputBinding(
       binding: binding,
       value: value,
       traits: traits,
+      layout: layout,
       authoringContext: authoringContext
     )
   }
@@ -42,6 +44,7 @@ package func registerTextInputBinding(
         binding: binding,
         value: value,
         traits: traits,
+        layout: layout,
         authoringContext: authoringContext
       )
     })
@@ -53,6 +56,7 @@ private func applyTextInputCommand(
   binding: Binding<String>,
   value: Binding<TextInputValue>,
   traits: TextInputTraits,
+  layout: @escaping @MainActor (TextInputValue) -> TextInputLayoutMap?,
   authoringContext: ImperativeAuthoringContextSnapshot?
 ) -> Bool {
   withImperativeAuthoringContext(authoringContext) {
@@ -61,7 +65,7 @@ private func applyTextInputCommand(
       currentValue,
       command: command,
       traits: traits,
-      layout: nil
+      layout: layout(currentValue)
     )
     guard mutation.value != currentValue || mutation.shouldWriteBinding else {
       return false
@@ -114,6 +118,10 @@ package func textInputCommand(
     return .move(.left, selecting: isSelecting)
   case .arrowRight:
     return .move(.right, selecting: isSelecting)
+  case .arrowUp:
+    return .move(.up, selecting: isSelecting)
+  case .arrowDown:
+    return .move(.down, selecting: isSelecting)
   case .home:
     return .move(.lineStart, selecting: isSelecting)
   case .end:

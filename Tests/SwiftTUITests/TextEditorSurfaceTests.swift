@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -67,6 +67,75 @@ struct TextEditorSurfaceTests {
     #expect(updatedSurface.contains("Line 1"))
     #expect(updatedSurface.contains("Line 2"))
     #expect(updatedSurface.contains("Line 3"))
+  }
+
+  @Test("TextEditor inserts newlines at the moved caret")
+  func textEditorInsertsNewlineAtMovedCaret() {
+    final class Box {
+      var value = "ac"
+    }
+
+    let box = Box()
+    let registry = LocalKeyHandlerRegistry()
+    let identity = testIdentity("MovedCaretTextEditor")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      TextEditor(
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .frame(width: 16, height: 5),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
+    #expect(registry.dispatch(identity: identity, event: .return))
+    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(box.value == "a\nbc")
+  }
+
+  @Test("TextEditor moves vertically through multiline text")
+  func textEditorMovesVerticallyThroughMultilineText() {
+    final class Box {
+      var value = "ab\ncd"
+    }
+
+    let box = Box()
+    let registry = LocalKeyHandlerRegistry()
+    let identity = testIdentity("VerticalCaretTextEditor")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      TextEditor(
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .frame(width: 16, height: 5),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, event: .arrowUp))
+    #expect(registry.dispatch(identity: identity, event: .character("X")))
+    #expect(box.value == "abX\ncd")
   }
 
   @Test("TextEditor keeps focused and unfocused chrome distinct")

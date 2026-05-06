@@ -138,6 +138,22 @@ struct TextInputRuntimeIntegrationTests {
     #expect(!surfaceText(runLoop.host).contains("Password"))
   }
 
+  @Test("TextEditor paste dispatch writes once and preserves newlines")
+  func textEditorPasteDispatchWritesOnceAndPreservesNewlines() throws {
+    let box = PasteTextBox()
+    let runLoop = makeTextInputRunLoop {
+      PasteTextEditorFixture(box: box)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: testIdentity("PasteTextEditor"))
+
+    runLoop.runLoop.handlePaste(PasteEvent(content: "line 1\nline 2"))
+
+    #expect(box.value == "line 1\nline 2")
+    #expect(box.setCount == 1)
+  }
+
   @Test("Paste falls back to scalar key presses for non-text focused handlers")
   func pasteFallsBackToScalarKeyPressesForNonTextHandlers() throws {
     final class Recorder {
@@ -200,6 +216,17 @@ private struct PasteSecureFieldFixture: View {
     SecureField("Password", text: box.binding())
       .id(testIdentity("PasteSecureField"))
       .textFieldStyle(.plain)
+  }
+}
+
+@MainActor
+private struct PasteTextEditorFixture: View {
+  let box: PasteTextBox
+
+  var body: some View {
+    TextEditor(text: box.binding())
+      .id(testIdentity("PasteTextEditor"))
+      .frame(width: 20, height: 5)
   }
 }
 

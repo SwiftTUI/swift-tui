@@ -3,8 +3,9 @@
 **Status:** Active implementation. Stages 0-5 of the linked V1 plan have
 landed: the package-private value model, reducer, layout map, presentation
 projection, field-content view, and reducer-backed `TextField` / `SecureField`
-key and paste handling are in place. `TextEditor` and caret-anchor semantics
-remain planned work.
+key and paste handling are in place. `TextEditor` now uses the same reducer for
+caret movement, newline insertion, and whole-string paste; caret-visible
+scroll adjustment and caret-anchor semantics remain planned work.
 
 **Owner:** unassigned.
 
