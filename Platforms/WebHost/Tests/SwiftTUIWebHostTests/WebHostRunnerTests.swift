@@ -65,7 +65,9 @@ struct WebHostRunnerTests {
 
     let session = await server.startedSession()
     try await waitUntil("banner write") {
-      banner.messages.contains(WebHostBanner.message(for: session))
+      banner.messages.contains(
+        WebHostBanner.message(for: session, configuration: .init(port: 0))
+      )
     }
 
     #expect(opener.openedURLs.isEmpty)
