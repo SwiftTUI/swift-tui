@@ -12,7 +12,9 @@ struct WebHostServerTests {
 
       let (data, response) = try await URLSession.shared.data(from: session.url(path: "/"))
       #expect(try statusCode(from: response) == 200)
-      #expect(String(decoding: data, as: UTF8.self).contains("<main id=\"app\"></main>"))
+      let html = String(decoding: data, as: UTF8.self)
+      #expect(html.contains("<main id=\"webhost-root\"></main>"))
+      #expect(html.contains("?token=test-token"))
     }
   }
 

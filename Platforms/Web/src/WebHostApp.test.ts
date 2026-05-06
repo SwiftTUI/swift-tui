@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { createWebHostApp, type WebHostAppOptions } from "./WebHostApp.ts";
+import type { WebSocketSceneSocket } from "./WebSocketSceneBridge.ts";
 import type {
   ResolvedWebHostTerminalStyle,
   WebHostTerminalStyle,
@@ -116,6 +117,43 @@ test("app controller switches scenes and propagates active styles", async () => 
   expect(controlsRuntime?.disposed).toBe(true);
 });
 
+test("app controller uses the embedded WebSocket bridge when configured", async () => {
+  const socket = new FakeSocket();
+  let socketURL = "";
+  let runtimeOptions: WebHostSceneRuntimeOptions | undefined;
+  const mount = makeElement("div");
+
+  const controller = await createWebHostApp({
+    mount: mount as unknown as HTMLElement,
+    manifest: {
+      defaultSceneId: "main",
+      scenes: [{ id: "main", title: "Main", isDefault: true }],
+    },
+    embeddedHost: {
+      token: "test-token",
+      webSocketBaseURL: "http://127.0.0.1:9123/",
+      webSocketFactory: (url) => {
+        socketURL = String(url);
+        return socket;
+      },
+    },
+    createElement: (tagName: string) => makeElement(tagName) as unknown as HTMLElement,
+    sceneRuntimeFactory: (options: WebHostSceneRuntimeOptions) => {
+      runtimeOptions = options;
+      return new FakeRuntime(options.descriptor.id) as unknown as never;
+    },
+  });
+
+  expect(socketURL).toBe("ws://127.0.0.1:9123/ws/scene/main?token=test-token");
+
+  socket.open();
+  runtimeOptions?.onInput(new TextEncoder().encode("input-record"));
+  expect(new TextDecoder().decode(socket.sent[0])).toBe("input-record");
+
+  await controller.dispose();
+  expect(socket.closed).toBe(true);
+});
+
 function makeElement(
   tagName: string
 ): Record<string, unknown> {
@@ -131,4 +169,54 @@ function makeElement(
     hasAttribute: () => false,
     setAttribute: () => {},
   };
+}
+
+class FakeSocket implements WebSocketSceneSocket {
+  binaryType: BinaryType = "blob";
+  readyState = 0;
+  readonly sent: Uint8Array[] = [];
+  closed = false;
+
+  private readonly listeners = new Map<string, Set<(event: unknown) => void>>();
+
+  send(
+    data: string | ArrayBufferLike | Blob | ArrayBufferView
+  ): void {
+    if (typeof data === "string") {
+      this.sent.push(new TextEncoder().encode(data));
+    } else if (data instanceof Uint8Array) {
+      this.sent.push(new Uint8Array(data));
+    } else if (data instanceof ArrayBuffer) {
+      this.sent.push(new Uint8Array(data));
+    } else if (ArrayBuffer.isView(data)) {
+      this.sent.push(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    }
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+
+  addEventListener(
+    type: string,
+    listener: (event: unknown) => void
+  ): void {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(
+    type: string,
+    listener: (event: unknown) => void
+  ): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  open(): void {
+    this.readyState = 1;
+    for (const listener of this.listeners.get("open") ?? []) {
+      listener({});
+    }
+  }
 }

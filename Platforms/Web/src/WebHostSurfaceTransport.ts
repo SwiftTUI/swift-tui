@@ -87,6 +87,12 @@ export type WebHostOutputRecord =
   | { type: "surface"; frame: WebHostSurfaceFrame }
   | { type: "text"; text: string };
 
+export interface WebHostOutputSink {
+  presentSurface(frame: WebHostSurfaceFrame): void;
+  writeOutput?(text: string): void;
+  writeError?(text: string): void;
+}
+
 export interface WebHostKeyInput {
   key:
     | "return"

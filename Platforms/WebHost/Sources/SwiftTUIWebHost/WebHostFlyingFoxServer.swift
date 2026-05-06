@@ -27,18 +27,14 @@ package struct WebHostFlyingFoxServer: WebHostServer {
 
     await server.appendRoute("GET /") { request in
       routeContext.authorizedResponse(for: request) {
-        httpResponse(
-          body: Self.indexHTML(scene: scene, token: token),
-          contentType: "text/html; charset=utf-8"
-        )
-      }
-    }
-    await server.appendRoute("GET /static/webhost.js") { request in
-      routeContext.authorizedResponse(for: request) {
-        httpResponse(
-          body: "window.__SWIFTTUI_WEBHOST__ = true;\n",
-          contentType: "application/javascript; charset=utf-8"
-        )
+        do {
+          return httpResponse(
+            body: try WebHostBrowserBundle.indexHTML(token: token),
+            contentType: "text/html; charset=utf-8"
+          )
+        } catch {
+          return notFoundResponse()
+        }
       }
     }
     await server.appendRoute("GET /scene-manifest.json") { request in
@@ -65,6 +61,16 @@ package struct WebHostFlyingFoxServer: WebHostServer {
         try await WebSocketHTTPHandler
         .webSocket(WebHostFlyingFoxWebSocketHandler(channel: channel))
         .handleRequest(request)
+    }
+    await server.appendRoute("GET /*") { request in
+      routeContext.authorizedResponse(for: request) {
+        do {
+          let resource = try WebHostBrowserBundle.resource(for: request.path)
+          return httpResponse(body: resource.data, contentType: resource.contentType)
+        } catch {
+          return notFoundResponse()
+        }
+      }
     }
 
     do {
@@ -96,25 +102,6 @@ package struct WebHostFlyingFoxServer: WebHostServer {
       serverTask.cancel()
       throw error
     }
-  }
-
-  private static func indexHTML(
-    scene: WebHostSceneDescriptor,
-    token: WebHostToken
-  ) -> String {
-    """
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>\(scene.title ?? scene.id)</title>
-      <script type="module" src="/static/webhost.js?token=\(token.rawValue)"></script>
-    </head>
-    <body>
-      <main id="app"></main>
-    </body>
-    </html>
-    """
   }
 
   private static func sceneManifest(
@@ -212,10 +199,17 @@ private func httpResponse(
   body: String,
   contentType: String
 ) -> HTTPResponse {
+  httpResponse(body: Data(body.utf8), contentType: contentType)
+}
+
+private func httpResponse(
+  body: Data,
+  contentType: String
+) -> HTTPResponse {
   HTTPResponse(
     statusCode: .ok,
     headers: [.contentType: contentType],
-    body: Data(body.utf8)
+    body: body
   )
 }
 
@@ -224,6 +218,14 @@ private func forbiddenResponse() -> HTTPResponse {
     statusCode: .forbidden,
     headers: [.contentType: "text/plain; charset=utf-8"],
     body: Data("Forbidden\n".utf8)
+  )
+}
+
+private func notFoundResponse() -> HTTPResponse {
+  HTTPResponse(
+    statusCode: .notFound,
+    headers: [.contentType: "text/plain; charset=utf-8"],
+    body: Data("Not Found\n".utf8)
   )
 }
 
