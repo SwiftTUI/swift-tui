@@ -35,9 +35,6 @@ extension TextEditor {
       isFocused: isFocused && showsFocusEffect
     )
     let synchronizedValue = textInputValue.synchronized(with: text.wrappedValue)
-    if synchronizedValue != textInputValue {
-      textInputValue = synchronizedValue
-    }
 
     registerTextInputBinding(
       text,
