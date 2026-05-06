@@ -81,15 +81,21 @@ Landed by this plan:
   `AccessibilityPoliteness`, and `AccessibilityNode`, and remove
   `PresentationRole`.
 
-Still follow-up work:
+Follow-up target behavior completed after this substrate plan:
 
 - CLI cursor-as-focus policy, accessible linear rendering, runtime live-region
-  announcements, reduce-motion/no-progress behavior, embedded-host ARIA, WASM
-  ARIA, and SwiftUI host bridging are not implemented by this plan.
-- Follow-up target behavior is split into:
+  announcements, and reduce-motion/no-progress behavior landed in:
   - `docs/plans/2026-05-05-003-accessibility-cli-runtime-plan.md`
+- Web/WASI ARIA landed in:
   - `docs/plans/2026-05-05-004-accessibility-web-aria-plan.md`
+- SwiftUI host bridging landed in:
   - `docs/plans/2026-05-05-005-accessibility-swiftui-host-plan.md`
+
+Still follow-up work:
+
+- Public cursor-anchor authoring.
+- Imperative announcement authoring.
+- Listening/lint coverage.
 
 ## Implementation Boundary
 
