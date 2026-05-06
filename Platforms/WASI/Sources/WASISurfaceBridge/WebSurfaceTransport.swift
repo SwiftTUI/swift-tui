@@ -1,4 +1,4 @@
-@_spi(Runners) package import SwiftTUI
+@_spi(Runners) public import SwiftTUI
 import Synchronization
 
 /// Container format the web-surface transport advertises to the JS
@@ -363,21 +363,21 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 }
 
-package enum WebSurfaceInputControlMessage: Equatable, Sendable {
+@_spi(WebHost) public enum WebSurfaceInputControlMessage: Equatable, Sendable {
   case resize(CellSize, cellPixelSize: PixelSize?)
   case style(TerminalRenderStyle)
 }
 
-package struct WebSurfaceInputParser {
+@_spi(WebHost) public struct WebSurfaceInputParser {
   private static let introducer: UInt8 = 0x1E
 
   private var bufferedCommand: [UInt8]?
   private var terminalInputParser = TerminalInputParser()
   private var cellPixelSize: PixelSize?
 
-  package init() {}
+  @_spi(WebHost) public init() {}
 
-  package mutating func feed(
+  @_spi(WebHost) public mutating func feed(
     _ bytes: [UInt8]
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
     var payload: [UInt8] = []
@@ -689,8 +689,8 @@ package struct WebSurfaceInputParser {
   }
 }
 
-package enum WebSurfaceFrameEncoder {
-  package static func encode(
+@_spi(WebHost) public enum WebSurfaceFrameEncoder {
+  @_spi(WebHost) public static func encode(
     _ surface: RasterSurface
   ) -> String {
     var knownImageIDs: Set<String> = []
@@ -700,7 +700,7 @@ package enum WebSurfaceFrameEncoder {
     )
   }
 
-  package static func encode(
+  @_spi(WebHost) public static func encode(
     _ surface: RasterSurface,
     knownImageIDs: inout Set<String>
   ) -> String {
@@ -712,7 +712,7 @@ package enum WebSurfaceFrameEncoder {
     )
   }
 
-  package static func encode(
+  @_spi(WebHost) public static func encode(
     _ surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity? = nil
@@ -726,7 +726,7 @@ package enum WebSurfaceFrameEncoder {
     )
   }
 
-  package static func encode(
+  @_spi(WebHost) public static func encode(
     _ surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity? = nil,
