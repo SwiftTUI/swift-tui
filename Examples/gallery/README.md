@@ -17,6 +17,12 @@ cd Examples/gallery
 swift run gallery-demo
 ```
 
+Run the same gallery through the opt-in embedded WebHost runner:
+
+```bash
+swift run gallery-demo --web
+```
+
 ## Test
 
 ```bash

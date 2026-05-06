@@ -20,8 +20,8 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
-    .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
     .package(name: "SwiftTUIArguments", path: "../../Platforms/Arguments"),
+    .package(name: "SwiftTUIWebHost", path: "../../Platforms/WebHost"),
   ],
   targets: [
     .executableTarget(
@@ -29,8 +29,8 @@ let package = Package(
       dependencies: [
         "GalleryDemoViews",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
         .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
+        .product(name: "SwiftTUIWebHostCLI", package: "SwiftTUIWebHost"),
       ]
     ),
     .target(
