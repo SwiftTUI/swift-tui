@@ -161,9 +161,11 @@ runtime against a `WebSocketSurfaceTransport` instead of a stdout pipe.
 
 ## Principles
 
-1. **No new wire format.** Reuse `WASISurfaceBridge`'s `web-surface`
-   encoder and `WebSurfaceInputParser`. If the WASM target ever needs
-   format changes, both targets get them.
+1. **One shared wire format.** Reuse `WASISurfaceBridge`'s
+   `web-surface` encoder and `WebSurfaceInputParser`. If the WASM
+   target needs format changes, both targets get them. ADR-0014 now
+   defines the accessibility extension as `web-surface` version 2,
+   not a second protocol.
 2. **Library-only stays library-only.** Per
    [ADR-0008](../decisions/0008-swifttui-library-only-runners-own-main.md),
    the embedded web host is a *runner package*, peer to
@@ -771,7 +773,9 @@ there.
 > styleIndex]` per visible cell — not semantic data. There are no
 > roles, labels, or focus identities in the v1 wire format. For
 > accessibility-correct browser rendering (real ARIA) the format
-> needs to be **extended** with an `accessibilityTree` field; this
+> needs to be **extended** with an `accessibilityTree` field; ADR-0014
+> accepts this as a `version: 2` additive envelope with per-node
+> `isFocused` and a dedicated browser live-region announcer. This
 > is laid out as Phase 6 step 1 in
 > [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) §"Suggested phasing." See
 > [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 3 for the
@@ -832,8 +836,9 @@ What this *doesn't* commit us to:
 
 - We are **not** adopting xterm.js. The browser bundle decodes
   structured per-cell records, not ANSI escapes.
-- We are **not** inventing a new format. If `web-surface` v2 ships
-  one day for the WASM target, embedded gets it for free.
+- We are **not** inventing a second format. `web-surface` v2 is the
+  shared accessibility-capable envelope for both WASM and embedded
+  hosts.
 
 A *secondary* wire format is worth flagging: a future "ANSI fallback
 mode" that emits ANSI escape sequences over the same WebSocket and is
@@ -841,18 +846,25 @@ consumed by xterm.js. This would let us serve "any ANSI-emitting
 process" — not just a SwiftTUI binary — through the same machinery,
 which is a credible follow-on. Not in v1.
 
-A **promoted** future format (post-audit, no longer optional for
-the accessibility headline) is the ARIA/semantic-tree projection
-from [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) §"What the embedded
-web host unlocks." Concretely:
+A **promoted** format (post-audit, no longer optional for the
+accessibility headline) is the ARIA/semantic-tree projection from
+[`ACCESSIBILITY.md`](./ACCESSIBILITY.md) §"What the embedded web host
+unlocks" and ADR-0014. Concretely:
 
 - Bump the `version` field in the JSON envelope from `1` to `2`.
 - Add an `accessibilityTree` field alongside `rows`, carrying the
   flat `AccessibilityNode` list produced by the audited Phase 3b
   extension to `SemanticExtractor` (see
   [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 2). Shape:
-  `[{id, parentId, role, label, hint, hidden, liveRegion,
-  isFocused, rect}, …]`.
+  `[{id, parentId, role, label, hint, liveRegion, cursorAnchor,
+  isFocused, rect}, ...]`.
+- Encode `isFocused` directly on matching nodes rather than sending a
+  separate top-level focused identity.
+- Mount live-region announcements through one dedicated offscreen
+  browser announcer with first-frame suppression and
+  assertive-before-polite ordering.
+- Do not invent labels for visual-only content; expose only the
+  semantic facts that the snapshot carries.
 - Backward-additive: a v1-aware browser bundle ignores the new
   field; a v2-aware bundle uses it to mount a hidden DOM tree
   alongside the visual grid.
@@ -1920,3 +1932,8 @@ The full research archive is in this document. Primary sources by theme.
   headline." A separate performance correction notes that the
   existing encoder emits a full surface per commit; a diff-based
   encoder is worth tracking as an explicit performance phase.
+- 2026-05-06: ADR-0014 accepted the Web/WASI ARIA wire policy:
+  `accessibilityTree` is required for the first usable accessibility
+  web bridge, semantic frames use `web-surface` version 2, focus is
+  serialized per node as `isFocused`, live-region announcements use a
+  dedicated browser announcer, and visual-only labels are not guessed.
