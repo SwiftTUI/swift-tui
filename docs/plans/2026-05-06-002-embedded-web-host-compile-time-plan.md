@@ -1,7 +1,7 @@
 ---
 title: "feat: embedded web host compile-time opt-in"
 type: feature
-status: design-approved
+status: shipped
 date: 2026-05-06
 proposal: "../proposals/EMBEDDED_WEB_HOST.md"
 depends_on:
@@ -15,7 +15,7 @@ depends_on:
 # Embedded Web Host Compile-Time Opt-In Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to
-> implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
+> implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for
 > tracking. Keep commits scoped to stages that reach a green checkpoint. This
 > plan creates a new runner package and must finish with
 > `bun run test --skip-bun-install` before calling the work complete.
@@ -192,7 +192,7 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
 - Modify: `Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift`
 - Modify: `Platforms/CLI/Tests/SwiftTUICLITests/TerminalRunnerTests.swift`
 
-- [ ] Add `Scripts/check_webhost_package_boundary.sh`.
+- [x] Add `Scripts/check_webhost_package_boundary.sh`.
 
   The script must fail if any non-WebHost package or target references the
   server product/dependency names. It should allow docs/proposals/plans to
@@ -227,7 +227,7 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
   printf '[check_webhost_package_boundary] ok\n'
   ```
 
-- [ ] Add the guard to `Scripts/test_all.sh` after the existing policy checks.
+- [x] Add the guard to `Scripts/test_all.sh` after the existing policy checks.
 
   Expected command entry:
 
@@ -238,7 +238,7 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
     ./Scripts/check_webhost_package_boundary.sh
   ```
 
-- [ ] Change `RuntimeConfiguration.WebConfig.openBrowser` default to `false`.
+- [x] Change `RuntimeConfiguration.WebConfig.openBrowser` default to `false`.
 
   Expected initializer shape:
 
@@ -250,7 +250,7 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
   }
   ```
 
-- [ ] Add `--open` to `SwiftTUIOptions` and remove `--no-open`.
+- [x] Add `--open` to `SwiftTUIOptions` and remove `--no-open`.
 
   Resolution rule:
 
@@ -264,14 +264,14 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
   let openBrowser = environment["SWIFTTUI_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
   ```
 
-- [ ] Add parser/resolution tests:
+- [x] Add parser/resolution tests:
 
   - `--web` produces `openBrowser == false`.
   - `--web --open` produces `openBrowser == true`.
   - `SWIFTTUI_WEB=1 SWIFTTUI_OPEN=1` produces `openBrowser == true`.
   - `SWIFTTUI_WEB=1`, and `SWIFTTUI_WEB=1 SWIFTTUI_OPEN=0` produce `openBrowser == false`.
 
-- [ ] Add a `TerminalRunner` error for web mode in terminal-only binaries.
+- [x] Add a `TerminalRunner` error for web mode in terminal-only binaries.
 
   Expected behavior:
 
@@ -288,7 +288,7 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
   Add the SwiftTUIWebHostCLI product or use a WebHost runner.
   ```
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   ./Scripts/check_webhost_package_boundary.sh
@@ -296,7 +296,7 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
   swiftly run swift test --package-path Platforms/CLI
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Scripts/check_webhost_package_boundary.sh Scripts/test_all.sh \
@@ -316,7 +316,7 @@ copying the protocol.
 - Modify: `Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceTransportTests.swift`
 - Create: `Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceSPITests.swift`
 
-- [ ] Promote the minimum encoder/parser surface needed by peer packages.
+- [x] Promote the minimum encoder/parser surface needed by peer packages.
 
   Preferred access shape: keep the existing type names and promote only
   `WebSurfaceFrameEncoder`, `WebSurfaceInputParser`, and
@@ -326,7 +326,7 @@ copying the protocol.
   Keep field names and record framing byte-for-byte identical to existing
   fixtures.
 
-- [ ] Add tests that call the promoted API directly.
+- [x] Add tests that call the promoted API directly.
 
   Cover:
 
@@ -335,13 +335,13 @@ copying the protocol.
   - parser decodes resize, style, key, mouse, and paste records;
   - malformed records are ignored rather than throwing.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   swiftly run swift test --package-path Platforms/WASI
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WASI/Sources Platforms/WASI/Tests
@@ -363,7 +363,7 @@ the server implementation.
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/PackageGraphIsolationTests.swift`
 - Modify: `Scripts/check_demo_builds.sh`
 
-- [ ] Add `Platforms/WebHost/Package.swift` with two products.
+- [x] Add `Platforms/WebHost/Package.swift` with two products.
 
   Product boundary:
 
@@ -382,13 +382,13 @@ the server implementation.
     `SwiftTUIArguments`.
   - `SwiftTUICLI` does not change its package dependencies.
 
-- [ ] Add placeholder runners that compile but do not start a server yet.
+- [x] Add placeholder runners that compile but do not start a server yet.
 
   `WebHostRunner.run` should throw a clear `WebHostRunnerError.serverNotImplemented`
   until Stage 4. `WebHostCLIRunner.run` should route `configuration.web != nil`
   to `WebHostRunner` and otherwise call `TerminalRunner`.
 
-- [ ] Add package graph tests and run the shell guard.
+- [x] Add package graph tests and run the shell guard.
 
   Test expectations:
 
@@ -397,9 +397,9 @@ the server implementation.
   - `Platforms/WebHost/Package.swift` contains `SwiftTUIWebHostCLI`;
   - `Scripts/check_webhost_package_boundary.sh` passes.
 
-- [ ] Add `Platforms/WebHost` to `Scripts/check_demo_builds.sh` build coverage.
+- [x] Add `Platforms/WebHost` to `Scripts/check_demo_builds.sh` build coverage.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   ./Scripts/check_webhost_package_boundary.sh
@@ -408,7 +408,7 @@ the server implementation.
   swiftly run swift test --package-path Platforms/CLI
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WebHost Scripts/check_demo_builds.sh
@@ -426,7 +426,7 @@ bidirectional byte stream without an HTTP server.
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketSurfaceTransportTests.swift`
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketInputReaderTests.swift`
 
-- [ ] Define a tiny package-internal byte-channel abstraction.
+- [x] Define a tiny package-internal byte-channel abstraction.
 
   Shape:
 
@@ -440,18 +440,18 @@ bidirectional byte stream without an HTTP server.
   }
   ```
 
-- [ ] Implement `WebSocketSurfaceTransport`.
+- [x] Implement `WebSocketSurfaceTransport`.
 
   It conforms to `PresentationSurface` and `SemanticPresentationSurface`.
   It uses `WebSurfaceFrameEncoder` from the promoted WASI SPI and sends full
   record-separator-prefixed `surface:` JSON records to `WebHostByteSink`.
 
-- [ ] Implement `WebSocketInputReader`.
+- [x] Implement `WebSocketInputReader`.
 
   It consumes `WebHostByteSource`, feeds `WebSurfaceInputParser`, applies
   resize/style control messages to the transport, and yields `InputEvent`.
 
-- [ ] Add tests with in-memory byte channels.
+- [x] Add tests with in-memory byte channels.
 
   Cover:
 
@@ -462,7 +462,7 @@ bidirectional byte stream without an HTTP server.
   - key and paste input yield expected `InputEvent` values;
   - sink backpressure preserves record order.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   swiftly run swift test --package-path Platforms/WebHost \
@@ -470,7 +470,7 @@ bidirectional byte stream without an HTTP server.
   swiftly run swift test --package-path Platforms/WASI
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WebHost Platforms/WASI
@@ -490,7 +490,7 @@ WebSocket client to the in-memory transport.
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostServerTests.swift`
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostSecurityTests.swift`
 
-- [ ] Define `WebHostServer`.
+- [x] Define `WebHostServer`.
 
   Required behavior:
 
@@ -502,12 +502,12 @@ WebSocket client to the in-memory transport.
   - expose connected scene channels as `WebHostByteSink` /
     `WebHostByteSource`.
 
-- [ ] Implement `WebHostFlyingFoxServer` behind the protocol.
+- [x] Implement `WebHostFlyingFoxServer` behind the protocol.
 
   Keep all FlyingFox imports in this file or adjacent WebHost-only files.
   No other package imports FlyingFox.
 
-- [ ] Add server tests.
+- [x] Add server tests.
 
   Cover:
 
@@ -517,7 +517,7 @@ WebSocket client to the in-memory transport.
   - WebSocket upgrade receives output and forwards input;
   - invalid origins are rejected.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   swiftly run swift test --package-path Platforms/WebHost \
@@ -525,7 +525,7 @@ WebSocket client to the in-memory transport.
   ./Scripts/check_webhost_package_boundary.sh
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WebHost
@@ -550,7 +550,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
 - Create: `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostBrowserBundle.swift`
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostBrowserBundleTests.swift`
 
-- [ ] Add `WebSocketSceneBridge`.
+- [x] Add `WebSocketSceneBridge`.
 
   It should:
 
@@ -559,12 +559,12 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - forward surface frames to `WebHostSceneRuntime`;
   - send input chunks produced by `WebHostSceneRuntime.onInput`.
 
-- [ ] Update `WebHostApp` to support WASI and WebSocket bridge factories.
+- [x] Update `WebHostApp` to support WASI and WebSocket bridge factories.
 
   Keep existing WASI behavior unchanged. Use the WebSocket bridge only when
   browser config identifies an embedded host manifest.
 
-- [ ] Add `Scripts/build-webhost-bundle.sh`.
+- [x] Add `Scripts/build-webhost-bundle.sh`.
 
   Command behavior:
 
@@ -579,7 +579,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
     `Platforms/WebHost/Sources/SwiftTUIWebHost/Resources/browser`;
   - fails if the bundle is empty.
 
-- [ ] Add `WebHostBrowserBundle` resource lookup tests.
+- [x] Add `WebHostBrowserBundle` resource lookup tests.
 
   Cover:
 
@@ -588,7 +588,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - CSS asset exists if emitted;
   - content types are `text/html`, `application/javascript`, and `text/css`.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   (cd Platforms/Web && bun run test)
@@ -597,7 +597,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
     --filter SwiftTUIWebHostTests.WebHostBrowserBundle
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/Web Scripts/build-webhost-bundle.sh Platforms/WebHost
@@ -614,7 +614,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
 - Modify: `Platforms/WebHost/Sources/SwiftTUIWebHost/BrowserOpener.swift`
 - Create: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostRunnerTests.swift`
 
-- [ ] Implement `WebHostRunner.run`.
+- [x] Implement `WebHostRunner.run`.
 
   It must:
 
@@ -628,7 +628,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - open the browser only when `openBrowser == true`;
   - keep running until cancellation or process termination.
 
-- [ ] Add runner tests using an in-process server fake.
+- [x] Add runner tests using an in-process server fake.
 
   Cover:
 
@@ -639,14 +639,14 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - `openBrowser == true` invokes the opener once;
   - one committed frame reaches the connected WebSocket client.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   swiftly run swift test --package-path Platforms/WebHost \
     --filter SwiftTUIWebHostTests.WebHostRunner
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WebHost
@@ -665,7 +665,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
 - Create: `Examples/WebHostExample/Tests/WebHostExampleTests/WebHostExampleTests.swift`
 - Modify: `Scripts/check_demo_builds.sh`
 
-- [ ] Implement `WebHostCLIRunner`.
+- [x] Implement `WebHostCLIRunner`.
 
   Behavior:
 
@@ -674,7 +674,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - otherwise call `TerminalRunner.run(app, configuration:)`;
   - do not modify `SwiftTUICLI` to know about WebHost.
 
-- [ ] Add combined-runner tests.
+- [x] Add combined-runner tests.
 
   Cover:
 
@@ -683,7 +683,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - terminal-only `TerminalRunner` still rejects `configuration.web`;
   - `SwiftTUICLI` package graph remains server-free.
 
-- [ ] Add `Examples/WebHostExample`.
+- [x] Add `Examples/WebHostExample`.
 
   It should import only:
 
@@ -694,14 +694,14 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
 
   The terminal-only examples must not import `SwiftTUIWebHostCLI`.
 
-- [ ] Add demo build coverage.
+- [x] Add demo build coverage.
 
   ```bash
   swiftly run swift build --package-path Examples/WebHostExample
   swiftly run swift test --package-path Examples/WebHostExample
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WebHost Examples/WebHostExample Scripts/check_demo_builds.sh
@@ -720,7 +720,7 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
 - Modify: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostSecurityTests.swift`
 - Modify: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostServerTests.swift`
 
-- [ ] Add port collision behavior.
+- [x] Add port collision behavior.
 
   Rule:
 
@@ -728,28 +728,28 @@ WebSocket bridge and packaging a static bundle as SwiftPM resources.
   - default port tries `9123` through `9132`;
   - port `0` accepts the kernel-assigned port.
 
-- [ ] Add external bind warning.
+- [x] Add external bind warning.
 
   If `bind == "0.0.0.0"`, the banner must include a warning that the server is
   reachable from the local network.
 
-- [ ] Add token cookie handoff.
+- [x] Add token cookie handoff.
 
   First valid `?token=` request may set a cookie; subsequent browser resource
   requests may use the cookie. WebSocket upgrades must validate token or
   cookie.
 
-- [ ] Add max message size enforcement.
+- [x] Add max message size enforcement.
 
   Default: close WebSocket connections over 8 MB with a clear close reason.
 
-- [ ] Run focused checks.
+- [x] Run focused checks.
 
   ```bash
   swiftly run swift test --package-path Platforms/WebHost
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add Platforms/WebHost
@@ -771,7 +771,7 @@ default.
 - Modify: `docs/proposals/EMBEDDED_WEB_HOST.md`
 - Modify: `docs/proposals/ACCESSIBILITY.md`
 
-- [ ] Document consumer choices.
+- [x] Document consumer choices.
 
   Required message:
 
@@ -780,22 +780,22 @@ default.
   - terminal plus web: import `SwiftTUIWebHostCLI`;
   - no WebHost product means no embedded server in the binary.
 
-- [ ] Update source layout docs for `Platforms/WebHost`.
+- [x] Update source layout docs for `Platforms/WebHost`.
 
-- [ ] Regenerate public API inventory.
+- [x] Regenerate public API inventory.
 
   ```bash
   ./Scripts/generate_public_api_inventory.sh
   ```
 
-- [ ] Run doc/frontmatter checks.
+- [x] Run doc/frontmatter checks.
 
   ```bash
   bun run Scripts/check_doc_frontmatter.ts
   ./Scripts/check_public_surface_policies.sh
   ```
 
-- [ ] Commit.
+- [x] Commit.
 
   ```bash
   git add README.md docs Scripts Platforms/WebHost
@@ -804,7 +804,7 @@ default.
 
 ## Stage 10: Final Verification
 
-- [ ] Run focused package gates.
+- [x] Run focused package gates.
 
   ```bash
   ./Scripts/check_webhost_package_boundary.sh
@@ -816,13 +816,13 @@ default.
   swiftly run swift test --package-path Examples/WebHostExample
   ```
 
-- [ ] Run repo-wide verification.
+- [x] Run repo-wide verification.
 
   ```bash
   bun run test --skip-bun-install
   ```
 
-- [ ] Inspect linked package boundaries.
+- [x] Inspect linked package boundaries.
 
   Confirm these facts before final handoff:
 
@@ -836,7 +836,7 @@ default.
   - a terminal-only example that receives `--web` prints the not-compiled
     message without raw-mode corruption.
 
-- [ ] Commit final verification docs or fixture updates if the verification
+- [x] Commit final verification docs or fixture updates if the verification
   commands changed the public API inventory.
 
   ```bash
