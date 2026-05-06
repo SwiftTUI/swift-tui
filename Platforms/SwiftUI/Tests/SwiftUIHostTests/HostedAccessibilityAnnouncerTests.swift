@@ -50,6 +50,34 @@ func host_announcer_orders_assertive_before_polite() {
 
 @MainActor
 @Test
+func host_announcer_orders_mixed_imperative_and_live_region_changes() {
+  var announcer = HostedAccessibilityAnnouncer()
+  _ = announcer.announcements(
+    for: snapshot([
+      liveNode("Status", label: "Idle", politeness: .polite)
+    ])
+  )
+
+  let output = announcer.announcements(
+    for: SemanticSnapshot(
+      accessibilityNodes: [
+        liveNode("Status", label: "Saved", politeness: .polite)
+      ],
+      accessibilityAnnouncements: [
+        AccessibilityAnnouncement(message: "Failed", politeness: .assertive)
+      ]
+    )
+  )
+
+  #expect(
+    output == [
+      .init(politeness: .assertive, label: "Failed"),
+      .init(politeness: .polite, label: "Saved"),
+    ])
+}
+
+@MainActor
+@Test
 func host_announcer_suppresses_unchanged_removed_reappeared_and_off_regions() {
   var announcer = HostedAccessibilityAnnouncer()
   _ = announcer.announcements(
@@ -94,6 +122,27 @@ func host_announcer_sanitizes_live_region_labels() {
   )
 
   #expect(output == [.init(politeness: .polite, label: "Loaded ?")])
+}
+
+@MainActor
+@Test
+func host_announcer_emits_imperative_announcements_without_live_region_baseline() {
+  var announcer = HostedAccessibilityAnnouncer()
+
+  let output = announcer.announcements(
+    for: SemanticSnapshot(
+      accessibilityAnnouncements: [
+        AccessibilityAnnouncement(message: "Saved\n✓", politeness: .assertive),
+        AccessibilityAnnouncement(message: "Queued", politeness: .polite),
+      ]
+    )
+  )
+
+  #expect(
+    output == [
+      .init(politeness: .assertive, label: "Saved ?"),
+      .init(politeness: .polite, label: "Queued"),
+    ])
 }
 
 private func snapshot(

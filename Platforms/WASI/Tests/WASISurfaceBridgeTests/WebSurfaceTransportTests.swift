@@ -123,6 +123,29 @@ struct WebSurfaceTransportTests {
     #expect(mixedNode["hidden"] == nil)
   }
 
+  @Test("encoder emits v2 imperative accessibility announcements")
+  func encoderEmitsAccessibilityAnnouncements() throws {
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.basicSurface(),
+        semanticSnapshot: SemanticSnapshot(
+          accessibilityAnnouncements: [
+            AccessibilityAnnouncement(message: "Saved", politeness: .assertive),
+            AccessibilityAnnouncement(message: "Queued", politeness: .polite),
+          ]
+        )
+      )
+    )
+
+    #expect(frame["version"] as? Int == 2)
+    let announcements = try #require(frame["accessibilityAnnouncements"] as? [[String: Any]])
+    #expect(announcements.count == 2)
+    #expect(announcements[0]["message"] as? String == "Saved")
+    #expect(announcements[0]["politeness"] as? String == "assertive")
+    #expect(announcements[1]["message"] as? String == "Queued")
+    #expect(announcements[1]["politeness"] as? String == "polite")
+  }
+
   @Test("encoder emits image data once and then reuses the cached image id")
   func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
     var knownImageIDs: Set<String> = []

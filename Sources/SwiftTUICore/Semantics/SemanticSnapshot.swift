@@ -126,6 +126,21 @@ public struct AccessibilityNode: Equatable, Sendable {
   }
 }
 
+/// An app-triggered accessibility announcement for assistive-technology consumers.
+public struct AccessibilityAnnouncement: Equatable, Sendable {
+  public var message: String
+  public var politeness: AccessibilityPoliteness
+
+  /// Creates an accessibility announcement.
+  public init(
+    message: String,
+    politeness: AccessibilityPoliteness = .polite
+  ) {
+    self.message = message
+    self.politeness = politeness
+  }
+}
+
 /// The complete semantic extraction result for a frame.
 public struct SemanticSnapshot: Equatable, Sendable {
   public var interactionRegions: [InteractionRegion]
@@ -135,6 +150,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var selectionRoutes: [SelectionRoute]
   public var namedCoordinateSpaces: [String: CellRect]
   public var accessibilityNodes: [AccessibilityNode]
+  public var accessibilityAnnouncements: [AccessibilityAnnouncement]
 
   public init(
     interactionRegions: [InteractionRegion] = [],
@@ -143,7 +159,8 @@ public struct SemanticSnapshot: Equatable, Sendable {
     scrollRoutes: [ScrollRoute] = [],
     selectionRoutes: [SelectionRoute] = [],
     namedCoordinateSpaces: [String: CellRect] = [:],
-    accessibilityNodes: [AccessibilityNode] = []
+    accessibilityNodes: [AccessibilityNode] = [],
+    accessibilityAnnouncements: [AccessibilityAnnouncement] = []
   ) {
     self.interactionRegions = interactionRegions
     self.focusRegions = focusRegions
@@ -152,5 +169,6 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.selectionRoutes = selectionRoutes
     self.namedCoordinateSpaces = namedCoordinateSpaces
     self.accessibilityNodes = accessibilityNodes
+    self.accessibilityAnnouncements = accessibilityAnnouncements
   }
 }

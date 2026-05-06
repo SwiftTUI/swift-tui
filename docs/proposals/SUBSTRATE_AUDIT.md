@@ -25,8 +25,7 @@ the browser runtime mounts that tree as ARIA beside the raster canvas.
 SwiftUI host bridging has landed through ADR-0015: hosted sessions carry
 semantic snapshots beside raster frames, and the native host mounts
 those records through a SwiftUI accessibility overlay. The remaining
-accessibility follow-ups are the imperative announcer API and
-listening/lint work.
+accessibility follow-up is listening/lint work.
 Text input caret anchoring has also landed through the text input V1 plan:
 `TextField`, `SecureField`, and `TextEditor` publish built-in caret anchors for
 cursor-following while keeping secure values redacted.
@@ -608,10 +607,13 @@ path for the substrate.
   implemented by hosted-session semantic callbacks,
   `SwiftUIHostSceneHost` semantic state, native role/frame mapping, the
   accessibility overlay, and platform live-region announcement hooks.
-  The remaining accessibility follow-ups are imperative announcements and
-  listening/lint work.
+  The remaining accessibility follow-up is listening/lint work.
 - 2026-05-06: Built-in text input caret anchoring landed. The cursor-following
   policy now uses real caret anchors for `TextField`, `SecureField`, and
   `TextEditor`.
 - 2026-05-06: Public cursor-anchor authoring landed. Custom focus targets can
   publish a local `CellPoint` anchor with `accessibilityCursorAnchor(_:)`.
+- 2026-05-06: Imperative accessibility announcements landed. The public
+  `AccessibilityAnnouncer.announce(_:)` API queues committed-frame semantic
+  announcements for CLI accessible output, Web/WASI ARIA, and SwiftUI host
+  platform announcements.

@@ -55,6 +55,7 @@ classifications:
     - SwiftTUI.WindowIdentifier
 
     # ─── View (authoring surface) ───────────────────────────────────────────
+    - SwiftTUIViews.AccessibilityAnnouncer
     - SwiftTUIViews.AnyLayout
     - SwiftTUIViews.AnyView
     - SwiftTUIViews.Binding
@@ -393,6 +394,7 @@ classifications:
 
     # ─── SwiftTUICore (pipeline + supporting types) ───────────────────────
     - SwiftTUICore.ActionScope
+    - SwiftTUICore.AccessibilityAnnouncement
     - SwiftTUICore.AccessibilityNode
     - SwiftTUICore.AccessibilityPoliteness
     - SwiftTUICore.AccessibilityRole

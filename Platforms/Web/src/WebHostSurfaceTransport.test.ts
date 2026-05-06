@@ -102,6 +102,21 @@ test("decoder accepts v2 accessibility trees", () => {
   ]);
 });
 
+test("decoder accepts imperative accessibility announcements", () => {
+  const decoder = new WebHostOutputDecoder();
+  const records = decoder.feed(encoder.encode(
+    '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'
+      + '"accessibilityAnnouncements":[{"message":"Saved","politeness":"assertive"},'
+      + '{"message":"Queued","politeness":"polite"}]}\n'
+  ));
+
+  const frame = surfaceFrame(records[0]);
+  expect(frame.accessibilityAnnouncements).toEqual([
+    { message: "Saved", politeness: "assertive" },
+    { message: "Queued", politeness: "polite" },
+  ]);
+});
+
 test("decoder rejects malformed accessibility trees as diagnostic text", () => {
   const decoder = new WebHostOutputDecoder();
   const line = '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'

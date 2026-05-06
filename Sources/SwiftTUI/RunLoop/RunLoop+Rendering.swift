@@ -225,6 +225,8 @@ extension RunLoop {
         focusSyncLifecycleCarryForward,
         into: &artifacts.commitPlan.lifecycle
       )
+      appendPendingAccessibilityAnnouncements(to: &artifacts)
+      latestSemanticSnapshot = artifacts.semanticSnapshot
       if focusSyncBudgetExceeded {
         let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
         assertionFailure(
@@ -920,6 +922,8 @@ extension RunLoop {
         focusSyncLifecycleCarryForward,
         into: &artifacts.commitPlan.lifecycle
       )
+      appendPendingAccessibilityAnnouncements(to: &artifacts)
+      latestSemanticSnapshot = artifacts.semanticSnapshot
       if focusSyncBudgetExceeded {
         let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
         assertionFailure(
@@ -1360,6 +1364,16 @@ extension RunLoop {
       focusedIdentity: focusTracker.currentFocusIdentity
     )
     try terminalSurface.presentAccessibilityCursorFocus(at: cursorPoint)
+  }
+
+  private func appendPendingAccessibilityAnnouncements(
+    to artifacts: inout FrameArtifacts
+  ) {
+    let announcements = drainPendingAccessibilityAnnouncements()
+    guard !announcements.isEmpty else {
+      return
+    }
+    artifacts.semanticSnapshot.accessibilityAnnouncements.append(contentsOf: announcements)
   }
 
   private func presentCommittedFrame(

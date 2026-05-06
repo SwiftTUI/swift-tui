@@ -1,4 +1,7 @@
-import type { WebHostAccessibilityNode } from "./WebHostSurfaceTransport.ts";
+import type {
+  WebHostAccessibilityAnnouncement,
+  WebHostAccessibilityNode,
+} from "./WebHostSurfaceTransport.ts";
 
 interface AccessibilityTreeMetrics {
   cellWidth: number;
@@ -31,7 +34,8 @@ export class AccessibilityTreeMounter {
 
   present(
     nodes: WebHostAccessibilityNode[],
-    metrics: AccessibilityTreeMetrics
+    metrics: AccessibilityTreeMetrics,
+    announcements: WebHostAccessibilityAnnouncement[] = []
   ): void {
     this.element.replaceChildren();
     this.nodesById.clear();
@@ -51,7 +55,7 @@ export class AccessibilityTreeMounter {
       (parent ?? this.element).appendChild(element);
     }
 
-    this.announceLiveRegionChanges(nodes);
+    this.announceLiveRegionChanges(nodes, announcements);
 
     const focused = nodes.find((node) => node.isFocused);
     if (focused) {
@@ -99,15 +103,24 @@ export class AccessibilityTreeMounter {
   }
 
   private announceLiveRegionChanges(
-    nodes: WebHostAccessibilityNode[]
+    nodes: WebHostAccessibilityNode[],
+    announcements: WebHostAccessibilityAnnouncement[]
   ): void {
     const candidates = nodes.filter(
       (node) => node.liveRegion && node.liveRegion !== "off" && node.label
     );
     const currentLabelsById = new Map(candidates.map((node) => [node.id, node.label ?? ""]));
+    const imperativeAssertive = announcements.filter(
+      (announcement) => announcement.politeness === "assertive"
+    );
+    const imperativePolite = announcements.filter(
+      (announcement) => announcement.politeness === "polite"
+    );
+
     if (!this.hasLiveRegionBaseline) {
       this.previousLabelsById = currentLabelsById;
       this.hasLiveRegionBaseline = true;
+      this.publishAnnouncements([], imperativeAssertive, [], imperativePolite);
       return;
     }
 
@@ -119,14 +132,30 @@ export class AccessibilityTreeMounter {
 
     const assertive = changed.filter((node) => node.liveRegion === "assertive");
     const polite = changed.filter((node) => node.liveRegion === "polite");
-    const ordered = [...assertive, ...polite];
+    this.publishAnnouncements(assertive, imperativeAssertive, polite, imperativePolite);
+  }
+
+  private publishAnnouncements(
+    assertive: WebHostAccessibilityNode[],
+    imperativeAssertive: WebHostAccessibilityAnnouncement[],
+    polite: WebHostAccessibilityNode[],
+    imperativePolite: WebHostAccessibilityAnnouncement[]
+  ): void {
+    const ordered = [...assertive, ...imperativeAssertive, ...polite, ...imperativePolite];
     if (ordered.length === 0) {
       return;
     }
 
-    const politeness = assertive.length > 0 ? "assertive" : "polite";
+    const politeness = assertive.length > 0 || imperativeAssertive.length > 0
+      ? "assertive"
+      : "polite";
     this.announcerElement.setAttribute("aria-live", politeness);
-    this.announcerElement.textContent = ordered.map((node) => node.label ?? "").join("\n");
+    this.announcerElement.textContent = ordered.map((entry) => {
+      if ("message" in entry) {
+        return entry.message;
+      }
+      return entry.label ?? "";
+    }).join("\n");
   }
 }
 

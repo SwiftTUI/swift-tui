@@ -51,7 +51,7 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
   package mutating func renderAnnouncements(
     for snapshot: SemanticSnapshot
   ) -> String {
-    let lines = announcements(for: snapshot).map {
+    let lines = ordered(announcements(for: snapshot) + imperativeAnnouncements(in: snapshot)).map {
       "\($0.politeness.description): \($0.label)"
     }
     guard !lines.isEmpty else {
@@ -117,6 +117,34 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
       return nil
     }
     return String(String.UnicodeScalarView(trimmed))
+  }
+
+  private func imperativeAnnouncements(
+    in snapshot: SemanticSnapshot
+  ) -> [LiveRegionAnnouncement] {
+    let announcements: [LiveRegionAnnouncement] = snapshot.accessibilityAnnouncements.compactMap {
+      announcement in
+      guard announcement.politeness != .off,
+        let label = sanitized(announcement.message)
+      else {
+        return nil
+      }
+      return LiveRegionAnnouncement(
+        politeness: announcement.politeness,
+        label: label
+      )
+    }
+    let assertive = announcements.filter { $0.politeness == .assertive }
+    let polite = announcements.filter { $0.politeness == .polite }
+    return assertive + polite
+  }
+
+  private func ordered(
+    _ announcements: [LiveRegionAnnouncement]
+  ) -> [LiveRegionAnnouncement] {
+    let assertive = announcements.filter { $0.politeness == .assertive }
+    let polite = announcements.filter { $0.politeness == .polite }
+    return assertive + polite
   }
 
   private func trimmingAsciiSpaces(

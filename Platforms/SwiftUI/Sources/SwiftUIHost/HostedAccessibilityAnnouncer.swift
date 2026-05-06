@@ -18,6 +18,7 @@ struct HostedAccessibilityAnnouncer: Equatable {
   mutating func announcements(
     for snapshot: SemanticSnapshot
   ) -> [HostedAccessibilityAnnouncement] {
+    let imperativeAnnouncements = imperativeAnnouncements(in: snapshot)
     let candidates = liveRegionCandidates(in: snapshot.accessibilityNodes)
     let currentLabelsByIdentity = Dictionary(
       uniqueKeysWithValues: candidates.map { ($0.identity, $0.label) }
@@ -28,7 +29,7 @@ struct HostedAccessibilityAnnouncer: Equatable {
     }
 
     guard hasBaseline else {
-      return []
+      return imperativeAnnouncements
     }
 
     let changed = candidates.filter { candidate in
@@ -37,14 +38,13 @@ struct HostedAccessibilityAnnouncer: Equatable {
       }
       return previous != candidate.label
     }
-    let assertive = changed.filter { $0.politeness == .assertive }
-    let polite = changed.filter { $0.politeness == .polite }
-    return (assertive + polite).map {
+    let liveRegionAnnouncements = changed.map {
       HostedAccessibilityAnnouncement(
         politeness: $0.politeness,
         label: $0.label
       )
     }
+    return ordered(liveRegionAnnouncements + imperativeAnnouncements)
   }
 
   mutating func reset() {
@@ -68,6 +68,34 @@ struct HostedAccessibilityAnnouncer: Equatable {
         label: label
       )
     }
+  }
+
+  private func imperativeAnnouncements(
+    in snapshot: SemanticSnapshot
+  ) -> [HostedAccessibilityAnnouncement] {
+    let announcements: [HostedAccessibilityAnnouncement] =
+      snapshot.accessibilityAnnouncements.compactMap { announcement in
+        guard announcement.politeness != .off,
+          let label = sanitized(announcement.message)
+        else {
+          return nil
+        }
+        return HostedAccessibilityAnnouncement(
+          politeness: announcement.politeness,
+          label: label
+        )
+      }
+    let assertive = announcements.filter { $0.politeness == .assertive }
+    let polite = announcements.filter { $0.politeness == .polite }
+    return assertive + polite
+  }
+
+  private func ordered(
+    _ announcements: [HostedAccessibilityAnnouncement]
+  ) -> [HostedAccessibilityAnnouncement] {
+    let assertive = announcements.filter { $0.politeness == .assertive }
+    let polite = announcements.filter { $0.politeness == .polite }
+    return assertive + polite
   }
 
   private func sanitized(

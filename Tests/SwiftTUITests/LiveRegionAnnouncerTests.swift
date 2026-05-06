@@ -46,6 +46,29 @@ struct LiveRegionAnnouncerTests {
     #expect(output == "assertive: Failed\npolite: Saved\n")
   }
 
+  @Test("announcer keeps assertive imperative messages ahead of polite live-region changes")
+  func announcerOrdersMixedImperativeAndLiveRegionChanges() {
+    var announcer = LiveRegionAnnouncer()
+    _ = announcer.renderAnnouncements(
+      for: liveRegionSnapshot([
+        liveRegionNode("Status", label: "Idle", politeness: .polite)
+      ])
+    )
+
+    let output = announcer.renderAnnouncements(
+      for: SemanticSnapshot(
+        accessibilityNodes: [
+          liveRegionNode("Status", label: "Saved", politeness: .polite)
+        ],
+        accessibilityAnnouncements: [
+          AccessibilityAnnouncement(message: "Failed", politeness: .assertive)
+        ]
+      )
+    )
+
+    #expect(output == "assertive: Failed\npolite: Saved\n")
+  }
+
   @Test("announcer drops removed nodes instead of announcing removal or reappearance")
   func announcerDropsRemovedNodes() {
     var announcer = LiveRegionAnnouncer()
@@ -144,6 +167,38 @@ struct LiveRegionAnnouncerTests {
     #expect(!output.contains("polite:"))
     #expect(!output.contains("assertive:"))
   }
+
+  @Test("accessible runtime appends imperative announcements from actions")
+  func accessibleRuntimeAppendsImperativeAnnouncementsFromActions() async throws {
+    let surface = LiveRegionTestSurface()
+    let rootIdentity = testIdentity("ImperativeAnnouncementRoot")
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: surface,
+      terminalInputReader: LiveRegionScriptedInputReader(events: [
+        .key(KeyPress(.return)),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
+      ]),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      runtimeConfiguration: RuntimeConfiguration(output: .accessible),
+      proposal: .init(width: 40, height: 8),
+      viewBuilder: ScopedMapper { _ in
+        Button("Save") {
+          AccessibilityAnnouncer.announce("Saved", politeness: .assertive)
+        }
+        .id(testIdentity("ImperativeAnnouncementButton"))
+        .accessibilityLabel("Save")
+      }
+    )
+
+    let result = try await runLoop.run()
+
+    let output = surface.writes.joined()
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(output.contains("button: Save"))
+    #expect(output.contains("assertive: Saved"))
+  }
 }
 
 @MainActor
@@ -231,6 +286,23 @@ private final class LiveRegionTestSurface: PresentationSurface {
 private final class LiveRegionInputReader: TerminalInputReading {
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
+      continuation.finish()
+    }
+  }
+}
+
+private final class LiveRegionScriptedInputReader: TerminalInputReading {
+  private let events: [InputEvent]
+
+  init(events: [InputEvent]) {
+    self.events = events
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      for event in events {
+        continuation.yield(event)
+      }
       continuation.finish()
     }
   }

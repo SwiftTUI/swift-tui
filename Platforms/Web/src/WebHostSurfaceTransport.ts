@@ -55,6 +55,11 @@ export interface WebHostAccessibilityNode {
   isFocused?: boolean;
 }
 
+export interface WebHostAccessibilityAnnouncement {
+  message: string;
+  politeness: WebHostAccessibilityLiveRegion;
+}
+
 export type WebHostSurfaceImageFormat = "png" | "jpeg" | "gif";
 
 export interface WebHostSurfaceImage {
@@ -75,6 +80,7 @@ export interface WebHostSurfaceFrame {
   rows: WebHostSurfaceCell[][];
   images?: WebHostSurfaceImage[];
   accessibilityTree?: WebHostAccessibilityNode[];
+  accessibilityAnnouncements?: WebHostAccessibilityAnnouncement[];
 }
 
 export type WebHostOutputRecord =
@@ -251,6 +257,10 @@ function isWebHostSurfaceFrame(
     && (
       frame.accessibilityTree === undefined
         || isWebHostAccessibilityNodes(frame.accessibilityTree)
+    )
+    && (
+      frame.accessibilityAnnouncements === undefined
+        || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)
     );
 }
 
@@ -289,6 +299,27 @@ function isWebHostAccessibilityPoint(
   return Array.isArray(value)
     && value.length === 2
     && value.every((entry) => typeof entry === "number");
+}
+
+function isWebHostAccessibilityAnnouncements(
+  value: unknown
+): value is WebHostAccessibilityAnnouncement[] {
+  return Array.isArray(value) && value.every(isWebHostAccessibilityAnnouncement);
+}
+
+function isWebHostAccessibilityAnnouncement(
+  value: unknown
+): value is WebHostAccessibilityAnnouncement {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const announcement = value as Partial<WebHostAccessibilityAnnouncement>;
+  return typeof announcement.message === "string"
+    && (
+      announcement.politeness === "off"
+        || announcement.politeness === "polite"
+        || announcement.politeness === "assertive"
+    );
 }
 
 function isWebHostSurfaceImages(

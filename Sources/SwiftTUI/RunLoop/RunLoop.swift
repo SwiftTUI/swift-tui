@@ -187,6 +187,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let dropDestinationRegistry = DropDestinationRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
   package var liveRegionAnnouncer = LiveRegionAnnouncer()
+  package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
 
@@ -407,10 +408,12 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     // registration storage so concurrent hosted scenes cannot steal
     // each other's animation, transition, or completion registrations.
     let animationController = renderer.internalAnimationController
-    return try await AnimationRegistrationStorage.withSink(animationController) {
-      try await TransitionRegistrationStorage.withSink(animationController) {
-        try await AnimationCompletionStorage.withSink(animationController) {
-          try await runWithInstalledAnimationSinks()
+    return try await AccessibilityAnnouncementStorage.withSink(self) {
+      try await AnimationRegistrationStorage.withSink(animationController) {
+        try await TransitionRegistrationStorage.withSink(animationController) {
+          try await AnimationCompletionStorage.withSink(animationController) {
+            try await runWithInstalledAnimationSinks()
+          }
         }
       }
     }

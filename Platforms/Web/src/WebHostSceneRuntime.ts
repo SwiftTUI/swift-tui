@@ -445,7 +445,7 @@ export class WebHostSceneRuntime {
     tree.present(this.currentFrame.accessibilityTree ?? [], {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight,
-    });
+    }, this.currentFrame.accessibilityAnnouncements ?? []);
   }
 
   private drawImages(
