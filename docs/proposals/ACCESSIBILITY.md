@@ -749,14 +749,14 @@ and thinner in one place**. Specifically:
   those `AccessibilityNode` records into ARIA nodes and live-region
   announcements without changing the raster canvas.
 
-- **Cursor-anchor policy is partially shipped.**
+- **Cursor-anchor policy is shipped behind the opt-in runtime gate.**
   `AccessibilityNode.cursorAnchor` exists as the shared output field, and nil
   means consumers should fall back to the node origin. CLI cursor-following is
   default-off and opt-in through `cursorFollowsFocus`. Built-in `TextField`,
   `SecureField`, and `TextEditor` now publish real caret anchors and suppress
-  their synthetic caret when hardware cursor-following is active. The public
-  `accessibilityCursorAnchor(_:)` modifier shape remains follow-up work for
-  custom focus targets.
+  their synthetic caret when hardware cursor-following is active. Custom focus
+  targets can publish a local cursor anchor with
+  `accessibilityCursorAnchor(_:)`.
 
 ### Implication
 
@@ -764,7 +764,8 @@ The proposal split is sharper than the first draft implied:
 
 - **What is now landed:** accessibility-specific fields on
   `SemanticMetadata` (`accessibilityLabel`, `accessibilityHint`,
-  `accessibilityHidden`, `accessibilityLiveRegion`), the
+  `accessibilityHidden`, `accessibilityLiveRegion`,
+  `accessibilityCursorAnchor`), the
   `AccessibilityRole` rename and expanded role set from ADR-0011,
   SwiftUI-shaped authoring modifiers for those fields,
   `SemanticExtractor` emission of sparse `AccessibilityNode` records
@@ -774,10 +775,9 @@ The proposal split is sharper than the first draft implied:
   motion/progress policy, and accessible-mode live-region announcements.
 
 - **What remains:** the first-class target consumers are now wired for
-  CLI, Web/WASI, and SwiftUI host paths. The public cursor-anchor
-  modifier for custom anchors, imperative
-  `AccessibilityAnnouncer.announce(_:)` API, and listening/lint work
-  also remain follow-ups.
+  CLI, Web/WASI, and SwiftUI host paths. Imperative
+  `AccessibilityAnnouncer.announce(_:)` API and listening/lint work remain
+  follow-ups.
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
@@ -1145,7 +1145,7 @@ extension View {
   /// view is focused. Defaults to the view's natural interaction
   /// point (caret for text fields, row start for list rows, label
   /// start for buttons).
-  func accessibilityCursorAnchor(_ anchor: AccessibilityCursorAnchor)
+  func accessibilityCursorAnchor(_ anchor: CellPoint)
     -> some View
 }
 ```
@@ -1550,10 +1550,10 @@ to be argued with, not accepted.)
    [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
    the field exists on `AccessibilityNode` (in absolute surface
    coordinates); nil means "use the node's origin." The public
-   modifier argument shape remains follow-up work for custom focus targets.
-   Built-in caret-anchor population for `TextField`, `SecureField`, and
-   `TextEditor` has landed through the text input V1 plan; see
-   [`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
+   `accessibilityCursorAnchor(_:)` modifier accepts a local `CellPoint` for
+   custom focus targets. Built-in caret-anchor population for `TextField`,
+   `SecureField`, and `TextEditor` has landed through the text input V1 plan;
+   see [`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
 
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
@@ -1682,18 +1682,17 @@ WebSocket transport landed).)
    ADR-0012 puts `cursorAnchor` on `AccessibilityNode`; the remaining
    behavior gate is now resolved by ADR-0013: terminal TUI output shows and
    moves the cursor only when `RuntimeConfiguration.cursorFollowsFocus` is
-   enabled and a focused accessibility node exists. The public modifier
-   argument type remains deferred; v1 uses built-in package-only anchors for
-   text input controls plus node-origin fallback for other nodes.
+   enabled and a focused accessibility node exists. Built-in text input
+   controls publish caret anchors, custom focus targets can use
+   `accessibilityCursorAnchor(_:)`, and nodes without an anchor fall back to
+   their origin.
 
-3. **Phase 3a — Accessibility authoring modifiers.** **(Substrate
-   landed, cursor-anchor modifier deferred.)** Added
+3. **Phase 3a — Accessibility authoring modifiers.** **(Landed.)** Added
    `accessibilityLabel`, `accessibilityHint`, `accessibilityHidden`,
-   `accessibilityLiveRegion`, and `accessibilityRole(_:)` modifiers
-   plus the corresponding fields on `SemanticMetadata`. ADR-0011 is
-   implemented: `PresentationRole` is now `AccessibilityRole`, with
-   the missing accessibility cases added. The public
-   `accessibilityCursorAnchor(_:)` shape remains deferred.
+   `accessibilityLiveRegion`, `accessibilityRole(_:)`, and
+   `accessibilityCursorAnchor(_:)` modifiers plus the corresponding fields on
+   `SemanticMetadata`. ADR-0011 is implemented: `PresentationRole` is now
+   `AccessibilityRole`, with the missing accessibility cases added.
 
 4. **Phase 3b — `SemanticExtractor` accessibility records.**
    **(Landed.)** Extends
@@ -1975,10 +1974,13 @@ in this document. The primary sources, grouped by theme:
   sessions can publish semantic snapshots beside raster frames,
   `SwiftUIHostSceneHost` stores the latest snapshot and focused identity,
   and the host mounts a native accessibility overlay with role mapping,
-  focus metadata, and live-region announcement handling. Remaining
-  accessibility follow-ups are public cursor-anchor authoring for custom
-  anchors, imperative announcements, and listening/lint work.
+  focus metadata, and live-region announcement handling. At that point, the
+  unresolved follow-ups were public cursor-anchor authoring for custom anchors,
+  imperative announcements, and listening/lint work.
 - 2026-05-06: Text input caret anchoring landed. `TextField`,
   `SecureField`, and `TextEditor` publish real caret anchors into
   accessibility semantics, suppress their synthetic caret when
   `cursorFollowsFocus` is active, and keep secure values redacted.
+- 2026-05-06: Public cursor-anchor authoring landed.
+  `accessibilityCursorAnchor(_:)` accepts a local `CellPoint` for custom focus
+  targets and writes the shared `AccessibilityNode.cursorAnchor` metadata.

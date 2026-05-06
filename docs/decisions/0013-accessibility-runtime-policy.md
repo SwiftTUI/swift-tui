@@ -57,10 +57,10 @@ with `SemanticSnapshot.accessibilityNodes`. If a focused node exists,
 the terminal cursor is shown and moved to `cursorAnchor ?? rect.origin`.
 If no focused accessibility node exists, the visual TUI may keep the
 cursor hidden. JSON, web output, and accessible linear output do not use
-terminal cursor policy. The public cursor-anchor modifier remains
-deferred; v1 uses built-in package-only anchors, including text-input caret
-anchors for `TextField`, `SecureField`, and `TextEditor`, plus the node-origin
-fallback for nodes without an anchor.
+terminal cursor policy. Custom focus targets can publish a local anchor with
+`accessibilityCursorAnchor(_:)`; built-in text controls publish text-input
+caret anchors for `TextField`, `SecureField`, and `TextEditor`, and nodes
+without an anchor fall back to their origin.
 
 Reduced motion suppresses non-essential frame churn. Repeating
 animations, spinners, blink, and transition intermediates do not tick

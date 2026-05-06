@@ -62,4 +62,14 @@ struct AccessibilityMetadataModifierTests {
     #expect(resolved.semanticMetadata.accessibilityHidden == true)
     #expect(resolved.semanticMetadata.accessibilityLiveRegion == .assertive)
   }
+
+  @Test("Accessibility cursor anchor modifier writes semantic metadata")
+  func accessibilityCursorAnchorModifierWritesSemanticMetadata() {
+    let resolved = Text("Chart")
+      .accessibilityRole(.image)
+      .accessibilityCursorAnchor(CellPoint(x: 4, y: 2))
+      .resolve(in: .init(identity: testIdentity("Accessibility", "CursorAnchor")))
+
+    #expect(resolved.semanticMetadata.accessibilityCursorAnchor == CellPoint(x: 4, y: 2))
+  }
 }

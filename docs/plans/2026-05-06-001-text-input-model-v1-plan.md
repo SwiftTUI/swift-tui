@@ -622,4 +622,3 @@ Verification result on 2026-05-06:
 - Copy/cut/select-all command handling.
 - Word movement and deletion shortcuts once modifier-bearing text-editing
   input is normalized across terminal, web, and SwiftUI hosts.
-- Public cursor-anchor authoring for custom focus targets.
