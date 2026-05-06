@@ -1765,12 +1765,15 @@ WebSocket transport landed).)
    consumed through host-owned role, focus, hit-testing, and announcement
    policy from ADR-0015.
 
-10. **Phase 9 — Tests + lint.** Snapshot tests for accessible-mode
-    output; prek hooks for raw-glyph and color-only-state detection;
-    listening tests under VoiceOver/NVDA/Orca documented in
+10. **Phase 9 — Tests + lint.** **(Landed for guardrails and listening
+    docs.)** Snapshot tests cover accessible-mode output, Web/WASI ARIA
+    transport, and SwiftUI host mapping. `Scripts/check_accessibility_guardrails.sh`
+    now pins reviewed raw-glyph, color-state, and visual-content source
+    manifests so new risk surfaces require explicit review. Listening tests
+    under VoiceOver/NVDA/Orca are documented in
     `Tests/SwiftTUITests/Accessibility/README.md`. The browser-target
-    listening tests are the easiest wins because the browser AT
-    story is mature.
+    listening tests are the easiest wins because the browser AT story is
+    mature.
 
 Each phase is independently shippable; each makes the framework
 materially more accessible than the previous one. Phases 1–5 are
@@ -1988,3 +1991,7 @@ in this document. The primary sources, grouped by theme:
   `AccessibilityAnnouncer.announce(_:)` queues
   `SemanticSnapshot.accessibilityAnnouncements` for CLI accessible output,
   Web/WASI ARIA, and SwiftUI host announcements.
+- 2026-05-06: Accessibility guardrails landed.
+  `Scripts/check_accessibility_guardrails.sh` validates listening-test docs and
+  source manifests for raw glyphs, color-state styling, and visual-only content
+  call sites.

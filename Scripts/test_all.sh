@@ -146,6 +146,7 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 
 Runs the full checked-in repo verification surface:
   - checked-in policy hooks
+  - accessibility guardrails for raw glyphs, color-state styling, and visual content
   - public-API baseline freshness check
   - root SwiftPM tests
   - Platforms/CLI tests
@@ -509,6 +510,12 @@ run_step \
   "$repo_root" \
   "./Scripts/check_concurrency_safety_policies.sh" \
   ./Scripts/check_concurrency_safety_policies.sh
+
+run_step \
+  "Check accessibility guardrails" \
+  "$repo_root" \
+  "./Scripts/check_accessibility_guardrails.sh" \
+  ./Scripts/check_accessibility_guardrails.sh
 
 run_step \
   "Check public-API baseline" \

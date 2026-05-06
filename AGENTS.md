@@ -103,6 +103,8 @@ Full policy in [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md).
   Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` library layers
 - **public-surface-policies** — enforces the guardrails in
   [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md)
+- **accessibility-guardrails** — pins reviewed raw-glyph, color-state, and
+  visual-content source files and requires listening-test docs
 - **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and
   `nonisolated(unsafe)`. Prefer explicit actor isolation, `Sendable` generic
   constraints, or `Synchronization` primitives instead.
