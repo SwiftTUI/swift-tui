@@ -1,0 +1,199 @@
+import Testing
+
+@testable import SwiftTUIViews
+
+@Suite
+struct TextInputReducerTests {
+  @Test("inserts text at collapsed selection")
+  func insertsTextAtCollapsedSelection() {
+    let value = TextInputValue(
+      text: "ac",
+      selection: .caret(at: TextOffset(1))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .insertText("b"),
+      traits: .singleLine,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "abc")
+    #expect(mutation.value.selection == .caret(at: TextOffset(2)))
+    #expect(mutation.changedRange == TextRange(TextOffset(1)..<TextOffset(2)))
+    #expect(mutation.insertedText == "b")
+    #expect(mutation.shouldWriteBinding)
+    #expect(mutation.shouldRequestFrame)
+  }
+
+  @Test("replaces non-collapsed selection")
+  func replacesNonCollapsedSelection() {
+    let value = TextInputValue(
+      text: "axc",
+      selection: TextSelection(anchor: TextOffset(1), head: TextOffset(2))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .insertText("b"),
+      traits: .singleLine,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "abc")
+    #expect(mutation.value.selection == .caret(at: TextOffset(2)))
+    #expect(mutation.changedRange == TextRange(TextOffset(1)..<TextOffset(2)))
+  }
+
+  @Test("backspace deletes cluster before caret")
+  func backspaceDeletesClusterBeforeCaret() {
+    let composed = "e\u{0301}"
+    let value = TextInputValue(
+      text: composed + "b",
+      selection: .caret(at: TextOffset(1))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .deleteBackward(granularity: .character),
+      traits: .singleLine,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "b")
+    #expect(mutation.value.selection == .caret(at: TextOffset(0)))
+    #expect(mutation.changedRange == TextRange(TextOffset(0)..<TextOffset(1)))
+  }
+
+  @Test("backspace deletes selected range")
+  func backspaceDeletesSelectedRange() {
+    let value = TextInputValue(
+      text: "abcd",
+      selection: TextSelection(anchor: TextOffset(1), head: TextOffset(3))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .deleteBackward(granularity: .character),
+      traits: .singleLine,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "ad")
+    #expect(mutation.value.selection == .caret(at: TextOffset(1)))
+    #expect(mutation.changedRange == TextRange(TextOffset(1)..<TextOffset(3)))
+  }
+
+  @Test("moves left and right by grapheme cluster")
+  func movesLeftAndRightByGraphemeCluster() {
+    let composed = "e\u{0301}"
+    let value = TextInputValue(
+      text: composed + "b",
+      selection: .caret(at: TextOffset(2))
+    )
+    let reducer = TextInputReducer()
+
+    let movedLeft = reducer.reduce(
+      value,
+      command: .move(.left, selecting: false),
+      traits: .singleLine,
+      layout: nil
+    ).value
+    let movedRight = reducer.reduce(
+      movedLeft,
+      command: .move(.right, selecting: false),
+      traits: .singleLine,
+      layout: nil
+    ).value
+
+    #expect(movedLeft.selection == .caret(at: TextOffset(1)))
+    #expect(movedRight.selection == .caret(at: TextOffset(2)))
+  }
+
+  @Test("home and end move within current line")
+  func homeAndEndMoveWithinCurrentLine() {
+    let value = TextInputValue(
+      text: "ab\ncd",
+      selection: .caret(at: TextOffset(4))
+    )
+    let reducer = TextInputReducer()
+
+    let movedHome = reducer.reduce(
+      value,
+      command: .move(.lineStart, selecting: false),
+      traits: .multiline,
+      layout: nil
+    ).value
+    let movedEnd = reducer.reduce(
+      movedHome,
+      command: .move(.lineEnd, selecting: false),
+      traits: .multiline,
+      layout: nil
+    ).value
+
+    #expect(movedHome.selection == .caret(at: TextOffset(3)))
+    #expect(movedEnd.selection == .caret(at: TextOffset(5)))
+  }
+
+  @Test("up and down preserve preferred visual column")
+  func upAndDownPreservePreferredVisualColumn() {
+    let value = TextInputValue(
+      text: "abc\nx\nabcd",
+      selection: .caret(at: TextOffset(3))
+    )
+    let reducer = TextInputReducer()
+
+    let movedDownToShortLine = reducer.reduce(
+      value,
+      command: .move(.down, selecting: false),
+      traits: .multiline,
+      layout: nil
+    ).value
+    let movedDownToLongLine = reducer.reduce(
+      movedDownToShortLine,
+      command: .move(.down, selecting: false),
+      traits: .multiline,
+      layout: nil
+    ).value
+
+    #expect(movedDownToShortLine.selection == .caret(at: TextOffset(5)))
+    #expect(movedDownToShortLine.preferredVisualColumn == 3)
+    #expect(movedDownToLongLine.selection == .caret(at: TextOffset(9)))
+    #expect(movedDownToLongLine.preferredVisualColumn == 3)
+  }
+
+  @Test("secure traits do not change stored text")
+  func secureTraitsDoNotChangeStoredText() {
+    let value = TextInputValue(
+      text: "pa",
+      selection: .caret(at: TextOffset(2))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .insertText("ss"),
+      traits: .secureField,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "pass")
+    #expect(mutation.value.selection == .caret(at: TextOffset(4)))
+  }
+
+  @Test("external binding update clamps selection")
+  func externalBindingUpdateClampsSelection() {
+    let value = TextInputValue(
+      text: "abcdef",
+      selection: TextSelection(anchor: TextOffset(5), head: TextOffset(6)),
+      composingRange: TextRange(TextOffset(1)..<TextOffset(3)),
+      preferredVisualColumn: 5
+    )
+
+    let synchronized = value.synchronized(with: "ab")
+
+    #expect(synchronized.text == "ab")
+    #expect(synchronized.selection == .caret(at: TextOffset(2)))
+    #expect(synchronized.composingRange == nil)
+    #expect(synchronized.preferredVisualColumn == nil)
+  }
+}
