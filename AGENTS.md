@@ -3,6 +3,9 @@
 Guidance for Claude Code and other agentic assistants working in this
 repository. Keep this file concise — the detailed design documents in
 [`docs/`](docs/README.md) are the source of truth. Update them there, not here.
+Use [`active_work.md`](active_work.md) as the live tracker for incomplete work:
+keep it current, keep entries concise, link to supporting docs, and remove
+items when completed rather than summarizing completed work there.
 
 ## Build & Test Commands
 
