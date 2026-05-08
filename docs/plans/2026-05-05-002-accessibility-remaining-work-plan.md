@@ -93,14 +93,14 @@ Follow-up target behavior completed after this substrate plan:
 - Public cursor-anchor authoring, imperative announcements, listening/lint
   guardrails, and visual-only content policy landed as follow-up accessibility
   tranches on 2026-05-06.
+- Durable shipped-behavior documentation landed in:
+  - `docs/ACCESSIBILITY.md`
 
 Still follow-up work outside the already-scoped tranches:
 
 - Reduce-motion animation semantics for transitions and animated content
   changes.
 - Modal presentation focus trapping and focus restoration.
-- Documentation migration from proposal/current-state notes into durable
-  reference docs.
 
 ## Implementation Boundary
 
@@ -110,7 +110,8 @@ remaining intentionally deferred areas are:
 
 - exact reduce-motion animation suppression rules;
 - modal focus trapping and restoration;
-- documentation home after implementation.
+- richer hosted-platform focus control beyond the current semantic focus
+  metadata.
 
 Those are listed in [Open Questions](#open-questions). Do not smuggle policy
 answers into this substrate patch.
@@ -484,10 +485,10 @@ must be resolved before implementing target-specific behavior.
    Default `SwiftTUICharts` summaries are emitted as image labels; custom
    unlabeled visual charts are skipped and warned in accessible output.
 
-10. **Documentation home after implementation.** Decide whether
-    `ACCESSIBILITY.md` remains a proposal or whether shipped substrate details
-    move into durable reference docs such as `RUNTIME.md`,
-    `PUBLIC_API_INVENTORY.md`, and a new `docs/ACCESSIBILITY.md`.
+10. ~~**Documentation home after implementation.**~~ **Resolved.** Current
+    shipped behavior lives in `docs/ACCESSIBILITY.md`. This plan and
+    `docs/proposals/ACCESSIBILITY.md` remain historical implementation and
+    research records.
 
 ## Final Verification
 

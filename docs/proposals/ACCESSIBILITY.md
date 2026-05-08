@@ -1,12 +1,12 @@
 # Accessibility
 
-**Status:** Living proposal and implementation record. The original research
-from the `accessibility-investigation` branch remains here for context, but
-the shared substrate and first target consumers have now shipped: CLI
-accessible output, Web/WASI ARIA, embedded WebHost ARIA delivery, SwiftUI host
-bridging, and text-input caret anchors for cursor-following. Long by intent —
-the goal is to keep the
-context here rather than scattered across session notes.
+**Status:** Historical research record and remaining-behavior proposal. Current
+shipped accessibility behavior lives in
+[`../ACCESSIBILITY.md`](../ACCESSIBILITY.md). The original research from the
+`accessibility-investigation` branch remains here for context, but the shared
+substrate and first target consumers have now shipped: CLI accessible output,
+Web/WASI ARIA, embedded WebHost ARIA delivery, SwiftUI host bridging, and
+text-input caret anchors for cursor-following.
 
 **Owner:** unassigned. Tracking branch: `accessibility-investigation`.
 
@@ -780,7 +780,9 @@ The proposal split is sharper than the first draft implied:
   imperative announcements, listening/lint guardrails, and visual-only
   content policy are also wired. Remaining proposal-level follow-up is now
   limited to broader behavior policy such as reduce-motion animation semantics
-  and modal focus handling.
+  and modal focus handling. Current shipped behavior is summarized in the
+  durable reference page
+  [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md).
 
 - **What this proposal does *not* do:** invent the role substrate
   (it exists), invent cursor-placement primitives (they exist), or
@@ -2003,6 +2005,9 @@ in this document. The primary sources, grouped by theme:
   `Scripts/check_accessibility_guardrails.sh` validates listening-test docs and
   source manifests for raw glyphs, color-state styling, and visual-only content
   call sites.
+- 2026-05-08: Current shipped accessibility behavior moved into the durable
+  reference page [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md). This proposal now
+  remains as the research record plus open behavior-policy context.
 - 2026-05-06: Visual-only content policy landed. `Canvas`, `Image`, and
   image-backed animated content require author labels or explicit hiding;
   default `SwiftTUICharts` summaries become image labels, while custom
