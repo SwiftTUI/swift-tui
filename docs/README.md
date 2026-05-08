@@ -13,6 +13,8 @@ swiftly run swift package generate-documentation --target SwiftTUI
 
 The repository [README.md](../README.md) is the public landing page.
 [AGENTS.md](../AGENTS.md) is the short guide for agentic assistants.
+[`../active_work.md`](../active_work.md) tracks incomplete work, and
+[`../CHANGELOG.md`](../CHANGELOG.md) records completed active-work history.
 
 ## Start Here
 

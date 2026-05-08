@@ -7,8 +7,13 @@
 - Include only work that is not yet completed.
 - Use concise task descriptions with links to supporting docs, plans, source
   files, or tests.
-- Remove completed work from this document entirely. Document completed work in
-  its supporting documentation instead.
+- Remove completed work from this document entirely.
+- When removing completed work, add a concise self-standing entry to
+  [CHANGELOG.md](CHANGELOG.md). Keep long-form details in the supporting docs,
+  plans, source, or tests.
+- Changelog entries may link to long-lived repo documentation, but every link
+  must be prefixed with the short git hash that anchors the referenced material,
+  for example: `4ee7a8f9 [docs/STATUS.md](docs/STATUS.md)`.
 - Treat this file as additive to the repo documentation structure. It does not
   replace durable docs, proposals, ADRs, plans, or tests.
 - Use this file as the first place to check what is next.
