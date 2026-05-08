@@ -33,7 +33,7 @@ struct MotionAndProgressPolicyTests {
     let frame = try #require(scheduler.consumeReadyFrame())
     let context = runLoop.resolveContext(for: frame)
 
-    #expect(context.environmentValues.reducesMotion)
+    #expect(context.environmentValues.accessibilityReduceMotion)
     #expect(context.environmentValues.suppressesProgress)
     #expect(context.transaction.animationRequest == .disabled)
     #expect(context.transaction.animationBatchID == nil)
@@ -43,7 +43,7 @@ struct MotionAndProgressPolicyTests {
   func reducedMotionRendersIndeterminateProgressAsStaticStatus() {
     let surface = renderedSurface(
       ProgressView("Loading", barWidth: 8),
-      environmentValues: policyEnvironment(reducesMotion: true),
+      environmentValues: policyEnvironment(accessibilityReduceMotion: true),
       identity: testIdentity("ReducedMotionProgress")
     )
 
@@ -78,7 +78,7 @@ struct MotionAndProgressPolicyTests {
     let reducedRegistry = LocalTaskRegistry()
     let reducedSurface = renderedSurface(
       Spinner(.asciiLineCompass),
-      environmentValues: policyEnvironment(reducesMotion: true),
+      environmentValues: policyEnvironment(accessibilityReduceMotion: true),
       taskRegistry: reducedRegistry,
       identity: testIdentity("ReducedSpinner")
     )
@@ -110,14 +110,14 @@ struct MotionAndProgressPolicyTests {
       animatedText(shifted: false, animation: animation),
       context: ResolveContext(
         identity: testIdentity("ReducedRepeatedAnimation"),
-        environmentValues: policyEnvironment(reducesMotion: true)
+        environmentValues: policyEnvironment(accessibilityReduceMotion: true)
       )
     )
     _ = reducedRenderer.render(
       animatedText(shifted: true, animation: animation),
       context: ResolveContext(
         identity: testIdentity("ReducedRepeatedAnimation"),
-        environmentValues: policyEnvironment(reducesMotion: true)
+        environmentValues: policyEnvironment(accessibilityReduceMotion: true)
       )
     )
 
@@ -130,7 +130,10 @@ struct MotionAndProgressPolicyTests {
   func staticControlsRenderUnchangedUnderPolicy() {
     let surface = renderedSurface(
       Text("Ready"),
-      environmentValues: policyEnvironment(reducesMotion: true, suppressesProgress: true),
+      environmentValues: policyEnvironment(
+        accessibilityReduceMotion: true,
+        suppressesProgress: true
+      ),
       identity: testIdentity("StaticPolicyText")
     )
 
@@ -183,11 +186,11 @@ private func renderArtifacts<V: View>(
 }
 
 private func policyEnvironment(
-  reducesMotion: Bool = false,
+  accessibilityReduceMotion: Bool = false,
   suppressesProgress: Bool = false
 ) -> EnvironmentValues {
   var values = EnvironmentValues()
-  values.reducesMotion = reducesMotion
+  values.accessibilityReduceMotion = accessibilityReduceMotion
   values.suppressesProgress = suppressesProgress
   return values
 }

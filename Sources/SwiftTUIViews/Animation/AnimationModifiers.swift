@@ -129,7 +129,7 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     }
 
     var childContext = context
-    if context.environmentValues.reducesMotion {
+    if context.environmentValues.accessibilityReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else if let animation {
       childContext.transaction.animationRequest = .animate(animation.animationBox)
@@ -183,7 +183,7 @@ public struct TransactionModifier: PrimitiveViewModifier {
     transform(&transaction)
 
     var childContext = context
-    if context.environmentValues.reducesMotion {
+    if context.environmentValues.accessibilityReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else {
       childContext.transaction.animationRequest = transaction.request

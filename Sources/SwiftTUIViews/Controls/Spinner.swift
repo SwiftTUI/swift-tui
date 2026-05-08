@@ -11,17 +11,17 @@ public struct Spinner: View {
   @State var iteration: Int = 0
 
   public var body: some View {
-    EnvironmentReader(\.reducesMotion) { reducesMotion in
-      spinnerBody(reducesMotion: reducesMotion)
+    EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
+      spinnerBody(accessibilityReduceMotion: accessibilityReduceMotion)
     }
   }
 
   @ViewBuilder
-  private func spinnerBody(reducesMotion: Bool) -> some View {
-    if reducesMotion {
-      spinnerText(reducesMotion: true)
+  private func spinnerBody(accessibilityReduceMotion: Bool) -> some View {
+    if accessibilityReduceMotion {
+      spinnerText(accessibilityReduceMotion: true)
     } else {
-      spinnerText(reducesMotion: false)
+      spinnerText(accessibilityReduceMotion: false)
         .task(id: Pair(a: set, b: stage)) {
           switch stage {
           case .active:
@@ -40,11 +40,11 @@ public struct Spinner: View {
   }
 
   @ViewBuilder
-  private func spinnerText(reducesMotion: Bool) -> some View {
+  private func spinnerText(accessibilityReduceMotion: Bool) -> some View {
     Group {
       switch stage {
       case .active:
-        if reducesMotion {
+        if accessibilityReduceMotion {
           Text(set.body.first ?? set.head)
         } else {
           Text(set.body[iteration])
