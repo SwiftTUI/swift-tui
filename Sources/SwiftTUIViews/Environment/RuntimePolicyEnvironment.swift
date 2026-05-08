@@ -1,4 +1,4 @@
-private enum ReducesMotionKey: EnvironmentKey {
+private enum AccessibilityReduceMotionKey: EnvironmentKey {
   static let defaultValue = false
 }
 
@@ -11,9 +11,9 @@ private enum CursorFollowsFocusKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-  package var reducesMotion: Bool {
-    get { self[ReducesMotionKey.self] }
-    set { self[ReducesMotionKey.self] = newValue }
+  public var accessibilityReduceMotion: Bool {
+    get { self[AccessibilityReduceMotionKey.self] }
+    set { self[AccessibilityReduceMotionKey.self] = newValue }
   }
 
   package var suppressesProgress: Bool {

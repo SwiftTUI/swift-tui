@@ -6632,6 +6632,7 @@ SwiftTUIViews.EnvironmentTransformModifier.concat(_:)
 SwiftTUIViews.EnvironmentValues
 SwiftTUIViews.EnvironmentValues.!=(_:_:)
 SwiftTUIViews.EnvironmentValues.==(_:_:)
+SwiftTUIViews.EnvironmentValues.accessibilityReduceMotion
 SwiftTUIViews.EnvironmentValues.activePaletteCommands
 SwiftTUIViews.EnvironmentValues.buttonBorderShape
 SwiftTUIViews.EnvironmentValues.buttonStyle

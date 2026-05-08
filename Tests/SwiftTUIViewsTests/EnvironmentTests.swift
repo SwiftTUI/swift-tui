@@ -29,4 +29,14 @@ struct EnvironmentTests {
     let b = EnvironmentValues()
     #expect(a == b)
   }
+
+  @Test("accessibilityReduceMotion defaults to false and can be overridden")
+  func accessibilityReduceMotion() {
+    var values = EnvironmentValues()
+
+    #expect(!values.accessibilityReduceMotion)
+
+    values.accessibilityReduceMotion = true
+    #expect(values.accessibilityReduceMotion)
+  }
 }

@@ -1198,7 +1198,7 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
     effectiveEnvironmentValues.activePaletteCommands = latestActivePaletteCommands
-    effectiveEnvironmentValues.reducesMotion = runtimeConfiguration.motion == .reduced
+    effectiveEnvironmentValues.accessibilityReduceMotion = runtimeConfiguration.motion == .reduced
     effectiveEnvironmentValues.suppressesProgress = runtimeConfiguration.noProgress
     effectiveEnvironmentValues.cursorFollowsFocus = runtimeConfiguration.cursorFollowsFocus
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {

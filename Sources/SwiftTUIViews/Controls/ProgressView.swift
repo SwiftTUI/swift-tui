@@ -91,7 +91,9 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: View, Resolvab
     in context: ResolveContext
   ) -> [ResolvedNode] {
     if isIndeterminate {
-      if context.environmentValues.reducesMotion || context.environmentValues.suppressesProgress {
+      if context.environmentValues.accessibilityReduceMotion
+        || context.environmentValues.suppressesProgress
+      {
         return progressStatusView(
           label: label,
           summary: EmptyView()
