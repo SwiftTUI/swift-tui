@@ -13,50 +13,113 @@
   replace durable docs, proposals, ADRs, plans, or tests.
 - Use this file as the first place to check what is next.
 
+## Repo Documentation Hygiene
+
+- [ ] Reconcile the current-plans list with plan front matter and landed source.
+  The docs index still lists shipped CPU latency, composed-presentation, and
+  gallery-regression plans as current. Supporting docs:
+  [docs/README.md](docs/README.md),
+  [docs/plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](docs/plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md),
+  [docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md](docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md),
+  [docs/plans/2026-05-01-007-gallery-animation-regression-notes.md](docs/plans/2026-05-01-007-gallery-animation-regression-notes.md).
+- [ ] Update docs that still describe shipped tooling as proposed or unwired.
+  Supporting docs and source:
+  [docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md),
+  [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md),
+  [Tools/TermUIPerf](Tools/TermUIPerf),
+  [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md),
+  [Sources/SwiftTUI/Configuration/RuntimeConfiguration.swift](Sources/SwiftTUI/Configuration/RuntimeConfiguration.swift).
+- [ ] Reconcile terminal-embedding plan status with the shipped
+  `Platforms/Embedding` source and file-previewer example. Supporting docs and
+  source:
+  [docs/plans/2026-05-04-001-terminal-embedding-plan.md](docs/plans/2026-05-04-001-terminal-embedding-plan.md),
+  [docs/STATUS.md](docs/STATUS.md),
+  [Platforms/Embedding](Platforms/Embedding),
+  [Examples/file-previewer](Examples/file-previewer).
+- [ ] Update the public API inventory for the border/stroke simplification that
+  has already landed in source. Supporting docs and source:
+  [docs/PUBLIC_API_INVENTORY.md](docs/PUBLIC_API_INVENTORY.md),
+  [Sources/SwiftTUICore/Styling/BorderSet.swift](Sources/SwiftTUICore/Styling/BorderSet.swift),
+  [Sources/SwiftTUICore/Styling/Styling.swift](Sources/SwiftTUICore/Styling/Styling.swift).
+- [ ] Reconcile historical animation proposal status with current transition and
+  matched-geometry source. Supporting docs and source:
+  [docs/proposals/ANIMATION_PLAN.md](docs/proposals/ANIMATION_PLAN.md),
+  [docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md](docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md),
+  [Sources/SwiftTUI/Lifecycle/AnimationController.swift](Sources/SwiftTUI/Lifecycle/AnimationController.swift),
+  [Sources/SwiftTUIViews/Animation/AnyTransition.swift](Sources/SwiftTUIViews/Animation/AnyTransition.swift).
+- [ ] Close or re-scope active plan files whose source appears to have moved
+  ahead of their unchecked task lists. Supporting plans:
+  [docs/plans/2026-04-26-003-border-stroke-simplification-plan.md](docs/plans/2026-04-26-003-border-stroke-simplification-plan.md),
+  [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
+  [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md).
+
+## Runtime And Public Surface Gaps
+
+- [ ] Finish behavior wiring for parsed `RuntimeConfiguration` fields that are
+  still documented as follow-up work: `--json`, standalone `--linear`,
+  `--debug`, and `--start-in`. Supporting docs and source:
+  [README.md](README.md),
+  [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md),
+  [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),
+  [Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift](Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift),
+  [Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift).
+- [ ] Continue the remaining `AnyView` / `[AnyView]` reduction work without
+  weakening the public-surface policy. Supporting docs and source:
+  [docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md),
+  [docs/ANYVIEW_INTERNALS.md](docs/ANYVIEW_INTERNALS.md),
+  [Sources/SwiftTUIViews/Foundation/ViewFoundation.swift](Sources/SwiftTUIViews/Foundation/ViewFoundation.swift),
+  [Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift](Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift).
+- [ ] Decide whether to execute or demote the first-class modifier-layer
+  migration. Supporting docs and source:
+  [docs/proposals/VIEW_MODIFIER_LAYER.md](docs/proposals/VIEW_MODIFIER_LAYER.md),
+  [Sources/SwiftTUIViews/Foundation/ViewModifier.swift](Sources/SwiftTUIViews/Foundation/ViewModifier.swift),
+  [Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift](Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift).
+- [ ] Replace the `.task(id:)` reflection-based descriptor identity with a
+  deliberate identity strategy. Supporting source:
+  [Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift](Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift).
+- [ ] Turn the current constraints in `docs/STATUS.md` into executable plans or
+  explicitly defer them: default-focus scopes, `@FocusedObject`, richer
+  `TextEditor`, `NavigationStack`, popover-style presentation, terminal
+  workspaces, deeper scroll control, and navigation surfaces. Supporting docs:
+  [docs/STATUS.md](docs/STATUS.md),
+  [docs/VISION.md](docs/VISION.md),
+  [docs/FOCUS.md](docs/FOCUS.md).
+
+## Canvas And Pointer Work
+
+- [ ] Finish or close the Canvas pointer-precision tranche. Supporting docs and
+  source:
+  [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
+  [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md),
+  [Sources/SwiftTUI/Input/InputReader.swift](Sources/SwiftTUI/Input/InputReader.swift),
+  [Sources/SwiftTUIViews/Canvas.swift](Sources/SwiftTUIViews/Canvas.swift),
+  [Tests/SwiftTUICoreTests/Pointer](Tests/SwiftTUICoreTests/Pointer),
+  [Tests/SwiftTUICoreTests/CanvasGridTests.swift](Tests/SwiftTUICoreTests/CanvasGridTests.swift).
+
 ## Remaining Accessibility Tasks
 
 Source of truth for shipped accessibility behavior:
-[`docs/ACCESSIBILITY.md`](docs/ACCESSIBILITY.md).
+[docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 
-- [ ] Complete reduced-motion semantics across all motion-producing surfaces.
-  - Current state: `EnvironmentValues.accessibilityReduceMotion` exists, and
-    `Spinner`, indeterminate `ProgressView`, and scoped animation modifiers
-    already honor it.
-  - Remaining work: define and test policy for transitions, `PhaseAnimator`,
-    `AnimatedImage`, matched geometry, and animated content changes.
-  - Evidence:
-    - `docs/ACCESSIBILITY.md`
-    - `Sources/SwiftTUIViews/Animation/PhaseAnimator.swift`
-    - `Sources/SwiftTUIAnimatedImage/AnimatedImage.swift`
-
-- [ ] Finish the modal accessibility focus contract.
-  - Current state: modal base suppression and one sheet focus-restoration path
-    are covered.
-  - Remaining work: make the cross-presentation contract explicit for initial
-    focus, trap/cycle behavior, dismiss restoration fallback, and target-bridge
-    behavior for `sheet`, `alert`, and `confirmationDialog`.
-  - Evidence:
-    - `docs/ACCESSIBILITY.md`
-    - `Tests/SwiftTUITests/PresentationSurfaceTests.swift`
-    - `Tests/SwiftTUITests/AppRuntimeTests.swift`
-
-- [ ] Decide whether SwiftUI host focus should move native VoiceOver focus.
-  - Current state: SwiftUI host focus is metadata-only in v1; the host records
-    `focusedAccessibilityIdentity` and mounts accessibility overlay elements,
-    but does not programmatically move global VoiceOver focus.
-  - Remaining work: either implement native focus movement with
-    `AccessibilityFocusState` or explicitly reaffirm metadata-only focus as the
-    intended policy.
-  - Evidence:
-    - `docs/decisions/0015-accessibility-swiftui-host-policy.md`
-    - `Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift`
-    - `Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift`
-
-- [ ] Clean up stale historical proposal open questions.
-  - Current state: `docs/ACCESSIBILITY.md` is current, but the long proposal
-    still contains old open-question text around detection hints, spinner
-    replacement granularity, and chart representation.
-  - Remaining work: mark resolved items as resolved, fold still-relevant items
-    into the durable docs or active plans, and demote true out-of-scope notes.
-  - Evidence:
-    - `docs/proposals/ACCESSIBILITY.md`
+- [ ] Complete reduced-motion policy and tests across transitions,
+  `PhaseAnimator`, `AnimatedImage`, matched geometry, and animated content
+  changes. Supporting docs and source:
+  [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md),
+  [docs/decisions/0013-accessibility-runtime-policy.md](docs/decisions/0013-accessibility-runtime-policy.md),
+  [Sources/SwiftTUIViews/Animation/PhaseAnimator.swift](Sources/SwiftTUIViews/Animation/PhaseAnimator.swift),
+  [Sources/SwiftTUIAnimatedImage/AnimatedImage.swift](Sources/SwiftTUIAnimatedImage/AnimatedImage.swift).
+- [ ] Finish the modal accessibility focus contract for initial focus,
+  trap/cycle behavior, dismiss restoration fallback, and target-bridge behavior
+  across `sheet`, `alert`, and `confirmationDialog`. Supporting docs and tests:
+  [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md),
+  [Tests/SwiftTUITests/PresentationSurfaceTests.swift](Tests/SwiftTUITests/PresentationSurfaceTests.swift),
+  [Tests/SwiftTUITests/AppRuntimeTests.swift](Tests/SwiftTUITests/AppRuntimeTests.swift).
+- [ ] Decide whether SwiftUI host focus should move native VoiceOver focus or
+  remain metadata-only. Supporting docs and source:
+  [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),
+  [Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift](Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift),
+  [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift).
+- [ ] Clean up stale historical accessibility proposal open questions.
+  Supporting docs:
+  [docs/proposals/ACCESSIBILITY.md](docs/proposals/ACCESSIBILITY.md),
+  [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
