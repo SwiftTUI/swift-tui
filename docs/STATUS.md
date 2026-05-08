@@ -37,6 +37,18 @@ Current async presentation and frame-tail worker ownership is summarized in
   writes for live runtime callbacks
 - Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`
 
+### Accessibility
+
+- Shared semantic accessibility substrate through `AccessibilityRole`,
+  authoring modifiers, `AccessibilityNode`, and semantic extraction.
+- Terminal accessible output, cursor-following policy, reduced-motion and
+  no-progress runtime policy, and live-region announcements.
+- Web/WASI and embedded WebHost ARIA delivery through the shared
+  `web-surface` accessibility tree.
+- SwiftUI host accessibility overlay and platform announcement bridge.
+- Visual-only content policy, source-manifest guardrails, and manual listening
+  evidence guidance.
+
 ### Runtime surface
 
 - `DefaultRenderer` for one-shot rendering, async runtime rendering, and pipeline
@@ -113,7 +125,9 @@ See [VISION.md](VISION.md) for the rationale and the intended ordering.
 
 - `NavigationStack`
 - popover-style presentation beyond the current sheet support
-- richer accessibility and assistive-technology modeling beyond the current semantic tree
+- accessibility behavior beyond the current semantic tree and target bridges,
+  including modal focus trapping, focus restoration, and richer native focus
+  control
 
 The project treats terminal-native reinterpretation as a first-class design
 rule. The remaining gaps are prioritized around terminal workspaces, deeper

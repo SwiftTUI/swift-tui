@@ -27,6 +27,8 @@ The repository [README.md](../README.md) is the public landing page.
 ## Reference
 
 - [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) — ownership map across targets and key files
+- [ACCESSIBILITY.md](ACCESSIBILITY.md) — shipped accessibility semantics,
+  runtime policy, target bridges, guardrails, and remaining gaps
 - [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) — canonical public surface, removed surface, and package-only seams
 - [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md) — guardrails for public API additions, `AnyView` / `AnyScene` policy
 - [ANYVIEW_INTERNALS.md](ANYVIEW_INTERNALS.md) — maintainer guide for
@@ -53,7 +55,7 @@ The repository [README.md](../README.md) is the public landing page.
 Active design proposals that are still shaping decisions:
 
 - [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — text input value, selection, reducer, layout-map, and caret-anchor foundation for `TextField`, `SecureField`, and `TextEditor`
-- [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — current accessibility substrate, target-consumption status, runtime policy, and remaining behavior questions
+- [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — historical research record and remaining accessibility behavior questions; current shipped behavior lives in [ACCESSIBILITY.md](ACCESSIBILITY.md)
 - [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `Platforms/WebHost/` runner for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy

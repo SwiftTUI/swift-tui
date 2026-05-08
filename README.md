@@ -237,6 +237,8 @@ Common entry points:
 
 - [docs/STATUS.md](docs/STATUS.md): shipped surface and current constraints
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): target boundaries and frame pipeline
+- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md): accessibility semantics,
+  runtime policy, target bridges, and guardrails
 - [docs/RUNTIME.md](docs/RUNTIME.md): lifecycle, graph-scoped state,
   terminal presentation safety, and incremental rendering behavior
 - [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work

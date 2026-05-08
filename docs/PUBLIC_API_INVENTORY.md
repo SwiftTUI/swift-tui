@@ -58,6 +58,24 @@ Important public-surface rules after the lowering migration:
   reuse signatures before the renderer may evaluate that layout on the
   frame-tail worker.
 
+### Accessibility
+
+The shipped accessibility surface is semantic-first; see
+[`ACCESSIBILITY.md`](ACCESSIBILITY.md) for target behavior.
+
+- `AccessibilityRole`, `AccessibilityPoliteness`, `AccessibilityNode`, and
+  `AccessibilityAnnouncement` define the public semantic records consumed by
+  terminal accessible output, Web/WASI ARIA, embedded WebHost ARIA, and the
+  SwiftUI host overlay.
+- Authoring modifiers include `.accessibilityRole(_)`,
+  `.accessibilityLabel(_)`, `.accessibilityHint(_)`,
+  `.accessibilityHidden(_)`, `.accessibilityLiveRegion(_)`, and
+  `.accessibilityCursorAnchor(_)`.
+- `AccessibilityAnnouncer.announce(_:politeness:)` sends app-triggered
+  announcements to the active runtime accessibility target.
+- `EnvironmentValues.accessibilityReduceMotion` mirrors the resolved runtime
+  motion policy and can be overridden by authored views.
+
 ### Shapes, borders, and styling
 
 The canonical shape / border / gradient surface as of the Milestone 7 shape-and-border revamp:

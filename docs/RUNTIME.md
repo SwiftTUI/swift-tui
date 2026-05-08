@@ -67,6 +67,19 @@ The runtime is keyboard-first, but it is not keyboard-only.
 
 That means control activation, selection changes, scrolling, and editing can all flow through the same semantic and lifecycle system regardless of whether the initiating event came from the keyboard or the mouse-reporting stream.
 
+### Accessibility Runtime Policy
+
+The runtime consumes `SemanticSnapshot.accessibilityNodes` after each committed
+frame. The shipped policy is summarized in [ACCESSIBILITY.md](ACCESSIBILITY.md):
+
+- Terminal accessible output renders the semantic tree as linear text.
+- Terminal cursor-following can move the hardware cursor to the focused
+  accessibility node when `RuntimeConfiguration.cursorFollowsFocus` is true.
+- Reduced-motion and no-progress policy is copied into `EnvironmentValues`
+  before view resolution, including `accessibilityReduceMotion`.
+- Web/WASI, embedded WebHost, and SwiftUI host packages consume the same
+  semantic records through their own platform bridges.
+
 ### Pointer Coordinates And Capabilities
 
 The runtime normalizes every pointer event into `PointerLocation`.
