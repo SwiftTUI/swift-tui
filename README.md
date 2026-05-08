@@ -233,6 +233,10 @@ design doc, active proposal, and background note in this repository. Per-module
 API reference lives in the `*.docc` catalogs under `Sources/`, generated with
 the DocC command above.
 
+For the current incomplete work queue, use [active_work.md](active_work.md).
+It is additive to the durable docs: keep it concise, link to supporting
+documents, and remove items when they are completed.
+
 Common entry points:
 
 - [docs/STATUS.md](docs/STATUS.md): shipped surface and current constraints
