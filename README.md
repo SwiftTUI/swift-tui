@@ -235,7 +235,10 @@ the DocC command above.
 
 For the current incomplete work queue, use [active_work.md](active_work.md).
 It is additive to the durable docs: keep it concise, link to supporting
-documents, and remove items when they are completed.
+documents, and remove items when they are completed. Completed active-work
+entries move to [CHANGELOG.md](CHANGELOG.md), where descriptions stay
+self-standing and any links to repo docs are prefixed with the short git hash
+that anchors the referenced material.
 
 Common entry points:
 
@@ -248,3 +251,4 @@ Common entry points:
 - [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work
 - [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md): CPU and input-latency evaluation workflow
 - [Examples/README.md](Examples/README.md): maintained example apps
+- [CHANGELOG.md](CHANGELOG.md): concise completed-work history
