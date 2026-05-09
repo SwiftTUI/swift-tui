@@ -28,11 +28,17 @@
   [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),
   [Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift](Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift),
   [Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift).
-- [ ] Continue the remaining `AnyView` / `[AnyView]` reduction work without
-  weakening the public-surface policy. Supporting docs and source:
+- [ ] Re-scope the remaining `AnyView` / `[AnyView]` reduction before more
+  implementation. Current production erasure is concentrated in the builder
+  backbone and private `TabViewStyle` boxes; the next step needs an explicit
+  choice between a typed structural builder migration and retained compatibility
+  seams. Supporting docs and source:
   [docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md),
   [docs/ANYVIEW_INTERNALS.md](docs/ANYVIEW_INTERNALS.md),
   [Sources/SwiftTUIViews/Foundation/ViewFoundation.swift](Sources/SwiftTUIViews/Foundation/ViewFoundation.swift),
+  [Sources/SwiftTUIViews/ViewBuilder/TupleView.swift](Sources/SwiftTUIViews/ViewBuilder/TupleView.swift),
+  [Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift](Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift),
+  [Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift](Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift),
   [Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift](Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift).
 - [ ] Decide whether to execute or demote the first-class modifier-layer
   migration. Supporting docs and source:

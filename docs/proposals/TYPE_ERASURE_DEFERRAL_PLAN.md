@@ -46,6 +46,26 @@ The runtime and scene layer now follow the maximum path:
 - `RunLoop<State, Content>` stores typed deferred builders through scoped generic helpers
 - hosted scene selection and manifest generation traverse typed scenes directly instead of collecting `[WindowSceneConfiguration]`
 
+## Current Re-Scope Status
+
+As of 2026-05-08, the remaining production erasure is no longer an "easy
+internal helper cleanup" pass. Current source concentrates `AnyView` in:
+
+- the builder backbone: `DeclaredChildrenView`, `TupleView`,
+  `ConditionalContent`, `VariadicView`, `Group`, and `ForEach` still traffic in
+  `[AnyView]` for compatibility and structural child flattening;
+- `ViewBuilder.buildLimitedAvailability`, which remains the deliberate
+  availability-erasure seam;
+- the public `AnyView` implementation and package-owned scope-preserving
+  `scopedAnyView(...)` helper;
+- the private `AnyTabViewStyleBox` transport in `TabViewStyles.swift`, where
+  heterogeneous style-associated body types are erased behind the style box.
+
+Do not continue by deleting isolated `AnyView` calls. The next implementation
+step must first choose whether to land the typed structural builder backbone or
+to preserve the current builder compatibility seams and only document the
+remaining private erasure.
+
 ## Investigation Findings
 
 ### Toolchain And Language Feasibility
