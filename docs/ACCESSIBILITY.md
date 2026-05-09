@@ -163,9 +163,11 @@ a nonvisual accessibility overlay beside it. Each `AccessibilityNode` maps to a
 native accessibility element with role-derived traits, label, hint, frame, and
 live-region behavior where the host platform supports it.
 
-SwiftUI host focus is metadata in v1. The host marks the matching semantic node
-as focused for ordering and future focus work, but it does not programmatically
-move global VoiceOver focus.
+SwiftUI host focus moves native VoiceOver focus by default. The host binds each
+overlay accessibility element to a shared `AccessibilityFocusState` value and
+sets that value from the runtime focused identity after each committed semantic
+frame. VoiceOver-originated focus traversal is not yet fed back into SwiftTUI
+runtime focus.
 
 See [`decisions/0015-accessibility-swiftui-host-policy.md`](decisions/0015-accessibility-swiftui-host-policy.md)
 for the native-host policy.
@@ -202,8 +204,7 @@ Manual listening coverage is documented in
 The shipped accessibility substrate and first target consumers are in place.
 The remaining known behavior gap is:
 
-- Richer native focus control in hosted platforms, beyond the current semantic
-  focus metadata.
+- Bidirectional native-to-runtime focus in hosted platforms.
 
 Historical plans and decisions:
 

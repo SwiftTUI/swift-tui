@@ -34,14 +34,18 @@ snapshot's layout-reading order and parent-child grouping where possible.
 The raster terminal view itself is hidden from assistive technology so
 screen readers do not traverse duplicate character-grid content.
 
-Focus is metadata in v1, not imperative VoiceOver focus control. The
-host cross-references the latest focused identity with the current
-accessibility nodes and marks the matching overlay element as the
-focused semantic target for ordering and future native focus work. It
-does not programmatically move global VoiceOver focus through
-`AccessibilityFocusState` in v1 because the host has a dynamic sparse
-tree rather than a stable authored SwiftUI enum. If the focused node is
-removed, the host exposes no focused semantic target for that frame.
+SwiftUI host focus moves native accessibility focus by default. The
+host cross-references the latest runtime focused identity with the
+current `AccessibilityNode` mappings and writes the matching overlay
+element ID into a host-owned `AccessibilityFocusState`. If the focused
+node is removed, the host clears the native accessibility focus request
+for that frame.
+
+This is a one-way runtime-to-native focus bridge in this tranche.
+VoiceOver user traversal does not yet mutate SwiftTUI runtime focus
+because that requires a separate interaction contract for mapping native
+accessibility focus changes back into `FocusTracker` without
+synthesizing misleading pointer or keyboard input.
 
 Live regions use a host-owned announcement diff with the same rules as
 ADR-0013 and ADR-0014: the first frame establishes baseline text,
