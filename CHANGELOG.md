@@ -18,6 +18,19 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- `136924f3` Completed the SwiftUI host native VoiceOver focus bridge: runtime
+  focus now resolves through the host overlay mappings into a host-owned
+  `AccessibilityFocusState`, removed focused nodes clear the native focus
+  request, and host-level tests pin the one-way runtime-to-native behavior.
+  Bidirectional VoiceOver traversal back into SwiftTUI runtime focus remains a
+  separate contract. See `cb94ee17`
+  [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),
+  `136924f3`
+  [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift),
+  `a332e626`
+  [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityFocusPolicy.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityFocusPolicy.swift),
+  and `d73379a8`
+  [Platforms/SwiftUI/Tests/SwiftUIHostTests/SwiftUIHostAccessibilityTests.swift](Platforms/SwiftUI/Tests/SwiftUIHostTests/SwiftUIHostAccessibilityTests.swift).
 - `2b76774e` Wired the remaining framework-owned runtime flags: `--json` /
   `SWIFTTUI_JSON=1` now emit machine-readable frame JSON, standalone
   `--linear` / `SWIFTTUI_LINEAR=1` select accessible linear output, and
