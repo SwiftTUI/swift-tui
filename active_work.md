@@ -28,6 +28,9 @@
   [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),
   [Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift](Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift),
   [Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift).
+  Ambiguity note: this needs an explicit runtime contract for each flag before
+  implementation, especially whether the modes are aliases, output formats, or
+  independent render policies.
 - [ ] Re-scope the remaining `AnyView` / `[AnyView]` reduction before more
   implementation. Current production erasure is concentrated in the builder
   backbone and private `TabViewStyle` boxes; the next step needs an explicit
@@ -40,6 +43,8 @@
   [Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift](Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift),
   [Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift](Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift),
   [Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift](Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift).
+  Ambiguity note: do not continue by mechanically removing erasure; choose a
+  migration direction for retained builders and style boxes first.
 - [ ] Turn the current constraints in `docs/STATUS.md` into executable plans or
   explicitly defer them: default-focus scopes, `@FocusedObject`, richer
   `TextEditor`, `NavigationStack`, popover-style presentation, terminal
@@ -47,6 +52,8 @@
   [docs/STATUS.md](docs/STATUS.md),
   [docs/VISION.md](docs/VISION.md),
   [docs/FOCUS.md](docs/FOCUS.md).
+  Ambiguity note: this is a prioritization pass, not a single implementation
+  task; each constraint needs an explicit plan-or-defer decision.
 
 ## Canvas And Pointer Work
 
@@ -77,3 +84,5 @@ Source of truth for shipped accessibility behavior:
   [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),
   [Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift](Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift),
   [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift).
+  Ambiguity note: this needs a host-platform policy decision before code work;
+  metadata-only is the current documented behavior.
