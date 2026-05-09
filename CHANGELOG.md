@@ -16,6 +16,21 @@ belong in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [active_work.md](active_work.md).
 - Keep completed-work summaries out of `active_work.md`.
 
+## 2026-05-09
+
+- `2b76774e` Wired the remaining framework-owned runtime flags: `--json` /
+  `SWIFTTUI_JSON=1` now emit machine-readable frame JSON, standalone
+  `--linear` / `SWIFTTUI_LINEAR=1` select accessible linear output, and
+  framework-owned `--start-in` / `SWIFTTUI_START_IN` was removed so launch
+  routing stays app-owned. See `2b76774e`
+  [Sources/SwiftTUI/Accessibility/LinearAccessibilityRenderer.swift](Sources/SwiftTUI/Accessibility/LinearAccessibilityRenderer.swift),
+  `2b76774e`
+  [Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift),
+  `2b76774e`
+  [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),
+  and `2b76774e`
+  [Tests/SwiftTUITests/JSONFrameRendererTests.swift](Tests/SwiftTUITests/JSONFrameRendererTests.swift).
+
 ## 2026-05-08
 
 - `bc531320` Completed the modal accessibility focus contract for `sheet`,

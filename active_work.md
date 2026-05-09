@@ -20,17 +20,6 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Wire the decided runtime flag contract: `--json` is machine output,
-  standalone `--linear` selects accessible linear output, and framework-owned
-  `--start-in` / `SWIFTTUI_START_IN` should be removed because launch scope is
-  app-owned consumer policy. Supporting docs and source:
-  [README.md](README.md),
-  [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md),
-  [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),
-  [Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift](Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift),
-  [Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift).
-  Decision note: `--json` and `--linear` are framework output modes;
-  `start-in`-style routing belongs in each consuming app's argument surface.
 - [ ] Re-scope the remaining `AnyView` / `[AnyView]` reduction before more
   implementation. Current production erasure is concentrated in the builder
   backbone and private `TabViewStyle` boxes; the next step needs an explicit
