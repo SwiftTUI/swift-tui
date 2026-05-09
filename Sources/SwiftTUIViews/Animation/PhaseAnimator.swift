@@ -93,7 +93,16 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   }
 
   public var body: some View {
-    if let triggerHash {
+    EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
+      phaseAnimatorBody(accessibilityReduceMotion: accessibilityReduceMotion)
+    }
+  }
+
+  @ViewBuilder
+  private func phaseAnimatorBody(accessibilityReduceMotion: Bool) -> some View {
+    if accessibilityReduceMotion {
+      content(phases[0])
+    } else if let triggerHash {
       // Touch `didSeeInitialTrigger` in body so `State.remember(...)`
       // registers a per-instance location for it during the normal
       // `withAuthoringContext` body evaluation. Without this read, the

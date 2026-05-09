@@ -42,8 +42,16 @@ public struct AnimatedImage: View {
   }
 
   public var body: some View {
-    let image = Image(data: sequence.frames[boundedFrameIndex].imageData)
-    if sequence.frames.count > 1 {
+    EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
+      animatedImageBody(accessibilityReduceMotion: accessibilityReduceMotion)
+    }
+  }
+
+  @ViewBuilder
+  private func animatedImageBody(accessibilityReduceMotion: Bool) -> some View {
+    let frameIndex = accessibilityReduceMotion ? 0 : boundedFrameIndex
+    let image = Image(data: sequence.frames[frameIndex].imageData)
+    if sequence.frames.count > 1 && !accessibilityReduceMotion {
       image.task(id: sequence) { @MainActor in
         await play()
       }

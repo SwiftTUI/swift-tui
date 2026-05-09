@@ -1,5 +1,5 @@
-import SwiftTUIAnimatedImage
 import SwiftTUI
+import SwiftTUIAnimatedImage
 import Testing
 
 @MainActor
@@ -85,6 +85,35 @@ struct AnimatedImageTests {
     )
     #expect(host.observedReferences.contains(expectedSecondFrame))
     #expect(result.renderedFrames >= 2)
+  }
+
+  @Test("AnimatedImage renders first frame without playback task under reduced motion")
+  func animatedImageRendersFirstFrameWithoutPlaybackTaskUnderReducedMotion() throws {
+    let frames = [
+      Self.frame(red: 255, green: 0, blue: 0),
+      Self.frame(red: 0, green: 0, blue: 255),
+    ]
+    let sequence = AnimatedImageSequence(
+      frames: frames,
+      frameDelays: [.milliseconds(20), .milliseconds(20)]
+    )
+    let taskRegistry = LocalTaskRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.accessibilityReduceMotion = true
+
+    let artifacts = DefaultRenderer().render(
+      AnimatedImage(sequence),
+      context: ResolveContext(
+        identity: Identity(components: ["animated-image.reduced-motion"]),
+        environmentValues: environmentValues,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+
+    #expect(taskRegistry.snapshot().isEmpty)
+    #expect(attachment.resolvedReference == .embeddedImage(frames[0].imageData))
   }
 
   private static func frame(
