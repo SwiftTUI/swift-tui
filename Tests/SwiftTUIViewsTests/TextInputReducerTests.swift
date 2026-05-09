@@ -323,6 +323,12 @@ struct TextInputReducerTests {
         traits: .multiline
       ) == .cutSelection
     )
+    #expect(
+      textInputCommand(
+        for: KeyPress(.character("v"), modifiers: .ctrl),
+        traits: .multiline
+      ) == .pasteClipboard
+    )
   }
 
   @Test("home and end move within current line")

@@ -17,4 +17,21 @@ extension RunLoop {
       }
     }
   }
+
+  package func runtimeClipboardReadAction() -> ClipboardReadAction {
+    ClipboardReadAction(
+      snapshotLabel: "ClipboardReadAction.runtime",
+      isPlaceholder: false
+    ) { [presentationSurface] in
+      guard let surface = presentationSurface as? any ClipboardReadingPresentationSurface else {
+        return nil
+      }
+
+      do {
+        return try surface.readClipboard()
+      } catch {
+        return nil
+      }
+    }
+  }
 }

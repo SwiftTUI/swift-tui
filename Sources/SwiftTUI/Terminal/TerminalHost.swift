@@ -712,7 +712,8 @@ extension PresentationSurface {
 
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: PresentationSurface, DamageAwarePresentationSurface,
-    ClipboardWritingPresentationSurface, TerminalInputCapabilityProviding,
+    ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface,
+    TerminalInputCapabilityProviding,
     TerminalCursorFocusPresentationSurface
   {
     private struct CapabilityProbeState {
@@ -1031,6 +1032,10 @@ extension PresentationSurface {
     public func writeClipboard(_ text: String) throws -> Bool {
       try write(terminalClipboardSequence(for: text))
       return true
+    }
+
+    package func readClipboard() throws -> String? {
+      systemClipboardText()
     }
 
     public func clearScreen() throws {
@@ -1862,7 +1867,7 @@ extension PresentationSurface {
   }
 #else
   public final class WebTerminalHost: PresentationSurface, ClipboardWritingPresentationSurface,
-    TerminalCursorFocusPresentationSurface, Sendable
+    ClipboardReadingPresentationSurface, TerminalCursorFocusPresentationSurface, Sendable
   {
     private struct State {
       var surfaceSize: CellSize
@@ -1985,6 +1990,10 @@ extension PresentationSurface {
     public func writeClipboard(_ text: String) throws -> Bool {
       try write(terminalClipboardSequence(for: text))
       return true
+    }
+
+    package func readClipboard() throws -> String? {
+      nil
     }
 
     public func clearScreen() throws {

@@ -177,6 +177,7 @@ package enum TextInputCommand: Equatable, Sendable {
   case selectAll
   case copySelection
   case cutSelection
+  case pasteClipboard
 }
 
 package struct TextInputMutation: Equatable, Sendable {

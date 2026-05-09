@@ -133,8 +133,8 @@ Sources/SwiftTUI/
 ### Support
 
 - `Support/LinkOpening.swift`: runtime link opener
-- `Support/ClipboardWriting.swift`: runtime clipboard action bridge from
-  environment values to clipboard-capable presentation surfaces
+- `Support/ClipboardWriting.swift`: runtime clipboard read/write action bridge
+  from environment values to clipboard-capable presentation surfaces
 - `Support/AsyncStreamTeardown.swift`: managed `AsyncStream` lifecycle helper
 - `Support/Standard.swift`: platform stdio helpers
 

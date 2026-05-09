@@ -439,11 +439,12 @@ package struct TextInputDisplayRun: Equatable, Sendable {
 }
 ```
 
-`shouldDrawSyntheticCaret` is true for normal TUI output when the hardware
-cursor-following policy is disabled. It is false when
-`RuntimeConfiguration.cursorFollowsFocus` is enabled and the runtime can place
-the hardware cursor at `caretAnchor`, and also false while a focused
-non-collapsed selection is rendered.
+`shouldDrawSyntheticCaret` is true for non-terminal snapshot paths when the
+hardware cursor cannot be placed at the text caret. It is false for focused
+terminal text inputs whose host can place the hardware cursor at `caretAnchor`,
+and also false while a focused non-collapsed selection is rendered. The broader
+`RuntimeConfiguration.cursorFollowsFocus` flag still extends cursor placement to
+non-text focused controls.
 
 ### TextInputSemantics
 
@@ -512,7 +513,9 @@ Framework-level exit bindings and app key commands currently run before
 focused text handlers for modifier-bearing keys. Current routing keeps
 `ctrl-a` as a focused text-input select-all command, moves the default exit
 binding to `ctrl-d`, and routes `ctrl-c` / `ctrl-x` to focused text-input
-copy/cut. Secure fields suppress clipboard text.
+copy/cut. `ctrl-v` reads host clipboard text where the active presentation
+surface supports it and inserts through the same reducer path as bracketed
+paste. Secure fields suppress clipboard text on copy/cut.
 
 ### Paste
 
@@ -551,10 +554,11 @@ Text-input semantics should flow through the existing semantic snapshot.
 
 Terminal TUI:
 
-- When cursor-following is disabled, render a synthetic caret and keep current
-  visual behavior.
-- When cursor-following is enabled, suppress the synthetic caret and publish
-  the real `caretAnchor`.
+- Focused text inputs use the hardware cursor by default when the presentation
+  surface can place it at `caretAnchor`; synthetic carets remain the fallback
+  for non-terminal snapshot paths.
+- When global cursor-following is enabled, non-text focused controls also move
+  the hardware cursor.
 - If no caret anchor is available, fall back to the node origin and record a
   test gap.
 

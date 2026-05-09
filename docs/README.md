@@ -72,7 +72,7 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-No dated implementation plans are currently active.
+- [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:
 
