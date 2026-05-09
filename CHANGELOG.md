@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `f12401cf` Replaced `.task(id:)` reflected-value descriptor identity with
+  retained value comparison in the view graph, preserving the public
+  `ID: Equatable` overload while making task restart decisions compare authored
+  IDs directly. See
+  `f12401cf` [Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift](Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift),
+  `f12401cf` [Sources/SwiftTUICore/Resolve/ViewGraph.swift](Sources/SwiftTUICore/Resolve/ViewGraph.swift),
+  and `f12401cf` [Tests/SwiftTUITests/LifecycleSelectiveEvaluationTests.swift](Tests/SwiftTUITests/LifecycleSelectiveEvaluationTests.swift).
 - `8f113e73` Removed the stale modifier-layer active item because the public
   `ViewModifier` / `ModifiedContent` migration has already shipped with
   primitive modifier lowering, modifier algebra tests, transition probing, and
