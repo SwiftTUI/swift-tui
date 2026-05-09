@@ -67,6 +67,7 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
+- [plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md](plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md) — planned SwiftUI host native VoiceOver focus bridge, making runtime focus move native accessibility focus by default
 - [plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md) — active fractional pointer and coordinate-space inventory; remaining work is limited to decision-bound follow-ups after the landed geometry, Canvas, terminal-pixel, host, and gesture work
 
 Implementation and post-mortem records retained for context:
