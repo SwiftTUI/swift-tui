@@ -1,8 +1,8 @@
 import Observation
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -33,7 +33,7 @@ struct LifecycleSelectiveEvaluationTests {
       initialArtifacts.resolvedTree.descendant(withText: "Count 0")
     )
     let expectedTask = TaskDescriptor(
-      id: "\(initialNode.identity)#task[\"stable\"]",
+      id: "\(initialNode.identity)#task[id:1]",
       priority: .userInitiated
     )
     #expect(initialNode.lifecycleMetadata.task == expectedTask)
@@ -126,6 +126,37 @@ struct LifecycleSelectiveEvaluationTests {
     #expect(updatedArtifacts.commitPlan.lifecycle.isEmpty)
   }
 
+  @Test("task id replacement compares authored values instead of reflected strings")
+  func taskIDReplacementComparesAuthoredValuesInsteadOfReflectedStrings() {
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
+      LifecycleSelectiveTaskCollisionProbe(label: "A", taskID: .init(value: 1)),
+      context: .init(identity: testIdentity("Root"))
+    )
+    let updated = renderer.render(
+      LifecycleSelectiveTaskCollisionProbe(label: "A", taskID: .init(value: 2)),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(
+      updated.commitPlan.lifecycle == [
+        .init(
+          identity: testIdentity("Root", "Group[0]"),
+          operation: .taskCancel(
+            .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
+          )
+        ),
+        .init(
+          identity: testIdentity("Root", "Group[0]"),
+          operation: .taskStart(
+            .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
+          )
+        ),
+      ]
+    )
+  }
+
   @Test("transparent task owner still cancels and restarts when descriptor changes")
   func transparentTaskOwnerStillCancelsAndRestartsWhenDescriptorChanges() {
     let renderer = DefaultRenderer()
@@ -144,13 +175,13 @@ struct LifecycleSelectiveEvaluationTests {
         .init(
           identity: testIdentity("Root", "Group[0]"),
           operation: .taskCancel(
-            .init(id: "Root/Group[0]#task[\"first\"]", priority: .userInitiated)
+            .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
           )
         ),
         .init(
           identity: testIdentity("Root", "Group[0]"),
           operation: .taskStart(
-            .init(id: "Root/Group[0]#task[\"second\"]", priority: .userInitiated)
+            .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
           )
         ),
       ]
@@ -175,7 +206,7 @@ struct LifecycleSelectiveEvaluationTests {
         .init(
           identity: testIdentity("Root", "true", "Group[0]"),
           operation: .taskCancel(
-            .init(id: "Root/true/Group[0]#task[\"optional\"]", priority: .userInitiated)
+            .init(id: "Root/true/Group[0]#task[id:1]", priority: .userInitiated)
           )
         )
       ]
@@ -228,6 +259,26 @@ private struct LifecycleSelectiveTaskReplacementProbe: View {
       Text(label)
     }
     .task(id: taskID) {}
+  }
+}
+
+private struct LifecycleSelectiveTaskCollisionProbe: View {
+  let label: String
+  let taskID: LifecycleSelectiveCollisionTaskID
+
+  var body: some View {
+    Group {
+      Text(label)
+    }
+    .task(id: taskID) {}
+  }
+}
+
+private struct LifecycleSelectiveCollisionTaskID: Equatable, CustomDebugStringConvertible {
+  let value: Int
+
+  var debugDescription: String {
+    "collision"
   }
 }
 

@@ -152,7 +152,7 @@ extension View {
     modifier(
       TaskLifecycleModifier(
         priority: priority,
-        descriptorID: nil,
+        descriptorIdentity: nil,
         action: action
       )
     )
@@ -164,11 +164,10 @@ extension View {
     @_inheritActorContext
     _ action: sending @escaping @isolated(any) () async -> Void
   ) -> some View {
-    // FIXME: the reflection call here doesn't pass muster as SwiftUI's likely implementation.
     modifier(
       TaskLifecycleModifier(
         priority: priority,
-        descriptorID: String(reflecting: value),
+        descriptorIdentity: TaskLifecycleDescriptorIdentity(value),
         action: action
       )
     )
@@ -732,10 +731,45 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
   }
 }
 
+private struct TaskLifecycleDescriptorIdentity {
+  private let label: @MainActor (ResolveContext, Identity) -> String
+
+  @MainActor
+  init<ID: Equatable>(_ value: ID) {
+    label = { context, identity in
+      if let graphLabel = context.viewGraph?.taskDescriptorIdentityLabel(
+        for: identity,
+        value: value
+      ) {
+        return graphLabel
+      }
+      return "id:\(String(reflecting: ID.self))"
+    }
+  }
+
+  @MainActor
+  func descriptorLabel(
+    in context: ResolveContext,
+    identity: Identity
+  ) -> String {
+    label(context, identity)
+  }
+}
+
 public struct TaskLifecycleModifier: PrimitiveViewModifier {
   var priority: TaskPriority
-  var descriptorID: String?
+  fileprivate var descriptorIdentity: TaskLifecycleDescriptorIdentity?
   let action: () async -> Void
+
+  fileprivate init(
+    priority: TaskPriority,
+    descriptorIdentity: TaskLifecycleDescriptorIdentity?,
+    action: @escaping () async -> Void
+  ) {
+    self.priority = priority
+    self.descriptorIdentity = descriptorIdentity
+    self.action = action
+  }
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -749,8 +783,14 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
       for: lifecycleIdentity,
       in: context
     )
+    let descriptorIdentityLabel = descriptorIdentity?.descriptorLabel(
+      in: context,
+      identity: lifecycleIdentity
+    )
     let descriptor = TaskDescriptor(
-      id: descriptorID.map { "\(lifecycleIdentity)#task[\($0)]" } ?? "\(lifecycleIdentity)#task",
+      id: descriptorIdentityLabel.map {
+        "\(lifecycleIdentity)#task[\($0)]"
+      } ?? "\(lifecycleIdentity)#task",
       priority: priority
     )
     if let taskRegistry = context.localTaskRegistry {

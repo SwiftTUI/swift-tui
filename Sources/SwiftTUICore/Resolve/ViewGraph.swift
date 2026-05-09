@@ -28,6 +28,8 @@ extension ViewGraph {
     package var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
     package var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
     package var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
+    package var taskDescriptorIdentitySlots: [Identity: TaskDescriptorIdentitySlot]
+    package var nextTaskDescriptorIdentityToken: UInt64
     package var stateSlotDependents: [StateSlotKey: Set<Identity>]
     package var environmentDependents: [ObjectIdentifier: Set<Identity>]
     package var observableDependents: [ObjectIdentifier: Set<Identity>]
@@ -65,6 +67,8 @@ extension ViewGraph {
       lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity,
       lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
       lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
+      taskDescriptorIdentitySlots: taskDescriptorIdentitySlots,
+      nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
       stateSlotDependents: stateSlotDependents,
       environmentDependents: environmentDependents,
       observableDependents: observableDependents,
@@ -96,6 +100,8 @@ extension ViewGraph {
     lifecycleEvaluationOwnersByIdentity = checkpoint.lifecycleEvaluationOwnersByIdentity
     lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
     lifecycleEvaluationTargetsRecordedByOwner = checkpoint.lifecycleEvaluationTargetsRecordedByOwner
+    taskDescriptorIdentitySlots = checkpoint.taskDescriptorIdentitySlots
+    nextTaskDescriptorIdentityToken = checkpoint.nextTaskDescriptorIdentityToken
     stateSlotDependents = checkpoint.stateSlotDependents
     environmentDependents = checkpoint.environmentDependents
     observableDependents = checkpoint.observableDependents
@@ -113,6 +119,33 @@ extension ViewGraph {
 
 package struct DirtyEvaluationPlan: Equatable, Sendable {
   package let frontierIdentities: [Identity]
+}
+
+/// Retained `.task(id:)` comparison state for one lifecycle identity.
+///
+/// The slot lives on the main-actor view graph, so it can compare the authored
+/// `ID: Equatable` value without requiring `ID: Sendable` or deriving identity
+/// from the value's textual representation.
+package struct TaskDescriptorIdentitySlot {
+  package let label: String
+  private let isEqual: (Any) -> Bool
+
+  package init<ID: Equatable>(
+    label: String,
+    value: ID
+  ) {
+    self.label = label
+    isEqual = { candidate in
+      guard let candidate = candidate as? ID else {
+        return false
+      }
+      return candidate == value
+    }
+  }
+
+  package func matches<ID: Equatable>(_ value: ID) -> Bool {
+    isEqual(value)
+  }
 }
 
 @MainActor
@@ -138,6 +171,8 @@ package final class ViewGraph {
   private var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
   private var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
   private var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
+  private var taskDescriptorIdentitySlots: [Identity: TaskDescriptorIdentitySlot]
+  private var nextTaskDescriptorIdentityToken: UInt64
   /// Instrumentation added for Item 7 of
   /// `docs/proposals/ARCHITECTURE_NOTES.md`.  Tracks
   /// non-trivial `recordRegistrationAlias` calls so the alias layer's
@@ -172,6 +207,8 @@ package final class ViewGraph {
     lifecycleEvaluationOwnersByIdentity = [:]
     lifecycleEvaluationTargetsByOwner = [:]
     lifecycleEvaluationTargetsRecordedByOwner = [:]
+    taskDescriptorIdentitySlots = [:]
+    nextTaskDescriptorIdentityToken = 0
     registrationAliasDiagnostics = .init()
     stateSlotDependents = [:]
     environmentDependents = [:]
@@ -326,6 +363,25 @@ package final class ViewGraph {
     if lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity] != nil {
       lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity, default: []].insert(targetIdentity)
     }
+  }
+
+  package func taskDescriptorIdentityLabel<ID: Equatable>(
+    for identity: Identity,
+    value: ID
+  ) -> String {
+    if let slot = taskDescriptorIdentitySlots[identity],
+      slot.matches(value)
+    {
+      return slot.label
+    }
+
+    nextTaskDescriptorIdentityToken &+= 1
+    let label = "id:\(nextTaskDescriptorIdentityToken)"
+    taskDescriptorIdentitySlots[identity] = TaskDescriptorIdentitySlot(
+      label: label,
+      value: value
+    )
+    return label
   }
 
   package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {
@@ -1308,6 +1364,7 @@ package final class ViewGraph {
       }
     }
     registrationAliasesByIdentity.removeValue(forKey: node.identity)
+    taskDescriptorIdentitySlots.removeValue(forKey: node.identity)
     nodesByIdentity.removeValue(forKey: node.identity)
   }
 
