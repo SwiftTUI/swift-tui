@@ -6,15 +6,15 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## Rules
 
-- Move completed items removed from `active_work.md` into this file.
+- Move completed items removed from `ACTIVE_WORK.md` into this file.
 - Each entry must say what changed without requiring readers to open another
   document.
 - Entries may link to long-lived repo documentation, plans, source, or tests for
   detail.
 - Every link in an entry must be prefixed with the short git hash that anchors
   the linked material, for example:
-  `4ee7a8f9` [active_work.md](active_work.md).
-- Keep completed-work summaries out of `active_work.md`.
+  `4ee7a8f9` [ACTIVE_WORK.md](ACTIVE_WORK.md).
+- Keep completed-work summaries out of `ACTIVE_WORK.md`.
 
 ## 2026-05-09
 
@@ -127,15 +127,15 @@ belong in the durable docs, plans, source, or tests linked from an entry.
   `e9ab33a5` [docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md](docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md),
   and `16e38b42` [docs/plans/2026-05-01-007-gallery-animation-regression-notes.md](docs/plans/2026-05-01-007-gallery-animation-regression-notes.md).
 - `41ed1600` Added the changelog workflow and documented that completed
-  active-work items move out of `active_work.md` into concise, self-standing
+  active-work items move out of `ACTIVE_WORK.md` into concise, self-standing
   changelog entries. See `41ed1600` [CHANGELOG.md](CHANGELOG.md) and
-  `41ed1600` [active_work.md](active_work.md).
+  `41ed1600` [ACTIVE_WORK.md](ACTIVE_WORK.md).
 - `4ee7a8f9` Re-audited remaining repo work and expanded the active-work queue
   with documentation hygiene, runtime/public-surface, Canvas/pointer, and
-  accessibility follow-ups. See `4ee7a8f9` [active_work.md](active_work.md).
+  accessibility follow-ups. See `4ee7a8f9` [ACTIVE_WORK.md](ACTIVE_WORK.md).
 - `8fcb8710` Added the repo-root active-work tracker and pointed the README
   and agent guide at it as the first place to check incomplete work. See
-  `8fcb8710` [active_work.md](active_work.md).
+  `8fcb8710` [ACTIVE_WORK.md](ACTIVE_WORK.md).
 - `e2dc520f` Published the durable shipped accessibility guide covering the
   semantic substrate, runtime policy, target bridges, guardrails, and remaining
   gaps. See `e2dc520f` [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
