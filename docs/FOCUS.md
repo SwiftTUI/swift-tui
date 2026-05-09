@@ -410,22 +410,23 @@ Example:
 struct LoginView: View {
     @Namespace private var namespace
     @State private var areCredentialsFilled = false
-    @Environment(\.resetFocus) private var resetFocus
 
     var body: some View {
-        VStack {
-            TextField("Username", text: .constant(""))
-                .prefersDefaultFocus(!areCredentialsFilled, in: namespace)
+        EnvironmentReader(\.resetFocus) { resetFocus in
+            VStack {
+                TextField("Username", text: .constant(""))
+                    .prefersDefaultFocus(!areCredentialsFilled, in: namespace)
 
-            Button("Log In") {}
-                .prefersDefaultFocus(areCredentialsFilled, in: namespace)
+                Button("Log In") {}
+                    .prefersDefaultFocus(areCredentialsFilled, in: namespace)
 
-            Button("Clear") {
-                areCredentialsFilled = false
-                resetFocus(in: namespace)
+                Button("Clear") {
+                    areCredentialsFilled = false
+                    resetFocus(in: namespace)
+                }
             }
+            .focusScope(namespace)
         }
-        .focusScope(namespace)
     }
 }
 ```
@@ -435,6 +436,18 @@ The idea here is different from `defaultFocus`:
 - `focusScope` creates a namespace-limited region for default-focus decisions
 - `prefersDefaultFocus` marks one or more candidates within that scope
 - `resetFocus` asks the system to reevaluate the scope's default focus
+
+SwiftTUI ships this family as a terminal-native focus reset surface:
+
+- `.focusScope(namespace)` marks the subtree whose default-focus candidates
+  belong to `namespace`
+- `.prefersDefaultFocus(_:in:)` registers a preferred candidate for that
+  namespace when the resolved view is focusable
+- `EnvironmentValues.resetFocus` exposes a `ResetFocusAction`; authored content
+  can read it with `EnvironmentReader(\.resetFocus)` and call
+  `resetFocus(in: namespace)`
+- reset requests route through the same focus tracker as Tab, arrow traversal,
+  pointer activation, and `@FocusState` synchronization
 
 This family is especially relevant to focus-first platforms like tvOS and macOS, and to watchOS. In the current Xcode 26.3 SDK interfaces, these APIs are explicitly unavailable on iOS and visionOS.
 

@@ -8,6 +8,7 @@ package struct NodeHandlers {
   package var pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler]
   package var gestureRegistrations: [Identity: AnyGestureRecognizer]
   package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
+  package var defaultFocusRegistrations: DefaultFocusRegistrationSnapshot
   package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
   package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
   package var scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot]
@@ -27,6 +28,7 @@ package struct NodeHandlers {
     pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler] = [:],
     gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
     gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
+    defaultFocusRegistrations: DefaultFocusRegistrationSnapshot = .init(),
     focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
     focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
     scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
@@ -45,6 +47,7 @@ package struct NodeHandlers {
     self.pointerHoverHandlerRegistrations = pointerHoverHandlerRegistrations
     self.gestureRegistrations = gestureRegistrations
     self.gestureStateRegistrations = gestureStateRegistrations
+    self.defaultFocusRegistrations = defaultFocusRegistrations
     self.focusBindingRegistrations = focusBindingRegistrations
     self.focusedValuesRegistrations = focusedValuesRegistrations
     self.scrollPositionRegistrations = scrollPositionRegistrations
@@ -124,6 +127,26 @@ package struct NodeHandlers {
     binding: AnyGestureStateBinding
   ) {
     gestureStateRegistrations[identity, default: []].append(binding)
+  }
+
+  package mutating func recordDefaultFocus(
+    _ registration: DefaultFocusScopeRegistrationSnapshot
+  ) {
+    if !defaultFocusRegistrations.scopes.contains(where: {
+      $0.namespace == registration.namespace && $0.identity == registration.identity
+    }) {
+      defaultFocusRegistrations.scopes.append(registration)
+    }
+  }
+
+  package mutating func recordDefaultFocus(
+    _ registration: DefaultFocusCandidateRegistrationSnapshot
+  ) {
+    if !defaultFocusRegistrations.candidates.contains(where: {
+      $0.namespace == registration.namespace && $0.identity == registration.identity
+    }) {
+      defaultFocusRegistrations.candidates.append(registration)
+    }
   }
 
   package mutating func recordFocusBinding(

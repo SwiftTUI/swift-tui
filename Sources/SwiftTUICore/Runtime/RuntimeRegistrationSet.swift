@@ -25,6 +25,7 @@ package struct RuntimeRegistrationSet {
   package let pointerHandlerRegistry: LocalPointerHandlerRegistry?
   package let gestureRegistry: LocalGestureRegistry?
   package let gestureStateRegistry: LocalGestureStateRegistry?
+  package let defaultFocusRegistry: LocalDefaultFocusRegistry?
   package let focusBindingRegistry: LocalFocusBindingRegistry?
   package let focusedValuesRegistry: LocalFocusedValuesRegistry?
   package let scrollPositionRegistry: LocalScrollPositionRegistry?
@@ -41,6 +42,7 @@ package struct RuntimeRegistrationSet {
     pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
     gestureRegistry: LocalGestureRegistry? = nil,
     gestureStateRegistry: LocalGestureStateRegistry? = nil,
+    defaultFocusRegistry: LocalDefaultFocusRegistry? = nil,
     focusBindingRegistry: LocalFocusBindingRegistry? = nil,
     focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
     scrollPositionRegistry: LocalScrollPositionRegistry? = nil,
@@ -56,6 +58,7 @@ package struct RuntimeRegistrationSet {
     self.pointerHandlerRegistry = pointerHandlerRegistry
     self.gestureRegistry = gestureRegistry
     self.gestureStateRegistry = gestureStateRegistry
+    self.defaultFocusRegistry = defaultFocusRegistry
     self.focusBindingRegistry = focusBindingRegistry
     self.focusedValuesRegistry = focusedValuesRegistry
     self.scrollPositionRegistry = scrollPositionRegistry
@@ -75,6 +78,7 @@ package struct RuntimeRegistrationSet {
       pointerHandlerRegistry: LocalPointerHandlerRegistry(),
       gestureRegistry: LocalGestureRegistry(),
       gestureStateRegistry: LocalGestureStateRegistry(),
+      defaultFocusRegistry: LocalDefaultFocusRegistry(),
       focusBindingRegistry: LocalFocusBindingRegistry(),
       focusedValuesRegistry: LocalFocusedValuesRegistry(),
       scrollPositionRegistry: LocalScrollPositionRegistry(),
@@ -97,6 +101,7 @@ package struct RuntimeRegistrationSet {
     )
     gestureRegistry?.reset()
     gestureStateRegistry?.reset()
+    defaultFocusRegistry?.reset()
     focusBindingRegistry?.reset()
     focusedValuesRegistry?.reset()
     scrollPositionRegistry?.reset()
@@ -132,6 +137,7 @@ package struct RuntimeRegistrationSet {
       rootedAt: roots,
       preserving: preservedGestureIdentities
     )
+    defaultFocusRegistry?.removeSubtrees(rootedAt: roots)
     focusBindingRegistry?.removeSubtrees(rootedAt: roots)
     focusedValuesRegistry?.removeSubtrees(rootedAt: roots)
     scrollPositionRegistry?.removeSubtrees(rootedAt: roots)
@@ -169,6 +175,7 @@ package struct RuntimeRegistrationSet {
     pointerHandlerRegistry?.restoreHover(handlers.pointerHoverHandlerRegistrations)
     gestureRegistry?.restore(handlers.gestureRegistrations)
     gestureStateRegistry?.restore(handlers.gestureStateRegistrations)
+    defaultFocusRegistry?.restore(handlers.defaultFocusRegistrations)
     focusBindingRegistry?.restore(handlers.focusBindingRegistrations)
     focusedValuesRegistry?.restore(handlers.focusedValuesRegistrations)
     scrollPositionRegistry?.restore(handlers.scrollPositionRegistrations)
@@ -209,6 +216,9 @@ package struct RuntimeRegistrationSet {
     }
     if gestureStateRegistry?.snapshot().isEmpty == false {
       blockers.insert(.handlerInstallations)
+    }
+    if defaultFocusRegistry?.snapshot() != DefaultFocusRegistrationSnapshot() {
+      blockers.insert(.focusBindingSync)
     }
     if focusBindingRegistry?.snapshot().isEmpty == false {
       blockers.insert(.focusBindingSync)

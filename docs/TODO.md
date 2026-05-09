@@ -26,20 +26,6 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Scope namespace-based default-focus APIs. `defaultFocus(...)`,
-  `.focusScope()`, and `.focusSection()` exist, but SwiftUI's older
-  namespace-scoped family is still missing: `.prefersDefaultFocus(_:in:)`,
-  `.focusScope(_:)`, and `resetFocus`. Decide whether this project wants full
-  parity, a terminal-native subset, or an explicit deferral; if it stays in
-  scope, cover nested scopes, presentation scopes, and reset behavior. Supporting
-  docs: [FOCUS.md](FOCUS.md).
-- [ ] Decide focused-object support. Focused values and focused bindings are
-  shipped, and the runtime has Observation invalidation support, but there is no
-  `@FocusedObject`, `.focusedObject(...)`, or `.focusedSceneObject(...)` surface.
-  Decide whether the API should support classic `ObservableObject`, modern
-  Observation reference types, both, or neither; then add the chosen surface and
-  focus-chain tests. Supporting docs: [FOCUS.md](FOCUS.md),
-  [RUNTIME.md](RUNTIME.md).
 - [ ] Plan the next `TextEditor` tranche. V1 shipped multiline editing, shared
   text-input reducer behavior, caret-visible scrolling, paste handling, and
   accessibility caret anchors. Remaining work is still actionable but belongs in

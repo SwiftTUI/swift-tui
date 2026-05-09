@@ -4,6 +4,207 @@ package enum FocusBindingRequest: Equatable, Sendable {
   case focus(Identity)
 }
 
+package struct DefaultFocusScopeRegistrationSnapshot: Equatable, Sendable {
+  package var namespace: MatchedGeometryNamespace
+  package var identity: Identity
+
+  package init(
+    namespace: MatchedGeometryNamespace,
+    identity: Identity
+  ) {
+    self.namespace = namespace
+    self.identity = identity
+  }
+}
+
+package struct DefaultFocusCandidateRegistrationSnapshot: Equatable, Sendable {
+  package var namespace: MatchedGeometryNamespace
+  package var identity: Identity
+
+  package init(
+    namespace: MatchedGeometryNamespace,
+    identity: Identity
+  ) {
+    self.namespace = namespace
+    self.identity = identity
+  }
+}
+
+package struct DefaultFocusRegistrationSnapshot: Equatable, Sendable {
+  package var scopes: [DefaultFocusScopeRegistrationSnapshot]
+  package var candidates: [DefaultFocusCandidateRegistrationSnapshot]
+
+  package init(
+    scopes: [DefaultFocusScopeRegistrationSnapshot] = [],
+    candidates: [DefaultFocusCandidateRegistrationSnapshot] = []
+  ) {
+    self.scopes = scopes
+    self.candidates = candidates
+  }
+}
+
+@MainActor
+package final class LocalDefaultFocusRegistry: Equatable {
+  private var scopes: [DefaultFocusScopeRegistrationSnapshot] = []
+  private var candidates: [DefaultFocusCandidateRegistrationSnapshot] = []
+  private var pendingResetNamespace: MatchedGeometryNamespace?
+
+  package init() {}
+
+  nonisolated package static func == (
+    lhs: LocalDefaultFocusRegistry,
+    rhs: LocalDefaultFocusRegistry
+  ) -> Bool {
+    lhs === rhs
+  }
+
+  package func registerScope(
+    namespace: MatchedGeometryNamespace,
+    identity: Identity
+  ) {
+    let registration = DefaultFocusScopeRegistrationSnapshot(
+      namespace: namespace,
+      identity: identity
+    )
+    scopes.append(registration)
+    ViewNodeContext.current?.recordDefaultFocus(registration)
+  }
+
+  package func registerCandidate(
+    namespace: MatchedGeometryNamespace,
+    identity: Identity
+  ) {
+    let registration = DefaultFocusCandidateRegistrationSnapshot(
+      namespace: namespace,
+      identity: identity
+    )
+    candidates.append(registration)
+    ViewNodeContext.current?.recordDefaultFocus(registration)
+  }
+
+  package func requestReset(
+    in namespace: MatchedGeometryNamespace
+  ) {
+    pendingResetNamespace = namespace
+  }
+
+  package func desiredFocusRequest(
+    focusRegions: [FocusRegion],
+    shouldApplyInitialDefault: Bool
+  ) -> FocusBindingRequest {
+    if let namespace = pendingResetNamespace {
+      pendingResetNamespace = nil
+      return focusRequest(
+        in: namespace,
+        focusRegions: focusRegions
+      )
+    }
+
+    guard shouldApplyInitialDefault else {
+      return .none
+    }
+
+    for scope in scopes {
+      let request = focusRequest(
+        in: scope.namespace,
+        focusRegions: focusRegions
+      )
+      if request != .none {
+        return request
+      }
+    }
+
+    for candidate in candidates
+    where focusRegions.contains(where: { $0.identity == candidate.identity }) {
+      return .focus(candidate.identity)
+    }
+
+    return .none
+  }
+
+  package func reset() {
+    scopes.removeAll(keepingCapacity: true)
+    candidates.removeAll(keepingCapacity: true)
+  }
+
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    scopes.removeAll { registration in
+      identityMatchesAnySubtreeRoot(
+        registration.identity,
+        roots: roots
+      )
+    }
+    candidates.removeAll { registration in
+      identityMatchesAnySubtreeRoot(
+        registration.identity,
+        roots: roots
+      )
+    }
+  }
+
+  package func snapshot() -> DefaultFocusRegistrationSnapshot {
+    DefaultFocusRegistrationSnapshot(
+      scopes: scopes,
+      candidates: candidates
+    )
+  }
+
+  package func restore(
+    _ snapshot: DefaultFocusRegistrationSnapshot
+  ) {
+    scopes.append(contentsOf: snapshot.scopes)
+    candidates.append(contentsOf: snapshot.candidates)
+  }
+
+  private func focusRequest(
+    in namespace: MatchedGeometryNamespace,
+    focusRegions: [FocusRegion]
+  ) -> FocusBindingRequest {
+    let regionByIdentity = Dictionary(
+      uniqueKeysWithValues: focusRegions.map { ($0.identity, $0) }
+    )
+    let scopeIdentities =
+      scopes
+      .filter { $0.namespace == namespace }
+      .map(\.identity)
+
+    for candidate in candidates where candidate.namespace == namespace {
+      guard let region = regionByIdentity[candidate.identity] else {
+        continue
+      }
+      guard
+        scopeIdentities.isEmpty
+          || scopeIdentities.contains(where: { scope in
+            region.identity == scope
+              || region.identity.isDescendant(of: scope)
+              || region.scopePath.contains(scope)
+          })
+      else {
+        continue
+      }
+      return .focus(candidate.identity)
+    }
+
+    for scope in scopeIdentities {
+      if let fallback = focusRegions.first(where: { region in
+        region.identity == scope
+          || region.identity.isDescendant(of: scope)
+          || region.scopePath.contains(scope)
+      }) {
+        return .focus(fallback.identity)
+      }
+    }
+
+    return .none
+  }
+}
+
 package struct FocusBindingRegistrationSnapshot: Sendable {
   package var identity: Identity
   package var bindingID: String

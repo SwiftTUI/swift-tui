@@ -175,6 +175,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let localPointerHandlerRegistry = LocalPointerHandlerRegistry()
   package let localGestureRegistry = LocalGestureRegistry()
   package let localGestureStateRegistry = LocalGestureStateRegistry()
+  package let localDefaultFocusRegistry = LocalDefaultFocusRegistry()
   package let localFocusBindingRegistry = LocalFocusBindingRegistry()
   package let localFocusedValuesRegistry = LocalFocusedValuesRegistry()
   package let localScrollPositionRegistry = LocalScrollPositionRegistry()
@@ -199,6 +200,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       pointerHandlerRegistry: localPointerHandlerRegistry,
       gestureRegistry: localGestureRegistry,
       gestureStateRegistry: localGestureStateRegistry,
+      defaultFocusRegistry: localDefaultFocusRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
       scrollPositionRegistry: localScrollPositionRegistry,

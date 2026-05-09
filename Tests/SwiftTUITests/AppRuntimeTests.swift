@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -551,6 +551,33 @@ struct AppRuntimeTests {
     #expect(firstFrame.contains("Focus: DefaultFocusWindow/Second"))
   }
 
+  @MainActor
+  @Test("namespace default focus seeds and resetFocus restores the preferred candidate")
+  func namespaceDefaultFocusSeedsAndResets() async throws {
+    let terminal = RecordingTerminalHost()
+
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Namespace Default Focus Window") {
+        NamespaceDefaultFocusWindow()
+      },
+      sessionName: "AppRuntimeTests.NamespaceDefaultFocusWindow",
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.tab), KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+
+    let firstFrame = try #require(terminal.frames.first)
+    #expect(firstFrame.contains("Focus: NamespaceDefaultFocusWindow/Second"))
+
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("Reset count: 1"))
+    #expect(lastFrame.contains("Focus: NamespaceDefaultFocusWindow/Second"))
+  }
+
   @Test("FocusedBinding reads binding values published through focusedSceneValue")
   func focusedBindingTracksFocusedSceneValue() {
     let registry = LocalFocusedValuesRegistry()
@@ -1010,6 +1037,33 @@ private struct DefaultFocusWindow: View {
         .focused($focusedField, equals: .second)
     }
     .defaultFocus($focusedField, .second)
+  }
+}
+
+private struct NamespaceDefaultFocusWindow: View {
+  @Namespace private var namespace
+  @State private var resetCount = 0
+
+  var body: some View {
+    EnvironmentReader(\.resetFocus) { resetFocus in
+      VStack(alignment: .leading, spacing: 1) {
+        EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+          Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
+        }
+        Text("Reset count: \(resetCount)")
+        Button("First") {}
+          .id(testIdentity("NamespaceDefaultFocusWindow", "First"))
+        Button("Second") {}
+          .id(testIdentity("NamespaceDefaultFocusWindow", "Second"))
+          .prefersDefaultFocus(in: namespace)
+        Button("Reset") {
+          resetCount += 1
+          resetFocus(in: namespace)
+        }
+        .id(testIdentity("NamespaceDefaultFocusWindow", "Reset"))
+      }
+      .focusScope(namespace)
+    }
   }
 }
 

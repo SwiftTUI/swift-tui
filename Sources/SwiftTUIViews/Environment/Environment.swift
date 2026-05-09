@@ -92,6 +92,67 @@ private enum OpenLinkActionKey: EnvironmentKey {
   static let defaultValue = OpenLinkAction.placeholder
 }
 
+/// A semantic action that asks the runtime to reevaluate default focus in a
+/// namespace-scoped focus region.
+public struct ResetFocusAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+  package let snapshotLabel: String
+  package let isPlaceholder: Bool
+  private let handler: @MainActor @Sendable (Namespace.ID) -> Bool
+
+  @MainActor
+  public init(
+    _ handler: @escaping @MainActor @Sendable (Namespace.ID) -> Bool
+  ) {
+    snapshotLabel = "ResetFocusAction.custom"
+    isPlaceholder = false
+    self.handler = handler
+  }
+
+  @discardableResult
+  @MainActor
+  public func callAsFunction(
+    in namespace: Namespace.ID
+  ) -> Bool {
+    handler(namespace)
+  }
+
+  @discardableResult
+  @MainActor
+  public func callAsFunction(
+    _ namespace: Namespace.ID
+  ) -> Bool {
+    handler(namespace)
+  }
+
+  public var description: String {
+    snapshotLabel
+  }
+
+  public var debugDescription: String {
+    snapshotLabel
+  }
+
+  package init(
+    snapshotLabel: String,
+    isPlaceholder: Bool,
+    handler: @escaping @MainActor @Sendable (Namespace.ID) -> Bool
+  ) {
+    self.snapshotLabel = snapshotLabel
+    self.isPlaceholder = isPlaceholder
+    self.handler = handler
+  }
+
+  package static let placeholder = Self(
+    snapshotLabel: "ResetFocusAction.default",
+    isPlaceholder: true,
+    handler: { _ in false }
+  )
+}
+
+private enum ResetFocusActionKey: EnvironmentKey {
+  static let defaultValue = ResetFocusAction.placeholder
+}
+
 private enum StackAxisKey: EnvironmentKey {
   static let defaultValue: SwiftTUICore.Axis? = nil
 }
@@ -222,6 +283,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localGestureStateRegistry: LocalGestureStateRegistry?
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
   package var localTerminationRegistry: LocalTerminationRegistry?
+  package var localDefaultFocusRegistry: LocalDefaultFocusRegistry?
   package var localFocusBindingRegistry: LocalFocusBindingRegistry?
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
   package var localScrollPositionRegistry: LocalScrollPositionRegistry?
@@ -250,6 +312,7 @@ public struct ResolveContext: Equatable, Sendable {
       pointerHandlerRegistry: localPointerHandlerRegistry,
       gestureRegistry: localGestureRegistry,
       gestureStateRegistry: localGestureStateRegistry,
+      defaultFocusRegistry: localDefaultFocusRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
       scrollPositionRegistry: localScrollPositionRegistry,
@@ -272,6 +335,7 @@ public struct ResolveContext: Equatable, Sendable {
     replaced.localPointerHandlerRegistry = registrations.pointerHandlerRegistry
     replaced.localGestureRegistry = registrations.gestureRegistry
     replaced.localGestureStateRegistry = registrations.gestureStateRegistry
+    replaced.localDefaultFocusRegistry = registrations.defaultFocusRegistry
     replaced.localFocusBindingRegistry = registrations.focusBindingRegistry
     replaced.localFocusedValuesRegistry = registrations.focusedValuesRegistry
     replaced.localScrollPositionRegistry = registrations.scrollPositionRegistry
@@ -323,6 +387,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localGestureRegistry = localGestureRegistry
     childContext.localGestureStateRegistry = localGestureStateRegistry
     childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
+    childContext.localDefaultFocusRegistry = localDefaultFocusRegistry
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     childContext.localScrollPositionRegistry = localScrollPositionRegistry
@@ -367,6 +432,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localGestureRegistry = localGestureRegistry
     replacedContext.localGestureStateRegistry = localGestureStateRegistry
     replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry
+    replacedContext.localDefaultFocusRegistry = localDefaultFocusRegistry
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     replacedContext.localScrollPositionRegistry = localScrollPositionRegistry
@@ -525,6 +591,7 @@ extension ResolveContext {
     self.localGestureStateRegistry = nil
     self.localPointerHandlerRegistry = nil
     localTerminationRegistry = nil
+    localDefaultFocusRegistry = nil
     self.localFocusBindingRegistry = nil
     self.localFocusedValuesRegistry = localFocusedValuesRegistry
     localScrollPositionRegistry = nil
@@ -548,6 +615,11 @@ extension EnvironmentValues {
     get { self[OpenLinkActionKey.self] }
     set { self[OpenLinkActionKey.self] = newValue }
   }
+
+  public var resetFocus: ResetFocusAction {
+    get { self[ResetFocusActionKey.self] }
+    set { self[ResetFocusActionKey.self] = newValue }
+  }
 }
 
 extension ResolveContext {
@@ -561,6 +633,7 @@ extension ResolveContext {
       && lhs.transaction == rhs.transaction
       && lhs.invalidatedIdentities == rhs.invalidatedIdentities
       && lhs.localActionRegistry == rhs.localActionRegistry
+      && lhs.localDefaultFocusRegistry == rhs.localDefaultFocusRegistry
       && lhs.localFocusBindingRegistry == rhs.localFocusBindingRegistry
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
       && lhs.localScrollPositionRegistry == rhs.localScrollPositionRegistry

@@ -159,6 +159,8 @@ extension RunLoop {
           self.hoveredPointerRouteID = nil
         }
 
+        let shouldApplyInitialDefaultFocus =
+          focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
         let focusChanged = focusTracker.updateRegions(
           renderedArtifacts.semanticSnapshot.focusRegions)
         latestActivePaletteCommands =
@@ -176,6 +178,11 @@ extension RunLoop {
           allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
         )
         let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
+        let defaultFocusRequest = localDefaultFocusRegistry.desiredFocusRequest(
+          focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
+          shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyInitialDefaultFocus
+        )
+        let appliedDefaultFocusRequest = applyDesiredFocusRequest(defaultFocusRequest)
         let focusStateChanged = localFocusBindingRegistry.sync(
           actualFocusedIdentity: focusTracker.currentFocusIdentity
         )
@@ -195,14 +202,15 @@ extension RunLoop {
         )
         focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
         focusBindingChangedDuringFrame =
-          focusBindingChangedDuringFrame || appliedFocusRequest || focusStateChanged
+          focusBindingChangedDuringFrame || appliedFocusRequest || appliedDefaultFocusRequest
+          || focusStateChanged
         focusedValuesChangedDuringFrame =
           focusedValuesChangedDuringFrame || focusedValuesChanged
         scrollPositionChangedDuringFrame =
           scrollPositionChangedDuringFrame || scrollPositionChanged
 
-        if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
-          || scrollPositionChanged
+        if focusChanged || appliedFocusRequest || appliedDefaultFocusRequest || focusStateChanged
+          || focusedValuesChanged || scrollPositionChanged
         {
           appendLifecycleCarryForward(
             renderedArtifacts.commitPlan.lifecycle,
@@ -856,6 +864,8 @@ extension RunLoop {
           self.hoveredPointerRouteID = nil
         }
 
+        let shouldApplyInitialDefaultFocus =
+          focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
         let focusChanged = focusTracker.updateRegions(
           renderedArtifacts.semanticSnapshot.focusRegions)
         latestActivePaletteCommands =
@@ -873,6 +883,11 @@ extension RunLoop {
           allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
         )
         let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
+        let defaultFocusRequest = localDefaultFocusRegistry.desiredFocusRequest(
+          focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
+          shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyInitialDefaultFocus
+        )
+        let appliedDefaultFocusRequest = applyDesiredFocusRequest(defaultFocusRequest)
         let focusStateChanged = localFocusBindingRegistry.sync(
           actualFocusedIdentity: focusTracker.currentFocusIdentity
         )
@@ -892,14 +907,15 @@ extension RunLoop {
         )
         focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
         focusBindingChangedDuringFrame =
-          focusBindingChangedDuringFrame || appliedFocusRequest || focusStateChanged
+          focusBindingChangedDuringFrame || appliedFocusRequest || appliedDefaultFocusRequest
+          || focusStateChanged
         focusedValuesChangedDuringFrame =
           focusedValuesChangedDuringFrame || focusedValuesChanged
         scrollPositionChangedDuringFrame =
           scrollPositionChangedDuringFrame || scrollPositionChanged
 
-        if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
-          || scrollPositionChanged
+        if focusChanged || appliedFocusRequest || appliedDefaultFocusRequest || focusStateChanged
+          || focusedValuesChanged || scrollPositionChanged
         {
           appendLifecycleCarryForward(
             renderedArtifacts.commitPlan.lifecycle,
@@ -1172,6 +1188,18 @@ extension RunLoop {
     }
   }
 
+  package func runtimeResetFocusAction() -> ResetFocusAction {
+    ResetFocusAction(
+      snapshotLabel: "ResetFocusAction.runtime",
+      isPlaceholder: false,
+      handler: { [weak scheduler, localDefaultFocusRegistry, rootIdentity] namespace in
+        localDefaultFocusRegistry.requestReset(in: namespace)
+        scheduler?.requestInvalidation(of: [rootIdentity])
+        return true
+      }
+    )
+  }
+
   package func resolveContext(
     for scheduledFrame: ScheduledFrame
   ) -> ResolveContext {
@@ -1203,6 +1231,9 @@ extension RunLoop {
     effectiveEnvironmentValues.cursorFollowsFocus = runtimeConfiguration.cursorFollowsFocus
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
+    }
+    if effectiveEnvironmentValues.resetFocus.isPlaceholder {
+      effectiveEnvironmentValues.resetFocus = runtimeResetFocusAction()
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     if runtimeConfiguration.motion == .reduced {
@@ -1239,6 +1270,7 @@ extension RunLoop {
     context.localTerminationRegistry = localTerminationRegistry
     context.localGestureRegistry = localGestureRegistry
     context.localGestureStateRegistry = localGestureStateRegistry
+    context.localDefaultFocusRegistry = localDefaultFocusRegistry
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localScrollPositionRegistry = localScrollPositionRegistry
