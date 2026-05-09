@@ -180,6 +180,65 @@ struct TextEditorSurfaceTests {
     #expect(box.value == "Z")
   }
 
+  @Test("TextEditor renders focused range selection")
+  func textEditorRendersFocusedRangeSelection() {
+    final class Box {
+      var value = "hello world"
+    }
+
+    let box = Box()
+    let registry = LocalKeyHandlerRegistry()
+    let identity = testIdentity("SelectedTextEditor")
+    let renderer = DefaultRenderer()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = renderer.render(
+      TextEditor(
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .frame(width: 16, height: 4),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(
+      registry.dispatch(
+        identity: identity,
+        keyPress: KeyPress(.arrowLeft, modifiers: [.shift, .alt])
+      )
+    )
+
+    let artifacts = renderer.render(
+      TextEditor(
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .frame(width: 16, height: 4),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("hello world"))
+    #expect(!artifacts.rasterSurface.lines.joined(separator: "\n").contains("_"))
+    #expect(reversedCharacters(in: artifacts.rasterSurface) == "world")
+  }
+
   @Test("TextEditor keeps focused and unfocused chrome distinct")
   func textEditorFocusStateAffectsRendering() {
     let identity = testIdentity("FocusedTextEditor")
@@ -209,5 +268,20 @@ struct TextEditorSurfaceTests {
     #expect(focusedSurface.contains("_"))
     #expect(!unfocusedSurface.contains("_"))
     #expect(focusedSurface != unfocusedSurface)
+  }
+}
+
+private func reversedCharacters(in surface: RasterSurface) -> String {
+  surface.cells.flatMap { row in
+    row.compactMap { cell -> Character? in
+      guard !cell.isContinuation,
+        cell.style?.emphasis.contains(.reverse) == true
+      else {
+        return nil
+      }
+      return cell.character
+    }
+  }.reduce(into: "") { partial, character in
+    partial.append(character)
   }
 }

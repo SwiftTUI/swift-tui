@@ -26,13 +26,6 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Continue the `TextEditor` V2 plan after the shipped shortcut foundation.
-  Next slices are visible selection rendering, clipboard command routing, host
-  value/selection transport, IME/composition, and large-document storage.
-  Supporting docs:
-  [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md),
-  [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md),
-  [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md).
 - [ ] Design the `NavigationStack` / route surface. `TabView` has shipped and
   ActionScope is ready to treat destinations as scopes, but there is no
   `NavigationStack`, `NavigationLink`, or route-driven selection model. Start

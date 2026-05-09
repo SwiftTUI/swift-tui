@@ -115,6 +115,12 @@ Current async presentation and frame-tail worker ownership is summarized in
   full-screen child graphics work today.
 - Kitty keyboard protocol, OSC 52 clipboard, and OSC 99 notifications are not
   intercepted for embedded children in v1.
+- Built-in text inputs use a `String`-backed package-private editing model with
+  grapheme offsets, reducer commands, caret anchors, and focused selection
+  rendering. Clipboard copy/cut, host-native value/selection transport,
+  IME/composition, and large-document rope/piece-tree storage remain deferred
+  until SwiftTUI has concrete clipboard adapters, host event contracts, or
+  workload evidence.
 - `Platforms/Embedding` does not build for iOS or WASI.
 - WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Platforms/WASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
 - Some internal lowering seams remain package-only for runtime plumbing and tests:

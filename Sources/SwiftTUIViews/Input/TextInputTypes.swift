@@ -206,4 +206,8 @@ extension TextRange {
       upperBound: min(self.upperBound, upperBound)
     )
   }
+
+  package func intersects(_ other: TextRange) -> Bool {
+    lowerBound < other.upperBound && other.lowerBound < upperBound
+  }
 }

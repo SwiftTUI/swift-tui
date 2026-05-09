@@ -154,6 +154,46 @@ struct TextInputRuntimeIntegrationTests {
     #expect(box.setCount == 1)
   }
 
+  @Test("TextEditor runtime Ctrl+A selects all before replacement")
+  func textEditorRuntimeCtrlASelectsAllBeforeReplacement() throws {
+    let box = PasteTextBox()
+    box.value = "hello"
+    let identity = testIdentity("SelectAllTextEditor")
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 20, height: 5)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl)) == nil)
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.character("Z"))) == nil)
+    #expect(box.value == "Z")
+  }
+
+  @Test("TextEditor runtime Ctrl+C uses default exit binding")
+  func textEditorRuntimeCtrlCUsesDefaultExitBinding() throws {
+    let box = PasteTextBox()
+    box.value = "hello"
+    let identity = testIdentity("ExitBindingTextEditor")
+    let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 20, height: 5)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+
+    let reason = runLoop.runLoop.handleKeyPress(exitKey)
+
+    #expect(reason == .userExit(exitKey))
+    #expect(box.value == "hello")
+  }
+
   @Test("TextEditor runtime scrolls to keep the caret visible")
   func textEditorRuntimeScrollsToKeepCaretVisible() throws {
     let box = PasteTextBox()
