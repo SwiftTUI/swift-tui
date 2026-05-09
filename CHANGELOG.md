@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `0c8b73f2` Reconciled the docs index with shipped plan front matter so CPU
+  latency evaluation, composed-presentation primitives, and the gallery
+  animation regression record live with implementation/post-mortem records
+  instead of current planned/active work. See
+  `0c8b73f2` [docs/plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](docs/plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md),
+  `e9ab33a5` [docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md](docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md),
+  and `16e38b42` [docs/plans/2026-05-01-007-gallery-animation-regression-notes.md](docs/plans/2026-05-01-007-gallery-animation-regression-notes.md).
 - `41ed1600` Added the changelog workflow and documented that completed
   active-work items move out of `active_work.md` into concise, self-standing
   changelog entries. See `41ed1600` [CHANGELOG.md](CHANGELOG.md) and
