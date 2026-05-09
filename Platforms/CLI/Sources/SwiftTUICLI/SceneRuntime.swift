@@ -38,7 +38,7 @@ final class SceneRuntime {
     self.lifecycle = SceneLifecycle(isPrimary: isPrimary)
 
     let diagnosticsLogger: FrameDiagnosticsLogger? =
-      if isPrimary, let path = Self.diagnosticsFilePath() {
+      if isPrimary, let path = Self.diagnosticsFilePath(configuration: configuration) {
         FrameDiagnosticsLogger(path: path)
       } else {
         nil
@@ -196,20 +196,33 @@ final class SceneRuntime {
     )
   }
 
-  /// Returns a diagnostics output file path when the `TERMUI_DIAGNOSTICS`
-  /// environment variable is set. A value of `1` or `true` writes to
-  /// `/tmp/termui-diagnostics.tsv`; any other truthy value is treated as a
-  /// custom file path.
-  private static func diagnosticsFilePath() -> String? {
-    guard let value = unsafe getenv("TERMUI_DIAGNOSTICS") else {
-      return nil
+  /// Returns a diagnostics output file path when debug instrumentation or the
+  /// legacy `TERMUI_DIAGNOSTICS` environment variable is enabled.
+  ///
+  /// A value of `1` or `true` writes to `/tmp/termui-diagnostics.tsv`; any
+  /// other truthy value is treated as a custom file path. `--debug` /
+  /// `SWIFTTUI_DEBUG=1` uses the same default path when no custom diagnostics
+  /// path is present.
+  static func diagnosticsFilePath(
+    configuration: RuntimeConfiguration,
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> String? {
+    if let string = environment["TERMUI_DIAGNOSTICS"],
+      let path = diagnosticsFilePath(from: string)
+    {
+      return path
     }
-    let string = unsafe String(cString: value)
+    return configuration.debug ? defaultDiagnosticsFilePath : nil
+  }
+
+  private static let defaultDiagnosticsFilePath = "/tmp/termui-diagnostics.tsv"
+
+  private static func diagnosticsFilePath(from string: String) -> String? {
     switch string.lowercased() {
     case "", "0", "false", "no":
       return nil
     case "1", "true", "yes":
-      return "/tmp/termui-diagnostics.tsv"
+      return defaultDiagnosticsFilePath
     default:
       return string
     }

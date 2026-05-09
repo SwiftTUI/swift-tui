@@ -123,8 +123,9 @@ struct MyApp: @preconcurrency SwiftTUIApp {
 > `--plain`, `--accessible`, `--reduce-motion`, `--no-progress`, and
 > `--cursor-follows-focus` now affect runtime behavior. `--web`, `--port`,
 > `--bind`, and `--open` are consumed by the opt-in `SwiftTUIWebHostCLI`
-> runner. Flags still pending behavior wiring: `--json` (alternative output
-> mode), `--linear`, `--debug`, and `--start-in`. All flags parse cleanly
+> runner. `--debug` enables the existing frame diagnostics logger. Flags still
+> pending behavior wiring: `--json` (alternative output mode), standalone
+> `--linear`, and `--start-in`. All flags parse cleanly
 > today; the unwired ones land in follow-up plans. See
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.

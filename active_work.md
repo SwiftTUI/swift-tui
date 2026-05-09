@@ -20,9 +20,9 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Finish behavior wiring for parsed `RuntimeConfiguration` fields that are
-  still documented as follow-up work: `--json`, standalone `--linear`,
-  `--debug`, and `--start-in`. Supporting docs and source:
+- [ ] Re-scope behavior wiring for parsed `RuntimeConfiguration` fields whose
+  intended behavior is still underspecified: `--json`, standalone `--linear`,
+  and `--start-in`. Supporting docs and source:
   [README.md](README.md),
   [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md),
   [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),

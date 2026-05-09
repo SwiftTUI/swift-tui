@@ -1906,9 +1906,10 @@ by theme:
   later wired `motion`, `output == .accessible`, `noProgress`,
   `cursorFollowsFocus`, and the reduce-motion environment value. WebHost work
   later wired `RuntimeConfiguration.web` through the opt-in
-  `SwiftTUIWebHostCLI` runner. Remaining parsed fields that still need behavior
+  `SwiftTUIWebHostCLI` runner. Runtime debug now enables the existing
+  frame-diagnostics logger. Remaining parsed fields that still need behavior
   plans are consumer-defined JSON output, standalone `--linear` layout behavior,
-  framework debug instrumentation, and `--start-in` scope activation.
+  and `--start-in` scope activation.
 - 2026-05-05: Phases 1–5 landed via plan
   [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
   `RuntimeConfiguration` value type + `Builder` + `detect(...)` factory in
