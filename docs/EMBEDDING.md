@@ -153,6 +153,11 @@ Full-screen child graphics can still work when the child is effectively taking
 over the terminal. The unsupported case is compositing those graphics inside a
 smaller SwiftTUI pane.
 
+The larger Zellij-style workspace layer is scoped separately in
+[proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md). That work
+should build on `TerminalView`; it should not add a second embedded-terminal
+render path.
+
 ## Internals
 
 The design and tradeoffs are captured in

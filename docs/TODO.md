@@ -34,14 +34,15 @@
   dismissal, anchor placement, and terminal fallback layout. Supporting docs:
   [VISION.md](VISION.md),
   [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
-- [ ] Define the first-class terminal workspace surface. The repo has `TabView`,
-  custom layouts, multi-scene manifests, terminal embedding, and examples that
-  can compose workspace-like UIs, but there is no explicit workspace/pane/session
-  authoring API. Decide whether the next step is docs and examples, split-pane
-  primitives, host shell chrome, session persistence, or a smaller scoped subset.
-  Supporting docs: [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md),
-  [TERMINAL_NATIVE_UX_RESEARCH.md](TERMINAL_NATIVE_UX_RESEARCH.md),
-  [proposals/TERMINAL_EMBEDDING.md](proposals/TERMINAL_EMBEDDING.md).
+- [ ] Design the first-class terminal workspace surface. `TerminalView` already
+  embeds one terminal program in one view, but there is no official
+  Zellij-style workspace layer for tabs, split-pane identity, pane commands,
+  session retention, persistence, or reattach semantics. Start from the scoped
+  proposal and produce an evidence example before committing broad public API.
+  Supporting docs: [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md),
+  [EMBEDDING.md](EMBEDDING.md),
+  [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md),
+  [TERMINAL_NATIVE_UX_RESEARCH.md](TERMINAL_NATIVE_UX_RESEARCH.md).
 - [ ] Scope deeper scroll control. `ScrollView` has public `ScrollPosition`,
   binding-backed offsets, indicators, keyboard scrolling, pointer scrolling, and
   caret/focus reveal, but it lacks a higher-level scroll reader/proxy model.
