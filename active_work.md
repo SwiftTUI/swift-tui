@@ -72,12 +72,6 @@
 Source of truth for shipped accessibility behavior:
 [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 
-- [ ] Finish the modal accessibility focus contract for initial focus,
-  trap/cycle behavior, dismiss restoration fallback, and target-bridge behavior
-  across `sheet`, `alert`, and `confirmationDialog`. Supporting docs and tests:
-  [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md),
-  [Tests/SwiftTUITests/PresentationSurfaceTests.swift](Tests/SwiftTUITests/PresentationSurfaceTests.swift),
-  [Tests/SwiftTUITests/AppRuntimeTests.swift](Tests/SwiftTUITests/AppRuntimeTests.swift).
 - [ ] Decide whether SwiftUI host focus should move native VoiceOver focus or
   remain metadata-only. Supporting docs and source:
   [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),

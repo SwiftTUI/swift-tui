@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `bc531320` Completed the modal accessibility focus contract for `sheet`,
+  `alert`, and `confirmationDialog`: modal focus regions now carry presentation
+  scope metadata, focus cycles inside active modal presentations, and dismissal
+  restores the previously focused background control when it still exists. See
+  `bc531320` [Sources/SwiftTUICore/Semantics/FocusTracker.swift](Sources/SwiftTUICore/Semantics/FocusTracker.swift),
+  `bc531320` [Sources/SwiftTUICore/Semantics/Semantics.swift](Sources/SwiftTUICore/Semantics/Semantics.swift),
+  and `bc531320` [Tests/SwiftTUITests/PresentationActionScopeTests.swift](Tests/SwiftTUITests/PresentationActionScopeTests.swift).
 - `964b7191` Completed reduced-motion behavior across the remaining animated
   surfaces: `PhaseAnimator` and `AnimatedImage` no longer start playback tasks
   when reduced motion is active, transition intermediates and matched geometry
