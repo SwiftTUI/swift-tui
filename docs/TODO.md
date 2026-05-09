@@ -26,13 +26,67 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Turn the current constraints in `STATUS.md` into executable plans or
-  explicitly defer them: default-focus scopes, `@FocusedObject`, richer
-  `TextEditor`, `NavigationStack`, popover-style presentation, terminal
-  workspaces, deeper scroll control, and navigation surfaces. Supporting docs:
-  [STATUS.md](STATUS.md),
+- [ ] Scope namespace-based default-focus APIs. `defaultFocus(...)`,
+  `.focusScope()`, and `.focusSection()` exist, but SwiftUI's older
+  namespace-scoped family is still missing: `.prefersDefaultFocus(_:in:)`,
+  `.focusScope(_:)`, and `resetFocus`. Decide whether this project wants full
+  parity, a terminal-native subset, or an explicit deferral; if it stays in
+  scope, cover nested scopes, presentation scopes, and reset behavior. Supporting
+  docs: [FOCUS.md](FOCUS.md).
+- [ ] Decide focused-object support. Focused values and focused bindings are
+  shipped, and the runtime has Observation invalidation support, but there is no
+  `@FocusedObject`, `.focusedObject(...)`, or `.focusedSceneObject(...)` surface.
+  Decide whether the API should support classic `ObservableObject`, modern
+  Observation reference types, both, or neither; then add the chosen surface and
+  focus-chain tests. Supporting docs: [FOCUS.md](FOCUS.md),
+  [RUNTIME.md](RUNTIME.md).
+- [ ] Plan the next `TextEditor` tranche. V1 shipped multiline editing, shared
+  text-input reducer behavior, caret-visible scrolling, paste handling, and
+  accessibility caret anchors. Remaining work is still actionable but belongs in
+  a V2 plan: public custom text-input storage, rope or piece-tree storage for
+  large documents, rich selection rendering, IME/composition, host
+  value/selection transport, copy/cut/select-all, and word movement/deletion
+  shortcuts. Supporting docs:
+  [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md),
+  [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md).
+- [ ] Design the `NavigationStack` / route surface. `TabView` has shipped and
+  ActionScope is ready to treat destinations as scopes, but there is no
+  `NavigationStack`, `NavigationLink`, or route-driven selection model. Start
+  with a terminal-native route design before adding API: destination identity,
+  back-stack rendering, focus restoration, command scope activation, and how
+  list selection differs when it drives navigation. Supporting docs:
   [VISION.md](VISION.md),
-  [FOCUS.md](FOCUS.md).
-  Ambiguity note: park this for later investigation. Some listed constraints
-  may already be obsolete, so this remains a prioritization pass rather than a
-  single implementation task.
+  [FOCUS.md](FOCUS.md),
+  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
+- [ ] Design popover-style presentation. The shipped presentation surface covers
+  `alert`, `confirmationDialog`, `sheet`, `paletteSheet`, `toast`, and `Menu`,
+  but there is no public popover API. Work should first decide whether popovers
+  are anchored non-modal overlays, menu-like intrinsic surfaces, sheet chrome
+  variants, or an explicit non-goal; then pin focus/action-scope behavior,
+  dismissal, anchor placement, and terminal fallback layout. Supporting docs:
+  [VISION.md](VISION.md),
+  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
+- [ ] Define the first-class terminal workspace surface. The repo has `TabView`,
+  custom layouts, multi-scene manifests, terminal embedding, and examples that
+  can compose workspace-like UIs, but there is no explicit workspace/pane/session
+  authoring API. Decide whether the next step is docs and examples, split-pane
+  primitives, host shell chrome, session persistence, or a smaller scoped subset.
+  Supporting docs: [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md),
+  [TERMINAL_NATIVE_UX_RESEARCH.md](TERMINAL_NATIVE_UX_RESEARCH.md),
+  [proposals/TERMINAL_EMBEDDING.md](proposals/TERMINAL_EMBEDDING.md).
+- [ ] Scope deeper scroll control. `ScrollView` has public `ScrollPosition`,
+  binding-backed offsets, indicators, keyboard scrolling, pointer scrolling, and
+  caret/focus reveal, but it lacks a higher-level scroll reader/proxy model.
+  Decide which controls matter next: scroll-to-identity, anchor-based scrolling,
+  page/home/end policy, scrollback and preview conventions, or host transport
+  hooks. Supporting docs: [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md),
+  [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).
+- [ ] Reconcile navigation-surface taxonomy. The repo now has focus traversal,
+  list/table selection, `TabView`, command scopes, scene attachment, and semantic
+  navigation-route placeholders, but no single document says which navigation
+  concepts are first-class and which are composed patterns. Produce a short plan
+  that separates route navigation, mode/tab switching, pane/workspace switching,
+  command-palette discovery, and ordinary focus movement before implementing more
+  public navigation API. Supporting docs: [VISION.md](VISION.md),
+  [FOCUS.md](FOCUS.md),
+  [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).

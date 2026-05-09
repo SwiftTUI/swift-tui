@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- Expanded the remaining status-stub tracker into scoped TODO items and removed
+  the backlog prose from `STATUS.md`, leaving status as the high-level overview
+  while live planned work lives in `TODO.md`.
 - Moved the repo-owned work tracker and completed-work history into `docs/` as
   `TODO.md` and `CHANGELOG.md`, and documented the binding with `STATUS.md`:
   status remains the high-level overview, while any planned or decision-bound

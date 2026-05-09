@@ -117,29 +117,15 @@ Current async presentation and frame-tail worker ownership is summarized in
   intercepted for embedded children in v1.
 - `Platforms/Embedding` does not build for iOS or WASI.
 - WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Platforms/WASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
-- Some focus surfaces remain missing:
-  - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
-  - object-focused wrappers such as `@FocusedObject`
-- Some higher-level workflow surfaces are unsettled:
-  - richer multiline editing behaviors beyond the current `TextEditor`
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
 
 ## Deferred By Design
 
-See [VISION.md](VISION.md) for the rationale and the intended ordering.
-
-- `NavigationStack`
-- popover-style presentation beyond the current sheet support
-- accessibility behavior beyond the current semantic tree and target bridges,
-  including modal focus trapping, focus restoration, and richer native focus
-  control
-
-The project treats terminal-native reinterpretation as a first-class design
-rule. The remaining gaps are prioritized around terminal workspaces, deeper
-scroll control, and navigation surfaces that still need a stronger hypothesis
-before they graduate.
+See [VISION.md](VISION.md) for the rationale and the intended ordering. Planned
+or decision-bound follow-up work is tracked in [TODO.md](TODO.md), not in this
+status overview.
 
 ### Commands, Keybindings, and Scopes
 
