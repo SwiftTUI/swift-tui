@@ -73,6 +73,7 @@ Implementation and post-mortem records retained for context:
 
 - [plans/2026-05-06-002-embedded-web-host-compile-time-plan.md](plans/2026-05-06-002-embedded-web-host-compile-time-plan.md) — implementation record for the compile-time opt-in embedded WebHost runner, browser bundle, WebSocket transport, package-boundary guardrails, and example package
 - [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md) — shipped V1 text input value, reducer, layout map, paste routing, and caret-anchor semantics
+- [plans/2026-05-04-001-terminal-embedding-plan.md](plans/2026-05-04-001-terminal-embedding-plan.md) — shipped terminal-program embedding through `TerminalView`, `TerminalProcessSession`, PTY process integration, render-diff validation, and the file-previewer example
 - [plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md) — shipped same-binary CPU and input-latency evaluation tooling for async rendering and future runtime optimization work
 - [plans/2026-05-02-002-composed-presentation-primitives-plan.md](plans/2026-05-02-002-composed-presentation-primitives-plan.md) — shipped migration from presentation-specific overlay hoisting to portal, overlay-stack, interaction-gate, and dismiss-stack primitives
 - [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md) — shipped regression guard and fix record for gallery one-shot animation transactions snapping after async Option 3

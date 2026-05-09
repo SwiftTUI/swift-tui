@@ -1,8 +1,9 @@
 ---
 title: "feat: terminal-program embedding via TerminalView, with file-previewer example"
 type: feature
-status: design-approved
+status: shipped
 date: 2026-05-04
+completed: 2026-05-05
 depends_on:
   - "../proposals/TERMINAL_EMBEDDING.md"
   - "../HOST_PACKAGES.md"
@@ -12,6 +13,13 @@ depends_on:
 ---
 
 # Terminal Embedding Implementation Plan
+
+> **Status:** Shipped on 2026-05-05. The implementation lives in
+> `Platforms/Embedding`, the validation example lives in
+> `Examples/file-previewer`, and the durable current-state docs are
+> `docs/EMBEDDING.md`, `docs/STATUS.md`, and `docs/SOURCE_LAYOUT.md`. The
+> unchecked boxes below are retained as historical execution notes, not active
+> work.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans`
 > to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
@@ -65,6 +73,24 @@ This plan turns it into landed code in a single direction:
 Each stage produces a green-checkpoint commit on its own. Stages 1–5 are
 load-bearing for the file previewer. Stages 6 and 8 are required for
 "multiplexer-grade" claim. Stage 7 is the example. Stage 9 is the writeup.
+
+## Completion Record
+
+Terminal embedding shipped as a peer package on 2026-05-05. The landed surface
+includes:
+
+- `SwiftTUIPTYPrimitives` for shared PTY lifecycle, read/write, resize, and CLI
+  scene-attachment reuse.
+- `SwiftTUITerminal` with the SwiftTerm-backed emulator wrapper, child-process
+  driver, `TerminalSession`, `TerminalProcessSession`, `TerminalView`, and
+  terminal metadata modifiers.
+- `DrawCommand.foreignSurface` and rasterizer support for embedding foreign
+  terminal grids inside the existing seven-phase frame pipeline.
+- The `Examples/file-previewer` package as the validation app.
+- Render-diff, SSH-latency, session lifecycle, input-mode, layout, and
+  file-previewer tests in the peer packages.
+- Current-state documentation in `docs/EMBEDDING.md`, `docs/STATUS.md`,
+  `docs/SOURCE_LAYOUT.md`, and `docs/VISION.md`.
 
 ## Non-Goals
 
