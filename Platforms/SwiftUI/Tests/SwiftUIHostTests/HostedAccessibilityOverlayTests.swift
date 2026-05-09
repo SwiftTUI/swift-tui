@@ -143,6 +143,49 @@ func overlay_mapping_moves_and_clears_focused_semantic_target() {
 
 @MainActor
 @Test
+func overlay_exposes_requested_native_focus_id() {
+  let focused = identity("overlay", "focused")
+  let overlay = HostedAccessibilityOverlay(
+    semanticSnapshot: SemanticSnapshot(
+      accessibilityNodes: [
+        AccessibilityNode(
+          identity: focused,
+          rect: .init(origin: .init(x: 1, y: 1), size: .init(width: 4, height: 1)),
+          role: .button,
+          label: "Run"
+        )
+      ]
+    ),
+    focusedIdentity: focused,
+    cellSize: .init(width: 8, height: 16)
+  )
+
+  #expect(overlay.requestedNativeFocusID == focused.path)
+}
+
+@MainActor
+@Test
+func overlay_clears_requested_native_focus_when_focused_node_disappears() {
+  let overlay = HostedAccessibilityOverlay(
+    semanticSnapshot: SemanticSnapshot(
+      accessibilityNodes: [
+        AccessibilityNode(
+          identity: identity("overlay", "other"),
+          rect: .init(origin: .init(x: 1, y: 1), size: .init(width: 4, height: 1)),
+          role: .button,
+          label: "Other"
+        )
+      ]
+    ),
+    focusedIdentity: identity("overlay", "missing"),
+    cellSize: .init(width: 8, height: 16)
+  )
+
+  #expect(overlay.requestedNativeFocusID == nil)
+}
+
+@MainActor
+@Test
 func overlay_mapping_handles_empty_and_zero_rect_trees() {
   let empty = HostedAccessibilityOverlay(
     semanticSnapshot: nil,
