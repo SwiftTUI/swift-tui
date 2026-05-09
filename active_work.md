@@ -76,6 +76,7 @@ Source of truth for shipped accessibility behavior:
 - [ ] Plan and implement SwiftUI host focus so runtime focus movement moves
   native VoiceOver focus by default, with the current metadata-only behavior
   treated as the pre-plan baseline. Supporting docs and source:
+  [docs/plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md](docs/plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md),
   [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),
   [Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift](Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift),
   [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift).
