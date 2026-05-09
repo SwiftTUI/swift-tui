@@ -53,14 +53,14 @@ rewrite teaches it to interpolate the gradient interior via
 
 ---
 
-## Current Status (2026-04-10)
+## Current Status
 
 Phases 0–6 of the original plan and every gap item surfaced by the
-2026-04-10 audit are shipped and green. The full package test suite is
-704/704 passing. `swift test --filter AnimationController` runs the
-animation-scoped suites (snapshot extraction, property animations,
-removal injection, end-to-end pipeline integration); every test is
-deterministic and passes without a real clock.
+2026-04-10 audit are shipped and green. Later commits migrated the value
+interpolation model to `Animatable`, added matched-geometry translation,
+finished completion/custom/repeat behavior, moved removal transitions to
+placed-level overlays when placed snapshots are available, and added regression
+coverage for those paths.
 
 Post-graph-refactor verification (item 18 in the original audit) has
 been run against commit `d8d0a80` (2026-04-10, ViewNode single source
@@ -78,7 +78,7 @@ All 18 gap items from the audit are closed:
 | 1 | Removal overlays as draw-only with frozen bounds | `capturePlacedTree` + `applyPlacedOverlays` inject at placed level, no measure/place on the overlay |
 | 2 | Per-node transient flag for removal overlays | `isTransient` on `ResolvedNode` and `PlacedNode`, filtered by `SemanticExtractor` + `collectLifecycleNodes` |
 | 3 | Per-cell blend target at raster time | `resolveTextStyle` takes `currentCellBackground` from the live raster surface |
-| 4 | Custom `Transition` body walking | `TransitionEffectContributing` protocol + Mirror walk descending into `content`/`base`/`body`/`wrapped` |
+| 4 | Custom `Transition` body walking | `TransitionEffectProvidingModifier` / `TransitionEffectProbeTraversable` hooks plus Mirror walk descending into `content`/`base`/`body`/`wrapped` |
 | 5 | Offset composition on non-intrinsic roots | `applyTransitionModifiersRecursively` composes with existing `.offset`, wraps `.frame`/`.padding`/etc. in a stable-identity wrapper |
 | 6 | `withAnimation` completion callbacks | `AnimationBatchID` + `AnimationCompletionSink` + per-batch refcount; batch drains fire the closure exactly once |
 | 7 | `Transaction.animation` getter | `AnimationBox.unwrap(as:)` round-trips via the stored AnyHashable |
@@ -88,7 +88,7 @@ All 18 gap items from the audit are closed:
 | 11 | `borderColor` extract + apply | Controller reads `drawMetadata.borderShapeStyle`, writes it via interpolated color |
 | 12 | `padding` edge animation | Independent `paddingTop`/`Leading`/`Bottom`/`Trailing` diff + apply, untouched edges preserved |
 | 13 | `flexibleFrame` extract | `extract` picks first finite dim per axis (max→ideal→min); `applyValue` writes back to the same slot, preserving other dimensions |
-| 14 | Tick frames inject dominant active request | `AnimationController.dominantActiveRequest()` consulted by `resolveContext(for:)` when the scheduled frame carries `.inherit` |
+| 14 | Tick result semantics cleanup | `hasPendingWork` / `redrawIdentities` replaced overloaded tick fields, so `dominantActiveRequest()` and identity-agnostic wake bypasses are no longer needed |
 | 15 | End-to-end integration tests | New `Animation end-to-end pipeline integration` suite covers full pipeline color animation + placed-level overlay injection |
 | 16 | `AnimationController.reset()` completeness | Every stored field cleared; regression test for mid-removal reset |
 | 17 | `didSet` recompute overhead on tick frames | `setChildrenPreservingDerivedState` + `setLayoutBehaviorPreservingDerivedState` bypass derived-state recomputes when the shape/variant is stable |
@@ -141,8 +141,9 @@ All 18 gap items from the audit are closed:
 - `BezierSolver` — cubic bezier timing curves via Newton-Raphson with a
   bisection fallback. Presets: `.linear`, `.easeIn`, `.easeOut`, `.easeInOut`.
 - `CustomAnimation` protocol with `AnimationState` (keyed Sendable storage)
-  and `AnimationContext<V: VectorArithmetic>`. **Note:** declared but not yet
-  evaluated by the controller — see "Gaps" below.
+  and `AnimationContext<V: VectorArithmetic>`. The controller evaluates custom
+  animations through `CustomAnimationBox` and carries per-key state across
+  ticks and retargeting.
 - `Animation` struct with:
   - Timing curves: `.default`, `.linear`, `.easeIn`, `.easeOut`, `.easeInOut`,
     `.timingCurve(...)`
@@ -165,35 +166,30 @@ All 18 gap items from the audit are closed:
 **Public view surface** — `Sources/View/Animation/`
 - `withAnimation(_:_:)` — registers the animation with the renderer-owned
   sink and sets the task-local for the body's scope
-- `withAnimation(_:completionCriteria:_:completion:)` — public for API
-  parity; completion closure is accepted but **not yet wired through the
-  controller** (see "Gaps")
+- `withAnimation(_:completionCriteria:_:completion:)` — allocates a batch ID,
+  registers a completion closure, and fires when the batch drains. Infinite
+  `.repeatForever` batches intentionally never complete.
 - `View.animation(_:value:)` → `ValueAnimationModifier` — value-gated with
   non-invalidating previous-value storage via `setStateSlotSilently`
 - `View.transaction(_:)` with a public `Transaction` shim exposing
-  `animation: Animation?` (setter works; getter returns nil because the
-  `AnimationBox` is hash-only — see "Gaps")
+  `animation: Animation?`; the getter round-trips boxes created from concrete
+  `Animation` values.
 
 **AnimationController** — `Sources/SwiftTUI/AnimationController.swift`
 - Stateful per-renderer engine wired between resolve and measure in
   `DefaultRenderer.render`
-- **Snapshot extraction** via `AnimatableSnapshot`:
-  - Opacity (from `drawMetadata.baseStyle.explicitOpacity`)
-  - Foreground/background colors — extractor **prefers local draw metadata,
-    falls back to `environmentSnapshot.style.foregroundStyle`**. This is
-    critical: `.foregroundStyle(color)` on a generic view writes to the
-    environment, not to the local draw metadata, so the naive extractor
-    would never animate colors applied that way.
-  - Layout-derived: offset, frame width/height. Padding and border color are
-    reserved in `AnimatableProperty` but not yet extracted or applied (see
-    "Gaps").
-- **Diff + enqueue** per `(identity, property)` key with effective-request
+- **Snapshot extraction** via slot-keyed `AnimatableSnapshot`:
+  - opacity; foreground/background/border shape styles; shape fill/stroke
+    styles; border blend phase; padding; offset; position; fixed frame
+    dimensions; and first-finite flexible-frame dimensions
+  - foreground/background extraction still falls back through the environment
+    so `.foregroundStyle(color)` on a generic view has a diff signal
+- **Diff + enqueue** per `(identity, slot)` key with effective-request
   resolution (child transaction overrides parent; `.inherit` walks up)
 - **Retargeting** on the value-change path: samples the current interpolated
   value from the existing animation and uses it as the new `from`, producing
   smooth retargeting under interruption
-- **Interpolation** via `Color.interpolated(to:progress:method:.perceptual)`
-  for colors, direct lerp for doubles, truncated lerp for integers
+- **Interpolation** via `AnyAnimatable` and concrete `Animatable` conformances
 - **Write-back** to a local copy of the resolved tree; the viewGraph cache is
   never mutated — that means tick frames can skip resolve entirely via the
   existing `canUseSelectiveEvaluation && !viewGraph.hasDirtyWork` pipeline
@@ -207,6 +203,9 @@ All 18 gap items from the audit are closed:
 - Combinators: `.combined(with:)`, `.asymmetric(insertion:removal:)`
 - `View.transition(_:)` modifier → `TransitionViewModifier` registers per
   identity via the controller sink at resolve time
+- `View.matchedGeometryEffect(id:in:isSource:)` tags placed nodes with a
+  matched-geometry key; the controller records previous source bounds and
+  animates destination origins through placed-level translation
 - **Insertion animations**: detected by identity-set diffing; `willAppear`
   modifiers → `identity` values using the active `withAnimation` curve
 - **Removal animations** — the hard case, now working:
@@ -227,11 +226,9 @@ All 18 gap items from the audit are closed:
     disappearing branch doesn't re-register on its removal frame because
     `TransitionViewModifier.resolveElements` never runs, so the removal
     lookup uses the previous frame's snapshot.
-  - **Re-injection** happens each tick in `applyInterpolations`, with
-    interpolated transition modifiers applied via
-    `interpolateRemovalModifiers` and cascaded recursively through the
-    subtree (opacity cascades to every descendant so leaf text fades;
-    offset applies only at the subtree root).
+  - **Re-injection** happens each tick at the placed level when a previous
+    placed snapshot is available, so exiting views don't re-enter measure/place.
+    The resolved-tree fallback is retained for missing placed snapshots.
   - **Purge on completion** when the animation curve returns nil
 
 **Smooth opacity rendering** — `Sources/Core/Rasterizer.swift`
@@ -242,21 +239,23 @@ All 18 gap items from the audit are closed:
 - `resolveTextStyle` now bakes fractional opacity into the foreground color
   via `Color.mixed(with:amount:)`. Blend target priority:
   1. Explicit `style.backgroundColor` if set
-  2. Otherwise `environment.theme.background`
+  2. The cell's current raster background, when known
+  3. Otherwise `environment.theme.background`
 - After baking, `ResolvedTextStyle.opacity` is normalized to 1.0 so
   presentation doesn't additionally emit SGR "faint" on top of the blended
   color
 - Result: continuously smooth fades on truecolor terminals; nearest-palette
   shades on 256-color terminals
 
-### Tests (20 animation-scoped under `--filter Animation`, 682 total passing)
+### Tests
 
-| File | Tests | Scope |
-|---|---|---|
-| `Tests/CoreTests/AnimationSchedulerTests.swift` | 5 | `requestDeadline` wake, coalesced earlier deadline re-wake, animation request propagation, post-consume reset, explicit-beats-inherit coalescing |
-| `Tests/ViewTests/AnimationSolverTests.swift` | 9 | Spring under/over/critically damped, bezier linear/easeInOut S-curve/endpoints, linear animation evaluation, preset distinctness, delay postponement |
-| `Tests/SwiftTUITests/AnimationControllerTests.swift` | 6 | Snapshot extraction (local, env fallback, priority); removal injection (direct parent, ancestor walk-up, purge-on-completion) |
-| `Tests/SwiftTUITests/TextFigureSurfaceTests.swift` | +1 | `fractionalOpacityProducesDistinctForegroundColors` — regression guard against the binary-faint regression (not matched by `--filter Animation`; counted separately) |
+| File | Scope |
+|---|---|
+| `Tests/SwiftTUICoreTests/AnimationSchedulerTests.swift` | request-deadline wake, animation request propagation, and coalescing |
+| `Tests/SwiftTUIViewsTests/AnimationSolverTests.swift` | timing curves, springs, repeat behavior, custom animation transport, and `Transaction.animation` round-trip |
+| `Tests/SwiftTUITests/AnimationControllerTests.swift` | snapshot extraction, property animation, transition insertion/removal, matched geometry, completion drain, custom animation state, padding/border/flexible-frame animation, and parity coverage |
+| `Tests/SwiftTUITests/AnimationRepeatForeverGrowthTests.swift` | bounded runtime bookkeeping for repeating animations |
+| `Tests/SwiftTUITests/TextFigureSurfaceTests.swift` | fractional-opacity rendering regression coverage |
 
 Three pre-existing tests were updated to reflect the new smooth-opacity
 semantics (opacity is baked into the color and normalized to 1.0 on raster
@@ -264,7 +263,11 @@ style runs): `TextFigureSurfaceTests.genericViewStylingPropagatesToTextFigureOut
 `SwiftUISurfaceTests.textStylingSurvivesDrawAndRaster`, and
 `InteractiveRuntimeTests.interactiveDemoSceneExercisesTruncationClippingWideGlyphsAndStyledText`.
 
-### Gaps and known limitations
+### Historical April 10 gap list (superseded)
+
+> The items in this section are the April 10 audit record. They are retained
+> for provenance and are not active work. Later commits closed the gap items
+> that are now summarized in the current-status section above.
 
 **Rendering + architectural**
 
@@ -426,7 +429,10 @@ style runs): `TextFigureSurfaceTests.genericViewStylingPropagatesToTextFigureOut
     has not been re-exercised against the new graph architecture. This
     is a verification gap, not a known regression.
 
-### What's next — prioritized
+### Historical April 10 next list (superseded)
+
+> This was the next-work list at the time of the April 10 audit. It is retained
+> as history and should not be used as the active task list.
 
 **P0 — post-refactor verification**
 - Item 18: re-run the gallery demo and the full animation test sweep
@@ -476,23 +482,23 @@ These are small finishes that turn public-looking API into real features.
 - Item 15: end-to-end integration test driving an animation through the
   real runtime and inspecting frame contents across the tick sequence
 
-### SwiftUI parity items the current code *does not* attempt
-
-The original plan explicitly deferred these; noting them here for
-completeness so nobody gets surprised:
+### Known limitations after shipped follow-up
 
 - `Binding.animation(_:)` — can be layered on top of the existing
   mutation-time plumbing without touching the controller
 - Body-scoped `.animation(_:body:)` — uses the same transaction plumbing
 - `contentTransition(_:)` — a distinct effect with its own runtime needs
-- `phaseAnimator(_:content:animation:)` — requires a separate driving engine
-  that sequences discrete phases on top of the base animation controller
 - `keyframeAnimator(...)` — a different class of engine with its own
   timeline and value generation; explicitly not a reuse of
   `AnimationController`
-- `matchedGeometryEffect` — requires cross-identity placement tracking that
-  the current runtime doesn't carry
-- Gradient / `TerminalChromeStyle` color interpolation
+- `AnimationCompletionCriteria.removed` is not yet distinct from
+  `.logicallyComplete` for non-removal animations
+- Custom `Transition` bodies are probed for opacity and offset only; modifiers
+  outside the current `TransitionModifiers` palette are ignored until that
+  effect palette grows
+- `matchedGeometryEffect` currently animates origin translation only, not size
+- `TerminalChromeStyle` interpolation is still not modeled as an animatable
+  shape style
 - 60fps mode (current target is 30fps via a fixed 33ms `frameInterval`)
 
 ---
@@ -1925,6 +1931,6 @@ These are enabled by this architecture but not part of this plan:
 - [../ARCHITECTURE.md](../ARCHITECTURE.md)
 - [../RUNTIME.md](../RUNTIME.md)
 - [../../Sources/SwiftTUI/SwiftTUI.swift](../../Sources/SwiftTUI/SwiftTUI.swift)
-- [../../Sources/SwiftTUI/RunLoop+Rendering.swift](../../Sources/SwiftTUI/RunLoop+Rendering.swift)
-- [../../Sources/Core/Graph/ViewGraph.swift](../../Sources/Core/Graph/ViewGraph.swift)
-- [../../Sources/Core/Scheduler.swift](../../Sources/Core/Scheduler.swift)
+- [../../Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](../../Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift)
+- [../../Sources/SwiftTUICore/Resolve/ViewGraph.swift](../../Sources/SwiftTUICore/Resolve/ViewGraph.swift)
+- [../../Sources/SwiftTUICore/Pipeline/Scheduler.swift](../../Sources/SwiftTUICore/Pipeline/Scheduler.swift)

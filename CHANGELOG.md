@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `7a8d9542` Reconciled the historical animation proposal docs with the shipped
+  controller surface: completion callbacks, custom animation evaluation,
+  repeat behavior, padding/border/flexible-frame animation, placed-level
+  removal overlays, and matched-geometry translation are no longer listed as
+  active gaps. See
+  `7a8d9542` [docs/proposals/ANIMATION_PLAN.md](docs/proposals/ANIMATION_PLAN.md)
+  and `c2e74728` [docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md](docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md).
 - `5cc2d3a4` Refreshed the public API inventory for the shipped border/stroke
   simplification: placement now lives on `StrokeStyle`, removed stroke sugar
   presets are no longer documented as public, and the generated API baseline is

@@ -95,8 +95,8 @@ Implementation and post-mortem records retained for context:
 - [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md) — reverted frame-head abort attempt and post-mortem
 - [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md) — scope-based command, keybinding, and toolbar design
 - [proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md) — phase-by-phase implementation record
-- [proposals/ANIMATION_PLAN.md](proposals/ANIMATION_PLAN.md) — original animation rollout
-- [proposals/ANIMATABLE_PROTOCOL_MIGRATION.md](proposals/ANIMATABLE_PROTOCOL_MIGRATION.md) — follow-up migration to SwiftUI-shaped `Animatable`
+- [proposals/ANIMATION_PLAN.md](proposals/ANIMATION_PLAN.md) — shipped original animation rollout plus current limitations
+- [proposals/ANIMATABLE_PROTOCOL_MIGRATION.md](proposals/ANIMATABLE_PROTOCOL_MIGRATION.md) — shipped follow-up migration to SwiftUI-shaped `Animatable`
 - [proposals/ARCHITECTURE_NOTES.md](proposals/ARCHITECTURE_NOTES.md) — view-graph and diffing improvements
 - [proposals/CELL_PIXEL_METRICS.md](proposals/CELL_PIXEL_METRICS.md) — public `CellPixelMetrics` on `GeometryProxy`/`EnvironmentValues` plus Braille-shape aspect correction
 - [proposals/GESTURES_IMPLEMENTATION.md](proposals/GESTURES_IMPLEMENTATION.md) — SwiftUI-shaped gesture API

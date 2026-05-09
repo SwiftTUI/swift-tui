@@ -1,5 +1,10 @@
 # Animatable Protocol Migration Implementation Plan
 
+> **Status:** Shipped. The checkbox steps below are retained as historical
+> execution notes, not active work. Current animation behavior is summarized in
+> `ANIMATION_PLAN.md`, `docs/PUBLIC_API_INVENTORY.md`, and the source/tests
+> under `Sources/SwiftTUI*/Animation` and `Tests/SwiftTUITests`.
+
 > **For agentic workers:** Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-04-13
