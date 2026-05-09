@@ -70,6 +70,19 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.output == .json)
   }
 
+  @Test("--linear selects accessible linear output")
+  func cliLinearSelectsAccessibleOutput() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.linear = true
+    let configuration = options.runtimeConfiguration(
+      environment: ["LANG": "en_US.UTF-8"], isStdoutTTY: true)
+    #expect(configuration.output == .accessible)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.noProgress == true)
+    #expect(configuration.linear == true)
+  }
+
   @Test("--cursor-follows-focus enables terminal cursor focus-following")
   func cliCursorFollowsFocus() throws {
     var options = try SwiftTUIOptions.parse([])
@@ -141,6 +154,32 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.motion == .normal)
     #expect(configuration.noProgress == false)
     #expect(configuration.linear == false)
+  }
+
+  @Test("--json beats SWIFTTUI_LINEAR=1")
+  func cliJsonBeatsEnvLinear() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.json = true
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_LINEAR": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
+    #expect(configuration.output == .json)
+    #expect(configuration.glyphs == .unicode)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.noProgress == false)
+    #expect(configuration.linear == false)
+  }
+
+  @Test("--linear beats SWIFTTUI_JSON=1")
+  func cliLinearBeatsEnvJson() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.linear = true
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_JSON": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
+    #expect(configuration.output == .accessible)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.noProgress == true)
+    #expect(configuration.linear == true)
   }
 
   @Test("--web --port 9000 --bind 0.0.0.0 produces WebConfig")
@@ -244,14 +283,6 @@ struct SwiftTUIOptionsResolutionTests {
     let configuration = options.runtimeConfiguration(
       environment: ["SWIFTTUI_DEBUG": "0"], isStdoutTTY: true)
     #expect(configuration.debug == true)
-  }
-
-  @Test("--start-in passthrough")
-  func cliStartInPassthrough() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.startIn = "search"
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.startIn == "search")
   }
 
   @Test("--plain combined with --force-color: plain's no-color still wins")

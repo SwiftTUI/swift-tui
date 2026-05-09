@@ -1380,6 +1380,13 @@ extension RunLoop {
     _ artifacts: FrameArtifacts,
     damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics {
+    if runtimeConfiguration.output == .json {
+      return try presentJSONFrame(
+        artifacts,
+        focusedIdentity: focusTracker.currentFocusIdentity
+      )
+    }
+
     if runtimeConfiguration.output == .accessible {
       return try presentLinearAccessibilityFrame(
         semanticSnapshot: artifacts.semanticSnapshot
@@ -1405,6 +1412,19 @@ extension RunLoop {
     return metrics
   }
 
+  private func presentJSONFrame(
+    _ artifacts: FrameArtifacts,
+    focusedIdentity: Identity?
+  ) throws -> TerminalPresentationMetrics {
+    let output = JSONFrameRenderer().render(
+      surface: artifacts.rasterSurface,
+      semanticSnapshot: artifacts.semanticSnapshot,
+      focusedIdentity: focusedIdentity
+    )
+    try presentationSurface.write(output)
+    return metrics(forWrittenOutput: output)
+  }
+
   private func presentLinearAccessibilityFrame(
     semanticSnapshot: SemanticSnapshot
   ) throws -> TerminalPresentationMetrics {
@@ -1416,6 +1436,12 @@ extension RunLoop {
     }
 
     try presentationSurface.write(output)
+    return metrics(forWrittenOutput: output)
+  }
+
+  private func metrics(
+    forWrittenOutput output: String
+  ) -> TerminalPresentationMetrics {
     let bytesWritten = output.utf8.count
     let linesTouched = output.utf8.reduce(0) { partial, byte in
       partial + (byte == 0x0A ? 1 : 0)

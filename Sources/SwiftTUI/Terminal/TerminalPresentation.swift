@@ -195,8 +195,8 @@ extension TerminalCapabilityProfile {
   ///     preference is treated as a "don't restrict me" hint rather than
   ///     a "force unicode glyphs" override).
   ///
-  /// Other `RuntimeConfiguration` fields (motion, output, web, debug,
-  /// start-in) are not terminal capability inputs; this method ignores them.
+  /// Other `RuntimeConfiguration` fields (motion, output, web, debug) are not
+  /// terminal capability inputs; this method ignores them.
   public func applying(_ configuration: RuntimeConfiguration) -> Self {
     var result = self
     switch configuration.color {

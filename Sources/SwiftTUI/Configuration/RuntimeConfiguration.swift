@@ -79,8 +79,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var verbosity: Verbosity
   /// If non-nil, serve the app over HTTP using these settings instead of (or in addition to) a local terminal.
   public var web: WebConfig?
-  /// Action-scope ID to focus at app launch (per ADR-0003). Nil starts at the default scope.
-  public var startIn: String?
   /// Enable framework-internal debug instrumentation (frame timings, render-tree diagnostics).
   public var debug: Bool
   /// Replace progress bars with static status messages.
@@ -97,7 +95,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     output: OutputMode = .tui,
     verbosity: Verbosity = .normal,
     web: WebConfig? = nil,
-    startIn: String? = nil,
     debug: Bool = false,
     noProgress: Bool = false,
     linear: Bool = false,
@@ -109,7 +106,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     self.output = output
     self.verbosity = verbosity
     self.web = web
-    self.startIn = startIn
     self.debug = debug
     self.noProgress = noProgress
     self.linear = linear

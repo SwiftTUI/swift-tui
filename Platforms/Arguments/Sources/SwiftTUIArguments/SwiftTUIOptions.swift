@@ -63,7 +63,7 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
 
   @Flag(
     name: .customLong("linear"),
-    help: "Linearize HStack-side-by-side layouts top-to-bottom. [env: SWIFTTUI_LINEAR]"
+    help: "Accessible linear output: drop the TUI for append-only text. [env: SWIFTTUI_LINEAR]"
   )
   public var linear: Bool = false
 
@@ -126,14 +126,6 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
     help: "Enable framework-internal debug instrumentation. [env: SWIFTTUI_DEBUG]"
   )
   public var debug: Bool = false
-
-  // ─── Action scopes (decision 0003) ─────────────────────────────
-
-  @Option(
-    name: .customLong("start-in"),
-    help: "Open with the action scope <id> already active. [env: SWIFTTUI_START_IN]"
-  )
-  public var startIn: String?
 
   public init() {}
 }

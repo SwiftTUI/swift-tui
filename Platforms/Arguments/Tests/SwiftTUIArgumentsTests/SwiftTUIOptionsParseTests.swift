@@ -24,7 +24,6 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.verbose == 0)
     #expect(options.quiet == false)
     #expect(options.debug == false)
-    #expect(options.startIn == nil)
   }
 
   @Test("Parses --no-color --ascii --reduce-motion")
@@ -64,12 +63,6 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.verbose == 3)
   }
 
-  @Test("Parses --start-in panel-id")
-  func parsesStartIn() throws {
-    let options = try SwiftTUIOptions.parse(["--start-in", "panel-id"])
-    #expect(options.startIn == "panel-id")
-  }
-
   @Test("Parses --quiet")
   func parsesQuiet() throws {
     let options = try SwiftTUIOptions.parse(["--quiet"])
@@ -86,6 +79,13 @@ struct SwiftTUIOptionsParseTests {
   func unknownFlagThrows() {
     #expect(throws: (any Error).self) {
       _ = try SwiftTUIOptions.parse(["--bogus-flag"])
+    }
+  }
+
+  @Test("--start-in is not framework-owned")
+  func startInIsNotFrameworkOwned() {
+    #expect(throws: (any Error).self) {
+      _ = try SwiftTUIOptions.parse(["--start-in", "panel-id"])
     }
   }
 }
