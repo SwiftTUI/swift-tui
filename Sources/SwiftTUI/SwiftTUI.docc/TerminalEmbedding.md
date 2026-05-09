@@ -105,8 +105,9 @@ initializer when the terminal pane owns the response locally.
 
 The v1 package supports local spawned child processes, pty creation and resize,
 SwiftTerm-backed VT emulation, focus-gated keyboard forwarding, X10 / 1000 /
-1002 / SGR mouse mode translation, bracketed paste, OSC 0/2 title changes, OSC
-7 working-directory changes, and OSC 8 hyperlink state.
+1002 / SGR mouse mode translation, bracketed paste, OSC 52 clipboard
+forwarding, OSC 0/2 title changes, OSC 7 working-directory changes, and OSC 8
+hyperlink state.
 
 `Examples/file-previewer` demonstrates the surface with Miller-column
 filesystem navigation and an embedded preview command in the rightmost column.
@@ -114,8 +115,7 @@ filesystem navigation and an embedded preview command in the rightmost column.
 ## Deferred Work
 
 Sixel and Kitty graphics inside an embedded pane, Kitty keyboard protocol, OSC
-52 clipboard interception, OSC 99 notification namespacing, iOS, and WASI are
-deferred beyond v1.
+99 notification namespacing, iOS, and WASI are deferred beyond v1.
 
 For the broader runtime model and deferred surface rationale, see <doc:Runtime>
 and <doc:Vision>.

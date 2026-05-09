@@ -1098,6 +1098,23 @@ struct TerminalPresentationTests {
     #expect(metrics.usedFullRepaint)
   }
 
+  @MainActor
+  @Test("terminal host writes OSC 52 clipboard requests")
+  func terminalHostWritesOSC52ClipboardRequests() throws {
+    let controller = PresentationMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    try host.writeClipboard("copy me")
+
+    #expect(controller.writes == ["\u{001B}]52;c;Y29weSBtZQ==\u{0007}"])
+  }
+
   @Test("terminal host full repaint uses explicit row addressing after full-width rows")
   func terminalHostFullRepaintUsesExplicitRowAddressingForSubsequentRows() throws {
     let controller = PresentationMockTerminalController(isTTY: true)

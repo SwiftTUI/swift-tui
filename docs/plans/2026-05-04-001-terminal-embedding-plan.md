@@ -30,7 +30,7 @@ depends_on:
 **Goal:** Land embedding of external terminal programs as a SwiftTUI `View`,
 with a column-view file previewer as the validation example, on an architecture
 that does not preclude later multiplexer-grade features (sixel-in-pane, OSC 99
-namespacing, render-diff under SSH, Kitty keyboard, OSC 52 clipboard).
+namespacing, render-diff under SSH, Kitty keyboard).
 
 **Architecture:** A new peer package `Platforms/Embedding` ships one library
 `SwiftTUITerminal` containing the emulator wrapper (over SwiftTerm), the PTY
@@ -2147,8 +2147,9 @@ Under "Current Constraints", add:
 ```markdown
 - Sixel and Kitty graphics inside an embedded pane are not supported;
   only full-screen child graphics work today
-- Kitty keyboard protocol, OSC 52 clipboard, and OSC 99 notifications
-  are not intercepted for embedded children in v1
+- Kitty keyboard protocol and OSC 99 notifications are not intercepted for
+  embedded children in v1; OSC 52 clipboard writes are forwarded to the
+  surrounding host clipboard action
 - `Platforms/Embedding` does not build for iOS or WASI
 ```
 

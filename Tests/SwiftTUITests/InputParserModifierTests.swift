@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 
 @MainActor
 @Suite
@@ -34,6 +34,13 @@ struct InputParserModifierTests {
     var parser = TerminalInputParser()
     let events = parser.feed([0x03])
     #expect(events == [.key(KeyPress(.character("c"), modifiers: .ctrl))])
+  }
+
+  @Test("Ctrl+D emits character 'd' with control modifier")
+  func ctrlD() {
+    var parser = TerminalInputParser()
+    let events = parser.feed([0x04])
+    #expect(events == [.key(KeyPress(.character("d"), modifiers: .ctrl))])
   }
 
   @Test("Tab (0x09) emits tab without modifiers")

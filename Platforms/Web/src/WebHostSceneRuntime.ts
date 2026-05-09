@@ -115,6 +115,7 @@ export class WebHostSceneRuntime {
 
     this.bridge?.bindOutput({
       presentSurface: (frame) => this.presentSurface(frame),
+      writeClipboard: (text) => this.writeClipboard(text),
       writeOutput: (text) => this.writeOutput(text),
       writeError: (text) => this.writeOutput(text),
     });
@@ -170,6 +171,22 @@ export class WebHostSceneRuntime {
       this.terminalMount.appendChild(diagnosticText);
     }
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
+  }
+
+  async writeClipboard(
+    text: string
+  ): Promise<void> {
+    const clipboard = globalThis.navigator?.clipboard;
+    if (!clipboard?.writeText) {
+      return;
+    }
+
+    try {
+      await clipboard.writeText(text);
+    } catch {
+      // Clipboard permissions are browser/user-gesture dependent; hosts treat
+      // rejection as a best-effort no-op rather than surfacing diagnostics.
+    }
   }
 
   sendInput(

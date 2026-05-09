@@ -29,6 +29,10 @@ package struct TextInputReducer: Sendable {
       next.selection = TextSelection(anchor: TextOffset(0), head: TextOffset(value.text.count))
       next.preferredVisualColumn = nil
       return TextInputMutation(value: next, shouldRequestFrame: next != value)
+    case .copySelection:
+      return copySelection(in: value, traits: traits)
+    case .cutSelection:
+      return cutSelection(in: value, traits: traits)
     }
   }
 
@@ -152,6 +156,51 @@ package struct TextInputReducer: Sendable {
         selection: .caret(at: range.lowerBound)
       ),
       changedRange: range,
+      shouldWriteBinding: true,
+      shouldRequestFrame: true
+    )
+  }
+
+  private func copySelection(
+    in value: TextInputValue,
+    traits: TextInputTraits
+  ) -> TextInputMutation {
+    guard !traits.isSecure, !value.selection.isCollapsed else {
+      return TextInputMutation(value: value)
+    }
+    return TextInputMutation(
+      value: value,
+      clipboardText: TextInputStringMetrics.substring(
+        range: value.selection.range,
+        in: value.text
+      )
+    )
+  }
+
+  private func cutSelection(
+    in value: TextInputValue,
+    traits: TextInputTraits
+  ) -> TextInputMutation {
+    guard !traits.isSecure, !value.selection.isCollapsed else {
+      return TextInputMutation(value: value)
+    }
+    let range = value.selection.range
+    let clipboardText = TextInputStringMetrics.substring(
+      range: range,
+      in: value.text
+    )
+    let nextText = TextInputStringMetrics.replacing(
+      range: range,
+      in: value.text,
+      with: ""
+    )
+    return TextInputMutation(
+      value: TextInputValue(
+        text: nextText,
+        selection: .caret(at: range.lowerBound)
+      ),
+      changedRange: range,
+      clipboardText: clipboardText,
       shouldWriteBinding: true,
       shouldRequestFrame: true
     )

@@ -128,6 +128,7 @@ public final class HostedSceneSession {
     onSurface: @escaping @MainActor @Sendable (RasterSurface) -> Void,
     onSemanticFrame:
       (@MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void)? = nil,
+    onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
@@ -153,19 +154,22 @@ public final class HostedSceneSession {
         surfaceSize: initialSize,
         appearance: appearance,
         theme: theme,
-        capabilityProfile: capabilityProfile
-      ) { surface in
-        Task { @MainActor in
-          onSurface(surface)
-        }
-      } semanticFrameHandler: { surface, semanticSnapshot, focusedIdentity in
-        guard let onSemanticFrame else {
-          return
-        }
-        Task { @MainActor in
-          onSemanticFrame(surface, semanticSnapshot, focusedIdentity)
-        }
-      },
+        capabilityProfile: capabilityProfile,
+        surfaceHandler: { surface in
+          Task { @MainActor in
+            onSurface(surface)
+          }
+        },
+        semanticFrameHandler: { surface, semanticSnapshot, focusedIdentity in
+          guard let onSemanticFrame else {
+            return
+          }
+          Task { @MainActor in
+            onSemanticFrame(surface, semanticSnapshot, focusedIdentity)
+          }
+        },
+        clipboardWriter: onClipboardWrite
+      ),
       runScene: selection.runScene,
       onFocusPresentationChange: onFocusPresentationChange
     )
@@ -339,7 +343,8 @@ public final class HostedSceneSession {
 }
 
 private final class HostedRasterSurface:
-  HostedScenePresentationSurface, SemanticPresentationSurface, Sendable
+  HostedScenePresentationSurface, ClipboardWritingPresentationSurface, SemanticPresentationSurface,
+  Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -352,6 +357,7 @@ private final class HostedRasterSurface:
   private let state: Mutex<State>
   private let surfaceHandler: @Sendable (RasterSurface) -> Void
   private let semanticFrameHandler: @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void
+  private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
 
   let capabilityProfile: TerminalCapabilityProfile
 
@@ -381,11 +387,13 @@ private final class HostedRasterSurface:
     theme: Theme?,
     capabilityProfile: TerminalCapabilityProfile,
     surfaceHandler: @escaping @Sendable (RasterSurface) -> Void,
-    semanticFrameHandler: @escaping @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void
+    semanticFrameHandler: @escaping @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void,
+    clipboardWriter: (@MainActor @Sendable (String) -> Bool)? = nil
   ) {
     self.capabilityProfile = capabilityProfile
     self.surfaceHandler = surfaceHandler
     self.semanticFrameHandler = semanticFrameHandler
+    self.clipboardWriter = clipboardWriter
     state = Mutex(
       State(
         surfaceSize: surfaceSize,
@@ -455,6 +463,12 @@ private final class HostedRasterSurface:
   func clearScreen() throws {}
 
   func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  @MainActor
+  func writeClipboard(_ text: String) throws -> Bool {
+    clipboardWriter?(text) ?? false
+  }
 
   @discardableResult
   func present(

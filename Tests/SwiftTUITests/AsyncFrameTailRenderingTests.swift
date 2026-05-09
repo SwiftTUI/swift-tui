@@ -3,8 +3,8 @@ import Foundation
 import Synchronization
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 private enum AsyncFrameTailRaisedCenterAlignmentID: AlignmentID {
@@ -58,7 +58,7 @@ struct AsyncFrameTailRenderingTests {
           }
           return .handled
         }
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -80,7 +80,7 @@ struct AsyncFrameTailRenderingTests {
     #expect(terminal.frames.isEmpty)
 
     inputReader.send(.key(.character("i")))
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     #expect(terminal.frames.isEmpty)
@@ -90,7 +90,7 @@ struct AsyncFrameTailRenderingTests {
       try await runTask.value
     }
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 1)
     #expect(gate.rasterEntryCount >= 3)
     #expect(terminal.frames.count >= 2)
@@ -136,7 +136,7 @@ struct AsyncFrameTailRenderingTests {
           }
           return .handled
         }
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -158,7 +158,7 @@ struct AsyncFrameTailRenderingTests {
     #expect(terminal.frames.isEmpty)
 
     inputReader.send(.key(.character("i")))
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     #expect(terminal.frames.isEmpty)
@@ -168,7 +168,7 @@ struct AsyncFrameTailRenderingTests {
       try await runTask.value
     }
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 1)
     #expect(gate.rasterEntryCount >= 1)
     #expect(terminal.frames.count >= 2)
@@ -220,7 +220,7 @@ struct AsyncFrameTailRenderingTests {
           }
           return .handled
         }
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -246,7 +246,7 @@ struct AsyncFrameTailRenderingTests {
 
     inputReader.send(.key(.character("i")))
     await gate.waitUntilBlocked()
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     runLoop.renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
     inputReader.finish()
     gate.release()
@@ -254,7 +254,7 @@ struct AsyncFrameTailRenderingTests {
     let result = try await valueWithTimeout {
       try await runTask.value
     }
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
 
     let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
     let rows = diagnosticRows(diagnostics)
@@ -378,7 +378,7 @@ struct AsyncFrameTailRenderingTests {
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
       keyHandler: { keyPress, _, _ in
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -415,13 +415,13 @@ struct AsyncFrameTailRenderingTests {
       terminal.frames.contains { $0.contains("geometry") }
     }
 
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     let result = try await valueWithTimeout {
       try await runTask.value
     }
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
 
     let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
     let rows = diagnosticRows(diagnostics)
@@ -676,7 +676,7 @@ struct AsyncFrameTailRenderingTests {
       ),
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
       keyHandler: { keyPress, _, _ in
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -711,13 +711,13 @@ struct AsyncFrameTailRenderingTests {
       }
     }
 
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     let result = try await valueWithTimeout {
       try await runTask.value
     }
     let layoutState = recorder.state
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(layoutState.measureRanOnMainThread == false)
     #expect(layoutState.placeRanOnMainThread == false)
   }
@@ -888,7 +888,7 @@ struct AsyncFrameTailRenderingTests {
           }
           return .handled
         }
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -915,7 +915,7 @@ struct AsyncFrameTailRenderingTests {
 
     inputReader.send(.key(.character("i")))
     inputReader.send(.key(.character("i")))
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
     gate.release()
 
@@ -923,7 +923,7 @@ struct AsyncFrameTailRenderingTests {
       try await runTask.value
     }
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 3)
     #expect(result.renderedFrames == 3)
     let value1Index = terminal.frames.firstIndex { $0.contains("value 1") }
@@ -982,7 +982,7 @@ struct AsyncFrameTailRenderingTests {
           }
           return .handled
         }
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -1026,7 +1026,7 @@ struct AsyncFrameTailRenderingTests {
     try await waitUntil {
       terminal.frames.last?.contains("value 2") == true
     }
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     let result = try await valueWithTimeout {
@@ -1034,7 +1034,7 @@ struct AsyncFrameTailRenderingTests {
     }
     await workerBlockTask.value
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 2)
     #expect(result.renderedFrames == 2)
     #expect(terminal.frames.contains { $0.contains("value 1") } == false)
@@ -1146,7 +1146,7 @@ struct AsyncFrameTailRenderingTests {
       stateContainer: stateContainer,
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
       keyHandler: { keyPress, _, _ in
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -1190,7 +1190,7 @@ struct AsyncFrameTailRenderingTests {
     try await waitUntil {
       terminal.frames.last?.contains("value 2") == true
     }
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     let result = try await valueWithTimeout {
@@ -1198,7 +1198,7 @@ struct AsyncFrameTailRenderingTests {
     }
     await workerBlockTask.value
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 2)
     #expect(result.renderedFrames == 3)
     #expect(runLoop.cancelledRenderCount == 0)
@@ -1259,7 +1259,7 @@ struct AsyncFrameTailRenderingTests {
           }
           return .handled
         }
-        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -1516,7 +1516,7 @@ struct AsyncFrameTailRenderingTests {
     try await waitUntil {
       terminal.frames.last?.contains("value 2") == true
     }
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     let result = try await valueWithTimeout {
@@ -1524,7 +1524,7 @@ struct AsyncFrameTailRenderingTests {
     }
     await workerBlockTask.value
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 2)
     #expect(terminal.frames.contains { $0.contains("value 1") } == false)
     #expect(terminal.frames.last?.contains("value 2") == true)
@@ -1775,14 +1775,14 @@ struct AsyncFrameTailRenderingTests {
     inputReader.send(.key(.space))
     inputReader.send(.key(.character("a"), modifiers: .ctrl))
     inputReader.send(.paste(PasteEvent(content: "/tmp/frame-head-run-loop.txt")))
-    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
 
     let result = try await valueWithTimeout {
       try await runTask.value
     }
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(recorder.events.contains("action"))
     #expect(recorder.events.contains("change:true"))
     #expect(recorder.events.contains("key-command"))

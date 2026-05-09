@@ -34,6 +34,16 @@ package enum TextInputStringMetrics {
     return copy
   }
 
+  package static func substring(
+    range: TextRange,
+    in text: String
+  ) -> String {
+    let clampedRange = range.clamped(to: TextOffset(text.count))
+    let lower = stringIndex(for: clampedRange.lowerBound, in: text)
+    let upper = stringIndex(for: clampedRange.upperBound, in: text)
+    return String(text[lower..<upper])
+  }
+
   package static func lineMetric(
     for offset: TextOffset,
     in text: String

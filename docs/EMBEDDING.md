@@ -130,6 +130,7 @@ The v1 embedding package supports:
 - focus-gated keyboard forwarding
 - mouse mode translation for X10, 1000, 1002, and SGR modes
 - bracketed paste encoding when the child enables bracketed paste
+- OSC 52 clipboard forwarding to the surrounding host clipboard action
 - OSC 0/2 title changes and OSC 7 working-directory changes
 - OSC 8 hyperlink state in the emulator grid
 - macOS and Linux hosts
@@ -145,7 +146,6 @@ out of scope:
 
 - Sixel and Kitty graphics inside a tiled embedded pane
 - Kitty keyboard protocol
-- OSC 52 clipboard interception
 - OSC 99 notification namespacing
 - iOS and WASI package builds
 

@@ -91,3 +91,21 @@ test("bridge resize updates environment, emits control input, and notifies liste
   })();
   expect(replayed).toEqual([[90, 30, undefined, undefined]]);
 });
+
+test("bridge delivers typed clipboard output to sinks", () => {
+  const bridge = new BrowserWASIBridge({
+    sceneId: "main",
+    columns: 80,
+    rows: 24,
+  });
+  const clipboard: string[] = [];
+
+  bridge.bindOutput({
+    presentSurface: () => {},
+    writeClipboard: (text) => clipboard.push(text),
+  });
+
+  bridge.stdout.write(new TextEncoder().encode('\u001Eclipboard:{"text":"copied text"}\n'));
+
+  expect(clipboard).toEqual(["copied text"]);
+});

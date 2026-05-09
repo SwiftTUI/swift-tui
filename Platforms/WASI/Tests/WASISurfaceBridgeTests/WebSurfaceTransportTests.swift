@@ -40,6 +40,24 @@ struct WebSurfaceTransportTests {
     #expect(metrics.strategy == .fullRepaint)
   }
 
+  @MainActor
+  @Test("host writes typed clipboard records")
+  func hostWritesTypedClipboardRecords() throws {
+    let pipe = Pipe()
+    let host = WebSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 2),
+      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+      renderStyle: .init(appearance: .fallback)
+    )
+
+    try host.writeClipboard("copy \"this\"")
+    pipe.fileHandleForWriting.closeFile()
+    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    pipe.fileHandleForReading.closeFile()
+
+    #expect(output == "\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n")
+  }
+
   @Test("encoder emits v2 accessibility tree with focus and live-region fields")
   func encoderEmitsAccessibilityTree() throws {
     let root = Identity(components: ["root"])

@@ -12,4 +12,4 @@ swift run gifcat ../../nyan.gif
 swift run gifcat first.gif second.gif third.gif
 ```
 
-`Ctrl+C` exits.
+`Ctrl+D` exits.

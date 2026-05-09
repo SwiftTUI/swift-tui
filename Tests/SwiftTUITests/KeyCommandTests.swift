@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -147,21 +147,21 @@ struct KeyCommandDispatchTests {
     #expect(fired.count == 0)
   }
 
-  @Test("keyCommand-registered Ctrl+C takes precedence over the default exit")
-  func consumerCtrlCOverridesDefaultExit() throws {
+  @Test("keyCommand-registered Ctrl+D takes precedence over the default exit")
+  func consumerCtrlDOverridesDefaultExit() throws {
     let fired = Counter()
 
     let runLoop = makeRunLoop {
       Panel(id: "app") {
         Text("inside").focusable(true)
       }
-      .keyCommand("Intercept", key: .character("c"), modifiers: .ctrl) {
+      .keyCommand("Intercept", key: .character("d"), modifiers: .ctrl) {
         fired.increment()
       }
     }
     try renderInitial(runLoop)
 
-    let reason = runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+    let reason = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
     #expect(reason == nil)
     #expect(fired.count == 1)
   }

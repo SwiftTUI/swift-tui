@@ -59,7 +59,7 @@ struct JSONFrameRendererTests {
       rootIdentity: rootIdentity,
       presentationSurface: surface,
       terminalInputReader: JSONRuntimeInputReader(events: [
-        .key(KeyPress(.character("c"), modifiers: .ctrl))
+        .key(KeyPress(.character("d"), modifiers: .ctrl))
       ]),
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: focusTracker,
@@ -76,7 +76,7 @@ struct JSONFrameRendererTests {
     let output = surface.writes.joined()
     let object = try decodeJSONObject(output)
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(!surface.didEnableRawMode)
     #expect(!surface.didDisableRawMode)
     #expect(surface.presentedSurfaces.isEmpty)

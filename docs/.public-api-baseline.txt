@@ -11,6 +11,8 @@ SwiftTUI.AppLaunchError.!=(_:_:)
 SwiftTUI.AppLaunchError.description
 SwiftTUI.AppLaunchError.localizedDescription
 SwiftTUI.AppLaunchError.noScenes
+SwiftTUI.ClipboardWritingPresentationSurface
+SwiftTUI.ClipboardWritingPresentationSurface.writeClipboard(_:)
 SwiftTUI.ConditionalScene
 SwiftTUI.ConditionalScene.Body
 SwiftTUI.ConditionalScene.Storage
@@ -124,7 +126,7 @@ SwiftTUI.HostedSceneSession
 SwiftTUI.HostedSceneSession.currentFocusPresentation
 SwiftTUI.HostedSceneSession.descriptor
 SwiftTUI.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onOutput:onFocusPresentationChange:)
-SwiftTUI.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onSurface:onSemanticFrame:onFocusPresentationChange:)
+SwiftTUI.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onSurface:onSemanticFrame:onClipboardWrite:onFocusPresentationChange:)
 SwiftTUI.HostedSceneSession.resize(to:)
 SwiftTUI.HostedSceneSession.resize(to:cellPixelSize:)
 SwiftTUI.HostedSceneSession.resize(to:cellPixelSize:pointerInputCapabilities:)
@@ -428,6 +430,7 @@ SwiftTUI.TerminalHost.setPointerHoverEnabled(_:)
 SwiftTUI.TerminalHost.surfaceSize
 SwiftTUI.TerminalHost.theme
 SwiftTUI.TerminalHost.write(_:)
+SwiftTUI.TerminalHost.writeClipboard(_:)
 SwiftTUI.TerminalHostError
 SwiftTUI.TerminalHostError.failedToReadAttributes(errno:)
 SwiftTUI.TerminalHostError.failedToReadFileStatusFlags(errno:)
@@ -5722,6 +5725,11 @@ SwiftTUIViews.Circle.transition(_:)
 SwiftTUIViews.Circle.truncationMode(_:)
 SwiftTUIViews.Circle.underline(_:color:)
 SwiftTUIViews.Circle.underline(_:pattern:color:)
+SwiftTUIViews.ClipboardWriteAction
+SwiftTUIViews.ClipboardWriteAction.callAsFunction(_:)
+SwiftTUIViews.ClipboardWriteAction.debugDescription
+SwiftTUIViews.ClipboardWriteAction.description
+SwiftTUIViews.ClipboardWriteAction.init(_:)
 SwiftTUIViews.ConditionalContent
 SwiftTUIViews.ConditionalContent.Storage
 SwiftTUIViews.ConditionalContent.Storage.falseContent(_:)
@@ -6692,6 +6700,7 @@ SwiftTUIViews.EnvironmentValues.activePaletteCommands
 SwiftTUIViews.EnvironmentValues.buttonBorderShape
 SwiftTUIViews.EnvironmentValues.buttonStyle
 SwiftTUIViews.EnvironmentValues.cellPixelMetrics
+SwiftTUIViews.EnvironmentValues.clipboardWriteAction
 SwiftTUIViews.EnvironmentValues.colorSchemeContrast
 SwiftTUIViews.EnvironmentValues.controlProminence
 SwiftTUIViews.EnvironmentValues.foregroundStyle

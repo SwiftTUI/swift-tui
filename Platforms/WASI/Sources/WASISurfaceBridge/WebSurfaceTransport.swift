@@ -121,7 +121,8 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
   }
 #endif
 
-package final class WebSurfaceTransport: PresentationSurface, SemanticPresentationSurface, Sendable
+package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPresentationSurface,
+  SemanticPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -230,6 +231,14 @@ package final class WebSurfaceTransport: PresentationSurface, SemanticPresentati
   package func clearScreen() throws {}
 
   package func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  @MainActor
+  package func writeClipboard(_ text: String) throws -> Bool {
+    let bytes = Array(WebSurfaceFrameEncoder.encodeClipboard(text).utf8)
+    try writeBytes(bytes)
+    return true
+  }
 
   @discardableResult
   package func present(
@@ -690,6 +699,12 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
 }
 
 @_spi(WebHost) public enum WebSurfaceFrameEncoder {
+  @_spi(WebHost) public static func encodeClipboard(
+    _ text: String
+  ) -> String {
+    "\u{001E}clipboard:{\"text\":\(jsonString(text))}\n"
+  }
+
   @_spi(WebHost) public static func encode(
     _ surface: RasterSurface
   ) -> String {

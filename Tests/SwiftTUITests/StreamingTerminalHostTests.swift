@@ -84,6 +84,25 @@ struct StreamingTerminalHostTests {
     #expect(output.contains("\u{001B}[?1003l\u{001B}[?1006h\u{001B}[?1002h"))
   }
 
+  @MainActor
+  @Test("streaming terminal host writes OSC 52 clipboard requests")
+  func streamingTerminalHostWritesOSC52ClipboardRequests() throws {
+    let writes = Mutex<[String]>([])
+    let host = StreamingTerminalHost(
+      surfaceSize: .init(width: 10, height: 4),
+      outputHandler: { output in
+        writes.withLock { capturedWrites in
+          capturedWrites.append(output)
+        }
+      }
+    )
+
+    try host.writeClipboard("copy me")
+
+    let output = writes.withLock { $0.joined() }
+    #expect(output == "\u{001B}]52;c;Y29weSBtZQ==\u{0007}")
+  }
+
   @Test("streaming terminal host stores host-owned theme updates")
   func streamingTerminalHostStoresThemeUpdates() {
     let host = StreamingTerminalHost(

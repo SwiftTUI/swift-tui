@@ -28,7 +28,8 @@ package func registerTextInputBinding(
       value: value,
       traits: traits,
       layout: layout,
-      authoringContext: authoringContext
+      authoringContext: authoringContext,
+      clipboardWriteAction: context.environmentValues.clipboardWriteAction
     )
   }
 
@@ -45,7 +46,8 @@ package func registerTextInputBinding(
         value: value,
         traits: traits,
         layout: layout,
-        authoringContext: authoringContext
+        authoringContext: authoringContext,
+        clipboardWriteAction: context.environmentValues.clipboardWriteAction
       )
     })
 }
@@ -57,7 +59,8 @@ private func applyTextInputCommand(
   value: Binding<TextInputValue>,
   traits: TextInputTraits,
   layout: @escaping @MainActor (TextInputValue) -> TextInputLayoutMap?,
-  authoringContext: ImperativeAuthoringContextSnapshot?
+  authoringContext: ImperativeAuthoringContextSnapshot?,
+  clipboardWriteAction: ClipboardWriteAction
 ) -> Bool {
   withImperativeAuthoringContext(authoringContext) {
     let currentValue = value.wrappedValue.synchronized(with: binding.wrappedValue)
@@ -67,7 +70,21 @@ private func applyTextInputCommand(
       traits: traits,
       layout: layout(currentValue)
     )
-    guard mutation.value != currentValue || mutation.shouldWriteBinding else {
+    let isClipboardCommand = command == .copySelection || command == .cutSelection
+    let didWriteClipboard: Bool
+    if let clipboardText = mutation.clipboardText {
+      guard clipboardWriteAction(clipboardText) else {
+        return isClipboardCommand
+      }
+      didWriteClipboard = true
+    } else {
+      didWriteClipboard = false
+    }
+
+    guard
+      mutation.value != currentValue || mutation.shouldWriteBinding || didWriteClipboard
+        || isClipboardCommand
+    else {
       return false
     }
 
@@ -75,7 +92,8 @@ private func applyTextInputCommand(
     if mutation.shouldWriteBinding {
       binding.wrappedValue = mutation.value.text
     }
-    return mutation.shouldRequestFrame || mutation.shouldWriteBinding
+    return mutation.shouldRequestFrame || mutation.shouldWriteBinding || didWriteClipboard
+      || isClipboardCommand
   }
 }
 
@@ -178,6 +196,16 @@ private func ctrlTextInputCommand(
   switch key {
   case .character("a"), .character("A"):
     return .selectAll
+  case .character("c"), .character("C"):
+    guard !isSelecting else {
+      return nil
+    }
+    return .copySelection
+  case .character("x"), .character("X"):
+    guard !isSelecting else {
+      return nil
+    }
+    return .cutSelection
   case .arrowLeft:
     return .move(.wordBackward, selecting: isSelecting)
   case .arrowRight:

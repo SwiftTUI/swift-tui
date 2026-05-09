@@ -17,19 +17,20 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 | Module | Top-level | All public |
 |---|---:|---:|
-| `SwiftTUI` | 48 | 513 |
-| `SwiftTUIViews` | 245 | 9249 |
+| `SwiftTUI` | 49 | 516 |
+| `SwiftTUIViews` | 246 | 9255 |
 | `SwiftTUIAnimatedImage` | 5 | 153 |
 | `SwiftTUICharts` | 17 | 1453 |
 | `SwiftTUICore` | 259 | 2585 |
 
 ## SwiftTUI
 
-### Canonical surface (48)
+### Canonical surface (49)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
 - `AppLaunchError` — enum — 4 members
+- `ClipboardWritingPresentationSurface` — protocol — 1 member
 - `ConditionalScene` — struct — 5 members
 - `DefaultRenderer` — struct — 9 members
 - `EmptyScene` — struct — 3 members
@@ -65,7 +66,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalCapabilityProfile` — struct — 31 members
 - `TerminalControlMessage` — enum — 3 members
 - `TerminalGraphicsCapabilities` — struct — 17 members
-- `TerminalHost` — class — 15 members
+- `TerminalHost` — class — 16 members
 - `TerminalHostError` — enum — 8 members
 - `TerminalInputParser` — struct — 2 members
 - `TerminalInputReading` — protocol — 1 member
@@ -78,7 +79,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (245)
+### Canonical surface (246)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -126,6 +127,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Capsule` — struct — 134 members
 - `ChangeLifecycleModifier` — struct — 2 members
 - `Circle` — struct — 134 members
+- `ClipboardWriteAction` — struct — 4 members
 - `ConditionalContent` — struct — 125 members
 - `ContentShapeModifier` — struct — 2 members
 - `ControlGroup` — struct — 125 members
@@ -146,7 +148,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `EnvironmentKey` — protocol — 2 members
 - `EnvironmentReader` — struct — 123 members
 - `EnvironmentTransformModifier` — struct — 2 members
-- `EnvironmentValues` — struct — 30 members
+- `EnvironmentValues` — struct — 31 members
 - `EnvironmentWritingModifier` — struct — 2 members
 - `ExclusiveGesture` — struct — 11 members
 - `FileOpenError` — enum — 3 members

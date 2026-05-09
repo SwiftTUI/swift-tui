@@ -28,7 +28,8 @@ public final class SwiftUIHostSceneHost {
   public init<A: SwiftTUI.App>(
     app: A,
     descriptor: SwiftUIHostSceneDescriptor,
-    style: SwiftUIHostTerminalStyle
+    style: SwiftUIHostTerminalStyle,
+    clipboardWriter: (@MainActor @Sendable (String) -> Bool)? = nil
   ) throws {
     self.descriptor = descriptor
     self.style = style
@@ -54,6 +55,7 @@ public final class SwiftUIHostSceneHost {
           focusedIdentity: focusedIdentity
         )
       },
+      onClipboardWrite: clipboardWriter ?? NativeClipboard.write,
       onFocusPresentationChange: { [weak self] presentation in
         self?.updateFocusPresentation(presentation)
       }

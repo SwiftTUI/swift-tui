@@ -177,7 +177,7 @@ struct LiveRegionAnnouncerTests {
       presentationSurface: surface,
       terminalInputReader: LiveRegionScriptedInputReader(events: [
         .key(KeyPress(.return)),
-        .key(KeyPress(.character("c"), modifiers: .ctrl)),
+        .key(KeyPress(.character("d"), modifiers: .ctrl)),
       ]),
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
@@ -195,7 +195,7 @@ struct LiveRegionAnnouncerTests {
     let result = try await runLoop.run()
 
     let output = surface.writes.joined()
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(output.contains("button: Save"))
     #expect(output.contains("assertive: Saved"))
   }

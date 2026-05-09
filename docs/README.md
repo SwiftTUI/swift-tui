@@ -73,7 +73,7 @@ No dated implementation plans are currently active.
 
 Implementation and post-mortem records retained for context:
 
-- [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md) — shipped `TextEditor` V2 shortcut and selection-rendering record; clipboard copy/cut, host value/selection transport, IME/composition, and large-document storage are explicit deferrals
+- [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md) — shipped `TextEditor` V2 shortcut, selection-rendering, clipboard copy/cut, and default-exit record; host value/selection transport, IME/composition, and large-document storage are explicit deferrals
 - [plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md) — shipped fractional pointer, coordinate-space, Canvas-grid, terminal-pixel, host-precision, and gesture implementation record; the remaining Canvas/pointer API decisions are resolved in the plan status section
 - [plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md](plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md) — shipped SwiftUI host native VoiceOver focus bridge, making runtime focus move native accessibility focus by default while leaving native-to-runtime focus for a later interaction contract
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — shipped Canvas pixel-grid rendering, direct cell writes, styled Braille, half-block grids, gifeditor migration, and documentation; the standalone `Examples/canvas` package named by the historical record is not currently maintained

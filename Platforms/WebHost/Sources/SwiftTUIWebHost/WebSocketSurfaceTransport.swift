@@ -21,8 +21,9 @@ package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConve
   }
 }
 
-package final class WebSocketSurfaceTransport: PresentationSurface, SemanticPresentationSurface,
-  Sendable
+package final class WebSocketSurfaceTransport: PresentationSurface,
+  ClipboardWritingPresentationSurface,
+  SemanticPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -110,6 +111,13 @@ package final class WebSocketSurfaceTransport: PresentationSurface, SemanticPres
   package func clearScreen() throws {}
 
   package func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  @MainActor
+  package func writeClipboard(_ text: String) throws -> Bool {
+    try sendBytes(Array(WebSurfaceFrameEncoder.encodeClipboard(text).utf8))
+    return true
+  }
 
   @discardableResult
   package func present(

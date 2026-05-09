@@ -175,12 +175,15 @@ package enum TextInputCommand: Equatable, Sendable {
   case replaceSelection(String)
   case setSelection(TextSelection)
   case selectAll
+  case copySelection
+  case cutSelection
 }
 
 package struct TextInputMutation: Equatable, Sendable {
   package var value: TextInputValue
   package var changedRange: TextRange?
   package var insertedText: String
+  package var clipboardText: String?
   package var shouldWriteBinding: Bool
   package var shouldRequestFrame: Bool
 
@@ -188,12 +191,14 @@ package struct TextInputMutation: Equatable, Sendable {
     value: TextInputValue,
     changedRange: TextRange? = nil,
     insertedText: String = "",
+    clipboardText: String? = nil,
     shouldWriteBinding: Bool = false,
     shouldRequestFrame: Bool = false
   ) {
     self.value = value
     self.changedRange = changedRange
     self.insertedText = insertedText
+    self.clipboardText = clipboardText
     self.shouldWriteBinding = shouldWriteBinding
     self.shouldRequestFrame = shouldRequestFrame
   }

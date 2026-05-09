@@ -1235,6 +1235,9 @@ extension RunLoop {
     if effectiveEnvironmentValues.resetFocus.isPlaceholder {
       effectiveEnvironmentValues.resetFocus = runtimeResetFocusAction()
     }
+    if effectiveEnvironmentValues.clipboardWriteAction.isPlaceholder {
+      effectiveEnvironmentValues.clipboardWriteAction = runtimeClipboardWriteAction()
+    }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     if runtimeConfiguration.motion == .reduced {
       transactionSnapshot.animationRequest = .disabled

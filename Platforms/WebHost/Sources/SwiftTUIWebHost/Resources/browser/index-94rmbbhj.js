@@ -355,6 +355,16 @@ class WebHostOutputDecoder {
     return [this.decodeLine(text)];
   }
   decodeLine(line) {
+    if (line.startsWith(`${recordPrefix}clipboard:`)) {
+      try {
+        const record = JSON.parse(line.slice(`${recordPrefix}clipboard:`.length));
+        if (isWebHostClipboardRecord(record)) {
+          return { type: "clipboard", text: record.text };
+        }
+      } catch {}
+      return { type: "text", text: `${line}
+` };
+    }
     if (!line.startsWith(`${recordPrefix}surface:`)) {
       return { type: "text", text: `${line}
 ` };
@@ -368,6 +378,9 @@ class WebHostOutputDecoder {
     return { type: "text", text: `${line}
 ` };
   }
+}
+function isWebHostClipboardRecord(value) {
+  return !!value && typeof value === "object" && typeof value.text === "string";
 }
 function encodeResizeControlMessage(columns, rows, cellWidth, cellHeight) {
   const normalizedColumns = Math.max(1, Math.round(columns));
@@ -502,6 +515,9 @@ class BrowserWASIBridge {
         switch (record.type) {
           case "surface":
             sink.presentSurface(record.frame);
+            break;
+          case "clipboard":
+            sink.writeClipboard?.(record.text);
             break;
           case "text":
             sink.writeOutput?.(record.text);
@@ -643,6 +659,9 @@ class WebSocketSceneBridge {
     switch (record.type) {
       case "surface":
         sink.presentSurface(record.frame);
+        break;
+      case "clipboard":
+        sink.writeClipboard?.(record.text);
         break;
       case "text":
         sink.writeOutput?.(record.text);
@@ -1562,6 +1581,7 @@ class WebHostSceneRuntime {
     this.installResizeObserver();
     this.bridge?.bindOutput({
       presentSurface: (frame) => this.presentSurface(frame),
+      writeClipboard: (text) => this.writeClipboard(text),
       writeOutput: (text) => this.writeOutput(text),
       writeError: (text) => this.writeOutput(text)
     });
@@ -1603,6 +1623,15 @@ class WebHostSceneRuntime {
       this.terminalMount.appendChild(diagnosticText);
     }
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
+  }
+  async writeClipboard(text) {
+    const clipboard = globalThis.navigator?.clipboard;
+    if (!clipboard?.writeText) {
+      return;
+    }
+    try {
+      await clipboard.writeText(text);
+    } catch {}
   }
   sendInput(chunk) {
     this.onInput(chunk);

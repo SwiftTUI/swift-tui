@@ -104,9 +104,11 @@ test("bridge decodes websocket output and sends queued input when the socket ope
   });
   const frames: unknown[] = [];
   const text: string[] = [];
+  const clipboard: string[] = [];
 
   bridge.bindOutput({
     presentSurface: (frame) => frames.push(frame),
+    writeClipboard: (value) => clipboard.push(value),
     writeOutput: (chunk) => text.push(chunk),
   });
 
@@ -119,6 +121,7 @@ test("bridge decodes websocket output and sends queued input when the socket ope
   socket.message(encoder.encode(
     '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'
       + '"accessibilityTree":[{"id":"root","rect":[0,0,2,1],"role":"group"}]}\n'
+      + '\u001Eclipboard:{"text":"copied text"}\n'
       + "legacy output\n"
   ));
   await Promise.resolve();
@@ -129,6 +132,7 @@ test("bridge decodes websocket output and sends queued input when the socket ope
     width: 2,
     accessibilityTree: [{ id: "root", role: "group" }],
   });
+  expect(clipboard).toEqual(["copied text"]);
   expect(text).toEqual(["legacy output\n"]);
 
   bridge.sendInput(encoder.encode("\u001Ekey:return:0\n"));

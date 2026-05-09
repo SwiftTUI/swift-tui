@@ -373,7 +373,7 @@ extension TerminalInputParser {
 
     switch firstByte {
     case 0x01...0x02, 0x04...0x08, 0x0B...0x0C, 0x0E...0x1A:
-      // Ctrl+A through Ctrl+Z (excluding 0x03=Ctrl+C, 0x09=Tab, 0x0A/0x0D=Return)
+      // Ctrl+A through Ctrl+Z (excluding 0x03=Ctrl+C, 0x09=Tab, 0x0A/0x0D=Return).
       bufferedBytes.removeFirst()
       let letter = Character(UnicodeScalar(Int(firstByte) + 0x60)!)
       return .key(KeyPress(.character(letter), modifiers: .ctrl))

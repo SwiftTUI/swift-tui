@@ -81,7 +81,7 @@ struct AnimatedImageTests {
 
     #expect(
       result.exitReason
-        == RunLoopExitReason.userExit(KeyPress(.character("c"), modifiers: .ctrl))
+        == RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
     )
     #expect(host.observedReferences.contains(expectedSecondFrame))
     #expect(result.renderedFrames >= 2)
@@ -179,7 +179,7 @@ private final class AnimatedImageConditionalInputReader: InputReading {
           elapsedNanoseconds += pollNanoseconds
         }
 
-        continuation.yield(KeyPress(.character("c"), modifiers: .ctrl))
+        continuation.yield(KeyPress(.character("d"), modifiers: .ctrl))
         continuation.finish()
       }
 

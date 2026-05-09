@@ -214,6 +214,77 @@ struct TextInputReducerTests {
     #expect(mutation.shouldRequestFrame)
   }
 
+  @Test("copy selection reports selected text without mutating")
+  func copySelectionReportsSelectedTextWithoutMutating() {
+    let value = TextInputValue(
+      text: "hello world",
+      selection: TextSelection(anchor: TextOffset(6), head: TextOffset(11))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .copySelection,
+      traits: .multiline,
+      layout: nil
+    )
+
+    #expect(mutation.value == value)
+    #expect(mutation.clipboardText == "world")
+    #expect(!mutation.shouldWriteBinding)
+    #expect(!mutation.shouldRequestFrame)
+  }
+
+  @Test("cut selection copies selected text and deletes it")
+  func cutSelectionCopiesSelectedTextAndDeletesIt() {
+    let value = TextInputValue(
+      text: "hello world",
+      selection: TextSelection(anchor: TextOffset(6), head: TextOffset(11))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .cutSelection,
+      traits: .multiline,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "hello ")
+    #expect(mutation.value.selection == .caret(at: TextOffset(6)))
+    #expect(mutation.changedRange == TextRange(TextOffset(6)..<TextOffset(11)))
+    #expect(mutation.clipboardText == "world")
+    #expect(mutation.shouldWriteBinding)
+    #expect(mutation.shouldRequestFrame)
+  }
+
+  @Test("secure copy and cut never expose clipboard text")
+  func secureCopyAndCutNeverExposeClipboardText() {
+    let value = TextInputValue(
+      text: "secret",
+      selection: TextSelection(anchor: TextOffset(0), head: TextOffset(6))
+    )
+    let reducer = TextInputReducer()
+
+    let copied = reducer.reduce(
+      value,
+      command: .copySelection,
+      traits: .secureField,
+      layout: nil
+    )
+    let cut = reducer.reduce(
+      value,
+      command: .cutSelection,
+      traits: .secureField,
+      layout: nil
+    )
+
+    #expect(copied.value == value)
+    #expect(copied.clipboardText == nil)
+    #expect(!copied.shouldWriteBinding)
+    #expect(cut.value == value)
+    #expect(cut.clipboardText == nil)
+    #expect(!cut.shouldWriteBinding)
+  }
+
   @Test("modified key presses map to word movement, word deletion, and select all")
   func modifiedKeyPressesMapToWordMovementWordDeletionAndSelectAll() {
     #expect(
@@ -239,6 +310,18 @@ struct TextInputReducerTests {
         for: KeyPress(.character("a"), modifiers: .ctrl),
         traits: .multiline
       ) == .selectAll
+    )
+    #expect(
+      textInputCommand(
+        for: KeyPress(.character("c"), modifiers: .ctrl),
+        traits: .multiline
+      ) == .copySelection
+    )
+    #expect(
+      textInputCommand(
+        for: KeyPress(.character("x"), modifiers: .ctrl),
+        traits: .multiline
+      ) == .cutSelection
     )
   }
 

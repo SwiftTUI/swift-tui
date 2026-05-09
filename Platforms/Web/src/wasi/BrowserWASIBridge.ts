@@ -75,6 +75,9 @@ export class BrowserWASIBridge {
         case "surface":
           sink.presentSurface(record.frame);
           break;
+        case "clipboard":
+          void sink.writeClipboard?.(record.text);
+          break;
         case "text":
           sink.writeOutput?.(record.text);
           break;

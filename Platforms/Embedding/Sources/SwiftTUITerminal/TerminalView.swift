@@ -21,19 +21,21 @@ public struct TerminalView<Session: TerminalSession>: View {
   public var body: some View {
     let _ = updateGeneration
     EnvironmentReader(\.terminalEventHandlers) { terminalEventHandlers in
-      GeometryReader { proxy in
-        ForeignSurface(payload: SessionGridPayload(session: session))
-          .focusable(true)
-          .onKeyPress { keyPress in
-            guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
-              return .ignored
+      EnvironmentReader(\.clipboardWriteAction) { clipboardWriteAction in
+        GeometryReader { proxy in
+          ForeignSurface(payload: SessionGridPayload(session: session))
+            .focusable(true)
+            .onKeyPress { keyPress in
+              guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
+                return .ignored
+              }
+              Task {
+                await session.send(key: key)
+              }
+              return .handled
             }
-            Task {
-              await session.send(key: key)
-            }
-            return .handled
-          }
-          .task(id: TerminalViewLifecycleID(session: ObjectIdentifier(session), size: proxy.size)) {
+            .task(id: TerminalViewLifecycleID(session: ObjectIdentifier(session), size: proxy.size))
+          {
             let events = session.events()
             try? await session.start()
             try? await session.resize(proxy.size)
@@ -46,6 +48,8 @@ public struct TerminalView<Session: TerminalSession>: View {
                 terminalEventHandlers.titleChanged?(title)
               case .workingDirectoryChanged(let directory):
                 terminalEventHandlers.workingDirectoryChanged?(directory)
+              case .clipboardWriteRequested(let bytes):
+                _ = clipboardWriteAction(String(decoding: bytes, as: UTF8.self))
               default:
                 break
               }
@@ -55,6 +59,7 @@ public struct TerminalView<Session: TerminalSession>: View {
               onExit?(reason)
             }
           }
+        }
       }
     }
   }

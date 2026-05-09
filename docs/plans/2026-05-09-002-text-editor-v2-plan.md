@@ -18,9 +18,10 @@ overlaps.
 
 **Current status:** Shipped. `TextEditor` now uses the shared V2 shortcut
 foundation and renders focused range selections through the shared text-input
-presentation path. Clipboard copy/cut, host-native value/selection transport,
-IME/composition, and large-document storage remain explicitly deferred until
-the repo has the relevant clipboard, host-event, or performance evidence.
+presentation path. Clipboard copy/cut now writes through terminal, hosted,
+SwiftUI, Web/WASI, and embedding host adapters. Host-native value/selection
+transport, IME/composition, and large-document storage remain explicitly
+deferred until the repo has the relevant host-event or performance evidence.
 
 ## Boundaries
 
@@ -48,10 +49,9 @@ the repo has the relevant clipboard, host-event, or performance evidence.
   accessibility caret behavior with focused tests.
 - [x] **Clipboard command routing.** Decide copy/cut/select-all routing against
   the runtime's exit-binding precedence. Current policy: focused text inputs may
-  consume `ctrl-a` for select-all; `ctrl-c` remains the default exit binding
-  unless an app-level `keyCommand` explicitly intercepts it; copy/cut commands
-  stay deferred until a clipboard adapter and secure-field suppression policy
-  exist.
+  consume `ctrl-a` for select-all; the default exit binding is `ctrl-d`;
+  `ctrl-c` / `ctrl-x` perform host-backed copy/cut for focused text inputs; and
+  secure fields suppress clipboard text.
 - [x] **Host value and selection transport.** Define the selection wire model
   boundary for Web/WASI and SwiftUI hosts. Current decision: do not add public
   or wire-level value/selection fields in this V2 tranche. A future host plan
@@ -85,7 +85,7 @@ the repo has the relevant clipboard, host-event, or performance evidence.
 - Green checkpoint: `swiftly run swift test --filter SwiftTUITests.TextEditorSurfaceTests`
   passes composed `TextEditor` range-selection rendering.
 - Green checkpoint: `swiftly run swift test --filter SwiftTUITests.TextInputRuntimeIntegrationTests`
-  pins `ctrl-a` select-all routing and `ctrl-c` default-exit precedence for
-  focused `TextEditor`.
+  pins `ctrl-a` select-all routing, host-backed copy/cut, secure-field
+  suppression, and `ctrl-d` default-exit precedence for focused `TextEditor`.
 - Final gate: `bun run test` passes all policy checks, root SwiftPM tests,
   platform package tests, example package tests, and perf-tool tests.

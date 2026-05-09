@@ -1,7 +1,8 @@
 import Synchronization
 
 package final class StreamingTerminalHost: PresentationSurface, DamageAwarePresentationSurface,
-  TerminalInputCapabilityProviding, TerminalCursorFocusPresentationSurface, Sendable
+  ClipboardWritingPresentationSurface, TerminalInputCapabilityProviding,
+  TerminalCursorFocusPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -229,6 +230,15 @@ package final class StreamingTerminalHost: PresentationSurface, DamageAwarePrese
     writeLock.withLock { _ in
       outputHandler(output)
     }
+  }
+
+  @discardableResult
+  @MainActor
+  package func writeClipboard(
+    _ text: String
+  ) throws -> Bool {
+    try write(terminalClipboardSequence(for: text))
+    return true
   }
 
   package func clearScreen() throws {
