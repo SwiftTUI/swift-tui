@@ -131,6 +131,16 @@ extension RunLoop {
       }
     }
 
+    if keyPress == KeyPress(.escape, modifiers: []) {
+      if let pop = renderer.topmostNavigationDestinationPopAction(
+        along: currentFocusScopePath()
+      ) {
+        pop()
+        scheduler.requestInvalidation(of: [rootIdentity])
+        return nil
+      }
+    }
+
     switch keyPress {
     case KeyPress(.tab, modifiers: .shift):
       focusTracker.focusPrevious()

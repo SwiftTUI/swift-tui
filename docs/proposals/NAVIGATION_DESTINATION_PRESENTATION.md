@@ -1,6 +1,6 @@
 # Navigation Destination Presentation
 
-**Status:** Proposed
+**Status:** Implemented for the binding-driven v1 surface.
 
 **Decision:** Start with binding-driven destination presentation only. Do not
 add `NavigationLink`, value links, public `NavigationPath`, or selection-driven
@@ -741,7 +741,7 @@ Implement this in two stages:
    in `NavigationStackStyle`, toolbar conventions, a workspace/pane API, or
    documentation-only patterns.
 
-This gives the framework a real navigation destination model without importing
-`NavigationLink` or a GUI navigation bar. It also leaves enough room to add
-path-based routing later if terminal examples show that binding-driven
-destinations are too narrow.
+Stage 1 is shipped: the framework has a real binding-driven destination model
+without importing `NavigationLink` or a GUI navigation bar. Stage 2 remains a
+future evidence-gathering track if terminal examples show that chrome, titles,
+breadcrumbs, or path-based routing are needed.

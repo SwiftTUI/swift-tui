@@ -42,7 +42,9 @@ Current async presentation and frame-tail worker ownership is summarized in
   readers, anchor preferences, `OpenLinkAction`, actor-context-aware
   `.task(...)`, default-focus modifiers, and graph-scoped imperative state
   writes for live runtime callbacks
-- Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`
+- Presentation and workflow surfaces including terminal-native `alert`,
+  `confirmationDialog`, `sheet`, `toast`, and binding-driven
+  `NavigationStack` destinations
 
 ### Accessibility
 
@@ -79,6 +81,10 @@ Current async presentation and frame-tail worker ownership is summarized in
 - The same authored `App` can feed three execution modes: terminal-native execution, WASI execution, or host-managed embedding through peer GUI host packages
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` for terminal-native shell composition
+- Binding-driven `NavigationStack` destination presentation through
+  `navigationDestination(isPresented:)` and `navigationDestination(item:)`;
+  `NavigationLink`, public `NavigationPath`, and automatic Back chrome remain
+  intentionally out of the shipped surface
 - terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
 
 ### Charts
