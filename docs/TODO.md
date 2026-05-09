@@ -29,8 +29,9 @@
 - [ ] Implement the binding-driven `NavigationStack` destination-presentation
   surface. `TabView` has shipped and ActionScope is ready to treat destinations
   as scopes, but there is no stack host or destination-presentation API.
-  `NavigationLink`, value links, and public `NavigationPath` are out of scope
-  for the first navigation surface; start from the proposed
+  `NavigationLink` is rejected, not deferred (see proposal §"Why
+  `NavigationLink` Stays Out"); value links and public `NavigationPath` are
+  deferred until evidence demands them. Start from the
   `navigationDestination(isPresented:)` and `navigationDestination(item:)`
   design. Supporting docs:
   [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md),
@@ -59,13 +60,4 @@
   Decide which controls matter next: scroll-to-identity, anchor-based scrolling,
   page/home/end policy, scrollback and preview conventions, or host transport
   hooks. Supporting docs: [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md),
-  [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).
-- [ ] Reconcile navigation-surface taxonomy. The repo now has focus traversal,
-  list/table selection, `TabView`, command scopes, scene attachment, and semantic
-  navigation-route placeholders, but no single document says which navigation
-  concepts are first-class and which are composed patterns. Produce a short plan
-  that separates route navigation, mode/tab switching, pane/workspace switching,
-  command-palette discovery, and ordinary focus movement before implementing more
-  public navigation API. Supporting docs: [VISION.md](VISION.md),
-  [FOCUS.md](FOCUS.md),
   [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).

@@ -58,6 +58,66 @@ SwiftUI's `navigationDestination(isPresented:destination:)` and
 - No default floating card or page-stack chrome.
 - No public environment push API in v1.
 
+## Why `NavigationLink` Stays Out
+
+`NavigationLink` is on the non-goals list above, but the framing matters. It is
+not deferred pending evidence. It is rejected because every signal in this
+codebase argues that the primitive does the wrong work for terminal UX. Future
+evidence might unlock a public path-based form, a value-typed destination
+mapping, or an environment push API; none of those would re-open the question
+about `NavigationLink` itself.
+
+The Terminal Native Doctrine's second principle names the canonical TUI loop
+as select, preview, act, confirm, stay oriented. The list pane and the preview
+pane stay coherent because moving through the list updates the preview without
+changing the active surface. `NavigationLink` couples row selection to a stack
+push: in SwiftUI's selection-bound list with `NavigationLink` rows, arrow
+movement is the route change. Importing that coupling here would mean every
+arrow keypress replaces the workspace with a detail page, which is the
+opposite of the workspace-first pattern this framework is shaped around.
+
+The codebase has also already separated focus from selection from activation.
+[FOCUS.md §10](../FOCUS.md) works through the distinction in detail. SwiftUI's
+selection-bound list communicates two things — the route-active row and the
+keyboard cursor — through one channel because there is a downstream
+`NavigationLink` to anchor the route signal. This runtime has no such anchor;
+the selected row is the focused row in nearly every case the runtime cares
+about. Adding `NavigationLink` would re-introduce the dual signal into a model
+that has already settled the simpler one. The chevron-decorated row affordance
+that comes with it is also pure GUI carryover: terminal users activate via
+cursor plus Enter, not by clicking a row's disclosure indicator.
+
+Authority flows up in this framework, not down.
+[ADR-0003](../decisions/0003-action-scopes-not-global-hotkeys.md) enshrines
+shallowest-wins for command dispatch — authority lives at scope roots, and
+deep dependencies cannot silently override a shell-level claim.
+`NavigationLink` runs in the opposite direction: a deep row decides that
+activating it pushes a stack-level destination, and the binding controlling
+that push is not visible at the call site. The state change is real, the
+source of truth is hidden, and the only way back is a built-in Back affordance
+the framework deliberately does not ship. The proposed
+`navigationDestination(item:)` form forces the binding into the open: a
+destination pushes only because the author mutated state the author owns. That
+is the same invariant `.sheet(item:)`, `.alert(item:)`, and the rest of the
+presentation family already enforce, and that `Panel`, `TabView`, and the
+toolbar surface preserve in their own ways. `NavigationLink` would be the only
+primitive in the framework that pushes by side effect.
+
+Page stacks are the doctrine's first anti-pattern. *Card-stack composition as
+a default app aesthetic* leads the anti-pattern list in
+[TERMINAL_NATIVE_DOCTRINE.md](../TERMINAL_NATIVE_DOCTRINE.md).
+`NavigationLink` is the most direct way to write code that produces that
+aesthetic by syntax: list of rows, tap a row, land on a page, repeat. A
+binding-driven destination requires authors to opt in to surface replacement,
+which surfaces the design choice each time. It biases the resulting app
+toward the workspace shape the doctrine recommends.
+
+This is why every entry under §"Deferred Work" stays in scope as a future
+addition except `NavigationLink` and the value-link row primitive. A future
+path-based form, value-typed mapping, or environment push API can land
+additively without re-opening the question. `NavigationLink` cannot — adding
+it would have to displace the rules above.
+
 ## Proposed Public Surface
 
 ### NavigationStack
@@ -407,6 +467,60 @@ The only built-in back affordance is framework-owned Escape. Visible back
 affordances are authored with `.toolbarItem(...)`, command palettes, help
 surfaces, or ordinary buttons.
 
+## Authoring A Legible Push
+
+V1 ships no destination chrome. A push that produces an empty rectangle on
+screen with no border, no Back affordance, and no depth indicator is
+technically valid but practically confusing. The framework's existing
+primitives compose into a legible push without requiring framework-level
+chrome decisions, and the convention is worth naming so authors do not feel
+the absence as a gap.
+
+The conventional pattern is: wrap the destination root in a `Panel`, declare
+a Close toolbar item that mutates the controlling binding, and let the focus
+rules from §"Focus Semantics" do the rest.
+
+```swift
+struct TrackBrowser: View {
+  @State private var selectedTrack: Track?
+
+  var body: some View {
+    NavigationStack(id: "tracks") {
+      TrackList(selection: $selectedTrack)
+        .navigationDestination(item: $selectedTrack) { track in
+          TrackDetail(track: track)
+            .panel(id: "track-detail")
+            .toolbarItem(
+              .init(title: "Close", systemHint: "Esc") {
+                selectedTrack = nil
+              }
+            )
+        }
+    }
+    .toolbar(style: .defaultBottom)
+  }
+}
+```
+
+Three things make this push legible:
+
+- The destination's `Panel` gives it a focusable rectangular region with a
+  stable identity, so the visible affordances ride on the same scaffolding
+  the rest of the framework uses for legibility.
+- The toolbar item gives the user an explicit Close target with a `systemHint`
+  of `Esc`, which echoes the framework-owned Escape behavior described in
+  §"Back And Dismissal Semantics" without depending on automatic Back chrome
+  the framework does not synthesize.
+- A border, separator, or label on the destination's `Panel` (authored with
+  standard modifiers) communicates the surface change visually, since the
+  framework does not animate the push.
+
+Authors who need a depth indicator, a breadcrumb, or a destination title can
+author them on the destination root with ordinary view code. The proposal
+does not standardize these because v1 does not yet have evidence about what
+shape they should take. Stage 2 (see §"Recommendation") is where that
+evidence is collected.
+
 ## Presentation Interplay
 
 Navigation destinations are not portal overlays. They replace the visible
@@ -582,15 +696,39 @@ Focused tests should land before or with implementation.
 
 ## Deferred Work
 
+The items below are not in v1, but they are not all deferred for the same
+reason. Distinguishing the categories matters for how a future stage decides
+to address them.
+
+### Deferred Until Evidence
+
 - Public `NavigationPath` or typed path binding.
 - `navigationDestination(for:)` value-type mapping.
-- Public `NavigationLink`.
-- Public environment navigation controller.
+- Public environment navigation controller (a `@Environment(\.dismiss)`-style
+  push/pop API).
 - Automatic Back toolbar item.
 - Navigation title and subtitle rendering.
 - Breadcrumb or stack-depth status chrome.
+
+These can land additively if examples surface a clear terminal-native shape.
+None of them displaces the binding-driven core proposed here.
+
+### Out Of Scope (See §"Why `NavigationLink` Stays Out")
+
+- Public `NavigationLink`.
+- Value-link row primitive (`NavigationLink(value:)`-style).
+
+These are rejected, not deferred. Adding them later would have to displace
+the binding-source-of-truth, shallowest-wins-authority, and selection-is-not-
+navigation rules this proposal preserves.
+
+### Different Track
+
 - `NavigationSplitView`.
 - Workspace/pane/session APIs.
+
+These belong to the workspace track outlined in [TODO.md](../TODO.md), not to
+the navigation-destination surface.
 
 ## Recommendation
 
