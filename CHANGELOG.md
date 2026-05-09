@@ -18,10 +18,19 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `964b7191` Completed reduced-motion behavior across the remaining animated
+  surfaces: `PhaseAnimator` and `AnimatedImage` no longer start playback tasks
+  when reduced motion is active, transition intermediates and matched geometry
+  are covered by disabled animation transactions, and the accessibility docs no
+  longer list reduced motion as an open gap. See
+  `964b7191` [Sources/SwiftTUIViews/Animation/PhaseAnimator.swift](Sources/SwiftTUIViews/Animation/PhaseAnimator.swift),
+  `964b7191` [Sources/SwiftTUIAnimatedImage/AnimatedImage.swift](Sources/SwiftTUIAnimatedImage/AnimatedImage.swift),
+  `964b7191` [Tests/SwiftTUITests/MotionAndProgressPolicyTests.swift](Tests/SwiftTUITests/MotionAndProgressPolicyTests.swift),
+  and `964b7191` [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - `7b32d595` Cleaned up stale historical accessibility proposal open questions:
   resolved questions now point to ADR-0011 through ADR-0015 and shipped
-  behavior, while only reduced-motion, modal-focus, and native-host-focus policy
-  remain listed as proposal-level questions. See
+  behavior, while only modal-focus and native-host-focus policy remain listed
+  as proposal-level questions after the reduced-motion completion. See
   `7b32d595` [docs/proposals/ACCESSIBILITY.md](docs/proposals/ACCESSIBILITY.md)
   and `e2dc520f` [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - `f12401cf` Replaced `.task(id:)` reflected-value descriptor identity with

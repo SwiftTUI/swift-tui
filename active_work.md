@@ -67,13 +67,6 @@
 Source of truth for shipped accessibility behavior:
 [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 
-- [ ] Complete reduced-motion policy and tests across transitions,
-  `PhaseAnimator`, `AnimatedImage`, matched geometry, and animated content
-  changes. Supporting docs and source:
-  [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md),
-  [docs/decisions/0013-accessibility-runtime-policy.md](docs/decisions/0013-accessibility-runtime-policy.md),
-  [Sources/SwiftTUIViews/Animation/PhaseAnimator.swift](Sources/SwiftTUIViews/Animation/PhaseAnimator.swift),
-  [Sources/SwiftTUIAnimatedImage/AnimatedImage.swift](Sources/SwiftTUIAnimatedImage/AnimatedImage.swift).
 - [ ] Finish the modal accessibility focus contract for initial focus,
   trap/cycle behavior, dismiss restoration fallback, and target-bridge behavior
   across `sheet`, `alert`, and `confirmationDialog`. Supporting docs and tests:
