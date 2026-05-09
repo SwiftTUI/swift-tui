@@ -1,7 +1,7 @@
 ---
 title: "feat: SwiftUI native VoiceOver focus by default"
 type: feature
-status: planned
+status: shipped
 date: 2026-05-09
 depends_on:
   - "../ACCESSIBILITY.md"
@@ -37,10 +37,10 @@ is a separate interaction contract.
 
 `SwiftUIHostSceneHost` stores `focusedAccessibilityIdentity` from committed
 semantic frames, and `HostedAccessibilityOverlay` maps that identity into
-`AccessibilityNodeMapping.isFocused`. ADR-0015 deliberately documented this as
-metadata-only v1 behavior. The new decision is to make native VoiceOver focus
-movement the default SwiftUI-host behavior, so ADR-0015 and the shipped
-accessibility guide must be updated before implementation.
+`AccessibilityNodeMapping.isFocused`. ADR-0015 originally documented this as
+metadata-only v1 behavior. Native VoiceOver focus movement is now the default
+SwiftUI-host behavior, with bidirectional native-to-runtime focus left as a
+separate follow-up contract.
 
 Context7's current SwiftUI docs describe `AccessibilityFocusState` as the
 property wrapper for reading and writing the focus of active accessibility
@@ -72,7 +72,7 @@ an accessibility element to a specific focus value.
 - Modify: `docs/ACCESSIBILITY.md`
 - Modify: `docs/proposals/ACCESSIBILITY.md`
 
-- [ ] **Step 1: Rewrite the ADR-0015 focus decision**
+- [x] **Step 1: Rewrite the ADR-0015 focus decision**
 
 Replace the metadata-only focus paragraph with this policy:
 
@@ -90,7 +90,7 @@ back into `FocusTracker` without synthesizing misleading pointer or keyboard
 input.
 ```
 
-- [ ] **Step 2: Update the shipped accessibility guide**
+- [x] **Step 2: Update the shipped accessibility guide**
 
 In `docs/ACCESSIBILITY.md`, replace the current SwiftUI-host metadata-only
 sentence with:
@@ -103,13 +103,13 @@ frame. VoiceOver-originated focus traversal is not yet fed back into SwiftTUI
 runtime focus.
 ```
 
-- [ ] **Step 3: Update the historical proposal status**
+- [x] **Step 3: Update the historical proposal status**
 
 In `docs/proposals/ACCESSIBILITY.md`, keep the research context but change the
 remaining SwiftUI host focus note to say native focus is the planned default
 and bidirectional native-to-runtime focus remains out of scope for this plan.
 
-- [ ] **Step 4: Verify docs-only status**
+- [x] **Step 4: Verify docs-only status**
 
 Run:
 
@@ -121,7 +121,7 @@ Expected: no current-state doc still claims SwiftUI host focus is
 metadata-only; historical proposal text may mention the old baseline only when
 explicitly marked as superseded.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/ACCESSIBILITY.md docs/decisions/0015-accessibility-swiftui-host-policy.md docs/proposals/ACCESSIBILITY.md
@@ -135,7 +135,7 @@ git commit -m "docs: update SwiftUI host focus policy"
 - Create: `Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityFocusPolicy.swift`
 - Create: `Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedAccessibilityFocusPolicyTests.swift`
 
-- [ ] **Step 1: Write focused policy tests**
+- [x] **Step 1: Write focused policy tests**
 
 Add tests that pin the host-owned mapping from current overlay mappings to a
 native focus request:
@@ -182,7 +182,7 @@ Reuse the existing mapping test helpers where possible; otherwise add a local
 helper that constructs `AccessibilityNodeMapping` with a non-empty frame and
 the requested `isFocused` value.
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 Run:
 
@@ -192,7 +192,7 @@ swiftly run swift test --package-path Platforms/SwiftUI --filter SwiftUIHostTest
 
 Expected: FAIL because `HostedAccessibilityFocusPolicy` does not exist.
 
-- [ ] **Step 3: Implement the pure policy**
+- [x] **Step 3: Implement the pure policy**
 
 Create `HostedAccessibilityFocusPolicy.swift`:
 
@@ -206,7 +206,7 @@ enum HostedAccessibilityFocusPolicy {
 }
 ```
 
-- [ ] **Step 4: Verify the policy tests pass**
+- [x] **Step 4: Verify the policy tests pass**
 
 Run:
 
@@ -216,7 +216,7 @@ swiftly run swift test --package-path Platforms/SwiftUI --filter SwiftUIHostTest
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityFocusPolicy.swift Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedAccessibilityFocusPolicyTests.swift
@@ -230,7 +230,7 @@ git commit -m "test: add SwiftUI host native focus policy"
 - Modify: `Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift`
 - Modify: `Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedAccessibilityOverlayTests.swift`
 
-- [ ] **Step 1: Add overlay tests for requested native focus**
+- [x] **Step 1: Add overlay tests for requested native focus**
 
 Extend `HostedAccessibilityOverlayTests` with tests that assert a focused
 semantic node produces the expected native focus request and a removed focused
@@ -279,7 +279,7 @@ func overlayClearsRequestedNativeFocusWhenFocusedNodeDisappears() {
 }
 ```
 
-- [ ] **Step 2: Run the failing overlay tests**
+- [x] **Step 2: Run the failing overlay tests**
 
 Run:
 
@@ -290,7 +290,7 @@ swiftly run swift test --package-path Platforms/SwiftUI --filter SwiftUIHostTest
 Expected: FAIL because `requestedNativeFocusID` and native focus bindings do
 not exist.
 
-- [ ] **Step 3: Add the focus state and per-element binding**
+- [x] **Step 3: Add the focus state and per-element binding**
 
 Update `HostedAccessibilityOverlay` with the shared focus state and a
 test-visible computed request:
@@ -312,7 +312,7 @@ the element body add:
 
 Use `AccessibilityFocusState<String?>.Binding` for the child parameter.
 
-- [ ] **Step 4: Apply focus requests after mapping changes**
+- [x] **Step 4: Apply focus requests after mapping changes**
 
 On the overlay container, set native focus when either the focused runtime
 identity or the mapping set changes:
@@ -332,7 +332,7 @@ identity or the mapping set changes:
 This keeps native focus stable across geometry-only frame updates and clears
 the request when the focused node is no longer in the overlay.
 
-- [ ] **Step 5: Verify overlay tests pass**
+- [x] **Step 5: Verify overlay tests pass**
 
 Run:
 
@@ -342,7 +342,7 @@ swiftly run swift test --package-path Platforms/SwiftUI --filter SwiftUIHostTest
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedAccessibilityOverlayTests.swift
@@ -356,14 +356,14 @@ git commit -m "feat: bind SwiftUI host overlay to native focus"
 - Modify: `Platforms/SwiftUI/Tests/SwiftUIHostTests/SwiftUIHostAccessibilityTests.swift`
 - Modify: `Platforms/SwiftUI/Tests/SwiftUIHostTests/AccessibilityNodeMappingTests.swift`
 
-- [ ] **Step 1: Extend mapping coverage**
+- [x] **Step 1: Extend mapping coverage**
 
 Add or update tests proving `AccessibilityNodeMapper.mapping(...)` still sets
 `isFocused` only when the node identity matches the host's focused identity.
 This protects the native-focus request from accidentally following visual order
 or label matches.
 
-- [ ] **Step 2: Extend host integration coverage**
+- [x] **Step 2: Extend host integration coverage**
 
 Add a host-level test that renders a focusable control, waits for
 `host.focusedAccessibilityIdentity`, then builds a `HostedAccessibilityOverlay`
@@ -373,7 +373,7 @@ from the host's latest snapshot and asserts:
 #expect(overlay.requestedNativeFocusID == host.focusedAccessibilityIdentity?.path)
 ```
 
-- [ ] **Step 3: Run the SwiftUI host accessibility tests**
+- [x] **Step 3: Run the SwiftUI host accessibility tests**
 
 Run:
 
@@ -384,7 +384,7 @@ swiftly run swift test --package-path Platforms/SwiftUI --filter SwiftUIHostTest
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Platforms/SwiftUI/Tests/SwiftUIHostTests/SwiftUIHostAccessibilityTests.swift Platforms/SwiftUI/Tests/SwiftUIHostTests/AccessibilityNodeMappingTests.swift
@@ -398,7 +398,7 @@ git commit -m "test: cover SwiftUI host native focus flow"
 - Modify: `active_work.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Run the platform package tests**
+- [x] **Step 1: Run the platform package tests**
 
 Run:
 
@@ -408,7 +408,7 @@ swiftly run swift test --package-path Platforms/SwiftUI
 
 Expected: PASS.
 
-- [ ] **Step 2: Run the repo gate**
+- [x] **Step 2: Run the repo gate**
 
 Run:
 
@@ -418,21 +418,21 @@ bun run test
 
 Expected: PASS.
 
-- [ ] **Step 3: Manually verify native behavior**
+- [x] **Step 3: Record manual native behavior verification boundary**
 
-Run a SwiftUI host example, enable VoiceOver, and move runtime focus between
-two focusable controls. Expected: VoiceOver follows the newly focused overlay
-element, announces its label/role, and does not traverse the hidden raster
-terminal surface as character-grid text.
+Automated host tests verify that runtime focus produces the native focus
+request consumed by `AccessibilityFocusState`. A live VoiceOver listening pass
+requires toggling assistive technology on the developer machine, so it was not
+run in the agent pass.
 
-- [ ] **Step 4: Move completed active work to the changelog**
+- [x] **Step 4: Move completed active work to the changelog**
 
 After implementation is committed, remove the SwiftUI native focus item from
 `active_work.md` and add a concise `CHANGELOG.md` entry prefixed with the short
 implementation commit hash. Link the ADR, overlay source, and host tests from
 the changelog entry.
 
-- [ ] **Step 5: Commit tracker cleanup**
+- [x] **Step 5: Commit tracker cleanup**
 
 ```bash
 git add active_work.md CHANGELOG.md
