@@ -18,6 +18,12 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `7b32d595` Cleaned up stale historical accessibility proposal open questions:
+  resolved questions now point to ADR-0011 through ADR-0015 and shipped
+  behavior, while only reduced-motion, modal-focus, and native-host-focus policy
+  remain listed as proposal-level questions. See
+  `7b32d595` [docs/proposals/ACCESSIBILITY.md](docs/proposals/ACCESSIBILITY.md)
+  and `e2dc520f` [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - `f12401cf` Replaced `.task(id:)` reflected-value descriptor identity with
   retained value comparison in the view graph, preserving the public
   `ID: Equatable` overload while making task restart decisions compare authored
