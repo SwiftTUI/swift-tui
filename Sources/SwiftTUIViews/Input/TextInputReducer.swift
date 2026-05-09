@@ -33,6 +33,8 @@ package struct TextInputReducer: Sendable {
       return copySelection(in: value, traits: traits)
     case .cutSelection:
       return cutSelection(in: value, traits: traits)
+    case .pasteClipboard:
+      return TextInputMutation(value: value)
     }
   }
 

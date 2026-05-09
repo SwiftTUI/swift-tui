@@ -1228,7 +1228,9 @@ extension RunLoop {
     effectiveEnvironmentValues.activePaletteCommands = latestActivePaletteCommands
     effectiveEnvironmentValues.accessibilityReduceMotion = runtimeConfiguration.motion == .reduced
     effectiveEnvironmentValues.suppressesProgress = runtimeConfiguration.noProgress
-    effectiveEnvironmentValues.cursorFollowsFocus = runtimeConfiguration.cursorFollowsFocus
+    effectiveEnvironmentValues.cursorFollowsFocus =
+      runtimeConfiguration.cursorFollowsFocus
+      || usesTerminalCursorForTextInput
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
@@ -1237,6 +1239,9 @@ extension RunLoop {
     }
     if effectiveEnvironmentValues.clipboardWriteAction.isPlaceholder {
       effectiveEnvironmentValues.clipboardWriteAction = runtimeClipboardWriteAction()
+    }
+    if effectiveEnvironmentValues.clipboardReadAction.isPlaceholder {
+      effectiveEnvironmentValues.clipboardReadAction = runtimeClipboardReadAction()
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     if runtimeConfiguration.motion == .reduced {
@@ -1382,9 +1387,7 @@ extension RunLoop {
   private func applyTerminalCursorFocusPolicy(
     semanticSnapshot: SemanticSnapshot
   ) throws {
-    guard runtimeConfiguration.output == .tui,
-      runtimeConfiguration.cursorFollowsFocus
-    else {
+    guard runtimeConfiguration.output == .tui else {
       return
     }
     guard
@@ -1393,12 +1396,40 @@ extension RunLoop {
       return
     }
 
-    let policy = AccessibilityRuntimePolicy()
-    let cursorPoint = policy.focusedCursorPoint(
-      in: semanticSnapshot,
-      focusedIdentity: focusTracker.currentFocusIdentity
-    )
+    let focusedNode = focusedAccessibilityNode(in: semanticSnapshot)
+    let usesTextInputCursor =
+      focusedNode?.cursorAnchor != nil
+      || currentFocusPresentation.prefersTextInput
+    guard runtimeConfiguration.cursorFollowsFocus || usesTextInputCursor else {
+      return
+    }
+
+    let cursorPoint =
+      if runtimeConfiguration.cursorFollowsFocus {
+        AccessibilityRuntimePolicy().focusedCursorPoint(
+          in: semanticSnapshot,
+          focusedIdentity: focusTracker.currentFocusIdentity
+        )
+      } else {
+        focusedNode?.cursorAnchor
+      }
     try terminalSurface.presentAccessibilityCursorFocus(at: cursorPoint)
+  }
+
+  private var usesTerminalCursorForTextInput: Bool {
+    runtimeConfiguration.output == .tui
+      && presentationSurface is any TerminalCursorFocusPresentationSurface
+  }
+
+  private func focusedAccessibilityNode(
+    in semanticSnapshot: SemanticSnapshot
+  ) -> AccessibilityNode? {
+    guard let focusedIdentity = focusTracker.currentFocusIdentity else {
+      return nil
+    }
+    return semanticSnapshot.accessibilityNodes.first { node in
+      node.identity == focusedIdentity
+    }
   }
 
   private func appendPendingAccessibilityAnnouncements(

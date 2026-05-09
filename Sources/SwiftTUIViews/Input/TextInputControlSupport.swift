@@ -29,7 +29,8 @@ package func registerTextInputBinding(
       traits: traits,
       layout: layout,
       authoringContext: authoringContext,
-      clipboardWriteAction: context.environmentValues.clipboardWriteAction
+      clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+      clipboardReadAction: context.environmentValues.clipboardReadAction
     )
   }
 
@@ -47,7 +48,8 @@ package func registerTextInputBinding(
         traits: traits,
         layout: layout,
         authoringContext: authoringContext,
-        clipboardWriteAction: context.environmentValues.clipboardWriteAction
+        clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+        clipboardReadAction: context.environmentValues.clipboardReadAction
       )
     })
 }
@@ -60,17 +62,29 @@ private func applyTextInputCommand(
   traits: TextInputTraits,
   layout: @escaping @MainActor (TextInputValue) -> TextInputLayoutMap?,
   authoringContext: ImperativeAuthoringContextSnapshot?,
-  clipboardWriteAction: ClipboardWriteAction
+  clipboardWriteAction: ClipboardWriteAction,
+  clipboardReadAction: ClipboardReadAction
 ) -> Bool {
   withImperativeAuthoringContext(authoringContext) {
     let currentValue = value.wrappedValue.synchronized(with: binding.wrappedValue)
+    let resolvedCommand: TextInputCommand
+    if command == .pasteClipboard {
+      guard let clipboardText = clipboardReadAction() else {
+        return true
+      }
+      resolvedCommand = .insertText(clipboardText)
+    } else {
+      resolvedCommand = command
+    }
     let mutation = TextInputReducer().reduce(
       currentValue,
-      command: command,
+      command: resolvedCommand,
       traits: traits,
       layout: layout(currentValue)
     )
-    let isClipboardCommand = command == .copySelection || command == .cutSelection
+    let isClipboardCommand =
+      command == .copySelection || command == .cutSelection
+      || command == .pasteClipboard
     let didWriteClipboard: Bool
     if let clipboardText = mutation.clipboardText {
       guard clipboardWriteAction(clipboardText) else {
@@ -206,6 +220,11 @@ private func ctrlTextInputCommand(
       return nil
     }
     return .cutSelection
+  case .character("v"), .character("V"):
+    guard !isSelecting else {
+      return nil
+    }
+    return .pasteClipboard
   case .arrowLeft:
     return .move(.wordBackward, selecting: isSelecting)
   case .arrowRight:

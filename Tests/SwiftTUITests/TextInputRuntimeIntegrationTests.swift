@@ -154,6 +154,34 @@ struct TextInputRuntimeIntegrationTests {
     #expect(box.setCount == 1)
   }
 
+  @Test("TextEditor terminal cursor is default and follows moved caret")
+  func textEditorTerminalCursorFollowsMovedCaretByDefault() throws {
+    let box = PasteTextBox()
+    box.value = "abc"
+    let identity = testIdentity("DefaultCursorTextEditor")
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 12, height: 4)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+    try renderPending(runLoop.runLoop)
+
+    let firstCursorPoint = try #require(runLoop.host.movedCursorPoints.last)
+    #expect(firstCursorPoint.x > 0)
+    #expect(!surfaceText(runLoop.host).contains("abc_"))
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.arrowLeft)) == nil)
+    try renderPending(runLoop.runLoop)
+
+    let movedCursorPoint = try #require(runLoop.host.movedCursorPoints.last)
+    #expect(movedCursorPoint.x == firstCursorPoint.x - 1)
+    #expect(movedCursorPoint.y == firstCursorPoint.y)
+    #expect(!surfaceText(runLoop.host).contains("abc_"))
+  }
+
   @Test("TextEditor runtime Ctrl+A selects all before replacement")
   func textEditorRuntimeCtrlASelectsAllBeforeReplacement() throws {
     let box = PasteTextBox()
@@ -215,6 +243,28 @@ struct TextInputRuntimeIntegrationTests {
     #expect(reason == nil)
     #expect(runLoop.host.clipboardWrites == ["hello"])
     #expect(box.value == "")
+  }
+
+  @Test("TextEditor runtime Ctrl+V pastes host clipboard text")
+  func textEditorRuntimeCtrlVPastesHostClipboardText() throws {
+    let box = PasteTextBox()
+    box.value = "hello "
+    let identity = testIdentity("PasteShortcutTextEditor")
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 20, height: 5)
+    }
+    runLoop.host.clipboardReadText = "world"
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+
+    let reason = runLoop.runLoop.handleKeyPress(KeyPress(.character("v"), modifiers: .ctrl))
+
+    #expect(reason == nil)
+    #expect(box.value == "hello world")
+    #expect(runLoop.host.clipboardReadCount == 1)
   }
 
   @Test("SecureField runtime Ctrl+C and Ctrl+X do not expose secure text")
@@ -403,7 +453,8 @@ private func surfaceText(_ host: TextInputRuntimeTerminalHost) -> String {
 }
 
 private final class TextInputRuntimeTerminalHost: PresentationSurface,
-  ClipboardWritingPresentationSurface
+  ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface,
+  TerminalCursorFocusPresentationSurface
 {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
@@ -412,6 +463,10 @@ private final class TextInputRuntimeTerminalHost: PresentationSurface,
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
   private(set) var clipboardWrites: [String] = []
+  var clipboardReadText: String?
+  private(set) var clipboardReadCount = 0
+  private(set) var movedCursorPoints: [CellPoint] = []
+  private(set) var writes: [String] = []
   private let surfaceSizeProvider: () -> CellSize
 
   init(
@@ -426,15 +481,21 @@ private final class TextInputRuntimeTerminalHost: PresentationSurface,
 
   func enableRawMode() throws {}
   func disableRawMode() throws {}
-  func write(_: String) throws {}
+  func write(_ output: String) throws { writes.append(output) }
   func clearScreen() throws {}
-  func moveCursor(to _: CellPoint) throws {}
+  func moveCursor(to point: CellPoint) throws { movedCursorPoints.append(point) }
 
   @discardableResult
   @MainActor
   func writeClipboard(_ text: String) throws -> Bool {
     clipboardWrites.append(text)
     return true
+  }
+
+  @MainActor
+  func readClipboard() throws -> String? {
+    clipboardReadCount += 1
+    return clipboardReadText
   }
 
   @discardableResult

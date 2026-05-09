@@ -206,6 +206,46 @@ private enum ClipboardWriteActionKey: EnvironmentKey {
   static let defaultValue = ClipboardWriteAction.placeholder
 }
 
+package struct ClipboardReadAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible
+{
+  package let snapshotLabel: String
+  package let isPlaceholder: Bool
+  private let handler: @MainActor @Sendable () -> String?
+
+  @MainActor
+  package func callAsFunction() -> String? {
+    handler()
+  }
+
+  package var description: String {
+    snapshotLabel
+  }
+
+  package var debugDescription: String {
+    snapshotLabel
+  }
+
+  package init(
+    snapshotLabel: String,
+    isPlaceholder: Bool,
+    handler: @escaping @MainActor @Sendable () -> String?
+  ) {
+    self.snapshotLabel = snapshotLabel
+    self.isPlaceholder = isPlaceholder
+    self.handler = handler
+  }
+
+  package static let placeholder = Self(
+    snapshotLabel: "ClipboardReadAction.default",
+    isPlaceholder: true,
+    handler: { nil }
+  )
+}
+
+private enum ClipboardReadActionKey: EnvironmentKey {
+  static let defaultValue = ClipboardReadAction.placeholder
+}
+
 private enum StackAxisKey: EnvironmentKey {
   static let defaultValue: SwiftTUICore.Axis? = nil
 }
@@ -677,6 +717,11 @@ extension EnvironmentValues {
   public var clipboardWriteAction: ClipboardWriteAction {
     get { self[ClipboardWriteActionKey.self] }
     set { self[ClipboardWriteActionKey.self] = newValue }
+  }
+
+  package var clipboardReadAction: ClipboardReadAction {
+    get { self[ClipboardReadActionKey.self] }
+    set { self[ClipboardReadActionKey.self] = newValue }
   }
 }
 
