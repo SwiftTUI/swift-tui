@@ -32,6 +32,7 @@
   are anchored non-modal overlays, menu-like intrinsic surfaces, sheet chrome
   variants, or an explicit non-goal; then pin focus/action-scope behavior,
   dismissal, anchor placement, and terminal fallback layout. Supporting docs:
+  [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md),
   [VISION.md](VISION.md),
   [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
 - [ ] Design the first-class terminal workspace surface. `TerminalView` already
