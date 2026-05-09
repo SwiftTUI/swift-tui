@@ -1,3 +1,4 @@
+import CoreGraphics
 import SwiftTUI
 import Testing
 
@@ -22,16 +23,26 @@ func scene_host_stores_latest_semantic_snapshot() async throws {
       && host.latestSemanticSnapshot?.accessibilityNodes.contains {
         $0.label == "Host action"
       } == true
+      && host.focusedAccessibilityIdentity != nil
   }
 
+  let snapshot = try #require(host.latestSemanticSnapshot)
+  let focusedIdentity = try #require(host.focusedAccessibilityIdentity)
   let actionNode = try #require(
-    host.latestSemanticSnapshot?.accessibilityNodes.first {
+    snapshot.accessibilityNodes.first {
       $0.label == "Host action"
     }
   )
-  if let focusedAccessibilityIdentity = host.focusedAccessibilityIdentity {
-    #expect(focusedAccessibilityIdentity == actionNode.identity)
-  }
+
+  #expect(focusedIdentity == actionNode.identity)
+
+  let overlay = HostedAccessibilityOverlay(
+    semanticSnapshot: snapshot,
+    focusedIdentity: focusedIdentity,
+    cellSize: CGSize(width: 8, height: 16)
+  )
+
+  #expect(overlay.requestedNativeFocusID == focusedIdentity.path)
 }
 
 @MainActor
