@@ -18,6 +18,12 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `5cc2d3a4` Refreshed the public API inventory for the shipped border/stroke
+  simplification: placement now lives on `StrokeStyle`, removed stroke sugar
+  presets are no longer documented as public, and the generated API baseline is
+  current. See
+  `5cc2d3a4` [docs/PUBLIC_API_INVENTORY.md](docs/PUBLIC_API_INVENTORY.md)
+  and `5cc2d3a4` [Sources/SwiftTUICore/Styling/Styling.swift](Sources/SwiftTUICore/Styling/Styling.swift).
 - `e3178a74` Reconciled the terminal-embedding tracker state by marking the
   implementation plan shipped, pointing the docs index at it as an
   implementation record, and removing the stale active-work item. See

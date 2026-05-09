@@ -20,11 +20,6 @@
 
 ## Repo Documentation Hygiene
 
-- [ ] Update the public API inventory for the border/stroke simplification that
-  has already landed in source. Supporting docs and source:
-  [docs/PUBLIC_API_INVENTORY.md](docs/PUBLIC_API_INVENTORY.md),
-  [Sources/SwiftTUICore/Styling/BorderSet.swift](Sources/SwiftTUICore/Styling/BorderSet.swift),
-  [Sources/SwiftTUICore/Styling/Styling.swift](Sources/SwiftTUICore/Styling/Styling.swift).
 - [ ] Reconcile historical animation proposal status with current transition and
   matched-geometry source. Supporting docs and source:
   [docs/proposals/ANIMATION_PLAN.md](docs/proposals/ANIMATION_PLAN.md),
