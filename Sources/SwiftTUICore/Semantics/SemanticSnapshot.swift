@@ -38,6 +38,7 @@ public struct FocusRegion: Equatable, Sendable {
   public var focusInteractions: FocusInteractions
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
+  package var modalFocusScopePath: [Identity]?
 
   public init(
     identity: Identity,
@@ -51,6 +52,23 @@ public struct FocusRegion: Equatable, Sendable {
     self.focusInteractions = focusInteractions
     self.scopePath = scopePath
     self.sectionIdentity = sectionIdentity
+    self.modalFocusScopePath = nil
+  }
+
+  package init(
+    identity: Identity,
+    rect: CellRect,
+    focusInteractions: FocusInteractions = .automatic,
+    scopePath: [Identity] = [],
+    sectionIdentity: Identity? = nil,
+    modalFocusScopePath: [Identity]?
+  ) {
+    self.identity = identity
+    self.rect = rect
+    self.focusInteractions = focusInteractions
+    self.scopePath = scopePath
+    self.sectionIdentity = sectionIdentity
+    self.modalFocusScopePath = modalFocusScopePath
   }
 }
 
