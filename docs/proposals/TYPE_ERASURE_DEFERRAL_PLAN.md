@@ -48,21 +48,22 @@ The runtime and scene layer now follow the maximum path:
 
 ## Current Re-Scope Status
 
-As of 2026-05-09, the remaining production erasure is no longer an "easy
-internal helper cleanup" pass. Current source concentrates `AnyView` in:
+As of 2026-05-09, the builder-backbone fork has been resolved in favor of the
+typed structural path already present in source. `TupleView` is pack-backed, and
+`DeclaredChildrenView` exposes typed resolve, deferred payload, portal payload,
+and metadata-first enumeration traversal. The old package-only erased declared
+child traversal was unused compatibility debt and has been retired.
 
-- the builder backbone: `DeclaredChildrenView`, `TupleView`,
-  `ConditionalContent`, `VariadicView`, `Group`, and `ForEach` still traffic in
-  `[AnyView]` for compatibility and structural child flattening;
-- `ViewBuilder.buildLimitedAvailability`, which remains the deliberate
-  availability-erasure seam;
+Current production `AnyView` use is therefore deliberate and narrow:
+
+- `ViewBuilder.buildLimitedAvailability`, the availability-erasure seam;
 - the public `AnyView` implementation and package-owned scope-preserving
-  `scopedAnyView(...)` helper.
+  `scopedAnyView(...)` helper;
+- explicit internal escape hatches that pass the public-surface policy review.
 
-Do not continue by deleting isolated `AnyView` calls. The next implementation
-step must first choose whether to land the typed structural builder backbone or
-to preserve the current builder compatibility seams and only document the
-remaining builder erasure.
+No broad parameter-pack migration remains for builder children at this time.
+Future work should not reintroduce `[AnyView]` builder plumbing unless a new
+runtime requirement proves typed traversal insufficient.
 
 The inventory below is retained as the investigation record for earlier
 categories. Use this re-scope section as the live implementation boundary.

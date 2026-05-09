@@ -106,21 +106,16 @@ struct FixtureEntry {
 Keep the identity source next to the erased value. Tests should assert behavior,
 not rely on `AnyView` being transparent in the resolved tree.
 
-### Builder Backbone Compatibility
+### Builder Backbone Traversal
 
-The current builder backbone still flattens some structural children into
-`[AnyView]`. That is tolerated because it is package-owned implementation debt
-tracked by the type-erasure deferral plan, not a public pattern to copy.
+The builder backbone uses typed structural traversal. `TupleView`,
+`ConditionalContent`, `VariadicView`, `Group`, and `ForEach` expose declared
+children through resolve, deferred payload, portal payload, and metadata-first
+enumeration paths rather than flattening builder output into `[AnyView]`.
 
-```swift
-package func collectChildren(
-  from view: some View,
-  into children: inout [AnyView]
-)
-```
-
-Do not expand this pattern to new subsystems unless the deferral plan explicitly
-calls for it. New builder-like code should prefer typed structural storage.
+Do not reintroduce `[AnyView]` builder plumbing unless a new runtime requirement
+proves typed traversal insufficient. New builder-like code should prefer typed
+structural storage.
 
 ### Deferred Authored Content
 

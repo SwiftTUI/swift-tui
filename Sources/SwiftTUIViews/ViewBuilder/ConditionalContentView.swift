@@ -71,26 +71,6 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
     }
   }
 
-  package func appendErasedDeclaredChildren(
-    into children: inout [AnyView]
-  ) {
-    switch storage {
-    case .trueContent(let content):
-      appendErasedDeclaredBuilderChildren(
-        from: content,
-        into: &children
-      )
-    case .falseContent(let content):
-      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
-        return
-      }
-      appendErasedDeclaredBuilderChildren(
-        from: content,
-        into: &children
-      )
-    }
-  }
-
   package func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   ) {
