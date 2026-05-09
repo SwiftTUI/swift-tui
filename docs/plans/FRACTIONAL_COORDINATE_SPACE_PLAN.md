@@ -15,6 +15,13 @@ Implementation plan prepared from `JOINT_PROPOSAL.md`, `CODEX_PROPOSAL.md`,
 It was later synced with Claude's implementation-plan scratch sections in
 `.agent-comms/scratch/claude-impl-plan-sections.md`.
 
+The plan remains active, but it must be re-scoped before more implementation
+starts. Source has already moved beyond several unchecked phases: continuous
+cell-space geometry, `PointerLocation`, pointer precision policy, terminal pixel
+mouse parsing, Canvas grids, and fractional gesture/control paths are present.
+The remaining work needs a current phase-by-phase inventory rather than blind
+execution of the original checklist.
+
 This plan assumes the project remains pre-release. Source compatibility and
 migration cost are not goals. Temporary compatibility aliases may be useful while
 working on a branch, but they should not be treated as durable public API.

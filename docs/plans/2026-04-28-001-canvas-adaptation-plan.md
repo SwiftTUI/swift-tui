@@ -1,11 +1,16 @@
 ---
 title: "feature: extend Canvas for pixel-grid rendering"
 type: feature
-status: active
+status: shipped
 date: 2026-04-28
 ---
 
 # feature: extend Canvas for pixel-grid rendering
+
+> **Status:** Shipped for Canvas rendering and the gifeditor migration. The
+> pixel-grid, direct-cell, styled-Braille, half-block, example, and documentation
+> phases are implemented. Pointer precision remains explicitly deferred to the
+> fractional-coordinate and Canvas/pointer active work.
 
 ## Overview
 

@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `5cc2d3a4` Closed the stale plan-status tracker by retaining the shipped
+  border/stroke and Canvas rendering plans as implementation records, and by
+  moving the fractional-coordinate uncertainty into the Canvas/pointer active
+  task for a fresh phase inventory. See
+  `5cc2d3a4` [docs/plans/2026-04-26-003-border-stroke-simplification-plan.md](docs/plans/2026-04-26-003-border-stroke-simplification-plan.md),
+  `81d11ad8` [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
+  and `0d3ba0b5` [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md).
 - `7a8d9542` Reconciled the historical animation proposal docs with the shipped
   controller surface: completion callbacks, custom animation evaluation,
   repeat behavior, padding/border/flexible-frame animation, placed-level
