@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `8f113e73` Removed the stale modifier-layer active item because the public
+  `ViewModifier` / `ModifiedContent` migration has already shipped with
+  primitive modifier lowering, modifier algebra tests, transition probing, and
+  tab metadata peeking. See
+  `8f113e73` [docs/proposals/VIEW_MODIFIER_LAYER.md](docs/proposals/VIEW_MODIFIER_LAYER.md),
+  `8f113e73` [Sources/SwiftTUIViews/Foundation/ViewModifier.swift](Sources/SwiftTUIViews/Foundation/ViewModifier.swift),
+  and `8f113e73` [Tests/SwiftTUIViewsTests/ViewModifierAlgebraTests.swift](Tests/SwiftTUIViewsTests/ViewModifierAlgebraTests.swift).
 - `4278c485` Wired `RuntimeConfiguration.debug` into the CLI runtime by enabling
   the existing frame diagnostics logger for `--debug` / `SWIFTTUI_DEBUG=1`, and
   narrowed the remaining runtime-configuration active item to the fields whose
