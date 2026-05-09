@@ -170,6 +170,18 @@ move global VoiceOver focus.
 See [`decisions/0015-accessibility-swiftui-host-policy.md`](decisions/0015-accessibility-swiftui-host-policy.md)
 for the native-host policy.
 
+## Modal Presentations
+
+Modal `sheet`, `alert`, and `confirmationDialog` presentations are accessibility
+focus scopes. While one of those presentations is active, background focus
+regions are suppressed, initial focus moves into the presented surface, and
+keyboard focus cycles within the presentation's active focus regions.
+
+When the presentation is dismissed, runtime focus restores to the previously
+focused background control when that control is still present. If that exact
+control no longer exists, normal focus replacement rules choose the nearest
+remaining focus target.
+
 ## Visual Content Policy
 
 Visual-only content must be labeled, hidden, summarized, or explicitly accepted
@@ -188,9 +200,8 @@ Manual listening coverage is documented in
 ## Remaining Gaps
 
 The shipped accessibility substrate and first target consumers are in place.
-The remaining known behavior gaps are:
+The remaining known behavior gap is:
 
-- Modal presentation focus trapping and focus restoration.
 - Richer native focus control in hosted platforms, beyond the current semantic
   focus metadata.
 
