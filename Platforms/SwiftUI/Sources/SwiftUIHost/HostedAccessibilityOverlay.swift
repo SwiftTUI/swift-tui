@@ -7,6 +7,8 @@ struct HostedAccessibilityOverlay: SwiftUI.View {
   let focusedIdentity: Identity?
   let cellSize: CGSize
 
+  @SwiftUI.AccessibilityFocusState private var nativeFocusedElementID: String?
+
   var mappings: [AccessibilityNodeMapping] {
     AccessibilityNodeMapper.mappings(
       for: semanticSnapshot,
@@ -15,23 +17,38 @@ struct HostedAccessibilityOverlay: SwiftUI.View {
     )
   }
 
+  var requestedNativeFocusID: String? {
+    HostedAccessibilityFocusPolicy.requestedFocusID(in: mappings)
+  }
+
   var body: some SwiftUI.View {
     let mappings = mappings
     ZStack(alignment: .topLeading) {
       ForEach(Array(mappings.enumerated()), id: \.element.id) { offset, mapping in
         HostedAccessibilityElement(
           mapping: mapping,
-          sortPriority: Double(mappings.count - offset)
+          sortPriority: Double(mappings.count - offset),
+          nativeFocusedElementID: $nativeFocusedElementID
         )
       }
     }
     .accessibilityElement(children: .contain)
+    .onAppear {
+      nativeFocusedElementID = requestedNativeFocusID
+    }
+    .onChange(of: requestedNativeFocusID) { _, newValue in
+      nativeFocusedElementID = newValue
+    }
+    .onChange(of: mappings) { _, _ in
+      nativeFocusedElementID = requestedNativeFocusID
+    }
   }
 }
 
 private struct HostedAccessibilityElement: SwiftUI.View {
   let mapping: AccessibilityNodeMapping
   let sortPriority: Double
+  let nativeFocusedElementID: SwiftUI.AccessibilityFocusState<String?>.Binding
 
   var body: some SwiftUI.View {
     SwiftUI.Color.clear
@@ -43,6 +60,7 @@ private struct HostedAccessibilityElement: SwiftUI.View {
       .accessibilityIdentifier(mapping.id)
       .accessibilityAddTraits(mapping.swiftUITraits)
       .accessibilitySortPriority(sortPriority)
+      .accessibilityFocused(nativeFocusedElementID, equals: mapping.id)
   }
 }
 
