@@ -191,6 +191,47 @@ What it does:
 
 Conceptually, default focus is still part of the ``FocusState`` model. It is not a separate focus storage mechanism.
 
+#### Namespace-Scoped Default Focus
+
+SwiftTUI also supports the namespace-scoped default-focus family:
+
+- `.focusScope(namespace)` marks the subtree whose default-focus candidates
+  belong to `namespace`
+- `.prefersDefaultFocus(_:in:)` registers a preferred focus candidate in that
+  namespace
+- `EnvironmentValues.resetFocus` provides a ``ResetFocusAction`` that asks the
+  runtime to reevaluate the namespace's preferred focus
+
+```swift
+struct LoginView: View {
+    @Namespace private var namespace
+    @State private var complete = false
+
+    var body: some View {
+        EnvironmentReader(\.resetFocus) { resetFocus in
+            VStack {
+                TextField("Username", text: .constant(""))
+                    .prefersDefaultFocus(!complete, in: namespace)
+
+                Button("Submit") {}
+                    .prefersDefaultFocus(complete, in: namespace)
+
+                Button("Reset") {
+                    complete = false
+                    resetFocus(in: namespace)
+                }
+            }
+            .focusScope(namespace)
+        }
+    }
+}
+```
+
+This API uses the same runtime focus tracker as keyboard traversal, pointer
+activation, and ``FocusState`` synchronization. If a preferred candidate is not
+currently focusable, reset falls back to the first focusable region in the
+namespace scope.
+
 ### `.focusable(...)` And Custom Controls
 
 Built-in controls already know how to participate in focus where appropriate. Custom controls need to opt in.
@@ -365,7 +406,8 @@ There are two related but distinct questions:
 - which target should receive focus when a screen first becomes active?
 - when focus is cleared or reset, where should it go next?
 
-The runtime answers those with default-focus modifiers tied to ``FocusState``.
+The runtime answers those with default-focus modifiers tied to ``FocusState``
+and namespace-scoped reset through ``ResetFocusAction``.
 
 ## What The Runtime Decides For You Versus What You Author
 

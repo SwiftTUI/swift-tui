@@ -450,6 +450,18 @@ package final class ViewNode {
     )
   }
 
+  package func recordDefaultFocus(
+    _ registration: DefaultFocusScopeRegistrationSnapshot
+  ) {
+    registeredHandlers.recordDefaultFocus(registration)
+  }
+
+  package func recordDefaultFocus(
+    _ registration: DefaultFocusCandidateRegistrationSnapshot
+  ) {
+    registeredHandlers.recordDefaultFocus(registration)
+  }
+
   package func recordFocusBindingRegistration(
     _ registration: FocusBindingRegistrationSnapshot
   ) {

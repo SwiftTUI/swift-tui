@@ -33,6 +33,10 @@ public final class FocusTracker {
     return focusRegions[currentIndex].identity
   }
 
+  package var isPreservingNoFocus: Bool {
+    prefersNoFocus
+  }
+
   @discardableResult
   public func updateRegions(_ regions: [FocusRegion]) -> Bool {
     let previousFocus = currentFocusIdentity

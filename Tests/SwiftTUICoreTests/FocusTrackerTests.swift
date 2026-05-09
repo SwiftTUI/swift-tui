@@ -55,6 +55,51 @@ struct FocusTrackerTests {
     #expect(tracker.currentFocusIdentity == testIdentity("a"))
   }
 
+  @MainActor
+  @Test("default focus registry resolves preferred candidates and reset fallbacks by namespace")
+  func defaultFocusRegistryResolvesNamespaceRequests() {
+    let registry = LocalDefaultFocusRegistry()
+    let firstNamespace = MatchedGeometryNamespace(1)
+    let secondNamespace = MatchedGeometryNamespace(2)
+    let firstScope = testIdentity("Root", "FirstScope")
+    let secondScope = testIdentity("Root", "SecondScope")
+    let first = testIdentity("First")
+    let second = testIdentity("Second")
+    let fallback = testIdentity("Fallback")
+
+    registry.registerScope(
+      namespace: firstNamespace,
+      identity: firstScope
+    )
+    registry.registerScope(
+      namespace: secondNamespace,
+      identity: secondScope
+    )
+    registry.registerCandidate(
+      namespace: firstNamespace,
+      identity: second
+    )
+
+    let focusRegions = [
+      focusRegion(first, y: 0, scopePath: [firstScope]),
+      focusRegion(second, y: 1, scopePath: [firstScope]),
+      focusRegion(fallback, y: 2, scopePath: [secondScope]),
+    ]
+
+    #expect(
+      registry.desiredFocusRequest(
+        focusRegions: focusRegions,
+        shouldApplyInitialDefault: true
+      ) == .focus(second))
+
+    registry.requestReset(in: secondNamespace)
+    #expect(
+      registry.desiredFocusRequest(
+        focusRegions: focusRegions,
+        shouldApplyInitialDefault: false
+      ) == .focus(fallback))
+  }
+
   // MARK: - Section-skipping Tab traversal
 
   @Test("focusNext skips past every region sharing the current section")
@@ -188,6 +233,22 @@ struct FocusTrackerTests {
   }
 
   // MARK: - Helpers
+
+  private func focusRegion(
+    _ identity: Identity,
+    y: Int,
+    scopePath: [Identity] = []
+  ) -> FocusRegion {
+    FocusRegion(
+      identity: identity,
+      rect: CellRect(
+        origin: CellPoint(x: 0, y: y),
+        size: CellSize(width: 10, height: 1)
+      ),
+      focusInteractions: .automatic,
+      scopePath: scopePath
+    )
+  }
 
   private func sectionedRegions(
     _ entries: [(String, String?)]

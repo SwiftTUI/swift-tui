@@ -1,6 +1,26 @@
-package import SwiftTUICore
+public import SwiftTUICore
 
 extension View {
+  public func prefersDefaultFocus(
+    _ prefersDefaultFocus: Bool = true,
+    in namespace: Namespace.ID
+  ) -> some View {
+    modifier(
+      PreferredDefaultFocusModifier(
+        prefersDefaultFocus: prefersDefaultFocus,
+        namespace: namespace
+      )
+    )
+  }
+
+  public func focusScope(
+    _ namespace: Namespace.ID
+  ) -> some View {
+    modifier(
+      DefaultFocusScopeModifier(namespace: namespace)
+    )
+  }
+
   public func defaultFocus(
     _ binding: FocusState<Bool>.Binding,
     _ value: Bool = true
@@ -23,6 +43,44 @@ extension View {
         value: value
       )
     )
+  }
+}
+
+public struct PreferredDefaultFocusModifier: PrimitiveViewModifier {
+  var prefersDefaultFocus: Bool
+  var namespace: Namespace.ID
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let node = content.resolve(in: context)
+    if prefersDefaultFocus {
+      context.localDefaultFocusRegistry?.registerCandidate(
+        namespace: namespace,
+        identity: node.identity
+      )
+    }
+    return [node]
+  }
+}
+
+public struct DefaultFocusScopeModifier: PrimitiveViewModifier {
+  var namespace: Namespace.ID
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    context.localDefaultFocusRegistry?.registerScope(
+      namespace: namespace,
+      identity: node.identity
+    )
+    node.semanticMetadata = node.semanticMetadata.merging(
+      focusStructureMetadata(scopeBoundary: true)
+    )
+    return [node]
   }
 }
 

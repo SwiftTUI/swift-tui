@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- Shipped namespace-scoped default-focus APIs and reset behavior:
+  `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus` now route
+  through the runtime focus tracker, while focused-object support was removed
+  from planned work.
 - Expanded the remaining status-stub tracker into scoped TODO items and removed
   the backlog prose from `STATUS.md`, leaving status as the high-level overview
   while live planned work lives in `TODO.md`.

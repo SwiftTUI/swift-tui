@@ -109,6 +109,7 @@ classifications:
     - SwiftTUIViews.PreferenceKey
     - SwiftTUIViews.ProgressView
     - SwiftTUIViews.Rectangle
+    - SwiftTUIViews.ResetFocusAction
     - SwiftTUIViews.Resolver
     - SwiftTUIViews.RoundedRectangle
     - SwiftTUIViews.ScrollView
@@ -334,12 +335,14 @@ classifications:
     - SwiftTUIViews.OverlayModifier
     - SwiftTUIViews.PaddingModifier
     - SwiftTUIViews.PaletteCommandRegistrationModifier
+    - SwiftTUIViews.PreferredDefaultFocusModifier
     - SwiftTUIViews.PositionModifier
     - SwiftTUIViews.PreferenceBackgroundValueModifier
     - SwiftTUIViews.PreferenceChangeModifier
     - SwiftTUIViews.PreferenceOverlayValueModifier
     - SwiftTUIViews.PreferenceTransformModifier
     - SwiftTUIViews.PreferenceWritingModifier
+    - SwiftTUIViews.DefaultFocusScopeModifier
 
     # ─── View additional style variants ───────────────────────────────────
     - SwiftTUIViews.DangerToastStyle
