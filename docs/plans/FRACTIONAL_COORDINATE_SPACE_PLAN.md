@@ -26,6 +26,39 @@ This plan assumes the project remains pre-release. Source compatibility and
 migration cost are not goals. Temporary compatibility aliases may be useful while
 working on a branch, but they should not be treated as durable public API.
 
+### Current Phase Inventory - 2026-05-08
+
+This inventory replaces the unchecked phase list as the execution guide. The
+old phases remain below as historical implementation context, but they should
+not be followed mechanically.
+
+| Area | Current state | Evidence |
+| --- | --- | --- |
+| Coordinate split | Landed. `Point`, `Size`, `Rect`, and `Vector` are continuous cell-space types; `CellPoint`, `CellSize`, and `CellRect` own integer terminal-cell layout; `PixelPoint` and `PixelSize` are separate provenance/image units. | [Point.swift](../../Sources/SwiftTUICore/Geometry/Point.swift), [CellGeometry.swift](../../Sources/SwiftTUICore/Geometry/CellGeometry.swift), [PixelGeometry.swift](../../Sources/SwiftTUICore/Geometry/PixelGeometry.swift) |
+| Pointer plumbing | Landed. Mouse and local pointer events carry `PointerLocation`; cell fallback centers the reported cell; `PointerInputCapabilities` flows through environment and geometry readers. | [PointerLocation.swift](../../Sources/SwiftTUICore/Pointer/PointerLocation.swift), [PointerPrecisionPolicy.swift](../../Sources/SwiftTUICore/Pointer/PointerPrecisionPolicy.swift), [PointerLocationTests.swift](../../Tests/SwiftTUICoreTests/Pointer/PointerLocationTests.swift) |
+| Gestures and coordinate spaces | Landed. `DragGesture`, `SpatialTapGesture`, pointer paths, hover, content shapes, and named coordinate spaces consume continuous cell points while routing still uses containing cells. | [DragGesture.swift](../../Sources/SwiftTUIViews/Gestures/DragGesture.swift), [SpatialTapGesture.swift](../../Sources/SwiftTUIViews/Gestures/SpatialTapGesture.swift), [PointerPath.swift](../../Sources/SwiftTUIViews/Gestures/PointerPath.swift), [CoordinateSpaceTests.swift](../../Tests/SwiftTUITests/CoordinateSpaceTests.swift) |
+| Host precision | Landed for native, WebHost, and WASI/web transports. Hosts construct `.subCell` locations from their exact local coordinates when cell metrics are available. | [NativeTerminalSurfaceView.swift](../../Platforms/SwiftUI/Sources/SwiftUIHost/NativeTerminalSurfaceView.swift), [WebSurfaceTransport.swift](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift), [WebSocketSurfaceTransport.swift](../../Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift) |
+| Canvas hit testing and drawing | Largely landed. `CanvasContext` maps continuous points and `PointerLocation` values into `CanvasGrid` samples, and `CanvasPixelGridDrawing` covers full-cell and vertical half-block rendering. The standalone `Examples/canvas` package named by the original plan is not present in the current repo; `gifeditor` and the root Canvas tests are the maintained verification surfaces. | [Canvas.swift](../../Sources/SwiftTUIViews/Canvas.swift), [CanvasDrawing.swift](../../Sources/SwiftTUICore/Draw/CanvasDrawing.swift), [CanvasGridTests.swift](../../Tests/SwiftTUICoreTests/CanvasGridTests.swift), [CanvasView.swift](../../Examples/gifeditor/Sources/GIFEditorUI/CanvasView.swift) |
+| Direct-manipulation controls | Landed for the current consumers. Slider tracks, scroll indicators, GIF editor canvas interaction, and chart coordinate helpers use continuous pointer coordinates with cell fallback behavior. | [SwiftUISurfaceTests.swift](../../Tests/SwiftTUITests/SwiftUISurfaceTests.swift), [ScrollIndicatorDraggingTests.swift](../../Tests/SwiftTUITests/ScrollIndicatorDraggingTests.swift), [ChartCoordinateConversion.swift](../../Sources/SwiftTUICharts/ChartCoordinateConversion.swift), [CanvasViewTests.swift](../../Examples/gifeditor/Tests/GIFEditorUITests/CanvasViewTests.swift) |
+| Terminal 1016 | Landed with explicit parser mode, capability policy, live/matrix resolution, tmux/screen safety, setup/teardown coverage, and terminal-pixel gesture delivery. | [InputReader.swift](../../Sources/SwiftTUI/Input/InputReader.swift), [TerminalHost.swift](../../Sources/SwiftTUI/Terminal/TerminalHost.swift), [TerminalGraphicsProtocolTests.swift](../../Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift) |
+| Hover, drop, path, and named spaces | Landed. Hover is subscriber-driven, drop contexts can carry spatial pointer metadata, `Path` supports continuous content shapes, and named spaces preserve fractional coordinates. | [PointerHover.swift](../../Sources/SwiftTUIViews/Gestures/PointerHover.swift), [DropDestinationRegistry.swift](../../Sources/SwiftTUICore/Runtime/DropDestinationRegistry.swift), [Path.swift](../../Sources/SwiftTUICore/Geometry/Path.swift), [ContentShapeTests.swift](../../Tests/SwiftTUITests/ContentShapeTests.swift) |
+
+Remaining work is decision-bound rather than a direct continuation of the old
+phase list:
+
+- Decide whether `PointerPath` needs a bounded sample cap before v1. Current
+  source retains every sample for the current gesture.
+- Decide whether the public `Canvas` closure-authoring form is still desired.
+  The current shipped API keeps the value/protocol form plus
+  `CanvasPixelGridDrawing`.
+- Decide whether `.pixelExact` should stay public while no graphics-protocol
+  pixel-buffer renderer exists, or be hidden until a renderer ships.
+- Decide whether to add a new standalone Canvas example. The currently retained
+  example surface is `gifeditor`.
+
+Do not start new implementation from this document until those choices are
+turned into narrow tasks.
+
 ## Target Outcome
 
 SwiftTUI should expose pointer locations in continuous cell space:

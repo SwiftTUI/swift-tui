@@ -50,11 +50,16 @@
 
 ## Canvas And Pointer Work
 
-- [ ] Re-scope, then finish or close the Canvas pointer-precision tranche.
-  Source has advanced beyond the unchecked plan lists; first produce a current
-  phase inventory covering terminal 1016, Canvas hit testing, host precision,
-  direct-manipulation controls, and remaining plan open questions. Supporting
-  docs and source:
+- [ ] Close the decision-bound leftovers from the fractional-coordinate
+  inventory. Core pointer plumbing, host precision, terminal 1016, Canvas
+  grids, GIF editor Canvas interaction, slider/scroll precision, chart
+  conversion helpers, hover, drop context, content shapes, and named coordinate
+  spaces are already present. Remaining choices need product/API decisions
+  before implementation: `PointerPath` sample-cap policy, public `Canvas`
+  closure-authoring support, `.pixelExact` availability before a graphics
+  renderer exists, and whether to add a new standalone Canvas example.
+  Ambiguity note: do not continue by blindly executing the old phase checklist.
+  Supporting docs and source:
   [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
   [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md),
   [Sources/SwiftTUI/Input/InputReader.swift](Sources/SwiftTUI/Input/InputReader.swift),
