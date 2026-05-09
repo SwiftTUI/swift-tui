@@ -85,7 +85,3 @@ Source of truth for shipped accessibility behavior:
   [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),
   [Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift](Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift),
   [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift).
-- [ ] Clean up stale historical accessibility proposal open questions.
-  Supporting docs:
-  [docs/proposals/ACCESSIBILITY.md](docs/proposals/ACCESSIBILITY.md),
-  [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
