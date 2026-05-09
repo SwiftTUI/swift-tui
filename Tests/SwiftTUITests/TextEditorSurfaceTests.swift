@@ -138,6 +138,48 @@ struct TextEditorSurfaceTests {
     #expect(box.value == "abX\ncd")
   }
 
+  @Test("TextEditor handles word shortcuts and select all")
+  func textEditorHandlesWordShortcutsAndSelectAll() {
+    final class Box {
+      var value = "hello world"
+    }
+
+    let box = Box()
+    let registry = LocalKeyHandlerRegistry()
+    let identity = testIdentity("ShortcutTextEditor")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+
+    _ = DefaultRenderer().render(
+      TextEditor(
+        text: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      )
+      .id(identity)
+      .frame(width: 16, height: 5),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft, modifiers: .alt)))
+    #expect(registry.dispatch(identity: identity, event: .character("X")))
+    #expect(box.value == "hello Xworld")
+
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.backspace, modifiers: .alt)))
+    #expect(box.value == "hello world")
+
+    #expect(
+      registry.dispatch(identity: identity, keyPress: KeyPress(.character("a"), modifiers: .ctrl)))
+    #expect(registry.dispatch(identity: identity, event: .character("Z")))
+    #expect(box.value == "Z")
+  }
+
   @Test("TextEditor keeps focused and unfocused chrome distinct")
   func textEditorFocusStateAffectsRendering() {
     let identity = testIdentity("FocusedTextEditor")

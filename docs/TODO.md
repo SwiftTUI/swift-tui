@@ -26,13 +26,11 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Plan the next `TextEditor` tranche. V1 shipped multiline editing, shared
-  text-input reducer behavior, caret-visible scrolling, paste handling, and
-  accessibility caret anchors. Remaining work is still actionable but belongs in
-  a V2 plan: public custom text-input storage, rope or piece-tree storage for
-  large documents, rich selection rendering, IME/composition, host
-  value/selection transport, copy/cut/select-all, and word movement/deletion
-  shortcuts. Supporting docs:
+- [ ] Continue the `TextEditor` V2 plan after the shipped shortcut foundation.
+  Next slices are visible selection rendering, clipboard command routing, host
+  value/selection transport, IME/composition, and large-document storage.
+  Supporting docs:
+  [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md),
   [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md),
   [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md).
 - [ ] Design the `NavigationStack` / route surface. `TabView` has shipped and

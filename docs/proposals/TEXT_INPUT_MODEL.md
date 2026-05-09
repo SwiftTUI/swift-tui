@@ -1,10 +1,12 @@
 # Text Input Model
 
-**Status:** V1 shipped. The linked V1 plan landed the package-private value
-model, reducer, layout map, presentation projection, field-content view,
-reducer-backed `TextField` / `SecureField`, focused paste dispatch,
-reducer-backed `TextEditor`, caret-visible runtime scrolling, and text-input
-caret anchors in accessibility semantics.
+**Status:** V1 shipped; V2 is active. The linked V1 plan landed the
+package-private value model, reducer, layout map, presentation projection,
+field-content view, reducer-backed `TextField` / `SecureField`, focused paste
+dispatch, reducer-backed `TextEditor`, caret-visible runtime scrolling, and
+text-input caret anchors in accessibility semantics. The V2 plan tracks the
+remaining editor work: selection rendering, clipboard command routing, host
+value/selection transport, IME/composition, and large-document storage.
 
 **Owner:** unassigned.
 
@@ -13,6 +15,8 @@ caret anchors in accessibility semantics.
 - [ACCESSIBILITY.md](./ACCESSIBILITY.md) - cursor-following and text-input caret anchors
 - [2026-05-06-001-text-input-model-v1-plan.md](../plans/2026-05-06-001-text-input-model-v1-plan.md)
   - staged V1 implementation plan
+- [2026-05-09-002-text-editor-v2-plan.md](../plans/2026-05-09-002-text-editor-v2-plan.md)
+  - active V2 `TextEditor` plan
 - [0013-accessibility-runtime-policy.md](../decisions/0013-accessibility-runtime-policy.md)
   - runtime cursor policy
 - [FOCUS.md](../FOCUS.md) - focus traversal and focused values

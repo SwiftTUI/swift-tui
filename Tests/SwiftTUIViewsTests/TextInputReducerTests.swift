@@ -1,5 +1,6 @@
 import Testing
 
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @Suite
@@ -84,6 +85,48 @@ struct TextInputReducerTests {
     #expect(mutation.changedRange == TextRange(TextOffset(1)..<TextOffset(3)))
   }
 
+  @Test("word backspace deletes to the previous word boundary")
+  func wordBackspaceDeletesToPreviousWordBoundary() {
+    let value = TextInputValue(
+      text: "hello, world",
+      selection: .caret(at: TextOffset(12))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .deleteBackward(granularity: .word),
+      traits: .multiline,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == "hello, ")
+    #expect(mutation.value.selection == .caret(at: TextOffset(7)))
+    #expect(mutation.changedRange == TextRange(TextOffset(7)..<TextOffset(12)))
+    #expect(mutation.shouldWriteBinding)
+    #expect(mutation.shouldRequestFrame)
+  }
+
+  @Test("word delete deletes to the next word boundary")
+  func wordDeleteDeletesToNextWordBoundary() {
+    let value = TextInputValue(
+      text: "hello, world",
+      selection: .caret(at: TextOffset(0))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .deleteForward(granularity: .word),
+      traits: .multiline,
+      layout: nil
+    )
+
+    #expect(mutation.value.text == ", world")
+    #expect(mutation.value.selection == .caret(at: TextOffset(0)))
+    #expect(mutation.changedRange == TextRange(TextOffset(0)..<TextOffset(5)))
+    #expect(mutation.shouldWriteBinding)
+    #expect(mutation.shouldRequestFrame)
+  }
+
   @Test("moves left and right by grapheme cluster")
   func movesLeftAndRightByGraphemeCluster() {
     let composed = "e\u{0301}"
@@ -108,6 +151,95 @@ struct TextInputReducerTests {
 
     #expect(movedLeft.selection == .caret(at: TextOffset(1)))
     #expect(movedRight.selection == .caret(at: TextOffset(2)))
+  }
+
+  @Test("moves by word boundaries")
+  func movesByWordBoundaries() {
+    let value = TextInputValue(
+      text: "hello, world",
+      selection: .caret(at: TextOffset(12))
+    )
+    let reducer = TextInputReducer()
+
+    let movedBackward = reducer.reduce(
+      value,
+      command: .move(.wordBackward, selecting: false),
+      traits: .multiline,
+      layout: nil
+    ).value
+    let movedForward = reducer.reduce(
+      TextInputValue(text: "hello, world", selection: .caret(at: TextOffset(0))),
+      command: .move(.wordForward, selecting: false),
+      traits: .multiline,
+      layout: nil
+    ).value
+
+    #expect(movedBackward.selection == .caret(at: TextOffset(7)))
+    #expect(movedForward.selection == .caret(at: TextOffset(5)))
+  }
+
+  @Test("word movement preserves selection anchors")
+  func wordMovementPreservesSelectionAnchors() {
+    let value = TextInputValue(
+      text: "hello, world",
+      selection: .caret(at: TextOffset(12))
+    )
+
+    let moved = TextInputReducer().reduce(
+      value,
+      command: .move(.wordBackward, selecting: true),
+      traits: .multiline,
+      layout: nil
+    ).value
+
+    #expect(moved.selection == TextSelection(anchor: TextOffset(12), head: TextOffset(7)))
+  }
+
+  @Test("select all selects the full text range")
+  func selectAllSelectsTheFullTextRange() {
+    let value = TextInputValue(
+      text: "hello\nworld",
+      selection: .caret(at: TextOffset(4))
+    )
+
+    let mutation = TextInputReducer().reduce(
+      value,
+      command: .selectAll,
+      traits: .multiline,
+      layout: nil
+    )
+
+    #expect(mutation.value.selection == TextSelection(anchor: TextOffset(0), head: TextOffset(11)))
+    #expect(!mutation.shouldWriteBinding)
+    #expect(mutation.shouldRequestFrame)
+  }
+
+  @Test("modified key presses map to word movement, word deletion, and select all")
+  func modifiedKeyPressesMapToWordMovementWordDeletionAndSelectAll() {
+    #expect(
+      textInputCommand(
+        for: KeyPress(.arrowLeft, modifiers: .alt),
+        traits: .multiline
+      ) == .move(.wordBackward, selecting: false)
+    )
+    #expect(
+      textInputCommand(
+        for: KeyPress(.arrowRight, modifiers: [.shift, .alt]),
+        traits: .multiline
+      ) == .move(.wordForward, selecting: true)
+    )
+    #expect(
+      textInputCommand(
+        for: KeyPress(.backspace, modifiers: .alt),
+        traits: .multiline
+      ) == .deleteBackward(granularity: .word)
+    )
+    #expect(
+      textInputCommand(
+        for: KeyPress(.character("a"), modifiers: .ctrl),
+        traits: .multiline
+      ) == .selectAll
+    )
   }
 
   @Test("home and end move within current line")

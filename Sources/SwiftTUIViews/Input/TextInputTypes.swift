@@ -174,6 +174,7 @@ package enum TextInputCommand: Equatable, Sendable {
   case move(TextMovement, selecting: Bool)
   case replaceSelection(String)
   case setSelection(TextSelection)
+  case selectAll
 }
 
 package struct TextInputMutation: Equatable, Sendable {

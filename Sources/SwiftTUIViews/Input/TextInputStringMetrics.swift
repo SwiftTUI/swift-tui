@@ -89,11 +89,65 @@ package enum TextInputStringMetrics {
     lineStarts(in: text).count
   }
 
+  package static func wordBoundaryBefore(
+    _ offset: TextOffset,
+    in text: String
+  ) -> TextOffset {
+    let characters = Array(text)
+    var index = min(offset.rawValue, characters.count)
+    guard index > 0 else {
+      return TextOffset(0)
+    }
+
+    index -= 1
+    while index > 0 && !isWordCharacter(characters[index]) {
+      index -= 1
+    }
+    guard isWordCharacter(characters[index]) else {
+      return TextOffset(0)
+    }
+    while index > 0 && isWordCharacter(characters[index - 1]) {
+      index -= 1
+    }
+    return TextOffset(index)
+  }
+
+  package static func wordBoundaryAfter(
+    _ offset: TextOffset,
+    in text: String
+  ) -> TextOffset {
+    let characters = Array(text)
+    var index = min(offset.rawValue, characters.count)
+    guard index < characters.count else {
+      return TextOffset(characters.count)
+    }
+
+    if isWordCharacter(characters[index]) {
+      while index < characters.count && isWordCharacter(characters[index]) {
+        index += 1
+      }
+    } else {
+      while index < characters.count && !isWordCharacter(characters[index]) {
+        index += 1
+      }
+      while index < characters.count && isWordCharacter(characters[index]) {
+        index += 1
+      }
+    }
+    return TextOffset(index)
+  }
+
   private static func lineStarts(in text: String) -> [Int] {
     var starts = [0]
     for (offset, character) in text.enumerated() where character == "\n" {
       starts.append(offset + 1)
     }
     return starts
+  }
+
+  private static func isWordCharacter(_ character: Character) -> Bool {
+    character.unicodeScalars.contains { scalar in
+      scalar == "_" || scalar.properties.isAlphabetic || scalar.properties.numericType != nil
+    }
   }
 }
