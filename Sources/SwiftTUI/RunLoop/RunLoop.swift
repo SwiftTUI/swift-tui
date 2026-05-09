@@ -424,7 +424,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     focusTracker.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
 
-    let usesRawTerminalMode = runtimeConfiguration.output != .accessible
+    let usesRawTerminalMode = runtimeConfiguration.output == .tui
     if usesRawTerminalMode {
       try presentationSurface.enableRawMode()
       synchronizeInputCapabilities()

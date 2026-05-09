@@ -14,10 +14,11 @@ extension SwiftTUIOptions {
     isStdoutTTY: Bool = isatty(STDOUT_FILENO) != 0
   ) -> RuntimeConfiguration {
     // Step 1: Establish env-var-derived baseline. `--json` is the CLI escape hatch
-    // from env-requested accessible mode, including accessible mode's implied policy.
+    // from env-requested accessible/linear mode, including implied policy.
     var baselineEnvironment = environment
     if json {
       baselineEnvironment["SWIFTTUI_ACCESSIBLE"] = nil
+      baselineEnvironment["SWIFTTUI_LINEAR"] = nil
     }
     let baseline = RuntimeConfiguration.detect(
       environment: baselineEnvironment, isStdoutTTY: isStdoutTTY)
@@ -62,8 +63,9 @@ extension SwiftTUIOptions {
       noProgress = true
     }
 
-    // Linear: --linear overrides baseline.
+    // Linear: --linear selects the accessible linear output path.
     if self.linear {
+      output = .accessible
       linear = true
     }
 
@@ -109,9 +111,6 @@ extension SwiftTUIOptions {
     // Debug: --debug overrides baseline.
     let debug = self.debug || baseline.debug
 
-    // Start-in: CLI value overrides env-var value.
-    let startInResolved = startIn ?? baseline.startIn
-
     return RuntimeConfiguration(
       color: color,
       glyphs: glyphs,
@@ -119,7 +118,6 @@ extension SwiftTUIOptions {
       output: output,
       verbosity: verbosity,
       web: web,
-      startIn: startInResolved,
       debug: debug,
       noProgress: noProgress,
       linear: linear,

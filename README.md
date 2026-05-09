@@ -96,7 +96,7 @@ browser bundle; `--web` is rejected before terminal raw-mode setup.
 
 Apps that want CLI flags plus the framework's standard flag surface
 (`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--web`,
-`--cursor-follows-focus`, `-v`, `--debug`, `--start-in`, ...) import
+`--cursor-follows-focus`, `--json`, `--linear`, `-v`, `--debug`, ...) import
 `SwiftTUIArguments` and conform to `SwiftTUIApp`:
 
 ```swift
@@ -123,10 +123,10 @@ struct MyApp: @preconcurrency SwiftTUIApp {
 > `--plain`, `--accessible`, `--reduce-motion`, `--no-progress`, and
 > `--cursor-follows-focus` now affect runtime behavior. `--web`, `--port`,
 > `--bind`, and `--open` are consumed by the opt-in `SwiftTUIWebHostCLI`
-> runner. `--debug` enables the existing frame diagnostics logger. Flags still
-> pending behavior wiring: `--json` (alternative output mode), standalone
-> `--linear`, and `--start-in`. All flags parse cleanly
-> today; the unwired ones land in follow-up plans. See
+> runner. `--debug` enables the existing frame diagnostics logger. `--json`
+> emits machine-readable frame JSON, and standalone `--linear` selects the
+> accessible linear output path. Launch routing such as "start in this scope"
+> is app-owned consumer policy, not a framework flag. See
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.
 

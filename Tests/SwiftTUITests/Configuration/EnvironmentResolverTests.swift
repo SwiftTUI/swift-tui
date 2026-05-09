@@ -143,13 +143,6 @@ struct EnvironmentResolverTests {
     #expect(configuration.web?.openBrowser == false)
   }
 
-  @Test("SWIFTTUI_START_IN=panel-id propagates")
-  func swiftTUIStartIn() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_START_IN": "panel-id"], isStdoutTTY: true)
-    #expect(configuration.startIn == "panel-id")
-  }
-
   @Test("SWIFTTUI_JSON=1 sets output to .json")
   func swiftTUIJson() {
     let configuration = RuntimeConfiguration.detect(
@@ -157,10 +150,14 @@ struct EnvironmentResolverTests {
     #expect(configuration.output == .json)
   }
 
-  @Test("SWIFTTUI_LINEAR=1 sets linear=true")
+  @Test("SWIFTTUI_LINEAR=1 selects accessible linear output")
   func swiftTUILinear() {
     let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_LINEAR": "1"], isStdoutTTY: true)
+      environment: ["SWIFTTUI_LINEAR": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
+    #expect(configuration.output == .accessible)
+    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.noProgress == true)
     #expect(configuration.linear == true)
   }
 
@@ -197,6 +194,21 @@ struct EnvironmentResolverTests {
     let configuration = RuntimeConfiguration.detect(
       environment: [
         "SWIFTTUI_ACCESSIBLE": "1",
+        "SWIFTTUI_JSON": "1",
+        "LANG": "en_US.UTF-8",
+      ], isStdoutTTY: true)
+    #expect(configuration.output == .json)
+    #expect(configuration.glyphs == .unicode)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.noProgress == false)
+    #expect(configuration.linear == false)
+  }
+
+  @Test("SWIFTTUI_JSON wins over SWIFTTUI_LINEAR when both set")
+  func swiftTUIJsonBeatsLinear() {
+    let configuration = RuntimeConfiguration.detect(
+      environment: [
+        "SWIFTTUI_LINEAR": "1",
         "SWIFTTUI_JSON": "1",
         "LANG": "en_US.UTF-8",
       ], isStdoutTTY: true)

@@ -9,7 +9,7 @@ extension RuntimeConfiguration {
   /// 1. `NO_COLOR` always wins over `FORCE_COLOR`
   /// 2. `CLICOLOR=0` disables color; `CLICOLOR_FORCE` forces it
   /// 3. `SWIFTTUI_JSON=1` wins over `SWIFTTUI_ACCESSIBLE=1`
-  /// 4. Accessible output implies ASCII, reduced motion, no progress, and linear output
+  /// 4. Accessible/linear output implies ASCII, reduced motion, no progress, and linear output
   /// 5. `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` enables terminal cursor focus-following
   /// 6. `SWIFTTUI_PLAIN=1` implies `--no-color --ascii --reduce-motion`
   /// 7. CLI flags (in `SwiftTUIArguments`) layer on top of this result
@@ -56,6 +56,7 @@ extension RuntimeConfiguration {
     }
     var linear = false
     if let v = environment["SWIFTTUI_LINEAR"], !v.isEmpty, v != "0" {
+      output = .accessible
       linear = true
     }
     var cursorFollowsFocus = false
@@ -64,6 +65,7 @@ extension RuntimeConfiguration {
     }
     if let v = environment["SWIFTTUI_JSON"], !v.isEmpty, v != "0" {
       output = .json
+      linear = false
     }
 
     var colorResolved = color
@@ -101,7 +103,6 @@ extension RuntimeConfiguration {
     }()
 
     let debug = (environment["SWIFTTUI_DEBUG"].map { !$0.isEmpty && $0 != "0" }) ?? false
-    let startIn = environment["SWIFTTUI_START_IN"].flatMap { $0.isEmpty ? nil : $0 }
 
     return RuntimeConfiguration(
       color: colorResolved,
@@ -110,7 +111,6 @@ extension RuntimeConfiguration {
       output: output,
       verbosity: verbosity,
       web: web,
-      startIn: startIn,
       debug: debug,
       noProgress: noProgress,
       linear: linear,

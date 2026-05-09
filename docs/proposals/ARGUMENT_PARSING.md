@@ -9,11 +9,13 @@ lives in `SwiftTUI` core. Bare-mode apps honor framework env vars via the
 default `App.main()` extension. Runner-internal scene and attach operations now
 route through subcommands instead of legacy flag forms, and the opt-in
 `SwiftTUIWebHostCLI` runner honors the flag-form WebHost configuration
-(`--web`, `--port`, `--bind`, `--open`). Remaining runtime-configuration
-follow-ups are the fields that still need behavior beyond parsing:
-consumer-defined JSON output, standalone `--linear` layout behavior,
-framework debug instrumentation, `--start-in` scope activation, and the optional
-`myapp web` subcommand shape.
+(`--web`, `--port`, `--bind`, `--open`). Runtime configuration fields now
+drive behavior beyond parsing: JSON emits machine-readable frame output,
+standalone `--linear` selects accessible linear output, and `--debug` enables
+the existing frame diagnostics logger. The previously proposed framework-owned
+`--start-in` / `SWIFTTUI_START_IN` surface was removed because launch scope is
+consumer routing policy. The remaining shape question is the optional
+`myapp web` subcommand and deeper help integration.
 
 The remainder of this document captures the design space for how SwiftTUI
 consumers declare their command line, which flags the framework reserves
@@ -135,7 +137,8 @@ diagnostics all pull from the same surface.
 > - [ADR-0008](../decisions/0008-swifttui-library-only-runners-own-main.md)
 >   — runners own `main()`. Argument parsing must live where `main()` lives.
 > - [ADR-0003](../decisions/0003-action-scopes-not-global-hotkeys.md) —
->   action scopes; some flags (`--start-in <scope-id>`) want to seed scopes.
+>   action scopes; scope seeding is app-owned consumer routing policy rather
+>   than a framework standard flag.
 
 ## Strategic shape
 
@@ -901,14 +904,6 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   )
   public var debug: Bool = false
 
-  // ─── Action scopes (decision 0003) ────────────────────────────
-
-  @Option(
-    name: .customLong("start-in"),
-    help: "Open with the action scope <id> already active."
-  )
-  public var startIn: String?
-
   // ─── Resolution ───────────────────────────────────────────────
 
   public init() {}
@@ -1004,14 +999,13 @@ SWIFTTUI OPTIONS:
   --no-color              Disable color output. [env: NO_COLOR]
   --force-color           Force color output. [env: FORCE_COLOR]
   --plain                 Plain text only: --no-color --ascii --reduce-motion.
-  --linear                Linearize side-by-side layouts.
+  --linear                Accessible linear output.
   --cursor-follows-focus  Move the terminal cursor to focus in TUI output.
   --json                  Output JSON instead of a TUI.
   --web                   Serve over HTTP instead of a local terminal.
   -v, --verbose           Verbose logging (-v, -vv, -vvv).
   --quiet                 Suppress non-error output.
   --debug                 Framework-internal debug instrumentation.
-  --start-in <id>         Open with action scope <id> active.
 
 SUBCOMMANDS:
   web                     Serve the app over HTTP.
@@ -1102,9 +1096,9 @@ swift-argument-parser registration error at parse time.
 | `--force-color` | — | Bool | `false` | Force color even when stdout is not a TTY. |
 | `--no-progress` | — | Bool | `false` | Static status instead of progress bars. |
 | `--plain` | — | Bool | `false` | Implies `--no-color --ascii --reduce-motion`. |
-| `--linear` | — | Bool | `false` | Linearize HStack layouts. |
+| `--linear` | — | Bool | `false` | Accessible linear output. |
 | `--cursor-follows-focus` | — | Bool | `false` | Move the terminal cursor to focus in TUI output. |
-| `--json` | — | Bool | `false` | JSON output (where the app supports it). |
+| `--json` | — | Bool | `false` | Machine-readable frame JSON output. |
 | `--web` | — | Bool | `false` | Web-host mode. (Or use `myapp web` subcommand.) |
 | `--port <n>` | — | Int | `0` | Port for `--web`. `0` = auto-assign. |
 | `--bind <addr>` | — | String | `"127.0.0.1"` | Bind address for `--web`. |
@@ -1112,7 +1106,6 @@ swift-argument-parser registration error at parse time.
 | `--verbose` | `-v` | Int | `0` | Repeat-count verbosity (`-v`, `-vv`, `-vvv`). |
 | `--quiet` | — | Bool | `false` | Suppress non-error logs. |
 | `--debug` | — | Bool | `false` | Framework-internal debug instrumentation. |
-| `--start-in <id>` | — | String? | `nil` | Open with action scope `<id>` active. |
 | `--help` | `-h` | Bool | — | Standard. Auto. |
 | `--help-all` | — | Bool | — | Standard. Auto. Verbose help. |
 | `--version` | — | Bool | — | Standard. Auto. |
@@ -1188,9 +1181,9 @@ truth for which env vars exist. This table extends it.
 | `SWIFTTUI_REDUCE_MOTION=1` | `--reduce-motion` | Framework | Suppress animations. |
 | `SWIFTTUI_NO_PROGRESS=1` | `--no-progress` | Framework | No progress bars. |
 | `SWIFTTUI_PLAIN=1` | `--plain` | Framework | Combined plain mode. |
-| `SWIFTTUI_LINEAR=1` | `--linear` | Framework | Linearize layouts. |
+| `SWIFTTUI_LINEAR=1` | `--linear` | Framework | Accessible linear output. |
 | `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` | `--cursor-follows-focus` | Framework | Move the terminal cursor to focus in TUI output. |
-| `SWIFTTUI_JSON=1` | `--json` | Framework | JSON output. |
+| `SWIFTTUI_JSON=1` | `--json` | Framework | Machine-readable frame JSON output. |
 | `SWIFTTUI_WEB=1` | `--web` | Framework | Web-host mode. |
 | `SWIFTTUI_PORT=<n>` | `--port` | Framework | Port for `--web`. |
 | `SWIFTTUI_BIND=<addr>` | `--bind` | Framework | Bind address for `--web`. |
@@ -1199,7 +1192,6 @@ truth for which env vars exist. This table extends it.
 | `SWIFTTUI_VERBOSE=<n>` | `-v` × n | Framework | Verbosity level (0–3). |
 | `SWIFTTUI_QUIET=1` | `--quiet` | Framework | Suppress non-error logs. |
 | `SWIFTTUI_DEBUG=1` | `--debug` | Framework | Framework debug instrumentation. |
-| `SWIFTTUI_START_IN=<id>` | `--start-in` | Framework | Open with action scope `<id>`. |
 
 **`SWIFTTUI_*` is the framework-reserved env-var prefix.** Consumers must
 not use this prefix for their own variables. Consumers' own env vars
@@ -1283,7 +1275,7 @@ Special cases:
 --accessible            --plain                 --port
 --ascii                 --linear                --bind
 --reduce-motion         --cursor-follows-focus  --open
---no-color              --json                  --start-in
+--no-color              --json
 --force-color           --web                   --debug
 --no-progress           --verbose               --help-all
 --quiet                 --theme                 --config
@@ -1353,8 +1345,6 @@ under `--help-all`:
 
 - `--debug` (framework debug instrumentation; not for end users).
 - `--profile` (when added).
-- `--start-in` (intended for development; see
-  [decision 0003 interaction](#interaction-with-decision-0003-action-scopes)).
 
 ### `--version`
 
@@ -1415,7 +1405,6 @@ public struct RuntimeConfiguration: Sendable {
   public var motion: MotionMode     // .reduced, .normal
   public var output: OutputMode     // .tui, .json, .accessible
   public var web: WebConfig?        // nil unless --web/--web subcommand
-  public var startIn: String?       // action-scope ID
   public var debug: Bool
   // ...
 }
@@ -1525,29 +1514,15 @@ proposal stays inside it.
 
 [ADR-0003](../decisions/0003-action-scopes-not-global-hotkeys.md)
 established that command authority lives at authorial focus scopes,
-not in a global hotkey registry. The relationship to argument
-parsing is small but real:
+not in a global hotkey registry. Framework argument parsing no longer
+reserves a launch-scope flag. Deep-link or "start in this panel" behavior is
+consumer routing policy: an app may define its own flag, URL parameter, or
+saved launch state and map that into its authored view state before handing
+control to the runner.
 
-- **`--start-in <scope-id>`** opens the app with a specific scope
-  already focused. Useful for development (jump straight to the
-  panel you're working on), for accessibility (skip navigation
-  to the most relevant region for screen-reader users), and for
-  scripting (deep-link into a specific panel from a shell alias).
-- The scope ID is matched against the runtime's scope-identity
-  table at startup. If the ID doesn't exist, the app starts at its
-  default scope and emits a warning to stderr (visible only with
-  `--debug` or `-v`).
-- Scope IDs are author-declared strings; the framework doesn't
-  enumerate them. Consumers who want `--start-in` to be helpful
-  document their scope IDs in their app's `--help` discussion text.
-
-This flag is intentionally minimal. We do not propose:
-
-- A flag-driven way to *trigger* arbitrary commands (`--invoke
-  some-command`). That's scripting territory; do it via stdin or
-  an IPC mechanism.
-- A flag-driven way to *register* commands (`--register-command ...`).
-  Action scopes are tree-authored per ADR-0003.
+The framework still does not propose a flag-driven way to trigger arbitrary
+commands (`--invoke some-command`) or register commands
+(`--register-command ...`). Action scopes remain tree-authored per ADR-0003.
 
 ---
 
@@ -1678,14 +1653,7 @@ Lean; lean is meant to be argued with, not committed.)
     invisible? **Lean: migrate to subcommands; runners that haven't
     migrated keep flags hidden behind `--help-all` until they do.**
 
-12. **`--start-in <scope-id>` validation.** Should we error on an
-    unknown scope ID at parse time, at startup, or at first use? We
-    can't know at parse time (scopes are tree-authored, not declared
-    statically). **Lean: warn at startup if the ID doesn't resolve
-    by first commit; don't fail the run.** The user typed the wrong
-    name; bring up the app at default scope and tell them.
-
-13. **Error exit codes.** Use BSD `sysexits.h` constants (`EX_USAGE
+12. **Error exit codes.** Use BSD `sysexits.h` constants (`EX_USAGE
     = 64`, `EX_CONFIG = 78`, `EX_NOINPUT = 66`)? Or just `1` for
     everything? **Lean: BSD sysexits for parser errors (matches
     swift-argument-parser default), `1` for runtime errors, `130`
@@ -1907,9 +1875,12 @@ by theme:
   `cursorFollowsFocus`, and the reduce-motion environment value. WebHost work
   later wired `RuntimeConfiguration.web` through the opt-in
   `SwiftTUIWebHostCLI` runner. Runtime debug now enables the existing
-  frame-diagnostics logger. Remaining parsed fields that still need behavior
-  plans are consumer-defined JSON output, standalone `--linear` layout behavior,
-  and `--start-in` scope activation.
+  frame-diagnostics logger.
+- 2026-05-09: JSON and standalone linear output now have framework behavior:
+  `--json` / `SWIFTTUI_JSON=1` emit machine-readable frame JSON, and
+  `--linear` / `SWIFTTUI_LINEAR=1` select accessible linear output. The
+  framework-owned `--start-in` / `SWIFTTUI_START_IN` surface was removed;
+  launch routing belongs in consumer app arguments or state.
 - 2026-05-05: Phases 1–5 landed via plan
   [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
   `RuntimeConfiguration` value type + `Builder` + `detect(...)` factory in

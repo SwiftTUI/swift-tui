@@ -46,12 +46,6 @@ extension RuntimeConfiguration {
       return copy
     }
 
-    public func startIn(_ value: String?) -> Self {
-      var copy = self
-      copy.configuration.startIn = value
-      return copy
-    }
-
     public func debug(_ value: Bool) -> Self {
       var copy = self
       copy.configuration.debug = value
