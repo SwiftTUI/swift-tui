@@ -26,12 +26,14 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Design the `NavigationStack` / route surface. `TabView` has shipped and
-  ActionScope is ready to treat destinations as scopes, but there is no
-  `NavigationStack`, `NavigationLink`, or route-driven selection model. Start
-  with a terminal-native route design before adding API: destination identity,
-  back-stack rendering, focus restoration, command scope activation, and how
-  list selection differs when it drives navigation. Supporting docs:
+- [ ] Implement the binding-driven `NavigationStack` destination-presentation
+  surface. `TabView` has shipped and ActionScope is ready to treat destinations
+  as scopes, but there is no stack host or destination-presentation API.
+  `NavigationLink`, value links, and public `NavigationPath` are out of scope
+  for the first navigation surface; start from the proposed
+  `navigationDestination(isPresented:)` and `navigationDestination(item:)`
+  design. Supporting docs:
+  [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md),
   [VISION.md](VISION.md),
   [FOCUS.md](FOCUS.md),
   [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
