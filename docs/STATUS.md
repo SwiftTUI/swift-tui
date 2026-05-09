@@ -122,6 +122,11 @@ Current async presentation and frame-tail worker ownership is summarized in
 - Kitty keyboard protocol and OSC 99 notifications are not intercepted for
   embedded children in v1. OSC 52 clipboard requests are forwarded to the
   active host clipboard action.
+- A first-class Zellij-style workspace surface is not shipped yet. Apps can
+  manually compose `TerminalView`, `TabView`, `Panel`, and custom layouts, but
+  there is no official pane-tree, pane command, session persistence, or reattach
+  API. The planned scope is tracked in [TODO.md](TODO.md) and
+  [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md).
 - Built-in text inputs use a `String`-backed package-private editing model with
   grapheme offsets, reducer commands, caret anchors, and focused selection
   rendering. Focused copy/cut writes through host clipboard adapters while
