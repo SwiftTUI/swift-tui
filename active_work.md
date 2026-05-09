@@ -20,13 +20,6 @@
 
 ## Repo Documentation Hygiene
 
-- [ ] Update docs that still describe shipped tooling as proposed or unwired.
-  Supporting docs and source:
-  [docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md),
-  [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md),
-  [Tools/TermUIPerf](Tools/TermUIPerf),
-  [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md),
-  [Sources/SwiftTUI/Configuration/RuntimeConfiguration.swift](Sources/SwiftTUI/Configuration/RuntimeConfiguration.swift).
 - [ ] Reconcile terminal-embedding plan status with the shipped
   `Platforms/Embedding` source and file-previewer example. Supporting docs and
   source:

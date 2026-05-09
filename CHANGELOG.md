@@ -18,6 +18,12 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `0c8b73f2` Refreshed shipped-tooling docs so the CPU latency evaluation
+  proposal describes the delivered `Tools/TermUIPerf` harness and the argument
+  parsing proposal no longer marks accessibility/WebHost runtime configuration
+  fields as parsed-but-unwired. See
+  `0c8b73f2` [docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md)
+  and `4278c485` [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md).
 - `0c8b73f2` Reconciled the docs index with shipped plan front matter so CPU
   latency evaluation, composed-presentation primitives, and the gallery
   animation regression record live with implementation/post-mortem records
