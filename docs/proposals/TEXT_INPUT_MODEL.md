@@ -5,10 +5,10 @@ plan landed the package-private value model, reducer, layout map, presentation
 projection, field-content view, reducer-backed `TextField` / `SecureField`,
 focused paste dispatch, reducer-backed `TextEditor`, caret-visible runtime
 scrolling, and text-input caret anchors in accessibility semantics. The V2 plan
-landed shared word/select-all shortcuts and visible range-selection rendering,
-while clipboard copy/cut, host value/selection transport, IME/composition, and
-large-document storage are explicitly deferred until their host or performance
-contracts are concrete.
+landed shared word/select-all shortcuts, visible range-selection rendering, and
+host-backed clipboard copy/cut. Host value/selection transport,
+IME/composition, and large-document storage are explicitly deferred until their
+host or performance contracts are concrete.
 
 **Owner:** unassigned.
 
@@ -510,10 +510,9 @@ Initial terminal key mapping:
 
 Framework-level exit bindings and app key commands currently run before
 focused text handlers for modifier-bearing keys. Current routing keeps
-`ctrl-a` as a focused text-input select-all command, keeps `ctrl-c` as the
-default exit binding unless an app-level `keyCommand` intercepts it, and
-defers copy/cut until SwiftTUI has a clipboard adapter plus a secure-field
-suppression policy.
+`ctrl-a` as a focused text-input select-all command, moves the default exit
+binding to `ctrl-d`, and routes `ctrl-c` / `ctrl-x` to focused text-input
+copy/cut. Secure fields suppress clipboard text.
 
 ### Paste
 
@@ -777,5 +776,7 @@ Deliverables:
 
 - 2026-05-06: Initial draft proposal.
 - 2026-05-09: Updated for shipped `TextEditor` V2 shortcuts and visible
-  selection rendering; recorded clipboard, host transport, IME, and
+  selection rendering; recorded host value/selection transport, IME, and
   large-document storage deferrals.
+- 2026-05-09: Added host-backed text copy/cut and moved the default exit
+  binding to `ctrl-d` so `ctrl-c` is available for copy.

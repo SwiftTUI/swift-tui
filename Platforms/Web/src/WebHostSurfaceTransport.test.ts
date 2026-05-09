@@ -142,6 +142,18 @@ test("decoder keeps malformed surface output visible as text", () => {
   ]);
 });
 
+test("decoder reads typed clipboard records", () => {
+  const decoder = new WebHostOutputDecoder();
+  const records = decoder.feed(encoder.encode('\u001Eclipboard:{"text":"copy \\"this\\""}\n'));
+
+  expect(records).toEqual([
+    {
+      type: "clipboard",
+      text: 'copy "this"',
+    },
+  ]);
+});
+
 test("decoder flushes partial buffered text as diagnostic output", () => {
   const decoder = new WebHostOutputDecoder();
 

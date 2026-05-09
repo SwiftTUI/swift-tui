@@ -226,7 +226,7 @@ struct LinearAccessibilityRendererTests {
       rootIdentity: rootIdentity,
       presentationSurface: surface,
       terminalInputReader: LinearAccessibilityInputReader(events: [
-        .key(KeyPress(.character("c"), modifiers: .ctrl))
+        .key(KeyPress(.character("d"), modifiers: .ctrl))
       ]),
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: focusTracker,
@@ -248,7 +248,7 @@ struct LinearAccessibilityRendererTests {
     let result = try await runLoop.run()
     let output = surface.writes.joined()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(!surface.didEnableRawMode)
     #expect(!surface.didDisableRawMode)
     #expect(surface.presentedSurfaces.isEmpty)

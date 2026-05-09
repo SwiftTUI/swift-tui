@@ -88,7 +88,7 @@ struct BordersAndShapesTabTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(
       result.renderedFrames >= 3,
       "expected the real BordersAndShapesTab to keep scheduling animation ticks; renderedFrames=\(result.renderedFrames)"
@@ -179,7 +179,7 @@ private final class GalleryGateInputReader: TerminalInputReading {
       let gate = gate
       let task = Task {
         await gate.wait()
-        continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
+        continuation.yield(.key(KeyPress(.character("d"), modifiers: .ctrl)))
         continuation.finish()
       }
 

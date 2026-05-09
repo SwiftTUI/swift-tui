@@ -619,9 +619,9 @@ Decisions made during implementation:
 - The package name is `Platforms/Embedding`. Its public products are
   `SwiftTUIPTYPrimitives` and `SwiftTUITerminal`; root `SwiftTUI` remains
   independent of the peer package.
-- Selection and copy are deferred. v1 does not ship a
-  `.terminalSelection(...)` modifier and does not intercept OSC 52 clipboard
-  writes for embedded children.
+- Selection overlay remains deferred. Clipboard writes are forwarded from
+  embedded children through OSC 52 interception to the surrounding host
+  clipboard action.
 - Render-diff validation is covered by the landed `TerminalView` large-output
   byte-budget test and latency-injected presentation test, plus the repo's
   TermUIPerf smoke and layout-scroll-burst comparisons. A dedicated live SSH

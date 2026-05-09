@@ -85,10 +85,12 @@ export interface WebHostSurfaceFrame {
 
 export type WebHostOutputRecord =
   | { type: "surface"; frame: WebHostSurfaceFrame }
+  | { type: "clipboard"; text: string }
   | { type: "text"; text: string };
 
 export interface WebHostOutputSink {
   presentSurface(frame: WebHostSurfaceFrame): void;
+  writeClipboard?(text: string): void | Promise<void>;
   writeOutput?(text: string): void;
   writeError?(text: string): void;
 }
@@ -165,6 +167,19 @@ export class WebHostOutputDecoder {
   private decodeLine(
     line: string
   ): WebHostOutputRecord {
+    if (line.startsWith(`${recordPrefix}clipboard:`)) {
+      try {
+        const record = JSON.parse(line.slice(`${recordPrefix}clipboard:`.length));
+        if (isWebHostClipboardRecord(record)) {
+          return { type: "clipboard", text: record.text };
+        }
+      } catch {
+        // Fall through to the text path below so malformed output remains visible.
+      }
+
+      return { type: "text", text: `${line}\n` };
+    }
+
     if (!line.startsWith(`${recordPrefix}surface:`)) {
       return { type: "text", text: `${line}\n` };
     }
@@ -180,6 +195,12 @@ export class WebHostOutputDecoder {
 
     return { type: "text", text: `${line}\n` };
   }
+}
+
+function isWebHostClipboardRecord(
+  value: unknown
+): value is { text: string } {
+  return !!value && typeof value === "object" && typeof (value as { text?: unknown }).text === "string";
 }
 
 export function encodeResizeControlMessage(

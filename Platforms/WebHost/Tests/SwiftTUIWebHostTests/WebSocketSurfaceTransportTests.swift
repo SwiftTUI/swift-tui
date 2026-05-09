@@ -57,6 +57,20 @@ struct WebSocketSurfaceTransportTests {
     #expect(records[1].contains("\"B\""))
   }
 
+  @MainActor
+  @Test("transport sends typed clipboard records")
+  func transportSendsTypedClipboardRecords() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    try transport.writeClipboard("copy \"this\"")
+
+    #expect(await sink.strings() == ["\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n"])
+  }
+
   private static func basicSurface(
     _ text: String
   ) -> RasterSurface {

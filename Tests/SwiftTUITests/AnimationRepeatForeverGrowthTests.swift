@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 /// Regression pins for the "gallery freezes on the chasing-light panel"
@@ -642,7 +642,7 @@ struct AnimationRepeatForeverGrowthTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(
       result.renderedFrames >= 3,
       """
@@ -792,7 +792,7 @@ private final class DelayedQuitTerminalInputReader: TerminalInputReading {
         if delayNanoseconds > 0 {
           try? await Task.sleep(nanoseconds: delayNanoseconds)
         }
-        continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
+        continuation.yield(.key(KeyPress(.character("d"), modifiers: .ctrl)))
         continuation.finish()
       }
 

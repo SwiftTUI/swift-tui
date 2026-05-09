@@ -153,6 +153,59 @@ private enum ResetFocusActionKey: EnvironmentKey {
   static let defaultValue = ResetFocusAction.placeholder
 }
 
+/// A semantic action that asks the active host to place text on the clipboard.
+public struct ClipboardWriteAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible
+{
+  package let snapshotLabel: String
+  package let isPlaceholder: Bool
+  private let handler: @MainActor @Sendable (String) -> Bool
+
+  @MainActor
+  public init(
+    _ handler: @escaping @MainActor @Sendable (String) -> Bool
+  ) {
+    snapshotLabel = "ClipboardWriteAction.custom"
+    isPlaceholder = false
+    self.handler = handler
+  }
+
+  @discardableResult
+  @MainActor
+  public func callAsFunction(
+    _ text: String
+  ) -> Bool {
+    handler(text)
+  }
+
+  public var description: String {
+    snapshotLabel
+  }
+
+  public var debugDescription: String {
+    snapshotLabel
+  }
+
+  package init(
+    snapshotLabel: String,
+    isPlaceholder: Bool,
+    handler: @escaping @MainActor @Sendable (String) -> Bool
+  ) {
+    self.snapshotLabel = snapshotLabel
+    self.isPlaceholder = isPlaceholder
+    self.handler = handler
+  }
+
+  package static let placeholder = Self(
+    snapshotLabel: "ClipboardWriteAction.default",
+    isPlaceholder: true,
+    handler: { _ in false }
+  )
+}
+
+private enum ClipboardWriteActionKey: EnvironmentKey {
+  static let defaultValue = ClipboardWriteAction.placeholder
+}
+
 private enum StackAxisKey: EnvironmentKey {
   static let defaultValue: SwiftTUICore.Axis? = nil
 }
@@ -619,6 +672,11 @@ extension EnvironmentValues {
   public var resetFocus: ResetFocusAction {
     get { self[ResetFocusActionKey.self] }
     set { self[ResetFocusActionKey.self] = newValue }
+  }
+
+  public var clipboardWriteAction: ClipboardWriteAction {
+    get { self[ClipboardWriteActionKey.self] }
+    set { self[ClipboardWriteActionKey.self] = newValue }
   }
 }
 

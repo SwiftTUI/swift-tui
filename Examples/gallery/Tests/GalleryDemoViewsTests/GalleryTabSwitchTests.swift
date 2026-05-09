@@ -263,7 +263,7 @@ struct GalleryTabSwitchTests {
           capture.postDismissSurface = surface
           return true
         },
-        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
       ]),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
@@ -275,7 +275,7 @@ struct GalleryTabSwitchTests {
     let postDismissSurface = try #require(capture.postDismissSurface)
     let postDismissText = postDismissSurface.lines.joined(separator: "\n")
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(
       prePaletteSurface != initialPhysicsSurface,
       "expected fullscreen animation to advance before opening the palette"

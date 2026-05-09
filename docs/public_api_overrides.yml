@@ -34,6 +34,7 @@ classifications:
     - SwiftTUI.AnyScene
     - SwiftTUI.App
     - SwiftTUI.AppLaunchError
+    - SwiftTUI.ClipboardWritingPresentationSurface
     - SwiftTUI.DefaultRenderer
     - SwiftTUI.HostedSceneSession
     - SwiftTUI.RunLoop
@@ -67,6 +68,7 @@ classifications:
     - SwiftTUIViews.CanvasDrawing
     - SwiftTUIViews.Capsule
     - SwiftTUIViews.Circle
+    - SwiftTUIViews.ClipboardWriteAction
     - SwiftTUIViews.ConditionalContent
     - SwiftTUIViews.ControlGroup
     - SwiftTUIViews.DisclosureGroup

@@ -51,7 +51,7 @@ struct AnimationRegressionTests {
           )
           return markerColumnsAfterToggle.contains(initialColumn + 30)
         },
-        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
       ]),
       viewBuilder: { AnimationsTab() }
     )
@@ -63,7 +63,7 @@ struct AnimationRegressionTests {
       column > startingColumn && column < finalColumn
     }
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(
       renderedFinalFrame,
       """
@@ -133,7 +133,7 @@ struct AnimationRegressionTests {
           )
           return markerColumnsAfterToggle.contains(initialColumn + 30)
         },
-        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
       ]),
       diagnosticsPath: diagnosticsURL.path,
       viewBuilder: { AnimationsTab() }
@@ -141,7 +141,7 @@ struct AnimationRegressionTests {
 
     let startingColumn = try #require(initialColumn)
     let finalColumn = startingColumn + 30
-    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(
       markerColumnsAfterToggle.contains(finalColumn),
       "expected the diagnostic probe to click the real gallery offset button"

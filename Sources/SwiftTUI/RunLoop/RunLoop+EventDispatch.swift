@@ -47,7 +47,7 @@ extension RunLoop {
     // Walks the current focus chain shallowest-first; a matching
     // keyCommand consumes the event (or blocks dispatch if disabled)
     // before the configured exit bindings run — so a consumer that
-    // registers a `keyCommand` for an exit key (e.g. Ctrl+C) takes
+    // registers a `keyCommand` for an exit key (e.g. Ctrl+D) takes
     // precedence over the framework-level exit for the duration that
     // scope is on the focus chain.
     if !keyPress.modifiers.isEmpty {

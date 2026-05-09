@@ -1,7 +1,7 @@
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -10,7 +10,7 @@ struct TerminationRequestTests {
   @Test("onTerminationRequest can cancel an exit key and allow a later one")
   func terminationRequestCanCancelExitKey() async throws {
     let recorder = TerminationRecorder()
-    let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    let exitKey = KeyPress(.character("d"), modifiers: .ctrl)
 
     let result = try await runTerminationHarness(
       events: [.key(exitKey), .key(exitKey)]
@@ -21,6 +21,12 @@ struct TerminationRequestTests {
 
     #expect(result.exitReason == .userExit(exitKey))
     #expect(recorder.requests == [.userExit(exitKey), .userExit(exitKey)])
+  }
+
+  @Test("default exit binding is Ctrl+D and leaves Ctrl+C for app shortcuts")
+  func defaultExitBindingUsesCtrlD() {
+    #expect(ExitKeyBindings.default.contains(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(!ExitKeyBindings.default.contains(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("onTerminationRequest receives signal exits")

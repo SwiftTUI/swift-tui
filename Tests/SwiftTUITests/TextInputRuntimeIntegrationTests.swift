@@ -173,12 +173,78 @@ struct TextInputRuntimeIntegrationTests {
     #expect(box.value == "Z")
   }
 
-  @Test("TextEditor runtime Ctrl+C uses default exit binding")
-  func textEditorRuntimeCtrlCUsesDefaultExitBinding() throws {
+  @Test("TextEditor runtime Ctrl+C copies the selection without exiting")
+  func textEditorRuntimeCtrlCCopiesSelectionWithoutExiting() throws {
+    let box = PasteTextBox()
+    box.value = "hello"
+    let identity = testIdentity("CopyTextEditor")
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 20, height: 5)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl)) == nil)
+    let reason = runLoop.runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+
+    #expect(reason == nil)
+    #expect(runLoop.host.clipboardWrites == ["hello"])
+    #expect(box.value == "hello")
+  }
+
+  @Test("TextEditor runtime Ctrl+X cuts the selection after copying")
+  func textEditorRuntimeCtrlXCutsSelectionAfterCopying() throws {
+    let box = PasteTextBox()
+    box.value = "hello"
+    let identity = testIdentity("CutTextEditor")
+    let runLoop = makeTextInputRunLoop {
+      TextEditor(text: box.binding())
+        .id(identity)
+        .frame(width: 20, height: 5)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl)) == nil)
+    let reason = runLoop.runLoop.handleKeyPress(KeyPress(.character("x"), modifiers: .ctrl))
+
+    #expect(reason == nil)
+    #expect(runLoop.host.clipboardWrites == ["hello"])
+    #expect(box.value == "")
+  }
+
+  @Test("SecureField runtime Ctrl+C and Ctrl+X do not expose secure text")
+  func secureFieldRuntimeClipboardShortcutsDoNotExposeSecureText() throws {
+    let box = PasteTextBox()
+    box.value = "secret"
+    let identity = testIdentity("ClipboardSecureField")
+    let runLoop = makeTextInputRunLoop {
+      SecureField("Password", text: box.binding())
+        .id(identity)
+        .textFieldStyle(.plain)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: identity)
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl)) == nil)
+    _ = runLoop.runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+    _ = runLoop.runLoop.handleKeyPress(KeyPress(.character("x"), modifiers: .ctrl))
+
+    #expect(runLoop.host.clipboardWrites.isEmpty)
+    #expect(box.value == "secret")
+  }
+
+  @Test("TextEditor runtime Ctrl+D uses default exit binding")
+  func textEditorRuntimeCtrlDUsesDefaultExitBinding() throws {
     let box = PasteTextBox()
     box.value = "hello"
     let identity = testIdentity("ExitBindingTextEditor")
-    let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    let exitKey = KeyPress(.character("d"), modifiers: .ctrl)
     let runLoop = makeTextInputRunLoop {
       TextEditor(text: box.binding())
         .id(identity)
@@ -336,13 +402,16 @@ private func surfaceText(_ host: TextInputRuntimeTerminalHost) -> String {
   host.latestSurface?.lines.joined(separator: "\n") ?? ""
 }
 
-private final class TextInputRuntimeTerminalHost: PresentationSurface {
+private final class TextInputRuntimeTerminalHost: PresentationSurface,
+  ClipboardWritingPresentationSurface
+{
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
+  private(set) var clipboardWrites: [String] = []
   private let surfaceSizeProvider: () -> CellSize
 
   init(
@@ -360,6 +429,13 @@ private final class TextInputRuntimeTerminalHost: PresentationSurface {
   func write(_: String) throws {}
   func clearScreen() throws {}
   func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  @MainActor
+  func writeClipboard(_ text: String) throws -> Bool {
+    clipboardWrites.append(text)
+    return true
+  }
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

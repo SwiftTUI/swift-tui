@@ -1,6 +1,6 @@
-import SwiftTUIAnimatedImage
 import Foundation
 import SwiftTUI
+import SwiftTUIAnimatedImage
 import Testing
 
 @testable import GifCat
@@ -148,7 +148,7 @@ struct GifCatViewTests {
 
     #expect(
       result.exitReason
-        == RunLoopExitReason.userExit(KeyPress(.character("c"), modifiers: .ctrl))
+        == RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
     )
     for expectedReference in expectedSecondFrameReferences {
       #expect(host.observedReferences.contains(expectedReference))
@@ -289,7 +289,7 @@ private final class GifCatConditionalInputReader: InputReading {
           elapsedNanoseconds += pollNanoseconds
         }
 
-        continuation.yield(KeyPress(.character("c"), modifiers: .ctrl))
+        continuation.yield(KeyPress(.character("d"), modifiers: .ctrl))
         continuation.finish()
       }
 

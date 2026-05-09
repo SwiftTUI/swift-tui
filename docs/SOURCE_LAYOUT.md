@@ -107,6 +107,8 @@ Sources/SwiftTUI/
 ### Terminal
 
 - `Terminal/TerminalHost.swift`: defines the `PresentationSurface` protocol (the `RunLoop`'s pluggable presentation target) plus the fd-backed `TerminalHost` and WASI-facing `WebTerminalHost` implementations
+- `Terminal/TerminalClipboard.swift`: shared clipboard-writing host capability
+  and terminal OSC 52 encoding
 - `Terminal/TerminalCursorFocusPresentationSurface.swift`: terminal-only cursor focus marker and cursor visibility helpers
 - `Terminal/StreamingTerminalHost.swift`: closure-backed `PresentationSurface` for embedded hosts that don't own a file descriptor
 - `Terminal/TerminalPresentation.swift`: capability-aware surface diffing,
@@ -131,6 +133,8 @@ Sources/SwiftTUI/
 ### Support
 
 - `Support/LinkOpening.swift`: runtime link opener
+- `Support/ClipboardWriting.swift`: runtime clipboard action bridge from
+  environment values to clipboard-capable presentation surfaces
 - `Support/AsyncStreamTeardown.swift`: managed `AsyncStream` lifecycle helper
 - `Support/Standard.swift`: platform stdio helpers
 
@@ -163,7 +167,8 @@ The package ships two library targets:
   - `WebSurfaceTransport.swift`: `web-surface` stdout encoder (`WebSurfaceFrameEncoder`),
     `WebSurfaceTransport` (presentation surface), and `WebSurfaceInputReader` /
     `WebSurfaceInputParser` for the resize/style/key/mouse stdin protocol that
-    `Platforms/Web`'s `BrowserWASIBridge` consumes
+    `Platforms/Web`'s `BrowserWASIBridge` consumes; also emits typed clipboard
+    records for browser clipboard adapters
 
 ## `Platforms/WebHost`
 
@@ -199,10 +204,11 @@ The package ships two public library targets:
 
 ## Embedded Host Packages
 
-- `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`
-- `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
+- `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`, with native AppKit/UIKit clipboard writes
+- `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas and typed clipboard records into `navigator.clipboard`
 - `Platforms/WebHost`: opt-in localhost HTTP/WebSocket host for native
-  binaries, using the same browser bundle and `web-surface` v2 protocol
+  binaries, using the same browser bundle and `web-surface` v2 protocol,
+  including typed clipboard records
 
 ## `Platforms/Embedding`
 

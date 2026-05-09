@@ -40,6 +40,23 @@ struct HostedSceneSessionTests {
     }
   }
 
+  private struct ClipboardSurfaceApp: App {
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        ClipboardTextEditorFixture()
+      }
+    }
+  }
+
+  private struct ClipboardTextEditorFixture: View {
+    @State private var text = "hello"
+
+    var body: some View {
+      TextEditor(text: $text)
+        .frame(width: 12, height: 3)
+    }
+  }
+
   @Test("hosted scene session rerenders on resize without exiting")
   func hostedSceneSessionRerendersOnResize() async throws {
     let recorder = OutputRecorder()
@@ -67,10 +84,10 @@ struct HostedSceneSessionTests {
       recorder.frameCount >= 2
     }
 
-    session.sendInput([0x03])  // Ctrl+C
+    session.sendInput([0x04])  // Ctrl+D
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
   @Test("hosted surface session publishes raster surfaces and accepts direct input events")
@@ -96,10 +113,48 @@ struct HostedSceneSessionTests {
 
     #expect(recorder.latestSurface?.lines.first?.contains("Primary") == true)
 
-    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
+    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+  }
+
+  @Test("hosted surface session forwards focused text clipboard writes")
+  func hostedSurfaceSessionForwardsFocusedTextClipboardWrites() async throws {
+    let surfaceRecorder = SurfaceRecorder()
+    let clipboardRecorder = ClipboardRecorder()
+    let session = try HostedSceneSession(
+      for: ClipboardSurfaceApp(),
+      sceneID: WindowIdentifier("primary"),
+      initialSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onSurface: { surface in
+        surfaceRecorder.record(surface)
+      },
+      onClipboardWrite: { text in
+        clipboardRecorder.record(text)
+        return true
+      }
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    try await waitUntil("first surface") {
+      surfaceRecorder.surfaceCount >= 1
+    }
+
+    session.send(.key(.init(.character("a"), modifiers: .ctrl)))
+    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
+
+    try await waitUntil("clipboard write") {
+      clipboardRecorder.writes == ["hello"]
+    }
+
+    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
+    let exitReason = try await task.value
+    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
   @Test("hosted surface session publishes semantic snapshots beside raster surfaces")
@@ -171,10 +226,10 @@ struct HostedSceneSessionTests {
       recorder.surfaceCount >= 2 && recorder.latestSurface?.size == .init(width: 32, height: 8)
     }
 
-    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
+    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
   @Test("hosted surface session throws when the requested scene does not exist")
@@ -229,10 +284,10 @@ struct HostedSceneSessionTests {
       recorder.frameCount >= 2
     }
 
-    session.sendInput([0x03])  // Ctrl+C
+    session.sendInput([0x04])  // Ctrl+D
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session schedules a new frame on style update")
@@ -287,10 +342,10 @@ struct HostedSceneSessionTests {
       recorder.frameCount >= 2
     }
 
-    session.sendInput([0x03])  // Ctrl+C
+    session.sendInput([0x04])  // Ctrl+D
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session throws when the requested scene does not exist")
@@ -474,6 +529,17 @@ private final class FocusPresentationRecorder {
     _ presentation: FocusPresentation
   ) {
     presentations.append(presentation)
+  }
+}
+
+@MainActor
+private final class ClipboardRecorder {
+  private(set) var writes: [String] = []
+
+  func record(
+    _ text: String
+  ) {
+    writes.append(text)
   }
 }
 
