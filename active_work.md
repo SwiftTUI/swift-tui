@@ -20,12 +20,6 @@
 
 ## Repo Documentation Hygiene
 
-- [ ] Reconcile historical animation proposal status with current transition and
-  matched-geometry source. Supporting docs and source:
-  [docs/proposals/ANIMATION_PLAN.md](docs/proposals/ANIMATION_PLAN.md),
-  [docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md](docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md),
-  [Sources/SwiftTUI/Lifecycle/AnimationController.swift](Sources/SwiftTUI/Lifecycle/AnimationController.swift),
-  [Sources/SwiftTUIViews/Animation/AnyTransition.swift](Sources/SwiftTUIViews/Animation/AnyTransition.swift).
 - [ ] Close or re-scope active plan files whose source appears to have moved
   ahead of their unchecked task lists. Supporting plans:
   [docs/plans/2026-04-26-003-border-stroke-simplification-plan.md](docs/plans/2026-04-26-003-border-stroke-simplification-plan.md),
