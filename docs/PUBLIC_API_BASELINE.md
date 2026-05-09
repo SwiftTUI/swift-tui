@@ -18,10 +18,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 48 | 513 |
-| `SwiftTUIViews` | 241 | 9104 |
+| `SwiftTUIViews` | 242 | 9110 |
 | `SwiftTUIAnimatedImage` | 5 | 151 |
 | `SwiftTUICharts` | 17 | 1431 |
-| `SwiftTUICore` | 259 | 2587 |
+| `SwiftTUICore` | 259 | 2585 |
 
 ## SwiftTUI
 
@@ -78,7 +78,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (241)
+### Canonical surface (242)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -121,7 +121,8 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Button` — struct — 126 members
 - `ButtonStyle` — protocol — 6 members
 - `ButtonStyleConfiguration` — struct — 131 members
-- `Canvas` — struct — 124 members
+- `Canvas` — struct — 125 members
+- `CanvasClosureDrawing` — struct — 4 members
 - `Capsule` — struct — 132 members
 - `ChangeLifecycleModifier` — struct — 2 members
 - `Circle` — struct — 132 members
@@ -395,7 +396,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `CanvasCell` — struct — 5 members
 - `CanvasContext` — struct — 35 members
 - `CanvasDrawing` — protocol — 1 member
-- `CanvasGrid` — struct — 23 members
+- `CanvasGrid` — struct — 21 members
 - `CanvasPayload` — struct — 5 members
 - `CanvasPixelGridDrawing` — struct — 7 members
 - `CanvasPixelGridMode` — enum — 4 members

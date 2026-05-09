@@ -1,10 +1,15 @@
 public import SwiftTUICore
 
-/// Ordered pointer samples captured during a gesture.
+/// Ordered pointer samples captured during the current gesture.
 ///
 /// The sample `location` is expressed in the gesture value's coordinate space.
 /// The `pointer` retains the original event-level provenance for callers that
 /// need to inspect precision, containing cell, or raw host/protocol pixels.
+///
+/// `PointerPath` is complete for one in-flight gesture: samples are retained
+/// from pointer-down through the current value and cleared when the recognizer
+/// tears down. Persist the samples into app state if they should outlive the
+/// gesture, for example when committing a sketch stroke.
 public struct PointerPath: Equatable, Hashable, Sendable, RandomAccessCollection {
   public struct Sample: Equatable, Hashable, Sendable {
     /// The sample location in the gesture value's coordinate space.

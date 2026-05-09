@@ -22,7 +22,7 @@ It provides:
   the single-``ForEach`` full-lazy path
 - continuous cell-space gestures and drawing through ``DragGesture``,
   ``SpatialTapGesture``, ``View/onPointerHover(_:)``, ``Canvas``, and
-  ``CanvasDrawing``
+  ``CanvasDrawing`` / ``CanvasClosureDrawing``
 - the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `toast`)
 - ASCII-art banner text through ``TextFigure``, backed by embedded FIGlet fonts that participate in normal layout proposals without requiring external font files
 
@@ -80,6 +80,7 @@ Lowering helpers remain package-only implementation details.
 
 - ``Canvas``
 - ``CanvasDrawing``
+- ``CanvasClosureDrawing``
 - ``CanvasContext``
 - ``DragGesture``
 - ``SpatialTapGesture``

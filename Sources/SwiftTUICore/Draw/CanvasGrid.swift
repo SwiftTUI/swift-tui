@@ -31,8 +31,6 @@ public struct CanvasGrid: Equatable, Hashable, Sendable {
     case horizontalHalfBlock
     /// One drawing sample per terminal cell.
     case fullCell
-    /// Reserved for future graphics-protocol pixel buffers.
-    case pixelExact
   }
 
   /// The glyph-packing style for this grid.
@@ -49,14 +47,13 @@ public struct CanvasGrid: Equatable, Hashable, Sendable {
   public static let verticalHalfBlock = Self(style: .verticalHalfBlock)
   public static let horizontalHalfBlock = Self(style: .horizontalHalfBlock)
   public static let fullCell = Self(style: .fullCell)
-  public static let pixelExact = Self(style: .pixelExact)
 
   /// Logical drawing columns inside each terminal cell.
   public var subdivisionsX: Int {
     switch style {
     case .braille2x4, .octant2x4, .sextant2x3, .quadrant2x2, .horizontalHalfBlock:
       return 2
-    case .verticalHalfBlock, .fullCell, .pixelExact:
+    case .verticalHalfBlock, .fullCell:
       return 1
     }
   }
@@ -70,7 +67,7 @@ public struct CanvasGrid: Equatable, Hashable, Sendable {
       return 3
     case .quadrant2x2, .verticalHalfBlock:
       return 2
-    case .horizontalHalfBlock, .fullCell, .pixelExact:
+    case .horizontalHalfBlock, .fullCell:
       return 1
     }
   }
@@ -303,7 +300,7 @@ package struct CanvasGridBuffer: Equatable, Sendable {
       return Self.verticalHalfBlockGlyph(mask)
     case .horizontalHalfBlock:
       return Self.horizontalHalfBlockGlyph(mask)
-    case .fullCell, .pixelExact:
+    case .fullCell:
       return "█"
     }
   }
@@ -332,8 +329,7 @@ package struct CanvasGridBuffer: Equatable, Sendable {
     switch grid.style {
     case .braille2x4, .octant2x4:
       return UInt16(BrailleCell.bitMask(x: localX, y: localY) ?? 0)
-    case .sextant2x3, .quadrant2x2, .verticalHalfBlock, .horizontalHalfBlock, .fullCell,
-      .pixelExact:
+    case .sextant2x3, .quadrant2x2, .verticalHalfBlock, .horizontalHalfBlock, .fullCell:
       return UInt16(1) << UInt16(localY * grid.subdivisionsX + localX)
     }
   }

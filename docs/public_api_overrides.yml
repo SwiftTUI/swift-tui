@@ -62,6 +62,7 @@ classifications:
     - SwiftTUIViews.Bindable
     - SwiftTUIViews.Button
     - SwiftTUIViews.Canvas
+    - SwiftTUIViews.CanvasClosureDrawing
     - SwiftTUIViews.CanvasContext
     - SwiftTUIViews.CanvasDrawing
     - SwiftTUIViews.Capsule

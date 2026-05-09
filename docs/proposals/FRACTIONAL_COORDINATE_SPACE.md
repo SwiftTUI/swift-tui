@@ -86,8 +86,9 @@ Canvas is already sub-cell in output but not in input:
 - `CanvasContext` exposes a hardcoded Braille 2x4 subpixel grid.
 - `CanvasPixelGridDrawing` separately supports full-cell and vertical
   half-block logical pixels.
-- `Examples/canvas` maps a cell hit to a fixed subpixel anchor, so dragging
-  inside a single cell cannot affect the sub-cell drawing.
+- The historical `Examples/canvas` sketch mapped a cell hit to a fixed subpixel
+  anchor, so dragging inside a single cell could not affect the sub-cell
+  drawing. The current repo does not retain that standalone package.
 
 The hosted surfaces already receive better information than the current API
 preserves:
@@ -330,6 +331,10 @@ public struct PointerPath: Equatable, Sendable, RandomAccessCollection {
 The runtime can still coalesce for ordinary controls, but captured precise drag
 routes should be able to receive sampled paths or coalesced batches.
 
+The shipped `PointerPath` contract keeps the complete current-gesture path and
+clears it on recognizer teardown; callers should persist samples into app state
+when strokes or routes must outlive the gesture.
+
 ### SpatialTapGesture
 
 `SpatialTapGesture.Value.location` becomes `Point`.
@@ -495,7 +500,6 @@ public struct CanvasGrid: Equatable, Sendable {
     case verticalHalfBlock
     case horizontalHalfBlock
     case fullCell
-    case pixelExact
   }
 
   public var style: Style
@@ -504,9 +508,8 @@ public struct CanvasGrid: Equatable, Sendable {
 }
 ```
 
-`pixelExact` is a future/high-capability mode for graphics-protocol hosts. It
-should be designed into the type system, but it does not need to ship in the
-first implementation.
+Pixel-exact graphics-protocol rendering remains reserved design space. It should
+not be public until a buffer-backed renderer exists and can be tested.
 
 ### CanvasContext
 
@@ -732,7 +735,8 @@ row selection or ordinary button activation.
 - Add `CanvasGrid`.
 - Make `CanvasContext` cell-space and grid-aware.
 - Replace fixed Braille-subpixel authoring with grid mapping helpers.
-- Update `Examples/canvas` to draw at actual sub-cell pointer positions.
+- Keep the maintained Canvas verification surfaces drawing at actual sub-cell
+  pointer positions: root Canvas tests and `Examples/gifeditor`.
 - Add Braille, half-block, full-cell, quadrant, and sextant mapping tests.
 
 ### Phase 6: Controls
@@ -811,10 +815,13 @@ pre-release.
   proposal recommends the latter.
 - How aggressive should terminal support probing be in unknown terminals?
 - Should `CanvasGrid.pixelExact` be in the first public API even if initially
-  unavailable on most hosts?
+  unavailable on most hosts? Resolved: no; keep it hidden until a graphics
+  renderer exists.
 - Should `CoordinateSpace.named(_:)` ship with the first sub-cell pass or in the
   Path/content-shape follow-up?
 - How should `PointerPath` sample memory be bounded for very long drags?
+  Resolved: keep the complete current-gesture path in v1 and clear it on
+  recognizer teardown.
 
 ## Final Recommendation
 

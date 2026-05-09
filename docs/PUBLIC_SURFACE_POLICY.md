@@ -117,8 +117,12 @@ authoring API.
 
 Canvas is the public arbitrary-drawing escape hatch. Prefer value drawings that
 conform to `CanvasDrawing` and draw in continuous cell space through
-`CanvasContext`. Keep dense terminal-cell pixel helpers as value APIs rather
-than style enums or public erasure seams.
+`CanvasContext` when stable structural equality and renderer deduplication
+matter. The closure-backed `Canvas` initializer is available for ad-hoc drawing
+code and compares by drawing identity. Keep dense terminal-cell pixel helpers as
+value APIs rather than style enums or public erasure seams. Do not expose
+pixel-exact Canvas grids until a real graphics-protocol renderer can exercise
+them.
 
 ## Transitional Runtime Policy
 
