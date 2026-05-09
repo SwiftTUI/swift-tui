@@ -60,6 +60,59 @@ public struct Canvas<Drawing: CanvasDrawing>: View, ResolvableView {
   }
 }
 
+/// Closure-backed ``Canvas`` drawing.
+///
+/// Use this for ad-hoc drawing code where a dedicated ``CanvasDrawing`` value
+/// type would be unnecessary. Equality is identity-based: copies of the same
+/// `CanvasClosureDrawing` compare equal, while two separately-created closure
+/// drawings compare different even if their closure bodies are textually
+/// identical. Use a value type conforming to ``CanvasDrawing`` when stable
+/// structural equality and renderer deduplication matter.
+public struct CanvasClosureDrawing: CanvasDrawing {
+  private let storage: CanvasClosureDrawingStorage
+
+  public init(
+    _ draw: @escaping @Sendable (inout CanvasContext) -> Void
+  ) {
+    storage = CanvasClosureDrawingStorage(draw: draw)
+  }
+
+  public func draw(into context: inout CanvasContext) {
+    storage.draw(&context)
+  }
+
+  public static func == (lhs: CanvasClosureDrawing, rhs: CanvasClosureDrawing) -> Bool {
+    lhs.storage === rhs.storage
+  }
+}
+
+private final class CanvasClosureDrawingStorage: Sendable {
+  let draw: @Sendable (inout CanvasContext) -> Void
+
+  init(
+    draw: @escaping @Sendable (inout CanvasContext) -> Void
+  ) {
+    self.draw = draw
+  }
+}
+
+extension Canvas where Drawing == CanvasClosureDrawing {
+  /// Creates a canvas from ad-hoc drawing code.
+  ///
+  /// The closure is retained as a drawing value and compared by identity. Use a
+  /// dedicated ``CanvasDrawing`` value type for drawings that should compare
+  /// structurally equal across rerenders.
+  public init(
+    grid: CanvasGrid = .braille2x4,
+    _ draw: @escaping @Sendable (inout CanvasContext) -> Void
+  ) {
+    self.init(
+      grid: grid,
+      CanvasClosureDrawing(draw)
+    )
+  }
+}
+
 extension Canvas where Drawing == CanvasPixelGridDrawing {
   /// Creates a dense pixel grid backed by Canvas.
   ///

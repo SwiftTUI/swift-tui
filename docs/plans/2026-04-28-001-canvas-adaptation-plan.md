@@ -8,14 +8,14 @@ date: 2026-04-28
 # feature: extend Canvas for pixel-grid rendering
 
 > **Status:** Shipped for Canvas rendering and the gifeditor migration. The
-> pixel-grid, direct-cell, styled-Braille, half-block, example, and documentation
-> phases are implemented. Pointer precision remains explicitly deferred to the
-> fractional-coordinate and Canvas/pointer active work.
+> pixel-grid, direct-cell, styled-Braille, half-block, and documentation phases
+> are implemented. Pointer precision shipped later through the
+> fractional-coordinate workstream.
 
-> **Current repo note (2026-05-08):** the standalone `Examples/canvas` package
-> named by this historical record is not present in the current checkout. Use
-> root Canvas tests and `Examples/gifeditor` as the maintained verification
-> surfaces unless a new standalone Canvas example is explicitly prioritized.
+> **Current repo note (2026-05-09):** the standalone `Examples/canvas` package
+> named by this historical record is not present in the current checkout and is
+> not required. Use root Canvas tests and `Examples/gifeditor` as the maintained
+> verification surfaces.
 
 ## Overview
 
@@ -38,9 +38,10 @@ but the Canvas rendering work must not depend on that support.
 
 ## Implementation Progress
 
-- 2026-04-28: Phase 1 is implemented as `Examples/canvas`. The package
-  contains a `canvas-demo` executable, a testable `CanvasDemoViews` library,
-  model/rendering tests, README coverage, and repo script wiring.
+- 2026-04-28: Phase 1 originally targeted a standalone `Examples/canvas`
+  package. That package is not retained in the current repo and is no longer
+  required; root Canvas tests and `Examples/gifeditor` cover the maintained
+  verification surface.
 - 2026-04-28: Phases 2-7 are implemented in the framework. `CanvasContext`
   now supports direct terminal-cell writes, full-cell pixel grids, vertical
   half-block pixel grids, and styled Braille cells with last-writer-wins
@@ -102,13 +103,13 @@ cell needs its own color.
   that only report cell coordinates.
 - No per-Braille-dot true-color model; terminal cells do not support that.
 
-## Phase 1: Canvas Verification Example
+## Phase 1: Historical Canvas Verification Example
 
-Create `Examples/canvas` as the executable verification surface for this work.
-This must happen before framework changes so behavior can be compared against
-today's Canvas implementation.
+The original plan proposed `Examples/canvas` as an executable verification
+surface before framework changes. The current repo decision is not to recreate
+that standalone package; this section remains only as historical design context.
 
-Initial app requirements:
+Historical app requirements:
 
 - package name: `canvas-demo`,
 - executable product: `canvas-demo`,
@@ -122,18 +123,11 @@ Initial app requirements:
 - one active foreground color, matching today's uniform Canvas style limit,
 - a compact help/status row that reports mode and cursor position.
 
-The first implementation should intentionally use only existing public Canvas
-API. If it is awkward, that awkwardness is evidence for the later API design.
+The proposed first implementation would have intentionally used only existing
+public Canvas API so any awkwardness became evidence for the later API design.
+Current verification uses root Canvas tests and `Examples/gifeditor` instead.
 
-Verification:
-
-```bash
-cd Examples/canvas
-swift run canvas-demo
-swift test
-```
-
-Acceptance criteria:
+Historical acceptance criteria:
 
 - The example runs as a terminal app.
 - The drawing model renders through `Canvas(Drawing)`, not a rectangle grid.
@@ -380,7 +374,6 @@ Recommended verification sequence during implementation:
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.CanvasViewTests
-cd Examples/canvas && swift test
 cd Examples/gifeditor && swift test
 bun run test
 ```
@@ -397,7 +390,6 @@ manual checks should include at least:
 
 The Canvas-adaptation worktree is complete when:
 
-- `Examples/canvas` exists and exercises the Canvas feature set,
 - Canvas supports dense per-cell color rendering,
 - Canvas supports full-cell and vertical half-block pixel grids,
 - Braille Canvas supports deterministic per-cell multi-color styling,

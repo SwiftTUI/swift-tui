@@ -2480,7 +2480,6 @@ SwiftTUICore.CanvasGrid.Style.braille2x4
 SwiftTUICore.CanvasGrid.Style.fullCell
 SwiftTUICore.CanvasGrid.Style.horizontalHalfBlock
 SwiftTUICore.CanvasGrid.Style.octant2x4
-SwiftTUICore.CanvasGrid.Style.pixelExact
 SwiftTUICore.CanvasGrid.Style.quadrant2x2
 SwiftTUICore.CanvasGrid.Style.sextant2x3
 SwiftTUICore.CanvasGrid.Style.verticalHalfBlock
@@ -2489,7 +2488,6 @@ SwiftTUICore.CanvasGrid.fullCell
 SwiftTUICore.CanvasGrid.horizontalHalfBlock
 SwiftTUICore.CanvasGrid.init(style:)
 SwiftTUICore.CanvasGrid.octant2x4
-SwiftTUICore.CanvasGrid.pixelExact
 SwiftTUICore.CanvasGrid.quadrant2x2
 SwiftTUICore.CanvasGrid.sextant2x3
 SwiftTUICore.CanvasGrid.style
@@ -5342,6 +5340,7 @@ SwiftTUIViews.Canvas.grid
 SwiftTUIViews.Canvas.id(_:)
 SwiftTUIViews.Canvas.ignoresSafeArea(_:)
 SwiftTUIViews.Canvas.init(grid:_:)
+SwiftTUIViews.Canvas.init(grid:_:)
 SwiftTUIViews.Canvas.init(pixelGridWidth:height:pixels:mode:)
 SwiftTUIViews.Canvas.layoutPriority(_:)
 SwiftTUIViews.Canvas.layoutValue(key:value:)
@@ -5413,6 +5412,11 @@ SwiftTUIViews.Canvas.transition(_:)
 SwiftTUIViews.Canvas.truncationMode(_:)
 SwiftTUIViews.Canvas.underline(_:color:)
 SwiftTUIViews.Canvas.underline(_:pattern:color:)
+SwiftTUIViews.CanvasClosureDrawing
+SwiftTUIViews.CanvasClosureDrawing.!=(_:_:)
+SwiftTUIViews.CanvasClosureDrawing.==(_:_:)
+SwiftTUIViews.CanvasClosureDrawing.draw(into:)
+SwiftTUIViews.CanvasClosureDrawing.init(_:)
 SwiftTUIViews.Capsule
 SwiftTUIViews.Capsule.accessibilityCursorAnchor(_:)
 SwiftTUIViews.Capsule.accessibilityHidden(_:)

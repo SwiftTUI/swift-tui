@@ -30,6 +30,11 @@ cell-space values. On a cell-only terminal, the runtime supplies the center of
 the reported cell. On native, web, or terminal-pixel input paths, the same API
 can carry sub-cell positions.
 
+`DragGesture.Value.path` is complete for the current gesture. It retains samples
+from pointer-down through the current value and is cleared when the recognizer
+tears down. Persist path samples into app state when a stroke or route should
+outlive the active gesture.
+
 For hover-only affordances, use ``View/onPointerHover(_:)``:
 
 ```swift
@@ -75,6 +80,18 @@ the base layout contract.
 ``Canvas`` drawings receive a ``CanvasContext`` sized in terminal cells.
 Drawing methods such as `setPixel(at:)` and `line(from:to:)` accept continuous
 cell-space ``Point`` values and pack them into the selected ``CanvasGrid``.
+
+For small ad-hoc drawings, use the closure form:
+
+```swift
+Canvas { context in
+  context.line(from: .zero, to: Point(x: 10, y: 2.5))
+}
+```
+
+Closure drawings compare by identity. Use a value type conforming to
+``CanvasDrawing`` when a drawing should compare structurally equal across
+rerenders.
 
 Dense pixel-grid helpers are still terminal-cell abstractions. Use them for
 editor-like surfaces, heatmaps, and previews where each logical pixel is meant

@@ -18,6 +18,10 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- Closed the Canvas/pointer decision work: `PointerPath` is documented as a
+  complete current-gesture path, closure-backed `Canvas` authoring is public
+  with identity-based equality, `.pixelExact` is hidden until a real graphics
+  renderer exists, and the standalone Canvas example remains out of scope.
 - Retired the remaining package-only `[AnyView]` builder traversal from
   `DeclaredChildrenView` and its structural builder conformers. Builder
   children now use the typed resolve, deferred payload, portal payload, and

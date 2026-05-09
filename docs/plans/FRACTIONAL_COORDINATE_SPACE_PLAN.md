@@ -1,7 +1,7 @@
 ---
 title: "feature: sub-cell pointer input"
 type: feature
-status: active
+status: shipped
 date: 2026-04-28
 proposal: "../proposals/FRACTIONAL_COORDINATE_SPACE.md"
 ---
@@ -15,18 +15,17 @@ Implementation plan prepared from `JOINT_PROPOSAL.md`, `CODEX_PROPOSAL.md`,
 It was later synced with Claude's implementation-plan scratch sections in
 `.agent-comms/scratch/claude-impl-plan-sections.md`.
 
-The plan remains active, but it must be re-scoped before more implementation
-starts. Source has already moved beyond several unchecked phases: continuous
-cell-space geometry, `PointerLocation`, pointer precision policy, terminal pixel
-mouse parsing, Canvas grids, and fractional gesture/control paths are present.
-The remaining work needs a current phase-by-phase inventory rather than blind
-execution of the original checklist.
+The plan is retained as an implementation record. Source has already moved
+beyond several unchecked phases: continuous cell-space geometry,
+`PointerLocation`, pointer precision policy, terminal pixel mouse parsing,
+Canvas grids, fractional gesture/control paths, and the final Canvas/pointer API
+decisions are present.
 
 This plan assumes the project remains pre-release. Source compatibility and
 migration cost are not goals. Temporary compatibility aliases may be useful while
 working on a branch, but they should not be treated as durable public API.
 
-### Current Phase Inventory - 2026-05-08
+### Current Phase Inventory - 2026-05-09
 
 This inventory replaces the unchecked phase list as the execution guide. The
 old phases remain below as historical implementation context, but they should
@@ -38,26 +37,26 @@ not be followed mechanically.
 | Pointer plumbing | Landed. Mouse and local pointer events carry `PointerLocation`; cell fallback centers the reported cell; `PointerInputCapabilities` flows through environment and geometry readers. | [PointerLocation.swift](../../Sources/SwiftTUICore/Pointer/PointerLocation.swift), [PointerPrecisionPolicy.swift](../../Sources/SwiftTUICore/Pointer/PointerPrecisionPolicy.swift), [PointerLocationTests.swift](../../Tests/SwiftTUICoreTests/Pointer/PointerLocationTests.swift) |
 | Gestures and coordinate spaces | Landed. `DragGesture`, `SpatialTapGesture`, pointer paths, hover, content shapes, and named coordinate spaces consume continuous cell points while routing still uses containing cells. | [DragGesture.swift](../../Sources/SwiftTUIViews/Gestures/DragGesture.swift), [SpatialTapGesture.swift](../../Sources/SwiftTUIViews/Gestures/SpatialTapGesture.swift), [PointerPath.swift](../../Sources/SwiftTUIViews/Gestures/PointerPath.swift), [CoordinateSpaceTests.swift](../../Tests/SwiftTUITests/CoordinateSpaceTests.swift) |
 | Host precision | Landed for native, WebHost, and WASI/web transports. Hosts construct `.subCell` locations from their exact local coordinates when cell metrics are available. | [NativeTerminalSurfaceView.swift](../../Platforms/SwiftUI/Sources/SwiftUIHost/NativeTerminalSurfaceView.swift), [WebSurfaceTransport.swift](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift), [WebSocketSurfaceTransport.swift](../../Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift) |
-| Canvas hit testing and drawing | Largely landed. `CanvasContext` maps continuous points and `PointerLocation` values into `CanvasGrid` samples, and `CanvasPixelGridDrawing` covers full-cell and vertical half-block rendering. The standalone `Examples/canvas` package named by the original plan is not present in the current repo; `gifeditor` and the root Canvas tests are the maintained verification surfaces. | [Canvas.swift](../../Sources/SwiftTUIViews/Canvas.swift), [CanvasDrawing.swift](../../Sources/SwiftTUICore/Draw/CanvasDrawing.swift), [CanvasGridTests.swift](../../Tests/SwiftTUICoreTests/CanvasGridTests.swift), [CanvasView.swift](../../Examples/gifeditor/Sources/GIFEditorUI/CanvasView.swift) |
+| Canvas hit testing and drawing | Landed. `CanvasContext` maps continuous points and `PointerLocation` values into `CanvasGrid` samples, `CanvasClosureDrawing` supports closure-based authoring with identity equality, and `CanvasPixelGridDrawing` covers full-cell and vertical half-block rendering. The standalone `Examples/canvas` package named by the original plan is not present in the current repo; `gifeditor` and the root Canvas tests are the maintained verification surfaces. | [Canvas.swift](../../Sources/SwiftTUIViews/Canvas.swift), [CanvasDrawing.swift](../../Sources/SwiftTUICore/Draw/CanvasDrawing.swift), [CanvasGridTests.swift](../../Tests/SwiftTUICoreTests/CanvasGridTests.swift), [CanvasView.swift](../../Examples/gifeditor/Sources/GIFEditorUI/CanvasView.swift) |
 | Direct-manipulation controls | Landed for the current consumers. Slider tracks, scroll indicators, GIF editor canvas interaction, and chart coordinate helpers use continuous pointer coordinates with cell fallback behavior. | [SwiftUISurfaceTests.swift](../../Tests/SwiftTUITests/SwiftUISurfaceTests.swift), [ScrollIndicatorDraggingTests.swift](../../Tests/SwiftTUITests/ScrollIndicatorDraggingTests.swift), [ChartCoordinateConversion.swift](../../Sources/SwiftTUICharts/ChartCoordinateConversion.swift), [CanvasViewTests.swift](../../Examples/gifeditor/Tests/GIFEditorUITests/CanvasViewTests.swift) |
 | Terminal 1016 | Landed with explicit parser mode, capability policy, live/matrix resolution, tmux/screen safety, setup/teardown coverage, and terminal-pixel gesture delivery. | [InputReader.swift](../../Sources/SwiftTUI/Input/InputReader.swift), [TerminalHost.swift](../../Sources/SwiftTUI/Terminal/TerminalHost.swift), [TerminalGraphicsProtocolTests.swift](../../Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift) |
 | Hover, drop, path, and named spaces | Landed. Hover is subscriber-driven, drop contexts can carry spatial pointer metadata, `Path` supports continuous content shapes, and named spaces preserve fractional coordinates. | [PointerHover.swift](../../Sources/SwiftTUIViews/Gestures/PointerHover.swift), [DropDestinationRegistry.swift](../../Sources/SwiftTUICore/Runtime/DropDestinationRegistry.swift), [Path.swift](../../Sources/SwiftTUICore/Geometry/Path.swift), [ContentShapeTests.swift](../../Tests/SwiftTUITests/ContentShapeTests.swift) |
 
-Remaining work is decision-bound rather than a direct continuation of the old
-phase list:
+The final decision-bound items are resolved:
 
-- Decide whether `PointerPath` needs a bounded sample cap before v1. Current
-  source retains every sample for the current gesture.
-- Decide whether the public `Canvas` closure-authoring form is still desired.
-  The current shipped API keeps the value/protocol form plus
-  `CanvasPixelGridDrawing`.
-- Decide whether `.pixelExact` should stay public while no graphics-protocol
-  pixel-buffer renderer exists, or be hidden until a renderer ships.
-- Decide whether to add a new standalone Canvas example. The currently retained
-  example surface is `gifeditor`.
+- `PointerPath` retains every sample for the current gesture. There is no v1
+  sample cap; apps should persist or trim samples they need after recognizer
+  teardown.
+- The public `Canvas` closure-authoring form is shipped through
+  `CanvasClosureDrawing`. It compares by identity, while value
+  `CanvasDrawing` types remain the structural equality path.
+- `.pixelExact` is hidden until a graphics-protocol pixel-buffer renderer can
+  make it testable.
+- No new standalone Canvas example is required. The maintained example surface
+  remains `gifeditor`, with root Canvas tests covering the public API.
 
-Do not start new implementation from this document until those choices are
-turned into narrow tasks.
+The historical phases below remain as implementation context. Do not execute
+them mechanically.
 
 ## Target Outcome
 
@@ -696,8 +695,9 @@ Run:
 - Existing code may treat `velocity == .zero` as a jitter filter. Search for
   velocity equality checks and replace truncation-dependent logic with an
   explicit threshold if needed.
-- `PointerPath` can grow during long drags. Decide and test the bounded-capacity
-  rule before shipping this phase.
+- `PointerPath` can grow during long drags. The shipped v1 contract keeps the
+  complete current-gesture path and clears it on recognizer teardown; callers
+  that persist strokes should trim their stored state if needed.
 
 ## Phase 4: Native And Web Host Precision
 
@@ -853,7 +853,6 @@ Modify:
 - `Sources/Core/BrailleCanvas.swift`
 - `Sources/Core/Rasterizer.swift`
 - `Sources/Core/RenderTreeAndSemanticsTypes.swift`
-- `Examples/canvas/Sources/CanvasDemoViews/CanvasDemoView.swift`
 - `Examples/gifeditor/Sources/GIFEditorUI/CanvasView.swift`
 - Canvas tests and example package tests.
 
@@ -871,7 +870,6 @@ public struct CanvasGrid: Equatable, Sendable {
     case verticalHalfBlock
     case horizontalHalfBlock
     case fullCell
-    case pixelExact
   }
 
   public var style: Style
@@ -880,8 +878,9 @@ public struct CanvasGrid: Equatable, Sendable {
 }
 ```
 
-`pixelExact` should be designed into the type system but may be unavailable until
-graphics-protocol rendering is ready.
+Pixel-exact graphics-protocol rendering is reserved design space and should stay
+out of the public `CanvasGrid` API until a buffer-backed renderer can exercise
+it.
 
 Change `CanvasContext` to expose cell-space drawing:
 
@@ -943,7 +942,8 @@ Rasterize continuous cell operations by projecting to the chosen grid:
 - Vertical half block: `floor(x)`, `floor(y * 2)`.
 - Horizontal half block: `floor(x * 2)`, `floor(y)`.
 - Full cell: `floor(x)`, `floor(y)`.
-- Pixel exact: future buffer-backed rasterization using cell pixel metrics.
+Pixel-exact rendering remains a future buffer-backed rasterization path using
+cell pixel metrics; it is not part of the current public grid set.
 
 Unify the current Braille and `CanvasPixelGridDrawing` paths under this grid
 model. A drawing should be able to change output style by changing the grid, not
@@ -980,10 +980,11 @@ No consumer should need `cellX * 2 + 1` or `cellY * 4 + 2`.
 5. Add the protocol and closure authoring forms.
 6. Migrate `CanvasPixelGridDrawing` into `.fullCell` and half-block grid modes,
    then remove or temporarily deprecate the old type during the phase branch.
-7. Update `Examples/canvas` to store `Point` samples from `DragGesture` rather
-   than synthetic `CanvasSketchPoint` subpixels.
-8. Keep `.pixelExact` as a tested unavailable/stub mode unless graphics-protocol
-   rendering is implemented in the same phase.
+7. Keep `gifeditor` and root Canvas tests as the maintained example and
+   verification surfaces; do not add standalone `Examples/canvas` unless it is
+   explicitly prioritized later.
+8. Keep `.pixelExact` hidden unless graphics-protocol rendering is implemented
+   in the same phase.
 
 ### Tests
 
@@ -995,13 +996,14 @@ No consumer should need `cellX * 2 + 1` or `cellY * 4 + 2`.
 - Current `CanvasDrawing: Equatable` dedup behavior remains covered.
 - Half-block/full-cell drawing is represented as grid modes, not a separate
   coordinate-space API.
-- `Examples/canvas` no longer synthesizes subpixel anchors from integer cells.
+- Root Canvas tests cover fractional samples without integer-cell-to-subpixel
+  synthesis.
 
 Run:
 
 - `swiftly run swift test --filter SwiftTUITests.CanvasViewTests`
-- `swiftly run swift test --filter CoreTests.BrailleCanvasTests`
-- `swiftly run swift test --package-path Examples/canvas`
+- `swiftly run swift test --filter SwiftTUICoreTests.CanvasGridTests`
+- `swiftly run swift test --package-path Examples/gifeditor`
 
 ### Acceptance
 
@@ -1414,9 +1416,9 @@ Update:
 
 Update or add examples:
 
-- `Examples/canvas`: remove integer-cell-to-subpixel synthesis and store
-  fractional `Point` samples from `DragGesture`.
-- Add a small capability display in the Canvas example using
+- `Examples/gifeditor`: keep Canvas interaction on fractional `Point` samples
+  from `DragGesture`.
+- Use root tests or `Examples/gifeditor` for any small capability display using
   `pointerInputCapabilities` and `cellPixelMetrics`.
 - If hover lands, add a minimal chart/crosshair or Canvas hover demonstration.
 - Keep examples honest on unsupported terminals: they should still work with
@@ -1474,8 +1476,8 @@ Phase 4 native/web:
 Phase 5 Canvas:
 
 - `swiftly run swift test --filter SwiftTUITests.CanvasViewTests`
-- `swiftly run swift test --filter CoreTests.BrailleCanvasTests`
-- `swiftly run swift test --package-path Examples/canvas`
+- `swiftly run swift test --filter SwiftTUICoreTests.CanvasGridTests`
+- `swiftly run swift test --package-path Examples/gifeditor`
 
 Phase 6 controls:
 
@@ -1594,16 +1596,15 @@ These should be answered during implementation, not left implicit:
   proposal uses `location`; implementation may choose `point` if it avoids
   awkward `event.location.location` call sites.
 - Should `PointerPath` include every event since gesture start or only a bounded
-  rolling window plus an index? The initial recommendation is every sample for
-  the current gesture with a count cap such as 1024 samples, configurable later
-  if real apps need it.
+  rolling window plus an index? Resolved: it includes every sample for the
+  current gesture, with no v1 cap.
 - Should image pixel-grid dimensions get a dedicated `PixelGridSize` rather than
   `PixelSize` or `CellSize`? The recommendation is a dedicated integer image
   pixel-grid type so terminal cells and image pixels do not share a misleading
   name.
-- Should `.pixelExact` be public before a pixel graphics renderer ships? The
-  recommendation is to reserve the design space, but only expose availability
-  that can be tested.
+- Should `.pixelExact` be public before a pixel graphics renderer ships?
+  Resolved: no. Reserve the design space, but only expose availability that can
+  be tested.
 - Should named coordinate spaces land with Phase 3 or Phase 8? They are useful
   but should not block the first fractional input path.
 - How should raw native `rawPixel` be documented when the host reports logical

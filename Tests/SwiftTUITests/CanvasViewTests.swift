@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 private struct DiagonalLine: CanvasDrawing, Equatable {
@@ -160,6 +160,20 @@ struct CanvasViewTests {
         #expect(scalar == 0x20 || scalar == 0x2800)
       }
     }
+  }
+
+  @Test("Canvas closure authoring renders ad-hoc drawing code")
+  func canvasClosureDrawing() {
+    let artifacts = DefaultRenderer().render(
+      Canvas { context in
+        context.setPixel(at: .zero)
+      }
+      .frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasClosure"))
+    )
+
+    let scalar = artifacts.rasterSurface.cells[0][0].character.unicodeScalars.first?.value ?? 0
+    #expect((scalar - 0x2800) & 0x01 != 0)
   }
 
   @Test("CanvasContext reports subpixel dimensions (2·cellW × 4·cellH)")
@@ -343,5 +357,19 @@ struct CanvasViewTests {
     #expect(a != c)
     #expect(d != e)
     #expect(a != f)
+  }
+
+  @Test("Canvas closure drawing equality is identity-based")
+  func canvasClosureDrawingEquality() {
+    let drawing = CanvasClosureDrawing { context in
+      context.setPixel(at: .zero)
+    }
+    let copy = drawing
+    let other = CanvasClosureDrawing { context in
+      context.setPixel(at: .zero)
+    }
+
+    #expect(CanvasPayload(drawing: drawing) == CanvasPayload(drawing: copy))
+    #expect(CanvasPayload(drawing: drawing) != CanvasPayload(drawing: other))
   }
 }

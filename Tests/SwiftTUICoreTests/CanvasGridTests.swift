@@ -20,8 +20,6 @@ struct CanvasGridTests {
     #expect(CanvasGrid.horizontalHalfBlock.subdivisionsY == 1)
     #expect(CanvasGrid.fullCell.subdivisionsX == 1)
     #expect(CanvasGrid.fullCell.subdivisionsY == 1)
-    #expect(CanvasGrid.pixelExact.subdivisionsX == 1)
-    #expect(CanvasGrid.pixelExact.subdivisionsY == 1)
   }
 
   @Test("CanvasGridBuffer preserves Braille masks for the default grid")
