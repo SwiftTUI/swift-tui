@@ -13,12 +13,14 @@ swiftly run swift package generate-documentation --target SwiftTUI
 
 The repository [README.md](../README.md) is the public landing page.
 [AGENTS.md](../AGENTS.md) is the short guide for agentic assistants.
-[`../ACTIVE_WORK.md`](../ACTIVE_WORK.md) tracks incomplete work, and
-[`../CHANGELOG.md`](../CHANGELOG.md) records completed active-work history.
+[`TODO.md`](TODO.md) tracks planned work and unresolved decisions, and
+[`CHANGELOG.md`](CHANGELOG.md) records completed TODO history.
 
 ## Start Here
 
-- [STATUS.md](STATUS.md) — shipped surface, current constraints, and short-term gaps
+- [STATUS.md](STATUS.md) — shipped surface, current constraints, goals, and
+  explicit deferrals; planned or decision-bound gaps are tracked in
+  [`TODO.md`](TODO.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — package boundaries and the frame pipeline
 - [RUNTIME.md](RUNTIME.md) — lifecycle, graph-scoped state, observation,
   presentation safety, and incremental rendering

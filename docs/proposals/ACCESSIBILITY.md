@@ -1526,7 +1526,7 @@ form the accessibility plan; this proposal alone is incomplete.
 This historical proposal no longer tracks questions that were resolved by
 ADR-0011 through ADR-0015 or by shipped source. Current shipped behavior lives
 in [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md); active follow-up work lives in
-[`../../ACTIVE_WORK.md`](../../ACTIVE_WORK.md).
+[`../TODO.md`](../TODO.md).
 
 The remaining proposal-level questions are:
 
@@ -1608,7 +1608,7 @@ WebSocket transport landed).)
    `TerminalHost` rendering. ADR-0013 decides that `--accessible` and
    `SWIFTTUI_ACCESSIBLE=1` imply ASCII, reduced motion, no progress, and
    linear output. Remaining runtime flag questions are tracked in
-   [`../../ACTIVE_WORK.md`](../../ACTIVE_WORK.md) rather than in this
+   [`../TODO.md`](../TODO.md) rather than in this
    historical proposal.
 
 2. **Phase 2 — Cursor-as-focus.** **(Landed.)** The mechanism
@@ -1713,7 +1713,7 @@ WebSocket transport landed).)
 Each phase was independently shippable. Phases 1-5 cover CLI accessibility;
 Phases 6-8 cover browser and native host consumers. The remaining work is no
 longer phase scaffolding: it is the focused behavior backlog listed in
-[`../../ACTIVE_WORK.md`](../../ACTIVE_WORK.md) and summarized in
+[`../TODO.md`](../TODO.md) and summarized in
 [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md).
 
 ---

@@ -3,12 +3,16 @@
 Guidance for Claude Code and other agentic assistants working in this
 repository. Keep this file concise — the detailed design documents in
 [`docs/`](docs/README.md) are the source of truth. Update them there, not here.
-Use [`ACTIVE_WORK.md`](ACTIVE_WORK.md) as the live tracker for incomplete work:
-keep it current, keep entries concise, link to supporting docs, and remove
-items when completed rather than summarizing completed work there. Move completed
-items into [`CHANGELOG.md`](CHANGELOG.md) with concise self-standing entries;
-prefix any changelog links to repo docs with the short git hash that anchors
-the referenced material.
+Use [`docs/TODO.md`](docs/TODO.md) as the live tracker for incomplete planned
+work and unresolved decisions: keep it current, keep entries concise, link to
+supporting docs, and remove items when completed rather than summarizing
+completed work there. [`docs/STATUS.md`](docs/STATUS.md) is the high-level
+state and direction overview, not the canonical work queue; any status gap that
+is planned, actively investigated, or awaiting a decision must have a
+corresponding `docs/TODO.md` item. Move completed items into
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md) with concise
+self-standing entries; prefix any changelog links to repo docs with the short
+git hash that anchors the referenced material.
 
 ## Build & Test Commands
 

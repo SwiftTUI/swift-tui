@@ -12,6 +12,13 @@ The package is usable for real terminal interfaces. The main gaps are not in
 the fundamental pipeline; they are in breadth of surface area, app-shell
 ergonomics, and a few still-conservative runtime paths.
 
+This document is the high-level product and runtime overview. It may describe
+goals, shipped surface, current constraints, and deferred-by-design areas, but
+it is not the canonical work queue. Any gap described here that is planned,
+actively investigated, or awaiting a decision must have a corresponding item in
+[`TODO.md`](TODO.md). If no `TODO.md` item exists, the text here should
+make clear that the topic is shipped, contextual, or explicitly deferred.
+
 Current async presentation and frame-tail worker ownership is summarized in
 [ASYNC_RENDERING.md](ASYNC_RENDERING.md).
 
