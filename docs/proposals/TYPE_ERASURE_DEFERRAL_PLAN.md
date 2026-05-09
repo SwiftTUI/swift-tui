@@ -48,7 +48,7 @@ The runtime and scene layer now follow the maximum path:
 
 ## Current Re-Scope Status
 
-As of 2026-05-08, the remaining production erasure is no longer an "easy
+As of 2026-05-09, the remaining production erasure is no longer an "easy
 internal helper cleanup" pass. Current source concentrates `AnyView` in:
 
 - the builder backbone: `DeclaredChildrenView`, `TupleView`,
@@ -57,14 +57,15 @@ internal helper cleanup" pass. Current source concentrates `AnyView` in:
 - `ViewBuilder.buildLimitedAvailability`, which remains the deliberate
   availability-erasure seam;
 - the public `AnyView` implementation and package-owned scope-preserving
-  `scopedAnyView(...)` helper;
-- the private `AnyTabViewStyleBox` transport in `TabViewStyles.swift`, where
-  heterogeneous style-associated body types are erased behind the style box.
+  `scopedAnyView(...)` helper.
 
 Do not continue by deleting isolated `AnyView` calls. The next implementation
 step must first choose whether to land the typed structural builder backbone or
 to preserve the current builder compatibility seams and only document the
-remaining private erasure.
+remaining builder erasure.
+
+The inventory below is retained as the investigation record for earlier
+categories. Use this re-scope section as the live implementation boundary.
 
 ## Investigation Findings
 

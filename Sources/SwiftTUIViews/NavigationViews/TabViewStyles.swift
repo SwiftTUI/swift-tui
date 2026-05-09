@@ -49,23 +49,14 @@ public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStr
     activeContent: DeferredViewPayload?,
     in context: ResolveContext
   ) -> ResolvedNode {
-    TabViewStyleBodyHost(
-      layoutBehavior: tabViewContainerAnyLayout.resolvedBehavior,
-      strip: FrameworkHostedTabStripView(
-        styleBox: box,
-        controlIdentity: controlIdentity,
-        configuration: configuration,
-        presentation: presentation
-      ),
+    box.resolveBody(
+      configuration: configuration,
+      presentation: presentation,
+      controlIdentity: controlIdentity,
       activeContentIndex: activeContentIndex,
       activeContent: activeContent,
-      overflow: FrameworkHostedTabOverflowSlotView(
-        styleBox: box,
-        controlIdentity: controlIdentity,
-        configuration: configuration,
-        presentation: presentation
-      )
-    ).resolve(in: context)
+      in: context
+    )
   }
 }
 
@@ -542,29 +533,14 @@ private protocol AnyTabViewStyleBox: Sendable {
   ) -> TabViewStylePresentation
 
   @MainActor
-  func makeTabBody(
+  func resolveBody(
     configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
-  ) -> AnyView
-
-  @MainActor
-  func makeOverflowTriggerBody(
-    configuration: TabViewStyleConfiguration,
-    trigger: TabViewOverflowTriggerConfiguration
-  ) -> AnyView
-
-  @MainActor
-  func makeOverflowItemBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration,
-    overflow: TabViewOverflowMenuPresentation
-  ) -> AnyView
-
-  @MainActor
-  func makeStripBackground(
-    configuration: TabViewStyleConfiguration,
-    presentation: TabViewStylePresentation
-  ) -> AnyView
+    presentation: TabViewStylePresentation,
+    controlIdentity: Identity,
+    activeContentIndex: Int?,
+    activeContent: DeferredViewPayload?,
+    in context: ResolveContext
+  ) -> ResolvedNode
 }
 
 private struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
@@ -578,57 +554,31 @@ private struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
   }
 
   @MainActor
-  func makeTabBody(
+  func resolveBody(
     configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
-  ) -> AnyView {
-    AnyView(
-      style.makeTabBody(
+    presentation: TabViewStylePresentation,
+    controlIdentity: Identity,
+    activeContentIndex: Int?,
+    activeContent: DeferredViewPayload?,
+    in context: ResolveContext
+  ) -> ResolvedNode {
+    TabViewStyleBodyHost(
+      layoutBehavior: tabViewContainerAnyLayout.resolvedBehavior,
+      strip: FrameworkHostedTabStripView(
+        style: style,
+        controlIdentity: controlIdentity,
         configuration: configuration,
-        item: item
-      )
-    )
-  }
-
-  @MainActor
-  func makeOverflowTriggerBody(
-    configuration: TabViewStyleConfiguration,
-    trigger: TabViewOverflowTriggerConfiguration
-  ) -> AnyView {
-    AnyView(
-      style.makeOverflowTriggerBody(
-        configuration: configuration,
-        trigger: trigger
-      )
-    )
-  }
-
-  @MainActor
-  func makeOverflowItemBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration,
-    overflow: TabViewOverflowMenuPresentation
-  ) -> AnyView {
-    AnyView(
-      style.makeOverflowItemBody(
-        configuration: configuration,
-        item: item,
-        overflow: overflow
-      )
-    )
-  }
-
-  @MainActor
-  func makeStripBackground(
-    configuration: TabViewStyleConfiguration,
-    presentation: TabViewStylePresentation
-  ) -> AnyView {
-    AnyView(
-      style.makeStripBackground(
+        presentation: presentation
+      ),
+      activeContentIndex: activeContentIndex,
+      activeContent: activeContent,
+      overflow: FrameworkHostedTabOverflowSlotView(
+        style: style,
+        controlIdentity: controlIdentity,
         configuration: configuration,
         presentation: presentation
       )
-    )
+    ).resolve(in: context)
   }
 }
 
@@ -851,8 +801,8 @@ private struct TabViewLayoutSlotNode: View, ResolvableView {
   }
 }
 
-private struct FrameworkHostedTabStripView: View {
-  let styleBox: any AnyTabViewStyleBox
+private struct FrameworkHostedTabStripView<S: TabViewStyle>: View {
+  let style: S
   let controlIdentity: Identity
   let configuration: TabViewStyleConfiguration
   let presentation: TabViewStylePresentation
@@ -865,7 +815,7 @@ private struct FrameworkHostedTabStripView: View {
             for: controlIdentity,
             index: index
           ),
-          content: styleBox.makeTabBody(
+          content: style.makeTabBody(
             configuration: configuration,
             item: tabStyleItemConfiguration(
               for: configuration,
@@ -878,7 +828,7 @@ private struct FrameworkHostedTabStripView: View {
       if let overflow = presentation.overflowMenu {
         PointerRouteView(
           identity: tabOverflowTriggerIdentity(for: controlIdentity),
-          content: styleBox.makeOverflowTriggerBody(
+          content: style.makeOverflowTriggerBody(
             configuration: configuration,
             trigger: tabOverflowTriggerConfiguration(for: overflow)
           )
@@ -889,7 +839,7 @@ private struct FrameworkHostedTabStripView: View {
     }
     .frame(height: presentation.stripHeight, alignment: .leading)
     .background {
-      styleBox.makeStripBackground(
+      style.makeStripBackground(
         configuration: configuration,
         presentation: presentation
       )
@@ -897,8 +847,8 @@ private struct FrameworkHostedTabStripView: View {
   }
 }
 
-private struct FrameworkHostedTabOverflowSlotView: View {
-  let styleBox: any AnyTabViewStyleBox
+private struct FrameworkHostedTabOverflowSlotView<S: TabViewStyle>: View {
+  let style: S
   let controlIdentity: Identity
   let configuration: TabViewStyleConfiguration
   let presentation: TabViewStylePresentation
@@ -910,7 +860,7 @@ private struct FrameworkHostedTabOverflowSlotView: View {
         Spacer(minLength: 0)
           .frame(width: overflow.triggerLeadingWidth)
         FrameworkHostedTabOverflowMenuView(
-          styleBox: styleBox,
+          style: style,
           controlIdentity: controlIdentity,
           configuration: configuration,
           overflow: overflow
@@ -931,8 +881,8 @@ private struct FrameworkHostedTabOverflowSlotView: View {
   }
 }
 
-private struct FrameworkHostedTabOverflowMenuView: View {
-  let styleBox: any AnyTabViewStyleBox
+private struct FrameworkHostedTabOverflowMenuView<S: TabViewStyle>: View {
+  let style: S
   let controlIdentity: Identity
   let configuration: TabViewStyleConfiguration
   let overflow: TabViewOverflowMenuPresentation
@@ -945,7 +895,7 @@ private struct FrameworkHostedTabOverflowMenuView: View {
             for: controlIdentity,
             index: index
           ),
-          content: styleBox.makeOverflowItemBody(
+          content: style.makeOverflowItemBody(
             configuration: configuration,
             item: tabStyleItemConfiguration(
               for: configuration,
