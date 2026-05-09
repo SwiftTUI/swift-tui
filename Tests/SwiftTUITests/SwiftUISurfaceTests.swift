@@ -649,10 +649,10 @@ struct SwiftUISurfaceTests {
     #expect(hidden.lifecycleMetadata.appearHandlerIDs == ["Root/false/Group[0]#appear[0]"])
     #expect(
       shown.lifecycleMetadata.task
-        == .init(id: "Root/true/Group[0]#task[\"shown\"]", priority: .userInitiated))
+        == .init(id: "Root/true/Group[0]#task[id:Swift.String]", priority: .userInitiated))
     #expect(
       hidden.lifecycleMetadata.task
-        == .init(id: "Root/false/Group[0]#task[\"hidden\"]", priority: .userInitiated))
+        == .init(id: "Root/false/Group[0]#task[id:Swift.String]", priority: .userInitiated))
   }
 
   @Test(
@@ -698,7 +698,7 @@ struct SwiftUISurfaceTests {
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskStart(
-            .init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .userInitiated))
+            .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated))
         ),
       ]
     )
@@ -707,12 +707,12 @@ struct SwiftUISurfaceTests {
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskCancel(
-            .init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .userInitiated))
+            .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated))
         ),
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskStart(
-            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .userInitiated))
+            .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated))
         ),
       ]
     )
@@ -721,7 +721,7 @@ struct SwiftUISurfaceTests {
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskCancel(
-            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .userInitiated))
+            .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated))
         ),
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
