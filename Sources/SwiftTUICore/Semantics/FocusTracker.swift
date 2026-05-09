@@ -13,6 +13,7 @@ public final class FocusTracker {
 
   private var currentIndex: Int?
   private var prefersNoFocus = false
+  private var modalRestorationStack: [ModalRestoration] = []
 
   public init(
     focusRegions: [FocusRegion] = [],
@@ -37,12 +38,23 @@ public final class FocusTracker {
     let previousFocus = currentFocusIdentity
     let previousFocusRegion = currentFocusRegion()
     let wasPreservingNoFocus = prefersNoFocus
+    recordModalRestorationIfNeeded(
+      previousFocusRegion: previousFocusRegion,
+      nextRegions: regions
+    )
+    let modalRestoration = modalRestorationCandidate(
+      previousFocusRegion: previousFocusRegion,
+      nextRegions: regions
+    )
     focusRegions = regions
 
     if let previousFocus,
       let preservedIndex = regions.firstIndex(where: { $0.identity == previousFocus })
     {
       currentIndex = preservedIndex
+      prefersNoFocus = false
+    } else if let modalRestoration {
+      currentIndex = modalRestoration.regionIndex
       prefersNoFocus = false
     } else if let previousFocusRegion,
       let replacementIndex = preferredReplacementIndex(
@@ -57,6 +69,11 @@ public final class FocusTracker {
     } else {
       currentIndex = regions.isEmpty ? nil : 0
     }
+    pruneModalRestorationStack(
+      previousFocusRegion: previousFocusRegion,
+      nextRegions: regions,
+      consumedIndex: modalRestoration?.stackIndex
+    )
 
     // Keep the initial automatic focus adoption as runtime state without forcing an
     // immediate second frame before the user has interacted.
@@ -209,6 +226,16 @@ public final class FocusTracker {
 }
 
 extension FocusTracker {
+  private struct ModalRestoration {
+    var modalScopePath: [Identity]
+    var focusRegion: FocusRegion
+  }
+
+  private struct ModalRestorationCandidate {
+    var stackIndex: Int
+    var regionIndex: Int
+  }
+
   private struct DirectionalCandidate {
     var index: Int
     var sharesSection: Bool
@@ -230,6 +257,90 @@ extension FocusTracker {
       return nil
     }
     return focusRegions[currentIndex]
+  }
+
+  private func recordModalRestorationIfNeeded(
+    previousFocusRegion: FocusRegion?,
+    nextRegions: [FocusRegion]
+  ) {
+    guard
+      let previousFocusRegion,
+      let nextModalScopePath = activeModalScopePath(in: nextRegions),
+      previousFocusRegion.modalFocusScopePath != nextModalScopePath,
+      !nextRegions.contains(where: { $0.identity == previousFocusRegion.identity })
+    else {
+      return
+    }
+
+    if modalRestorationStack.last?.modalScopePath == nextModalScopePath {
+      modalRestorationStack.removeLast()
+    }
+    modalRestorationStack.append(
+      ModalRestoration(
+        modalScopePath: nextModalScopePath,
+        focusRegion: previousFocusRegion
+      )
+    )
+  }
+
+  private func modalRestorationCandidate(
+    previousFocusRegion: FocusRegion?,
+    nextRegions: [FocusRegion]
+  ) -> ModalRestorationCandidate? {
+    guard
+      let previousModalScopePath = previousFocusRegion?.modalFocusScopePath,
+      activeModalScopePath(in: nextRegions) != previousModalScopePath,
+      let stackIndex = modalRestorationStack.lastIndex(where: { restoration in
+        restoration.modalScopePath == previousModalScopePath
+          && nextRegions.contains { $0.identity == restoration.focusRegion.identity }
+      })
+    else {
+      return nil
+    }
+
+    guard
+      let regionIndex = nextRegions.firstIndex(
+        where: { $0.identity == modalRestorationStack[stackIndex].focusRegion.identity }
+      )
+    else {
+      return nil
+    }
+
+    return ModalRestorationCandidate(stackIndex: stackIndex, regionIndex: regionIndex)
+  }
+
+  private func pruneModalRestorationStack(
+    previousFocusRegion: FocusRegion?,
+    nextRegions: [FocusRegion],
+    consumedIndex: Int?
+  ) {
+    if let consumedIndex {
+      modalRestorationStack.remove(at: consumedIndex)
+    }
+
+    guard
+      let previousModalScopePath = previousFocusRegion?.modalFocusScopePath,
+      activeModalScopePath(in: nextRegions) != previousModalScopePath
+    else {
+      return
+    }
+
+    modalRestorationStack.removeAll { $0.modalScopePath == previousModalScopePath }
+  }
+
+  private func activeModalScopePath(
+    in regions: [FocusRegion]
+  ) -> [Identity]? {
+    guard
+      let firstRegion = regions.first,
+      let firstModalScopePath = firstRegion.modalFocusScopePath
+    else {
+      return nil
+    }
+
+    return regions.allSatisfy { $0.modalFocusScopePath == firstModalScopePath }
+      ? firstModalScopePath
+      : nil
   }
 
   private func directionalCandidateIndex(

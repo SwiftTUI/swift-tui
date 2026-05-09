@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -130,6 +130,50 @@ struct PresentationActionScopeTests {
   }
 
   @Test(
+    "Modal presentations trap focus and restore the pre-modal focus",
+    arguments: ModalPresentationKind.allCases
+  )
+  func modalPresentationsTrapAndRestoreFocus(kind: ModalPresentationKind) throws {
+    let tracker = FocusTracker(invalidationIdentities: [testIdentity("Root")])
+    let backgroundOne = testIdentity("BackgroundOne")
+    let backgroundTwo = testIdentity("BackgroundTwo")
+    let rootIdentity = testIdentity("Root")
+    let proposal = ProposedSize(width: .finite(48), height: .finite(12))
+
+    let closedArtifacts = DefaultRenderer().render(
+      modalFocusFixture(kind: kind, isPresented: false),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    #expect(!tracker.updateRegions(closedArtifacts.semanticSnapshot.focusRegions))
+    #expect(tracker.setFocus(to: backgroundTwo))
+
+    let openArtifacts = DefaultRenderer().render(
+      modalFocusFixture(kind: kind, isPresented: true),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    let openFocusIdentities = Set(openArtifacts.semanticSnapshot.focusRegions.map(\.identity))
+
+    #expect(tracker.updateRegions(openArtifacts.semanticSnapshot.focusRegions))
+    #expect(!openFocusIdentities.contains(backgroundOne))
+    #expect(!openFocusIdentities.contains(backgroundTwo))
+
+    let initialModalFocus = try #require(tracker.currentFocusIdentity)
+    #expect(openFocusIdentities.contains(initialModalFocus))
+
+    for _ in 0..<(openFocusIdentities.count + 1) {
+      _ = tracker.focusNext()
+      let currentFocus = try #require(tracker.currentFocusIdentity)
+      #expect(openFocusIdentities.contains(currentFocus))
+    }
+
+    #expect(tracker.updateRegions(closedArtifacts.semanticSnapshot.focusRegions))
+    #expect(tracker.currentFocusIdentity == backgroundTwo)
+  }
+
+  @Test(
     """
     Leaf inside a sheet within a WindowHostView has scene identity first \
     and sheet identity later on scopePath
@@ -184,6 +228,74 @@ struct PresentationActionScopeTests {
       "Sheet surface identity missing from sheet leaf scopePath."
     )
     #expect(sceneIndex < sheetIndex)
+  }
+}
+
+enum ModalPresentationKind: CaseIterable, CustomStringConvertible, Sendable {
+  case sheet
+  case alert
+  case confirmationDialog
+
+  var description: String {
+    switch self {
+    case .sheet:
+      "sheet"
+    case .alert:
+      "alert"
+    case .confirmationDialog:
+      "confirmationDialog"
+    }
+  }
+}
+
+@MainActor
+@ViewBuilder
+private func modalFocusFixture(
+  kind: ModalPresentationKind,
+  isPresented: Bool
+) -> some View {
+  let base = VStack(alignment: .leading, spacing: 1) {
+    Button("Background One") {}
+      .id(testIdentity("BackgroundOne"))
+    Button("Background Two") {}
+      .id(testIdentity("BackgroundTwo"))
+  }
+  .frame(width: 48, height: 12, alignment: .topLeading)
+
+  switch kind {
+  case .sheet:
+    base.sheet("Inspector", isPresented: .constant(isPresented)) {
+      Button("Close Inspector") {}
+        .id(testIdentity("ModalAction"))
+    }
+  case .alert:
+    base.alert(
+      "Delete project",
+      isPresented: .constant(isPresented),
+      actions: {
+        Button("Delete") {}
+          .id(testIdentity("ModalAction"))
+        Button("Cancel") {}
+          .id(testIdentity("ModalCancel"))
+      },
+      message: {
+        Text("This cannot be undone.")
+      }
+    )
+  case .confirmationDialog:
+    base.confirmationDialog(
+      "Archive task",
+      isPresented: .constant(isPresented),
+      actions: {
+        Button("Archive") {}
+          .id(testIdentity("ModalAction"))
+        Button("Cancel") {}
+          .id(testIdentity("ModalCancel"))
+      },
+      message: {
+        Text("Move the task out of the active list.")
+      }
+    )
   }
 }
 

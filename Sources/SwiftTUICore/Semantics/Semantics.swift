@@ -19,6 +19,7 @@ public struct SemanticExtractor: Sendable {
         node,
         scopePath,
         sectionIdentity,
+        modalFocusScopePath,
         clipRect,
         order,
         sealingParentOnChain,
@@ -46,7 +47,8 @@ public struct SemanticExtractor: Sendable {
               rect: semanticBounds(for: node),
               focusInteractions: node.semanticMetadata.focusInteractions,
               scopePath: scopePath,
-              sectionIdentity: sectionIdentity
+              sectionIdentity: sectionIdentity,
+              modalFocusScopePath: modalFocusScopePath
             )
           )
         }
@@ -82,6 +84,7 @@ public struct SemanticExtractor: Sendable {
             for: node,
             scopePath: scopePath,
             sectionIdentity: sectionIdentity,
+            modalFocusScopePath: modalFocusScopePath,
             clippedTo: clipRect,
             sealingParentOnChain: sealingParentOnChain,
             interactionRegions: &interactionRegions,
@@ -107,6 +110,7 @@ public struct SemanticExtractor: Sendable {
         node,
         scopePath,
         sectionIdentity,
+        modalFocusScopePath,
         clipRect,
         sealingParentOnChain,
         interactionsDisabledOnChain,
@@ -124,6 +128,7 @@ public struct SemanticExtractor: Sendable {
             for: node,
             scopePath: scopePath,
             sectionIdentity: sectionIdentity,
+            modalFocusScopePath: modalFocusScopePath,
             clippedTo: clipRect,
             interactionRegions: &interactionRegions,
             focusRegions: &focusRegions,
@@ -158,8 +163,11 @@ extension SemanticExtractor {
     sectionIdentity: Identity? = nil,
     clipRect: CellRect? = nil,
     hitTestOrder: inout Int,
-    preVisit: (PlacedNode, [Identity], Identity?, CellRect?, Int, Bool, Bool, inout Int) -> Void,
-    postVisit: (PlacedNode, [Identity], Identity?, CellRect?, Bool, Bool, inout Int) -> Void
+    preVisit:
+      (PlacedNode, [Identity], Identity?, [Identity]?, CellRect?, Int, Bool, Bool, inout Int) ->
+      Void,
+    postVisit: (PlacedNode, [Identity], Identity?, [Identity]?, CellRect?, Bool, Bool, inout Int) ->
+      Void
   ) {
     enum Phase {
       case enter
@@ -170,6 +178,7 @@ extension SemanticExtractor {
       let node: PlacedNode
       let scopePath: [Identity]
       let sectionIdentity: Identity?
+      let modalFocusScopePath: [Identity]?
       let clipRect: CellRect?
       /// `true` when an ancestor on the current walk chain is marked
       /// `sealsFocusDescendants`. Propagated to descendants so focus
@@ -185,6 +194,7 @@ extension SemanticExtractor {
         node: node,
         scopePath: scopePath,
         sectionIdentity: sectionIdentity,
+        modalFocusScopePath: nil,
         clipRect: clipRect,
         sealingParentOnChain: false,
         interactionsDisabledOnChain: false,
@@ -210,6 +220,10 @@ extension SemanticExtractor {
           frame.node.semanticMetadata.focusSectionBoundary
           ? frame.node.identity
           : frame.sectionIdentity
+        let nodeModalFocusScopePath =
+          isModalPresentationRole(frame.node.semanticMetadata.accessibilityRole)
+          ? nodeScopePath
+          : frame.modalFocusScopePath
         let nodeClipRect = combinedClipRect(
           inherited: frame.clipRect,
           next: frame.node.clipBounds
@@ -221,6 +235,7 @@ extension SemanticExtractor {
           frame.node,
           nodeScopePath,
           nodeSectionIdentity,
+          nodeModalFocusScopePath,
           nodeClipRect,
           nodeHitTestOrder,
           frame.sealingParentOnChain,
@@ -233,6 +248,7 @@ extension SemanticExtractor {
             node: frame.node,
             scopePath: nodeScopePath,
             sectionIdentity: nodeSectionIdentity,
+            modalFocusScopePath: nodeModalFocusScopePath,
             clipRect: nodeClipRect,
             sealingParentOnChain: frame.sealingParentOnChain,
             interactionsDisabledOnChain: frame.interactionsDisabledOnChain,
@@ -252,6 +268,7 @@ extension SemanticExtractor {
               node: child,
               scopePath: nodeScopePath,
               sectionIdentity: nodeSectionIdentity,
+              modalFocusScopePath: nodeModalFocusScopePath,
               clipRect: nodeClipRect,
               sealingParentOnChain: childSealingParentOnChain,
               interactionsDisabledOnChain: childInteractionsDisabledOnChain,
@@ -264,6 +281,7 @@ extension SemanticExtractor {
           frame.node,
           frame.scopePath,
           frame.sectionIdentity,
+          frame.modalFocusScopePath,
           frame.clipRect,
           frame.sealingParentOnChain,
           frame.interactionsDisabledOnChain,
@@ -286,6 +304,17 @@ extension SemanticExtractor {
       next
     case (.some(let inherited), .some(let next)):
       inherited.intersection(next)
+    }
+  }
+
+  private func isModalPresentationRole(
+    _ role: AccessibilityRole?
+  ) -> Bool {
+    switch role {
+    case .alert, .confirmationDialog, .sheet:
+      true
+    default:
+      false
     }
   }
 
@@ -711,6 +740,7 @@ extension SemanticExtractor {
     for node: PlacedNode,
     scopePath: [Identity],
     sectionIdentity: Identity?,
+    modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
     interactionRegions: inout [InteractionRegion],
@@ -726,6 +756,7 @@ extension SemanticExtractor {
         payload: payload,
         scopePath: scopePath,
         sectionIdentity: sectionIdentity,
+        modalFocusScopePath: modalFocusScopePath,
         clippedTo: clipRect,
         sealingParentOnChain: sealingParentOnChain,
         interactionRegions: &interactionRegions,
@@ -778,7 +809,8 @@ extension SemanticExtractor {
               rect: clippedRect,
               focusInteractions: .activate,
               scopePath: scopePath,
-              sectionIdentity: sectionIdentity ?? node.identity
+              sectionIdentity: sectionIdentity ?? node.identity,
+              modalFocusScopePath: modalFocusScopePath
             )
           )
         }
@@ -836,6 +868,7 @@ extension SemanticExtractor {
     payload: RichTextPayload,
     scopePath: [Identity],
     sectionIdentity: Identity?,
+    modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
     interactionRegions: inout [InteractionRegion],
@@ -922,7 +955,8 @@ extension SemanticExtractor {
               rect: clippedRect,
               focusInteractions: .activate,
               scopePath: scopePath,
-              sectionIdentity: sectionIdentity
+              sectionIdentity: sectionIdentity,
+              modalFocusScopePath: modalFocusScopePath
             )
           )
         }
@@ -962,6 +996,7 @@ extension SemanticExtractor {
     for node: PlacedNode,
     scopePath: [Identity],
     sectionIdentity: Identity?,
+    modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
@@ -1008,7 +1043,8 @@ extension SemanticExtractor {
           rect: clippedRect,
           focusInteractions: .edit,
           scopePath: scopePath,
-          sectionIdentity: sectionIdentity
+          sectionIdentity: sectionIdentity,
+          modalFocusScopePath: modalFocusScopePath
         )
       )
     }
