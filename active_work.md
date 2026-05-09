@@ -40,11 +40,6 @@
   [Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift](Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift),
   [Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift](Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift),
   [Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift](Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift).
-- [ ] Decide whether to execute or demote the first-class modifier-layer
-  migration. Supporting docs and source:
-  [docs/proposals/VIEW_MODIFIER_LAYER.md](docs/proposals/VIEW_MODIFIER_LAYER.md),
-  [Sources/SwiftTUIViews/Foundation/ViewModifier.swift](Sources/SwiftTUIViews/Foundation/ViewModifier.swift),
-  [Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift](Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift).
 - [ ] Replace the `.task(id:)` reflection-based descriptor identity with a
   deliberate identity strategy. Supporting source:
   [Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift](Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift).
