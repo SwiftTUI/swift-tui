@@ -395,8 +395,8 @@ git commit -m "test: cover SwiftUI host native focus flow"
 
 **Files:**
 
-- Modify: `ACTIVE_WORK.md`
-- Modify: `CHANGELOG.md`
+- Modify: `docs/TODO.md`
+- Modify: `docs/CHANGELOG.md`
 
 - [x] **Step 1: Run the platform package tests**
 
@@ -428,13 +428,13 @@ run in the agent pass.
 - [x] **Step 4: Move completed active work to the changelog**
 
 After implementation is committed, remove the SwiftUI native focus item from
-`ACTIVE_WORK.md` and add a concise `CHANGELOG.md` entry prefixed with the short
+`docs/TODO.md` and add a concise `docs/CHANGELOG.md` entry prefixed with the short
 implementation commit hash. Link the ADR, overlay source, and host tests from
 the changelog entry.
 
 - [x] **Step 5: Commit tracker cleanup**
 
 ```bash
-git add ACTIVE_WORK.md CHANGELOG.md
+git add docs/TODO.md docs/CHANGELOG.md
 git commit -m "docs: close SwiftUI native focus active work"
 ```

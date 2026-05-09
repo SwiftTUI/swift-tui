@@ -234,12 +234,15 @@ design doc, active proposal, and background note in this repository. Per-module
 API reference lives in the `*.docc` catalogs under `Sources/`, generated with
 the DocC command above.
 
-For the current incomplete work queue, use [ACTIVE_WORK.md](ACTIVE_WORK.md).
-It is additive to the durable docs: keep it concise, link to supporting
-documents, and remove items when they are completed. Completed active-work
-entries move to [CHANGELOG.md](CHANGELOG.md), where descriptions stay
-self-standing and any links to repo docs are prefixed with the short git hash
-that anchors the referenced material.
+For the current incomplete work queue, use [docs/TODO.md](docs/TODO.md). It is
+additive to the durable docs: keep it concise, link to supporting documents,
+and remove items when they are completed. [docs/STATUS.md](docs/STATUS.md)
+remains the high-level overview of shipped surface, constraints, goals, and
+explicit deferrals; any planned or decision-bound status gap belongs in
+`docs/TODO.md`. Completed TODO entries move to
+[docs/CHANGELOG.md](docs/CHANGELOG.md), where
+descriptions stay self-standing and any links to repo docs are prefixed with
+the short git hash that anchors the referenced material.
 
 Common entry points:
 
@@ -252,4 +255,4 @@ Common entry points:
 - [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work
 - [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md): CPU and input-latency evaluation workflow
 - [Examples/README.md](Examples/README.md): maintained example apps
-- [CHANGELOG.md](CHANGELOG.md): concise completed-work history
+- [docs/CHANGELOG.md](docs/CHANGELOG.md): concise completed-work history

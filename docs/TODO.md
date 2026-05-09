@@ -1,10 +1,11 @@
-# Active Work
+# TODO
 
 ## Rules
 
-- Keep this document up to date whenever active tasks are added, completed, or
-  re-scoped.
-- Include only work that is not yet completed.
+- Keep this document up to date whenever planned work or unresolved decisions
+  are added, completed, or re-scoped.
+- Include only planned work and unresolved decisions. Do not include completed,
+  explicitly deferred, or rejected items.
 - Use concise task descriptions with links to supporting docs, plans, source
   files, or tests.
 - Remove completed work from this document entirely.
@@ -13,20 +14,25 @@
   plans, source, or tests.
 - Changelog entries may link to long-lived repo documentation, but every link
   must be prefixed with the short git hash that anchors the referenced material,
-  for example: `4ee7a8f9 [docs/STATUS.md](docs/STATUS.md)`.
+  for example: `4ee7a8f9 [STATUS.md](STATUS.md)`.
 - Treat this file as additive to the repo documentation structure. It does not
   replace durable docs, proposals, ADRs, plans, or tests.
 - Use this file as the first place to check what is next.
+- `STATUS.md` may summarize goals, shipped surface, constraints, and
+  deferred-by-design areas. Any gap or goal in `STATUS.md` that is
+  planned, actively investigated, or awaiting a decision must have a
+  corresponding item here. If there is no item here, the status text should make
+  clear that the topic is shipped, contextual, or explicitly deferred.
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Turn the current constraints in `docs/STATUS.md` into executable plans or
+- [ ] Turn the current constraints in `STATUS.md` into executable plans or
   explicitly defer them: default-focus scopes, `@FocusedObject`, richer
   `TextEditor`, `NavigationStack`, popover-style presentation, terminal
   workspaces, deeper scroll control, and navigation surfaces. Supporting docs:
-  [docs/STATUS.md](docs/STATUS.md),
-  [docs/VISION.md](docs/VISION.md),
-  [docs/FOCUS.md](docs/FOCUS.md).
+  [STATUS.md](STATUS.md),
+  [VISION.md](VISION.md),
+  [FOCUS.md](FOCUS.md).
   Ambiguity note: park this for later investigation. Some listed constraints
   may already be obsolete, so this remains a prioritization pass rather than a
   single implementation task.
