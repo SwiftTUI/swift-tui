@@ -20,17 +20,17 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Re-scope behavior wiring for parsed `RuntimeConfiguration` fields whose
-  intended behavior is still underspecified: `--json`, standalone `--linear`,
-  and `--start-in`. Supporting docs and source:
+- [ ] Wire the decided runtime flag contract: `--json` is machine output,
+  standalone `--linear` selects accessible linear output, and framework-owned
+  `--start-in` / `SWIFTTUI_START_IN` should be removed because launch scope is
+  app-owned consumer policy. Supporting docs and source:
   [README.md](README.md),
   [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md),
   [Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift](Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift),
   [Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift](Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift),
   [Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift](Sources/SwiftTUI/RunLoop/RunLoop+Rendering.swift).
-  Ambiguity note: this needs an explicit runtime contract for each flag before
-  implementation, especially whether the modes are aliases, output formats, or
-  independent render policies.
+  Decision note: `--json` and `--linear` are framework output modes;
+  `start-in`-style routing belongs in each consuming app's argument surface.
 - [ ] Re-scope the remaining `AnyView` / `[AnyView]` reduction before more
   implementation. Current production erasure is concentrated in the builder
   backbone and private `TabViewStyle` boxes; the next step needs an explicit
@@ -43,8 +43,9 @@
   [Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift](Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift),
   [Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift](Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift),
   [Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift](Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift).
-  Ambiguity note: do not continue by mechanically removing erasure; choose a
-  migration direction for retained builders and style boxes first.
+  Ambiguity note: leave this active but do not implement it now. Do not
+  continue by mechanically removing erasure; choose a migration direction for
+  retained builders and style boxes first.
 - [ ] Turn the current constraints in `docs/STATUS.md` into executable plans or
   explicitly defer them: default-focus scopes, `@FocusedObject`, richer
   `TextEditor`, `NavigationStack`, popover-style presentation, terminal
@@ -52,8 +53,9 @@
   [docs/STATUS.md](docs/STATUS.md),
   [docs/VISION.md](docs/VISION.md),
   [docs/FOCUS.md](docs/FOCUS.md).
-  Ambiguity note: this is a prioritization pass, not a single implementation
-  task; each constraint needs an explicit plan-or-defer decision.
+  Ambiguity note: park this for later investigation. Some listed constraints
+  may already be obsolete, so this remains a prioritization pass rather than a
+  single implementation task.
 
 ## Canvas And Pointer Work
 
@@ -65,7 +67,10 @@
   before implementation: `PointerPath` sample-cap policy, public `Canvas`
   closure-authoring support, `.pixelExact` availability before a graphics
   renderer exists, and whether to add a new standalone Canvas example.
-  Ambiguity note: do not continue by blindly executing the old phase checklist.
+  Ambiguity note: prior implementation already landed the core pointer and
+  fractional-coordinate plumbing, so this is not a catch-up checklist. Treat the
+  remaining bullets as product/API design choices and do not blindly execute the
+  old phase checklist.
   Supporting docs and source:
   [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
   [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md),
@@ -79,10 +84,11 @@
 Source of truth for shipped accessibility behavior:
 [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 
-- [ ] Decide whether SwiftUI host focus should move native VoiceOver focus or
-  remain metadata-only. Supporting docs and source:
+- [ ] Plan and implement SwiftUI host focus so runtime focus movement moves
+  native VoiceOver focus by default, with the current metadata-only behavior
+  treated as the pre-plan baseline. Supporting docs and source:
   [docs/decisions/0015-accessibility-swiftui-host-policy.md](docs/decisions/0015-accessibility-swiftui-host-policy.md),
   [Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift](Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift),
   [Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift](Platforms/SwiftUI/Sources/SwiftUIHost/HostedAccessibilityOverlay.swift).
-  Ambiguity note: this needs a host-platform policy decision before code work;
-  metadata-only is the current documented behavior.
+  Decision note: native focus movement should become the default SwiftUI host
+  behavior; write the plan before implementation.
