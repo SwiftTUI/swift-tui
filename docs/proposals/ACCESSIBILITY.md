@@ -695,8 +695,10 @@ and thinner in one place**. Specifically:
   `--no-color`, `--force-color`, `--ascii`, `--plain`,
   `--cursor-follows-focus`, `--accessible`, `--reduce-motion`, and
   `--no-progress` now reach runtime behavior. Accessible output uses the
-  linear renderer. Standalone `--linear`, `--json`, and `--web` behavior
-  remain follow-ups.
+  linear renderer. Standalone `--linear` and app-defined `--json` behavior
+  remain runtime-configuration follow-ups owned by
+  [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md), not by this accessibility
+  research record.
 
 - **Cursor positioning mechanism exists.**
   [`TerminalHost.swift`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)
@@ -1521,115 +1523,45 @@ form the accessibility plan; this proposal alone is incomplete.
 
 ## Open questions
 
-(Things we should decide before implementation starts. List is meant
-to be argued with, not accepted.)
+This historical proposal no longer tracks questions that were resolved by
+ADR-0011 through ADR-0015 or by shipped source. Current shipped behavior lives
+in [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md); active follow-up work lives in
+[`../../active_work.md`](../../active_work.md).
 
-1. **Should `SWIFTTUI_ACCESSIBLE=1` imply `SWIFTTUI_ASCII=1` and
-   `SWIFTTUI_REDUCE_MOTION=1`, or are they orthogonal?** Argument for
-   coupling: simpler mental model; users who want one usually want all.
-   Argument against: a sighted user with a small terminal may want
-   ASCII without losing color. Lean: imply, but allow individual
-   overrides.
+The remaining proposal-level questions are:
 
-2. **Does `accessibilityRole` default infer from the view kind, or is
-   it required for non-builtins?** **Resolved by
-   [ADR-0012](../decisions/0012-accessibility-node-shape.md)
-   §"Role inference"** — built-ins set the role in
-   `SemanticMetadata.accessibilityRole` (post ADR-0011 rename);
-   consumer-authored views without an explicit role default to
-   `.group` if they have a11y-relevant descendants and are skipped
-   otherwise.
+1. **Reduced-motion semantics for animated state changes.** `Spinner`,
+   `ProgressView`, and core animation modifiers have shipped reduced-motion
+   behavior, but transition intermediates, `PhaseAnimator`, `AnimatedImage`,
+   matched geometry, and animated content changes still need a complete policy
+   and test pass. Skipping motion must still commit and announce the new state.
 
-3. **Linear-mode HStack ordering: top-down left-right by source order,
-   or by laid-out reading order?** SwiftUI picks layout reading order;
-   web ARIA picks source order. The two can diverge under RTL. Lean:
-   layout reading order, mirrored under RTL.
+2. **Modal presentation focus contract.** `.sheet`, `.alert`, and
+   `.confirmationDialog` still need the full accessibility focus contract for
+   initial focus, trap/cycle behavior, dismiss restoration fallback, and
+   target-bridge behavior.
 
-4. **Where does `accessibilityLiveRegion`'s output go in CLI mode when
-   the app is *not* in accessible mode?** Options: discard, write to a
-   reserved status line, write to stderr behind a flag. Lean: reserved
-   status line; an app-author can opt out per-region.
+3. **Native host focus beyond metadata.** ADR-0015 deliberately shipped SwiftUI
+   host focus as semantic metadata only. A later decision must say whether host
+   focus should programmatically move native VoiceOver focus or remain
+   metadata-only.
 
-5. **Do we need an `accessibilityCursorAnchor()` modifier, or can the
-   focus engine always derive the anchor from the focused view's
-   geometry?** **Resolved by
-   [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
-   the field exists on `AccessibilityNode` (in absolute surface
-   coordinates); nil means "use the node's origin." The public
-   `accessibilityCursorAnchor(_:)` modifier accepts a local `CellPoint` for
-   custom focus targets. Built-in caret-anchor population for `TextField`,
-   `SecureField`, and `TextEditor` has landed through the text input V1 plan;
-   see [`TEXT_INPUT_MODEL.md`](./TEXT_INPUT_MODEL.md).
+Closed historical questions:
 
-6. **How do animations interact with reduce-motion?** Specifically: a
-   transition that *also* changes text content (e.g., a list reorder).
-   Skipping the animation should still announce the new state. The
-   `Animation` subsystem (`Sources/SwiftTUIViews/Animation/`,
-   `Sources/SwiftTUI/Lifecycle/AnimationController.swift`) needs an audit.
-
-7. **Theme / appearance interaction.** Decision 0009 has views write
-   semantic tokens. Do accessibility roles ride on the same channel,
-   or a parallel one? Lean: parallel (semantic tokens are *theme*
-   intent; accessibility roles are *AT* intent; conflating risks both).
-
-8. **Embedded web host: does v1 reuse the landed Web/WASI ARIA path?**
-   **Resolved in source (2026-05-06).** The embedded host uses the same
-   `web-surface` v2 `accessibilityTree` extension and browser-side DOM
-   mounting as Web/WASI. It serves the bundled browser runtime over
-   localhost HTTP and carries frames/input over WebSocket.
-
-   The original v1-vs-v2 question for the **WASM** web target stands
-   separately: it's the deploy-as-website story and is less urgent
-   for accessibility than the embedded host. Lean: WASM ARIA mapping
-   in v2 of the WASM target, after the embedded host validates the
-   semantic-record-to-DOM translation.
-
-9. **How do we handle `Canvas` / `BrailleCanvas` / image rendering?**
-   **Resolved in source (2026-05-06).** Visual-only view surfaces require an
-   accessibility label or an explicit `accessibilityHidden(true)` choice.
-   `Canvas` and `Image` mark themselves as image-like visual content.
-   `AnimatedImage` inherits the `Image(data:)` policy. Common
-   `SwiftTUICharts` views publish built-in textual summaries as image labels
-   when using their default summary initializers; custom builder-based charts
-   warn unless authors add `accessibilityLabel(...)` or hide the chart.
-   Unlabeled visual content is omitted from accessible linear output and emits
-   a semantic warning in accessible output instead of guessing a label.
-
-10. **Modal presentations** (`.sheet`, `.alert`, `.confirmationDialog`).
-    They need focus trapping and `Esc` to dismiss; what happens to
-    focus on dismiss is a separate subproblem. Lean: defer to the
-    action-scopes proposal (decision 0003) and add a follow-up note.
-
-11. **Detection vs declaration.** We've said we don't detect screen
-    readers. But should we honor `SSH_TTY` / `TERM_PROGRAM` /
-    `WT_SESSION` (Windows Terminal session marker) as hints — e.g.,
-    enable UIA-event-friendly behavior on Windows Terminal? Lean: no
-    detection; users opt in with env vars or flags. Keep it simple.
-
-12. **Spinner replacement granularity.** When reduce-motion replaces
-    a spinner with `Working…`, does it also include progress
-    information ("Working… 32%")? Argument for: useful. Argument
-    against: now we're doing periodic updates again, which is what we
-    were trying to avoid. Lean: yes but only when the surrounding
-    progress changes by ≥10%, never on a timer.
-
-13. **Should reading `LANG=C` auto-enable accessible mode, or only
-    ASCII?** Some users set `LANG=C` for performance/locale reasons,
-    not a11y reasons. Lean: ASCII only; accessible mode requires
-    explicit opt-in.
-
-14. **Charts / `SwiftTUICharts`.** Charts are inherently visual.
-    What's the accessible representation? Tabular data? Text
-    summary? Lean: every chart must be authored with a textual data
-    summary that takes over in accessible mode, similar to
-    `<figcaption>` + `aria-describedby` in HTML.
-
-15. **Output-mode precedence between JSON and accessible output.**
-    CLI flags currently resolve `--accessible` before `--json`, while
-    environment detection lets `SWIFTTUI_JSON=1` override
-    `SWIFTTUI_ACCESSIBLE=1`. Before wiring either output mode to
-    behavior, pick one precedence rule and align code, tests, and
-    `ARGUMENT_PARSING.md`.
+- Accessible mode implications, JSON precedence, layout-reading order,
+  live-region delivery, cursor-as-focus, `LANG=C`, and screen-reader detection
+  policy are resolved by
+  [`ADR-0013`](../decisions/0013-accessibility-runtime-policy.md).
+- Role naming and role inference are resolved by
+  [`ADR-0011`](../decisions/0011-accessibility-role-replaces-presentation-role.md)
+  and [`ADR-0012`](../decisions/0012-accessibility-node-shape.md).
+- Web/WASI and embedded-host ARIA transport are resolved by
+  [`ADR-0014`](../decisions/0014-accessibility-web-aria-wire-policy.md) and
+  shipped through the shared `web-surface` v2 `accessibilityTree` path.
+- Visual-only content policy for `Canvas`, `Image`, animated images, and charts
+  is shipped and documented in [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md).
+- Theme semantics and accessibility semantics remain parallel channels; visual
+  theme tokens do not carry assistive-technology roles.
 
 ---
 
@@ -1668,26 +1600,24 @@ with † depend on `ARGUMENT_PARSING.md` reaching at least Phase 1
 `EMBEDDED_WEB_HOST.md` reaching at least Phase 1 (basic runner +
 WebSocket transport landed).)
 
-1. **Phase 1 — Env contract + ASCII mode.** † **(Partly landed.)**
+1. **Phase 1 — Env contract + ASCII mode.** † **(Landed for accessibility
+   policy.)**
    `RuntimeConfiguration`, `RuntimeConfiguration.detect(...)`,
    `SwiftTUIOptions`, and `SwiftTUIOptions.runtimeConfiguration(...)`
    now cover the env/flag surface from `ARGUMENT_PARSING.md`.
    `--no-color`, `--force-color`, `--ascii`, and `--plain` reach
-   `TerminalHost` rendering. Remaining Phase 1 work is behavior-side:
-   grow the glyph fallback coverage where built-ins still use Unicode
-   directly. ADR-0013 decides that `--accessible` and
-   `SWIFTTUI_ACCESSIBLE=1` imply ASCII, reduced motion, no progress,
-   and linear output.
+   `TerminalHost` rendering. ADR-0013 decides that `--accessible` and
+   `SWIFTTUI_ACCESSIBLE=1` imply ASCII, reduced motion, no progress, and
+   linear output. Remaining runtime flag questions are tracked in
+   [`../../active_work.md`](../../active_work.md) rather than in this
+   historical proposal.
 
-2. **Phase 2 — Cursor-as-focus.** **(Same effort as drafted.)** The
-   mechanism (`moveCursor`, `hideCursor`, `showCursor`) and the data
-   (`FocusTracker.currentFocusIdentity` → `FocusRegion.rect`)
-   already exist; the new work is the policy: after each commit,
-   look up the focused widget and call `moveCursor` to its anchor.
-   ADR-0012 puts `cursorAnchor` on `AccessibilityNode`; the remaining
-   behavior gate is now resolved by ADR-0013: terminal TUI output shows and
-   moves the cursor only when `RuntimeConfiguration.cursorFollowsFocus` is
-   enabled and a focused accessibility node exists. Built-in text input
+2. **Phase 2 — Cursor-as-focus.** **(Landed.)** The mechanism
+   (`moveCursor`, `hideCursor`, `showCursor`), focus data, shared
+   `AccessibilityNode.cursorAnchor`, and runtime policy are wired. Terminal
+   TUI output shows and moves the cursor only when
+   `RuntimeConfiguration.cursorFollowsFocus` is enabled and a focused
+   accessibility node exists. Built-in text input
    controls publish caret anchors, custom focus targets can use
    `accessibilityCursorAnchor(_:)`, and nodes without an anchor fall back to
    their origin.
@@ -1730,8 +1660,8 @@ WebSocket transport landed).)
    region; SwiftUI host sessions post them through the platform announcement
    API.
 
-7. **Phase 6 — Embedded-host / Web/WASI ARIA mapping.** ‡ **(Landed
-   for the shared WASI/web-surface path.)** Three sub-steps:
+7. **Phase 6 — Embedded-host / Web/WASI ARIA mapping.** ‡ **(Landed.)**
+   Three sub-steps:
 
    1. **Wire-format extension.** Bump `WebSurfaceFrameEncoder`'s
       version field from `1` to `2`. Add an `accessibilityTree`
@@ -1753,12 +1683,9 @@ WebSocket transport landed).)
       `CommitPlanner` strategy. Optional for v1 of the embedded
       host; required before scaling.
 
-   **This is the strongest single accessibility ship the framework
-   can make** because it gives every binary a first-class accessible
-   viewer in the browser. The shared WASI/web-surface encoder and
-   browser bundle now implement the v2 tree and ARIA mounter; a
-   separate embedded host runner can reuse that path when it conforms
-   its transport.
+   The shared WASI/web-surface encoder and browser bundle now implement the v2
+   tree and ARIA mounter, and the opt-in embedded WebHost runner reuses that
+   path over HTTP/WebSocket.
 
 8. **Phase 7 — WASM web ARIA mapping.** **(Landed.)** Same code path
    as Phase 6, different transport. The WASI package emits
@@ -1784,11 +1711,11 @@ WebSocket transport landed).)
     listening tests are the easiest wins because the browser AT story is
     mature.
 
-Each phase is independently shippable; each makes the framework
-materially more accessible than the previous one. Phases 1–5 are
-**CLI accessibility** and can land without any web-host work. Phase 6
-is the headline a11y ship and benefits the most users; it requires
-the embedded host runner to exist.
+Each phase was independently shippable. Phases 1-5 cover CLI accessibility;
+Phases 6-8 cover browser and native host consumers. The remaining work is no
+longer phase scaffolding: it is the focused behavior backlog listed in
+[`../../active_work.md`](../../active_work.md) and summarized in
+[`../ACCESSIBILITY.md`](../ACCESSIBILITY.md).
 
 ---
 
@@ -2008,6 +1935,9 @@ in this document. The primary sources, grouped by theme:
 - 2026-05-08: Current shipped accessibility behavior moved into the durable
   reference page [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md). This proposal now
   remains as the research record plus open behavior-policy context.
+- 2026-05-08: Cleaned up stale open questions. The proposal now lists only the
+  current reduced-motion, modal-focus, and native-host-focus questions; resolved
+  historical questions point at ADR-0011 through ADR-0015 and shipped behavior.
 - 2026-05-06: Visual-only content policy landed. `Canvas`, `Image`, and
   image-backed animated content require author labels or explicit hiding;
   default `SwiftTUICharts` summaries become image labels, while custom
