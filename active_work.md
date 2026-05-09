@@ -40,9 +40,6 @@
   [Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift](Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift),
   [Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift](Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift),
   [Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift](Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift).
-- [ ] Replace the `.task(id:)` reflection-based descriptor identity with a
-  deliberate identity strategy. Supporting source:
-  [Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift](Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift).
 - [ ] Turn the current constraints in `docs/STATUS.md` into executable plans or
   explicitly defer them: default-focus scopes, `@FocusedObject`, richer
   `TextEditor`, `NavigationStack`, popover-style presentation, terminal
