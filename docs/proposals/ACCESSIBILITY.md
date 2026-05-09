@@ -1467,11 +1467,11 @@ The SwiftUI host bridges swift-tui's semantic record to native Apple
 accessibility by mounting a nonvisual SwiftUI overlay above the raster
 terminal surface. The policy is recorded in
 [`ADR-0015`](../decisions/0015-accessibility-swiftui-host-policy.md):
-v1 uses semantic focus metadata rather than imperative VoiceOver focus
-movement, converts `CellRect` through the host's native cell metrics for
-accessibility frames, diffs live regions by identity before posting
-platform announcements, and never invents labels for visual-only
-content. This implementation is tracked by
+native host focus moves VoiceOver focus by default from the runtime's
+focused identity, converts `CellRect` through the host's native cell
+metrics for accessibility frames, diffs live regions by identity before
+posting platform announcements, and never invents labels for visual-only
+content. The first SwiftUI host accessibility tranche is tracked by
 [`2026-05-05-005-accessibility-swiftui-host-plan.md`](../plans/2026-05-05-005-accessibility-swiftui-host-plan.md),
 now marked completed.
 
@@ -1535,10 +1535,11 @@ The remaining proposal-level questions are:
    initial focus, trap/cycle behavior, dismiss restoration fallback, and
    target-bridge behavior.
 
-2. **Native host focus beyond metadata.** ADR-0015 deliberately shipped SwiftUI
-   host focus as semantic metadata only. A later decision must say whether host
-   focus should programmatically move native VoiceOver focus or remain
-   metadata-only.
+2. **Bidirectional native host focus.** SwiftUI host focus now plans native
+   VoiceOver movement from runtime focus by default. VoiceOver-originated
+   traversal back into SwiftTUI runtime focus remains out of scope until there
+   is a separate interaction contract for mapping native accessibility focus
+   changes into `FocusTracker`.
 
 Closed historical questions:
 
