@@ -83,13 +83,19 @@ package func textInputCommand(
   for keyPress: KeyPress,
   traits: TextInputTraits
 ) -> TextInputCommand? {
-  let isSelecting: Bool
-  switch keyPress.modifiers {
-  case []:
-    isSelecting = false
-  case .shift:
-    isSelecting = true
-  default:
+  var commandModifiers = keyPress.modifiers
+  let isSelecting = commandModifiers.contains(.shift)
+  commandModifiers.remove(.shift)
+
+  if let modifiedCommand = modifiedTextInputCommand(
+    for: keyPress.key,
+    modifiers: commandModifiers,
+    selecting: isSelecting
+  ) {
+    return modifiedCommand
+  }
+
+  guard commandModifiers.isEmpty else {
     return nil
   }
 
@@ -126,6 +132,61 @@ package func textInputCommand(
     return .move(.lineStart, selecting: isSelecting)
   case .end:
     return .move(.lineEnd, selecting: isSelecting)
+  default:
+    return nil
+  }
+}
+
+private func modifiedTextInputCommand(
+  for key: KeyEvent,
+  modifiers: EventModifiers,
+  selecting isSelecting: Bool
+) -> TextInputCommand? {
+  switch modifiers {
+  case .alt:
+    return altTextInputCommand(for: key, selecting: isSelecting)
+  case .ctrl:
+    return ctrlTextInputCommand(for: key, selecting: isSelecting)
+  default:
+    return nil
+  }
+}
+
+private func altTextInputCommand(
+  for key: KeyEvent,
+  selecting isSelecting: Bool
+) -> TextInputCommand? {
+  switch key {
+  case .arrowLeft:
+    return .move(.wordBackward, selecting: isSelecting)
+  case .arrowRight:
+    return .move(.wordForward, selecting: isSelecting)
+  case .backspace:
+    guard !isSelecting else {
+      return nil
+    }
+    return .deleteBackward(granularity: .word)
+  default:
+    return nil
+  }
+}
+
+private func ctrlTextInputCommand(
+  for key: KeyEvent,
+  selecting isSelecting: Bool
+) -> TextInputCommand? {
+  switch key {
+  case .character("a"), .character("A"):
+    return .selectAll
+  case .arrowLeft:
+    return .move(.wordBackward, selecting: isSelecting)
+  case .arrowRight:
+    return .move(.wordForward, selecting: isSelecting)
+  case .backspace:
+    guard !isSelecting else {
+      return nil
+    }
+    return .deleteBackward(granularity: .word)
   default:
     return nil
   }

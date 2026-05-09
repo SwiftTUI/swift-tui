@@ -58,7 +58,7 @@ The repository [README.md](../README.md) is the public landing page.
 
 Active design proposals that are still shaping decisions:
 
-- [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — text input value, selection, reducer, layout-map, and caret-anchor foundation for `TextField`, `SecureField`, and `TextEditor`
+- [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — text input value, selection, reducer, layout-map, caret-anchor foundation, and V2 editing direction for `TextField`, `SecureField`, and `TextEditor`
 - [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — historical research record and remaining accessibility behavior questions; current shipped behavior lives in [ACCESSIBILITY.md](ACCESSIBILITY.md)
 - [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `Platforms/WebHost/` runner for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
@@ -67,7 +67,9 @@ Active design proposals that are still shaping decisions:
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
-Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans: none.
+Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
+
+- [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md) — active `TextEditor` V2 plan; the shortcut foundation is shipped, while visible selection rendering, clipboard command routing, host value/selection transport, IME/composition, and large-document storage remain planned
 
 Implementation and post-mortem records retained for context:
 

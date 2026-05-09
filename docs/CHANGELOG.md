@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- Scoped the `TextEditor` V2 tranche into a dated plan and shipped the
+  package-private shortcut foundation: shared word-boundary navigation,
+  word-deletion, and ctrl-a select-all now flow through the reducer and the
+  composed `TextEditor` runtime path. Remaining V2 work stays in `TODO.md`.
 - Shipped namespace-scoped default-focus APIs and reset behavior:
   `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus` now route
   through the runtime focus tracker, while focused-object support was removed

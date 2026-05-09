@@ -13,10 +13,10 @@ package struct TextInputReducer: Sendable {
       return insert(text, into: value, traits: traits)
     case .replaceSelection(let text):
       return insert(text, into: value, traits: traits)
-    case .deleteBackward:
-      return deleteBackward(in: value)
-    case .deleteForward:
-      return deleteForward(in: value)
+    case .deleteBackward(let granularity):
+      return deleteBackward(granularity: granularity, in: value)
+    case .deleteForward(let granularity):
+      return deleteForward(granularity: granularity, in: value)
     case .move(let movement, let selecting):
       return move(movement, in: value, selecting: selecting, layout: layout)
     case .setSelection(let selection):
@@ -24,6 +24,11 @@ package struct TextInputReducer: Sendable {
       next.selection = selection
       next.preferredVisualColumn = nil
       return TextInputMutation(value: next.clampingSelection(), shouldRequestFrame: true)
+    case .selectAll:
+      var next = value
+      next.selection = TextSelection(anchor: TextOffset(0), head: TextOffset(value.text.count))
+      next.preferredVisualColumn = nil
+      return TextInputMutation(value: next, shouldRequestFrame: next != value)
     }
   }
 
@@ -57,6 +62,7 @@ package struct TextInputReducer: Sendable {
   }
 
   private func deleteBackward(
+    granularity: TextGranularity,
     in value: TextInputValue
   ) -> TextInputMutation {
     if !value.selection.isCollapsed {
@@ -65,13 +71,18 @@ package struct TextInputReducer: Sendable {
     guard value.selection.head.rawValue > 0 else {
       return TextInputMutation(value: value)
     }
+    let lowerBound = backwardDeletionBoundary(granularity: granularity, in: value)
+    guard lowerBound < value.selection.head else {
+      return TextInputMutation(value: value)
+    }
     let range = TextRange(
-      TextOffset(value.selection.head.rawValue - 1)..<value.selection.head
+      lowerBound..<value.selection.head
     )
     return delete(range: range, in: value)
   }
 
   private func deleteForward(
+    granularity: TextGranularity,
     in value: TextInputValue
   ) -> TextInputMutation {
     if !value.selection.isCollapsed {
@@ -80,10 +91,50 @@ package struct TextInputReducer: Sendable {
     guard value.selection.head.rawValue < value.text.count else {
       return TextInputMutation(value: value)
     }
+    let upperBound = forwardDeletionBoundary(granularity: granularity, in: value)
+    guard value.selection.head < upperBound else {
+      return TextInputMutation(value: value)
+    }
     let range = TextRange(
-      value.selection.head..<TextOffset(value.selection.head.rawValue + 1)
+      value.selection.head..<upperBound
     )
     return delete(range: range, in: value)
+  }
+
+  private func backwardDeletionBoundary(
+    granularity: TextGranularity,
+    in value: TextInputValue
+  ) -> TextOffset {
+    switch granularity {
+    case .character:
+      return TextOffset(value.selection.head.rawValue - 1)
+    case .word:
+      return TextInputStringMetrics.wordBoundaryBefore(value.selection.head, in: value.text)
+    case .line:
+      let metric = TextInputStringMetrics.lineMetric(for: value.selection.head, in: value.text)
+      if metric.lineStart < value.selection.head {
+        return metric.lineStart
+      }
+      return TextOffset(value.selection.head.rawValue - 1)
+    }
+  }
+
+  private func forwardDeletionBoundary(
+    granularity: TextGranularity,
+    in value: TextInputValue
+  ) -> TextOffset {
+    switch granularity {
+    case .character:
+      return TextOffset(value.selection.head.rawValue + 1)
+    case .word:
+      return TextInputStringMetrics.wordBoundaryAfter(value.selection.head, in: value.text)
+    case .line:
+      let metric = TextInputStringMetrics.lineMetric(for: value.selection.head, in: value.text)
+      if value.selection.head < metric.lineEnd {
+        return metric.lineEnd
+      }
+      return TextOffset(value.selection.head.rawValue + 1)
+    }
   }
 
   private func delete(
@@ -142,10 +193,10 @@ package struct TextInputReducer: Sendable {
       target = TextOffset(value.text.count)
       preferredVisualColumn = nil
     case .wordBackward:
-      target = TextOffset(max(0, value.selection.head.rawValue - 1))
+      target = TextInputStringMetrics.wordBoundaryBefore(value.selection.head, in: value.text)
       preferredVisualColumn = nil
     case .wordForward:
-      target = TextOffset(min(value.text.count, value.selection.head.rawValue + 1))
+      target = TextInputStringMetrics.wordBoundaryAfter(value.selection.head, in: value.text)
       preferredVisualColumn = nil
     case .up:
       let moved = verticalMove(delta: -1, in: value, layout: layout)
