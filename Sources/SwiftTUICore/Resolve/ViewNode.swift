@@ -61,6 +61,7 @@ package final class ViewNode {
   private var hasCommittedPresence: Bool
   private var suppressesStructuralLifecycle: Bool
   private var nextChangeModifierOrdinal: Int
+  private var nextNavigationDestinationModifierOrdinal: Int
   private var preparedFrameID: UInt64
   private var visitedFrameID: UInt64
   private var evaluator: (@MainActor () -> Void)?
@@ -93,6 +94,7 @@ package final class ViewNode {
     hasCommittedPresence = false
     suppressesStructuralLifecycle = false
     nextChangeModifierOrdinal = 0
+    nextNavigationDestinationModifierOrdinal = 0
     preparedFrameID = 0
     visitedFrameID = 0
     evaluator = nil
@@ -112,6 +114,7 @@ package final class ViewNode {
     currentBodyStateSlotCount = 0
     pendingChangeHandlerIDs.removeAll(keepingCapacity: true)
     nextChangeModifierOrdinal = 0
+    nextNavigationDestinationModifierOrdinal = 0
     preparedFrameID = frameID
   }
 
@@ -281,6 +284,13 @@ package final class ViewNode {
       nextChangeModifierOrdinal += 1
     }
     return nextChangeModifierOrdinal
+  }
+
+  package func claimNavigationDestinationModifierOrdinal() -> Int {
+    defer {
+      nextNavigationDestinationModifierOrdinal += 1
+    }
+    return nextNavigationDestinationModifierOrdinal
   }
 
   package func queueChangeHandler(
@@ -720,6 +730,7 @@ extension ViewNode {
     package var hasCommittedPresence: Bool
     package var suppressesStructuralLifecycle: Bool
     package var nextChangeModifierOrdinal: Int
+    package var nextNavigationDestinationModifierOrdinal: Int
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
     package var evaluator: (@MainActor () -> Void)?
@@ -751,6 +762,7 @@ extension ViewNode {
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
+      nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
       evaluator: evaluator
@@ -782,6 +794,8 @@ extension ViewNode {
     hasCommittedPresence = checkpoint.hasCommittedPresence
     suppressesStructuralLifecycle = checkpoint.suppressesStructuralLifecycle
     nextChangeModifierOrdinal = checkpoint.nextChangeModifierOrdinal
+    nextNavigationDestinationModifierOrdinal =
+      checkpoint.nextNavigationDestinationModifierOrdinal
     preparedFrameID = checkpoint.preparedFrameID
     visitedFrameID = checkpoint.visitedFrameID
     evaluator = checkpoint.evaluator

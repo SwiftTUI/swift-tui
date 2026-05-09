@@ -26,18 +26,6 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Implement the binding-driven `NavigationStack` destination-presentation
-  surface. `TabView` has shipped and ActionScope is ready to treat destinations
-  as scopes, but there is no stack host or destination-presentation API.
-  `NavigationLink` is rejected, not deferred (see proposal §"Why
-  `NavigationLink` Stays Out"); value links and public `NavigationPath` are
-  deferred until evidence demands them. Start from the
-  `navigationDestination(isPresented:)` and `navigationDestination(item:)`
-  design. Supporting docs:
-  [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md),
-  [VISION.md](VISION.md),
-  [FOCUS.md](FOCUS.md),
-  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
 - [ ] Design popover-style presentation. The shipped presentation surface covers
   `alert`, `confirmationDialog`, `sheet`, `paletteSheet`, `toast`, and `Menu`,
   but there is no public popover API. Work should first decide whether popovers

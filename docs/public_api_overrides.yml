@@ -104,6 +104,7 @@ classifications:
     - SwiftTUIViews.List
     - SwiftTUIViews.Menu
     - SwiftTUIViews.ModifiedContent
+    - SwiftTUIViews.NavigationStack
     - SwiftTUIViews.OpenLinkAction
     - SwiftTUIViews.OutlineGroup
     - SwiftTUIViews.Panel
@@ -253,8 +254,10 @@ classifications:
     - SwiftTUIViews.BoolDefaultFocusModifier
     - SwiftTUIViews.BoolFocusBindingModifier
     - SwiftTUIViews.BorderModifier
+    - SwiftTUIViews.BooleanNavigationDestinationModifier
     - SwiftTUIViews.BuiltinPromptPresentationModifier
     - SwiftTUIViews.BuiltinSheetPresentationModifier
+    - SwiftTUIViews.ItemNavigationDestinationModifier
     - SwiftTUIViews.SafeAreaInsetModifier
     - SwiftTUIViews.SafeAreaPaddingModifier
     - SwiftTUIViews.SemanticMetadataModifier

@@ -23,7 +23,7 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - text layout enums and interpolation support exposed through `Text`, including `Text.TruncationMode`, `Text.WrappingStrategy`, and rich interpolation of embedded `Text` and `Link` segments
 - banner-style text rendering through `TextFigure`, including enum-backed embedded-font selection through `TextFigure.Font` and discovery through `TextFigure.availableFonts`
 - `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader` (`LazyVStack` and `LazyHStack` support viewport-lazy placement and single-`ForEach` full-lazy rows)
-- `Tab`, `TabView`
+- `Tab`, `TabView`, `NavigationStack`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`, `Spinner`
 - `ToastStyle`
@@ -32,7 +32,7 @@ The canonical authoring surface is the SwiftUI-shaped one:
   `EnvironmentValues.imageResourceRoots` and
   `EnvironmentValues.accessibilityReduceMotion`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.anchorPreference(key:value:transform:)`, `.transformAnchorPreference(_:value:transform:)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.prefersDefaultFocus(_:in:)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusScope(_:)`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.anchorPreference(key:value:transform:)`, `.transformAnchorPreference(_:value:transform:)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.prefersDefaultFocus(_:in:)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusScope(_:)`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.navigationDestination(isPresented:)`, `.navigationDestination(item:)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 - low-level `Standard` output/file helpers and `FileOpenError` for runtime
   integration paths that need direct stream writes
@@ -143,6 +143,9 @@ for the model and the implementation record.
 - `ActionScope` protocol (`Core`) with `AnyID` type-erased identity
 - `CommandRegistry` runtime hook (`Core`), wired into `RunLoop`
 - `Panel<ID, Content>` primitive plus `.panel(id:)` and `.panel()` modifiers (`View`)
+- `NavigationStack<ID, Root>` primitive plus
+  `.navigationDestination(isPresented:)` and `.navigationDestination(item:)`
+  modifiers (`View`)
 - `FocusContainment` enum plus `.focusContainment(_:)` on `Panel`
 - `Scene`-conforming types conform to `ActionScope`
 - `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers conform to `ActionScope`

@@ -18,6 +18,16 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- `cf86a3a4` Shipped binding-driven navigation destination presentation:
+  `NavigationStack`, `navigationDestination(isPresented:)`, and
+  `navigationDestination(item:)` now render stack-owned destinations without
+  `NavigationLink` or automatic Back chrome, and Escape pops destinations only
+  after active modal presentations have dismissed. See `cf86a3a4`
+  [docs/proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md),
+  `cf86a3a4`
+  [Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift](../Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift),
+  and `cf86a3a4`
+  [Tests/SwiftTUITests/NavigationDestinationTests.swift](../Tests/SwiftTUITests/NavigationDestinationTests.swift).
 - Added cross-host clipboard writing for focused text inputs and embedded
   terminal children. `TextEditor` / `TextField` copy and cut now route through
   terminal OSC 52, hosted raster sessions, SwiftUI native pasteboards, Web/WASI

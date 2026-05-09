@@ -415,7 +415,7 @@ Sources/SwiftTUICore/
 - `Input/*.swift`: key-press modifiers, secure and multiline text input
   controls, and the package-private text input model/reducer/layout/presentation
   support used by `TextField`, `SecureField`, and `TextEditor`
-- `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
+- `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, `TabView`, and binding-driven `NavigationStack` destination surfaces
 - `Canvas.swift`: public Canvas view construction over `CanvasDrawing` and dense
   pixel-grid drawings
 - `Gestures/*.swift`: gestures, pointer paths, coordinate-space resolution,

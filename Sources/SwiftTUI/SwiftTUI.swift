@@ -1,7 +1,7 @@
-@_exported import SwiftTUICore
 @_exported import EmbeddedFonts
-import Synchronization
+@_exported import SwiftTUICore
 @_exported import SwiftTUIViews
+import Synchronization
 
 #if canImport(Darwin)
   import Darwin
@@ -1224,6 +1224,20 @@ public struct DefaultRenderer {
   @MainActor
   package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
     presentationPortalState.dismissStack().topmostEscapeDismissAction()
+  }
+
+  /// Package-only accessor so the run loop can route framework-reserved
+  /// Escape handling to the active destination stack after modal presentation
+  /// dismissal has had first claim.
+  @MainActor
+  package func topmostNavigationDestinationPopAction(
+    along scopePath: [Identity]
+  ) -> (@MainActor @Sendable () -> Void)? {
+    let resolved = renderPipelineTree(from: viewGraph.snapshot())
+    return navigationDestinationPopAction(
+      in: resolved,
+      along: scopePath
+    )
   }
 
   /// Package-only accessor exposing the renderer's internal
