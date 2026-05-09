@@ -41,10 +41,6 @@ package protocol DeclaredChildrenView {
     into resolved: inout [ResolvedNode]
   )
 
-  func appendErasedDeclaredChildren(
-    into children: inout [AnyView]
-  )
-
   func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   )
@@ -223,33 +219,6 @@ package func enumerateDeclaredChildViews<V: View>(
   visitor(view, childContext) {
     resolveView(view, in: childContext)
   }
-}
-
-@MainActor
-package func appendErasedDeclaredBuilderChildren<V: View>(
-  from view: V,
-  into children: inout [AnyView]
-) {
-  let erased: Any = view
-  if let structural = erased as? any DeclaredChildrenView {
-    structural.appendErasedDeclaredChildren(
-      into: &children
-    )
-    return
-  }
-  children.append(scopedAnyView { view })
-}
-
-@MainActor
-package func erasedDeclaredBuilderChildren<V: View>(
-  from view: V
-) -> [AnyView] {
-  var children: [AnyView] = []
-  appendErasedDeclaredBuilderChildren(
-    from: view,
-    into: &children
-  )
-  return children
 }
 
 @MainActor

@@ -18,6 +18,12 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- Retired the remaining package-only `[AnyView]` builder traversal from
+  `DeclaredChildrenView` and its structural builder conformers. Builder
+  children now use the typed resolve, deferred payload, portal payload, and
+  metadata-first enumeration paths, leaving `buildLimitedAvailability`, public
+  `AnyView`, and explicit policy-reviewed escape hatches as the intended
+  production erasure seams.
 - `136924f3` Completed the SwiftUI host native VoiceOver focus bridge: runtime
   focus now resolves through the host overlay mappings into a host-owned
   `AccessibilityFocusState`, removed focused nodes clear the native focus

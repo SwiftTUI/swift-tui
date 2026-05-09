@@ -40,17 +40,6 @@ public struct TupleView<each Content: View>: View, ResolvableView, DeclaredChild
     }
   }
 
-  package func appendErasedDeclaredChildren(
-    into children: inout [AnyView]
-  ) {
-    for child in repeat each value {
-      appendErasedDeclaredBuilderChildren(
-        from: child,
-        into: &children
-      )
-    }
-  }
-
   package func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   ) {

@@ -20,20 +20,6 @@
 
 ## Runtime And Public Surface Gaps
 
-- [ ] Re-scope the remaining `AnyView` / `[AnyView]` reduction before more
-  implementation. Current production erasure is concentrated in the builder
-  backbone; the next step needs an explicit choice between a typed structural
-  builder migration and retained compatibility seams. Supporting docs and
-  source:
-  [docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](docs/proposals/TYPE_ERASURE_DEFERRAL_PLAN.md),
-  [docs/ANYVIEW_INTERNALS.md](docs/ANYVIEW_INTERNALS.md),
-  [Sources/SwiftTUIViews/Foundation/ViewFoundation.swift](Sources/SwiftTUIViews/Foundation/ViewFoundation.swift),
-  [Sources/SwiftTUIViews/ViewBuilder/TupleView.swift](Sources/SwiftTUIViews/ViewBuilder/TupleView.swift),
-  [Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift](Sources/SwiftTUIViews/ViewBuilder/ConditionalContentView.swift),
-  [Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift](Sources/SwiftTUIViews/ViewBuilder/VariadicView.swift).
-  Ambiguity note: leave this active but do not implement it now. Do not
-  continue by mechanically removing erasure; choose a migration direction for
-  retained builders first.
 - [ ] Turn the current constraints in `docs/STATUS.md` into executable plans or
   explicitly defer them: default-focus scopes, `@FocusedObject`, richer
   `TextEditor`, `NavigationStack`, popover-style presentation, terminal

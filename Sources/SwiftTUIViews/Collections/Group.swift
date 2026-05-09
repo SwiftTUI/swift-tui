@@ -38,15 +38,6 @@ public struct Group<Content: View>: View, ResolvableView, DeclaredChildrenView {
     )
   }
 
-  package func appendErasedDeclaredChildren(
-    into children: inout [AnyView]
-  ) {
-    appendErasedDeclaredBuilderChildren(
-      from: content,
-      into: &children
-    )
-  }
-
   package func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   ) {

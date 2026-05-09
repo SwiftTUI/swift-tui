@@ -40,17 +40,6 @@ public struct VariadicView<Content: View>: View, ResolvableView, DeclaredChildre
     }
   }
 
-  package func appendErasedDeclaredChildren(
-    into children: inout [AnyView]
-  ) {
-    for element in content {
-      appendErasedDeclaredBuilderChildren(
-        from: element,
-        into: &children
-      )
-    }
-  }
-
   package func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   ) {

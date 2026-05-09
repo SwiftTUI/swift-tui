@@ -82,20 +82,6 @@ extension ForEach: DeclaredChildrenView {
     resolved.append(contentsOf: resolveElements(in: childContext))
   }
 
-  package func appendErasedDeclaredChildren(
-    into children: inout [AnyView]
-  ) {
-    for element in data {
-      let view = withAuthoringContext(authoringScope) {
-        content(element)
-      }
-      appendErasedDeclaredBuilderChildren(
-        from: view,
-        into: &children
-      )
-    }
-  }
-
   package func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   ) {
