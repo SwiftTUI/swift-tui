@@ -2,28 +2,28 @@
 
 ## Status
 
-Proposed. This document defines the measurement system needed to evaluate
-async rendering and future runtime optimizations by their CPU cost and latency
-benefit. It is a proposal for repo tooling and process, not a change to runtime
-rendering behavior by itself.
+Shipped initial implementation. `Tools/TermUIPerf` is the repo-local
+measurement harness for evaluating async rendering and future runtime
+optimizations by CPU cost and latency benefit. It does not change default
+runtime rendering behavior by itself; it provides repeatable evidence for
+runtime decisions.
 
-The current runtime already has useful frame diagnostics through
-`FrameDiagnosticsLogger`: phase timings, worker enqueue and compute time,
-main-actor blocked and suspended time, presentation metrics, cancellation and
-drop policy state, and total frame duration. Those diagnostics are a strong
-attribution layer, but they are not yet an evaluation pipeline.
+The shipped harness includes:
 
-What is missing is the outer harness:
-
-- repeatable scenarios,
+- repeatable scenarios (`gallery-animation-click` and `layout-scroll-burst`),
 - same-binary comparison between full-main and async rendering modes,
 - input-to-paint latency probes,
 - process CPU sampling,
-- release-build runs,
+- debug and release run configuration,
 - stored run metadata,
-- summary and comparison tooling,
-- a documented process for deciding whether a CPU increase is justified by a
-  latency improvement.
+- `summary.json` and `termui-perf compare`, and
+- documented interpretation rules in
+  [`../PERFORMANCE_EVALUATION.md`](../PERFORMANCE_EVALUATION.md).
+
+The current runtime also feeds the harness through `FrameDiagnosticsLogger`:
+phase timings, worker enqueue and compute time, main-actor blocked and
+suspended time, presentation metrics, cancellation and drop policy state, and
+total frame duration.
 
 ## Problem
 
@@ -77,9 +77,9 @@ performance lab that can be rerun across commits and branches.
   recording-host scenarios should be the default; PTY-backed scenarios are a
   separate presentation-cost track.
 
-## Proposed Architecture
+## Shipped Architecture
 
-Create a small repo performance lab with four layers:
+The repo performance lab has four layers:
 
 1. Runtime mode control.
 2. Scenario execution.
@@ -112,8 +112,8 @@ needs a stable way to select it.
 
 ### Scenario Execution
 
-Add a deterministic CLI harness, likely as a small package under
-`Tools/TermUIPerf`, with commands such as:
+The deterministic CLI harness lives under `Tools/TermUIPerf`, with commands
+such as:
 
 ```bash
 swiftly run swift run --package-path Tools/TermUIPerf termui-perf run \
@@ -125,15 +125,18 @@ swiftly run swift run --package-path Tools/TermUIPerf termui-perf compare \
   .perf/runs/base .perf/runs/candidate
 ```
 
-Initial scenarios should cover both real composed paths and synthetic stress
-paths:
+Initial scenarios cover real composed paths:
 
 - `gallery-animation-click`: click a real gallery animation control and measure
   one-shot animation input-to-present latency and frame jitter.
+- `layout-scroll-burst`: scroll through layout-heavy content and measure
+  interaction latency, render coalescing, and cancellation/drop behavior.
+
+Candidate follow-up scenarios should cover both real composed paths and
+synthetic stress paths:
+
 - `gallery-tab-burst`: switch tabs repeatedly and measure interaction latency,
   render coalescing, and cancellation/drop behavior.
-- `layout-scroll-burst`: scroll through layout-heavy content with worker-safe
-  layout.
 - `lazy-scroll-burst`: scroll through lazy content to expose snapshot and
   fallback costs.
 - `geometry-reader-fallback`: force layout-dependent realization and confirm
@@ -298,33 +301,28 @@ CI should initially archive `.perf/runs/**/summary.json` and print comparisons
 without failing pull requests. Failing budgets should be introduced only after
 the repo has a known noise floor.
 
-## First Implementation Tranche
+## Initial Implementation Shipped
 
-The first tranche should deliver the smallest useful loop:
+The first shipped tranche delivered the smallest useful loop:
 
-1. Add a render mode switch.
-2. Add `Tools/TermUIPerf`.
-3. Add two scenarios:
+1. Added a render mode switch.
+2. Added `Tools/TermUIPerf`.
+3. Added two scenarios:
    - `gallery-animation-click`
    - `layout-scroll-burst`
-4. Reuse `FrameDiagnosticsLogger`, but write frame diagnostics to the run
+4. Reused `FrameDiagnosticsLogger`, writing frame diagnostics to the run
    artifact directory.
-5. Add process CPU sampling.
-6. Add `summary.json`.
-7. Add `termui-perf compare`.
-8. Document the local workflow.
+5. Added process CPU sampling.
+6. Added `summary.json`.
+7. Added `termui-perf compare`.
+8. Documented the local workflow.
 
 This is enough to decide whether async rendering is moving work off the main
 actor, whether total CPU changed, and whether the latency gain justifies that
 CPU profile.
 
-## Open Questions
+## Remaining Open Questions
 
-- Should the first render mode switch be public, SPI, package-local, or
-  environment-only?
-- Should real example packages be benchmarked through a separate tool package
-  that depends on `Examples/gallery` and `Examples/layouts`, or should the first
-  scenarios be synthetic and root-package-only?
 - How much of `FrameDiagnosticsLogger` should be reused directly versus copied
   into an in-memory sink to avoid file I/O perturbing CPU measurements?
 - When should thread-level CPU be added?

@@ -1,15 +1,19 @@
 # Argument Parsing
 
-**Status:** Phases 1–5 implemented per
+**Status:** Phases 1–6 implemented per
 [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
 The `SwiftTUIArguments` peer package ships `SwiftTUIOptions` (power mode),
 the `SwiftTUIApp` protocol (easy mode), and `CompletionsCommand` for
 zsh/bash/fish completion script printing and installation. `RuntimeConfiguration`
 lives in `SwiftTUI` core. Bare-mode apps honor framework env vars via the
-default `App.main()` extension. Phase 6 (runner-internal-flag migration to
-subcommands), Phase 7 (web subcommand wiring, blocked on `EMBEDDED_WEB_HOST.md`),
-and the broader runtime-configuration → rendering wiring are tracked as
-follow-up plans.
+default `App.main()` extension. Runner-internal scene and attach operations now
+route through subcommands instead of legacy flag forms, and the opt-in
+`SwiftTUIWebHostCLI` runner honors the flag-form WebHost configuration
+(`--web`, `--port`, `--bind`, `--open`). Remaining runtime-configuration
+follow-ups are the fields that still need behavior beyond parsing:
+consumer-defined JSON output, standalone `--linear` layout behavior,
+framework debug instrumentation, `--start-in` scope activation, and the optional
+`myapp web` subcommand shape.
 
 The remainder of this document captures the design space for how SwiftTUI
 consumers declare their command line, which flags the framework reserves
@@ -1898,9 +1902,13 @@ by theme:
   `TerminalRunner.launchApp` thread the configuration through to
   `TerminalHost(capabilityProfile:)`. So `--no-color`, `--force-color`,
   `--ascii`, and `--plain` (which expands to `--no-color --ascii
-  --reduce-motion`) now affect the actual render. Other fields
-  (`motion`, `output`, `web`, `linear`, `noProgress`, `debug`, `startIn`)
-  remain parsed-but-unwired and are tracked as follow-up plans.
+  --reduce-motion`) now affect the actual render. Accessibility runtime work
+  later wired `motion`, `output == .accessible`, `noProgress`,
+  `cursorFollowsFocus`, and the reduce-motion environment value. WebHost work
+  later wired `RuntimeConfiguration.web` through the opt-in
+  `SwiftTUIWebHostCLI` runner. Remaining parsed fields that still need behavior
+  plans are consumer-defined JSON output, standalone `--linear` layout behavior,
+  framework debug instrumentation, and `--start-in` scope activation.
 - 2026-05-05: Phases 1–5 landed via plan
   [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
   `RuntimeConfiguration` value type + `Builder` + `detect(...)` factory in
