@@ -18,14 +18,6 @@
   replace durable docs, proposals, ADRs, plans, or tests.
 - Use this file as the first place to check what is next.
 
-## Repo Documentation Hygiene
-
-- [ ] Close or re-scope active plan files whose source appears to have moved
-  ahead of their unchecked task lists. Supporting plans:
-  [docs/plans/2026-04-26-003-border-stroke-simplification-plan.md](docs/plans/2026-04-26-003-border-stroke-simplification-plan.md),
-  [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
-  [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md).
-
 ## Runtime And Public Surface Gaps
 
 - [ ] Finish behavior wiring for parsed `RuntimeConfiguration` fields that are
@@ -60,8 +52,11 @@
 
 ## Canvas And Pointer Work
 
-- [ ] Finish or close the Canvas pointer-precision tranche. Supporting docs and
-  source:
+- [ ] Re-scope, then finish or close the Canvas pointer-precision tranche.
+  Source has advanced beyond the unchecked plan lists; first produce a current
+  phase inventory covering terminal 1016, Canvas hit testing, host precision,
+  direct-manipulation controls, and remaining plan open questions. Supporting
+  docs and source:
   [docs/plans/2026-04-28-001-canvas-adaptation-plan.md](docs/plans/2026-04-28-001-canvas-adaptation-plan.md),
   [docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](docs/plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md),
   [Sources/SwiftTUI/Input/InputReader.swift](Sources/SwiftTUI/Input/InputReader.swift),

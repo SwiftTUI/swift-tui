@@ -67,10 +67,12 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
+- [plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md) — active fractional pointer and coordinate-space plan; re-scope against the landed geometry, Canvas, terminal-pixel, and gesture source before executing more phases
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — shipped Canvas pixel-grid rendering, direct cell writes, styled Braille, half-block grids, gifeditor migration, and documentation; pointer precision remains in the fractional-coordinate workstream
+- [plans/2026-04-26-003-border-stroke-simplification-plan.md](plans/2026-04-26-003-border-stroke-simplification-plan.md) — shipped border/stroke cleanup record; landed behavior keeps `.rounded` as the canonical default while placement lives on `StrokeStyle`
 - [plans/2026-05-06-002-embedded-web-host-compile-time-plan.md](plans/2026-05-06-002-embedded-web-host-compile-time-plan.md) — implementation record for the compile-time opt-in embedded WebHost runner, browser bundle, WebSocket transport, package-boundary guardrails, and example package
 - [plans/2026-05-06-001-text-input-model-v1-plan.md](plans/2026-05-06-001-text-input-model-v1-plan.md) — shipped V1 text input value, reducer, layout map, paste routing, and caret-anchor semantics
 - [plans/2026-05-04-001-terminal-embedding-plan.md](plans/2026-05-04-001-terminal-embedding-plan.md) — shipped terminal-program embedding through `TerminalView`, `TerminalProcessSession`, PTY process integration, render-diff validation, and the file-previewer example

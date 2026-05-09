@@ -1,11 +1,17 @@
 ---
 title: "refactor: border / stroke simplification"
 type: refactor
-status: active
+status: shipped
 date: 2026-04-26
 ---
 
 # Border / Stroke Simplification Implementation Plan
+
+> **Status:** Shipped with changed defaults. This plan is retained as a
+> historical implementation record for the border/stroke cleanup. The landed
+> source moved placement onto `StrokeStyle` and removed the duplicate stroke
+> sugar surface, but the canonical default is the shipped `.rounded` border set
+> rather than this plan's proposed `.outerHalfBlock`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
