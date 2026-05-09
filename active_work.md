@@ -20,13 +20,6 @@
 
 ## Repo Documentation Hygiene
 
-- [ ] Reconcile the current-plans list with plan front matter and landed source.
-  The docs index still lists shipped CPU latency, composed-presentation, and
-  gallery-regression plans as current. Supporting docs:
-  [docs/README.md](docs/README.md),
-  [docs/plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md](docs/plans/2026-05-02-001-cpu-latency-evaluation-pipeline-plan.md),
-  [docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md](docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md),
-  [docs/plans/2026-05-01-007-gallery-animation-regression-notes.md](docs/plans/2026-05-01-007-gallery-animation-regression-notes.md).
 - [ ] Update docs that still describe shipped tooling as proposed or unwired.
   Supporting docs and source:
   [docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](docs/proposals/CPU_LATENCY_EVALUATION_PIPELINE.md),
