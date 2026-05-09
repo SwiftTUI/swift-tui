@@ -1,7 +1,21 @@
 package import SwiftTUICore
 
+package struct TextInputDisplayRun: Equatable, Sendable {
+  package var text: String
+  package var isSelected: Bool
+
+  package init(
+    text: String,
+    isSelected: Bool
+  ) {
+    self.text = text
+    self.isSelected = isSelected
+  }
+}
+
 package struct TextInputPresentation: Equatable, Sendable {
   package var displayText: String
+  package var displayRuns: [TextInputDisplayRun]
   package var isShowingPrompt: Bool
   package var layoutMap: TextInputLayoutMap
   package var caretAnchor: CellPoint
@@ -17,7 +31,7 @@ package struct TextInputPresentation: Equatable, Sendable {
     width: Int?
   ) {
     let shouldShowPrompt = value.text.isEmpty && !isFocused && prompt != nil
-    let shouldDrawSyntheticCaret = isFocused && !cursorFollowsFocus
+    let shouldDrawSyntheticCaret = isFocused && !cursorFollowsFocus && value.selection.isCollapsed
     let projectedClusters = Self.projectedClusters(
       value: value,
       traits: traits,
@@ -28,21 +42,35 @@ package struct TextInputPresentation: Equatable, Sendable {
       width: width
     )
     let caretAnchor = layoutMap.caretPoint(for: value.selection.head)
-    var displayText = String(projectedClusters.map(\.display))
+    let selectedRange =
+      isFocused && !value.selection.isCollapsed && !shouldShowPrompt
+      ? value.selection.range
+      : nil
+    var displayRuns = Self.displayRuns(
+      for: projectedClusters,
+      selectedRange: selectedRange
+    )
     if shouldDrawSyntheticCaret {
-      displayText.append("_")
+      displayRuns.append(TextInputDisplayRun(text: "_", isSelected: false))
     }
+    let displayText = displayRuns.map(\.text).joined()
 
     self.displayText = displayText
+    self.displayRuns = displayRuns
     self.isShowingPrompt = shouldShowPrompt
     self.layoutMap = layoutMap
     self.caretAnchor = caretAnchor
-    self.selectionRects = [
-      CellRect(
-        origin: caretAnchor,
-        size: CellSize(width: 1, height: 1)
-      )
-    ]
+    self.selectionRects =
+      if let selectedRange {
+        layoutMap.selectionRects(for: selectedRange)
+      } else {
+        [
+          CellRect(
+            origin: caretAnchor,
+            size: CellSize(width: 1, height: 1)
+          )
+        ]
+      }
     self.shouldDrawSyntheticCaret = shouldDrawSyntheticCaret
   }
 
@@ -73,6 +101,32 @@ package struct TextInputPresentation: Equatable, Sendable {
         isNewline: character == "\n"
       )
     }
+  }
+
+  private static func displayRuns(
+    for clusters: [TextInputProjectedCluster],
+    selectedRange: TextRange?
+  ) -> [TextInputDisplayRun] {
+    var runs: [TextInputDisplayRun] = []
+
+    for cluster in clusters {
+      let isSelected = selectedRange?.intersects(cluster.textRange) ?? false
+      if let lastIndex = runs.indices.last,
+        runs[lastIndex].isSelected == isSelected
+      {
+        runs[lastIndex].text.append(cluster.display)
+        continue
+      }
+
+      runs.append(
+        TextInputDisplayRun(
+          text: String(cluster.display),
+          isSelected: isSelected
+        )
+      )
+    }
+
+    return runs
   }
 }
 

@@ -619,6 +619,7 @@ package func controlFocusRow<Content: View>(
 @MainActor
 package func textEditorBody(
   displayText: String,
+  displayRuns: [TextInputDisplayRun]? = nil,
   ownerIdentity: Identity? = nil,
   caretAnchor: CellPoint? = nil,
   chrome: ControlChrome,
@@ -629,6 +630,7 @@ package func textEditorBody(
     VStack(alignment: .leading, spacing: 0) {
       TextInputContent(
         displayText: displayText,
+        displayRuns: displayRuns,
         ownerIdentity: ownerIdentity,
         caretAnchor: caretAnchor
       )

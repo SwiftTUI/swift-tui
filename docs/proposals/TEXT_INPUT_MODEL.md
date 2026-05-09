@@ -1,12 +1,14 @@
 # Text Input Model
 
-**Status:** V1 shipped; V2 is active. The linked V1 plan landed the
-package-private value model, reducer, layout map, presentation projection,
-field-content view, reducer-backed `TextField` / `SecureField`, focused paste
-dispatch, reducer-backed `TextEditor`, caret-visible runtime scrolling, and
-text-input caret anchors in accessibility semantics. The V2 plan tracks the
-remaining editor work: selection rendering, clipboard command routing, host
-value/selection transport, IME/composition, and large-document storage.
+**Status:** V1 shipped; the `TextEditor` V2 tranche is shipped. The linked V1
+plan landed the package-private value model, reducer, layout map, presentation
+projection, field-content view, reducer-backed `TextField` / `SecureField`,
+focused paste dispatch, reducer-backed `TextEditor`, caret-visible runtime
+scrolling, and text-input caret anchors in accessibility semantics. The V2 plan
+landed shared word/select-all shortcuts and visible range-selection rendering,
+while clipboard copy/cut, host value/selection transport, IME/composition, and
+large-document storage are explicitly deferred until their host or performance
+contracts are concrete.
 
 **Owner:** unassigned.
 
@@ -16,7 +18,7 @@ value/selection transport, IME/composition, and large-document storage.
 - [2026-05-06-001-text-input-model-v1-plan.md](../plans/2026-05-06-001-text-input-model-v1-plan.md)
   - staged V1 implementation plan
 - [2026-05-09-002-text-editor-v2-plan.md](../plans/2026-05-09-002-text-editor-v2-plan.md)
-  - active V2 `TextEditor` plan
+  - shipped V2 `TextEditor` shortcut, selection-rendering, and deferral record
 - [0013-accessibility-runtime-policy.md](../decisions/0013-accessibility-runtime-policy.md)
   - runtime cursor policy
 - [FOCUS.md](../FOCUS.md) - focus traversal and focused values
@@ -423,18 +425,25 @@ Presentation is the derived view-facing data.
 ```swift
 package struct TextInputPresentation: Equatable, Sendable {
   package var displayText: String
+  package var displayRuns: [TextInputDisplayRun]
   package var isShowingPrompt: Bool
   package var layoutMap: TextInputLayoutMap
   package var caretAnchor: CellPoint
   package var selectionRects: [CellRect]
   package var shouldDrawSyntheticCaret: Bool
 }
+
+package struct TextInputDisplayRun: Equatable, Sendable {
+  package var text: String
+  package var isSelected: Bool
+}
 ```
 
 `shouldDrawSyntheticCaret` is true for normal TUI output when the hardware
 cursor-following policy is disabled. It is false when
 `RuntimeConfiguration.cursorFollowsFocus` is enabled and the runtime can place
-the hardware cursor at `caretAnchor`.
+the hardware cursor at `caretAnchor`, and also false while a focused
+non-collapsed selection is rendered.
 
 ### TextInputSemantics
 
@@ -500,9 +509,11 @@ Initial terminal key mapping:
 | ctrl/alt variants | word or document movement where terminals report them |
 
 Framework-level exit bindings and app key commands currently run before
-focused text handlers for modifier-bearing keys. That is a deliberate runtime
-policy, but it means copy/cut/paste shortcuts should be added only with an
-explicit command-routing decision.
+focused text handlers for modifier-bearing keys. Current routing keeps
+`ctrl-a` as a focused text-input select-all command, keeps `ctrl-c` as the
+default exit binding unless an app-level `keyCommand` intercepts it, and
+defers copy/cut until SwiftTUI has a clipboard adapter plus a secure-field
+suppression policy.
 
 ### Paste
 
@@ -562,12 +573,17 @@ Web/WASI:
 - Future web-host controls can map `value`, `selectionStart`,
   `selectionEnd`, `aria-multiline`, and password/secure traits from the same
   semantic payload.
+- Host transport must define grapheme-to-host offset conversion, host-originated
+  edits, and graph-scoped synchronization before adding public or wire-level
+  value/selection fields.
 
 SwiftUI host:
 
 - Existing mappings already classify `.textField`, `.secureField`, and
   `.textEditor` as text input.
 - Add value/selection/caret metadata only after the semantic payload is stable.
+- IME/composition belongs in host-specific input events first; terminal raw
+  input should not pretend to reproduce platform composition.
 
 ## Storage Decision
 
@@ -599,6 +615,11 @@ Why keep a storage seam:
 V1 should introduce a small package-private storage wrapper only if it keeps
 index conversion and metrics centralized. It should not expose a public storage
 protocol until there is more than one real implementation.
+
+The V2 `TextEditor` tranche kept `String` storage. Selection rendering and
+runtime shortcut routing do not create enough evidence to justify a rope or
+piece tree yet; that decision should be revisited only with large-document
+workloads or host-transport access patterns in hand.
 
 ## Anti-Patterns to Avoid
 
@@ -727,18 +748,13 @@ Deliverables:
 2. Should `TextInputValue` include scroll position directly, or should
    `TextEditor` own scroll as a companion state? The reducer needs access to
    it for caret-visible behavior either way.
-3. How much of selection rendering should ship in v1? The model should support
-   ranges immediately, but visible range highlighting can be staged.
-4. Should `TextFieldStyleConfiguration` gain public field-content API, or
+3. Should `TextFieldStyleConfiguration` gain public field-content API, or
    should it remain package-only until the style story is proven?
-5. How should framework exit bindings interact with text editing shortcuts
-   such as copy/cut/paste? Current runtime policy gives exit bindings priority.
-6. Which line-ending policy should text inputs use? Current SwiftTUI text
+4. Which line-ending policy should text inputs use? Current SwiftTUI text
    layout normalizes around `\n`; future file-backed editors may need CRLF
    preservation.
-7. Should IME/composition be supported only in web/native hosts at first, or
-   should terminal input expose a limited composing model for paste and
-   dead-key terminals?
+5. What host-specific event model should Web/WASI and SwiftUI use for IME,
+   composition, value/selection transport, and host-originated edits?
 
 ## Sources
 
@@ -760,3 +776,6 @@ Deliverables:
 ## Changelog
 
 - 2026-05-06: Initial draft proposal.
+- 2026-05-09: Updated for shipped `TextEditor` V2 shortcuts and visible
+  selection rendering; recorded clipboard, host transport, IME, and
+  large-document storage deferrals.

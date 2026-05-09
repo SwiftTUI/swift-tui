@@ -1,7 +1,7 @@
 ---
 title: "feat: text editor v2"
 type: feature
-status: active
+status: shipped
 date: 2026-05-09
 depends_on:
   - "../proposals/TEXT_INPUT_MODEL.md"
@@ -16,9 +16,11 @@ APIs. V2 should proceed in slices that keep `TextField`, `SecureField`, and
 `TextEditor` sharing the same package-private reducer wherever behavior
 overlaps.
 
-**Current status:** The first V2 slice is shipped in this branch: word
-movement/deletion and select-all now flow through shared text-input commands and
-the composed `TextEditor` key-handler path.
+**Current status:** Shipped. `TextEditor` now uses the shared V2 shortcut
+foundation and renders focused range selections through the shared text-input
+presentation path. Clipboard copy/cut, host-native value/selection transport,
+IME/composition, and large-document storage remain explicitly deferred until
+the repo has the relevant clipboard, host-event, or performance evidence.
 
 ## Boundaries
 
@@ -40,26 +42,30 @@ the composed `TextEditor` key-handler path.
   alt/ctrl backspace to word deletion, and ctrl-a to select-all where the
   focused text input receives those key presses. Cover the pure reducer and the
   composed `TextEditor` runtime path.
-- [ ] **Visible range selection.** Render non-collapsed selections in
+- [x] **Visible range selection.** Render non-collapsed selections in
   `TextInputContent` using the existing `TextInputLayoutMap`. Pin multiline
   selections, wrapped lines, secure redaction, focused/unfocused rendering, and
   accessibility caret behavior with focused tests.
-- [ ] **Clipboard command routing.** Decide copy/cut/select-all routing against
-  the runtime's exit-binding precedence. Add explicit command routing only after
-  the policy says when text inputs may consume ctrl-c, ctrl-x, ctrl-a, and
-  paste-like shortcuts.
-- [ ] **Host value and selection transport.** Define the selection wire model
-  for Web/WASI and SwiftUI hosts, including grapheme-to-host offset conversion,
-  secure-field suppression, host-originated edits, and synchronization with
-  graph-scoped `TextInputValue`.
-- [ ] **Composition and IME.** Use `composingRange` as the shared model point,
+- [x] **Clipboard command routing.** Decide copy/cut/select-all routing against
+  the runtime's exit-binding precedence. Current policy: focused text inputs may
+  consume `ctrl-a` for select-all; `ctrl-c` remains the default exit binding
+  unless an app-level `keyCommand` explicitly intercepts it; copy/cut commands
+  stay deferred until a clipboard adapter and secure-field suppression policy
+  exist.
+- [x] **Host value and selection transport.** Define the selection wire model
+  boundary for Web/WASI and SwiftUI hosts. Current decision: do not add public
+  or wire-level value/selection fields in this V2 tranche. A future host plan
+  must define grapheme-to-host offset conversion, secure-field suppression,
+  host-originated edits, and graph-scoped synchronization before adding API.
+- [x] **Composition and IME.** Use `composingRange` as the shared model point,
   but design per-host input events before adding public API. Terminal support
-  should document raw-input limits instead of pretending to reproduce platform
-  IME.
-- [ ] **Large-document storage.** Evaluate rope or piece-tree storage behind
+  documents the raw-input limit; native/web hosts need their own composition
+  event contract before SwiftTUI exposes composition.
+- [x] **Large-document storage.** Evaluate rope or piece-tree storage behind
   the reducer after selection rendering and host transport define the required
-  access patterns. Public custom storage should come after the internal storage
-  seam has real performance and host evidence.
+  access patterns. Current decision: keep `String` storage behind
+  `Binding<String>` until real large-document workloads or host transport
+  requirements justify a package-private rope/piece-tree seam.
 
 ## Validation
 
@@ -70,5 +76,16 @@ the composed `TextEditor` key-handler path.
   passes the shared reducer shortcut coverage.
 - Green checkpoint: `swiftly run swift test --filter SwiftTUITests.TextEditorSurfaceTests/textEditorHandlesWordShortcutsAndSelectAll`
   passes the composed `TextEditor` shortcut path.
+- Red checkpoint: `swiftly run swift test --filter SwiftTUIViewsTests.TextInputLayoutMapTests`
+  failed before implementation because `TextInputPresentation` did not expose
+  styled display runs for selected ranges.
+- Green checkpoint: `swiftly run swift test --filter SwiftTUIViewsTests.TextInputLayoutMapTests`
+  passes selection rect coverage for multiline, wrapped, focused/unfocused, and
+  secure-projected input.
+- Green checkpoint: `swiftly run swift test --filter SwiftTUITests.TextEditorSurfaceTests`
+  passes composed `TextEditor` range-selection rendering.
+- Green checkpoint: `swiftly run swift test --filter SwiftTUITests.TextInputRuntimeIntegrationTests`
+  pins `ctrl-a` select-all routing and `ctrl-c` default-exit precedence for
+  focused `TextEditor`.
 - Final gate: `bun run test` passes all policy checks, root SwiftPM tests,
   platform package tests, example package tests, and perf-tool tests.

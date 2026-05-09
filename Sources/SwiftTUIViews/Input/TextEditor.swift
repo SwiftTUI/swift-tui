@@ -68,6 +68,7 @@ extension TextEditor {
 
     let child = textEditorBody(
       displayText: presentation.displayText,
+      displayRuns: presentation.displayRuns,
       ownerIdentity: context.identity,
       caretAnchor: presentation.caretAnchor,
       chrome: chrome,

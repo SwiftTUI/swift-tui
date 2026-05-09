@@ -61,6 +61,34 @@ package struct TextInputLayoutMap: Equatable, Sendable {
     return line.sourceRange.upperBound
   }
 
+  package func selectionRects(for range: TextRange) -> [CellRect] {
+    let clampedRange = range.clamped(
+      to: TextOffset(lines.map(\.sourceRange.upperBound.rawValue).max() ?? 0)
+    )
+    guard !clampedRange.isEmpty else {
+      return []
+    }
+
+    return lines.compactMap { line in
+      let lowerBound = max(clampedRange.lowerBound, line.sourceRange.lowerBound)
+      let upperBound = min(clampedRange.upperBound, line.sourceRange.upperBound)
+      guard lowerBound < upperBound else {
+        return nil
+      }
+
+      let startX = line.origin.x + line.cellOffset(for: lowerBound)
+      let endX = line.origin.x + line.cellOffset(for: upperBound)
+      guard endX > startX else {
+        return nil
+      }
+
+      return CellRect(
+        origin: CellPoint(x: startX, y: line.origin.y),
+        size: CellSize(width: endX - startX, height: 1)
+      )
+    }
+  }
+
   package func verticalOffset(
     from offset: TextOffset,
     delta: Int,

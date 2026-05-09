@@ -58,7 +58,7 @@ The repository [README.md](../README.md) is the public landing page.
 
 Active design proposals that are still shaping decisions:
 
-- [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — text input value, selection, reducer, layout-map, caret-anchor foundation, and V2 editing direction for `TextField`, `SecureField`, and `TextEditor`
+- [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — shipped text input value, selection, reducer, layout-map, caret-anchor, shortcut, and selection-rendering foundation for `TextField`, `SecureField`, and `TextEditor`
 - [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — historical research record and remaining accessibility behavior questions; current shipped behavior lives in [ACCESSIBILITY.md](ACCESSIBILITY.md)
 - [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `Platforms/WebHost/` runner for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
@@ -69,10 +69,11 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md) — active `TextEditor` V2 plan; the shortcut foundation is shipped, while visible selection rendering, clipboard command routing, host value/selection transport, IME/composition, and large-document storage remain planned
+No dated implementation plans are currently active.
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md) — shipped `TextEditor` V2 shortcut and selection-rendering record; clipboard copy/cut, host value/selection transport, IME/composition, and large-document storage are explicit deferrals
 - [plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md](plans/FRACTIONAL_COORDINATE_SPACE_PLAN.md) — shipped fractional pointer, coordinate-space, Canvas-grid, terminal-pixel, host-precision, and gesture implementation record; the remaining Canvas/pointer API decisions are resolved in the plan status section
 - [plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md](plans/2026-05-09-001-swiftui-native-voiceover-focus-plan.md) — shipped SwiftUI host native VoiceOver focus bridge, making runtime focus move native accessibility focus by default while leaving native-to-runtime focus for a later interaction contract
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — shipped Canvas pixel-grid rendering, direct cell writes, styled Braille, half-block grids, gifeditor migration, and documentation; the standalone `Examples/canvas` package named by the historical record is not currently maintained

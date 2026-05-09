@@ -18,6 +18,12 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-09
 
+- Completed the `TextEditor` V2 tranche: focused range selections now render
+  through shared text-input display runs and layout-map selection rects, ctrl-a
+  select-all is pinned through the runtime, ctrl-c remains the default exit
+  binding, and clipboard copy/cut, host transport, IME/composition, and
+  large-document storage are recorded as explicit deferrals rather than active
+  TODO work.
 - Scoped the `TextEditor` V2 tranche into a dated plan and shipped the
   package-private shortcut foundation: shared word-boundary navigation,
   word-deletion, and ctrl-a select-all now flow through the reducer and the

@@ -103,6 +103,96 @@ struct TextInputLayoutMapTests {
     #expect(presentation.layoutMap.caretPoint(for: TextOffset(4)) == CellPoint(x: 1, y: 1))
   }
 
+  @Test("selection rects span explicit and wrapped lines")
+  func selectionRectsSpanExplicitAndWrappedLines() {
+    let multilinePresentation = TextInputPresentation(
+      value: TextInputValue(
+        text: "ab\ncd",
+        selection: TextSelection(anchor: TextOffset(1), head: TextOffset(4))
+      ),
+      traits: .multiline,
+      prompt: nil,
+      isFocused: true,
+      cursorFollowsFocus: false,
+      width: nil
+    )
+    let wrappedPresentation = TextInputPresentation(
+      value: TextInputValue(
+        text: "abcdef",
+        selection: TextSelection(anchor: TextOffset(2), head: TextOffset(5))
+      ),
+      traits: .multiline,
+      prompt: nil,
+      isFocused: true,
+      cursorFollowsFocus: false,
+      width: 3
+    )
+
+    #expect(
+      multilinePresentation.selectionRects
+        == [
+          CellRect(origin: CellPoint(x: 1, y: 0), size: CellSize(width: 1, height: 1)),
+          CellRect(origin: CellPoint(x: 0, y: 1), size: CellSize(width: 1, height: 1)),
+        ]
+    )
+    #expect(
+      wrappedPresentation.selectionRects
+        == [
+          CellRect(origin: CellPoint(x: 2, y: 0), size: CellSize(width: 1, height: 1)),
+          CellRect(origin: CellPoint(x: 0, y: 1), size: CellSize(width: 2, height: 1)),
+        ]
+    )
+  }
+
+  @Test("focused range selection suppresses synthetic caret")
+  func focusedRangeSelectionSuppressesSyntheticCaret() {
+    let presentation = TextInputPresentation(
+      value: TextInputValue(
+        text: "hello",
+        selection: TextSelection(anchor: TextOffset(1), head: TextOffset(4))
+      ),
+      traits: .singleLine,
+      prompt: nil,
+      isFocused: true,
+      cursorFollowsFocus: false,
+      width: nil
+    )
+
+    #expect(!presentation.shouldDrawSyntheticCaret)
+    #expect(presentation.displayText == "hello")
+    #expect(presentation.displayRuns.map(\.text).joined() == "hello")
+    #expect(presentation.displayRuns.map(\.isSelected) == [false, true, false])
+  }
+
+  @Test("selection rendering is focused-only and keeps secure text redacted")
+  func selectionRenderingIsFocusedOnlyAndKeepsSecureTextRedacted() {
+    let secureSelection = TextSelection(anchor: TextOffset(1), head: TextOffset(4))
+    let securePresentation = TextInputPresentation(
+      value: TextInputValue(text: "secret", selection: secureSelection),
+      traits: .secureField,
+      prompt: nil,
+      isFocused: true,
+      cursorFollowsFocus: false,
+      width: nil
+    )
+    let unfocusedPresentation = TextInputPresentation(
+      value: TextInputValue(
+        text: "visible", selection: TextSelection(anchor: TextOffset(1), head: TextOffset(4))),
+      traits: .singleLine,
+      prompt: nil,
+      isFocused: false,
+      cursorFollowsFocus: false,
+      width: nil
+    )
+
+    #expect(
+      securePresentation.displayRuns.map(\.text).joined() == String(repeating: "\u{2022}", count: 6)
+    )
+    #expect(securePresentation.displayRuns.map(\.isSelected) == [false, true, false])
+    #expect(!securePresentation.displayText.contains("secret"))
+    #expect(unfocusedPresentation.displayRuns.map(\.isSelected) == [false])
+  }
+
   @Test("secure projection masks display but keeps source offsets")
   func secureProjectionMasksDisplayButKeepsSourceOffsets() {
     let presentation = TextInputPresentation(

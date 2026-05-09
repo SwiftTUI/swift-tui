@@ -87,6 +87,7 @@ extension SecureField {
       displayText: fallbackPresentation.displayText,
       fieldContent: .init(
         displayText: presentation.displayText,
+        displayRuns: presentation.displayRuns,
         ownerIdentity: context.identity,
         caretAnchor: presentation.caretAnchor
       ),
