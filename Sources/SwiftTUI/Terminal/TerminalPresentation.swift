@@ -196,7 +196,7 @@ extension TerminalCapabilityProfile {
   ///     a "force unicode glyphs" override).
   ///
   /// Other `RuntimeConfiguration` fields (motion, output, web, debug,
-  /// start-in) are not yet wired; this method ignores them.
+  /// start-in) are not terminal capability inputs; this method ignores them.
   public func applying(_ configuration: RuntimeConfiguration) -> Self {
     var result = self
     switch configuration.color {

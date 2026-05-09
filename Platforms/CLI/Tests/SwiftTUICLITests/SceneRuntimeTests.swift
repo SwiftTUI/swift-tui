@@ -14,6 +14,39 @@ import Testing
 @Suite
 @MainActor
 struct SceneRuntimeTests {
+  @Test("RuntimeConfiguration.debug enables frame diagnostics")
+  func debugConfigurationEnablesFrameDiagnostics() {
+    #expect(
+      SceneRuntime.diagnosticsFilePath(
+        configuration: .init(debug: true),
+        environment: [:]
+      ) == "/tmp/termui-diagnostics.tsv")
+    #expect(
+      SceneRuntime.diagnosticsFilePath(
+        configuration: .default,
+        environment: [:]
+      ) == nil)
+  }
+
+  @Test("TERMUI_DIAGNOSTICS custom path still controls diagnostics output")
+  func termuiDiagnosticsCustomPathControlsDiagnosticsOutput() {
+    #expect(
+      SceneRuntime.diagnosticsFilePath(
+        configuration: .init(debug: true),
+        environment: ["TERMUI_DIAGNOSTICS": "/tmp/custom-swifttui.tsv"]
+      ) == "/tmp/custom-swifttui.tsv")
+    #expect(
+      SceneRuntime.diagnosticsFilePath(
+        configuration: .default,
+        environment: ["TERMUI_DIAGNOSTICS": "yes"]
+      ) == "/tmp/termui-diagnostics.tsv")
+    #expect(
+      SceneRuntime.diagnosticsFilePath(
+        configuration: .default,
+        environment: ["TERMUI_DIAGNOSTICS": "0"]
+      ) == nil)
+  }
+
   @Test("Secondary scene input end suspends and reattaches")
   func secondarySceneSuspendsAndReattaches() async throws {
     let selection = collectWindowSceneSelections(

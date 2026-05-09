@@ -18,6 +18,13 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `4278c485` Wired `RuntimeConfiguration.debug` into the CLI runtime by enabling
+  the existing frame diagnostics logger for `--debug` / `SWIFTTUI_DEBUG=1`, and
+  narrowed the remaining runtime-configuration active item to the fields whose
+  behavior still needs a fresh scope decision. See
+  `4278c485` [Platforms/CLI/Sources/SwiftTUICLI/SceneRuntime.swift](Platforms/CLI/Sources/SwiftTUICLI/SceneRuntime.swift),
+  `4278c485` [Platforms/CLI/Tests/SwiftTUICLITests/SceneRuntimeTests.swift](Platforms/CLI/Tests/SwiftTUICLITests/SceneRuntimeTests.swift),
+  and `4278c485` [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md).
 - `5cc2d3a4` Closed the stale plan-status tracker by retaining the shipped
   border/stroke and Canvas rendering plans as implementation records, and by
   moving the fractional-coordinate uncertainty into the Canvas/pointer active
