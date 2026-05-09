@@ -85,6 +85,40 @@ func node_mapper_converts_cell_rects_to_native_frames() throws {
 
 @MainActor
 @Test
+func node_mapper_marks_focus_only_for_exact_identity_match() throws {
+  let focusedIdentity = Identity(components: ["menu", "run"])
+  let siblingIdentity = Identity(components: ["menu", "other"])
+  let focused = try #require(
+    AccessibilityNodeMapper.mapping(
+      for: AccessibilityNode(
+        identity: focusedIdentity,
+        rect: .init(origin: .zero, size: .init(width: 1, height: 1)),
+        role: .button,
+        label: "Run"
+      ),
+      focusedIdentity: focusedIdentity,
+      cellSize: .init(width: 8, height: 16)
+    )
+  )
+  let sameLabelSibling = try #require(
+    AccessibilityNodeMapper.mapping(
+      for: AccessibilityNode(
+        identity: siblingIdentity,
+        rect: .init(origin: .init(x: 2, y: 0), size: .init(width: 1, height: 1)),
+        role: .button,
+        label: "Run"
+      ),
+      focusedIdentity: focusedIdentity,
+      cellSize: .init(width: 8, height: 16)
+    )
+  )
+
+  #expect(focused.isFocused)
+  #expect(!sameLabelSibling.isFocused)
+}
+
+@MainActor
+@Test
 func node_mapper_skips_invalid_accessibility_frames() {
   let emptyRectNode = AccessibilityNode(
     identity: identity("empty"),
