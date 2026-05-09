@@ -116,10 +116,12 @@ Current shipped behavior:
   or no-progress mode is active.
 - Animation modifiers skip non-essential interpolation when reduced motion is
   active.
-
-Still open: the broader policy for transition intermediates and animated
-content changes is not fully settled. Keep new animation behavior behind
-`accessibilityReduceMotion` checks when it can generate decorative frame churn.
+- `PhaseAnimator` renders its first phase without starting phase-cycling tasks
+  when reduced motion is active.
+- `AnimatedImage` renders its first frame without starting a playback task when
+  reduced motion is active.
+- Transition intermediates and matched-geometry translations snap to the final
+  state under the reduced-motion transaction policy.
 
 ## Terminal Output
 
@@ -188,8 +190,6 @@ Manual listening coverage is documented in
 The shipped accessibility substrate and first target consumers are in place.
 The remaining known behavior gaps are:
 
-- Reduced-motion policy for transition intermediates and animated content
-  changes.
 - Modal presentation focus trapping and focus restoration.
 - Richer native focus control in hosted platforms, beyond the current semantic
   focus metadata.

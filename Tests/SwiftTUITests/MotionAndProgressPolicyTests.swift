@@ -126,6 +126,46 @@ struct MotionAndProgressPolicyTests {
     #expect(!reducedRenderer.internalAnimationController.lastTickResult.hasPendingWork)
   }
 
+  @Test("reduced motion suppresses PhaseAnimator task ticks")
+  func reducedMotionSuppressesPhaseAnimatorTaskTicks() {
+    let normalRegistry = LocalTaskRegistry()
+    _ = renderArtifacts(
+      phaseAnimatorProbe(),
+      taskRegistry: normalRegistry,
+      identity: testIdentity("NormalPhaseAnimator")
+    )
+
+    let reducedRegistry = LocalTaskRegistry()
+    let reducedSurface = renderedSurface(
+      phaseAnimatorProbe(),
+      environmentValues: policyEnvironment(accessibilityReduceMotion: true),
+      taskRegistry: reducedRegistry,
+      identity: testIdentity("ReducedPhaseAnimator")
+    )
+
+    #expect(normalRegistry.snapshot().count == 1)
+    #expect(reducedRegistry.snapshot().isEmpty)
+    #expect(reducedSurface.contains("rest"))
+  }
+
+  @Test("reduced motion suppresses transition intermediates")
+  func reducedMotionSuppressesTransitionIntermediates() async {
+    let normalCount = await transitionAnimationCount(reducedMotion: false)
+    let reducedCount = await transitionAnimationCount(reducedMotion: true)
+
+    #expect(normalCount > 0)
+    #expect(reducedCount == 0)
+  }
+
+  @Test("reduced motion suppresses matched geometry translation")
+  func reducedMotionSuppressesMatchedGeometryTranslation() {
+    let normalCount = matchedGeometryAnimationCount(reducedMotion: false)
+    let reducedCount = matchedGeometryAnimationCount(reducedMotion: true)
+
+    #expect(normalCount > 0)
+    #expect(reducedCount == 0)
+  }
+
   @Test("static controls render unchanged under motion and progress policy")
   func staticControlsRenderUnchangedUnderPolicy() {
     let surface = renderedSurface(
@@ -142,6 +182,15 @@ struct MotionAndProgressPolicyTests {
 }
 
 @MainActor
+private func phaseAnimatorProbe() -> some View {
+  PhaseAnimator(["rest", "pulse"]) { phase in
+    Text(phase)
+  } animation: { _ in
+    .linear(duration: .milliseconds(500))
+  }
+}
+
+@MainActor
 private func animatedText(
   shifted: Bool,
   animation: Animation
@@ -149,6 +198,98 @@ private func animatedText(
   Text("Move")
     .offset(x: shifted ? 4 : 0, y: 0)
     .animation(animation, value: shifted)
+}
+
+@MainActor
+private func transitionAnimationCount(reducedMotion: Bool) async -> Int {
+  let renderer = DefaultRenderer()
+  let controller = renderer.internalAnimationController
+  let animation = Animation.linear(duration: .milliseconds(500))
+  controller.register(animation)
+  let rootIdentity = testIdentity(reducedMotion ? "ReducedTransition" : "NormalTransition")
+  let environmentValues = policyEnvironment(accessibilityReduceMotion: reducedMotion)
+
+  return await TransitionRegistrationStorage.withSink(controller) {
+    _ = renderer.render(
+      transitionProbe(show: false),
+      context: ResolveContext(
+        identity: rootIdentity,
+        environmentValues: environmentValues
+      )
+    )
+
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest =
+      reducedMotion ? .disabled : .animate(animation.animationBox)
+    _ = renderer.render(
+      transitionProbe(show: true),
+      context: ResolveContext(
+        identity: rootIdentity,
+        environmentValues: environmentValues,
+        transaction: transaction
+      )
+    )
+
+    return controller.activeAnimationCount
+  }
+}
+
+@MainActor
+private func transitionProbe(show: Bool) -> some View {
+  VStack {
+    if show {
+      Text("Panel")
+        .id(testIdentity("Panel"))
+        .transition(.opacity)
+    }
+  }
+}
+
+@MainActor
+private func matchedGeometryAnimationCount(reducedMotion: Bool) -> Int {
+  let renderer = DefaultRenderer()
+  let controller = renderer.internalAnimationController
+  let animation = Animation.linear(duration: .milliseconds(500))
+  controller.register(animation)
+  let rootIdentity = testIdentity(reducedMotion ? "ReducedMatched" : "NormalMatched")
+  let environmentValues = policyEnvironment(accessibilityReduceMotion: reducedMotion)
+
+  _ = renderer.render(
+    matchedGeometryProbe(swapped: false),
+    context: ResolveContext(
+      identity: rootIdentity,
+      environmentValues: environmentValues
+    ),
+    proposal: ProposedSize(width: .finite(40), height: .finite(3))
+  )
+
+  var transaction = TransactionSnapshot()
+  transaction.animationRequest =
+    reducedMotion ? .disabled : .animate(animation.animationBox)
+  _ = renderer.render(
+    matchedGeometryProbe(swapped: true),
+    context: ResolveContext(
+      identity: rootIdentity,
+      environmentValues: environmentValues,
+      transaction: transaction
+    ),
+    proposal: ProposedSize(width: .finite(40), height: .finite(3))
+  )
+
+  return controller.activeMatchedGeometryCount
+}
+
+@MainActor
+private func matchedGeometryProbe(swapped: Bool) -> some View {
+  HStack(spacing: 1) {
+    if swapped {
+      Text("other")
+      Text("hero").matchedGeometryEffect(id: "hero")
+    } else {
+      Text("hero").matchedGeometryEffect(id: "hero")
+      Text("other")
+    }
+  }
 }
 
 @MainActor

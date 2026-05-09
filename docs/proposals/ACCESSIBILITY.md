@@ -1530,18 +1530,12 @@ in [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md); active follow-up work lives in
 
 The remaining proposal-level questions are:
 
-1. **Reduced-motion semantics for animated state changes.** `Spinner`,
-   `ProgressView`, and core animation modifiers have shipped reduced-motion
-   behavior, but transition intermediates, `PhaseAnimator`, `AnimatedImage`,
-   matched geometry, and animated content changes still need a complete policy
-   and test pass. Skipping motion must still commit and announce the new state.
-
-2. **Modal presentation focus contract.** `.sheet`, `.alert`, and
+1. **Modal presentation focus contract.** `.sheet`, `.alert`, and
    `.confirmationDialog` still need the full accessibility focus contract for
    initial focus, trap/cycle behavior, dismiss restoration fallback, and
    target-bridge behavior.
 
-3. **Native host focus beyond metadata.** ADR-0015 deliberately shipped SwiftUI
+2. **Native host focus beyond metadata.** ADR-0015 deliberately shipped SwiftUI
    host focus as semantic metadata only. A later decision must say whether host
    focus should programmatically move native VoiceOver focus or remain
    metadata-only.
@@ -1560,6 +1554,10 @@ Closed historical questions:
   shipped through the shared `web-surface` v2 `accessibilityTree` path.
 - Visual-only content policy for `Canvas`, `Image`, animated images, and charts
   is shipped and documented in [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md).
+- Reduced-motion policy for `Spinner`, `ProgressView`, `PhaseAnimator`,
+  `AnimatedImage`, transition intermediates, matched geometry, and animated
+  content changes is shipped and documented in
+  [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md).
 - Theme semantics and accessibility semantics remain parallel channels; visual
   theme tokens do not carry assistive-technology roles.
 
@@ -1936,8 +1934,11 @@ in this document. The primary sources, grouped by theme:
   reference page [`../ACCESSIBILITY.md`](../ACCESSIBILITY.md). This proposal now
   remains as the research record plus open behavior-policy context.
 - 2026-05-08: Cleaned up stale open questions. The proposal now lists only the
-  current reduced-motion, modal-focus, and native-host-focus questions; resolved
-  historical questions point at ADR-0011 through ADR-0015 and shipped behavior.
+  current modal-focus and native-host-focus questions; resolved historical
+  questions point at ADR-0011 through ADR-0015 and shipped behavior.
+- 2026-05-08: Reduced-motion behavior was completed for `PhaseAnimator`,
+  `AnimatedImage`, transition intermediates, matched geometry, and animated
+  content changes. Reduced-motion is no longer a proposal-level open question.
 - 2026-05-06: Visual-only content policy landed. `Canvas`, `Image`, and
   image-backed animated content require author labels or explicit hiding;
   default `SwiftTUICharts` summaries become image labels, while custom
