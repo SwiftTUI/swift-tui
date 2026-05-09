@@ -12,6 +12,11 @@ date: 2026-04-28
 > phases are implemented. Pointer precision remains explicitly deferred to the
 > fractional-coordinate and Canvas/pointer active work.
 
+> **Current repo note (2026-05-08):** the standalone `Examples/canvas` package
+> named by this historical record is not present in the current checkout. Use
+> root Canvas tests and `Examples/gifeditor` as the maintained verification
+> surfaces unless a new standalone Canvas example is explicitly prioritized.
+
 ## Overview
 
 Extend `Canvas` into the framework primitive used for dense editable pixel
