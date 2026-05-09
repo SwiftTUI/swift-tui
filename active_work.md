@@ -20,13 +20,6 @@
 
 ## Repo Documentation Hygiene
 
-- [ ] Reconcile terminal-embedding plan status with the shipped
-  `Platforms/Embedding` source and file-previewer example. Supporting docs and
-  source:
-  [docs/plans/2026-05-04-001-terminal-embedding-plan.md](docs/plans/2026-05-04-001-terminal-embedding-plan.md),
-  [docs/STATUS.md](docs/STATUS.md),
-  [Platforms/Embedding](Platforms/Embedding),
-  [Examples/file-previewer](Examples/file-previewer).
 - [ ] Update the public API inventory for the border/stroke simplification that
   has already landed in source. Supporting docs and source:
   [docs/PUBLIC_API_INVENTORY.md](docs/PUBLIC_API_INVENTORY.md),

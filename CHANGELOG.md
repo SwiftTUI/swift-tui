@@ -18,6 +18,10 @@ belong in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-08
 
+- `e3178a74` Reconciled the terminal-embedding tracker state by marking the
+  implementation plan shipped, pointing the docs index at it as an
+  implementation record, and removing the stale active-work item. See
+  `e3178a74` [docs/plans/2026-05-04-001-terminal-embedding-plan.md](docs/plans/2026-05-04-001-terminal-embedding-plan.md).
 - `0c8b73f2` Refreshed shipped-tooling docs so the CPU latency evaluation
   proposal describes the delivered `Tools/TermUIPerf` harness and the argument
   parsing proposal no longer marks accessibility/WebHost runtime configuration
