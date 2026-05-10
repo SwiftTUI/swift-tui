@@ -1,4 +1,6 @@
 import Foundation
+import SwiftTUICore
+import SwiftTUIViews
 
 /// Returns the minimum-to-maximum date range covered by `days`, or `nil`
 /// when the input is empty.
@@ -143,5 +145,105 @@ private func weekdayLabels(weekStart: CalendarHeatmapWeekStart) -> [String] {
     return ["", "Mon", "", "Wed", "", "Fri", ""]
   case .monday:
     return ["", "Tue", "", "Thu", "", "Sat", ""]
+  }
+}
+
+// MARK: - View body helpers
+
+@MainActor
+@ViewBuilder
+func calendarHeatmapBody(
+  bucket: CalendarHeatmapBucket,
+  cellWidth: Int,
+  tone: BannerTone,
+  showsMonthHeader: Bool,
+  showsDayLabels: Bool,
+  showsScaleLegend: Bool
+) -> some View {
+  let effectiveWidth = max(1, cellWidth)
+  let accentStyle =
+    tone == .automatic
+    ? AnyShapeStyle(.tint)
+    : metricAccentStyle(for: tone)
+  let maximumValue = max(1, bucket.grid.flatMap { $0 }.compactMap { $0 }.map(abs).max() ?? 1)
+
+  VStack(alignment: .leading, spacing: 0) {
+    if showsMonthHeader {
+      calendarHeatmapMonthHeaderRow(
+        labels: bucket.monthHeader,
+        cellWidth: effectiveWidth,
+        leadingPad: showsDayLabels ? dayLabelColumnWidth : 0
+      )
+    }
+    ForEach(0..<7, id: \.self) { row in
+      HStack(alignment: .center, spacing: 0) {
+        if showsDayLabels {
+          Text(bucket.dayLabels[row])
+            .foregroundStyle(.foreground)
+            .frame(width: dayLabelColumnWidth, height: 1, alignment: .trailing)
+        }
+        ForEach(bucket.grid[row].indices, id: \.self) { column in
+          let cell = bucket.grid[row][column]
+          Text(String(repeating: calendarHeatmapGlyph(value: cell, maximumValue: maximumValue),
+                      count: effectiveWidth))
+            .foregroundStyle(accentStyle)
+        }
+      }
+    }
+    if showsScaleLegend {
+      calendarHeatmapScaleLegendRow(accentStyle: accentStyle)
+    }
+  }
+}
+
+private let dayLabelColumnWidth = 4
+
+private func calendarHeatmapGlyph(value: Double?, maximumValue: Double) -> String {
+  guard let value else { return " " }      // out of range → space
+  if value == 0 { return "·" }              // in range, no activity → dot
+  // Map to the existing HeatStrip 4-step ramp.
+  let fraction = min(max(abs(value) / maximumValue, 0), 1)
+  switch fraction {
+  case ..<0.25: return "░"
+  case ..<0.5:  return "▒"
+  case ..<0.75: return "▓"
+  default:      return "█"
+  }
+}
+
+@MainActor
+@ViewBuilder
+private func calendarHeatmapMonthHeaderRow(
+  labels: [String],
+  cellWidth: Int,
+  leadingPad: Int
+) -> some View {
+  HStack(alignment: .center, spacing: 0) {
+    if leadingPad > 0 {
+      Text(String(repeating: " ", count: leadingPad))
+    }
+    ForEach(labels.indices, id: \.self) { column in
+      let label = labels[column]
+      let padded = label.isEmpty
+        ? String(repeating: " ", count: cellWidth)
+        : String((label + String(repeating: " ", count: cellWidth)).prefix(cellWidth))
+      Text(padded)
+        .foregroundStyle(.separator)
+    }
+  }
+}
+
+@MainActor
+@ViewBuilder
+private func calendarHeatmapScaleLegendRow(
+  accentStyle: AnyShapeStyle
+) -> some View {
+  HStack(alignment: .center, spacing: 1) {
+    Text("Less").foregroundStyle(.separator)
+    Text("░").foregroundStyle(accentStyle)
+    Text("▒").foregroundStyle(accentStyle)
+    Text("▓").foregroundStyle(accentStyle)
+    Text("█").foregroundStyle(accentStyle)
+    Text("More").foregroundStyle(.separator)
   }
 }
