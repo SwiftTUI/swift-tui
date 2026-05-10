@@ -49,7 +49,7 @@ func yCell(value: Double, domain: ClosedRange<Double>, plotHeight: Int) -> Int {
 /// One rasterized cell in a line chart plot grid.
 struct LineRasterCell: Equatable, Sendable {
   /// `•` for isolated points, `│`/`─`/`╭`/`╮`/`╰`/`╯` for connector
-  /// segments. Picked by `connectorGlyph(prev:next:)`.
+  /// segments. Picked by `connectorGlyph(at:neighbor:)`.
   var glyph: Character
 }
 
