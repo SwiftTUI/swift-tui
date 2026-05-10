@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// Edits a string binding using keyboard input while masking the rendered value.
-public struct SecureField<Label: View>: View, ResolvableView {
+public struct SecureField<Label: View>: PrimitiveView, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?
   @State private var textInputValue = TextInputValue()

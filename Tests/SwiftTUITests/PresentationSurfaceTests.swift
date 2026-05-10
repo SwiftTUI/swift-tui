@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUI
+@testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 @MainActor
@@ -333,7 +333,7 @@ private struct ConditionalAlertPresentationView: View {
   }
 }
 
-private struct RenderTimePresentationMutationProbe: View, ResolvableView {
+private struct RenderTimePresentationMutationProbe: PrimitiveView, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let spec = alertPromptPresentationSpec()
     let sourceIdentity = context.identity

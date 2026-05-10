@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact meter for displaying a single fractional value.
-public struct Meter<Label: View, CurrentValueLabel: View>: View, ResolvableView {
+public struct Meter<Label: View, CurrentValueLabel: View>: PrimitiveView, ResolvableView {
   public var tone: BannerTone
   public var value: Double
   public var total: Double

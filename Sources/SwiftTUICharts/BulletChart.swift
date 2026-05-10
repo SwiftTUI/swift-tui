@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A bullet chart that compares a current value against a target or range.
-public struct BulletChart<Label: View, Summary: View>: View, ResolvableView {
+public struct BulletChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var value: Double
   public var target: Double
   public var total: Double

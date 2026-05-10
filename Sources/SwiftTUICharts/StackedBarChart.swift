@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A stacked bar chart for segmented totals.
-public struct StackedBarChart<Label: View, Summary: View>: View, ResolvableView {
+public struct StackedBarChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var entries: [BarChartEntry]
   public var total: Double?
   public var barWidth: Int

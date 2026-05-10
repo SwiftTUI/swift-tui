@@ -2,7 +2,7 @@ package import SwiftTUICore
 
 /// The builder artifact produced by array-like view composition such as
 /// `ForEach` expansion or `buildArray` support.
-public struct VariadicView<Content: View>: View, ResolvableView, DeclaredChildrenView {
+public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView {
   package let content: [Content]
 
   package init(

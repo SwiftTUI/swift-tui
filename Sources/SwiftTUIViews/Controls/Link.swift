@@ -1,7 +1,7 @@
 @_spi(Testing) public import SwiftTUICore
 
 /// Displays focusable hyperlink text.
-public struct Link: View, ResolvableView {
+public struct Link: PrimitiveView, ResolvableView {
   public var label: Text
   public var destination: LinkDestination
 

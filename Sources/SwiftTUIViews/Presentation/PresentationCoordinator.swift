@@ -1218,7 +1218,7 @@ package func presentationPortalIdentity(
     ])
 }
 
-package struct PresentationPortalRoot<Content: View>: View, ResolvableView {
+package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableView {
   package var content: Content
   package var portalState: PresentationPortalState
   package var contentRootIdentity: Identity

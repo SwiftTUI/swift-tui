@@ -391,7 +391,7 @@ private struct OutlineRow<Content: View>: View {
   }
 }
 
-private struct ScopedOutlineRowContent<Content: View>: View, ResolvableView {
+private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, ResolvableView {
   let authoringScope: AuthoringContext?
   let content: Content
 

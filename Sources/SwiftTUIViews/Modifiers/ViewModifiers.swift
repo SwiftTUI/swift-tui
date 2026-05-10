@@ -1,10 +1,6 @@
 public import SwiftTUICore
 
 extension View {
-  public var body: Never {
-    fatalError("\(Self.self) is a primitive view and does not expose a composed body.")
-  }
-
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     resolveViewElements(self, in: context)
   }

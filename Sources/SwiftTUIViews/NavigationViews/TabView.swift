@@ -2,7 +2,7 @@ package import SwiftTUICore
 
 /// Selects one declared tab and renders a terminal-native tab strip above the
 /// active content.
-public struct TabView<SelectionValue: Hashable, Content: View>: View, ResolvableView {
+public struct TabView<SelectionValue: Hashable, Content: View>: PrimitiveView, ResolvableView {
   public var selection: Binding<SelectionValue>
   private var content: Content
   private let authoringScope: AuthoringContext?

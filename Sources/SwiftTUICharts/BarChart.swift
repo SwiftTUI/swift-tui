@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A horizontal bar chart for comparing labeled values.
-public struct BarChart<Label: View, Summary: View>: View, ResolvableView {
+public struct BarChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var entries: [BarChartEntry]
   public var barWidth: Int
   public var labelWidth: Int

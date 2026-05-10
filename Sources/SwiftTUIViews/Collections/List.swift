@@ -1,7 +1,7 @@
 @_spi(Testing) package import SwiftTUICore
 
 /// Groups related collection content with optional header and footer content.
-public struct Section<Content: View, Header: View, Footer: View>: View,
+public struct Section<Content: View, Header: View, Footer: View>: PrimitiveView,
   ResolvableView
 {
   private var showsHeader: Bool
@@ -124,7 +124,7 @@ extension Section {
 }
 
 /// Presents selectable rows in a vertically scrollable list.
-public struct List<SelectionValue: Hashable, Content: View>: View, ResolvableView {
+public struct List<SelectionValue: Hashable, Content: View>: PrimitiveView, ResolvableView {
   public var selection: Binding<SelectionValue>
   private var onActivate: (@MainActor (SelectionValue) -> Void)?
   private var content: Content

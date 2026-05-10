@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// A typed deferred view wrapper that preserves the original authoring scope.
-package struct ScopedBuilder<Output: View>: View, ResolvableView {
+package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
   private let output: Output
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 

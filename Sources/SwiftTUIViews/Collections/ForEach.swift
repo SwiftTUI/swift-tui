@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// Generates repeated content from a random-access collection.
-public struct ForEach<Data, ID, Content>: View, ResolvableView
+public struct ForEach<Data, ID, Content>: PrimitiveView, ResolvableView
 where Data: RandomAccessCollection, ID: Hashable, Content: View {
   public var data: Data
   public var id: KeyPath<Data.Element, ID>

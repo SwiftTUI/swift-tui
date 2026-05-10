@@ -3730,7 +3730,7 @@ private func interactiveProbeTextNode(
   )
 }
 
-private struct RunLoopInvalidationProbeLeaf: View, ResolvableView {
+private struct RunLoopInvalidationProbeLeaf: PrimitiveView, ResolvableView {
   let state: Int
   let recorder: RunLoopInvalidationRecorder
 
@@ -3748,7 +3748,7 @@ private struct RunLoopInvalidationProbeLeaf: View, ResolvableView {
   }
 }
 
-private struct RunLoopInvalidationProbeRoot: View, ResolvableView {
+private struct RunLoopInvalidationProbeRoot: PrimitiveView, ResolvableView {
   let state: Int
   let recorder: RunLoopInvalidationRecorder
 
@@ -3810,7 +3810,7 @@ private final class ReusedHandlerRecorder: Sendable {
   }
 }
 
-private struct ReusedHandlerProbe: View, ResolvableView {
+private struct ReusedHandlerProbe: PrimitiveView, ResolvableView {
   let recorder: ReusedHandlerRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -3826,7 +3826,7 @@ private struct ReusedHandlerProbe: View, ResolvableView {
   }
 }
 
-private struct ReusedHandlerRoot: View, ResolvableView {
+private struct ReusedHandlerRoot: PrimitiveView, ResolvableView {
   let recorder: ReusedHandlerRecorder
   let dirtyLabel: String
 
@@ -4171,7 +4171,7 @@ private final class RuntimeLifecycleRecorder: Sendable {
   }
 }
 
-private struct LifecycleRuntimeProbe: View, ResolvableView {
+private struct LifecycleRuntimeProbe: PrimitiveView, ResolvableView {
   let recorder: RuntimeLifecycleRecorder
   let focusable: Bool
 
@@ -4214,7 +4214,7 @@ private struct LifecycleRuntimeProbe: View, ResolvableView {
   }
 }
 
-private struct ScrollLifecycleRuntimeProbe: View, ResolvableView {
+private struct ScrollLifecycleRuntimeProbe: PrimitiveView, ResolvableView {
   let label: String
   let text: String
   let recorder: RuntimeLifecycleRecorder
@@ -4253,7 +4253,7 @@ private struct ScrollLifecycleRuntimeProbe: View, ResolvableView {
   }
 }
 
-private struct LifecycleRuntimeRoot: View, ResolvableView {
+private struct LifecycleRuntimeRoot: PrimitiveView, ResolvableView {
   let state: LifecycleRuntimeState
   let recorder: RuntimeLifecycleRecorder
   let focusable: Bool

@@ -12,7 +12,7 @@ package protocol ViewNode {
 /// directly.
 @MainActor
 public protocol View {
-  associatedtype Body: View = Never
+  associatedtype Body: View
 
   @ViewBuilder @MainActor
   var body: Body { get }
@@ -24,6 +24,15 @@ extension Never: View {
 
   public var body: Never {
     fatalError("Never.body is unreachable.")
+  }
+}
+
+@MainActor
+package protocol PrimitiveView: View where Body == Never {}
+
+extension PrimitiveView {
+  public var body: Body {
+    fatalError("\(Self.self) is a primitive view and does not expose a composed body.")
   }
 }
 

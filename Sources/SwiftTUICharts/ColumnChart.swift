@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A vertical column chart for comparing labeled values.
-public struct ColumnChart<Label: View, Summary: View>: View, ResolvableView {
+public struct ColumnChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var entries: [BarChartEntry]
   public var chartHeight: Int
   public var columnWidth: Int

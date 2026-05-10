@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact strip of heat-style cells for relative intensity data.
-public struct HeatStrip<Label: View, Summary: View>: View, ResolvableView {
+public struct HeatStrip<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var entries: [BarChartEntry]
   public var cellWidth: Int
   private let label: Label

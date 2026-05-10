@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// A compact progress bar with optional label and current-value content.
-public struct ProgressView<Label: View, CurrentValueLabel: View>: View, ResolvableView {
+public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView, ResolvableView {
   public var value: Double
   public var total: Double
   public var barWidth: Int

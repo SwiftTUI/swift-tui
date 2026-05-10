@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Overlays children along the z axis using alignment rules.
-public struct ZStack<Content: View>: View, ResolvableView {
+public struct ZStack<Content: View>: PrimitiveView, ResolvableView {
   public var alignment: Alignment
   package var content: Content
 

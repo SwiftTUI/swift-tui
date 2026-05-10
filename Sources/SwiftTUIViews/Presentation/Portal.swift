@@ -27,7 +27,7 @@ package struct PortalContentPayload: Sendable {
 }
 
 @MainActor
-package struct PortalPayloadView: View, ResolvableView {
+package struct PortalPayloadView: PrimitiveView, ResolvableView {
   package var payload: PortalContentPayload
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -67,7 +67,7 @@ package func portalDeclaredBuilderChildren<V: View>(
 }
 
 @MainActor
-package struct PortalPayloadGroupView: View, ResolvableView {
+package struct PortalPayloadGroupView: PrimitiveView, ResolvableView {
   package var kindName: String
   package var payloads: [PortalContentPayload]
 

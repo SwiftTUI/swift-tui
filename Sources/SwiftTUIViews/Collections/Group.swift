@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// A transparent structural container that groups child views.
-public struct Group<Content: View>: View, ResolvableView, DeclaredChildrenView {
+public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView {
   package var content: Content
 
   public init(

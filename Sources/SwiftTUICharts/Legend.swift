@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact legend that pairs labels with semantic tones.
-public struct Legend<Label: View>: View, ResolvableView {
+public struct Legend<Label: View>: PrimitiveView, ResolvableView {
   public var items: [LegendItem]
   public var itemSpacing: Int
   private let label: Label

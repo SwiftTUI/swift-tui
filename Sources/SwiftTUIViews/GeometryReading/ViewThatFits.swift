@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Chooses the first child whose layout fits the proposed space.
-public struct ViewThatFits<Content: View>: View, ResolvableView {
+public struct ViewThatFits<Content: View>: PrimitiveView, ResolvableView {
   public var axes: Axis.Set
   package var content: Content
 

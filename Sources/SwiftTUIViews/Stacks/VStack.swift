@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Arranges children vertically using stack layout rules.
-public struct VStack<Content: View>: View, ResolvableView {
+public struct VStack<Content: View>: PrimitiveView, ResolvableView {
   public var alignment: HorizontalAlignment
   public var spacing: Int?
   package var content: Content

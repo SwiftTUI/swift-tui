@@ -30,7 +30,7 @@
 ///   .frame(width: 40, height: 8)
 ///   .foregroundStyle(Color.green)
 /// ```
-public struct Canvas<Drawing: CanvasDrawing>: View, ResolvableView {
+public struct Canvas<Drawing: CanvasDrawing>: PrimitiveView, ResolvableView {
   /// The drawing this canvas will rasterize at paint time.
   public let drawing: Drawing
 

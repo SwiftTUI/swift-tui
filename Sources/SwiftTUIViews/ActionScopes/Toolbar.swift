@@ -46,7 +46,6 @@ extension ToolbarStyle where Self == DefaultTopToolbarStyle {
   public static var defaultTop: DefaultTopToolbarStyle { .init() }
 }
 
-
 extension ToolbarStyle where Self == DefaultBottomToolbarStyle {
   public static var defaultBottom: DefaultBottomToolbarStyle { .init() }
 }
@@ -157,7 +156,7 @@ public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable 
 
 }
 
-private struct ToolbarScopeNode: View, ResolvableView {
+private struct ToolbarScopeNode: PrimitiveView, ResolvableView {
   let contentChildren: [ResolvedNode]
   let contentLayoutBehavior: LayoutBehavior
   let stripNode: ResolvedNode
@@ -190,7 +189,7 @@ private struct ToolbarScopeNode: View, ResolvableView {
   }
 }
 
-private struct ToolbarContentNode: View, ResolvableView {
+private struct ToolbarContentNode: PrimitiveView, ResolvableView {
   let children: [ResolvedNode]
   let layoutBehavior: LayoutBehavior
 
@@ -217,7 +216,7 @@ private struct ToolbarContentNode: View, ResolvableView {
 /// chrome-surface background behind it so the toolbar reads as a
 /// distinct bar rather than a floating row of buttons flush against
 /// the content.
-private struct ToolbarItemsStrip<S: ToolbarStyle>: View, ResolvableView {
+private struct ToolbarItemsStrip<S: ToolbarStyle>: PrimitiveView, ResolvableView {
   let items: [ToolbarItemConfig]
   let style: S
 

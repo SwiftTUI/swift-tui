@@ -2,7 +2,7 @@ public import SwiftTUICore
 
 @MainActor
 public protocol ViewModifier {
-  associatedtype Body: View = Never
+  associatedtype Body: View
   typealias Content = ViewModifierContent<Self>
 
   @ViewBuilder
@@ -10,7 +10,7 @@ public protocol ViewModifier {
 }
 
 extension ViewModifier where Body == Never {
-  public func body(content _: Content) -> Never {
+  public func body(content _: Content) -> Body {
     fatalError("\(Self.self) is a primitive modifier and does not expose a composed body.")
   }
 }
@@ -53,7 +53,7 @@ package protocol PrimitiveViewModifier: ViewModifier where Body == Never {
   ) -> [ResolvedNode]
 }
 
-public struct ViewModifierContent<Modifier: ViewModifier>: View, ResolvableView {
+public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, ResolvableView {
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 
   package init<Base: View>(

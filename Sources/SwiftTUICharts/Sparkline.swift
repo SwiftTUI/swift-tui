@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact trend line rendered in terminal cells.
-public struct Sparkline<Label: View, Summary: View>: View, ResolvableView {
+public struct Sparkline<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var tone: BannerTone
   public var values: [Double]
   private let label: Label

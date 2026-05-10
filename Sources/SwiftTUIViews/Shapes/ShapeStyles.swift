@@ -53,6 +53,10 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
 }
 
 extension Shape {
+  public var body: Never {
+    fatalError("\(Self.self) is a shape and does not expose a composed body.")
+  }
+
   public var kindName: String {
     String(describing: Self.self)
   }
@@ -179,7 +183,7 @@ extension InsettableShape {
   }
 }
 
-private struct ShapeRenderView: View, ResolvableView {
+private struct ShapeRenderView: PrimitiveView, ResolvableView {
   var kindName: String
   var geometry: ShapeGeometry
   var insetAmount: Int

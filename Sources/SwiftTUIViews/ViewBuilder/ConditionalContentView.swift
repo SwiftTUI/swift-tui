@@ -2,7 +2,7 @@ package import SwiftTUICore
 
 /// The builder artifact produced by conditional branches inside a
 /// ``ViewBuilder``.
-public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
+public struct ConditionalContent<TrueContent: View, FalseContent: View>: PrimitiveView,
   ResolvableView, DeclaredChildrenView
 {
   /// The currently active conditional branch.

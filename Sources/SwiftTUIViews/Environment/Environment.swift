@@ -793,7 +793,7 @@ package final class ResolveInvalidationProxy {
 }
 
 /// Reads an environment value and maps it into authored content.
-public struct EnvironmentReader<Value, Content: View>: View, ResolvableView {
+public struct EnvironmentReader<Value, Content: View>: PrimitiveView, ResolvableView {
   private let keyPath: KeyPath<EnvironmentValues, Value>
   private let content: (Value) -> Content
   private let authoringContext: AuthoringContext?

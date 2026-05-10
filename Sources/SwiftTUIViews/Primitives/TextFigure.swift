@@ -1,8 +1,8 @@
-@_spi(Testing) public import SwiftTUICore
 @_exported import EmbeddedFonts
+@_spi(Testing) public import SwiftTUICore
 
 /// Displays ASCII-art text using embedded FIGlet fonts.
-public struct TextFigure: View, ResolvableView {
+public struct TextFigure: PrimitiveView, ResolvableView {
   public typealias Font = EmbeddedFigletFont
   public typealias ColorMode = TextFigureColorMode
 

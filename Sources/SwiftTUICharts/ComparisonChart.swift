@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A chart that shows current values against baselines.
-public struct ComparisonChart<Label: View, Summary: View>: View, ResolvableView {
+public struct ComparisonChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var entries: [ComparisonEntry]
   public var barWidth: Int
   public var labelWidth: Int

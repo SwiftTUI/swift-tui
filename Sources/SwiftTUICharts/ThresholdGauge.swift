@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A gauge that changes tone across authored threshold bands.
-public struct ThresholdGauge<Label: View, Summary: View>: View, ResolvableView {
+public struct ThresholdGauge<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var value: Double
   public var total: Double
   public var bands: [ThresholdBand]

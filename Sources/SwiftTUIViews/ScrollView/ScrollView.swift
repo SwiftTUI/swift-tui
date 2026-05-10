@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Presents scrollable content along one or both axes.
-public struct ScrollView<Content: View>: View, ResolvableView {
+public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   public var axes: Axis.Set
   public var showsIndicators: Bool
   @State private var internalPosition = ScrollPosition.zero

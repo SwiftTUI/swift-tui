@@ -2,7 +2,7 @@
 
 /// Displays a PNG or JPEG image sourced from an explicit resource path,
 /// local file URL, or bytes embedded directly in the binary.
-public struct Image: View, ResolvableView {
+public struct Image: PrimitiveView, ResolvableView {
   public var source: ImageSource
   public var isResizable: Bool
   public var scalingMode: ImageScalingMode
