@@ -103,4 +103,32 @@ struct CalendarHeatmapDateMathTests {
     )
     #expect(bucket.grid[0][0] == 8)
   }
+
+  @Test("bucketDays spans multiple weeks with correct column assignment")
+  func bucketDaysMultipleWeeks() {
+    let cal = Self.makeUTCGregorian()
+    // 2024-01-07 (Sun) → 2024-01-27 (Sat) = 3 full weeks.
+    let days = [
+      DateValue(Self.date("2024-01-07"), value: 1),   // Sun, week 0
+      DateValue(Self.date("2024-01-13"), value: 2),   // Sat, week 0
+      DateValue(Self.date("2024-01-14"), value: 3),   // Sun, week 1
+      DateValue(Self.date("2024-01-21"), value: 4),   // Sun, week 2
+      DateValue(Self.date("2024-01-27"), value: 5),   // Sat, week 2
+    ]
+    let bucket = bucketDays(
+      days,
+      range: Self.date("2024-01-07")...Self.date("2024-01-27"),
+      calendar: cal,
+      weekStart: .sunday
+    )
+    #expect(bucket.grid.count == 7)
+    #expect(bucket.grid[0].count == 3)         // 3 week columns
+    #expect(bucket.grid[0][0] == 1)            // Sun, week 0
+    #expect(bucket.grid[6][0] == 2)            // Sat, week 0
+    #expect(bucket.grid[0][1] == 3)            // Sun, week 1
+    #expect(bucket.grid[0][2] == 4)            // Sun, week 2
+    #expect(bucket.grid[6][2] == 5)            // Sat, week 2
+    #expect(bucket.grid[0][2] != nil)
+    #expect(bucket.grid[1][0] == nil)          // Mon week 0, no data
+  }
 }

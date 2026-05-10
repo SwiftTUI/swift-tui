@@ -57,7 +57,6 @@ func bucketDays(
     guard day >= lower && day <= upper else { continue }
     let (row, col) = position(of: day,
                               from: firstColumnDate,
-                              weekStart: weekStart,
                               calendar: calendar)
     guard col >= 0 && col < columnCount else { continue }
     grid[row][col] = (grid[row][col] ?? 0) + entry.value
@@ -68,7 +67,7 @@ func bucketDays(
     columnCount: columnCount,
     calendar: calendar
   )
-  let dayLabels = weekdayLabels(weekStart: weekStart, calendar: calendar)
+  let dayLabels = weekdayLabels(weekStart: weekStart)
 
   return CalendarHeatmapBucket(grid: grid, monthHeader: monthHeader, dayLabels: dayLabels)
 }
@@ -105,7 +104,6 @@ private func weekColumns(
 private func position(
   of day: Date,
   from firstColumnDate: Date,
-  weekStart: CalendarHeatmapWeekStart,
   calendar: Calendar
 ) -> (row: Int, col: Int) {
   let daysSinceStart = calendar.dateComponents([.day], from: firstColumnDate, to: day).day ?? 0
@@ -137,10 +135,7 @@ private func monthHeaderLabels(
   return labels
 }
 
-private func weekdayLabels(
-  weekStart: CalendarHeatmapWeekStart,
-  calendar: Calendar
-) -> [String] {
+private func weekdayLabels(weekStart: CalendarHeatmapWeekStart) -> [String] {
   // Match the screenshot reference: blank, Mon, blank, Wed, blank, Fri, blank
   // (or the Sun-start permutation).
   switch weekStart {
