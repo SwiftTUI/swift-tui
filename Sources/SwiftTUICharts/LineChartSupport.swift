@@ -1,4 +1,6 @@
 import Foundation
+import SwiftTUICore
+import SwiftTUIViews
 
 struct LineChartDomain: Equatable, Sendable {
   var x: ClosedRange<Double>
@@ -416,4 +418,196 @@ func yAxisTickLabels(
     out.append(AxisTickLabel(row: row, text: format.format(value)))
   }
   return out
+}
+
+struct ComposedSeriesGrid: Equatable, Sendable {
+  /// Rasterized cells across all series, with later series overwriting
+  /// earlier ones (after area fills are painted first).
+  var grid: [[LineRasterCell?]]
+  /// Index into `series` for the series that owns each filled cell; the
+  /// view layer uses this to pick the tone.
+  var seriesIndex: [[Int?]]
+}
+
+/// Composites every series in z-order: areas first across all `.area`
+/// series, then lines and steps (and the area's own line) on top in
+/// declaration order. Later series win when cells collide.
+func composeSeriesGrids(
+  series: [LineChartSeries],
+  domain: LineChartDomain,
+  plotWidth: Int,
+  plotHeight: Int,
+  baselineRow: Int
+) -> ComposedSeriesGrid {
+  let width = max(1, plotWidth)
+  let height = max(1, plotHeight)
+  var grid: [[LineRasterCell?]] = Array(
+    repeating: Array(repeating: nil, count: width),
+    count: height
+  )
+  var seriesIndex: [[Int?]] = Array(
+    repeating: Array(repeating: nil, count: width),
+    count: height
+  )
+
+  // Pass 1: area fills only.
+  for (index, s) in series.enumerated() where s.style == .area {
+    let g = rasterizeArea(
+      points: s.points, domain: domain,
+      plotWidth: width, plotHeight: height,
+      baselineRow: baselineRow
+    )
+    for row in 0..<height {
+      for col in 0..<width where g[row][col] != nil {
+        grid[row][col] = g[row][col]
+        seriesIndex[row][col] = index
+      }
+    }
+  }
+
+  // Pass 2: lines and steps on top, in declaration order.
+  for (index, s) in series.enumerated() {
+    let g: [[LineRasterCell?]]
+    switch s.style {
+    case .line, .area:
+      g = rasterizeLine(points: s.points, domain: domain,
+                         plotWidth: width, plotHeight: height)
+    case .step:
+      g = rasterizeStep(points: s.points, domain: domain,
+                         plotWidth: width, plotHeight: height)
+    }
+    for row in 0..<height {
+      for col in 0..<width where g[row][col] != nil {
+        grid[row][col] = g[row][col]
+        seriesIndex[row][col] = index
+      }
+    }
+  }
+
+  return ComposedSeriesGrid(grid: grid, seriesIndex: seriesIndex)
+}
+
+@MainActor
+@ViewBuilder
+func lineChartBody(
+  series: [LineChartSeries],
+  height: Int,
+  width: Int,
+  xAxis: LineChartXAxis,
+  yAxis: LineChartYAxis,
+  legend: LineChartLegendConfig,
+  baseline: LineChartBaseline
+) -> some View {
+  let yAxisLabelWidth = 6
+  let plotWidth  = max(1, width - yAxisLabelWidth - 2)   // 2 for axis chrome
+  let plotHeight = max(1, height)
+
+  let domainOrNil = plotDomain(series: series)
+  let domain = domainOrNil ?? LineChartDomain(x: 0...1, y: 0...1)
+
+  let yTicks = yAxisTickLabels(
+    domain: domain.y,
+    ticks: yAxis.ticks,
+    format: yAxis.format,
+    plotHeight: plotHeight
+  )
+  let xTicks = xAxisTickLabels(
+    domain: domain.x,
+    ticks: xAxis.ticks,
+    format: xAxis.format,
+    plotWidth: plotWidth
+  )
+
+  let baselineRow: Int = {
+    switch baseline {
+    case .zero:
+      return yCell(value: 0, domain: domain.y, plotHeight: plotHeight)
+    case .auto:
+      return plotHeight - 1
+    }
+  }()
+
+  let composed = composeSeriesGrids(
+    series: series,
+    domain: domain,
+    plotWidth: plotWidth,
+    plotHeight: plotHeight,
+    baselineRow: baselineRow
+  )
+  let composedGrid = composed.grid
+  let cellSeriesIndex = composed.seriesIndex
+
+  VStack(alignment: .leading, spacing: 0) {
+    // Y axis labels + plot rows.
+    ForEach(0..<plotHeight, id: \.self) { row in
+      HStack(alignment: .center, spacing: 0) {
+        let yLabel = yTicks.first(where: { $0.row == row })?.text ?? ""
+        Text(yLabel)
+          .frame(width: yAxisLabelWidth, alignment: .trailing)
+          .foregroundStyle(.separator)
+        Text(row == baselineRow ? "┼" : "┤")
+          .foregroundStyle(.separator)
+        ForEach(0..<plotWidth, id: \.self) { col in
+          let cell = composedGrid[row][col]
+          let seriesIndex = cellSeriesIndex[row][col]
+          let toneStyle = seriesIndex.flatMap { index -> AnyShapeStyle? in
+            guard index < series.count else { return nil }
+            return series[index].tone == .automatic
+              ? AnyShapeStyle(.tint)
+              : metricAccentStyle(for: series[index].tone)
+          } ?? AnyShapeStyle(.separator)
+          Text(cell.map { String($0.glyph) } ?? " ")
+            .foregroundStyle(toneStyle)
+        }
+      }
+    }
+    // X axis baseline + labels.
+    HStack(alignment: .center, spacing: 0) {
+      Text(String(repeating: " ", count: yAxisLabelWidth))
+      Text("┼")
+        .foregroundStyle(.separator)
+      Text(String(repeating: "─", count: plotWidth))
+        .foregroundStyle(.separator)
+    }
+    HStack(alignment: .center, spacing: 0) {
+      Text(String(repeating: " ", count: yAxisLabelWidth + 1))
+      Text(formatXAxisLine(xTicks: xTicks, plotWidth: plotWidth))
+        .foregroundStyle(.separator)
+    }
+    // Legend strip.
+    if legend.position != .hidden {
+      legendStrip(series: series, spacing: legend.itemSpacing)
+    }
+  }
+}
+
+private func formatXAxisLine(xTicks: [AxisTickLabel], plotWidth: Int) -> String {
+  var line = Array(repeating: Character(" "), count: plotWidth)
+  for tick in xTicks {
+    let text = Array(tick.text)
+    let start = max(0, tick.col - text.count / 2)
+    for (i, ch) in text.enumerated() {
+      let position = start + i
+      guard position < plotWidth else { break }
+      line[position] = ch
+    }
+  }
+  return String(line)
+}
+
+@MainActor
+@ViewBuilder
+private func legendStrip(series: [LineChartSeries], spacing: Int) -> some View {
+  HStack(alignment: .center, spacing: spacing) {
+    ForEach(series.indices, id: \.self) { index in
+      let toneStyle =
+        series[index].tone == .automatic
+        ? AnyShapeStyle(.tint)
+        : metricAccentStyle(for: series[index].tone)
+      HStack(alignment: .center, spacing: 1) {
+        Text("●").foregroundStyle(toneStyle)
+        Text(series[index].label).foregroundStyle(.foreground)
+      }
+    }
+  }
 }
