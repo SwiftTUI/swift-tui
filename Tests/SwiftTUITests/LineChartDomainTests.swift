@@ -19,4 +19,25 @@ struct LineChartDomainTests {
     #expect(point.x == 123_456)
     #expect(point.y == 9)
   }
+
+  @Test("LineChartSeries stores label, points, style, and tone")
+  func seriesStoresInputs() {
+    let series = LineChartSeries(
+      "Opus",
+      points: [.init(x: 0, y: 1), .init(x: 1, y: 2)],
+      style: .area,
+      tone: .info
+    )
+    #expect(series.label == "Opus")
+    #expect(series.points.count == 2)
+    #expect(series.style == .area)
+    #expect(series.tone == .info)
+  }
+
+  @Test("LineChartSeries defaults to .line / .automatic")
+  func seriesDefaults() {
+    let series = LineChartSeries("X", points: [])
+    #expect(series.style == .line)
+    #expect(series.tone == .automatic)
+  }
 }
