@@ -1,6 +1,4 @@
 public import Foundation
-import SwiftTUICore
-import SwiftTUIViews
 
 /// A `(x, y)` point in a line chart's continuous coordinate space.
 public struct LineChartPoint: Hashable, Sendable {
