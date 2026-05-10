@@ -87,7 +87,7 @@ struct DemoApp: App {
 ```
 
 `SwiftTUIWebHostCLI` routes normal launches to the terminal runner and routes
-`--web` launches to the embedded localhost HTTP/WebSocket host. Apps that
+`--web` launches through the localhost WebHost runner/browser bridge. Apps that
 import only `SwiftTUICLI` do not compile or link the web server, FlyingFox, or
 browser bundle; `--web` is rejected before terminal raw-mode setup.
 
@@ -139,11 +139,15 @@ The same authored `App` and `Scene` declarations can then flow into these
 execution modes:
 
 - terminal-native execution via the executable runner package `Platforms/CLI`
-- terminal plus embedded-localhost web execution via the opt-in runner package
+- terminal plus localhost-browser WebHost execution via the opt-in runner package
   `Platforms/WebHost`
 - WASI execution via the executable runner package `Platforms/WASI`
 - host-managed embedding via the embedded host packages `Platforms/SwiftUI`
   and `Platforms/Web`
+
+In repo terminology, a runner owns process startup or launch routing, while a
+host owns an external presentation environment or embedding lifecycle. See
+[docs/TERMINOLOGY.md](docs/TERMINOLOGY.md) for the precise boundary.
 
 `SwiftTUI` on its own is library-only. It provides the shared runtime,
 `SceneManifest`, and `HostedSceneSession`, but it does not provide an
@@ -164,8 +168,8 @@ Scripts/test_all.sh
 
 `swiftly run swift test` covers the root package. `Scripts/test_all.sh` is the
 single repo-level entrypoint for the full checked-in test surface across the
-runner packages, GUI packages, and example projects, and it verifies the Swift
-and Bun environment first. On Linux, it exports
+runner packages, embedded host packages, and example projects, and it verifies
+the Swift and Bun environment first. On Linux, it exports
 `DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only
 `Platforms/SwiftUI` SwiftUI host tests. If you're
 already using the repo's root Bun workspace, `bun run test` is a thin

@@ -1,0 +1,98 @@
+# Terminology
+
+This page pins the external vocabulary for SwiftTUI package integration. Internal
+types may still use `Host` in their concrete names, but public docs should use
+these terms consistently.
+
+## Runner
+
+A runner owns process startup for an authored `App`.
+
+Use **runner** when the package or type owns top-level execution, default
+`App.main()` behavior, launch routing, argv/env parsing, raw-mode setup, crash
+guards, scene discovery, or explicit entry points such as `TerminalRunner.run`.
+
+Current runner packages and products:
+
+- `Platforms/CLI` / `SwiftTUICLI`: terminal-native executable launch through
+  `TerminalRunner`.
+- `Platforms/WASI` / `SwiftTUIWASI`: WASI executable launch and manifest output
+  through `WASIRunner`.
+- `Platforms/WebHost` / `SwiftTUIWebHost`: web-only localhost-browser launch
+  through `WebHostRunner`.
+- `Platforms/WebHost` / `SwiftTUIWebHostCLI`: combined terminal/WebHost launch
+  routing through `WebHostCLIRunner`.
+
+## Host
+
+A host owns an external presentation environment or embedding lifecycle for a
+SwiftTUI scene.
+
+Use **host** when the package or shell owns a platform surface, window or
+browser lifecycle, size and style delivery, native input, clipboard bridging,
+accessibility bridging, scene-switching chrome, or retained
+`HostedSceneSession` values inside another app/runtime.
+
+Current embedded host packages:
+
+- `Platforms/SwiftUI`: embeds SwiftTUI scenes in a native SwiftUI app shell.
+- `Platforms/Web`: embeds SwiftTUI WASI scenes in a browser canvas.
+
+`Platforms/WebHost` is intentionally compound: it provides a runner that starts
+a localhost server and a browser host that presents the running scene. When
+writing about it, say **WebHost runner**, **WebHost CLI runner**,
+**localhost WebHost bridge**, or **browser host** depending on which side is in
+scope.
+
+## Presentation Surface
+
+A presentation surface is the low-level frame sink used by `RunLoop`.
+
+Use **presentation surface** for `PresentationSurface` implementations such as
+`TerminalHost`, `StreamingTerminalHost`, `WebSurfaceTransport`, and
+`WebSocketSurfaceTransport`. A presentation surface may be created by a runner
+or retained by a host, but it is not itself a package-level runner or embedded
+host package.
+
+## Hosted Scene Session
+
+A `HostedSceneSession` is a retained runtime session for one selected scene. It
+lets embedded host packages keep scene state alive while the platform shell
+manages visibility, size, style, input, and lifecycle. The session is the
+shared runtime seam between SwiftTUI and embedded hosts; it is not the host
+itself.
+
+## Terminal-Program Embedding
+
+`Platforms/Embedding` lets authored SwiftTUI views embed external terminal
+programs through `TerminalView` and related session types. It is a peer package,
+but it is not an executable runner package and it is not an embedded host
+package for SwiftTUI apps.
+
+## Usage Rules
+
+- Say **runner package** for packages that own executable startup or launch
+  routing.
+- Say **embedded host package** for packages that retain SwiftTUI scenes inside
+  another app/runtime lifecycle.
+- Say **platform integration package** when discussing both runners and hosts
+  together.
+- Say **presentation surface** for `RunLoop` frame sinks and terminal/web/native
+  transport implementations.
+- Avoid using **host package** as a blanket term for all platform integration
+  packages.
+- Avoid using **GUI host** in current docs; the checked-in packages now live
+  under `Platforms/`.
+
+## Adjacent Uses Of Host
+
+These uses are valid but are not the package-integration meaning above. Do not
+rewrite them unless the surrounding doc is specifically discussing runner/host
+package boundaries.
+
+- URL and HTTP host names, bind hosts, and allowed hosts.
+- DocC or web static hosting.
+- SwiftUI layout research terms such as "root host" or "hosting container".
+- Internal view-tree container terms such as portal hosts or toolbar hosts.
+- Concrete public type/product names such as `TerminalHost`, `StreamingTerminalHost`,
+  `SwiftUIHost*`, and `WebHost*`.

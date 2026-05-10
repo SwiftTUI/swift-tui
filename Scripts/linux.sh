@@ -329,9 +329,9 @@ cmd_web() {
     bun install --frozen-lockfile
     bun run build
 
-    cd ../XtermWebExample
+    cd ../../Platforms/Web
     bun install --frozen-lockfile
-    bun run build
+    bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
   "
 }
 

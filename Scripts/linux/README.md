@@ -95,7 +95,7 @@ resolves the repo root from its own location.
 ./Scripts/linux.sh test           # swift test (root package)
 ./Scripts/linux.sh cli-test       # swift test for Platforms/CLI
 ./Scripts/linux.sh examples       # Build Linux example packages
-./Scripts/linux.sh web            # Build WebExample + XtermWebExample
+./Scripts/linux.sh web            # Build WebExample + Platforms/Web host bundle
 ./Scripts/linux.sh workflow       # examples + web (mirrors CI)
 ./Scripts/linux.sh full           # test + workflow
 

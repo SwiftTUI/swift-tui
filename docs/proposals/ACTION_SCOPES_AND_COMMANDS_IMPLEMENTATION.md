@@ -84,7 +84,7 @@ This phase deletes all pre-existing keybinding surface that the new system repla
 
 - [ ] **Step 1: List all `.onKeyPress` callers**
 
-Run: `grep -rn "\.onKeyPress\|OnKeyPress" Tests/ Sources/ Examples/ Runners/ GUI/`
+Run: `rg "\.onKeyPress|OnKeyPress" Tests/ Sources/ Examples/ Platforms/`
 
 Expected: a list of files. Production code callers (outside `Sources/View/Modifiers/OnKeyPress.swift` and its test) need their tests deleted or rewritten to avoid `.onKeyPress`. If any production source file uses it, that's a blocker — re-check the spec and discuss before proceeding.
 
@@ -2086,7 +2086,7 @@ Expected: all pass, no skipped tests.
 
 - [ ] **Step 3: Verify no stale references**
 
-Run: `grep -rn "HotkeyRegistry\|onKeyPress\|hotkeyRegistry" Sources/ Tests/ Runners/ GUI/ Examples/`
+Run: `rg "HotkeyRegistry|onKeyPress|hotkeyRegistry" Sources/ Tests/ Platforms/ Examples/`
 Expected: no matches (aside from possibly in historical docs — those are fine).
 
 - [ ] **Step 4: Commit any final touch-ups**

@@ -261,10 +261,10 @@ Alternatively: delete the DocC article entirely and fold a one-paragraph
 This article is mostly project-internal contracts:
 
 - "Shipped Architecture" — describes which package owns which file
-  (`SwiftUIHostAppState`, `NativeSceneBridge`, etc.). Useful for the host-
+  (`SwiftUIHostAppState`, `NativeSceneBridge`, etc.). Useful for embedded-host
   package authors. Not useful for someone choosing how to embed.
 - "Responsibilities Split" — internal contract between the root package and
-  peer host packages.
+  peer platform integration packages.
 - **"Non-Negotiable Decisions"** — eight numbered project-policy decisions.
   This is governance, not API.
 - **"Out Of Scope"** — what we will not build. Roadmap policy.

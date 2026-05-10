@@ -196,7 +196,7 @@ This module owns GIF encoding and decoding. It intentionally exposes frame-list
 initializers keyed by `framesPerSecond` or explicit `frameDelays`, not
 closure-based frame producers.
 
-### Peer runner packages
+### Peer platform integration packages
 
 Platform-specific execution and embedding are intentionally outside the root
 package surface:
@@ -205,15 +205,17 @@ package surface:
   - `Platforms/CLI` exposes `TerminalRunner` plus the default terminal-native `App.main()` story
   - `Platforms/WASI` exposes `WASIRunner` plus the default WASI `App.main()` story
   - `Platforms/WebHost` exposes `WebHostRunner`, `WebHostConfig`, and
-    `WebHostRunnerError` for web-only localhost launch
+    `WebHostRunnerError` for web-only localhost-browser launch
   - `Platforms/WebHost` also exposes the `SwiftTUIWebHostCLI` product with
     `WebHostCLIRunner` for binaries that intentionally combine terminal and
-    embedded-web behavior
+    WebHost behavior
 - embedded host packages:
   - `Platforms/SwiftUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
   - `Platforms/Web` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
-  - `Platforms/WebHost` serves a bundled browser runtime from the native
-    process and drives it over the shared `web-surface` v2 WebSocket protocol
+
+`Platforms/WebHost` is compound: its runner starts a localhost browser host
+that serves a bundled browser runtime from the native process and drives it over
+the shared `web-surface` v2 WebSocket protocol.
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.

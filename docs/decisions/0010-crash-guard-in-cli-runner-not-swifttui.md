@@ -41,9 +41,9 @@ not a primitive for browser hosts at all.
 ## Decision
 
 The crash guard lives in the **CLI runner package**
-(`Runners/SwiftTUICLI`), not in the root `SwiftTUI` library.
+(`Platforms/CLI`), not in the root `SwiftTUI` library.
 
-`Runners/SwiftTUICLI/Sources/SwiftTUICLI/SceneRuntime.swift`
+`Platforms/CLI/Sources/SwiftTUICLI/SceneRuntime.swift`
 installs `CrashSignalHandler` from the vendored `UnixSignals` package
 for the primary scene before the session enters raw mode. The guard:
 

@@ -8,7 +8,8 @@ Choose the level that matches your app:
 
 - use ``DefaultRenderer`` when you need frame artifacts or textual previews
 - use ``RunLoop`` when you want full control over state, focus, input handling, and terminal hosting
-- use ``SceneManifest`` and ``HostedSceneSession`` when you want host-managed scene hosting on top of the shared runtime
+- use ``SceneManifest`` and ``HostedSceneSession`` when you want an embedded
+  host package to retain scenes on top of the shared runtime
 
 `App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting runtime or pipeline artifacts to whichever layer you need next.
 
@@ -61,6 +62,7 @@ modes:
 
 - terminal-native execution through an executable runner package
 - WASI execution through an executable runner package
+- localhost-browser execution through the compound WebHost package
 - host-managed embedding through an embedded host package
 
 `SwiftTUI` itself is library-only. It owns scene declarations, manifests, and
@@ -82,10 +84,15 @@ For WASI apps, import `SwiftTUIWASI` and either rely on its default
 
 ### Embedded hosts
 
-For host-managed embedding, keep the authored `App` in `SwiftTUI`, then let a
-peer host package build `SceneManifest` values and retain one or more
+For host-managed embedding, keep the authored `App` in `SwiftTUI`, then let an
+embedded host package build `SceneManifest` values and retain one or more
 `HostedSceneSession` values.
 
 `Platforms/SwiftUI` uses that path to embed SwiftTUI scenes inside a SwiftUI
-app on Apple platforms. `Platforms/Web` and `GUI/XtermWebHost` use the same
-authored scene model for browser hosting on top of a `SwiftTUIWASI` build.
+app on Apple platforms. `Platforms/Web` uses the same authored scene model for
+browser hosting on top of a `SwiftTUIWASI` build.
+
+`Platforms/WebHost` is deliberately compound: `SwiftTUIWebHost` provides
+`WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`
+provides `WebHostCLIRunner` for binaries that intentionally support both
+terminal-native and `--web` launch.

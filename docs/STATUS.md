@@ -75,10 +75,14 @@ Current async presentation and frame-tail worker ownership is summarized in
 ### Scene and multi-scene surface
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `SwiftTUI`
-- `SceneDescriptor`, `SceneManifest`, and `HostedSceneSession` in `SwiftTUI` for host-package tooling and retained non-terminal hosting
+- `SceneDescriptor`, `SceneManifest`, and `HostedSceneSession` in `SwiftTUI` for embedded host package tooling and retained non-terminal hosting
 - `TerminalRunner` in `Platforms/CLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
 - `WASIRunner` in `Platforms/WASI` for manifest generation and WASI-hosted scene launch
-- The same authored `App` can feed three execution modes: terminal-native execution, WASI execution, or host-managed embedding through peer GUI host packages
+- `WebHostRunner` and `WebHostCLIRunner` in `Platforms/WebHost` for
+  localhost-browser launch and terminal/WebHost launch routing
+- The same authored `App` can feed terminal-native execution, WASI execution,
+  localhost-browser WebHost execution, or host-managed embedding through peer
+  embedded host packages
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` for terminal-native shell composition
 - Binding-driven `NavigationStack` destination presentation through
@@ -106,10 +110,16 @@ Current async presentation and frame-tail worker ownership is summarized in
 
 ## Current Constraints
 
-- The core `SwiftTUI` runtime renders one active scene into one active host per session. Multi-scene apps are supported, but only one scene is on screen at a time per host.
-- `SwiftTUI` is library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
-- Embedded GUI host packages use `SwiftTUI` scene manifests plus `HostedSceneSession`. Peer host packages live at `Platforms/SwiftUI` and `Platforms/Web`; they own their own platform shell integration, scene switching chrome, and style surfaces.
-- Embedded GUI host packages own one active host style object at a time and
+- The core `SwiftTUI` runtime renders one active scene into one active
+  presentation surface per session. Multi-scene apps are supported, but only
+  one scene is on screen at a time per surface.
+- `SwiftTUI` is library-only. Platform integration splits between executable
+  runner packages, embedded host packages, and the compound WebHost package
+  under `Platforms/`.
+- Embedded host packages live at `Platforms/SwiftUI` and `Platforms/Web`. They
+  use `SwiftTUI` scene manifests plus `HostedSceneSession` and own their own
+  platform shell integration, scene switching chrome, and style surfaces.
+- Embedded host packages own one active host style object at a time and
   can swap it at runtime; the root TUI app renders semantic tokens without
   knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.

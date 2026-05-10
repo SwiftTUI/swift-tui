@@ -12,7 +12,7 @@
 
 - Exposes the SwiftUI-shaped authoring surface
 - Resolves authored views into core nodes
-- Hosts property wrappers, environment plumbing, focus APIs, layouts, and controls
+- Provides property wrappers, environment plumbing, focus APIs, layouts, and controls
 
 ### `SwiftTUICharts`
 
@@ -30,12 +30,14 @@
 
 - Re-exports the public package surface that matters for single-session runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
-- Hosts host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+- Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
 ### Platform integration packages
 
 - executable runner packages `Platforms/CLI` and `Platforms/WASI` build top-level execution layers on top of `SwiftTUI`
-- embedded host packages `Platforms/SwiftUI` and `Platforms/Web` host the same authored `SwiftTUI` apps inside platform-managed shells
+- embedded host packages `Platforms/SwiftUI` and `Platforms/Web` retain the same authored `SwiftTUI` apps inside platform-managed shells
+- `Platforms/WebHost` is a compound package: its runner starts a localhost
+  browser host and its CLI product composes terminal and WebHost launch routing
 
 The conceptual model is:
 
@@ -47,8 +49,11 @@ That last integration layer comes in two forms:
 
 - executable runner packages own top-level execution and default `App.main()` stories
 - embedded host packages retain `HostedSceneSession` values inside another app or runtime lifecycle
+- compound packages must say which side is in scope: runner, host bridge, or
+  presentation surface
 
-Detailed per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
+Detailed terminology lives in [TERMINOLOGY.md](TERMINOLOGY.md). Detailed
+per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 
 ## Frame Pipeline
 
@@ -173,7 +178,7 @@ The first and last bullets are what motivates the strict phase order in code. Co
 It coordinates:
 
 - `TerminalHost` for raw mode, alternate-screen ownership, surface sizing, and writes
-- `StreamingTerminalHost` for embedded hosts that need the same presentation contract without owning a file descriptor
+- `StreamingTerminalHost` for presentation surfaces that need the same presentation contract without owning a file descriptor
 - `HostedSceneSession` native surface hosting for embedded SwiftUI hosts that consume `RasterSurface` directly
 - input readers and signal readers for event streams
 - `InjectedTerminalInputReader` for wrapper-managed byte or event delivery that still shares the terminal control-message contract
@@ -200,6 +205,8 @@ Those integration layers serve three execution modes:
 - terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or the default `App.main()` provided by `Platforms/CLI`
 - WASI executable execution and manifest generation via `WASIRunner` in `Platforms/WASI`
 - host-managed embedding via `SceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `Platforms/SwiftUI` and `Platforms/Web`
+- localhost-browser WebHost execution via `WebHostRunner` and the WebHost
+  browser bridge in `Platforms/WebHost`
 
 CLI scene management is executable-runner policy rather than an authored-scene
 rule. One-window and multi-window apps share the same runner story; `SwiftTUI`
@@ -220,8 +227,8 @@ itself remains library-only.
 
 - The public styling story is semantic-token-first: TUI views author against
   `.foreground`, `.background`, `.warning`, `.tint`, and related roles
-- Hosts and embedded host packages choose the active theme; the inner TUI app does not
-  branch on host style variants or inspect theme choice directly
+- The active host integration chooses the active theme; the inner TUI app does
+  not branch on host style variants or inspect theme choice directly
 - Terminal appearance can be inferred heuristically or queried actively from the
   host and can synthesize the default semantic theme when no explicit host theme
   is provided

@@ -9,10 +9,10 @@ future file moves.
 - `Sources/`: root Swift package targets (`SwiftTUICore`, `SwiftTUIViews`, `SwiftTUIAnimatedImage`,
   `SwiftTUICharts`, and `SwiftTUI`)
 - `Tests/`: root Swift package tests for the package products
-- `Platforms/`: peer SwiftPM platform-integration packages — runners (`CLI`, `WASI`,
-  `WebHost`) that own `App.main()` or launch routing, plus embedded hosts
-  (`SwiftUI`, `Web`, `WebHost`) that retain `HostedSceneSession` values inside
-  another app or runtime shell
+- `Platforms/`: peer SwiftPM platform-integration packages — executable runners
+  (`CLI`, `WASI`), embedded hosts (`SwiftUI`, `Web`), the compound WebHost
+  runner/browser-host package (`WebHost`), plus terminal-program embedding
+  support (`Embedding`)
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
   `swift-hash`, `swift-png`, `swift-jpeg`, and `swift-gif`
@@ -34,10 +34,11 @@ future file moves.
   - executable runner packages:
     - `Platforms/CLI`
     - `Platforms/WASI`
+  - compound runner/browser-host package:
+    - `Platforms/WebHost`
   - embedded host packages:
     - `Platforms/SwiftUI`
     - `Platforms/Web`
-    - `Platforms/WebHost`
   - embedded terminal-program package:
     - `Platforms/Embedding`
 
@@ -101,7 +102,7 @@ Sources/SwiftTUI/
 - `Scenes/App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `AnyScene`, and typed scene builder artifacts
 - `Scenes/SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `Scenes/SceneManifest.swift`: `SceneDescriptor`, `SceneManifest`, and manifest generation from authored scenes
-- `Scenes/HostedSceneSession.swift`: retained hosted scene runtime for GUI host packages and other non-terminal hosts
+- `Scenes/HostedSceneSession.swift`: retained hosted scene runtime for embedded host packages and other non-terminal hosts
 - `Scenes/SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 
 ### Terminal
@@ -172,7 +173,8 @@ The package ships two library targets:
 
 ## `Platforms/WebHost`
 
-The package ships two public library targets:
+The package ships two public library targets and intentionally combines runner
+and browser-host responsibilities:
 
 - `SwiftTUIWebHost` — opt-in embedded HTTP/WebSocket launcher. App authors
   `import SwiftTUIWebHost` for web-only binaries that serve a local browser
@@ -206,9 +208,9 @@ The package ships two public library targets:
 
 - `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`, with native AppKit/UIKit clipboard writes
 - `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas and typed clipboard records into `navigator.clipboard`
-- `Platforms/WebHost`: opt-in localhost HTTP/WebSocket host for native
-  binaries, using the same browser bundle and `web-surface` v2 protocol,
-  including typed clipboard records
+
+`Platforms/WebHost` is covered above because it is both a runner package and a
+localhost browser host bridge for native binaries.
 
 ## `Platforms/Embedding`
 

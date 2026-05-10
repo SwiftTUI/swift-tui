@@ -372,12 +372,12 @@ if ! rg -n --fixed-strings --quiet -- '### `SwiftTUI`' docs/PUBLIC_API_INVENTORY
   fail "docs/PUBLIC_API_INVENTORY.md should classify the SwiftTUI runtime explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '### Peer runner packages' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should classify the peer runner packages explicitly."
+if ! rg -n --fixed-strings --quiet -- '### Peer platform integration packages' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should classify the peer platform integration packages explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`SwiftTUI` for shared runtime integration plus peer runner packages for executable launch' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should describe the library-plus-runner package model explicitly."
+if ! rg -n --fixed-strings --quiet -- 'peer platform integration packages: runners for executable launch and embedded' docs/PUBLIC_SURFACE_POLICY.md; then
+  fail "docs/PUBLIC_SURFACE_POLICY.md should describe the runner and embedded host package model explicitly."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'Experimental or showcase targets follow the same rule' docs/PUBLIC_SURFACE_POLICY.md; then

@@ -108,8 +108,9 @@ file. The view does not care; the session does.
 1. **The view is SwiftUI-shaped; the runtime is not novel.** `TerminalView`
    participates in the resolve→measure→place→semantics→draw→raster→commit
    pipeline like any other view. It is not a `BackgroundProcess` view, not
-   a special scene, not a host package. Its only deviation from SwiftUI
-   precedent is that SwiftUI itself has no analogous concept.
+  a special scene, and not a runner or embedded host package. Its only
+  deviation from SwiftUI precedent is that SwiftUI itself has no analogous
+  concept.
 2. **The session is a `Sendable` actor; the view is a passive observer.**
    Authored apps create a session value, hand it to the view, and read
    observable state. The view does not own the child process lifetime
@@ -551,7 +552,7 @@ on this timeline because **most of Zellij isn't the multiplexer**, it's
 the workspace UX — and SwiftTUI already ships the workspace UX. The
 multiplexer-specific work compresses to the four to six items above
 because the seven-phase pipeline, focus model, action scopes, and
-host-package story are reused.
+platform integration story is reused.
 
 ### What would make this a *better* product than Zellij
 
