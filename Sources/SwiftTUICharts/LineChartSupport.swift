@@ -45,3 +45,102 @@ func yCell(value: Double, domain: ClosedRange<Double>, plotHeight: Int) -> Int {
   let row = Int((invertedFraction * Double(plotHeight - 1)).rounded())
   return min(max(row, 0), plotHeight - 1)
 }
+
+/// One rasterized cell in a line chart plot grid.
+struct LineRasterCell: Equatable, Sendable {
+  /// `•` for isolated points, `│`/`─`/`╭`/`╮`/`╰`/`╯` for connector
+  /// segments. Picked by `connectorGlyph(prev:next:)`.
+  var glyph: Character
+}
+
+/// Maps a series of `(x, y)` points (already sorted by x) into a
+/// `plotHeight × plotWidth` grid. `nil` cells stay empty.
+func rasterizeLine(
+  points: [LineChartPoint],
+  domain: LineChartDomain,
+  plotWidth: Int,
+  plotHeight: Int
+) -> [[LineRasterCell?]] {
+  let width = max(1, plotWidth)
+  let height = max(1, plotHeight)
+  var grid: [[LineRasterCell?]] = Array(
+    repeating: Array(repeating: nil, count: width),
+    count: height
+  )
+
+  guard !points.isEmpty else { return grid }
+
+  if points.count == 1 {
+    let p = points[0]
+    let col = xCell(value: p.x, domain: domain.x, plotWidth: width)
+    let row = yCell(value: p.y, domain: domain.y, plotHeight: height)
+    grid[row][col] = LineRasterCell(glyph: "•")
+    return grid
+  }
+
+  // Compute (col, row) for every input point first.
+  let cells: [(col: Int, row: Int)] = points.map { p in
+    (xCell(value: p.x, domain: domain.x, plotWidth: width),
+     yCell(value: p.y, domain: domain.y, plotHeight: height))
+  }
+
+  // For each consecutive pair, fill the vertical span between them at
+  // each column they cover, then place a connector glyph.
+  for i in 0..<(cells.count - 1) {
+    let from = cells[i]
+    let to   = cells[i + 1]
+    let colStart = min(from.col, to.col)
+    let colEnd   = max(from.col, to.col)
+    let rowStart = min(from.row, to.row)
+    let rowEnd   = max(from.row, to.row)
+
+    // Vertical fill in the leading column (from current Y down to the
+    // midpoint), and in the trailing column (from the midpoint up to
+    // the next Y). Concretely, fill every row between rowStart and
+    // rowEnd in the column closer to that endpoint.
+    for row in rowStart...rowEnd {
+      let col = (row <= (rowStart + rowEnd) / 2) ? (from.row <= to.row ? from.col : to.col)
+                                                 : (from.row <= to.row ? to.col   : from.col)
+      if grid[row][col] == nil {
+        grid[row][col] = LineRasterCell(glyph: "│")
+      }
+    }
+
+    // Horizontal fill between columns at the latched-in Y.
+    if colStart != colEnd {
+      let rowAtFrom = from.row
+      let rowAtTo   = to.row
+      for col in (colStart + 1)..<colEnd {
+        let row = col < (colStart + colEnd) / 2 ? rowAtFrom : rowAtTo
+        if grid[row][col] == nil {
+          grid[row][col] = LineRasterCell(glyph: "─")
+        }
+      }
+    }
+
+    // Corner glyphs at the endpoints.
+    grid[from.row][from.col] = LineRasterCell(glyph: connectorGlyph(at: from, neighbor: to))
+    grid[to.row][to.col]     = LineRasterCell(glyph: connectorGlyph(at: to, neighbor: from))
+  }
+
+  return grid
+}
+
+private func connectorGlyph(
+  at cell: (col: Int, row: Int),
+  neighbor: (col: Int, row: Int)
+) -> Character {
+  // Same row → horizontal segment.
+  if cell.row == neighbor.row { return "─" }
+  // Same column → vertical segment.
+  if cell.col == neighbor.col { return "│" }
+
+  let goingRight = neighbor.col > cell.col
+  let goingDown  = neighbor.row > cell.row
+  switch (goingRight, goingDown) {
+  case (true,  true):  return "╮"   // turn down to the right
+  case (true,  false): return "╯"   // turn up to the right
+  case (false, true):  return "╭"   // turn down to the left
+  case (false, false): return "╰"   // turn up to the left
+  }
+}
