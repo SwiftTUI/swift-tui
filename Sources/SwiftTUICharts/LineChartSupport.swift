@@ -25,3 +25,23 @@ func plotDomain(series: [LineChartSeries]) -> LineChartDomain? {
   guard any else { return nil }
   return LineChartDomain(x: minX...maxX, y: minY...maxY)
 }
+
+/// Maps a domain X value to a column index in `[0, plotWidth)`.
+func xCell(value: Double, domain: ClosedRange<Double>, plotWidth: Int) -> Int {
+  let span = domain.upperBound - domain.lowerBound
+  guard span > 0, plotWidth > 0 else { return 0 }
+  let fraction = (value - domain.lowerBound) / span
+  let column = Int((fraction * Double(plotWidth - 1)).rounded())
+  return min(max(column, 0), plotWidth - 1)
+}
+
+/// Maps a domain Y value to a row index in `[0, plotHeight)`, inverted
+/// so row 0 corresponds to the top of the plot.
+func yCell(value: Double, domain: ClosedRange<Double>, plotHeight: Int) -> Int {
+  let span = domain.upperBound - domain.lowerBound
+  guard span > 0, plotHeight > 0 else { return 0 }
+  let fraction = (value - domain.lowerBound) / span
+  let invertedFraction = 1 - fraction
+  let row = Int((invertedFraction * Double(plotHeight - 1)).rounded())
+  return min(max(row, 0), plotHeight - 1)
+}
