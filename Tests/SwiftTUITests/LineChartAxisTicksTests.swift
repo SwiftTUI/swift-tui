@@ -134,4 +134,25 @@ struct LineChartXAxisTickTests {
     #expect(texts.contains("Mar"))
     #expect(texts.contains("Apr"))
   }
+
+  @Test("date tick labels use calendar timezone, not system timezone")
+  func dateTicksRespectCalendarTimezone() {
+    // Build a UTC gregorian calendar and a range that lands a tick at
+    // 2024-02-01 00:00:00 UTC. Without pinTimezone(_:to:), machines west
+    // of UTC would render that boundary as "Jan" because the system
+    // timezone shifts it back into January local time. Pinning the
+    // calendar's UTC timezone onto Date.FormatStyle forces "Feb".
+    var calUTC = Calendar(identifier: .gregorian)
+    calUTC.timeZone = TimeZone(identifier: "UTC")!
+    let feb1UTC = ISO8601DateFormatter().date(from: "2024-02-01T00:00:00Z")!
+    let oneDayLater = feb1UTC.addingTimeInterval(86_400)
+    let labels = xAxisTickLabels(
+      domain: feb1UTC.timeIntervalSinceReferenceDate...oneDayLater.timeIntervalSinceReferenceDate,
+      ticks: .dates(every: .month),
+      format: .date(.dateTime.month(.abbreviated)),
+      plotWidth: 10,
+      calendar: calUTC
+    )
+    #expect(labels.map(\.text).contains("Feb"))
+  }
 }
