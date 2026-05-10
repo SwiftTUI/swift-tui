@@ -55,3 +55,42 @@ struct LineChartAxisConfigTests {
     #expect(LineChartLegendConfig.hidden.position == .hidden)
   }
 }
+
+@Suite("LineChart Y axis ticks")
+struct LineChartYAxisTickTests {
+  @Test("yAxisTickLabels with .count(N) yields N evenly spaced labels")
+  func yAxisCountEvenSpacing() {
+    let labels = yAxisTickLabels(
+      domain: 0...100,
+      ticks: .count(5),
+      format: .number,
+      plotHeight: 10
+    )
+    #expect(labels.count == 5)
+    // First label at the top row, last at the bottom row.
+    #expect(labels.first?.row == 0)
+    #expect(labels.last?.row == 9)
+  }
+
+  @Test("yAxisTickLabels with .automatic falls back to 5 ticks")
+  func yAxisAutomatic() {
+    let labels = yAxisTickLabels(
+      domain: 0...10,
+      ticks: .automatic,
+      format: .number,
+      plotHeight: 8
+    )
+    #expect(labels.count == 5)
+  }
+
+  @Test("yAxisTickLabels formats values with the supplied FormatStyle")
+  func yAxisFormat() {
+    let labels = yAxisTickLabels(
+      domain: 0...1_000_000,
+      ticks: .count(2),
+      format: .number.notation(.compactName),
+      plotHeight: 5
+    )
+    #expect(labels[0].text.contains("M") || labels[0].text.contains("K"))
+  }
+}

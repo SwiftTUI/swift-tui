@@ -227,3 +227,49 @@ func rasterizeStep(
   }
   return grid
 }
+
+struct AxisTickLabel: Equatable, Sendable {
+  var row: Int
+  var col: Int
+  var text: String
+}
+
+extension AxisTickLabel {
+  init(row: Int, text: String) { self.init(row: row, col: 0, text: text) }
+  init(col: Int, text: String) { self.init(row: 0, col: col, text: text) }
+}
+
+func yAxisTickLabels(
+  domain: ClosedRange<Double>,
+  ticks: LineChartYAxis.Ticks,
+  format: FloatingPointFormatStyle<Double>,
+  plotHeight: Int
+) -> [AxisTickLabel] {
+  let height = max(1, plotHeight)
+  let span = domain.upperBound - domain.lowerBound
+
+  let count: Int
+  switch ticks {
+  case .automatic:
+    count = 5
+  case .count(let n):
+    count = max(2, n)
+  case .every:
+    // Stride-based ticks: compute count from span / stride. Fall back to
+    // .automatic for `.every` since stride support on Y is rare.
+    count = 5
+  }
+
+  guard span > 0 else {
+    return [AxisTickLabel(row: 0, text: format.format(domain.lowerBound))]
+  }
+
+  var out: [AxisTickLabel] = []
+  for i in 0..<count {
+    let fraction = Double(i) / Double(count - 1)        // 0 ... 1
+    let value = domain.upperBound - fraction * span      // top to bottom
+    let row = Int((fraction * Double(height - 1)).rounded())
+    out.append(AxisTickLabel(row: row, text: format.format(value)))
+  }
+  return out
+}
