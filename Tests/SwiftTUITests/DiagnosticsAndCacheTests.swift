@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
 private enum FocusedReuseKey: FocusedValueKey {
@@ -82,7 +82,7 @@ private func resolvedProbeTextNode(
   )
 }
 
-private struct ResolveProbeLeaf: View, ResolvableView {
+private struct ResolveProbeLeaf: PrimitiveView, ResolvableView {
   let recorder: ResolveProbeRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -101,7 +101,7 @@ private struct ResolveProbeLeaf: View, ResolvableView {
   }
 }
 
-private struct RecordingBranchLeaf: View, ResolvableView {
+private struct RecordingBranchLeaf: PrimitiveView, ResolvableView {
   let label: String
   let recorder: BranchResolveRecorder
 
@@ -120,7 +120,7 @@ private struct RecordingBranchLeaf: View, ResolvableView {
   }
 }
 
-private struct RecordingBranchRoot: View, ResolvableView {
+private struct RecordingBranchRoot: PrimitiveView, ResolvableView {
   let labels: [String]
   let recorder: BranchResolveRecorder
 
@@ -144,7 +144,7 @@ private struct RecordingBranchRoot: View, ResolvableView {
   }
 }
 
-private struct ResolveProbeRoot: View, ResolvableView {
+private struct ResolveProbeRoot: PrimitiveView, ResolvableView {
   let recorder: ResolveProbeRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {

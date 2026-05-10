@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// A focusable multiline text editor that accepts terminal keyboard input.
-public struct TextEditor: View, ResolvableView {
+public struct TextEditor: PrimitiveView, ResolvableView {
   public var text: Binding<String>
   @State private var scrollPosition = ScrollPosition.zero
   @State private var textInputValue = TextInputValue()

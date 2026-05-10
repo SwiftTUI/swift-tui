@@ -104,7 +104,7 @@ public struct GeometryProxy: Equatable, Sendable {
 }
 
 /// Reads the current proposed geometry and maps it into authored content.
-public struct GeometryReader<Content: View>: View, ResolvableView {
+public struct GeometryReader<Content: View>: PrimitiveView, ResolvableView {
   private let content: (GeometryProxy) -> Content
 
   public init(

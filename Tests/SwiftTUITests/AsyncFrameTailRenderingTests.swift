@@ -3084,7 +3084,7 @@ private struct AsyncFrameTailSendableGuideLayout: SendableLayout {
   }
 }
 
-private struct AsyncFrameTailWorkerCustomLayout<Content: View>: View, ResolvableView {
+private struct AsyncFrameTailWorkerCustomLayout<Content: View>: PrimitiveView, ResolvableView {
   var recorder: AsyncFrameTailWorkerCustomLayoutRecorder
   var content: Content
 

@@ -7,7 +7,7 @@ package import SwiftTUICore
 /// `@ViewBuilder` composition and generic `Content: View` storage when those
 /// are practical. See the ``AnyView`` article for usage examples and identity
 /// behavior.
-public struct AnyView: View, ResolvableView {
+public struct AnyView: PrimitiveView, ResolvableView {
   private let storage: AnyViewStorage
 
   package init<V: View & ResolvableView>(resolving view: V) {
@@ -108,7 +108,7 @@ private struct AnyViewStorage {
   let resolve: @MainActor (ResolveContext) -> ResolvedNode
 }
 
-private struct AnyViewPayload: View, ResolvableView {
+private struct AnyViewPayload: PrimitiveView, ResolvableView {
   let storage: AnyViewStorage
 
   var body: Never {

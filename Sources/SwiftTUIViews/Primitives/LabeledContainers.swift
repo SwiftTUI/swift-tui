@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// Displays a title paired with an icon or glyph view.
-public struct Label<Title: View, Icon: View>: View, ResolvableView {
+public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {
   private var title: Title
   private var icon: Icon
 
@@ -49,7 +49,7 @@ extension Label {
 }
 
 /// Displays a leading label paired with trailing content or a value.
-public struct LabeledContent<Label: View, Content: View>: View, ResolvableView {
+public struct LabeledContent<Label: View, Content: View>: PrimitiveView, ResolvableView {
   private var label: Label
   private var content: Content
 
@@ -99,7 +99,7 @@ extension LabeledContent {
 }
 
 /// Groups related controls into a compact row or stack.
-public struct ControlGroup<Label: View, Content: View>: View, ResolvableView {
+public struct ControlGroup<Label: View, Content: View>: PrimitiveView, ResolvableView {
   private var showsLabel: Bool
   private var label: Label
   private var content: Content
@@ -150,7 +150,7 @@ public struct ControlGroup<Label: View, Content: View>: View, ResolvableView {
 }
 
 /// Frames related content with optional label chrome.
-public struct GroupBox<Label: View, Content: View>: View, ResolvableView {
+public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableView {
   private var showsLabel: Bool
   private var label: Label
   private var content: Content

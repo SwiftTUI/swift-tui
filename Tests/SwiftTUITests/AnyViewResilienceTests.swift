@@ -447,7 +447,7 @@ private struct ScopedAnyViewActionOwner: View {
   }
 }
 
-private struct ScopedAnyViewHost: View, ResolvableView {
+private struct ScopedAnyViewHost: PrimitiveView, ResolvableView {
   let content: AnyView
 
   var body: Never {

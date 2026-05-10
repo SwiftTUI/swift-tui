@@ -700,7 +700,7 @@ private struct TabViewContainerLayout: SendableLayout {
   }
 }
 
-private struct TabViewStyleBodyHost<Strip: View, Overflow: View>: View, ResolvableView {
+private struct TabViewStyleBodyHost<Strip: View, Overflow: View>: PrimitiveView, ResolvableView {
   let layoutBehavior: LayoutBehavior
   let strip: Strip
   let activeContentIndex: Int?
@@ -773,7 +773,7 @@ private struct TabViewStyleBodyHost<Strip: View, Overflow: View>: View, Resolvab
   }
 }
 
-private struct TabViewLayoutSlotNode: View, ResolvableView {
+private struct TabViewLayoutSlotNode: PrimitiveView, ResolvableView {
   let kindName: String
   let role: TabViewLayoutSubviewRole
   var layoutBehavior: LayoutBehavior = .intrinsic
@@ -1022,7 +1022,7 @@ private struct LiteralTabsStripBackgroundView: View {
   }
 }
 
-private struct LiteralTabsStripBaseRule: View, ResolvableView {
+private struct LiteralTabsStripBaseRule: PrimitiveView, ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var drawMetadata = DrawMetadata()
     drawMetadata.foregroundStyle = .semantic(.foreground)

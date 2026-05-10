@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Arranges children vertically using lazy stack layout rules.
-public struct LazyVStack<Content: View>: View, ResolvableView {
+public struct LazyVStack<Content: View>: PrimitiveView, ResolvableView {
   public var alignment: HorizontalAlignment
   public var spacing: Int?
   package var content: Content

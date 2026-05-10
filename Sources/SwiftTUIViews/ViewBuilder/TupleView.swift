@@ -2,7 +2,7 @@ package import SwiftTUICore
 
 /// The builder artifact produced when a ``ViewBuilder`` contains multiple child
 /// expressions in sequence.
-public struct TupleView<each Content: View>: View, ResolvableView, DeclaredChildrenView {
+public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView {
   package let value: (repeat each Content)
 
   package init(

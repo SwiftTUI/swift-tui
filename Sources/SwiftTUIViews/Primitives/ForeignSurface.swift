@@ -4,7 +4,7 @@
 ///
 /// The payload is sampled during rasterization. The view itself fills its
 /// proposed size, matching `Canvas` and shape primitives.
-public struct ForeignSurface<Payload: ForeignSurfacePayload>: View, ResolvableView {
+public struct ForeignSurface<Payload: ForeignSurfacePayload>: PrimitiveView, ResolvableView {
   public let payload: Payload
 
   public init(payload: Payload) {

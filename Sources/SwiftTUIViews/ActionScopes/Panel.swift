@@ -22,7 +22,9 @@ public enum FocusContainment: Sendable {
 ///
 /// Pair with `.keyCommand(...)`, `.paletteCommand(...)`, or
 /// `.focusContainment(_:)` to configure.
-public struct Panel<ID: Hashable & Sendable, Content: View>: View, ActionScope, ResolvableView {
+public struct Panel<ID: Hashable & Sendable, Content: View>: PrimitiveView, ActionScope,
+  ResolvableView
+{
   public let id: ID
   package let containment: FocusContainment
   package let content: Content

@@ -70,7 +70,7 @@ public struct Spinner: View {
     }
   }
 
-  public struct SpinnerSet: Hashable, Sendable, View, CustomStringConvertible {
+  public struct SpinnerSet: Hashable, Sendable, CustomStringConvertible {
     public enum Progression {
       case bounce
       case `repeat`

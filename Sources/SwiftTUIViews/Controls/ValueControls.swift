@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// Toggles a boolean binding on or off.
-public struct Toggle<Label: View>: View, ResolvableView {
+public struct Toggle<Label: View>: PrimitiveView, ResolvableView {
   public var isOn: Binding<Bool>
   private var label: Label
   private let authoringScope: AuthoringContext?
@@ -118,7 +118,7 @@ extension Toggle {
   }
 }
 
-public struct TextField<Label: View>: View, ResolvableView {
+public struct TextField<Label: View>: PrimitiveView, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?
   @State private var textInputValue = TextInputValue()
@@ -236,7 +236,7 @@ extension TextField {
 }
 
 /// Reveals or hides nested content behind an expansion control.
-public struct DisclosureGroup<Label: View, Content: View>: View, ResolvableView {
+public struct DisclosureGroup<Label: View, Content: View>: PrimitiveView, ResolvableView {
   public var isExpanded: Binding<Bool>
   private var label: Label
   private var content: Content

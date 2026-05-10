@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// A focusable control that triggers an action when activated.
-public struct Button<Label: View>: View, ResolvableView {
+public struct Button<Label: View>: PrimitiveView, ResolvableView {
   public var role: ButtonRole?
   package var systemHintText: String?
   private var action: (@MainActor @Sendable () -> Void)?

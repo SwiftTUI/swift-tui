@@ -79,7 +79,7 @@ package func composeOverlayStackTree(
 }
 
 @MainActor
-private struct OverlayStackOverlayHost: View, ResolvableView {
+private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
   var entries: [OverlayStackEntry]
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -107,7 +107,7 @@ private struct OverlayStackOverlayHost: View, ResolvableView {
 }
 
 @MainActor
-private struct OverlayStackEntryHost: View, ResolvableView {
+private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
   var entry: OverlayStackEntry
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {

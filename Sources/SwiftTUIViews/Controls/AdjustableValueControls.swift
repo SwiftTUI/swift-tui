@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// Increments or decrements a numeric binding.
-public struct Stepper<Label: View>: View, ResolvableView {
+public struct Stepper<Label: View>: PrimitiveView, ResolvableView {
   private enum ValueStorage {
     case integer(Binding<Int>, bounds: ClosedRange<Int>?, step: Int)
     case double(Binding<Double>, bounds: ClosedRange<Double>?, step: Double)
@@ -322,7 +322,7 @@ extension Stepper {
 }
 
 /// Adjusts a numeric binding along a bounded linear range.
-public struct Slider<Label: View>: View, ResolvableView {
+public struct Slider<Label: View>: PrimitiveView, ResolvableView {
   private enum ValueStorage {
     case integer(Binding<Int>, bounds: ClosedRange<Int>, step: Int)
     case double(Binding<Double>, bounds: ClosedRange<Double>, step: Double)

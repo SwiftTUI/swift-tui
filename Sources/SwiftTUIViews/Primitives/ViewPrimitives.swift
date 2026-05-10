@@ -1,7 +1,7 @@
 @_spi(Testing) public import SwiftTUICore
 
 /// Displays a string of terminal text.
-public struct Text: View, ResolvableView {
+public struct Text: PrimitiveView, ResolvableView {
   package enum Storage {
     case plain(String)
     case rich(RichContent)
@@ -226,7 +226,7 @@ extension Text {
 }
 
 /// A flexible empty region that expands to absorb extra space.
-public struct Spacer: View, ResolvableView {
+public struct Spacer: PrimitiveView, ResolvableView {
   public var minLength: Int
 
   public init(minLength: Int = 0) {
@@ -245,7 +245,7 @@ public struct Spacer: View, ResolvableView {
 }
 
 /// A one-cell single-line rule that adapts to its surrounding layout direction.
-public struct Divider: View, ResolvableView {
+public struct Divider: PrimitiveView, ResolvableView {
   public var strokeStyle: StrokeStyle
 
   public init(strokeStyle: StrokeStyle = .single) {

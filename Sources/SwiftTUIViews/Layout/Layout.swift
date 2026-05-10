@@ -797,7 +797,7 @@ public struct ZStackLayout: Layout, BuiltinLayoutBehaviorProviding {
   }
 }
 
-private struct LayoutContainer<Content: View>: View, ResolvableView {
+private struct LayoutContainer<Content: View>: PrimitiveView, ResolvableView {
   var layout: AnyLayout
   var authoringScope: AuthoringContext?
   var content: Content

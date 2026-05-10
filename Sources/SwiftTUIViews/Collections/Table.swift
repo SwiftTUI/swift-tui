@@ -1,7 +1,7 @@
 @_spi(Testing) package import SwiftTUICore
 
 /// Declares the cell content for a row in a ``Table``.
-public struct TableRow<Content: View>: View, ResolvableView {
+public struct TableRow<Content: View>: PrimitiveView, ResolvableView {
   private var content: Content
 
   public init(
@@ -37,7 +37,7 @@ extension TableRow {
 }
 
 /// Presents row and column data in a terminal table.
-public struct Table<SelectionValue: Hashable, Rows: View>: View, ResolvableView {
+public struct Table<SelectionValue: Hashable, Rows: View>: PrimitiveView, ResolvableView {
   public var columns: [TableColumn]
   private var selection: Binding<SelectionValue>?
   private var rows: Rows

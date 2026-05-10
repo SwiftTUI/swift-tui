@@ -2,7 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact textual timeline for ordered events or releases.
-public struct Timeline: View, ResolvableView {
+public struct Timeline: PrimitiveView, ResolvableView {
   public var entries: [TimelineEntry]
 
   public init(_ entries: [TimelineEntry]) {

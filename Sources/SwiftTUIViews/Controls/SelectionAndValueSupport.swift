@@ -654,7 +654,7 @@ package func textEditorBody(
   .layoutMetadata(.init(minimumHeight: 3))
 }
 
-struct PointerRouteView<Content: View>: View, ResolvableView {
+struct PointerRouteView<Content: View>: PrimitiveView, ResolvableView {
   var identity: Identity
   var content: Content
 

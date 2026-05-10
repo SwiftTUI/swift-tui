@@ -37,7 +37,7 @@ package struct DeferredViewPayload: Sendable {
 }
 
 @MainActor
-package struct DeferredPayloadView: View, ResolvableView {
+package struct DeferredPayloadView: PrimitiveView, ResolvableView {
   package var payload: DeferredViewPayload
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -46,7 +46,7 @@ package struct DeferredPayloadView: View, ResolvableView {
 }
 
 @MainActor
-package struct DeferredPayloadGroupView: View, ResolvableView {
+package struct DeferredPayloadGroupView: PrimitiveView, ResolvableView {
   package var kindName: String
   package var payloads: [DeferredViewPayload]
 

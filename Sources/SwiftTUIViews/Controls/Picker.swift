@@ -1,7 +1,7 @@
 package import SwiftTUICore
 
 /// Selects one value from a set of tagged options.
-public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View,
+public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: PrimitiveView,
   ResolvableView
 {
   public var selection: Binding<SelectionValue>

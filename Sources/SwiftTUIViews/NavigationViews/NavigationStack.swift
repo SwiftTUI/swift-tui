@@ -5,7 +5,7 @@ public import SwiftTUICore
 /// `NavigationStack` has no built-in chrome. It renders the root content when
 /// no destination binding is active and renders the topmost active destination
 /// when one or more `navigationDestination(...)` declarations are active.
-public struct NavigationStack<ID: Hashable & Sendable, Root: View>: View, ActionScope,
+public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveView, ActionScope,
   ResolvableView
 {
   public let id: ID
@@ -397,7 +397,7 @@ private func resolveActiveDestinationChain(
   )
 }
 
-private struct NavigationDestinationSurface: View, ActionScope, ResolvableView {
+private struct NavigationDestinationSurface: PrimitiveView, ActionScope, ResolvableView {
   typealias ID = Identity
 
   var instance: NavigationDestinationInstance

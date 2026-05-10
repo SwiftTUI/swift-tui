@@ -16,7 +16,7 @@ package import SwiftTUICore
 ///   source frames through the presentation system.
 /// - The menu stays non-modal: opening it does not freeze surrounding
 ///   controls, although Escape still dismisses the topmost open menu.
-public struct Menu<Label: View, Content: View>: View, ResolvableView {
+public struct Menu<Label: View, Content: View>: PrimitiveView, ResolvableView {
   @State private var isExpanded = false
   package var label: Label
   package var content: Content
