@@ -35,8 +35,17 @@ struct LineChartAxisConfigTests {
 
   @Test("Y axis .values defaults to compact-name notation")
   func yAxisValuesDefaultsToCompact() {
-    _ = LineChartYAxis.values()
-    // Smoke: just verify it builds without crashing.
+    let axis = LineChartYAxis.values()
+    if case .count(let n) = axis.ticks { #expect(n == 5) } else {
+      Issue.record("expected .count tick strategy")
+    }
+    #expect(axis.isHidden == false)
+    // FloatingPointFormatStyle is not Equatable, so we can't directly
+    // compare against `.number.notation(.compactName)`. Verifying the
+    // format produces compact notation on a large number is the next
+    // best assertion of the documented default.
+    let formatted = axis.format.format(1_000_000)
+    #expect(formatted.contains("M") || formatted.contains("K"))
   }
 
   @Test("Legend config presets")
