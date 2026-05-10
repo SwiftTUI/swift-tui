@@ -22,8 +22,11 @@ if [ -z "$view_protocol_block" ]; then
   fail "Could not isolate the public View protocol block in Sources/SwiftTUIViews/Foundation/ViewFoundation.swift."
 else
   case "$view_protocol_block" in
-  *"associatedtype Body: View = Never"*) ;;
-  *) fail "The public View protocol must keep associatedtype Body: View = Never." ;;
+  *"associatedtype Body: View = Never"*)
+    fail "The public View protocol must not default Body to Never."
+    ;;
+  *"associatedtype Body: View"*) ;;
+  *) fail "The public View protocol must declare associatedtype Body: View." ;;
   esac
   case "$view_protocol_block" in
   *"var body: Body { get }"*) ;;
@@ -45,6 +48,11 @@ fi
 if ! rg -U -n -P --quiet -- '@ViewBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
   Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
   fail "View.body must stay @ViewBuilder and @MainActor-annotated."
+fi
+
+if rg -U -n -P --quiet -- 'extension\s+View\s*(?:where[^{]+)?\{\s*public\s+var\s+body\s*:\s*Never' \
+  Sources/SwiftTUIViews; then
+  fail "Public primitive body witnesses must not be declared directly on extension View."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol Scene \{' \

@@ -143,13 +143,17 @@ Checked-in Swift sources should stay inside the structured concurrency model.
 
 ## View Lowering Policy
 
-- Public `View` stays body-only.
+- Public `View` stays body-only: do not add `Body = Never` defaults or
+  `extension View` body witnesses. Framework primitives must opt into
+  package-only primitive ownership through `PrimitiveView` or a view-like
+  protocol such as `Shape`.
 - Public modifiers are first-class through `ViewModifier`, `View.modifier(_:)`,
   and `ModifiedContent`.
 - Concrete built-in modifier value types may be public when they participate in
   that algebra; direct primitive lowering still remains package-only.
 - Public builder-taking APIs should accept typed `@ViewBuilder` closures, not `[AnyView]`.
-- Internal lowering protocols such as `ResolvableView` must stay package-only.
+- Internal lowering protocols such as `PrimitiveView` and `ResolvableView` must
+  stay package-only.
 - Direct primitive lowering stays package-only through internal hooks such as
   `PrimitiveViewModifier`.
 

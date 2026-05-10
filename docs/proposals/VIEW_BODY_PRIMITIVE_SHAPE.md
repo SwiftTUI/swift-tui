@@ -1,7 +1,7 @@
 # View Body Primitive Shape
 
 **Date:** 2026-05-10  
-**Status:** Proposed  
+**Status:** Implemented
 **Scope:** `View`, `ResolvableView`, `ViewModifier`, primitive lowering, public protocol conformance diagnostics
 
 ## Summary
@@ -21,10 +21,10 @@ conformance because the public `View` protocol currently defaults `Body` to
 `Never`, and an unconditional `extension View` supplies `body: Never`.
 
 The fix is to move the primitive-body escape hatch off the public `View`
-protocol and onto the package-only primitive lowering seam. In SwiftTUI, that
-seam is currently `ResolvableView`. Public `View` should be body-only;
-package-owned primitive views should be `ResolvableView` values whose
-`Body == Never` witness is supplied through that package protocol.
+protocol and onto a package-only primitive view seam. Public `View` should be
+body-only; package-owned primitive views should opt into a hidden
+`PrimitiveView` witness, and values that lower directly should separately opt
+into `ResolvableView`.
 
 `ViewModifier` has a related but slightly different mismatch. It should keep the
 SwiftUI-compatible primitive modifier body default for explicitly primitive
@@ -180,36 +180,49 @@ so the extension still leaks primitive behavior to arbitrary views.
 
 ### Package Primitive View Seam
 
-`ResolvableView` should become the package-only primitive view protocol:
+`PrimitiveView` is the package-only primitive body protocol:
 
 ```swift
 @MainActor
-package protocol ResolvableView: View where Body == Never {
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode]
-}
+package protocol PrimitiveView: View where Body == Never {}
 
-extension ResolvableView {
+extension PrimitiveView {
   public var body: Body {
     fatalError("\(Self.self) is a primitive view and does not expose a composed body.")
-  }
-
-  package func resolve(in context: ResolveContext) -> ResolvedNode {
-    resolveView(self, in: context)
   }
 }
 ```
 
-This makes the inheritance hierarchy match the behavior SwiftTUI already wants:
+`ResolvableView` remains package-only, but it is not the primitive body witness:
+
+```swift
+@MainActor
+package protocol ResolvableView {
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode]
+}
+```
+
+This distinction is required because `ResolvableView` is also used for
+optimized direct lowering of values that still have real composed bodies, most
+notably `ModifiedContent<Content, Modifier>` when `Modifier:
+PrimitiveViewModifier`.
+
+The hierarchy is therefore:
 
 ```text
 View
 +-- user-authored body views
-+-- ResolvableView where Body == Never
-    +-- Text, EmptyView, Group, ForEach, GeometryReader, Canvas, controls, shapes, ...
++-- PrimitiveView where Body == Never
+    +-- Text, EmptyView, Group, ForEach, GeometryReader, Canvas, controls, ...
++-- Shape where Body == Never
+    +-- Rectangle, RoundedRectangle, Circle, Ellipse, Capsule, ...
++-- ResolvableView
+    +-- direct-lowering values, usually also PrimitiveView
+    +-- optimized body-bearing values such as primitive ModifiedContent
 ```
 
 The public `View` protocol stays clean. The primitive-body default only exists
-for types that opt into package-owned lowering.
+for types that opt into package-owned primitive body ownership.
 
 The existing package helpers that are useful for any `View`, such as
 `resolveElements(in:)` and `resolve(in:)`, may remain as package methods on
@@ -217,20 +230,21 @@ The existing package helpers that are useful for any `View`, such as
 
 ### Public Built-In Views
 
-Built-in primitive views should continue to compile because they conform to
-`ResolvableView`, directly or indirectly:
+Built-in primitive views continue to compile because they conform to
+`PrimitiveView` or to a public primitive-shaped protocol with its own body
+witness, such as `Shape`. Values that lower directly also conform to
+`ResolvableView`:
 
 ```swift
-public struct Text: View, ResolvableView { ... }
-public struct EmptyView: View, ResolvableView { ... }
+public struct Text: PrimitiveView, ResolvableView { ... }
+public struct EmptyView: PrimitiveView, ResolvableView { ... }
 public struct Rectangle: InsettableShape, ResolvableView { ... }
 ```
 
 They do not all need explicit `typealias Body = Never` declarations if the
-`ResolvableView` protocol constraint and extension supply the witness. Existing
-explicit `body: Never` declarations may remain temporarily if removing them
-would make the first migration too noisy. The final shape should prefer one
-primitive-body source of truth on `ResolvableView`.
+`PrimitiveView` or `Shape` extension supplies the witness. Existing explicit
+`body: Never` declarations may remain temporarily if removing them would make
+the first migration too noisy.
 
 ### `DeclaredChildrenView`
 
@@ -306,7 +320,8 @@ The change is compile-time ownership, not runtime lowering:
 The existing policy already says:
 
 - Public `View` stays body-only.
-- Internal lowering protocols such as `ResolvableView` stay package-only.
+- Internal lowering protocols such as `PrimitiveView` and `ResolvableView` stay
+  package-only.
 - Direct primitive lowering stays package-only through hooks such as
   `PrimitiveViewModifier`.
 
@@ -317,7 +332,7 @@ longer public surface. That is an intended source break for invalid conformers.
 ## Non-Goals
 
 1. Do not change renderer, layout, draw, raster, or commit semantics.
-2. Do not make `ResolvableView` public.
+2. Do not make `PrimitiveView` or `ResolvableView` public.
 3. Do not introduce a public `_PrimitiveView` API.
 4. Do not preserve source compatibility for invalid empty `View` or
    `ViewModifier` conformances.
@@ -328,7 +343,7 @@ longer public surface. That is an intended source break for invalid conformers.
 
 ## Validation Requirements
 
-Future implementation must add compile-time regression coverage for these
+The implementation includes compile-time regression coverage for these
 consumer-facing cases:
 
 ```swift
@@ -365,10 +380,9 @@ It must also retain runtime coverage for representative primitives:
 - at least one `Shape`
 - at least one primitive `ViewModifier`
 
-## Open Decisions
+## Resolved Decisions
 
-None for the first migration. If the package protocol extension cannot provide
-a public `body` witness for every public primitive under the active Swift 6.3
-toolchain, the implementation should not broaden `View` again. It should add
-explicit `public typealias Body = Never` and `public var body: Never` witnesses
-to the affected primitive types, then continue toward the same public shape.
+The first migration uses a package-only `PrimitiveView` protocol instead of
+making `ResolvableView` refine `View where Body == Never`. That preserves the
+direct-lowering fast path for body-bearing `ModifiedContent` while still moving
+the primitive body witness away from public `View`.

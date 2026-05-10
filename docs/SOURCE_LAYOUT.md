@@ -403,9 +403,11 @@ Sources/SwiftTUICore/
 - `Foundation/AnyView.swift`, `Foundation/ErasedViewTypeID.swift`,
   `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`,
   `Foundation/ViewCompositionHelpers.swift`, `Foundation/ViewFoundation.swift`,
-  and `Foundation/ViewModifier.swift`: `View`, `ViewModifier`,
-  `ModifiedContent`, `Resolver`, `AnyView`, payload type identity, style
-  primitives, and internal composition helpers
+  and `Foundation/ViewModifier.swift`: public `View` / `ViewModifier`
+  protocols, package-only primitive and direct-lowering seams (`PrimitiveView`,
+  `ResolvableView`, `PrimitiveViewModifier`), `ModifiedContent`, `Resolver`,
+  `AnyView`, payload type identity, style primitives, and internal composition
+  helpers
 - `ViewBuilder/ViewBuilder.swift`, `ViewBuilder/TupleView.swift`, `ViewBuilder/ConditionalContentView.swift`, `ViewBuilder/VariadicView.swift`, and `ViewBuilder/EmptyView.swift`: typed builder artifacts and builder machinery
 - `State/State.swift`, `State/GestureState.swift`, `State/FocusState.swift`,
   and `State/FocusedValue.swift`: graph-scoped dynamic state, gesture state,
@@ -425,7 +427,7 @@ Sources/SwiftTUICore/
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/InteractionGate.swift`, `Presentation/OverlayStack.swift`, `Presentation/Portal.swift`, and `Presentation/DismissStack.swift`: package-internal primitives for visible-but-disabled subtrees, root overlay composition, destination-owned portal content, and topmost-dismiss routing
 - `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: presentation adapters and chrome for built-in alert/confirmation-dialog/sheet/menu/toast surfaces lowered into the primitive portal stack
-- `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers plus the package-only modifier-value lowering hooks that back them
+- `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifier methods plus package-level `View` helpers; primitive body witnesses do not live here
 - `SwiftTUIViews.docc/`: module landing page and authoring guides
 
 ## `SwiftTUICharts`
