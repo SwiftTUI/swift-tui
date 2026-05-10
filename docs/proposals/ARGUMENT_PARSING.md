@@ -3,12 +3,14 @@
 **Status:** Phases 1–6 implemented per
 [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
 The `SwiftTUIArguments` peer package ships `SwiftTUIOptions` (power mode),
-the `SwiftTUIApp` protocol (easy mode), and `CompletionsCommand` for
+the additive `SwiftTUICommand` protocol (easy mode), and `CompletionsCommand` for
 zsh/bash/fish completion script printing and installation. `RuntimeConfiguration`
 lives in `SwiftTUI` core. Bare-mode apps honor framework env vars via the
-default `App.main()` extension. Runner-internal scene and attach operations now
-route through subcommands instead of legacy flag forms, and the opt-in
-`SwiftTUIWebHostCLI` runner honors the flag-form WebHost configuration
+default `App.main()` extension. Apps that opt into argument parsing conform to
+both `App` and `SwiftTUICommand`; runner packages provide the launch behavior.
+Runner-internal scene and attach operations now route through subcommands
+instead of legacy flag forms, and the opt-in `SwiftTUIWebHostCLI` runner honors
+the flag-form WebHost configuration
 (`--web`, `--port`, `--bind`, `--open`). Runtime configuration fields now
 drive behavior beyond parsing: JSON emits machine-readable frame output,
 standalone `--linear` selects accessible linear output, and `--debug` enables
@@ -43,7 +45,7 @@ on the same flag surface.
 5. [API options considered](#api-options-considered)
    1. [Option A: bare swift-argument-parser, framework documents conventions](#option-a-bare-swift-argument-parser-framework-documents-conventions)
    2. [Option B: framework provides an `OptionGroup` of standard flags](#option-b-framework-provides-an-optiongroup-of-standard-flags)
-   3. [Option C: framework provides a `SwiftTUIApp` protocol that wraps `AsyncParsableCommand`](#option-c-framework-provides-a-swifttuiapp-protocol-that-wraps-asyncparsablecommand)
+   3. [Option C: framework provides a `SwiftTUICommand` protocol that wraps `AsyncParsableCommand`](#option-c-framework-provides-a-swifttuicommand-protocol-that-wraps-asyncparsablecommand)
    4. [Option D: hand-rolled framework parser, no swift-argument-parser dependency](#option-d-hand-rolled-framework-parser-no-swift-argument-parser-dependency)
    5. [Option E: macro-based `@SwiftTUIMain` derivation](#option-e-macro-based-swifttuimain-derivation)
 6. [Proposed design](#proposed-design)
@@ -154,9 +156,10 @@ seam:
 The framework standard flags layer is **opt-in but first-party**. Consumers
 who don't want it can keep their hand-rolled `static func main()` and call
 `TerminalRunner.run(MyApp.self)` directly with no parsing. Consumers who
-do want it write `@main struct MyApp: SwiftTUIApp { ... }`, and a default
-`main()` parses the arguments, applies the runtime configuration, and then
-runs the app. That `SwiftTUIApp` protocol is what this proposal calls the
+do want it write `@main struct MyApp: App, SwiftTUICommand { ... }`; the
+imported runner product provides the matching default `main()`, parses the
+arguments, applies the runtime configuration, and then runs the app. That
+`SwiftTUICommand` protocol is what this proposal calls the
 "recommended-but-optional helper" — recommended because it gives you the
 standard flags, optional because library-only / runners-own-main means we
 *can't* take it from you.
@@ -471,14 +474,15 @@ struct MyApp: AsyncParsableCommand, App {
 design. The "consumer might forget" objection is mitigated by Option C
 (below), which wraps this into a protocol the consumer can opt into.
 
-### Option C: framework provides a `SwiftTUIApp` protocol that wraps `AsyncParsableCommand`
+### Option C: framework provides a `SwiftTUICommand` protocol that wraps `AsyncParsableCommand`
 
 **Shape.** A protocol with a default `static main()` that does the
-right thing. Consumers conform their `App` to it.
+right thing when paired with a runner package. Consumers add it alongside
+`App`.
 
 ```swift
 @main
-struct MyApp: SwiftTUIApp {
+struct MyApp: App, SwiftTUICommand {
   // Your own flags:
   @Option(help: "How many widgets to show")
   var widgets: Int = 10
@@ -491,10 +495,10 @@ struct MyApp: SwiftTUIApp {
 }
 ```
 
-`SwiftTUIApp` (in `SwiftTUIArguments`):
+`SwiftTUICommand` (in `SwiftTUIArguments`):
 
 ```swift
-public protocol SwiftTUIApp: App, AsyncParsableCommand {
+public protocol SwiftTUICommand: AsyncParsableCommand {
   /// Inherited from ParsableArguments — implementations declare their own
   /// flags as @Option / @Flag / @Argument here.
 
@@ -502,51 +506,47 @@ public protocol SwiftTUIApp: App, AsyncParsableCommand {
   /// (e.g. force accessibility on regardless of flags).
   func runtimeConfiguration() -> RuntimeConfiguration
 }
+```
 
-extension SwiftTUIApp {
-  public func runtimeConfiguration() -> RuntimeConfiguration {
-    swiftTUIOptions.runtimeConfiguration(environment: ProcessInfo.processInfo.environment)
-  }
+Runner packages then provide launch behavior for parsed app commands:
 
-  public func run() async throws {
-    let configuration = runtimeConfiguration()
-    try await TerminalRunner.run(self, configuration: configuration)
-  }
-
+```swift
+extension App where Self: SwiftTUICommand {
   public static func main() async {
-    // Standard ParsableCommand main() flow with our own pre-validation,
-    // help-rendering, and exit-on-error handling.
-    await self._main(arguments: nil)
+    // Parse the SwiftTUICommand root and launch through this runner.
   }
 }
 ```
 
-The protocol synthesizes the `@OptionGroup SwiftTUIOptions` via its
-own embedded property, which Swift-argument-parser flattens correctly
-when the conforming type is itself a `ParsableArguments`/`ParsableCommand`.
+```swift
+extension SwiftTUICommand {
+  public func runtimeConfiguration() -> RuntimeConfiguration {
+    swiftTUIOptions.runtimeConfiguration(environment: ProcessInfo.processInfo.environment)
+  }
+}
+```
 
-(Implementation detail: because we can't add stored properties through a
-protocol extension, the actual bundling is via a base struct or via a
-macro. The exact mechanism is an implementation choice; the proposal is
-a declaration that `SwiftTUIApp` exists and behaves this way.)
+The conforming command declares an `@OptionGroup SwiftTUIOptions` property,
+which swift-argument-parser flattens correctly when the conforming type is
+itself a `ParsableArguments`/`ParsableCommand`. A future macro could still
+derive that property, but the shipped protocol keeps the requirement explicit.
 
 **Pros.**
-- One-line opt-in. The consumer writes nothing about argument parsing
-  at all unless they have their own flags.
+- Small opt-in. The consumer writes `App, SwiftTUICommand` and declares
+  the framework `@OptionGroup`, then only adds parser properties for
+  app-specific flags.
 - Default `runtimeConfiguration()` does the right thing; override
   available for advanced cases.
-- Default `main()` ensures parse-then-validate-then-launch order is
-  always honored.
+- Runner-provided `main()` ensures parse-then-validate-then-launch order
+  is always honored.
 - Discoverable: `--help` is automatic; standard flags appear; if the
   consumer adds an `@Option`, it joins the same parser.
 
 **Cons.**
-- Protocol composition (`App` × `AsyncParsableCommand`) is fiddly
-  given `App` already has a default `main()`. We have to make sure
-  `SwiftTUIApp.main()` wins the dispatch; this is a known Swift
-  ambiguity. Solution: `App` itself does **not** define `main()`
-  today (per decision 0008, runners do); `SwiftTUIApp` then provides
-  it cleanly.
+- Protocol composition (`App` × `AsyncParsableCommand`) is fiddly if
+  one protocol subsumes the other. The shipped shape avoids that:
+  `SwiftTUICommand` is additive, and runner packages provide launch
+  behavior through `extension App where Self: SwiftTUICommand`.
 - The mechanism for getting `SwiftTUIOptions` flags into the parser
   without the consumer typing `@OptionGroup` requires either a base
   struct or a macro. Either is doable but adds complexity.
@@ -629,20 +629,22 @@ The macro expansion injects:
 **Verdict.** **Deferred, not rejected.** The protocol approach
 (Option C) gets us 90% of the ergonomic benefit with none of the
 macro tax. If after a few months of real consumer use, the
-boilerplate of "import SwiftTUIArguments, conform to SwiftTUIApp"
-turns out to chafe, a macro can be added on top without breaking the
-protocol. Macro-now is premature.
+boilerplate of "import SwiftTUIArguments, conform to `App,
+SwiftTUICommand`, declare `@OptionGroup`" turns out to chafe, a macro
+can be added on top without breaking the protocol. Macro-now is
+premature.
 
 ---
 
 ## Proposed design
 
 The recommended path: **Option B (the OptionGroup) is always available;
-Option C (the SwiftTUIApp protocol) is the recommended path for new
-apps.** Both live in a new optional library `SwiftTUIArguments`, peer
-to `SwiftTUICLI`. Consumers who want full control over parsing skip
-the protocol and use the OptionGroup directly. Consumers who want
-zero ceremony conform to the protocol.
+Option C (the additive SwiftTUICommand protocol) is the recommended
+path for new apps.** Both live in a new optional library
+`SwiftTUIArguments`, peer to `SwiftTUICLI`. Consumers who want full
+control over parsing skip the protocol and use the OptionGroup
+directly. Consumers who want framework-managed parsing conform to the
+protocol alongside `App`.
 
 ### Where argument parsing lives
 
@@ -702,7 +704,9 @@ import SwiftTUICLI
 import SwiftTUIArguments
 
 @main
-struct MyApp: SwiftTUIApp {
+struct MyApp: App, SwiftTUICommand {
+  @OptionGroup var swiftTUIOptions: SwiftTUIOptions
+
   @Option(help: "How many widgets to show")
   var widgets: Int = 10
 
@@ -719,7 +723,8 @@ struct MyApp: SwiftTUIApp {
 
 What happens at startup:
 
-1. `SwiftTUIApp.main()` runs (default-provided by the protocol).
+1. The imported runner's `App where Self: SwiftTUICommand` `main()`
+   runs.
 2. `CommandLine.arguments` is parsed against `MyApp`'s declared
    flags **plus the `SwiftTUIOptions` group flattened in by the
    protocol**.
@@ -1037,7 +1042,8 @@ Highlights:
 
 ### Validation timing
 
-Argument parsing happens in `SwiftTUIApp.main()`, which is called
+Argument parsing happens in the runner-provided `App where Self:
+SwiftTUICommand` `main()`, which is called
 **before** any of the following:
 
 1. `TerminalRunner.run(...)` is invoked.
@@ -1311,9 +1317,9 @@ sharp-edge.
 - swift-argument-parser registers all flags into one namespace at
   parse time. A duplicate long-name is a registration error, surfaced
   as `ArgumentParser.ValidationError` with a descriptive message.
-- We catch this error in `SwiftTUIApp.main()` and rewrap it with a
-  framework-flavored error message that names which framework flag
-  the consumer collided with.
+- We catch this error in the runner-provided `SwiftTUICommand` main path
+  and rewrap it with a framework-flavored error message that names
+  which framework flag the consumer collided with.
 - We do not provide a runtime "consumer wins" or "framework wins"
   override. The collision is a bug in the consumer's app declaration.
 
@@ -1349,7 +1355,7 @@ under `--help-all`:
 ### `--version`
 
 Auto-provided by swift-argument-parser via
-`CommandConfiguration.version`. The `SwiftTUIApp` protocol's default
+`CommandConfiguration.version`. The `SwiftTUICommand` protocol's default
 synthesizes a two-line version string:
 
 ```
@@ -1378,7 +1384,7 @@ expose the existing
 subcommand. `install` writes to user-writable shell-specific defaults and accepts
 `--output <path>` for explicit installation targets.
 
-Consumer opt-in: any consumer using `SwiftTUIApp` gets completions
+Consumer opt-in: any consumer using `SwiftTUICommand` gets completions
 automatically. Consumers using bare `AsyncParsableCommand` already
 get them from swift-argument-parser. Consumers in bare mode (no
 parser) don't get them, which is fine — they don't have flags to
@@ -1463,9 +1469,10 @@ runner packages. This proposal layers cleanly on top:
 - **`SwiftTUIArguments` is a peer of the runner packages.** It does
   not move into root SwiftTUI. The Foundation-free invariant on
   `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` is preserved.
-- **The protocol `SwiftTUIApp` lives in `SwiftTUIArguments`.** It is
-  *not* a re-export from `SwiftTUI`. Consumers who want it import it
-  explicitly:
+- **The additive protocol `SwiftTUICommand` lives in
+  `SwiftTUIArguments`.** It is *not* a re-export from `SwiftTUI`.
+  Consumers who want it import it explicitly, or import a runner that
+  publicly imports `SwiftTUIArguments`:
 
   ```swift
   import SwiftTUI
@@ -1573,12 +1580,12 @@ Lean; lean is meant to be argued with, not committed.)
    often prefer flags; subcommands help discoverability and group
    the options clearly in `--help`.
 
-2. **Should `SwiftTUIApp` be a protocol or a base struct?** Protocol
-   composition with `App` and `AsyncParsableCommand` is fiddly
-   (Swift-level dispatch ambiguities possible). A base struct is
-   cleaner but locks consumers into single inheritance. **Lean:
-   protocol.** The fiddliness is well-trodden in Swift now (Apple's
-   own `App` is a protocol composing with multiple things). We pay
+2. **Should `SwiftTUICommand` be a protocol or a base struct?** Protocol
+   composition with `App` and `AsyncParsableCommand` is fiddly when
+   one protocol subsumes the other. A base struct is cleaner but locks
+   consumers into single inheritance. **Lean: additive protocol.** We
+   keep `App` and command parsing separate, then let runner packages
+   provide the shared launch behavior. We pay
    the protocol-ergonomics price once.
 
 3. **Should env-var binding be declarative on individual flags, or
@@ -1724,8 +1731,8 @@ This proposal does **not** cover:
    OptionGroup.** Power-mode usage (Option B). Consumers who want it
    add a dependency. Framework flags appear in their `--help`.
 
-4. **Phase 4 — `SwiftTUIApp` protocol.** Easy-mode usage (Option C).
-   Default `main()`, default `runtimeConfiguration()`. Examples
+4. **Phase 4 — `SwiftTUICommand` protocol.** Easy-mode usage (Option C).
+   Runner-provided `main()`, default `runtimeConfiguration()`. Examples
    migrated from bare mode to protocol mode.
 
 5. **Phase 5 — `myapp completions` subcommand.** Surface
@@ -1744,7 +1751,7 @@ This proposal does **not** cover:
 
 8. **Phase 8 — Documentation, examples, and the migration story.**
    Update `Examples/gallery` and `Examples/minimal` to use
-   `SwiftTUIApp`. Document the bare → easy-mode migration.
+   `SwiftTUICommand`. Document the bare → easy-mode migration.
 
 Each phase is independently shippable; each gives consumers more
 ergonomics than the previous one. Phases 1–3 are the foundation;
@@ -1833,8 +1840,9 @@ by theme:
   precedence rules, and the integration with decisions 0008 and
   0003. The recommended path is the `SwiftTUIArguments` peer package
   shipping `SwiftTUIOptions: ParsableArguments` (power mode) and
-  `SwiftTUIApp: AsyncParsableCommand & App` (easy mode), layered on
-  top of swift-argument-parser. Web-host flag specifics
+  `SwiftTUICommand: AsyncParsableCommand` plus runner extensions for
+  `App where Self: SwiftTUICommand` (easy mode), layered on top of
+  swift-argument-parser. Web-host flag specifics
   (`--web` / `--port` / `--bind` / `--open`) have landed as parse
   surface with manual browser-open by default; the embedded-host proposal
   records the compile-time opt-in server and runner behavior.
@@ -1859,7 +1867,7 @@ by theme:
   parser, the `CLIModeError` enum, and the one-shot deprecation warning
   (the framework has no consumers yet, so a deprecation cycle would be
   pure overhead). `CLIMode.parse(_:)` is no longer throwing.
-  Discoverability via `myapp --help` for `SwiftTUIApp` consumers is NOT
+  Discoverability via `myapp --help` for `SwiftTUICommand` consumers is NOT
   in scope here — their parser owns argv first; surfacing the runner
   subcommands through their `--help` requires deeper integration that
   remains a follow-up.
@@ -1888,16 +1896,20 @@ by theme:
   env-var-aware default `App.main()` in `SwiftTUICLI`; new
   `Platforms/Arguments/` peer package shipping `SwiftTUIOptions:
   ParsableArguments`, `SwiftTUIOptions.runtimeConfiguration(...)`,
-  `SwiftTUIApp` protocol with default `static func main()` (disambiguating
-  `App.main` vs `AsyncParsableCommand.main`), and `CompletionsCommand`
-  subcommand surface. `Examples/gallery` migrated; `Examples/argparse`
-  added as the canonical consumer-flag + framework-flag demo;
-  `Examples/minimal` documented as the bare-mode rendering reference.
+  initial `SwiftTUIApp` protocol with default `static func main()`
+  (disambiguating `App.main` vs `AsyncParsableCommand.main`), and
+  `CompletionsCommand` subcommand surface. `Examples/gallery` migrated;
+  `Examples/argparse` added as the canonical consumer-flag +
+  framework-flag demo; `Examples/minimal` documented as the bare-mode
+  rendering reference.
   Two implementation refinements emerged during the plan: (1) the
   `--plain` precedence had a code-vs-doc mismatch that was resolved by
   treating `--plain` as a flag-expander rather than a direct mutator
   (so `--plain --force-color` yields `noColor` per proposal §Precedence
-  rules item 5); and (2) consumers must annotate `@MainActor` and use
-  `@preconcurrency SwiftTUIApp` because `App.init()` is `@MainActor` and
-  `ParsableArguments.init()` is nonisolated — a future macro could
-  absorb both modifiers.
+  rules item 5); and (2) consumers initially needed a protocol-conformance
+  workaround because `App.init()` was `@MainActor` while
+  `ParsableArguments.init()` was nonisolated.
+- 2026-05-10: `App.init()` became nonisolated and the argument helper was
+  reshaped as additive `SwiftTUICommand`. `SwiftTUIArguments` now owns only
+  parsing/configuration/completion helpers; runner packages provide the
+  default launch behavior for `App where Self: SwiftTUICommand`.

@@ -2,7 +2,6 @@ import SwiftTUI
 import SwiftTUIWebHostCLI
 
 @main
-@MainActor
 struct WebHostExampleApp: App {
   init() {}
 

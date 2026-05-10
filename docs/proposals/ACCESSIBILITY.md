@@ -1496,7 +1496,7 @@ authority and they cross-reference rather than duplicate:
 |---|---|
 | [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) (this doc) | The semantic API surface (`accessibilityLabel`, `accessibilityRole`, `accessibilityHidden`, `accessibilityLiveRegion`, `AccessibilityAnnouncer`), per-target render strategies (cursor-as-focus, ASCII fallback, reduce-motion, ARIA mapping), and the env-var contract for accessibility-related toggles. |
 | [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Records the shipped `Platforms/WebHost/` runner peer using FlyingFox plus the already-landed `web-surface` v2 `accessibilityTree` wire format. |
-| [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md) | The framework-reserved flag namespace, the `SwiftTUIOptions` `OptionGroup` and `SwiftTUIApp` protocol, and the precedence rules between CLI flags, env vars, and TTY auto-detection. Recommends layering on `swift-argument-parser` and shipping as a peer to the existing `SwiftTUICLI` runner. |
+| [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md) | The framework-reserved flag namespace, the `SwiftTUIOptions` `OptionGroup` and additive `SwiftTUICommand` protocol, and the precedence rules between CLI flags, env vars, and TTY auto-detection. Recommends layering on `swift-argument-parser` and shipping runner integration in peer runner products. |
 | [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) | The factual record of what's already in the codebase. Read this *first* if any of the other proposals' "what we already have" claims feel surprising — the audit corrected a few of them. |
 
 **Reading order for a new contributor:** start here (`ACCESSIBILITY.md`)

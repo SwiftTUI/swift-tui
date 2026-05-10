@@ -12,7 +12,7 @@ import PackageDescription
 //     GIFEditorUI_SwiftUI target would slot in alongside.
 //   * GIFEditor — composition root. Today it just exposes the root
 //     view; tomorrow it can wire alternative UIs to the same core.
-//   * gifeditor — the executable. Hosts the App via SwiftTUICLI.
+//   * gifeditor — the executable. Hosts the App via SwiftTUIWebHostCLI.
 let package = Package(
   name: "gifeditor",
   platforms: [
@@ -39,7 +39,6 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
-    .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
     .package(name: "SwiftTUIArguments", path: "../../Platforms/Arguments"),
     .package(name: "SwiftTUIWebHost", path: "../../Platforms/WebHost"),
     .package(path: "../../Vendor/swift-gif"),
@@ -64,7 +63,6 @@ let package = Package(
         "GIFEditorUI",
         "GIFEditorCore",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUIWebHostCLI", package: "SwiftTUIWebHost"),
       ]
     ),
     .executableTarget(
@@ -72,8 +70,8 @@ let package = Package(
       dependencies: [
         "GIFEditor",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
         .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
+        .product(name: "SwiftTUIWebHostCLI", package: "SwiftTUIWebHost"),
       ]
     ),
     .testTarget(

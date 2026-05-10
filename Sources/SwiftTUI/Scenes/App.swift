@@ -470,8 +470,7 @@ extension WindowGroup: ActionScope {
 public protocol App {
   associatedtype Body: Scene
 
-  @MainActor
-  init()
+  nonisolated init()
 
   @SceneBuilder @MainActor
   var body: Body { get }

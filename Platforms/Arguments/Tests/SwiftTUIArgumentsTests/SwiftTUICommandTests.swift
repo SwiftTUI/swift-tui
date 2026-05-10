@@ -1,41 +1,42 @@
-import Testing
 import ArgumentParser
 import SwiftTUI
+import Testing
+
 @testable import SwiftTUIArguments
 
 @MainActor
-struct SwiftTUIAppTests {
-  @Test("SwiftTUIApp parses --no-color and produces expected RuntimeConfiguration")
-  func swiftTUIAppParsesNoColor() throws {
-    let app = try TestSwiftTUIApp.parse(["--no-color"])
+struct SwiftTUICommandTests {
+  @Test("SwiftTUICommand parses --no-color and produces expected RuntimeConfiguration")
+  func swiftTUICommandParsesNoColor() throws {
+    let app = try TestSwiftTUICommand.parse(["--no-color"])
     let configuration = app.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.color == .never)
   }
 
-  @Test("SwiftTUIApp parses consumer-defined flag")
-  func swiftTUIAppParsesConsumerFlag() throws {
-    let app = try TestSwiftTUIApp.parse(["--widgets", "42"])
+  @Test("SwiftTUICommand parses consumer-defined flag")
+  func swiftTUICommandParsesConsumerFlag() throws {
+    let app = try TestSwiftTUICommand.parse(["--widgets", "42"])
     #expect(app.widgets == 42)
   }
 
-  @Test("SwiftTUIApp parses both framework and consumer flags")
-  func swiftTUIAppParsesBoth() throws {
-    let app = try TestSwiftTUIApp.parse(["--widgets", "5", "--accessible"])
+  @Test("SwiftTUICommand parses both framework and consumer flags")
+  func swiftTUICommandParsesBoth() throws {
+    let app = try TestSwiftTUICommand.parse(["--widgets", "5", "--accessible"])
     #expect(app.widgets == 5)
     let configuration = app.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.output == .accessible)
   }
 
   @Test("Override of runtimeConfiguration() is honored")
-  func swiftTUIAppHonorsOverride() throws {
-    let app = try TestSwiftTUIAppWithOverride.parse([])
+  func swiftTUICommandHonorsOverride() throws {
+    let app = try TestSwiftTUICommandWithOverride.parse([])
     let configuration = app.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.debug == true)  // forced on by override
   }
 
   @Test("--help output includes SWIFTTUI OPTIONS section")
   func helpIncludesSwiftTUIOptionsSection() {
-    let helpText = TestSwiftTUIApp.helpMessage()
+    let helpText = TestSwiftTUICommand.helpMessage()
     #expect(helpText.contains("SWIFTTUI OPTIONS"))
     #expect(helpText.contains("--accessible"))
     #expect(helpText.contains("--no-color"))
@@ -68,8 +69,7 @@ struct SwiftTUIAppTests {
 // Test fixtures — declared inside the test target so they don't leak into the
 // SwiftTUIArguments product. Both conform to App via a body that returns an empty
 // scene (this is just for parsing; we never run the scene in tests).
-@MainActor
-struct TestSwiftTUIApp: @preconcurrency SwiftTUIApp {
+struct TestSwiftTUICommand: App, SwiftTUICommand {
   @OptionGroup(title: "SwiftTUI Options") public var swiftTUIOptions: SwiftTUIOptions
   @Option public var widgets: Int = 10
   init() {}
@@ -80,8 +80,7 @@ struct TestSwiftTUIApp: @preconcurrency SwiftTUIApp {
   }
 }
 
-@MainActor
-struct TestSwiftTUIAppWithOverride: @preconcurrency SwiftTUIApp {
+struct TestSwiftTUICommandWithOverride: App, SwiftTUICommand {
   @OptionGroup public var swiftTUIOptions: SwiftTUIOptions
   init() {}
   var body: some Scene {
@@ -97,4 +96,3 @@ struct TestSwiftTUIAppWithOverride: @preconcurrency SwiftTUIApp {
     return c
   }
 }
-

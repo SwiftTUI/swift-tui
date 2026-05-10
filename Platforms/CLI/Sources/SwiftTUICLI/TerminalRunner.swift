@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUI
+public import SwiftTUIArguments
 
 #if canImport(Darwin)
   import Darwin
@@ -496,6 +497,37 @@ extension App {
       isStdoutTTY: isatty(STDOUT_FILENO) != 0
     )
     try! await TerminalRunner.run(Self.self, configuration: configuration)
+  }
+}
+
+extension App where Self: SwiftTUICommand {
+  @MainActor public func run() async throws {
+    let configuration = runtimeConfiguration()
+    try await TerminalRunner.run(self, configuration: configuration)
+  }
+
+  /// Default entry point for terminal-native apps that opt into
+  /// `SwiftTUICommand` argument parsing.
+  public static func main() async {
+    do {
+      var command = try parseSwiftTUIRootCommand()
+      if let script = completionScript(forParsedCommand: command) {
+        FileHandle.standardOutput.write(Data(script.utf8))
+        return
+      }
+      if let installedURL = try installCompletionScript(forParsedCommand: command) {
+        let message = "Installed completion script at \(installedURL.path)\n"
+        FileHandle.standardOutput.write(Data(message.utf8))
+        return
+      }
+      if let appCommand = command as? Self {
+        try await appCommand.run()
+        return
+      }
+      try command.run()
+    } catch {
+      exit(withError: error)
+    }
   }
 }
 

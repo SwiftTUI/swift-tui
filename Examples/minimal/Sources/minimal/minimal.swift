@@ -2,7 +2,7 @@
 // scene runtime, App protocol, or SwiftTUIArguments. It exercises the lowest
 // level of the rendering API (DefaultRenderer + TerminalSurfaceRenderer) so
 // readers can see the layer that everything else is built on. See
-// Examples/gallery for the SwiftTUIApp easy-mode pattern with argument
+// Examples/gallery for the SwiftTUICommand easy-mode pattern with argument
 // parsing, or Examples/argparse for a focused arg-parsing demo.
 
 import Foundation

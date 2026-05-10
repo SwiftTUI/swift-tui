@@ -16,6 +16,15 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-10
+
+- Reshaped framework argument parsing around additive `SwiftTUICommand`
+  conformance instead of making the argument-parsing protocol subsume `App`.
+  `App.init()` is now nonisolated, runner products own the default launch path,
+  WebHost-capable apps can opt into the combined runner without the
+  terminal-only `--web` error, and example apps no longer need app-level
+  `@preconcurrency` conformances.
+
 ## 2026-05-09
 
 - `cf86a3a4` Shipped binding-driven navigation destination presentation:

@@ -1,6 +1,6 @@
 public import ArgumentParser
 
-/// The framework-owned option group flattened into every `SwiftTUIApp`'s command.
+/// The framework-owned option group flattened into every `SwiftTUICommand`.
 ///
 /// Consumers using power mode flatten this directly:
 ///
@@ -9,7 +9,8 @@ public import ArgumentParser
 /// var swiftTUIOptions: SwiftTUIOptions
 /// ```
 ///
-/// Consumers using easy mode (`SwiftTUIApp` protocol) get this for free.
+/// Consumers using the `SwiftTUICommand` protocol get this through the
+/// required `swiftTUIOptions` property.
 ///
 /// Reserved long flag names (consumers must not redeclare): see
 /// `docs/proposals/ARGUMENT_PARSING.md` § Reserved namespace.
