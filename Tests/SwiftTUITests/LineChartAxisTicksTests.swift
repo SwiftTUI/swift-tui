@@ -94,3 +94,44 @@ struct LineChartYAxisTickTests {
     #expect(labels[0].text.contains("M") || labels[0].text.contains("K"))
   }
 }
+
+@Suite("LineChart X axis ticks")
+struct LineChartXAxisTickTests {
+  @Test("xAxisTickLabels with .count(N) yields N evenly spaced labels")
+  func xCountEvenSpacing() {
+    let labels = xAxisTickLabels(
+      domain: 0...100,
+      ticks: .count(3),
+      format: .number(.number),
+      plotWidth: 20
+    )
+    #expect(labels.count == 3)
+    #expect(labels.first?.col == 0)
+    #expect(labels.last?.col == 19)
+  }
+
+  @Test("xAxisTickLabels with .dates(every: .month) snaps to month starts")
+  func xDateStrideSnapsToMonth() {
+    let cal = Calendar(identifier: .gregorian)
+    var calUTC = cal
+    calUTC.timeZone = TimeZone(identifier: "UTC")!
+    // Range: 2024-01-15 ... 2024-04-15.
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withFullDate]
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    let start = formatter.date(from: "2024-01-15")!
+    let end   = formatter.date(from: "2024-04-15")!
+    let labels = xAxisTickLabels(
+      domain: start.timeIntervalSinceReferenceDate...end.timeIntervalSinceReferenceDate,
+      ticks: .dates(every: .month),
+      format: .date(.dateTime.month(.abbreviated)),
+      plotWidth: 30,
+      calendar: calUTC
+    )
+    // Expect ticks at Feb, Mar, Apr starts (within the range).
+    let texts = labels.map(\.text)
+    #expect(texts.contains("Feb"))
+    #expect(texts.contains("Mar"))
+    #expect(texts.contains("Apr"))
+  }
+}
