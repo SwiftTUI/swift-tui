@@ -40,4 +40,30 @@ struct LineChartDomainTests {
     #expect(series.style == .line)
     #expect(series.tone == .automatic)
   }
+
+  @Test("plotDomain spans min..max across series for X and Y")
+  func plotDomainSpansAllSeries() {
+    let s1 = LineChartSeries("A", points: [.init(x: 0, y: 1), .init(x: 5, y: 10)])
+    let s2 = LineChartSeries("B", points: [.init(x: 2, y: -3), .init(x: 6, y: 4)])
+    let domain = plotDomain(series: [s1, s2])
+    #expect(domain?.x.lowerBound == 0)
+    #expect(domain?.x.upperBound == 6)
+    #expect(domain?.y.lowerBound == -3)
+    #expect(domain?.y.upperBound == 10)
+  }
+
+  @Test("plotDomain is nil when no series contains points")
+  func plotDomainNilWhenEmpty() {
+    let s = LineChartSeries("A", points: [])
+    #expect(plotDomain(series: [s]) == nil)
+    #expect(plotDomain(series: []) == nil)
+  }
+
+  @Test("plotDomain degenerates to a 1-wide range when all values equal")
+  func plotDomainDegenerate() {
+    let s = LineChartSeries("A", points: [.init(x: 5, y: 5)])
+    let domain = plotDomain(series: [s])
+    #expect(domain?.x == 5...5)
+    #expect(domain?.y == 5...5)
+  }
 }
