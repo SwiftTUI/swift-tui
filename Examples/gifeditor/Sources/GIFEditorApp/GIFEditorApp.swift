@@ -21,10 +21,14 @@ struct GIFEditorApp: App, SwiftTUICommand {
 
   var body: some Scene {
     WindowGroup {
-      GIFEditor.makeRootView(path: path)
+      GIFEditor(path: path)
     }
     .exitOnKeys([
       KeyPress(.character("q"), modifiers: .ctrl)
     ])
+  }
+
+  static func run() async throws {
+    try await WebHostCLIRunner.run(GIFEditorApp.self)
   }
 }

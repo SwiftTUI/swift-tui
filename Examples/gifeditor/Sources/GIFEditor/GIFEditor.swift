@@ -9,16 +9,18 @@ import SwiftTUI
 /// based on an optional file path, then hands it to `EditorView`. A future
 /// SwiftUI port would have a sibling factory function that returns a
 /// SwiftUI view fed the same `GIFDocument`.
-public enum GIFEditor {
-
+public struct GIFEditor: View {
+  let document: GIFDocument
   /// Loads the GIF at `path` if any, otherwise returns a blank 32×32
   /// document. Errors during load are turned into a one-frame document
   /// whose status message describes the error so the user sees them
   /// in-app rather than on stderr.
-  @MainActor
-  public static func makeRootView(path: String? = nil) -> some View {
-    let document = loadDocument(path: path)
-    return EditorView(document: document)
+  public init(path: String? = nil) {
+    self.document = Self.loadDocument(path: path)
+  }
+
+  public var body: some View {
+    EditorView(document: document)
   }
 
   static func loadDocument(path: String?) -> GIFDocument {
