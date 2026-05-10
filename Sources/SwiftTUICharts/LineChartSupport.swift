@@ -144,3 +144,42 @@ private func connectorGlyph(
   case (false, false): return "╰"   // turn up to the left
   }
 }
+
+/// Renders `.area` style: fills every cell between the line and
+/// `baselineRow` with `▒`, then the line itself on top.
+func rasterizeArea(
+  points: [LineChartPoint],
+  domain: LineChartDomain,
+  plotWidth: Int,
+  plotHeight: Int,
+  baselineRow: Int
+) -> [[LineRasterCell?]] {
+  let lineGrid = rasterizeLine(
+    points: points,
+    domain: domain,
+    plotWidth: plotWidth,
+    plotHeight: plotHeight
+  )
+  var grid = lineGrid
+  let height = max(1, plotHeight)
+  let width  = max(1, plotWidth)
+  let clampedBaseline = min(max(baselineRow, 0), height - 1)
+
+  // For each column, find the topmost filled row from the line raster.
+  // Fill from that row + 1 down to `clampedBaseline` with `▒`.
+  for col in 0..<width {
+    var topRow: Int?
+    for row in 0..<height where lineGrid[row][col] != nil {
+      topRow = row
+      break
+    }
+    guard let topRow else { continue }
+    let fillStart = topRow + 1
+    let fillEnd = clampedBaseline
+    guard fillStart <= fillEnd else { continue }
+    for row in fillStart...fillEnd where grid[row][col] == nil {
+      grid[row][col] = LineRasterCell(glyph: "▒")
+    }
+  }
+  return grid
+}

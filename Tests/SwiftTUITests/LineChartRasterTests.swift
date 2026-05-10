@@ -67,3 +67,39 @@ struct LineChartLineRasterTests {
     #expect(column0Filled && column1Filled)
   }
 }
+
+@Suite("LineChart area rasterization")
+struct LineChartAreaRasterTests {
+  @Test("rasterizeArea fills from line down to baselineRow")
+  func areaFillsDownToBaseline() {
+    let grid = rasterizeArea(
+      points: [.init(x: 0, y: 1), .init(x: 1, y: 2)],
+      domain: LineChartDomain(x: 0...1, y: 0...3),
+      plotWidth: 2, plotHeight: 3,
+      baselineRow: 2
+    )
+    // Cells below the line at each column should be `▒`.
+    var foundShade = false
+    for row in 0..<3 {
+      for col in 0..<2 {
+        if grid[row][col]?.glyph == "▒" { foundShade = true }
+      }
+    }
+    #expect(foundShade)
+  }
+
+  @Test("rasterizeArea does not paint above the line")
+  func areaDoesNotPaintAbove() {
+    let grid = rasterizeArea(
+      points: [.init(x: 0, y: 0), .init(x: 1, y: 0)],
+      domain: LineChartDomain(x: 0...1, y: 0...3),
+      plotWidth: 2, plotHeight: 3,
+      baselineRow: 2
+    )
+    // Top row should be empty since the line sits at y=0 (which inverts
+    // to row 2 — bottom). Row 0 (top) should have no fills.
+    for col in 0..<2 {
+      #expect(grid[0][col] == nil)
+    }
+  }
+}
