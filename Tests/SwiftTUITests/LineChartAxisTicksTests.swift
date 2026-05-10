@@ -156,3 +156,25 @@ struct LineChartXAxisTickTests {
     #expect(labels.map(\.text).contains("Feb"))
   }
 }
+
+@Suite("LineChart modifiers")
+@MainActor
+struct LineChartModifierTests {
+  @Test("chartXAxis stores the supplied config")
+  func storesXAxisConfig() {
+    let chart = LineChart(series: [], height: 8).chartXAxis(.hidden)
+    #expect(chart.xAxis.isHidden == true)
+  }
+
+  @Test("chartLegend stores legend config")
+  func storesLegendConfig() {
+    let chart = LineChart(series: [], height: 8).chartLegend(.hidden)
+    #expect(chart.legend.position == .hidden)
+  }
+
+  @Test("chartBaseline stores baseline")
+  func storesBaseline() {
+    let chart = LineChart(series: [], height: 8).chartBaseline(.zero)
+    #expect(chart.baseline == .zero)
+  }
+}
