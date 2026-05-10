@@ -39,7 +39,12 @@ The canonical authoring surface is the SwiftUI-shaped one:
 
 Important public-surface rules after the lowering migration:
 
-- `View` is body-only. It no longer inherits any low-level resolver protocol.
+- `View` is body-only. It has no `Body = Never` default and no broad
+  `extension View` body witness.
+- Primitive lowering remains package-only. Framework primitives opt into
+  `PrimitiveView` or a view-like protocol such as `Shape`; values that lower
+  directly opt into `ResolvableView`; primitive modifiers opt into
+  `PrimitiveViewModifier` or explicitly set `Body == Never`.
 - `View`, `Scene`, and `App` are `@MainActor` authoring protocols.
 - APIs that evaluate authored `body` trees, including `Resolver.resolve(...)` and `DefaultRenderer.render(...)`, are `@MainActor`.
 - Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
@@ -266,6 +271,7 @@ Low-level styling support such as `Theme` remains public in `Core`, but it is no
 
 These symbols still exist for internal reuse, diagnostics, or narrow package-local compatibility, but they are no longer part of the public API story:
 
+- `PrimitiveView`
 - `ResolvableView`
 - `ViewNode`
 - the local runtime registries and lifecycle replay helpers used by `RunLoop`
