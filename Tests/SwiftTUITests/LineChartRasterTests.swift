@@ -103,3 +103,23 @@ struct LineChartAreaRasterTests {
     }
   }
 }
+
+@Suite("LineChart step rasterization")
+struct LineChartStepRasterTests {
+  @Test("rasterizeStep holds Y constant across each segment then jumps")
+  func stepHoldsThenJumps() {
+    let grid = rasterizeStep(
+      points: [.init(x: 0, y: 0), .init(x: 3, y: 3)],
+      domain: LineChartDomain(x: 0...3, y: 0...3),
+      plotWidth: 4, plotHeight: 4
+    )
+    // Row 3 (y=0 inverted) should be filled for cols 0..2; col 3 holds
+    // the jump up to row 0.
+    #expect(grid[3][0] != nil)
+    #expect(grid[3][1] != nil)
+    #expect(grid[3][2] != nil)
+    // The jump column contains a vertical segment plus the new sample.
+    let jumpColumnHasFill = (0..<4).contains { grid[$0][3] != nil }
+    #expect(jumpColumnHasFill)
+  }
+}

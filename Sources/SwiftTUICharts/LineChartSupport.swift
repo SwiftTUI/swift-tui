@@ -183,3 +183,47 @@ func rasterizeArea(
   }
   return grid
 }
+
+/// Renders `.step` style: a horizontal segment at each sample's Y for
+/// the full width up to (but not including) the next sample's column,
+/// then a vertical jump in that column to the new Y.
+func rasterizeStep(
+  points: [LineChartPoint],
+  domain: LineChartDomain,
+  plotWidth: Int,
+  plotHeight: Int
+) -> [[LineRasterCell?]] {
+  let width = max(1, plotWidth)
+  let height = max(1, plotHeight)
+  var grid: [[LineRasterCell?]] = Array(
+    repeating: Array(repeating: nil, count: width),
+    count: height
+  )
+
+  guard !points.isEmpty else { return grid }
+
+  let cells: [(col: Int, row: Int)] = points.map { p in
+    (xCell(value: p.x, domain: domain.x, plotWidth: width),
+     yCell(value: p.y, domain: domain.y, plotHeight: height))
+  }
+
+  for i in 0..<cells.count {
+    let here = cells[i]
+    let endCol = (i + 1 < cells.count) ? cells[i + 1].col : width
+    // Horizontal hold from `here.col` to `endCol - 1` at `here.row`.
+    for col in here.col..<min(endCol, width) where grid[here.row][col] == nil {
+      grid[here.row][col] = LineRasterCell(glyph: "─")
+    }
+    // Vertical jump in `endCol` from `here.row` to the next sample's
+    // row, if there is one.
+    if i + 1 < cells.count, endCol < width {
+      let next = cells[i + 1]
+      let rowStart = min(here.row, next.row)
+      let rowEnd   = max(here.row, next.row)
+      for row in rowStart...rowEnd where grid[row][endCol] == nil {
+        grid[row][endCol] = LineRasterCell(glyph: "│")
+      }
+    }
+  }
+  return grid
+}
