@@ -13,8 +13,8 @@ struct WebHostExampleApp: App {
           .bold()
         Divider()
         Text("Terminal and browser output are selected at launch.")
-        LabeledContent("Mode", value: "compile-time opt-in")
-        Button("Refresh") {}
+        Text("Run this example with or without --web")
+          .foregroundStyle(.red)
       }
       .padding(1)
     }

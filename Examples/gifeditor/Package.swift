@@ -41,6 +41,7 @@ let package = Package(
     .package(name: "swift-tui", path: "../.."),
     .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
     .package(name: "SwiftTUIArguments", path: "../../Platforms/Arguments"),
+    .package(name: "SwiftTUIWebHost", path: "../../Platforms/WebHost"),
     .package(path: "../../Vendor/swift-gif"),
   ],
   targets: [
@@ -63,6 +64,7 @@ let package = Package(
         "GIFEditorUI",
         "GIFEditorCore",
         .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIWebHostCLI", package: "SwiftTUIWebHost"),
       ]
     ),
     .executableTarget(
