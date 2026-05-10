@@ -77,8 +77,10 @@ on the same flag surface.
 
 Per [ADR-0008](../decisions/0008-swifttui-library-only-runners-own-main.md),
 SwiftTUI is **library-only**. Executable launch is owned by peer runner
-packages (`SwiftTUICLI`, `SwiftTUIWASI`, `GUI/SwiftUIHost`, `GUI/WebHost`).
-Consumers writing terminal-native apps `import SwiftTUI` plus `import
+packages such as `SwiftTUICLI`, `SwiftTUIWASI`, and `SwiftTUIWebHost`.
+Embedded host packages (`Platforms/SwiftUI`, `Platforms/Web`) retain hosted
+scene sessions instead of owning `App.main()`. Consumers writing
+terminal-native apps `import SwiftTUI` plus `import
 SwiftTUICLI`, declare an `@main struct MyApp: App`, and the runner walks
 their scene body and runs the result.
 
@@ -1484,8 +1486,8 @@ runner packages. This proposal layers cleanly on top:
   SwiftTUICLI." The third import is opt-in; bare-mode consumers
   skip it.
 - **The runner consumes a typed `RuntimeConfiguration`, not a parser
-  object.** This means a future WASI-mode runner, browser-host, or
-  SwiftUI-host can also accept the same configuration value, even
+  object.** This means a future WASI-mode runner, browser host, or
+  SwiftUI host can also accept the same configuration value, even
   though the *parser* doesn't make sense in those contexts (e.g.,
   there's no argv in a browser tab). Each runner reads what it needs
   from `RuntimeConfiguration`; no runner has to know about
@@ -1493,7 +1495,8 @@ runner packages. This proposal layers cleanly on top:
 - **WASI runner integration.** `SwiftTUIWASI` could ship its own
   thin `SwiftTUIWASIApp` protocol that follows the same pattern but
   parses from manifest mode rather than argv. Sketched, deferred.
-- **GUI/SwiftUIHost and GUI/WebHost integration.** These don't have
+- **Embedded host integration.** `Platforms/SwiftUI`, `Platforms/Web`, and
+  browser-hosted WebHost paths don't have
   argv, but they may take config from their hosting environment
   (URL params, app delegate launch options, browser query string).
   A "manual" `RuntimeConfiguration` builder exists for these cases:
@@ -1844,8 +1847,8 @@ by theme:
   `App where Self: SwiftTUICommand` (easy mode), layered on top of
   swift-argument-parser. Web-host flag specifics
   (`--web` / `--port` / `--bind` / `--open`) have landed as parse
-  surface with manual browser-open by default; the embedded-host proposal
-  records the compile-time opt-in server and runner behavior.
+  surface with manual browser-open by default; the embedded WebHost proposal
+  records the compile-time opt-in server, browser host, and runner behavior.
 - 2026-05-04: Substrate-audit correction applied. See
   [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md). The existing
   `TerminalCapabilityProfile.detect` already reads `NO_COLOR`,

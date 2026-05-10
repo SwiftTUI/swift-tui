@@ -133,12 +133,13 @@ Examples/WebExample/
 
 ## See also
 
-- [`Platforms/Web`](../../Platforms/Web) — the host package this example
-  consumes
+- [`Platforms/Web`](../../Platforms/Web) — the embedded host package this
+  example consumes
 - [`Platforms/WASI`](../../Platforms/WASI) — the WASI
   runner that produces the manifest mode this example builds against
 - [`docs/HOST_PACKAGES.md`](../../docs/HOST_PACKAGES.md) — the
-  packaging model that puts host packages alongside the root package
+  packaging model that puts platform integration packages alongside the root
+  package
 - [`docs/decisions/0007-host-packages-are-peers.md`](../../docs/decisions/0007-host-packages-are-peers.md) — the ADR for that model
 - [Top-level `Website/`](../../Website) — Astro stub that iframes
   this example as the live demo

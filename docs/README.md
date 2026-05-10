@@ -31,6 +31,8 @@ The repository [README.md](../README.md) is the public landing page.
 ## Reference
 
 - [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) — ownership map across targets and key files
+- [TERMINOLOGY.md](TERMINOLOGY.md) — runner, host, presentation-surface, and
+  hosted-session vocabulary for public docs and package integration
 - [ACCESSIBILITY.md](ACCESSIBILITY.md) — shipped accessibility semantics,
   runtime policy, target bridges, guardrails, and remaining gaps
 - [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) — canonical public surface, removed surface, and package-only seams
@@ -46,7 +48,8 @@ The repository [README.md](../README.md) is the public landing page.
 
 ## Platform Packaging
 
-- [HOST_PACKAGES.md](HOST_PACKAGES.md) — runner-package and embedded-host packaging model
+- [HOST_PACKAGES.md](HOST_PACKAGES.md) — platform integration package model for
+  executable runners and embedded hosts
 - [ANDROID.md](ANDROID.md) — Android cross-compilation
 - [../Examples/README.md](../Examples/README.md) — maintained example apps and packages
 

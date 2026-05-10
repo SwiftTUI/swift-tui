@@ -18,7 +18,7 @@ SwiftTUI is split into four targets so that pure pipeline work, authoring work, 
 
 - Exposes the SwiftUI-shaped authoring surface
 - Resolves authored views into core nodes
-- Hosts property wrappers, environment plumbing, focus APIs, layouts, and controls
+- Provides property wrappers, environment plumbing, focus APIs, layouts, and controls
 
 ### `SwiftTUICharts`
 
@@ -30,12 +30,14 @@ SwiftTUI is split into four targets so that pure pipeline work, authoring work, 
 
 - Re-exports the public package surface that matters for single-session runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, ``RunLoop``, and rendering entry points
-- Hosts host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+- Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
 ### Platform integration packages
 
 - executable runner packages `Platforms/CLI` and `Platforms/WASI` build top-level execution layers on top of `SwiftTUI`
-- embedded host packages `Platforms/SwiftUI` and `Platforms/Web` host the same authored `SwiftTUI` apps inside platform-managed shells
+- embedded host packages `Platforms/SwiftUI` and `Platforms/Web` retain the same authored `SwiftTUI` apps inside platform-managed shells
+- `Platforms/WebHost` is a compound package: its runner starts a localhost
+  browser host and its CLI product composes terminal and WebHost launch routing
 
 The conceptual model is:
 
@@ -47,6 +49,8 @@ That last integration layer comes in two forms:
 
 - executable runner packages own top-level execution and default `App.main()` stories
 - embedded host packages retain `HostedSceneSession` values inside another app or runtime lifecycle
+- compound packages must say which side is in scope: runner, host bridge, or
+  presentation surface
 
 For a deeper look at how those pieces fit together at the host boundary, see <doc:Host-Integration>.
 
@@ -133,6 +137,8 @@ Those integration layers serve three execution modes:
 - terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or the default `App.main()` provided by `Platforms/CLI`
 - WASI executable execution and manifest generation via `WASIRunner` in `Platforms/WASI`
 - host-managed embedding via `SceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `Platforms/SwiftUI` and `Platforms/Web`
+- localhost-browser WebHost execution via `WebHostRunner` and the WebHost
+  browser bridge in `Platforms/WebHost`
 
 CLI scene management is executable-runner policy rather than an authored-scene rule. One-window and multi-window apps share the same runner story; `SwiftTUI` itself remains library-only.
 
@@ -150,7 +156,7 @@ CLI scene management is executable-runner policy rather than an authored-scene r
 ## Styling And Presentation
 
 - The public styling story is semantic-token-first: TUI views author against `.foreground`, `.background`, `.warning`, `.tint`, and related roles
-- Hosts and embedded host packages choose the active theme; the inner TUI app does not branch on host style variants or inspect theme choice directly
+- The active host integration chooses the active theme; the inner TUI app does not branch on host style variants or inspect theme choice directly
 - Terminal appearance can be inferred heuristically or queried actively from the host and can synthesize the default semantic theme when no explicit host theme is provided
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
 - Presentation sanitizes authored text and OSC 8 hyperlink destinations before

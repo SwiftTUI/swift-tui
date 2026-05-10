@@ -26,8 +26,8 @@ Pointer input quality varies enormously by terminal:
 - **Sub-cell-capable terminals** (Kitty, WezTerm, iTerm2, foot in some
   modes) can report pixel coordinates via DEC private mode 1016
   (SGR-Pixels).
-- **Native and web hosts** (`GUI/SwiftUIHost`,
-  `GUI/WebHost`) can deliver true pixel coordinates derived from
+- **Native and web hosts** (`Platforms/SwiftUI`,
+  `Platforms/Web`, and `Platforms/WebHost`) can deliver true pixel coordinates derived from
   device input.
 
 Authored gesture code shouldn't have to branch on host capability. A

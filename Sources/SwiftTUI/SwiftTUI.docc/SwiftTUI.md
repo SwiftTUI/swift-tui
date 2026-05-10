@@ -28,8 +28,9 @@ packages build on.
 
 Scene declarations such as ``App`` and ``WindowGroup`` also live here, but
 platform integration lives in peer packages: executable runner packages
-`Platforms/CLI` and `Platforms/WASI`, plus embedded host
-packages `Platforms/SwiftUI`, `Platforms/Web`, and `GUI/XtermWebHost`.
+`Platforms/CLI` and `Platforms/WASI`, embedded host packages
+`Platforms/SwiftUI` and `Platforms/Web`, and the compound WebHost package in
+`Platforms/WebHost`.
 `SwiftTUI` itself is library-only.
 
 Pointer input policy types such as `TerminalMouseInputResolution`,

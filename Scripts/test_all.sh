@@ -168,7 +168,7 @@ The script also checks required environment dependencies up front:
 
 On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
-  - skips `Platforms/SwiftUI` tests because the SwiftUI host package is Apple-only
+  - skips `Platforms/SwiftUI` tests because the SwiftUI embedded host package is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
@@ -552,7 +552,7 @@ run_function_step \
 if [ "$is_linux" -eq 1 ]; then
   skip_step \
     "Run Platforms/SwiftUI tests" \
-    "SwiftUI host package is only available on Apple platforms"
+    "SwiftUI embedded host package is only available on Apple platforms"
 else
   run_function_step \
     "Run Platforms/SwiftUI tests" \

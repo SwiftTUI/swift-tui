@@ -3,7 +3,8 @@
 This page is the durable reference for shipped accessibility behavior in
 SwiftTUI. The long research record remains in
 [`proposals/ACCESSIBILITY.md`](proposals/ACCESSIBILITY.md); this page describes
-what app authors and host-package maintainers can rely on today.
+what app authors, runner maintainers, and embedded-host-package maintainers can
+rely on today.
 
 ## Model
 
@@ -71,7 +72,8 @@ Calls outside an active SwiftTUI runtime are ignored.
 ## Runtime Policy
 
 `RuntimeConfiguration` owns the resolved runtime accessibility policy. It can
-come from environment detection, `SwiftTUIArguments`, or a host runner.
+come from environment detection, `SwiftTUIArguments`, a runner, or an embedded
+host package.
 
 Important fields:
 

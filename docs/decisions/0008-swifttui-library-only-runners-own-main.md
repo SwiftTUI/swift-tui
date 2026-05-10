@@ -23,7 +23,7 @@ Options considered:
    `App.main()`. Authors who import SwiftTUI get terminal-native
    execution for free.
 2. **In a peer runner package.** SwiftTUI stays library-only;
-   `Runners/SwiftTUICLI` provides the default `App.main()`. Authors
+   `Platforms/CLI` provides the default `App.main()`. Authors
    import both.
 
 Option 1 is more convenient for first-time users. It's also a
@@ -35,9 +35,9 @@ infrastructure. None of those are wanted by:
 - consumers running SwiftTUI under WASI (they need the WASI runner's
   manifest mode),
 - consumers embedding SwiftTUI inside a SwiftUI macOS / iOS app via
-  `GUI/SwiftUIHost` (they hand scene sessions to the host's run
+  `Platforms/SwiftUI` (they hand scene sessions to the host's run
   loop),
-- consumers embedding SwiftTUI in the browser via `GUI/WebHost`
+- consumers embedding SwiftTUI in the browser via `Platforms/Web`
   (they consume a WASI build and surface raster output to a canvas).
 
 For three of the four shipped execution modes, the terminal-native
@@ -59,7 +59,7 @@ import SwiftTUICLI   // <-- provides the default App.main()
 struct MyApp: App { ... }
 ```
 
-`Runners/SwiftTUICLI` provides:
+`Platforms/CLI` provides:
 
 - the default `App.main()` story for terminal-native execution,
 - `TerminalRunner.run(MyApp.self)` as an explicit launch
@@ -68,16 +68,18 @@ struct MyApp: App { ... }
 - PTY-backed secondary scenes,
 - the crash-guard installation (see ADR-0010).
 
-`Runners/SwiftTUIWASI` provides the equivalent for WASI execution.
-Embedded host packages (`GUI/SwiftUIHost`, `GUI/WebHost`) consume
-hosted scene sessions directly without involving any default
-`App.main()` at all.
+`Platforms/WASI` provides the equivalent for WASI execution.
+Embedded host packages (`Platforms/SwiftUI`, `Platforms/Web`) consume hosted
+scene sessions directly without involving any default `App.main()` at all.
+`Platforms/WebHost` is compound: `SwiftTUIWebHost` provides
+`WebHostRunner`, and `SwiftTUIWebHostCLI` composes terminal and WebHost launch
+routing.
 
 ## Status
 
 Accepted. The terminal-native default `App.main()` lives in
-`Runners/SwiftTUICLI/Sources/SwiftTUICLI/SwiftTUICLI.swift`. The
-root package's only library products are `View`, `SwiftTUI`, and
+`Platforms/CLI/Sources/SwiftTUICLI/SwiftTUICLI.swift`. The root package's
+library products are `SwiftTUIViews`, `SwiftTUI`, `SwiftTUIAnimatedImage`, and
 `SwiftTUICharts`.
 
 ## Consequences

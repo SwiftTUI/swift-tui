@@ -462,9 +462,9 @@ package struct TextInputSemantics: Equatable, Sendable {
 
 For secure text, `value == nil`. The role remains `.secureField`.
 
-Longer term, this may become public or SPI if host packages need richer
-bridging. The first implementation should keep it package-level until the
-shape is proven.
+Longer term, this may become public or SPI if host integrations need richer
+bridging. The first implementation should keep it package-level until the shape
+is proven.
 
 ## Rendering and Style Integration
 
