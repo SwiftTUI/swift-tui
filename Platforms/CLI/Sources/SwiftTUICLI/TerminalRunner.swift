@@ -505,8 +505,9 @@ public enum TerminalRunnerError: Error, Equatable, Sendable, CustomStringConvert
   public var description: String {
     switch self {
     case .webHostNotLinked:
-      return "--web was requested, but this binary was not compiled with SwiftTUI" + "WebHost. "
-        + "Add the SwiftTUI" + "WebHostCLI product or use a WebHost runner."
+      return "--web requires the opt-in WebHost runner, but this executable was built with "
+        + "terminal-only SwiftTUICLI. Link the SwiftTUI" + "WebHostCLI product and call "
+        + "WebHostCLIRunner.run(...), or remove --web."
     }
   }
 }

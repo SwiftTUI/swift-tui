@@ -1120,8 +1120,9 @@ accepts `--web`, the terminal runner must fail early with a clear message
 such as:
 
 ```text
-[swifttui] --web was requested, but this binary was not compiled with
-SwiftTUIWebHost. Add the SwiftTUIWebHostCLI product or use a WebHost runner.
+[swifttui] --web requires the opt-in WebHost runner, but this executable was
+built with terminal-only SwiftTUICLI. Link the SwiftTUIWebHostCLI product and
+call WebHostCLIRunner.run(...), or remove --web.
 ```
 
 Web-capable combined binary:

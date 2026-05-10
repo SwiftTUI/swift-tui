@@ -283,10 +283,11 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
 
   Error description:
 
-  ```text
-  --web was requested, but this binary was not compiled with SwiftTUIWebHost.
-  Add the SwiftTUIWebHostCLI product or use a WebHost runner.
-  ```
+```text
+--web requires the opt-in WebHost runner, but this executable was built with
+terminal-only SwiftTUICLI. Link the SwiftTUIWebHostCLI product and call
+WebHostCLIRunner.run(...), or remove --web.
+```
 
 - [x] Run focused checks.
 

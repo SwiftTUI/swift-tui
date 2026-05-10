@@ -23,8 +23,9 @@ struct TerminalRunnerConfigurationTests {
       Issue.record("Expected TerminalRunner to reject web mode.")
     } catch let error as TerminalRunnerError {
       let expected =
-        "--web was requested, but this binary was not compiled with SwiftTUI"
-        + "WebHost. Add the SwiftTUI" + "WebHostCLI product or use a WebHost runner."
+        "--web requires the opt-in WebHost runner, but this executable was built with "
+        + "terminal-only SwiftTUICLI. Link the SwiftTUI" + "WebHostCLI product and call "
+        + "WebHostCLIRunner.run(...), or remove --web."
       #expect(error == .webHostNotLinked)
       #expect(error.description == expected)
     } catch {
