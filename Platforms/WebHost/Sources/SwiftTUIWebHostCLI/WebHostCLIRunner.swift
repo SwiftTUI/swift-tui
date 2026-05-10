@@ -1,3 +1,4 @@
+import Foundation
 public import SwiftTUI
 import SwiftTUIArguments
 import SwiftTUICLI
@@ -58,5 +59,36 @@ public enum WebHostCLIRunner {
   ) throws -> RuntimeConfiguration {
     try SwiftTUIOptions.parse(arguments)
       .runtimeConfiguration(environment: environment, isStdoutTTY: isStdoutTTY)
+  }
+}
+
+extension App where Self: SwiftTUICommand {
+  @MainActor public func run() async throws {
+    let configuration = runtimeConfiguration()
+    try await WebHostCLIRunner.run(self, configuration: configuration)
+  }
+
+  /// Default entry point for apps that opt into both `SwiftTUICommand`
+  /// argument parsing and the combined terminal/WebHost runner.
+  public static func main() async {
+    do {
+      var command = try parseSwiftTUIRootCommand()
+      if let script = completionScript(forParsedCommand: command) {
+        FileHandle.standardOutput.write(Data(script.utf8))
+        return
+      }
+      if let installedURL = try installCompletionScript(forParsedCommand: command) {
+        let message = "Installed completion script at \(installedURL.path)\n"
+        FileHandle.standardOutput.write(Data(message.utf8))
+        return
+      }
+      if let appCommand = command as? Self {
+        try await appCommand.run()
+        return
+      }
+      try command.run()
+    } catch {
+      exit(withError: error)
+    }
   }
 }

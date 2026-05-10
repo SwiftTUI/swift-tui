@@ -4,7 +4,6 @@ import SwiftTUIArguments
 import SwiftTUIWebHostCLI
 
 @main
-@MainActor
 struct GalleryDemoApp: App {
   var body: some Scene {
     WindowGroup {

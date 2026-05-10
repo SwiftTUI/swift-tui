@@ -60,16 +60,16 @@ struct CompletionsCommandTests {
     #expect(fishURL.path == "/tmp/swifttui-home/.config/fish/completions/myapp.fish")
   }
 
-  @Test("SwiftTUIApp default configuration exposes completions print")
-  func swiftTUIAppDefaultConfigurationExposesCompletionsPrint() throws {
-    let command = try TestSwiftTUIApp.parseAsRoot(["completions", "print", "zsh"])
+  @Test("SwiftTUICommand default configuration exposes completions print")
+  func swiftTUICommandDefaultConfigurationExposesCompletionsPrint() throws {
+    let command = try TestSwiftTUICommand.parseAsRoot(["completions", "print", "zsh"])
     let printCommand = try #require(command as? CompletionsCommand.Print)
     #expect(printCommand.shell.rawValue == "zsh")
   }
 
-  @Test("SwiftTUIApp detects completions before root argument parsing")
-  func swiftTUIAppDetectsCompletionsBeforeRootArgumentParsing() throws {
-    let command = try TestSwiftTUIApp.completionCommand(forRawArguments: [
+  @Test("SwiftTUICommand detects completions before root argument parsing")
+  func swiftTUICommandDetectsCompletionsBeforeRootArgumentParsing() throws {
+    let command = try TestSwiftTUICommand.completionCommand(forRawArguments: [
       "completions", "install", "fish", "--output", "/tmp/myapp.fish",
     ])
     let installCommand = try #require(command as? CompletionsCommand.Install)
@@ -77,18 +77,18 @@ struct CompletionsCommandTests {
     #expect(installCommand.outputPath == "/tmp/myapp.fish")
   }
 
-  @Test("SwiftTUIApp emits root completion script for completions print")
-  func swiftTUIAppEmitsRootCompletionScript() throws {
-    let command = try TestSwiftTUIApp.parseAsRoot(["completions", "print", "zsh"])
-    let script = try #require(TestSwiftTUIApp.completionScript(forParsedCommand: command))
+  @Test("SwiftTUICommand emits root completion script for completions print")
+  func swiftTUICommandEmitsRootCompletionScript() throws {
+    let command = try TestSwiftTUICommand.parseAsRoot(["completions", "print", "zsh"])
+    let script = try #require(TestSwiftTUICommand.completionScript(forParsedCommand: command))
     #expect(script.contains("--accessible"))
     #expect(script.contains("--cursor-follows-focus"))
     #expect(script.contains("--widgets"))
     #expect(script.contains("completions"))
   }
 
-  @Test("SwiftTUIApp installs root completion script for completions install")
-  func swiftTUIAppInstallsRootCompletionScript() throws {
+  @Test("SwiftTUICommand installs root completion script for completions install")
+  func swiftTUICommandInstallsRootCompletionScript() throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("swift-tui-completions-\(UUID().uuidString)", isDirectory: true)
     let outputURL = directory.appendingPathComponent("test-app.fish")
@@ -96,10 +96,10 @@ struct CompletionsCommandTests {
       try? FileManager.default.removeItem(at: directory)
     }
 
-    let command = try TestSwiftTUIApp.parseAsRoot([
+    let command = try TestSwiftTUICommand.parseAsRoot([
       "completions", "install", "fish", "--output", outputURL.path,
     ])
-    let installedURL = try TestSwiftTUIApp.installCompletionScript(forParsedCommand: command)
+    let installedURL = try TestSwiftTUICommand.installCompletionScript(forParsedCommand: command)
     let installed = try #require(installedURL)
 
     #expect(installed.path == outputURL.path)

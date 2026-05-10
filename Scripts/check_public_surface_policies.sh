@@ -62,9 +62,9 @@ if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurre
   fail "The public App protocol must stay @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+init\(\)' \
+if ! rg -U -n -P --quiet -- 'nonisolated\s+init\(\)' \
   Sources/SwiftTUI/Scenes/App.swift; then
-  fail "App.init must stay @MainActor-annotated."
+  fail "App.init must stay nonisolated so runner/argument protocols can compose with App."
 fi
 
 if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \

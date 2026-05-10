@@ -1,7 +1,7 @@
 #if canImport(AppKit)
-  @preconcurrency import AppKit
+  import AppKit
 #elseif canImport(UIKit)
-  @preconcurrency import UIKit
+  import UIKit
 #endif
 
 enum NativeClipboard {

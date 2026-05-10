@@ -1,11 +1,10 @@
 import Layouts
 import SwiftTUI
-import SwiftTUICLI
 import SwiftTUIArguments
+import SwiftTUICLI
 
 @main
-@MainActor
-struct LayoutsApp: @preconcurrency SwiftTUIApp {
+struct LayoutsApp: App, SwiftTUICommand {
   @OptionGroup(title: "SwiftTUI Options")
   var swiftTUIOptions: SwiftTUIOptions
 

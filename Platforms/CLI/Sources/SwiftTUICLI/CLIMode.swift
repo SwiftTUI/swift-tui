@@ -23,7 +23,7 @@
     /// - `myapp scenes [--pid N | --instance NAME]` — `.listScenes(...)`.
     /// - `myapp attach <scene-id> [--pid N | --instance NAME]` — `.attach(...)`.
     ///
-    /// When `arguments` doesn't match any of those (e.g., a `SwiftTUIApp`
+    /// When `arguments` doesn't match any of those (e.g., a `SwiftTUICommand`
     /// consumer's own flags appear in argv first), returns
     /// `.app(instanceName: nil)` — the consumer's parser owns argv, so the
     /// runner treats the invocation as plain "run mode".
@@ -37,7 +37,8 @@
 
       switch parsed {
       case let attach as RunnerCLI.Attach:
-        return .attach(sceneID: attach.sceneID, selector: selector(pid: attach.pid, name: attach.instance))
+        return .attach(
+          sceneID: attach.sceneID, selector: selector(pid: attach.pid, name: attach.instance))
       case let scenes as RunnerCLI.Scenes:
         return .listScenes(selector: selector(pid: scenes.pid, name: scenes.instance))
       case is RunnerCLI.Instances:

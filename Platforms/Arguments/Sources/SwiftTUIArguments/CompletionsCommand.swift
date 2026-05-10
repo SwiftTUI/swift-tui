@@ -3,7 +3,7 @@ import Foundation
 
 /// Subcommand for managing shell completion scripts.
 ///
-/// `SwiftTUIApp` installs this by default. If an app overrides
+/// `SwiftTUICommand` installs this by default. If an app overrides
 /// `CommandConfiguration`, include `CompletionsCommand.self` in its
 /// `subcommands` list to keep this surface available.
 ///
@@ -54,7 +54,7 @@ public struct CompletionsCommand: ParsableCommand {
 
     public mutating func run() throws {
       throw CleanExit.message(
-        "completions print must run from a SwiftTUIApp root command so the generated script "
+        "completions print must run from a SwiftTUICommand root command so the generated script "
           + "includes the app's options."
       )
     }
@@ -79,7 +79,7 @@ public struct CompletionsCommand: ParsableCommand {
 
     public mutating func run() throws {
       throw CleanExit.message(
-        "completions install must run from a SwiftTUIApp root command so the generated script "
+        "completions install must run from a SwiftTUICommand root command so the generated script "
           + "includes the app's options."
       )
     }

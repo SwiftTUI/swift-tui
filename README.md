@@ -73,7 +73,6 @@ runner package instead:
 import SwiftTUIWebHostCLI
 
 @main
-@MainActor
 struct DemoApp: App {
   var body: some Scene {
     WindowGroup("Deploy Dashboard") {
@@ -97,7 +96,7 @@ browser bundle; `--web` is rejected before terminal raw-mode setup.
 Apps that want CLI flags plus the framework's standard flag surface
 (`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--web`,
 `--cursor-follows-focus`, `--json`, `--linear`, `-v`, `--debug`, ...) import
-`SwiftTUIArguments` and conform to `SwiftTUIApp`:
+`SwiftTUIArguments` and add `SwiftTUICommand` alongside `App`:
 
 ```swift
 import SwiftTUI
@@ -105,8 +104,7 @@ import SwiftTUICLI
 import SwiftTUIArguments
 
 @main
-@MainActor
-struct MyApp: @preconcurrency SwiftTUIApp {
+struct MyApp: App, SwiftTUICommand {
   @OptionGroup(title: "SwiftTUI Options")
   var swiftTUIOptions: SwiftTUIOptions
 

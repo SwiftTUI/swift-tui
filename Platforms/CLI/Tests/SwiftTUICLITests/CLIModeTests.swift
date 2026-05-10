@@ -75,7 +75,7 @@ struct CLIModeTests {
 
   @Test("Consumer flags fall through to plain app mode")
   func consumerFlagsFallThroughToApp() {
-    // A `SwiftTUIApp` consumer owns argv first; from CLIMode's perspective,
+    // A `SwiftTUICommand` consumer owns argv first; from CLIMode's perspective,
     // any non-runner-subcommand input should be treated as 'run mode'.
     let mode = CLIMode.parse(["myapp", "--widgets", "10", "--show-ids"])
     #expect(mode == .app(instanceName: nil))

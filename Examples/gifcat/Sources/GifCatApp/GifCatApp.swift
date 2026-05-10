@@ -1,12 +1,11 @@
 import GifCat
 import SwiftTUI
-import SwiftTUICLI
 import SwiftTUIArguments
+import SwiftTUICLI
 
 @main
-@MainActor
-struct GifCatApp: @preconcurrency SwiftTUIApp {
-  static let configuration = CommandConfiguration(
+struct GifCatApp: App, SwiftTUICommand {
+  nonisolated static let configuration = CommandConfiguration(
     commandName: "gifcat",
     abstract: "Display one or more GIFs in a grid in the terminal."
   )

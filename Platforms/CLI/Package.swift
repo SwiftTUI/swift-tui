@@ -25,6 +25,7 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
+    .package(name: "SwiftTUIArguments", path: "../Arguments"),
     .package(path: "../Embedding"),
     .package(path: "../../Vendor/UnixSignals"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
@@ -34,6 +35,7 @@ let package = Package(
       name: "SwiftTUICLI",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
         .product(name: "SwiftTUIPTYPrimitives", package: "Embedding"),
         .product(name: "UnixSignals", package: "UnixSignals"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
@@ -46,6 +48,7 @@ let package = Package(
         "SwiftTUICLI",
         .product(name: "SwiftTUIPTYPrimitives", package: "Embedding"),
         .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
       ],
       swiftSettings: swiftSettings()
     ),

@@ -3,9 +3,8 @@ import SwiftTUIArguments
 import SwiftTUICLI
 
 @main
-@MainActor
-struct ArgParseDemoApp: @preconcurrency SwiftTUIApp {
-  static let configuration = CommandConfiguration(
+struct ArgParseDemoApp: App, SwiftTUICommand {
+  nonisolated static let configuration = CommandConfiguration(
     commandName: "argparse-demo",
     abstract: "Demonstrates consumer flags + SwiftTUI framework flags coexisting.",
     subcommands: [CompletionsCommand.self]

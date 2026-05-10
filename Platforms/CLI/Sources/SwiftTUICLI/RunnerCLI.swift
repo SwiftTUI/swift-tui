@@ -3,7 +3,7 @@
 
   /// Runner-internal subcommand surface used by the bare-mode `App.main()`.
   ///
-  /// Not exposed to `SwiftTUIApp` consumers — they own their own argv and
+  /// Not exposed to `SwiftTUICommand` consumers — they own their own argv and
   /// route through their own `ParsableCommand`.
   ///
   /// Surface:
