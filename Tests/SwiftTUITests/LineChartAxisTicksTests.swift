@@ -172,6 +172,12 @@ struct LineChartModifierTests {
     #expect(chart.legend.position == .hidden)
   }
 
+  @Test("chartYAxis stores the supplied config")
+  func storesYAxisConfig() {
+    let chart = LineChart(series: [], height: 8).chartYAxis(.hidden)
+    #expect(chart.yAxis.isHidden == true)
+  }
+
   @Test("chartBaseline stores baseline")
   func storesBaseline() {
     let chart = LineChart(series: [], height: 8).chartBaseline(.zero)
