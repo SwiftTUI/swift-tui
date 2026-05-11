@@ -1,0 +1,16 @@
+fixture calendar-heatmap
+configuration ansi16
+surface 60x11
+capability glyph=unicode color=ansi16 styles=true
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
+01│\u{001B}[90mActivity\u{001B}[0m·············································\u{001B}[90m10·days\u{001B}[0m
+02│\u{001B}[97m····\u{001B}[0m\u{001B}[90mAS····O···N···D···\u{001B}[0m
+03│····\u{001B}[96m··········▒····▓·█\u{001B}[0m
+04│·\u{001B}[97mTue\u{001B}[0m\u{001B}[96m·░▒▓·█·▓··········\u{001B}[0m
+05│····\u{001B}[96m·░················\u{001B}[0m
+06│·\u{001B}[97mThu\u{001B}[0m\u{001B}[96m··················\u{001B}[0m
+07│····\u{001B}[96m············█·····\u{001B}[0m
+08│·\u{001B}[97mSat\u{001B}[0m\u{001B}[96m··················\u{001B}[0m
+09│····\u{001B}[96m··················\u{001B}[0m
+10│\u{001B}[90mLess\u{001B}[0m·\u{001B}[96m░\u{001B}[0m·\u{001B}[96m▒\u{001B}[0m·\u{001B}[96m▓\u{001B}[0m·\u{001B}[96m█\u{001B}[0m·\u{001B}[90mMore\u{001B}[0m
+11│

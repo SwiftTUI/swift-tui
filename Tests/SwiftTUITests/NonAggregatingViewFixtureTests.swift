@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUICharts
 import Testing
 
@@ -227,6 +228,79 @@ struct NonAggregatingViewFixtureTests {
         )
       )
 
+    case "calendar-heatmap":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 11),
+        view: AnyView(
+          CalendarHeatmap(
+            "Activity",
+            days: calendarHeatmapDays,
+            range: calendarHeatmapRange,
+            weekStart: .monday,
+            calendar: utcGregorianCalendar,
+            cellWidth: 1
+          )
+        )
+      )
+
+    case "line-chart-three-series":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 12),
+        view: AnyView(
+          LineChart(
+            "Tokens per Day",
+            series: tokenSeries(),
+            height: 8
+          )
+          .chartXAxis(.dates(every: .week))
+          .chartYAxis(.values(count: 5))
+          .chartLegend(.bottom)
+        )
+      )
+
+    case "line-chart-area":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 10),
+        view: AnyView(
+          LineChart(
+            "Net LOC",
+            series: [
+              LineChartSeries("net loc",
+                              points: locSeries(),
+                              style: .area,
+                              tone: .info)
+            ],
+            height: 6
+          )
+          .chartXAxis(.dates(every: .month))
+          .chartYAxis(.values(count: 4))
+          .chartBaseline(.zero)
+        )
+      )
+
+    case "line-chart-step":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 10),
+        view: AnyView(
+          LineChart(
+            "Release cadence",
+            series: [
+              LineChartSeries("releases",
+                              points: stepSeries(),
+                              style: .step,
+                              tone: .success)
+            ],
+            height: 6
+          )
+          .chartXAxis(.dates(every: .month))
+          .chartYAxis(.values(count: 4))
+        )
+      )
+
     default:
       return FixtureSpec(
         name: name,
@@ -261,6 +335,10 @@ private let nonAggregatingFixtureNames = [
   "threshold-gauge",
   "column-chart",
   "heat-strip",
+  "calendar-heatmap",
+  "line-chart-three-series",
+  "line-chart-area",
+  "line-chart-step",
 ]
 
 private struct FixtureSpec {
@@ -331,3 +409,90 @@ private let thresholdBands: [ThresholdBand] = [
   .init(upTo: 80, tone: .warning),
   .init(upTo: 100, tone: .success),
 ]
+
+private let utcGregorianCalendar: Calendar = {
+  var cal = Calendar(identifier: .gregorian)
+  cal.timeZone = TimeZone(identifier: "UTC")!
+  return cal
+}()
+
+private let calendarHeatmapRange: ClosedRange<Date> = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  return formatter.date(from: "2024-09-01")!...formatter.date(from: "2024-12-29")!
+}()
+
+private let calendarHeatmapDays: [DateValue] = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    DateValue(d("2024-09-03"), value: 2),
+    DateValue(d("2024-09-04"), value: 1),
+    DateValue(d("2024-09-10"), value: 4),
+    DateValue(d("2024-09-17"), value: 5),
+    DateValue(d("2024-10-01"), value: 8),
+    DateValue(d("2024-10-15"), value: 6),
+    DateValue(d("2024-11-04"), value: 3),
+    DateValue(d("2024-11-22"), value: 9),
+    DateValue(d("2024-12-09"), value: 7),
+    DateValue(d("2024-12-23"), value: 10),
+  ]
+}()
+
+private func tokenSeries() -> [LineChartSeries] {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    LineChartSeries("Opus 4.7", points: [
+      .init(date: d("2024-09-01"), value: 1_200_000),
+      .init(date: d("2024-09-08"), value: 3_400_000),
+      .init(date: d("2024-09-15"), value: 5_100_000),
+      .init(date: d("2024-09-22"), value: 4_200_000),
+    ], tone: .info),
+    LineChartSeries("Opus 4.6", points: [
+      .init(date: d("2024-09-01"), value: 800_000),
+      .init(date: d("2024-09-08"), value: 2_100_000),
+      .init(date: d("2024-09-15"), value: 1_900_000),
+      .init(date: d("2024-09-22"), value: 2_500_000),
+    ], tone: .success),
+    LineChartSeries("Haiku 4.5", points: [
+      .init(date: d("2024-09-01"), value: 400_000),
+      .init(date: d("2024-09-08"), value: 700_000),
+      .init(date: d("2024-09-15"), value: 1_100_000),
+      .init(date: d("2024-09-22"), value: 900_000),
+    ], tone: .warning),
+  ]
+}
+
+private func locSeries() -> [LineChartPoint] {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    .init(date: d("2024-01-01"), value: 0),
+    .init(date: d("2024-02-01"), value: 1_200),
+    .init(date: d("2024-03-01"), value: 1_800),
+    .init(date: d("2024-04-01"), value: 2_500),
+    .init(date: d("2024-05-01"), value: 4_100),
+    .init(date: d("2024-06-01"), value: 5_400),
+  ]
+}
+
+private func stepSeries() -> [LineChartPoint] {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    .init(date: d("2024-01-01"), value: 1),
+    .init(date: d("2024-02-15"), value: 2),
+    .init(date: d("2024-04-01"), value: 4),
+    .init(date: d("2024-05-20"), value: 5),
+  ]
+}

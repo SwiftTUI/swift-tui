@@ -1,0 +1,16 @@
+fixture calendar-heatmap
+configuration preview-unicode
+surface 60x11
+capability glyph=unicode color=none styles=false
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
+01│Activity·············································10·days
+02│····AS····O···N···D···
+03│··············▒····▓·█
+04│·Tue·░▒▓·█·▓··········
+05│·····░················
+06│·Thu··················
+07│················█·····
+08│·Sat··················
+09│······················
+10│Less·░·▒·▓·█·More
+11│
