@@ -33,6 +33,8 @@ The module is intentionally separate from the core roadmap so charting needs do 
 - ``Sparkline``
 - ``Timeline``
 - ``HeatStrip``
+- ``CalendarHeatmap``
+- ``LineChart``
 
 ### Support Types
 
@@ -41,6 +43,16 @@ The module is intentionally separate from the core roadmap so charting needs do 
 - ``TimelineEntry``
 - ``LegendItem``
 - ``ThresholdBand``
+- ``DateValue``
+- ``LineChartPoint``
+- ``LineChartSeries``
+- ``LineChartSeriesStyle``
+- ``LineChartXAxis``
+- ``LineChartYAxis``
+- ``LineChartLegendConfig``
+- ``LineChartBaseline``
+- ``DateAxisStride``
+- ``CalendarHeatmapWeekStart``
 
 ### Guide
 

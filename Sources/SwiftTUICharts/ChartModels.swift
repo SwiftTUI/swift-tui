@@ -1,3 +1,4 @@
+public import Foundation
 import SwiftTUICore
 import SwiftTUIViews
 
@@ -83,5 +84,16 @@ public struct ThresholdBand: Hashable, Sendable {
   ) {
     self.upperBound = upperBound
     self.tone = tone
+  }
+}
+
+/// A date paired with a numeric value, used by date-axis charts.
+public struct DateValue: Hashable, Sendable {
+  public var date: Date
+  public var value: Double
+
+  public init(_ date: Date, value: Double) {
+    self.date = date
+    self.value = value
   }
 }

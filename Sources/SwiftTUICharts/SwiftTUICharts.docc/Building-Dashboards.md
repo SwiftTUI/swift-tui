@@ -34,3 +34,40 @@ integer `CellRect` values from layout, and pointer or hover locations are
 continuous cell-space `Point` values. Convert from the continuous point into a
 domain value at the chart boundary; keep chart layout itself cell-denominated
 so the same view works with cell-only pointer fallback.
+
+## Calendars and time series
+
+### Calendar heatmap
+
+For daily activity over a long horizon (commits per day, requests per
+day, ...), use `CalendarHeatmap`. Pass a flat array of `DateValue` and
+the chart buckets them into a weekday × week grid.
+
+```swift
+CalendarHeatmap(
+  "Activity",
+  days: dailyCounts,
+  weekStart: .monday
+)
+```
+
+### Multi-series line chart
+
+For continuous numeric or time-series data with one or more lines, use
+`LineChart`. Series can be `.line`, `.area`, or `.step`; the X axis can
+be numeric or Date-aware via `.chartXAxis(.dates(...))`.
+
+```swift
+LineChart(
+  "Tokens per Day",
+  series: [
+    .init("Opus 4.7", points: opus47, tone: .info),
+    .init("Opus 4.6", points: opus46, tone: .success),
+    .init("Haiku 4.5", points: haiku45, tone: .warning),
+  ],
+  height: 8
+)
+.chartXAxis(.dates(every: .week))
+.chartYAxis(.values(count: 6, format: .number.notation(.compactName)))
+.chartLegend(.bottom)
+```

@@ -520,6 +520,17 @@ func columnChartBody(
   }
 }
 
+/// Maps a 0...1 intensity fraction to the canonical 4-step ramp glyph.
+/// Returns `"░"` for < 0.25, `"▒"` for < 0.5, `"▓"` for < 0.75, `"█"` otherwise.
+func intensityRampGlyph(fraction: Double) -> String {
+  switch fraction {
+  case ..<0.25: return "░"
+  case ..<0.5:  return "▒"
+  case ..<0.75: return "▓"
+  default:      return "█"
+  }
+}
+
 func heatStripGlyph(
   value: Double,
   maximumValue: Double
@@ -529,18 +540,10 @@ func heatStripGlyph(
   }
 
   let fraction = min(max(abs(value) / maximumValue, 0), 1)
-  switch fraction {
-  case 0:
+  if fraction == 0 {
     return " "
-  case ..<0.25:
-    return "░"
-  case ..<0.5:
-    return "▒"
-  case ..<0.75:
-    return "▓"
-  default:
-    return "█"
   }
+  return intensityRampGlyph(fraction: fraction)
 }
 
 @MainActor
