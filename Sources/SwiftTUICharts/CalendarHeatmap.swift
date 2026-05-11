@@ -3,7 +3,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 /// A GitHub-style weekday × week intensity grid for daily activity data.
-public struct CalendarHeatmap<Label: View, Summary: View>: View, ResolvableView {
+public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var days: [DateValue]
   public var range: ClosedRange<Date>?
   public var weekStart: CalendarHeatmapWeekStart
