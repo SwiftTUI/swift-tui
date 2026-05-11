@@ -260,6 +260,47 @@ struct NonAggregatingViewFixtureTests {
         )
       )
 
+    case "line-chart-area":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 10),
+        view: AnyView(
+          LineChart(
+            "Net LOC",
+            series: [
+              LineChartSeries("net loc",
+                              points: locSeries(),
+                              style: .area,
+                              tone: .info)
+            ],
+            height: 6
+          )
+          .chartXAxis(.dates(every: .month))
+          .chartYAxis(.values(count: 4))
+          .chartBaseline(.zero)
+        )
+      )
+
+    case "line-chart-step":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 10),
+        view: AnyView(
+          LineChart(
+            "Release cadence",
+            series: [
+              LineChartSeries("releases",
+                              points: stepSeries(),
+                              style: .step,
+                              tone: .success)
+            ],
+            height: 6
+          )
+          .chartXAxis(.dates(every: .month))
+          .chartYAxis(.values(count: 4))
+        )
+      )
+
     default:
       return FixtureSpec(
         name: name,
@@ -296,6 +337,8 @@ private let nonAggregatingFixtureNames = [
   "heat-strip",
   "calendar-heatmap",
   "line-chart-three-series",
+  "line-chart-area",
+  "line-chart-step",
 ]
 
 private struct FixtureSpec {
@@ -423,5 +466,33 @@ private func tokenSeries() -> [LineChartSeries] {
       .init(date: d("2024-09-15"), value: 1_100_000),
       .init(date: d("2024-09-22"), value: 900_000),
     ], tone: .warning),
+  ]
+}
+
+private func locSeries() -> [LineChartPoint] {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    .init(date: d("2024-01-01"), value: 0),
+    .init(date: d("2024-02-01"), value: 1_200),
+    .init(date: d("2024-03-01"), value: 1_800),
+    .init(date: d("2024-04-01"), value: 2_500),
+    .init(date: d("2024-05-01"), value: 4_100),
+    .init(date: d("2024-06-01"), value: 5_400),
+  ]
+}
+
+private func stepSeries() -> [LineChartPoint] {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    .init(date: d("2024-01-01"), value: 1),
+    .init(date: d("2024-02-15"), value: 2),
+    .init(date: d("2024-04-01"), value: 4),
+    .init(date: d("2024-05-20"), value: 5),
   ]
 }
