@@ -138,13 +138,16 @@ private func monthHeaderLabels(
 }
 
 private func weekdayLabels(weekStart: CalendarHeatmapWeekStart) -> [String] {
-  // Match the screenshot reference: blank, Mon, blank, Wed, blank, Fri, blank
-  // (or the Sun-start permutation).
+  // Label Mon/Wed/Fri (the canonical weekday markers in GitHub-style
+  // heatmaps) regardless of week-start orientation. Row indices shift
+  // with the week start so the labels land on the right days:
+  //   .sunday → rows 0..6 = Sun..Sat → label rows 1, 3, 5
+  //   .monday → rows 0..6 = Mon..Sun → label rows 0, 2, 4
   switch weekStart {
   case .sunday:
     return ["", "Mon", "", "Wed", "", "Fri", ""]
   case .monday:
-    return ["", "Tue", "", "Thu", "", "Sat", ""]
+    return ["Mon", "", "Wed", "", "Fri", "", ""]
   }
 }
 

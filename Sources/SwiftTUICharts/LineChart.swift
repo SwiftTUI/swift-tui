@@ -24,6 +24,11 @@ public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableVi
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    // Even when the caller supplies their own label/summary views, we
+    // still want a synthesized accessibility summary so VoiceOver users
+    // hear a meaningful description. The convenience inits below
+    // override this when they have a title to compose with.
+    let summarizedSeriesCount = "\(series.count) series"
     self.init(
       series: series,
       height: height,
@@ -32,7 +37,7 @@ public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableVi
       yAxis: .automatic,
       legend: .bottom,
       baseline: .auto,
-      accessibilitySummary: nil,
+      accessibilitySummary: summarizedSeriesCount,
       label: label,
       summary: summary
     )
