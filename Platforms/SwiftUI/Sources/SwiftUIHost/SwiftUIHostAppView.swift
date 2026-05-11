@@ -1,5 +1,5 @@
 import SwiftTUI
-import SwiftUI
+public import SwiftUI
 
 public struct SwiftUIHostAppView<A: SwiftTUI.App>: SwiftUI.View {
   private let state: SwiftUIHostAppState<A>

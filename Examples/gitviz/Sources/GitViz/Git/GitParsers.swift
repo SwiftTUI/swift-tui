@@ -142,7 +142,8 @@ enum GitParsers {
 
   /// Format string for `git for-each-ref refs/tags`. Fields are separated by
   /// US, records by RS.
-  static let tagFormat = "%(refname:short)\u{1F}%(objectname)\u{1F}%(taggerdate:iso-strict)\u{1F}%(committerdate:iso-strict)\u{1F}%(objecttype)\u{1E}"
+  static let tagFormat =
+    "%(refname:short)\u{1F}%(objectname)\u{1F}%(taggerdate:iso-strict)\u{1F}%(committerdate:iso-strict)\u{1F}%(objecttype)\u{1E}"
 
   /// Parses `git for-each-ref refs/tags --format=<tagFormat>` output.
   ///
@@ -207,7 +208,8 @@ enum GitParsers {
         counts[path, default: 0] += 1
       }
     }
-    return counts
+    return
+      counts
       .map { FileTally(path: $0.key, changeCount: $0.value) }
       .sorted { lhs, rhs in
         if lhs.changeCount != rhs.changeCount {
@@ -228,35 +230,29 @@ enum GitParsers {
 
   /// Parses an ISO-8601 timestamp from git (`%aI` / `iso-strict`).
   static func parseISODate(_ value: String) -> Date? {
-    if let parsed = isoFormatter.date(from: value) {
+    if let parsed = isoDateFormatter(formatOptions: [.withInternetDateTime]).date(from: value) {
       return parsed
     }
     // git sometimes emits "1970-01-01T00:00:00+00:00" — accept the common
     // variants without timezone fractional seconds.
-    if let parsed = isoFormatterNoFractional.date(from: value) {
+    if let parsed = isoDateFormatter(
+      formatOptions: [
+        .withYear, .withMonth, .withDay,
+        .withTime, .withColonSeparatorInTime, .withDashSeparatorInDate,
+        .withTimeZone, .withColonSeparatorInTimeZone,
+        .withSpaceBetweenDateAndTime,
+      ]
+    ).date(from: value) {
       return parsed
     }
     return nil
   }
 
-  // ISO8601DateFormatter is not Sendable, but Foundation explicitly documents
-  // that its parsing methods are thread-safe once configured. Cache one
-  // formatter per format option set in module-scope `let`s so we don't
-  // re-create them per parse.
-  nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+  private static func isoDateFormatter(
+    formatOptions: ISO8601DateFormatter.Options
+  ) -> ISO8601DateFormatter {
     let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
+    formatter.formatOptions = formatOptions
     return formatter
-  }()
-
-  nonisolated(unsafe) private static let isoFormatterNoFractional: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [
-      .withYear, .withMonth, .withDay,
-      .withTime, .withColonSeparatorInTime, .withDashSeparatorInDate,
-      .withTimeZone, .withColonSeparatorInTimeZone,
-      .withSpaceBetweenDateAndTime,
-    ]
-    return formatter
-  }()
+  }
 }

@@ -1,21 +1,21 @@
 # Terminal Embedding
 
 Host external terminal programs inside SwiftTUI layout with the
-`SwiftTUITerminal` peer package.
+`SwiftTUITerminal` product.
 
 ## Overview
 
-Terminal embedding is implemented outside the root `SwiftTUI` product in
-`Platforms/Embedding`. Apps import `SwiftTUI` for the authoring/runtime surface
-and `SwiftTUITerminal` for `TerminalView<Session>`, `TerminalSession`, and
-`TerminalProcessSession`.
+Terminal embedding is implemented outside the root `SwiftTUI` runtime product
+in the root package's `SwiftTUITerminal` product. Apps import `SwiftTUI` for
+the authoring/runtime surface and `SwiftTUITerminal` for
+`TerminalView<Session>`, `TerminalSession`, and `TerminalProcessSession`.
 
 `TerminalView` participates in the normal SwiftTUI frame pipeline. It measures
 from its parent proposal, draws a foreign terminal grid through the existing
 raster path, and forwards keyboard input to the child session only while
 focused. The child program does not own a separate commit path.
 
-For the package boundary context, see <doc:Architecture> and
+For the product boundary context, see <doc:Architecture> and
 <doc:Host-Integration>.
 
 ## Authoring

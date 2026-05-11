@@ -77,8 +77,8 @@ frame. The shipped policy is summarized in [ACCESSIBILITY.md](ACCESSIBILITY.md):
   accessibility node when `RuntimeConfiguration.cursorFollowsFocus` is true.
 - Reduced-motion and no-progress policy is copied into `EnvironmentValues`
   before view resolution, including `accessibilityReduceMotion`.
-- Web/WASI, the localhost WebHost browser bridge, and the SwiftUI embedded
-  host package consume the same semantic records through their own platform
+- Web/WASI, the localhost WebHost browser bridge, and the SwiftUI host product
+  consume the same semantic records through their own platform
   bridges.
 
 ### Pointer Coordinates And Capabilities
@@ -342,7 +342,7 @@ Limitations:
 - SIGKILL and OOM-kill cannot be caught — the kernel terminates the process immediately
 - `tcsetattr` is not officially async-signal-safe per POSIX, though it is safe in practice on Darwin and Linux
 - The crash guard does not cover WASI (no signals) or Windows
-- Other process owners, including future runner packages or embedded host apps that own a real tty, would need their own crash guard installation
+- Other process owners, including future runner products or embedded host apps that own a real tty, would need their own crash guard installation
 
 ## Coverage Anchors
 

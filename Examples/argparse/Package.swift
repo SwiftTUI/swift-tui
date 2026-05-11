@@ -10,16 +10,14 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
-    .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
-    .package(name: "SwiftTUIArguments", path: "../../Platforms/Arguments"),
   ],
   targets: [
     .executableTarget(
       name: "ArgParseDemo",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
-        .product(name: "SwiftTUIArguments", package: "SwiftTUIArguments"),
+        .product(name: "SwiftTUICLI", package: "swift-tui"),
+        .product(name: "SwiftTUIArguments", package: "swift-tui"),
       ]
     )
   ]

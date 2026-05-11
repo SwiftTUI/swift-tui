@@ -75,14 +75,15 @@ Current async presentation and frame-tail worker ownership is summarized in
 ### Scene and multi-scene surface
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `SwiftTUI`
-- `SceneDescriptor`, `SceneManifest`, and `HostedSceneSession` in `SwiftTUI` for embedded host package tooling and retained non-terminal hosting
-- `TerminalRunner` in `Platforms/CLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
-- `WASIRunner` in `Platforms/WASI` for manifest generation and WASI-hosted scene launch
-- `WebHostRunner` and `WebHostCLIRunner` in `Platforms/WebHost` for
+- `SceneDescriptor`, `SceneManifest`, and `HostedSceneSession` in `SwiftTUI` for host product tooling and retained non-terminal hosting
+- `TerminalRunner` in `SwiftTUICLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
+- `WASIRunner` in `SwiftTUIWASI` for manifest generation and WASI-hosted scene launch
+- `WebHostRunner` and `WebHostCLIRunner` in `SwiftTUIWebHost` /
+  `SwiftTUIWebHostCLI` for
   localhost-browser launch and terminal/WebHost launch routing
 - The same authored `App` can feed terminal-native execution, WASI execution,
-  localhost-browser WebHost execution, or host-managed embedding through peer
-  embedded host packages
+  localhost-browser WebHost execution, or host-managed embedding through root
+  package platform products
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` for terminal-native shell composition
 - Binding-driven `NavigationStack` destination presentation through
@@ -100,7 +101,7 @@ Current async presentation and frame-tail worker ownership is summarized in
 - `AnimatedImage`, `AnimatedImageSequence`, `AnimatedImageFrame`,
   `AnimatedImagePixel`, and `AnimatedGIF`
 
-### Terminal embedding (peer package)
+### Terminal embedding
 
 - `TerminalView<Session>`, `TerminalSession` protocol, and
   `TerminalProcessSession` for spawned children
@@ -113,13 +114,14 @@ Current async presentation and frame-tail worker ownership is summarized in
 - The core `SwiftTUI` runtime renders one active scene into one active
   presentation surface per session. Multi-scene apps are supported, but only
   one scene is on screen at a time per surface.
-- `SwiftTUI` is library-only. Platform integration splits between executable
-  runner packages, embedded host packages, and the compound WebHost package
-  under `Platforms/`.
-- Embedded host packages live at `Platforms/SwiftUI` and `Platforms/Web`. They
-  use `SwiftTUI` scene manifests plus `HostedSceneSession` and own their own
-  platform shell integration, scene switching chrome, and style surfaces.
-- Embedded host packages own one active host style object at a time and
+- `SwiftTUI` is library-only. Platform integration lives in sibling root
+  package products for executable runners, hosts, WebHost, and terminal
+  embedding. `Platforms/` is the source layout for those targets, while
+  `Platforms/Web` remains the Bun browser package.
+- Host products and packages use `SwiftTUI` scene manifests plus
+  `HostedSceneSession` and own their own platform shell integration, scene
+  switching chrome, and style surfaces.
+- Host products own one active host style object at a time and
   can swap it at runtime; the root TUI app renders semantic tokens without
   knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
@@ -146,8 +148,8 @@ Current async presentation and frame-tail worker ownership is summarized in
   value/selection transport, IME/composition, and large-document rope/piece-tree
   storage remain deferred until SwiftTUI has concrete host event contracts or
   workload evidence.
-- `Platforms/Embedding` does not build for iOS or WASI.
-- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Platforms/WASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
+- `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` do not build for iOS or WASI.
+- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through the root `SwiftTUIWASI` product / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`

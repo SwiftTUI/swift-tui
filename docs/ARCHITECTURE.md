@@ -32,24 +32,29 @@
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
 - Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
-### Platform integration packages
+### Platform integration products
 
-- executable runner packages `Platforms/CLI` and `Platforms/WASI` build top-level execution layers on top of `SwiftTUI`
-- embedded host packages `Platforms/SwiftUI` and `Platforms/Web` retain the same authored `SwiftTUI` apps inside platform-managed shells
-- `Platforms/WebHost` is a compound package: its runner starts a localhost
-  browser host and its CLI product composes terminal and WebHost launch routing
+- executable runner products `SwiftTUICLI` and `SwiftTUIWASI` build top-level
+  execution layers on top of `SwiftTUI`
+- host products and packages retain the same authored `SwiftTUI` apps inside
+  platform-managed shells: `SwiftUIHost` for native SwiftUI and
+  `Platforms/Web` for browser deployment
+- `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
+  `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
+- terminal-program embedding lives in `SwiftTUITerminal` and
+  `SwiftTUIPTYPrimitives`
 
 The conceptual model is:
 
 ```text
-authored app surface -> shared SwiftTUI runtime -> platform integration package -> platform shell
+authored app surface -> shared SwiftTUI runtime -> platform integration product -> platform shell
 ```
 
 That last integration layer comes in two forms:
 
-- executable runner packages own top-level execution and default `App.main()` stories
-- embedded host packages retain `HostedSceneSession` values inside another app or runtime lifecycle
-- compound packages must say which side is in scope: runner, host bridge, or
+- executable runner products own top-level execution and default `App.main()` stories
+- host products retain `HostedSceneSession` values inside another app or runtime lifecycle
+- compound products must say which side is in scope: runner, host bridge, or
   presentation surface
 
 Detailed terminology lives in [TERMINOLOGY.md](TERMINOLOGY.md). Detailed
@@ -196,17 +201,20 @@ The core runtime is intentionally narrow today:
 - keyboard-first interaction with optional pointer input when the host or
   terminal supports reporting
 
-Platform integration and multi-scene orchestration are packaged separately in
-peer platform integration packages rather than in the root `SwiftTUI`
-library.
+Platform integration and multi-scene orchestration live in sibling products in
+the root package rather than in the `SwiftTUI` library product itself.
 
 Those integration layers serve three execution modes:
 
-- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or the default `App.main()` provided by `Platforms/CLI`
-- WASI executable execution and manifest generation via `WASIRunner` in `Platforms/WASI`
-- host-managed embedding via `SceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `Platforms/SwiftUI` and `Platforms/Web`
+- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or
+  the default `App.main()` provided by `SwiftTUICLI`
+- WASI executable execution and manifest generation via `WASIRunner` in
+  `SwiftTUIWASI`
+- host-managed embedding via `SceneManifest(for:)` and
+  `HostedSceneSession(for:sceneID:...)`, as used by `SwiftUIHost` and
+  `Platforms/Web`
 - localhost-browser WebHost execution via `WebHostRunner` and the WebHost
-  browser bridge in `Platforms/WebHost`
+  browser bridge in `SwiftTUIWebHost`
 
 CLI scene management is executable-runner policy rather than an authored-scene
 rule. One-window and multi-window apps share the same runner story; `SwiftTUI`

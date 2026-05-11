@@ -23,14 +23,14 @@ Use it when you want to:
 - ``DefaultRenderer`` for one-shot rendering and frame inspection
 - ``RunLoop`` for interactive sessions that own terminal I/O, scheduling, focus, lifecycle staging, and presentation
 
-It also owns the shared scene-hosting APIs that peer platform integration
-packages build on.
+It also owns the shared scene-hosting APIs that root package platform products
+build on.
 
 Scene declarations such as ``App`` and ``WindowGroup`` also live here, but
-platform integration lives in peer packages: executable runner packages
-`Platforms/CLI` and `Platforms/WASI`, embedded host packages
-`Platforms/SwiftUI` and `Platforms/Web`, and the compound WebHost package in
-`Platforms/WebHost`.
+platform integration lives in sibling products in the same root package:
+`SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`, `SwiftTUIWebHost`, and
+`SwiftTUIWebHostCLI`. Browser deployment through `Platforms/Web` remains the
+Bun package that consumes a `SwiftTUIWASI` build.
 `SwiftTUI` itself is library-only.
 
 Pointer input policy types such as `TerminalMouseInputResolution`,

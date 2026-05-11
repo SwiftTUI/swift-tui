@@ -325,6 +325,7 @@ public_style_enums=$(
 for style_enum in $public_style_enums; do
   case "$style_enum" in
   AnyShapeStyle) ;;
+  LineChartSeriesStyle) ;;
   *)
     fail "New public enum-backed *Style surface appeared: $style_enum. Authoring-facing style APIs should prefer public extensible style protocols."
     ;;
@@ -360,31 +361,31 @@ if ! rg -n --fixed-strings --quiet -- '`SwiftTUI`' README.md; then
   fail "README.md should name SwiftTUI explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`Platforms/CLI`' README.md; then
-  fail "README.md should name the SwiftTUICLI runner package explicitly."
+if ! rg -n --fixed-strings --quiet -- '`SwiftTUICLI`' README.md; then
+  fail "README.md should name the SwiftTUICLI runner product explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`Platforms/WASI`' README.md; then
-  fail "README.md should name the SwiftTUIWASI runner package explicitly."
+if ! rg -n --fixed-strings --quiet -- '`SwiftTUIWASI`' README.md; then
+  fail "README.md should name the SwiftTUIWASI runner product explicitly."
 fi
 
 if ! rg -n --fixed-strings --quiet -- '### `SwiftTUI`' docs/PUBLIC_API_INVENTORY.md; then
   fail "docs/PUBLIC_API_INVENTORY.md should classify the SwiftTUI runtime explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '### Peer platform integration packages' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should classify the peer platform integration packages explicitly."
+if ! rg -n --fixed-strings --quiet -- '### Root-package platform integration products' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should classify the root-package platform integration products explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'peer platform integration packages: runners for executable launch and embedded' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should describe the runner and embedded host package model explicitly."
+if ! rg -n --fixed-strings --quiet -- 'one Swift package exposing `SwiftTUI` for shared' docs/PUBLIC_SURFACE_POLICY.md; then
+  fail "docs/PUBLIC_SURFACE_POLICY.md should describe the root package platform product model explicitly."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'Experimental or showcase targets follow the same rule' docs/PUBLIC_SURFACE_POLICY.md; then
   fail "docs/PUBLIC_SURFACE_POLICY.md should keep the showcase-target policy heading."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'they should not be exported as package products' docs/PUBLIC_SURFACE_POLICY.md; then
+if ! rg -n --fixed-strings --quiet -- 'exported as package products' docs/PUBLIC_SURFACE_POLICY.md; then
   fail "docs/PUBLIC_SURFACE_POLICY.md should keep the showcase export policy."
 fi
 

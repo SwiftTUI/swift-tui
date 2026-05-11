@@ -57,8 +57,8 @@ Confirmed deviations today:
 - **Terminal-program embedding as authored content.** SwiftUI has no direct
   equivalent for hosting a running terminal program inside a `View`, but the
   terminal workspace model needs that verb. SwiftTUI supports it through the
-  peer `Platforms/Embedding` package and `TerminalView`; the design is captured
-  in [proposals/TERMINAL_EMBEDDING.md](proposals/TERMINAL_EMBEDDING.md).
+  `SwiftTUITerminal` product and `TerminalView`; the design is captured in
+  [proposals/TERMINAL_EMBEDDING.md](proposals/TERMINAL_EMBEDDING.md).
 - **Terminal-native reinterpretation of defaults.** Automatic chrome, app shell
   composition, and navigation-oriented surfaces may intentionally diverge from
   desktop SwiftUI precedent when modern terminal UX has a clearly better answer.

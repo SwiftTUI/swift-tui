@@ -2,12 +2,12 @@
 
 **Status:** Phases 1–6 implemented per
 [`docs/plans/2026-05-04-002-argument-parsing-plan.md`](../plans/2026-05-04-002-argument-parsing-plan.md).
-The `SwiftTUIArguments` peer package ships `SwiftTUIOptions` (power mode),
+The `SwiftTUIArguments` root package product ships `SwiftTUIOptions` (power mode),
 the additive `SwiftTUICommand` protocol (easy mode), and `CompletionsCommand` for
 zsh/bash/fish completion script printing and installation. `RuntimeConfiguration`
 lives in `SwiftTUI` core. Bare-mode apps honor framework env vars via the
 default `App.main()` extension. Apps that opt into argument parsing conform to
-both `App` and `SwiftTUICommand`; runner packages provide the launch behavior.
+both `App` and `SwiftTUICommand`; runner products provide the launch behavior.
 Runner-internal scene and attach operations now route through subcommands
 instead of legacy flag forms, and the opt-in `SwiftTUIWebHostCLI` runner honors
 the flag-form WebHost configuration
@@ -76,9 +76,9 @@ on the same flag surface.
 ## Context
 
 Per [ADR-0008](../decisions/0008-swifttui-library-only-runners-own-main.md),
-SwiftTUI is **library-only**. Executable launch is owned by peer runner
-packages such as `SwiftTUICLI`, `SwiftTUIWASI`, and `SwiftTUIWebHost`.
-Embedded host packages (`Platforms/SwiftUI`, `Platforms/Web`) retain hosted
+SwiftTUI is **library-only**. Executable launch is owned by runner products
+such as `SwiftTUICLI`, `SwiftTUIWASI`, and `SwiftTUIWebHost`.
+Host products and packages (`SwiftUIHost`, `Platforms/Web`) retain hosted
 scene sessions instead of owning `App.main()`. Consumers writing
 terminal-native apps `import SwiftTUI` plus `import
 SwiftTUICLI`, declare an `@main struct MyApp: App`, and the runner walks
@@ -479,7 +479,7 @@ design. The "consumer might forget" objection is mitigated by Option C
 ### Option C: framework provides a `SwiftTUICommand` protocol that wraps `AsyncParsableCommand`
 
 **Shape.** A protocol with a default `static main()` that does the
-right thing when paired with a runner package. Consumers add it alongside
+right thing when paired with a runner product. Consumers add it alongside
 `App`.
 
 ```swift
@@ -547,7 +547,7 @@ derive that property, but the shipped protocol keeps the requirement explicit.
 **Cons.**
 - Protocol composition (`App` × `AsyncParsableCommand`) is fiddly if
   one protocol subsumes the other. The shipped shape avoids that:
-  `SwiftTUICommand` is additive, and runner packages provide launch
+  `SwiftTUICommand` is additive, and runner products provide launch
   behavior through `extension App where Self: SwiftTUICommand`.
 - The mechanism for getting `SwiftTUIOptions` flags into the parser
   without the consumer typing `@OptionGroup` requires either a base
@@ -580,7 +580,7 @@ full parser. No swift-argument-parser dependency.
 - Not a credible engineering plan.
 
 **Verdict.** Rejected. The dependency cost of swift-argument-parser is
-acceptable for a runner library (which is already a peer package, not
+acceptable for a runner library (which is already a platform product, not
 the foundation-free `SwiftTUICore` / `SwiftTUIViews` / `SwiftTUI` layer). The Foundation
 constraint applies to library products, not to runner products.
 
@@ -1465,11 +1465,12 @@ default swift-argument-parser behavior is correct.
 ## Interaction with decision 0008 (runners own main)
 
 [ADR-0008](../decisions/0008-swifttui-library-only-runners-own-main.md)
-says: SwiftTUI is library-only; executable launch is owned by peer
-runner packages. This proposal layers cleanly on top:
+says: SwiftTUI is library-only; executable launch is owned by runner
+products. This proposal layers cleanly on top:
 
-- **`SwiftTUIArguments` is a peer of the runner packages.** It does
-  not move into root SwiftTUI. The Foundation-free invariant on
+- **`SwiftTUIArguments` is a sibling root package product to the runner
+  products.** It does not move into the `SwiftTUI` runtime product. The
+  Foundation-free invariant on
   `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` is preserved.
 - **The additive protocol `SwiftTUICommand` lives in
   `SwiftTUIArguments`.** It is *not* a re-export from `SwiftTUI`.
@@ -1495,7 +1496,7 @@ runner packages. This proposal layers cleanly on top:
 - **WASI runner integration.** `SwiftTUIWASI` could ship its own
   thin `SwiftTUIWASIApp` protocol that follows the same pattern but
   parses from manifest mode rather than argv. Sketched, deferred.
-- **Embedded host integration.** `Platforms/SwiftUI`, `Platforms/Web`, and
+- **Host integration.** `SwiftUIHost`, `Platforms/Web`, and
   browser-hosted WebHost paths don't have
   argv, but they may take config from their hosting environment
   (URL params, app delegate launch options, browser query string).
@@ -1587,7 +1588,7 @@ Lean; lean is meant to be argued with, not committed.)
    composition with `App` and `AsyncParsableCommand` is fiddly when
    one protocol subsumes the other. A base struct is cleaner but locks
    consumers into single inheritance. **Lean: additive protocol.** We
-   keep `App` and command parsing separate, then let runner packages
+   keep `App` and command parsing separate, then let runner products
    provide the shared launch behavior. We pay
    the protocol-ergonomics price once.
 
@@ -1841,7 +1842,7 @@ by theme:
   OptionGroup, protocol, hand-rolled, macro), the standard-flags
   table, the env-var ↔ flag mapping consistent with ACCESSIBILITY.md,
   precedence rules, and the integration with decisions 0008 and
-  0003. The recommended path is the `SwiftTUIArguments` peer package
+  0003. The recommended path is the `SwiftTUIArguments` product
   shipping `SwiftTUIOptions: ParsableArguments` (power mode) and
   `SwiftTUICommand: AsyncParsableCommand` plus runner extensions for
   `App where Self: SwiftTUICommand` (easy mode), layered on top of
@@ -1897,7 +1898,7 @@ by theme:
   `RuntimeConfiguration` value type + `Builder` + `detect(...)` factory in
   `SwiftTUI` core; `TerminalRunner.run(_:configuration:)` overload and
   env-var-aware default `App.main()` in `SwiftTUICLI`; new
-  `Platforms/Arguments/` peer package shipping `SwiftTUIOptions:
+  `SwiftTUIArguments` product shipping `SwiftTUIOptions:
   ParsableArguments`, `SwiftTUIOptions.runtimeConfiguration(...)`,
   initial `SwiftTUIApp` protocol with default `static func main()`
   (disambiguating `App.main` vs `AsyncParsableCommand.main`), and
@@ -1914,5 +1915,5 @@ by theme:
   `ParsableArguments.init()` was nonisolated.
 - 2026-05-10: `App.init()` became nonisolated and the argument helper was
   reshaped as additive `SwiftTUICommand`. `SwiftTUIArguments` now owns only
-  parsing/configuration/completion helpers; runner packages provide the
+  parsing/configuration/completion helpers; runner products provide the
   default launch behavior for `App where Self: SwiftTUICommand`.

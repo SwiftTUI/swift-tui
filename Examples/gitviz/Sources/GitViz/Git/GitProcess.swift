@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Errors produced when invoking `git` via Foundation `Process`.
 enum GitProcessError: Error, CustomStringConvertible, Sendable {
@@ -98,20 +99,17 @@ enum GitProcess {
 }
 
 /// Thread-safe Data holder used to publish the result of a background
-/// pipe-draining `Thread`. `NSLock` keeps the write visible to the joining
-/// thread without pulling in actor isolation; it's the smallest hammer that
-/// closes the data race the compiler would otherwise flag.
-private final class DataBox: @unchecked Sendable {
-  private let lock = NSLock()
-  private var value = Data()
+/// pipe-draining `Thread`.
+private final class DataBox: Sendable {
+  private let storage = Mutex<Data>(Data())
+
   func set(_ data: Data) {
-    lock.lock()
-    value = data
-    lock.unlock()
+    storage.withLock { value in
+      value = data
+    }
   }
+
   func get() -> Data {
-    lock.lock()
-    defer { lock.unlock() }
-    return value
+    storage.withLock { $0 }
   }
 }

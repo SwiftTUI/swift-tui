@@ -59,7 +59,7 @@ host's theme**. The view does not branch on which theme is active.
 
 Host responsibilities:
 
-- The embedded host package, host bridge, or terminal runner picks the active theme
+- The host product, host bridge, or terminal runner picks the active theme
   variant (light, dark, or custom).
 - The host can swap themes at runtime through a paired control-message
   channel; the runtime delivers the change to all hosted scene
@@ -86,14 +86,14 @@ Accepted. Shipped platform integration paths own their own theme inputs:
 - terminal-native runners (`SwiftTUICLI` / `SwiftTUIWASI`) infer
   the appearance from the terminal and pair it with a default semantic
   theme,
-- `Platforms/SwiftUI` exposes explicit light / dark variants paired
+- `SwiftUIHost` exposes explicit light / dark variants paired
   with native renderer palette state,
 - `Platforms/Web` mirrors the same shape and binds to the embedding
   page's color scheme,
-- `Platforms/WebHost` serves the same browser-side style shape through its
+- `SwiftTUIWebHost` serves the same browser-side style shape through its
   localhost browser host.
 
-Embedded host packages and host bridges own their style mapping; the root
+Host products and host bridges own their style mapping; the root
 package does not ship a cross-platform color database.
 
 ## Consequences
@@ -121,7 +121,7 @@ package does not ship a cross-platform color database.
 
 - Adding a new public color-affecting API requires a corresponding
   semantic token, not a literal-color signature.
-- Embedded host packages cannot expose package-only internals through their
+- Host products cannot expose package-only internals through their
   theme APIs; the supported boundary is semantic tokens plus the
   paired render-style update message.
 

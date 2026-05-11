@@ -51,8 +51,8 @@ Interactive:
 
 Repo-aware:
   test              Run \`swift test\`
-  cli-test          Run \`swift test\` for Platforms/CLI
-  cli-build-tests   Build Platforms/CLI tests without running them
+  cli-test          Run focused SwiftTUICLI tests from the root package
+  cli-build-tests   Build root package tests without running them
   examples          Build the Linux example packages
   web               Build the browser examples
   workflow          Mirror the Examples Linux workflow: examples + web
@@ -305,15 +305,14 @@ cmd_cli_test() {
   run_shell_script "
     swift test \
       --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli") \
-      --package-path Platforms/CLI
+      --filter SwiftTUICLITests
   "
 }
 
 cmd_cli_build_tests() {
   run_shell_script "
     swift build --build-tests \
-      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli") \
-      --package-path Platforms/CLI
+      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli")
   "
 }
 

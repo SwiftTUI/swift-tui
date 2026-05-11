@@ -148,11 +148,13 @@ Runs the full checked-in repo verification surface:
   - checked-in policy hooks
   - accessibility guardrails for raw glyphs, color-state styling, and visual content
   - public-API baseline freshness check
-  - root SwiftPM tests
-  - Platforms/CLI tests
-  - Platforms/Embedding tests
-  - Platforms/WASI tests
-  - Platforms/SwiftUI tests
+  - focused root SwiftPM framework tests
+  - focused SwiftTUIArguments tests
+  - focused SwiftTUICLI tests
+  - focused SwiftTUITerminal / PTY primitive tests
+  - focused SwiftTUIWASI / WASISurfaceBridge tests
+  - focused SwiftTUIWebHost tests
+  - focused SwiftUIHost tests on Apple platforms
   - Platforms/Web Bun tests
   - Examples/gallery tests
   - Examples/layouts tests
@@ -168,7 +170,7 @@ The script also checks required environment dependencies up front:
 
 On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
-  - skips `Platforms/SwiftUI` tests because the SwiftUI embedded host package is Apple-only
+  - skips focused SwiftUIHost tests because the target is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
@@ -530,34 +532,69 @@ run_step \
   ./Scripts/generate_public_api_inventory.sh --check
 
 run_function_step \
-  "Run root SwiftPM tests" \
-  "$(swift_command_text test)" \
-  run_swift test
+  "Run SwiftTUICore tests" \
+  "$(swift_command_text test --filter SwiftTUICoreTests)" \
+  run_swift test --filter SwiftTUICoreTests
 
 run_function_step \
-  "Run Platforms/CLI tests" \
-  "$(swift_command_text test --package-path Platforms/CLI)" \
-  run_swift test --package-path Platforms/CLI
+  "Run SwiftTUIViews tests" \
+  "$(swift_command_text test --filter SwiftTUIViewsTests)" \
+  run_swift test --filter SwiftTUIViewsTests
 
 run_function_step \
-  "Run Platforms/Embedding tests" \
-  "$(swift_command_text test --package-path Platforms/Embedding)" \
-  run_swift test --package-path Platforms/Embedding
+  "Run SwiftTUI runtime tests" \
+  "$(swift_command_text test --filter SwiftTUITests)" \
+  run_swift test --filter SwiftTUITests
 
 run_function_step \
-  "Run Platforms/WASI tests" \
-  "$(swift_command_text test --package-path Platforms/WASI)" \
-  run_swift test --package-path Platforms/WASI
+  "Run SwiftTUIAnimatedImage tests" \
+  "$(swift_command_text test --filter SwiftTUIAnimatedImageTests)" \
+  run_swift test --filter SwiftTUIAnimatedImageTests
+
+run_function_step \
+  "Run SwiftTUIArguments tests" \
+  "$(swift_command_text test --filter SwiftTUIArgumentsTests)" \
+  run_swift test --filter SwiftTUIArgumentsTests
+
+run_function_step \
+  "Run SwiftTUICLI tests" \
+  "$(swift_command_text test --filter SwiftTUICLITests)" \
+  run_swift test --filter SwiftTUICLITests
+
+run_function_step \
+  "Run SwiftTUITerminal tests" \
+  "$(swift_command_text test --filter SwiftTUITerminalTests)" \
+  run_swift test --filter SwiftTUITerminalTests
+
+run_function_step \
+  "Run SwiftTUIPTYPrimitives tests" \
+  "$(swift_command_text test --filter SwiftTUIPTYPrimitivesTests)" \
+  run_swift test --filter SwiftTUIPTYPrimitivesTests
+
+run_function_step \
+  "Run WASISurfaceBridge tests" \
+  "$(swift_command_text test --filter WASISurfaceBridgeTests)" \
+  run_swift test --filter WASISurfaceBridgeTests
+
+run_function_step \
+  "Run SwiftTUIWASI tests" \
+  "$(swift_command_text test --filter SwiftTUIWASITests)" \
+  run_swift test --filter SwiftTUIWASITests
+
+run_function_step \
+  "Run SwiftTUIWebHost tests" \
+  "$(swift_command_text test --filter SwiftTUIWebHostTests)" \
+  run_swift test --filter SwiftTUIWebHostTests
 
 if [ "$is_linux" -eq 1 ]; then
   skip_step \
-    "Run Platforms/SwiftUI tests" \
-    "SwiftUI embedded host package is only available on Apple platforms"
+    "Run SwiftUIHost tests" \
+    "SwiftUIHost is only available on Apple platforms"
 else
   run_function_step \
-    "Run Platforms/SwiftUI tests" \
-    "$(swift_command_text test --package-path Platforms/SwiftUI)" \
-    run_swift test --package-path Platforms/SwiftUI
+    "Run SwiftUIHost tests" \
+    "$(swift_command_text test --filter SwiftUIHostTests)" \
+    run_swift test --filter SwiftUIHostTests
 fi
 
 #run_step \

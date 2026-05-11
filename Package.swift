@@ -38,6 +38,18 @@ let packageDependencies: [Package.Dependency] = [
     from: "1.1.3"
   ),
   .package(
+    url: "https://github.com/apple/swift-argument-parser.git",
+    from: "1.5.0"
+  ),
+  .package(
+    url: "https://github.com/migueldeicaza/SwiftTerm.git",
+    from: "1.2.0"
+  ),
+  .package(
+    url: "https://github.com/swhitty/FlyingFox.git",
+    from: "0.26.0"
+  ),
+  .package(
     path: "Vendor/UnixSignals"
   ),
   .package(
@@ -89,6 +101,12 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   ),
 ]
 
+#if os(Linux)
+let includeSwiftUIHost = false
+#else
+let includeSwiftUIHost = true
+#endif
+
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
   .SwiftSetting]
 {
@@ -104,15 +122,29 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
   ] + settings
 }
 
+let packageProducts: [Product] = [
+  .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
+  .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
+  .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
+  .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
+  .library(name: "SwiftTUIArguments", targets: ["SwiftTUIArguments"]),
+  .library(name: "SwiftTUIPTYPrimitives", targets: ["SwiftTUIPTYPrimitives"]),
+  .library(name: "SwiftTUITerminal", targets: ["SwiftTUITerminal"]),
+  .library(name: "SwiftTUICLI", targets: ["SwiftTUICLI"]),
+  .library(name: "WASISurfaceBridge", targets: ["WASISurfaceBridge"]),
+  .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
+  .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
+  .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
+] + (includeSwiftUIHost
+  ? [
+    .library(name: "SwiftUIHost", targets: ["SwiftUIHost"])
+  ]
+  : [])
+
 let package = Package(
   name: "swift-tui",
   platforms: packagePlatforms,
-  products: [
-    .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
-    .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
-    .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
-    .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
-  ],
+  products: packageProducts,
   dependencies: packageDependencies,
   targets: [
     .target(
@@ -158,6 +190,92 @@ let package = Package(
       resources: [],
       swiftSettings: swiftSettings()
     ),
+    .target(
+      name: "SwiftTUIArguments",
+      dependencies: [
+        "SwiftTUI",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Platforms/Arguments/Sources/SwiftTUIArguments",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIPTYCPrimitives",
+      path: "Platforms/Embedding/Sources/SwiftTUIPTYCPrimitives"
+    ),
+    .target(
+      name: "SwiftTUIPTYPrimitives",
+      dependencies: [
+        "SwiftTUI"
+      ],
+      path: "Platforms/Embedding/Sources/SwiftTUIPTYPrimitives",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUITerminal",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUIPTYPrimitives",
+        "SwiftTUIPTYCPrimitives",
+        .product(name: "SwiftTerm", package: "SwiftTerm"),
+      ],
+      path: "Platforms/Embedding/Sources/SwiftTUITerminal",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUICLI",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUIArguments",
+        "SwiftTUIPTYPrimitives",
+        .product(name: "UnixSignals", package: "UnixSignals"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Platforms/CLI/Sources/SwiftTUICLI",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "WASISurfaceBridge",
+      dependencies: [
+        "SwiftTUI"
+      ],
+      path: "Platforms/WASI/Sources/WASISurfaceBridge",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIWASI",
+      dependencies: [
+        "SwiftTUI",
+        "WASISurfaceBridge",
+      ],
+      path: "Platforms/WASI/Sources/SwiftTUIWASI",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIWebHost",
+      dependencies: [
+        "SwiftTUI",
+        "WASISurfaceBridge",
+        .product(name: "FlyingFox", package: "FlyingFox"),
+        .product(name: "FlyingSocks", package: "FlyingFox"),
+      ],
+      path: "Platforms/WebHost/Sources/SwiftTUIWebHost",
+      resources: [
+        .copy("Resources/browser")
+      ],
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIWebHostCLI",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUICLI",
+        "SwiftTUIArguments",
+        "SwiftTUIWebHost",
+      ],
+      path: "Platforms/WebHost/Sources/SwiftTUIWebHostCLI",
+      swiftSettings: swiftSettings()
+    ),
     .testTarget(
       name: "SwiftTUICoreTests",
       dependencies: [
@@ -183,6 +301,76 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .testTarget(
+      name: "SwiftTUIArgumentsTests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUIArguments",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Platforms/Arguments/Tests/SwiftTUIArgumentsTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUICLITests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUIArguments",
+        "SwiftTUICLI",
+        "SwiftTUIPTYPrimitives",
+      ],
+      path: "Platforms/CLI/Tests/SwiftTUICLITests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUIPTYPrimitivesTests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUIPTYPrimitives",
+      ],
+      path: "Platforms/Embedding/Tests/SwiftTUIPTYPrimitivesTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUITerminalTests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUICore",
+        "SwiftTUIPTYPrimitives",
+        "SwiftTUITerminal",
+      ],
+      path: "Platforms/Embedding/Tests/SwiftTUITerminalTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "WASISurfaceBridgeTests",
+      dependencies: [
+        "SwiftTUI",
+        "WASISurfaceBridge",
+      ],
+      path: "Platforms/WASI/Tests/WASISurfaceBridgeTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUIWASITests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUIWASI",
+      ],
+      path: "Platforms/WASI/Tests/SwiftTUIWASITests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUIWebHostTests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUICLI",
+        "SwiftTUIWebHost",
+        "SwiftTUIWebHostCLI",
+      ],
+      path: "Platforms/WebHost/Tests/SwiftTUIWebHostTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
       name: "SwiftTUIAnimatedImageTests",
       dependencies: [
         "SwiftTUIAnimatedImage",
@@ -190,5 +378,28 @@ let package = Package(
       ],
       swiftSettings: swiftSettings()
     ),
-  ]
+  ] + (includeSwiftUIHost
+    ? [
+      .target(
+        name: "SwiftUIHost",
+        dependencies: [
+          "SwiftTUI"
+        ],
+        path: "Platforms/SwiftUI/Sources/SwiftUIHost",
+        resources: [
+          .process("Resources")
+        ],
+        swiftSettings: swiftSettings()
+      ),
+      .testTarget(
+        name: "SwiftUIHostTests",
+        dependencies: [
+          "SwiftTUI",
+          "SwiftUIHost",
+        ],
+        path: "Platforms/SwiftUI/Tests/SwiftUIHostTests",
+        swiftSettings: swiftSettings()
+      ),
+    ]
+    : [])
 )

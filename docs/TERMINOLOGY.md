@@ -1,45 +1,45 @@
 # Terminology
 
-This page pins the external vocabulary for SwiftTUI package integration. Internal
-types may still use `Host` in their concrete names, but public docs should use
-these terms consistently.
+This page pins the external vocabulary for SwiftTUI platform integration.
+Internal types may still use `Host` in their concrete names, but public docs
+should use these terms consistently.
 
 ## Runner
 
 A runner owns process startup for an authored `App`.
 
-Use **runner** when the package or type owns top-level execution, default
+Use **runner** when the product or type owns top-level execution, default
 `App.main()` behavior, launch routing, argv/env parsing, raw-mode setup, crash
 guards, scene discovery, or explicit entry points such as `TerminalRunner.run`.
 
-Current runner packages and products:
+Current runner products:
 
-- `Platforms/CLI` / `SwiftTUICLI`: terminal-native executable launch through
-  `TerminalRunner`.
-- `Platforms/WASI` / `SwiftTUIWASI`: WASI executable launch and manifest output
-  through `WASIRunner`.
-- `Platforms/WebHost` / `SwiftTUIWebHost`: web-only localhost-browser launch
+- `SwiftTUICLI`: terminal-native executable launch through `TerminalRunner`.
+- `SwiftTUIWASI`: WASI executable launch and manifest output through
+  `WASIRunner`.
+- `SwiftTUIWebHost`: web-only localhost-browser launch
   through `WebHostRunner`.
-- `Platforms/WebHost` / `SwiftTUIWebHostCLI`: combined terminal/WebHost launch
-  routing through `WebHostCLIRunner`.
+- `SwiftTUIWebHostCLI`: combined terminal/WebHost launch routing through
+  `WebHostCLIRunner`.
 
 ## Host
 
 A host owns an external presentation environment or embedding lifecycle for a
 SwiftTUI scene.
 
-Use **host** when the package or shell owns a platform surface, window or
+Use **host** when the product or shell owns a platform surface, window or
 browser lifecycle, size and style delivery, native input, clipboard bridging,
 accessibility bridging, scene-switching chrome, or retained
 `HostedSceneSession` values inside another app/runtime.
 
-Current embedded host packages:
+Current host products and packages:
 
-- `Platforms/SwiftUI`: embeds SwiftTUI scenes in a native SwiftUI app shell.
-- `Platforms/Web`: embeds SwiftTUI WASI scenes in a browser canvas.
+- `SwiftUIHost`: embeds SwiftTUI scenes in a native SwiftUI app shell.
+- `Platforms/Web`: Bun package that embeds SwiftTUI WASI scenes in a browser
+  canvas.
 
-`Platforms/WebHost` is intentionally compound: it provides a runner that starts
-a localhost server and a browser host that presents the running scene. When
+`SwiftTUIWebHost` is intentionally compound: it provides a runner that starts a
+localhost server and a browser host that presents the running scene. When
 writing about it, say **WebHost runner**, **WebHost CLI runner**,
 **localhost WebHost bridge**, or **browser host** depending on which side is in
 scope.
@@ -51,36 +51,34 @@ A presentation surface is the low-level frame sink used by `RunLoop`.
 Use **presentation surface** for `PresentationSurface` implementations such as
 `TerminalHost`, `StreamingTerminalHost`, `WebSurfaceTransport`, and
 `WebSocketSurfaceTransport`. A presentation surface may be created by a runner
-or retained by a host, but it is not itself a package-level runner or embedded
-host package.
+or retained by a host, but it is not itself a product-level runner or host.
 
 ## Hosted Scene Session
 
 A `HostedSceneSession` is a retained runtime session for one selected scene. It
-lets embedded host packages keep scene state alive while the platform shell
-manages visibility, size, style, input, and lifecycle. The session is the
-shared runtime seam between SwiftTUI and embedded hosts; it is not the host
-itself.
+lets host products keep scene state alive while the platform shell manages
+visibility, size, style, input, and lifecycle. The session is the shared runtime
+seam between SwiftTUI and hosts; it is not the host itself.
 
 ## Terminal-Program Embedding
 
-`Platforms/Embedding` lets authored SwiftTUI views embed external terminal
-programs through `TerminalView` and related session types. It is a peer package,
-but it is not an executable runner package and it is not an embedded host
-package for SwiftTUI apps.
+`SwiftTUITerminal` lets authored SwiftTUI views embed external terminal
+programs through `TerminalView` and related session types. Its sources live in
+`Platforms/Embedding`, but it is not a runner product and it is not a host
+product for SwiftTUI apps.
 
 ## Usage Rules
 
-- Say **runner package** for packages that own executable startup or launch
+- Say **runner product** for products that own executable startup or launch
   routing.
-- Say **embedded host package** for packages that retain SwiftTUI scenes inside
-  another app/runtime lifecycle.
-- Say **platform integration package** when discussing both runners and hosts
+- Say **host product** for products that retain SwiftTUI scenes inside another
+  app/runtime lifecycle.
+- Say **platform integration product** when discussing Swift runners and hosts
   together.
 - Say **presentation surface** for `RunLoop` frame sinks and terminal/web/native
   transport implementations.
 - Avoid using **host package** as a blanket term for all platform integration
-  packages.
+  products.
 - Avoid using **GUI host** in current docs; the checked-in packages now live
   under `Platforms/`.
 

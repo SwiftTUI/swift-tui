@@ -15,14 +15,13 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
-    .package(name: "SwiftTUIWebHost", path: "../../Platforms/WebHost"),
   ],
   targets: [
     .executableTarget(
       name: "WebHostExample",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUIWebHostCLI", package: "SwiftTUIWebHost"),
+        .product(name: "SwiftTUIWebHostCLI", package: "swift-tui"),
       ]
     ),
     .testTarget(

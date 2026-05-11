@@ -1,67 +1,49 @@
-# Platform Integration Packages
+# Platform Integration Products
 
 ## Goal
 
-Make SwiftTUI apps shippable outside the root library through peer platform
-integration packages. The external terms are precise:
+Make every first-party Swift integration surface available from the root
+`swift-tui` package. Consumers should add one package dependency and choose the
+products they need:
 
-- **runner packages** own process startup and launch routing
-- **embedded host packages** retain SwiftTUI scenes inside another app or
-  runtime lifecycle
+- **runner products** own process startup and launch routing
+- **host products** retain SwiftTUI scenes inside another app or runtime
+  lifecycle
 - **presentation surfaces** are low-level frame sinks used by `RunLoop`
 
-See [TERMINOLOGY.md](TERMINOLOGY.md) for the full vocabulary. Current platform
-integration packages are:
+See [TERMINOLOGY.md](TERMINOLOGY.md) for the full vocabulary. The `Platforms/`
+directory is now source layout for root package targets, except
+`Platforms/Web`, which remains the Bun browser package.
 
-- `Platforms/CLI`: an executable runner package for terminal-native apps
-- `Platforms/WASI`: an executable runner package for WASI apps and manifest
-  output
-- `Platforms/SwiftUI`: an embedded host package that lets a macOS or iOS app
-  host a SwiftTUI scene without a terminal emulator
-- `Platforms/Web`: an embedded host package that lets a SwiftTUI app ship in
-  the browser by drawing SwiftTUI's `web-surface` raster output onto a canvas
-  without a terminal emulator dependency
-- `Platforms/WebHost`: a compound package that provides a WebHost runner plus a
-  localhost browser host over HTTP/WebSocket when the consumer opts into the
-  WebHost product
+## Root Package Products
 
-The authoring story stays the same:
+The root `Package.swift` exposes the framework and platform products together:
 
-- app authors continue to write `App`, `Scene`, and `WindowGroup` in the root package
-- embedded host packages own scene selection chrome and host-local style surfaces
-- presentation surfaces own terminal, stream, socket, or native-surface frame
-  delivery
-- scene state must survive host-driven scene switches
-- resize and host style changes must continue to flow through the same runtime invalidation path as terminal `SIGWINCH`
+- `SwiftTUI`: shared runtime, scene declarations, `SceneManifest`, and
+  `HostedSceneSession`
+- `SwiftTUICLI`: terminal-native executable runner
+- `SwiftTUIArguments`: shared framework flag and environment parsing
+- `SwiftTUIWASI`: WASI executable runner and manifest mode
+- `WASISurfaceBridge`: pure `web-surface` transport for WASI/Web integrations
+- `SwiftUIHost`: native SwiftUI scene host on Apple platforms
+- `SwiftTUIWebHost`: localhost browser WebHost runner and bridge
+- `SwiftTUIWebHostCLI`: combined terminal/WebHost runner
+- `SwiftTUITerminal`: `TerminalView`, terminal emulator, and child-process
+  session APIs
+- `SwiftTUIPTYPrimitives`: pty creation, fd lifecycle, read/write, and resize
+  support
 
-All Swift build commands in this document assume the repo-default `swiftly`
-toolchain story; see [TOOLCHAINS.md](TOOLCHAINS.md) for the full rules.
+The source directories remain useful ownership boundaries:
 
-## Shipped Architecture
+- `Platforms/CLI`: `SwiftTUICLI`
+- `Platforms/Arguments`: `SwiftTUIArguments`
+- `Platforms/WASI`: `SwiftTUIWASI` and `WASISurfaceBridge`
+- `Platforms/SwiftUI`: `SwiftUIHost`
+- `Platforms/WebHost`: `SwiftTUIWebHost` and `SwiftTUIWebHostCLI`
+- `Platforms/Embedding`: `SwiftTUITerminal` and `SwiftTUIPTYPrimitives`
+- `Platforms/Web`: Bun package for deploy-to-browser hosting
 
-### Root package support
-
-The platform-integration-facing root work is landed:
-
-- `SwiftTUI` exposes `SceneDescriptor`,
-  `SceneManifest`, and `HostedSceneSession`
-- `Platforms/CLI` owns terminal-native `App.main()`, attach/list CLI
-  behavior, and pty-backed scene management
-- `Platforms/WASI` owns manifest-only mode through `TUIGUI_MODE=manifest`
-  plus WASI scene launch
-- `Platforms/WebHost` owns the opt-in WebHost runner and localhost browser host
-  bridge for local binaries that should render in a browser
-- shared control-message parsing lives in
-  `Sources/SwiftTUI/TerminalControlMessages.swift`
-- embedded host packages use `InjectedTerminalInputReader` where they need
-  wrapper-managed byte or event delivery; WebHost uses streaming presentation
-  output (`StreamingTerminalHost`), while the native SwiftUI host receives
-  `RasterSurface` values directly
-- hosted sessions now accept paired render-style updates so terminal appearance
-  and semantic theme move together at runtime
-- `SwiftTUI` is now library-only; executable launch is entirely runner-owned
-
-### Consumer composition
+## Consumer Composition
 
 Consumers choose one launch composition at compile time:
 
@@ -72,143 +54,120 @@ Consumers choose one launch composition at compile time:
   `WebHostRunner`
 - terminal plus local-browser apps import `SwiftTUIWebHostCLI`; normal launches
   use `TerminalRunner`, while `--web` uses `WebHostRunner`
-- browser-deployed apps use `Platforms/Web` plus `SwiftTUIWASI`; that path runs
-  SwiftTUI inside the browser instead of serving from the native binary
+- WASI apps import `SwiftTUIWASI`; transport-only browser consumers can import
+  `WASISurfaceBridge`
+- native Apple apps import `SwiftUIHost` to retain `HostedSceneSession` values
+  inside SwiftUI app lifecycle
+- apps that embed external terminal programs import `SwiftTUITerminal`
 
-The compile-time boundary is deliberate. Runtime flags can request web mode,
-but server functionality exists only in binaries that depend on a WebHost
-product.
+Example apps remain separate mini packages. They depend on the repo root with:
 
-### `Platforms/SwiftUI`
+```swift
+.package(name: "swift-tui", path: "../..")
+```
 
-The native SwiftUI embedded host package is landed as a standalone SPM package:
+and select products with `.product(name: ..., package: "swift-tui")`.
 
-- package root: `Platforms/SwiftUI`
-- dependencies:
-  - local path dependency on the root package
-- key runtime files:
-  - `SwiftUIHostAppState.swift`
-  - `SwiftUIHostAppView.swift`
-  - `SwiftUIHostSceneHost.swift`
-  - `NativeSceneBridge.swift`
-  - `NativeTerminalSurfaceView.swift`
-  - `SwiftUIHostTerminalStyle.swift`
-- SwiftUI styles now expose explicit light and dark theme variants, each pairing
-  native renderer palette state with SwiftTUI semantic theme tokens
-- verification:
-  - `SceneRetentionTests.swift`
-  - `ResizeBridgeTests.swift`
-  - `StyleMappingTests.swift`
+## Shipped Architecture
 
-### `Platforms/Web`
+The platform-integration-facing root work is landed:
 
-The deploy-to-browser web package is landed:
+- `SwiftTUI` exposes `SceneDescriptor`, `SceneManifest`, and
+  `HostedSceneSession`
+- `SwiftTUICLI` owns terminal-native `App.main()`, attach/list CLI behavior,
+  and pty-backed scene management
+- `SwiftTUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest` plus
+  WASI scene launch
+- `SwiftTUIWebHost` owns the opt-in WebHost runner and localhost browser host
+  bridge for local binaries that should render in a browser
+- `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing without
+  adding WebHost dependencies to terminal-only binaries
+- `SwiftUIHost` owns the native SwiftUI retained-scene surface
+- `SwiftTUITerminal` owns terminal-program embedding through `TerminalView`
+- shared control-message parsing lives in
+  `Sources/SwiftTUI/TerminalControlMessages.swift`
+- embedded hosts use `InjectedTerminalInputReader` where they need
+  wrapper-managed byte or event delivery; WebHost uses streaming presentation
+  output, while the native SwiftUI host receives `RasterSurface` values
+  directly
+- hosted sessions accept paired render-style updates so terminal appearance and
+  semantic theme move together at runtime
+- `SwiftTUI` itself remains library-only; executable launch is runner-owned
 
-- package root: `Platforms/Web`
-- build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
-- transport: SwiftTUI's `web-surface` WASI transport. The Swift runner emits
-  structured raster-surface records on stdout, and the browser host draws
-  rectangles and text into a canvas. There is no terminal-emulator dependency.
-- key runtime and build files:
-  - `src/WebHostApp.ts`
-  - `src/WebHostSceneRuntime.ts`
-  - `src/WebHostSceneManifest.ts`
-  - `src/WebHostSurfaceTransport.ts`
-  - `src/build/buildAppWasm.ts`
-  - `src/build/generateSceneManifest.ts`
-- web styles expose explicit light and dark theme variants and can bind them
-  to the host color scheme before pushing a full render-style payload into
-  the WASI runtime
-
-### `Platforms/WebHost`
-
-The WebHost package is landed as a standalone SwiftPM package with both runner
-and browser-host responsibilities:
-
-- package root: `Platforms/WebHost`
-- products:
-  - `SwiftTUIWebHost` for web-only localhost-browser launch through
-    `WebHostRunner`
-  - `SwiftTUIWebHostCLI` for binaries that intentionally compose terminal and
-    WebHost launch behavior through `WebHostCLIRunner`
-- dependencies:
-  - local path dependency on the root package
-  - local path dependencies on `Platforms/WASI` for `web-surface` framing and
-    `Platforms/CLI` for the combined runner
-  - FlyingFox, linked only by this package, for HTTP/WebSocket serving
-- transport: the same `web-surface` v2 frame and input protocol used by
-  Web/WASI, including accessibility-tree and announcement payloads
-- key runtime and build files:
-  - `SwiftTUIWebHost/WebHostRunner.swift`
-  - `SwiftTUIWebHost/WebHostConfig.swift`
-  - `SwiftTUIWebHost/WebHostFlyingFoxServer.swift`
-  - `SwiftTUIWebHost/WebSocketSurfaceTransport.swift`
-  - `SwiftTUIWebHost/WebSocketInputReader.swift`
-  - `SwiftTUIWebHost/WebHostBrowserBundle.swift`
-  - `SwiftTUIWebHostCLI/WebHostCLIRunner.swift`
-  - `Scripts/build-webhost-bundle.sh`
-- security defaults:
-  - loopback bind by default
-  - tokenized URL plus cookie handoff
-  - warning banner for external binds
-  - bounded WebSocket message size
-
-## Responsibilities Split
+## Responsibilities
 
 The current boundary is:
 
-- root package:
+- root runtime product:
   - app authoring
   - scene collection
   - retained hosted runtime sessions
   - manifest generation
   - control-message contract for resize and render-style updates
-- runner packages:
+- runner products:
   - default `App.main()` or explicit launcher entry points
   - launch routing, argv/env parsing, and runtime-configuration construction
   - process-level setup such as raw mode, signal/crash handling, or manifest
     output where applicable
-- embedded host packages:
+- host products:
   - window or browser shell integration
   - native surface or canvas surface embedding
   - scene tabs, pickers, or other host-local chrome
   - host-specific style mapping and host-owned theme swapping
+- terminal embedding products:
+  - pty management
+  - emulator-backed foreign-surface snapshots
+  - child process lifecycle and input forwarding
 
-This is intentional. Platform integration packages are peers, not new products
-in the root package.
+Runner and host responsibilities are explicit external concepts; `Platforms/`
+is only the source directory that contains their target implementations.
 
 ## Current Constraints
 
 - CLI multi-scene management and authored multiple scenes are intentionally
   separate concepts:
-  - `Platforms/CLI` can manage multiple native scenes with discovery,
-    ptys, and attach flows
-  - `Platforms/WASI` still executes one selected scene per wasm process
-- Embedded host packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
-- `Platforms/Web` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. The package shares the repo Bun workspace for builds and tests.
-- `Platforms/WebHost` serves a single scene in v1. Multi-scene browser chrome,
+  - `SwiftTUICLI` can manage multiple native scenes with discovery, ptys, and
+    attach flows
+  - `SwiftTUIWASI` still executes one selected scene per wasm process
+- Host products still own scene switching UI and style surfaces. The root
+  runtime exposes scene manifests and hosted sessions, not a full
+  cross-platform app shell.
+- `Platforms/Web` build scripts drive the repo-default `swiftly` toolchain
+  and the repo Bun workspace. See [TOOLCHAINS.md](TOOLCHAINS.md) for the
+  toolchain requirement.
+- `SwiftTUIWebHost` serves a single scene in v1. Multi-scene browser chrome,
   multi-viewer control transfer, TLS, QR codes, and recording remain follow-up
   work.
-- Executable runner packages and embedded host packages are intentionally
-  outside the root package products. Consumers opt into them separately.
+- `SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
+  that link the embedded HTTP/WebSocket server dependency and browser
+  resources. Terminal-only binaries never weak-link or discover that code at
+  runtime.
 
 ## Non-Negotiable Decisions
 
-1. Embedded host packages are peer packages, not new top-level products in the root package.
-2. The root package exposes first-class scene manifest and hosted-session APIs so peer packages do not rely on package-only internals.
-3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
-4. Scene switching is host-managed. It is not a new terminal escape-sequence protocol.
-5. Terminal style is host-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and embedded host packages choose the active theme variant.
-6. The SwiftUI embedded host package owns the native SwiftUI surface without a terminal-emulator dependency.
-7. The web package keeps one wasm module instance per scene and one canvas surface per scene so scene state survives switches without a more complex protocol.
-8. The WebHost package is the only first-party package that links the embedded
-   HTTP/WebSocket server dependency and browser resources; terminal-only
-   binaries never weak-link or discover that code at runtime.
-9. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
+1. Swift platform integration products live in the root package.
+2. Example apps stay as separate mini packages that depend on the root package.
+3. `Platforms/` remains an ownership map for source files, not a set of nested
+   SwiftPM packages.
+4. The root runtime exposes first-class scene manifest and hosted-session APIs
+   so platform products do not rely on package-only internals.
+5. Each scene gets its own retained runtime session. Switching scenes changes
+   which hosted session is visible; it does not rebuild the app body from
+   scratch.
+6. Scene switching is host-managed. It is not a new terminal escape-sequence
+   protocol.
+7. Terminal style is host-owned. The Swift package and the Bun package expose
+   mirrored style concepts, not a shared cross-language source file, and hosts
+   choose the active theme variant.
+8. The web package keeps one wasm module instance per scene and one canvas
+   surface per scene so scene state survives switches without a more complex
+   protocol.
+9. The existing resize control-message contract stays the foundation for all
+   non-POSIX resize behavior and is extended with paired render-style updates.
 
 ## Verification Paths
 
-Relevant package-level verification lives in:
+Relevant verification lives in:
 
 ```bash
 Scripts/test_all.sh
@@ -216,9 +175,8 @@ Scripts/test_all.sh
 
 `Scripts/test_all.sh` is the canonical full-repo check. From the repo root you
 can also invoke the same flow with `bun run test`. The runner verifies the
-Swift and Bun environment first, then runs the root, runner-package,
-embedded-host-package, and example-project test suites that are checked into this
-repository.
+Swift and Bun environment first, then runs the root products, example packages,
+and web tooling that are checked into this repository.
 
 The compile-time WebHost boundary is also checked directly:
 
@@ -229,6 +187,8 @@ The compile-time WebHost boundary is also checked directly:
 ## Out Of Scope
 
 - generating an Xcode project
-- building custom desktop or mobile chrome beyond a terminal surface and scene/style control APIs
-- adding a terminal-emulator-backed browser host package
-- adding tabs, split panes, or session persistence beyond in-memory retained scene sessions
+- building custom desktop or mobile chrome beyond a terminal surface and
+  scene/style control APIs
+- adding a terminal-emulator-backed browser host product
+- adding tabs, split panes, or session persistence beyond in-memory retained
+  scene sessions
