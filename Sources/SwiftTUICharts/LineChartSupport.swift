@@ -51,7 +51,7 @@ func yCell(value: Double, domain: ClosedRange<Double>, plotHeight: Int) -> Int {
 /// One rasterized cell in a line chart plot grid.
 struct LineRasterCell: Equatable, Sendable {
   /// `•` for isolated points, `│`/`─`/`╭`/`╮`/`╰`/`╯` for connector
-  /// segments. Picked by `connectorGlyph(at:neighbor:)`.
+  /// segments. Picked by `dataPointGlyph(...)` / `elbowGlyph(...)`.
   var glyph: Character
 }
 
@@ -86,64 +86,154 @@ func rasterizeLine(
      yCell(value: p.y, domain: domain.y, plotHeight: height))
   }
 
-  // For each consecutive pair, fill the vertical span between them at
-  // each column they cover, then place a connector glyph.
+  // Step-after rasterization: for each consecutive pair (from, to), hold a
+  // horizontal segment at `from.row` from `from.col` to `to.col`, drop an
+  // elbow at `(to.col, from.row)`, then a vertical segment at `to.col` from
+  // `from.row` to `to.row`. This produces a single connected staircase per
+  // segment instead of the disjoint split-column rendering the previous
+  // algorithm produced (where vertical fill landed in two different columns
+  // and horizontal fill landed in two different rows, with no glyph bridging
+  // them).
   for i in 0..<(cells.count - 1) {
-    let from = cells[i]
-    let to   = cells[i + 1]
-    let colStart = min(from.col, to.col)
-    let colEnd   = max(from.col, to.col)
-    let rowStart = min(from.row, to.row)
-    let rowEnd   = max(from.row, to.row)
+    drawSegment(from: cells[i], to: cells[i + 1], into: &grid)
+  }
 
-    // Vertical fill in the leading column (from current Y down to the
-    // midpoint), and in the trailing column (from the midpoint up to
-    // the next Y). Concretely, fill every row between rowStart and
-    // rowEnd in the column closer to that endpoint.
-    for row in rowStart...rowEnd {
-      let col = (row <= (rowStart + rowEnd) / 2) ? (from.row <= to.row ? from.col : to.col)
-                                                 : (from.row <= to.row ? to.col   : from.col)
-      if grid[row][col] == nil {
-        grid[row][col] = LineRasterCell(glyph: "│")
-      }
-    }
-
-    // Horizontal fill between columns at the latched-in Y.
-    if colStart != colEnd {
-      let rowAtFrom = from.row
-      let rowAtTo   = to.row
-      for col in (colStart + 1)..<colEnd {
-        let row = col < (colStart + colEnd) / 2 ? rowAtFrom : rowAtTo
-        if grid[row][col] == nil {
-          grid[row][col] = LineRasterCell(glyph: "─")
-        }
-      }
-    }
-
-    // Corner glyphs at the endpoints.
-    grid[from.row][from.col] = LineRasterCell(glyph: connectorGlyph(at: from, neighbor: to))
-    grid[to.row][to.col]     = LineRasterCell(glyph: connectorGlyph(at: to, neighbor: from))
+  // Set data-point glyphs after segment drawing so they overwrite the
+  // segment fill at the corresponding cell. Internal data points combine
+  // "incoming vertical" with "outgoing horizontal" into a corner glyph;
+  // endpoints fall through to a sensible single-neighbor corner.
+  for i in 0..<cells.count {
+    let previous = i > 0 ? cells[i - 1] : nil
+    let next     = i + 1 < cells.count ? cells[i + 1] : nil
+    grid[cells[i].row][cells[i].col] = LineRasterCell(
+      glyph: dataPointGlyph(current: cells[i], previous: previous, next: next)
+    )
   }
 
   return grid
 }
 
-private func connectorGlyph(
-  at cell: (col: Int, row: Int),
-  neighbor: (col: Int, row: Int)
-) -> Character {
-  // Same row → horizontal segment.
-  if cell.row == neighbor.row { return "─" }
-  // Same column → vertical segment.
-  if cell.col == neighbor.col { return "│" }
+/// Draws a single step-after segment from `from` to `to` into `grid`.
+///
+/// Layout: horizontal at `from.row` from `from.col` to `to.col`, elbow at
+/// `(to.col, from.row)`, vertical at `to.col` from `from.row` to `to.row`.
+/// Cells already filled by a previous segment are left untouched.
+private func drawSegment(
+  from: (col: Int, row: Int),
+  to: (col: Int, row: Int),
+  into grid: inout [[LineRasterCell?]]
+) {
+  if from.row == to.row {
+    let colStart = min(from.col, to.col)
+    let colEnd = max(from.col, to.col)
+    for col in colStart...colEnd where grid[from.row][col] == nil {
+      grid[from.row][col] = LineRasterCell(glyph: "─")
+    }
+    return
+  }
+  if from.col == to.col {
+    let rowStart = min(from.row, to.row)
+    let rowEnd = max(from.row, to.row)
+    for row in rowStart...rowEnd where grid[row][from.col] == nil {
+      grid[row][from.col] = LineRasterCell(glyph: "│")
+    }
+    return
+  }
 
-  let goingRight = neighbor.col > cell.col
-  let goingDown  = neighbor.row > cell.row
+  let goingRight = to.col > from.col
+  let goingDown = to.row > from.row
+
+  // Horizontal at from.row, exclusive of from.col (the data-point glyph for
+  // `from` overwrites that cell later), inclusive up to to.col (which gets
+  // the elbow glyph here, overwritten only if a later segment reuses it).
+  let hStart = goingRight ? from.col + 1 : to.col
+  let hEnd   = goingRight ? to.col       : from.col - 1
+  if hStart <= hEnd {
+    for col in hStart...hEnd where grid[from.row][col] == nil {
+      grid[from.row][col] = LineRasterCell(
+        glyph: col == to.col
+          ? elbowGlyph(goingRight: goingRight, goingDown: goingDown)
+          : "─"
+      )
+    }
+  }
+
+  // Vertical at to.col, exclusive of from.row (elbow handles it) and
+  // exclusive of to.row (the next data-point glyph handles it).
+  let vStart = min(from.row, to.row) + 1
+  let vEnd = max(from.row, to.row) - 1
+  if vStart <= vEnd {
+    for row in vStart...vEnd where grid[row][to.col] == nil {
+      grid[row][to.col] = LineRasterCell(glyph: "│")
+    }
+  }
+}
+
+/// Corner glyph at the elbow joining the horizontal and vertical halves of
+/// a step-after segment.
+private func elbowGlyph(goingRight: Bool, goingDown: Bool) -> Character {
   switch (goingRight, goingDown) {
-  case (true,  true):  return "╮"   // turn down to the right
-  case (true,  false): return "╯"   // turn up to the right
-  case (false, true):  return "╭"   // turn down to the left
-  case (false, false): return "╰"   // turn up to the left
+  case (true,  true):  "╮"   // horizontal-right meets vertical-down
+  case (true,  false): "╯"   // horizontal-right meets vertical-up
+  case (false, true):  "╭"   // horizontal-left meets vertical-down
+  case (false, false): "╰"   // horizontal-left meets vertical-up
+  }
+}
+
+/// Glyph for a data point that joins an incoming vertical (from the previous
+/// segment) with an outgoing horizontal (to the next segment), for step-after
+/// rasterization.
+private func dataPointGlyph(
+  current: (col: Int, row: Int),
+  previous: (col: Int, row: Int)?,
+  next: (col: Int, row: Int)?
+) -> Character {
+  // Isolated point.
+  guard previous != nil || next != nil else { return "•" }
+
+  // First point: only an outgoing direction. The step-after pattern starts
+  // the first segment with a horizontal at current.row going to next.col, so
+  // the data-point glyph is a corner that "starts" the line — `╰` if the
+  // line is about to step up, `╭` if it's about to step down, `─` if flat.
+  if previous == nil, let next {
+    if next.row == current.row { return "─" }
+    return next.row > current.row ? "╭" : "╰"
+  }
+
+  // Last point: only an incoming direction. The previous segment dropped a
+  // vertical at current.col arriving from previous.row; cap with a corner
+  // that "closes" the line.
+  if let previous, next == nil {
+    if previous.row == current.row { return "─" }
+    return previous.row > current.row ? "╯" : "╮"
+  }
+
+  guard let previous, let next else { return "•" }
+
+  // Internal data point. The incoming segment ends in a vertical at
+  // current.col (or is purely horizontal if previous.row == current.row).
+  // The outgoing segment starts with a horizontal at current.row.
+  let exitRight = next.col > current.col
+  if previous.row == current.row {
+    // No incoming vertical — line continues horizontally. The next segment
+    // will turn at to.col so just emit `─` to keep the line continuous.
+    return "─"
+  }
+  // Unicode arc glyphs name themselves by the DIRECTIONS the line extends
+  // from the cell, not by the corner's geometric position in a box:
+  //   ╰ "UP AND RIGHT"   neighbors: above + to the right
+  //   ╭ "DOWN AND RIGHT" neighbors: below + to the right
+  //   ╮ "DOWN AND LEFT"  neighbors: below + to the left
+  //   ╯ "UP AND LEFT"    neighbors: above + to the left
+  // For step-after rasterization, "comeFromAbove" means the incoming
+  // vertical lands on this cell from the cell ABOVE — so the cell's actual
+  // neighbor is above, and the glyph extends UP. Same logic for left/right.
+  let comeFromAbove = previous.row < current.row
+  switch (exitRight, comeFromAbove) {
+  case (true,  true):  return "╰"   // neighbors above + right
+  case (true,  false): return "╭"   // neighbors below + right
+  case (false, true):  return "╯"   // neighbors above + left
+  case (false, false): return "╮"   // neighbors below + left
   }
 }
 
