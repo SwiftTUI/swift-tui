@@ -58,7 +58,7 @@ A SwiftTUI app author writes:
 
 ```swift
 import SwiftTUI
-import SwiftTUITerminal  // new peer package
+import SwiftTUITerminal
 
 struct ShellPane: View {
   @State private var session = TerminalProcessSession(command: "/bin/zsh")
@@ -97,7 +97,7 @@ file. The view does not care; the session does.
 - **Not a Foundation creep into `SwiftTUICore`/`SwiftTUIViews`/`SwiftTUI`.** The pure
   emulator state and the cell-grid types stay Foundation-free; the PTY
   driver, child-process management, and any third-party emulator
-  dependency live in a peer package.
+  dependency live in the terminal embedding products.
 - **Not iOS or WASI in v1.** PTY semantics on iOS are restricted (no
   `forkpty`); WASI has no PTY at all. v1 targets macOS and Linux. iOS
   may later host a *connected* terminal (SSH-backed) without a local
@@ -108,7 +108,7 @@ file. The view does not care; the session does.
 1. **The view is SwiftUI-shaped; the runtime is not novel.** `TerminalView`
    participates in the resolve→measure→place→semantics→draw→raster→commit
    pipeline like any other view. It is not a `BackgroundProcess` view, not
-  a special scene, and not a runner or embedded host package. Its only
+  a special scene, and not a runner or host product. Its only
   deviation from SwiftUI precedent is that SwiftUI itself has no analogous
   concept.
 2. **The session is a `Sendable` actor; the view is a passive observer.**
@@ -380,9 +380,7 @@ Zellij in SwiftTUI" below.
 Per [PUBLIC_SURFACE_POLICY.md](../PUBLIC_SURFACE_POLICY.md), new public
 surface needs justification.
 
-In the new peer package `Platforms/Embedding` (working name; alternatives:
-`Sources/SwiftTUITerminal` if it ships from the root package, but the
-Foundation requirement argues for a peer):
+In the terminal embedding product:
 
 - `TerminalView<Session: TerminalSession>` — the only authored verb the
   doctrine actually adds
@@ -596,8 +594,8 @@ Worth saying out loud since the question asks for a rewrite, not a port:
    `PtyPair.swift` show this is uneven terrain. Budget includes
    audit time.
 4. **iOS / WASI exclusion.** v1 explicitly drops iOS and WASI for the
-   embedding package. The root packages remain cross-platform; the
-   peer package gates on `canImport(Darwin) || canImport(Glibc)`.
+   embedding products. The root package remains cross-platform; these products
+   gate on `canImport(Darwin) || canImport(Glibc)`.
    This is a known constraint but not a blocker for the doctrine.
 5. **`AnyView` policy.** `TerminalView` is generic over `Session`, so
    no erasure is needed. The package must not introduce
@@ -617,9 +615,9 @@ Decisions made during implementation:
   rasterizer blits the foreign grid into the normal cell surface; authored
   tinting, framing, and overlays remain ordinary SwiftTUI composition around
   the terminal view.
-- The package name is `Platforms/Embedding`. Its public products are
+- The source directory is `Platforms/Embedding`. Its public products are
   `SwiftTUIPTYPrimitives` and `SwiftTUITerminal`; root `SwiftTUI` remains
-  independent of the peer package.
+  independent of those products.
 - Selection overlay remains deferred. Clipboard writes are forwarded from
   embedded children through OSC 52 interception to the surrounding host
   clipboard action.

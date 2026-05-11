@@ -60,8 +60,8 @@ swift sdk install https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-
 Examples:
 
 ```bash
-swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --target Core
-swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Platforms/WASI --target SwiftTUIWASI
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --target SwiftTUICore
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --target SwiftTUIWASI
 swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
 ```
 
@@ -97,7 +97,8 @@ bun run build
 Xcode remains a valid native build path.
 
 In particular, the outer macOS or iOS app build still works fine in Xcode when
-a consumer embeds `Platforms/SwiftUI` in an application target.
+a consumer embeds the root package's `SwiftUIHost` product in an application
+target.
 
 That does not change the package-development rule for this repository:
 
@@ -108,7 +109,7 @@ That does not change the package-development rule for this repository:
 
 ## Worktrees
 
-Internal packages in this repository depend on the repo root via local path
+Example packages in this repository depend on the repo root via local path
 dependencies and refer to that package as `swift-tui`.
 
 When adding new local path dependencies that point back at this repo, prefer
@@ -119,7 +120,7 @@ the explicit form:
 ```
 
 That pins the package name used by downstream `.product(..., package:
-"swift-tui")` references and keeps nested packages working even when a
+"swift-tui")` references and keeps example packages working even when a
 worktree directory is renamed.
 
 For new git worktrees, still keep the final path component as

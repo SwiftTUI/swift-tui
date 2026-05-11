@@ -40,8 +40,8 @@ not a primitive for browser hosts at all.
 
 ## Decision
 
-The crash guard lives in the **CLI runner package**
-(`Platforms/CLI`), not in the root `SwiftTUI` library.
+The crash guard lives in the **CLI runner product**
+(`SwiftTUICLI`), not in the root `SwiftTUI` library.
 
 `Platforms/CLI/Sources/SwiftTUICLI/SceneRuntime.swift`
 installs `CrashSignalHandler` from the vendored `UnixSignals` package
@@ -97,13 +97,13 @@ code paths.
 
 **Discipline imposed:**
 
-- New runner packages that own a tty (e.g. a future Android tty
+- New runner products that own a tty (e.g. a future Android tty
   runner) must install their own crash guard or explicitly document
   why one is unnecessary.
 - The root library's tests do not exercise the crash guard path —
-  that coverage belongs to the runner package's tests.
+  that coverage belongs to the runner product's tests.
 
-The bet: process-global concerns belong to the package that owns the
+The bet: process-global concerns belong to the product that owns the
 process, not to the library that drives the view tree. Co-locating
 ownership with responsibility is worth the small ergonomic cost of
 two imports for terminal-native apps.

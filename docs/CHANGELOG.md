@@ -16,6 +16,16 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-11
+
+- Merged first-party Swift platform integrations into the root package:
+  external consumers now add one `swift-tui` package dependency and select
+  products such as `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`,
+  `SwiftTUIWebHost`, `SwiftTUIWebHostCLI`, `SwiftTUITerminal`, and
+  `SwiftTUIPTYPrimitives`. The `Platforms/` tree remains source layout,
+  `Platforms/Web` remains the Bun browser package, and examples remain
+  separate mini packages.
+
 ## 2026-05-10
 
 - Reshaped framework argument parsing around additive `SwiftTUICommand`

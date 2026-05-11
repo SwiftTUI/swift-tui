@@ -70,19 +70,36 @@ struct WebHostCLIRunnerTests {
     }
   }
 
-  @Test("SwiftTUICLI package graph remains server-free")
-  func swiftTUICLIPackageGraphRemainsServerFree() throws {
+  @Test("SwiftTUICLI target graph remains server-free")
+  func swiftTUICLITargetGraphRemainsServerFree() throws {
     let packageURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("Platforms/CLI/Package.swift")
-    let source = try String(contentsOf: packageURL, encoding: .utf8)
+      .appendingPathComponent("Package.swift")
+    let manifest = try String(contentsOf: packageURL, encoding: .utf8)
+    let source = try #require(targetBlock(named: "SwiftTUICLI", in: manifest))
 
     #expect(!source.contains("SwiftTUIWebHost"))
     #expect(!source.contains("FlyingFox"))
+  }
+
+  private func targetBlock(named targetName: String, in manifest: String) -> String? {
+    let marker = ".target(\n      name: \"\(targetName)\""
+    guard let markerRange = manifest.range(of: marker) else {
+      return nil
+    }
+
+    let suffix = manifest[markerRange.lowerBound...]
+    if let nextTarget = suffix.dropFirst(marker.count).range(of: "\n    .target(") {
+      return String(suffix[..<nextTarget.lowerBound])
+    }
+    if let nextTestTarget = suffix.dropFirst(marker.count).range(of: "\n    .testTarget(") {
+      return String(suffix[..<nextTestTarget.lowerBound])
+    }
+    return String(suffix)
   }
 }
 

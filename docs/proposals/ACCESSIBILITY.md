@@ -686,7 +686,7 @@ and thinner in one place**. Specifically:
   ASCII glyph fallback automatically), and `isTTY` (drops to no
   color when stdout is not a TTY). Since the audit,
   `RuntimeConfiguration.detect(environment:isStdoutTTY:)` and the
-  `SwiftTUIArguments` peer package have landed. They add parsing and
+  `SwiftTUIArguments` product have landed. They add parsing and
   precedence for `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`,
   and the `SWIFTTUI_*` family, plus framework flags such as
   `--accessible`, `--ascii`, `--reduce-motion`, `--plain`,
@@ -1886,7 +1886,7 @@ in this document. The primary sources, grouped by theme:
   from `1-31` to `2-31` due to the file split.
 - 2026-05-05: Current-state pass after argument-parsing implementation.
   `RuntimeConfiguration.detect(...)`, `SwiftTUIOptions`, and the
-  `SwiftTUIArguments` peer package now parse the env/flag surface;
+  `SwiftTUIArguments` product now parses the env/flag surface;
   color/glyph flags (`--no-color`, `--force-color`, `--ascii`,
   `--plain`) reach rendering. Marked the remaining behavior wiring
   explicitly, noted that ADR-0011/ADR-0012 are accepted but not yet

@@ -1,8 +1,10 @@
 # Terminal Embedding
 
 Terminal embedding lets a SwiftTUI app host an external terminal program inside
-normal authored view layout. The v1 surface lives in the peer
-`Platforms/Embedding` package, not the root `SwiftTUI` product.
+normal authored view layout. The v1 surface lives in the root package's
+`SwiftTUITerminal` and `SwiftTUIPTYPrimitives` products. The sources are under
+`Platforms/Embedding`, but that directory is source layout, not a separate
+SwiftPM package.
 
 Import `SwiftTUI` for the authoring/runtime surface and `SwiftTUITerminal` for
 the embedding APIs:
@@ -12,7 +14,7 @@ import SwiftTUI
 import SwiftTUITerminal
 ```
 
-The package ships `TerminalView<Session>`, the `TerminalSession` protocol, and
+`SwiftTUITerminal` ships `TerminalView<Session>`, the `TerminalSession` protocol, and
 `TerminalProcessSession` for spawning a local child process behind a pty.
 
 ## Overview
@@ -122,7 +124,7 @@ reaction.
 
 ## Capabilities Today
 
-The v1 embedding package supports:
+The v1 embedding products support:
 
 - local spawned child processes through `TerminalProcessSession`
 - pty creation and resizing through shared `SwiftTUIPTYPrimitives`

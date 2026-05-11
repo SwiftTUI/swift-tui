@@ -93,7 +93,7 @@ resolves the repo root from its own location.
 
 # Run the same things CI runs:
 ./Scripts/linux.sh test           # swift test (root package)
-./Scripts/linux.sh cli-test       # swift test for Platforms/CLI
+./Scripts/linux.sh cli-test       # focused SwiftTUICLI tests from the root package
 ./Scripts/linux.sh examples       # Build Linux example packages
 ./Scripts/linux.sh web            # Build WebExample + Platforms/Web host bundle
 ./Scripts/linux.sh workflow       # examples + web (mirrors CI)

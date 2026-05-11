@@ -8,8 +8,8 @@ Choose the level that matches your app:
 
 - use ``DefaultRenderer`` when you need frame artifacts or textual previews
 - use ``RunLoop`` when you want full control over state, focus, input handling, and terminal hosting
-- use ``SceneManifest`` and ``HostedSceneSession`` when you want an embedded
-  host package to retain scenes on top of the shared runtime
+- use ``SceneManifest`` and ``HostedSceneSession`` when you want a host product
+  to retain scenes on top of the shared runtime
 
 `App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting runtime or pipeline artifacts to whichever layer you need next.
 
@@ -54,16 +54,16 @@ phase timings, worker queue/compute timings, `main_actor_blocked_ms`,
 
 ## Scene-Based Apps
 
-The public scene declarations live in `SwiftTUI`, but platform integration
-lives in peer packages.
+The public scene declarations live in `SwiftTUI`, while platform integration
+lives in sibling root package products.
 
 The same authored `App` and `Scene` declarations can feed three execution
 modes:
 
-- terminal-native execution through an executable runner package
-- WASI execution through an executable runner package
-- localhost-browser execution through the compound WebHost package
-- host-managed embedding through an embedded host package
+- terminal-native execution through the `SwiftTUICLI` runner product
+- WASI execution through the `SwiftTUIWASI` runner product
+- localhost-browser execution through the compound `SwiftTUIWebHost` product
+- host-managed embedding through a host product
 
 `SwiftTUI` itself is library-only. It owns scene declarations, manifests, and
 hosted-session APIs, but it does not provide a default `App.main()` or an
@@ -82,17 +82,17 @@ try await TerminalRunner.run(MyApp.self)
 For WASI apps, import `SwiftTUIWASI` and either rely on its default
 `App.main()` or call `WASIRunner.run(MyApp.self)` explicitly.
 
-### Embedded hosts
+### Host products
 
 For host-managed embedding, keep the authored `App` in `SwiftTUI`, then let an
-embedded host package build `SceneManifest` values and retain one or more
+host product build `SceneManifest` values and retain one or more
 `HostedSceneSession` values.
 
-`Platforms/SwiftUI` uses that path to embed SwiftTUI scenes inside a SwiftUI
+`SwiftUIHost` uses that path to embed SwiftTUI scenes inside a SwiftUI
 app on Apple platforms. `Platforms/Web` uses the same authored scene model for
 browser hosting on top of a `SwiftTUIWASI` build.
 
-`Platforms/WebHost` is deliberately compound: `SwiftTUIWebHost` provides
+`SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
 `WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`
 provides `WebHostCLIRunner` for binaries that intentionally support both
 terminal-native and `--web` launch.

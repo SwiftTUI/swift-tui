@@ -1,4 +1,4 @@
-import Observation
+public import Observation
 import SwiftTUI
 
 public struct SwiftUIHostSceneDescriptor: Identifiable, Hashable, Sendable {

@@ -15,14 +15,18 @@ Usage: Scripts/check_demo_builds.sh [--skip-clean] [--skip-bun-install]
 
 Builds the repository's demo packages and host shells, then runs stack-safety
 input harnesses against the terminal examples:
-  - Examples/canvas
+  - Examples/argparse
+  - Examples/file-previewer
   - Examples/gallery
+  - Examples/gifcat
+  - Examples/gifeditor
+  - Examples/gitviz
   - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
   - Examples/WebHostExample
-  - Platforms/WebHost
-  - Platforms/SwiftUI
+  - SwiftTUIWebHost and SwiftTUIWebHostCLI root-package targets
+  - SwiftUIHost root-package target
   - Examples/SwiftUIExample/SwiftUIExample.xcodeproj
   - Examples/WebExample (Bun build)
   - Platforms/Web against WebExampleApp
@@ -110,15 +114,22 @@ if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_
 fi
 
 if [ "$skip_clean" -eq 0 ]; then
+  run_step \
+    "Clean root SwiftTUI package" \
+    "$repo_root" \
+    swift package clean
+
   for package_path in \
-    "Examples/canvas" \
+    "Examples/argparse" \
+    "Examples/file-previewer" \
     "Examples/gallery" \
+    "Examples/gifcat" \
+    "Examples/gifeditor" \
+    "Examples/gitviz" \
     "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
-    "Examples/WebHostExample" \
-    "Platforms/WebHost" \
-    "Platforms/SwiftUI"; do
+    "Examples/WebHostExample"; do
     run_step \
       "Clean $package_path" \
       "$repo_root" \
@@ -126,15 +137,22 @@ if [ "$skip_clean" -eq 0 ]; then
   done
 fi
 
-run_step \
-  "Build Examples/canvas" \
-  "$repo_root" \
-  swift build --package-path Examples/canvas
+for package_path in \
+  "Examples/argparse" \
+  "Examples/file-previewer" \
+  "Examples/gifcat" \
+  "Examples/gifeditor" \
+  "Examples/gitviz"; do
+  run_step \
+    "Build $package_path" \
+    "$repo_root" \
+    swift build --package-path "$package_path"
 
-run_step \
-  "Build Examples/canvas (release)" \
-  "$repo_root" \
-  swift build -c release --package-path Examples/canvas
+  run_step \
+    "Build $package_path (release)" \
+    "$repo_root" \
+    swift build -c release --package-path "$package_path"
+done
 
 run_step \
   "Build Examples/gallery" \
@@ -191,14 +209,14 @@ run_step \
   swift test --package-path Examples/WebHostExample
 
 run_step \
-  "Build Platforms/WebHost" \
+  "Build SwiftTUIWebHost root targets" \
   "$repo_root" \
-  swift build --package-path Platforms/WebHost
+  swift build --target SwiftTUIWebHost --target SwiftTUIWebHostCLI
 
 run_step \
-  "Build Platforms/SwiftUI" \
+  "Build SwiftUIHost root target" \
   "$repo_root" \
-  swift build --package-path Platforms/SwiftUI
+  swift build --target SwiftUIHost
 
 if [ "$skip_clean" -eq 0 ]; then
   run_step \

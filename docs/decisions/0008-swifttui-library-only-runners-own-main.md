@@ -22,9 +22,8 @@ Options considered:
 1. **Inside `SwiftTUI`.** The runtime library provides the default
    `App.main()`. Authors who import SwiftTUI get terminal-native
    execution for free.
-2. **In a peer runner package.** SwiftTUI stays library-only;
-   `Platforms/CLI` provides the default `App.main()`. Authors
-   import both.
+2. **In a runner product.** SwiftTUI stays library-only;
+   `SwiftTUICLI` provides the default `App.main()`. Authors import both.
 
 Option 1 is more convenient for first-time users. It's also a
 commitment: every consumer of SwiftTUI inherits a terminal-native
@@ -35,7 +34,7 @@ infrastructure. None of those are wanted by:
 - consumers running SwiftTUI under WASI (they need the WASI runner's
   manifest mode),
 - consumers embedding SwiftTUI inside a SwiftUI macOS / iOS app via
-  `Platforms/SwiftUI` (they hand scene sessions to the host's run
+  `SwiftUIHost` (they hand scene sessions to the host's run
   loop),
 - consumers embedding SwiftTUI in the browser via `Platforms/Web`
   (they consume a WASI build and surface raster output to a canvas).
@@ -46,8 +45,8 @@ worst.
 
 ## Decision
 
-`SwiftTUI` is **library-only**. Executable launch is owned by peer
-runner packages.
+`SwiftTUI` is **library-only**. Executable launch is owned by runner
+products.
 
 Consumers writing terminal-native apps:
 
@@ -59,7 +58,7 @@ import SwiftTUICLI   // <-- provides the default App.main()
 struct MyApp: App { ... }
 ```
 
-`Platforms/CLI` provides:
+`SwiftTUICLI` provides:
 
 - the default `App.main()` story for terminal-native execution,
 - `TerminalRunner.run(MyApp.self)` as an explicit launch
@@ -68,19 +67,18 @@ struct MyApp: App { ... }
 - PTY-backed secondary scenes,
 - the crash-guard installation (see ADR-0010).
 
-`Platforms/WASI` provides the equivalent for WASI execution.
-Embedded host packages (`Platforms/SwiftUI`, `Platforms/Web`) consume hosted
+`SwiftTUIWASI` provides the equivalent for WASI execution.
+Host products and packages (`SwiftUIHost`, `Platforms/Web`) consume hosted
 scene sessions directly without involving any default `App.main()` at all.
-`Platforms/WebHost` is compound: `SwiftTUIWebHost` provides
+`SwiftTUIWebHost` is compound: `SwiftTUIWebHost` provides
 `WebHostRunner`, and `SwiftTUIWebHostCLI` composes terminal and WebHost launch
 routing.
 
 ## Status
 
 Accepted. The terminal-native default `App.main()` lives in
-`Platforms/CLI/Sources/SwiftTUICLI/SwiftTUICLI.swift`. The root package's
-library products are `SwiftTUIViews`, `SwiftTUI`, `SwiftTUIAnimatedImage`, and
-`SwiftTUICharts`.
+`SwiftTUICLI`. The root package exposes framework products plus the platform
+runner, host, WebHost, and terminal-embedding products.
 
 ## Consequences
 
@@ -91,7 +89,7 @@ library products are `SwiftTUIViews`, `SwiftTUI`, `SwiftTUIAnimatedImage`, and
   policy.
 - WASI and embedded-host consumers don't pay for raw-mode setup, PTY
   helpers, or signal handlers they'll never use.
-- Each runner package's CLI behavior (attach flows, scene discovery,
+- Each runner product's CLI behavior (attach flows, scene discovery,
   socket protocols) evolves on its own surface without touching the
   root library's public API.
 
@@ -101,15 +99,15 @@ library products are `SwiftTUIViews`, `SwiftTUI`, `SwiftTUIAnimatedImage`, and
   terminal-native binary. The two-import pattern is the supported
   shape.
 - Adding new launcher behavior (e.g. a daemon mode, a stdin-only
-  test harness) is a runner-package change, not a root-package
+  test harness) is a runner-product change, not a `SwiftTUI` runtime product
   change.
 
 **Discipline imposed:**
 
 - New default-launch behavior must justify itself at the runner level.
   "Add it to SwiftTUI for convenience" is rejected.
-- Runner packages must not require modifications to the root package
-  to ship new launch behavior. If they do, the root package needs a
+- Runner products must not require modifications to the `SwiftTUI` runtime
+  product to ship new launch behavior. If they do, the root package needs a
   new supported seam first.
 
 The bet: keeping the launcher decision out of the library means the

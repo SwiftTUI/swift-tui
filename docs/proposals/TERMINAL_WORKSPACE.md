@@ -74,12 +74,12 @@ TerminalWorkspaceView(workspace: $workspace)
 
 This is an illustrative shape, not an approved API. The important constraints
 are stable IDs, explicit model ownership, normal SwiftTUI view composition, and
-no root `SwiftTUI` dependency on the embedding peer package.
+no root `SwiftTUI` runtime dependency on the embedding products.
 
 ## Recommended Layering
 
-Start as a first-party peer package rather than adding terminal-process
-workspace APIs directly to root `SwiftTUI`:
+Start as a first-party product separate from `SwiftTUI` rather than adding
+terminal-process workspace APIs directly to the runtime product:
 
 ```text
 SwiftTUIWorkspace
@@ -212,4 +212,3 @@ Before calling this surface first-class, the repo should have:
 - a real example that can be run from the documented example command path
 - documentation updates in `EMBEDDING.md`, `STATUS.md`, `SOURCE_LAYOUT.md`, and
   the public API inventory once the API lands
-

@@ -43,8 +43,8 @@ imperative writes into later snapshots of that instance. Interactive
 view graph that registered the callback, so reused view values do not leak
 state across live sessions.
 
-For full interactive applications, choose a platform integration package. For
-terminal-native executable apps, import `SwiftTUICLI`:
+For full interactive applications, choose the root package product that matches
+your launch mode. For terminal-native executable apps, import `SwiftTUICLI`:
 
 ```swift
 import SwiftTUICLI
@@ -67,7 +67,7 @@ try await TerminalRunner.run(DemoApp.self)
 ```
 
 For binaries that intentionally support `--web`, import the opt-in combined
-runner package instead:
+runner product instead:
 
 ```swift
 import SwiftTUIWebHostCLI
@@ -136,22 +136,27 @@ see [Examples/argparse](Examples/argparse) for a working consumer-flags +
 framework-flags demo.
 
 The same authored `App` and `Scene` declarations can then flow into these
-execution modes:
+root package products:
 
-- terminal-native execution via the executable runner package `Platforms/CLI`
-- terminal plus localhost-browser WebHost execution via the opt-in runner package
-  `Platforms/WebHost`
-- WASI execution via the executable runner package `Platforms/WASI`
-- host-managed embedding via the embedded host packages `Platforms/SwiftUI`
-  and `Platforms/Web`
+- terminal-native execution via the `SwiftTUICLI` runner product
+- terminal plus localhost-browser WebHost execution via the opt-in
+  `SwiftTUIWebHostCLI` runner product
+- WASI execution via the `SwiftTUIWASI` runner product, with
+  `WASISurfaceBridge` available for transport-only consumers
+- host-managed native embedding via the `SwiftUIHost` product on Apple
+  platforms
+- terminal-program embedding via `SwiftTUITerminal` and
+  `SwiftTUIPTYPrimitives`
+- deploy-to-browser hosting through `Platforms/Web`, which remains a Bun
+  package that consumes a `SwiftTUIWASI` build
 
 In repo terminology, a runner owns process startup or launch routing, while a
 host owns an external presentation environment or embedding lifecycle. See
 [docs/TERMINOLOGY.md](docs/TERMINOLOGY.md) for the precise boundary.
 
 `SwiftTUI` on its own is library-only. It provides the shared runtime,
-`SceneManifest`, and `HostedSceneSession`, but it does not provide an
-executable product or default `App.main()`.
+`SceneManifest`, and `HostedSceneSession`; runner and host behavior is exposed
+through sibling products in the same root package.
 
 ## Development Requirements
 
@@ -166,14 +171,13 @@ swiftly run swift test
 Scripts/test_all.sh
 ```
 
-`swiftly run swift test` covers the root package. `Scripts/test_all.sh` is the
-single repo-level entrypoint for the full checked-in test surface across the
-runner packages, embedded host packages, and example projects, and it verifies
-the Swift and Bun environment first. On Linux, it exports
-`DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only
-`Platforms/SwiftUI` SwiftUI host tests. If you're
-already using the repo's root Bun workspace, `bun run test` is a thin
-entrypoint to the same script.
+`swiftly run swift test` covers the root package, including the Swift platform
+products. `Scripts/test_all.sh` is the single repo-level entrypoint for the full
+checked-in test surface across root products, example packages, and web
+tooling, and it verifies the Swift and Bun environment first. On Linux, it
+exports `DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only `SwiftUIHost`
+tests. If you're already using the repo's root Bun workspace, `bun run test` is
+a thin entrypoint to the same script.
 
 ## Performance Evaluation
 

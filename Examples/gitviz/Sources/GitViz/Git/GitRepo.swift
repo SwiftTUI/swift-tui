@@ -34,12 +34,14 @@ struct GitRepo: Sendable {
     let branch = try? run(["rev-parse", "--abbrev-ref", "HEAD"]).trimmedLine
     let commitCount =
       (try? GitParsers.parseInteger(run(["rev-list", "--count", "HEAD"]))) ?? 0
-    let firstCommit = (try? run([
-      "log", "--reverse", "--pretty=format:%aI", "--max-count", "1",
-    ]).trimmedLine).flatMap { GitParsers.parseISODate($0) }
-    let lastCommit = (try? run([
-      "log", "--pretty=format:%aI", "--max-count", "1",
-    ]).trimmedLine).flatMap { GitParsers.parseISODate($0) }
+    let firstCommit =
+      (try? run([
+        "log", "--reverse", "--pretty=format:%aI", "--max-count", "1",
+      ]).trimmedLine).flatMap { GitParsers.parseISODate($0) }
+    let lastCommit =
+      (try? run([
+        "log", "--pretty=format:%aI", "--max-count", "1",
+      ]).trimmedLine).flatMap { GitParsers.parseISODate($0) }
     let contributorCount =
       (try? run(["shortlog", "-s", "-n", "-e", "HEAD"]).lineCount) ?? 0
     let tagCount =
@@ -178,14 +180,10 @@ struct GitRepo: Sendable {
   }
 
   private func formatGitDate(_ date: Date) -> String {
-    Self.gitDateFormatter.string(from: date)
-  }
-
-  nonisolated(unsafe) private static let gitDateFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withFullDate]
-    return formatter
-  }()
+    return formatter.string(from: date)
+  }
 
   private func parseSubjects(_ raw: String) -> [String: String] {
     var map: [String: String] = [:]
@@ -200,9 +198,9 @@ struct GitRepo: Sendable {
   }
 }
 
-private extension String {
+extension String {
   /// First non-empty line, trimmed.
-  var trimmedLine: String {
+  fileprivate var trimmedLine: String {
     for line in self.split(separator: "\n") {
       let trimmed = line.trimmingCharacters(in: .whitespaces)
       if !trimmed.isEmpty { return trimmed }
@@ -211,7 +209,7 @@ private extension String {
   }
 
   /// Count of non-empty lines after trimming.
-  var lineCount: Int {
+  fileprivate var lineCount: Int {
     var count = 0
     for line in self.split(separator: "\n") {
       if !line.trimmingCharacters(in: .whitespaces).isEmpty {

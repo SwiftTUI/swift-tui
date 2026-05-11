@@ -21,7 +21,6 @@ let package = Package(
   dependencies: [
     .package(name: "swift-tui", path: "../../.."),
     .package(path: "../../gallery"),
-    .package(name: "SwiftTUIWASI", path: "../../../Platforms/WASI"),
   ],
   targets: [
     .target(
@@ -36,7 +35,7 @@ let package = Package(
       name: "WebExampleApp",
       dependencies: [
         "WebExampleScenes",
-        .product(name: "SwiftTUIWASI", package: "SwiftTUIWASI"),
+        .product(name: "SwiftTUIWASI", package: "swift-tui"),
       ],
       path: "Sources/TerminalApp"
     ),

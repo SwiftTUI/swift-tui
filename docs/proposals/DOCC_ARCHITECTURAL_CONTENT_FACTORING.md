@@ -263,8 +263,8 @@ This article is mostly project-internal contracts:
 - "Shipped Architecture" — describes which package owns which file
   (`SwiftUIHostAppState`, `NativeSceneBridge`, etc.). Useful for embedded-host
   package authors. Not useful for someone choosing how to embed.
-- "Responsibilities Split" — internal contract between the root package and
-  peer platform integration packages.
+- "Responsibilities Split" — internal contract between the root runtime product
+  and platform integration products.
 - **"Non-Negotiable Decisions"** — eight numbered project-policy decisions.
   This is governance, not API.
 - **"Out Of Scope"** — what we will not build. Roadmap policy.

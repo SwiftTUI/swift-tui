@@ -6,13 +6,13 @@ future file moves.
 
 ## Repository Layout
 
-- `Sources/`: root Swift package targets (`SwiftTUICore`, `SwiftTUIViews`, `SwiftTUIAnimatedImage`,
-  `SwiftTUICharts`, and `SwiftTUI`)
-- `Tests/`: root Swift package tests for the package products
-- `Platforms/`: peer SwiftPM platform-integration packages — executable runners
-  (`CLI`, `WASI`), embedded hosts (`SwiftUI`, `Web`), the compound WebHost
-  runner/browser-host package (`WebHost`), plus terminal-program embedding
-  support (`Embedding`)
+- `Sources/`: root Swift package framework targets (`SwiftTUICore`,
+  `SwiftTUIViews`, `SwiftTUIAnimatedImage`, `SwiftTUICharts`, and `SwiftTUI`)
+- `Tests/`: root Swift package tests for the framework products
+- `Platforms/`: source directories for root Swift package platform products:
+  executable runners (`CLI`, `WASI`), host products (`SwiftUI`, `WebHost`),
+  shared argument parsing (`Arguments`), and terminal-program embedding
+  support (`Embedding`). `Platforms/Web` is the Bun browser package.
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
   `swift-hash`, `swift-png`, `swift-jpeg`, and `swift-gif`
@@ -30,17 +30,23 @@ future file moves.
 - Internal support targets:
   - `SwiftTUICore`
 
-- Peer platform integration packages:
-  - executable runner packages:
-    - `Platforms/CLI`
-    - `Platforms/WASI`
-  - compound runner/browser-host package:
-    - `Platforms/WebHost`
-  - embedded host packages:
-    - `Platforms/SwiftUI`
+- Root platform integration products:
+  - executable runner products:
+    - `SwiftTUICLI` (`Platforms/CLI`)
+    - `SwiftTUIWASI` (`Platforms/WASI`)
+  - compound runner/browser-host products:
+    - `SwiftTUIWebHost`
+    - `SwiftTUIWebHostCLI`
+  - host product:
+    - `SwiftUIHost` (`Platforms/SwiftUI`)
+  - embedded terminal-program products:
+    - `SwiftTUITerminal`
+    - `SwiftTUIPTYPrimitives`
+  - shared platform support products:
+    - `SwiftTUIArguments`
+    - `WASISurfaceBridge`
+  - browser package:
     - `Platforms/Web`
-  - embedded terminal-program package:
-    - `Platforms/Embedding`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
@@ -102,7 +108,7 @@ Sources/SwiftTUI/
 - `Scenes/App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `AnyScene`, and typed scene builder artifacts
 - `Scenes/SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `Scenes/SceneManifest.swift`: `SceneDescriptor`, `SceneManifest`, and manifest generation from authored scenes
-- `Scenes/HostedSceneSession.swift`: retained hosted scene runtime for embedded host packages and other non-terminal hosts
+- `Scenes/HostedSceneSession.swift`: retained hosted scene runtime for host products and other non-terminal hosts
 - `Scenes/SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 
 ### Terminal
@@ -146,7 +152,7 @@ Sources/SwiftTUI/
 
 ## `Platforms/CLI`
 
-- `SwiftTUICLI.swift`: re-export surface for the CLI runner package
+- `SwiftTUICLI.swift`: re-export surface for the CLI runner product
 - `TerminalRunner.swift`: terminal-native app launch, CLI-mode routing, and single-scene test helper
 - `SceneRuntime.swift`: per-scene runtime orchestration for multi-scene terminal apps
 - `SceneLifecycle.swift`: scene session coordination
@@ -159,10 +165,10 @@ Sources/SwiftTUI/
 
 ## `Platforms/WASI`
 
-The package ships two library targets:
+This source directory backs two root package library products:
 
 - `SwiftTUIWASI` — process-owning launcher. App authors `import SwiftTUIWASI` to get `App.main()`.
-  - `SwiftTUIWASI.swift`: re-export surface for the WASI launcher package
+  - `SwiftTUIWASI.swift`: re-export surface for the WASI launcher product
   - `WASIRunner.swift`: manifest mode plus WASI scene selection and launch
 - `WASISurfaceBridge` — pure raster-surface transport, importable on its own without the launcher.
   - `WebSurfaceTransport.swift`: `web-surface` stdout encoder (`WebSurfaceFrameEncoder`),
@@ -173,8 +179,8 @@ The package ships two library targets:
 
 ## `Platforms/WebHost`
 
-The package ships two public library targets and intentionally combines runner
-and browser-host responsibilities:
+This source directory backs two root package library products and intentionally
+combines runner and browser-host responsibilities:
 
 - `SwiftTUIWebHost` — opt-in embedded HTTP/WebSocket launcher. App authors
   `import SwiftTUIWebHost` for web-only binaries that serve a local browser
@@ -197,25 +203,25 @@ and browser-host responsibilities:
   - `WebHostBanner.swift`: copy-pasteable URL/banner output and external-bind
     warning text
   - `BrowserOpener.swift`: opt-in browser launch for `--open`
-- `SwiftTUIWebHostCLI` — compile-time composition package for binaries that
+- `SwiftTUIWebHostCLI` — compile-time composition product for binaries that
   intentionally support both terminal-native execution and WebHost mode.
   - `SwiftTUIWebHostCLI.swift`: re-export surface for `SwiftTUI` and
     `SwiftTUIWebHost`
   - `WebHostCLIRunner.swift`: routes `RuntimeConfiguration.web != nil` to
     `WebHostRunner` and otherwise calls `TerminalRunner`
 
-## Embedded Host Packages
+## Host Products And Browser Package
 
-- `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`, with native AppKit/UIKit clipboard writes
+- `Platforms/SwiftUI`: native SwiftUI host product built on `SceneManifest` and `HostedSceneSession`, with native AppKit/UIKit clipboard writes
 - `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas and typed clipboard records into `navigator.clipboard`
 
-`Platforms/WebHost` is covered above because it is both a runner package and a
+`Platforms/WebHost` is covered above because it is both a runner product and a
 localhost browser host bridge for native binaries.
 
 ## `Platforms/Embedding`
 
-The package ships two public library targets plus one internal C support
-target:
+This source directory backs two public library products plus one internal C
+support target:
 
 - `SwiftTUIPTYPrimitives` — shared pty creation, fd lifecycle, read/write, and
   resize support used by `Platforms/CLI` scene attachment and terminal-program
@@ -224,9 +230,9 @@ target:
   driver, `TerminalSession`, `TerminalProcessSession`, `TerminalView`, and
   terminal metadata modifiers.
 
-`Platforms/Embedding` is a peer package. Root `SwiftTUI` does not depend on it;
-apps and examples opt in when they need external terminal programs inside an
-authored SwiftTUI view tree.
+Root `SwiftTUI` does not depend on these products; apps and examples opt in
+when they need external terminal programs inside an authored SwiftTUI view
+tree.
 
 ## `SwiftTUICore`
 

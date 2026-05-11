@@ -6,9 +6,11 @@ Examples/file-previewer/Sources/FilePreviewerApp/ColumnBrowser.swift
 Examples/gifeditor/Sources/GIFEditorUI/MenuBarView.swift
 Examples/gifeditor/Sources/GIFEditorUI/TimelineView.swift
 Examples/gifeditor/Sources/GIFEditorUI/ToolboxView.swift
+Examples/gitviz/Sources/GitViz/Views/LanePalette.swift
 Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostAppView.swift
 Sources/SwiftTUICharts/ChartChromeSupport.swift
 Sources/SwiftTUICharts/ChartSupport.swift
+Sources/SwiftTUICharts/LineChartSupport.swift
 Sources/SwiftTUICharts/Meter.swift
 Sources/SwiftTUICharts/Sparkline.swift
 Sources/SwiftTUICore/Draw/DrawExtractor+Tables.swift

@@ -21,7 +21,7 @@ The repository [README.md](../README.md) is the public landing page.
 - [STATUS.md](STATUS.md) — shipped surface, current constraints, goals, and
   explicit deferrals; planned or decision-bound gaps are tracked in
   [`TODO.md`](TODO.md)
-- [ARCHITECTURE.md](ARCHITECTURE.md) — package boundaries and the frame pipeline
+- [ARCHITECTURE.md](ARCHITECTURE.md) — product/target boundaries and the frame pipeline
 - [RUNTIME.md](RUNTIME.md) — lifecycle, graph-scoped state, observation,
   presentation safety, and incremental rendering
 - [ASYNC_RENDERING.md](ASYNC_RENDERING.md) — async presentation and frame-tail offload
@@ -46,10 +46,10 @@ The repository [README.md](../README.md) is the public landing page.
 - [STATE_KEYING.md](STATE_KEYING.md) — graph-scoped state-keying rules,
   snapshot fallback behavior, and authored-view identity
 
-## Platform Packaging
+## Platform Products
 
-- [HOST_PACKAGES.md](HOST_PACKAGES.md) — platform integration package model for
-  executable runners and embedded hosts
+- [HOST_PACKAGES.md](HOST_PACKAGES.md) — root-package platform products for
+  executable runners, embedded hosts, and terminal-program embedding
 - [ANDROID.md](ANDROID.md) — Android cross-compilation
 - [../Examples/README.md](../Examples/README.md) — maintained example apps and packages
 
@@ -63,7 +63,7 @@ Active design proposals that are still shaping decisions:
 
 - [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — shipped text input value, selection, reducer, layout-map, caret-anchor, shortcut, and selection-rendering foundation for `TextField`, `SecureField`, and `TextEditor`
 - [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — historical research record and remaining accessibility behavior questions; current shipped behavior lives in [ACCESSIBILITY.md](ACCESSIBILITY.md)
-- [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `Platforms/WebHost/` runner for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
+- [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` products for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
 - [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) — scoped design work for a first-class Zellij-style terminal workspace surface above `TerminalView`
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — draft anchored popover and TipKit-inspired `popoverTip` API proposal

@@ -25,8 +25,9 @@ swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/testName    # 
 swift format format -i --configuration .swift-format.json Sources/ Tests/       # Format
 ```
 
-Always run `bun run test` after changes that touch shared code, peer packages,
-or repo tooling, and confirm it passes before considering work complete.
+Always run `bun run test` after changes that touch shared code, platform
+products, example packages, or repo tooling, and confirm it passes before
+considering work complete.
 
 See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
 (`swiftly`, wasm SDK, Bun, Xcode, Android NDK).

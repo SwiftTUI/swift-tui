@@ -386,12 +386,24 @@ classifications:
     - SwiftTUICharts.BarChart
     - SwiftTUICharts.BarChartEntry
     - SwiftTUICharts.BulletChart
+    - SwiftTUICharts.CalendarHeatmap
+    - SwiftTUICharts.CalendarHeatmapWeekStart
     - SwiftTUICharts.ColumnChart
     - SwiftTUICharts.ComparisonChart
     - SwiftTUICharts.ComparisonEntry
+    - SwiftTUICharts.DateAxisStride
+    - SwiftTUICharts.DateValue
     - SwiftTUICharts.HeatStrip
     - SwiftTUICharts.Legend
     - SwiftTUICharts.LegendItem
+    - SwiftTUICharts.LineChart
+    - SwiftTUICharts.LineChartBaseline
+    - SwiftTUICharts.LineChartLegendConfig
+    - SwiftTUICharts.LineChartPoint
+    - SwiftTUICharts.LineChartSeries
+    - SwiftTUICharts.LineChartSeriesStyle
+    - SwiftTUICharts.LineChartXAxis
+    - SwiftTUICharts.LineChartYAxis
     - SwiftTUICharts.Meter
     - SwiftTUICharts.Sparkline
     - SwiftTUICharts.StackedBarChart
@@ -699,6 +711,16 @@ classifications:
 # package-only-seam unless an explicit canonical override applies).
 module_defaults:
   Core: package-only-seam
+  SwiftTUIArguments: canonical
+  SwiftTUIPTYPrimitives: canonical
+  SwiftTUITerminal: canonical
+  SwiftTUICLI: canonical
+  WASISurfaceBridge: canonical
+  SwiftTUIWASI: canonical
+  SwiftTUIWebHost: canonical
+  SwiftTUIWebHostCLI: canonical
+  SwiftUIHost: canonical
+  SwiftTUIPTYCPrimitives: package-only-seam
 
 # Global fallback for any symbol not otherwise classified.
 default: pending-review

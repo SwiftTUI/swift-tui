@@ -1,4 +1,4 @@
-import Observation
+public import Observation
 import SwiftTUI
 import SwiftUI
 

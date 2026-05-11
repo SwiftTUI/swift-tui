@@ -72,8 +72,8 @@ Calls outside an active SwiftTUI runtime are ignored.
 ## Runtime Policy
 
 `RuntimeConfiguration` owns the resolved runtime accessibility policy. It can
-come from environment detection, `SwiftTUIArguments`, a runner, or an embedded
-host package.
+come from environment detection, `SwiftTUIArguments`, a runner, or a host
+product.
 
 Important fields:
 

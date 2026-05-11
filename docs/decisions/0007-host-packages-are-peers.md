@@ -1,7 +1,7 @@
 ---
 adr: "0007"
 title: "Platform integration packages are peers, not root products"
-status: accepted
+status: superseded
 date: 2026-04-29
 sources:
   - docs/HOST_PACKAGES.md
@@ -10,6 +10,11 @@ sources:
 ---
 
 # ADR-0007: Platform integration packages are peers, not root products
+
+Superseded by
+[ADR-0016](0016-platform-products-live-in-root-package.md) on 2026-05-11.
+`Platforms/` remains the source ownership map, but Swift platform integration
+products now live in the root `Package.swift`.
 
 ## Context
 
@@ -61,10 +66,9 @@ The root package does not own any of those.
 
 ## Status
 
-Accepted. The current peer set lives under `Platforms/`: `CLI`, `WASI`,
-`SwiftUI`, `Web`, `WebHost`, and `Embedding`. Each Swift package has its own
-`Package.swift`, test target, and dependency graph; `Platforms/Web` is a Bun
-package for browser hosting.
+Superseded on 2026-05-11 by ADR-0016. This ADR remains as the historical
+record for why the project originally split platform integrations into nested
+SwiftPM packages.
 
 ## Consequences
 

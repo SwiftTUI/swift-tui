@@ -15,15 +15,13 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
-    .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
-    .package(name: "SwiftTUIEmbedding", path: "../../Platforms/Embedding"),
   ],
   targets: [
     .target(
       name: "FilePreviewerApp",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUITerminal", package: "SwiftTUIEmbedding"),
+        .product(name: "SwiftTUITerminal", package: "swift-tui"),
       ]
     ),
     .executableTarget(
@@ -31,7 +29,7 @@ let package = Package(
       dependencies: [
         "FilePreviewerApp",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
+        .product(name: "SwiftTUICLI", package: "swift-tui"),
       ]
     ),
     .testTarget(
