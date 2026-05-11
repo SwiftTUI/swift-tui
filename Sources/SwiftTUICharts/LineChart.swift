@@ -4,7 +4,7 @@ import SwiftTUIViews
 
 /// A multi-series continuous plot supporting `.line`, `.area`, and
 /// `.step` series styles, with Date- or numeric-aware axis modifiers.
-public struct LineChart<Label: View, Summary: View>: View, ResolvableView {
+public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
   public var series: [LineChartSeries]
   public var height: Int
   public var width: Int?
