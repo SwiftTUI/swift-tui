@@ -19,9 +19,17 @@ public enum LineChartBaseline: Hashable, Sendable {
 /// `.chartXAxis(_:)`.
 public struct LineChartXAxis: Hashable, Sendable {
   public enum Ticks: Hashable, Sendable {
-    case automatic           // ~4-6 evenly spaced
+    /// ~5 evenly spaced ticks chosen by the renderer.
+    case automatic
+    /// Exactly `N` evenly spaced ticks across the plot.
     case count(Int)
+    /// Approximately one tick per `stride` of domain. The number of ticks
+    /// is derived from `span / stride`, but the ticks are then spaced
+    /// evenly across the plot — they are not positioned at exact multiples
+    /// of `stride`. Use `.dates(every:)` for calendar-boundary snapping.
     case every(stride: Double)
+    /// Snaps ticks to calendar boundaries of the given stride
+    /// (e.g., month starts).
     case dates(every: DateAxisStride)
   }
 
@@ -63,8 +71,14 @@ public struct LineChartXAxis: Hashable, Sendable {
 /// `.dates` tick / format variants.
 public struct LineChartYAxis: Hashable, Sendable {
   public enum Ticks: Hashable, Sendable {
+    /// ~5 evenly spaced ticks chosen by the renderer.
     case automatic
+    /// Exactly `N` evenly spaced ticks across the plot.
     case count(Int)
+    /// Approximately one tick per `stride` of domain. The number of ticks
+    /// is derived from `span / stride`, but the ticks are then spaced
+    /// evenly across the plot — they are not positioned at exact multiples
+    /// of `stride`.
     case every(stride: Double)
   }
 

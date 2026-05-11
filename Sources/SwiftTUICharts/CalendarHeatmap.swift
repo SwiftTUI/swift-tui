@@ -31,6 +31,11 @@ public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, Resolv
     @ViewBuilder label: () -> Label,
     @ViewBuilder summary: () -> Summary
   ) {
+    // Even when the caller supplies their own label/summary views, we
+    // still want a synthesized accessibility summary so VoiceOver users
+    // hear a meaningful description. The convenience inits below
+    // override this when they have a title to compose with.
+    let summarizedDayCount = "\(days.count) days"
     self.init(
       days: days,
       range: range,
@@ -41,7 +46,7 @@ public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, Resolv
       showsDayLabels: showsDayLabels,
       showsScaleLegend: showsScaleLegend,
       tone: tone,
-      accessibilitySummary: nil,
+      accessibilitySummary: summarizedDayCount,
       label: label,
       summary: summary
     )

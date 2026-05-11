@@ -400,10 +400,11 @@ func yAxisTickLabels(
     count = 5
   case .count(let n):
     count = max(2, n)
-  case .every:
-    // Stride-based ticks: compute count from span / stride. Fall back to
-    // .automatic for `.every` since stride support on Y is rare.
-    count = 5
+  case .every(let stride):
+    // Derive tick count from span / stride, then space them evenly across
+    // the plot. See LineChartYAxis.Ticks.every for the documented
+    // approximation contract.
+    count = max(2, Int(span / max(stride, .leastNonzeroMagnitude)))
   }
 
   guard span > 0 else {
