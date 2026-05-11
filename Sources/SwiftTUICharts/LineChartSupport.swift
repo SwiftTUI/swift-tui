@@ -498,8 +498,11 @@ func lineChartBody(
   legend: LineChartLegendConfig,
   baseline: LineChartBaseline
 ) -> some View {
-  let yAxisLabelWidth = 6
-  let plotWidth  = max(1, width - yAxisLabelWidth - 2)   // 2 for axis chrome
+  // When Y axis is hidden, reclaim the label column width for the plot.
+  let yAxisLabelWidth = yAxis.isHidden ? 0 : 6
+  // 2 for axis chrome (┤/┼ separator) when Y axis is visible; 0 when hidden.
+  let yAxisChromeWidth = yAxis.isHidden ? 0 : 2
+  let plotWidth  = max(1, width - yAxisLabelWidth - yAxisChromeWidth)
   let plotHeight = max(1, height)
 
   let domainOrNil = plotDomain(series: series)
@@ -538,15 +541,21 @@ func lineChartBody(
   let cellSeriesIndex = composed.seriesIndex
 
   VStack(alignment: .leading, spacing: 0) {
+    // Top legend strip (when position is .top).
+    if legend.position == .top {
+      legendStrip(series: series, spacing: legend.itemSpacing)
+    }
     // Y axis labels + plot rows.
     ForEach(0..<plotHeight, id: \.self) { row in
       HStack(alignment: .center, spacing: 0) {
-        let yLabel = yTicks.first(where: { $0.row == row })?.text ?? ""
-        Text(yLabel)
-          .frame(width: yAxisLabelWidth, alignment: .trailing)
-          .foregroundStyle(.separator)
-        Text(row == baselineRow ? "┼" : "┤")
-          .foregroundStyle(.separator)
+        if !yAxis.isHidden {
+          let yLabel = yTicks.first(where: { $0.row == row })?.text ?? ""
+          Text(yLabel)
+            .frame(width: yAxisLabelWidth, alignment: .trailing)
+            .foregroundStyle(.separator)
+          Text(row == baselineRow ? "┼" : "┤")
+            .foregroundStyle(.separator)
+        }
         ForEach(0..<plotWidth, id: \.self) { col in
           let cell = composedGrid[row][col]
           let seriesIndex = cellSeriesIndex[row][col]
@@ -561,21 +570,26 @@ func lineChartBody(
         }
       }
     }
-    // X axis baseline + labels.
+    // X axis baseline row (always shown — it's the plot border, not labels).
     HStack(alignment: .center, spacing: 0) {
       Text(String(repeating: " ", count: yAxisLabelWidth))
-      Text("┼")
-        .foregroundStyle(.separator)
+      if !yAxis.isHidden {
+        Text("┼")
+          .foregroundStyle(.separator)
+      }
       Text(String(repeating: "─", count: plotWidth))
         .foregroundStyle(.separator)
     }
-    HStack(alignment: .center, spacing: 0) {
-      Text(String(repeating: " ", count: yAxisLabelWidth + 1))
-      Text(formatXAxisLine(xTicks: xTicks, plotWidth: plotWidth))
-        .foregroundStyle(.separator)
+    // X axis label row (hidden when xAxis.isHidden).
+    if !xAxis.isHidden {
+      HStack(alignment: .center, spacing: 0) {
+        Text(String(repeating: " ", count: yAxisLabelWidth + (yAxis.isHidden ? 0 : 1)))
+        Text(formatXAxisLine(xTicks: xTicks, plotWidth: plotWidth))
+          .foregroundStyle(.separator)
+      }
     }
-    // Legend strip.
-    if legend.position != .hidden {
+    // Bottom legend strip (when position is .bottom).
+    if legend.position == .bottom {
       legendStrip(series: series, spacing: legend.itemSpacing)
     }
   }

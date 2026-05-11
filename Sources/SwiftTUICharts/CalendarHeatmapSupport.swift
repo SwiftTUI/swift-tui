@@ -201,14 +201,8 @@ private let dayLabelColumnWidth = 4
 private func calendarHeatmapGlyph(value: Double?, maximumValue: Double) -> String {
   guard let value else { return " " }      // out of range → space
   if value == 0 { return "·" }              // in range, no activity → dot
-  // Map to the existing HeatStrip 4-step ramp.
   let fraction = min(max(abs(value) / maximumValue, 0), 1)
-  switch fraction {
-  case ..<0.25: return "░"
-  case ..<0.5:  return "▒"
-  case ..<0.75: return "▓"
-  default:      return "█"
-  }
+  return intensityRampGlyph(fraction: fraction)
 }
 
 @MainActor
