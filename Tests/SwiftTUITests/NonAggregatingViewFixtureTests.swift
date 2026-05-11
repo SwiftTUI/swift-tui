@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUICharts
 import Testing
 
@@ -227,6 +228,22 @@ struct NonAggregatingViewFixtureTests {
         )
       )
 
+    case "calendar-heatmap":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 60, height: 11),
+        view: AnyView(
+          CalendarHeatmap(
+            "Activity",
+            days: calendarHeatmapDays,
+            range: calendarHeatmapRange,
+            weekStart: .monday,
+            calendar: utcGregorianCalendar,
+            cellWidth: 1
+          )
+        )
+      )
+
     default:
       return FixtureSpec(
         name: name,
@@ -261,6 +278,7 @@ private let nonAggregatingFixtureNames = [
   "threshold-gauge",
   "column-chart",
   "heat-strip",
+  "calendar-heatmap",
 ]
 
 private struct FixtureSpec {
@@ -331,3 +349,35 @@ private let thresholdBands: [ThresholdBand] = [
   .init(upTo: 80, tone: .warning),
   .init(upTo: 100, tone: .success),
 ]
+
+private let utcGregorianCalendar: Calendar = {
+  var cal = Calendar(identifier: .gregorian)
+  cal.timeZone = TimeZone(identifier: "UTC")!
+  return cal
+}()
+
+private let calendarHeatmapRange: ClosedRange<Date> = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  return formatter.date(from: "2024-09-01")!...formatter.date(from: "2024-12-29")!
+}()
+
+private let calendarHeatmapDays: [DateValue] = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withFullDate]
+  formatter.timeZone = TimeZone(identifier: "UTC")
+  func d(_ s: String) -> Date { formatter.date(from: s)! }
+  return [
+    DateValue(d("2024-09-03"), value: 2),
+    DateValue(d("2024-09-04"), value: 1),
+    DateValue(d("2024-09-10"), value: 4),
+    DateValue(d("2024-09-17"), value: 5),
+    DateValue(d("2024-10-01"), value: 8),
+    DateValue(d("2024-10-15"), value: 6),
+    DateValue(d("2024-11-04"), value: 3),
+    DateValue(d("2024-11-22"), value: 9),
+    DateValue(d("2024-12-09"), value: 7),
+    DateValue(d("2024-12-23"), value: 10),
+  ]
+}()
