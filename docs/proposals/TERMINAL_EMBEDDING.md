@@ -458,7 +458,7 @@ The user's prompting question. An honest answer:
 | Tabs                        | `TabView`                                                              |
 | Tiled panes                 | `HStack` / `VStack` / custom `Layout` (replaces Cassowary)             |
 | Stacked panes               | a custom `Layout` variant                                              |
-| Floating panes              | `.sheet(...)` / `.popover` (when it lands)                             |
+| Floating panes              | `.sheet(...)` / `.popover(...)`                                        |
 | Status bar                  | `Text` + `LabeledContent` in a `VStack`                                |
 | Mode indicator              | `@State` / `@Observable` driving status text                           |
 | Keybindings + modes         | `ActionScope` + `.keyCommand(...)` (already shipped)                   |

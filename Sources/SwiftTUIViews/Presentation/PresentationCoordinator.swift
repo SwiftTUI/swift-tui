@@ -124,6 +124,14 @@ package protocol ManagedPresentationCoordinator: PresentationCoordinator {
   func restoreCheckpoint(_ checkpoint: StoredPresentationCoordinatorCheckpoint<Item>)
 }
 
+extension ManagedPresentationCoordinator {
+  package func modalPolicy(
+    for _: Item
+  ) -> PortalModalPolicy {
+    Self.modalPolicy
+  }
+}
+
 // MARK: - Shared Item Storage
 
 package struct TrackedPresentationItem<Item: Identifiable & Sendable>: Sendable
@@ -488,6 +496,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   package var bodyMode: BodyMode
   package var chrome: PresentationChrome
   package var contentSizing: PromptPresentationContentSizing
+  package var createsFocusScope: Bool
 
   package init(
     alignment: Alignment,
@@ -502,7 +511,8 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     scrollMaxHeight: Int,
     bodyMode: BodyMode,
     chrome: PresentationChrome = .surface,
-    contentSizing: PromptPresentationContentSizing = .fillAvailable
+    contentSizing: PromptPresentationContentSizing = .fillAvailable,
+    createsFocusScope: Bool = true
   ) {
     self.alignment = alignment
     self.accessibilityRole = accessibilityRole
@@ -517,6 +527,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     self.bodyMode = bodyMode
     self.chrome = chrome
     self.contentSizing = contentSizing
+    self.createsFocusScope = createsFocusScope
   }
 }
 
@@ -545,6 +556,31 @@ package struct PromptPresentationItem: Identifiable, Sendable {
     self.messagePayloads = messagePayloads
     self.contentPayloads = contentPayloads
     self.dismiss = dismiss
+  }
+}
+
+package struct PopoverPresentationItem: Identifiable, Sendable {
+  package var id: String
+  package var sourceIdentity: Identity
+  package var attachmentAnchor: PopoverAttachmentAnchor
+  package var arrowEdge: Edge?
+  package var modalPolicy: PortalModalPolicy
+  package var surfaceItem: PromptPresentationItem
+
+  package init(
+    id: String,
+    sourceIdentity: Identity,
+    attachmentAnchor: PopoverAttachmentAnchor,
+    arrowEdge: Edge?,
+    modalPolicy: PortalModalPolicy,
+    surfaceItem: PromptPresentationItem
+  ) {
+    self.id = id
+    self.sourceIdentity = sourceIdentity
+    self.attachmentAnchor = attachmentAnchor
+    self.arrowEdge = arrowEdge
+    self.modalPolicy = modalPolicy
+    self.surfaceItem = surfaceItem
   }
 }
 
@@ -701,6 +737,53 @@ package final class SheetPresentationCoordinator:
     for item: PromptPresentationItem
   ) -> (@MainActor @Sendable () -> Void)? {
     item.dismiss
+  }
+}
+
+@MainActor
+package final class PopoverPresentationCoordinator:
+  StoredPresentationCoordinator<PopoverPresentationItem>,
+  ManagedPresentationCoordinator
+{
+  package static let zIndex = 220
+  package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
+  package static let overlayKindName = "PopoverPresentation"
+
+  @ViewBuilder
+  package func makeBody() -> some View {
+    if let latestItem {
+      HostedPopoverPresentation(item: latestItem)
+    }
+  }
+
+  package func present(
+    _ item: PopoverPresentationItem
+  ) {
+    super.present(
+      item,
+      message: "PopoverPresentationCoordinator.present(_:) must not be called during view update."
+    )
+  }
+
+  package func dismiss(
+    id: String
+  ) {
+    super.dismiss(
+      id: id,
+      message: "PopoverPresentationCoordinator.dismiss(id:) must not be called during view update."
+    )
+  }
+
+  package func dismissAction(
+    for item: PopoverPresentationItem
+  ) -> (@MainActor @Sendable () -> Void)? {
+    item.surfaceItem.dismiss
+  }
+
+  package func modalPolicy(
+    for item: PopoverPresentationItem
+  ) -> PortalModalPolicy {
+    item.modalPolicy
   }
 }
 
@@ -943,7 +1026,7 @@ where C.Item.ID: Sendable {
         stableTieBreaker: stableID
       ),
       kindName: C.overlayKindName,
-      modalPolicy: C.modalPolicy,
+      modalPolicy: coordinator.modalPolicy(for: item),
       acceptsEscape: coordinator.dismissAction(for: item) != nil,
       dismiss: coordinator.dismissAction(for: item),
       payload: PortalContentPayload {
@@ -1012,6 +1095,7 @@ package final class PresentationCoordinatorRegistry {
     fileprivate var confirmationDialog:
       PresentationCoordinatorBox<ConfirmationDialogPresentationCoordinator>.Checkpoint
     fileprivate var sheet: PresentationCoordinatorBox<SheetPresentationCoordinator>.Checkpoint
+    fileprivate var popover: PresentationCoordinatorBox<PopoverPresentationCoordinator>.Checkpoint
     fileprivate var menu: PresentationCoordinatorBox<MenuPresentationCoordinator>.Checkpoint
     fileprivate var toast: PresentationCoordinatorBox<ToastPresentationCoordinator>.Checkpoint
   }
@@ -1021,12 +1105,14 @@ package final class PresentationCoordinatorRegistry {
     ConfirmationDialogPresentationCoordinator
   >()
   package let sheet = PresentationCoordinatorBox<SheetPresentationCoordinator>()
+  package let popover = PresentationCoordinatorBox<PopoverPresentationCoordinator>()
   package let menu = PresentationCoordinatorBox<MenuPresentationCoordinator>()
   package let toast = PresentationCoordinatorBox<ToastPresentationCoordinator>()
   private lazy var allBoxes = [
     AnyPresentationCoordinatorBox(alert),
     AnyPresentationCoordinatorBox(confirmationDialog),
     AnyPresentationCoordinatorBox(sheet),
+    AnyPresentationCoordinatorBox(popover),
     AnyPresentationCoordinatorBox(menu),
     AnyPresentationCoordinatorBox(toast),
   ]
@@ -1038,6 +1124,7 @@ package final class PresentationCoordinatorRegistry {
       alert: alert.makeCheckpoint(),
       confirmationDialog: confirmationDialog.makeCheckpoint(),
       sheet: sheet.makeCheckpoint(),
+      popover: popover.makeCheckpoint(),
       menu: menu.makeCheckpoint(),
       toast: toast.makeCheckpoint()
     )
@@ -1047,6 +1134,7 @@ package final class PresentationCoordinatorRegistry {
     alert.restoreCheckpoint(checkpoint.alert)
     confirmationDialog.restoreCheckpoint(checkpoint.confirmationDialog)
     sheet.restoreCheckpoint(checkpoint.sheet)
+    popover.restoreCheckpoint(checkpoint.popover)
     menu.restoreCheckpoint(checkpoint.menu)
     toast.restoreCheckpoint(checkpoint.toast)
   }

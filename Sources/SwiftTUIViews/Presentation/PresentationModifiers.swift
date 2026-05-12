@@ -641,11 +641,8 @@ package struct PromptPresentationSurface: View, ActionScope {
           maxWidth: maximumWidth,
           alignment: .leading
         )
-        .focusScope()
         .semanticMetadata(
-          .init(
-            accessibilityRole: item.descriptor.accessibilityRole
-          )
+          presentationSemanticMetadata
         )
     case .menu:
       // Menu chrome: compact, intrinsic-width bordered box. No header
@@ -663,11 +660,8 @@ package struct PromptPresentationSurface: View, ActionScope {
             style: StrokeStyle(borderSet: .innerHalfBlock, placement: .outset)
           )
         }
-        .focusScope()
         .semanticMetadata(
-          .init(
-            accessibilityRole: item.descriptor.accessibilityRole
-          )
+          presentationSemanticMetadata
         )
     case .dropdown:
       // Full-width, top-aligned strip. No side or top border — a single
@@ -686,11 +680,8 @@ package struct PromptPresentationSurface: View, ActionScope {
             .drawMetadata(.init(opacity: 0.6))
             .frame(maxWidth: .infinity, alignment: .bottom)
         }
-        .focusScope()
         .semanticMetadata(
-          .init(
-            accessibilityRole: item.descriptor.accessibilityRole
-          )
+          presentationSemanticMetadata
         )
     }
   }
@@ -700,6 +691,16 @@ package struct PromptPresentationSurface: View, ActionScope {
       return .finite(maxWidth)
     }
     return .infinity
+  }
+
+  private var presentationSemanticMetadata: SemanticMetadata {
+    var metadata = SemanticMetadata(
+      accessibilityRole: item.descriptor.accessibilityRole
+    )
+    if item.descriptor.createsFocusScope {
+      metadata = metadata.merging(focusStructureMetadata(scopeBoundary: true))
+    }
+    return metadata
   }
 
   private var presentationHeader: some View {
