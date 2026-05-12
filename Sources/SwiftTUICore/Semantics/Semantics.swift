@@ -138,6 +138,7 @@ public struct SemanticExtractor: Sendable {
       }
     )
 
+    let scrollTargets = scrollTargets(from: placed)
     let accessibilityNodes = accessibilityNodes(
       from: placed,
       focusRegions: focusRegions
@@ -148,6 +149,7 @@ public struct SemanticExtractor: Sendable {
       interactionRegions: interactionRegions,
       focusRegions: focusRegions,
       scrollRoutes: scrollRoutes,
+      scrollTargets: scrollTargets,
       selectionRoutes: selectionRoutes,
       namedCoordinateSpaces: namedCoordinateSpaces,
       accessibilityNodes: accessibilityNodes,
@@ -316,6 +318,50 @@ extension SemanticExtractor {
     default:
       false
     }
+  }
+
+  private func scrollTargets(from node: PlacedNode) -> [ScrollTarget] {
+    struct Frame {
+      var node: PlacedNode
+      var activeScrollIdentity: Identity?
+    }
+
+    var targets: [ScrollTarget] = []
+    var stack = [Frame(node: node, activeScrollIdentity: nil)]
+
+    while let frame = stack.popLast() {
+      if frame.node.isTransient { continue }
+
+      if let activeScrollIdentity = frame.activeScrollIdentity,
+        frame.node.identity != activeScrollIdentity
+      {
+        let rect = semanticBounds(for: frame.node)
+        if !rect.isEmpty {
+          targets.append(
+            ScrollTarget(
+              identity: frame.node.identity,
+              scrollIdentity: activeScrollIdentity,
+              rect: rect
+            )
+          )
+        }
+      }
+
+      let childScrollIdentity =
+        frame.node.semanticMetadata.scrollRole == nil
+        ? frame.activeScrollIdentity
+        : frame.node.identity
+      for child in frame.node.children.reversed() {
+        stack.append(
+          Frame(
+            node: child,
+            activeScrollIdentity: childScrollIdentity
+          )
+        )
+      }
+    }
+
+    return targets
   }
 
   private func interactionRect(

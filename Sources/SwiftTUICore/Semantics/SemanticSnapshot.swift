@@ -89,6 +89,42 @@ public struct ScrollRoute: Equatable, Sendable {
   }
 }
 
+package enum ScrollTargetRole: Equatable, Sendable {
+  case view
+}
+
+package struct ScrollTarget: Equatable, Sendable {
+  package var identity: Identity
+  package var scrollIdentity: Identity
+  package var rect: CellRect
+  package var role: ScrollTargetRole
+
+  package init(
+    identity: Identity,
+    scrollIdentity: Identity,
+    rect: CellRect,
+    role: ScrollTargetRole = .view
+  ) {
+    self.identity = identity
+    self.scrollIdentity = scrollIdentity
+    self.rect = rect
+    self.role = role
+  }
+}
+
+package struct ScrollTargetQuery: Equatable, Sendable {
+  package var identity: Identity?
+  package var explicitIDComponent: String?
+
+  package init(
+    identity: Identity? = nil,
+    explicitIDComponent: String? = nil
+  ) {
+    self.identity = identity
+    self.explicitIDComponent = explicitIDComponent
+  }
+}
+
 /// Selection metadata extracted for list-like controls.
 public struct SelectionRoute: Equatable, Sendable {
   public var identity: Identity
@@ -182,6 +218,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var focusRegions: [FocusRegion]
   public var navigationRoutes: [NavigationRoute]
   public var scrollRoutes: [ScrollRoute]
+  package var scrollTargets: [ScrollTarget]
   public var selectionRoutes: [SelectionRoute]
   public var namedCoordinateSpaces: [String: CellRect]
   public var accessibilityNodes: [AccessibilityNode]
@@ -202,6 +239,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.focusRegions = focusRegions
     self.navigationRoutes = navigationRoutes
     self.scrollRoutes = scrollRoutes
+    self.scrollTargets = []
     self.selectionRoutes = selectionRoutes
     self.namedCoordinateSpaces = namedCoordinateSpaces
     self.accessibilityNodes = accessibilityNodes
@@ -214,6 +252,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
     focusRegions: [FocusRegion] = [],
     navigationRoutes: [NavigationRoute] = [],
     scrollRoutes: [ScrollRoute] = [],
+    scrollTargets: [ScrollTarget] = [],
     selectionRoutes: [SelectionRoute] = [],
     namedCoordinateSpaces: [String: CellRect] = [:],
     accessibilityNodes: [AccessibilityNode] = [],
@@ -224,6 +263,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.focusRegions = focusRegions
     self.navigationRoutes = navigationRoutes
     self.scrollRoutes = scrollRoutes
+    self.scrollTargets = scrollTargets
     self.selectionRoutes = selectionRoutes
     self.namedCoordinateSpaces = namedCoordinateSpaces
     self.accessibilityNodes = accessibilityNodes

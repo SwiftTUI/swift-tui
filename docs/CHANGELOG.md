@@ -23,6 +23,16 @@ in the durable docs, plans, source, or tests linked from an entry.
   hosts log through OSLog, web hosts send typed runtime-issue records for
   browser console logging, and frame diagnostics now include the runtime issues
   observed during the frame.
+- Added a gallery `Scroll Control` tab that demonstrates `ScrollViewReader`
+  and `ScrollViewProxy` identity, anchor, edge, and offset commands through the
+  public example app.
+- `da7eab74` Implemented deeper scroll control V1: `ScrollViewReader` and
+  `ScrollViewProxy` now support identity, anchor, edge, and offset scrolling
+  through committed scroll-target geometry, and focused scroll views handle
+  Home/End movement. Semantic `ScrollPosition` binding, target behavior,
+  scrollback conventions, and host observation hooks remain deferred by the
+  scope plan. See `da7eab74`
+  [docs/plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md).
 - Fixed toolbar item actions built without a construction-time authoring context:
   `.toolbarItem(config)` now supplies the attachment context instead of letting
   the config's nil snapshot clear it, so externally assembled configs can still

@@ -1694,6 +1694,14 @@ public struct DefaultRenderer {
       diagnostics: diagnostics
     )
 
+    resolveContext.localScrollPositionRegistry?.updateGeometry(
+      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
+      scrollTargets: artifacts.semanticSnapshot.scrollTargets
+    )
+    context.localScrollPositionRegistry?.updateGeometry(
+      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
+      scrollTargets: artifacts.semanticSnapshot.scrollTargets
+    )
     frameTailRenderer.storeCommittedFrame(
       artifacts,
       baselinePlacedTree: tail.baselinePlaced
@@ -2125,6 +2133,14 @@ public struct DefaultRenderer {
       runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
     )
 
+    candidate.draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
+      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
+      scrollTargets: artifacts.semanticSnapshot.scrollTargets
+    )
+    candidate.draft.registrationDraft.updateCommittedScrollGeometry(
+      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
+      scrollTargets: artifacts.semanticSnapshot.scrollTargets
+    )
     frameTailRenderer.storeCommittedFrame(
       artifacts,
       baselinePlacedTree: tail.baselinePlaced

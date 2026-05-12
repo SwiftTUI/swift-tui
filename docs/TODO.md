@@ -44,11 +44,3 @@
   [EMBEDDING.md](EMBEDDING.md),
   [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md),
   [TERMINAL_NATIVE_UX_RESEARCH.md](TERMINAL_NATIVE_UX_RESEARCH.md).
-- [ ] Implement deeper scroll control V1. The scope pass recommends starting
-  with a `ScrollViewReader` / `ScrollViewProxy` model for identity and anchor
-  based scrolling, plus home/end policy, while deferring semantic
-  `ScrollPosition` binding, target behavior, scrollback conventions, and host
-  observation hooks. Supporting docs:
-  [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md),
-  [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md),
-  [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).
