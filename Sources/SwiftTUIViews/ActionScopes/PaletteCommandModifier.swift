@@ -105,15 +105,6 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
       PaletteCommandsPreferenceKey.self,
       value: [contribution]
     )
-    context.commandRegistry?.registerPaletteCommand(
-      at: node.identity,
-      command: RegisteredPaletteCommand(
-        name: name,
-        description: description,
-        isEnabled: isEnabled,
-        action: contribution.action
-      )
-    )
     return [node]
   }
 }

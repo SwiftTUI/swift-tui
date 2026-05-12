@@ -222,9 +222,6 @@ package struct NodeHandlers {
     for (identity, commands) in registration.keyCommandsByScope {
       commandRegistrations.keyCommandsByScope[identity] = commands
     }
-    for (identity, commands) in registration.paletteCommandsByScope {
-      commandRegistrations.paletteCommandsByScope[identity] = commands
-    }
   }
 
   package mutating func recordDropDestination(
