@@ -8,13 +8,10 @@ import SwiftTUI
 /// which gives the child its own `viewNode` and therefore safe local
 /// `@State` / `@FocusState` storage.
 ///
-/// The commands are still passed in explicitly (rather than read from
-/// the environment) because opening the palette as a sheet moves focus
-/// into the overlay tree, where the scope chain no longer includes the
-/// Gallery's Panel. The caller snapshots `activePaletteCommands` at
-/// the moment the palette opens and passes that snapshot through, so
-/// the list reflects what was visible when the user invoked the
-/// palette.
+/// Commands are passed in by the framework — `.paletteSheet`'s content
+/// closure receives the snapshot of `paletteCommand` contributions
+/// absorbed from the host scope's subtree (mirroring how
+/// `.toolbar(style:)` absorbs toolbar items).
 struct CommandPaletteList: View {
   let commands: [ActivePaletteCommand]
   let dismiss: @MainActor @Sendable () -> Void

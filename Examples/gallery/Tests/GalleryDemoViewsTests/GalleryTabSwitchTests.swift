@@ -734,15 +734,9 @@ struct GalleryTabSwitchTests {
   }
 }
 
-@MainActor
-private final class TestPaletteCommandHolder {
-  var commands: [ActivePaletteCommand] = []
-}
-
 private struct GallerySelectionSeedHarness: View {
   @State private var selection: GalleryView.GalleryTab
   @State private var isPaletteOpen = false
-  @State private var paletteHolder = TestPaletteCommandHolder()
 
   init(initialSelection: GalleryView.GalleryTab) {
     _selection = State(initialValue: initialSelection)
@@ -751,8 +745,7 @@ private struct GallerySelectionSeedHarness: View {
   var body: some View {
     GallerySelectionRuntimeBridge(
       selection: $selection,
-      isPaletteOpen: $isPaletteOpen,
-      paletteHolder: paletteHolder
+      isPaletteOpen: $isPaletteOpen
     )
   }
 }
@@ -760,15 +753,9 @@ private struct GallerySelectionSeedHarness: View {
 private struct GallerySelectionRuntimeBridge: View {
   @Binding var selection: GalleryView.GalleryTab
   @Binding var isPaletteOpen: Bool
-  let paletteHolder: TestPaletteCommandHolder
 
   var body: some View {
-    EnvironmentReader(\.activePaletteCommands) { commands in
-      if !commands.isEmpty {
-        paletteHolder.commands = commands
-      }
-      return galleryBody()
-    }
+    galleryBody()
   }
 
   private func galleryBody() -> some View {
@@ -860,9 +847,9 @@ private struct GallerySelectionRuntimeBridge: View {
       action: { selection = .physics }
     )
     .toolbar(style: DefaultBottomToolbarStyle())
-    .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
+    .paletteSheet("Command palette", isPresented: $isPaletteOpen) { commands in
       CommandPaletteList(
-        commands: paletteHolder.commands,
+        commands: commands,
         dismiss: { isPaletteOpen = false }
       )
     }

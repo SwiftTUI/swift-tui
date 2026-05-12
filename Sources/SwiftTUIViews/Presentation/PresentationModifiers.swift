@@ -274,30 +274,6 @@ extension View {
     )
   }
 
-  /// Presents `content` as a full-width, top-aligned dropdown banner
-  /// with a single soft bottom divider and no side or top border —
-  /// suited to command palettes and similar chrome that should read as
-  /// part of the window itself rather than a floating card.
-  ///
-  /// Semantically a sheet (routes through the sheet presentation
-  /// registry and obeys the same Escape-dismissal rules), distinguished
-  /// only by its visual chrome.
-  public func paletteSheet<S: StringProtocol, SheetContent: View>(
-    _ title: S,
-    isPresented: Binding<Bool>,
-    @ViewBuilder content sheetContent: () -> SheetContent
-  ) -> some View {
-    modifier(
-      BuiltinSheetPresentationModifier(
-        title: String(title),
-        isPresented: isPresented,
-        spec: sheetPromptPresentationSpec(chrome: .dropdown),
-        sheetContent: sheetContent(),
-        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
-      )
-    )
-  }
 }
 
 @MainActor

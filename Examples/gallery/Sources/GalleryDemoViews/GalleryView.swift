@@ -107,7 +107,12 @@ public struct GalleryView: View {
       action: { selection = .physics }
     )
     .toolbar(style: .defaultBottom)
-    .paletteSheet("Open...", isPresented: $showPalette, content: { Text("...") })
+    .paletteSheet("Command palette", isPresented: $showPalette) { commands in
+      CommandPaletteList(
+        commands: commands,
+        dismiss: { showPalette = false }
+      )
+    }
   }
 }
 
