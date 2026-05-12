@@ -21,7 +21,8 @@ in the durable docs, plans, source, or tests linked from an entry.
 - Shipped anchored popover presentation: Boolean and item-driven `.popover`
   modifiers plus a TipKit-inspired `.popoverTip` convenience now render compact
   source-relative overlays with terminal edge fallback, Escape dismissal, modal
-  gating for interactive content, and non-modal read-only tips.
+  gating for interactive content, non-modal read-only tips, and a gallery
+  `Popovers` tab.
 - Fixed toolbar item actions built without a construction-time authoring context:
   `.toolbarItem(config)` now supplies the attachment context instead of letting
   the config's nil snapshot clear it, so externally assembled configs can still
