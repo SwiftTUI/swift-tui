@@ -19,20 +19,20 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
 | `SwiftTUIRuntime` | 48 | 515 |
-| `SwiftTUIViews` | 250 | 9296 |
-| `SwiftTUIAnimatedImage` | 5 | 154 |
-| `SwiftTUICharts` | 29 | 1812 |
+| `SwiftTUIViews` | 255 | 9637 |
+| `SwiftTUIAnimatedImage` | 5 | 157 |
+| `SwiftTUICharts` | 29 | 1851 |
 | `SwiftTUIArguments` | 4 | 113 |
 | `SwiftTUIPTYPrimitives` | 6 | 34 |
-| `SwiftTUITerminal` | 12 | 291 |
-| `SwiftTUITerminalWorkspace` | 14 | 257 |
+| `SwiftTUITerminal` | 12 | 294 |
+| `SwiftTUITerminalWorkspace` | 14 | 260 |
 | `SwiftTUICLI` | 5 | 24 |
 | `WASISurfaceBridge` | 0 | 0 |
 | `SwiftTUIWASI` | 2 | 8 |
 | `SwiftTUIWebHost` | 3 | 17 |
 | `SwiftTUIWebHostCLI` | 1 | 5 |
 | `SwiftUIHost` | 7 | 886 |
-| `SwiftTUICore` | 262 | 2605 |
+| `SwiftTUICore` | 264 | 2618 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -92,7 +92,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (253)
+### Canonical surface (255)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -274,11 +274,11 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SafeAreaInsetModifier` — struct — 2 members
 - `SafeAreaPaddingModifier` — struct — 2 members
 - `ScrollPosition` — struct — 8 members
-- `ScrollView` — struct — 127 members
+- `ScrollView` — struct — 130 members
 - `ScrollViewProxy` — struct — 5 members
-- `ScrollViewReader` — struct — 123 members
-- `Section` — struct — 125 members
-- `SecureField` — struct — 126 members
+- `ScrollViewReader` — struct — 126 members
+- `Section` — struct — 128 members
+- `SecureField` — struct — 129 members
 - `SegmentedPickerStyle` — struct — 5 members
 - `SemanticMetadataModifier` — struct — 2 members
 - `SendableLayout` — protocol — 3 members
@@ -448,7 +448,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalWorkspaceState` — struct — 28 members
 - `TerminalWorkspaceTab` — struct — 9 members
 - `TerminalWorkspaceTabID` — struct — 8 members
-- `TerminalWorkspaceView` — struct — 126 members
+- `TerminalWorkspaceView` — struct — 129 members
 
 ## SwiftTUICLI
 
@@ -501,7 +501,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (262)
+### Canonical surface (264)
 
 - `AccessibilityAnnouncement` — struct — 4 members
 - `AccessibilityNode` — struct — 11 members
