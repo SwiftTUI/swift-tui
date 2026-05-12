@@ -58,6 +58,22 @@ struct ToolbarTests {
     #expect(items.first?.title == "Copy")
   }
 
+  @Test("Builder toolbarItem variant extracts text from composed label views")
+  func builderVariantExtractsComposedLabelText() {
+    let view = Text("X").toolbarItem(action: {}) {
+      HStack(spacing: 1) {
+        Text("Copy")
+        Text("File").foregroundStyle(.muted)
+      }
+    } icon: {
+      EmptyView()
+    }
+    let context = ResolveContext(identity: testIdentity("toolbar-root"))
+    let resolved = Resolver().resolve(AnyView(view), in: context)
+    let items = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+    #expect(items.first?.title == "Copy File")
+  }
+
   @Test("Panel with toolbar absorbs toolbar items from its subtree")
   func toolbarAbsorbsItems() {
     let panel =

@@ -4,6 +4,7 @@
 # New entries require accessibility review before this manifest is updated.
 Examples/LayoutsSwiftUI/Sources/LayoutsApp/LayoutsApp.swift
 Examples/SwiftUIExample/SwiftUIExample/ContentView.swift
+Examples/gallery/Sources/GalleryDemoViews/AnimatedImageTab.swift
 Examples/gallery/Sources/GalleryDemoViews/BordersAndShapesTab.swift
 Examples/gallery/Sources/GalleryDemoViews/FileDropTab.swift
 Examples/gallery/Sources/GalleryDemoViews/ImagesTab.swift

@@ -16,6 +16,19 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-12
+
+- Fixed toolbar item actions built without a construction-time authoring context:
+  `.toolbarItem(config)` now supplies the attachment context instead of letting
+  the config's nil snapshot clear it, so externally assembled configs can still
+  mutate view-local state when fired from the rendered toolbar.
+- Broadened the builder-form `.toolbarItem(...)` title extraction to resolve
+  composed label views and collect text from the label subtree, covering labels
+  such as small stacks of `Text` rather than only a direct `Text` value.
+- Linked the gallery views target to `SwiftTUIAnimatedImage` and added an
+  `Animated GIF` tab that decodes the embedded GIF fixture through the peer
+  animated-image product and renders it with `AnimatedImage`.
+
 ## 2026-05-11
 
 - Implemented the release-facing public product/import contract: `SwiftTUI` is

@@ -40,6 +40,10 @@ public struct GalleryView: View {
         ImagesTab()
       }
 
+      Tab("Animated GIF", value: GalleryView.GalleryTab.animatedGIF) {
+        AnimatedImageTab()
+      }
+
       Tab("Animations", value: GalleryView.GalleryTab.animations) {
         AnimationsTab()
       }
@@ -95,6 +99,10 @@ public struct GalleryView: View {
       action: { selection = .images }
     )
     .paletteCommand(
+      name: "Animated GIF",
+      action: { selection = .animatedGIF }
+    )
+    .paletteCommand(
       name: "Animations",
       action: { selection = .animations }
     )
@@ -125,6 +133,7 @@ extension GalleryView {
     case calculator
     case bordersAndShapes
     case images
+    case animatedGIF
     case animations
     case fileDrop
     case physics
@@ -140,6 +149,8 @@ extension GalleryView {
       case "borders", "bordersandshapes", "borders-and-shapes", "shapes":
         self = .bordersAndShapes
       case "images", "image": self = .images
+      case "animatedgif", "animated-gif", "gif", "animatedimage", "animated-image":
+        self = .animatedGIF
       case "animations", "animation": self = .animations
       case "filedrop", "file-drop", "files": self = .fileDrop
       case "physics": self = .physics
