@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct TodoTab: View {
   @State private var items: [TodoItem] = TodoItem.seeds

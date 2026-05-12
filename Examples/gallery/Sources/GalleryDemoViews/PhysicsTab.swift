@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct PhysicsTab: View {
   @State private var toyState = FullScreenToyPhysics.State()

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Showcases the "Borders & Shapes" revamp landed across Milestones
 /// 1–7A of the 2026-04-11 pass.  Each panel exercises a distinct slice

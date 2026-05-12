@@ -1,5 +1,5 @@
-import SwiftTUI
 import SwiftTUIAnimatedImage
+import SwiftTUIRuntime
 
 struct AnimatedImageTab: View {
   private static let sequence = try? AnimatedGIF.decode(data: ImagesTab.gifBytes)

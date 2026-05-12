@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct CounterTab: View {
   @State private var count: Int = 0

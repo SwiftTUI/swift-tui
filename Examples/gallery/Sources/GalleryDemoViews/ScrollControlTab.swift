@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct ScrollControlTab: View {
   @State private var position = ScrollPosition.zero

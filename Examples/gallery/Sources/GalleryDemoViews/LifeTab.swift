@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Conway's Game of Life, rendered through SwiftTUI at three zoom
 /// levels and editable by tap or click-and-drag.
