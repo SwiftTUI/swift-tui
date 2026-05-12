@@ -50,7 +50,6 @@ private struct CommandPaletteListBody: View {
     VStack(alignment: .leading, spacing: 0) {
       header
       Divider()
-      diagnosticRow
       TextField("Filter commands…", text: $query)
         .focused($isQueryFocused)
       Divider()
@@ -73,21 +72,6 @@ private struct CommandPaletteListBody: View {
       Text("Tab + Enter to run")
         .foregroundStyle(.separator)
     }
-  }
-
-  // Visible diagnostic row. Remove once the palette is working
-  // end-to-end in the gallery; kept for now so the user can see at a
-  // glance whether the snapshot reached the sheet and whether the
-  // text field is holding focus.
-  private var diagnosticRow: some View {
-    HStack(spacing: 2) {
-      Text("debug:")
-      Text("cmds=\(commands.count)")
-      Text("match=\(matches.count)")
-      Text("focus=\(isQueryFocused ? "yes" : "no")")
-      Spacer()
-    }
-    .foregroundStyle(.separator)
   }
 
   // Footer with an explicit Close button. The framework's Esc-closes-
