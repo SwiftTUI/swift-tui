@@ -2,7 +2,9 @@
 
 ## Overview
 
-Use the `View` module the same way you would approach a small SwiftUI feature: compose containers, local state, focused controls, and modifiers around a body-driven tree.
+Use the `SwiftTUIViews` module the same way you would approach a small SwiftUI
+feature: compose containers, local state, focused controls, and modifiers around
+a body-driven tree.
 
 The main difference is that SwiftTUI eventually renders into a cell surface instead of a pixel buffer. That means you should think in terms of:
 
@@ -21,7 +23,9 @@ SwiftTUI now follows SwiftUI-style actor isolation for authored view trees.
 - `Binding.init(get:set:)` and `.task(...)` inherit the current actor context, while button actions, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`
 - because `View.body` itself is `@MainActor`, ordinary authored view code still uses those APIs from the main actor
 
-The pure `Core` pipeline remains nonisolated. If you need off-main inspection, move to already-resolved or already-rendered pipeline artifacts rather than evaluating a fresh `View` tree off the main actor.
+The pure `SwiftTUICore` pipeline remains nonisolated. If you need off-main
+inspection, move to already-resolved or already-rendered pipeline artifacts
+rather than evaluating a fresh `View` tree off the main actor.
 
 ## Containers And Controls
 
@@ -62,7 +66,10 @@ package-only; ordinary call sites should stay on the modifier surface.
 
 ## Preview And Inspection
 
-When you want to inspect authored output without running a full terminal session, use ``Resolver`` inside `View`, or the higher-level `DefaultRenderer` type from `SwiftTUI`, from the main actor to produce resolved trees, frame artifacts, or rendered terminal text.
+When you want to inspect authored output without running a full terminal
+session, use ``Resolver`` from `SwiftTUIViews`, or the higher-level
+`DefaultRenderer` type from `SwiftTUIRuntime` or `SwiftTUI`, from the main actor
+to produce resolved trees, frame artifacts, or rendered terminal text.
 
 See also:
 

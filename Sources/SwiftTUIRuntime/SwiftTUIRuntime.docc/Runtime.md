@@ -22,12 +22,19 @@ For the underlying phases, see <doc:Architecture>.
 
 ## Root-Hoisted Presentations
 
-Built-in presentations — `alert`, `confirmationDialog`, `sheet`, and `toast` — are authored inside the base view tree but displayed at the root.
+Built-in presentations — `alert`, `confirmationDialog`, `sheet`, `popover`,
+`popoverTip`, menus, and `toast` — are authored inside the base view tree but
+displayed through root-level composition.
 
 - Base resolution collects presentation declarations during the ordinary resolve pass
-- Visible presentation payloads resolve as overlay roots after the base tree has already been resolved
-- Presentation hosts derive visible overlay state from the current resolved base declarations before overlay composition; wrapper-hosted and selectively re-evaluated subtrees must not wait for an outer host rerender before an already-declared presentation appears
-- The renderer composes the base root and any overlay roots for downstream measure, place, semantics, draw, raster, and commit work
+- Portal roots reconcile those declarations, then compose visible overlay
+  payloads around the resolved base tree
+- Presentation hosts derive visible overlay state from the current resolved
+  base declarations before overlay composition; wrapper-hosted and selectively
+  re-evaluated subtrees must not wait for an outer host rerender before an
+  already-declared presentation appears
+- The renderer composes the base root and overlay stack for downstream measure,
+  place, semantics, draw, raster, and commit work
 - Opening or dismissing a presentation does not re-resolve the displayed base subtree under a synthetic identity path. Presentation churn should be transparent to the currently selected tab or child owner unless the presentation action itself mutates the state that selects different content
 - Dismissing a presentation prunes only the overlay-owned subtree identities for that presentation; dismissal must not run broad stale-subtree cleanup that reaches unrelated retained content
 - Modal overlays can still suppress base interaction through the composed frame's semantic state
@@ -62,7 +69,8 @@ All-motion hover reporting is enabled only while rendered views have
 `onPointerHover` subscribers, then disabled again when the subscribers
 disappear.
 
-For the deeper focus model, see the `Focus` article in the `View` module.
+For the deeper focus model, see the `Focus` article in the `SwiftTUIViews`
+module.
 
 ## Commit, Lifecycle, And Tasks
 
@@ -144,7 +152,8 @@ The shipped ownership model is split into three categories:
   a later snapshot of that same instance can observe it even when no live
   invalidator exists
 
-For the deeper keying tradeoffs, see the `State-Keying` article in the `View` module.
+For the deeper keying tradeoffs, see the `State-Keying` article in the
+`SwiftTUIViews` module.
 
 ### Environment Model
 

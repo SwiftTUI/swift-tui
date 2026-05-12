@@ -11,13 +11,13 @@ boundaries and the seven-phase frame pipeline that connects them.
 
 ## Target Boundaries
 
-### `Core`
+### `SwiftTUICore`
 
 - Defines the shared geometry, styling, semantic, raster, and commit data types
 - Implements layout, semantic extraction, draw extraction, rasterization, diagnostics, scheduling, and commit planning
 - Stays pure with respect to terminal I/O
 
-### `View`
+### `SwiftTUIViews`
 
 - Exposes the SwiftUI-shaped authoring surface
 - Resolves authored views into core nodes
@@ -25,9 +25,15 @@ boundaries and the seven-phase frame pipeline that connects them.
 
 ### `SwiftTUICharts`
 
-- Builds compact chart and metric views on top of `View`
+- Builds compact chart and metric views on top of `SwiftTUIViews`
 - Reuses the same layout, semantic, draw, and raster pipeline
 - Remains a separate track so charting does not distort the core library surface
+
+### `SwiftTUIAnimatedImage`
+
+- Builds finite pre-composed animated image views on top of `SwiftTUIViews`
+- Owns GIF import and export through the vendored `swift-gif` package
+- Keeps animated media concerns out of the core `SwiftTUI` runtime surface
 
 ### `SwiftTUIRuntime`
 
@@ -40,7 +46,7 @@ boundaries and the seven-phase frame pipeline that connects them.
 
 - Release-facing convenience product for terminal-native apps
 - Re-exports `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so
-  ordinary terminal apps can write only `import SwiftTUI`
+  terminal-native apps can write only `import SwiftTUI`
 - Does not depend on WebHost, browser resources, SwiftUI hosting, WASI hosting,
   charts, animated images, or terminal-program embedding
 
@@ -54,7 +60,8 @@ boundaries and the seven-phase frame pipeline that connects them.
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
 - terminal-program embedding lives in `SwiftTUITerminal` and
-  `SwiftTUIPTYPrimitives`
+  `SwiftTUIPTYPrimitives`; tabbed and split-pane terminal workspaces live in
+  `SwiftTUITerminalWorkspace`
 
 The conceptual model is:
 
@@ -98,7 +105,10 @@ provide.
 - Public `View` values are lowered into `ResolvedNode` trees
 - Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
 - Environment and metadata are merged here
-- Root-hoisted presentations are declared during normal base resolution, then composed around the resolved base tree afterward so the displayed base subtree keeps its authored identity space
+- Root presentation entries are declared during normal base resolution. The
+  portal root reconciles those entries, then composes active overlays around the
+  resolved base tree so the displayed base subtree keeps its authored identity
+  space
 - Reuse is conservative and keyed by identity, invalidation scope, and compatible context
 
 ### Measure
@@ -115,7 +125,8 @@ provide.
 ### Semantics
 
 - The semantic extractor walks the placed tree to derive focus regions, interaction regions, action routes, selection routes, and scroll routes
-- Disabled state and hit policy are respected here so non-interactive nodes fall out of routing
+- Disabled state, interaction gates, and hit policy are respected here so
+  non-interactive nodes fall out of routing
 
 ### Draw
 

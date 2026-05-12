@@ -1,6 +1,7 @@
 # ``SwiftTUICharts``
 
-Compact charts and metric-oriented views built on the same `View` and `Core` foundations as the rest of SwiftTUI.
+Compact charts and metric-oriented views built on the same `SwiftTUIViews` and
+`SwiftTUICore` foundations as the rest of SwiftTUI.
 
 ## Overview
 

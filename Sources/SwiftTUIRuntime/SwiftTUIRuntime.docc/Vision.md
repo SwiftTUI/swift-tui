@@ -1,8 +1,9 @@
 # About SwiftTUI
 
 
-SwiftTUI is SwiftUI for the terminal. 
-Building terminal user interfaces with an authoring model, layout model, and runtime contract that are deliberately shaped after SwiftUI. 
+SwiftTUI is SwiftUI for the terminal.
+It builds terminal user interfaces with an authoring model, layout model, and
+runtime contract that are deliberately shaped after SwiftUI.
 
 Principles:
 
@@ -16,15 +17,22 @@ In scope today:
 - ``RunLoop``-driven interactive sessions with alternate-screen ownership and ANSI rendering
 - Tree-forward collection presentation as a first-class authoring pattern
 - PNG and baseline JPEG image presentation
-- Keyboard based focus and navigation model with Pointer based augmentation
+- GIF import/export and finite animation through the peer `SwiftTUIAnimatedImage` product
+- Compact charts and metric components through the peer `SwiftTUICharts` product
+- Terminal-native presentation through alerts, confirmation dialogs, sheets,
+  popovers, popover tips, menus, and toasts
+- Binding-driven `NavigationStack` destination presentation
+- Keyboard based focus and navigation model with pointer based augmentation
 - Terminal capability detection for colors, images, pointer precision, etc.
+- Shared accessibility semantics with terminal, Web/WASI, and SwiftUI host delivery
 
 Deliberately deferred:
 
-- `NavigationStack` et al.
-- A full accessibility-tree
+- `NavigationLink`, public `NavigationPath`, and automatic Back chrome
+- Host-native text value/selection transport and IME/composition
+- Process reattachment for terminal workspaces after app restart
 - Media-heavy surfaces beyond static PNG / JPEG presentation and the peer
-  `AnimatedImage` product
+  `SwiftTUIAnimatedImage` product
 
 ## See Also
 

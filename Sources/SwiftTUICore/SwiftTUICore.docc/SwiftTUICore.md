@@ -14,7 +14,8 @@ The `SwiftTUICore` module owns the parts of the system that should stay independ
 - commit planning
 - frame diagnostics and snapshot support
 
-If `SwiftTUIViews` is the authoring layer and `SwiftTUI` is the runtime layer, `SwiftTUICore` is the engine in between them.
+If `SwiftTUIViews` is the authoring layer and `SwiftTUIRuntime` is the runtime
+layer, `SwiftTUICore` is the engine in between them.
 
 ## Design Boundary
 
