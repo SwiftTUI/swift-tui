@@ -18,9 +18,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       <p class="lead reveal" style="--i:2">
         A Swift package that lowers SwiftUI-shaped views through a strict
         seven-phase pipeline — no global solver, no virtual DOM, no
-        <span class="mono">curses</span>. One <span class="mono">App</span>
-        declaration runs as a terminal binary, in the browser via WASI,
-        or embedded inside a SwiftUI window or a DOM element.
+        <span class="mono">curses</span>. The same <span class="mono">App</span>
+        and <span class="mono">Scene</span> declarations can run in a terminal
+        executable, through WASI browser deployment, through a native WebHost
+        launch, or inside a host-managed SwiftUI surface.
       </p>
       <code class="lead-pipeline mono reveal" style="--i:2">
         resolve <span class="arr">→</span> measure <span class="arr">→</span> place <span class="arr">→</span> semantics <span class="arr">→</span> draw <span class="arr">→</span> raster <span class="arr">→</span> <em>commit</em>
@@ -53,15 +54,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 .package(url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>, branch: <span class="s">"main"</span>)
 
 <span class="cm">// add to your executable target</span>
-.product(name: <span class="s">"SwiftTUI"</span>,    package: <span class="s">"SwiftTUI"</span>)
-.product(name: <span class="s">"SwiftTUICLI"</span>, package: <span class="s">"SwiftTUI"</span>)</code></pre>
+.product(name: <span class="s">"SwiftTUI"</span>, package: <span class="s">"SwiftTUI"</span>)</code></pre>
       </div>
 
       <ul class="meta reveal mono" style="--i:5">
-        <li><span class="k">requires</span><span class="v">Swift 6.3 · macOS 15 · iOS 18 · Linux · Android (in tree)</span></li>
-        <li><span class="k">runs in</span><span class="v">terminal · browser via WASI · SwiftUI · any DOM element</span></li>
-        <li><span class="k">strict</span><span class="v">Swift 6 · <em>@MainActor</em>-isolated · memory-safe · existential-any</span></li>
-        <li><span class="k">deferred</span><span class="v"><em>NavigationStack</em> · richer accessibility modeling</span></li>
+        <li><span class="k">requires</span><span class="v">Swift 6.3 · macOS 15+ / iOS 18+ package platforms · Linux/WASI paths</span></li>
+        <li><span class="k">runs in</span><span class="v">terminal · WASI browser package · localhost WebHost · SwiftUI host</span></li>
+        <li><span class="k">model</span><span class="v">SwiftUI-shaped · <em>@MainActor</em> view bodies · graph-scoped state</span></li>
+        <li><span class="k">deferred</span><span class="v"><em>NavigationLink</em> · public <em>NavigationPath</em> · host-native IME / selection</span></li>
       </ul>
     </div>
 

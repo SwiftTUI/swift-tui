@@ -10,19 +10,19 @@ const phases = [
     n: "02",
     name: "measure",
     one: "Parents propose sizes, children choose.",
-    sym: "ProposedSize · ChosenSize",
+    sym: "ProposedSize · MeasuredNode",
   },
   {
     n: "03",
     name: "place",
     one: "Recursive layout assigns integer-cell rects.",
-    sym: "PlacementPlan",
+    sym: "PlacedNode",
   },
   {
     n: "04",
     name: "semantics",
-    one: "Focus chain, accessibility, and identity roll up.",
-    sym: "SemanticTree",
+    one: "Focus, accessibility, actions, selection, and scroll routes are extracted.",
+    sym: "SemanticSnapshot",
   },
   {
     n: "05",
@@ -33,13 +33,13 @@ const phases = [
   {
     n: "06",
     name: "raster",
-    one: "Commands rasterize into a capability-aware surface.",
+    one: "Draw commands become a styled cell grid.",
     sym: "RasterSurface",
   },
   {
     n: "07",
     name: "commit",
-    one: "Diffs against the last frame and streams sanitized terminal output.",
+    one: "Lifecycle and handler work are packaged for the runtime.",
     sym: "CommitPlan",
   },
 ];

@@ -16,7 +16,7 @@ const canonical = `${site}${base || ""}/`;
 
 const title = "SwiftTUI · SwiftUI semantics, drawn in terminal cells";
 const description =
-  "SwiftTUI is a Swift package that lowers SwiftUI-shaped views through a strict seven-phase pipeline. One @main App declaration runs as a terminal binary, in the browser via WASI, or embedded inside SwiftUI and any DOM element.";
+  "SwiftTUI is a Swift package that lowers SwiftUI-shaped views through a strict seven-phase pipeline. The same App and Scene declarations can run in a terminal executable, through WASI browser deployment, through a native WebHost launch, or inside a host-managed SwiftUI surface.";
 const ogImage = `${canonical}og.png`;
 
 const softwareSourceCodeJsonLd = {
@@ -25,7 +25,7 @@ const softwareSourceCodeJsonLd = {
   name: "SwiftTUI",
   description,
   programmingLanguage: "Swift",
-  runtimePlatform: "Swift 6.3, macOS 15+, iOS 18+, Linux, WASI",
+  runtimePlatform: "Swift 6.3, macOS 15+, iOS 18+, Linux, WASI, Android source support",
   codeRepository: "https://github.com/GoodHatsLLC/SwiftTUI",
   url: canonical,
   license: "https://github.com/GoodHatsLLC/SwiftTUI/blob/main/LICENSE",
@@ -79,7 +79,7 @@ const softwareSourceCodeJsonLd = {
       href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
     />
 
-    <script type="application/ld+json" set:html={JSON.stringify(softwareSourceCodeJsonLd)} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(softwareSourceCodeJsonLd)} />
   </head>
   <body>
     <div class="ambient" aria-hidden="true"></div>

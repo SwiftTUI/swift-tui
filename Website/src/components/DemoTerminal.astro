@@ -84,7 +84,7 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
         <span class="caret">›</span>
         <span class="path">target/wasm32-wasi</span>
         <span class="sep">·</span>
-        <span class="phase">runtime: <em>WebHost</em></span>
+        <span class="phase">runtime: <em>SwiftTUIWASI</em></span>
       </div>
       <div class="mid">
         <span class="phaseRing shed-1">resolve</span>
@@ -108,7 +108,7 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
   <p class="caption">
     The frame above is Conway's Game of Life, written as a single SwiftTUI
     <span class="mono">View</span>, compiled to <span class="mono">wasm32-wasi</span>,
-    and mounted via <span class="mono">GUI/WebHost</span>. Click a cell to flip
+    and mounted through <span class="mono">Platforms/Web</span>. Click a cell to flip
     it; click and drag to paint a stroke. The zoom picker switches between
     braille (8&times; density), half-block (2&times;), and square (1&times;)
     rendering — same authoring code, three glyph strategies. No terminal

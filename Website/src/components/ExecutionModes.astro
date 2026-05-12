@@ -3,14 +3,15 @@
 <section class="modes" id="runtimes">
   <div class="shell">
     <header class="head">
-      <span class="eyebrow"><span class="num">/02</span>Three runtimes, one App</span>
-      <h2>Authored once. Hosted anywhere a Swift compiler reaches.</h2>
+      <span class="eyebrow"><span class="num">/02</span>Launch and host products</span>
+      <h2>Authored once. Run through the host you choose.</h2>
       <p class="lede">
-        The same <span class="mono">@main struct App</span> declaration flows
-        into terminal-native binaries, into the browser via WASI with
-        <span class="mono">SharedArrayBuffer</span>-backed stdin, and into
-        host-managed embeddings inside SwiftUI windows or any DOM element.
-        The framework owns the cells; the host owns the chrome.
+        The same <span class="mono">App</span> and
+        <span class="mono">Scene</span> declarations flow into terminal-native
+        binaries, browser deployments built with <span class="mono">SwiftTUIWASI</span>,
+        localhost browser sessions through <span class="mono">SwiftTUIWebHost</span>,
+        and retained native scenes through <span class="mono">SwiftUIHost</span>.
+        The framework owns the cells; each host owns its chrome.
       </p>
     </header>
 
@@ -19,7 +20,7 @@
         <div class="tile-head">
           <div class="tile-id">
             <span class="badge">native</span>
-            <span class="path mono">Runners/SwiftTUICLI</span>
+            <span class="path mono">SwiftTUI · SwiftTUICLI</span>
           </div>
           <h3>Terminal-native</h3>
           <p>
@@ -28,7 +29,7 @@
             handling, mouse reporting, and pty-backed secondary scenes ship by default.
           </p>
         </div>
-        <pre class="code mono"><code><span class="kw">import</span> <span class="ty">SwiftTUICLI</span>
+        <pre class="code mono"><code><span class="kw">import</span> <span class="ty">SwiftTUI</span>
 
 <span class="at">@main</span> <span class="kw">struct</span> <span class="ty">DemoApp</span>: <span class="ty">App</span> &#123;
   <span class="kw">var</span> body: <span class="kw">some</span> <span class="ty">Scene</span> &#123;
@@ -38,8 +39,8 @@
   &#125;
 &#125;</code></pre>
         <ul class="meta mono">
-          <li><span class="dot on"></span><span>shipped · macOS 15+ · Linux · iOS 18+</span></li>
-          <li><span class="dot"></span><span class="dim">Android · in tree, not yet certified</span></li>
+          <li><span class="dot on"></span><span>terminal convenience product ships from the root package</span></li>
+          <li><span class="dot"></span><span class="dim">WebHost support is compile-time opt-in</span></li>
         </ul>
       </article>
 
@@ -47,13 +48,13 @@
         <div class="tile-head">
           <div class="tile-id">
             <span class="badge">wasi</span>
-            <span class="path mono">Runners/SwiftTUIWASI</span>
+            <span class="path mono">SwiftTUIWASI · Platforms/Web</span>
           </div>
           <h3>Browser, via WASI</h3>
           <p>
             Build the same target to <span class="mono">wasm32-wasi</span>. The
             <span class="mono">WASIRunner</span> emits a scene manifest the host loads through
-            <span class="mono">GUI/WebHost</span> — no terminal emulator, no xterm.js, no
+            <span class="mono">Platforms/Web</span> — no terminal emulator, no xterm.js, no
             postMessage shim.
           </p>
         </div>
@@ -76,30 +77,36 @@ swift build --swift-sdk swift-6.3.1-RELEASE_wasm \
           <div class="half">
             <div class="tile-id">
               <span class="badge">embed</span>
-              <span class="path mono">GUI/SwiftUIHost</span>
+              <span class="path mono">SwiftUIHost</span>
             </div>
             <h3>Inside SwiftUI</h3>
             <p>
-              Retain a <span class="mono">HostedSceneSession</span> in your SwiftUI view.
-              Theme tokens swap at runtime; the authored TUI never sees the host.
+              Retain SwiftTUI scenes inside a native SwiftUI app shell.
+              Theme tokens swap at runtime; the authored TUI does not branch on
+              the host style.
             </p>
-            <pre class="code mono"><code><span class="ty">SwiftUIHost</span>(scene: deployScene)
-  .terminalTheme(.solarizedDark)
-  .frame(minWidth: <span class="n">560</span>, minHeight: <span class="n">320</span>)</code></pre>
+            <pre class="code mono"><code><span class="kw">let</span> state = <span class="kw">try</span> <span class="ty">SwiftUIHostAppState</span>(
+  app: <span class="ty">DemoApp</span>(),
+  style: .default
+)
+<span class="ty">SwiftUIHostAppView</span>(state: state)</code></pre>
           </div>
           <div class="half">
             <div class="tile-id">
               <span class="badge">embed</span>
-              <span class="path mono">GUI/WebHost</span>
+              <span class="path mono">SwiftTUIWebHost</span>
             </div>
-            <h3>Inside any DOM element</h3>
+            <h3>Localhost browser host</h3>
             <p>
-              Drop a <span class="mono">.terminal-shell</span> div into an Astro, Remix,
-              Next, or vanilla page. The host owns chrome &mdash; the framework owns the cells.
+              Native binaries can opt into <span class="mono">--web</span> routing.
+              The runner serves the bundled browser runtime over localhost and
+              carries frames through the shared <span class="mono">web-surface</span> protocol.
             </p>
-            <pre class="code mono"><code>&lt;div class=<span class="s">"terminal-shell"</span>
-     data-scene=<span class="s">"gallery"</span>&gt;&lt;/div&gt;
-&lt;script type=<span class="s">"module"</span> src=<span class="s">"/host.js"</span>&gt;&lt;/script&gt;</code></pre>
+            <pre class="code mono"><code><span class="kw">import</span> <span class="ty">SwiftTUIWebHostCLI</span>
+
+<span class="at">@main</span> <span class="kw">struct</span> <span class="ty">DemoApp</span>: <span class="ty">App</span> &#123;
+  <span class="cm">// normal launch: terminal; --web: browser host</span>
+&#125;</code></pre>
           </div>
         </div>
       </article>
