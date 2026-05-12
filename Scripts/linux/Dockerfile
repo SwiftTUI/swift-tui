@@ -32,8 +32,12 @@ LABEL org.opencontainers.image.title="swift-tui-linux" \
 ENV BUN_INSTALL=${BUN_INSTALL} \
     SWIFTLY_HOME_DIR=/root/.local/share/swiftly \
     SWIFTLY_BIN_DIR=/root/.local/bin \
-    PATH="${BUN_INSTALL}/bin:${SWIFTLY_BIN_DIR}:${PATH}" \
     DEBIAN_FRONTEND=noninteractive
+ENV PATH="${BUN_INSTALL}/bin:${SWIFTLY_BIN_DIR}:${PATH}"
+
+# Swiftly's generated env.sh uses bash conditionals, so image provisioning must
+# not source it through Docker's default /bin/sh.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # System dependencies. The upstream swift image ships a slim Ubuntu base, so
 # we add the tools the SwiftTUI Linux + WebExample workflows actually use:
