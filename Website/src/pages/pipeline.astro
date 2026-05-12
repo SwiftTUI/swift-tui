@@ -1,0 +1,437 @@
+---
+import "../styles/site.css";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const site = (import.meta.env.SITE ?? "https://swifttui.io").replace(/\/$/, "");
+const canonical = `${site}${base || ""}/pipeline/`;
+const title = "SwiftTUI Rendering Pipeline";
+const description =
+  "A user-facing guide to SwiftTUI's resolve, measure, place, semantics, draw, raster, and commit frame pipeline.";
+
+const phases = [
+  {
+    n: "01",
+    name: "resolve",
+    question: "What views exist in this frame?",
+    artifact: "ResolvedNode tree",
+    body:
+      "SwiftTUI evaluates the authored View body and records structure, modifiers, environment values, identity, and presentation declarations. Nothing has a size yet. The result is a tree that says what the interface is made of.",
+    example:
+      "A VStack with a title, Divider, ProgressView, and two LabeledContent rows becomes a resolved tree with those children and their modifiers attached.",
+  },
+  {
+    n: "02",
+    name: "measure",
+    question: "How much cell space does each subtree want?",
+    artifact: "MeasuredNode tree",
+    body:
+      "Parents propose a cell size, and children choose the size they need inside that proposal. Text wrapping, fixed sizes, spacing, custom Layout values, and controls make their sizing decisions here.",
+    example:
+      "Given a 40-column proposal, the title can stay on one row while a long label may wrap or report a taller measured size.",
+  },
+  {
+    n: "03",
+    name: "place",
+    question: "Where does each measured view land?",
+    artifact: "PlacedNode tree",
+    body:
+      "The layout engine assigns each measured subtree an integer-cell rectangle: x, y, width, and height. This is the first phase with final geometry.",
+    example:
+      "The title might land at row 0, the divider at row 1, and the progress view at row 2, all within the same 40-column window.",
+  },
+  {
+    n: "04",
+    name: "semantics",
+    question: "How can the user interact with this frame?",
+    artifact: "SemanticSnapshot",
+    body:
+      "SwiftTUI walks the placed tree and extracts focus targets, button actions, key commands, pointer hit regions, scroll routes, selection routes, drop targets, and accessibility nodes.",
+    example:
+      "A focused TextField contributes an editing route and caret position; a disabled Button stays visible but does not contribute an activation route.",
+  },
+  {
+    n: "05",
+    name: "draw",
+    question: "What should be painted?",
+    artifact: "DrawNode commands",
+    body:
+      "Placed views become drawing commands: text runs, dividers, borders, shapes, chart marks, table chrome, image placeholders, and style tokens. Drawing commands still are not terminal bytes.",
+    example:
+      "The divider becomes a horizontal rule command, and the progress view becomes text plus filled and empty bar segments with semantic styles.",
+  },
+  {
+    n: "06",
+    name: "raster",
+    question: "Which styled cells are visible?",
+    artifact: "RasterSurface",
+    body:
+      "Draw commands are packed into a grid of terminal cells. Each cell records a character and style information. The raster surface is host-neutral data, so terminal escape sequences are still outside this phase.",
+    example:
+      "A 40 by 8 preview frame becomes 320 cells, including blank cells, divider glyphs, bar glyphs, and styled text cells.",
+  },
+  {
+    n: "07",
+    name: "commit",
+    question: "What runtime work follows this frame?",
+    artifact: "CommitPlan",
+    body:
+      "SwiftTUI packages lifecycle transitions and handler installation for the runtime. This is where appeared and disappeared identities, task starts and cancellations, and current input handlers become explicit work.",
+    example:
+      "If a sheet opens, the commit plan installs overlay handlers and starts any newly appeared task after the frame is ready to present.",
+  },
+];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+    />
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <SiteHeader />
+    <main>
+      <section class="pipeline-hero">
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <span class="tag">
+              <span class="dot"></span>
+              <span>rendering pipeline</span>
+            </span>
+            <h1>How a SwiftTUI frame becomes terminal cells.</h1>
+            <p class="lead">
+              Every frame follows the same path: resolve, measure, place,
+              semantics, draw, raster, and commit. The split keeps app code
+              predictable: layout decides geometry, semantics decide interaction,
+              drawing decides visible content, and presentation decides terminal
+              bytes only after the frame is data.
+            </p>
+          </div>
+          <aside class="hero-panel mono" aria-label="Pipeline overview">
+            <div class="panel-bar">Frame path</div>
+            <ol>
+              {phases.map((phase) => (
+                <li>
+                  <span>{phase.n}</span>
+                  <strong>{phase.name}</strong>
+                  <em>{phase.question}</em>
+                </li>
+              ))}
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <section class="example-band">
+        <div class="shell example-grid">
+          <div>
+            <span class="eyebrow"><span class="num">/example</span>One authored view</span>
+            <h2>The same declaration feeds every phase.</h2>
+            <p>
+              You author a View. SwiftTUI handles the pipeline. You only reach
+              for pipeline artifacts when you want previews, test assertions, or
+              detailed debugging output.
+            </p>
+          </div>
+          <pre class="code mono"><code><span class="kw">struct</span> <span class="ty">BuildSummary</span>: <span class="ty">View</span> &#123;
+  <span class="kw">var</span> body: <span class="kw">some</span> <span class="ty">View</span> &#123;
+    <span class="ty">VStack</span>(alignment: .leading, spacing: <span class="n">0</span>) &#123;
+      <span class="ty">Text</span>(<span class="s">"Deploy Queue"</span>).bold()
+      <span class="ty">Divider</span>()
+      <span class="ty">ProgressView</span>(<span class="s">"Release"</span>, value: <span class="n">18</span>, total: <span class="n">24</span>)
+      <span class="ty">LabeledContent</span>(<span class="s">"Owner"</span>, value: <span class="s">"infra"</span>)
+    &#125;
+    .padding(<span class="n">1</span>)
+  &#125;
+&#125;</code></pre>
+        </div>
+      </section>
+
+      <section class="phase-list">
+        <div class="shell">
+          <header class="section-head">
+            <span class="eyebrow"><span class="num">/phases</span>Step by step</span>
+            <h2>What each phase answers.</h2>
+          </header>
+          <ol class="phase-cards">
+            {phases.map((phase) => (
+              <li class="phase-card">
+                <div class="phase-main">
+                  <span class="phase-num mono">{phase.n}</span>
+                  <div>
+                    <h3>{phase.name}</h3>
+                    <p class="question">{phase.question}</p>
+                  </div>
+                </div>
+                <p>{phase.body}</p>
+                <div class="phase-example">
+                  <span class="mono">example</span>
+                  <p>{phase.example}</p>
+                </div>
+                <div class="artifact mono">{phase.artifact}</div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section class="boundary">
+        <div class="shell boundary-grid">
+          <div>
+            <span class="eyebrow"><span class="num">/boundary</span>Terminal presentation</span>
+            <h2>Terminal escape sequences happen after raster.</h2>
+          </div>
+          <div class="boundary-copy">
+            <p>
+              The raster surface is a styled cell grid, not a stream of terminal
+              control codes. Terminal capability decisions such as truecolor,
+              ANSI fallback, Kitty graphics, Sixel graphics, and OSC 8 hyperlink
+              emission happen at the presentation boundary.
+            </p>
+            <p>
+              That boundary is also where SwiftTUI sanitizes authored text and
+              hyperlink destinations before writing bytes to a terminal stream.
+              Layout, routing, and raster data stay independent from terminal
+              escape-sequence safety rules.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="inspect">
+        <div class="shell inspect-grid">
+          <div>
+            <span class="eyebrow"><span class="num">/inspect</span>When you need artifacts</span>
+            <h2>Use DefaultRenderer for previews and assertions.</h2>
+            <p>
+              App code usually does not call pipeline phases directly. For a
+              preview, test, or diagnostic path, render a view on the main actor
+              and inspect the returned frame artifacts.
+            </p>
+          </div>
+          <pre class="code mono"><code><span class="kw">let</span> renderer = <span class="ty">DefaultRenderer</span>()
+<span class="kw">let</span> frame = renderer.render(
+  <span class="ty">BuildSummary</span>(),
+  proposal: .init(width: <span class="n">40</span>, height: <span class="n">8</span>)
+)
+
+<span class="kw">let</span> surface = frame.rasterSurface
+<span class="kw">let</span> routes = frame.semanticSnapshot
+<span class="kw">let</span> work = frame.commitPlan</code></pre>
+        </div>
+      </section>
+    </main>
+    <SiteFooter />
+  </body>
+</html>
+
+<style>
+  .pipeline-hero {
+    padding: 76px 0 48px;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.96fr) minmax(320px, 0.72fr);
+    gap: 48px;
+    align-items: start;
+  }
+  .hero-copy .tag { margin-bottom: 24px; }
+  .lead {
+    margin-top: 22px;
+    max-width: 68ch;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .hero-panel {
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .panel-bar {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: var(--panel-2);
+  }
+  .hero-panel ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .hero-panel li {
+    display: grid;
+    grid-template-columns: 42px 86px 1fr;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    align-items: baseline;
+  }
+  .hero-panel li:last-child { border-bottom: 0; }
+  .hero-panel span {
+    color: var(--accent);
+    font-size: 11px;
+  }
+  .hero-panel strong {
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .hero-panel em {
+    color: var(--ink-3);
+    font-size: 11px;
+    font-style: normal;
+    line-height: 1.45;
+  }
+
+  .example-band,
+  .phase-list,
+  .boundary,
+  .inspect {
+    padding: 72px 0;
+    border-top: 1px solid var(--line);
+  }
+  .example-grid,
+  .inspect-grid,
+  .boundary-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 42px;
+    align-items: start;
+  }
+  .example-grid h2,
+  .inspect-grid h2,
+  .boundary-grid h2,
+  .section-head h2 {
+    margin-top: 14px;
+  }
+  .example-grid p,
+  .inspect-grid p,
+  .boundary-copy p {
+    margin-top: 16px;
+    max-width: 68ch;
+    line-height: 1.65;
+  }
+  .boundary-copy p:first-child { margin-top: 0; }
+  .code {
+    margin: 0;
+    padding: 18px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: #060606;
+    color: var(--ink);
+    font-size: 12.5px;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  .code .kw { color: #d28cff; }
+  .code .ty { color: #6ddfff; }
+  .code .s { color: var(--accent); }
+  .code .n { color: #f59e0b; }
+
+  .section-head {
+    max-width: 760px;
+    margin-bottom: 34px;
+  }
+  .phase-cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .phase-card {
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: linear-gradient(180deg, var(--panel) 0%, var(--bg-soft) 100%);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 290px;
+  }
+  .phase-main {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .phase-num {
+    color: var(--accent);
+    font-size: 11px;
+  }
+  .phase-card h3 {
+    font-size: 22px;
+    letter-spacing: -0.012em;
+  }
+  .question {
+    margin-top: 5px;
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+  .phase-card > p {
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.62;
+  }
+  .phase-example {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .phase-example span {
+    color: var(--ink-4);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .phase-example p {
+    margin-top: 6px;
+    color: var(--ink-3);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .artifact {
+    margin-top: auto;
+    padding-top: 16px;
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 980px) {
+    .hero-grid,
+    .example-grid,
+    .inspect-grid,
+    .boundary-grid {
+      grid-template-columns: 1fr;
+    }
+    .phase-cards { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 620px) {
+    .pipeline-hero { padding-top: 48px; }
+    .hero-panel li { grid-template-columns: 34px 76px 1fr; gap: 8px; }
+    .phase-card { min-height: 0; }
+  }
+</style>
