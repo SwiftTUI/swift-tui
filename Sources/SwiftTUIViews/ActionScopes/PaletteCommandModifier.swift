@@ -1,13 +1,9 @@
 public import SwiftTUICore
 
-/// A snapshot of a palette command visible from the current focus
-/// chain, exposed via `EnvironmentValues.activePaletteCommands`.
-///
-/// Consumer-authored palette surfaces read this value to render and
-/// dispatch the commands active at the current focus. The snapshot is
-/// updated by the runtime after each frame, so a palette view that
-/// reads it sees the commands authored by every scope on the current
-/// focus chain — shallowest first.
+/// A palette-command contribution carried via
+/// `PaletteCommandsPreferenceKey` and absorbed by `.paletteSheet(...)`
+/// at the nearest enclosing `ActionScope`. The absorbing scope passes
+/// the snapshot from its subtree into the sheet content closure.
 public struct ActivePaletteCommand: Sendable {
   public let name: String
   public let description: String?
@@ -24,20 +20,6 @@ public struct ActivePaletteCommand: Sendable {
     self.description = description
     self.isEnabled = isEnabled
     self.action = action
-  }
-}
-
-private enum ActivePaletteCommandsKey: EnvironmentKey {
-  static let defaultValue: [ActivePaletteCommand] = []
-}
-
-extension EnvironmentValues {
-  /// The palette commands active along the current focus chain,
-  /// ordered shallowest-first. Consumer-authored palette views read
-  /// this to discover what actions the user can invoke now.
-  public var activePaletteCommands: [ActivePaletteCommand] {
-    get { self[ActivePaletteCommandsKey.self] }
-    set { self[ActivePaletteCommandsKey.self] = newValue }
   }
 }
 
@@ -59,16 +41,10 @@ package enum PaletteCommandsPreferenceKey: PreferenceKey {
 }
 
 extension ActionScope where Self: View & Sendable {
-  /// Declares a searchable, consumer-invocable command at this scope's
-  /// root. The framework does not ship a palette surface; consumer
-  /// code is responsible for presenting a palette view and querying
-  /// `EnvironmentValues.activePaletteCommands` to discover the
-  /// commands visible from the current focus chain.
-  ///
-  /// Palette commands stack at each scope identity in authored order.
-  /// A command remains visible while its scope is on the focus chain;
-  /// disabled commands still appear so the palette can render them
-  /// greyed out, but activating a disabled command is a no-op.
+  /// Declares a searchable, consumer-invocable command. Contributions
+  /// bubble up to the nearest enclosing `.paletteSheet(...)` (an
+  /// `ActionScope`), which absorbs them and passes the snapshot into
+  /// its content closure. Mirrors `.toolbarItem(...)` ↔ `.toolbar(style:)`.
   @MainActor
   public func paletteCommand(
     name: String,
