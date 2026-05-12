@@ -145,6 +145,7 @@ root package products:
   platforms
 - terminal-program embedding via `SwiftTUITerminal` and
   `SwiftTUIPTYPrimitives`
+- first-class terminal workspaces via `SwiftTUITerminalWorkspace`
 - deploy-to-browser hosting through `Platforms/Web`, which remains a Bun
   package that consumes a `SwiftTUIWASI` build
 

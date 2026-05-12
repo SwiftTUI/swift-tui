@@ -24,7 +24,8 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUICharts` | 29 | 1812 |
 | `SwiftTUIArguments` | 4 | 113 |
 | `SwiftTUIPTYPrimitives` | 6 | 34 |
-| `SwiftTUITerminal` | 12 | 290 |
+| `SwiftTUITerminal` | 12 | 291 |
+| `SwiftTUITerminalWorkspace` | 14 | 257 |
 | `SwiftTUICLI` | 5 | 24 |
 | `WASISurfaceBridge` | 0 | 0 |
 | `SwiftTUIWASI` | 2 | 8 |
@@ -423,9 +424,28 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalExitReason` — enum — 4 members
 - `TerminalLifecycle` — enum — 4 members
 - `TerminalMouseMode` — enum — 6 members
-- `TerminalProcessSession` — class — 12 members
+- `TerminalProcessSession` — class — 13 members
 - `TerminalSession` — protocol — 11 members
 - `TerminalView` — struct — 126 members
+
+## SwiftTUITerminalWorkspace
+
+### Canonical surface (14)
+
+- `TerminalPaneID` — struct — 8 members
+- `TerminalPaneSpec` — struct — 13 members
+- `TerminalSplit` — struct — 7 members
+- `TerminalSplitAxis` — enum — 4 members
+- `TerminalWorkspaceAction` — enum — 12 members
+- `TerminalWorkspaceDirection` — enum — 6 members
+- `TerminalWorkspaceLayout` — enum — 3 members
+- `TerminalWorkspaceNode` — enum — 8 members
+- `TerminalWorkspacePaneFrame` — struct — 4 members
+- `TerminalWorkspaceSessionStore` — class — 7 members
+- `TerminalWorkspaceState` — struct — 28 members
+- `TerminalWorkspaceTab` — struct — 9 members
+- `TerminalWorkspaceTabID` — struct — 8 members
+- `TerminalWorkspaceView` — struct — 126 members
 
 ## SwiftTUICLI
 

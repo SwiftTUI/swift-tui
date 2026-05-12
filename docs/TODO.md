@@ -35,12 +35,3 @@
   [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md),
   [VISION.md](VISION.md),
   [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
-- [ ] Design the first-class terminal workspace surface. `TerminalView` already
-  embeds one terminal program in one view, but there is no official
-  Zellij-style workspace layer for tabs, split-pane identity, pane commands,
-  session retention, persistence, or reattach semantics. Start from the scoped
-  proposal and produce an evidence example before committing broad public API.
-  Supporting docs: [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md),
-  [EMBEDDING.md](EMBEDDING.md),
-  [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md),
-  [TERMINAL_NATIVE_UX_RESEARCH.md](TERMINAL_NATIVE_UX_RESEARCH.md).

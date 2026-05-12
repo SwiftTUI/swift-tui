@@ -51,7 +51,8 @@
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
 - terminal-program embedding lives in `SwiftTUITerminal` and
-  `SwiftTUIPTYPrimitives`
+  `SwiftTUIPTYPrimitives`; first-class terminal workspaces live in
+  `SwiftTUITerminalWorkspace`
 
 The conceptual model is:
 

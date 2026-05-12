@@ -21,6 +21,7 @@ input harnesses against the terminal examples:
   - Examples/gifcat
   - Examples/gifeditor
   - Examples/gitviz
+  - Examples/terminal-workspace
   - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
@@ -126,6 +127,7 @@ if [ "$skip_clean" -eq 0 ]; then
     "Examples/gifcat" \
     "Examples/gifeditor" \
     "Examples/gitviz" \
+    "Examples/terminal-workspace" \
     "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
@@ -142,7 +144,8 @@ for package_path in \
   "Examples/file-previewer" \
   "Examples/gifcat" \
   "Examples/gifeditor" \
-  "Examples/gitviz"; do
+  "Examples/gitviz" \
+  "Examples/terminal-workspace"; do
   run_step \
     "Build $package_path" \
     "$repo_root" \

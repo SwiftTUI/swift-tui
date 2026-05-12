@@ -109,6 +109,16 @@ Current async presentation and frame-tail worker ownership is summarized in
   title changes, OSC 7 working-directory changes, and OSC 8 hyperlinks
 - Lives in `Platforms/Embedding`; macOS and Linux only
 
+### Terminal workspaces
+
+- `SwiftTUITerminalWorkspace` provides `TerminalWorkspaceState`,
+  `TerminalWorkspaceTab`, `TerminalWorkspaceNode`, `TerminalPaneSpec`,
+  `TerminalWorkspaceSessionStore`, and `TerminalWorkspaceView`.
+- V1 covers tabs, split-pane trees, stable pane identity, directional focus,
+  split/close/zoom/new-tab commands, retained `TerminalProcessSession` values,
+  and `Codable` layout/command metadata.
+- `Examples/terminal-workspace` is the maintained Zellij-style evidence app.
+
 ## Current Constraints
 
 - The core `SwiftTUIRuntime` runtime renders one active scene into one active
@@ -134,11 +144,10 @@ Current async presentation and frame-tail worker ownership is summarized in
 - Kitty keyboard protocol and OSC 99 notifications are not intercepted for
   embedded children in v1. OSC 52 clipboard requests are forwarded to the
   active host clipboard action.
-- A first-class Zellij-style workspace surface is not shipped yet. Apps can
-  manually compose `TerminalView`, `TabView`, `Panel`, and custom layouts, but
-  there is no official pane-tree, pane command, session persistence, or reattach
-  API. The planned scope is tracked in [TODO.md](TODO.md) and
-  [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md).
+- `SwiftTUITerminalWorkspace` persists layout and non-secret command metadata,
+  but does not yet reattach to still-running child processes after app restart.
+  That is outside the current work queue until a session-supervisor or runner
+  contract is scoped.
 - Built-in text inputs use a `String`-backed package-private editing model with
   grapheme offsets, reducer commands, caret anchors, and focused selection
   rendering. Focused terminal text inputs use the hardware cursor by default

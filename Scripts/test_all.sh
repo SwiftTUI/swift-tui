@@ -159,6 +159,7 @@ Runs the full checked-in repo verification surface:
   - Examples/gallery tests
   - Examples/layouts tests
   - Examples/file-previewer tests
+  - Examples/terminal-workspace tests
   - Tools/TermUIPerf tests
   - Examples/WebExample Bun tests
   - Examples/WebExample browser integration test
@@ -617,6 +618,11 @@ run_function_step \
   "Run Examples/file-previewer tests" \
   "$(swift_command_text test --package-path Examples/file-previewer)" \
   run_swift test --package-path Examples/file-previewer
+
+run_function_step \
+  "Run Examples/terminal-workspace tests" \
+  "$(swift_command_text test --package-path Examples/terminal-workspace)" \
+  run_swift test --package-path Examples/terminal-workspace
 
 run_function_step \
   "Run Tools/TermUIPerf tests" \

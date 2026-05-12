@@ -59,6 +59,7 @@ struct PackageGraphIsolationTests {
       "WASISurfaceBridge",
       "SwiftUIHost",
       "SwiftTUITerminal",
+      "SwiftTUITerminalWorkspace",
     ] {
       let block = try #require(targetBlock(named: targetName, in: rootManifest))
       #expect(block.contains("\"SwiftTUIRuntime\""))
@@ -127,8 +128,10 @@ struct PackageGraphIsolationTests {
       let endCandidates = [
         suffix[searchStart...].range(of: "\n    .target(")?.lowerBound,
         suffix[searchStart...].range(of: "\n      .target(")?.lowerBound,
+        suffix[searchStart...].range(of: "\n        .target(")?.lowerBound,
         suffix[searchStart...].range(of: "\n    .testTarget(")?.lowerBound,
         suffix[searchStart...].range(of: "\n      .testTarget(")?.lowerBound,
+        suffix[searchStart...].range(of: "\n        .testTarget(")?.lowerBound,
       ].compactMap { $0 }
 
       let blockEnd = endCandidates.min() ?? suffix.endIndex
@@ -145,7 +148,8 @@ struct PackageGraphIsolationTests {
 
   private func swiftSources(in directory: URL) throws -> String {
     let fileManager = FileManager.default
-    guard let enumerator = fileManager.enumerator(at: directory, includingPropertiesForKeys: nil) else {
+    guard let enumerator = fileManager.enumerator(at: directory, includingPropertiesForKeys: nil)
+    else {
       return ""
     }
 
