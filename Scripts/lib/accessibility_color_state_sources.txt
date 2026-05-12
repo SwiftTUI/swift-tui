@@ -8,6 +8,7 @@ Examples/gifeditor/Sources/GIFEditorUI/MenuBarView.swift
 Examples/gifeditor/Sources/GIFEditorUI/TimelineView.swift
 Examples/gifeditor/Sources/GIFEditorUI/ToolboxView.swift
 Examples/gitviz/Sources/GitViz/Views/LanePalette.swift
+Platforms/Embedding/Sources/SwiftTUITerminalWorkspace/TerminalWorkspaceView.swift
 Platforms/SwiftUI/Sources/SwiftUIHost/SwiftUIHostAppView.swift
 Sources/SwiftTUICharts/ChartChromeSupport.swift
 Sources/SwiftTUICharts/ChartSupport.swift

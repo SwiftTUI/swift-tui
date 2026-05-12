@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-12
 
+- Shipped the first-class terminal workspace V1 as the
+  `SwiftTUITerminalWorkspace` product: apps can model tabbed split-pane
+  terminal workspaces with stable pane IDs, retained sessions, pane commands,
+  zoom, layout persistence, and a Zellij-style example package.
 - Added a host-facing runtime issue channel and used it for unhosted
   `.toolbarItem(...)` declarations: CLI hosts forward issues to stderr, SwiftUI
   hosts log through OSLog, web hosts send typed runtime-issue records for

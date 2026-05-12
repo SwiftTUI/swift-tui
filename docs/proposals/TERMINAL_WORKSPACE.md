@@ -1,9 +1,11 @@
 # First-Class Terminal Workspace Surface
 
-**Status:** Scoped proposal; not yet implemented.
+**Status:** Implemented for V1 by `SwiftTUITerminalWorkspace`.
 
 This document scopes the work needed to move from shipped terminal-program
-embedding to a first-class, Zellij-style terminal workspace surface.
+embedding to a first-class, Zellij-style terminal workspace surface. V1 has
+landed as a terminal-only product; the remaining notes describe what shipped
+and what is intentionally deferred.
 
 It is intentionally separate from
 [TERMINAL_EMBEDDING.md](TERMINAL_EMBEDDING.md). `TerminalView` already gives
@@ -61,9 +63,18 @@ A plausible authoring shape is:
       id: "dev",
       title: "dev",
       root: .split(
-        axis: .horizontal,
-        first: .terminal(id: "shell", command: "/bin/zsh"),
-        second: .terminal(id: "logs", command: "/usr/bin/tail", arguments: ["-f", "app.log"])
+        TerminalSplit(
+          axis: .horizontal,
+          first: .terminal(.shell(id: "shell", title: "shell")),
+          second: .terminal(
+            TerminalPaneSpec(
+              id: "logs",
+              title: "logs",
+              command: "/usr/bin/tail",
+              arguments: ["-f", "app.log"]
+            )
+          )
+        )
       )
     )
   ]
@@ -72,9 +83,9 @@ A plausible authoring shape is:
 TerminalWorkspaceView(workspace: $workspace)
 ```
 
-This is an illustrative shape, not an approved API. The important constraints
-are stable IDs, explicit model ownership, normal SwiftTUI view composition, and
-no root `SwiftTUI` runtime dependency on the embedding products.
+The important constraints are stable IDs, explicit model ownership, normal
+SwiftTUI view composition, and no root `SwiftTUI` runtime dependency on the
+embedding products.
 
 ## Recommended Layering
 
@@ -82,8 +93,8 @@ Start as a first-party product separate from `SwiftTUI` rather than adding
 terminal-process workspace APIs directly to the runtime product:
 
 ```text
-SwiftTUIWorkspace
-  depends on SwiftTUI
+SwiftTUITerminalWorkspace
+  depends on SwiftTUIRuntime
   depends on SwiftTUITerminal
   owns workspace state, pane tree transforms, chrome, and examples
 
@@ -99,7 +110,30 @@ allowing an official package to feel first-class. If generic split-pane or
 workspace primitives become useful outside terminal-process panes, they can be
 promoted later as root `SwiftTUIViews` APIs without moving `TerminalView`.
 
-## Phased Work
+## Shipped V1
+
+The first public product is `SwiftTUITerminalWorkspace`, an opt-in peer above
+`SwiftTUITerminal` rather than a dependency of root `SwiftTUI`.
+
+It ships:
+
+- `TerminalPaneID` and `TerminalWorkspaceTabID`
+- `TerminalPaneSpec` for serializable command metadata
+- `TerminalWorkspaceNode` and `TerminalSplit` for recursive split-pane trees
+- `TerminalWorkspaceState` reducers for tab selection, focus movement,
+  split, close, rename, zoom, and tab creation
+- `TerminalWorkspaceLayout` for deterministic pane-frame math
+- `TerminalWorkspaceSessionStore` for retaining `TerminalProcessSession`
+  values by pane id
+- `TerminalWorkspaceView` with tab chrome, active-pane chrome, bottom key hints,
+  workspace key commands, and a command palette
+- `Examples/terminal-workspace`, a Zellij-style app with dev/ops tabs, live
+  terminal panes, command palette actions, and persisted layout metadata
+
+The V1 persistence contract is layout and non-secret command metadata only.
+Restored workspaces spawn fresh processes.
+
+## Historical Phase Notes
 
 ### Phase 1: Evidence Example
 
@@ -144,7 +178,7 @@ terminal render path.
 
 ### Phase 4: Session Registry
 
-Introduce lifecycle ownership around terminal sessions:
+V1 introduces lifecycle ownership around terminal sessions:
 
 - map `PaneID` to retained `TerminalProcessSession` values
 - restart or close sessions without rebuilding unrelated panes
@@ -152,13 +186,12 @@ Introduce lifecycle ownership around terminal sessions:
 - surface exited, failed, and detached states
 - define what happens when a pane is moved, zoomed, hidden, or restored
 
-This is the point where the design should decide whether the registry belongs
-inside `SwiftTUIWorkspace`, inside `SwiftTUITerminal`, or as an app-owned
-reference type.
+The registry ships in `SwiftTUITerminalWorkspace` as
+`TerminalWorkspaceSessionStore`.
 
 ### Phase 5: Persistence And Reattach
 
-Define the durable session story:
+Define the durable session story beyond V1:
 
 - serialize layout and non-secret command metadata
 - restore layout without assuming processes survived
@@ -184,31 +217,35 @@ panes:
 These should stay opt-in or capability-driven. A basic embedded shell should
 not pay the complexity tax for every multiplexer edge.
 
-## Open Decisions
+## Resolved And Remaining Decisions
 
-- Should the public package be `SwiftTUIWorkspace`, a target inside
-  `Platforms/Embedding`, or a root `SwiftTUIViews` promotion after the example
-  proves the model?
-- Is the first public model terminal-only, or should it be generic over any
-  SwiftTUI pane content?
-- How much Zellij-style behavior is core, and how much belongs in examples or
-  app-authored commands?
-- Does reattach build on existing `TerminalRunner` socket discovery, or does it
-  require a new session supervisor?
-- What is the host story for SwiftUI/Web/WASI surfaces that cannot spawn local
-  PTYs?
-- What is the right accessibility representation for a pane containing a live
-  terminal program?
+- The public package is `SwiftTUITerminalWorkspace` under
+  `Platforms/Embedding`; root `SwiftTUI` does not depend on it.
+- The first public model is terminal-only. Generic pane content remains a
+  future decision so V1 does not force an `AnyView`-heavy pane API.
+- Core owns pane-tree state, retained sessions, split/focus/close/zoom/new-tab
+  commands, and default chrome. App-specific workflows stay in examples or
+  app-authored commands.
+- Reattach remains unresolved and likely needs a session supervisor or runner
+  contract beyond layout persistence.
+- SwiftUI/Web/WASI hosts that cannot spawn PTYs remain outside V1.
+- Accessibility for live terminal panes still needs a richer contract than
+  active-pane chrome and the embedded terminal's current semantic surface.
 
 ## Validation Expectations
 
-Before calling this surface first-class, the repo should have:
+The V1 surface is covered by:
 
-- pure model tests for pane tree transforms and serialized restoration
-- focus/action-scope tests for pane commands and key collisions
-- `TerminalView` integration tests proving sessions are not restarted by pane
-  movement, zoom, or tab switching
-- render-diff tests with multiple active panes and slow presentation
-- a real example that can be run from the documented example command path
+- pure model tests for pane-tree transforms, serialized restoration, layout
+  math, and session-store retention
+- the `Examples/terminal-workspace` package, runnable from the documented
+  command path
 - documentation updates in `EMBEDDING.md`, `STATUS.md`, `SOURCE_LAYOUT.md`, and
-  the public API inventory once the API lands
+  the public API inventory
+
+Remaining validation before a future reattach or daemon-backed session story:
+
+- focus/action-scope collision tests for complex nested workspace scopes
+- `TerminalView` integration tests proving sessions are not restarted by pane
+  movement, zoom, or tab switching in a live run loop
+- render-diff tests with multiple active panes and slow presentation

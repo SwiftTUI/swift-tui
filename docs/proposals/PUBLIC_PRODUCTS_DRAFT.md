@@ -190,6 +190,7 @@ own host policy. They should not depend on the terminal convenience product.
 | `SwiftTUIWebHost` | `import SwiftTUIRuntime` + `import SwiftTUIWebHost` | Localhost browser host only. No terminal runner required. |
 | `WASISurfaceBridge` | `import WASISurfaceBridge` | Pure `web-surface` transport support. No terminal dependencies. |
 | `SwiftTUITerminal` | `import SwiftTUIRuntime` + `import SwiftTUITerminal` | Terminal-emulator and child-process embedding. Domain-specific, not part of regular app convenience. |
+| `SwiftTUITerminalWorkspace` | `import SwiftTUIRuntime` + `import SwiftTUITerminalWorkspace` | Tabbed/split-pane workspace surface above `TerminalView`. Domain-specific, not part of regular app convenience. |
 
 The important rule is symmetry: once a consumer does not import the `SwiftTUI`
 convenience product, terminal execution is just another host choice. It should

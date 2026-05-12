@@ -92,6 +92,11 @@ public final class TerminalProcessSession: TerminalSession {
     state.lifecycle
   }
 
+  /// Requests termination of the child process group backing this session.
+  public func terminate(signal: Int32 = 15) async {
+    try? await pty.sendSignal(signal)
+  }
+
   public func send(key: TerminalEmulatorKey) async {
     let bytes = await emulator.encode(key: key)
     guard !bytes.isEmpty, let pair = await pty.pair else {

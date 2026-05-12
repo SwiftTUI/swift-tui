@@ -24,13 +24,13 @@ The canonical public surface is the one used in README examples, architecture do
 - the `SwiftTUI` convenience product for ordinary terminal executable apps
 - root package platform products when the app needs terminal-native execution,
   WASI execution, WebHost execution, host-managed embedding, or
-  terminal-program embedding
+  terminal-program embedding, or terminal workspace composition
 
 The supported package model is one Swift package exposing `SwiftTUI` for the
 default terminal app story, `SwiftTUIRuntime` for shared runtime integration,
 and sibling platform integration products: runners for executable launch, host
 products for host-managed embedding, and terminal embedding products for child
-terminal programs.
+terminal programs and workspace surfaces.
 
 In this repo, an executable runner product owns top-level execution and the
 default `App.main()` story, while a host product retains `HostedSceneSession`

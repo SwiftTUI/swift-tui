@@ -42,6 +42,7 @@ The repository [README.md](../README.md) is the public landing page.
 - [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md) — fixture, determinism, regression, and test-topology rules
 - [PERFORMANCE_EVALUATION.md](PERFORMANCE_EVALUATION.md) — local CPU-versus-latency scenario runs, artifacts, and comparison workflow
 - [EMBEDDING.md](EMBEDDING.md) — terminal-program embedding through `TerminalView` and `TerminalProcessSession`
+- [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) — shipped first-class terminal workspace surface above `TerminalView`
 - [FOCUS.md](FOCUS.md) — focus traversal, focused values, default-focus behavior
 - [STATE_KEYING.md](STATE_KEYING.md) — graph-scoped state-keying rules,
   snapshot fallback behavior, and authored-view identity
@@ -66,7 +67,6 @@ Active design proposals that are still shaping decisions:
 - [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` products for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
 - [proposals/PUBLIC_PRODUCTS_DRAFT.md](proposals/PUBLIC_PRODUCTS_DRAFT.md) — implemented release-facing product/import contract for one-import terminal apps, `SwiftTUIRuntime` composition, explicit host products, and first-class domain utility targets
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
-- [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) — scoped design work for a first-class Zellij-style terminal workspace surface above `TerminalView`
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — draft anchored popover and TipKit-inspired `popoverTip` API proposal
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy
 - [proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](proposals/CPU_LATENCY_EVALUATION_PIPELINE.md) — CPU-versus-latency measurement system for async rendering and future runtime optimizations

@@ -31,6 +31,8 @@ The root `Package.swift` exposes the framework and platform products together:
 - `SwiftTUIWebHostCLI`: combined terminal/WebHost runner
 - `SwiftTUITerminal`: `TerminalView`, terminal emulator, and child-process
   session APIs
+- `SwiftTUITerminalWorkspace`: tabs, split panes, workspace state, retained
+  terminal sessions, and workspace chrome above `TerminalView`
 - `SwiftTUIPTYPrimitives`: pty creation, fd lifecycle, read/write, and resize
   support
 
@@ -43,7 +45,8 @@ The source directories remain useful ownership boundaries:
 - `Platforms/WASI`: `SwiftTUIWASI` and `WASISurfaceBridge`
 - `Platforms/SwiftUI`: `SwiftUIHost`
 - `Platforms/WebHost`: `SwiftTUIWebHost` and `SwiftTUIWebHostCLI`
-- `Platforms/Embedding`: `SwiftTUITerminal` and `SwiftTUIPTYPrimitives`
+- `Platforms/Embedding`: `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`,
+  and `SwiftTUIPTYPrimitives`
 - `Platforms/Web`: Bun package for deploy-to-browser hosting
 
 ## Consumer Composition
@@ -65,6 +68,8 @@ Consumers choose one launch composition at compile time:
 - native Apple apps import `SwiftUIHost` to retain `HostedSceneSession` values
   inside SwiftUI app lifecycle
 - apps that embed external terminal programs import `SwiftTUITerminal`
+- apps that need a tabbed/split-pane terminal workspace import
+  `SwiftTUITerminalWorkspace`
 
 Example apps remain separate mini packages. They depend on the repo root with:
 
@@ -132,6 +137,7 @@ The current boundary is:
   - pty management
   - emulator-backed foreign-surface snapshots
   - child process lifecycle and input forwarding
+  - terminal workspace state, pane commands, and session retention
 
 Runner and host responsibilities are explicit external concepts; `Platforms/`
 is only the source directory that contains their target implementations.
