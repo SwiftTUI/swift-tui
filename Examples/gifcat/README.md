@@ -8,8 +8,8 @@ one terminal cell between images.
 
 ```bash
 cd Examples/gifcat
-swift run gifcat ../../nyan.gif
-swift run gifcat first.gif second.gif third.gif
+swiftly run swift run gifcat ../../nyan.gif
+swiftly run swift run gifcat first.gif second.gif third.gif
 ```
 
 `Ctrl+D` exits.

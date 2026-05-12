@@ -61,7 +61,10 @@ public struct LineChartXAxis: Hashable, Sendable {
 
   public static func dates(
     every stride: DateAxisStride,
-    format: Date.FormatStyle = .dateTime.month(.abbreviated).day()
+    format: Date.FormatStyle = .dateTime
+      .month(.abbreviated)
+      .day()
+      .locale(Locale(identifier: "en_US_POSIX"))
   ) -> Self {
     .init(ticks: .dates(every: stride), format: .date(format))
   }

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import SwiftTUICore
@@ -192,20 +193,46 @@ struct GestureRunLoopDispatchTests {
     let point = centerPoint(of: region.rect)
 
     let host = RecordingGestureTerminalHost(size: terminalSize)
-    let result = try await runHarness(
-      host: host,
-      terminalSize: terminalSize,
+    let inputReader = InjectedTerminalInputReader()
+    let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      schedule: [
-        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
-        .init(
-          delayNanoseconds: 75_000_000,
-          event: .mouse(.init(kind: .up(.primary), location: point))
-        ),
-      ],
-      viewBuilder: { view }
+      presentationSurface: host,
+      terminalInputReader: inputReader,
+      signalReader: EmptyGestureSignals(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: env,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      exitKeyBindings: .none,
+      viewBuilder: { _, _ in view }
     )
 
+    let task = Task {
+      try await runLoop.run()
+    }
+
+    do {
+      try await waitUntilGesture("initial frame") {
+        host.presentCount > 0
+      }
+      inputReader.send(.mouse(.init(kind: .down(.primary), location: point)))
+      try await waitUntilGesture("long press callback") {
+        box.count == 1
+      }
+      inputReader.finish()
+    } catch {
+      inputReader.finish()
+      _ = try? await task.value
+      throw error
+    }
+
+    let result = try await task.value
     #expect(result.exitReason == .inputEnded)
     #expect(box.count == 1)
   }
@@ -351,6 +378,11 @@ private final class RecordingGestureTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
+  private let presentCountStorage = Mutex(0)
+
+  var presentCount: Int {
+    presentCountStorage.withLock { $0 }
+  }
 
   init(size: CellSize) {
     self.surfaceSize = size
@@ -364,6 +396,36 @@ private final class RecordingGestureTerminalHost: PresentationSurface {
 
   @discardableResult
   func present(_: RasterSurface) throws -> TerminalPresentationMetrics {
-    .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
+    presentCountStorage.withLock { $0 += 1 }
+    return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
+  }
+}
+
+private func waitUntilGesture(
+  _ label: String,
+  timeoutNanoseconds: UInt64 = 20_000_000_000,
+  pollNanoseconds: UInt64 = 10_000_000,
+  condition: @escaping () async -> Bool
+) async throws {
+  let clock = ContinuousClock()
+  let start = clock.now
+
+  while !(await condition()) {
+    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
+      throw GestureRunLoopDispatchTestTimeout(label)
+    }
+    try await Task.sleep(nanoseconds: pollNanoseconds)
+  }
+}
+
+private struct GestureRunLoopDispatchTestTimeout: Error, CustomStringConvertible {
+  let label: String
+
+  init(_ label: String) {
+    self.label = label
+  }
+
+  var description: String {
+    "Timed out waiting for \(label)"
   }
 }

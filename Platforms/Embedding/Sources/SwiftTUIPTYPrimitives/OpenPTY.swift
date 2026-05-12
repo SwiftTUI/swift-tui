@@ -44,7 +44,7 @@ public func ptyResize(masterFD: Int32, cols: Int, rows: Int) throws(PTYError) {
     ws_ypixel: 0
   )
 
-  guard unsafe ioctl(masterFD, TIOCSWINSZ, &windowSize) == 0 else {
+  guard unsafe ioctl(masterFD, UInt(TIOCSWINSZ), &windowSize) == 0 else {
     throw .resizeFailed(errno: errno)
   }
 }

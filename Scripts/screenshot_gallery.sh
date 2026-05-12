@@ -37,7 +37,7 @@ gallery="$repo_root/Examples/gallery/.build/arm64-apple-macosx/debug/gallery-dem
 
 if [[ ! -x "$gallery" ]]; then
   echo "gallery-demo not built. Run:" >&2
-  echo "  swift build --package-path $repo_root/Examples/gallery --product gallery-demo" >&2
+  echo "  swiftly run swift build --package-path $repo_root/Examples/gallery --product gallery-demo" >&2
   exit 69
 fi
 

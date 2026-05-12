@@ -158,7 +158,7 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
   storage remain deferred until SwiftTUI has concrete host event contracts or
   workload evidence.
 - `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` do not build for iOS or WASI.
-- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through the root `SwiftTUIWASI` product / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
+- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through the root `SwiftTUIWASI` product / example-app build paths. Repo-local package builds and tests should use the explicit `swiftly run swift ...` form; `xcrun swift` may resolve to an incompatible Xcode toolchain.
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`

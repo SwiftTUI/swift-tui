@@ -8,11 +8,12 @@ REPO_BASENAME="$(basename "$REPO_DIR")"
 WASM_SDK_ID="${WASM_SDK_ID:-swift-6.3.1-RELEASE_wasm}"
 WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz}"
 WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2}"
+SWIFTLY_VERSION="${SWIFTLY_VERSION:-1.1.1}"
 
 CONTAINER_TOOL=""
 # Default to the prebuilt image published by .github/workflows/build-linux-image.yml.
 # Override with LINUX_IMAGE=swift:6.3.1 (or any other base) to fall back to lazy
-# provisioning of bun + the Wasm SDK at runtime — see ensure_bun / ensure_wasm_sdk.
+# provisioning of swiftly, bun, and the Wasm SDK at runtime.
 IMAGE="${LINUX_IMAGE:-ghcr.io/goodhatsllc/swift-tui-linux:latest}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
 CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}}"
@@ -50,19 +51,19 @@ Interactive:
   info              Print container configuration and tool versions
 
 Repo-aware:
-  test              Run \`swift test\`
+  test              Run \`swiftly run swift test\`
   cli-test          Run focused SwiftTUICLI tests from the root package
   cli-build-tests   Build root package tests without running them
   examples          Build the Linux example packages
   web               Build the browser examples
   workflow          Mirror the Examples Linux workflow: examples + web
-  full              Run \`swift test\`, then \`workflow\`
+  full              Run \`swiftly run swift test\`, then \`workflow\`
 
 Environment:
   LINUX_CONTAINER_TOOL  Force docker or podman
   LINUX_IMAGE           Override the image (default: $IMAGE)
                        Set to e.g. swift:6.3.1 to fall back to the upstream
-                       Swift base image; bun and the Wasm SDK will be
+                       Swift base image; swiftly, bun, and the Wasm SDK will be
                        installed lazily on first use.
   LINUX_CONTAINER_NAME  Override the container name
   LINUX_CONTAINER_DIR   Override the in-container workspace mount
@@ -78,6 +79,8 @@ Environment:
                        (default: $LINUX_IMAGE_BUILD_TAG)
   LINUX_SWIFT_VERSION   SWIFT_VERSION build arg passed to \`build\`
                        (default: $LINUX_SWIFT_VERSION)
+  SWIFTLY_VERSION       Swiftly version used by \`build\` and lazy installs
+                       (default: $SWIFTLY_VERSION)
   WASM_SDK_URL / WASM_SDK_CHECKSUM
                        Wasm SDK build args passed to \`build\` and used by
                        the lazy-install fallback when LINUX_IMAGE is a
@@ -194,6 +197,7 @@ build_image() {
     --file "$LINUX_IMAGE_DOCKERFILE" \
     --tag "$LINUX_IMAGE_BUILD_TAG" \
     --build-arg "SWIFT_VERSION=$LINUX_SWIFT_VERSION" \
+    --build-arg "SWIFTLY_VERSION=$SWIFTLY_VERSION" \
     --build-arg "WASM_SDK_URL=$WASM_SDK_URL" \
     --build-arg "WASM_SDK_CHECKSUM=$WASM_SDK_CHECKSUM" \
     "$LINUX_IMAGE_CONTEXT"
@@ -220,9 +224,36 @@ run_in_container() {
 run_shell_script() {
   local script="$1"
   run_in_container bash -lc "
+    export SWIFTLY_HOME_DIR=/root/.local/share/swiftly
+    export SWIFTLY_BIN_DIR=/root/.local/bin
+    export PATH=\"\$SWIFTLY_BIN_DIR:\$PATH\"
     export DISABLE_EXPLICIT_PLATFORMS=$(printf '%q' "$LINUX_DISABLE_EXPLICIT_PLATFORMS")
     cd $(printf '%q' "$CONTAINER_DIR")
     $script
+  "
+}
+
+ensure_swiftly() {
+  run_shell_script "
+    if command -v swiftly >/dev/null 2>&1 && swiftly run swift --version >/dev/null 2>&1; then
+      exit 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates
+    fi
+
+    tmpdir=\$(mktemp -d)
+    trap 'rm -rf \"\$tmpdir\"' EXIT
+    cd \"\$tmpdir\"
+
+    swiftly_archive=swiftly-$(printf '%q' "$SWIFTLY_VERSION")-\$(uname -m).tar.gz
+    curl -fsSLO \"https://download.swift.org/swiftly/linux/\$swiftly_archive\"
+    tar -zxf \"\$swiftly_archive\"
+    ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+    . \"\${SWIFTLY_HOME_DIR}/env.sh\"
+    swiftly install --use --assume-yes $(printf '%q' "$LINUX_SWIFT_VERSION")
   "
 }
 
@@ -247,12 +278,13 @@ ensure_bun() {
 }
 
 ensure_wasm_sdk() {
+  ensure_swiftly
   run_shell_script "
-    if swift sdk list | grep -q $(printf '%q' "$WASM_SDK_ID"); then
+    if swiftly run swift sdk list | grep -q $(printf '%q' "$WASM_SDK_ID"); then
       exit 0
     fi
 
-    swift sdk install \
+    swiftly run swift sdk install \
       $(printf '%q' "$WASM_SDK_URL") \
       --checksum $(printf '%q' "$WASM_SDK_CHECKSUM")
   "
@@ -260,6 +292,7 @@ ensure_wasm_sdk() {
 
 cmd_info() {
   ensure_container_tool
+  ensure_swiftly
   run_shell_script '
     export BUN_INSTALL=/root/.bun
     export PATH="$BUN_INSTALL/bin:$PATH"
@@ -273,7 +306,8 @@ cmd_info() {
     echo
     uname -a
     echo
-    swift --version
+    swiftly --version
+    swiftly run swift --version
     echo
     if command -v bun >/dev/null 2>&1; then
       bun --version
@@ -289,29 +323,33 @@ cmd_info() {
 }
 
 cmd_examples() {
+  ensure_swiftly
   run_shell_script "
-    swift --version
-    swift build --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/examples-gallery") --package-path Examples/gallery
+    swiftly run swift --version
+    swiftly run swift build --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/examples-gallery") --package-path Examples/gallery
   "
 }
 
 cmd_test() {
+  ensure_swiftly
   run_shell_script "
-    swift test --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/root")
+    swiftly run swift test --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/root")
   "
 }
 
 cmd_cli_test() {
+  ensure_swiftly
   run_shell_script "
-    swift test \
+    swiftly run swift test \
       --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli") \
       --filter SwiftTUICLITests
   "
 }
 
 cmd_cli_build_tests() {
+  ensure_swiftly
   run_shell_script "
-    swift build --build-tests \
+    swiftly run swift build --build-tests \
       --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli")
   "
 }

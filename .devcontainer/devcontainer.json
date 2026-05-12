@@ -44,5 +44,5 @@
 
   // Smoke test on first container creation so a broken image fails loudly
   // during setup, not on first build.
-  "postCreateCommand": "swift --version && swift sdk list && bun --version"
+  "postCreateCommand": "swiftly --version && swiftly run swift --version && swiftly run swift sdk list && bun --version"
 }

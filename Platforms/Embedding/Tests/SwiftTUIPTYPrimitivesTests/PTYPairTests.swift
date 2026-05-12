@@ -46,7 +46,7 @@ struct PTYPairTests {
     try await pair.resize(CellSize(width: 132, height: 50))
 
     var ws = winsize()
-    _ = unsafe ioctl(handles.masterFD, TIOCGWINSZ, &ws)
+    _ = unsafe ioctl(handles.masterFD, UInt(TIOCGWINSZ), &ws)
     #expect(ws.ws_col == 132)
     #expect(ws.ws_row == 50)
   }

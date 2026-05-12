@@ -7,7 +7,7 @@ for package development and verification is `swiftly` with Swift `6.3.1`.
 
 The repo pins Swift `6.3.1` in [`.swift-version`](../.swift-version).
 
-Use `swiftly` by default for all repo-local SwiftPM work:
+Use `swiftly` for all repo-local SwiftPM work:
 
 ```bash
 swiftly run swift build
@@ -15,30 +15,11 @@ swiftly run swift test
 swiftly run swift package generate-documentation --target SwiftTUI
 ```
 
-If you prefer the shorter `swift ...` form, only use it from a shell where
-`swift` already resolves to the `swiftly`-managed Swift 6.3.1 toolchain.
-
-That means:
-
-- `swift` resolves to the `swiftly`-managed Swift 6.3.1 toolchain
-- `swift --version` reports `Apple Swift version 6.3.1 (swift-6.3.1-RELEASE)`
-
-Verify that first:
-
-```bash
-swift --version
-```
-
-If your shell does not already resolve `swift` through `swiftly`, either fix
-your PATH or use `swiftly run swift ...` explicitly.
-
-Equivalent shorthand once `swift` is routed through `swiftly`:
-
-```bash
-swift build
-swift test
-swift package generate-documentation --target SwiftTUI
-```
+Do not run repo-local development tests with bare `swift test`, `xcrun swift
+test`, or whichever Xcode-selected Swift binary happens to be on `PATH`. Those
+commands can reuse incompatible build artifacts or compiler/runtime versions
+after branch merges. Use the explicit `swiftly run swift ...` form so every
+developer and CI-style local gate uses the pinned Swift `6.3.1` toolchain.
 
 Do not use `xcrun swift` for the repo's package builds, tests, DocC generation,
 or wasm packaging. `xcrun` may resolve to an Xcode-selected toolchain that does
@@ -54,7 +35,7 @@ Their starting and max memory can also be bumped - although no yet-known failure
 Install the matching Swift 6.3.1 release wasm SDK with:
 
 ```bash
-swift sdk install https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz --checksum bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
+swiftly run swift sdk install https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz --checksum bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
 ```
 
 Examples:
@@ -68,6 +49,9 @@ swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc
 `Platforms/Web` build scripts use `swiftly` directly, so require a
 swiftly-managed Swift 6.3.1 toolchain.
 Install Swiftly before invoking `bun` if required.
+
+The Linux dev image and `Scripts/linux.sh` follow the same rule: built-in
+Linux package builds and tests invoke Swift through `swiftly run swift ...`.
 
 ```
 curl -L https://download.swift.org/swiftly/darwin/swiftly.pkg > swiftly.pkg

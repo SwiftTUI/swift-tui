@@ -14,18 +14,18 @@ composition.
 
 ```bash
 cd Examples/gallery
-swift run gallery-demo
+swiftly run swift run gallery-demo
 ```
 
 Run the same gallery through the opt-in embedded WebHost runner:
 
 ```bash
-swift run gallery-demo --web
+swiftly run swift run gallery-demo --web
 ```
 
 ## Test
 
 ```bash
 cd Examples/gallery
-swift test
+swiftly run swift test
 ```

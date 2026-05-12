@@ -3,6 +3,10 @@ import Testing
 
 @testable import SwiftTUIWebHost
 
+#if canImport(FoundationNetworking)
+  import FoundationNetworking
+#endif
+
 struct WebHostSecurityTests {
   @Test("valid token sets a cookie that authorizes subsequent resources and WebSockets")
   func validTokenSetsCookieThatAuthorizesSubsequentResourcesAndWebSockets() async throws {
@@ -21,23 +25,16 @@ struct WebHostSecurityTests {
 
       var components = URLComponents(url: session.webSocketURL, resolvingAgainstBaseURL: false)!
       components.queryItems = nil
-      var webSocketRequest = URLRequest(url: try #require(components.url))
-      webSocketRequest.setValue(cookie, forHTTPHeaderField: "Cookie")
-      let webSocket = URLSession.shared.webSocketTask(with: webSocketRequest)
-      webSocket.resume()
+      let webSocket = try WebSocketTestClient.connect(
+        to: try #require(components.url),
+        headers: [("Cookie", cookie)]
+      )
 
       try await session.channel.send(Array("cookie-authorized".utf8))
-      let received = try await webSocket.receive()
-      switch received {
-      case .data(let data):
-        #expect(String(decoding: data, as: UTF8.self) == "cookie-authorized")
-      case .string(let text):
-        #expect(text == "cookie-authorized")
-      @unknown default:
-        Issue.record("Unexpected WebSocket message: \(received)")
-      }
+      let received = try webSocket.receiveMessage()
+      #expect(String(decoding: received, as: UTF8.self) == "cookie-authorized")
 
-      webSocket.cancel(with: .normalClosure, reason: nil)
+      webSocket.close()
     }
   }
 
@@ -62,11 +59,11 @@ struct WebHostSecurityTests {
   @Test("invalid WebSocket origins are rejected")
   func invalidWebSocketOriginsAreRejected() async throws {
     try await withServer { session in
-      var request = URLRequest(url: session.webSocketURL)
-      request.setValue("http://evil.example", forHTTPHeaderField: "Origin")
-
-      let (_, response) = try await URLSession.shared.data(for: request)
-      #expect(try statusCode(from: response) == 403)
+      let status = try WebSocketTestClient.requestUpgradeStatus(
+        to: session.webSocketURL,
+        headers: [("Origin", "http://evil.example")]
+      )
+      #expect(status == 403)
     }
   }
 
