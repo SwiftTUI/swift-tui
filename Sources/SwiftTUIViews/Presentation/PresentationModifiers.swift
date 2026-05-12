@@ -474,10 +474,6 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
       return [node]
     }
 
-    let sheetContent = withAuthoringContext(sheetContentAuthoringContext) {
-      sheetContentBuilder(absorbed)
-    }
-
     let sourceIdentity = node.identity
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let spec = sheetPromptPresentationSpec(chrome: .dropdown)
@@ -491,7 +487,7 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
       actionPayloads: [],
       messagePayloads: [],
       contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
-        portalDeclaredBuilderChildren(from: sheetContent)
+        portalDeclaredBuilderChildren(from: sheetContentBuilder(absorbed))
       },
       dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
         withAuthoringContext(dismissAuthoringContext) {

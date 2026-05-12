@@ -43,8 +43,9 @@ extension EnvironmentValues {
 
 /// Preference key that accumulates `paletteCommand` contributions from
 /// every descendant in a scope's subtree. Consumed and cleared at the
-/// nearest `.paletteSheet(...)` host (an `ActionScope`), which passes
-/// the absorbed snapshot into the sheet content closure. Mirrors
+/// nearest `ActionScope` host with a `.paletteSheet(...)` modifier
+/// (i.e. the `ActionScope`-scoped overload), which passes the absorbed
+/// snapshot into the sheet content closure. Mirrors
 /// `ToolbarItemsPreferenceKey`.
 package enum PaletteCommandsPreferenceKey: PreferenceKey {
   package static var defaultValue: [ActivePaletteCommand] { [] }
