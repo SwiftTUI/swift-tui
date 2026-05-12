@@ -140,7 +140,7 @@ enum AccessibilityNodeMapper {
       (role.description, [], .adjustable)
     case .alert, .status, .timer:
       (role.description, [], .staticText)
-    case .cell, .confirmationDialog, .custom, .group, .list, .menu, .picker, .region,
+    case .cell, .confirmationDialog, .custom, .group, .list, .menu, .picker, .popover, .region,
       .scrollView, .scrollViewWithIndicators, .section, .separator, .sheet, .table,
       .tableRow, .tabPanel, .tabView:
       (role.description, [], .group)

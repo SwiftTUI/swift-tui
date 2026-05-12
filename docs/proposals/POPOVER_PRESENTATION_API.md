@@ -1,6 +1,6 @@
 # Popover Presentation API
 
-**Status:** Draft proposal; not implemented.
+**Status:** Shipped on 2026-05-12.
 
 **Decision:** Add a small anchored popover surface that is close to SwiftUI's
 binding-driven `popover` modifiers, plus a TipKit-inspired `popoverTip`
@@ -12,12 +12,12 @@ convenience that stays deliberately lighter than a full tip eligibility system.
 
 ## Context
 
-`VISION.md` defers popover-style presentation because the package did not yet
-have a strong enough terminal interaction model. The current presentation stack
-now has portal roots, overlay composition, interaction gates, dismiss stacks,
-action scopes, source-frame geometry, and menu-style intrinsic overlays. That
-makes a basic anchored popover feasible without inventing a separate
-presentation system.
+`VISION.md` previously deferred popover-style presentation until the package had
+a strong enough terminal interaction model. The presentation stack now has
+portal roots, overlay composition, interaction gates, dismiss stacks, action
+scopes, source-frame geometry, and menu-style intrinsic overlays. That makes a
+basic anchored popover feasible without inventing a separate presentation
+system.
 
 The missing distinction is source anchoring. `Menu` already uses a non-modal
 portal entry, but its v1 caveat is that expanded content anchors at the
@@ -29,8 +29,8 @@ content adjacent to that rectangle.
 
 - Provide a SwiftUI-shaped modifier for anchored transient presentation.
 - Keep popovers compact, intrinsic, and source-relative by default.
-- Make keyboard behavior deterministic: Escape dismisses, focus restoration is
-  explicit, and action scopes follow the existing presentation rules.
+- Make keyboard behavior deterministic: Escape dismisses and action scopes
+  follow the existing presentation rules.
 - Support binding-driven Boolean and item-driven presentation.
 - Provide a TipKit-inspired convenience for lightweight guidance without taking
   on TipKit's rule engine, event donation, persistence, or display-frequency
@@ -49,7 +49,7 @@ content adjacent to that rectangle.
 - No custom terminal-only DSL separate from the existing `View` modifier model.
 - No implicit conversion of `Menu` into popover; menu semantics remain distinct.
 
-## Proposed Popover Surface
+## Shipped Popover Surface
 
 The core API should be binding-driven and nearly match SwiftUI's basic shape:
 
@@ -62,12 +62,12 @@ extension View {
     @ViewBuilder content: () -> Content
   ) -> some View
 
-  public func popover<Item: Identifiable, Content: View>(
+  public func popover<Item: Identifiable & Sendable, Content: View>(
     item: Binding<Item?>,
     attachmentAnchor: PopoverAttachmentAnchor = .rect(.bounds),
     arrowEdge: Edge? = nil,
-    @ViewBuilder content: (Item) -> Content
-  ) -> some View
+    @ViewBuilder content: @escaping @MainActor (Item) -> Content
+  ) -> some View where Item.ID: Sendable
 }
 ```
 
@@ -151,7 +151,7 @@ modifier contributes a presentation declaration plus an attachment request. Once
 the base tree is placed, the presentation coordinator can resolve the source
 identity to an absolute source rect and choose a popover rect.
 
-Recommended v1 behavior:
+Shipped v1 behavior:
 
 - `.rect(.bounds)` attaches to the source view's placed bounds.
 - `.point(.center)` attaches to a source-relative point.
@@ -173,16 +173,17 @@ to narrow terminals.
 
 A popover is a transient presentation scope, not just a decorative overlay.
 
-Recommended v1 behavior:
+Shipped v1 behavior:
 
 - Opening a popover creates a presentation action scope.
 - Interactive popovers are modal by default: base routes are gated while the
   popover is active, matching the existing modal presentation model.
 - Escape dismisses the topmost popover through `DismissStack`.
-- Dismissal restores focus to the source identity when that identity still
-  exists.
-- If popover content has no focusable controls, focus may remain visually on the
-  source while Escape still dismisses the popover.
+- Dismissal follows the existing presentation dismissal path; interactive
+  popovers keep focus contained while active by gating base routes.
+- Read-only `popoverTip` content is non-modal and does not install a
+  presentation focus scope. Boolean and item popovers, plus tips with actions,
+  gate base routes while active.
 - Popovers should not re-resolve the displayed base subtree under a synthetic
   identity path. Presentation churn remains transparent to the source subtree.
 
@@ -201,7 +202,7 @@ extension View {
     _ tip: Tip?,
     isPresented: Binding<Bool>? = nil,
     attachmentAnchor: PopoverAttachmentAnchor = .rect(.bounds),
-    arrowEdges: Edge.Set = .all,
+    arrowEdge: Edge? = nil,
     action: @escaping @MainActor @Sendable (PopoverTipAction) -> Void = { _ in }
   ) -> some View
 }
@@ -211,9 +212,12 @@ Use a package-owned protocol name so this does not imply compatibility with
 Apple TipKit:
 
 ```swift
-public protocol PopoverTip: Identifiable, Sendable {
+public protocol PopoverTip: Identifiable, Sendable where ID: Sendable {
+  @MainActor
   var title: Text { get }
+  @MainActor
   var message: Text? { get }
+  @MainActor
   var icon: Text? { get }
   var actions: [PopoverTipAction] { get }
   var isEligible: Bool { get }
@@ -222,6 +226,8 @@ public protocol PopoverTip: Identifiable, Sendable {
 public struct PopoverTipAction: Identifiable, Equatable, Sendable {
   public var id: String
   public var title: String
+
+  public init(id: String, title: String)
 }
 ```
 
@@ -229,7 +235,9 @@ Protocol defaults keep simple tips terse:
 
 ```swift
 extension PopoverTip {
+  @MainActor
   public var message: Text? { nil }
+  @MainActor
   public var icon: Text? { nil }
   public var actions: [PopoverTipAction] { [] }
   public var isEligible: Bool { true }
@@ -253,7 +261,7 @@ Button("Favorite") {
 .popoverTip(
   FavoriteTip(),
   isPresented: $showsFavoriteTip,
-  arrowEdges: .vertical
+  arrowEdge: .bottom
 )
 ```
 
@@ -272,8 +280,7 @@ Button("Favorite") {
 
 ## Implementation Shape
 
-The likely implementation is an extension of the existing presentation
-primitive stack:
+The implementation extends the existing presentation primitive stack:
 
 1. Add a popover presentation descriptor/token next to alert, sheet, menu, and
    toast descriptors.
@@ -284,17 +291,19 @@ primitive stack:
 6. Compose through `OverlayStack`, gate through `InteractionGate` only when the
    popover is modal, and dismiss through `DismissStack`.
 7. Add focused runtime tests that assert source-relative placement, edge
-   fallback, focus restoration, Escape dismissal, and base-subtree stability.
+   fallback, modal gating, Escape dismissal, item binding behavior, and tip
+   eligibility/action behavior.
 
-## Open Decisions
+## Resolved Decisions
 
-- Should the first public popover include a `modal:` option, or should v1 ship
-  modal-only and keep non-modal behavior reserved for `Menu` and tips?
-- Should `arrowEdge` be `Edge?`, or should the public popover modifier mirror
-  TipKit's `arrowEdges: Edge.Set` from the start?
-- Should `UnitRect` be public, or can `PopoverAttachmentAnchor` provide
-  `.bounds` and point cases without exposing a general unit-rect type?
-- What is the smallest useful arrow rendering in cell-space: no arrow,
-  one-cell border notch, or a glyph connector?
-- Should tip dismissal state be purely source-local, or should the package offer
-  an opt-in persistence hook later?
+- V1 boolean and item popovers are modal by default. Read-only tips are the
+  only shipped non-modal popover path; tips with actions become modal so their
+  buttons receive the presentation focus scope.
+- The public placement argument is `arrowEdge: Edge?`. `nil` means automatic
+  edge selection with terminal fallback behavior.
+- `UnitRect` and `UnitSize` are public geometry types so `.rect(.bounds)` reads
+  like SwiftUI and can support future unit-rect anchor work.
+- V1 ships without arrow glyph chrome. Placement communicates attachment; arrow
+  drawing can be added later without changing the call site.
+- Tip dismissal state is source-local and ephemeral when no `isPresented`
+  binding is supplied. Persistence remains outside the shipped API.

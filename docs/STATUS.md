@@ -22,8 +22,8 @@ make clear that the topic is shipped, contextual, or explicitly deferred.
 Current async presentation and frame-tail worker ownership is summarized in
 [ASYNC_RENDERING.md](ASYNC_RENDERING.md).
 
-`alert`, `confirmationDialog`, `sheet`, and `toast` are part of the public
-`View` surface. The full ActionScope/commands rollout — `Panel`,
+`alert`, `confirmationDialog`, `sheet`, `popover`, `popoverTip`, and `toast`
+are part of the public `View` surface. The full ActionScope/commands rollout — `Panel`,
 `.keyCommand`, `.paletteCommand`, `.toolbar`, and `.toolbarItem` — has shipped
 (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)).
 
@@ -43,8 +43,8 @@ Current async presentation and frame-tail worker ownership is summarized in
   `.task(...)`, default-focus modifiers, and graph-scoped imperative state
   writes for live runtime callbacks
 - Presentation and workflow surfaces including terminal-native `alert`,
-  `confirmationDialog`, `sheet`, `toast`, and binding-driven
-  `NavigationStack` destinations
+  `confirmationDialog`, `sheet`, `popover`, `popoverTip`, `toast`, and
+  binding-driven `NavigationStack` destinations
 
 ### Accessibility
 
@@ -90,7 +90,7 @@ Current async presentation and frame-tail worker ownership is summarized in
   `navigationDestination(isPresented:)` and `navigationDestination(item:)`;
   `NavigationLink`, public `NavigationPath`, and automatic Back chrome remain
   intentionally out of the shipped surface
-- terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
+- terminal-native `alert`, `confirmationDialog`, and popover presentation in the canonical `View` surface
 
 ### Charts
 
@@ -170,8 +170,8 @@ has fully landed:
   wired into the runtime.
 - `Panel` primitive plus `.panel(id:)` / `.panel()` / `.focusContainment(_:)`.
 - `Scene`-conforming types and the `.alert` / `.confirmationDialog` / `.sheet`
-  presentation modifiers conform to `ActionScope`; presentation overlays
-  scope-inherit scene identity.
+  / `.popover` presentation modifiers conform to `ActionScope`; presentation
+  overlays scope-inherit scene identity.
 - `.keyCommand(...)` with shallowest-wins focus-chain dispatch. Modifier-less
   registrations are silently dropped (single-key dispatch is framework-reserved
   for typing, arrow navigation, Tab, Enter, and Escape); a disabled match

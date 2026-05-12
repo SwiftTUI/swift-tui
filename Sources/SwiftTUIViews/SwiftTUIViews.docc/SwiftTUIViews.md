@@ -23,7 +23,7 @@ It provides:
 - continuous cell-space gestures and drawing through ``DragGesture``,
   ``SpatialTapGesture``, ``View/onPointerHover(_:)``, ``Canvas``, and
   ``CanvasDrawing`` / ``CanvasClosureDrawing``
-- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `toast`)
+- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `popover`, `popoverTip`, `toast`)
 - ASCII-art banner text through ``TextFigure``, backed by embedded FIGlet fonts that participate in normal layout proposals without requiring external font files
 
 `SwiftTUIViews` is intentionally close to SwiftUI in shape. The goal is not to expose a terminal-specific DSL. The goal is to preserve the parts of SwiftUI that make large UI codebases composable and predictable while still targeting cell-based rendering.
