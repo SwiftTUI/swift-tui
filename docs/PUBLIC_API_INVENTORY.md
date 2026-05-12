@@ -22,7 +22,11 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - modifier algebra through `ViewModifier`, `View.modifier(_:)`, and `ModifiedContent`
 - text layout enums and interpolation support exposed through `Text`, including `Text.TruncationMode`, `Text.WrappingStrategy`, and rich interpolation of embedded `Text` and `Link` segments
 - banner-style text rendering through `TextFigure`, including enum-backed embedded-font selection through `TextFigure.Font` and discovery through `TextFigure.availableFonts`
-- `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader` (`LazyVStack` and `LazyHStack` support viewport-lazy placement and single-`ForEach` full-lazy rows)
+- `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`,
+  `ScrollView`, `ScrollViewReader`, `ScrollViewProxy`, `List`,
+  `OutlineGroup`, `Table`, `Section`, `GeometryReader` (`LazyVStack`
+  and `LazyHStack` support viewport-lazy placement and single-`ForEach`
+  full-lazy rows)
 - `Tab`, `TabView`, `NavigationStack`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`, `Spinner`

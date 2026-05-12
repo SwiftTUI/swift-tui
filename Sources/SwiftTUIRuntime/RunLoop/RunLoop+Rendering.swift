@@ -187,6 +187,7 @@ extension RunLoop {
           focusedIdentity: focusTracker.currentFocusIdentity,
           focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
           scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+          scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets,
           accessibilityNodes: renderedArtifacts.semanticSnapshot.accessibilityNodes
         )
         focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
@@ -881,6 +882,7 @@ extension RunLoop {
           focusedIdentity: focusTracker.currentFocusIdentity,
           focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
           scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+          scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets,
           accessibilityNodes: renderedArtifacts.semanticSnapshot.accessibilityNodes
         )
         focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
