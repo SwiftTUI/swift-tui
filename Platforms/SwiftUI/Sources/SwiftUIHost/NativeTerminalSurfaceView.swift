@@ -1,6 +1,6 @@
 import CoreGraphics
 import Foundation
-import SwiftTUI
+import SwiftTUIRuntime
 
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
   import AppKit
@@ -441,7 +441,7 @@ struct NativeTerminalMetrics {
   }
 
   fileprivate func font(
-    for emphasis: SwiftTUI.TextStyle.TextEmphasis
+    for emphasis: SwiftTUIRuntime.TextStyle.TextEmphasis
   ) -> NativePlatformFont {
     switch (emphasis.contains(.bold), emphasis.contains(.italic)) {
     case (true, true):
@@ -506,7 +506,7 @@ private enum NativeRasterSurfaceRenderer {
     x: Int,
     y: Int,
     style: ResolvedTextStyle,
-    defaultForeground: SwiftTUI.Color,
+    defaultForeground: SwiftTUIRuntime.Color,
     metrics: NativeTerminalMetrics,
     context: CGContext
   ) {
@@ -653,7 +653,7 @@ private enum NativeRasterSurfaceRenderer {
   extension NativePlatformFont {
     fileprivate static func terminalFont(
       style: SwiftUIHostTerminalStyle,
-      emphasis: SwiftTUI.TextStyle.TextEmphasis
+      emphasis: SwiftTUIRuntime.TextStyle.TextEmphasis
     ) -> NativePlatformFont {
       BundledFonts.registerIfNeeded()
       let size = CGFloat(style.fontSize ?? 14)
@@ -683,7 +683,7 @@ private enum NativeRasterSurfaceRenderer {
     }
 
     fileprivate func withTerminalTraits(
-      _ traits: SwiftTUI.TextStyle.TextEmphasis
+      _ traits: SwiftTUIRuntime.TextStyle.TextEmphasis
     ) -> NativePlatformFont {
       var result = self
       if traits.contains(.bold) {
@@ -698,7 +698,7 @@ private enum NativeRasterSurfaceRenderer {
 
   extension NativePlatformColor {
     fileprivate static func terminalColor(
-      _ color: SwiftTUI.Color,
+      _ color: SwiftTUIRuntime.Color,
       alphaMultiplier: Double = 1
     ) -> NativePlatformColor {
       let converted = color.converted(to: .sRGB)
@@ -808,7 +808,7 @@ private enum NativeRasterSurfaceRenderer {
   extension NativePlatformFont {
     fileprivate static func terminalFont(
       style: SwiftUIHostTerminalStyle,
-      emphasis: SwiftTUI.TextStyle.TextEmphasis
+      emphasis: SwiftTUIRuntime.TextStyle.TextEmphasis
     ) -> NativePlatformFont {
       BundledFonts.registerIfNeeded()
       let size = CGFloat(style.fontSize ?? 14)
@@ -838,7 +838,7 @@ private enum NativeRasterSurfaceRenderer {
     }
 
     fileprivate func withTerminalTraits(
-      _ traits: SwiftTUI.TextStyle.TextEmphasis
+      _ traits: SwiftTUIRuntime.TextStyle.TextEmphasis
     ) -> NativePlatformFont {
       var symbolicTraits = fontDescriptor.symbolicTraits
       if traits.contains(.bold) {
@@ -856,7 +856,7 @@ private enum NativeRasterSurfaceRenderer {
 
   extension NativePlatformColor {
     fileprivate static func terminalColor(
-      _ color: SwiftTUI.Color,
+      _ color: SwiftTUIRuntime.Color,
       alphaMultiplier: Double = 1
     ) -> NativePlatformColor {
       let converted = color.converted(to: .sRGB)

@@ -16,8 +16,6 @@ let package = Package(
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTUICharts", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "swift-tui"),
-        .product(name: "SwiftTUIArguments", package: "swift-tui"),
       ]
     ),
     .testTarget(

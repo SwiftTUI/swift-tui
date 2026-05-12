@@ -2,7 +2,8 @@
 
 ## Overview
 
-At the lowest public runtime level, you can resolve and render any `View` into terminal text:
+At the lowest public runtime level, you can resolve and render any `View` into
+terminal text:
 
 ```swift
 import SwiftTUI
@@ -43,11 +44,11 @@ imperative writes into later snapshots of that instance. Interactive
 view graph that registered the callback, so reused view values do not leak
 state across live sessions.
 
-For full interactive applications, choose the root package product that matches
-your launch mode. For terminal-native executable apps, import `SwiftTUICLI`:
+For full interactive terminal applications, depend on the `SwiftTUI` product
+and import only `SwiftTUI`:
 
 ```swift
-import SwiftTUICLI
+import SwiftTUI
 
 @main
 struct DemoApp: App {
@@ -59,8 +60,9 @@ struct DemoApp: App {
 }
 ```
 
-`SwiftTUICLI` provides the default terminal-native `App.main()`. When you
-want an explicit launcher instead of `@main`, call:
+`SwiftTUI` re-exports the platform-neutral runtime, standard argument parsing,
+and the terminal runner. When you want an explicit launcher instead of
+`@main`, call:
 
 ```swift
 try await TerminalRunner.run(DemoApp.self)
@@ -79,29 +81,24 @@ struct DemoApp: App {
       BuildSummary()
     }
   }
-
-  static func main() async throws {
-    try await WebHostCLIRunner.run(Self.self)
-  }
 }
 ```
 
 `SwiftTUIWebHostCLI` routes normal launches to the terminal runner and routes
 `--web` launches through the localhost WebHost runner/browser bridge. Apps that
-import only `SwiftTUICLI` do not compile or link the web server, FlyingFox, or
+import only `SwiftTUI` do not compile or link the web server, FlyingFox, or
 browser bundle; `--web` is rejected before terminal raw-mode setup.
 
 ### Argument parsing
 
 Apps that want CLI flags plus the framework's standard flag surface
 (`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--web`,
-`--cursor-follows-focus`, `--json`, `--linear`, `-v`, `--debug`, ...) import
-`SwiftTUIArguments` and add `SwiftTUICommand` alongside `App`:
+`--cursor-follows-focus`, `--json`, `--linear`, `-v`, `--debug`, ...) add
+`SwiftTUICommand` alongside `App`. The protocol and framework options are
+available from the same `SwiftTUI` import:
 
 ```swift
 import SwiftTUI
-import SwiftTUICLI
-import SwiftTUIArguments
 
 @main
 struct MyApp: App, SwiftTUICommand {
@@ -128,7 +125,7 @@ struct MyApp: App, SwiftTUICommand {
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.
 
-Bare-mode apps (no `SwiftTUIArguments` import) still honor `NO_COLOR`,
+Bare-mode apps (no `SwiftTUICommand` conformance) still honor `NO_COLOR`,
 `LANG=C`, and the `SWIFTTUI_*` environment variables automatically. The
 full design is in
 [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md);
@@ -138,7 +135,8 @@ framework-flags demo.
 The same authored `App` and `Scene` declarations can then flow into these
 root package products:
 
-- terminal-native execution via the `SwiftTUICLI` runner product
+- terminal-native execution via the `SwiftTUI` convenience product, or
+  explicit composition with `SwiftTUIRuntime` plus `SwiftTUICLI`
 - terminal plus localhost-browser WebHost execution via the opt-in
   `SwiftTUIWebHostCLI` runner product
 - WASI execution via the `SwiftTUIWASI` runner product, with
@@ -154,9 +152,9 @@ In repo terminology, a runner owns process startup or launch routing, while a
 host owns an external presentation environment or embedding lifecycle. See
 [docs/TERMINOLOGY.md](docs/TERMINOLOGY.md) for the precise boundary.
 
-`SwiftTUI` on its own is library-only. It provides the shared runtime,
-`SceneManifest`, and `HostedSceneSession`; runner and host behavior is exposed
-through sibling products in the same root package.
+`SwiftTUIRuntime` is the platform-neutral runtime product. It provides the
+shared runtime, `SceneManifest`, and `HostedSceneSession`; runner and host
+behavior is exposed through sibling products in the same root package.
 
 ## Development Requirements
 

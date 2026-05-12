@@ -4,6 +4,14 @@ This page pins the external vocabulary for SwiftTUI platform integration.
 Internal types may still use `Host` in their concrete names, but public docs
 should use these terms consistently.
 
+## Product Layers
+
+- `SwiftTUI`: release-facing terminal app convenience product. It re-exports
+  `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so ordinary
+  terminal apps can write only `import SwiftTUI`.
+- `SwiftTUIRuntime`: platform-neutral authored-view/runtime composition
+  product used by explicit runner and host products.
+
 ## Runner
 
 A runner owns process startup for an authored `App`.

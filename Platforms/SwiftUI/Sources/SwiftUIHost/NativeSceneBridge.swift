@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 @MainActor
 final class NativeSceneBridge {

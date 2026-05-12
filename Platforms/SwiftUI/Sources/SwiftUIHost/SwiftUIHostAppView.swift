@@ -1,7 +1,7 @@
-import SwiftTUI
+import SwiftTUIRuntime
 public import SwiftUI
 
-public struct SwiftUIHostAppView<A: SwiftTUI.App>: SwiftUI.View {
+public struct SwiftUIHostAppView<A: SwiftTUIRuntime.App>: SwiftUI.View {
   private let state: SwiftUIHostAppState<A>
 
   public init(state: SwiftUIHostAppState<A>) {

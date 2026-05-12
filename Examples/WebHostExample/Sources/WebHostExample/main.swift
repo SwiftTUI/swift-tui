@@ -1,4 +1,3 @@
-import SwiftTUI
 import SwiftTUIWebHostCLI
 
 @main
@@ -16,14 +15,6 @@ struct WebHostExampleApp: App {
           .foregroundStyle(.red)
       }
       .padding(1)
-    }
-  }
-
-  static func main() async {
-    do {
-      try await WebHostCLIRunner.run(Self.self)
-    } catch {
-      fatalError(String(describing: error))
     }
   }
 }

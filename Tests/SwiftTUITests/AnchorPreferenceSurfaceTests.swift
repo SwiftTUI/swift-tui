@@ -1,7 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 private enum BoundsAnchorPreferenceKey: PreferenceKey {

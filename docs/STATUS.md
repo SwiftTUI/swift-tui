@@ -111,14 +111,14 @@ Current async presentation and frame-tail worker ownership is summarized in
 
 ## Current Constraints
 
-- The core `SwiftTUI` runtime renders one active scene into one active
+- The core `SwiftTUIRuntime` runtime renders one active scene into one active
   presentation surface per session. Multi-scene apps are supported, but only
   one scene is on screen at a time per surface.
-- `SwiftTUI` is library-only. Platform integration lives in sibling root
-  package products for executable runners, hosts, WebHost, and terminal
-  embedding. `Platforms/` is the source layout for those targets, while
-  `Platforms/Web` remains the Bun browser package.
-- Host products and packages use `SwiftTUI` scene manifests plus
+- `SwiftTUI` is the terminal app convenience product; platform integration
+  lives in sibling root package products for explicit runners, hosts, WebHost,
+  and terminal embedding. `Platforms/` is the source layout for those targets,
+  while `Platforms/Web` remains the Bun browser package.
+- Host products and packages use `SwiftTUIRuntime` scene manifests plus
   `HostedSceneSession` and own their own platform shell integration, scene
   switching chrome, and style surfaces.
 - Host products own one active host style object at a time and

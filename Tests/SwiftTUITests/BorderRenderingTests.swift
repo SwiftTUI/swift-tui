@@ -1,7 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// Glyph-level assertions for the rewritten `.border(...)` view modifier.

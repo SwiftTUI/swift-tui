@@ -711,6 +711,8 @@ classifications:
 # package-only-seam unless an explicit canonical override applies).
 module_defaults:
   Core: package-only-seam
+  SwiftTUI: canonical
+  SwiftTUIRuntime: canonical
   SwiftTUIArguments: canonical
   SwiftTUIPTYPrimitives: canonical
   SwiftTUITerminal: canonical

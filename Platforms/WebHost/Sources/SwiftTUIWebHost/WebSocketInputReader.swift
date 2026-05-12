@@ -1,4 +1,4 @@
-@_spi(Runners) import SwiftTUI
+@_spi(Runners) import SwiftTUIRuntime
 @_spi(WebHost) import WASISurfaceBridge
 
 package protocol WebHostByteSource: Sendable {

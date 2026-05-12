@@ -1,5 +1,5 @@
 public import Observation
-import SwiftTUI
+import SwiftTUIRuntime
 
 public struct SwiftUIHostSceneDescriptor: Identifiable, Hashable, Sendable {
   public var id: WindowIdentifier
@@ -27,7 +27,7 @@ public struct SwiftUIHostSceneDescriptor: Identifiable, Hashable, Sendable {
 
 @MainActor
 @Observable
-public final class SwiftUIHostAppState<A: SwiftTUI.App> {
+public final class SwiftUIHostAppState<A: SwiftTUIRuntime.App> {
   public let scenes: [SwiftUIHostSceneDescriptor]
 
   public private(set) var selectedSceneID: WindowIdentifier

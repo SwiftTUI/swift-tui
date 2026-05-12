@@ -1,7 +1,7 @@
 import Dispatch
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
 
 #if canImport(Darwin)

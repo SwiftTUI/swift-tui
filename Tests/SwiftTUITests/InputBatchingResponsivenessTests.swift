@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import SwiftTUIViews
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin

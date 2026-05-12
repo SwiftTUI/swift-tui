@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 struct EnvironmentResolverTests {
   @Test("Empty environment + TTY produces default-ish configuration")

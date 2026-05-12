@@ -1,4 +1,4 @@
-@_spi(Runners) public import SwiftTUI
+@_spi(Runners) public import SwiftTUIRuntime
 
 public enum WebHostRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
   case multipleScenesUnsupported(count: Int)

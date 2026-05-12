@@ -3,7 +3,7 @@ import SwiftTUICharts
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 // AnyView policy: retain erased fixture roots here for test support only.

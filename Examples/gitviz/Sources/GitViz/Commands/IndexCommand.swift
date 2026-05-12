@@ -1,5 +1,5 @@
 import ArgumentParser
-import SwiftTUICLI
+import SwiftTUI
 
 struct IndexCommand: AsyncParsableCommand {
   static let configuration = CommandConfiguration(

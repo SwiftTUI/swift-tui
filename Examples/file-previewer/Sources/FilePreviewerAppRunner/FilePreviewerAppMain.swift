@@ -1,6 +1,5 @@
 import FilePreviewerApp
 import SwiftTUI
-import SwiftTUICLI
 
 @main
 struct FilePreviewerAppMain: App {

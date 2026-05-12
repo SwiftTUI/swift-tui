@@ -1,5 +1,5 @@
 public import Observation
-import SwiftTUI
+import SwiftTUIRuntime
 import SwiftUI
 
 @MainActor
@@ -25,7 +25,7 @@ public final class SwiftUIHostSceneHost {
   @ObservationIgnored
   private var accessibilityAnnouncer = HostedAccessibilityAnnouncer()
 
-  public init<A: SwiftTUI.App>(
+  public init<A: SwiftTUIRuntime.App>(
     app: A,
     descriptor: SwiftUIHostSceneDescriptor,
     style: SwiftUIHostTerminalStyle,

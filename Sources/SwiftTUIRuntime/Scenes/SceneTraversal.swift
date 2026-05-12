@@ -61,7 +61,7 @@ package struct SceneBox<Base: Scene>: AnySceneBox {
     visitor: inout Visitor,
     state: inout SceneTraversalState
   ) -> SceneTraversalControl {
-    SwiftTUI.traverseWindowScenes(
+    SwiftTUIRuntime.traverseWindowScenes(
       base,
       visitor: &visitor,
       state: &state
@@ -75,7 +75,7 @@ package func traverseWindowScenes<S: Scene, Visitor: WindowSceneVisitor>(
   visitor: inout Visitor
 ) -> SceneTraversalControl {
   var state = SceneTraversalState()
-  return traverseWindowScenes(
+  return SwiftTUIRuntime.traverseWindowScenes(
     scene,
     visitor: &visitor,
     state: &state
@@ -87,7 +87,7 @@ package func collectSceneDescriptors<S: Scene>(
   from scene: S
 ) -> [SceneDescriptor] {
   var visitor = SceneDescriptorCollector()
-  _ = traverseWindowScenes(
+  _ = SwiftTUIRuntime.traverseWindowScenes(
     scene,
     visitor: &visitor
   )
@@ -131,7 +131,7 @@ private func withSelectedWindowSceneConfiguration<
     matching: identifier,
     base: visitor
   )
-  _ = traverseWindowScenes(
+  _ = SwiftTUIRuntime.traverseWindowScenes(
     scene,
     visitor: &selectingVisitor
   )
@@ -153,7 +153,7 @@ package func traverseWindowScenes<S: Scene, Visitor: WindowSceneVisitor>(
     )
   }
 
-  return traverseWindowScenes(
+  return SwiftTUIRuntime.traverseWindowScenes(
     scene.body,
     visitor: &visitor,
     state: &state
@@ -175,7 +175,7 @@ extension TupleScene: SceneTraversalNode {
     state: inout SceneTraversalState
   ) -> SceneTraversalControl {
     for child in repeat each value {
-      if SwiftTUI.traverseWindowScenes(
+      if SwiftTUIRuntime.traverseWindowScenes(
         child,
         visitor: &visitor,
         state: &state
@@ -195,7 +195,7 @@ extension ConditionalScene: SceneTraversalNode {
   ) -> SceneTraversalControl {
     switch storage {
     case .trueScene(let trueScene):
-      return SwiftTUI.traverseWindowScenes(
+      return SwiftTUIRuntime.traverseWindowScenes(
         trueScene,
         visitor: &visitor,
         state: &state
@@ -204,7 +204,7 @@ extension ConditionalScene: SceneTraversalNode {
       if collapsesImplicitEmptyFalseBranch, falseScene is EmptyScene {
         return .continue
       }
-      return SwiftTUI.traverseWindowScenes(
+      return SwiftTUIRuntime.traverseWindowScenes(
         falseScene,
         visitor: &visitor,
         state: &state
@@ -219,7 +219,7 @@ extension VariadicScene: SceneTraversalNode {
     state: inout SceneTraversalState
   ) -> SceneTraversalControl {
     for child in content {
-      if SwiftTUI.traverseWindowScenes(
+      if SwiftTUIRuntime.traverseWindowScenes(
         child,
         visitor: &visitor,
         state: &state

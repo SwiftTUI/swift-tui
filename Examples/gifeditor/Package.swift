@@ -68,7 +68,6 @@ let package = Package(
       dependencies: [
         "GIFEditor",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUIArguments", package: "swift-tui"),
         .product(name: "SwiftTUIWebHostCLI", package: "swift-tui"),
       ]
     ),

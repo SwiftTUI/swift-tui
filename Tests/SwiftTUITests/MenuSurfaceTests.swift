@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 

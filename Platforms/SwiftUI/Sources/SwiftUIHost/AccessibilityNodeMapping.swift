@@ -1,5 +1,5 @@
 import CoreGraphics
-import SwiftTUI
+import SwiftTUIRuntime
 import SwiftUI
 
 struct AccessibilityNodeMapping: Equatable {

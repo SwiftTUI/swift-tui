@@ -1,5 +1,5 @@
 public import Foundation
-public import SwiftTUI
+public import SwiftTUIRuntime
 
 extension SwiftTUIOptions {
   /// Resolves parsed flags + env vars into a `RuntimeConfiguration`.

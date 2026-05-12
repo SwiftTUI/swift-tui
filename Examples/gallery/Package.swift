@@ -27,7 +27,6 @@ let package = Package(
       dependencies: [
         "GalleryDemoViews",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUIArguments", package: "swift-tui"),
         .product(name: "SwiftTUIWebHostCLI", package: "swift-tui"),
       ]
     ),

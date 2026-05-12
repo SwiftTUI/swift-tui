@@ -71,8 +71,8 @@ func scene_host_receives_snapshot_with_accessibility_hidden_subtrees_pruned() as
 }
 
 @MainActor
-private struct AccessibilityHostApp: SwiftTUI.App {
-  var body: some SwiftTUI.Scene {
+private struct AccessibilityHostApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       Button("Host") {}
         .accessibilityLabel("Host action")
@@ -81,8 +81,8 @@ private struct AccessibilityHostApp: SwiftTUI.App {
 }
 
 @MainActor
-private struct HiddenAccessibilityHostApp: SwiftTUI.App {
-  var body: some SwiftTUI.Scene {
+private struct HiddenAccessibilityHostApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       VStack(alignment: .leading, spacing: 0) {
         Button("Visible") {}

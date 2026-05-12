@@ -1,5 +1,4 @@
 import SwiftTUI
-import SwiftTUICLI
 
 /// Helper that wraps `RenderOnce.print` with the gitviz options resolution.
 ///

@@ -1,7 +1,7 @@
 import Synchronization
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 @Suite
 struct StreamingTerminalHostTests {

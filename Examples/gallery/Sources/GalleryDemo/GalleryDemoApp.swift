@@ -1,6 +1,4 @@
 import GalleryDemoViews
-import SwiftTUI
-import SwiftTUIArguments
 import SwiftTUIWebHostCLI
 
 @main

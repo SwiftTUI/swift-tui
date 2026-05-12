@@ -2,7 +2,7 @@ import Foundation
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// Cell-level assertions for the new `.border(blend:set:sides:phase:)`

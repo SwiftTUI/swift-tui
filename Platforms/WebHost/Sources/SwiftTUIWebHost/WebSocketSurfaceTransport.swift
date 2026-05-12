@@ -1,5 +1,5 @@
 @unsafe @preconcurrency import Dispatch
-@_spi(Runners) import SwiftTUI
+@_spi(Runners) import SwiftTUIRuntime
 import Synchronization
 @_spi(WebHost) import WASISurfaceBridge
 

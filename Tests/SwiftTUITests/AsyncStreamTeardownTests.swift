@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 @Suite("AsyncStream teardown")
 struct AsyncStreamTeardownTests {

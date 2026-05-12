@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-11
 
+- Implemented the release-facing public product/import contract: `SwiftTUI` is
+  now the one-import terminal app convenience product, `SwiftTUIRuntime` is the
+  platform-neutral runtime/composition product, host products depend below the
+  convenience layer, and `SwiftTUIWebHostCLI` is the explicit import
+  replacement for binaries that support both terminal and `--web` launch.
 - Merged first-party Swift platform integrations into the root package:
   external consumers now add one `swift-tui` package dependency and select
   products such as `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`,

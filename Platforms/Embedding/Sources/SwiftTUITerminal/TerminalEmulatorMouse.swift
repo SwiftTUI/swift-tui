@@ -1,4 +1,4 @@
-public import SwiftTUI
+public import SwiftTUIRuntime
 
 public struct TerminalEmulatorMouse: Sendable, Equatable, Hashable {
   public enum Button: Sendable, Equatable, Hashable {

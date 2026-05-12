@@ -11,8 +11,9 @@ struct WebHostExampleTests {
       .appendingPathComponent("Sources/WebHostExample/main.swift")
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
-    #expect(source.contains("import SwiftTUI"))
     #expect(source.contains("import SwiftTUIWebHostCLI"))
+    #expect(!source.contains("WebHostCLIRunner.run"))
+    #expect(!source.contains("import SwiftTUI\n"))
     #expect(!source.contains("import SwiftTUICLI"))
   }
 }

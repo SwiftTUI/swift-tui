@@ -26,19 +26,28 @@
 - Owns GIF encoding and decoding through the vendored `swift-gif` package
 - Keeps animated media concerns out of the core `SwiftTUI` runtime surface
 
+### `SwiftTUIRuntime`
+
+- Re-exports the public authoring and core surface that matters for shared runtime work
+- Adds terminal host integration, alternate-screen ownership, input parsing,
+  capability-aware presentation, `RunLoop`, and rendering entry points
+- Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+
 ### `SwiftTUI`
 
-- Re-exports the public package surface that matters for single-session runtime work
-- Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
-- Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+- Release-facing convenience product for terminal-native apps
+- Re-exports `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so
+  ordinary terminal apps can write only `import SwiftTUI`
+- Does not depend on WebHost, FlyingFox, browser resources, SwiftUI hosting,
+  WASI hosting, charts, animated images, or terminal-program embedding
 
 ### Platform integration products
 
 - executable runner products `SwiftTUICLI` and `SwiftTUIWASI` build top-level
-  execution layers on top of `SwiftTUI`
-- host products and packages retain the same authored `SwiftTUI` apps inside
-  platform-managed shells: `SwiftUIHost` for native SwiftUI and
-  `Platforms/Web` for browser deployment
+  execution layers on top of `SwiftTUIRuntime`
+- host products and packages retain authored `SwiftTUIRuntime` apps inside
+  platform-managed shells: `SwiftUIHost` for native SwiftUI, `SwiftTUIWebHost`
+  for localhost-browser launch, and `Platforms/Web` for browser deployment
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
 - terminal-program embedding lives in `SwiftTUITerminal` and
@@ -47,7 +56,7 @@
 The conceptual model is:
 
 ```text
-authored app surface -> shared SwiftTUI runtime -> platform integration product -> platform shell
+authored app surface -> SwiftTUIRuntime -> platform integration product -> platform shell
 ```
 
 That last integration layer comes in two forms:
@@ -196,18 +205,18 @@ It coordinates:
 The core runtime is intentionally narrow today:
 
 - one terminal host
-- one active root scene in `SwiftTUI`
+- one active root scene in `SwiftTUIRuntime`
 - one full-canvas `WindowGroup` per session
 - keyboard-first interaction with optional pointer input when the host or
   terminal supports reporting
 
 Platform integration and multi-scene orchestration live in sibling products in
-the root package rather than in the `SwiftTUI` library product itself.
+the root package rather than in the `SwiftTUIRuntime` product itself.
 
 Those integration layers serve three execution modes:
 
 - terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or
-  the default `App.main()` provided by `SwiftTUICLI`
+  the default `App.main()` provided by the `SwiftTUI` convenience product
 - WASI executable execution and manifest generation via `WASIRunner` in
   `SwiftTUIWASI`
 - host-managed embedding via `SceneManifest(for:)` and
@@ -217,8 +226,9 @@ Those integration layers serve three execution modes:
   browser bridge in `SwiftTUIWebHost`
 
 CLI scene management is executable-runner policy rather than an authored-scene
-rule. One-window and multi-window apps share the same runner story; `SwiftTUI`
-itself remains library-only.
+rule. One-window and multi-window apps share the same runner story; composed
+hosts depend on `SwiftTUIRuntime` instead of the `SwiftTUI` terminal
+convenience product.
 
 ## Important Data Products
 

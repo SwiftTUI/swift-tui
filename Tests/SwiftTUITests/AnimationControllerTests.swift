@@ -3,7 +3,7 @@ import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor

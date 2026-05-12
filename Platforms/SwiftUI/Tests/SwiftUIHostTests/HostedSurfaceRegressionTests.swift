@@ -187,8 +187,8 @@ func hosted_surface_drag_gesture_receives_fractional_location() async throws {
 }
 
 @MainActor
-private struct PressedButtonApp: SwiftTUI.App {
-  var body: some SwiftTUI.Scene {
+private struct PressedButtonApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       Button("Press") {}
         .buttonStyle(.borderedProminent)
@@ -198,8 +198,8 @@ private struct PressedButtonApp: SwiftTUI.App {
 }
 
 @MainActor
-private struct ScrollSurfaceApp: SwiftTUI.App {
-  var body: some SwiftTUI.Scene {
+private struct ScrollSurfaceApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
@@ -214,8 +214,8 @@ private struct ScrollSurfaceApp: SwiftTUI.App {
 }
 
 @MainActor
-private struct AnimationSurfaceApp: SwiftTUI.App {
-  var body: some SwiftTUI.Scene {
+private struct AnimationSurfaceApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       AnimationSurfaceView()
     }
@@ -223,8 +223,8 @@ private struct AnimationSurfaceApp: SwiftTUI.App {
 }
 
 @MainActor
-private struct FractionalDragSurfaceApp: SwiftTUI.App {
-  var body: some SwiftTUI.Scene {
+private struct FractionalDragSurfaceApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       FractionalDragSurfaceView()
     }
@@ -232,10 +232,10 @@ private struct FractionalDragSurfaceApp: SwiftTUI.App {
 }
 
 @MainActor
-private struct AnimationSurfaceView: SwiftTUI.View {
+private struct AnimationSurfaceView: SwiftTUIRuntime.View {
   @State private var shifted = false
 
-  var body: some SwiftTUI.View {
+  var body: some SwiftTUIRuntime.View {
     VStack(alignment: .leading, spacing: 0) {
       Button("Animate") {
         withAnimation(.linear(duration: .milliseconds(600))) {
@@ -249,10 +249,10 @@ private struct AnimationSurfaceView: SwiftTUI.View {
 }
 
 @MainActor
-private struct FractionalDragSurfaceView: SwiftTUI.View {
+private struct FractionalDragSurfaceView: SwiftTUIRuntime.View {
   @State private var label = "drag idle"
 
-  var body: some SwiftTUI.View {
+  var body: some SwiftTUIRuntime.View {
     Text(label)
       .frame(width: 24, height: 1, alignment: .leading)
       .gesture(

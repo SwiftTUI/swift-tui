@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor

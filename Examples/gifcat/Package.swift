@@ -34,8 +34,6 @@ let package = Package(
       dependencies: [
         "GifCat",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "swift-tui"),
-        .product(name: "SwiftTUIArguments", package: "swift-tui"),
       ]
     ),
     .testTarget(

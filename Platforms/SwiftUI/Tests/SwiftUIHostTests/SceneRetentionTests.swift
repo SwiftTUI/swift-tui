@@ -3,7 +3,7 @@ import Testing
 
 @testable import SwiftUIHost
 
-private struct MultiSceneApp: SwiftTUI.App {
+private struct MultiSceneApp: SwiftTUIRuntime.App {
   init() {}
 
   var body: some Scene {
