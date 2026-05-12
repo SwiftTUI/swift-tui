@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftTUIRuntime
 
 public struct GalleryView: View {
   public init() {}

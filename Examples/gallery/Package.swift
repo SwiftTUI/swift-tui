@@ -33,7 +33,7 @@ let package = Package(
     .target(
       name: "GalleryDemoViews",
       dependencies: [
-        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIRuntime", package: "swift-tui"),
         .product(name: "SwiftTUIAnimatedImage", package: "swift-tui"),
         .product(name: "SwiftTUICharts", package: "swift-tui"),
       ]

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct TextInputTab: View {
   @State private var searchText = "SwiftTUI"

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Showcases the animation features that landed in the 2026-04-10
 /// gap-closure pass.  Each section exercises a distinct capability

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A fuzzy-filterable command-palette list used inside the Gallery's
 /// palette sheet. The outer wrapper intentionally returns a

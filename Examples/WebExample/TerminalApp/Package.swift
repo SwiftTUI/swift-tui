@@ -27,7 +27,7 @@ let package = Package(
       name: "WebExampleScenes",
       dependencies: [
         .product(name: "GalleryDemoViews", package: "gallery"),
-        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIRuntime", package: "swift-tui"),
       ],
       path: "Sources/WebExampleScenes"
     ),

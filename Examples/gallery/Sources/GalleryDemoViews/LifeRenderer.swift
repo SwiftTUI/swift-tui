@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Draws a Conway's Life grid into a SwiftTUI ``Canvas`` at one of the
 /// three supported zoom levels.

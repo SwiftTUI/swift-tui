@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct PopoverTab: View {
   @State private var showDetails = true

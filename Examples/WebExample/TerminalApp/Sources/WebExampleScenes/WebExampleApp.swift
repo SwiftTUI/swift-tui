@@ -1,5 +1,5 @@
 import GalleryDemoViews
-import SwiftTUI
+import SwiftTUIRuntime
 
 public struct WebExampleApp: App {
   public init() {}

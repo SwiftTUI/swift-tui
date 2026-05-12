@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Zoom levels for the Life grid. Each level packs a different number
 /// of game cells into a single terminal cell tile.
