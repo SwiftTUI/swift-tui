@@ -717,6 +717,7 @@ module_defaults:
   SwiftTUIArguments: canonical
   SwiftTUIPTYPrimitives: canonical
   SwiftTUITerminal: canonical
+  SwiftTUITerminalWorkspace: canonical
   SwiftTUICLI: canonical
   WASISurfaceBridge: canonical
   SwiftTUIWASI: canonical

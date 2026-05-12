@@ -98,9 +98,9 @@ let swiftTUITestDependencies: [Target.Dependency] = [
 ]
 
 #if os(Linux)
-let includeSwiftUIHost = false
+  let includeSwiftUIHost = false
 #else
-let includeSwiftUIHost = true
+  let includeSwiftUIHost = true
 #endif
 
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
@@ -118,25 +118,28 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
   ] + settings
 }
 
-let packageProducts: [Product] = [
-  .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
-  .library(name: "SwiftTUIRuntime", targets: ["SwiftTUIRuntime"]),
-  .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
-  .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
-  .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
-  .library(name: "SwiftTUIArguments", targets: ["SwiftTUIArguments"]),
-  .library(name: "SwiftTUIPTYPrimitives", targets: ["SwiftTUIPTYPrimitives"]),
-  .library(name: "SwiftTUITerminal", targets: ["SwiftTUITerminal"]),
-  .library(name: "SwiftTUICLI", targets: ["SwiftTUICLI"]),
-  .library(name: "WASISurfaceBridge", targets: ["WASISurfaceBridge"]),
-  .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
-  .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
-  .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
-] + (includeSwiftUIHost
-  ? [
-    .library(name: "SwiftUIHost", targets: ["SwiftUIHost"])
+let packageProducts: [Product] =
+  [
+    .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
+    .library(name: "SwiftTUIRuntime", targets: ["SwiftTUIRuntime"]),
+    .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
+    .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
+    .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
+    .library(name: "SwiftTUIArguments", targets: ["SwiftTUIArguments"]),
+    .library(name: "SwiftTUIPTYPrimitives", targets: ["SwiftTUIPTYPrimitives"]),
+    .library(name: "SwiftTUITerminal", targets: ["SwiftTUITerminal"]),
+    .library(name: "SwiftTUITerminalWorkspace", targets: ["SwiftTUITerminalWorkspace"]),
+    .library(name: "SwiftTUICLI", targets: ["SwiftTUICLI"]),
+    .library(name: "WASISurfaceBridge", targets: ["WASISurfaceBridge"]),
+    .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
+    .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
+    .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
   ]
-  : [])
+  + (includeSwiftUIHost
+    ? [
+      .library(name: "SwiftUIHost", targets: ["SwiftUIHost"])
+    ]
+    : [])
 
 let package = Package(
   name: "swift-tui",
@@ -228,6 +231,15 @@ let package = Package(
         .product(name: "SwiftTerm", package: "SwiftTerm"),
       ],
       path: "Platforms/Embedding/Sources/SwiftTUITerminal",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUITerminalWorkspace",
+      dependencies: [
+        "SwiftTUIRuntime",
+        "SwiftTUITerminal",
+      ],
+      path: "Platforms/Embedding/Sources/SwiftTUITerminalWorkspace",
       swiftSettings: swiftSettings()
     ),
     .target(
@@ -350,6 +362,17 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .testTarget(
+      name: "SwiftTUITerminalWorkspaceTests",
+      dependencies: [
+        "SwiftTUI",
+        "SwiftTUICore",
+        "SwiftTUITerminal",
+        "SwiftTUITerminalWorkspace",
+      ],
+      path: "Platforms/Embedding/Tests/SwiftTUITerminalWorkspaceTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
       name: "WASISurfaceBridgeTests",
       dependencies: [
         "SwiftTUI",
@@ -386,28 +409,29 @@ let package = Package(
       ],
       swiftSettings: swiftSettings()
     ),
-  ] + (includeSwiftUIHost
-    ? [
-      .target(
-        name: "SwiftUIHost",
-        dependencies: [
-          "SwiftTUIRuntime"
-        ],
-        path: "Platforms/SwiftUI/Sources/SwiftUIHost",
-        resources: [
-          .process("Resources")
-        ],
-        swiftSettings: swiftSettings()
-      ),
-      .testTarget(
-        name: "SwiftUIHostTests",
-        dependencies: [
-          "SwiftTUI",
-          "SwiftUIHost",
-        ],
-        path: "Platforms/SwiftUI/Tests/SwiftUIHostTests",
-        swiftSettings: swiftSettings()
-      ),
-    ]
-    : [])
+  ]
+    + (includeSwiftUIHost
+      ? [
+        .target(
+          name: "SwiftUIHost",
+          dependencies: [
+            "SwiftTUIRuntime"
+          ],
+          path: "Platforms/SwiftUI/Sources/SwiftUIHost",
+          resources: [
+            .process("Resources")
+          ],
+          swiftSettings: swiftSettings()
+        ),
+        .testTarget(
+          name: "SwiftUIHostTests",
+          dependencies: [
+            "SwiftTUI",
+            "SwiftUIHost",
+          ],
+          path: "Platforms/SwiftUI/Tests/SwiftUIHostTests",
+          swiftSettings: swiftSettings()
+        ),
+      ]
+      : [])
 )
