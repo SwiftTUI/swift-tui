@@ -155,7 +155,7 @@ extension ImagesTab {
     return Array(data)
   }()
 
-  fileprivate static let gifBytes: [UInt8] = {
+  static let gifBytes: [UInt8] = {
     let joined = gifBase64.joined()
     guard let data = Data(base64Encoded: joined) else {
       return []

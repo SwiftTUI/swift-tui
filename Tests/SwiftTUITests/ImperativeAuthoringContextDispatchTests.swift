@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -66,6 +66,22 @@ struct ImperativeAuthoringContextDispatchTests {
 
     #expect(surfaceText(primary.host).contains("mutated"))
     #expect(surfaceText(secondary.host).contains("idle"))
+  }
+
+  @Test(
+    "toolbarItem config without a construction-time context uses its attachment context"
+  )
+  func toolbarItemWithoutConstructionContextTargetsAttachmentGraph() throws {
+    let fixture = ToolbarNilConstructionContextFixture()
+    let primary = makeRunLoop(rootName: "NilContextToolbarPrimary") { fixture }
+
+    try renderInitial(primary.runLoop)
+    focusLeafmostFocusable(in: primary.runLoop)
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+    try renderPending(primary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("mutated"))
   }
 
   @Test(
@@ -536,6 +552,26 @@ private struct ToolbarScopeFixture: View {
             action: { value = "mutated" }
           )
         )
+    }
+    .toolbar(style: DefaultBottomToolbarStyle())
+  }
+}
+
+@MainActor
+private struct ToolbarNilConstructionContextFixture: View {
+  @State private var value = "idle"
+
+  var body: some View {
+    let config = withAuthoringContext(nil) {
+      ToolbarItemConfig(
+        title: "Mutate",
+        action: { value = "mutated" }
+      )
+    }
+
+    Panel(id: "scope") {
+      Text(value)
+        .toolbarItem(config)
     }
     .toolbar(style: DefaultBottomToolbarStyle())
   }

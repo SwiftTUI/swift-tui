@@ -35,10 +35,14 @@ public struct ToolbarItemConfig: Sendable {
     self.position = position
     self.isEnabled = isEnabled
     self.systemHint = Button<Text>.normalizeSystemHint(systemHint)
-    self.action = {
-      withImperativeAuthoringContext(authoringContext) {
-        action()
+    if let authoringContext {
+      self.action = {
+        withImperativeAuthoringContext(authoringContext) {
+          action()
+        }
       }
+    } else {
+      self.action = action
     }
   }
 }
@@ -128,14 +132,17 @@ extension View {
 }
 
 /// Best-effort title extraction from a label view. Handles a plain
-/// `Text` directly; returns nil for anything else. The builder variant
-/// of `.toolbarItem` falls back to an empty string when extraction
-/// fails, which is acceptable until the toolbar render path plumbs
-/// full label views through.
+/// `Text` directly, then falls back to resolving the label and
+/// collecting text payloads from the resolved subtree.
 @MainActor
 private func extractPrimaryText<Label: View>(from label: Label) -> String? {
   if let text = label as? Text {
     return text.content
   }
-  return nil
+  let resolved = Resolver().resolve(
+    label,
+    in: .init(identity: Identity(components: [.named("ToolbarItemLabel")]))
+  )
+  let text = resolvedNodeLabelText(from: resolved)
+  return text.isEmpty ? nil : text
 }

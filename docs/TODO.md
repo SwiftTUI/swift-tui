@@ -53,6 +53,3 @@
   [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md),
   [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).
 - [ ] FIX: .toolbarItem(...) outside any enclosing .toolbar(style:)-bearing scope is silently dropped. Nothing renders, nothing warns. Preferences just bubble to the root and disappear.
-- [ ] INVESTIGATE: toolbars, The action will re-enter whatever authoring context was active when the config was constructed — usually fine, but if you build a ToolbarItemConfig outside a view body and then attach it later, the authoring snapshot will be nil, and the action will run with no imperative context.
-- [ ] FIX: The toolbarItem builder form is honest tech debt — extractPrimaryText at :136-141 only handles Text directly. Anything else falls through to  (per the comment at :116-117). The doc at :104-108 calls it out
-- [ ] FEAT: the gallery should link animatedimage and show a working gif.
