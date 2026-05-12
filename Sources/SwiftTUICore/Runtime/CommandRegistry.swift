@@ -37,40 +37,17 @@ package struct RegisteredKeyCommand: Sendable {
   }
 }
 
-/// A registered palette command (no key binding).
-package struct RegisteredPaletteCommand: Sendable {
-  package var name: String
-  package var description: String?
-  package var isEnabled: Bool
-  package var action: @MainActor @Sendable () -> Void
-
-  package init(
-    name: String,
-    description: String?,
-    isEnabled: Bool,
-    action: @escaping @MainActor @Sendable () -> Void
-  ) {
-    self.name = name
-    self.description = description
-    self.isEnabled = isEnabled
-    self.action = action
-  }
-}
-
 package struct CommandRegistrySnapshot: Sendable {
   package var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]]
-  package var paletteCommandsByScope: [Identity: [RegisteredPaletteCommand]]
 
   package init(
-    keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:],
-    paletteCommandsByScope: [Identity: [RegisteredPaletteCommand]] = [:]
+    keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:]
   ) {
     self.keyCommandsByScope = keyCommandsByScope
-    self.paletteCommandsByScope = paletteCommandsByScope
   }
 
   package var isEmpty: Bool {
-    keyCommandsByScope.isEmpty && paletteCommandsByScope.isEmpty
+    keyCommandsByScope.isEmpty
   }
 }
 
@@ -86,7 +63,6 @@ package struct CommandRegistrySnapshot: Sendable {
 @MainActor
 package final class CommandRegistry: Equatable {
   private var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:]
-  private var paletteCommandsByScope: [Identity: [RegisteredPaletteCommand]] = [:]
 
   package init() {}
 
@@ -117,21 +93,6 @@ package final class CommandRegistry: Equatable {
     )
   }
 
-  /// Appends a palette command at the given scope identity.
-  package func registerPaletteCommand(
-    at scope: Identity,
-    command: RegisteredPaletteCommand
-  ) {
-    var list = paletteCommandsByScope[scope] ?? []
-    list.append(command)
-    paletteCommandsByScope[scope] = list
-    ViewNodeContext.current?.recordCommandRegistration(
-      CommandRegistrySnapshot(
-        paletteCommandsByScope: [scope: list]
-      )
-    )
-  }
-
   /// Returns the registered key command at `scope` that matches
   /// `binding`, if any.
   package func keyCommand(
@@ -139,11 +100,6 @@ package final class CommandRegistry: Equatable {
     matching binding: KeyBinding
   ) -> RegisteredKeyCommand? {
     keyCommandsByScope[scope]?[binding]
-  }
-
-  /// Returns all palette commands registered at `scope`.
-  package func paletteCommands(at scope: Identity) -> [RegisteredPaletteCommand] {
-    paletteCommandsByScope[scope] ?? []
   }
 
   /// Walks the focus chain shallowest-first and fires the first
@@ -167,29 +123,14 @@ package final class CommandRegistry: Equatable {
     return false
   }
 
-  /// Returns all palette commands visible along the given focus chain,
-  /// ordered shallowest-first.
-  package func paletteCommands(along scopePath: [Identity]) -> [RegisteredPaletteCommand] {
-    scopePath.flatMap { paletteCommandsByScope[$0] ?? [] }
-  }
-
   /// Clears every registration.
   package func reset() {
     keyCommandsByScope.removeAll(keepingCapacity: true)
-    paletteCommandsByScope.removeAll(keepingCapacity: true)
-  }
-
-  /// Debug-only: snapshot of {scope identity → count of palette
-  /// commands at that scope}. Intended for diagnostics and tests; do
-  /// not rely on this from production code.
-  package func paletteCommandCountsByScope() -> [Identity: Int] {
-    paletteCommandsByScope.mapValues(\.count)
   }
 
   package func snapshot() -> CommandRegistrySnapshot {
     CommandRegistrySnapshot(
-      keyCommandsByScope: keyCommandsByScope,
-      paletteCommandsByScope: paletteCommandsByScope
+      keyCommandsByScope: keyCommandsByScope
     )
   }
 
@@ -201,25 +142,18 @@ package final class CommandRegistry: Equatable {
     for (identity, commands) in snapshot.keyCommandsByScope {
       keyCommandsByScope[identity] = commands
     }
-    for (identity, commands) in snapshot.paletteCommandsByScope {
-      paletteCommandsByScope[identity] = commands
-    }
   }
 
-  /// Removes every key-command and palette-command registered at any
-  /// identity whose path is rooted at one of `roots`. Call this when a
-  /// subtree is about to re-resolve in a partial invalidation pass, so
-  /// re-registrations don't duplicate stale entries and abandoned
-  /// scopes don't linger in dispatch/palette lookups.
+  /// Removes every key-command registered at any identity whose path is
+  /// rooted at one of `roots`. Call this when a subtree is about to
+  /// re-resolve in a partial invalidation pass, so re-registrations
+  /// don't duplicate stale entries and abandoned scopes don't linger in
+  /// dispatch lookups.
   package func removeSubtrees(rootedAt roots: [Identity]) {
     guard !roots.isEmpty else { return }
     for identity in keyCommandsByScope.keys
     where commandRegistryIdentityMatchesAnySubtreeRoot(identity, roots: roots) {
       keyCommandsByScope.removeValue(forKey: identity)
-    }
-    for identity in paletteCommandsByScope.keys
-    where commandRegistryIdentityMatchesAnySubtreeRoot(identity, roots: roots) {
-      paletteCommandsByScope.removeValue(forKey: identity)
     }
   }
 }
