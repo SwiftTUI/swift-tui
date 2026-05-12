@@ -51,10 +51,10 @@ const phases = [
       <h2>Seven phases. Strict order. No collapsing.</h2>
       <p class="lede">
         Layout is recursive parent-child negotiation, not a global solver.
-        Graph-scoped state drives rendering, not the reverse. The phase order is enforced
-        by <span class="mono">DefaultRenderer</span>, <span class="mono">FrameArtifacts</span>,
-        and the regression suites — every phase has a typed artifact you
-        can snapshot, diff, or assert against in tests.
+        Graph-scoped state drives rendering, not the reverse. The runtime keeps
+        each phase explicit, and <span class="mono">DefaultRenderer</span> exposes
+        <span class="mono">FrameArtifacts</span> when you want to inspect or
+        snapshot a frame.
       </p>
     </header>
 
