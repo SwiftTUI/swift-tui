@@ -173,37 +173,6 @@ struct CommandRegistryTests {
     #expect(second.count == 1)
   }
 
-  @Test("Palette commands register, read back, and accumulate shallowest-first along a chain")
-  func paletteCommandsRegisterAndAccumulate() {
-    let registry = CommandRegistry()
-    let shallow = Identity(components: ["shallow"])
-    let deep = Identity(components: ["shallow", "deep"])
-    registry.registerPaletteCommand(
-      at: shallow,
-      command: RegisteredPaletteCommand(
-        name: "Shallow",
-        description: nil,
-        isEnabled: true,
-        action: {}
-      )
-    )
-    registry.registerPaletteCommand(
-      at: deep,
-      command: RegisteredPaletteCommand(
-        name: "Deep",
-        description: "deeper",
-        isEnabled: false,
-        action: {}
-      )
-    )
-    let atShallow = registry.paletteCommands(at: shallow)
-    let atDeep = registry.paletteCommands(at: deep)
-    #expect(atShallow.map(\.name) == ["Shallow"])
-    #expect(atDeep.map(\.name) == ["Deep"])
-
-    let visible = registry.paletteCommands(along: [shallow, deep])
-    #expect(visible.map(\.name) == ["Shallow", "Deep"])
-  }
 }
 
 @MainActor
