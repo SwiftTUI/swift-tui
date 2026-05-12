@@ -3,7 +3,7 @@ const steps = [
   {
     n: "01",
     label: "add the package",
-    desc: "One dependency in Package.swift. Two products — SwiftTUI for the framework, SwiftTUICLI for the @main runner.",
+    desc: "One dependency in Package.swift. Add the SwiftTUI product to your executable target for a terminal-native app.",
   },
   {
     n: "02",
@@ -24,8 +24,9 @@ const steps = [
       <h2>Add the package. Author an <span class="mono">App</span>. <span class="mono">swift run</span>.</h2>
       <p class="lede">
         Three SwiftPM steps. No code generators, no build scripts, no
-        native binaries to download. The same flow targets macOS, Linux, and
-        Android (in tree). For WASI, pass a wasm <span class="mono">--swift-sdk</span> on the same
+        native binaries to download. The same app authoring model targets
+        terminal-native binaries and host-managed surfaces. For WASI, pass a
+        wasm <span class="mono">--swift-sdk</span> on the same
         <span class="mono">swift build</span> invocation; the authoring code does not change.
       </p>
       <p class="prereq mono">
@@ -54,12 +55,12 @@ const steps = [
         </div>
         <pre class="t-body mono"><code><span class="cm"># 1 · resolve dependencies</span>
 <span class="p">$</span> swift package resolve
-  <span class="ok">✓</span> SwiftTUI &middot; main &middot; 2 products
+  <span class="ok">✓</span> SwiftTUI resolved
 
-<span class="cm"># 2 · build &amp; run — one frame, your terminal</span>
+<span class="cm"># 2 · build &amp; run — your app owns the terminal until it exits</span>
 <span class="p">$</span> swift run HelloTUI
-<span class="ok">›</span> resolve · measure · place · semantics · draw · raster <span class="bar">·</span> <span class="commit">commit</span>
-<span class="ok">›</span> ready &mdash; 1 frame, 14 nodes, 0.31&thinsp;ms</code></pre>
+<span class="ok">›</span> alternate screen opens
+<span class="ok">›</span> resolve · measure · place · semantics · draw · raster <span class="bar">·</span> <span class="commit">commit</span></code></pre>
       </article>
     </div>
 
@@ -68,7 +69,7 @@ const steps = [
         <span class="path">Sources/HelloTUI/HelloTUI.swift</span>
         <span class="meta">@main &middot; terminal-native</span>
       </div>
-      <pre class="hello-body mono"><code><span class="kw">import</span> <span class="ty">SwiftTUICLI</span>
+      <pre class="hello-body mono"><code><span class="kw">import</span> <span class="ty">SwiftTUI</span>
 
 <span class="at">@main</span> <span class="kw">struct</span> <span class="ty">HelloTUI</span>: <span class="ty">App</span> &#123;
   <span class="kw">var</span> body: <span class="kw">some</span> <span class="ty">Scene</span> &#123;
@@ -88,9 +89,10 @@ const steps = [
       <span class="mono">--swift-sdk</span> for your wasm SDK on the same
       <span class="mono">swift build</span> invocation &mdash; the authoring code is
       unchanged. Embedding inside a host? Retain a
-      <span class="mono">HostedSceneSession</span> from
-      <span class="mono">GUI/SwiftUIHost</span> or
-      <span class="mono">GUI/WebHost</span>; the same <span class="mono">App</span> body drives both.
+      <span class="mono">HostedSceneSession</span> through
+      <span class="mono">SwiftUIHost</span>, or opt into
+      <span class="mono">SwiftTUIWebHostCLI</span> for localhost browser launch;
+      the same <span class="mono">App</span> body drives both.
     </p>
   </div>
 </section>

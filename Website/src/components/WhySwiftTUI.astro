@@ -18,7 +18,7 @@ const points = [
     n: "03",
     title: "Strict, inspectable pipeline",
     body:
-      "Seven phases — resolve, measure, place, semantics, draw, raster, commit — enforced by DefaultRenderer, FrameArtifacts, and the regression suites. Inspect any phase in tests; snapshot any frame; diff any commit.",
+      "Seven phases — resolve, measure, place, semantics, draw, raster, commit — stay visible through DefaultRenderer and FrameArtifacts. Inspect a frame when you need to understand layout, routing, or final cells.",
     sym: "DefaultRenderer · FrameArtifacts",
   },
   {
@@ -30,10 +30,10 @@ const points = [
   },
   {
     n: "05",
-    title: "Swift 6 package internals",
+    title: "Swift 6 library, normal app code",
     body:
-      "The package builds in Swift 6 language mode with strict memory-safety settings, explicit @MainActor authoring APIs, and real Sendable boundaries. App packages choose their own policy.",
-    sym: "Swift 6 · @MainActor View.body · Sendable artifacts",
+      "SwiftTUI builds with Swift 6 language mode, explicit @MainActor authoring APIs, and Sendable frame artifacts. Your app can consume the package without copying those build settings.",
+    sym: "Swift 6 · @MainActor View.body · SwiftPM package",
   },
   {
     n: "06",
