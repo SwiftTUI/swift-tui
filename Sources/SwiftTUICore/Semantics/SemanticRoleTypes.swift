@@ -52,6 +52,7 @@ public enum AccessibilityRole: Hashable, Sendable, CustomStringConvertible {
   case menu
   case menuItem
   case picker
+  case popover
   case progressBar
   case region
   case rowHeader
@@ -108,6 +109,8 @@ public enum AccessibilityRole: Hashable, Sendable, CustomStringConvertible {
       "menuItem"
     case .picker:
       "picker"
+    case .popover:
+      "popover"
     case .progressBar:
       "progressBar"
     case .region:

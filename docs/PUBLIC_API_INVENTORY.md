@@ -30,13 +30,13 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `Tab`, `TabView`, `NavigationStack`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`, `Spinner`
-- `ToastStyle`
+- `ToastStyle`, `PopoverAttachmentAnchor`, `PopoverTip`, and `PopoverTipAction`
 - `Layout`, `SendableLayout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `Anchor`, `AnchorSource`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`, and `ResetFocusAction`
 - image-source and runtime-policy environment configuration such as
   `EnvironmentValues.imageResourceRoots` and
   `EnvironmentValues.accessibilityReduceMotion`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.anchorPreference(key:value:transform:)`, `.transformAnchorPreference(_:value:transform:)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.prefersDefaultFocus(_:in:)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusScope(_:)`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.navigationDestination(isPresented:)`, `.navigationDestination(item:)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.anchorPreference(key:value:transform:)`, `.transformAnchorPreference(_:value:transform:)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.prefersDefaultFocus(_:in:)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusScope(_:)`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.popover(...)`, `.popoverTip(...)`, `.toast(...)`, `.navigationDestination(isPresented:)`, `.navigationDestination(item:)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 - low-level `Standard` output/file helpers and `FileOpenError` for runtime
   integration paths that need direct stream writes
@@ -127,7 +127,8 @@ The animation pipeline now follows the SwiftUI-shaped `Animatable`-protocol mode
 - **`Animatable`** (`Core`): the SwiftUI-shaped protocol that exposes an `animatableData: AnimatableData` round-trip for any type that wants to participate in interpolation. Built-in conformances cover all paint and geometry types the controller needs to interpolate.
 - **`AnimatablePair<First, Second>`** (`Core`): the standard pair combinator for composing two `Animatable` values into a single `animatableData` round-trip.
 - **`AnimatableArray<Element>`** (`Core`): an ordered, fixed-length array of `Animatable` elements that itself conforms to `Animatable`, used by gradients to interpolate their stops list and by any other variable-arity collection of animatable values. Length mismatches between the source and target snap to the target rather than interpolating, matching SwiftUI's behavior.
-- **`UnitPoint`** (`Core`): continuous unit-square coordinate (`x ∈ [0, 1]`, `y ∈ [0, 1]`) with named-corner static initializers (`.topLeading`, `.center`, `.bottomTrailing`, etc.). Used by `LinearGradient.startPoint`, `LinearGradient.endPoint`, and `RadialGradient.center`. Conforms to `Animatable` so gradient orientations interpolate continuously under `withAnimation`. Coexists with `Alignment`, which remains the named-slot type for stack/overlay/background alignment parameters.
+- **`UnitPoint`** (`Core`): continuous unit-square coordinate (`x ∈ [0, 1]`, `y ∈ [0, 1]`) with named-corner static initializers (`.topLeading`, `.center`, `.bottomTrailing`, etc.). Used by `LinearGradient.startPoint`, `LinearGradient.endPoint`, `RadialGradient.center`, and popover point anchors. Conforms to `Animatable` so gradient orientations interpolate continuously under `withAnimation`. Coexists with `Alignment`, which remains the named-slot type for stack/overlay/background alignment parameters.
+- **`UnitSize`** and **`UnitRect`** (`Core`): normalized size and rectangle values used by `PopoverAttachmentAnchor.rect(.bounds)` and future unit-rect geometry APIs.
 - **`EdgeInsets`** (`Core`): now conforms to `Animatable`, so `.padding(...)` and frame-inset values interpolate componentwise.
 - **`Color`** (`Core`): conforms to `Animatable` via OKLab interpolation, so `.foregroundStyle(color)` and any other `Color`-typed value interpolates perceptually.
 - **`Gradient.Stop`, `Gradient`, `LinearGradient`, `RadialGradient`** (`Core`): all conform to `Animatable`. Compound conformance flows through `AnimatablePair` and `AnimatableArray` so gradient stops, locations, colors, and endpoints all interpolate together.
@@ -158,6 +159,10 @@ for the model and the implementation record.
 - `FocusContainment` enum plus `.focusContainment(_:)` on `Panel`
 - `Scene`-conforming types conform to `ActionScope`
 - `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers conform to `ActionScope`
+- `.popover` and `.popoverTip` present source-anchored popover surfaces through
+  the same overlay and dismiss stack. Boolean and item popovers are modal by
+  default; read-only tips are non-modal, while tips with actions gate base
+  interaction.
 - `.keyCommand(_:key:modifiers:isEnabled:action:)` on `ActionScope where Self: View & Sendable`, with shallowest-wins dispatch along the current focus chain (modifier-less bindings are framework-reserved and silently dropped)
 - `.paletteCommand(name:description:isEnabled:action:)` on `ActionScope where Self: View & Sendable` plus `ActivePaletteCommand` and `EnvironmentValues.activePaletteCommands` for consumer-authored palette query surfaces. The captured list is refreshed after each frame from the current focus chain.
 - `.toolbar(style:)` on `ActionScope where Self: View & Sendable`, plus

@@ -56,6 +56,10 @@ public struct GalleryView: View {
         FileDropTab()
       }
 
+      Tab("Popovers", value: GalleryView.GalleryTab.popovers) {
+        PopoverTab()
+      }
+
       Tab("Physics", value: GalleryView.GalleryTab.physics) {
         PhysicsTab()
       }
@@ -119,6 +123,10 @@ public struct GalleryView: View {
       action: { selection = .fileDrop }
     )
     .paletteCommand(
+      name: "Popovers",
+      action: { selection = .popovers }
+    )
+    .paletteCommand(
       name: "Physics",
       action: { selection = .physics }
     )
@@ -145,6 +153,7 @@ extension GalleryView {
     case animatedGIF
     case animations
     case fileDrop
+    case popovers
     case physics
 
     init?(environmentName: String) {
@@ -164,6 +173,7 @@ extension GalleryView {
         self = .animatedGIF
       case "animations", "animation": self = .animations
       case "filedrop", "file-drop", "files": self = .fileDrop
+      case "popover", "popovers", "tips": self = .popovers
       case "physics": self = .physics
       default: return nil
       }

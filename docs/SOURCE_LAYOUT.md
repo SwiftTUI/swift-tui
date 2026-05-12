@@ -459,7 +459,7 @@ Sources/SwiftTUICore/
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/InteractionGate.swift`, `Presentation/OverlayStack.swift`, `Presentation/Portal.swift`, and `Presentation/DismissStack.swift`: package-internal primitives for visible-but-disabled subtrees, root overlay composition, destination-owned portal content, and topmost-dismiss routing
-- `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: presentation adapters and chrome for built-in alert/confirmation-dialog/sheet/menu/toast surfaces lowered into the primitive portal stack
+- `Presentation/PresentationCoordinator.swift`, `Presentation/PresentationModifiers.swift`, and `Presentation/PopoverPresentation.swift`: presentation adapters and chrome for built-in alert/confirmation-dialog/sheet/menu/toast/popover surfaces lowered into the primitive portal stack, including source-relative popover placement
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifier methods plus package-level `View` helpers; primitive body witnesses do not live here
 - `SwiftTUIViews.docc/`: module landing page and authoring guides
 
