@@ -41,6 +41,22 @@ extension EnvironmentValues {
   }
 }
 
+/// Preference key that accumulates `paletteCommand` contributions from
+/// every descendant in a scope's subtree. Consumed and cleared at the
+/// nearest `.paletteSheet(...)` host (an `ActionScope`), which passes
+/// the absorbed snapshot into the sheet content closure. Mirrors
+/// `ToolbarItemsPreferenceKey`.
+package enum PaletteCommandsPreferenceKey: PreferenceKey {
+  package static var defaultValue: [ActivePaletteCommand] { [] }
+
+  package static func reduce(
+    value: inout [ActivePaletteCommand],
+    nextValue: () -> [ActivePaletteCommand]
+  ) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
 extension ActionScope where Self: View & Sendable {
   /// Declares a searchable, consumer-invocable command at this scope's
   /// root. The framework does not ship a palette surface; consumer
@@ -96,19 +112,29 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
+    var node = content.resolve(in: context)
     let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
+    let contribution = ActivePaletteCommand(
+      name: name,
+      description: description,
+      isEnabled: isEnabled,
+      action: {
+        withImperativeAuthoringContext(dynamicPropertyScope) {
+          action()
+        }
+      }
+    )
+    node.preferenceValues.merge(
+      PaletteCommandsPreferenceKey.self,
+      value: [contribution]
+    )
     context.commandRegistry?.registerPaletteCommand(
       at: node.identity,
       command: RegisteredPaletteCommand(
         name: name,
         description: description,
         isEnabled: isEnabled,
-        action: {
-          withImperativeAuthoringContext(dynamicPropertyScope) {
-            action()
-          }
-        }
+        action: contribution.action
       )
     )
     return [node]
