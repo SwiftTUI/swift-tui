@@ -1,7 +1,7 @@
 ---
 title: "feat: deeper scroll control scope"
 type: feature
-status: planned
+status: shipped
 date: 2026-05-09
 depends_on:
   - "../SOURCE_LAYOUT.md"
@@ -20,6 +20,14 @@ depends_on:
 `ScrollView` a terminal-native pane primitive. The next useful layer is identity
 and anchor based scrolling, plus explicit page/home/end policy. Offset-only
 helpers are already present and should not be mistaken for the deeper model.
+
+**Current status:** Shipped for the V1 boundary. `ScrollViewReader` and
+`ScrollViewProxy` provide imperative identity, anchor, edge, and cell-offset
+scroll commands; semantic scroll-target geometry is committed through the
+existing scroll-position registry; focused scroll views and indicators consume
+Home/End for bounded movement. Semantic `ScrollPosition` bindings, target
+behavior/default-anchor policy, scrollback conventions, page-key modeling, and
+host observation hooks remain deferred.
 
 **Architecture:** Preserve the current offset-backed runtime as the execution
 substrate. Add semantic scroll targets during placement/semantics, route public
@@ -290,6 +298,19 @@ Implement the smallest semantic layer that proves identity and anchor control:
   - existing focus-driven caret reveal still uses minimal reveal
   - existing scroll indicator click/drag tests still pass
   - lazy-stack scroll placement and layout-dependent geometry tests remain green
+
+## Shipped Validation
+
+- Core target-offset coverage:
+  `swiftly run swift test --filter LocalScrollPositionRegistryTests`.
+- Surface coverage:
+  `swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests`.
+- Composed runtime coverage:
+  `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/scrollViewReaderProxyActionsRerenderThroughComposedRunLoop`.
+- Regression coverage:
+  `swiftly run swift test --filter SwiftTUITests.ScrollIndicatorDraggingTests`.
+- Public API baseline:
+  `Scripts/generate_public_api_inventory.sh --check`.
 
 ## Open Decisions
 

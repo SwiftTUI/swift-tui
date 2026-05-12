@@ -88,6 +88,13 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
           context.localKeyHandlerRegistry?.register(identity: identity) { event in
             withImperativeAuthoringContext(authoringContext) {
+              if let edge = scrollBoundaryEdge(for: event, targetAxis: targetAxis) {
+                return context.localScrollPositionRegistry?.scrollToEdge(
+                  edge,
+                  scopeIdentity: context.identity
+                ) ?? false
+              }
+
               var next = binding.wrappedValue
               guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
                 return false

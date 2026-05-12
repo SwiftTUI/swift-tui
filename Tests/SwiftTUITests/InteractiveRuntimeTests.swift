@@ -2,8 +2,8 @@ import EmbeddedFonts
 import Foundation
 import Testing
 
-@testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 #if canImport(Darwin)
@@ -2866,6 +2866,89 @@ struct InteractiveRuntimeTests {
     let rendered = terminal.frames.last ?? ""
     #expect(rendered.contains("Mouse 1"))
     #expect(!rendered.contains("Mouse 0"))
+  }
+
+  @MainActor
+  @Test("ScrollViewReader proxy actions rerender through the composed RunLoop")
+  func scrollViewReaderProxyActionsRerenderThroughComposedRunLoop() throws {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let terminalSize = CellSize(width: 20, height: 6)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("ReaderRuntimeRoot")
+    let buttonIdentity = testIdentity("ReaderRuntimeJump")
+    let targetIdentity = testIdentity("ReaderRuntimeTarget")
+    let scheduler = FrameScheduler()
+    let view = ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Jump") {
+          proxy.scrollTo(targetIdentity)
+        }
+        .id(buttonIdentity)
+
+        ScrollView(
+          .vertical,
+          showsIndicators: false,
+          position: Binding(
+            get: { box.position },
+            set: { box.position = $0 }
+          )
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<10) { index in
+              if index == 8 {
+                Text("Row \(index)")
+                  .id(targetIdentity)
+              } else {
+                Text("Row \(index)")
+              }
+            }
+          }
+        }
+        .frame(width: 5, height: 3, alignment: .topLeading)
+      }
+    }
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        view
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+    #expect(terminal.frames.last?.contains("Row 0") == true)
+
+    #expect(runLoop.localActionRegistry.dispatch(identity: buttonIdentity))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let rendered = terminal.frames.last ?? ""
+    #expect(box.position == .init(x: 0, y: 6))
+    #expect(rendered.contains("Row 8"))
+    #expect(!rendered.contains("Row 0"))
   }
 
   @MainActor

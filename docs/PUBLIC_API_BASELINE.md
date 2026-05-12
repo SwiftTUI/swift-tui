@@ -19,7 +19,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
 | `SwiftTUIRuntime` | 48 | 513 |
-| `SwiftTUIViews` | 250 | 9296 |
+| `SwiftTUIViews` | 252 | 9426 |
 | `SwiftTUIAnimatedImage` | 5 | 154 |
 | `SwiftTUICharts` | 29 | 1812 |
 | `SwiftTUIArguments` | 4 | 113 |
@@ -91,7 +91,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (250)
+### Canonical surface (252)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -271,6 +271,8 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SafeAreaPaddingModifier` — struct — 2 members
 - `ScrollPosition` — struct — 8 members
 - `ScrollView` — struct — 127 members
+- `ScrollViewProxy` — struct — 5 members
+- `ScrollViewReader` — struct — 123 members
 - `Section` — struct — 125 members
 - `SecureField` — struct — 126 members
 - `SegmentedPickerStyle` — struct — 5 members
