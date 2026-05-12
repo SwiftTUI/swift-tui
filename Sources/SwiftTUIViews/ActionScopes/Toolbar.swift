@@ -101,6 +101,9 @@ public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable 
       return [passthrough]
     }
 
+    var absorbedPreferences = base.preferenceValues
+    absorbedPreferences[ToolbarItemsPreferenceKey.self] = []
+
     let stripView = ToolbarItemsStrip(items: items, style: style)
     let stripNode = stripView.resolve(
       in: context.child(component: .named("toolbar-strip"))
@@ -127,8 +130,9 @@ public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable 
       context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet)
     )
     // Clear the preference at this scope boundary so absorbed items
-    // do not re-bubble to ancestor toolbar hosts.
-    scopeWithStrip.preferenceValues[ToolbarItemsPreferenceKey.self] = []
+    // do not re-bubble to ancestor toolbar hosts while preserving
+    // sibling preferences attached directly to the scope node.
+    scopeWithStrip.preferenceValues = absorbedPreferences
 
     return [scopeWithStrip]
   }

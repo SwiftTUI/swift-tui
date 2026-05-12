@@ -290,6 +290,51 @@ struct GalleryTabSwitchTests {
     )
   }
 
+  @Test("gallery command palette lists tab commands")
+  func galleryCommandPaletteListsTabCommands() async throws {
+    let terminalSize = CellSize(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryCommandPaletteCommands")])
+    let host = GalleryTabSwitchRecordingHost(size: terminalSize)
+    let capture = GalleryCommandPaletteCapture()
+
+    let result = try await Self.runHarness(
+      presentationSurface: host,
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          host.lastPresentedSurface != nil
+        },
+        .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          guard let surface = host.lastPresentedSurface else {
+            return false
+          }
+          let text = surface.lines.joined(separator: "\n")
+          guard text.contains("Command palette") else {
+            return false
+          }
+          capture.paletteSurface = surface
+          return true
+        },
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+      ]),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: { GalleryView() }
+    )
+
+    let paletteSurface = try #require(capture.paletteSurface)
+    let paletteText = paletteSurface.lines.joined(separator: "\n")
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(
+      !paletteText.contains("No commands in the current scope."),
+      "expected gallery palette commands; surface was:\n\(paletteText)"
+    )
+    #expect(
+      paletteText.contains("File Drop"),
+      "expected the gallery palette to include tab commands; surface was:\n\(paletteText)"
+    )
+  }
+
   @Test("scene-hosted gallery stays on Todo after deleting the top todo row")
   func sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
@@ -965,6 +1010,11 @@ private final class GallerySurfaceCapture {
   var initialPhysicsSurface: RasterSurface?
   var prePaletteSurface: RasterSurface?
   var postDismissSurface: RasterSurface?
+}
+
+@MainActor
+private final class GalleryCommandPaletteCapture {
+  var paletteSurface: RasterSurface?
 }
 
 private func deduplicated(
