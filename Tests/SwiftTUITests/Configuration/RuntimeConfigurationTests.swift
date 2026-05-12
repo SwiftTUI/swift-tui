@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 struct RuntimeConfigurationTests {
   @Test("Default configuration uses auto color, unicode glyphs, normal motion")

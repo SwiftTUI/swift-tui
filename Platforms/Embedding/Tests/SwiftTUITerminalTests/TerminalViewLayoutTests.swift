@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 import SwiftTUICore
 import Synchronization
 import Testing
@@ -67,7 +67,7 @@ struct TerminalViewLayoutTests {
     let inputReader = ClipboardTerminalInputReader()
     let host = ClipboardTerminalHost()
     let rootIdentity = Identity(components: [.named("TerminalViewClipboardRoot")])
-    let runLoop = SwiftTUI.RunLoop(
+    let runLoop = SwiftTUIRuntime.RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: host,
       terminalInputReader: inputReader,

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 import SwiftTUICore
 
 public struct TerminalView<Session: TerminalSession>: View {

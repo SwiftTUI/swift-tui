@@ -1,7 +1,7 @@
 import Testing
 import SwiftTUIViews
 
-@_spi(Runners) @testable import SwiftTUI
+@_spi(Runners) @testable import SwiftTUIRuntime
 
 @MainActor
 @Suite

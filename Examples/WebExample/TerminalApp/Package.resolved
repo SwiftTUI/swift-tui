@@ -1,6 +1,15 @@
 {
-  "originHash" : "36d9a3a0667988d74d4085b8ca3c9b8031ed1c5483c360267a27665bb02bb81d",
+  "originHash" : "5d629b23426aa8b35fa73b9fef2157bdcb3e110761447abebc6bb7ecb1c1ce23",
   "pins" : [
+    {
+      "identity" : "flyingfox",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swhitty/FlyingFox.git",
+      "state" : {
+        "revision" : "de38230104cf63ef4843cb569ba11c13f8165685",
+        "version" : "0.26.2"
+      }
+    },
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",

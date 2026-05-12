@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 struct TerminalEventHandlers: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   var titleChanged: (@MainActor @Sendable (String) -> Void)?

@@ -1,5 +1,5 @@
 #if !canImport(WASILibc)
-  @_spi(Runners) import SwiftTUI
+  @_spi(Runners) import SwiftTUIRuntime
   import Synchronization
 
   final class SceneInfoRegistry: Sendable {

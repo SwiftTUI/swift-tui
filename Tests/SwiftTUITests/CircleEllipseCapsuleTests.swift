@@ -1,7 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// Returns the number of Braille dots lit in a raster cell, or 0 if

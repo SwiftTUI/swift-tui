@@ -66,15 +66,10 @@ let packageDependencies: [Package.Dependency] = [
   ),
 ]
 
-let swiftTUIDependencies: [Target.Dependency] = [
+let swiftTUIRuntimeDependencies: [Target.Dependency] = [
   "SwiftTUICore",
   "SwiftTUIViews",
   .product(name: "EmbeddedFonts", package: "swift-figlet"),
-  .product(
-    name: "UnixSignals",
-    package: "UnixSignals",
-    condition: .when(platforms: nativeRuntimePlatforms),
-  ),
   .product(
     name: "JPEG",
     package: "swift-jpeg"
@@ -87,6 +82,7 @@ let swiftTUIDependencies: [Target.Dependency] = [
 
 let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUI",
+  "SwiftTUIRuntime",
   "SwiftTUICore",
   "SwiftTUIViews",
   "SwiftTUIAnimatedImage",
@@ -124,6 +120,7 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
 
 let packageProducts: [Product] = [
   .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
+  .library(name: "SwiftTUIRuntime", targets: ["SwiftTUIRuntime"]),
   .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
   .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
   .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
@@ -185,15 +182,26 @@ let package = Package(
     ),
 
     .target(
-      name: "SwiftTUI",
-      dependencies: swiftTUIDependencies,
+      name: "SwiftTUIRuntime",
+      dependencies: swiftTUIRuntimeDependencies,
+      path: "Sources/SwiftTUIRuntime",
       resources: [],
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUI",
+      dependencies: [
+        "SwiftTUIRuntime",
+        "SwiftTUIArguments",
+        "SwiftTUICLI",
+      ],
+      path: "Sources/SwiftTUI",
       swiftSettings: swiftSettings()
     ),
     .target(
       name: "SwiftTUIArguments",
       dependencies: [
-        "SwiftTUI",
+        "SwiftTUIRuntime",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Platforms/Arguments/Sources/SwiftTUIArguments",
@@ -206,7 +214,7 @@ let package = Package(
     .target(
       name: "SwiftTUIPTYPrimitives",
       dependencies: [
-        "SwiftTUI"
+        "SwiftTUICore"
       ],
       path: "Platforms/Embedding/Sources/SwiftTUIPTYPrimitives",
       swiftSettings: swiftSettings()
@@ -214,7 +222,7 @@ let package = Package(
     .target(
       name: "SwiftTUITerminal",
       dependencies: [
-        "SwiftTUI",
+        "SwiftTUIRuntime",
         "SwiftTUIPTYPrimitives",
         "SwiftTUIPTYCPrimitives",
         .product(name: "SwiftTerm", package: "SwiftTerm"),
@@ -225,7 +233,7 @@ let package = Package(
     .target(
       name: "SwiftTUICLI",
       dependencies: [
-        "SwiftTUI",
+        "SwiftTUIRuntime",
         "SwiftTUIArguments",
         "SwiftTUIPTYPrimitives",
         .product(name: "UnixSignals", package: "UnixSignals"),
@@ -237,7 +245,7 @@ let package = Package(
     .target(
       name: "WASISurfaceBridge",
       dependencies: [
-        "SwiftTUI"
+        "SwiftTUIRuntime"
       ],
       path: "Platforms/WASI/Sources/WASISurfaceBridge",
       swiftSettings: swiftSettings()
@@ -245,7 +253,7 @@ let package = Package(
     .target(
       name: "SwiftTUIWASI",
       dependencies: [
-        "SwiftTUI",
+        "SwiftTUIRuntime",
         "WASISurfaceBridge",
       ],
       path: "Platforms/WASI/Sources/SwiftTUIWASI",
@@ -254,7 +262,7 @@ let package = Package(
     .target(
       name: "SwiftTUIWebHost",
       dependencies: [
-        "SwiftTUI",
+        "SwiftTUIRuntime",
         "WASISurfaceBridge",
         .product(name: "FlyingFox", package: "FlyingFox"),
         .product(name: "FlyingSocks", package: "FlyingFox"),
@@ -268,7 +276,7 @@ let package = Package(
     .target(
       name: "SwiftTUIWebHostCLI",
       dependencies: [
-        "SwiftTUI",
+        "SwiftTUIRuntime",
         "SwiftTUICLI",
         "SwiftTUIArguments",
         "SwiftTUIWebHost",
@@ -383,7 +391,7 @@ let package = Package(
       .target(
         name: "SwiftUIHost",
         dependencies: [
-          "SwiftTUI"
+          "SwiftTUIRuntime"
         ],
         path: "Platforms/SwiftUI/Sources/SwiftUIHost",
         resources: [

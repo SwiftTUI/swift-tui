@@ -1,7 +1,6 @@
 import ArgumentParser
 import Foundation
-import SwiftTUIArguments
-import SwiftTUICLI
+import SwiftTUI
 
 /// Shared option group flattened into every gitviz subcommand.
 ///

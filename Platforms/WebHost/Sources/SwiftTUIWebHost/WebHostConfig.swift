@@ -1,4 +1,4 @@
-public import SwiftTUI
+public import SwiftTUIRuntime
 
 public struct WebHostConfig: Equatable, Sendable {
   package static let defaultPortRange = 9123...9132

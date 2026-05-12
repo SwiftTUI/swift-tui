@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 struct RuntimeConfigurationBuilderTests {
   @Test("Builder produces customized configuration")

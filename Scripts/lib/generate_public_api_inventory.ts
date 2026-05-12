@@ -86,6 +86,7 @@ interface SymbolGraph {
 
 const PRIMARY_MODULES = [
   "SwiftTUI",
+  "SwiftTUIRuntime",
   "SwiftTUIViews",
   "SwiftTUIAnimatedImage",
   "SwiftTUICharts",

@@ -1,6 +1,4 @@
 import SwiftTUI
-import SwiftTUIArguments
-import SwiftTUICLI
 import SwiftTUICharts
 import Testing
 

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 public enum SwiftUIHostCursorStyle: String, Sendable, Hashable {
   case block
@@ -7,19 +7,19 @@ public enum SwiftUIHostCursorStyle: String, Sendable, Hashable {
 }
 
 public struct SwiftUIHostTerminalPalette: Equatable, Sendable {
-  public var foreground: SwiftTUI.Color
-  public var background: SwiftTUI.Color
-  public var cursor: SwiftTUI.Color
-  public var selectionBackground: SwiftTUI.Color
-  public var selectionForeground: SwiftTUI.Color
+  public var foreground: SwiftTUIRuntime.Color
+  public var background: SwiftTUIRuntime.Color
+  public var cursor: SwiftTUIRuntime.Color
+  public var selectionBackground: SwiftTUIRuntime.Color
+  public var selectionForeground: SwiftTUIRuntime.Color
   public var ansi: TerminalPalette
 
   public init(
-    foreground: SwiftTUI.Color,
-    background: SwiftTUI.Color,
-    cursor: SwiftTUI.Color,
-    selectionBackground: SwiftTUI.Color,
-    selectionForeground: SwiftTUI.Color,
+    foreground: SwiftTUIRuntime.Color,
+    background: SwiftTUIRuntime.Color,
+    cursor: SwiftTUIRuntime.Color,
+    selectionBackground: SwiftTUIRuntime.Color,
+    selectionForeground: SwiftTUIRuntime.Color,
     ansi: TerminalPalette = .default
   ) {
     self.foreground = foreground

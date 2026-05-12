@@ -2,6 +2,71 @@ import Foundation
 import Testing
 
 struct PackageGraphIsolationTests {
+  @Test("SwiftTUI is the terminal convenience product")
+  func swiftTUIIsTerminalConvenienceProduct() throws {
+    let rootManifest = try String(
+      contentsOf: repoRoot().appendingPathComponent("Package.swift"),
+      encoding: .utf8
+    )
+    let swiftTUITargetBlock = try #require(targetBlock(named: "SwiftTUI", in: rootManifest))
+
+    #expect(swiftTUITargetBlock.contains("\"SwiftTUIRuntime\""))
+    #expect(swiftTUITargetBlock.contains("\"SwiftTUIArguments\""))
+    #expect(swiftTUITargetBlock.contains("\"SwiftTUICLI\""))
+    #expect(!swiftTUITargetBlock.contains("SwiftTUI" + "WebHost"))
+    #expect(!swiftTUITargetBlock.contains("Flying" + "Fox"))
+  }
+
+  @Test("SwiftTUIRuntime stays below host and terminal runner products")
+  func swiftTUIRuntimeStaysBelowHostAndTerminalRunnerProducts() throws {
+    let rootManifest = try String(
+      contentsOf: repoRoot().appendingPathComponent("Package.swift"),
+      encoding: .utf8
+    )
+    let runtimeTargetBlock = try #require(targetBlock(named: "SwiftTUIRuntime", in: rootManifest))
+
+    #expect(!runtimeTargetBlock.contains("\"SwiftTUICLI\""))
+    #expect(!runtimeTargetBlock.contains("SwiftTUI" + "WebHost"))
+    #expect(!runtimeTargetBlock.contains("Flying" + "Fox"))
+    #expect(!runtimeTargetBlock.contains("Unix" + "Signals"))
+    #expect(!runtimeTargetBlock.contains("Swift" + "Term"))
+  }
+
+  @Test("argument parser depends below the terminal convenience product")
+  func argumentParserDependsBelowTerminalConvenienceProduct() throws {
+    let rootManifest = try String(
+      contentsOf: repoRoot().appendingPathComponent("Package.swift"),
+      encoding: .utf8
+    )
+    let argumentsTargetBlock = try #require(
+      targetBlock(named: "SwiftTUIArguments", in: rootManifest)
+    )
+
+    #expect(argumentsTargetBlock.contains("\"SwiftTUIRuntime\""))
+    #expect(!argumentsTargetBlock.contains("\"SwiftTUI\""))
+  }
+
+  @Test("host products depend on runtime instead of terminal convenience")
+  func hostProductsDependOnRuntimeInsteadOfTerminalConvenience() throws {
+    let rootManifest = try String(
+      contentsOf: repoRoot().appendingPathComponent("Package.swift"),
+      encoding: .utf8
+    )
+
+    for targetName in [
+      "SwiftTUIWebHost",
+      "SwiftTUIWASI",
+      "WASISurfaceBridge",
+      "SwiftUIHost",
+      "SwiftTUITerminal",
+    ] {
+      let block = try #require(targetBlock(named: targetName, in: rootManifest))
+      #expect(block.contains("\"SwiftTUIRuntime\""))
+      #expect(!block.contains("\"SwiftTUI\""))
+      #expect(!block.contains("\"SwiftTUICLI\""))
+    }
+  }
+
   @Test("terminal-only target does not reference WebHost products")
   func terminalOnlyTargetDoesNotReferenceWebHostProducts() throws {
     let root = repoRoot()
@@ -53,19 +118,29 @@ struct PackageGraphIsolationTests {
   }
 
   private func targetBlock(named targetName: String, in manifest: String) -> String? {
-    let marker = ".target(\n      name: \"\(targetName)\""
-    guard let markerRange = manifest.range(of: marker) else {
-      return nil
+    let targetStart = ".target("
+    var searchRange = manifest.startIndex..<manifest.endIndex
+
+    while let markerRange = manifest.range(of: targetStart, range: searchRange) {
+      let suffix = manifest[markerRange.lowerBound...]
+      let searchStart = suffix.index(markerRange.lowerBound, offsetBy: targetStart.count)
+      let endCandidates = [
+        suffix[searchStart...].range(of: "\n    .target(")?.lowerBound,
+        suffix[searchStart...].range(of: "\n      .target(")?.lowerBound,
+        suffix[searchStart...].range(of: "\n    .testTarget(")?.lowerBound,
+        suffix[searchStart...].range(of: "\n      .testTarget(")?.lowerBound,
+      ].compactMap { $0 }
+
+      let blockEnd = endCandidates.min() ?? suffix.endIndex
+      let block = String(suffix[..<blockEnd])
+      if block.contains("name: \"\(targetName)\"") {
+        return block
+      }
+
+      searchRange = blockEnd..<manifest.endIndex
     }
 
-    let suffix = manifest[markerRange.lowerBound...]
-    if let nextTarget = suffix.dropFirst(marker.count).range(of: "\n    .target(") {
-      return String(suffix[..<nextTarget.lowerBound])
-    }
-    if let nextTestTarget = suffix.dropFirst(marker.count).range(of: "\n    .testTarget(") {
-      return String(suffix[..<nextTestTarget.lowerBound])
-    }
-    return String(suffix)
+    return nil
   }
 
   private func swiftSources(in directory: URL) throws -> String {

@@ -4,7 +4,7 @@ import SwiftTUITerminal
 import Synchronization
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 @Suite("TerminalView render diff")
 struct RenderDiffTests {
@@ -87,8 +87,8 @@ struct RenderDiffTests {
     inputReader: ManualTerminalInputReader,
     session: TerminalProcessSession,
     terminalSize: CellSize
-  ) -> SwiftTUI.RunLoop<Int, TerminalView<TerminalProcessSession>> {
-    SwiftTUI.RunLoop(
+  ) -> SwiftTUIRuntime.RunLoop<Int, TerminalView<TerminalProcessSession>> {
+    SwiftTUIRuntime.RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: host,
       terminalInputReader: inputReader,

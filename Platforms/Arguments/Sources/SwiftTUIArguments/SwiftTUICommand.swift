@@ -1,6 +1,6 @@
 public import ArgumentParser
 public import Foundation
-public import SwiftTUI
+public import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin

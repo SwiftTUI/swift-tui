@@ -1,6 +1,4 @@
 import SwiftTUI
-import SwiftTUIArguments
-import SwiftTUICLI
 
 @main
 struct ArgParseDemoApp: App, SwiftTUICommand {

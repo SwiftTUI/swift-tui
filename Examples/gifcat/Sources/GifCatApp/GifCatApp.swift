@@ -1,7 +1,5 @@
 import GifCat
 import SwiftTUI
-import SwiftTUIArguments
-import SwiftTUICLI
 
 @main
 struct GifCatApp: App, SwiftTUICommand {

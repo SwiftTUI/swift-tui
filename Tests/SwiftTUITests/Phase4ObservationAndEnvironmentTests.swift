@@ -1,7 +1,7 @@
 import Observation
 import Testing
 
-@_spi(Runners) @testable import SwiftTUI
+@_spi(Runners) @testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 

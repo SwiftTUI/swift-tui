@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUICharts
 @testable import SwiftTUICore
 @testable import SwiftTUIViews

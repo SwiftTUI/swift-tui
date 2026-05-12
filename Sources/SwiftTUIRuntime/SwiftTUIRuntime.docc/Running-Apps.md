@@ -2,7 +2,7 @@
 
 ## Overview
 
-`SwiftTUI` supports both low-level and high-level runtime entry points.
+`SwiftTUIRuntime` supports both low-level and high-level runtime entry points.
 
 Choose the level that matches your app:
 
@@ -54,26 +54,28 @@ phase timings, worker queue/compute timings, `main_actor_blocked_ms`,
 
 ## Scene-Based Apps
 
-The public scene declarations live in `SwiftTUI`, while platform integration
-lives in sibling root package products.
+The public scene declarations live in `SwiftTUIRuntime`, while platform
+integration lives in sibling root package products. The `SwiftTUI` convenience
+product re-exports this module plus terminal launch support for ordinary
+terminal apps.
 
-The same authored `App` and `Scene` declarations can feed three execution
+The same authored `App` and `Scene` declarations can feed these execution
 modes:
 
-- terminal-native execution through the `SwiftTUICLI` runner product
+- terminal-native execution through the `SwiftTUI` convenience product or the
+  explicit `SwiftTUICLI` runner product
 - WASI execution through the `SwiftTUIWASI` runner product
 - localhost-browser execution through the compound `SwiftTUIWebHost` product
 - host-managed embedding through a host product
 
-`SwiftTUI` itself is library-only. It owns scene declarations, manifests, and
-hosted-session APIs, but it does not provide a default `App.main()` or an
-executable product on its own.
+`SwiftTUIRuntime` owns scene declarations, manifests, and hosted-session APIs.
+It does not pull in runner products on its own.
 
 ### Executable runners
 
-For terminal-native apps, import `SwiftTUICLI` and mark your app type with
-`@main` to use the default CLI `App.main()`. When you need an explicit
-launcher, call:
+For ordinary terminal-native apps, import `SwiftTUI` and mark your app type
+with `@main` to use the default terminal `App.main()`. When you need an
+explicit launcher, compose `SwiftTUIRuntime` with `SwiftTUICLI` and call:
 
 ```swift
 try await TerminalRunner.run(MyApp.self)
@@ -84,8 +86,8 @@ For WASI apps, import `SwiftTUIWASI` and either rely on its default
 
 ### Host products
 
-For host-managed embedding, keep the authored `App` in `SwiftTUI`, then let an
-host product build `SceneManifest` values and retain one or more
+For host-managed embedding, keep the authored `App` in `SwiftTUIRuntime`, then
+let a host product build `SceneManifest` values and retain one or more
 `HostedSceneSession` values.
 
 `SwiftUIHost` uses that path to embed SwiftTUI scenes inside a SwiftUI

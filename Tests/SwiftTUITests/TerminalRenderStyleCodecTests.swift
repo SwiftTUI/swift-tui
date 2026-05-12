@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@_spi(Runners) @testable import SwiftTUI
+@_spi(Runners) @testable import SwiftTUIRuntime
 
 @Suite
 struct TerminalRenderStyleCodecTests {

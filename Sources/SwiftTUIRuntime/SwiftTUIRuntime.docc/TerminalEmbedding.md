@@ -5,10 +5,11 @@ Host external terminal programs inside SwiftTUI layout with the
 
 ## Overview
 
-Terminal embedding is implemented outside the root `SwiftTUI` runtime product
-in the root package's `SwiftTUITerminal` product. Apps import `SwiftTUI` for
-the authoring/runtime surface and `SwiftTUITerminal` for
-`TerminalView<Session>`, `TerminalSession`, and `TerminalProcessSession`.
+Terminal embedding is implemented outside the `SwiftTUIRuntime` product in the
+root package's `SwiftTUITerminal` product. Apps import `SwiftTUI` for the
+terminal convenience surface or `SwiftTUIRuntime` for explicit composition, and
+import `SwiftTUITerminal` for `TerminalView<Session>`, `TerminalSession`, and
+`TerminalProcessSession`.
 
 `TerminalView` participates in the normal SwiftTUI frame pipeline. It measures
 from its parent proposal, draws a foreign terminal grid through the existing

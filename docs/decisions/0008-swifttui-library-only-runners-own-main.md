@@ -1,15 +1,24 @@
 ---
 adr: "0008"
 title: "SwiftTUI is library-only; runners own App.main()"
-status: accepted
+status: superseded
 date: 2026-04-29
 sources:
   - docs/HOST_PACKAGES.md
   - docs/ARCHITECTURE.md
   - README.md
+superseded_by:
+  - docs/decisions/0017-terminal-convenience-product-over-runtime.md
 ---
 
 # ADR-0008: SwiftTUI is library-only; runners own App.main()
+
+> Superseded by
+> [ADR-0017](0017-terminal-convenience-product-over-runtime.md), which records
+> the May 2026 public product contract. The platform-neutral runtime role moved
+> to `SwiftTUIRuntime`, while `SwiftTUI` became the release-facing terminal app
+> convenience product that re-exports `SwiftTUIRuntime`, `SwiftTUIArguments`,
+> and `SwiftTUICLI`.
 
 ## Context
 
@@ -76,9 +85,10 @@ routing.
 
 ## Status
 
-Accepted. The terminal-native default `App.main()` lives in
-`SwiftTUICLI`. The root package exposes framework products plus the platform
-runner, host, WebHost, and terminal-embedding products.
+Superseded. `SwiftTUICLI` still owns the lower-level terminal runner, but
+`SwiftTUI` now re-exports it as part of the terminal convenience product. Host
+products depend on `SwiftTUIRuntime` directly rather than on the `SwiftTUI`
+convenience layer.
 
 ## Consequences
 

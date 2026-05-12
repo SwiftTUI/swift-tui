@@ -1,5 +1,5 @@
 public import Foundation
-public import SwiftTUI
+public import SwiftTUIRuntime
 public import SwiftTUIArguments
 
 #if canImport(Darwin)

@@ -1,6 +1,6 @@
 import Testing
 
-@_spi(Runners) @testable import SwiftTUI
+@_spi(Runners) @testable import SwiftTUIRuntime
 
 @Suite("Async lifecycle generation fences")
 struct AsyncLifecycleGenerationTests {

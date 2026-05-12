@@ -19,8 +19,9 @@ directory is now source layout for root package targets, except
 
 The root `Package.swift` exposes the framework and platform products together:
 
-- `SwiftTUI`: shared runtime, scene declarations, `SceneManifest`, and
-  `HostedSceneSession`
+- `SwiftTUI`: one-import terminal app convenience product
+- `SwiftTUIRuntime`: platform-neutral authoring/runtime composition product,
+  scene declarations, `SceneManifest`, and `HostedSceneSession`
 - `SwiftTUICLI`: terminal-native executable runner
 - `SwiftTUIArguments`: shared framework flag and environment parsing
 - `SwiftTUIWASI`: WASI executable runner and manifest mode
@@ -37,6 +38,8 @@ The source directories remain useful ownership boundaries:
 
 - `Platforms/CLI`: `SwiftTUICLI`
 - `Platforms/Arguments`: `SwiftTUIArguments`
+- `Sources/SwiftTUIRuntime`: platform-neutral runtime, scene, terminal
+  presentation, and hosted-session seams
 - `Platforms/WASI`: `SwiftTUIWASI` and `WASISurfaceBridge`
 - `Platforms/SwiftUI`: `SwiftUIHost`
 - `Platforms/WebHost`: `SwiftTUIWebHost` and `SwiftTUIWebHostCLI`
@@ -47,13 +50,16 @@ The source directories remain useful ownership boundaries:
 
 Consumers choose one launch composition at compile time:
 
-- terminal-only apps import `SwiftTUICLI`; `--web` is rejected before raw-mode
+- terminal-only apps import `SwiftTUI`; `--web` is rejected before raw-mode
   setup and the binary links no server, WebSocket, FlyingFox, or browser-bundle
   code
+- custom terminal launchers can compose `SwiftTUIRuntime` with `SwiftTUICLI`
+  directly when they do not want the `SwiftTUI` convenience product
 - web-only local-browser apps import `SwiftTUIWebHost`; launch is owned by
   `WebHostRunner`
-- terminal plus local-browser apps import `SwiftTUIWebHostCLI`; normal launches
-  use `TerminalRunner`, while `--web` uses `WebHostRunner`
+- terminal plus local-browser apps use `SwiftTUIWebHostCLI` as an import
+  replacement; normal launches use `TerminalRunner`, while `--web` uses
+  `WebHostRunner`
 - WASI apps import `SwiftTUIWASI`; transport-only browser consumers can import
   `WASISurfaceBridge`
 - native Apple apps import `SwiftUIHost` to retain `HostedSceneSession` values
@@ -73,9 +79,12 @@ and select products with `.product(name: ..., package: "swift-tui")`.
 The platform-integration-facing root work is landed:
 
 - `SwiftTUI` exposes `SceneDescriptor`, `SceneManifest`, and
-  `HostedSceneSession`
-- `SwiftTUICLI` owns terminal-native `App.main()`, attach/list CLI behavior,
-  and pty-backed scene management
+  `HostedSceneSession` through the terminal convenience import
+- `SwiftTUIRuntime` owns the shared runtime, scene declarations,
+  `SceneManifest`, and `HostedSceneSession`
+- `SwiftTUICLI` owns terminal-native attach/list CLI behavior and explicit
+  terminal launch; the `SwiftTUI` convenience product re-exports it for the
+  default terminal `App.main()` story
 - `SwiftTUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest` plus
   WASI scene launch
 - `SwiftTUIWebHost` owns the opt-in WebHost runner and localhost browser host
@@ -85,20 +94,25 @@ The platform-integration-facing root work is landed:
 - `SwiftUIHost` owns the native SwiftUI retained-scene surface
 - `SwiftTUITerminal` owns terminal-program embedding through `TerminalView`
 - shared control-message parsing lives in
-  `Sources/SwiftTUI/TerminalControlMessages.swift`
+  `Sources/SwiftTUIRuntime/Terminal/TerminalControlMessages.swift`
 - embedded hosts use `InjectedTerminalInputReader` where they need
   wrapper-managed byte or event delivery; WebHost uses streaming presentation
   output, while the native SwiftUI host receives `RasterSurface` values
   directly
 - hosted sessions accept paired render-style updates so terminal appearance and
   semantic theme move together at runtime
-- `SwiftTUI` itself remains library-only; executable launch is runner-owned
+- composed host products depend on `SwiftTUIRuntime` instead of the `SwiftTUI`
+  terminal convenience product
 
 ## Responsibilities
 
 The current boundary is:
 
-- root runtime product:
+- `SwiftTUI` terminal convenience product:
+  - one-import terminal app authoring
+  - standard argument parsing
+  - default terminal `App.main()` through `SwiftTUICLI`
+- platform-neutral runtime product:
   - app authoring
   - scene collection
   - retained hosted runtime sessions
@@ -140,8 +154,8 @@ is only the source directory that contains their target implementations.
   work.
 - `SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
   that link the embedded HTTP/WebSocket server dependency and browser
-  resources. Terminal-only binaries never weak-link or discover that code at
-  runtime.
+  resources. Terminal-only `SwiftTUI` binaries never weak-link or discover
+  that code at runtime.
 
 ## Non-Negotiable Decisions
 

@@ -29,7 +29,6 @@ let package = Package(
       dependencies: [
         "FilePreviewerApp",
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "SwiftTUICLI", package: "swift-tui"),
       ]
     ),
     .testTarget(

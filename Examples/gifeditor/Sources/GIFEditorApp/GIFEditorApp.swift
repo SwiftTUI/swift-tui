@@ -1,7 +1,5 @@
 import Foundation
 import GIFEditor
-import SwiftTUI
-import SwiftTUIArguments
 import SwiftTUIWebHostCLI
 
 @main

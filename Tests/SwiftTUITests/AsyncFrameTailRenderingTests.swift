@@ -3,7 +3,7 @@ import Foundation
 import Synchronization
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
@@ -3294,7 +3294,7 @@ private enum AsyncFrameTailSendableFocusField: String, Hashable {
   case second
 }
 
-extension SwiftTUI.RunLoop {
+extension SwiftTUIRuntime.RunLoop {
   @MainActor
   fileprivate func currentView() -> ScopedBuilder<Content> {
     viewBuilder(
@@ -3354,7 +3354,7 @@ private final class AsyncFrameHeadAbortEffectRecorder: Sendable {
 
 @MainActor
 private func renderAsyncFrameHeadAbortScaffoldFrame<State, V: View>(
-  _ runLoop: SwiftTUI.RunLoop<State, V>
+  _ runLoop: SwiftTUIRuntime.RunLoop<State, V>
 ) throws {
   runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
   var renderedFrames = 0
@@ -3363,7 +3363,7 @@ private func renderAsyncFrameHeadAbortScaffoldFrame<State, V: View>(
 
 @MainActor
 private func focusLeafmostAsyncFrameHeadAbortScaffoldRegion<State, V: View>(
-  in runLoop: SwiftTUI.RunLoop<State, V>
+  in runLoop: SwiftTUIRuntime.RunLoop<State, V>
 ) {
   guard
     let leafmost = runLoop.latestSemanticSnapshot.focusRegions.filter({

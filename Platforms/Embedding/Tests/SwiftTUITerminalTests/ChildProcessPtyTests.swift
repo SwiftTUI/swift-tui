@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 import SwiftTUIPTYPrimitives
 import Testing
 

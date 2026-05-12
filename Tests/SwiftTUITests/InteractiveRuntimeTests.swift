@@ -2,7 +2,7 @@ import EmbeddedFonts
 import Foundation
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIViews
 

@@ -1,2 +1,2 @@
 @_exported import ArgumentParser
-@_exported import SwiftTUI
+@_exported import SwiftTUIRuntime

@@ -1,7 +1,5 @@
 import Layouts
 import SwiftTUI
-import SwiftTUIArguments
-import SwiftTUICLI
 
 @main
 struct LayoutsApp: App, SwiftTUICommand {

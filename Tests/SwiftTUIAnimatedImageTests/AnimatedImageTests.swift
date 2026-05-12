@@ -57,7 +57,7 @@ struct AnimatedImageTests {
     environment.terminalAppearance = host.appearance
     environment.terminalSize = terminalSize
 
-    let runLoop = SwiftTUI.RunLoop(
+    let runLoop = SwiftTUIRuntime.RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: host,
       inputReader: inputReader,

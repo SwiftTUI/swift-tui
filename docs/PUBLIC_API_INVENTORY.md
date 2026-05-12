@@ -164,9 +164,16 @@ for the model and the implementation record.
   `ToolbarItemConfig` and the hoisting preference contract that bubbles item
   contributions up to the nearest enclosing `.toolbar(style:)` modifier
 
-### `SwiftTUI`
+### `SwiftTUI` and `SwiftTUIRuntime`
 
-The runtime-facing public surface is also canonical:
+`SwiftTUI` is the terminal app convenience import. It re-exports
+`SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so ordinary terminal
+apps can write only `import SwiftTUI` and still get standard framework flags
+plus the default terminal `App.main()` behavior.
+
+`SwiftTUIRuntime` is the platform-neutral runtime import used by host products
+and custom launchers that do not want the terminal convenience product. Its
+runtime-facing public surface is canonical:
 
 - `DefaultRenderer`
 - `RunLoop`
@@ -201,12 +208,14 @@ closure-based frame producers.
 Platform-specific execution and embedding are root package products:
 
 - executable runner products:
-  - `SwiftTUICLI` exposes `TerminalRunner` plus the default terminal-native `App.main()` story
+  - `SwiftTUICLI` exposes `TerminalRunner` plus the terminal-native
+    `App.main()` story re-exported by `SwiftTUI`
   - `SwiftTUIWASI` exposes `WASIRunner` plus the default WASI `App.main()` story
   - `SwiftTUIWebHost` exposes `WebHostRunner`, `WebHostConfig`, and
     `WebHostRunnerError` for web-only localhost-browser launch
-  - `SwiftTUIWebHostCLI` exposes `WebHostCLIRunner` for binaries that
-    intentionally combine terminal and WebHost behavior
+  - `SwiftTUIWebHostCLI` exposes `WebHostCLIRunner` plus the WebHost-aware
+    default `App.main()` story for binaries that intentionally combine terminal
+    and WebHost behavior
 - host products and packages:
   - `SwiftUIHost` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
   - `Platforms/Web` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
@@ -224,7 +233,7 @@ These are supported root package products, except `Platforms/Web`, which remains
 the Bun browser package.
 
 The WebHost surface is compile-time opt-in. A terminal-only app that imports
-only `SwiftTUICLI` links no WebHost server, FlyingFox dependency, or browser
+only `SwiftTUI` links no WebHost server, FlyingFox dependency, or browser
 bundle, and web mode is rejected before raw-mode setup. A web-capable app must
 depend on `SwiftTUIWebHost` or `SwiftTUIWebHostCLI` explicitly.
 
@@ -239,7 +248,7 @@ The core data model and pipeline types are canonical:
 - the incremental presentation and retained-frame machinery that the runtime depends on
 
 `Core` is currently target-level infrastructure re-exported through
-`SwiftTUI`, not a separate library product.
+`SwiftTUIRuntime` and `SwiftTUI`, not a separate library product.
 
 ## Removed From The Public Surface
 

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
   import AppKit

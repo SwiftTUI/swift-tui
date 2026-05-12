@@ -1,7 +1,7 @@
 import Foundation
-public import SwiftTUI
 import SwiftTUIArguments
 import SwiftTUICLI
+public import SwiftTUIRuntime
 import SwiftTUIWebHost
 
 public enum WebHostCLIRunner {
@@ -59,6 +59,18 @@ public enum WebHostCLIRunner {
   ) throws -> RuntimeConfiguration {
     try SwiftTUIOptions.parse(arguments)
       .runtimeConfiguration(environment: environment, isStdoutTTY: isStdoutTTY)
+  }
+}
+
+extension App {
+  /// Default entry point for apps that opt into the combined terminal/WebHost
+  /// runner without defining app-specific command parsing.
+  public static func main() async {
+    do {
+      try await WebHostCLIRunner.run(Self.self)
+    } catch {
+      fatalError(String(describing: error))
+    }
   }
 }
 

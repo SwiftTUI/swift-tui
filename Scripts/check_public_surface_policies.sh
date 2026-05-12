@@ -56,27 +56,27 @@ if rg -U -n -P --quiet -- 'extension\s+View\s*(?:where[^{]+)?\{\s*public\s+var\s
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol Scene \{' \
-  Sources/SwiftTUI/Scenes/App.swift; then
+  Sources/SwiftTUIRuntime/Scenes/App.swift; then
   fail "The public Scene protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUI/Scenes/App.swift; then
+  Sources/SwiftTUIRuntime/Scenes/App.swift; then
   fail "Scene.body must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol App \{' \
-  Sources/SwiftTUI/Scenes/App.swift; then
+  Sources/SwiftTUIRuntime/Scenes/App.swift; then
   fail "The public App protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- 'nonisolated\s+init\(\)' \
-  Sources/SwiftTUI/Scenes/App.swift; then
+  Sources/SwiftTUIRuntime/Scenes/App.swift; then
   fail "App.init must stay nonisolated so runner/argument protocols can compose with App."
 fi
 
 if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUI/Scenes/App.swift; then
+  Sources/SwiftTUIRuntime/Scenes/App.swift; then
   fail "App.body must stay @SceneBuilder and @MainActor-annotated."
 fi
 
@@ -86,7 +86,7 @@ if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
-  Sources/SwiftTUI/SwiftTUI.swift; then
+  Sources/SwiftTUIRuntime/SwiftTUI.swift; then
   fail "DefaultRenderer.render must stay @MainActor."
 fi
 
@@ -124,7 +124,7 @@ docs/RUNTIME.md
 docs/STATUS.md
 docs/PUBLIC_API_INVENTORY.md
 Sources/SwiftTUIViews/SwiftTUIViews.docc/Authoring-Views.md
-Sources/SwiftTUI/SwiftTUI.docc/Running-Apps.md
+Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Running-Apps.md
 EOF
 
 while IFS= read -r doc_file; do
@@ -377,7 +377,7 @@ if ! rg -n --fixed-strings --quiet -- '### Root-package platform integration pro
   fail "docs/PUBLIC_API_INVENTORY.md should classify the root-package platform integration products explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'one Swift package exposing `SwiftTUI` for shared' docs/PUBLIC_SURFACE_POLICY.md; then
+if ! rg -U -n -P --quiet -- 'one Swift package exposing `SwiftTUI` for the\s+default terminal app story' docs/PUBLIC_SURFACE_POLICY.md; then
   fail "docs/PUBLIC_SURFACE_POLICY.md should describe the root package platform product model explicitly."
 fi
 

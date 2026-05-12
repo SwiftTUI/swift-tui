@@ -7,9 +7,8 @@ This note defines how the package should think about its public API shape after 
 The package should present one primary authoring story:
 
 - write views with the SwiftUI-shaped surface in `View`
-- use `SwiftTUI` for shared runtime integration plus root package platform
-  products for executable launch, host-managed embedding, and
-  terminal-program embedding
+- use `SwiftTUI` for one-import terminal apps and `SwiftTUIRuntime` for
+  platform-neutral runtime composition with explicit host products
 - treat `Core` as pipeline and data-model infrastructure
 
 Anything outside that shape must justify why it is public.
@@ -20,15 +19,18 @@ The canonical public surface is the one used in README examples, architecture do
 
 - `View` and the SwiftUI-shaped container and leaf APIs
 - property wrappers and environment plumbing that feel like SwiftUI
-- runtime integration points in `SwiftTUI` that run those views in a terminal session or shared scene session
+- runtime integration points in `SwiftTUIRuntime` that render those views or
+  retain shared scene sessions
+- the `SwiftTUI` convenience product for ordinary terminal executable apps
 - root package platform products when the app needs terminal-native execution,
   WASI execution, WebHost execution, host-managed embedding, or
   terminal-program embedding
 
-The supported package model is one Swift package exposing `SwiftTUI` for shared
-runtime integration plus sibling platform integration products: runners for
-executable launch, host products for host-managed embedding, and terminal
-embedding products for child terminal programs.
+The supported package model is one Swift package exposing `SwiftTUI` for the
+default terminal app story, `SwiftTUIRuntime` for shared runtime integration,
+and sibling platform integration products: runners for executable launch, host
+products for host-managed embedding, and terminal embedding products for child
+terminal programs.
 
 In this repo, an executable runner product owns top-level execution and the
 default `App.main()` story, while a host product retains `HostedSceneSession`
@@ -36,17 +38,20 @@ values inside another app or runtime shell.
 
 Runner and host composition is explicit:
 
-- terminal-only apps depend on `SwiftTUICLI`
+- terminal-only apps depend on `SwiftTUI`
+- custom terminal launchers can compose `SwiftTUIRuntime` with `SwiftTUICLI`
 - WASI apps depend on `SwiftTUIWASI`
 - web-only localhost apps depend on `SwiftTUIWebHost` and call
   `WebHostRunner`
 - apps that intentionally support both terminal-native and localhost-browser
-  launch depend on `SwiftTUIWebHostCLI` and call `WebHostCLIRunner`
+  launch depend on `SwiftTUIWebHostCLI`; simple apps can use its default
+  `App.main()`, while custom launchers can call `WebHostCLIRunner`
 
 `SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
 that may link the embedded HTTP/WebSocket server, FlyingFox, and bundled
-browser resources. `SwiftTUICLI` must keep rejecting web mode without probing
-or weak-linking the WebHost package.
+browser resources. The `SwiftTUI` terminal convenience product and
+`SwiftTUICLI` runner must keep rejecting web mode without probing or
+weak-linking the WebHost package.
 
 If a feature can be expressed naturally on that surface, it should be documented there first.
 

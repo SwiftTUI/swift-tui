@@ -21,10 +21,11 @@ struct GalleryWebHostCompositionTests {
     #expect(source.contains("import SwiftTUIWebHostCLI"))
     #expect(source.contains("WebHostCLIRunner.run("))
     #expect(source.contains("struct GalleryDemoOptions: ParsableArguments"))
+    #expect(!source.contains("import SwiftTUI\n"))
     #expect(!source.contains("import SwiftTUICLI"))
 
-    #expect(manifest.contains("SwiftTUIWebHost"))
     #expect(manifest.contains("SwiftTUIWebHostCLI"))
+    #expect(!manifest.contains("SwiftTUIArguments"))
     #expect(!manifest.contains("SwiftTUICLI"))
   }
 }

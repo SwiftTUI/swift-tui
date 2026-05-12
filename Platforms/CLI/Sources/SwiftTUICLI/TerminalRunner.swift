@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Runners) import SwiftTUI
+@_spi(Runners) import SwiftTUIRuntime
 public import SwiftTUIArguments
 
 #if canImport(Darwin)

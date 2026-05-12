@@ -1,4 +1,4 @@
-@_spi(Runners) public import SwiftTUI
+@_spi(Runners) public import SwiftTUIRuntime
 import Synchronization
 
 /// Container format the web-surface transport advertises to the JS

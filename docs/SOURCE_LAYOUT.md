@@ -7,7 +7,8 @@ future file moves.
 ## Repository Layout
 
 - `Sources/`: root Swift package framework targets (`SwiftTUICore`,
-  `SwiftTUIViews`, `SwiftTUIAnimatedImage`, `SwiftTUICharts`, and `SwiftTUI`)
+  `SwiftTUIViews`, `SwiftTUIRuntime`, `SwiftTUIAnimatedImage`,
+  `SwiftTUICharts`, and the thin `SwiftTUI` convenience target)
 - `Tests/`: root Swift package tests for the framework products
 - `Platforms/`: source directories for root Swift package platform products:
   executable runners (`CLI`, `WASI`), host products (`SwiftUI`, `WebHost`),
@@ -24,6 +25,7 @@ future file moves.
 
 - Library products:
   - `SwiftTUIViews`
+  - `SwiftTUIRuntime`
   - `SwiftTUI`
   - `SwiftTUIAnimatedImage`
   - `SwiftTUICharts`
@@ -58,26 +60,26 @@ future file moves.
   - `Vendor/swift-gif` — pure-Swift GIF decoder and encoder used by
     `SwiftTUIAnimatedImage` and GIF-focused example packages
 
-`SwiftTUICore` remains the shared pipeline target, but it is not exposed as a separate
-library product. Downstream package consumers reach those types through
-`SwiftTUI` re-exports.
+`SwiftTUICore` remains the shared pipeline target, but it is not exposed as a
+separate library product. Downstream package consumers reach those types
+through `SwiftTUIRuntime` or `SwiftTUI` re-exports.
 
-## `SwiftTUI`
+## `SwiftTUIRuntime`
 
-`SwiftTUI` is the terminal runtime and umbrella product. It is organized
+`SwiftTUIRuntime` is the platform-neutral runtime product. It is organized
 around runtime feature concerns:
 
 ```
-Sources/SwiftTUI/
+Sources/SwiftTUIRuntime/
   Accessibility/ — runtime accessibility policy adapters for terminal targets
   RunLoop/      — runtime coordinator, event dispatch, pointer routing, render scheduling
   Lifecycle/    — post-present lifecycle staging, task running, animation control
   Scenes/       — App protocol, scene traversal, scene manifest, hosted scene sessions
   Terminal/     — terminal host, presentation, appearance + capability detection, image rendering
-  Input/        — keyboard, pointer, paste, drop, signal, exit-key bindings input decoding
+  Input/        — keyboard, pointer, paste, drop, and exit-key bindings input decoding
   Diagnostics/  — frame diagnostics logging
   Support/      — link opening, async-stream teardown, platform stdio helpers
-  SwiftTUI.docc/ — module landing page and runtime guides
+  SwiftTUIRuntime.docc/ — module landing page and runtime guides
   SwiftTUI.swift — umbrella `@_exported` re-export of `SwiftTUICore`, `SwiftTUIViews`, plus runtime entry points
 ```
 
@@ -88,7 +90,9 @@ Sources/SwiftTUI/
   author-triggered `AccessibilityAnnouncer` messages
 - `Accessibility/LinearAccessibilityRenderer.swift`: semantic linear renderer for accessible CLI output
 - `Accessibility/LiveRegionAnnouncer.swift`: accessible-mode live-region change tracker and announcement renderer
-- `RunLoop/RunLoop.swift`: runtime coordinator and shared runtime state
+- `RunLoop/RunLoop.swift`: runtime coordinator, shared runtime state, and
+  `InProcessSignalReader` for hosts that inject termination events without
+  Unix signal handling
 - `RunLoop/RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
 - `RunLoop/RunLoop+PointerHandling.swift`: pointer routing, activation, hover, capture, and scroll-wheel handling
 - `RunLoop/RunLoop+EventPump.swift`: event buffering and coalescing
@@ -130,7 +134,6 @@ Sources/SwiftTUI/
 
 - `Input/InputReader.swift`: keyboard, mouse, pointer, paste, and drop input decoding
 - `Input/InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares control-message parsing
-- `Input/SignalReader.swift`: native and in-process signal readers
 - `Input/ExitKeyBindings.swift`: exit-key configuration
 
 ### Diagnostics
@@ -148,11 +151,27 @@ Sources/SwiftTUI/
 ### Umbrella
 
 - `SwiftTUI.swift`: `@_exported` re-export of `SwiftTUICore` and `SwiftTUIViews` plus `DefaultRenderer` (retained-frame, resolve-reuse, portal-root integration, and presentation-aware frame artifacts)
-- `SwiftTUI.docc/`: module landing page and runtime guides
+- `SwiftTUIRuntime.docc/`: module landing page and runtime guides
+
+## `SwiftTUI`
+
+`SwiftTUI` is the release-facing terminal app convenience target:
+
+```
+Sources/SwiftTUI/
+  SwiftTUI.swift — `@_exported` re-export of `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI`
+```
+
+It owns no runtime implementation files. Terminal-only apps import this product
+for the default `App.main()` story; platform hosts compose with
+`SwiftTUIRuntime` directly so they do not inherit terminal convenience
+behavior.
 
 ## `Platforms/CLI`
 
 - `SwiftTUICLI.swift`: re-export surface for the CLI runner product
+- `SignalReader.swift`: UnixSignals-backed terminal signal reader and default
+  CLI signal-reader factory
 - `TerminalRunner.swift`: terminal-native app launch, CLI-mode routing, and single-scene test helper
 - `SceneRuntime.swift`: per-scene runtime orchestration for multi-scene terminal apps
 - `SceneLifecycle.swift`: scene session coordination
@@ -185,7 +204,7 @@ combines runner and browser-host responsibilities:
 - `SwiftTUIWebHost` — opt-in embedded HTTP/WebSocket launcher. App authors
   `import SwiftTUIWebHost` for web-only binaries that serve a local browser
   view from the native process.
-  - `SwiftTUIWebHost.swift`: re-export surface for `SwiftTUI`
+  - `SwiftTUIWebHost.swift`: re-export surface for `SwiftTUIRuntime`
   - `WebHostConfig.swift`: bind, port, browser-open, and candidate-port policy
   - `WebHostRunner.swift`: single-scene WebHost launch path built on
     `HostedSceneSession` / `SceneSessionResources`
@@ -205,8 +224,8 @@ combines runner and browser-host responsibilities:
   - `BrowserOpener.swift`: opt-in browser launch for `--open`
 - `SwiftTUIWebHostCLI` — compile-time composition product for binaries that
   intentionally support both terminal-native execution and WebHost mode.
-  - `SwiftTUIWebHostCLI.swift`: re-export surface for `SwiftTUI` and
-    `SwiftTUIWebHost`
+  - `SwiftTUIWebHostCLI.swift`: re-export surface for `SwiftTUIRuntime`,
+    `SwiftTUIArguments`, and `SwiftTUIWebHost`
   - `WebHostCLIRunner.swift`: routes `RuntimeConfiguration.web != nil` to
     `WebHostRunner` and otherwise calls `TerminalRunner`
 

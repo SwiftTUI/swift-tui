@@ -1,4 +1,4 @@
-package import SwiftTUI
+package import SwiftTUIRuntime
 
 package enum InteractiveDemoSelectionMode: String, CaseIterable, Equatable, Sendable {
   case inspect

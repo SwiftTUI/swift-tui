@@ -2,7 +2,7 @@ import SwiftTUIViews
 import Synchronization
 import Testing
 
-@testable import SwiftTUI
+@testable import SwiftTUIRuntime
 
 @MainActor
 @Suite(.serialized)
