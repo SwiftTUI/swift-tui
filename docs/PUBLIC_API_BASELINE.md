@@ -19,12 +19,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
 | `SwiftTUIRuntime` | 48 | 513 |
-| `SwiftTUIViews` | 249 | 9354 |
-| `SwiftTUIAnimatedImage` | 5 | 155 |
-| `SwiftTUICharts` | 29 | 1825 |
+| `SwiftTUIViews` | 250 | 9296 |
+| `SwiftTUIAnimatedImage` | 5 | 154 |
+| `SwiftTUICharts` | 29 | 1812 |
 | `SwiftTUIArguments` | 4 | 113 |
 | `SwiftTUIPTYPrimitives` | 6 | 34 |
-| `SwiftTUITerminal` | 12 | 291 |
+| `SwiftTUITerminal` | 12 | 290 |
 | `SwiftTUICLI` | 5 | 24 |
 | `WASISurfaceBridge` | 0 | 0 |
 | `SwiftTUIWASI` | 2 | 8 |
@@ -91,7 +91,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (249)
+### Canonical surface (250)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -111,7 +111,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `AnyTextFieldStyle` — struct — 6 members
 - `AnyToastStyle` — struct — 7 members
 - `AnyTransition` — struct — 9 members
-- `AnyView` — struct — 125 members
+- `AnyView` — struct — 124 members
 - `AppearLifecycleModifier` — struct — 2 members
 - `ASCIIOutlineStyle` — struct — 5 members
 - `AutomaticButtonStyle` — struct — 4 members
@@ -130,20 +130,21 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `BorderedButtonStyle` — struct — 4 members
 - `BorderedProminentButtonStyle` — struct — 4 members
 - `BorderModifier` — struct — 2 members
+- `BuiltinPaletteSheetPresentationModifier` — struct — 2 members
 - `BuiltinPromptPresentationModifier` — struct — 2 members
 - `BuiltinSheetPresentationModifier` — struct — 2 members
-- `Button` — struct — 129 members
+- `Button` — struct — 128 members
 - `ButtonStyle` — protocol — 6 members
-- `ButtonStyleConfiguration` — struct — 135 members
-- `Canvas` — struct — 128 members
+- `ButtonStyleConfiguration` — struct — 134 members
+- `Canvas` — struct — 127 members
 - `CanvasClosureDrawing` — struct — 4 members
-- `Capsule` — struct — 136 members
+- `Capsule` — struct — 135 members
 - `ChangeLifecycleModifier` — struct — 2 members
-- `Circle` — struct — 136 members
+- `Circle` — struct — 135 members
 - `ClipboardWriteAction` — struct — 4 members
-- `ConditionalContent` — struct — 127 members
+- `ConditionalContent` — struct — 126 members
 - `ContentShapeModifier` — struct — 2 members
-- `ControlGroup` — struct — 126 members
+- `ControlGroup` — struct — 125 members
 - `CoordinateSpace` — struct — 11 members
 - `CustomAnimation` — protocol — 5 members
 - `DangerToastStyle` — struct — 3 members
@@ -151,17 +152,17 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `DefaultFocusScopeModifier` — struct — 2 members
 - `DefaultTopToolbarStyle` — struct — 4 members
 - `DisappearLifecycleModifier` — struct — 2 members
-- `DisclosureGroup` — struct — 126 members
-- `Divider` — struct — 125 members
+- `DisclosureGroup` — struct — 125 members
+- `Divider` — struct — 124 members
 - `DragGesture` — struct — 22 members
 - `DrawMetadataModifier` — struct — 2 members
 - `DropDestinationRegistrationModifier` — struct — 2 members
-- `Ellipse` — struct — 136 members
-- `EmptyView` — struct — 124 members
+- `Ellipse` — struct — 135 members
+- `EmptyView` — struct — 123 members
 - `EnvironmentKey` — protocol — 2 members
-- `EnvironmentReader` — struct — 124 members
+- `EnvironmentReader` — struct — 123 members
 - `EnvironmentTransformModifier` — struct — 2 members
-- `EnvironmentValues` — struct — 31 members
+- `EnvironmentValues` — struct — 30 members
 - `EnvironmentWritingModifier` — struct — 2 members
 - `ExclusiveGesture` — struct — 11 members
 - `FileOpenError` — enum — 3 members
@@ -171,11 +172,11 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FocusedValue` — struct — 2 members
 - `FocusedValueWritingModifier` — struct — 2 members
 - `FocusState` — struct — 7 members
-- `ForEach` — struct — 128 members
-- `ForeignSurface` — struct — 125 members
+- `ForEach` — struct — 127 members
+- `ForeignSurface` — struct — 124 members
 - `FrameModifier` — struct — 2 members
 - `GeometryProxy` — struct — 9 members
-- `GeometryReader` — struct — 124 members
+- `GeometryReader` — struct — 123 members
 - `Gesture` — protocol — 8 members
 - `GestureAttachmentModifier` — struct — 2 members
 - `GestureBuilder` — enum — 1 member
@@ -184,25 +185,25 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `GestureStateBinding` — struct — 2 members
 - `GestureStateBox` — class — 6 members
 - `GestureStateGesture` — struct — 12 members
-- `Group` — struct — 124 members
-- `GroupBox` — struct — 126 members
+- `Group` — struct — 123 members
+- `GroupBox` — struct — 125 members
 - `HorizontalAlignmentGuideModifier` — struct — 2 members
-- `HStack` — struct — 126 members
+- `HStack` — struct — 125 members
 - `HStackLayout` — struct — 8 members
 - `IDModifier` — struct — 2 members
 - `IgnoreSafeAreaModifier` — struct — 2 members
-- `Image` — struct — 132 members
+- `Image` — struct — 131 members
 - `InfoToastStyle` — struct — 3 members
 - `InlinePickerStyle` — struct — 5 members
 - `InsetGroupedListStyle` — struct — 5 members
-- `InsetShape` — struct — 138 members
+- `InsetShape` — struct — 137 members
 - `InsettableShape` — protocol — 1 member
 - `ItemNavigationDestinationModifier` — struct — 2 members
 - `KeyCommandRegistrationModifier` — struct — 2 members
 - `KeyPressMatch` — struct — 4 members
 - `KeyPressModifier` — struct — 2 members
-- `Label` — struct — 126 members
-- `LabeledContent` — struct — 126 members
+- `Label` — struct — 125 members
+- `LabeledContent` — struct — 125 members
 - `Layout` — protocol — 8 members
 - `LayoutPoint` — typealias
 - `LayoutRect` — typealias
@@ -211,16 +212,16 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `LayoutSubviews` — typealias
 - `LayoutValueKey` — protocol — 2 members
 - `LayoutValueModifier` — struct — 2 members
-- `LazyHStack` — struct — 126 members
-- `LazyVStack` — struct — 126 members
-- `Link` — struct — 127 members
+- `LazyHStack` — struct — 125 members
+- `LazyVStack` — struct — 125 members
+- `Link` — struct — 126 members
 - `LinkButtonStyle` — struct — 4 members
-- `List` — struct — 133 members
+- `List` — struct — 132 members
 - `ListStyle` — protocol — 1 member
 - `LiteralTabsTabViewStyle` — struct — 7 members
 - `LongPressGesture` — struct — 11 members
 - `MatchedGeometryModifier` — struct — 2 members
-- `Menu` — struct — 125 members
+- `Menu` — struct — 124 members
 - `MenuPickerStyle` — struct — 5 members
 - `ModifiedContent` — struct — 145 members
 - `NamedCoordinateSpaceModifier` — struct — 2 members
@@ -231,16 +232,16 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `OpenLinkAction` — struct — 4 members
 - `OptionalDefaultFocusModifier` — struct — 2 members
 - `OptionalFocusBindingModifier` — struct — 2 members
-- `OutlineGroup` — struct — 128 members
+- `OutlineGroup` — struct — 127 members
 - `OutlineStyle` — protocol — 1 member
 - `OverlayModifier` — struct — 2 members
 - `PaddingModifier` — struct — 2 members
 - `PaletteCommandRegistrationModifier` — struct — 2 members
 - `Panel` — struct — 131 members
-- `PhaseAnimator` — struct — 126 members
-- `Picker` — struct — 126 members
+- `PhaseAnimator` — struct — 125 members
+- `Picker` — struct — 125 members
 - `PickerStyle` — protocol — 8 members
-- `PickerStyleConfiguration` — struct — 139 members
+- `PickerStyleConfiguration` — struct — 138 members
 - `PlainButtonStyle` — struct — 4 members
 - `PlainListStyle` — struct — 5 members
 - `PlainOutlineStyle` — struct — 5 members
@@ -256,39 +257,39 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `PreferenceWritingModifier` — struct — 2 members
 - `PreferredDefaultFocusModifier` — struct — 2 members
 - `PresentationChrome` — enum — 4 members
-- `ProgressView` — struct — 133 members
+- `ProgressView` — struct — 132 members
 - `ProposedViewSize` — typealias
 - `RadioGroupPickerStyle` — struct — 5 members
-- `Rectangle` — struct — 136 members
+- `Rectangle` — struct — 135 members
 - `ResetFocusAction` — struct — 5 members
 - `ResolveContext` — struct — 10 members
 - `Resolver` — struct — 2 members
 - `RoundedBorderTextFieldStyle` — struct — 3 members
 - `RoundedOutlineStyle` — struct — 5 members
-- `RoundedRectangle` — struct — 137 members
+- `RoundedRectangle` — struct — 136 members
 - `SafeAreaInsetModifier` — struct — 2 members
 - `SafeAreaPaddingModifier` — struct — 2 members
 - `ScrollPosition` — struct — 8 members
-- `ScrollView` — struct — 128 members
-- `Section` — struct — 126 members
-- `SecureField` — struct — 127 members
+- `ScrollView` — struct — 127 members
+- `Section` — struct — 125 members
+- `SecureField` — struct — 126 members
 - `SegmentedPickerStyle` — struct — 5 members
 - `SemanticMetadataModifier` — struct — 2 members
 - `SendableLayout` — protocol — 3 members
 - `Shape` — protocol — 13 members
-- `Slider` — struct — 127 members
-- `Spacer` — struct — 125 members
+- `Slider` — struct — 126 members
+- `Spacer` — struct — 124 members
 - `SpatialTapGesture` — struct — 15 members
-- `Spinner` — struct — 176 members
+- `Spinner` — struct — 175 members
 - `Standard` — enum — 12 members
 - `State` — struct — 4 members
-- `Stepper` — struct — 127 members
+- `Stepper` — struct — 126 members
 - `SuccessToastStyle` — struct — 3 members
-- `Tab` — struct — 125 members
-- `Table` — struct — 126 members
+- `Tab` — struct — 124 members
+- `Table` — struct — 125 members
 - `TableColumn` — struct — 6 members
-- `TableRow` — struct — 124 members
-- `TabView` — struct — 125 members
+- `TableRow` — struct — 123 members
+- `TabView` — struct — 124 members
 - `TabViewOverflowMenuPresentation` — struct — 15 members
 - `TabViewOverflowTriggerConfiguration` — struct — 7 members
 - `TabViewStyle` — protocol — 14 members
@@ -300,17 +301,17 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TapGesture` — struct — 9 members
 - `TaskLifecycleModifier` — struct — 2 members
 - `TerminationRequestModifier` — struct — 2 members
-- `Text` — struct — 154 members
-- `TextEditor` — struct — 125 members
-- `TextField` — struct — 127 members
+- `Text` — struct — 153 members
+- `TextEditor` — struct — 124 members
+- `TextField` — struct — 126 members
 - `TextFieldStyle` — protocol — 4 members
-- `TextFieldStyleConfiguration` — struct — 259 members
-- `TextFigure` — struct — 131 members
+- `TextFieldStyleConfiguration` — struct — 257 members
+- `TextFigure` — struct — 130 members
 - `ToastModifier` — struct — 2 members
 - `ToastStyle` — protocol — 3 members
 - `ToastStyleConfiguration` — struct — 1 member
 - `ToastStylePresentation` — struct — 11 members
-- `Toggle` — struct — 126 members
+- `Toggle` — struct — 125 members
 - `ToolbarItemConfig` — struct — 12 members
 - `ToolbarItemContributionModifier` — struct — 2 members
 - `ToolbarModifier` — struct — 2 members
@@ -323,24 +324,24 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TransitionPhase` — enum — 5 members
 - `TransitionProperties` — struct — 2 members
 - `TransitionRegistrationModifier` — struct — 2 members
-- `TupleView` — struct — 124 members
+- `TupleView` — struct — 123 members
 - `UnderlineTabViewStyle` — struct — 7 members
 - `ValueAnimationModifier` — struct — 2 members
-- `VariadicView` — struct — 124 members
+- `VariadicView` — struct — 123 members
 - `VerticalAlignmentGuideModifier` — struct — 2 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 133 members
+- `View` — protocol — 132 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
-- `ViewModifierContent` — struct — 124 members
+- `ViewModifierContent` — struct — 123 members
 - `ViewSpacing` — struct — 5 members
-- `ViewThatFits` — struct — 125 members
-- `VStack` — struct — 126 members
+- `ViewThatFits` — struct — 124 members
+- `VStack` — struct — 125 members
 - `VStackLayout` — struct — 8 members
 - `WarningToastStyle` — struct — 3 members
 - `withAnimation(_:_:)` — func
 - `withAnimation(_:completionCriteria:_:completion:)` — func
-- `ZStack` — struct — 125 members
+- `ZStack` — struct — 124 members
 - `ZStackLayout` — struct — 7 members
 
 ## SwiftTUIAnimatedImage
@@ -348,7 +349,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 ### Canonical surface (5)
 
 - `AnimatedGIF` — enum — 3 members
-- `AnimatedImage` — struct — 130 members
+- `AnimatedImage` — struct — 129 members
 - `AnimatedImageFrame` — struct — 6 members
 - `AnimatedImagePixel` — struct — 6 members
 - `AnimatedImageSequence` — struct — 5 members
@@ -358,20 +359,20 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 ### Canonical surface (29)
 
 - `BannerTone` — struct — 6 members
-- `BarChart` — struct — 129 members
+- `BarChart` — struct — 128 members
 - `BarChartEntry` — struct — 5 members
-- `BulletChart` — struct — 131 members
-- `CalendarHeatmap` — struct — 136 members
+- `BulletChart` — struct — 130 members
+- `CalendarHeatmap` — struct — 135 members
 - `CalendarHeatmapWeekStart` — enum — 3 members
-- `ColumnChart` — struct — 129 members
-- `ComparisonChart` — struct — 129 members
+- `ColumnChart` — struct — 128 members
+- `ComparisonChart` — struct — 128 members
 - `ComparisonEntry` — struct — 7 members
 - `DateAxisStride` — enum — 6 members
 - `DateValue` — struct — 4 members
-- `HeatStrip` — struct — 128 members
-- `Legend` — struct — 128 members
+- `HeatStrip` — struct — 127 members
+- `Legend` — struct — 127 members
 - `LegendItem` — struct — 4 members
-- `LineChart` — struct — 137 members
+- `LineChart` — struct — 136 members
 - `LineChartBaseline` — enum — 3 members
 - `LineChartLegendConfig` — struct — 12 members
 - `LineChartPoint` — struct — 5 members
@@ -379,12 +380,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `LineChartSeriesStyle` — enum — 4 members
 - `LineChartXAxis` — struct — 20 members
 - `LineChartYAxis` — struct — 13 members
-- `Meter` — struct — 130 members
-- `Sparkline` — struct — 128 members
-- `StackedBarChart` — struct — 129 members
+- `Meter` — struct — 129 members
+- `Sparkline` — struct — 127 members
+- `StackedBarChart` — struct — 128 members
 - `ThresholdBand` — struct — 4 members
-- `ThresholdGauge` — struct — 130 members
-- `Timeline` — struct — 125 members
+- `ThresholdGauge` — struct — 129 members
+- `Timeline` — struct — 124 members
 - `TimelineEntry` — struct — 5 members
 
 ## SwiftTUIArguments
@@ -422,7 +423,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalMouseMode` — enum — 6 members
 - `TerminalProcessSession` — class — 12 members
 - `TerminalSession` — protocol — 11 members
-- `TerminalView` — struct — 127 members
+- `TerminalView` — struct — 126 members
 
 ## SwiftTUICLI
 

@@ -255,6 +255,7 @@ classifications:
     - SwiftTUIViews.BoolFocusBindingModifier
     - SwiftTUIViews.BorderModifier
     - SwiftTUIViews.BooleanNavigationDestinationModifier
+    - SwiftTUIViews.BuiltinPaletteSheetPresentationModifier
     - SwiftTUIViews.BuiltinPromptPresentationModifier
     - SwiftTUIViews.BuiltinSheetPresentationModifier
     - SwiftTUIViews.ItemNavigationDestinationModifier
