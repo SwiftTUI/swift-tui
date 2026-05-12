@@ -43,6 +43,7 @@ future file moves.
     - `SwiftUIHost` (`Platforms/SwiftUI`)
   - embedded terminal-program products:
     - `SwiftTUITerminal`
+    - `SwiftTUITerminalWorkspace`
     - `SwiftTUIPTYPrimitives`
   - shared platform support products:
     - `SwiftTUIArguments`
@@ -248,6 +249,9 @@ support target:
 - `SwiftTUITerminal` — SwiftTerm-backed emulator wrapper, child-process pty
   driver, `TerminalSession`, `TerminalProcessSession`, `TerminalView`, and
   terminal metadata modifiers.
+- `SwiftTUITerminalWorkspace` — terminal workspace model, pane-tree reducers,
+  layout math, session retention, and `TerminalWorkspaceView` chrome built on
+  `TerminalView`.
 
 Root `SwiftTUI` does not depend on these products; apps and examples opt in
 when they need external terminal programs inside an authored SwiftTUI view

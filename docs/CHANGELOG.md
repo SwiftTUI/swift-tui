@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-12
 
+- Shipped the first-class terminal workspace V1 as the
+  `SwiftTUITerminalWorkspace` product: apps can model tabbed split-pane
+  terminal workspaces with stable pane IDs, retained sessions, pane commands,
+  zoom, layout persistence, and a Zellij-style example package.
 - Fixed toolbar item actions built without a construction-time authoring context:
   `.toolbarItem(config)` now supplies the attachment context instead of letting
   the config's nil snapshot clear it, so externally assembled configs can still

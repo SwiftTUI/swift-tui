@@ -156,9 +156,41 @@ over the terminal. The unsupported case is compositing those graphics inside a
 smaller SwiftTUI pane.
 
 The larger Zellij-style workspace layer is scoped separately in
-[proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md). That work
-should build on `TerminalView`; it should not add a second embedded-terminal
-render path.
+[proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) and ships as
+the `SwiftTUITerminalWorkspace` product. It builds on `TerminalView`; it does
+not add a second embedded-terminal render path.
+
+Import `SwiftTUITerminalWorkspace` when an app needs tabs, split-pane identity,
+pane commands, zoom, retained sessions, and serialized layout metadata:
+
+```swift
+import SwiftTUI
+import SwiftTUITerminalWorkspace
+
+@State private var workspace = TerminalWorkspaceState(
+  tabs: [
+    TerminalWorkspaceTab(
+      id: "dev",
+      title: "dev",
+      root: .split(
+        TerminalSplit(
+          axis: .horizontal,
+          first: .terminal(.shell(id: "shell", title: "shell")),
+          second: .terminal(
+            TerminalPaneSpec(id: "logs", title: "logs", command: "/usr/bin/log")
+          )
+        )
+      )
+    )
+  ]
+)
+
+TerminalWorkspaceView(workspace: $workspace)
+```
+
+`TerminalWorkspaceState` is `Codable`; persist it to restore layout and
+non-secret command metadata. V1 restores fresh processes on launch rather than
+reattaching to still-running child processes.
 
 ## Internals
 

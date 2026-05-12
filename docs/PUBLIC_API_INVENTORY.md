@@ -222,6 +222,9 @@ Platform-specific execution and embedding are root package products:
 - terminal-program embedding products:
   - `SwiftTUITerminal` exposes `TerminalView`, `TerminalSession`, and
     `TerminalProcessSession`
+  - `SwiftTUITerminalWorkspace` exposes the first-class tabbed/split-pane
+    workspace layer above `TerminalView`, including workspace state, pane
+    specs, layout math, session retention, and `TerminalWorkspaceView`
   - `SwiftTUIPTYPrimitives` exposes pty creation, fd lifecycle, read/write,
     and resize support
 
