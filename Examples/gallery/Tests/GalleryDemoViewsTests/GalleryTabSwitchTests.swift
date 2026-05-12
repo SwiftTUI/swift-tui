@@ -333,6 +333,10 @@ struct GalleryTabSwitchTests {
       paletteText.contains("File Drop"),
       "expected the gallery palette to include tab commands; surface was:\n\(paletteText)"
     )
+    #expect(
+      paletteText.contains("Popovers"),
+      "expected the gallery palette to include the popovers tab command; surface was:\n\(paletteText)"
+    )
   }
 
   @Test("scene-hosted gallery stays on Todo after deleting the top todo row")
