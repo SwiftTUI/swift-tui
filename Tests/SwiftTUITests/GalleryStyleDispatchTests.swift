@@ -86,7 +86,7 @@ struct GalleryStyleDispatchTests {
     }
     try renderInitial(runLoop)
 
-    // After two renders, activePaletteCommands env should have entries.
+    // After two renders, PaletteCommandsPreferenceKey should have entries.
     runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
