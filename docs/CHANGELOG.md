@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-12
 
+- Shipped anchored popover presentation: Boolean and item-driven `.popover`
+  modifiers plus a TipKit-inspired `.popoverTip` convenience now render compact
+  source-relative overlays with terminal edge fallback, Escape dismissal, modal
+  gating for interactive content, non-modal read-only tips, and a gallery
+  `Popovers` tab.
 - Shipped the first-class terminal workspace V1 as the
   `SwiftTUITerminalWorkspace` product: apps can model tabbed split-pane
   terminal workspaces with stable pane IDs, retained sessions, pane commands,

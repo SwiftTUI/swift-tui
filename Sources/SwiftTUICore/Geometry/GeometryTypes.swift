@@ -186,6 +186,42 @@ extension UnitPoint: Animatable {
   }
 }
 
+/// A size expressed in unit coordinates.
+public struct UnitSize: Equatable, Hashable, Sendable {
+  public var width: Double
+  public var height: Double
+
+  public init(
+    width: Double,
+    height: Double
+  ) {
+    self.width = width
+    self.height = height
+  }
+
+  public static let zero = UnitSize(width: 0, height: 0)
+}
+
+/// A rectangle expressed relative to another rectangle's bounds.
+public struct UnitRect: Equatable, Hashable, Sendable {
+  public var origin: UnitPoint
+  public var size: UnitSize
+
+  public init(
+    origin: UnitPoint,
+    size: UnitSize
+  ) {
+    self.origin = origin
+    self.size = size
+  }
+
+  /// The complete bounds of the source rectangle.
+  public static let bounds = UnitRect(
+    origin: .zero,
+    size: UnitSize(width: 1, height: 1)
+  )
+}
+
 extension EdgeInsets: Animatable {
   public typealias AnimatableData = AnimatablePair<
     AnimatablePair<Int, Int>,

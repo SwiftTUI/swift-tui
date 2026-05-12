@@ -80,7 +80,6 @@ Some SwiftUI concepts likely belong in SwiftTUI eventually, but the package does
 Deferred items:
 
 - `NavigationStack`
-- popover-style presentation beyond the current sheet support
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction

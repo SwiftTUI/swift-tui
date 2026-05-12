@@ -109,6 +109,9 @@ classifications:
     - SwiftTUIViews.OutlineGroup
     - SwiftTUIViews.Panel
     - SwiftTUIViews.Picker
+    - SwiftTUIViews.PopoverAttachmentAnchor
+    - SwiftTUIViews.PopoverTip
+    - SwiftTUIViews.PopoverTipAction
     - SwiftTUIViews.PreferenceKey
     - SwiftTUIViews.ProgressView
     - SwiftTUIViews.Rectangle
@@ -668,6 +671,8 @@ classifications:
     - SwiftTUICore.TransactionSnapshot
     - SwiftTUICore.TransferFunction
     - SwiftTUICore.UnitPoint
+    - SwiftTUICore.UnitRect
+    - SwiftTUICore.UnitSize
     - SwiftTUICore.Vector
     - SwiftTUICore.Vector3
     - SwiftTUICore.VectorArithmetic
