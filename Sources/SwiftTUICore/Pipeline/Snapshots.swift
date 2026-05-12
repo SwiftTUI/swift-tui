@@ -112,6 +112,12 @@ public struct SnapshotRenderer {
         "  \(route.identity.path) viewport=\(describe(route.viewportRect)) content=\(describe(route.contentBounds))"
       )
     }
+    lines.append("scrollTargets: \(snapshot.scrollTargets.count)")
+    for target in snapshot.scrollTargets {
+      lines.append(
+        "  \(target.identity.path) scroll=\(target.scrollIdentity.path) rect=\(describe(target.rect))"
+      )
+    }
     lines.append("selectionRoutes: \(snapshot.selectionRoutes.count)")
     for route in snapshot.selectionRoutes {
       lines.append("  \(route.identity.path) role=\(route.role)")

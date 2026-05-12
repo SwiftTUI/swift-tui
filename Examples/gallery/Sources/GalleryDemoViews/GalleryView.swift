@@ -28,6 +28,10 @@ public struct GalleryView: View {
         TextInputTab()
       }
 
+      Tab("Scroll Control", value: GalleryView.GalleryTab.scrollControl) {
+        ScrollControlTab()
+      }
+
       Tab("Calculator", value: GalleryView.GalleryTab.calculator) {
         CalculatorTab()
       }
@@ -87,6 +91,10 @@ public struct GalleryView: View {
       action: { selection = .textInput }
     )
     .paletteCommand(
+      name: "Scroll Control",
+      action: { selection = .scrollControl }
+    )
+    .paletteCommand(
       name: "Calculator",
       action: { selection = .calculator }
     )
@@ -130,6 +138,7 @@ extension GalleryView {
     case counter
     case todo
     case textInput
+    case scrollControl
     case calculator
     case bordersAndShapes
     case images
@@ -145,6 +154,8 @@ extension GalleryView {
       case "todo": self = .todo
       case "text", "input", "inputs", "textinput", "text-input", "text-inputs":
         self = .textInput
+      case "scroll", "scrollcontrol", "scroll-control", "scrolling":
+        self = .scrollControl
       case "calculator", "calc": self = .calculator
       case "borders", "bordersandshapes", "borders-and-shapes", "shapes":
         self = .bordersAndShapes

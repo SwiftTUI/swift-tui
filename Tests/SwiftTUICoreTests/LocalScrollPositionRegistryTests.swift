@@ -107,6 +107,155 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 0, y: 2))
   }
 
+  @Test("scrollTo target below viewport uses the minimum reveal delta")
+  func scrollToTargetBelowViewportUsesMinimumRevealDelta() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let targetIdentity = testIdentity("Scroll", "Content", "Target")
+    var offset = ScrollOffset.zero
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    registry.updateGeometry(
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: .init(origin: .zero, size: .init(width: 10, height: 4)),
+          contentBounds: .init(origin: .zero, size: .init(width: 10, height: 12))
+        )
+      ],
+      scrollTargets: [
+        ScrollTarget(
+          identity: targetIdentity,
+          scrollIdentity: scrollIdentity,
+          rect: .init(origin: .init(x: 0, y: 6), size: .init(width: 4, height: 1))
+        )
+      ]
+    )
+
+    let changed = registry.scrollToTarget(
+      .init(identity: targetIdentity),
+      anchor: nil,
+      scopeIdentity: nil
+    )
+
+    #expect(changed)
+    #expect(offset == .init(x: 0, y: 3))
+  }
+
+  @Test("scrollTo target with bottom anchor aligns to the viewport bottom")
+  func scrollToTargetBottomAnchorAlignsToViewportBottom() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let targetIdentity = testIdentity("Scroll", "Content", "Target")
+    var offset = ScrollOffset.zero
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    registry.updateGeometry(
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: .init(origin: .zero, size: .init(width: 10, height: 4)),
+          contentBounds: .init(origin: .zero, size: .init(width: 10, height: 12))
+        )
+      ],
+      scrollTargets: [
+        ScrollTarget(
+          identity: targetIdentity,
+          scrollIdentity: scrollIdentity,
+          rect: .init(origin: .init(x: 0, y: 8), size: .init(width: 4, height: 1))
+        )
+      ]
+    )
+
+    let changed = registry.scrollToTarget(
+      .init(identity: targetIdentity),
+      anchor: .bottom,
+      scopeIdentity: nil
+    )
+
+    #expect(changed)
+    #expect(offset == .init(x: 0, y: 5))
+  }
+
+  @Test("scrollTo target clamps anchored offsets at content edges")
+  func scrollToTargetClampsAnchoredOffsetsAtContentEdges() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let targetIdentity = testIdentity("Scroll", "Content", "Target")
+    var offset = ScrollOffset.zero
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    registry.updateGeometry(
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: .init(origin: .zero, size: .init(width: 10, height: 4)),
+          contentBounds: .init(origin: .zero, size: .init(width: 10, height: 8))
+        )
+      ],
+      scrollTargets: [
+        ScrollTarget(
+          identity: targetIdentity,
+          scrollIdentity: scrollIdentity,
+          rect: .init(origin: .init(x: 0, y: 12), size: .init(width: 4, height: 1))
+        )
+      ]
+    )
+
+    let changed = registry.scrollToTarget(
+      .init(identity: targetIdentity),
+      anchor: .bottom,
+      scopeIdentity: nil
+    )
+
+    #expect(changed)
+    #expect(offset == .init(x: 0, y: 4))
+  }
+
+  @Test("scrollTo missing target is a no-op")
+  func scrollToMissingTargetIsNoOp() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    var offset = ScrollOffset(x: 1, y: 2)
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    registry.updateGeometry(
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: .init(origin: .zero, size: .init(width: 10, height: 4)),
+          contentBounds: .init(origin: .zero, size: .init(width: 10, height: 12))
+        )
+      ],
+      scrollTargets: []
+    )
+
+    let changed = registry.scrollToTarget(
+      .init(identity: testIdentity("Missing")),
+      anchor: nil,
+      scopeIdentity: nil
+    )
+
+    #expect(!changed)
+    #expect(offset == .init(x: 1, y: 2))
+  }
+
   @Test("focused text input cursor anchor can reveal a descendant scroll route")
   func focusedTextInputCursorAnchorRevealsDescendantScrollRoute() {
     let registry = LocalScrollPositionRegistry()

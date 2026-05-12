@@ -1,8 +1,8 @@
 import SwiftTUICharts
 import Testing
 
-@testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 private struct PaletteRow: Identifiable {
@@ -3725,6 +3725,114 @@ struct SwiftUISurfaceTests {
 
     position.scrollTo(y: 1)
     #expect(position == .init(x: 2, y: 1))
+  }
+
+  @Test("ScrollViewReader scrollTo minimally reveals an identified row")
+  func scrollViewReaderScrollToMinimallyRevealsIdentifiedRow() {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let actionRegistry = LocalActionRegistry()
+    let scrollRegistry = LocalScrollPositionRegistry()
+    let renderer = DefaultRenderer()
+    let targetIdentity = testIdentity("ReaderTargetRow")
+    let buttonIdentity = testIdentity("ReaderJumpButton")
+    let rootIdentity = testIdentity("ScrollViewReaderRoot")
+    let context = ResolveContext(
+      identity: rootIdentity,
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    var renderContext = context
+    renderContext.localScrollPositionRegistry = scrollRegistry
+
+    let view = ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Jump") {
+          proxy.scrollTo(targetIdentity)
+        }
+        .id(buttonIdentity)
+
+        ScrollView(
+          .vertical,
+          showsIndicators: false,
+          position: Binding(
+            get: { box.position },
+            set: { box.position = $0 }
+          )
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<10) { index in
+              if index == 8 {
+                Text("Row \(index)")
+                  .id(targetIdentity)
+              } else {
+                Text("Row \(index)")
+              }
+            }
+          }
+        }
+        .frame(width: 5, height: 3, alignment: .topLeading)
+      }
+    }
+
+    let initial = renderer.render(view, context: renderContext)
+    #expect(initial.rasterSurface.lines.prefix(4) == [" Jump ", "Row 0", "Row 1", "Row 2"])
+
+    #expect(actionRegistry.dispatch(identity: buttonIdentity))
+    #expect(box.position == .init(x: 0, y: 6))
+
+    let scrolled = renderer.render(view, context: renderContext)
+    #expect(scrolled.rasterSurface.lines.prefix(4) == [" Jump ", "Row 6", "Row 7", "Row 8"])
+  }
+
+  @Test("ScrollView home and end keys move the focused scroll view to content bounds")
+  func scrollViewHomeAndEndKeysMoveFocusedScrollViewToContentBounds() {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let scrollRegistry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("KeyboardBoundaryScroll")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = scrollIdentity
+
+    var context = ResolveContext(
+      identity: testIdentity("KeyboardBoundaryRoot"),
+      environmentValues: environmentValues,
+      localKeyHandlerRegistry: keyRegistry,
+      applyEnvironmentValues: true
+    )
+    context.localScrollPositionRegistry = scrollRegistry
+
+    let view =
+      ScrollView(
+        .vertical,
+        showsIndicators: false,
+        position: Binding(
+          get: { box.position },
+          set: { box.position = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<8) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 5, height: 3, alignment: .topLeading)
+
+    _ = DefaultRenderer().render(view, context: context)
+
+    #expect(keyRegistry.dispatch(identity: scrollIdentity, event: .end))
+    #expect(box.position == .init(x: 0, y: 5))
+    #expect(keyRegistry.dispatch(identity: scrollIdentity, event: .home))
+    #expect(box.position == .zero)
   }
 
   @Test("ScrollView renders indicator chrome by default and respects the scrollIndicators modifier")

@@ -32,6 +32,8 @@ package struct ScrollPositionRegistrationSnapshot {
 @MainActor
 package final class LocalScrollPositionRegistry: Equatable {
   private var registrations: [Identity: ScrollPositionRegistrationSnapshot] = [:]
+  private var latestScrollRoutes: [ScrollRoute] = []
+  private var latestScrollTargets: [ScrollTarget] = []
 
   package init() {}
 
@@ -56,13 +58,151 @@ package final class LocalScrollPositionRegistry: Equatable {
     ViewNodeContext.current?.recordScrollPositionRegistration(registration)
   }
 
+  package func updateGeometry(
+    scrollRoutes: [ScrollRoute],
+    scrollTargets: [ScrollTarget]
+  ) {
+    latestScrollRoutes = scrollRoutes
+    latestScrollTargets = scrollTargets
+  }
+
+  @discardableResult
+  package func scrollToTarget(
+    _ query: ScrollTargetQuery,
+    anchor: UnitPoint?,
+    scopeIdentity: Identity?
+  ) -> Bool {
+    guard
+      let target = latestScrollTargets.first(where: {
+        targetMatches($0, query: query)
+          && routeMatchesScope($0.scrollIdentity, scopeIdentity: scopeIdentity)
+      }),
+      let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity }),
+      let registration = registrations[target.scrollIdentity]
+    else {
+      return false
+    }
+
+    let currentOffset = registration.currentOffset()
+    let adjustedOffset = adjustedOffset(
+      currentOffset,
+      scrolling: target.rect,
+      anchor: anchor,
+      in: route
+    )
+    guard adjustedOffset != currentOffset else {
+      return false
+    }
+
+    registration.applyOffset(adjustedOffset)
+    return true
+  }
+
+  @discardableResult
+  package func scrollToEdge(
+    _ edge: Edge,
+    scopeIdentity: Identity?
+  ) -> Bool {
+    guard let route = firstRoute(matching: scopeIdentity),
+      let registration = registrations[route.identity]
+    else {
+      return false
+    }
+
+    let currentOffset = registration.currentOffset()
+    var next = currentOffset
+    switch edge {
+    case .top:
+      next.y = 0
+    case .bottom:
+      next.y = max(0, route.contentBounds.size.height - route.viewportRect.size.height)
+    case .leading:
+      next.x = 0
+    case .trailing:
+      next.x = max(0, route.contentBounds.size.width - route.viewportRect.size.width)
+    }
+
+    next = clampedOffset(next, in: route)
+    guard next != currentOffset else {
+      return false
+    }
+
+    registration.applyOffset(next)
+    return true
+  }
+
+  @discardableResult
+  package func scrollBy(
+    x deltaX: Int = 0,
+    y deltaY: Int = 0,
+    scopeIdentity: Identity?
+  ) -> Bool {
+    guard deltaX != 0 || deltaY != 0 else {
+      return false
+    }
+    guard let route = firstRoute(matching: scopeIdentity),
+      let registration = registrations[route.identity]
+    else {
+      return false
+    }
+
+    let currentOffset = registration.currentOffset()
+    let next = clampedOffset(
+      ScrollOffset(x: currentOffset.x + deltaX, y: currentOffset.y + deltaY),
+      in: route
+    )
+    guard next != currentOffset else {
+      return false
+    }
+
+    registration.applyOffset(next)
+    return true
+  }
+
+  @discardableResult
+  package func scrollTo(
+    x: Int? = nil,
+    y: Int? = nil,
+    scopeIdentity: Identity?
+  ) -> Bool {
+    guard x != nil || y != nil else {
+      return false
+    }
+    guard let route = firstRoute(matching: scopeIdentity),
+      let registration = registrations[route.identity]
+    else {
+      return false
+    }
+
+    let currentOffset = registration.currentOffset()
+    let next = clampedOffset(
+      ScrollOffset(
+        x: x ?? currentOffset.x,
+        y: y ?? currentOffset.y
+      ),
+      in: route
+    )
+    guard next != currentOffset else {
+      return false
+    }
+
+    registration.applyOffset(next)
+    return true
+  }
+
   @discardableResult
   package func sync(
     focusedIdentity: Identity?,
     focusRegions: [FocusRegion],
     scrollRoutes: [ScrollRoute],
+    scrollTargets: [ScrollTarget] = [],
     accessibilityNodes: [AccessibilityNode] = []
   ) -> Bool {
+    updateGeometry(
+      scrollRoutes: scrollRoutes,
+      scrollTargets: scrollTargets
+    )
+
     guard let focusedIdentity,
       let focusedRegion = focusRegions.first(where: { $0.identity == focusedIdentity })
     else {
@@ -108,6 +248,8 @@ package final class LocalScrollPositionRegistry: Equatable {
 
   package func reset() {
     registrations.removeAll(keepingCapacity: true)
+    latestScrollRoutes.removeAll(keepingCapacity: true)
+    latestScrollTargets.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -121,6 +263,13 @@ package final class LocalScrollPositionRegistry: Equatable {
       identityMatchesAnySubtreeRoot($0, roots: roots)
     }) {
       registrations.removeValue(forKey: identity)
+    }
+    latestScrollRoutes.removeAll {
+      identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+    }
+    latestScrollTargets.removeAll {
+      identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+        || identityMatchesAnySubtreeRoot($0.scrollIdentity, roots: roots)
     }
   }
 
@@ -168,6 +317,92 @@ package final class LocalScrollPositionRegistry: Equatable {
       viewportLength: route.viewportRect.size.height
     )
     return next
+  }
+
+  private func adjustedOffset(
+    _ currentOffset: ScrollOffset,
+    scrolling targetRect: CellRect,
+    anchor: UnitPoint?,
+    in route: ScrollRoute
+  ) -> ScrollOffset {
+    guard let anchor else {
+      return adjustedOffset(
+        currentOffset,
+        revealing: targetRect,
+        in: route
+      )
+    }
+
+    var next = currentOffset
+    next.x +=
+      anchoredCoordinate(in: targetRect.origin.x, length: targetRect.size.width, anchor.x)
+      - anchoredCoordinate(
+        in: route.viewportRect.origin.x, length: route.viewportRect.size.width, anchor.x)
+    next.y +=
+      anchoredCoordinate(in: targetRect.origin.y, length: targetRect.size.height, anchor.y)
+      - anchoredCoordinate(
+        in: route.viewportRect.origin.y, length: route.viewportRect.size.height, anchor.y)
+
+    return clampedOffset(next, in: route)
+  }
+
+  private func firstRoute(
+    matching scopeIdentity: Identity?
+  ) -> ScrollRoute? {
+    latestScrollRoutes.first {
+      routeMatchesScope($0.identity, scopeIdentity: scopeIdentity)
+    }
+  }
+
+  private func routeMatchesScope(
+    _ routeIdentity: Identity,
+    scopeIdentity: Identity?
+  ) -> Bool {
+    guard let scopeIdentity else {
+      return true
+    }
+    return routeIdentity == scopeIdentity || routeIdentity.isDescendant(of: scopeIdentity)
+  }
+
+  private func targetMatches(
+    _ target: ScrollTarget,
+    query: ScrollTargetQuery
+  ) -> Bool {
+    if let identity = query.identity, target.identity == identity {
+      return true
+    }
+    if let explicitIDComponent = query.explicitIDComponent,
+      target.identity.lastComponent == explicitIDComponent
+    {
+      return true
+    }
+    return false
+  }
+
+  private func anchoredCoordinate(
+    in origin: Int,
+    length: Int,
+    _ unit: Double
+  ) -> Int {
+    origin + Int((Double(max(0, length - 1)) * unit).rounded())
+  }
+
+  private func clampedOffset(
+    _ offset: ScrollOffset,
+    in route: ScrollRoute
+  ) -> ScrollOffset {
+    ScrollOffset(
+      x: clampedOffset(
+        offset.x,
+        contentLength: route.contentBounds.size.width,
+        viewportLength: route.viewportRect.size.width
+      ),
+      y: clampedOffset(
+        offset.y,
+        contentLength: route.contentBounds.size.height,
+        viewportLength: route.viewportRect.size.height
+      )
+    )
   }
 
   private func clampedOffset(

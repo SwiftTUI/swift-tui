@@ -116,6 +116,8 @@ classifications:
     - SwiftTUIViews.Resolver
     - SwiftTUIViews.RoundedRectangle
     - SwiftTUIViews.ScrollView
+    - SwiftTUIViews.ScrollViewProxy
+    - SwiftTUIViews.ScrollViewReader
     - SwiftTUIViews.Section
     - SwiftTUIViews.SecureField
     - SwiftTUIViews.SendableLayout

@@ -60,6 +60,16 @@ package final class FrameHeadRegistrationDraft {
     draftRegistrations.frameDropEligibilityBlockers()
   }
 
+  package func updateCommittedScrollGeometry(
+    scrollRoutes: [ScrollRoute],
+    scrollTargets: [ScrollTarget]
+  ) {
+    liveRegistrations.scrollPositionRegistry?.updateGeometry(
+      scrollRoutes: scrollRoutes,
+      scrollTargets: scrollTargets
+    )
+  }
+
   package func discard() {
     precondition(!didCommit && !didDiscard)
     didDiscard = true
