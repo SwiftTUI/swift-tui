@@ -17,27 +17,25 @@ struct GalleryStyleDispatchTests {
     let fired = Counter()
 
     let runLoop = makeRunLoopLocal {
-      EnvironmentReader(\.activePaletteCommands) { _ in
-        TabView(selection: .constant(0)) {
-          Text("inside").focusable(true).tag(0)
-          Text("other").focusable(true).tag(1)
-        }
-        .tabViewStyle(.literalTabs)
-        .toolbarItem(
-          .init(
-            title: "Palette",
-            action: {}
-          )
-        )
-        .panel(id: "gallery")
-        .keyCommand(
-          "Switch to Counter",
-          key: .character("1"),
-          modifiers: .ctrl,
-          action: { fired.increment() }
-        )
-        .toolbar(style: DefaultBottomToolbarStyle())
+      TabView(selection: .constant(0)) {
+        Text("inside").focusable(true).tag(0)
+        Text("other").focusable(true).tag(1)
       }
+      .tabViewStyle(.literalTabs)
+      .toolbarItem(
+        .init(
+          title: "Palette",
+          action: {}
+        )
+      )
+      .panel(id: "gallery")
+      .keyCommand(
+        "Switch to Counter",
+        key: .character("1"),
+        modifiers: .ctrl,
+        action: { fired.increment() }
+      )
+      .toolbar(style: DefaultBottomToolbarStyle())
     }
     try renderInitial(runLoop)
 
@@ -54,23 +52,21 @@ struct GalleryStyleDispatchTests {
     let fired3 = Counter()
 
     let runLoop = makeRunLoopLocal {
-      EnvironmentReader(\.activePaletteCommands) { _ in
-        TabView(selection: .constant(0)) {
-          Text("a").focusable(true).tag(0)
-          Text("b").focusable(true).tag(1)
-          Text("c").focusable(true).tag(2)
-        }
-        .tabViewStyle(.literalTabs)
-        .toolbarItem(.init(title: "P", action: {}))
-        .panel(id: "gallery")
-        .keyCommand("one", key: .character("1"), modifiers: .ctrl) { fired1.increment() }
-        .keyCommand("two", key: .character("2"), modifiers: .ctrl) { fired2.increment() }
-        .keyCommand("three", key: .character("3"), modifiers: .ctrl) { fired3.increment() }
-        .paletteCommand(name: "one", action: {})
-        .paletteCommand(name: "two", action: {})
-        .paletteCommand(name: "three", action: {})
-        .toolbar(style: DefaultBottomToolbarStyle())
+      TabView(selection: .constant(0)) {
+        Text("a").focusable(true).tag(0)
+        Text("b").focusable(true).tag(1)
+        Text("c").focusable(true).tag(2)
       }
+      .tabViewStyle(.literalTabs)
+      .toolbarItem(.init(title: "P", action: {}))
+      .panel(id: "gallery")
+      .keyCommand("one", key: .character("1"), modifiers: .ctrl) { fired1.increment() }
+      .keyCommand("two", key: .character("2"), modifiers: .ctrl) { fired2.increment() }
+      .keyCommand("three", key: .character("3"), modifiers: .ctrl) { fired3.increment() }
+      .paletteCommand(name: "one", action: {})
+      .paletteCommand(name: "two", action: {})
+      .paletteCommand(name: "three", action: {})
+      .toolbar(style: DefaultBottomToolbarStyle())
     }
     try renderInitial(runLoop)
 
@@ -124,9 +120,10 @@ struct GalleryStyleDispatchTests {
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     }
 
-    let counts = runLoop.commandRegistry.paletteCommandCountsByScope()
-    #expect(counts.count == 1)
-    #expect(counts.values.first == 3, "expected 3 palette commands per scope, got \(counts)")
+    #expect(
+      PaletteDupProbeRoot.absorbed.value.count == 3,
+      "expected exactly 3 palette commands after re-resolves, got \(PaletteDupProbeRoot.absorbed.value.count)"
+    )
   }
 
   @Test("Alt+digit keyCommand fires via the input path")
@@ -150,40 +147,6 @@ struct GalleryStyleDispatchTests {
 
     _ = runLoop.handleKeyPress(KeyPress(.character("1"), modifiers: .alt))
     #expect(fired.count == 1)
-  }
-
-  @Test(
-    "Gallery-exact flow: ⌃K keyCommand snapshots non-empty activePaletteCommands via the env closure capture"
-  )
-  func galleryExactFlowKeyCommandSnapshotsNonEmptyCommands() throws {
-    GallerySimulator.reset()
-
-    let runLoop = makeRunLoopLocal {
-      GallerySimulator()
-    }
-    try renderInitial(runLoop)
-
-    // Drive additional frames so env propagation has time to deliver
-    // palette commands to the reader's closure capture.
-    for _ in 0..<3 {
-      runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
-      var rendered = 0
-      try runLoop.renderPendingFrames(renderedFrames: &rendered)
-    }
-
-    // Simulate the user pressing ⌃K.
-    _ = runLoop.handleKeyPress(KeyPress(.character("k"), modifiers: .ctrl))
-
-    // After firing, one more render to settle state.
-    runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
-    var rendered = 0
-    try runLoop.renderPendingFrames(renderedFrames: &rendered)
-
-    let snapshot = GallerySimulator.snapshotAtKeyPress.value
-    #expect(
-      snapshot.count == 3,
-      "Expected keyCommand action to have captured 3 palette commands at the moment ⌃K fired; got \(snapshot.count)"
-    )
   }
 
   @Test("Gallery-exact flow: ⌃K presents the palette on the next runtime input frame")
@@ -231,89 +194,11 @@ struct GalleryStyleDispatchTests {
     var rendered = 0
     try runLoop.renderPendingFrames(renderedFrames: &rendered)
 
-    let snapshot = GallerySimulator.snapshotAtKeyPress.value
-    #expect(snapshot.count == 3)
-
     let surfaceText = latestSurfaceText(for: runLoop)
     #expect(surfaceText.contains("Command palette"))
     #expect(surfaceText.contains("palette sheet"))
   }
 
-  @Test(
-    "activePaletteCommands captured via env reader reflects Panel commands when a .toolbar wraps the Panel"
-  )
-  func toolbarWrappedPanelSurfacesActivePaletteCommandsViaEnv() throws {
-    let capturedCounts = LockedBoxLocal<[Int]>(initial: [])
-
-    let runLoop = makeRunLoopLocal {
-      EnvironmentReader(\.activePaletteCommands) { commands in
-        capturedCounts.append(commands.count)
-        return
-          TabView(selection: .constant(0)) {
-            Text("body").focusable(true).tag(0)
-          }
-          .tabViewStyle(.literalTabs)
-          .toolbarItem(.init(title: "Palette", action: {}))
-          .panel(id: "gallery")
-          .paletteCommand(name: "A", action: {})
-          .paletteCommand(name: "B", action: {})
-          .paletteCommand(name: "C", action: {})
-          .toolbar(style: DefaultBottomToolbarStyle())
-      }
-    }
-    try renderInitial(runLoop)
-
-    // Drive a few more frames so any pending focus/env updates settle.
-    for _ in 0..<3 {
-      runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
-      var rendered = 0
-      try runLoop.renderPendingFrames(renderedFrames: &rendered)
-    }
-
-    let seen = capturedCounts.value
-    // This is the EXACT failure mode the user reports: with a toolbar
-    // wrapping the Panel, the env reader never sees the palette
-    // commands, so the gallery's snapshot-capture path hands [] into
-    // the sheet.
-    #expect(
-      seen.contains(3),
-      "Expected to observe 3 palette commands at some render, got: \(seen)"
-    )
-  }
-
-  @Test("activePaletteCommands arrives via environment after a render cycle")
-  func activePaletteCommandsFlowsIntoEnvironment() throws {
-    let capturedCounts = LockedBoxLocal<[Int]>(initial: [])
-
-    let runLoop = makeRunLoopLocal {
-      EnvironmentReader(\.activePaletteCommands) { commands in
-        // Capture every time the reader re-resolves.
-        capturedCounts.append(commands.count)
-        return
-          TabView(selection: .constant(0)) {
-            Text("inside").focusable(true).tag(0)
-          }
-          .tabViewStyle(.literalTabs)
-          .panel(id: "gallery")
-          .paletteCommand(name: "A", action: {})
-          .paletteCommand(name: "B", action: {})
-          .paletteCommand(name: "C", action: {})
-      }
-    }
-    try renderInitial(runLoop)
-
-    // After one render, the palette commands registered this frame get
-    // captured at end-of-frame and injected into next frame's env. A
-    // second render cycle is needed for the reader to see them.
-    runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-
-    let seen = capturedCounts.value
-    // We should see the env value at least once; after a second frame
-    // it should include 3 palette commands.
-    #expect(seen.contains(3), "Expected to observe 3 palette commands at some render, got: \(seen)")
-  }
 }
 
 @MainActor
@@ -324,34 +209,22 @@ private final class LockedBoxLocal<T> {
   func update(_ mutate: (inout T) -> Void) { mutate(&_value) }
 }
 
-extension LockedBoxLocal where T == [Int] {
-  func append(_ element: Int) {
-    update { $0.append(element) }
-  }
-}
-
 @MainActor
 private struct GallerySimulator: View {
   static let snapshotAtKeyPress = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
-  static let lastSeenEnvCount = LockedBoxLocal<Int>(initial: -1)
 
   static func reset() {
     snapshotAtKeyPress.update { $0 = [] }
-    lastSeenEnvCount.update { $0 = -1 }
   }
 
   @State private var isPaletteOpen: Bool = false
 
   var body: some View {
-    EnvironmentReader(\.activePaletteCommands) { commands in
-      Self.lastSeenEnvCount.update { $0 = commands.count }
-      return galleryBody(commands: commands)
-    }
+    galleryBody()
   }
 
-  private func galleryBody(
-    commands: [ActivePaletteCommand]
-  ) -> some View {
+  @ViewBuilder
+  private func galleryBody() -> some View {
     TabView(selection: .constant(0)) {
       Text("body").focusable(true).tag(0)
     }
@@ -363,7 +236,6 @@ private struct GallerySimulator: View {
       key: .character("k"),
       modifiers: .ctrl,
       action: {
-        Self.snapshotAtKeyPress.update { $0 = commands }
         isPaletteOpen = true
       }
     )
@@ -371,8 +243,9 @@ private struct GallerySimulator: View {
     .paletteCommand(name: "B", action: {})
     .paletteCommand(name: "C", action: {})
     .toolbar(style: DefaultBottomToolbarStyle())
-    .sheet("Command palette", isPresented: .constant(isPaletteOpen)) {
-      Text("palette sheet")
+    .paletteSheet("Command palette", isPresented: $isPaletteOpen) { commands in
+      Self.snapshotAtKeyPress.update { $0 = commands }
+      return Text("palette sheet")
     }
   }
 }
@@ -389,6 +262,7 @@ private struct WrappedGallerySimulator: View {
 @MainActor
 private struct PaletteDupProbeRoot: View {
   static let tickSource = LockedBoxLocal<Int>(initial: 0)
+  static let absorbed = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
 
   @State private var tick: Int = 0
 
@@ -401,6 +275,10 @@ private struct PaletteDupProbeRoot: View {
     .paletteCommand(name: "A", action: {})
     .paletteCommand(name: "B", action: {})
     .paletteCommand(name: "C", action: {})
+    .paletteSheet("__capture", isPresented: .constant(true)) { commands in
+      Self.absorbed.update { $0 = commands }
+      return EmptyView()
+    }
     .onAppear {
       tick = Self.tickSource.value
     }
@@ -415,22 +293,22 @@ private struct GalleryStyleOuter: View {
   static let capturedCommands = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
 
   var body: some View {
-    EnvironmentReader(\.activePaletteCommands) { commands in
+    TabView(selection: $selection) {
+      Text("zero").focusable(true).tag(0)
+      Text("one").focusable(true).tag(1)
+    }
+    .tabViewStyle(.literalTabs)
+    .panel(id: "gallery")
+    .paletteCommand(
+      name: "Switch",
+      action: {
+        selection = 1
+        Self.selectionSink.update { $0 = selection }
+      }
+    )
+    .paletteSheet("__capture", isPresented: .constant(true)) { commands in
       Self.capturedCommands.update { $0 = commands }
-      return
-        TabView(selection: $selection) {
-          Text("zero").focusable(true).tag(0)
-          Text("one").focusable(true).tag(1)
-        }
-        .tabViewStyle(.literalTabs)
-        .panel(id: "gallery")
-        .paletteCommand(
-          name: "Switch",
-          action: {
-            selection = 1
-            Self.selectionSink.update { $0 = selection }
-          }
-        )
+      return EmptyView()
     }
   }
 }

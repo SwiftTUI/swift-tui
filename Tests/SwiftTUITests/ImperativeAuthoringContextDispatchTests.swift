@@ -34,13 +34,12 @@ struct ImperativeAuthoringContextDispatchTests {
     let secondary = makeRunLoop(rootName: "SharedPaletteSecondary") { sharedView }
 
     try renderInitial(primary.runLoop)
+    // Capture primary's command before secondary's render overwrites the static box.
+    let command = try #require(
+      PaletteCommandScopeFixture.absorbed.commands.first(where: { $0.name == "Mutate" })
+    )
     try renderInitial(secondary.runLoop)
 
-    let command = try #require(
-      primary.runLoop.commandRegistry.paletteCommands(
-        along: primary.runLoop.currentFocusScopePath()
-      ).first
-    )
     command.action()
     try renderPending(primary.runLoop)
     try renderPending(secondary.runLoop)
@@ -501,6 +500,8 @@ private struct KeyCommandScopeFixture: View {
 
 @MainActor
 private struct PaletteCommandScopeFixture: View {
+  static let absorbed = PaletteCommandFixtureCaptureBox()
+
   @State private var value = "idle"
 
   var body: some View {
@@ -510,7 +511,16 @@ private struct PaletteCommandScopeFixture: View {
     .paletteCommand(name: "Mutate") {
       value = "mutated"
     }
+    .backgroundPreferenceValue(PaletteCommandsPreferenceKey.self) { commands in
+      Self.absorbed.commands = commands
+      return EmptyView()
+    }
   }
+}
+
+@MainActor
+private final class PaletteCommandFixtureCaptureBox {
+  var commands: [ActivePaletteCommand] = []
 }
 
 @MainActor

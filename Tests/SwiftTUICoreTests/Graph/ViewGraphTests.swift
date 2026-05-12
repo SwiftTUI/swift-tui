@@ -362,16 +362,6 @@ struct ViewGraphTests {
               action: { commandCounter.increment() }
             )
           ]
-        ],
-        paletteCommandsByScope: [
-          childIdentity: [
-            RegisteredPaletteCommand(
-              name: "Save",
-              description: nil,
-              isEnabled: true,
-              action: {}
-            )
-          ]
         ]
       )
     )
@@ -414,7 +404,6 @@ struct ViewGraphTests {
       into: registrations
     )
 
-    #expect(commandRegistry.paletteCommands(at: childIdentity).map(\.name) == ["Save"])
     #expect(commandRegistry.dispatch(key: binding, along: [rootIdentity, childIdentity]))
     #expect(commandCounter.count == 1)
     #expect(
