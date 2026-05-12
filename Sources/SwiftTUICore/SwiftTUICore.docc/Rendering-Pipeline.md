@@ -8,7 +8,9 @@ Every frame in SwiftTUI moves through the same ordered phases:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-`Core` owns every phase after authored views have already been declared and before the runtime has presented the result to a terminal.
+`SwiftTUICore` owns every phase after authored views have already been lowered
+from `SwiftTUIViews` and before `SwiftTUIRuntime` presents the result to a
+terminal or host product.
 
 ## Phase Roles
 

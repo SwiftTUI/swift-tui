@@ -33,7 +33,9 @@ What that means in practice:
 - State and environment come next: graph-scoped `@State`, `@Binding`,
   `@Observable`, focused values, and focus bindings
 - Runtime correctness comes next: lifecycle ownership, task staging, and incremental terminal presentation
-- Broader orchestration APIs such as stack navigation, sheets, and popovers arrive only after the foundation is firm
+- Broader orchestration APIs such as stack navigation, sheets, and popovers
+  arrive only after the foundation is firm. The current shipped subset includes
+  binding-driven navigation destinations and terminal-native presentations.
 - Terminal-only chrome that would bend the public authoring story away from SwiftUI does not belong in the core library
 
 ### Deviations From SwiftUI
@@ -79,7 +81,9 @@ Some SwiftUI concepts likely belong in SwiftTUI eventually, but the package does
 
 Deferred items:
 
-- `NavigationStack`
+- `NavigationLink`, public `NavigationPath`, and automatic Back chrome
+- host-native text value/selection transport and IME/composition
+- process reattachment for terminal workspaces after app restart
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction
@@ -102,9 +106,11 @@ Current implementation status and short-term constraints live in [STATUS.md](STA
 
 ### What Is Not In Scope Today
 
-- media-heavy surfaces beyond PNG, baseline JPEG, and the peer `AnimatedImage`
-  product (video, remote fetching, asset bundles)
-- a full accessibility-tree or assistive-technology story
+- media-heavy surfaces beyond PNG, baseline JPEG, and the peer
+  `SwiftTUIAnimatedImage` product (video, remote fetching, asset bundles)
+- host-native assistive-technology control beyond the shipped semantic
+  accessibility substrate, terminal accessible output, Web/WASI ARIA mounting,
+  and SwiftUI host accessibility overlay
 - pixel-precise layout or a second, non-terminal presentation model
 
 ### Image Rendering

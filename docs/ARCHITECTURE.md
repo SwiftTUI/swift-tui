@@ -37,7 +37,7 @@
 
 - Release-facing convenience product for terminal-native apps
 - Re-exports `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so
-  ordinary terminal apps can write only `import SwiftTUI`
+  terminal-native apps can write only `import SwiftTUI`
 - Does not depend on WebHost, FlyingFox, browser resources, SwiftUI hosting,
   WASI hosting, charts, animated images, or terminal-program embedding
 
