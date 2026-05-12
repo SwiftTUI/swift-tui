@@ -12,24 +12,22 @@ Design and taxonomy live in
 ## Run
 
 ```bash
-cd Examples/layouts
-swift run layouts-demo
+cd Examples/LayoutsSwiftUI
+swiftly run swift run layouts-swiftui-demo
 ```
 
 The app launches directly into the picker. `↑↓` move, `⏎` opens a
 layout, `esc` pops back, `⌃C` quits.
 
-## Test
+## Build
 
 ```bash
-cd Examples/layouts
-swift test
+cd Examples/LayoutsSwiftUI
+swiftly run swift build
 ```
 
-81 tests across 54 suites: 56 parameterised smoke tests (one per
-catalog entry), targeted behaviour tests for the `.behaviour` tier,
-catalog-integrity invariants, and a picker-shell test that
-rasterises every category section.
+This SwiftUI reference package does not have a test target; the corresponding
+SwiftTUI layouts package owns the raster behaviour tests.
 
 ## Findings
 

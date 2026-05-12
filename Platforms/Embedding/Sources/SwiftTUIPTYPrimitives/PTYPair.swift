@@ -182,7 +182,7 @@ public actor PTYPair {
       }
 
       if readCount == 0 {
-        finishReading()
+        close()
         return
       }
 
@@ -195,7 +195,7 @@ public actor PTYPair {
         return
       }
 
-      finishReading()
+      close()
       return
     }
   }

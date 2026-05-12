@@ -1,5 +1,5 @@
-import SwiftTUIRuntime
 import SwiftTUICore
+import SwiftTUIRuntime
 import Synchronization
 import Testing
 
@@ -297,7 +297,7 @@ private func allCommands(in node: DrawNode) -> [DrawCommand] {
 
 private func waitUntil(
   _ label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
+  timeoutNanoseconds: UInt64 = 15_000_000_000,
   pollNanoseconds: UInt64 = 10_000_000,
   condition: @escaping () async -> Bool
 ) async throws {

@@ -31,6 +31,8 @@ considering work complete.
 
 See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
 (`swiftly`, wasm SDK, Bun, Xcode, Android NDK).
+Do not run repo-local builds or tests with bare `swift` or `xcrun swift`; use
+`swiftly run swift ...` so development runs match the pinned Swift toolchain.
 
 ## Architecture (one-page summary)
 

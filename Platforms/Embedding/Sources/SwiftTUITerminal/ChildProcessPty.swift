@@ -27,7 +27,7 @@ public actor ChildProcessPty {
   private let workingDirectory: String?
   private let initialSize: CellSize
   private var exitContinuation: CheckedContinuation<ExitStatus, Never>?
-  private var exitSource: (any DispatchSourceProcess)?
+  private var exitTask: Task<Void, Never>?
   private var exitStatus: ExitStatus?
   private var hasStarted = false
 
@@ -87,7 +87,7 @@ public actor ChildProcessPty {
     }
 
     pid = Int32(forkedPID)
-    installExitSource(pid: forkedPID)
+    installExitWatcher(pid: forkedPID)
     await Self.waitUntilProcessGroupExists(pid: forkedPID)
     await childPair.releaseAndCloseSlaveFD()
   }
@@ -121,59 +121,35 @@ public actor ChildProcessPty {
     }
   }
 
-  private func installExitSource(pid: pid_t) {
-    let source = DispatchSource.makeProcessSource(
-      identifier: pid,
-      eventMask: .exit,
-      queue: DispatchQueue.global(qos: .userInitiated)
-    )
-    source.setEventHandler { [weak self] in
-      guard let self else {
-        return
-      }
-
-      Task {
-        await self.reapChild()
-      }
+  private func installExitWatcher(pid: pid_t) {
+    exitTask = Task.detached(priority: .userInitiated) { [weak self] in
+      let status = Self.waitForChildExit(pid: pid)
+      await self?.completeExit(status)
     }
-    source.setCancelHandler {}
-    exitSource = source
-    source.resume()
   }
 
-  private func reapChild() async {
-    guard pid > 0 else {
-      completeExit(.unknown)
-      return
-    }
-
+  private static func waitForChildExit(pid: pid_t) -> ExitStatus {
     var status: Int32 = 0
     while true {
-      let result = unsafe waitpid(pid_t(pid), &status, WNOHANG)
-      if result == 0 {
-        return
-      }
+      let result = unsafe waitpid(pid, &status, 0)
       if result < 0 && errno == EINTR {
         continue
       }
       if result < 0 {
-        completeExit(.unknown)
-      } else {
-        completeExit(Self.decodeExitStatus(status))
+        return .unknown
       }
-      await pair?.close()
-      return
+      return decodeExitStatus(status)
     }
   }
 
-  private func completeExit(_ status: ExitStatus) {
+  private func completeExit(_ status: ExitStatus) async {
     guard exitStatus == nil else {
       return
     }
 
     exitStatus = status
-    exitSource?.cancel()
-    exitSource = nil
+    exitTask?.cancel()
+    exitTask = nil
     let continuation = exitContinuation
     exitContinuation = nil
     continuation?.resume(returning: status)

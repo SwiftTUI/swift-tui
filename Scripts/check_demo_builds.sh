@@ -33,7 +33,7 @@ input harnesses against the terminal examples:
   - Platforms/Web against WebExampleApp
 
 The script also checks required environment dependencies up front:
-  - Swift availability
+  - Swift 6.3.x via `swiftly`
   - Bun availability
   - Python 3 availability
   - Xcode availability
@@ -83,10 +83,14 @@ require_command() {
   fi
 }
 
-require_command swift
+require_command swiftly
 require_command bun
 require_command python3
 require_command xcodebuild
+
+run_swift() {
+  swiftly run swift "$@"
+}
 
 run_step() {
   title=$1
@@ -118,7 +122,7 @@ if [ "$skip_clean" -eq 0 ]; then
   run_step \
     "Clean root SwiftTUI package" \
     "$repo_root" \
-    swift package clean
+    run_swift package clean
 
   for package_path in \
     "Examples/argparse" \
@@ -135,7 +139,7 @@ if [ "$skip_clean" -eq 0 ]; then
     run_step \
       "Clean $package_path" \
       "$repo_root" \
-      swift package clean --package-path "$package_path"
+      run_swift package clean --package-path "$package_path"
   done
 fi
 
@@ -149,23 +153,23 @@ for package_path in \
   run_step \
     "Build $package_path" \
     "$repo_root" \
-    swift build --package-path "$package_path"
+    run_swift build --package-path "$package_path"
 
   run_step \
     "Build $package_path (release)" \
     "$repo_root" \
-    swift build -c release --package-path "$package_path"
+    run_swift build -c release --package-path "$package_path"
 done
 
 run_step \
   "Build Examples/gallery" \
   "$repo_root" \
-  swift build --package-path Examples/gallery
+  run_swift build --package-path Examples/gallery
 
 run_step \
   "Build Examples/gallery (release)" \
   "$repo_root" \
-  swift build -c release --package-path Examples/gallery
+  run_swift build -c release --package-path Examples/gallery
 
 run_step \
   "Stack safety Examples/gallery (debug)" \
@@ -184,42 +188,42 @@ run_step \
 run_step \
   "Build Examples/layouts" \
   "$repo_root" \
-  swift build --package-path Examples/layouts
+  run_swift build --package-path Examples/layouts
 
 run_step \
   "Build Examples/layouts (release)" \
   "$repo_root" \
-  swift build -c release --package-path Examples/layouts
+  run_swift build -c release --package-path Examples/layouts
 
 run_step \
   "Build Examples/SwiftUIExample/TerminalApp" \
   "$repo_root" \
-  swift build --package-path Examples/SwiftUIExample/TerminalApp
+  run_swift build --package-path Examples/SwiftUIExample/TerminalApp
 
 run_step \
   "Build Examples/WebExample/TerminalApp" \
   "$repo_root" \
-  swift build --package-path Examples/WebExample/TerminalApp
+  run_swift build --package-path Examples/WebExample/TerminalApp
 
 run_step \
   "Build Examples/WebHostExample" \
   "$repo_root" \
-  swift build --package-path Examples/WebHostExample
+  run_swift build --package-path Examples/WebHostExample
 
 run_step \
   "Test Examples/WebHostExample" \
   "$repo_root" \
-  swift test --package-path Examples/WebHostExample
+  run_swift test --package-path Examples/WebHostExample
 
 run_step \
   "Build SwiftTUIWebHost root targets" \
   "$repo_root" \
-  swift build --target SwiftTUIWebHost --target SwiftTUIWebHostCLI
+  run_swift build --target SwiftTUIWebHost --target SwiftTUIWebHostCLI
 
 run_step \
   "Build SwiftUIHost root target" \
   "$repo_root" \
-  swift build --target SwiftUIHost
+  run_swift build --target SwiftUIHost
 
 if [ "$skip_clean" -eq 0 ]; then
   run_step \

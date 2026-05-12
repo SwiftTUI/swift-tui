@@ -8,11 +8,11 @@ least one subcommand.
 
 ```bash
 cd Examples/gitviz
-swift run gitviz                  # index of subcommands
-swift run gitviz info             # repo summary
-swift run gitviz activity         # GitHub-style calendar heatmap
-swift run gitviz deltas           # insertions / deletions line chart
-swift run gitviz dashboard        # everything back-to-back
+swiftly run swift run gitviz                  # index of subcommands
+swiftly run swift run gitviz info             # repo summary
+swiftly run swift run gitviz activity         # GitHub-style calendar heatmap
+swiftly run swift run gitviz deltas           # insertions / deletions line chart
+swiftly run swift run gitviz dashboard        # everything back-to-back
 ```
 
 All subcommands accept `--path <repo>` to point at a different working tree

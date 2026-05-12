@@ -22,8 +22,8 @@ parallel `GIFEditorUI_SwiftUI` target alongside `GIFEditorUI`.
 
 ```bash
 cd Examples/gifeditor
-swift run gifeditor                       # launch with a fresh 32x32 document
-swift run gifeditor ../../nyan.gif        # launch editing a real GIF
+swiftly run swift run gifeditor                       # launch with a fresh 32x32 document
+swiftly run swift run gifeditor ../../nyan.gif        # launch editing a real GIF
 ```
 
 After making edits, press `Ctrl+S` to save (back to the source path or to
@@ -144,7 +144,7 @@ cell.
 
 ```bash
 cd Examples/gifeditor
-swift test
+swiftly run swift test
 ```
 
 The core test suite verifies:

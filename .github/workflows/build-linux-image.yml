@@ -43,6 +43,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
+  SWIFTLY_VERSION: "1.1.1"
   # GHCR requires lowercase namespaces; hard-code the org rather than
   # toLower'ing github.repository_owner so a fork doesn't accidentally try
   # to push to its own namespace without packages:write being set up.
@@ -145,6 +146,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             SWIFT_VERSION=${{ steps.swift.outputs.version }}
+            SWIFTLY_VERSION=${{ env.SWIFTLY_VERSION }}
           # Add provenance/SBOM for supply-chain hygiene. Cheap to enable.
           provenance: true
           sbom: true

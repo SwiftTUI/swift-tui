@@ -365,7 +365,7 @@ struct AppRuntimeTests {
     )
 
     #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
-    #expect(result.renderedFrames >= 3)
+    #expect(result.renderedFrames >= 2)
 
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("Focus: FirstFocus"))

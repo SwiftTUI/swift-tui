@@ -3,7 +3,7 @@
 # SwiftTUI Linux dev/test image.
 #
 # Bakes everything Scripts/linux.sh used to install lazily on first use:
-#   * Swift toolchain (from the upstream `swift:<version>` image)
+#   * Swiftly + the pinned Swift toolchain
 #   * Bun (system-wide install at /usr/local/bun)
 #   * Wasm Swift SDK (preinstalled at /root/.swiftpm/swift-sdks)
 #   * binaryen (wasm-opt), brotli, ripgrep, curl, unzip, git, ca-certificates
@@ -13,11 +13,13 @@
 # these explicitly; local `docker build` falls back to the defaults below.
 #
 # IMPORTANT: keep these defaults in sync with .swift-version and the
-# WASM_SDK_* vars at the top of Scripts/linux.sh.
+# SWIFTLY_* / WASM_SDK_* vars at the top of Scripts/linux.sh.
 
 ARG SWIFT_VERSION=6.3.1
 FROM swift:${SWIFT_VERSION}
 
+ARG SWIFT_VERSION=6.3.1
+ARG SWIFTLY_VERSION=1.1.1
 ARG WASM_SDK_URL=https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz
 ARG WASM_SDK_CHECKSUM=bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
 ARG BUN_INSTALL=/usr/local/bun
@@ -28,7 +30,9 @@ LABEL org.opencontainers.image.title="swift-tui-linux" \
       org.opencontainers.image.licenses="MIT"
 
 ENV BUN_INSTALL=${BUN_INSTALL} \
-    PATH="${BUN_INSTALL}/bin:${PATH}" \
+    SWIFTLY_HOME_DIR=/root/.local/share/swiftly \
+    SWIFTLY_BIN_DIR=/root/.local/bin \
+    PATH="${BUN_INSTALL}/bin:${SWIFTLY_BIN_DIR}:${PATH}" \
     DEBIAN_FRONTEND=noninteractive
 
 # System dependencies. The upstream swift image ships a slim Ubuntu base, so
@@ -62,16 +66,29 @@ RUN curl -fsSL https://bun.sh/install | bash \
  && ln -sf "${BUN_INSTALL}/bin/bun"  /usr/local/bin/bun \
  && ln -sf "${BUN_INSTALL}/bin/bunx" /usr/local/bin/bunx
 
-# Wasm Swift SDK. `swift sdk install` is the official path; it unpacks the
-# artifact bundle into /root/.swiftpm/swift-sdks. We do NOT mount a volume
-# over /root/.swiftpm at runtime (see Scripts/linux/README.md "Volumes"),
-# otherwise the SDK installed here would be hidden behind the volume.
-RUN swift sdk install "${WASM_SDK_URL}" --checksum "${WASM_SDK_CHECKSUM}"
+# Swiftly, installed before the Wasm SDK so all SwiftPM work goes through the
+# same toolchain manager used by the host-side repo workflow. The upstream
+# swift:<version> base provides enough Swift runtime support for the swiftly
+# bootstrap binary; swiftly then installs and selects the repo-pinned toolchain.
+RUN swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz" \
+ && curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}" \
+ && tar -zxf "${swiftly_archive}" \
+ && ./swiftly init --skip-install --quiet-shell-followup --assume-yes \
+ && . "${SWIFTLY_HOME_DIR}/env.sh" \
+ && swiftly install --use --assume-yes "${SWIFT_VERSION}" \
+ && rm -f "${swiftly_archive}" swiftly
+
+# Wasm Swift SDK. `swiftly run swift sdk install` unpacks the artifact bundle
+# into /root/.swiftpm/swift-sdks. We do NOT mount a volume over /root/.swiftpm
+# at runtime (see Scripts/linux/README.md "Volumes"), otherwise the SDK
+# installed here would be hidden behind the volume.
+RUN swiftly run swift sdk install "${WASM_SDK_URL}" --checksum "${WASM_SDK_CHECKSUM}"
 
 # Smoke test the layered tools so a broken image fails the build instead of
 # blowing up the first time someone runs `./linux.sh test`.
-RUN swift --version \
- && swift sdk list \
+RUN swiftly --version \
+ && swiftly run swift --version \
+ && swiftly run swift sdk list \
  && bun --version \
  && wasm-opt --version \
  && brotli --version \

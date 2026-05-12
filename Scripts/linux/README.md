@@ -65,7 +65,8 @@ bind-mounted at runtime.
 
 | Tool          | Why it's preinstalled                                       |
 |---------------|-------------------------------------------------------------|
-| Swift 6.3.1   | From the base image                                         |
+| Swiftly       | Selects the repo-pinned Swift toolchain                     |
+| Swift 6.3.1   | Installed and selected through Swiftly                      |
 | bun           | Builds `Examples/WebExample` and the Astro website          |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
 | binaryen      | Provides `wasm-opt` for the WebExample wasm pipeline        |
@@ -74,7 +75,8 @@ bind-mounted at runtime.
 | git, curl, unzip, ca-certificates, jq | General build prerequisites           |
 
 Everything in this table used to be installed lazily on first use by
-`Scripts/linux.sh` (`apt-get install`, `curl | bash`, `swift sdk install`).
+`Scripts/linux.sh` (`apt-get install`, `curl | bash`, `swiftly install`,
+`swiftly run swift sdk install`).
 Baking it into the image moves a one-time cost from "every container reset"
 to "every Dockerfile change", which is roughly 100x less often.
 
@@ -83,7 +85,9 @@ to "every Dockerfile change", which is roughly 100x less often.
 ## Daily workflow
 
 All CLI calls go through `Scripts/linux.sh`. Run it from anywhere — it
-resolves the repo root from its own location.
+resolves the repo root from its own location. Built-in Linux build and test
+commands invoke Swift through `swiftly run swift ...`, matching the host-side
+toolchain rule in [`docs/TOOLCHAINS.md`](../../docs/TOOLCHAINS.md).
 
 ```bash
 # First time on a new machine:
@@ -92,7 +96,7 @@ resolves the repo root from its own location.
 ./Scripts/linux.sh info           # Sanity check: prints toolchain versions
 
 # Run the same things CI runs:
-./Scripts/linux.sh test           # swift test (root package)
+./Scripts/linux.sh test           # swiftly run swift test (root package)
 ./Scripts/linux.sh cli-test       # focused SwiftTUICLI tests from the root package
 ./Scripts/linux.sh examples       # Build Linux example packages
 ./Scripts/linux.sh web            # Build WebExample + Platforms/Web host bundle
@@ -101,7 +105,7 @@ resolves the repo root from its own location.
 
 # Drop into the container for ad-hoc work:
 ./Scripts/linux.sh shell
-./Scripts/linux.sh run swift build --package-path Examples/gallery
+./Scripts/linux.sh run swiftly run swift build --package-path Examples/gallery
 
 # Lifecycle:
 ./Scripts/linux.sh stop           # Stop the container (state preserved)
@@ -130,8 +134,9 @@ When you run `./Scripts/linux.sh test`, the script:
    - The SwiftPM cache **volume**, mounted at `/root/.cache/org.swift.swiftpm`.
 5. Sets `WORKDIR=/workspace`, then runs `sleep infinity` as PID 1 so the
    container stays alive between commands.
-6. `docker exec`s `swift test` inside it, with `DISABLE_EXPLICIT_PLATFORMS=1`
-   so `Package.swift` skips the macOS/iOS platform pins.
+6. `docker exec`s `swiftly run swift test` inside it, with
+   `DISABLE_EXPLICIT_PLATFORMS=1` so `Package.swift` skips the macOS/iOS
+   platform pins.
 
 **Bind mounts vs named volumes** is the key distinction:
 
@@ -182,6 +187,14 @@ LINUX_IMAGE=ghcr.io/goodhatsllc/swift-tui-linux:sha-abc1234 \
 2. Update the `ARG SWIFT_VERSION=` default at the top of `Scripts/linux/Dockerfile`.
 3. Update `LINUX_SWIFT_VERSION` default in `Scripts/linux.sh` (kept in sync for local builds).
 4. Push the change. CI rebuilds and republishes `:latest`.
+
+### Bumping Swiftly
+
+1. Update `SWIFTLY_VERSION` in:
+   - `Scripts/linux.sh`
+   - `Scripts/linux/Dockerfile`
+   - `.github/workflows/build-linux-image.yml`
+2. Push the change. CI rebuilds and republishes `:latest`.
 
 ### Bumping the Wasm SDK
 
@@ -244,11 +257,13 @@ LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh start
 LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh full
 ```
 
-`linux.sh` keeps lazy installers for bun and the Wasm SDK
-(`ensure_bun`, `ensure_wasm_sdk`) specifically so this fallback continues to
-work. The first `web` build will be slow (downloads bun, downloads the
-Wasm SDK, installs binaryen/brotli/etc via apt); subsequent runs reuse what
-got installed inside the container until `nuke`.
+`linux.sh` keeps lazy installers for Swiftly, bun, and the Wasm SDK
+(`ensure_swiftly`, `ensure_bun`, `ensure_wasm_sdk`) specifically so this
+fallback continues to work. The first command that needs Swift will install
+Swiftly and the pinned Swift toolchain; the first `web` build will also be
+slow because it downloads bun, downloads the Wasm SDK, and installs
+binaryen/brotli/etc via apt. Subsequent runs reuse what got installed inside
+the container until `nuke`.
 
 This path exists for resilience — don't make it the default. Every time it
 runs it re-downloads ~200MB of toolchain.
@@ -267,6 +282,7 @@ Things that **used to** be volumes and are now baked into the image:
 
 | Old volume                       | Replaced by                                  |
 |----------------------------------|----------------------------------------------|
+| `swift-tui-…-swiftly-home`       | Swiftly + selected toolchain preinstalled in image (`/root/.local/share/swiftly`) |
 | `swift-tui-…-swiftpm-home`       | Wasm SDK preinstalled in image (`/root/.swiftpm/swift-sdks`) |
 | `swift-tui-…-bun`                | bun installed system-wide in image (`/usr/local/bun`)        |
 
@@ -298,7 +314,7 @@ ever run `docker login ghcr.io`. Either:
 - `docker logout ghcr.io` and retry, or
 - `docker login ghcr.io` with a GitHub PAT that has `read:packages`.
 
-### `swift sdk list` doesn't show the Wasm SDK
+### `swiftly run swift sdk list` doesn't show the Wasm SDK
 
 Two possible causes:
 
@@ -367,6 +383,7 @@ docker build \
   -f Scripts/linux/Dockerfile \
   -t ghcr.io/goodhatsllc/swift-tui-linux:latest \
   --build-arg SWIFT_VERSION=6.3.1 \
+  --build-arg SWIFTLY_VERSION=1.1.1 \
   Scripts/linux
 ```
 

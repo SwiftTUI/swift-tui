@@ -3,6 +3,10 @@ import Testing
 
 @testable import SwiftTUIWebHost
 
+#if canImport(FoundationNetworking)
+  import FoundationNetworking
+#endif
+
 struct WebHostServerTests {
   @Test("default port policy uses preferred range while explicit zero is kernel assigned")
   func defaultPortPolicyUsesPreferredRangeWhileExplicitZeroIsKernelAssigned() {
@@ -46,25 +50,17 @@ struct WebHostServerTests {
   func webSocketUpgradeReceivesOutputAndForwardsInput() async throws {
     try await withServer { session in
       var chunks = session.channel.chunks().makeAsyncIterator()
-      let webSocket = URLSession.shared.webSocketTask(with: session.webSocketURL)
-      webSocket.resume()
+      let webSocket = try WebSocketTestClient.connect(to: session.webSocketURL)
 
       try await session.channel.send(Array("surface-frame".utf8))
-      let received = try await webSocket.receive()
-      switch received {
-      case .data(let data):
-        #expect(String(decoding: data, as: UTF8.self) == "surface-frame")
-      case .string(let text):
-        #expect(text == "surface-frame")
-      @unknown default:
-        Issue.record("Unexpected WebSocket message: \(received)")
-      }
+      let received = try webSocket.receiveMessage()
+      #expect(String(decoding: received, as: UTF8.self) == "surface-frame")
 
-      try await webSocket.send(.data(Data("input-record".utf8)))
+      try webSocket.sendBinary(Data("input-record".utf8))
       let chunk = try #require(await chunks.next())
       #expect(String(decoding: chunk, as: UTF8.self) == "input-record")
 
-      webSocket.cancel(with: .normalClosure, reason: nil)
+      webSocket.close()
     }
   }
 

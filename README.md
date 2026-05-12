@@ -178,6 +178,11 @@ exports `DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only `SwiftUIHost`
 tests. If you're already using the repo's root Bun workspace, `bun run test` is
 a thin entrypoint to the same script.
 
+For development tests, use `swiftly run swift ...` explicitly. Do not use bare
+`swift test` or `xcrun swift test`; they can pick up an Xcode-selected toolchain
+or stale artifacts that do not match the repo's pinned Swift `6.3.1`
+environment.
+
 ## Performance Evaluation
 
 Use the repo-local perf tool when changing async rendering, frame scheduling,

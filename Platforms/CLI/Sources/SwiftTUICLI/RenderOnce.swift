@@ -1,6 +1,6 @@
 public import Foundation
-public import SwiftTUIRuntime
 public import SwiftTUIArguments
+public import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin
@@ -116,7 +116,7 @@ public enum RenderOnce {
     #if canImport(WASILibc)
       return false
     #else
-      return isatty(unsafe fileno(unsafe stdout)) != 0
+      return isatty(STDOUT_FILENO) != 0
     #endif
   }
 
@@ -126,7 +126,7 @@ public enum RenderOnce {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
       var size = winsize()
       let result = unsafe withUnsafeMutablePointer(to: &size) { pointer in
-        unsafe ioctl(unsafe fileno(unsafe stdout), UInt(TIOCGWINSZ), pointer)
+        unsafe ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), pointer)
       }
       guard result == 0, size.ws_col > 0 else { return nil }
       return Int(size.ws_col)

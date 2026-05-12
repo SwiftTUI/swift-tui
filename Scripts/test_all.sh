@@ -165,7 +165,7 @@ Runs the full checked-in repo verification surface:
   - Examples/WebExample browser integration test
 
 The script also checks required environment dependencies up front:
-  - Swift 6.3.x via `swiftly` when available, otherwise `swift`
+  - Swift 6.3.x via `swiftly`
   - Bun availability
   - Bun workspace dependencies via `bun install --frozen-lockfile` at the repo root
 
@@ -225,11 +225,7 @@ swift_command_text() {
     printf 'DISABLE_EXPLICIT_PLATFORMS=1 '
   fi
 
-  if [ "$SWIFT_LAUNCHER" = "swiftly" ]; then
-    printf 'swiftly run swift'
-  else
-    printf 'swift'
-  fi
+  printf 'swiftly run swift'
 
   for argument; do
     printf ' %s' "$argument"
@@ -306,29 +302,8 @@ for argument in "$@"; do
   esac
 done
 
-SWIFT_LAUNCHER=""
-
-detect_swift_command() {
-  if command -v swiftly >/dev/null 2>&1; then
-    SWIFT_LAUNCHER=swiftly
-    return 0
-  fi
-
-  if command -v swift >/dev/null 2>&1; then
-    SWIFT_LAUNCHER=swift
-    return 0
-  fi
-
-  >&2 echo "Missing required command: swiftly or swift"
-  exit 1
-}
-
 run_swift() {
-  if [ "$SWIFT_LAUNCHER" = "swiftly" ]; then
-    swiftly run swift "$@"
-  else
-    swift "$@"
-  fi
+  swiftly run swift "$@"
 }
 
 require_command() {
@@ -414,7 +389,7 @@ check_swift_environment() {
   *)
     >&2 echo ""
     >&2 echo "Expected Swift 6.3.x for this repository."
-    >&2 echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
+    >&2 echo "Use 'swiftly run swift ...' for repo-local package builds and tests."
     return 1
     ;;
   esac
@@ -475,7 +450,7 @@ print_summary() {
   fi
 }
 
-detect_swift_command
+require_command swiftly
 require_command bun
 
 if [ "$is_linux" -eq 1 ]; then

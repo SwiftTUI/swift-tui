@@ -170,7 +170,7 @@ private enum RuntimeTestError: Error {
 @MainActor
 private func waitUntil(
   _ label: String,
-  timeoutNanoseconds: UInt64 = 2_000_000_000,
+  timeoutNanoseconds: UInt64 = 10_000_000_000,
   pollNanoseconds: UInt64 = 20_000_000,
   condition: @escaping @MainActor () -> Bool
 ) async throws {

@@ -13,7 +13,7 @@ Design and taxonomy live in
 
 ```bash
 cd Examples/layouts
-swift run layouts-demo
+swiftly run swift run layouts-demo
 ```
 
 The app launches directly into the picker. `↑↓` move, `⏎` opens a
@@ -23,7 +23,7 @@ layout, `esc` pops back, `⌃C` quits.
 
 ```bash
 cd Examples/layouts
-swift test
+swiftly run swift test
 ```
 
 81 tests across 54 suites: 56 parameterised smoke tests (one per

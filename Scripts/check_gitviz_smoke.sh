@@ -12,9 +12,14 @@ binary="$example_root/.build/debug/gitviz"
 
 cd "$example_root"
 
+if ! command -v swiftly >/dev/null 2>&1; then
+  echo "Missing required command: swiftly" >&2
+  exit 1
+fi
+
 if [ ! -x "$binary" ]; then
   echo "==> Building gitviz"
-  swift build
+  swiftly run swift build
 fi
 
 run() {
