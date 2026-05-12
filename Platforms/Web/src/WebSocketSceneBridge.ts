@@ -158,6 +158,9 @@ export class WebSocketSceneBridge implements WebHostSceneBridge {
     case "clipboard":
       void sink.writeClipboard?.(record.text);
       break;
+    case "runtimeIssue":
+      sink.notifyRuntimeIssue?.(record.issue);
+      break;
     case "text":
       sink.writeOutput?.(record.text);
       break;

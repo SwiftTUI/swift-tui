@@ -45,6 +45,7 @@ public final class HostedSceneSession {
   private let focusTracker: FocusTracker
   private let runScene: HostedSceneRunner
   private let onFocusPresentationChange: (@MainActor @Sendable (FocusPresentation) -> Void)?
+  private let runtimeIssueSink: RuntimeIssueSink?
   private var runTask: Task<RunLoopExitReason, any Error>?
   private var shutdownWaiter: Task<Void, Never>?
 
@@ -56,6 +57,7 @@ public final class HostedSceneSession {
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     onOutput: @escaping @Sendable (String) -> Void,
+    runtimeIssueSink: RuntimeIssueSink? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
@@ -85,6 +87,7 @@ public final class HostedSceneSession {
         outputHandler: onOutput
       ),
       runScene: selection.runScene,
+      runtimeIssueSink: runtimeIssueSink,
       onFocusPresentationChange: onFocusPresentationChange
     )
   }
@@ -99,6 +102,7 @@ public final class HostedSceneSession {
     capabilityProfile: TerminalCapabilityProfile,
     runScene: @escaping HostedSceneRunner,
     onOutput: @escaping @Sendable (String) -> Void,
+    runtimeIssueSink: RuntimeIssueSink? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
@@ -114,6 +118,7 @@ public final class HostedSceneSession {
         outputHandler: onOutput
       ),
       runScene: runScene,
+      runtimeIssueSink: runtimeIssueSink,
       onFocusPresentationChange: onFocusPresentationChange
     )
   }
@@ -129,6 +134,7 @@ public final class HostedSceneSession {
     onSemanticFrame:
       (@MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void)? = nil,
     onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil,
+    runtimeIssueSink: RuntimeIssueSink? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
@@ -171,6 +177,7 @@ public final class HostedSceneSession {
         clipboardWriter: onClipboardWrite
       ),
       runScene: selection.runScene,
+      runtimeIssueSink: runtimeIssueSink,
       onFocusPresentationChange: onFocusPresentationChange
     )
   }
@@ -181,6 +188,7 @@ public final class HostedSceneSession {
     sessionName: String,
     host: any HostedScenePresentationSurface,
     runScene: @escaping HostedSceneRunner,
+    runtimeIssueSink: RuntimeIssueSink?,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
@@ -207,6 +215,7 @@ public final class HostedSceneSession {
     focusTracker = FocusTracker(
       invalidationIdentities: [rootIdentity]
     )
+    self.runtimeIssueSink = runtimeIssueSink
     self.onFocusPresentationChange = onFocusPresentationChange
   }
 
@@ -215,7 +224,7 @@ public final class HostedSceneSession {
       return try await runTask.value
     }
 
-    let resources = SceneSessionResources(
+    var resources = SceneSessionResources(
       presentationSurface: host,
       terminalInputReader: inputReader,
       signalReader: signalReader,
@@ -225,6 +234,7 @@ public final class HostedSceneSession {
         self?.updateCurrentFocusPresentation(presentation)
       }
     )
+    resources.runtimeIssueSink = runtimeIssueSink
 
     let task = Task {
       @MainActor [runScene, stateContainer, focusTracker, resources] in

@@ -19,6 +19,7 @@ public struct ToolbarItemConfig: Sendable {
   public var isEnabled: Bool
   public var systemHint: String?
   public var action: @MainActor @Sendable () -> Void
+  package var sourceIdentity: Identity?
 
   @MainActor
   public init(
@@ -35,6 +36,7 @@ public struct ToolbarItemConfig: Sendable {
     self.position = position
     self.isEnabled = isEnabled
     self.systemHint = Button<Text>.normalizeSystemHint(systemHint)
+    sourceIdentity = nil
     if let authoringContext {
       self.action = {
         withImperativeAuthoringContext(authoringContext) {
@@ -89,6 +91,7 @@ public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
     var node = content.resolve(in: context)
     let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
     var wrappedConfig = config
+    wrappedConfig.sourceIdentity = node.identity
     wrappedConfig.action = { [action = config.action] in
       withImperativeAuthoringContext(dynamicPropertyScope) {
         action()

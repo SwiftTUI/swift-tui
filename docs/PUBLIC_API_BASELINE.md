@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
-| `SwiftTUIRuntime` | 48 | 513 |
+| `SwiftTUIRuntime` | 48 | 515 |
 | `SwiftTUIViews` | 250 | 9296 |
 | `SwiftTUIAnimatedImage` | 5 | 154 |
 | `SwiftTUICharts` | 29 | 1812 |
@@ -31,7 +31,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 17 |
 | `SwiftTUIWebHostCLI` | 1 | 5 |
 | `SwiftUIHost` | 7 | 886 |
-| `SwiftTUICore` | 259 | 2585 |
+| `SwiftTUICore` | 262 | 2605 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -49,7 +49,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `EmptyScene` — struct — 3 members
 - `ExitKeyBindings` — struct — 6 members
 - `FileOpenError` — enum — 3 members
-- `FrameDiagnosticRecord` — struct — 74 members
+- `FrameDiagnosticRecord` — struct — 75 members
 - `FrameDiagnosticsLogger` — class — 2 members
 - `HostedSceneSession` — class — 16 members
 - `HostedSceneSessionError` — enum — 4 members
@@ -63,7 +63,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `MouseEvent` — struct — 14 members
 - `PasteEvent` — struct — 3 members
 - `PresentationSurface` — protocol — 18 members
-- `RunLoop` — class — 5 members
+- `RunLoop` — class — 6 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 5 members
 - `RuntimeConfiguration` — struct — 70 members
@@ -476,7 +476,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (259)
+### Canonical surface (262)
 
 - `AccessibilityAnnouncement` — struct — 4 members
 - `AccessibilityNode` — struct — 11 members
@@ -558,7 +558,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ForeignSurfacePayload` — protocol — 1 member
 - `FrameArtifacts` — struct — 10 members
 - `FrameContext` — struct — 8 members
-- `FrameDiagnostics` — struct — 31 members
+- `FrameDiagnostics` — struct — 32 members
 - `FrameDropEligibility` — struct — 46 members
 - `FrameMainActorTimings` — struct — 4 members
 - `FramePhaseTimings` — struct — 10 members
@@ -662,6 +662,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RichTextRun` — struct — 5 members
 - `RouteID` — struct — 5 members
 - `RouteKind` — enum — 3 members
+- `RuntimeIssue` — struct — 8 members
+- `RuntimeIssueSeverity` — enum — 6 members
+- `RuntimeIssueSink` — struct — 2 members
 - `RuntimeRegistrationDiagnostics` — struct — 6 members
 - `ScheduledFrame` — struct — 9 members
 - `ScrollIndicatorVisibility` — enum — 4 members

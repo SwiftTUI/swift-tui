@@ -597,6 +597,9 @@ classifications:
     - SwiftTUICore.RichTextRun
     - SwiftTUICore.RouteID
     - SwiftTUICore.RouteKind
+    - SwiftTUICore.RuntimeIssue
+    - SwiftTUICore.RuntimeIssueSeverity
+    - SwiftTUICore.RuntimeIssueSink
     - SwiftTUICore.RuntimeRegistrationDiagnostics
     - SwiftTUICore.ScheduledFrame
     - SwiftTUICore.ScrollIndicatorVisibility

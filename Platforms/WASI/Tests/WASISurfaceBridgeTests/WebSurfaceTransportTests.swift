@@ -58,6 +58,30 @@ struct WebSurfaceTransportTests {
     #expect(output == "\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n")
   }
 
+  @Test("encoder emits typed runtime issue records")
+  func encoderEmitsRuntimeIssueRecords() throws {
+    let issue = RuntimeIssue(
+      severity: .warning,
+      code: "toolbar.unhostedItems",
+      message: "Toolbar item was not rendered",
+      identity: Identity(components: ["root", "body"]),
+      source: ".toolbarItem(...)"
+    )
+    let output = WebSurfaceFrameEncoder.encodeRuntimeIssue(issue)
+    let prefix = "\u{001E}runtimeIssue:"
+    let line = output.trimmingCharacters(in: .newlines)
+    #expect(line.hasPrefix(prefix))
+    let decoded = try JSONSerialization.jsonObject(
+      with: Data(String(line.dropFirst(prefix.count)).utf8)
+    )
+    let record = try #require(decoded as? [String: Any])
+    #expect(record["severity"] as? String == "warning")
+    #expect(record["code"] as? String == "toolbar.unhostedItems")
+    #expect(record["message"] as? String == "Toolbar item was not rendered")
+    #expect(record["identity"] as? String == "root/body")
+    #expect(record["source"] as? String == ".toolbarItem(...)")
+  }
+
   @Test("encoder emits v2 accessibility tree with focus and live-region fields")
   func encoderEmitsAccessibilityTree() throws {
     let root = Identity(components: ["root"])

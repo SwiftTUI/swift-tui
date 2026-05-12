@@ -230,10 +230,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []
   package var cancelledRenderCount = 0
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
+  package var reportedRuntimeIssues: Set<RuntimeIssue> = []
 
   /// Optional file-based diagnostics logger. When set, every rendered frame
   /// emits a tab-separated record to the configured output file.
   public var diagnosticsLogger: FrameDiagnosticsLogger?
+
+  /// Optional host channel for runtime issue notifications.
+  public var runtimeIssueSink: RuntimeIssueSink?
 
   /// Rendering pipeline used by the interactive run loop.
   public var renderMode: RuntimeRenderMode
@@ -284,6 +288,20 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         }
       )
     )
+  }
+
+  @MainActor
+  package func reportRuntimeIssue(_ issue: RuntimeIssue) {
+    guard reportedRuntimeIssues.insert(issue).inserted else {
+      return
+    }
+    runtimeIssueSink?.report(issue)
+  }
+
+  package func reportRuntimeIssues(_ issues: [RuntimeIssue]) {
+    for issue in issues {
+      reportRuntimeIssue(issue)
+    }
   }
 
   package convenience init(

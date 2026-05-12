@@ -105,10 +105,12 @@ test("bridge decodes websocket output and sends queued input when the socket ope
   const frames: unknown[] = [];
   const text: string[] = [];
   const clipboard: string[] = [];
+  const runtimeIssues: unknown[] = [];
 
   bridge.bindOutput({
     presentSurface: (frame) => frames.push(frame),
     writeClipboard: (value) => clipboard.push(value),
+    notifyRuntimeIssue: (issue) => runtimeIssues.push(issue),
     writeOutput: (chunk) => text.push(chunk),
   });
 
@@ -122,6 +124,9 @@ test("bridge decodes websocket output and sends queued input when the socket ope
     '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'
       + '"accessibilityTree":[{"id":"root","rect":[0,0,2,1],"role":"group"}]}\n'
       + '\u001Eclipboard:{"text":"copied text"}\n'
+      + '\u001EruntimeIssue:{"severity":"warning","code":"toolbar.unhostedItems",'
+      + '"message":"Toolbar item was not rendered",'
+      + '"description":"SwiftTUI runtime warning [toolbar.unhostedItems] Toolbar item was not rendered"}\n'
       + "legacy output\n"
   ));
   await Promise.resolve();
@@ -133,6 +138,14 @@ test("bridge decodes websocket output and sends queued input when the socket ope
     accessibilityTree: [{ id: "root", role: "group" }],
   });
   expect(clipboard).toEqual(["copied text"]);
+  expect(runtimeIssues).toEqual([
+    {
+      severity: "warning",
+      code: "toolbar.unhostedItems",
+      message: "Toolbar item was not rendered",
+      description: "SwiftTUI runtime warning [toolbar.unhostedItems] Toolbar item was not rendered",
+    },
+  ]);
   expect(text).toEqual(["legacy output\n"]);
 
   bridge.sendInput(encoder.encode("\u001Ekey:return:0\n"));

@@ -218,6 +218,7 @@ extension RunLoop {
       guard var artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
+      reportRuntimeIssues(artifacts.diagnostics.runtimeIssues)
       mergeLifecycleCarryForward(
         focusSyncLifecycleCarryForward,
         into: &artifacts.commitPlan.lifecycle
@@ -390,6 +391,7 @@ extension RunLoop {
             runtimePointerHoverHandlerCount: diag.runtimeRegistrations.pointerHoverHandlerCount,
             runtimeGestureRecognizerCount: diag.runtimeRegistrations.gestureRecognizerCount,
             runtimeGestureStateBindingCount: diag.runtimeRegistrations.gestureStateBindingCount,
+            runtimeIssues: diag.runtimeIssues,
             staleFramePolicy: "commit_ordered",
             tailJobState: FrameTailJobState.completed.rawValue,
             tailCancelReason: "-",
@@ -456,6 +458,7 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     renderGeneration: RenderGeneration,
+    runtimeIssues: [RuntimeIssue],
     tailJobState: FrameTailJobState,
     tailCancelReason: String,
     animationControllerActiveAnimationCount: Int,
@@ -515,6 +518,7 @@ extension RunLoop {
         runtimePointerHoverHandlerCount: 0,
         runtimeGestureRecognizerCount: 0,
         runtimeGestureStateBindingCount: 0,
+        runtimeIssues: runtimeIssues,
         staleFramePolicy: "cancel_pending_before_start",
         tailJobState: tailJobState.rawValue,
         tailCancelReason: tailCancelReason,
@@ -563,6 +567,7 @@ extension RunLoop {
     renderGeneration: RenderGeneration,
     newestDesiredGeneration: RenderGeneration,
     decision: CompletedFrameDropDecision?,
+    runtimeIssues: [RuntimeIssue],
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool
   ) {
@@ -625,6 +630,7 @@ extension RunLoop {
         runtimePointerHoverHandlerCount: 0,
         runtimeGestureRecognizerCount: 0,
         runtimeGestureStateBindingCount: 0,
+        runtimeIssues: runtimeIssues,
         staleFramePolicy: "drop_completed_visual_only",
         tailJobState: FrameTailJobState.droppedCompleted.rawValue,
         tailCancelReason: "-",
@@ -780,6 +786,7 @@ extension RunLoop {
             shouldCancelQueued: shouldCancelQueuedTailForMode
           )
           if renderOutcome.tailJobState == .cancelledBeforeStart {
+            reportRuntimeIssues(renderOutcome.runtimeIssues)
             appendLifecycleCarryForward(
               focusSyncLifecycleCarryForward,
               into: &deferredLifecycleCarryForward
@@ -792,6 +799,7 @@ extension RunLoop {
               scheduledFrame: scheduledFrame,
               renderIntentDiagnostics: renderIntentDiagnostics,
               renderGeneration: renderOutcome.renderGeneration,
+              runtimeIssues: renderOutcome.runtimeIssues,
               tailJobState: renderOutcome.tailJobState,
               tailCancelReason: renderOutcome.tailCancelReason ?? "-",
               animationControllerActiveAnimationCount: renderer
@@ -802,6 +810,7 @@ extension RunLoop {
             continue frameLoop
           }
           if renderOutcome.tailJobState == .droppedCompleted {
+            reportRuntimeIssues(renderOutcome.runtimeIssues)
             appendLifecycleCarryForward(
               focusSyncLifecycleCarryForward,
               into: &deferredLifecycleCarryForward
@@ -815,6 +824,7 @@ extension RunLoop {
               newestDesiredGeneration: renderOutcome.newestDesiredGeneration
                 ?? RenderGeneration(nextRenderIntentGeneration),
               decision: renderOutcome.completedFrameDropDecision,
+              runtimeIssues: renderOutcome.runtimeIssues,
               animationControllerActiveAnimationCount: renderer
                 .internalAnimationController.activeAnimationCount,
               animationControllerHasPendingWork: renderer
@@ -912,6 +922,7 @@ extension RunLoop {
       guard var artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
+      reportRuntimeIssues(artifacts.diagnostics.runtimeIssues)
       mergeLifecycleCarryForward(
         focusSyncLifecycleCarryForward,
         into: &artifacts.commitPlan.lifecycle
@@ -1084,6 +1095,7 @@ extension RunLoop {
             runtimePointerHoverHandlerCount: diag.runtimeRegistrations.pointerHoverHandlerCount,
             runtimeGestureRecognizerCount: diag.runtimeRegistrations.gestureRecognizerCount,
             runtimeGestureStateBindingCount: diag.runtimeRegistrations.gestureStateBindingCount,
+            runtimeIssues: diag.runtimeIssues,
             staleFramePolicy: "commit_ordered",
             tailJobState: tailJobState.rawValue,
             tailCancelReason: "-",

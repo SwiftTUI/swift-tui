@@ -56,6 +56,7 @@ public final class SwiftUIHostSceneHost {
         )
       },
       onClipboardWrite: clipboardWriter ?? NativeClipboard.write,
+      runtimeIssueSink: SwiftUIRuntimeIssueLogger.sink,
       onFocusPresentationChange: { [weak self] presentation in
         self?.updateFocusPresentation(presentation)
       }

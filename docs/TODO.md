@@ -52,4 +52,3 @@
   [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md),
   [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md),
   [TERMINAL_NATIVE_DOCTRINE.md](TERMINAL_NATIVE_DOCTRINE.md).
-- [ ] FIX: .toolbarItem(...) outside any enclosing .toolbar(style:)-bearing scope is silently dropped. Nothing renders, nothing warns. Preferences just bubble to the root and disappear.

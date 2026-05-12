@@ -83,14 +83,25 @@ export interface WebHostSurfaceFrame {
   accessibilityAnnouncements?: WebHostAccessibilityAnnouncement[];
 }
 
+export interface WebHostRuntimeIssue {
+  severity: "warning" | "error";
+  code: string;
+  message: string;
+  description: string;
+  identity?: string;
+  source?: string;
+}
+
 export type WebHostOutputRecord =
   | { type: "surface"; frame: WebHostSurfaceFrame }
   | { type: "clipboard"; text: string }
+  | { type: "runtimeIssue"; issue: WebHostRuntimeIssue }
   | { type: "text"; text: string };
 
 export interface WebHostOutputSink {
   presentSurface(frame: WebHostSurfaceFrame): void;
   writeClipboard?(text: string): void | Promise<void>;
+  notifyRuntimeIssue?(issue: WebHostRuntimeIssue): void;
   writeOutput?(text: string): void;
   writeError?(text: string): void;
 }
@@ -180,6 +191,19 @@ export class WebHostOutputDecoder {
       return { type: "text", text: `${line}\n` };
     }
 
+    if (line.startsWith(`${recordPrefix}runtimeIssue:`)) {
+      try {
+        const record = JSON.parse(line.slice(`${recordPrefix}runtimeIssue:`.length));
+        if (isWebHostRuntimeIssue(record)) {
+          return { type: "runtimeIssue", issue: record };
+        }
+      } catch {
+        // Fall through to the text path below so malformed output remains visible.
+      }
+
+      return { type: "text", text: `${line}\n` };
+    }
+
     if (!line.startsWith(`${recordPrefix}surface:`)) {
       return { type: "text", text: `${line}\n` };
     }
@@ -201,6 +225,21 @@ function isWebHostClipboardRecord(
   value: unknown
 ): value is { text: string } {
   return !!value && typeof value === "object" && typeof (value as { text?: unknown }).text === "string";
+}
+
+function isWebHostRuntimeIssue(
+  value: unknown
+): value is WebHostRuntimeIssue {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Partial<WebHostRuntimeIssue>;
+  return (record.severity === "warning" || record.severity === "error")
+    && typeof record.code === "string"
+    && typeof record.message === "string"
+    && typeof record.description === "string"
+    && (record.identity === undefined || typeof record.identity === "string")
+    && (record.source === undefined || typeof record.source === "string");
 }
 
 export function encodeResizeControlMessage(
