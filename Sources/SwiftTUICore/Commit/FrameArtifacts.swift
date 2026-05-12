@@ -27,6 +27,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
   public var runtimeRegistrations: RuntimeRegistrationDiagnostics
+  public var runtimeIssues: [RuntimeIssue]
   public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
   package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
 
@@ -59,6 +60,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     customLayoutFallbackCount: Int = 0,
     firstCustomLayoutFallbackIdentity: Identity? = nil,
     runtimeRegistrations: RuntimeRegistrationDiagnostics = .init(),
+    runtimeIssues: [RuntimeIssue] = [],
     dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
   ) {
     self.proposal = proposal
@@ -89,6 +91,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.customLayoutFallbackCount = customLayoutFallbackCount
     self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
     self.runtimeRegistrations = runtimeRegistrations
+    self.runtimeIssues = runtimeIssues
     self.dropEligibilityBlockers = dropEligibilityBlockers
   }
 }
@@ -254,6 +257,7 @@ extension FrameDiagnostics {
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil,
+    runtimeIssues: [RuntimeIssue] = [],
     dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
   ) -> Self {
     let customLayoutFallback = customLayoutFallbackSummary(resolved)
@@ -290,6 +294,7 @@ extension FrameDiagnostics {
       measurementCache: measurementCache,
       customLayoutFallbackCount: customLayoutFallback.count,
       firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity,
+      runtimeIssues: runtimeIssues,
       dropEligibilityBlockers: dropEligibilityBlockers
     )
     diagnostics.geometryResolutionDiagnostics =

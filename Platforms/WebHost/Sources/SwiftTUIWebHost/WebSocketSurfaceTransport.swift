@@ -119,6 +119,10 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
     return true
   }
 
+  package func notifyRuntimeIssue(_ issue: RuntimeIssue) throws {
+    try sendBytes(Array(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue).utf8))
+  }
+
   @discardableResult
   package func present(
     _ surface: RasterSurface

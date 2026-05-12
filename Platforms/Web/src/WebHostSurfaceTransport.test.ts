@@ -154,6 +154,30 @@ test("decoder reads typed clipboard records", () => {
   ]);
 });
 
+test("decoder reads typed runtime issue records", () => {
+  const decoder = new WebHostOutputDecoder();
+  const records = decoder.feed(encoder.encode(
+    '\u001EruntimeIssue:{"severity":"warning","code":"toolbar.unhostedItems",'
+      + '"message":"Toolbar item was not rendered",'
+      + '"description":"SwiftTUI runtime warning [toolbar.unhostedItems] Toolbar item was not rendered",'
+      + '"identity":"root/body","source":".toolbarItem(...)"}\n'
+  ));
+
+  expect(records).toEqual([
+    {
+      type: "runtimeIssue",
+      issue: {
+        severity: "warning",
+        code: "toolbar.unhostedItems",
+        message: "Toolbar item was not rendered",
+        description: "SwiftTUI runtime warning [toolbar.unhostedItems] Toolbar item was not rendered",
+        identity: "root/body",
+        source: ".toolbarItem(...)",
+      },
+    },
+  ]);
+});
+
 test("decoder flushes partial buffered text as diagnostic output", () => {
   const decoder = new WebHostOutputDecoder();
 

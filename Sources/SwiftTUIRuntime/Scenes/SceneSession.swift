@@ -12,6 +12,7 @@ import SwiftTUIViews
   @_spi(Runners) public let surfaceName: String
   @_spi(Runners) public let environmentValues: [String: String]
   @_spi(Runners) public let diagnosticsLogger: FrameDiagnosticsLogger?
+  @_spi(Runners) public var runtimeIssueSink: RuntimeIssueSink?
   @_spi(Runners) public let runtimeConfiguration: RuntimeConfiguration
   @_spi(Runners) public let focusPresentationHandler:
     (@MainActor @Sendable (FocusPresentation) -> Void)?
@@ -34,6 +35,7 @@ import SwiftTUIViews
     self.surfaceName = surfaceName
     self.environmentValues = environmentValues
     self.diagnosticsLogger = diagnosticsLogger
+    self.runtimeIssueSink = nil
     self.runtimeConfiguration = runtimeConfiguration
     self.focusPresentationHandler = focusPresentationHandler
   }
@@ -81,6 +83,7 @@ import SwiftTUIViews
       }
     )
     runLoop.diagnosticsLogger = resources.diagnosticsLogger
+    runLoop.runtimeIssueSink = resources.runtimeIssueSink
 
     return try await runLoop.run()
   }

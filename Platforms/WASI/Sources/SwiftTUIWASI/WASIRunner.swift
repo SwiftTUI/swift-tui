@@ -137,12 +137,16 @@ public enum WASIRunner {
         }
       }
 
-      return .init(
+      var resources = SceneSessionResources(
         presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
         surfaceName: "web-surface"
       )
+      resources.runtimeIssueSink = RuntimeIssueSink { issue in
+        try? host.notifyRuntimeIssue(issue)
+      }
+      return resources
     }
 
     @MainActor

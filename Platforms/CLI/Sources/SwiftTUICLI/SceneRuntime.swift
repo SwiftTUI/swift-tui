@@ -56,13 +56,15 @@ final class SceneRuntime {
         isTTY: isTTY
       )
       .applying(configuration)
-      self.resources = SceneSessionResources(
+      var resources = SceneSessionResources(
         presentationSurface: TerminalHost(capabilityProfile: capabilityProfile),
         terminalInputReader: InputReader(),
         signalReader: defaultSignalReader(),
         diagnosticsLogger: diagnosticsLogger,
         runtimeConfiguration: configuration
       )
+      resources.runtimeIssueSink = .standardError
+      self.resources = resources
     } else {
       let pty = try ScenePty()
       ptyPair = pty
@@ -73,7 +75,7 @@ final class SceneRuntime {
         isTTY: isTTY
       )
       .applying(configuration)
-      self.resources = SceneSessionResources(
+      var resources = SceneSessionResources(
         presentationSurface: TerminalHost(
           inputFileDescriptor: pty.masterFD,
           outputFileDescriptor: pty.masterFD,
@@ -82,6 +84,8 @@ final class SceneRuntime {
         terminalInputReader: InputReader(fileDescriptor: pty.masterFD),
         runtimeConfiguration: configuration
       )
+      resources.runtimeIssueSink = .standardError
+      self.resources = resources
     }
 
     stateContainer = StateContainer(

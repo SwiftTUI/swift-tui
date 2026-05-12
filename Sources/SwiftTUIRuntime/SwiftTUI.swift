@@ -138,6 +138,7 @@ package enum FrameTailJobState: String, Sendable {
 
 package struct CancellableRenderOutcome {
   package var artifacts: FrameArtifacts?
+  package var runtimeIssues: [RuntimeIssue]
   package var renderGeneration: RenderGeneration
   package var newestDesiredGeneration: RenderGeneration?
   package var tailJobState: FrameTailJobState
@@ -199,6 +200,7 @@ package struct FrameHeadDraft {
   fileprivate var frameContext: FrameContext
   fileprivate var resolved: ResolvedNode
   fileprivate var frameTailInput: FrameTailInput
+  fileprivate var runtimeIssues: [RuntimeIssue]
   fileprivate var animationTimestamp: MonotonicInstant
   fileprivate var resolveDuration: Duration
   fileprivate var animationCheckpoint: AnimationController.Checkpoint
@@ -1398,6 +1400,7 @@ public struct DefaultRenderer {
       abortPreparedFrameHead(draft)
       return CancellableRenderOutcome(
         artifacts: nil,
+        runtimeIssues: draft.runtimeIssues,
         renderGeneration: draft.renderGeneration,
         newestDesiredGeneration: nil,
         tailJobState: .cancelledBeforeStart,
@@ -1421,6 +1424,7 @@ public struct DefaultRenderer {
         )
         return CancellableRenderOutcome(
           artifacts: nil,
+          runtimeIssues: candidate.previewArtifacts.diagnostics.runtimeIssues,
           renderGeneration: draft.renderGeneration,
           newestDesiredGeneration: newestDesiredGeneration,
           tailJobState: .droppedCompleted,
@@ -1431,6 +1435,7 @@ public struct DefaultRenderer {
       let artifacts = commitCompletedFrameCandidate(candidate)
       return CancellableRenderOutcome(
         artifacts: artifacts,
+        runtimeIssues: artifacts.diagnostics.runtimeIssues,
         renderGeneration: draft.renderGeneration,
         newestDesiredGeneration: newestDesiredGeneration,
         tailJobState: .completed,
@@ -1525,6 +1530,7 @@ public struct DefaultRenderer {
       resolved,
       context: resolveContext
     )
+    let runtimeIssues = rootRuntimeIssues(in: resolved)
 
     // Animation: capture from/to for changed animatable properties, then
     // apply interpolated values to the resolved tree before measure.
@@ -1668,10 +1674,11 @@ public struct DefaultRenderer {
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache,
+        runtimeIssues: runtimeIssues,
         dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
-      diagnostics = .init()
+      diagnostics = .init(runtimeIssues: runtimeIssues)
     }
     diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
@@ -1804,6 +1811,7 @@ public struct DefaultRenderer {
       resolved,
       context: resolveContext
     )
+    let runtimeIssues = rootRuntimeIssues(in: resolved)
 
     let animationTimestamp = MonotonicInstant.now()
     animationController.processResolvedTree(
@@ -1862,6 +1870,7 @@ public struct DefaultRenderer {
       frameContext: frameContext,
       resolved: resolved,
       frameTailInput: frameTailInput,
+      runtimeIssues: runtimeIssues,
       animationTimestamp: animationTimestamp,
       resolveDuration: resolveDuration,
       animationCheckpoint: animationCheckpoint
@@ -2231,10 +2240,11 @@ public struct DefaultRenderer {
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache,
+        runtimeIssues: draft.runtimeIssues,
         dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
-      diagnostics = .init()
+      diagnostics = .init(runtimeIssues: draft.runtimeIssues)
     }
     diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
@@ -2346,6 +2356,39 @@ public struct DefaultRenderer {
     let start = clock.now
     let value = operation()
     return (value, start.duration(to: clock.now))
+  }
+
+  @MainActor
+  private func rootRuntimeIssues(
+    in resolved: ResolvedNode
+  ) -> [RuntimeIssue] {
+    let unhostedToolbarItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+    guard !unhostedToolbarItems.isEmpty else {
+      return []
+    }
+
+    let titles =
+      unhostedToolbarItems
+      .map(\.title)
+      .filter { !$0.isEmpty }
+    let titleSummary =
+      if titles.isEmpty {
+        ""
+      } else {
+        " Items: \(titles.joined(separator: ", "))."
+      }
+    let sourceIdentity =
+      unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
+    return [
+      RuntimeIssue(
+        severity: .warning,
+        code: "toolbar.unhostedItems",
+        message:
+          "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
+        identity: sourceIdentity,
+        source: ".toolbarItem(...)"
+      )
+    ]
   }
 
   private func wrapInContainerSafeArea(

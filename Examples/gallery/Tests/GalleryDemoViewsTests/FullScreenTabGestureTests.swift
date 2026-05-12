@@ -93,7 +93,7 @@ struct PhysicsTabGestureTests {
 
     // The ball's footprint at the initial render — `toyState =
     // State()` puts it at local (0, 0) within the GeometryReader.
-    let metrics = env.cellPixelMetrics
+    let metrics = CellPixelMetrics.estimated
     let ballHeight = max(
       1,
       Int((Double(FullScreenToyPhysics.diameter) / metrics.aspectRatio).rounded())

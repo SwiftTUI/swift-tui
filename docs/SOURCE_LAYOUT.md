@@ -411,6 +411,8 @@ Sources/SwiftTUICore/
   `Runtime/DroppedPathParsing.swift`: action scopes, command registry, drop routing
 - `Runtime/PortalTypes.swift`: portal IDs, modal policy, overlay ordering, dismiss ordering
 - `Runtime/PreferenceValues.swift`: preference storage
+- `Runtime/RuntimeIssue.swift`: host-facing runtime issue model, sink, and
+  per-frame recorder bridged into frame diagnostics
 - `Runtime/RuntimeRegistrationSet.swift`, `Runtime/FrameHeadRegistrationDraft.swift`:
   frame-scoped runtime registration aggregates
 - `Support/MonotonicInstant.swift`, `Support/PlatformLock.swift`,

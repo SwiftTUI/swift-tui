@@ -1,6 +1,6 @@
 import Foundation
-@_spi(Runners) import SwiftTUIRuntime
 public import SwiftTUIArguments
+@_spi(Runners) import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin
@@ -105,15 +105,17 @@ public enum TerminalRunner {
         KeyboardOnlyInputAdapter(inputReader: inputReader)
       }
 
+    var resources = SceneSessionResources(
+      presentationSurface: presentationSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler
+    )
+    resources.runtimeIssueSink = .standardError
     return try await runSelectedScene(
       selection: selection,
       sessionName: sessionName,
-      resources: .init(
-        presentationSurface: presentationSurface,
-        terminalInputReader: terminalInputReader,
-        signalReader: signalReader,
-        scheduler: scheduler
-      )
+      resources: resources
     )
   }
 

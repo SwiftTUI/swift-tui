@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-12
 
+- Added a host-facing runtime issue channel and used it for unhosted
+  `.toolbarItem(...)` declarations: CLI hosts forward issues to stderr, SwiftUI
+  hosts log through OSLog, web hosts send typed runtime-issue records for
+  browser console logging, and frame diagnostics now include the runtime issues
+  observed during the frame.
 - Fixed toolbar item actions built without a construction-time authoring context:
   `.toolbarItem(config)` now supplies the attachment context instead of letting
   the config's nil snapshot clear it, so externally assembled configs can still

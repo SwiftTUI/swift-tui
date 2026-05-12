@@ -240,6 +240,10 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
     return true
   }
 
+  package func notifyRuntimeIssue(_ issue: RuntimeIssue) throws {
+    try writeBytes(Array(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue).utf8))
+  }
+
   @discardableResult
   package func present(
     _ surface: RasterSurface
@@ -703,6 +707,24 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     _ text: String
   ) -> String {
     "\u{001E}clipboard:{\"text\":\(jsonString(text))}\n"
+  }
+
+  @_spi(WebHost) public static func encodeRuntimeIssue(
+    _ issue: RuntimeIssue
+  ) -> String {
+    var fields = [
+      "\"severity\":\(jsonString(issue.severity.rawValue))",
+      "\"code\":\(jsonString(issue.code))",
+      "\"message\":\(jsonString(issue.message))",
+      "\"description\":\(jsonString(issue.description))",
+    ]
+    if let identity = issue.identity {
+      fields.append("\"identity\":\(jsonString(identity.path))")
+    }
+    if let source = issue.source {
+      fields.append("\"source\":\(jsonString(source))")
+    }
+    return "\u{001E}runtimeIssue:{\(fields.joined(separator: ","))}\n"
   }
 
   @_spi(WebHost) public static func encode(

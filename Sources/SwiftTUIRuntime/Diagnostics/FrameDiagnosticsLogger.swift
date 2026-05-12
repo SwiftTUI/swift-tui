@@ -51,6 +51,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var runtimePointerHoverHandlerCount: Int
   public var runtimeGestureRecognizerCount: Int
   public var runtimeGestureStateBindingCount: Int
+  public var runtimeIssues: [RuntimeIssue]
   public var staleFramePolicy: String
   public var tailJobState: String
   public var tailCancelReason: String
@@ -221,6 +222,8 @@ public final class FrameDiagnosticsLogger {
       String(record.runtimePointerHoverHandlerCount),
       String(record.runtimeGestureRecognizerCount),
       String(record.runtimeGestureStateBindingCount),
+      String(record.runtimeIssues.count),
+      formatRuntimeIssues(record.runtimeIssues),
       record.staleFramePolicy,
       record.tailJobState,
       record.tailCancelReason,
@@ -317,6 +320,8 @@ public final class FrameDiagnosticsLogger {
       "runtime_pointer_hover_handlers",
       "runtime_gesture_recognizers",
       "runtime_gesture_state_bindings",
+      "runtime_issue_count",
+      "runtime_issues",
       "stale_frame_policy",
       "tail_job_state",
       "tail_cancel_reason",
@@ -386,5 +391,32 @@ public final class FrameDiagnosticsLogger {
       return "-"
     }
     return blockers.map(\.rawValue).sorted().joined(separator: "+")
+  }
+
+  private func formatRuntimeIssues(
+    _ issues: [RuntimeIssue]
+  ) -> String {
+    guard !issues.isEmpty else {
+      return "-"
+    }
+    return
+      issues
+      .map { sanitizeField($0.description) }
+      .joined(separator: " | ")
+  }
+
+  private func sanitizeField(
+    _ value: String
+  ) -> String {
+    String(
+      value.map { character in
+        switch character {
+        case "\t", "\n", "\r":
+          " "
+        default:
+          character
+        }
+      }
+    )
   }
 }

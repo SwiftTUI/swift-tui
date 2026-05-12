@@ -75,6 +75,10 @@ public struct SnapshotRenderer {
     lines.append(
       "firstGeometryResolutionMiss=anchor:\(geometry.firstAnchorResolutionMissIdentity?.path ?? "nil") missingNamed:\(geometry.firstMissingNamedCoordinateSpaceName ?? "nil") duplicateNamed:\(geometry.firstDuplicateNamedCoordinateSpaceName ?? "nil")"
     )
+    lines.append("runtimeIssues=\(diagnostics.runtimeIssues.count)")
+    for issue in diagnostics.runtimeIssues {
+      lines.append("  \(issue.description)")
+    }
 
     return lines.joined(separator: "\n")
   }

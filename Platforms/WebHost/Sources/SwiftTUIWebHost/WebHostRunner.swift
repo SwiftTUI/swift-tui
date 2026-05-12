@@ -86,15 +86,19 @@ public enum WebHostRunner {
     )
     let inputReader = WebSocketInputReader(source: session.channel, transport: transport)
     let sceneTask = Task { @MainActor in
-      try await runSelectedScene(
+      var resources = SceneSessionResources(
+        presentationSurface: transport,
+        terminalInputReader: inputReader,
+        surfaceName: "web",
+        runtimeConfiguration: configuration
+      )
+      resources.runtimeIssueSink = RuntimeIssueSink { issue in
+        try? transport.notifyRuntimeIssue(issue)
+      }
+      _ = try await runSelectedScene(
         selection: selection,
         sessionName: String(reflecting: A.self),
-        resources: SceneSessionResources(
-          presentationSurface: transport,
-          terminalInputReader: inputReader,
-          surfaceName: "web",
-          runtimeConfiguration: configuration
-        )
+        resources: resources
       )
     }
 

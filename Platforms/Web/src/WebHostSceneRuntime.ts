@@ -16,6 +16,7 @@ import {
   encodePasteInputMessage,
   type WebHostOutputSink,
   type WebHostKeyInput,
+  type WebHostRuntimeIssue,
   type WebHostSurfaceFrame,
   type WebHostSurfaceImage,
   type WebHostSurfaceImageFormat,
@@ -116,6 +117,7 @@ export class WebHostSceneRuntime {
     this.bridge?.bindOutput({
       presentSurface: (frame) => this.presentSurface(frame),
       writeClipboard: (text) => this.writeClipboard(text),
+      notifyRuntimeIssue: (issue) => this.notifyRuntimeIssue(issue),
       writeOutput: (text) => this.writeOutput(text),
       writeError: (text) => this.writeOutput(text),
     });
@@ -171,6 +173,12 @@ export class WebHostSceneRuntime {
       this.terminalMount.appendChild(diagnosticText);
     }
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
+  }
+
+  notifyRuntimeIssue(
+    issue: WebHostRuntimeIssue
+  ): void {
+    console.log(issue.description);
   }
 
   async writeClipboard(

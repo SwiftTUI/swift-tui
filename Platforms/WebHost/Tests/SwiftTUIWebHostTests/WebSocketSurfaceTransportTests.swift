@@ -71,6 +71,30 @@ struct WebSocketSurfaceTransportTests {
     #expect(await sink.strings() == ["\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n"])
   }
 
+  @Test("transport sends typed runtime issue records")
+  func transportSendsTypedRuntimeIssueRecords() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    try transport.notifyRuntimeIssue(
+      RuntimeIssue(
+        severity: .warning,
+        code: "toolbar.unhostedItems",
+        message: "Toolbar item was not rendered",
+        identity: Identity(components: ["root", "body"]),
+        source: ".toolbarItem(...)"
+      )
+    )
+
+    let record = try #require(await sink.strings().first)
+    #expect(record.hasPrefix("\u{001E}runtimeIssue:"))
+    #expect(record.contains("\"code\":\"toolbar.unhostedItems\""))
+    #expect(record.contains("\"identity\":\"root/body\""))
+  }
+
   private static func basicSurface(
     _ text: String
   ) -> RasterSurface {

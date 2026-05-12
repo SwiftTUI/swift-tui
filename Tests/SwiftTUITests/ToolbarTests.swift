@@ -98,6 +98,98 @@ struct ToolbarTests {
     #expect(leakedItems.isEmpty)
   }
 
+  @Test("Unhosted toolbar items emit runtime issues")
+  func unhostedToolbarItemEmitsRuntimeIssue() {
+    let view = Text("content").toolbarItem(
+      .init(
+        title: "Save",
+        icon: nil,
+        position: .top,
+        isEnabled: true,
+        action: {}
+      )
+    )
+
+    let artifacts = DefaultRenderer().render(
+      view,
+      context: ResolveContext(identity: testIdentity("toolbar-unhosted-root"))
+    )
+    let issue = artifacts.diagnostics.runtimeIssues.first
+    #expect(artifacts.diagnostics.runtimeIssues.count == 1)
+    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.severity == .warning)
+    #expect(issue?.identity != nil)
+  }
+
+  @Test("Hosted toolbar items do not emit runtime issues")
+  func hostedToolbarItemDoesNotEmitRuntimeIssue() {
+    let panel =
+      Panel(id: "outer") {
+        Text("content").toolbarItem(
+          .init(
+            title: "Save",
+            icon: nil,
+            position: .top,
+            isEnabled: true,
+            action: {}
+          )
+        )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-hosted-root"))
+    )
+    #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
+  }
+
+  @Test("RunLoop forwards runtime issues to the host sink")
+  func runLoopForwardsRuntimeIssuesToHostSink() async throws {
+    let rootIdentity = testIdentity("toolbar-runloop-root")
+    let receivedIssues = LockedBox<[RuntimeIssue]>([])
+    let terminalSize = CellSize(width: 24, height: 4)
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: ToolbarIssueTerminalHost(size: terminalSize),
+      terminalInputReader: EmptyToolbarIssueInput(),
+      signalReader: EmptyToolbarIssueSignals(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        Text("content").toolbarItem(
+          .init(
+            title: "Save",
+            icon: nil,
+            position: .top,
+            isEnabled: true,
+            action: {}
+          )
+        )
+      }
+    )
+    runLoop.runtimeIssueSink = RuntimeIssueSink { issue in
+      receivedIssues.withLock { issues in
+        issues.append(issue)
+      }
+    }
+
+    let result = try await runLoop.run()
+    let issue = receivedIssues.value.first
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(receivedIssues.value.count == 1)
+    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.severity == .warning)
+  }
+
   @Test(
     "Toolbar items bubble past a non-toolbar scope and land at the next ancestor with a toolbar")
   func toolbarItemsBubblePastScopeWithoutToolbar() {
@@ -338,6 +430,43 @@ struct ToolbarTests {
     if let bodyRow, let closeRow {
       #expect(closeRow == lines.index(before: lines.endIndex))
       #expect(bodyRow < closeRow)
+    }
+  }
+}
+
+private final class ToolbarIssueTerminalHost: PresentationSurface {
+  let surfaceSize: CellSize
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+
+  init(size: CellSize) {
+    surfaceSize = size
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  func present(_: RasterSurface) throws -> TerminalPresentationMetrics {
+    .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
+  }
+}
+
+private final class EmptyToolbarIssueInput: TerminalInputReading {
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      continuation.finish()
+    }
+  }
+}
+
+private final class EmptyToolbarIssueSignals: SignalReading {
+  func events() -> AsyncStream<String> {
+    AsyncStream { continuation in
+      continuation.finish()
     }
   }
 }
