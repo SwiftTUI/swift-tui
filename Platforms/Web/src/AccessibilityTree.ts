@@ -8,6 +8,10 @@ interface AccessibilityTreeMetrics {
   cellHeight: number;
 }
 
+interface AccessibilityTreePresentationOptions {
+  synchronizeFocus?: boolean;
+}
+
 interface RoleMapping {
   role?: string;
   level?: number;
@@ -35,7 +39,8 @@ export class AccessibilityTreeMounter {
   present(
     nodes: WebHostAccessibilityNode[],
     metrics: AccessibilityTreeMetrics,
-    announcements: WebHostAccessibilityAnnouncement[] = []
+    announcements: WebHostAccessibilityAnnouncement[] = [],
+    options: AccessibilityTreePresentationOptions = {}
   ): void {
     this.element.replaceChildren();
     this.nodesById.clear();
@@ -58,8 +63,8 @@ export class AccessibilityTreeMounter {
     this.announceLiveRegionChanges(nodes, announcements);
 
     const focused = nodes.find((node) => node.isFocused);
-    if (focused) {
-      this.nodesById.get(focused.id)?.focus?.();
+    if ((options.synchronizeFocus ?? true) && focused) {
+      this.nodesById.get(focused.id)?.focus?.({ preventScroll: true });
     }
   }
 

@@ -39,6 +39,8 @@ export interface WebHostSceneRuntimeOptions {
   style: WebHostTerminalStyle;
   bridge?: WebHostSceneBridge;
   onInput(chunk: Uint8Array): void;
+  synchronizeAccessibilityFocus?: boolean;
+  captureWheelInput?: boolean;
 }
 
 interface CachedWebHostImage {
@@ -60,6 +62,8 @@ export class WebHostSceneRuntime {
 
   private readonly bridge?: WebHostSceneBridge;
   private readonly onInput: (chunk: Uint8Array) => void;
+  private readonly synchronizeAccessibilityFocus: boolean;
+  private readonly captureWheelInput: boolean;
   private readonly imageCache = new Map<string, CachedWebHostImage>();
   private currentStyle: ResolvedWebHostTerminalStyle;
   private canvas?: HTMLCanvasElement;
@@ -86,6 +90,8 @@ export class WebHostSceneRuntime {
     this.currentStyle = normalizeWebHostTerminalStyle(options.style);
     this.bridge = options.bridge;
     this.onInput = options.onInput;
+    this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
+    this.captureWheelInput = options.captureWheelInput ?? true;
     this.element = document.createElement("section");
     this.element.className = "webhost-scene";
     this.element.dataset.sceneId = options.descriptor.id;
@@ -144,7 +150,9 @@ export class WebHostSceneRuntime {
     this.applyVisibility();
     if (visible) {
       this.resizeToMount();
-      this.terminalMount.focus?.();
+      if (this.synchronizeAccessibilityFocus) {
+        this.terminalMount.focus?.({ preventScroll: true });
+      }
     }
   }
 
@@ -307,7 +315,7 @@ export class WebHostSceneRuntime {
 
       const button = pointerButton(event.button);
       this.activePointerButton = button;
-      this.terminalMount.focus?.();
+      this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
       this.onInput(encodeMouseInputMessage({
         kind: "down",
@@ -352,6 +360,10 @@ export class WebHostSceneRuntime {
     };
 
     const handleWheel = (event: WheelEvent) => {
+      if (!this.captureWheelInput) {
+        return;
+      }
+
       const location = this.cellLocation(event);
       if (!location) {
         return;
@@ -526,7 +538,9 @@ export class WebHostSceneRuntime {
     tree.present(this.currentFrame.accessibilityTree ?? [], {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight,
-    }, this.currentFrame.accessibilityAnnouncements ?? []);
+    }, this.currentFrame.accessibilityAnnouncements ?? [], {
+      synchronizeFocus: this.synchronizeAccessibilityFocus,
+    });
   }
 
   private drawImages(

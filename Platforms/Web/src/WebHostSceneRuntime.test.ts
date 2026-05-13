@@ -295,6 +295,7 @@ test("runtime mounts accessibility tree and announces live-region changes", asyn
     expect(button.getAttribute("aria-label")).toBe("Save");
     expect(button.getAttribute("aria-description")).toBe("Writes the file");
     expect(button.focused).toBe(true);
+    expect(button.lastFocusOptions).toEqual({ preventScroll: true });
     expect(status.getAttribute("role")).toBe("status");
     expect(status.getAttribute("aria-live")).toBe("polite");
     expect(status.style.left).toBe("0px");
@@ -754,6 +755,72 @@ test("runtime maps browser input events to web-surface messages", async () => {
   }
 });
 
+test("runtime can run as a passive embed without stealing focus or wheel scroll", async () => {
+  const dom = installFakeDOM();
+  try {
+    const inputs: string[] = [];
+    const bridge = new BrowserWASIBridge({
+      sceneId: "main",
+      columns: 4,
+      rows: 2,
+    });
+    const mount = new FakeElement("div");
+    const runtime = new WebHostSceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: { fontSize: 20 },
+      bridge,
+      onInput: (chunk) => {
+        inputs.push(decoder.decode(chunk));
+      },
+      synchronizeAccessibilityFocus: false,
+      captureWheelInput: false,
+    });
+
+    await runtime.mount();
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 2,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
+      accessibilityTree: [
+        {
+          id: "root/button",
+          rect: [0, 0, 2, 1],
+          role: "button",
+          label: "Save",
+          isFocused: true,
+        },
+      ],
+    })));
+
+    const tree = childWithClass(runtime.terminalMount, "webhost-scene__accessibility-tree");
+    const button = childWithData(tree, "accessibilityId", "root/button");
+    let wheelPrevented = false;
+
+    runtime.terminalMount.dispatch("wheel", {
+      clientX: 35,
+      clientY: 30,
+      deltaX: 0,
+      deltaY: 20,
+      shiftKey: false,
+      altKey: false,
+      ctrlKey: false,
+      preventDefault() {
+        wheelPrevented = true;
+      },
+    });
+
+    expect(button.focused).toBe(false);
+    expect(button.lastFocusOptions).toBeUndefined();
+    expect(inputs).toEqual([]);
+    expect(wheelPrevented).toBe(false);
+  } finally {
+    dom.restore();
+  }
+});
+
 test("runtime preserves pointer movement within one cell", async () => {
   const dom = installFakeDOM();
   try {
@@ -959,6 +1026,7 @@ class FakeElement {
   id = "";
   hidden = false;
   focused = false;
+  lastFocusOptions: FocusOptions | undefined;
   tabIndex = 0;
   textContent = "";
   rect = {
@@ -994,8 +1062,9 @@ class FakeElement {
   }
 
   remove(): void {}
-  focus(): void {
+  focus(options?: FocusOptions): void {
     this.focused = true;
+    this.lastFocusOptions = options;
   }
   setPointerCapture(): void {}
   releasePointerCapture(): void {}

@@ -15,7 +15,9 @@
 
 import {
   createWebHostApp,
+  WebHostSceneRuntime,
   type WebHostAppController,
+  type WebHostSceneRuntimeOptions,
 } from "webhost";
 import "./index.css";
 import {
@@ -33,6 +35,8 @@ import {
 const terminalAppManifestUrl = new URL(terminalAppManifestPath, import.meta.url);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
 const backtabSequence = new TextEncoder().encode("[Z");
+const isPassiveMarketingEmbed = new URLSearchParams(window.location.search).get("embed")
+  === "marketing";
 
 try {
   await bootstrap();
@@ -207,6 +211,11 @@ async function createController(
   onRuntimeCreated: (runtime: WasmSceneRuntimeHandle) => void,
 ): Promise<WebHostAppController> {
   try {
+    const wasmRuntimeFactory = createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
+      onSceneResize,
+      onRuntimeCreated,
+    });
+
     return await createWebHostApp({
       mount,
       manifestUrl: terminalAppManifestUrl,
@@ -215,10 +224,7 @@ async function createController(
       environment: {
         TUIGUI_APP_NAME: "Examples/WebExample",
       },
-      sceneRuntimeFactory: createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
-        onSceneResize,
-        onRuntimeCreated,
-      }),
+      sceneRuntimeFactory: (options) => wasmRuntimeFactory(passiveEmbedOptions(options)),
     });
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -228,8 +234,23 @@ async function createController(
       manifest: fallbackManifest,
       style: defaultStyle,
       initialSceneId: fallbackManifest.defaultSceneId,
+      sceneRuntimeFactory: (options) => new WebHostSceneRuntime(passiveEmbedOptions(options)),
     });
   }
+}
+
+function passiveEmbedOptions(
+  options: WebHostSceneRuntimeOptions
+): WebHostSceneRuntimeOptions {
+  if (!isPassiveMarketingEmbed) {
+    return options;
+  }
+
+  return {
+    ...options,
+    synchronizeAccessibilityFocus: false,
+    captureWheelInput: false,
+  };
 }
 
 function installShiftTabPassthrough(
