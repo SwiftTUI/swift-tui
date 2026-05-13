@@ -1,7 +1,7 @@
 ---
 title: "refactor: host presentation damage"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-13
 depends_on:
   - "../HOST_RENDERING_PIPELINES.md"
@@ -12,9 +12,14 @@ depends_on:
 # Host Presentation Damage Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to
-> implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
-> tracking. Commit after the plan first, then keep implementation commits scoped
-> to green checkpoints.
+> implement this plan task-by-task. Steps below are now marked complete. Commit
+> after the plan first, then keep implementation commits scoped to green
+> checkpoints.
+
+> **Status:** Shipped. `PresentationDamage` is now a public host-presentation
+> hint, damage-aware semantic presentation is wired through the runtime branch,
+> SwiftUIHost uses damage for native dirty-rect invalidation, and WebHost/WASI
+> encode damage so the browser canvas can redraw dirty rectangles only.
 
 **Goal:** Promote retained-frame presentation damage into the shared host
 presentation path, then use it to avoid unnecessary full redraw work in the CLI,
@@ -165,7 +170,7 @@ and the repo-wide `bun run test` gate.
 - Modify: `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
 - Test: `Tests/SwiftTUITests/InteractiveRuntimeTests.swift`
 
-- [ ] **Step 1: Add semantic damage dispatch coverage**
+- [x] **Step 1: Add semantic damage dispatch coverage**
 
 Add a test host that conforms to the new protocol shape:
 
@@ -194,7 +199,7 @@ Drive a small retained runtime state change and assert that the first frame has
 `nil` damage and the later state-change frame has non-`nil` damage with a
 non-empty dirty-row set.
 
-- [ ] **Step 2: Make `PresentationDamage` public but keep graphics identity
+- [x] **Step 2: Make `PresentationDamage` public but keep graphics identity
 internals package-only**
 
 Expose:
@@ -212,12 +217,12 @@ public func columnRanges(for row: Int) -> [Range<Int>]?
 Keep `graphicsInvalidation` and the initializer that accepts
 `graphicsInvalidation` as `package`.
 
-- [ ] **Step 3: Expose `FrameArtifacts.presentationDamage`**
+- [x] **Step 3: Expose `FrameArtifacts.presentationDamage`**
 
 Make `FrameArtifacts.presentationDamage` public and document that it is an
 optional presentation hint, not a correctness requirement.
 
-- [ ] **Step 4: Add the standard protocol and metrics helper**
+- [x] **Step 4: Add the standard protocol and metrics helper**
 
 Add:
 
@@ -253,7 +258,7 @@ The helper returns full-repaint metrics when `damage == nil` or
 `damage.requiresFullTextRepaint`, and incremental metrics based on row/range
 counts otherwise.
 
-- [ ] **Step 5: Update run-loop dispatch**
+- [x] **Step 5: Update run-loop dispatch**
 
 Change `presentCommittedFrame(...)` so the branch order is:
 
@@ -264,7 +269,7 @@ Change `presentCommittedFrame(...)` so the branch order is:
 5. `DamageAwarePresentationSurface`.
 6. Plain `PresentationSurface`.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run:
 
@@ -282,19 +287,19 @@ Expected: semantic damage dispatch coverage passes.
 - Modify: `Sources/SwiftTUICore/Raster/Rasterizer+Damage.swift`
 - Test: `Tests/SwiftTUICoreTests/RasterizerTests.swift`
 
-- [ ] **Step 1: Add retained-image coverage**
+- [x] **Step 1: Add retained-image coverage**
 
 Render a surface containing an image attachment, then render an incremental
 dirty row outside that image. Assert the second `RasterSurface` still contains
 the original image attachment.
 
-- [ ] **Step 2: Retain non-dirty previous attachments**
+- [x] **Step 2: Retain non-dirty previous attachments**
 
 When `Rasterizer` starts from `previousSurface`, seed `imageAttachments` with
 attachments whose `visibleBounds` do not overlap any dirty row. Continue to let
 dirty-row painting append attachments in dirty regions.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run:
 
@@ -315,36 +320,36 @@ remains green.
 - Modify: `Platforms/SwiftUI/Sources/SwiftUIHost/NativeTerminalSurfaceView.swift`
 - Test: `Platforms/SwiftUI/Tests/SwiftUIHostTests/HostedSurfaceRegressionTests.swift`
 
-- [ ] **Step 1: Add hosted-session damage coverage**
+- [x] **Step 1: Add hosted-session damage coverage**
 
 Extend a hosted-session interaction test to capture semantic frames with damage
 and assert that an interaction after the first frame supplies non-`nil` damage.
 
-- [ ] **Step 2: Thread damage through `HostedRasterSurface`**
+- [x] **Step 2: Thread damage through `HostedRasterSurface`**
 
 Make `HostedRasterSurface` conform to
 `DamageAwareSemanticPresentationSurface`. Its semantic `present` method should
 submit the surface, invoke the semantic-frame callback with damage, and return
 `TerminalPresentationMetrics.rasterHostMetrics(for:damage:)`.
 
-- [ ] **Step 3: Store damage in `SwiftUIHostSceneHost`**
+- [x] **Step 3: Store damage in `SwiftUIHostSceneHost`**
 
 Add an internal `latestPresentationDamage` property. Clear it on stop and set it
 when receiving semantic frames.
 
-- [ ] **Step 4: Pass surface and damage together into native views**
+- [x] **Step 4: Pass surface and damage together into native views**
 
 Replace direct `view.surface = host.latestSurface` assignment with a method that
 updates the surface and its matching damage in one call.
 
-- [ ] **Step 5: Add dirty-rect drawing**
+- [x] **Step 5: Add dirty-rect drawing**
 
 In `NativeTerminalSurfaceView`, invalidate the full view when damage is `nil`,
 the size changed, or full text repaint is required. Otherwise invalidate row or
 range rects. Update `NativeRasterSurfaceRenderer.draw(...)` to accept the dirty
 rect and only walk intersecting rows/cells/images.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run:
 
@@ -366,7 +371,7 @@ Expected: SwiftUIHost tests pass.
 - Test: `Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketSurfaceTransportTests.swift`
 - Test: `Platforms/Web/src/WebHostSceneRuntime.test.ts`
 
-- [ ] **Step 1: Add transport damage coverage**
+- [x] **Step 1: Add transport damage coverage**
 
 Add Swift tests that call semantic `present(..., damage:)`, decode the emitted
 record text, and assert that the JSON contains:
@@ -378,31 +383,31 @@ record text, and assert that the JSON contains:
 Also assert metrics are incremental with `linesTouched == 1` and
 `cellsChanged == 3`.
 
-- [ ] **Step 2: Add browser runtime coverage**
+- [x] **Step 2: Add browser runtime coverage**
 
 Add a TypeScript test that first presents a full frame, then presents a second
 frame with `damage.textRows` for one cell range. Assert the second draw does not
 reassign `canvas.width`/`canvas.height`, does not clear the full canvas, and
 does fill/redraw only the dirty rect.
 
-- [ ] **Step 3: Encode optional damage metadata**
+- [x] **Step 3: Encode optional damage metadata**
 
 Add a `damage:` parameter to `WebSurfaceFrameEncoder.encode(...)`, include the
 optional JSON payload, and thread it through both WebSocket and WASI transports.
 
-- [ ] **Step 4: Update TypeScript schema and validators**
+- [x] **Step 4: Update TypeScript schema and validators**
 
 Add `WebHostSurfaceDamage` and `WebHostSurfaceDamageTextRow` types to
 `WebHostSurfaceTransport.ts`, then update `isWebHostSurfaceFrame(...)`.
 
-- [ ] **Step 5: Redraw partial web frames**
+- [x] **Step 5: Redraw partial web frames**
 
 Make `WebHostSceneRuntime.presentSurface(...)` pass `frame.damage` to `draw`.
 Make `resizeCanvas()` return whether dimensions changed and skip assignment when
 unchanged. In `draw`, full redraw on missing damage, full repaint flags, first
 frame, or canvas resize; otherwise clear/fill and draw only damage rects.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run:
 
@@ -424,13 +429,13 @@ Expected: Swift transport tests and browser runtime tests pass.
 - Modify: `docs/.public-api-baseline.txt`
 - Modify: `docs/plans/2026-05-13-001-host-presentation-damage-plan.md`
 
-- [ ] **Step 1: Update host rendering docs**
+- [x] **Step 1: Update host rendering docs**
 
 Document that retained interactive sessions may produce optional presentation
 damage beside `RasterSurface` and `SemanticSnapshot`, and update the branch
 order for damage-aware semantic hosts.
 
-- [ ] **Step 2: Regenerate public API inventory**
+- [x] **Step 2: Regenerate public API inventory**
 
 Run:
 
@@ -442,7 +447,7 @@ Scripts/generate_public_api_inventory.sh --check
 Expected: generated baseline includes `PresentationDamage` and
 `PresentationDamage.TextRow`.
 
-- [ ] **Step 3: Mark the plan shipped**
+- [x] **Step 3: Mark the plan shipped**
 
 Change this plan's front matter `status:` from `active` to `shipped` after all
 implementation verification passes.
@@ -471,4 +476,3 @@ bun run test
 Expected: all focused checks pass, public API baseline is current, whitespace
 check passes, and `bun run test` passes or any unrelated pre-existing blocker is
 clearly isolated with focused checks green.
-

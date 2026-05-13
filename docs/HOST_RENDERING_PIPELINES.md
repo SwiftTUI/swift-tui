@@ -235,6 +235,8 @@ if output == .json:
   JSONFrameRenderer writes machine-readable frame JSON
 else if output == .accessible:
   LinearAccessibilityRenderer writes semantic text
+else if surface is DamageAwareSemanticPresentationSurface:
+  present(raster, semanticSnapshot, focusedIdentity, damage)
 else if surface is SemanticPresentationSurface:
   present(raster, semanticSnapshot, focusedIdentity)
 else if surface is DamageAwarePresentationSurface:
@@ -426,39 +428,46 @@ Each `SwiftUIHostSceneHost` creates a `NativeSceneBridge`, then constructs a
 - initial cell size
 - initial terminal appearance and theme
 - `onSurface`
-- `onSemanticFrame`
+- `onSemanticFrameWithDamage`
 - clipboard writer
 - runtime issue sink
 - focus presentation callback
 
 This constructor chooses the `HostedRasterSurface` branch inside
-`HostedSceneSession`. That surface conforms to `SemanticPresentationSurface`.
-When `RunLoop.presentCommittedFrame(...)` reaches the semantic-surface branch,
+`HostedSceneSession`. That surface conforms to
+`DamageAwareSemanticPresentationSurface`. When
+`RunLoop.presentCommittedFrame(...)` reaches the damage-aware semantic branch,
 the host receives:
 
 ```text
 RasterSurface
 SemanticSnapshot
 focused Identity
+PresentationDamage?
 ```
 
 No ANSI is generated. No terminal fd exists. The surface handler stores the
 latest raster surface on `SwiftUIHostSceneHost`; the semantic frame handler also
-stores the latest semantic snapshot and focused accessibility identity.
+stores the latest semantic snapshot, focused accessibility identity, and
+presentation damage hint.
 
 `SwiftUIHostAppView` bridges that host into native UI with an
 `NSViewRepresentable` or `UIViewRepresentable`. The representable configures
 `NativeTerminalSurfaceView` with:
 
 - latest `RasterSurface`
+- latest `PresentationDamage?`
 - `SwiftUIHostTerminalStyle`
 - `FocusPresentation`
 - text-input keyboard presentation state
 - resize callback
 - input callback
 
-`NativeTerminalSurfaceView` then draws the raster surface procedurally with
-native drawing:
+`NativeTerminalSurfaceView.present(surface:damage:)` invalidates the full native
+view when damage is unknown, the surface size changed, or the damage flags force
+a full text/graphics repaint. Otherwise it converts dirty rows and column ranges
+into cell-aligned native dirty rectangles. The draw pass receives the platform
+dirty rect and procedurally draws only intersecting content:
 
 - fill the background
 - walk raster cells
@@ -580,8 +589,9 @@ while giving opt-in binaries a single launch import.
 6. Creates `WebSocketInputReader`.
 7. Runs the selected scene through `SceneSession.run(...)`.
 
-`WebSocketSurfaceTransport` conforms to `SemanticPresentationSurface`. It
-advertises a web-capable terminal profile:
+`WebSocketSurfaceTransport` conforms to
+`DamageAwareSemanticPresentationSurface`. It advertises a web-capable terminal
+profile:
 
 - Unicode glyphs
 - true color
@@ -596,6 +606,7 @@ On presentation, it encodes:
 - style table
 - row cells as `[x, text, span, styleIndex]`
 - image attachments
+- optional presentation damage as dirty text rows and full-repaint flags
 - accessibility tree
 - accessibility announcements
 - clipboard and runtime issue records when needed
@@ -605,9 +616,11 @@ The browser side uses `WebSocketSceneBridge` to decode byte chunks into
 
 - stores the latest frame
 - resizes the canvas
-- clears and fills the background
-- draws cells and line decorations
+- clears and fills the full background, or only damage-derived dirty rectangles
+  when the previous canvas/frame is compatible
+- draws cells and line decorations intersecting the dirty region
 - decodes and caches images
+- draws image attachments intersecting the dirty region
 - mounts accessibility nodes as ARIA beside the canvas
 - posts accessibility announcements
 
@@ -718,10 +731,12 @@ transport mode is surface. It creates:
 - `InProcessSignalReader` for resize/style wakeups
 - runtime issue sink that writes runtime issue records through the transport
 
-`WebSurfaceTransport` writes the same record family consumed by
-`WebHostOutputDecoder`: surface, clipboard, runtime issue, and text records. The
-surface encoder is shared at the Swift level with the WebHost transport through
-the `WASISurfaceBridge` target.
+`WebSurfaceTransport` conforms to the same damage-aware semantic surface
+protocol as local WebHost. It writes the same record family consumed by
+`WebHostOutputDecoder`: surface, clipboard, runtime issue, and text records.
+Surface records include optional presentation damage, and the encoder is shared
+at the Swift level with the WebHost transport through the `WASISurfaceBridge`
+target.
 
 ### Inbound Input And Resize Flow
 
@@ -796,11 +811,14 @@ inside a lifecycle owned by SwiftUI or the browser shell.
 ### Frame Sink
 
 The shared renderer always produces `RasterSurface` and `SemanticSnapshot`.
-After that:
+When retained raster/presentation state is compatible, it may also produce
+`PresentationDamage` as an advisory host-presentation hint. After that:
 
 - CLI lowers raster cells into terminal bytes.
-- SwiftUIHost hands raster and semantics directly to native objects.
-- WebHost and WASI encode raster and semantics into `web-surface` records.
+- SwiftUIHost hands raster, semantics, focus, and damage directly to native
+  objects.
+- WebHost and WASI encode raster, semantics, focus, and damage into
+  `web-surface` records.
 
 ### Incremental Presentation
 
@@ -811,12 +829,14 @@ There are two kinds of incrementality:
 2. Presentation incrementality: the host-specific decision about how much output
    to send or redraw after a committed `RasterSurface`.
 
-All interactive hosts share the first kind. CLI has the richest second kind
-because terminal output is expensive and stateful: it tracks previous surfaces,
-dirty rows/spans, cursor moves, erase-to-end-of-line lowering, synchronized
-output, and terminal graphics replay. SwiftUIHost redraws a native view from the
-latest surface. Web transports currently ship complete surface records and let
-the browser redraw the canvas from the latest frame.
+All interactive hosts share the first kind. CLI has the richest terminal-byte
+lowering because terminal output is expensive and stateful: it tracks previous
+surfaces, dirty rows/spans, cursor moves, erase-to-end-of-line lowering,
+synchronized output, and terminal graphics replay. SwiftUIHost now uses the same
+damage hint to limit native invalidation and drawing to dirty cell rectangles.
+Web transports still ship complete surface records for correctness and simple
+wire compatibility, but they include damage metadata so the browser canvas can
+avoid clearing and redrawing cells/images outside the dirty rectangles.
 
 ### Input Precision
 
@@ -888,8 +908,9 @@ stdio disposal.
    raster.
 2. Add host behavior at the `PresentationSurface`, `TerminalInputReading`,
    `SignalReading`, or `HostedSceneSession` seams.
-3. If a surface needs accessibility data, implement `SemanticPresentationSurface`
-   instead of inventing a second accessibility extraction pass.
+3. If a surface needs accessibility data, implement `SemanticPresentationSurface`;
+   if it can also use damage, implement `DamageAwareSemanticPresentationSurface`
+   so semantic presentation does not drop redraw hints.
 4. Resize/style updates should update surface state and have an explicit wake
    contract.
 5. Keep `SwiftTUIRuntime` below runner and host products. Host products should

@@ -15,6 +15,7 @@ public final class SwiftUIHostSceneHost {
   public private(set) var latestSemanticSnapshot: SemanticSnapshot?
   public private(set) var focusedAccessibilityIdentity: Identity?
   public private(set) var style: SwiftUIHostTerminalStyle
+  private(set) var latestPresentationDamage: PresentationDamage?
 
   @ObservationIgnored
   private let bridge: NativeSceneBridge
@@ -48,11 +49,12 @@ public final class SwiftUIHostSceneHost {
       onSurface: { [weak self] surface in
         self?.receiveSurface(surface)
       },
-      onSemanticFrame: { [weak self] surface, semanticSnapshot, focusedIdentity in
+      onSemanticFrameWithDamage: { [weak self] surface, semanticSnapshot, focusedIdentity, damage in
         self?.receiveSemanticFrame(
           surface: surface,
           semanticSnapshot: semanticSnapshot,
-          focusedIdentity: focusedIdentity
+          focusedIdentity: focusedIdentity,
+          damage: damage
         )
       },
       onClipboardWrite: clipboardWriter ?? NativeClipboard.write,
@@ -93,6 +95,7 @@ public final class SwiftUIHostSceneHost {
     bridge.stopSession()
     focusPresentation = .none
     focusedAccessibilityIdentity = nil
+    latestPresentationDamage = nil
     accessibilityAnnouncer.reset()
     manualKeyboardPresentationRequested = false
     bridge.updateKeyboardPresentation(
@@ -140,16 +143,19 @@ public final class SwiftUIHostSceneHost {
     _ surface: RasterSurface
   ) {
     latestSurface = surface
+    latestPresentationDamage = nil
   }
 
   private func receiveSemanticFrame(
     surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?
   ) {
     latestSurface = surface
     latestSemanticSnapshot = semanticSnapshot
     focusedAccessibilityIdentity = focusedIdentity
+    latestPresentationDamage = damage
     NativeAccessibilityAnnouncementPoster.post(
       accessibilityAnnouncer.announcements(for: semanticSnapshot)
     )

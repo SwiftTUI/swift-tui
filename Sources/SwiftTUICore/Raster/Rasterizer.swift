@@ -81,8 +81,10 @@ public struct Rasterizer: Sendable {
       !damage.dirtyRows.isEmpty
     {
       cells = previousSurface.cells
-      imageAttachments = []
       dirtyRows = damage.dirtyRows
+      imageAttachments = previousSurface.imageAttachments.filter { attachment in
+        !visibleBounds(attachment.visibleBounds, intersectsAnyOf: damage.dirtyRows)
+      }
       damageToRefine = damage
       clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
     } else {
@@ -140,4 +142,3 @@ public struct Rasterizer: Sendable {
     )
   }
 }
-

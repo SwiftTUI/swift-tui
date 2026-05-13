@@ -170,7 +170,12 @@ public struct FrameArtifacts: Equatable, Sendable {
   public var semanticSnapshot: SemanticSnapshot
   public var drawTree: DrawNode
   public var rasterSurface: RasterSurface
-  package var presentationDamage: PresentationDamage?
+  /// Optional retained-frame presentation damage.
+  ///
+  /// A non-`nil` value is an advisory hint for presentation surfaces that retain
+  /// the previous committed frame and can redraw only changed rows or ranges.
+  /// A `nil` value means the frame must be treated as a full repaint.
+  public var presentationDamage: PresentationDamage?
   /// Identities whose ``DrawNode`` had a non-empty visible rect after
   /// all ancestor clip bounds were applied during rasterization.
   ///

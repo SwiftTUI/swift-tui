@@ -1,4 +1,19 @@
 extension Rasterizer {
+  internal func visibleBounds(
+    _ bounds: CellRect,
+    intersectsAnyOf dirtyRows: Set<Int>
+  ) -> Bool {
+    guard bounds.size.height > 0, !dirtyRows.isEmpty else {
+      return false
+    }
+
+    let lowerBound = bounds.origin.y
+    let upperBound = bounds.origin.y + bounds.size.height
+    return dirtyRows.contains(where: { row in
+      row >= lowerBound && row < upperBound
+    })
+  }
+
   internal func clear(
     cells: inout [[RasterCell]],
     for damage: PresentationDamage,
@@ -174,4 +189,3 @@ extension Rasterizer {
     row.indices.contains(index) ? row[index] : .empty
   }
 }
-

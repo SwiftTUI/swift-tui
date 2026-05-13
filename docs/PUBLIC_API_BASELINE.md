@@ -32,7 +32,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 17 |
 | `SwiftTUIWebHostCLI` | 1 | 5 |
 | `SwiftUIHost` | 7 | 886 |
-| `SwiftTUICore` | 264 | 2618 |
+| `SwiftTUICore` | 265 | 2633 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -501,7 +501,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (264)
+### Canonical surface (265)
 
 - `AccessibilityAnnouncement` — struct — 4 members
 - `AccessibilityNode` — struct — 11 members
@@ -581,7 +581,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FocusTracker` — class — 10 members
 - `ForeignGrid` — struct — 5 members
 - `ForeignSurfacePayload` — protocol — 1 member
-- `FrameArtifacts` — struct — 10 members
+- `FrameArtifacts` — struct — 11 members
 - `FrameContext` — struct — 8 members
 - `FrameDiagnostics` — struct — 32 members
 - `FrameDropEligibility` — struct — 46 members
@@ -664,6 +664,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `PreferenceKey` — protocol — 3 members
 - `PreformattedTextLine` — struct — 4 members
 - `PreformattedTextRun` — struct — 4 members
+- `PresentationDamage` — struct — 13 members
 - `PresentationDamageDiagnostics` — struct — 9 members
 - `ProposedDimension` — enum — 5 members
 - `ProposedSize` — struct — 6 members

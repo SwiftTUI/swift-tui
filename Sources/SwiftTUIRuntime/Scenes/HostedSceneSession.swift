@@ -133,6 +133,12 @@ public final class HostedSceneSession {
     onSurface: @escaping @MainActor @Sendable (RasterSurface) -> Void,
     onSemanticFrame:
       (@MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void)? = nil,
+    onSemanticFrameWithDamage:
+      (
+        @MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) ->
+          Void
+      )? =
+      nil,
     onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil,
     runtimeIssueSink: RuntimeIssueSink? = nil,
     onFocusPresentationChange:
@@ -166,12 +172,16 @@ public final class HostedSceneSession {
             onSurface(surface)
           }
         },
-        semanticFrameHandler: { surface, semanticSnapshot, focusedIdentity in
-          guard let onSemanticFrame else {
-            return
+        semanticFrameHandler: { surface, semanticSnapshot, focusedIdentity, damage in
+          if let onSemanticFrame {
+            Task { @MainActor in
+              onSemanticFrame(surface, semanticSnapshot, focusedIdentity)
+            }
           }
-          Task { @MainActor in
-            onSemanticFrame(surface, semanticSnapshot, focusedIdentity)
+          if let onSemanticFrameWithDamage {
+            Task { @MainActor in
+              onSemanticFrameWithDamage(surface, semanticSnapshot, focusedIdentity, damage)
+            }
           }
         },
         clipboardWriter: onClipboardWrite
@@ -353,8 +363,8 @@ public final class HostedSceneSession {
 }
 
 private final class HostedRasterSurface:
-  HostedScenePresentationSurface, ClipboardWritingPresentationSurface, SemanticPresentationSurface,
-  Sendable
+  HostedScenePresentationSurface, ClipboardWritingPresentationSurface,
+  DamageAwareSemanticPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -366,7 +376,8 @@ private final class HostedRasterSurface:
 
   private let state: Mutex<State>
   private let surfaceHandler: @Sendable (RasterSurface) -> Void
-  private let semanticFrameHandler: @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void
+  private let semanticFrameHandler:
+    @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
 
   let capabilityProfile: TerminalCapabilityProfile
@@ -397,7 +408,8 @@ private final class HostedRasterSurface:
     theme: Theme?,
     capabilityProfile: TerminalCapabilityProfile,
     surfaceHandler: @escaping @Sendable (RasterSurface) -> Void,
-    semanticFrameHandler: @escaping @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void,
+    semanticFrameHandler:
+      @escaping @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) -> Void,
     clipboardWriter: (@MainActor @Sendable (String) -> Bool)? = nil
   ) {
     self.capabilityProfile = capabilityProfile
@@ -493,7 +505,7 @@ private final class HostedRasterSurface:
     damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics {
     submit(surface)
-    return presentationMetrics(
+    return TerminalPresentationMetrics.rasterHostMetrics(
       for: surface,
       damage: damage
     )
@@ -505,11 +517,26 @@ private final class HostedRasterSurface:
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity?
   ) throws -> TerminalPresentationMetrics {
-    submit(surface)
-    semanticFrameHandler(surface, semanticSnapshot, focusedIdentity)
-    return presentationMetrics(
-      for: surface,
+    try present(
+      surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
       damage: nil
+    )
+  }
+
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
+    submit(surface)
+    semanticFrameHandler(surface, semanticSnapshot, focusedIdentity, damage)
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: surface,
+      damage: damage
     )
   }
 
@@ -517,33 +544,9 @@ private final class HostedRasterSurface:
     _ surface: RasterSurface
   ) {
     surfaceHandler(surface)
-  }
-
-  private func presentationMetrics(
-    for surface: RasterSurface,
-    damage: PresentationDamage?
-  ) -> TerminalPresentationMetrics {
-    let previousSurface = state.withLock(\.lastSubmittedSurface)
     state.withLock { state in
       state.lastSubmittedSurface = surface
     }
-
-    let strategy: TerminalPresentationMetrics.Strategy =
-      previousSurface == nil || previousSurface?.size != surface.size
-      ? .fullRepaint
-      : .incremental
-    let linesTouched = damage?.dirtyRows.count ?? max(0, surface.size.height)
-    let cellsChanged =
-      damage?.textRows.reduce(0) { partial, row in
-        partial + row.columnRanges.reduce(0) { $0 + $1.count }
-      } ?? max(0, surface.size.width) * max(0, surface.size.height)
-
-    return TerminalPresentationMetrics(
-      bytesWritten: 0,
-      linesTouched: linesTouched,
-      cellsChanged: cellsChanged,
-      strategy: strategy
-    )
   }
 }
 

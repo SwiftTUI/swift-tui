@@ -57,7 +57,10 @@ private struct TerminalSurfaceHost: SwiftUI.View {
     }
 
     private func configure(_ view: NativeTerminalSurfaceView) {
-      view.surface = host.latestSurface
+      view.present(
+        surface: host.latestSurface,
+        damage: host.latestPresentationDamage
+      )
       view.style = host.style
       view.focusPresentation = host.focusPresentation
       view.allowsTextInput =
@@ -86,7 +89,10 @@ private struct TerminalSurfaceHost: SwiftUI.View {
     }
 
     private func configure(_ view: NativeTerminalSurfaceView) {
-      view.surface = host.latestSurface
+      view.present(
+        surface: host.latestSurface,
+        damage: host.latestPresentationDamage
+      )
       view.style = host.style
       view.focusPresentation = host.focusPresentation
       view.allowsTextInput =

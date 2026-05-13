@@ -72,6 +72,22 @@ export interface WebHostSurfaceImage {
   dataBase64?: string;
 }
 
+export type WebHostSurfaceDamageRange = [
+  start: number,
+  end: number,
+];
+
+export type WebHostSurfaceDamageTextRow = [
+  row: number,
+  ranges: WebHostSurfaceDamageRange[],
+];
+
+export interface WebHostSurfaceDamage {
+  textRows: WebHostSurfaceDamageTextRow[];
+  requiresFullTextRepaint: boolean;
+  requiresFullGraphicsReplay: boolean;
+}
+
 export interface WebHostSurfaceFrame {
   version: 1 | 2;
   width: number;
@@ -79,6 +95,7 @@ export interface WebHostSurfaceFrame {
   styles: Array<WebHostSurfaceStyle | null>;
   rows: WebHostSurfaceCell[][];
   images?: WebHostSurfaceImage[];
+  damage?: WebHostSurfaceDamage;
   accessibilityTree?: WebHostAccessibilityNode[];
   accessibilityAnnouncements?: WebHostAccessibilityAnnouncement[];
 }
@@ -320,6 +337,7 @@ function isWebHostSurfaceFrame(
     && Array.isArray(frame.styles)
     && Array.isArray(frame.rows)
     && (frame.images === undefined || isWebHostSurfaceImages(frame.images))
+    && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage))
     && (
       frame.accessibilityTree === undefined
         || isWebHostAccessibilityNodes(frame.accessibilityTree)
@@ -408,6 +426,38 @@ function isWebHostSurfaceImage(
     && isWebHostSurfaceScalingMode(image.scalingMode)
     && (image.pixelSize === undefined || isWebHostSurfaceSize(image.pixelSize))
     && (image.dataBase64 === undefined || typeof image.dataBase64 === "string");
+}
+
+function isWebHostSurfaceDamage(
+  value: unknown
+): value is WebHostSurfaceDamage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const damage = value as Partial<WebHostSurfaceDamage>;
+  return Array.isArray(damage.textRows)
+    && damage.textRows.every(isWebHostSurfaceDamageTextRow)
+    && typeof damage.requiresFullTextRepaint === "boolean"
+    && typeof damage.requiresFullGraphicsReplay === "boolean";
+}
+
+function isWebHostSurfaceDamageTextRow(
+  value: unknown
+): value is WebHostSurfaceDamageTextRow {
+  return Array.isArray(value)
+    && value.length === 2
+    && typeof value[0] === "number"
+    && Array.isArray(value[1])
+    && value[1].every(isWebHostSurfaceDamageRange);
+}
+
+function isWebHostSurfaceDamageRange(
+  value: unknown
+): value is WebHostSurfaceDamageRange {
+  return Array.isArray(value)
+    && value.length === 2
+    && typeof value[0] === "number"
+    && typeof value[1] === "number";
 }
 
 function isWebHostSurfaceImageFormat(

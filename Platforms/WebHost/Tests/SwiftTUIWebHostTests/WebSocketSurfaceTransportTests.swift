@@ -40,6 +40,40 @@ struct WebSocketSurfaceTransportTests {
     #expect(metrics.bytesWritten == record.utf8.count)
   }
 
+  @Test("damage-aware semantic present emits damage and partial repaint metrics")
+  func damageAwareSemanticPresentEmitsDamageAndPartialMetrics() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 2),
+      sink: sink
+    )
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 1, columnRanges: [0..<1])
+      ]
+    )
+
+    let damageAwareTransport: any DamageAwareSemanticPresentationSurface = transport
+    let metrics = try damageAwareTransport.present(
+      Self.basicSurface("OK"),
+      semanticSnapshot: SemanticSnapshot(),
+      focusedIdentity: nil,
+      damage: damage
+    )
+
+    let record = try #require(await sink.strings().first)
+    let frame = try decodedSurfaceFrame(record)
+    let decodedDamage = try #require(frame["damage"] as? [String: Any])
+    let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
+    let textRow = try #require(textRows.first)
+
+    #expect(textRow.first as? Int == 1)
+    #expect(textRow.dropFirst().first as? [[Int]] == [[0, 1]])
+    #expect(metrics.linesTouched == 1)
+    #expect(metrics.cellsChanged == 1)
+    #expect(metrics.strategy == .incremental)
+  }
+
   @Test("sink backpressure preserves present record order")
   func sinkBackpressurePreservesPresentRecordOrder() async throws {
     let sink = RecordingByteSink()

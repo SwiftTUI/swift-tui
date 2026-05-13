@@ -17,6 +17,7 @@ import {
   type WebHostOutputSink,
   type WebHostKeyInput,
   type WebHostRuntimeIssue,
+  type WebHostSurfaceDamage,
   type WebHostSurfaceFrame,
   type WebHostSurfaceImage,
   type WebHostSurfaceImageFormat,
@@ -43,6 +44,13 @@ export interface WebHostSceneRuntimeOptions {
 interface CachedWebHostImage {
   image?: CanvasImageSource;
   promise?: Promise<CanvasImageSource>;
+}
+
+interface DirtyRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export class WebHostSceneRuntime {
@@ -212,11 +220,12 @@ export class WebHostSceneRuntime {
   private presentSurface(
     frame: WebHostSurfaceFrame
   ): void {
+    const previousFrame = this.currentFrame;
     this.currentFrame = frame;
     this.columns = Math.max(1, Math.round(frame.width));
     this.rows = Math.max(1, Math.round(frame.height));
-    this.resizeCanvas();
-    this.draw();
+    const resized = this.resizeCanvas();
+    this.draw(previousFrame && !resized ? frame.damage : undefined);
     this.syncAccessibilityTree();
   }
 
@@ -410,18 +419,31 @@ export class WebHostSceneRuntime {
     this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
   }
 
-  private resizeCanvas(): void {
+  private resizeCanvas(): boolean {
     if (!this.canvas) {
-      return;
+      return false;
     }
 
     const cssWidth = Math.max(1, this.columns * this.cellWidth);
     const cssHeight = Math.max(1, this.rows * this.cellHeight);
     const scale = globalThis.window?.devicePixelRatio || 1;
-    this.canvas.width = Math.ceil(cssWidth * scale);
-    this.canvas.height = Math.ceil(cssHeight * scale);
-    this.canvas.style.width = `${cssWidth}px`;
-    this.canvas.style.height = `${cssHeight}px`;
+    const width = Math.ceil(cssWidth * scale);
+    const height = Math.ceil(cssHeight * scale);
+    const styleWidth = `${cssWidth}px`;
+    const styleHeight = `${cssHeight}px`;
+    if (this.canvas.width === width
+      && this.canvas.height === height
+      && this.canvas.style.width === styleWidth
+      && this.canvas.style.height === styleHeight
+    ) {
+      return false;
+    }
+
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.canvas.style.width = styleWidth;
+    this.canvas.style.height = styleHeight;
+    return true;
   }
 
   private measureCells(): void {
@@ -438,7 +460,9 @@ export class WebHostSceneRuntime {
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
 
-  private draw(): void {
+  private draw(
+    damage?: WebHostSurfaceDamage
+  ): void {
     const canvas = this.canvas;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) {
@@ -448,25 +472,49 @@ export class WebHostSceneRuntime {
     const scale = globalThis.window?.devicePixelRatio || 1;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.textBaseline = "alphabetic";
-    context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
-    context.fillStyle = webTUITerminalBackgroundColor(this.currentStyle);
-    context.fillRect(0, 0, this.columns * this.cellWidth, this.rows * this.cellHeight);
 
     const frame = this.currentFrame;
+    const dirtyRects = frame ? this.dirtyRectsForDamage(damage, frame) : undefined;
+    if (dirtyRects?.length === 0) {
+      return;
+    }
+
+    context.fillStyle = webTUITerminalBackgroundColor(this.currentStyle);
+    if (dirtyRects) {
+      for (const rect of dirtyRects) {
+        context.clearRect(rect.x, rect.y, rect.width, rect.height);
+        context.fillRect(rect.x, rect.y, rect.width, rect.height);
+      }
+    } else {
+      context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
+      context.fillRect(0, 0, this.columns * this.cellWidth, this.rows * this.cellHeight);
+    }
+
     if (!frame) {
       return;
     }
 
+    this.drawRows(context, frame, dirtyRects);
+    this.drawImages(context, frame.images ?? [], dirtyRects);
+  }
+
+  private drawRows(
+    context: CanvasRenderingContext2D,
+    frame: WebHostSurfaceFrame,
+    dirtyRects?: DirtyRect[]
+  ): void {
     for (let y = 0; y < frame.rows.length; y += 1) {
       const row = frame.rows[y] ?? [];
       for (const cell of row) {
         const [x, text, span, styleIndex] = cell;
+        const cellRect = this.cellRect(x, y, span);
+        if (dirtyRects && !dirtyRects.some((rect) => rectsIntersect(rect, cellRect))) {
+          continue;
+        }
         const style = frame.styles[styleIndex] ?? undefined;
         this.drawCell(context, x, y, text, span, style);
       }
     }
-
-    this.drawImages(context, frame.images ?? []);
   }
 
   private syncAccessibilityTree(): void {
@@ -483,16 +531,18 @@ export class WebHostSceneRuntime {
 
   private drawImages(
     context: CanvasRenderingContext2D,
-    images: WebHostSurfaceImage[]
+    images: WebHostSurfaceImage[],
+    dirtyRects?: DirtyRect[]
   ): void {
     for (const image of images) {
-      this.drawImage(context, image);
+      this.drawImage(context, image, dirtyRects);
     }
   }
 
   private drawImage(
     context: CanvasRenderingContext2D,
-    image: WebHostSurfaceImage
+    image: WebHostSurfaceImage,
+    dirtyRects?: DirtyRect[]
   ): void {
     const decodedImage = this.cachedImage(image);
     if (!decodedImage) {
@@ -502,6 +552,15 @@ export class WebHostSceneRuntime {
     const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
     const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
     if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      return;
+    }
+    const imageRect = {
+      x: clipX * this.cellWidth,
+      y: clipY * this.cellHeight,
+      width: clipWidth * this.cellWidth,
+      height: clipHeight * this.cellHeight,
+    };
+    if (dirtyRects && !dirtyRects.some((rect) => rectsIntersect(rect, imageRect))) {
       return;
     }
 
@@ -593,6 +652,48 @@ export class WebHostSceneRuntime {
     this.drawTextLine(context, rectX, rectY, width, style?.underline, "underline", foreground);
     this.drawTextLine(context, rectX, rectY, width, style?.strikethrough, "strike", foreground);
     context.globalAlpha = 1;
+  }
+
+  private dirtyRectsForDamage(
+    damage: WebHostSurfaceDamage | undefined,
+    frame: WebHostSurfaceFrame
+  ): DirtyRect[] | undefined {
+    if (!damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay) {
+      return undefined;
+    }
+
+    const rects: DirtyRect[] = [];
+    for (const [row, ranges] of damage.textRows) {
+      if (row < 0 || row >= frame.height) {
+        continue;
+      }
+      if (ranges.length === 0) {
+        rects.push(this.cellRect(0, row, frame.width));
+        continue;
+      }
+      for (const [start, end] of ranges) {
+        const lowerBound = Math.max(0, Math.min(frame.width, Math.floor(start)));
+        const upperBound = Math.max(lowerBound, Math.min(frame.width, Math.ceil(end)));
+        if (lowerBound >= upperBound) {
+          continue;
+        }
+        rects.push(this.cellRect(lowerBound, row, upperBound - lowerBound));
+      }
+    }
+    return rects;
+  }
+
+  private cellRect(
+    x: number,
+    y: number,
+    span: number
+  ): DirtyRect {
+    return {
+      x: x * this.cellWidth,
+      y: y * this.cellHeight,
+      width: Math.max(1, span) * this.cellWidth,
+      height: this.cellHeight,
+    };
   }
 
   private drawTextLine(
@@ -778,6 +879,16 @@ function normalizedWheelDelta(
     return -1;
   }
   return 0;
+}
+
+function rectsIntersect(
+  lhs: DirtyRect,
+  rhs: DirtyRect
+): boolean {
+  return lhs.x < rhs.x + rhs.width
+    && lhs.x + lhs.width > rhs.x
+    && lhs.y < rhs.y + rhs.height
+    && lhs.y + lhs.height > rhs.y;
 }
 
 function resolvedForeground(

@@ -218,6 +218,28 @@ struct WebSurfaceTransportTests {
     #expect(secondImage["dataBase64"] == nil)
   }
 
+  @Test("encoder emits presentation damage for browser partial redraws")
+  func encoderEmitsPresentationDamage() throws {
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.basicSurface(),
+        damage: PresentationDamage(
+          textRows: [
+            .init(row: 1, columnRanges: [0..<1, 1..<2])
+          ]
+        )
+      )
+    )
+
+    let damage = try #require(frame["damage"] as? [String: Any])
+    #expect(damage["requiresFullTextRepaint"] as? Bool == false)
+    #expect(damage["requiresFullGraphicsReplay"] as? Bool == false)
+    let textRows = try #require(damage["textRows"] as? [[Any]])
+    let textRow = try #require(textRows.first)
+    #expect(textRow.first as? Int == 1)
+    #expect(textRow.dropFirst().first as? [[Int]] == [[0, 2]])
+  }
+
   @Test("encoder advertises gif format and ships dataBase64 for animated GIF inputs")
   func encoderAdvertisesGIFFormatAndShipsDataBase64() throws {
     // GIF89a header followed by a few palette/data bytes — short, but

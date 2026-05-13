@@ -67,6 +67,22 @@ test("decoder preserves typed image records", () => {
   ]);
 });
 
+test("decoder preserves presentation damage records", () => {
+  const decoder = new WebHostOutputDecoder();
+  const records = decoder.feed(encoder.encode(
+    '\u001Esurface:{"version":1,"width":2,"height":2,"styles":[null],"rows":[[],[]],'
+      + '"images":[],"damage":{"textRows":[[1,[[0,2]]]],'
+      + '"requiresFullTextRepaint":false,"requiresFullGraphicsReplay":false}}\n'
+  ));
+
+  const frame = surfaceFrame(records[0]);
+  expect(frame.damage).toEqual({
+    textRows: [[1, [[0, 2]]]],
+    requiresFullTextRepaint: false,
+    requiresFullGraphicsReplay: false,
+  });
+});
+
 test("decoder accepts v2 accessibility trees", () => {
   const decoder = new WebHostOutputDecoder();
   const records = decoder.feed(encoder.encode(

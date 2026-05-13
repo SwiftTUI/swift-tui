@@ -3003,6 +3003,7 @@ SwiftTUICore.FrameArtifacts.drawTree
 SwiftTUICore.FrameArtifacts.init(resolvedTree:measuredTree:placedTree:semanticSnapshot:drawTree:rasterSurface:commitPlan:diagnostics:)
 SwiftTUICore.FrameArtifacts.measuredTree
 SwiftTUICore.FrameArtifacts.placedTree
+SwiftTUICore.FrameArtifacts.presentationDamage
 SwiftTUICore.FrameArtifacts.rasterSurface
 SwiftTUICore.FrameArtifacts.resolvedTree
 SwiftTUICore.FrameArtifacts.semanticSnapshot
@@ -3713,6 +3714,20 @@ SwiftTUICore.PreformattedTextRun.!=(_:_:)
 SwiftTUICore.PreformattedTextRun.content
 SwiftTUICore.PreformattedTextRun.init(content:style:)
 SwiftTUICore.PreformattedTextRun.style
+SwiftTUICore.PresentationDamage
+SwiftTUICore.PresentationDamage.!=(_:_:)
+SwiftTUICore.PresentationDamage.TextRow
+SwiftTUICore.PresentationDamage.TextRow.!=(_:_:)
+SwiftTUICore.PresentationDamage.TextRow.columnRanges
+SwiftTUICore.PresentationDamage.TextRow.init(row:columnRanges:)
+SwiftTUICore.PresentationDamage.TextRow.row
+SwiftTUICore.PresentationDamage.columnRanges(for:)
+SwiftTUICore.PresentationDamage.dirtyRows
+SwiftTUICore.PresentationDamage.init(dirtyRows:requiresFullTextRepaint:requiresFullGraphicsReplay:)
+SwiftTUICore.PresentationDamage.init(textRows:requiresFullTextRepaint:requiresFullGraphicsReplay:)
+SwiftTUICore.PresentationDamage.requiresFullGraphicsReplay
+SwiftTUICore.PresentationDamage.requiresFullTextRepaint
+SwiftTUICore.PresentationDamage.textRows
 SwiftTUICore.PresentationDamageDiagnostics
 SwiftTUICore.PresentationDamageDiagnostics.!=(_:_:)
 SwiftTUICore.PresentationDamageDiagnostics.graphicsInvalidationCount
@@ -4924,7 +4939,7 @@ SwiftTUIRuntime.HostedSceneSession
 SwiftTUIRuntime.HostedSceneSession.currentFocusPresentation
 SwiftTUIRuntime.HostedSceneSession.descriptor
 SwiftTUIRuntime.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onOutput:runtimeIssueSink:onFocusPresentationChange:)
-SwiftTUIRuntime.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onSurface:onSemanticFrame:onClipboardWrite:runtimeIssueSink:onFocusPresentationChange:)
+SwiftTUIRuntime.HostedSceneSession.init(for:sceneID:initialSize:appearance:theme:capabilityProfile:onSurface:onSemanticFrame:onSemanticFrameWithDamage:onClipboardWrite:runtimeIssueSink:onFocusPresentationChange:)
 SwiftTUIRuntime.HostedSceneSession.resize(to:)
 SwiftTUIRuntime.HostedSceneSession.resize(to:cellPixelSize:)
 SwiftTUIRuntime.HostedSceneSession.resize(to:cellPixelSize:pointerInputCapabilities:)

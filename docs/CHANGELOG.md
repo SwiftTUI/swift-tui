@@ -16,6 +16,14 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-13
+
+- Promoted presentation damage into the shared host presentation contract:
+  Web/WASI, SwiftUIHost, and CLI now receive the same frame-tail damage signal,
+  semantic hosts can consume raster, semantics, focus, and damage together, and
+  Web/SwiftUI presentation paths use dirty-region redraws instead of repainting
+  every compatible frame.
+
 ## 2026-05-12
 
 - Shipped late preference reconciliation in the runtime frame tail: toolbar hosts
