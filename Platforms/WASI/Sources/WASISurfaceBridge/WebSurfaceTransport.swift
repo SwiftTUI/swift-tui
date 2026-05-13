@@ -122,7 +122,7 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
 #endif
 
 package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPresentationSurface,
-  SemanticPresentationSurface, Sendable
+  DamageAwareSemanticPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -252,18 +252,16 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
       Array(
         WebSurfaceFrameEncoder.encode(
           surface,
+          damage: nil,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
     }
     try writeBytes(bytes)
-    return TerminalPresentationMetrics(
-      bytesWritten: bytes.count,
-      linesTouched: max(0, surface.size.height),
-      cellsChanged: max(0, surface.size.width) * max(0, surface.size.height),
-      strategy: .fullRepaint,
-      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
-      graphicsAttachmentsReplayed: surface.imageAttachments.count
+    return .rasterHostMetrics(
+      for: surface,
+      damage: nil,
+      bytesWritten: bytes.count
     )
   }
 
@@ -273,24 +271,37 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity?
   ) throws -> TerminalPresentationMetrics {
+    try present(
+      surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      damage: nil
+    )
+  }
+
+  @discardableResult
+  package func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
     let bytes = state.withLock { state in
       Array(
         WebSurfaceFrameEncoder.encode(
           surface,
           semanticSnapshot: semanticSnapshot,
           focusedIdentity: focusedIdentity,
+          damage: damage,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
     }
     try writeBytes(bytes)
-    return TerminalPresentationMetrics(
-      bytesWritten: bytes.count,
-      linesTouched: max(0, surface.size.height),
-      cellsChanged: max(0, surface.size.width) * max(0, surface.size.height),
-      strategy: .fullRepaint,
-      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
-      graphicsAttachmentsReplayed: surface.imageAttachments.count
+    return .rasterHostMetrics(
+      for: surface,
+      damage: damage,
+      bytesWritten: bytes.count
     )
   }
 
@@ -733,32 +744,33 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     var knownImageIDs: Set<String> = []
     return encode(
       surface,
+      damage: nil,
       knownImageIDs: &knownImageIDs
     )
   }
 
   @_spi(WebHost) public static func encode(
     _ surface: RasterSurface,
+    damage: PresentationDamage?
+  ) -> String {
+    var knownImageIDs: Set<String> = []
+    return encode(
+      surface,
+      damage: damage,
+      knownImageIDs: &knownImageIDs
+    )
+  }
+
+  @_spi(WebHost) public static func encode(
+    _ surface: RasterSurface,
+    damage: PresentationDamage? = nil,
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
       surface,
       semanticSnapshot: nil,
       focusedIdentity: nil,
-      knownImageIDs: &knownImageIDs
-    )
-  }
-
-  @_spi(WebHost) public static func encode(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity? = nil
-  ) -> String {
-    var knownImageIDs: Set<String> = []
-    return encode(
-      surface,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
+      damage: damage,
       knownImageIDs: &knownImageIDs
     )
   }
@@ -767,12 +779,30 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     _ surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity? = nil,
+    damage: PresentationDamage? = nil
+  ) -> String {
+    var knownImageIDs: Set<String> = []
+    return encode(
+      surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      damage: damage,
+      knownImageIDs: &knownImageIDs
+    )
+  }
+
+  @_spi(WebHost) public static func encode(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity? = nil,
+    damage: PresentationDamage? = nil,
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
       surface,
       semanticSnapshot: Optional(semanticSnapshot),
       focusedIdentity: focusedIdentity,
+      damage: damage,
       knownImageIDs: &knownImageIDs
     )
   }
@@ -781,6 +811,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     _ surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
+    damage: PresentationDamage?,
     knownImageIDs: inout Set<String>
   ) -> String {
     var styles: [ResolvedTextStyle?] = [nil]
@@ -819,6 +850,10 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
       knownImageIDs: &knownImageIDs
     ).joined(separator: ",")
     json += "]"
+    if let damage {
+      json += ",\"damage\":"
+      json += encodeDamage(damage)
+    }
     if let accessibilityTree, !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
       json += accessibilityTree.joined(separator: ",")
@@ -831,6 +866,26 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     }
     json += "}\n"
     return json
+  }
+
+  private static func encodeDamage(
+    _ damage: PresentationDamage
+  ) -> String {
+    let fields = [
+      "\"textRows\":[\(damage.textRows.map(encodeDamageTextRow).joined(separator: ","))]",
+      "\"requiresFullTextRepaint\":\(damage.requiresFullTextRepaint ? "true" : "false")",
+      "\"requiresFullGraphicsReplay\":\(damage.requiresFullGraphicsReplay ? "true" : "false")",
+    ]
+    return "{" + fields.joined(separator: ",") + "}"
+  }
+
+  private static func encodeDamageTextRow(
+    _ row: PresentationDamage.TextRow
+  ) -> String {
+    let ranges = row.columnRanges.map { range in
+      "[\(range.lowerBound),\(range.upperBound)]"
+    }.joined(separator: ",")
+    return "[\(row.row),[\(ranges)]]"
   }
 
   private static func encodeRow(

@@ -23,7 +23,7 @@ package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConve
 
 package final class WebSocketSurfaceTransport: PresentationSurface,
   ClipboardWritingPresentationSurface,
-  SemanticPresentationSurface, Sendable
+  DamageAwareSemanticPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -131,12 +131,17 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
       Array(
         WebSurfaceFrameEncoder.encode(
           surface,
+          damage: nil,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
     }
     try sendBytes(bytes)
-    return metrics(for: surface, byteCount: bytes.count)
+    return .rasterHostMetrics(
+      for: surface,
+      damage: nil,
+      bytesWritten: bytes.count
+    )
   }
 
   @discardableResult
@@ -145,18 +150,38 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity?
   ) throws -> TerminalPresentationMetrics {
+    try present(
+      surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      damage: nil
+    )
+  }
+
+  @discardableResult
+  package func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
     let bytes = state.withLock { state in
       Array(
         WebSurfaceFrameEncoder.encode(
           surface,
           semanticSnapshot: semanticSnapshot,
           focusedIdentity: focusedIdentity,
+          damage: damage,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
     }
     try sendBytes(bytes)
-    return metrics(for: surface, byteCount: bytes.count)
+    return .rasterHostMetrics(
+      for: surface,
+      damage: damage,
+      bytesWritten: bytes.count
+    )
   }
 
   private static func pointerInputCapabilities(
@@ -211,17 +236,4 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
     }
   }
 
-  private func metrics(
-    for surface: RasterSurface,
-    byteCount: Int
-  ) -> TerminalPresentationMetrics {
-    TerminalPresentationMetrics(
-      bytesWritten: byteCount,
-      linesTouched: max(0, surface.size.height),
-      cellsChanged: max(0, surface.size.width) * max(0, surface.size.height),
-      strategy: .fullRepaint,
-      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
-      graphicsAttachmentsReplayed: surface.imageAttachments.count
-    )
-  }
 }

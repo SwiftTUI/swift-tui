@@ -287,6 +287,56 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
       graphicsAttachmentsReplayed: surface.imageAttachments.count
     )
   }
+
+  package static func rasterHostMetrics(
+    for surface: RasterSurface,
+    damage: PresentationDamage?,
+    bytesWritten: Int = 0,
+    graphicsReplayScope: GraphicsReplayScope? = nil,
+    graphicsAttachmentsReplayed: Int? = nil
+  ) -> Self {
+    let defaultGraphicsScope: GraphicsReplayScope =
+      if damage == nil || damage?.requiresFullGraphicsReplay == true {
+        surface.imageAttachments.isEmpty ? .none : .full
+      } else if damage?.graphicsInvalidation.isEmpty == false {
+        .targeted
+      } else {
+        .none
+      }
+    let replayedAttachments =
+      graphicsAttachmentsReplayed
+      ?? (defaultGraphicsScope == .none ? 0 : surface.imageAttachments.count)
+
+    guard let damage, !damage.requiresFullTextRepaint else {
+      return Self(
+        bytesWritten: bytesWritten,
+        linesTouched: max(0, surface.size.height),
+        cellsChanged: max(0, surface.size.width) * max(0, surface.size.height),
+        strategy: .fullRepaint,
+        graphicsReplayScope: graphicsReplayScope ?? defaultGraphicsScope,
+        graphicsAttachmentsReplayed: replayedAttachments
+      )
+    }
+
+    let cellsChanged = damage.textRows.reduce(0) { partial, row in
+      if row.columnRanges.isEmpty {
+        return partial + max(0, surface.size.width)
+      }
+      return partial
+        + row.columnRanges.reduce(0) { rowPartial, range in
+          rowPartial + max(0, range.upperBound - range.lowerBound)
+        }
+    }
+
+    return Self(
+      bytesWritten: bytesWritten,
+      linesTouched: damage.textRows.count,
+      cellsChanged: cellsChanged,
+      strategy: .incremental,
+      graphicsReplayScope: graphicsReplayScope ?? defaultGraphicsScope,
+      graphicsAttachmentsReplayed: replayedAttachments
+    )
+  }
 }
 
 /// Abstraction over a presentation target used by `RunLoop`.
@@ -327,6 +377,19 @@ package protocol DamageAwarePresentationSurface: PresentationSurface {
     _ surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity?
+  ) throws -> TerminalPresentationMetrics
+}
+
+@_spi(Runners)
+public protocol DamageAwareSemanticPresentationSurface:
+  SemanticPresentationSurface
+{
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics
 }
 

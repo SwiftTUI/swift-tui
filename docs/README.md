@@ -86,11 +86,11 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-13-001-host-presentation-damage-plan.md](plans/2026-05-13-001-host-presentation-damage-plan.md) — active promotion of retained-frame presentation damage into the shared host presentation path, with SwiftUIHost and WebHost/WASI incremental redraw support
 - [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-13-001-host-presentation-damage-plan.md](plans/2026-05-13-001-host-presentation-damage-plan.md) — shipped host presentation damage promotion: `PresentationDamage` is an optional public host hint, damage-aware semantic presentation preserves accessibility data and damage, SwiftUIHost redraws dirty native rects, and WebHost/WASI redraw dirty browser-canvas regions while still sending complete frame records
 - [plans/2026-05-12-002-late-preference-reconciliation-plan.md](plans/2026-05-12-002-late-preference-reconciliation-plan.md) — shipped runtime late preference reconciliation seam, with toolbar hosts absorbing `.toolbarItem(...)` values emitted by realized `GeometryReader` content before commit
 - [plans/2026-05-12-001-popover-presentation-plan.md](plans/2026-05-12-001-popover-presentation-plan.md) — shipped anchored popover presentation implementation record for Boolean and item-driven `.popover`, TipKit-inspired `.popoverTip`, source-relative terminal placement, Escape dismissal, and the gallery `Popovers` tab
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — shipped anchored popover and TipKit-inspired `popoverTip` API proposal

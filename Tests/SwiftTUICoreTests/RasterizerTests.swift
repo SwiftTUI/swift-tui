@@ -142,6 +142,70 @@ struct RasterizerTests {
     #expect(attachment.visibleBounds == CellRect(origin: .zero, size: .init(width: 4, height: 3)))
   }
 
+  @Test("incremental raster reuse retains image attachments outside dirty rows")
+  func incrementalRasterReuseRetainsImageAttachmentsOutsideDirtyRows() throws {
+    let rasterizer = Rasterizer()
+    let rootBounds = CellRect(origin: .zero, size: .init(width: 4, height: 4))
+    let rowBounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
+    let imageIdentity = testIdentity("image")
+    let imageBounds = CellRect(origin: .init(x: 0, y: 2), size: .init(width: 4, height: 2))
+
+    func drawTree(
+      text: String
+    ) -> DrawNode {
+      DrawNode(
+        identity: testIdentity("root"),
+        bounds: rootBounds,
+        children: [
+          DrawNode(
+            identity: testIdentity("row"),
+            bounds: rowBounds,
+            commands: [
+              .text(
+                bounds: rowBounds,
+                content: text,
+                style: .init(),
+                lineLimit: nil,
+                truncationMode: .tail,
+                wrappingStrategy: .wordBoundary
+              )
+            ]
+          ),
+          DrawNode(
+            identity: imageIdentity,
+            bounds: imageBounds,
+            commands: [
+              .image(
+                bounds: imageBounds,
+                identity: imageIdentity,
+                payload: .init(source: .path("demo.png"))
+              )
+            ]
+          ),
+        ]
+      )
+    }
+
+    let previousSurface = rasterizer.rasterize(drawTree(text: "AAAA"))
+    let previousAttachment = try #require(previousSurface.imageAttachments.first)
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      drawTree(text: "BBBB"),
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [0..<4])])
+    )
+
+    let attachment = try #require(result.surface.imageAttachments.first)
+    #expect(result.surface.lines.first == "BBBB")
+    #expect(result.surface.imageAttachments.count == 1)
+    #expect(attachment == previousAttachment)
+    #expect(
+      result.presentationDamage?.textRows == [
+        .init(row: 0, columnRanges: [0..<4])
+      ])
+  }
+
   @Test("incremental raster reuse refines row damage to actual changed spans")
   func incrementalRasterReuseRefinesDamageToActualChangedSpans() {
     let rasterizer = Rasterizer()

@@ -6,12 +6,13 @@ import SwiftTUIRuntime
   import AppKit
 
   final class NativeTerminalSurfaceView: NSView {
-    var surface: RasterSurface? {
-      didSet { needsDisplay = true }
-    }
+    private(set) var surface: RasterSurface?
 
     var style: SwiftUIHostTerminalStyle = .default {
       didSet {
+        guard oldValue != style else {
+          return
+        }
         updateMetrics()
         needsDisplay = true
       }
@@ -61,8 +62,18 @@ import SwiftTUIRuntime
         style: style,
         metrics: metrics,
         bounds: bounds,
+        dirtyRect: dirtyRect,
         context: context
       )
+    }
+
+    func present(
+      surface: RasterSurface?,
+      damage: PresentationDamage?
+    ) {
+      let previousSize = self.surface?.size
+      self.surface = surface
+      invalidateSurface(previousSize: previousSize, surface: surface, damage: damage)
     }
 
     override func keyDown(with event: NSEvent) {
@@ -163,17 +174,47 @@ import SwiftTUIRuntime
       lastPublishedCellPixelSize = cellPixelSize
       onResize?(grid, cellPixelSize)
     }
+
+    private func invalidateSurface(
+      previousSize: CellSize?,
+      surface: RasterSurface?,
+      damage: PresentationDamage?
+    ) {
+      guard let surface,
+        let damage,
+        previousSize == surface.size,
+        !damage.requiresFullTextRepaint,
+        !damage.requiresFullGraphicsReplay
+      else {
+        needsDisplay = true
+        return
+      }
+
+      let rects = NativeRasterSurfaceRenderer.dirtyRects(
+        for: damage,
+        surface: surface,
+        metrics: metrics,
+        bounds: bounds
+      )
+      guard !rects.isEmpty else {
+        return
+      }
+      for rect in rects {
+        setNeedsDisplay(rect)
+      }
+    }
   }
 #elseif canImport(UIKit)
   import UIKit
 
   final class NativeTerminalSurfaceView: UIView, UIKeyInput {
-    var surface: RasterSurface? {
-      didSet { setNeedsDisplay() }
-    }
+    private(set) var surface: RasterSurface?
 
     var style: SwiftUIHostTerminalStyle = .default {
       didSet {
+        guard oldValue != style else {
+          return
+        }
         updateMetrics()
         setNeedsDisplay()
       }
@@ -229,8 +270,18 @@ import SwiftTUIRuntime
         style: style,
         metrics: metrics,
         bounds: bounds,
+        dirtyRect: rect,
         context: context
       )
+    }
+
+    func present(
+      surface: RasterSurface?,
+      damage: PresentationDamage?
+    ) {
+      let previousSize = self.surface?.size
+      self.surface = surface
+      invalidateSurface(previousSize: previousSize, surface: surface, damage: damage)
     }
 
     func insertText(_ text: String) {
@@ -359,6 +410,35 @@ import SwiftTUIRuntime
       lastPublishedCellPixelSize = cellPixelSize
       onResize?(grid, cellPixelSize)
     }
+
+    private func invalidateSurface(
+      previousSize: CellSize?,
+      surface: RasterSurface?,
+      damage: PresentationDamage?
+    ) {
+      guard let surface,
+        let damage,
+        previousSize == surface.size,
+        !damage.requiresFullTextRepaint,
+        !damage.requiresFullGraphicsReplay
+      else {
+        setNeedsDisplay()
+        return
+      }
+
+      let rects = NativeRasterSurfaceRenderer.dirtyRects(
+        for: damage,
+        surface: surface,
+        metrics: metrics,
+        bounds: bounds
+      )
+      guard !rects.isEmpty else {
+        return
+      }
+      for rect in rects {
+        setNeedsDisplay(rect)
+      }
+    }
   }
 #endif
 
@@ -462,8 +542,14 @@ private enum NativeRasterSurfaceRenderer {
     style: SwiftUIHostTerminalStyle,
     metrics: NativeTerminalMetrics,
     bounds: CGRect,
+    dirtyRect: CGRect,
     context: CGContext
   ) {
+    let dirtyBounds = bounds.intersection(dirtyRect)
+    guard !dirtyBounds.isNull, !dirtyBounds.isEmpty else {
+      return
+    }
+
     let defaultForeground = style.palette.foreground
     let defaultBackground = style.palette.background
     context.setFillColor(
@@ -472,7 +558,7 @@ private enum NativeRasterSurfaceRenderer {
         alphaMultiplier: Double(style.backgroundOpacity)
       ).cgColor
     )
-    context.fill(bounds)
+    context.fill(dirtyBounds)
 
     guard let surface else {
       return
@@ -480,6 +566,10 @@ private enum NativeRasterSurfaceRenderer {
 
     for (y, row) in surface.cells.enumerated() {
       for (x, cell) in row.enumerated() where !cell.isContinuation {
+        let rect = cellRect(x: x, y: y, span: cell.spanWidth, metrics: metrics)
+        guard rect.intersects(dirtyBounds) else {
+          continue
+        }
         drawCell(
           cell,
           x: x,
@@ -496,9 +586,90 @@ private enum NativeRasterSurfaceRenderer {
       drawImageAttachment(
         attachment,
         metrics: metrics,
+        dirtyRect: dirtyBounds,
         context: context
       )
     }
+  }
+
+  static func dirtyRects(
+    for damage: PresentationDamage,
+    surface: RasterSurface,
+    metrics: NativeTerminalMetrics,
+    bounds: CGRect
+  ) -> [CGRect] {
+    guard !damage.requiresFullTextRepaint else {
+      return [bounds]
+    }
+
+    var rects: [CGRect] = []
+    for textRow in damage.textRows {
+      guard textRow.row >= 0, textRow.row < surface.size.height else {
+        continue
+      }
+      if textRow.columnRanges.isEmpty {
+        appendDirtyRect(
+          x: 0,
+          y: textRow.row,
+          width: surface.size.width,
+          metrics: metrics,
+          bounds: bounds,
+          to: &rects
+        )
+        continue
+      }
+
+      for range in textRow.columnRanges {
+        let lowerBound = max(0, min(surface.size.width, range.lowerBound))
+        let upperBound = max(lowerBound, min(surface.size.width, range.upperBound))
+        guard lowerBound < upperBound else {
+          continue
+        }
+        appendDirtyRect(
+          x: lowerBound,
+          y: textRow.row,
+          width: upperBound - lowerBound,
+          metrics: metrics,
+          bounds: bounds,
+          to: &rects
+        )
+      }
+    }
+    return rects
+  }
+
+  private static func appendDirtyRect(
+    x: Int,
+    y: Int,
+    width: Int,
+    metrics: NativeTerminalMetrics,
+    bounds: CGRect,
+    to rects: inout [CGRect]
+  ) {
+    let rect = cellRect(
+      x: x,
+      y: y,
+      span: width,
+      metrics: metrics
+    ).intersection(bounds)
+    guard !rect.isNull, !rect.isEmpty else {
+      return
+    }
+    rects.append(rect)
+  }
+
+  private static func cellRect(
+    x: Int,
+    y: Int,
+    span: Int,
+    metrics: NativeTerminalMetrics
+  ) -> CGRect {
+    CGRect(
+      x: CGFloat(x) * metrics.cellSize.width,
+      y: CGFloat(y) * metrics.cellSize.height,
+      width: CGFloat(max(1, span)) * metrics.cellSize.width,
+      height: metrics.cellSize.height
+    )
   }
 
   private static func drawCell(
@@ -511,12 +682,7 @@ private enum NativeRasterSurfaceRenderer {
     context: CGContext
   ) {
     let spanWidth = max(1, cell.spanWidth)
-    let rect = CGRect(
-      x: CGFloat(x) * metrics.cellSize.width,
-      y: CGFloat(y) * metrics.cellSize.height,
-      width: CGFloat(spanWidth) * metrics.cellSize.width,
-      height: metrics.cellSize.height
-    )
+    let rect = cellRect(x: x, y: y, span: spanWidth, metrics: metrics)
 
     if let background = style.backgroundColor {
       context.setFillColor(
@@ -624,6 +790,7 @@ private enum NativeRasterSurfaceRenderer {
   private static func drawImageAttachment(
     _ attachment: RasterImageAttachment,
     metrics: NativeTerminalMetrics,
+    dirtyRect: CGRect,
     context _: CGContext
   ) {
     guard let image = NativePlatformImage.terminalImage(from: attachment.source) else {
@@ -641,6 +808,9 @@ private enum NativeRasterSurfaceRenderer {
       width: CGFloat(bounds.size.width) * metrics.cellSize.width,
       height: CGFloat(bounds.size.height) * metrics.cellSize.height
     )
+    guard rect.intersects(dirtyRect) else {
+      return
+    }
     image.drawTerminalImage(in: rect)
   }
 }

@@ -61,12 +61,20 @@ extension PresentationDamageDiagnostics {
     )
   }
 }
-package struct PresentationDamage: Equatable, Sendable {
-  package struct TextRow: Equatable, Sendable {
-    package var row: Int
-    package var columnRanges: [Range<Int>]
+/// Optional retained-frame presentation damage produced by the renderer.
+///
+/// Hosts may use this value to avoid repainting a full ``RasterSurface`` when
+/// the previous submitted frame is still compatible. A `nil` damage value means
+/// the host must treat the frame as a full repaint.
+public struct PresentationDamage: Equatable, Sendable {
+  /// A dirty text row and the column ranges changed within that row.
+  ///
+  /// An empty ``columnRanges`` array means the entire row is dirty.
+  public struct TextRow: Equatable, Sendable {
+    public var row: Int
+    public var columnRanges: [Range<Int>]
 
-    package init(
+    public init(
       row: Int,
       columnRanges: [Range<Int>] = []
     ) {
@@ -75,10 +83,35 @@ package struct PresentationDamage: Equatable, Sendable {
     }
   }
 
-  package var textRows: [TextRow]
+  public var textRows: [TextRow]
   package var graphicsInvalidation: Set<Identity>
-  package var requiresFullTextRepaint: Bool
-  package var requiresFullGraphicsReplay: Bool
+  public var requiresFullTextRepaint: Bool
+  public var requiresFullGraphicsReplay: Bool
+
+  public init(
+    dirtyRows: Set<Int> = [],
+    requiresFullTextRepaint: Bool = false,
+    requiresFullGraphicsReplay: Bool = false
+  ) {
+    self.init(
+      textRows: dirtyRows.sorted().map { TextRow(row: $0) },
+      requiresFullTextRepaint: requiresFullTextRepaint,
+      requiresFullGraphicsReplay: requiresFullGraphicsReplay
+    )
+  }
+
+  public init(
+    textRows: [TextRow],
+    requiresFullTextRepaint: Bool = false,
+    requiresFullGraphicsReplay: Bool = false
+  ) {
+    self.init(
+      textRows: textRows,
+      graphicsInvalidation: [],
+      requiresFullTextRepaint: requiresFullTextRepaint,
+      requiresFullGraphicsReplay: requiresFullGraphicsReplay
+    )
+  }
 
   package init(
     dirtyRows: Set<Int> = [],
@@ -106,11 +139,11 @@ package struct PresentationDamage: Equatable, Sendable {
     self.requiresFullGraphicsReplay = requiresFullGraphicsReplay
   }
 
-  package var dirtyRows: Set<Int> {
+  public var dirtyRows: Set<Int> {
     Set(textRows.map(\.row))
   }
 
-  package func columnRanges(for row: Int) -> [Range<Int>]? {
+  public func columnRanges(for row: Int) -> [Range<Int>]? {
     textRows.first { $0.row == row }?.columnRanges
   }
 
@@ -175,4 +208,3 @@ package struct PresentationDamage: Equatable, Sendable {
     return merged
   }
 }
-

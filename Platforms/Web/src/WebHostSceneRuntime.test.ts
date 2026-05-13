@@ -141,6 +141,75 @@ test("runtime draws decoded surface frames into the canvas", async () => {
   }
 });
 
+test("runtime redraws only damaged cells when a compatible frame includes damage", async () => {
+  const dom = installFakeDOM();
+  try {
+    const bridge = new BrowserWASIBridge({
+      sceneId: "main",
+      columns: 4,
+      rows: 2,
+    });
+    const mount = new FakeElement("div");
+    const runtime = new WebHostSceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: {
+        fontSize: 20,
+        fontFamily: "Test Mono",
+      },
+      bridge,
+      onInput: () => {},
+    });
+
+    await runtime.mount();
+
+    const canvas = dom.canvases[0]!;
+    const context = canvas.context;
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 1,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [
+        [[0, "A", 1, 0], [1, "B", 1, 0]],
+        [[0, "C", 1, 0], [1, "D", 1, 0]],
+      ],
+      images: [],
+    })));
+
+    context.operations = [];
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 1,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [
+        [[0, "A", 1, 0], [1, "B", 1, 0]],
+        [[0, "X", 1, 0], [1, "D", 1, 0]],
+      ],
+      images: [],
+      damage: {
+        textRows: [[1, [[0, 1]]]],
+        requiresFullTextRepaint: false,
+        requiresFullGraphicsReplay: false,
+      },
+    })));
+
+    expect(context.operations).toContainEqual({
+      type: "clearRect",
+      x: 0,
+      y: 27,
+      width: 10,
+      height: 27,
+    });
+    expect(fillTextOperations(context, "X")).toHaveLength(1);
+    expect(fillTextOperations(context, "A")).toEqual([]);
+    expect(fillTextOperations(context, "D")).toEqual([]);
+  } finally {
+    dom.restore();
+  }
+});
+
 test("runtime mounts accessibility tree and announces live-region changes", async () => {
   const dom = installFakeDOM();
   try {
