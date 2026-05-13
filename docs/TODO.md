@@ -23,3 +23,13 @@
   planned, actively investigated, or awaiting a decision must have a
   corresponding item here. If there is no item here, the status text should make
   clear that the topic is shipped, contextual, or explicitly deferred.
+
+## Active Investigations
+
+- Decide which local-browser WebHost polish should follow v1, using
+  [proposals/LOCAL_BROWSER_HOST_LEARNINGS.md](proposals/LOCAL_BROWSER_HOST_LEARNINGS.md)
+  as the investigation record.
+- Decide whether to split `Platforms/Web` into consumable browser/runtime and
+  build packages such as `@swifttui/web` and `@swifttui/build`, using
+  [proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md](proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md)
+  as the investigation record.
