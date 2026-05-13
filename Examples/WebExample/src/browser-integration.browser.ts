@@ -32,6 +32,37 @@ test("WebExample renders WASI surface frames into a nonblank canvas", async () =
       state: "attached",
       timeout: 30_000,
     });
+    const initialLayout = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>("#root");
+      const frame = document.querySelector<HTMLElement>(".terminal-frame");
+      const canvas = document.querySelector<HTMLCanvasElement>(".webhost-scene__surface");
+      if (!root || !frame || !canvas) {
+        throw new Error("missing WebExample layout elements");
+      }
+
+      const rootRect = root.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      return {
+        hasResizeHandle: document.querySelector("[data-resize-handle]") !== null,
+        rootWidth: rootRect.width,
+        rootHeight: rootRect.height,
+        frameWidth: frameRect.width,
+        frameHeight: frameRect.height,
+        canvasWidth: canvasRect.width,
+        canvasHeight: canvasRect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      };
+    });
+    expect(initialLayout.hasResizeHandle).toBe(false);
+    expect(initialLayout.rootWidth).toBe(initialLayout.viewportWidth);
+    expect(initialLayout.rootHeight).toBe(initialLayout.viewportHeight);
+    expect(initialLayout.frameWidth).toBeGreaterThan(1_200);
+    expect(initialLayout.frameHeight).toBeGreaterThan(780);
+    expect(initialLayout.canvasWidth).toBeGreaterThan(1_200);
+    expect(initialLayout.canvasHeight).toBeGreaterThan(760);
+
     const canvasState = await page.waitForFunction(() => {
       const canvas = document.querySelector(".webhost-scene__surface");
       if (!(canvas instanceof HTMLCanvasElement)) {
@@ -93,6 +124,63 @@ test("WebExample renders WASI surface frames into a nonblank canvas", async () =
 
     await page.click(".scene-select-trigger");
     await page.click('.scene-select-option[data-scene-id="details"]');
+    const initialResizeState = await page.waitForFunction(() => {
+      const activeScene = document.querySelector(".webhost-scene:not([hidden])");
+      const host = document.querySelector<HTMLElement>(".terminal-host");
+      const canvas = activeScene?.querySelector<HTMLCanvasElement>(".webhost-scene__surface");
+      const size = host?.dataset.size;
+      if (activeScene?.getAttribute("data-scene-id") !== "details" || !size || !canvas) {
+        return false;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      return {
+        size,
+        canvasWidth: rect.width,
+        canvasHeight: rect.height,
+      };
+    }, undefined, {
+      polling: 250,
+      timeout: 30_000,
+    });
+
+    const initialResizeStateValue = await initialResizeState.jsonValue() as {
+      size: string;
+      canvasWidth: number;
+      canvasHeight: number;
+    };
+
+    await page.setViewportSize({ width: 900, height: 620 });
+    const resizedState = await page.waitForFunction((initial) => {
+      const activeScene = document.querySelector(".webhost-scene:not([hidden])");
+      const host = document.querySelector<HTMLElement>(".terminal-host");
+      const canvas = activeScene?.querySelector<HTMLCanvasElement>(".webhost-scene__surface");
+      const size = host?.dataset.size;
+      if (activeScene?.getAttribute("data-scene-id") !== "details" || !size || !canvas) {
+        return false;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const current = {
+        size,
+        canvasWidth: rect.width,
+        canvasHeight: rect.height,
+      };
+      return current.size !== initial.size &&
+        current.canvasWidth < initial.canvasWidth &&
+        current.canvasHeight < initial.canvasHeight
+        ? current
+        : false;
+    }, initialResizeStateValue, {
+      polling: 250,
+      timeout: 30_000,
+    });
+    expect(await resizedState.jsonValue()).toMatchObject({
+      size: expect.any(String),
+      canvasWidth: expect.any(Number),
+      canvasHeight: expect.any(Number),
+    });
+
     const buttonAccessibleNode = await page.waitForFunction(() => {
       const activeScene = document.querySelector(".webhost-scene:not([hidden])");
       const buttons = activeScene?.querySelectorAll(

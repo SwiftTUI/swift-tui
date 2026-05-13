@@ -1,23 +1,17 @@
 // frontend.ts
 //
 // The minimal embedding example: mounts a SwiftTUI WASI build into a
-// browser canvas using the WebHost host, with a scene picker, a status
-// line, and a resize handle.
+// browser canvas using the WebHost host, with a scene picker.
 //
-// This file is the shipped reference for "how do I embed SwiftTUI in
-// a Bun-served browser app?" — it deliberately stays small.
+// This file is the reference for "how do I embed a SwiftTUI app in the browser?".
 //
 // Boot order:
 //   1. mount WebHost against ../TerminalApp/dist/{scene-manifest.json, app.wasm}.
-//   2. render the scene picker + status + resize handle around the canvas.
+//   2. render the scene picker around a viewport-sized canvas.
 //
 // Cross-origin isolation (required for SharedArrayBuffer-backed stdin) is
 // expected to come from the host's HTTP headers — see ../README.md and the
 // COOP/COEP headers set by built-app-server.ts and the deploy host.
-//
-// All shell DOM is constructed via document.createElement / .append rather
-// than via innerHTML. There is no untrusted-input path into this page;
-// the structured DOM construction is for clarity, not sandboxing.
 
 import {
   createWebHostApp,
@@ -38,11 +32,7 @@ import {
 
 const terminalAppManifestUrl = new URL(terminalAppManifestPath, import.meta.url);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
-const minimumFrameWidth = 320;
-const minimumFrameHeight = 240;
 const backtabSequence = new TextEncoder().encode("[Z");
-const readmeUrl =
-  "https://github.com/GoodHatsLLC/swift-tui/blob/main/Examples/WebExample/README.md";
 
 try {
   await bootstrap();
@@ -95,7 +85,7 @@ function renderStartupError(error: unknown): void {
 
   root.append(
     el("div", {
-      class: "example-shell",
+      class: "example-shell example-shell--error",
       children: [
         el("main", {
           class: "example-error",
@@ -121,12 +111,6 @@ async function bootstrap(): Promise<void> {
   // Static shell. A host page that adopts this pattern can render whatever
   // chrome it wants around the .terminal-shell element — only the
   // .terminal-shell + its data-* hooks are load-bearing.
-  const status = el("span", {
-    class: "status-item",
-    text: "Booting the browser demo…",
-    attrs: { "aria-live": "polite" },
-    dataset: { status: "true" },
-  });
   const scenes = el("div", {
     class: "scene-select",
     attrs: { "aria-label": "Scene selector" },
@@ -141,41 +125,6 @@ async function bootstrap(): Promise<void> {
     dataset: { terminalFrame: "true" },
     children: [terminalHost],
   });
-  const resizeHandle = el("button", {
-    class: "terminal-resize-handle",
-    attrs: {
-      type: "button",
-      "aria-label": "Resize terminal demo",
-      title: "Resize terminal demo",
-    },
-    dataset: { resizeHandle: "true" },
-  });
-
-  const readmeLink = el("a", {
-    text: "README",
-    attrs: {
-      href: readmeUrl,
-      target: "_blank",
-      rel: "noreferrer",
-    },
-  });
-
-  const lede = el("p", { class: "example-lede" });
-  lede.append(
-    document.createTextNode(
-      "The component gallery below is a real SwiftTUI ",
-    ),
-    el("code", { text: "App" }),
-    document.createTextNode(
-      " built for WASI and mounted onto a canvas via the ",
-    ),
-    el("code", { text: "WebHost" }),
-    document.createTextNode(
-      " host. There is no terminal-emulator dependency — the browser draws raster surface output directly. See the ",
-    ),
-    readmeLink,
-    document.createTextNode(" for the embedding pattern."),
-  );
 
   const shell = el("div", {
     class: "example-shell",
@@ -183,17 +132,6 @@ async function bootstrap(): Promise<void> {
       el("main", {
         class: "example-main",
         children: [
-          el("header", {
-            class: "example-header",
-            children: [
-              el("p", {
-                class: "example-eyebrow",
-                text: "SwiftTUI · WebHost embedding example",
-              }),
-              el("h1", { text: "The same authored app, rendered in the browser." }),
-              lede,
-            ],
-          }),
           el("div", {
             class: "terminal-shell",
             children: [
@@ -203,10 +141,10 @@ async function bootstrap(): Promise<void> {
                   el("div", {
                     class: "terminal-topline-copy",
                     children: [
-                      el("span", { class: "terminal-label", text: "WebExample" }),
+                      el("span", { class: "terminal-label", text: "Conway's Game of Life" }),
                       el("span", {
                         class: "terminal-caption",
-                        text: "SwiftTUI running through WebHost",
+                        text: "A SwiftTUI app. Running in the Platforms/Web host.",
                       }),
                     ],
                   }),
@@ -217,19 +155,6 @@ async function bootstrap(): Promise<void> {
                 class: "terminal-frame-shell",
                 children: [terminalFrame],
               }),
-              el("div", {
-                class: "terminal-resize-bar",
-                children: [
-                  el("div", {
-                    class: "terminal-status",
-                    children: [
-                      el("span", { class: "status-label", text: "Live canvas" }),
-                      status,
-                    ],
-                  }),
-                  resizeHandle,
-                ],
-              }),
             ],
           }),
         ],
@@ -238,13 +163,10 @@ async function bootstrap(): Promise<void> {
   });
   root.append(shell);
 
-  installResizeHandle(terminalFrame, resizeHandle);
-
   const sceneSizes = new Map<string, string>();
   const sceneRuntimes = new Map<string, WasmSceneRuntimeHandle>();
   let controller: WebHostAppController | undefined;
-  let manifestSource = "";
-  const renderStatus = () => {
+  const updateHostMetadata = () => {
     if (!controller) return;
     const activeScene = controller.scenes.find(
       (scene) => scene.id === controller?.selectedSceneId,
@@ -252,38 +174,28 @@ async function bootstrap(): Promise<void> {
     const activeLabel = activeScene?.title ?? activeScene?.id ?? controller.selectedSceneId;
     const sizeLabel = sceneSizes.get(controller.selectedSceneId);
     terminalHost.dataset.sceneId = controller.selectedSceneId;
+    terminalHost.dataset.sceneTitle = activeLabel;
     terminalHost.dataset.size = sizeLabel ?? "";
-    status.textContent = sizeLabel
-      ? `${activeLabel} · ${sizeLabel}`
-      : `${activeLabel} · loaded from ${manifestSource}`;
   };
 
-  ({
-    controller,
-    manifestSource,
-  } = await createController(
+  controller = await createController(
     terminalHost,
     (event) => {
       sceneSizes.set(event.sceneId, `${event.columns}x${event.rows}`);
-      renderStatus();
+      updateHostMetadata();
     },
     (runtime) => {
       sceneRuntimes.set(runtime.descriptor.id, runtime);
     },
-  ));
+  );
   installShiftTabPassthrough(terminalHost, () => controller, sceneRuntimes);
   const defaultScene =
     controller.scenes.find((scene) => scene.isDefault)?.id ?? controller.selectedSceneId;
   await controller.switchScene(defaultScene);
   renderSceneButtons(controller, scenes, () => {
-    renderStatus();
+    updateHostMetadata();
   });
-
-  if (controller.scenes.length > 0) {
-    renderStatus();
-  } else {
-    status.textContent = "Terminal host loaded.";
-  }
+  updateHostMetadata();
 }
 
 // ---------------------------------------------------------------------------
@@ -293,36 +205,30 @@ async function createController(
   mount: HTMLElement,
   onSceneResize: (event: WasmSceneResizeEvent) => void,
   onRuntimeCreated: (runtime: WasmSceneRuntimeHandle) => void,
-): Promise<{ controller: WebHostAppController; manifestSource: string }> {
+): Promise<WebHostAppController> {
   try {
-    return {
-      controller: await createWebHostApp({
-        mount,
-        manifestUrl: terminalAppManifestUrl,
-        style: defaultStyle,
-        initialSceneId: "main",
-        environment: {
-          TUIGUI_APP_NAME: "Examples/WebExample",
-        },
-        sceneRuntimeFactory: createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
-          onSceneResize,
-          onRuntimeCreated,
-        }),
+    return await createWebHostApp({
+      mount,
+      manifestUrl: terminalAppManifestUrl,
+      style: defaultStyle,
+      initialSceneId: "main",
+      environment: {
+        TUIGUI_APP_NAME: "Examples/WebExample",
+      },
+      sceneRuntimeFactory: createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
+        onSceneResize,
+        onRuntimeCreated,
       }),
-      manifestSource: "TerminalApp",
-    };
+    });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn("Falling back to the local preview manifest:", error);
-    return {
-      controller: await createWebHostApp({
-        mount,
-        manifest: fallbackManifest,
-        style: defaultStyle,
-        initialSceneId: fallbackManifest.defaultSceneId,
-      }),
-      manifestSource: "fallback preview",
-    };
+    return await createWebHostApp({
+      mount,
+      manifest: fallbackManifest,
+      style: defaultStyle,
+      initialSceneId: fallbackManifest.defaultSceneId,
+    });
   }
 }
 
@@ -463,66 +369,4 @@ function updateSceneSelection(
     const isActive = option.dataset.sceneId === controller.selectedSceneId;
     option.setAttribute("aria-selected", String(isActive));
   }
-}
-
-// ---------------------------------------------------------------------------
-// Resize handle
-
-function installResizeHandle(frame: HTMLElement, handle: HTMLButtonElement): void {
-  let drag:
-    | {
-        pointerId: number;
-        startX: number;
-        startY: number;
-        startWidth: number;
-        startHeight: number;
-      }
-    | undefined;
-
-  const stopDrag = (pointerId?: number) => {
-    if (!drag || (pointerId !== undefined && drag.pointerId !== pointerId)) return;
-    drag = undefined;
-    document.body.classList.remove("is-resizing-terminal");
-  };
-
-  const resizeToPointer = (event: PointerEvent) => {
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const width = Math.max(
-      minimumFrameWidth,
-      Math.round(drag.startWidth + event.clientX - drag.startX),
-    );
-    const height = Math.max(
-      minimumFrameHeight,
-      Math.round(drag.startHeight + event.clientY - drag.startY),
-    );
-    frame.style.width = `${width}px`;
-    frame.style.height = `${height}px`;
-  };
-
-  handle.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const rect = frame.getBoundingClientRect();
-    drag = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: rect.width,
-      startHeight: rect.height,
-    };
-    document.body.classList.add("is-resizing-terminal");
-    handle.setPointerCapture(event.pointerId);
-  });
-
-  handle.addEventListener("pointermove", resizeToPointer);
-  handle.addEventListener("pointerup", (event) => {
-    resizeToPointer(event);
-    stopDrag(event.pointerId);
-  });
-  handle.addEventListener("pointercancel", (event) => {
-    stopDrag(event.pointerId);
-  });
-  window.addEventListener("blur", () => {
-    stopDrag();
-  });
 }

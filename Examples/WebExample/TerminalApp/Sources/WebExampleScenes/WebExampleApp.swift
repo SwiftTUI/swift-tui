@@ -5,25 +5,38 @@ public struct WebExampleApp: App {
   public init() {}
 
   public var body: some Scene {
-    WindowGroup("Conway's Life") {
+    WindowGroup("Game of Life") {
       LifeTab()
     }
-    WindowGroup("Details", id: WindowIdentifier("details")) {
+    WindowGroup("Demo Details", id: WindowIdentifier("details")) {
+      Panel(id: "details-panel") {
       GeometryReader { geometry in
         VStack(alignment: .leading, spacing: 1) {
-          Text("Details")
+          Text("Conway's Game of Life Web Demo")
           Divider()
-          Text("Reported terminal size: \(geometry.size.width)x\(geometry.size.height)")
-          Text("Conway's Game of Life — this whole grid is one SwiftTUI View,")
-          Text("compiled to wasm32-wasi and rendered into terminal cells.")
-          Text("Scene switching is owned by the web host.")
-          Text("Resize updates flow through the synthetic SIGWINCH control message path.")
-          Button("Refresh status") {}
-            .accessibilityLabel("Refresh status")
+          Text(
+            """
+            This is a standard SwiftTUI app with two Scenes: \"Game of Life\", \"Demo Details\".
+            The app runs in any of SwiftTUI's Platform hosts including:
+            - the standard terminal host
+            - the SwiftUI host (for both iOS and macOS)
+            - the Web host
+            """)
+          Text(
+            """
+            For this demo the app is compiled to wasm32-wasi to run in your browser via the Web host.
+            """
+          )
+          Text("""
+            The host handles displaying scenes.
+            Here, it lets you pick the current scene and displays its output in this page's HTML <canvas>.
+            """)
+          Spacer()
         }
-        .padding(1)
-        .frame(maxHeight: .infinity)
+        .toolbarItem(ToolbarItemConfig(title: "terminal size: \(geometry.size.width)x\(geometry.size.height)", action: {}))
       }
-    }
+    }.toolbar(style: .defaultBottom)
+  }
+    
   }
 }
