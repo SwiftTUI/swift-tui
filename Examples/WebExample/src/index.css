@@ -1,20 +1,19 @@
-/* WebExample — embedding-focused stylesheet.
+/* WebExample - embedding-focused stylesheet.
  *
  * The site marketing chrome (header, hero, info blocks, parity grid,
  * footer) used to live here. It moved to the top-level Website/ Astro
  * project alongside the doctrine + design + decisions corpus.
  *
  * What stays here is the small surface a host page actually adopts to
- * embed SwiftTUI in a Bun-served browser app:
+ * embed SwiftTUI in a browser app:
  *
  *   .terminal-shell        outer frame around the canvas
  *   .terminal-topline      header strip (label + scene picker)
- *   .terminal-frame        the resizable canvas region
+ *   .terminal-frame        the viewport-sized canvas region
  *   .terminal-host         the WebHost mount target
- *   .terminal-resize-bar   footer strip (status + resize handle)
  *   .scene-select          dropdown for switching between authored Scenes
  *
- * The `.example-*` classes are page chrome only — they exist so this
+ * The `.example-*` classes are page chrome only - they exist so this
  * file is browseable on its own. A host page that adopts the embedding
  * pattern can render whatever surrounding chrome it likes; only
  * .terminal-shell + the data-* hooks in frontend.ts are load-bearing.
@@ -59,7 +58,8 @@
 
 html,
 body {
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 body {
@@ -71,6 +71,7 @@ body {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
 a {
@@ -88,6 +89,8 @@ button:focus-visible {
 }
 
 #root {
+  width: 100vw;
+  height: 100dvh;
   min-height: 100vh;
 }
 
@@ -96,14 +99,28 @@ button:focus-visible {
 /* ============================================================== */
 
 .example-shell {
-  width: min(100%, calc(var(--max-width) + 48px));
-  margin: 0 auto;
-  padding: var(--space-2xl) var(--space-lg);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .example-main {
   display: grid;
-  gap: var(--space-2xl);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.example-shell--error {
+  width: min(100%, calc(var(--max-width) + 48px));
+  height: auto;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-lg);
 }
 
 .example-header {
@@ -197,9 +214,12 @@ button:focus-visible {
 
 .terminal-shell {
   width: 100%;
+  height: 100%;
+  min-height: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
-  border: 1px solid var(--border-visible);
+  border: 0;
   background: var(--surface);
   overflow: hidden;
 }
@@ -328,80 +348,20 @@ button:focus-visible {
 /* ---- Frame ---- */
 
 .terminal-frame-shell {
-  padding: var(--space-lg);
+  display: grid;
+  min-height: 0;
+  padding: 0;
 }
 
 .terminal-frame {
-  width: min(1080px, 100%);
-  height: min(720px, 64svh);
-  min-width: 320px;
-  min-height: 240px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid var(--border);
-  background: var(--black);
-}
-
-body.is-resizing-terminal .terminal-frame {
-  border-style: dashed;
-  border-color: var(--text-display);
-}
-
-.terminal-resize-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
-  border-top: 1px solid var(--border);
-  font-family: var(--font-mono);
-}
-
-.terminal-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  min-width: 0;
-}
-
-.status-label {
-  color: var(--text-disabled);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
-}
-
-.status-item {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.terminal-resize-handle {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  padding: 0;
   border: 0;
-  border-right: 2px solid var(--text-secondary);
-  border-bottom: 2px solid var(--text-secondary);
-  background: transparent;
-  cursor: nwse-resize;
-}
-.terminal-resize-handle:hover {
-  border-right-color: var(--text-display);
-  border-bottom-color: var(--text-display);
-}
-
-body.is-resizing-terminal,
-body.is-resizing-terminal * {
-  cursor: nwse-resize !important;
-  user-select: none !important;
+  background: var(--black);
 }
 
 /* ---- WebHost scene mount ---- */
@@ -409,9 +369,10 @@ body.is-resizing-terminal * {
 .terminal-host {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0 !important;
   background: transparent !important;
   padding: 0 !important;
-  min-height: 100% !important;
   display: block !important;
   border-top: 0;
   cursor: default !important;
@@ -420,11 +381,15 @@ body.is-resizing-terminal * {
 .terminal-host > .webhost-scene-root {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .terminal-host .webhost-scene {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   padding: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -441,13 +406,16 @@ body.is-resizing-terminal * {
 .terminal-host .webhost-scene__terminal {
   width: 100%;
   height: 100%;
-  min-height: 100% !important;
+  min-width: 0;
+  min-height: 0 !important;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   cursor: default !important;
 }
 .terminal-host .webhost-scene__terminal canvas {
+  max-width: 100%;
+  max-height: 100%;
   touch-action: none;
   cursor: default !important;
 }
@@ -457,21 +425,9 @@ body.is-resizing-terminal * {
 /* ============================================================== */
 
 @media (max-width: 900px) {
-  .example-shell {
-    padding: var(--space-md);
-  }
-  .terminal-frame {
-    height: min(560px, 58svh);
-  }
   .terminal-topline {
     flex-direction: column;
     align-items: flex-start;
-  }
-}
-
-@media (max-width: 640px) {
-  .terminal-frame {
-    height: min(440px, 54svh);
   }
 }
 

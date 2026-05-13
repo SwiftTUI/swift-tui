@@ -33,11 +33,10 @@ The whole pattern is ~60 lines of load-bearing code in
 - `createWasmSceneRuntimeFactory(wasmUrl, ...)` — wires the WASI
   bootstrap that runs `WebExampleApp` inside each scene runtime
 
-Everything else in `src/frontend.ts` is page chrome (header, scene
-picker, status line, resize handle). A host page that adopts this
-pattern can render whatever surrounding chrome it likes — only the
-`.terminal-shell` element + the `data-*` hooks consumed by
-WebHost are load-bearing.
+Everything else in `src/frontend.ts` is page chrome (the scene picker
+around a viewport-sized mount). A host page that adopts this pattern can
+render whatever surrounding chrome it likes — only the `.terminal-shell`
+element + the `data-*` hooks consumed by WebHost are load-bearing.
 
 ## What to copy when adopting this pattern
 
