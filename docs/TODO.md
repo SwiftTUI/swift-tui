@@ -26,3 +26,7 @@
 
 ## Runtime And Public Surface Gaps
 
+- Ship late preference reconciliation so preference consumers see values emitted
+  by realized layout-dependent content, starting with toolbar items inside
+  `GeometryReader`.
+  See [docs/plans/2026-05-12-002-late-preference-reconciliation-plan.md](plans/2026-05-12-002-late-preference-reconciliation-plan.md).
