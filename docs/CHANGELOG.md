@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-12
 
+- Shipped late preference reconciliation in the runtime frame tail: toolbar hosts
+  now absorb `.toolbarItem(...)` values emitted by realized
+  layout-dependent content before commit, re-run layout when toolbar chrome
+  changes geometry, preserve async worker offload for unaffected trees, and expose
+  toolbar item labels through Web/WASI accessibility output.
 - Shipped anchored popover presentation: Boolean and item-driven `.popover`
   modifiers plus a TipKit-inspired `.popoverTip` convenience now render compact
   source-relative overlays with terminal edge fallback, Escape dismissal, modal

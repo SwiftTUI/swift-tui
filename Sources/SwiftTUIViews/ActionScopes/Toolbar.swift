@@ -90,22 +90,176 @@ public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable 
     // learned about the toolbar strip.
     let base = content.resolve(in: context)
     let items = base.preferenceValues[ToolbarItemsPreferenceKey.self]
+    let hostedBase = base.withToolbarLatePreferenceHost(
+      style: style,
+      context: context
+    )
 
     guard !items.isEmpty else {
       // No contributions — preserve the base node unchanged, but still
       // clear the preference so ancestor hosts do not re-absorb any
       // stray items. (Empty in practice, but the clear is cheap and
       // keeps the invariant uniform.)
-      var passthrough = base
+      var passthrough = hostedBase
       passthrough.preferenceValues[ToolbarItemsPreferenceKey.self] = []
       return [passthrough]
     }
 
-    var absorbedPreferences = base.preferenceValues
+    return [
+      hostedBase.reconciledToolbarHost(
+        items: items,
+        style: style,
+        context: context
+      )
+    ]
+  }
+
+}
+
+private enum ToolbarLatePreferenceHostKey {}
+
+private let toolbarLatePreferenceHostMetadataKey = ObjectIdentifier(
+  ToolbarLatePreferenceHostKey.self
+)
+
+private struct ToolbarLatePreferenceHostDescriptor: Sendable {
+  let debugValue: String
+  let reconcile: @MainActor @Sendable (ResolvedNode, [ToolbarItemConfig]) -> ResolvedNode
+}
+
+package struct LatePreferenceReconciliationOutput {
+  package var resolved: ResolvedNode
+  package var changed: Bool
+  package var requiresRelayout: Bool
+
+  package init(
+    resolved: ResolvedNode,
+    changed: Bool,
+    requiresRelayout: Bool
+  ) {
+    self.resolved = resolved
+    self.changed = changed
+    self.requiresRelayout = requiresRelayout
+  }
+}
+
+@MainActor
+package func reconcileLatePreferenceConsumers(
+  in root: ResolvedNode
+) -> LatePreferenceReconciliationOutput {
+  reconcileToolbarHosts(in: root)
+}
+
+@MainActor
+private func reconcileToolbarHosts(
+  in root: ResolvedNode
+) -> LatePreferenceReconciliationOutput {
+  let result = reconcileToolbarHostSubtree(root)
+  return .init(
+    resolved: result.node,
+    changed: result.changed,
+    requiresRelayout: result.requiresRelayout
+  )
+}
+
+@MainActor
+private func reconcileToolbarHostSubtree(
+  _ input: ResolvedNode
+) -> (node: ResolvedNode, changed: Bool, requiresRelayout: Bool) {
+  guard input.containsToolbarLatePreferenceHost else {
+    return (input, false, false)
+  }
+
+  var node = input
+  var changed = false
+  var requiresRelayout = false
+
+  if !node.children.isEmpty {
+    var reconciledChildren: [ResolvedNode] = []
+    reconciledChildren.reserveCapacity(node.children.count)
+    for child in node.children {
+      let result = reconcileToolbarHostSubtree(child)
+      reconciledChildren.append(result.node)
+      changed = changed || result.changed
+      requiresRelayout = requiresRelayout || result.requiresRelayout
+    }
+    node.children = reconciledChildren
+  }
+
+  guard
+    let descriptor = node.layoutMetadata.layoutValue(
+      for: toolbarLatePreferenceHostMetadataKey,
+      as: ToolbarLatePreferenceHostDescriptor.self
+    )
+  else {
+    return (node, changed, requiresRelayout)
+  }
+
+  let items = node.preferenceValues[ToolbarItemsPreferenceKey.self]
+  let reconciled = descriptor.reconcile(node, items)
+  changed = changed || reconciled != node
+  requiresRelayout = requiresRelayout || !reconciled.isEquivalentForPlacement(to: node)
+  return (reconciled, changed, requiresRelayout)
+}
+
+extension ResolvedNode {
+  fileprivate var containsToolbarLatePreferenceHost: Bool {
+    if layoutMetadata.layoutValue(
+      for: toolbarLatePreferenceHostMetadataKey,
+      as: ToolbarLatePreferenceHostDescriptor.self
+    ) != nil {
+      return true
+    }
+    return children.contains { $0.containsToolbarLatePreferenceHost }
+  }
+
+  @MainActor
+  fileprivate func withToolbarLatePreferenceHost<S: ToolbarStyle>(
+    style: S,
+    context: ResolveContext
+  ) -> ResolvedNode {
+    var copy = self
+    let debugValue = "\(String(reflecting: S.self)):\(style.placement)"
+    copy.layoutMetadata = copy.layoutMetadata.settingLayoutValue(
+      ToolbarLatePreferenceHostDescriptor(
+        debugValue: debugValue,
+        reconcile: { node, items in
+          node.reconciledToolbarHost(
+            items: items,
+            style: style,
+            context: context
+          )
+        }
+      ),
+      for: toolbarLatePreferenceHostMetadataKey,
+      debugName: "toolbar-host",
+      debugValue: debugValue
+    )
+    return copy
+  }
+
+  @MainActor
+  fileprivate func reconciledToolbarHost<S: ToolbarStyle>(
+    items: [ToolbarItemConfig],
+    style: S,
+    context: ResolveContext
+  ) -> ResolvedNode {
+    let content = toolbarHostContent()
+
+    guard !items.isEmpty else {
+      var passthrough = self
+      if !content.hasHostedToolbar {
+        passthrough.children = content.children
+        passthrough.layoutBehavior = content.layoutBehavior
+      }
+      passthrough.preferenceValues[ToolbarItemsPreferenceKey.self] = []
+      return passthrough
+    }
+
+    var absorbedPreferences = preferenceValues
     absorbedPreferences[ToolbarItemsPreferenceKey.self] = []
 
-    let stripView = ToolbarItemsStrip(items: items, style: style)
-    let stripNode = stripView.resolve(
+    let stripNode = ToolbarItemsStrip(items: items, style: style).resolve(
       in: context.child(component: .named("toolbar-strip"))
     )
 
@@ -115,49 +269,80 @@ public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable 
     // real child view so retained snapshot rebuilds recurse through a
     // committed toolbar subtree instead of a stale injected copy.
     let toolbarNode = ToolbarScopeNode(
-      contentChildren: base.children,
-      contentLayoutBehavior: base.layoutBehavior,
+      contentChildren: content.children,
+      contentLayoutBehavior: content.layoutBehavior,
       stripNode: stripNode,
-      edge: toolbarEdge,
-      alignment: toolbarAlignment
+      edge: toolbarEdge(for: style),
+      alignment: toolbarAlignment(for: style)
     ).resolve(
       in: context.child(component: .named("toolbar-scope"))
     )
 
-    var scopeWithStrip = base
+    var scopeWithStrip = self
     scopeWithStrip.children = [toolbarNode]
     scopeWithStrip.layoutBehavior = .safeAreaIgnoring(
-      context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet)
+      context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet(for: style))
     )
     // Clear the preference at this scope boundary so absorbed items
     // do not re-bubble to ancestor toolbar hosts while preserving
     // sibling preferences attached directly to the scope node.
     scopeWithStrip.preferenceValues = absorbedPreferences
 
-    return [scopeWithStrip]
+    return scopeWithStrip
   }
 
-  private var toolbarEdge: Edge {
-    switch style.placement {
-    case .top: .top
-    case .bottom: .bottom
+  private func toolbarHostContent() -> (
+    children: [ResolvedNode],
+    layoutBehavior: LayoutBehavior,
+    hasHostedToolbar: Bool
+  ) {
+    guard
+      children.count == 1,
+      isKind(children[0].kind, named: "ToolbarScope"),
+      let contentNode = children[0].children.first,
+      isKind(contentNode.kind, named: "ToolbarContent")
+    else {
+      return (children, layoutBehavior, false)
     }
+
+    return (contentNode.children, contentNode.layoutBehavior, true)
   }
 
-  private var toolbarAlignment: Alignment {
-    switch style.placement {
-    case .top: .top
-    case .bottom: .bottom
-    }
-  }
+}
 
-  private var toolbarEdgeSet: Edge.Set {
-    switch style.placement {
-    case .top: .top
-    case .bottom: .bottom
-    }
+private func toolbarEdge<S: ToolbarStyle>(
+  for style: S
+) -> Edge {
+  switch style.placement {
+  case .top: .top
+  case .bottom: .bottom
   }
+}
 
+private func toolbarAlignment<S: ToolbarStyle>(
+  for style: S
+) -> Alignment {
+  switch style.placement {
+  case .top: .top
+  case .bottom: .bottom
+  }
+}
+
+private func toolbarEdgeSet<S: ToolbarStyle>(
+  for style: S
+) -> Edge.Set {
+  switch style.placement {
+  case .top: .top
+  case .bottom: .bottom
+  }
+}
+
+private func isKind(
+  _ kind: NodeKind,
+  named name: String
+) -> Bool {
+  if case .view(let n) = kind, n == name { return true }
+  return false
 }
 
 private struct ToolbarScopeNode: PrimitiveView, ResolvableView {
@@ -259,6 +444,7 @@ private struct ToolbarItemButton: View {
       }
     }
     .systemHint(config.systemHint)
+    .accessibilityLabel(config.title)
     .disabled(!config.isEnabled)
   }
 }

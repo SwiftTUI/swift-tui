@@ -162,9 +162,19 @@ extension ResolvedNode {
       copy.children = realizations[copy.identity] ?? []
       return copy
     }
+    guard copy.children.contains(where: { $0.containsLayoutDependentContent }) else {
+      return copy
+    }
     copy.children = copy.children.map {
       $0.applyingLayoutDependentRealizations(realizations)
     }
     return copy
+  }
+
+  private var containsLayoutDependentContent: Bool {
+    if layoutDependentContent != nil {
+      return true
+    }
+    return children.contains { $0.containsLayoutDependentContent }
   }
 }

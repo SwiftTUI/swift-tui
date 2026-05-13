@@ -149,6 +149,20 @@ test("WebExample renders WASI surface frames into a nonblank canvas", async () =
       canvasWidth: number;
       canvasHeight: number;
     };
+    const initialToolbarLabel = await page.waitForFunction(() => {
+      const activeScene = document.querySelector(".webhost-scene:not([hidden])");
+      const buttons = activeScene?.querySelectorAll(
+        '.webhost-scene__accessibility-tree [role="button"]',
+      ) ?? [];
+      const toolbarButton = Array.from(buttons).find((button) =>
+        button.getAttribute("aria-label")?.startsWith("terminal size:") === true
+      );
+      return toolbarButton?.getAttribute("aria-label") ?? false;
+    }, undefined, {
+      polling: 250,
+      timeout: 30_000,
+    });
+    const initialToolbarLabelValue = await initialToolbarLabel.jsonValue() as string;
 
     await page.setViewportSize({ width: 900, height: 620 });
     const resizedState = await page.waitForFunction((initial) => {
@@ -180,20 +194,22 @@ test("WebExample renders WASI surface frames into a nonblank canvas", async () =
       canvasWidth: expect.any(Number),
       canvasHeight: expect.any(Number),
     });
-
-    const buttonAccessibleNode = await page.waitForFunction(() => {
+    const resizedToolbarLabel = await page.waitForFunction((initialLabel) => {
       const activeScene = document.querySelector(".webhost-scene:not([hidden])");
       const buttons = activeScene?.querySelectorAll(
         '.webhost-scene__accessibility-tree [role="button"]',
       ) ?? [];
-      return Array.from(buttons).some(
-        (button) => button.getAttribute("aria-label") === "Refresh status",
+      const toolbarButton = Array.from(buttons).find((button) =>
+        button.getAttribute("aria-label")?.startsWith("terminal size:") === true
       );
-    }, undefined, {
+      const label = toolbarButton?.getAttribute("aria-label");
+      return label && label !== initialLabel ? label : false;
+    }, initialToolbarLabelValue, {
       polling: 250,
       timeout: 30_000,
     });
-    expect(await buttonAccessibleNode.jsonValue()).toBe(true);
+    expect(await resizedToolbarLabel.jsonValue()).toMatch(/^terminal size:/);
+
     expect(runtimeErrors).toEqual([]);
   } finally {
     await page.close();

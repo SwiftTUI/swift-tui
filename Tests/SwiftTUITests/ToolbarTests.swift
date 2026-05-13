@@ -144,6 +144,153 @@ struct ToolbarTests {
     #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
   }
 
+  @Test("Late toolbar items inside GeometryReader emit unhosted runtime issues")
+  func lateToolbarItemInsideGeometryReaderEmitsRuntimeIssue() {
+    let artifacts = DefaultRenderer().render(
+      GeometryReader { _ in
+        Text("content").toolbarItem(
+          .init(
+            title: "Late Save",
+            icon: nil,
+            position: .bottom,
+            isEnabled: true,
+            action: {}
+          )
+        )
+      },
+      context: .init(identity: testIdentity("toolbar-late-unhosted-root")),
+      proposal: .init(width: 24, height: 4)
+    )
+    let issue = artifacts.diagnostics.runtimeIssues.first
+
+    #expect(artifacts.diagnostics.runtimeIssues.count == 1)
+    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.severity == .warning)
+    #expect(issue?.identity != nil)
+  }
+
+  @Test("Panel toolbar absorbs toolbar items realized inside GeometryReader")
+  func toolbarAbsorbsItemsRealizedInsideGeometryReader() {
+    let panel =
+      Panel(id: "outer") {
+        GeometryReader { proxy in
+          Text("body \(proxy.size.width)x\(proxy.size.height)")
+            .toolbarItem(
+              .init(
+                title: "Size \(proxy.size.width)x\(proxy.size.height)",
+                icon: nil,
+                position: .bottom,
+                isEnabled: true,
+                action: {}
+              )
+            )
+        }
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+      .frame(width: 30, height: 6)
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-late-hosted-root")),
+      proposal: .init(width: 30, height: 6)
+    )
+    let lines = artifacts.rasterSurface.lines
+    let bodyRow = lines.firstIndex { $0.contains("body 30x5") }
+    let sizeRow = lines.firstIndex { $0.contains("Size 30x5") }
+
+    #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
+    #expect(bodyRow != nil)
+    #expect(sizeRow != nil)
+    if let bodyRow, let sizeRow {
+      #expect(bodyRow < sizeRow)
+    }
+    #expect(
+      artifacts.semanticSnapshot.accessibilityNodes.contains { node in
+        node.role == .button && node.label == "Size 30x5"
+      }
+    )
+  }
+
+  @Test("Late toolbar items commit their action handlers")
+  func lateToolbarItemActionHandlerCommits() throws {
+    let actionRegistry = LocalActionRegistry()
+    var actionCount = 0
+    let panel =
+      Panel(id: "outer") {
+        GeometryReader { proxy in
+          Text("body \(proxy.size.width)x\(proxy.size.height)")
+            .toolbarItem(
+              .init(
+                title: "Increment \(proxy.size.width)x\(proxy.size.height)",
+                icon: nil,
+                position: .bottom,
+                isEnabled: true,
+                action: {
+                  actionCount += 1
+                }
+              )
+            )
+        }
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+      .frame(width: 30, height: 6)
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(
+        identity: testIdentity("toolbar-late-action-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 30, height: 6)
+    )
+    let button = try #require(
+      artifacts.semanticSnapshot.accessibilityNodes.first { node in
+        node.role == .button && node.label == "Increment 30x5"
+      }
+    )
+
+    #expect(actionRegistry.dispatch(identity: button.identity))
+    #expect(actionCount == 1)
+  }
+
+  @Test("Unselected layout-dependent candidates do not leak toolbar items")
+  func unselectedLayoutDependentCandidatesDoNotLeakToolbarItems() {
+    let panel =
+      Panel(id: "outer") {
+        ViewThatFits {
+          GeometryReader { proxy in
+            Text("wide \(proxy.size.width)x\(proxy.size.height)")
+              .toolbarItem(
+                .init(
+                  title: "Wide",
+                  icon: nil,
+                  position: .bottom,
+                  isEnabled: true,
+                  action: {}
+                )
+              )
+          }
+          .frame(width: 20, height: 1)
+
+          Text("fit")
+        }
+        .frame(width: 3, height: 1)
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-unselected-candidate-root")),
+      proposal: .init(width: 3, height: 1)
+    )
+    let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
+    #expect(!rendered.contains("Wide"))
+    #expect(rendered.contains("fit"))
+  }
+
   @Test("RunLoop forwards runtime issues to the host sink")
   func runLoopForwardsRuntimeIssuesToHostSink() async throws {
     let rootIdentity = testIdentity("toolbar-runloop-root")
