@@ -1,7 +1,7 @@
 ---
 title: "refactor: late preference reconciliation"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-12
 depends_on:
   - "2026-05-01-001-layout-dependent-content-realization-plan.md"
@@ -225,6 +225,26 @@ bun run test
 If the final gate fails for unrelated pre-existing baseline drift, record the
 failing command and keep focused validation evidence for the changed surface.
 
+## Shipped Record
+
+The shipped implementation adds a bounded post-realization reconciliation loop to
+the runtime frame tail. After layout-dependent content is realized, the runtime
+reconciles late preference consumers, and if a consumer changes structure or safe
+area, it re-runs layout with a fresh layout context before semantics, draw,
+raster, and commit.
+
+This tranche wires toolbar hosting into that seam. `.toolbar(style:)` leaves an
+internal host descriptor on the resolved `ActionScope`; late
+`ToolbarItemsPreferenceKey` values from realized `GeometryReader` content are
+absorbed at the nearest host, rendered through the existing toolbar subtree, and
+cleared before they can bubble to an ancestor host. Toolbar item buttons also
+carry their configured title as an accessibility label, so Web/WASI ARIA output
+reflects the visible toolbar control.
+
+The async frame-tail path preserves worker-safe layout offload when no late
+toolbar host is present, and falls back to main-actor reconciliation only for
+trees that need the late consumer pass.
+
 ## Risks
 
 - A second layout pass can change geometry-dependent titles or content. That is
@@ -238,9 +258,10 @@ failing command and keep focused validation evidence for the changed surface.
   gap. This tranche should leave the seam ready for them, but not silently
   claim they are fixed until covered by tests.
 
-## Open Follow-ups
+## Deferred Follow-ups
 
-- Decide whether `overlayPreferenceValue` and `backgroundPreferenceValue` move
-  to the same reconciliation seam immediately after toolbar lands.
-- Decide whether reconciliation counts should become public frame diagnostics
-  or stay internal until more consumers use the phase.
+- `overlayPreferenceValue` and `backgroundPreferenceValue` are likely affected by
+  the same architecture gap, but remain deferred until they have their own
+  failing examples and acceptance tests.
+- Reconciliation counts remain internal for now. Public frame diagnostics should
+  wait until more than one consumer uses the phase.

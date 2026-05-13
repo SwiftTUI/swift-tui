@@ -97,6 +97,13 @@ private struct FrameTailLayoutOutput {
   var ranOffMain: Bool
 }
 
+private struct ReconciledFrameTailLayout {
+  var input: FrameTailInput
+  var layout: FrameTailLayoutOutput
+  var resolved: ResolvedNode
+  var runtimeIssues: [RuntimeIssue]
+}
+
 private struct FrameTailSemanticsOutput {
   var semantics: SemanticSnapshot
   var duration: Duration
@@ -207,8 +214,11 @@ package struct FrameHeadDraft {
 }
 
 private struct AsyncFrameTailDraftOutput {
+  var frameTailInput: FrameTailInput
   var layout: FrameTailLayoutOutput
   var tail: FrameTailOutput
+  var resolved: ResolvedNode
+  var runtimeIssues: [RuntimeIssue]
   var renderSuspensionDuration: Duration
 }
 
@@ -1164,6 +1174,8 @@ private final class FrameTailRenderer: Sendable {
 /// into `FrameArtifacts` for previews, snapshot tests, diagnostics, or custom
 /// presentation.
 public struct DefaultRenderer {
+  private static let maxLatePreferenceReconciliationPasses = 4
+
   public let resolver: Resolver
   public let layoutEngine: LayoutEngine
   public let semanticExtractor: SemanticExtractor
@@ -1530,7 +1542,6 @@ public struct DefaultRenderer {
       resolved,
       context: resolveContext
     )
-    let runtimeIssues = rootRuntimeIssues(in: resolved)
 
     // Animation: capture from/to for changed animatable properties, then
     // apply interpolated values to the resolved tree before measure.
@@ -1559,7 +1570,7 @@ public struct DefaultRenderer {
       transaction: context.transaction,
       invalidatedIdentities: context.invalidatedIdentities
     )
-    let frameTailInput = FrameTailInput(
+    let initialFrameTailInput = FrameTailInput(
       generation: renderGeneration,
       resolved: resolved,
       proposal: proposal,
@@ -1567,13 +1578,14 @@ public struct DefaultRenderer {
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext
     )
-    let tailLayout = frameTailRenderer.renderLayout(
-      frameTailInput,
+    let reconciledTailLayout = renderLayoutResolvingLatePreferences(
+      initialFrameTailInput,
       clock: clock
     )
-    resolved = resolved.applyingLayoutDependentRealizations(
-      layoutPassContext.layoutDependentRealizationsByIdentity
-    )
+    let frameTailInput = reconciledTailLayout.input
+    let tailLayout = reconciledTailLayout.layout
+    resolved = reconciledTailLayout.resolved
+    let runtimeIssues = reconciledTailLayout.runtimeIssues
     let placed = tailLayout.baselinePlaced
     // Capture the BASELINE placed tree (pre-overlay) for two things:
     // 1. The animation controller's removal-snapshot lookup on the
@@ -1710,6 +1722,86 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  private func renderLayoutResolvingLatePreferences(
+    _ initialInput: FrameTailInput,
+    clock: ContinuousClock?
+  ) -> ReconciledFrameTailLayout {
+    var input = initialInput
+    var layout = frameTailRenderer.renderLayout(
+      input,
+      clock: clock
+    )
+
+    for _ in 0..<Self.maxLatePreferenceReconciliationPasses {
+      let realized = input.resolved.applyingLayoutDependentRealizations(
+        input.layoutPassContext.layoutDependentRealizationsByIdentity
+      )
+      let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+      let runtimeIssues = rootRuntimeIssues(in: reconciliation.resolved)
+
+      guard reconciliation.requiresRelayout else {
+        var finalInput = input
+        finalInput.resolved = reconciliation.resolved
+        return ReconciledFrameTailLayout(
+          input: finalInput,
+          layout: layout,
+          resolved: reconciliation.resolved,
+          runtimeIssues: runtimeIssues
+        )
+      }
+
+      input = relayoutInput(
+        basedOn: input,
+        resolved: reconciliation.resolved
+      )
+      layout = frameTailRenderer.renderLayout(
+        input,
+        clock: clock
+      )
+    }
+
+    let realized = input.resolved.applyingLayoutDependentRealizations(
+      input.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    if !reconciliation.requiresRelayout {
+      var finalInput = input
+      finalInput.resolved = reconciliation.resolved
+      return ReconciledFrameTailLayout(
+        input: finalInput,
+        layout: layout,
+        resolved: reconciliation.resolved,
+        runtimeIssues: rootRuntimeIssues(in: reconciliation.resolved)
+      )
+    }
+    var finalInput = input
+    finalInput.resolved = realized
+    return ReconciledFrameTailLayout(
+      input: finalInput,
+      layout: layout,
+      resolved: realized,
+      runtimeIssues: [latePreferenceReconciliationLimitIssue(rootIdentity: input.rootIdentity)]
+    )
+  }
+
+  private func relayoutInput(
+    basedOn input: FrameTailInput,
+    resolved: ResolvedNode
+  ) -> FrameTailInput {
+    FrameTailInput(
+      generation: input.generation,
+      resolved: resolved,
+      proposal: input.proposal,
+      rootIdentity: input.rootIdentity,
+      retained: input.retained,
+      layoutPassContext: LayoutPassContext(
+        retainedLayout: input.retained.retainedLayout,
+        invalidatedIdentities: input.layoutPassContext.invalidatedIdentities
+      )
+    )
+  }
+
+  @MainActor
   private func renderViewAsync<V: View>(
     _ root: V,
     context: ResolveContext,
@@ -1819,7 +1911,6 @@ public struct DefaultRenderer {
       resolved,
       context: resolveContext
     )
-    let runtimeIssues = rootRuntimeIssues(in: resolved)
 
     let animationTimestamp = MonotonicInstant.now()
     animationController.processResolvedTree(
@@ -1878,7 +1969,7 @@ public struct DefaultRenderer {
       frameContext: frameContext,
       resolved: resolved,
       frameTailInput: frameTailInput,
-      runtimeIssues: runtimeIssues,
+      runtimeIssues: [],
       animationTimestamp: animationTimestamp,
       resolveDuration: resolveDuration,
       animationCheckpoint: animationCheckpoint
@@ -1905,6 +1996,61 @@ public struct DefaultRenderer {
     _ draft: FrameHeadDraft,
     cancellationToken: FrameTailJobCancellationToken?
   ) async -> AsyncFrameTailDraftOutput? {
+    if frameTailRenderer.canOffloadLayout(draft.frameTailInput) {
+      return await renderFrameTailAsyncWithoutLatePreferenceReconciliation(
+        draft,
+        cancellationToken: cancellationToken
+      )
+    }
+
+    let layoutResult = await renderLayoutResolvingLatePreferencesAsync(
+      draft.frameTailInput,
+      clock: draft.clock,
+      cancellationToken: cancellationToken
+    )
+    guard let reconciledLayout = layoutResult.layout else {
+      return nil
+    }
+    let layout = reconciledLayout.layout
+    let placed = layout.baselinePlaced
+    animationController.capturePlacedTree(layout.baselinePlaced)
+    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
+      for: placed,
+      at: draft.animationTimestamp
+    )
+    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
+    let rasterSuspensionStart = draft.clock?.now
+    suspensionHooks?.onBegin?()
+    let tail = await frameTailRenderer.renderRasterAsync(
+      reconciledLayout.input,
+      layout: layout,
+      placed: placed,
+      animationOverlaySnapshot: animationOverlaySnapshot,
+      clock: draft.clock
+    )
+    suspensionHooks?.onEnd?()
+    let rasterSuspensionDuration =
+      if let rasterSuspensionStart, let clock = draft.clock {
+        rasterSuspensionStart.duration(to: clock.now)
+      } else {
+        Duration.zero
+      }
+
+    return AsyncFrameTailDraftOutput(
+      frameTailInput: reconciledLayout.input,
+      layout: layout,
+      tail: tail,
+      resolved: reconciledLayout.resolved,
+      runtimeIssues: reconciledLayout.runtimeIssues,
+      renderSuspensionDuration: layoutResult.suspensionDuration + rasterSuspensionDuration
+    )
+  }
+
+  @MainActor
+  private func renderFrameTailAsyncWithoutLatePreferenceReconciliation(
+    _ draft: FrameHeadDraft,
+    cancellationToken: FrameTailJobCancellationToken?
+  ) async -> AsyncFrameTailDraftOutput? {
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let layoutSuspends = frameTailRenderer.canOffloadLayout(draft.frameTailInput)
     let layoutSuspensionStart = layoutSuspends ? draft.clock?.now : nil
@@ -1928,6 +2074,7 @@ public struct DefaultRenderer {
       } else {
         Duration.zero
       }
+    let resolved = draft.resolved
     let placed = layout.baselinePlaced
     animationController.capturePlacedTree(layout.baselinePlaced)
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
@@ -1952,10 +2099,127 @@ public struct DefaultRenderer {
       }
 
     return AsyncFrameTailDraftOutput(
+      frameTailInput: draft.frameTailInput,
       layout: layout,
       tail: tail,
+      resolved: resolved,
+      runtimeIssues: rootRuntimeIssues(in: resolved),
       renderSuspensionDuration: layoutSuspensionDuration + rasterSuspensionDuration
     )
+  }
+
+  @MainActor
+  private func renderLayoutResolvingLatePreferencesAsync(
+    _ initialInput: FrameTailInput,
+    clock: ContinuousClock?,
+    cancellationToken: FrameTailJobCancellationToken?
+  ) async -> (layout: ReconciledFrameTailLayout?, suspensionDuration: Duration) {
+    var input = initialInput
+    var totalSuspensionDuration = Duration.zero
+    var layoutResult = await renderFrameTailLayoutAsync(
+      input,
+      clock: clock,
+      cancellationToken: cancellationToken
+    )
+    totalSuspensionDuration += layoutResult.suspensionDuration
+    guard var layout = layoutResult.layout else {
+      return (nil, totalSuspensionDuration)
+    }
+
+    for _ in 0..<Self.maxLatePreferenceReconciliationPasses {
+      let realized = input.resolved.applyingLayoutDependentRealizations(
+        input.layoutPassContext.layoutDependentRealizationsByIdentity
+      )
+      let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+      let runtimeIssues = rootRuntimeIssues(in: reconciliation.resolved)
+
+      guard reconciliation.requiresRelayout else {
+        var finalInput = input
+        finalInput.resolved = reconciliation.resolved
+        return (
+          ReconciledFrameTailLayout(
+            input: finalInput,
+            layout: layout,
+            resolved: reconciliation.resolved,
+            runtimeIssues: runtimeIssues
+          ),
+          totalSuspensionDuration
+        )
+      }
+
+      input = relayoutInput(
+        basedOn: input,
+        resolved: reconciliation.resolved
+      )
+      layoutResult = await renderFrameTailLayoutAsync(
+        input,
+        clock: clock,
+        cancellationToken: cancellationToken
+      )
+      totalSuspensionDuration += layoutResult.suspensionDuration
+      guard let nextLayout = layoutResult.layout else {
+        return (nil, totalSuspensionDuration)
+      }
+      layout = nextLayout
+    }
+
+    let realized = input.resolved.applyingLayoutDependentRealizations(
+      input.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    if !reconciliation.requiresRelayout {
+      var finalInput = input
+      finalInput.resolved = reconciliation.resolved
+      return (
+        ReconciledFrameTailLayout(
+          input: finalInput,
+          layout: layout,
+          resolved: reconciliation.resolved,
+          runtimeIssues: rootRuntimeIssues(in: reconciliation.resolved)
+        ),
+        totalSuspensionDuration
+      )
+    }
+    var finalInput = input
+    finalInput.resolved = realized
+    return (
+      ReconciledFrameTailLayout(
+        input: finalInput,
+        layout: layout,
+        resolved: realized,
+        runtimeIssues: [latePreferenceReconciliationLimitIssue(rootIdentity: input.rootIdentity)]
+      ),
+      totalSuspensionDuration
+    )
+  }
+
+  @MainActor
+  private func renderFrameTailLayoutAsync(
+    _ input: FrameTailInput,
+    clock: ContinuousClock?,
+    cancellationToken: FrameTailJobCancellationToken?
+  ) async -> (layout: FrameTailLayoutOutput?, suspensionDuration: Duration) {
+    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
+    let layoutSuspends = frameTailRenderer.canOffloadLayout(input)
+    let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
+    if layoutSuspends {
+      suspensionHooks?.onBegin?()
+    }
+    let layout = await frameTailRenderer.renderLayoutAsync(
+      input,
+      clock: clock,
+      cancellationToken: cancellationToken
+    )
+    if layoutSuspends {
+      suspensionHooks?.onEnd?()
+    }
+    let layoutSuspensionDuration =
+      if let layoutSuspensionStart, let clock {
+        layoutSuspensionStart.duration(to: clock.now)
+      } else {
+        Duration.zero
+      }
+    return (layout, layoutSuspensionDuration)
   }
 
   @MainActor
@@ -1963,16 +2227,9 @@ public struct DefaultRenderer {
     _ draft: FrameHeadDraft,
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableFrameTailResult {
-    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
-    let layoutSuspends = frameTailRenderer.canOffloadLayout(draft.frameTailInput)
-    let layoutSuspensionStart = layoutSuspends ? draft.clock?.now : nil
-    if layoutSuspends {
-      suspensionHooks?.onBegin?()
-    }
-
     let cancellationToken = FrameTailJobCancellationToken()
     let layoutTask = Task { @MainActor in
-      await frameTailRenderer.renderLayoutAsync(
+      await renderLayoutResolvingLatePreferencesAsync(
         draft.frameTailInput,
         clock: draft.clock,
         cancellationToken: cancellationToken
@@ -1982,39 +2239,27 @@ public struct DefaultRenderer {
     while cancellationToken.currentState == .queued {
       if await shouldCancelQueued(), cancellationToken.cancelBeforeStart() {
         layoutTask.cancel()
-        if layoutSuspends {
-          suspensionHooks?.onEnd?()
-        }
         return .cancelledBeforeStart
       }
       try? await Task.sleep(for: .milliseconds(1))
     }
 
-    guard let layout = await layoutTask.value else {
-      if layoutSuspends {
-        suspensionHooks?.onEnd?()
-      }
+    let layoutResult = await layoutTask.value
+    guard let reconciledLayout = layoutResult.layout else {
       return .cancelledBeforeStart
     }
-    if layoutSuspends {
-      suspensionHooks?.onEnd?()
-    }
-    let layoutSuspensionDuration =
-      if let layoutSuspensionStart, let clock = draft.clock {
-        layoutSuspensionStart.duration(to: clock.now)
-      } else {
-        Duration.zero
-      }
+    let layout = reconciledLayout.layout
     let placed = layout.baselinePlaced
     animationController.capturePlacedTree(layout.baselinePlaced)
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
       at: draft.animationTimestamp
     )
+    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let rasterSuspensionStart = draft.clock?.now
     suspensionHooks?.onBegin?()
     let tail = await frameTailRenderer.renderRasterAsync(
-      draft.frameTailInput,
+      reconciledLayout.input,
       layout: layout,
       placed: placed,
       animationOverlaySnapshot: animationOverlaySnapshot,
@@ -2031,9 +2276,12 @@ public struct DefaultRenderer {
     cancellationToken.markCompleted()
     return .output(
       AsyncFrameTailDraftOutput(
+        frameTailInput: reconciledLayout.input,
         layout: layout,
         tail: tail,
-        renderSuspensionDuration: layoutSuspensionDuration + rasterSuspensionDuration
+        resolved: reconciledLayout.resolved,
+        runtimeIssues: reconciledLayout.runtimeIssues,
+        renderSuspensionDuration: layoutResult.suspensionDuration + rasterSuspensionDuration
       )
     )
   }
@@ -2048,10 +2296,7 @@ public struct DefaultRenderer {
     additionalBlockers:
       @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
   ) -> CompletedFrameCandidate {
-    let resolved = completedFrameResolvedTree(
-      draft: draft,
-      tailOutput: tailOutput
-    )
+    let resolved = tailOutput.resolved
     let workerTimings = completedFrameWorkerTimings(
       draft: draft,
       tailOutput: tailOutput
@@ -2176,15 +2421,6 @@ public struct DefaultRenderer {
     }
   }
 
-  private func completedFrameResolvedTree(
-    draft: FrameHeadDraft,
-    tailOutput _: AsyncFrameTailDraftOutput
-  ) -> ResolvedNode {
-    draft.resolved.applyingLayoutDependentRealizations(
-      draft.frameTailInput.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-  }
-
   private func completedFrameWorkerTimings(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput
@@ -2248,19 +2484,19 @@ public struct DefaultRenderer {
         phaseTimings: phaseTimings,
         renderGenerations: .init(
           render: draft.renderGeneration,
-          layoutInput: draft.frameTailInput.generation,
+          layoutInput: tailOutput.frameTailInput.generation,
           layoutOutput: layout.generation,
-          rasterInput: draft.frameTailInput.generation,
+          rasterInput: tailOutput.frameTailInput.generation,
           rasterOutput: tail.generation
         ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache,
-        runtimeIssues: draft.runtimeIssues,
+        runtimeIssues: tailOutput.runtimeIssues,
         dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
-      diagnostics = .init(runtimeIssues: draft.runtimeIssues)
+      diagnostics = .init(runtimeIssues: tailOutput.runtimeIssues)
     }
     diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
@@ -2405,6 +2641,19 @@ public struct DefaultRenderer {
         source: ".toolbarItem(...)"
       )
     ]
+  }
+
+  private func latePreferenceReconciliationLimitIssue(
+    rootIdentity: Identity
+  ) -> RuntimeIssue {
+    RuntimeIssue(
+      severity: .warning,
+      code: "latePreference.reconciliationLimitExceeded",
+      message:
+        "Late preference reconciliation did not converge within \(Self.maxLatePreferenceReconciliationPasses) passes; the frame was committed from the last fully laid-out tree without applying the final late preference changes.",
+      identity: rootIdentity,
+      source: "late preference reconciliation"
+    )
   }
 
   private func wrapInContainerSafeArea(

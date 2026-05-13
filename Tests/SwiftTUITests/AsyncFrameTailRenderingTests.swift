@@ -3,8 +3,8 @@ import Foundation
 import Synchronization
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 private enum AsyncFrameTailRaisedCenterAlignmentID: AlignmentID {
@@ -547,6 +547,30 @@ struct AsyncFrameTailRenderingTests {
     #expect(workerTimings.layoutCompute == .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
+  }
+
+  @Test("late toolbar diagnostics are preserved on the async renderer")
+  func lateToolbarDiagnosticsArePreservedOnAsyncRenderer() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      GeometryReader { _ in
+        Text("content").toolbarItem(
+          .init(
+            title: "Late Save",
+            icon: nil,
+            position: .bottom,
+            isEnabled: true,
+            action: {}
+          )
+        )
+      },
+      context: .init(identity: testIdentity("AsyncLateToolbarRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+    let issue = artifacts.diagnostics.runtimeIssues.first
+
+    #expect(artifacts.diagnostics.runtimeIssues.count == 1)
+    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.severity == .warning)
   }
 
   @Test("public SendableLayout opt-in runs layout on the frame-tail worker")

@@ -78,11 +78,11 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-12-002-late-preference-reconciliation-plan.md](plans/2026-05-12-002-late-preference-reconciliation-plan.md) — active platform fix for preferences emitted by realized layout-dependent content, starting with toolbar items inside `GeometryReader`
 - [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-12-002-late-preference-reconciliation-plan.md](plans/2026-05-12-002-late-preference-reconciliation-plan.md) — shipped runtime late preference reconciliation seam, with toolbar hosts absorbing `.toolbarItem(...)` values emitted by realized `GeometryReader` content before commit
 - [plans/2026-05-12-001-popover-presentation-plan.md](plans/2026-05-12-001-popover-presentation-plan.md) — shipped anchored popover presentation implementation record for Boolean and item-driven `.popover`, TipKit-inspired `.popoverTip`, source-relative terminal placement, Escape dismissal, and the gallery `Popovers` tab
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — shipped anchored popover and TipKit-inspired `popoverTip` API proposal
 - [plans/2026-05-09-002-text-editor-v2-plan.md](plans/2026-05-09-002-text-editor-v2-plan.md) — shipped `TextEditor` V2 shortcut, selection-rendering, clipboard copy/cut, and default-exit record; host value/selection transport, IME/composition, and large-document storage are explicit deferrals
