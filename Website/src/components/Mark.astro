@@ -1,36 +1,27 @@
 ---
+import logo from "../../../logo/md.gif";
+
 interface Props { size?: number }
 const { size = 22 } = Astro.props;
+const logoSrc = typeof logo === "string" ? logo : logo.src;
+const radius = Math.max(5, Math.round(size * 0.2));
 ---
-<svg
+<img
+  class="mark"
+  src={logoSrc}
   width={size}
   height={size}
-  viewBox="0 0 32 32"
-  fill="none"
-  xmlns="http://www.w3.org/2000/svg"
+  style={`--mark-size:${size}px;--mark-radius:${radius}px`}
+  alt=""
   aria-hidden="true"
->
-  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="currentColor" stroke-opacity="0.18"/>
-  <path
-    d="M7.5 10.25 L13 10.25"
-    stroke="currentColor"
-    stroke-width="1.5"
-    stroke-linecap="square"
-    opacity="0.55"
-  />
-  <path
-    d="M7.5 14 L19 14"
-    stroke="currentColor"
-    stroke-width="1.5"
-    stroke-linecap="square"
-    opacity="0.85"
-  />
-  <path
-    d="M7.5 17.75 L16 17.75"
-    stroke="currentColor"
-    stroke-width="1.5"
-    stroke-linecap="square"
-    opacity="0.55"
-  />
-  <rect x="20" y="20" width="5" height="2.4" fill="#34d399" />
-</svg>
+  decoding="async"
+/>
+
+<style>
+  .mark {
+    width: var(--mark-size);
+    height: var(--mark-size);
+    border-radius: var(--mark-radius);
+    object-fit: cover;
+  }
+</style>

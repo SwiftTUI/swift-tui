@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const iframeSrc = `${base}/webexample/`;
+const iframeSrc = `${base}/webexample/?embed=marketing`;
 const isDev = import.meta.env.DEV;
 const localWebExampleIndexPath = fileURLToPath(
   new URL("../../../Examples/WebExample/pages-dist/index.html", import.meta.url)
