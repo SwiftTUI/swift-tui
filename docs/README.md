@@ -51,6 +51,9 @@ The repository [README.md](../README.md) is the public landing page.
 
 - [HOST_PACKAGES.md](HOST_PACKAGES.md) — root-package platform products for
   executable runners, embedded hosts, and terminal-program embedding
+- [HOST_RENDERING_PIPELINES.md](HOST_RENDERING_PIPELINES.md) — detailed
+  rendering, input, resize, and presentation data flow for CLI, SwiftUIHost,
+  WebHost, and `Platforms/Web`
 - [ANDROID.md](ANDROID.md) — Android cross-compilation
 - [../Examples/README.md](../Examples/README.md) — maintained example apps and packages
 
