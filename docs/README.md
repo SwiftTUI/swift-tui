@@ -65,6 +65,11 @@ Active design proposals that are still shaping decisions:
 - [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md) — shipped text input value, selection, reducer, layout-map, caret-anchor, shortcut, and selection-rendering foundation for `TextField`, `SecureField`, and `TextEditor`
 - [proposals/ACCESSIBILITY.md](proposals/ACCESSIBILITY.md) — historical research record and remaining accessibility behavior questions; current shipped behavior lives in [ACCESSIBILITY.md](ACCESSIBILITY.md)
 - [proposals/EMBEDDED_WEB_HOST.md](proposals/EMBEDDED_WEB_HOST.md) — shipped compile-time opt-in `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` products for serving SwiftTUI apps through localhost HTTP/WebSocket using the shared `web-surface` browser runtime
+- [proposals/LOCAL_BROWSER_HOST_LEARNINGS.md](proposals/LOCAL_BROWSER_HOST_LEARNINGS.md) — investigation draft capturing external-consumer and open-source-pattern
+  learnings for the native local-browser host story
+- [proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md](proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md) — investigation draft for making `Platforms/Web`
+  consumable as browser/runtime and build packages such as `@swifttui/web` and
+  `@swifttui/build`
 - [proposals/PUBLIC_PRODUCTS_DRAFT.md](proposals/PUBLIC_PRODUCTS_DRAFT.md) — implemented release-facing product/import contract for one-import terminal apps, `SwiftTUIRuntime` composition, explicit host products, and first-class domain utility targets
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
 - [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) — scoped design work for a first-class Zellij-style terminal workspace surface above `TerminalView`
