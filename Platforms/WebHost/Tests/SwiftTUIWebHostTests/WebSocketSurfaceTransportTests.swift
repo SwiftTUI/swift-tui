@@ -16,20 +16,21 @@ struct WebSocketSurfaceTransportTests {
     let button = root.child("button")
 
     let metrics = try transport.present(
-      Self.basicSurface("OK"),
-      semanticSnapshot: SemanticSnapshot(
-        accessibilityNodes: [
-          AccessibilityNode(
-            identity: button,
-            parentIdentity: root,
-            rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
-            role: .button,
-            label: "Save"
-          )
-        ]
+      SemanticPresentationFrame(
+        surface: Self.basicSurface("OK"),
+        semanticSnapshot: SemanticSnapshot(
+          accessibilityNodes: [
+            AccessibilityNode(
+              identity: button,
+              parentIdentity: root,
+              rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
+              role: .button,
+              label: "Save"
+            )
+          ]
+        ),
+        focusedIdentity: button
       ),
-      focusedIdentity: button,
-      damage: nil
     )
 
     let record = try #require(await sink.strings().first)
@@ -56,10 +57,12 @@ struct WebSocketSurfaceTransportTests {
 
     let damageAwareTransport: any DamageAwareSemanticPresentationSurface = transport
     let metrics = try damageAwareTransport.present(
-      Self.basicSurface("OK"),
-      semanticSnapshot: SemanticSnapshot(),
-      focusedIdentity: nil,
-      damage: damage
+      SemanticPresentationFrame(
+        surface: Self.basicSurface("OK"),
+        semanticSnapshot: SemanticSnapshot(),
+        focusedIdentity: nil,
+        rasterDamage: damage
+      )
     )
 
     let record = try #require(await sink.strings().first)

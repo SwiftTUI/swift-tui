@@ -236,7 +236,7 @@ if output == .json:
 else if output == .accessible:
   LinearAccessibilityRenderer writes semantic text
 else if surface is DamageAwareSemanticPresentationSurface:
-  present(raster, semanticSnapshot, focusedIdentity, damage)
+  present(SemanticPresentationFrame(raster, semanticSnapshot, focusedIdentity, rasterDamage))
 else if surface is DamageAwarePresentationSurface:
   present(raster, damage)
 else:
@@ -425,8 +425,7 @@ Each `SwiftUIHostSceneHost` creates a `NativeSceneBridge`, constructs a
 
 - initial cell size
 - initial terminal appearance and theme
-- `onSurface`
-- `onSemanticFrameWithDamage`
+- `onFrame`
 - clipboard writer
 
 It then constructs a `HostedSceneSession` with:
@@ -438,19 +437,18 @@ It then constructs a `HostedSceneSession` with:
 
 `HostedRasterSurface` conforms to `DamageAwareSemanticPresentationSurface`. When
 `RunLoop.presentCommittedFrame(...)` reaches the damage-aware semantic branch,
-the host receives:
+the host receives a single `SemanticPresentationFrame` containing:
 
 ```text
 RasterSurface
 SemanticSnapshot
 focused Identity
-PresentationDamage?
+raster PresentationDamage?
 ```
 
 No ANSI is generated. No terminal fd exists. The surface handler stores the
-latest raster surface on `SwiftUIHostSceneHost`; the semantic frame handler also
-stores the latest semantic snapshot, focused accessibility identity, and
-presentation damage hint.
+latest raster surface, semantic snapshot, focused accessibility identity, and
+raster damage hint on `SwiftUIHostSceneHost`.
 
 `SwiftUIHostAppView` bridges that host into native UI with an
 `NSViewRepresentable` or `UIViewRepresentable`. The representable configures
@@ -555,7 +553,7 @@ SwiftTUIWebHostCLI optional routing
 -> SceneSession.run(...)
 -> RunLoop
 -> DefaultRenderer
--> WebSocketSurfaceTransport.present(raster, semanticSnapshot, focusedIdentity, damage)
+-> WebSocketSurfaceTransport.present(SemanticPresentationFrame)
 -> WebSurfaceFrameEncoder
 -> WebSocket bytes
 -> WebSocketSceneBridge
@@ -695,7 +693,7 @@ Browser createWebHostApp(...)
 -> SceneSession.run(...)
 -> RunLoop
 -> DefaultRenderer
--> WebSurfaceTransport.present(raster, semanticSnapshot, focusedIdentity, damage)
+-> WebSurfaceTransport.present(SemanticPresentationFrame)
 -> WebSurfaceFrameEncoder
 -> stdout bytes
 -> BrowserWASIBridge WebHostOutputDecoder

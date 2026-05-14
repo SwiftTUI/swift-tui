@@ -91,44 +91,46 @@ struct WebSurfaceTransportTests {
     let mixed = group.child("mixed")
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        Self.basicSurface(),
-        semanticSnapshot: SemanticSnapshot(
-          accessibilityNodes: [
-            AccessibilityNode(
-              identity: group,
-              parentIdentity: root,
-              rect: .init(origin: .zero, size: .init(width: 2, height: 2)),
-              role: .group,
-              label: "Actions"
-            ),
-            AccessibilityNode(
-              identity: button,
-              parentIdentity: group,
-              rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
-              role: .button,
-              label: "Save",
-              hint: "Writes the file",
-              cursorAnchor: .init(x: 1, y: 0)
-            ),
-            AccessibilityNode(
-              identity: live,
-              parentIdentity: group,
-              rect: .init(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1)),
-              role: .status,
-              label: "Saved",
-              liveRegion: .polite
-            ),
-            AccessibilityNode(
-              identity: mixed,
-              parentIdentity: group,
-              rect: .init(origin: .zero, size: .init(width: 1, height: 1)),
-              role: .group,
-              label: "Mixed",
-              hidden: true
-            ),
-          ]
-        ),
-        focusedIdentity: button
+        SemanticPresentationFrame(
+          surface: Self.basicSurface(),
+          semanticSnapshot: SemanticSnapshot(
+            accessibilityNodes: [
+              AccessibilityNode(
+                identity: group,
+                parentIdentity: root,
+                rect: .init(origin: .zero, size: .init(width: 2, height: 2)),
+                role: .group,
+                label: "Actions"
+              ),
+              AccessibilityNode(
+                identity: button,
+                parentIdentity: group,
+                rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
+                role: .button,
+                label: "Save",
+                hint: "Writes the file",
+                cursorAnchor: .init(x: 1, y: 0)
+              ),
+              AccessibilityNode(
+                identity: live,
+                parentIdentity: group,
+                rect: .init(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1)),
+                role: .status,
+                label: "Saved",
+                liveRegion: .polite
+              ),
+              AccessibilityNode(
+                identity: mixed,
+                parentIdentity: group,
+                rect: .init(origin: .zero, size: .init(width: 1, height: 1)),
+                role: .group,
+                label: "Mixed",
+                hidden: true
+              ),
+            ]
+          ),
+          focusedIdentity: button
+        )
       )
     )
 
@@ -169,12 +171,15 @@ struct WebSurfaceTransportTests {
   func encoderEmitsAccessibilityAnnouncements() throws {
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        Self.basicSurface(),
-        semanticSnapshot: SemanticSnapshot(
-          accessibilityAnnouncements: [
-            AccessibilityAnnouncement(message: "Saved", politeness: .assertive),
-            AccessibilityAnnouncement(message: "Queued", politeness: .polite),
-          ]
+        SemanticPresentationFrame(
+          surface: Self.basicSurface(),
+          semanticSnapshot: SemanticSnapshot(
+            accessibilityAnnouncements: [
+              AccessibilityAnnouncement(message: "Saved", politeness: .assertive),
+              AccessibilityAnnouncement(message: "Queued", politeness: .polite),
+            ]
+          ),
+          focusedIdentity: nil
         )
       )
     )

@@ -18,19 +18,21 @@ struct WebSurfaceSPITests {
     let child = root.child("button")
     let frame = try decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        Self.basicSurface(),
-        semanticSnapshot: SemanticSnapshot(
-          accessibilityNodes: [
-            AccessibilityNode(
-              identity: child,
-              parentIdentity: root,
-              rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
-              role: .button,
-              label: "Save"
-            )
-          ]
-        ),
-        focusedIdentity: child
+        SemanticPresentationFrame(
+          surface: Self.basicSurface(),
+          semanticSnapshot: SemanticSnapshot(
+            accessibilityNodes: [
+              AccessibilityNode(
+                identity: child,
+                parentIdentity: root,
+                rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
+                role: .button,
+                label: "Save"
+              )
+            ]
+          ),
+          focusedIdentity: child
+        )
       )
     )
 

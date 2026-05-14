@@ -119,7 +119,7 @@ Sources/SwiftTUIRuntime/
 
 ### Terminal
 
-- `Terminal/TerminalHost.swift`: defines the `PresentationSurface` protocol (the `RunLoop`'s pluggable presentation target) plus the fd-backed `TerminalHost` and WASI-facing `WebTerminalHost` implementations
+- `Terminal/TerminalHost.swift`: defines the `PresentationSurface` protocol, `SemanticPresentationFrame`, and fd-backed `TerminalHost`
 - `Terminal/TerminalClipboard.swift`: shared clipboard-writing host capability
   and terminal OSC 52 encoding
 - `Terminal/TerminalCursorFocusPresentationSurface.swift`: terminal-only cursor focus marker and cursor visibility helpers

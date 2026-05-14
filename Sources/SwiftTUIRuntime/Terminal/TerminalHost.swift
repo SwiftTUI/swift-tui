@@ -370,17 +370,35 @@ package protocol DamageAwarePresentationSurface: PresentationSurface {
   ) throws -> TerminalPresentationMetrics
 }
 
+/// A committed raster frame plus the semantic data needed by non-terminal hosts.
+///
+/// ``rasterDamage`` describes changed raster rows/ranges relative to the
+/// previous committed raster frame. It is not a semantic-tree diff.
+public struct SemanticPresentationFrame: Equatable, Sendable {
+  public var surface: RasterSurface
+  public var semanticSnapshot: SemanticSnapshot
+  public var focusedIdentity: Identity?
+  public var rasterDamage: PresentationDamage?
+
+  public init(
+    surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot,
+    focusedIdentity: Identity?,
+    rasterDamage: PresentationDamage? = nil
+  ) {
+    self.surface = surface
+    self.semanticSnapshot = semanticSnapshot
+    self.focusedIdentity = focusedIdentity
+    self.rasterDamage = rasterDamage
+  }
+}
+
 @_spi(Runners)
 public protocol DamageAwareSemanticPresentationSurface:
   PresentationSurface
 {
   @discardableResult
-  func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics
+  func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics
 }
 
 extension PresentationSurface {

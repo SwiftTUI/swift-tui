@@ -145,27 +145,19 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
   }
 
   @discardableResult
-  package func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
+  package func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics {
     let bytes = state.withLock { state in
       Array(
         WebSurfaceFrameEncoder.encode(
-          surface,
-          semanticSnapshot: semanticSnapshot,
-          focusedIdentity: focusedIdentity,
-          damage: damage,
+          frame,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
     }
     try sendBytes(bytes)
     return .rasterHostMetrics(
-      for: surface,
-      damage: damage,
+      for: frame.surface,
+      damage: frame.rasterDamage,
       bytesWritten: bytes.count
     )
   }

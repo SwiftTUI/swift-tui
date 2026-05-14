@@ -44,16 +44,8 @@ public final class SwiftUIHostSceneHost {
       surfaceSize: .init(width: 80, height: 24),
       appearance: initialRenderStyle.appearance,
       theme: initialRenderStyle.theme,
-      onSurface: { [weak self] surface in
-        self?.receiveSurface(surface)
-      },
-      onSemanticFrameWithDamage: { [weak self] surface, semanticSnapshot, focusedIdentity, damage in
-        self?.receiveSemanticFrame(
-          surface: surface,
-          semanticSnapshot: semanticSnapshot,
-          focusedIdentity: focusedIdentity,
-          damage: damage
-        )
+      onFrame: { [weak self] frame in
+        self?.receiveFrame(frame)
       },
       onClipboardWrite: clipboardWriter ?? NativeClipboard.write
     )
@@ -142,25 +134,15 @@ public final class SwiftUIHostSceneHost {
     bridge
   }
 
-  private func receiveSurface(
-    _ surface: RasterSurface
+  private func receiveFrame(
+    _ frame: SemanticPresentationFrame
   ) {
-    latestSurface = surface
-    latestPresentationDamage = nil
-  }
-
-  private func receiveSemanticFrame(
-    surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
-  ) {
-    latestSurface = surface
-    latestSemanticSnapshot = semanticSnapshot
-    focusedAccessibilityIdentity = focusedIdentity
-    latestPresentationDamage = damage
+    latestSurface = frame.surface
+    latestSemanticSnapshot = frame.semanticSnapshot
+    focusedAccessibilityIdentity = frame.focusedIdentity
+    latestPresentationDamage = frame.rasterDamage
     NativeAccessibilityAnnouncementPoster.post(
-      accessibilityAnnouncer.announcements(for: semanticSnapshot)
+      accessibilityAnnouncer.announcements(for: frame.semanticSnapshot)
     )
   }
 
