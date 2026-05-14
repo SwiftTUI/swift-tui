@@ -6,22 +6,26 @@ public struct WebHostConfig: Equatable, Sendable {
   public var bind: String
   public var port: Int
   public var openBrowser: Bool
+  public var sceneID: WindowIdentifier?
 
   public init(
     bind: String = "127.0.0.1",
     port: Int = 9123,
-    openBrowser: Bool = false
+    openBrowser: Bool = false,
+    sceneID: WindowIdentifier? = nil
   ) {
     self.bind = bind
     self.port = port
     self.openBrowser = openBrowser
+    self.sceneID = sceneID
   }
 
   public init(_ webConfig: RuntimeConfiguration.WebConfig) {
     self.init(
       bind: webConfig.bind,
       port: webConfig.port,
-      openBrowser: webConfig.openBrowser
+      openBrowser: webConfig.openBrowser,
+      sceneID: webConfig.sceneID
     )
   }
 

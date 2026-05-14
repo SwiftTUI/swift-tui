@@ -27,23 +27,70 @@ struct WebHostRunnerTests {
     }
   }
 
-  @Test("runner rejects multiple scenes in V1")
-  func runnerRejectsMultipleScenesInV1() async throws {
-    do {
+  @Test("runner defaults to the default scene for multi-scene apps")
+  func runnerDefaultsToDefaultSceneForMultiSceneApps() async throws {
+    let server = FakeWebHostServer()
+    let task = Task { @MainActor in
       try await WebHostRunner.run(
         MultipleSceneApp(),
         configuration: .init(web: .init()),
+        server: server,
+        token: WebHostToken(rawValue: "test-token"),
+        browserOpener: RecordingBrowserOpener(),
+        bannerWriter: RecordingBannerWriter()
+      )
+    }
+
+    let scene = await server.startedScene()
+    #expect(scene.id == "primary")
+    #expect(scene.isDefault == true)
+    await cancelAndDrain(task)
+  }
+
+  @Test("runner launches requested scene for multi-scene apps")
+  func runnerLaunchesRequestedSceneForMultiSceneApps() async throws {
+    let server = FakeWebHostServer()
+    let task = Task { @MainActor in
+      try await WebHostRunner.run(
+        MultipleSceneApp(),
+        configuration: .init(web: .init(sceneID: WindowIdentifier("secondary"))),
+        server: server,
+        token: WebHostToken(rawValue: "test-token"),
+        browserOpener: RecordingBrowserOpener(),
+        bannerWriter: RecordingBannerWriter()
+      )
+    }
+
+    let scene = await server.startedScene()
+    #expect(scene.id == "secondary")
+    #expect(scene.title == "Secondary")
+    #expect(scene.isDefault == false)
+    await cancelAndDrain(task)
+  }
+
+  @Test("runner reports missing requested scene")
+  func runnerReportsMissingRequestedScene() async throws {
+    do {
+      try await WebHostRunner.run(
+        MultipleSceneApp(),
+        configuration: .init(web: .init(sceneID: WindowIdentifier("missing"))),
         server: FakeWebHostServer(),
         token: WebHostToken(rawValue: "test-token"),
         browserOpener: RecordingBrowserOpener(),
         bannerWriter: RecordingBannerWriter()
       )
-      Issue.record("Expected multiple-scene launch to fail.")
+      Issue.record("Expected missing-scene launch to fail.")
     } catch let error as WebHostRunnerError {
-      #expect(error == .multipleScenesUnsupported(count: 2))
-      #expect(error.description.contains("supports exactly one scene"))
+      #expect(
+        error
+          == .sceneNotFound(
+            WindowIdentifier("missing"),
+            available: [WindowIdentifier("primary"), WindowIdentifier("secondary")]
+          )
+      )
+      #expect(error.description.contains("Available scenes: primary, secondary"))
     } catch {
-      Issue.record("Expected WebHostRunnerError.multipleScenesUnsupported, got \(error).")
+      Issue.record("Expected WebHostRunnerError.sceneNotFound, got \(error).")
     }
   }
 
@@ -161,7 +208,9 @@ private struct SingleSceneApp: App {
 
 private actor FakeWebHostServer: WebHostServer {
   private var session: WebHostServerSession?
+  private var scene: WebHostSceneDescriptor?
   private var continuation: CheckedContinuation<WebHostServerSession, Never>?
+  private var sceneContinuation: CheckedContinuation<WebHostSceneDescriptor, Never>?
   private(set) var stopCount = 0
 
   func start(
@@ -182,8 +231,11 @@ private actor FakeWebHostServer: WebHostServer {
       }
     )
     self.session = session
+    self.scene = scene
     continuation?.resume(returning: session)
     continuation = nil
+    sceneContinuation?.resume(returning: scene)
+    sceneContinuation = nil
     return session
   }
 
@@ -193,6 +245,15 @@ private actor FakeWebHostServer: WebHostServer {
     }
     return await withCheckedContinuation { continuation in
       self.continuation = continuation
+    }
+  }
+
+  func startedScene() async -> WebHostSceneDescriptor {
+    if let scene {
+      return scene
+    }
+    return await withCheckedContinuation { continuation in
+      self.sceneContinuation = continuation
     }
   }
 

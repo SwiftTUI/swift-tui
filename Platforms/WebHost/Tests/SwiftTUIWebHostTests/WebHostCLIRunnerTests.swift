@@ -1,6 +1,6 @@
 import Foundation
-import SwiftTUIRuntime
 import SwiftTUICLI
+import SwiftTUIRuntime
 import Testing
 
 @testable import SwiftTUIWebHost
@@ -12,7 +12,9 @@ struct WebHostCLIRunnerTests {
   @Test("combined runner parses standard SwiftTUI web arguments")
   func combinedRunnerParsesStandardSwiftTUIWebArguments() throws {
     let configuration = try WebHostCLIRunner.runtimeConfiguration(
-      arguments: ["--web", "--port", "4567", "--bind", "127.0.0.1", "--open"],
+      arguments: [
+        "--web", "--port", "4567", "--bind", "127.0.0.1", "--open", "--scene", "details",
+      ],
       environment: [:],
       isStdoutTTY: true
     )
@@ -20,6 +22,7 @@ struct WebHostCLIRunnerTests {
     #expect(configuration.web?.port == 4567)
     #expect(configuration.web?.bind == "127.0.0.1")
     #expect(configuration.web?.openBrowser == true)
+    #expect(configuration.web?.sceneID == WindowIdentifier("details"))
   }
 
   @Test("combined runner routes web configuration to WebHost runner")

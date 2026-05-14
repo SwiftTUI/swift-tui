@@ -70,11 +70,19 @@ extension RuntimeConfiguration {
       return copy
     }
 
-    public func web(port: Int = 0, bind: String = "127.0.0.1", openBrowser: Bool = false)
-      -> Self
-    {
+    public func web(
+      port: Int = 0,
+      bind: String = "127.0.0.1",
+      openBrowser: Bool = false,
+      sceneID: WindowIdentifier? = nil
+    ) -> Self {
       var copy = self
-      copy.configuration.web = WebConfig(port: port, bind: bind, openBrowser: openBrowser)
+      copy.configuration.web = WebConfig(
+        port: port,
+        bind: bind,
+        openBrowser: openBrowser,
+        sceneID: sceneID
+      )
       return copy
     }
 

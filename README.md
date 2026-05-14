@@ -117,11 +117,11 @@ struct MyApp: App, SwiftTUICommand {
 > **Note on flag-to-behavior wiring:** `--no-color`, `--force-color`, `--ascii`,
 > `--plain`, `--accessible`, `--reduce-motion`, `--no-progress`, and
 > `--cursor-follows-focus` now affect runtime behavior. `--web`, `--port`,
-> `--bind`, and `--open` are consumed by the opt-in `SwiftTUIWebHostCLI`
+> `--bind`, `--open`, and `--scene` are consumed by the opt-in `SwiftTUIWebHostCLI`
 > runner. `--debug` enables the existing frame diagnostics logger. `--json`
 > emits machine-readable frame JSON, and standalone `--linear` selects the
-> accessible linear output path. Launch routing such as "start in this scope"
-> is app-owned consumer policy, not a framework flag. See
+> accessible linear output path. `--scene` selects which declared `WindowGroup`
+> identifier the single-scene WebHost launch should run. See
 > [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
 > for the full roadmap.
 

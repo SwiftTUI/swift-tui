@@ -90,7 +90,10 @@ extension RuntimeConfiguration {
       let requestedOpen = environment["SWIFTTUI_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
       let disabledOpen = environment["SWIFTTUI_NO_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
       let openBrowser = requestedOpen && !disabledOpen
-      return WebConfig(port: port, bind: bind, openBrowser: openBrowser)
+      let sceneID = environment["SWIFTTUI_WEB_SCENE"].flatMap { value in
+        value.isEmpty ? nil : WindowIdentifier(value)
+      }
+      return WebConfig(port: port, bind: bind, openBrowser: openBrowser, sceneID: sceneID)
     }()
 
     // Verbosity.

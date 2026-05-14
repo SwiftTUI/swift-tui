@@ -192,6 +192,16 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.web?.port == 9000)
     #expect(configuration.web?.bind == "0.0.0.0")
     #expect(configuration.web?.openBrowser == false)
+    #expect(configuration.web?.sceneID == nil)
+  }
+
+  @Test("--web --scene details produces WebConfig with scene id")
+  func cliWebSceneProducesWebConfigWithSceneID() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.web = true
+    options.scene = "details"
+    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    #expect(configuration.web?.sceneID == WindowIdentifier("details"))
   }
 
   @Test("--web --open produces WebConfig with browser open enabled")
@@ -211,6 +221,16 @@ struct SwiftTUIOptionsResolutionTests {
       isStdoutTTY: true
     )
     #expect(configuration.web?.openBrowser == true)
+  }
+
+  @Test("SWIFTTUI_WEB_SCENE produces WebConfig with scene id")
+  func envWebSceneProducesWebConfigWithSceneID() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_WEB_SCENE": "details"],
+      isStdoutTTY: true
+    )
+    #expect(configuration.web?.sceneID == WindowIdentifier("details"))
   }
 
   @Test("SWIFTTUI_WEB defaults browser open to false")

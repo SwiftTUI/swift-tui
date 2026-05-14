@@ -18,18 +18,18 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
-| `SwiftTUIRuntime` | 52 | 573 |
+| `SwiftTUIRuntime` | 52 | 574 |
 | `SwiftTUIViews` | 255 | 9637 |
 | `SwiftTUIAnimatedImage` | 5 | 157 |
 | `SwiftTUICharts` | 29 | 1851 |
-| `SwiftTUIArguments` | 4 | 113 |
+| `SwiftTUIArguments` | 4 | 114 |
 | `SwiftTUIPTYPrimitives` | 6 | 34 |
 | `SwiftTUITerminal` | 12 | 294 |
 | `SwiftTUITerminalWorkspace` | 14 | 260 |
 | `SwiftTUICLI` | 5 | 24 |
 | `WASISurfaceBridge` | 0 | 0 |
 | `SwiftTUIWASI` | 2 | 8 |
-| `SwiftTUIWebHost` | 3 | 17 |
+| `SwiftTUIWebHost` | 3 | 19 |
 | `SwiftTUIWebHostCLI` | 1 | 5 |
 | `SwiftUIHost` | 7 | 886 |
 | `SwiftTUICore` | 265 | 2633 |
@@ -69,7 +69,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RunLoop` — class — 6 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 5 members
-- `RuntimeConfiguration` — struct — 70 members
+- `RuntimeConfiguration` — struct — 71 members
 - `RuntimeRenderMode` — enum — 12 members
 - `Scene` — protocol — 2 members
 - `SceneBuilder` — enum — 10 members
@@ -405,7 +405,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `CompletionsCommand` — struct — 70 members
 - `SwiftTUIApp` — typealias
 - `SwiftTUICommand` — protocol — 8 members
-- `SwiftTUIOptions` — struct — 31 members
+- `SwiftTUIOptions` — struct — 32 members
 
 ## SwiftTUIPTYPrimitives
 
@@ -477,9 +477,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ### Canonical surface (3)
 
-- `WebHostConfig` — struct — 6 members
+- `WebHostConfig` — struct — 7 members
 - `WebHostRunner` — enum — 4 members
-- `WebHostRunnerError` — enum — 4 members
+- `WebHostRunnerError` — enum — 5 members
 
 ## SwiftTUIWebHostCLI
 

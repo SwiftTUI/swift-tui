@@ -1111,6 +1111,7 @@ swift-argument-parser registration error at parse time.
 | `--port <n>` | — | Int | `0` | Port for `--web`. `0` = auto-assign. |
 | `--bind <addr>` | — | String | `"127.0.0.1"` | Bind address for `--web`. |
 | `--open` | — | Bool | `false` | Open the browser with `--web`. |
+| `--scene <id>` | — | String | `nil` | Scene identifier to launch with `--web`. |
 | `--verbose` | `-v` | Int | `0` | Repeat-count verbosity (`-v`, `-vv`, `-vvv`). |
 | `--quiet` | — | Bool | `false` | Suppress non-error logs. |
 | `--debug` | — | Bool | `false` | Framework-internal debug instrumentation. |
@@ -1197,6 +1198,7 @@ truth for which env vars exist. This table extends it.
 | `SWIFTTUI_BIND=<addr>` | `--bind` | Framework | Bind address for `--web`. |
 | `SWIFTTUI_OPEN=1` | `--open` | Framework | Open the browser. |
 | `SWIFTTUI_NO_OPEN=1` | — | Framework | Compatibility env var that explicitly disables browser opening. |
+| `SWIFTTUI_WEB_SCENE=<id>` | `--scene` | Framework | Scene identifier to launch with `--web`. |
 | `SWIFTTUI_VERBOSE=<n>` | `-v` × n | Framework | Verbosity level (0–3). |
 | `SWIFTTUI_QUIET=1` | `--quiet` | Framework | Suppress non-error logs. |
 | `SWIFTTUI_DEBUG=1` | `--debug` | Framework | Framework debug instrumentation. |
@@ -1283,7 +1285,7 @@ Special cases:
 --accessible            --plain                 --port
 --ascii                 --linear                --bind
 --reduce-motion         --cursor-follows-focus  --open
---no-color              --json
+--no-color              --json                  --scene
 --force-color           --web                   --debug
 --no-progress           --verbose               --help-all
 --quiet                 --theme                 --config

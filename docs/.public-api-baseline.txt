@@ -264,6 +264,7 @@ SwiftTUIArguments.SwiftTUIOptions.port
 SwiftTUIArguments.SwiftTUIOptions.quiet
 SwiftTUIArguments.SwiftTUIOptions.reduceMotion
 SwiftTUIArguments.SwiftTUIOptions.runtimeConfiguration(environment:isStdoutTTY:)
+SwiftTUIArguments.SwiftTUIOptions.scene
 SwiftTUIArguments.SwiftTUIOptions.usageString(includeHidden:)
 SwiftTUIArguments.SwiftTUIOptions.validate()
 SwiftTUIArguments.SwiftTUIOptions.verbose
@@ -5076,7 +5077,7 @@ SwiftTUIRuntime.RuntimeConfiguration.Builder.motion(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.noProgress(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.output(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.verbosity(_:)
-SwiftTUIRuntime.RuntimeConfiguration.Builder.web(port:bind:openBrowser:)
+SwiftTUIRuntime.RuntimeConfiguration.Builder.web(port:bind:openBrowser:sceneID:)
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode.!=(_:_:)
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode.always
@@ -5116,9 +5117,10 @@ SwiftTUIRuntime.RuntimeConfiguration.Verbosity.verbose(level:)
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.!=(_:_:)
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.bind
-SwiftTUIRuntime.RuntimeConfiguration.WebConfig.init(port:bind:openBrowser:)
+SwiftTUIRuntime.RuntimeConfiguration.WebConfig.init(port:bind:openBrowser:sceneID:)
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.openBrowser
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.port
+SwiftTUIRuntime.RuntimeConfiguration.WebConfig.sceneID
 SwiftTUIRuntime.RuntimeConfiguration.builder()
 SwiftTUIRuntime.RuntimeConfiguration.color
 SwiftTUIRuntime.RuntimeConfiguration.cursorFollowsFocus
@@ -15586,9 +15588,10 @@ SwiftTUIWebHost.WebHostConfig
 SwiftTUIWebHost.WebHostConfig.!=(_:_:)
 SwiftTUIWebHost.WebHostConfig.bind
 SwiftTUIWebHost.WebHostConfig.init(_:)
-SwiftTUIWebHost.WebHostConfig.init(bind:port:openBrowser:)
+SwiftTUIWebHost.WebHostConfig.init(bind:port:openBrowser:sceneID:)
 SwiftTUIWebHost.WebHostConfig.openBrowser
 SwiftTUIWebHost.WebHostConfig.port
+SwiftTUIWebHost.WebHostConfig.sceneID
 SwiftTUIWebHost.WebHostRunner
 SwiftTUIWebHost.WebHostRunner.run(_:)
 SwiftTUIWebHost.WebHostRunner.run(_:)
@@ -15599,6 +15602,7 @@ SwiftTUIWebHost.WebHostRunnerError.!=(_:_:)
 SwiftTUIWebHost.WebHostRunnerError.description
 SwiftTUIWebHost.WebHostRunnerError.localizedDescription
 SwiftTUIWebHost.WebHostRunnerError.multipleScenesUnsupported(count:)
+SwiftTUIWebHost.WebHostRunnerError.sceneNotFound(_:available:)
 SwiftTUIWebHostCLI.WebHostCLIRunner
 SwiftTUIWebHostCLI.WebHostCLIRunner.run(_:)
 SwiftTUIWebHostCLI.WebHostCLIRunner.run(_:)

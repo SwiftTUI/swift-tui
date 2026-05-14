@@ -41,6 +41,7 @@ struct SwiftTUICommandTests {
     #expect(helpText.contains("--accessible"))
     #expect(helpText.contains("--no-color"))
     #expect(helpText.contains("--web"))
+    #expect(helpText.contains("--scene"))
     // swift-argument-parser may wrap long help strings across lines, so we
     // can't always match `[env: NAME]` as a contiguous substring (e.g. the
     // `--no-color` line wraps `[env: NO_COLOR]` across two lines). Match a

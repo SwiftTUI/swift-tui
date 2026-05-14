@@ -37,6 +37,15 @@ struct RuntimeConfigurationBuilderTests {
     #expect(configuration.web?.port == 8080)
     #expect(configuration.web?.bind == "0.0.0.0")
     #expect(configuration.web?.openBrowser == false)
+    #expect(configuration.web?.sceneID == nil)
+  }
+
+  @Test("Builder web() sets selected scene")
+  func builderWebConfigSceneID() {
+    let configuration = RuntimeConfiguration.builder()
+      .web(sceneID: WindowIdentifier("details"))
+      .build()
+    #expect(configuration.web?.sceneID == WindowIdentifier("details"))
   }
 
   @Test("Builder web() defaults browser open to false")
