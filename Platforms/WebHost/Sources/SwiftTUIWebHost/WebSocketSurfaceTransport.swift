@@ -148,20 +148,6 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
   package func present(
     _ surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?
-  ) throws -> TerminalPresentationMetrics {
-    try present(
-      surface,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
-      damage: nil
-    )
-  }
-
-  @discardableResult
-  package func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
     focusedIdentity: Identity?,
     damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics {

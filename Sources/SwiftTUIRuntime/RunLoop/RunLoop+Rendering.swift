@@ -1458,12 +1458,6 @@ extension RunLoop {
         focusedIdentity: focusTracker.currentFocusIdentity,
         damage: damage
       )
-    } else if let semanticHost = presentationSurface as? any SemanticPresentationSurface {
-      metrics = try semanticHost.present(
-        artifacts.rasterSurface,
-        semanticSnapshot: artifacts.semanticSnapshot,
-        focusedIdentity: focusTracker.currentFocusIdentity
-      )
     } else if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
       metrics = try damageAwareHost.present(
         artifacts.rasterSurface,

@@ -7,9 +7,7 @@ import Testing
 private final class FakeSceneSession: HostedSceneSessionHandling {
   var startCount = 0
   var stopCount = 0
-  var receivedResizes: [(size: CellSize, cellPixelSize: PixelSize?)] = []
-  var receivedPointerInputCapabilities: [PointerInputCapabilities] = []
-  var receivedStyles: [TerminalRenderStyle] = []
+  var refreshCount = 0
   var receivedEvents: [InputEvent] = []
 
   func start() async throws -> RunLoopExitReason {
@@ -21,17 +19,8 @@ private final class FakeSceneSession: HostedSceneSessionHandling {
     receivedEvents.append(event)
   }
 
-  func resize(
-    to size: CellSize,
-    cellPixelSize: PixelSize?,
-    pointerInputCapabilities: PointerInputCapabilities
-  ) {
-    receivedResizes.append((size, cellPixelSize))
-    receivedPointerInputCapabilities.append(pointerInputCapabilities)
-  }
-
-  func updateStyle(_ style: TerminalRenderStyle) {
-    receivedStyles.append(style)
+  func requestSurfaceRefresh() {
+    refreshCount += 1
   }
 
   func stop() {
@@ -48,33 +37,41 @@ func bridge_forwards_resize_and_style_updates() async throws {
     style: style
   )
   let session = FakeSceneSession()
+  let surface = HostedRasterSurface(
+    surfaceSize: .init(width: 80, height: 24),
+    appearance: style.renderStyle.appearance,
+    theme: style.renderStyle.theme,
+    onSurface: { _ in }
+  )
 
-  bridge.attach(session: session)
+  bridge.attach(session: session, surface: surface)
 
   _ = try await bridge.startSession()
   #expect(session.startCount == 1)
+  #expect(session.refreshCount == 1)
 
   bridge.resize(
     to: .init(width: 120, height: 40),
     cellPixelSize: .init(width: 8, height: 16)
   )
-  #expect(session.receivedResizes.map(\.size) == [.init(width: 120, height: 40)])
-  #expect(session.receivedResizes.map(\.cellPixelSize) == [.init(width: 8, height: 16)])
+  #expect(surface.surfaceSize == .init(width: 120, height: 40))
+  #expect(surface.graphicsCapabilities.cellPixelSize == .init(width: 8, height: 16))
   #expect(
-    session.receivedPointerInputCapabilities == [
-      PointerInputCapabilities(
+    surface.pointerInputCapabilities
+      == PointerInputCapabilities(
         precision: .subCell(
           source: .nativePixels,
           metrics: .init(width: 8, height: 16, source: .reported)
         ),
         supportsHover: true
-      )
-    ])
+      ))
+  #expect(session.refreshCount == 2)
 
   bridge.send(.key(.init(.character("x"))))
   #expect(session.receivedEvents == [.key(.init(.character("x")))])
 
-  #expect(session.receivedStyles.last == style.renderStyle)
+  #expect(surface.appearance == style.renderStyle.appearance)
+  #expect(surface.theme == style.renderStyle.theme)
 
   let swappedStyle = SwiftUIHostTerminalStyle(
     palette: .init(
@@ -93,9 +90,10 @@ func bridge_forwards_resize_and_style_updates() async throws {
   )
 
   bridge.apply(style: swappedStyle)
-  #expect(session.receivedStyles.last?.appearance.foregroundColor == .hex("#5A5B5C"))
-  #expect(session.receivedStyles.last?.appearance.backgroundColor == .hex("#6A6B6C"))
-  #expect(session.receivedStyles.last?.theme == swappedStyle.theme)
+  #expect(surface.appearance.foregroundColor == .hex("#5A5B5C"))
+  #expect(surface.appearance.backgroundColor == .hex("#6A6B6C"))
+  #expect(surface.theme == swappedStyle.theme)
+  #expect(session.refreshCount == 3)
 
   bridge.stopSession()
   #expect(session.stopCount == 1)
@@ -109,9 +107,14 @@ func bridge_forwards_pointer_events_in_order() {
     style: .default
   )
   let session = FakeSceneSession()
+  let surface = HostedRasterSurface(
+    surfaceSize: .init(width: 80, height: 24),
+    appearance: .fallback,
+    onSurface: { _ in }
+  )
   let location = Point(x: 4, y: 2)
 
-  bridge.attach(session: session)
+  bridge.attach(session: session, surface: surface)
   bridge.send(.mouse(.init(kind: .down(.primary), location: location)))
   bridge.send(.mouse(.init(kind: .dragged(.primary), location: .init(x: 5, y: 2))))
   bridge.send(.mouse(.init(kind: .up(.primary), location: .init(x: 5, y: 2))))

@@ -177,7 +177,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Upside.** Enables a class of regression tests that are currently awkward to write. The fixture-based testing already in the project would gain an honest way to pin pixel-denominated outputs.
 
-**Downside.** Crosses the line between authoring and runtime. Authors writing views should never set cell pixel size; test harnesses need to. Conflating them in a single API is a hazard. The clean answer is that test harnesses inject via `StreamingTerminalHost.init(graphicsCapabilities:)`, which is already `package` visibility, while the authored read-side stays strictly read-only.
+**Downside.** Crosses the line between authoring and runtime. Authors writing views should never set cell pixel size; test harnesses need to. Conflating them in a single API is a hazard. The clean answer is that host/test harnesses inject via `HostedRasterSurface.updateSurfaceCapabilities(...)`, while the authored read-side stays strictly read-only.
 
 **Fit with SwiftTUI.** Medium. The injection path already exists privately; exposing the read side for authors makes the testing case workable almost for free.
 

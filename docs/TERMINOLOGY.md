@@ -57,7 +57,7 @@ scope.
 A presentation surface is the low-level frame sink used by `RunLoop`.
 
 Use **presentation surface** for `PresentationSurface` implementations such as
-`TerminalHost`, `StreamingTerminalHost`, `WebSurfaceTransport`, and
+`TerminalHost`, `HostedRasterSurface`, `WebSurfaceTransport`, and
 `WebSocketSurfaceTransport`. A presentation surface may be created by a runner
 or retained by a host, but it is not itself a product-level runner or host.
 
@@ -100,5 +100,5 @@ package boundaries.
 - DocC or web static hosting.
 - SwiftUI layout research terms such as "root host" or "hosting container".
 - Internal view-tree container terms such as portal hosts or toolbar hosts.
-- Concrete public type/product names such as `TerminalHost`, `StreamingTerminalHost`,
+- Concrete public type/product names such as `TerminalHost`, `HostedRasterSurface`,
   `SwiftUIHost*`, and `WebHost*`.

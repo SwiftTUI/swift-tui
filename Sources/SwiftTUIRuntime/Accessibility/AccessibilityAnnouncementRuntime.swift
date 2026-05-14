@@ -13,7 +13,7 @@ extension RunLoop: AccessibilityAnnouncementSink {
 
   private var publishesAccessibilityAnnouncements: Bool {
     runtimeConfiguration.output == .accessible
-      || presentationSurface is any SemanticPresentationSurface
+      || presentationSurface is any DamageAwareSemanticPresentationSurface
   }
 
   package func drainPendingAccessibilityAnnouncements() -> [AccessibilityAnnouncement] {

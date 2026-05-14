@@ -168,7 +168,7 @@ Those integration layers serve three execution modes:
 - WASI executable execution and manifest generation via `WASIRunner` in
   `SwiftTUIWASI`
 - host-managed embedding via `SceneManifest(for:)` and
-  `HostedSceneSession(for:sceneID:...)`, as used by `SwiftUIHost` and
+  `HostedRasterSurface` plus `HostedSceneSession(for:sceneID:surface:)`, as used by `SwiftUIHost` and
   `Platforms/Web`
 - localhost-browser WebHost execution via `WebHostRunner` and the WebHost
   browser bridge in `SwiftTUIWebHost`

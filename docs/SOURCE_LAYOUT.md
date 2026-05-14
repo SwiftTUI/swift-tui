@@ -114,6 +114,7 @@ Sources/SwiftTUIRuntime/
 - `Scenes/SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `Scenes/SceneManifest.swift`: `SceneDescriptor`, `SceneManifest`, and manifest generation from authored scenes
 - `Scenes/HostedSceneSession.swift`: retained hosted scene runtime for host products and other non-terminal hosts
+- `Scenes/HostedRasterSurface.swift`: native raster/semantic `PresentationSurface` for host products that do not write ANSI bytes
 - `Scenes/SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 
 ### Terminal
@@ -122,7 +123,6 @@ Sources/SwiftTUIRuntime/
 - `Terminal/TerminalClipboard.swift`: shared clipboard-writing host capability
   and terminal OSC 52 encoding
 - `Terminal/TerminalCursorFocusPresentationSurface.swift`: terminal-only cursor focus marker and cursor visibility helpers
-- `Terminal/StreamingTerminalHost.swift`: closure-backed `PresentationSurface` for embedded hosts that don't own a file descriptor
 - `Terminal/TerminalPresentation.swift`: capability-aware surface diffing,
   sanitized text presentation, and OSC 8 hyperlink lowering
 - `Terminal/TerminalAppearanceDetection.swift`: appearance probing
@@ -208,7 +208,7 @@ combines runner and browser-host responsibilities:
   - `SwiftTUIWebHost.swift`: re-export surface for `SwiftTUIRuntime`
   - `WebHostConfig.swift`: bind, port, browser-open, and candidate-port policy
   - `WebHostRunner.swift`: single-scene WebHost launch path built on
-    `HostedSceneSession` / `SceneSessionResources`
+    `SceneSessionResources`
   - `WebHostServer.swift`: package-internal server and channel protocol
   - `WebHostFlyingFoxServer.swift`: FlyingFox-backed HTTP/WebSocket adapter,
     token/cookie validation, static bundle serving, and close-frame handling

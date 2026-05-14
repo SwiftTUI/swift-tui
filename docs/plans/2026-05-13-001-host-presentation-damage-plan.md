@@ -19,7 +19,9 @@ depends_on:
 > **Status:** Shipped. `PresentationDamage` is now a public host-presentation
 > hint, damage-aware semantic presentation is wired through the runtime branch,
 > SwiftUIHost uses damage for native dirty-rect invalidation, and WebHost/WASI
-> encode damage so the browser canvas can redraw dirty rectangles only.
+> encode damage so the browser canvas can redraw dirty rectangles only. Follow-up:
+> the semantic-only presentation surface was removed, so hosts that need
+> semantics must implement the damage-bearing semantic protocol.
 
 **Goal:** Promote retained-frame presentation damage into the shared host
 presentation path, then use it to avoid unnecessary full redraw work in the CLI,
@@ -29,9 +31,9 @@ SwiftUI, local WebHost, and WASI Web hosts.
 frame products. Promote `PresentationDamage` from terminal-only/package
 optimization into an optional presentation hint: `nil` means the host must
 present a full frame, while non-`nil` describes rows/ranges that can be used for
-incremental presentation when the previous retained frame is compatible. Add a
-damage-aware semantic host protocol so accessibility-capable hosts do not lose
-damage at the current `SemanticPresentationSurface` branch.
+incremental presentation when the previous retained frame is compatible. The
+damage-aware semantic host protocol is the only semantic host protocol so
+accessibility-capable hosts cannot drop damage at dispatch.
 
 **Tech Stack:** Swift 6.3 strict concurrency, SwiftPM package access and runner
 SPI, Swift Testing, SwiftUI/AppKit/UIKit drawing, WASISurfaceBridge
@@ -47,11 +49,10 @@ and the repo-wide `bun run test` gate.
   package-level implementation seams.
 - `FrameArtifacts.diagnostics.presentationDamage` exposes counts and full
   repaint flags publicly, but not the row/range damage payload itself.
-- `RunLoop.presentCommittedFrame(...)` checks `SemanticPresentationSurface`
-  before `DamageAwarePresentationSurface`, so SwiftUIHost, WebHost, and WASI
-  Web receive semantics but lose the damage payload.
-- `HostedRasterSurface` has a damage-aware overload, but the semantic overload
-  is the path used by SwiftUIHost and it currently reports full-frame metrics.
+- `RunLoop.presentCommittedFrame(...)` checks the damage-bearing semantic
+  protocol before non-semantic damage-aware raster hosts.
+- `HostedRasterSurface` uses the damage-bearing semantic path for SwiftUIHost
+  and reports standardized raster-host metrics.
 - `WebSocketSurfaceTransport` and `WebSurfaceTransport` encode whole
   `web-surface` frames and report full-repaint metrics.
 - `WebHostSceneRuntime` clears and redraws the full canvas for every surface
@@ -228,7 +229,7 @@ Add:
 
 ```swift
 @_spi(Runners) public protocol DamageAwareSemanticPresentationSurface:
-  SemanticPresentationSurface
+  PresentationSurface
 {
   @discardableResult
   func present(
@@ -265,9 +266,8 @@ Change `presentCommittedFrame(...)` so the branch order is:
 1. JSON output.
 2. Linear accessibility output.
 3. `DamageAwareSemanticPresentationSurface`.
-4. `SemanticPresentationSurface`.
-5. `DamageAwarePresentationSurface`.
-6. Plain `PresentationSurface`.
+4. `DamageAwarePresentationSurface`.
+5. Plain `PresentationSurface`.
 
 - [x] **Step 6: Verify**
 

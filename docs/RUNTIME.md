@@ -293,9 +293,9 @@ re-reads `cellPixelSize` on every access to `baselineGraphicsCapabilities()` via
 (`CSI 16 t`, `CSI 14 t`, Kitty support, sixel capability) remain one-shot at
 startup; only cell pixel dimensions are live.
 
-Hosted sessions can simulate a cell-pixel-size change in tests via
-`HostedSceneSession.resize(to:cellPixelSize:)`, which threads the new value
-through `StreamingTerminalHost.updateCellPixelSize(_:)` and fires a SIGWINCH.
+Hosted/native sessions update `HostedRasterSurface` with the new cell-pixel
+size and then call `HostedSceneSession.requestSurfaceRefresh()`, which fires an
+in-process `SIGWINCH`.
 
 ### Deterministic Scenario Checks
 

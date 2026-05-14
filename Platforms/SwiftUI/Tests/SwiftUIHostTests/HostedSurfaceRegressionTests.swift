@@ -8,14 +8,11 @@ import Testing
 @Test
 func hosted_surface_publishes_pressed_button_frame_before_mouse_up() async throws {
   let recorder = SurfaceRecorder()
+  let surface = hostedSurface(recorder: recorder)
   let session = try HostedSceneSession(
     for: PressedButtonApp(),
     sceneID: "main",
-    initialSize: .init(width: 32, height: 8),
-    appearance: .fallback,
-    onSurface: { surface in
-      recorder.record(surface)
-    }
+    surface: surface
   )
 
   let runTask = Task { try await session.start() }
@@ -49,14 +46,11 @@ func hosted_surface_publishes_pressed_button_frame_before_mouse_up() async throw
 @Test
 func hosted_surface_scroll_wheel_updates_visible_scroll_view() async throws {
   let recorder = SurfaceRecorder()
+  let surface = hostedSurface(recorder: recorder)
   let session = try HostedSceneSession(
     for: ScrollSurfaceApp(),
     sceneID: "main",
-    initialSize: .init(width: 32, height: 8),
-    appearance: .fallback,
-    onSurface: { surface in
-      recorder.record(surface)
-    }
+    surface: surface
   )
 
   let runTask = Task { try await session.start() }
@@ -91,14 +85,11 @@ func hosted_surface_scroll_wheel_updates_visible_scroll_view() async throws {
 @Test
 func hosted_surface_animation_publishes_intermediate_frames() async throws {
   let recorder = SurfaceRecorder()
+  let surface = hostedSurface(recorder: recorder)
   let session = try HostedSceneSession(
     for: AnimationSurfaceApp(),
     sceneID: "main",
-    initialSize: .init(width: 32, height: 8),
-    appearance: .fallback,
-    onSurface: { surface in
-      recorder.record(surface)
-    }
+    surface: surface
   )
 
   let runTask = Task { try await session.start() }
@@ -133,14 +124,11 @@ func hosted_surface_animation_publishes_intermediate_frames() async throws {
 @Test
 func hosted_surface_drag_gesture_receives_fractional_location() async throws {
   let recorder = SurfaceRecorder()
+  let surface = hostedSurface(recorder: recorder)
   let session = try HostedSceneSession(
     for: FractionalDragSurfaceApp(),
     sceneID: "main",
-    initialSize: .init(width: 32, height: 8),
-    appearance: .fallback,
-    onSurface: { surface in
-      recorder.record(surface)
-    }
+    surface: surface
   )
 
   let runTask = Task { try await session.start() }
@@ -184,6 +172,17 @@ func hosted_surface_drag_gesture_receives_fractional_location() async throws {
 
   _ = try await session.stopAndWait()
   _ = await runTask.result
+}
+
+@MainActor
+private func hostedSurface(recorder: SurfaceRecorder) -> HostedRasterSurface {
+  HostedRasterSurface(
+    surfaceSize: .init(width: 32, height: 8),
+    appearance: .fallback,
+    onSurface: { surface in
+      recorder.record(surface)
+    }
+  )
 }
 
 @MainActor

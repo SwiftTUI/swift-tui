@@ -69,78 +69,67 @@ struct CellPixelMetricsRefreshTests {
     #expect(host.graphicsCapabilities.cellPixelSize == PixelSize(width: 8, height: 16))
   }
 
-  @Test("StreamingTerminalHost surface reflects updated cellPixelSize")
-  func streamingHostUpdateCellPixelSize() {
-    let host = StreamingTerminalHost(
-      surfaceSize: CellSize(width: 80, height: 24),
-      graphicsCapabilities: TerminalGraphicsCapabilities(
-        cellPixelSize: PixelSize(width: 8, height: 16)
-      ),
-      outputHandler: { _ in }
-    )
-
-    #expect(host.graphicsCapabilities.cellPixelSize == PixelSize(width: 8, height: 16))
-
-    host.updateSurfaceCapabilities(
-      TerminalSurfaceCapabilities(
-        cellPixelSize: PixelSize(width: 12, height: 24),
-        pointerInputCapabilities: host.pointerInputCapabilities
-      )
-    )
-
-    #expect(host.graphicsCapabilities.cellPixelSize == PixelSize(width: 12, height: 24))
-  }
-
-  @Test("StreamingTerminalHost clears cell pixel size on nil update")
-  func streamingHostClearsCellPixelSize() {
-    let host = StreamingTerminalHost(
-      surfaceSize: CellSize(width: 80, height: 24),
-      graphicsCapabilities: TerminalGraphicsCapabilities(
-        cellPixelSize: PixelSize(width: 10, height: 20)
-      ),
-      outputHandler: { _ in }
-    )
-
-    host.updateSurfaceCapabilities(
-      TerminalSurfaceCapabilities(
-        cellPixelSize: nil,
-        pointerInputCapabilities: host.pointerInputCapabilities
-      )
-    )
-
-    #expect(host.graphicsCapabilities.cellPixelSize == nil)
-  }
-
-  @Test("HostedSceneSession.resize carries cellPixelSize into the host")
+  @Test("HostedRasterSurface reflects updated cellPixelSize")
   @MainActor
-  func hostedResizeUpdatesCellPixelSize() {
-    let session = HostedSceneSession(
-      descriptor: SceneDescriptor(
-        id: WindowIdentifier("test"),
-        title: nil,
-        isDefault: true
-      ),
-      rootIdentity: Identity(components: ["test"]),
-      sessionName: "test",
-      initialSize: CellSize(width: 80, height: 24),
+  func hostedRasterSurfaceUpdateCellPixelSize() {
+    let surface = HostedRasterSurface(
+      surfaceSize: CellSize(width: 80, height: 24),
       appearance: .fallback,
-      theme: nil,
-      capabilityProfile: .trueColor,
-      runScene: { _, _, _ in
-        RunLoopResult(
-          finalState: SceneSessionState(),
-          renderedFrames: 0,
-          exitReason: .inputEnded
-        )
-      },
-      onOutput: { _ in }
+      onSurface: { _ in }
     )
 
-    session.resize(
-      to: CellSize(width: 80, height: 24), cellPixelSize: PixelSize(width: 12, height: 24))
+    surface.updateSurfaceCapabilities(
+      cellPixelSize: PixelSize(width: 12, height: 24),
+      pointerInputCapabilities: surface.pointerInputCapabilities
+    )
 
-    #expect(
-      session.hostGraphicsCapabilitiesForTesting.cellPixelSize == PixelSize(width: 12, height: 24))
+    #expect(surface.graphicsCapabilities.cellPixelSize == PixelSize(width: 12, height: 24))
+  }
+
+  @Test("HostedRasterSurface clears cell pixel size on nil update")
+  @MainActor
+  func hostedRasterSurfaceClearsCellPixelSize() {
+    let surface = HostedRasterSurface(
+      surfaceSize: CellSize(width: 80, height: 24),
+      appearance: .fallback,
+      onSurface: { _ in }
+    )
+    surface.updateSurfaceCapabilities(
+      cellPixelSize: PixelSize(width: 10, height: 20),
+      pointerInputCapabilities: surface.pointerInputCapabilities
+    )
+
+    surface.updateSurfaceCapabilities(
+      cellPixelSize: nil,
+      pointerInputCapabilities: surface.pointerInputCapabilities
+    )
+
+    #expect(surface.graphicsCapabilities.cellPixelSize == nil)
+  }
+
+  @Test("HostedRasterSurface carries pointer capabilities beside cellPixelSize")
+  @MainActor
+  func hostedRasterSurfaceUpdatesPointerCapabilities() {
+    let surface = HostedRasterSurface(
+      surfaceSize: CellSize(width: 80, height: 24),
+      appearance: .fallback,
+      onSurface: { _ in }
+    )
+    let capabilities = PointerInputCapabilities(
+      precision: .subCell(
+        source: .nativePixels,
+        metrics: CellPixelMetrics(width: 12, height: 24, source: .reported)
+      ),
+      supportsHover: true
+    )
+
+    surface.updateSurfaceCapabilities(
+      cellPixelSize: PixelSize(width: 12, height: 24),
+      pointerInputCapabilities: capabilities
+    )
+
+    #expect(surface.graphicsCapabilities.cellPixelSize == PixelSize(width: 12, height: 24))
+    #expect(surface.pointerInputCapabilities == capabilities)
   }
 
   @Test("SIGWINCH-driven refresh surfaces new metrics in the next GeometryReader proxy")

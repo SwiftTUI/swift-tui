@@ -10,6 +10,7 @@ final class NativeSceneBridge {
 
   private var style: SwiftUIHostTerminalStyle
   private var session: (any HostedSceneSessionHandling)?
+  private var surface: HostedRasterSurface?
   private var focusPresentation: FocusPresentation = .none
   private var manualKeyboardPresentationRequested = false
   private(set) var lastViewportSize: CellSize?
@@ -24,8 +25,12 @@ final class NativeSceneBridge {
     self.style = style
   }
 
-  func attach(session: any HostedSceneSessionHandling) {
+  func attach(
+    session: any HostedSceneSessionHandling,
+    surface: HostedRasterSurface
+  ) {
     self.session = session
+    self.surface = surface
     syncSessionStyle()
   }
 
@@ -66,11 +71,12 @@ final class NativeSceneBridge {
     lastViewportSize = size
     lastCellPixelSize = cellPixelSize
     lastPointerInputCapabilities = pointerInputCapabilities
-    session?.resize(
-      to: size,
+    surface?.updateSurfaceSize(size)
+    surface?.updateSurfaceCapabilities(
       cellPixelSize: cellPixelSize,
       pointerInputCapabilities: pointerInputCapabilities
     )
+    session?.requestSurfaceRefresh()
   }
 
   func send(
@@ -88,7 +94,8 @@ final class NativeSceneBridge {
   }
 
   private func syncSessionStyle() {
-    session?.updateStyle(style.renderStyle)
+    surface?.updateStyle(style.renderStyle)
+    session?.requestSurfaceRefresh()
   }
 
   private static func pointerInputCapabilities(
@@ -127,12 +134,7 @@ final class NativeSceneBridge {
 protocol HostedSceneSessionHandling: AnyObject {
   func start() async throws -> RunLoopExitReason
   func send(_ event: InputEvent)
-  func resize(
-    to size: CellSize,
-    cellPixelSize: PixelSize?,
-    pointerInputCapabilities: PointerInputCapabilities
-  )
-  func updateStyle(_ style: TerminalRenderStyle)
+  func requestSurfaceRefresh()
   func stop()
 }
 

@@ -40,10 +40,8 @@ public final class SwiftUIHostSceneHost {
       style: style
     )
 
-    let session = try HostedSceneSession(
-      for: app,
-      sceneID: descriptor.id,
-      initialSize: .init(width: 80, height: 24),
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 80, height: 24),
       appearance: initialRenderStyle.appearance,
       theme: initialRenderStyle.theme,
       onSurface: { [weak self] surface in
@@ -57,13 +55,18 @@ public final class SwiftUIHostSceneHost {
           damage: damage
         )
       },
-      onClipboardWrite: clipboardWriter ?? NativeClipboard.write,
+      onClipboardWrite: clipboardWriter ?? NativeClipboard.write
+    )
+    let session = try HostedSceneSession(
+      for: app,
+      sceneID: descriptor.id,
+      surface: surface,
       runtimeIssueSink: SwiftUIRuntimeIssueLogger.sink,
       onFocusPresentationChange: { [weak self] presentation in
         self?.updateFocusPresentation(presentation)
       }
     )
-    bridge.attach(session: session)
+    bridge.attach(session: session, surface: surface)
   }
 
   public func start() {

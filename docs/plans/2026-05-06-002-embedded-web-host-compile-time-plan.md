@@ -108,8 +108,8 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
 - `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostFlyingFoxServer.swift`
   - FlyingFox adapter hidden behind `WebHostServer`.
 - `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift`
-  - `PresentationSurface` / `SemanticPresentationSurface` over a WebSocket
-    send channel.
+  - `PresentationSurface` / `DamageAwareSemanticPresentationSurface` over a
+    WebSocket send channel.
 - `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketInputReader.swift`
   - `TerminalInputReading` over a WebSocket receive channel.
 - `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostBrowserBundle.swift`
@@ -443,7 +443,7 @@ bidirectional byte stream without an HTTP server.
 
 - [x] Implement `WebSocketSurfaceTransport`.
 
-  It conforms to `PresentationSurface` and `SemanticPresentationSurface`.
+  It conforms to `PresentationSurface` and `DamageAwareSemanticPresentationSurface`.
   It uses `WebSurfaceFrameEncoder` from the promoted WASI SPI and sends full
   record-separator-prefixed `surface:` JSON records to `WebHostByteSink`.
 
@@ -456,8 +456,8 @@ bidirectional byte stream without an HTTP server.
 
   Cover:
 
-  - `present(_:semanticSnapshot:focusedIdentity:)` emits a v2 frame with
-    `accessibilityTree`;
+  - `present(_:semanticSnapshot:focusedIdentity:damage:)` emits a v2 frame with
+    `accessibilityTree` and optional presentation damage;
   - resize input updates `surfaceSize`;
   - style input updates `appearance`/`theme`;
   - key and paste input yield expected `InputEvent` values;

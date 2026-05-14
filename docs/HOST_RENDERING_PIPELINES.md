@@ -141,7 +141,7 @@ The host-specific parts are therefore:
 | --- | --- | --- | --- | --- | --- |
 | CLI interactive | `TerminalRunner` / default `App.main()` | `SceneSession` + `RunLoop` | `TerminalHost` writes ANSI/terminal graphics to fd | `InputReader` parses terminal bytes | OS `SIGWINCH`; terminal size re-read on next frame |
 | CLI `RenderOnce` | Caller | No live `RunLoop` | `TerminalSurfaceRenderer` returns ANSI text | None | Width resolved once |
-| SwiftUIHost | SwiftUI app lifecycle | `HostedSceneSession` per scene | `HostedRasterSurface` delivers `RasterSurface`/semantics to native view | AppKit/UIKit events become `InputEvent` | `HostedSceneSession.resize(...)` updates host and sends in-process `SIGWINCH` |
+| SwiftUIHost | SwiftUI app lifecycle | `HostedSceneSession` per scene | `HostedRasterSurface` delivers `RasterSurface`/semantics to native view | AppKit/UIKit events become `InputEvent` | `HostedRasterSurface` is updated directly; `HostedSceneSession.requestSurfaceRefresh()` sends in-process `SIGWINCH` |
 | Local WebHost | `WebHostRunner` / `WebHostCLIRunner` | `SceneSession` + `RunLoop` | `WebSocketSurfaceTransport` sends `web-surface` records | WebSocket input records parsed by `WebSocketInputReader` | Current local path updates transport from control records; it does not install a signal reader |
 | Platforms/Web WASI | Browser/WASI shell + `WASIRunner` | `SceneSession` + `RunLoop` inside wasm | `WebSurfaceTransport` writes `web-surface` records to stdout | `WebSurfaceInputReader` reads stdin records | Control records update host and send in-process `SIGWINCH` |
 
@@ -237,8 +237,6 @@ else if output == .accessible:
   LinearAccessibilityRenderer writes semantic text
 else if surface is DamageAwareSemanticPresentationSurface:
   present(raster, semanticSnapshot, focusedIdentity, damage)
-else if surface is SemanticPresentationSurface:
-  present(raster, semanticSnapshot, focusedIdentity)
 else if surface is DamageAwarePresentationSurface:
   present(raster, damage)
 else:
@@ -422,20 +420,23 @@ one `SwiftUIHostSceneHost` per scene and retains those hosts in a dictionary.
 Scene switching changes selected native host visibility; it does not rebuild the
 authored app from scratch.
 
-Each `SwiftUIHostSceneHost` creates a `NativeSceneBridge`, then constructs a
-`HostedSceneSession` with:
+Each `SwiftUIHostSceneHost` creates a `NativeSceneBridge`, constructs a
+`HostedRasterSurface` with:
 
 - initial cell size
 - initial terminal appearance and theme
 - `onSurface`
 - `onSemanticFrameWithDamage`
 - clipboard writer
+
+It then constructs a `HostedSceneSession` with:
+
+- the selected scene
+- the `HostedRasterSurface`
 - runtime issue sink
 - focus presentation callback
 
-This constructor chooses the `HostedRasterSurface` branch inside
-`HostedSceneSession`. That surface conforms to
-`DamageAwareSemanticPresentationSurface`. When
+`HostedRasterSurface` conforms to `DamageAwareSemanticPresentationSurface`. When
 `RunLoop.presentCommittedFrame(...)` reaches the damage-aware semantic branch,
 the host receives:
 
@@ -505,17 +506,16 @@ NativeTerminalSurfaceView.layout/layoutSubviews
 -> onResize(CellSize, PixelSize)
 -> SwiftUIHostSceneHost.resize(...)
 -> NativeSceneBridge.resize(...)
--> HostedSceneSession.resize(...)
 -> HostedRasterSurface.updateSurfaceSize/updateSurfaceCapabilities
+-> HostedSceneSession.requestSurfaceRefresh()
 -> InProcessSignalReader.send("SIGWINCH")
 -> RunLoop schedules a signal frame
 ```
 
 Style updates flow similarly through `SwiftUIHostAppState.setStyle(...)`,
 `SwiftUIHostSceneHost.apply(style:)`, `NativeSceneBridge.apply(style:)`, and
-`HostedSceneSession.updateStyle(...)`. The hosted session updates appearance and
-theme on the presentation surface and sends in-process `SIGWINCH` so the next
-frame resolves with the new environment.
+`HostedRasterSurface.updateStyle(...)`. The hosted session sends in-process
+`SIGWINCH` so the next frame resolves with the new environment.
 
 ### SwiftUIHost Divergences
 
@@ -555,7 +555,7 @@ SwiftTUIWebHostCLI optional routing
 -> SceneSession.run(...)
 -> RunLoop
 -> DefaultRenderer
--> WebSocketSurfaceTransport.present(raster, semanticSnapshot, focusedIdentity)
+-> WebSocketSurfaceTransport.present(raster, semanticSnapshot, focusedIdentity, damage)
 -> WebSurfaceFrameEncoder
 -> WebSocket bytes
 -> WebSocketSceneBridge
@@ -695,7 +695,7 @@ Browser createWebHostApp(...)
 -> SceneSession.run(...)
 -> RunLoop
 -> DefaultRenderer
--> WebSurfaceTransport.present(raster, semanticSnapshot, focusedIdentity)
+-> WebSurfaceTransport.present(raster, semanticSnapshot, focusedIdentity, damage)
 -> WebSurfaceFrameEncoder
 -> stdout bytes
 -> BrowserWASIBridge WebHostOutputDecoder
@@ -859,8 +859,8 @@ The current paths are:
 
 - CLI: OS `SIGWINCH` wakes the run loop; `TerminalHost.surfaceSize` is read on
   the next render.
-- SwiftUIHost: `HostedSceneSession.resize(...)` updates the hosted surface and
-  sends in-process `SIGWINCH`.
+- SwiftUIHost: `HostedRasterSurface` is updated directly, then
+  `HostedSceneSession.requestSurfaceRefresh()` sends in-process `SIGWINCH`.
 - Platforms/Web WASI: `WebSurfaceInputReader` control handler updates
   `WebSurfaceTransport` and sends in-process `SIGWINCH`.
 - Local WebHost: `WebSocketInputReader` control handler updates
@@ -908,9 +908,9 @@ stdio disposal.
    raster.
 2. Add host behavior at the `PresentationSurface`, `TerminalInputReading`,
    `SignalReading`, or `HostedSceneSession` seams.
-3. If a surface needs accessibility data, implement `SemanticPresentationSurface`;
-   if it can also use damage, implement `DamageAwareSemanticPresentationSurface`
-   so semantic presentation does not drop redraw hints.
+3. If a surface needs accessibility data, implement
+   `DamageAwareSemanticPresentationSurface` so semantic presentation always
+   carries redraw hints.
 4. Resize/style updates should update surface state and have an explicit wake
    contract.
 5. Keep `SwiftTUIRuntime` below runner and host products. Host products should

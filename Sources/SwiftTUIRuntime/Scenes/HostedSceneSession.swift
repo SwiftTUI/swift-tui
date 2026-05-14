@@ -1,5 +1,4 @@
 import SwiftTUIViews
-import Synchronization
 
 public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringConvertible {
   case sceneNotFound(WindowIdentifier)
@@ -19,25 +18,13 @@ package typealias HostedSceneRunner =
     FocusTracker
   ) async throws -> RunLoopResult<SceneSessionState>
 
-private protocol HostedScenePresentationSurface: PresentationSurface,
-  DamageAwarePresentationSurface, Sendable
-{
-  func updateSurfaceSize(_ surfaceSize: CellSize)
-  func updateAppearance(_ appearance: TerminalAppearance)
-  func updateTheme(_ theme: Theme?)
-  func updateStyle(_ style: TerminalRenderStyle)
-  func updateSurfaceCapabilities(_ capabilities: TerminalSurfaceCapabilities)
-}
-
-extension StreamingTerminalHost: HostedScenePresentationSurface {}
-
 @MainActor
 public final class HostedSceneSession {
   public let descriptor: SceneDescriptor
+  public let surface: HostedRasterSurface
   public private(set) var currentFocusPresentation: FocusPresentation = .none
 
   private let sessionName: String
-  private let host: any HostedScenePresentationSurface
   private let inputReader: InjectedTerminalInputReader
   private let signalReader: InProcessSignalReader
   private let scheduler: any FrameScheduling
@@ -52,25 +39,16 @@ public final class HostedSceneSession {
   public convenience init<A: App>(
     for app: A,
     sceneID: WindowIdentifier,
-    initialSize: CellSize,
-    appearance: TerminalAppearance,
-    theme: Theme? = nil,
-    capabilityProfile: TerminalCapabilityProfile = .trueColor,
-    onOutput: @escaping @Sendable (String) -> Void,
+    surface: HostedRasterSurface,
     runtimeIssueSink: RuntimeIssueSink? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
     let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
-    var visitor = HostedSceneSelectionVisitor(
-      sessionName: sessionName
-    )
     guard
-      let selection = withWindowSceneConfiguration(
-        in: app.body,
-        matching: sceneID,
-        visitor: &visitor
-      )
+      let selection = collectWindowSceneSelections(from: app.body).first(where: {
+        $0.identifier == sceneID
+      })
     else {
       throw HostedSceneSessionError.sceneNotFound(sceneID)
     }
@@ -79,126 +57,27 @@ public final class HostedSceneSession {
       descriptor: selection.descriptor,
       rootIdentity: selection.rootIdentity,
       sessionName: sessionName,
-      host: StreamingTerminalHost(
-        surfaceSize: initialSize,
-        appearance: appearance,
-        theme: theme,
-        capabilityProfile: capabilityProfile,
-        outputHandler: onOutput
-      ),
-      runScene: selection.runScene,
+      surface: surface,
+      runScene: { resources, stateContainer, focusTracker in
+        try await selection.run(
+          sessionName: sessionName,
+          resources: resources,
+          stateContainer: stateContainer,
+          focusTracker: focusTracker
+        )
+      },
       runtimeIssueSink: runtimeIssueSink,
       onFocusPresentationChange: onFocusPresentationChange
     )
   }
 
-  package convenience init(
+  package init(
     descriptor: SceneDescriptor,
     rootIdentity: Identity,
     sessionName: String,
-    initialSize: CellSize,
-    appearance: TerminalAppearance,
-    theme: Theme? = nil,
-    capabilityProfile: TerminalCapabilityProfile,
+    surface: HostedRasterSurface,
     runScene: @escaping HostedSceneRunner,
-    onOutput: @escaping @Sendable (String) -> Void,
     runtimeIssueSink: RuntimeIssueSink? = nil,
-    onFocusPresentationChange:
-      (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
-  ) {
-    self.init(
-      descriptor: descriptor,
-      rootIdentity: rootIdentity,
-      sessionName: sessionName,
-      host: StreamingTerminalHost(
-        surfaceSize: initialSize,
-        appearance: appearance,
-        theme: theme,
-        capabilityProfile: capabilityProfile,
-        outputHandler: onOutput
-      ),
-      runScene: runScene,
-      runtimeIssueSink: runtimeIssueSink,
-      onFocusPresentationChange: onFocusPresentationChange
-    )
-  }
-
-  public convenience init<A: App>(
-    for app: A,
-    sceneID: WindowIdentifier,
-    initialSize: CellSize,
-    appearance: TerminalAppearance,
-    theme: Theme? = nil,
-    capabilityProfile: TerminalCapabilityProfile = .trueColor,
-    onSurface: @escaping @MainActor @Sendable (RasterSurface) -> Void,
-    onSemanticFrame:
-      (@MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?) -> Void)? = nil,
-    onSemanticFrameWithDamage:
-      (
-        @MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) ->
-          Void
-      )? =
-      nil,
-    onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil,
-    runtimeIssueSink: RuntimeIssueSink? = nil,
-    onFocusPresentationChange:
-      (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
-  ) throws {
-    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
-    var visitor = HostedSceneSelectionVisitor(
-      sessionName: sessionName
-    )
-    guard
-      let selection = withWindowSceneConfiguration(
-        in: app.body,
-        matching: sceneID,
-        visitor: &visitor
-      )
-    else {
-      throw HostedSceneSessionError.sceneNotFound(sceneID)
-    }
-
-    self.init(
-      descriptor: selection.descriptor,
-      rootIdentity: selection.rootIdentity,
-      sessionName: sessionName,
-      host: HostedRasterSurface(
-        surfaceSize: initialSize,
-        appearance: appearance,
-        theme: theme,
-        capabilityProfile: capabilityProfile,
-        surfaceHandler: { surface in
-          Task { @MainActor in
-            onSurface(surface)
-          }
-        },
-        semanticFrameHandler: { surface, semanticSnapshot, focusedIdentity, damage in
-          if let onSemanticFrame {
-            Task { @MainActor in
-              onSemanticFrame(surface, semanticSnapshot, focusedIdentity)
-            }
-          }
-          if let onSemanticFrameWithDamage {
-            Task { @MainActor in
-              onSemanticFrameWithDamage(surface, semanticSnapshot, focusedIdentity, damage)
-            }
-          }
-        },
-        clipboardWriter: onClipboardWrite
-      ),
-      runScene: selection.runScene,
-      runtimeIssueSink: runtimeIssueSink,
-      onFocusPresentationChange: onFocusPresentationChange
-    )
-  }
-
-  private init(
-    descriptor: SceneDescriptor,
-    rootIdentity: Identity,
-    sessionName: String,
-    host: any HostedScenePresentationSurface,
-    runScene: @escaping HostedSceneRunner,
-    runtimeIssueSink: RuntimeIssueSink?,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
@@ -206,14 +85,14 @@ public final class HostedSceneSession {
     self.sessionName = sessionName
     self.runScene = runScene
     signalReader = InProcessSignalReader()
-    self.host = host
-    inputReader = InjectedTerminalInputReader { [signalReader, host] message in
+    self.surface = surface
+    inputReader = InjectedTerminalInputReader { [signalReader, surface] message in
       switch message {
       case .resize(let size):
-        host.updateSurfaceSize(size)
+        surface.updateSurfaceSize(size)
         signalReader.send("SIGWINCH")
       case .style(let style):
-        host.updateStyle(style)
+        surface.updateStyle(style)
         signalReader.send("SIGWINCH")
       }
     }
@@ -235,7 +114,7 @@ public final class HostedSceneSession {
     }
 
     var resources = SceneSessionResources(
-      presentationSurface: host,
+      presentationSurface: surface,
       terminalInputReader: inputReader,
       signalReader: signalReader,
       scheduler: scheduler,
@@ -290,61 +169,7 @@ public final class HostedSceneSession {
     inputReader.send(events)
   }
 
-  public func resize(
-    to size: CellSize
-  ) {
-    host.updateSurfaceSize(size)
-    signalReader.send("SIGWINCH")
-  }
-
-  public func resize(
-    to size: CellSize,
-    cellPixelSize: PixelSize?
-  ) {
-    resize(
-      to: size,
-      cellPixelSize: cellPixelSize,
-      pointerInputCapabilities: .cellOnly
-    )
-  }
-
-  public func resize(
-    to size: CellSize,
-    cellPixelSize: PixelSize?,
-    pointerInputCapabilities: PointerInputCapabilities
-  ) {
-    host.updateSurfaceSize(size)
-    host.updateSurfaceCapabilities(
-      TerminalSurfaceCapabilities(
-        cellPixelSize: cellPixelSize,
-        pointerInputCapabilities: pointerInputCapabilities
-      )
-    )
-    signalReader.send("SIGWINCH")
-  }
-
-  package var hostGraphicsCapabilitiesForTesting: TerminalGraphicsCapabilities {
-    host.graphicsCapabilities
-  }
-
-  public func updateAppearance(
-    _ appearance: TerminalAppearance
-  ) {
-    host.updateAppearance(appearance)
-    signalReader.send("SIGWINCH")
-  }
-
-  public func updateTheme(
-    _ theme: Theme?
-  ) {
-    host.updateTheme(theme)
-    signalReader.send("SIGWINCH")
-  }
-
-  public func updateStyle(
-    _ style: TerminalRenderStyle
-  ) {
-    host.updateStyle(style)
+  public func requestSurfaceRefresh() {
     signalReader.send("SIGWINCH")
   }
 
@@ -359,194 +184,6 @@ public final class HostedSceneSession {
     let exitReason = try await runTask.value
     await shutdownWaiter?.value
     return exitReason
-  }
-}
-
-private final class HostedRasterSurface:
-  HostedScenePresentationSurface, ClipboardWritingPresentationSurface,
-  DamageAwareSemanticPresentationSurface, Sendable
-{
-  private struct State: Sendable {
-    var surfaceSize: CellSize
-    var renderStyle: TerminalRenderStyle
-    var graphicsCapabilities: TerminalGraphicsCapabilities
-    var pointerInputCapabilities: PointerInputCapabilities
-    var lastSubmittedSurface: RasterSurface?
-  }
-
-  private let state: Mutex<State>
-  private let surfaceHandler: @Sendable (RasterSurface) -> Void
-  private let semanticFrameHandler:
-    @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) -> Void
-  private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
-
-  let capabilityProfile: TerminalCapabilityProfile
-
-  var surfaceSize: CellSize {
-    state.withLock(\.surfaceSize)
-  }
-
-  var appearance: TerminalAppearance {
-    state.withLock(\.renderStyle.appearance)
-  }
-
-  var theme: Theme? {
-    state.withLock(\.renderStyle.theme)
-  }
-
-  var graphicsCapabilities: TerminalGraphicsCapabilities {
-    state.withLock(\.graphicsCapabilities)
-  }
-
-  var pointerInputCapabilities: PointerInputCapabilities {
-    state.withLock(\.pointerInputCapabilities)
-  }
-
-  init(
-    surfaceSize: CellSize,
-    appearance: TerminalAppearance,
-    theme: Theme?,
-    capabilityProfile: TerminalCapabilityProfile,
-    surfaceHandler: @escaping @Sendable (RasterSurface) -> Void,
-    semanticFrameHandler:
-      @escaping @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) -> Void,
-    clipboardWriter: (@MainActor @Sendable (String) -> Bool)? = nil
-  ) {
-    self.capabilityProfile = capabilityProfile
-    self.surfaceHandler = surfaceHandler
-    self.semanticFrameHandler = semanticFrameHandler
-    self.clipboardWriter = clipboardWriter
-    state = Mutex(
-      State(
-        surfaceSize: surfaceSize,
-        renderStyle: .init(
-          appearance: appearance,
-          theme: theme
-        ),
-        graphicsCapabilities: .none,
-        pointerInputCapabilities: .cellOnly,
-        lastSubmittedSurface: nil
-      )
-    )
-  }
-
-  func updateSurfaceSize(
-    _ surfaceSize: CellSize
-  ) {
-    state.withLock { state in
-      state.surfaceSize = surfaceSize
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  func updateAppearance(
-    _ appearance: TerminalAppearance
-  ) {
-    state.withLock { state in
-      state.renderStyle.appearance = appearance
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  func updateTheme(
-    _ theme: Theme?
-  ) {
-    state.withLock { state in
-      state.renderStyle.theme = theme
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  func updateStyle(
-    _ style: TerminalRenderStyle
-  ) {
-    state.withLock { state in
-      state.renderStyle = style
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  func updateSurfaceCapabilities(
-    _ capabilities: TerminalSurfaceCapabilities
-  ) {
-    state.withLock { state in
-      state.graphicsCapabilities.cellPixelSize = capabilities.cellPixelSize
-      state.pointerInputCapabilities = capabilities.pointerInputCapabilities
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  func enableRawMode() throws {}
-
-  func disableRawMode() throws {}
-
-  func write(_: String) throws {}
-
-  func clearScreen() throws {}
-
-  func moveCursor(to _: CellPoint) throws {}
-
-  @discardableResult
-  @MainActor
-  func writeClipboard(_ text: String) throws -> Bool {
-    clipboardWriter?(text) ?? false
-  }
-
-  @discardableResult
-  func present(
-    _ surface: RasterSurface
-  ) throws -> TerminalPresentationMetrics {
-    try present(surface, damage: nil)
-  }
-
-  @discardableResult
-  func present(
-    _ surface: RasterSurface,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
-    submit(surface)
-    return TerminalPresentationMetrics.rasterHostMetrics(
-      for: surface,
-      damage: damage
-    )
-  }
-
-  @discardableResult
-  func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?
-  ) throws -> TerminalPresentationMetrics {
-    try present(
-      surface,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
-      damage: nil
-    )
-  }
-
-  @discardableResult
-  func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
-    submit(surface)
-    semanticFrameHandler(surface, semanticSnapshot, focusedIdentity, damage)
-    return TerminalPresentationMetrics.rasterHostMetrics(
-      for: surface,
-      damage: damage
-    )
-  }
-
-  private func submit(
-    _ surface: RasterSurface
-  ) {
-    surfaceHandler(surface)
-    state.withLock { state in
-      state.lastSubmittedSurface = surface
-    }
   }
 }
 
@@ -575,40 +212,5 @@ extension HostedSceneSession {
 
     currentFocusPresentation = presentation
     onFocusPresentationChange?(presentation)
-  }
-}
-
-@MainActor
-private struct HostedSceneSelection {
-  let descriptor: SceneDescriptor
-  let rootIdentity: Identity
-  let runScene: HostedSceneRunner
-}
-
-@MainActor
-private struct HostedSceneSelectionVisitor: WindowSceneConfigurationVisitor {
-  let sessionName: String
-
-  mutating func visit<Content: View>(
-    descriptor: SceneDescriptor,
-    configuration: WindowSceneConfiguration<Content>
-  ) -> WindowSceneConfigurationVisitResult<HostedSceneSelection> {
-    let sessionName = self.sessionName
-
-    return .finish(
-      HostedSceneSelection(
-        descriptor: descriptor,
-        rootIdentity: configuration.rootIdentity,
-        runScene: { resources, stateContainer, focusTracker in
-          try await SceneSession.run(
-            configuration: configuration,
-            sessionName: sessionName,
-            stateContainer: stateContainer,
-            focusTracker: focusTracker,
-            resources: resources
-          )
-        }
-      )
-    )
   }
 }

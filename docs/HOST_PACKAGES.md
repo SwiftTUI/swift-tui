@@ -21,7 +21,8 @@ The root `Package.swift` exposes the framework and platform products together:
 
 - `SwiftTUI`: one-import terminal app convenience product
 - `SwiftTUIRuntime`: platform-neutral authoring/runtime composition product,
-  scene declarations, `SceneManifest`, and `HostedSceneSession`
+  scene declarations, `SceneManifest`, `HostedRasterSurface`, and
+  `HostedSceneSession`
 - `SwiftTUICLI`: terminal-native executable runner
 - `SwiftTUIArguments`: shared framework flag and environment parsing
 - `SwiftTUIWASI`: WASI executable runner and manifest mode
@@ -66,7 +67,7 @@ Consumers choose one launch composition at compile time:
 - WASI apps import `SwiftTUIWASI`; transport-only browser consumers can import
   `WASISurfaceBridge`
 - native Apple apps import `SwiftUIHost` to retain `HostedSceneSession` values
-  inside SwiftUI app lifecycle
+  with `HostedRasterSurface` inside SwiftUI app lifecycle
 - apps that embed external terminal programs import `SwiftTUITerminal`
 - apps that need a tabbed/split-pane terminal workspace import
   `SwiftTUITerminalWorkspace`
@@ -83,10 +84,10 @@ and select products with `.product(name: ..., package: "swift-tui")`.
 
 The platform-integration-facing root work is landed:
 
-- `SwiftTUI` exposes `SceneDescriptor`, `SceneManifest`, and
-  `HostedSceneSession` through the terminal convenience import
+- `SwiftTUI` exposes `SceneDescriptor`, `SceneManifest`, `HostedRasterSurface`,
+  and `HostedSceneSession` through the terminal convenience import
 - `SwiftTUIRuntime` owns the shared runtime, scene declarations,
-  `SceneManifest`, and `HostedSceneSession`
+  `SceneManifest`, `HostedRasterSurface`, and `HostedSceneSession`
 - `SwiftTUICLI` owns terminal-native attach/list CLI behavior and explicit
   terminal launch; the `SwiftTUI` convenience product re-exports it for the
   default terminal `App.main()` story
