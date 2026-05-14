@@ -59,11 +59,19 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     public let bind: String
     /// Whether the runner should auto-open the user's browser when serving.
     public let openBrowser: Bool
+    /// Optional scene identifier to launch when serving over WebHost.
+    public let sceneID: WindowIdentifier?
 
-    public init(port: Int = 0, bind: String = "127.0.0.1", openBrowser: Bool = false) {
+    public init(
+      port: Int = 0,
+      bind: String = "127.0.0.1",
+      openBrowser: Bool = false,
+      sceneID: WindowIdentifier? = nil
+    ) {
       self.port = port
       self.bind = bind
       self.openBrowser = openBrowser
+      self.sceneID = sceneID
     }
   }
 

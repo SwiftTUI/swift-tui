@@ -2,11 +2,19 @@
 
 public enum WebHostRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
   case multipleScenesUnsupported(count: Int)
+  case sceneNotFound(WindowIdentifier, available: [WindowIdentifier])
 
   public var description: String {
     switch self {
     case .multipleScenesUnsupported(let count):
       return "SwiftTUIWebHost V1 supports exactly one scene, but received \(count)."
+    case .sceneNotFound(let identifier, let available):
+      let availableList = available.map(\.rawValue).joined(separator: ", ")
+      if availableList.isEmpty {
+        return "No WebHost scene found for identifier \(identifier.rawValue)."
+      }
+      return
+        "No WebHost scene found for identifier \(identifier.rawValue). Available scenes: \(availableList)."
     }
   }
 }
@@ -58,12 +66,12 @@ public enum WebHostRunner {
     guard !selections.isEmpty else {
       throw AppLaunchError.noScenes
     }
-    guard selections.count == 1 else {
-      throw WebHostRunnerError.multipleScenesUnsupported(count: selections.count)
-    }
 
-    let selection = selections[0]
     let webConfiguration = configuration.web.map(WebHostConfig.init) ?? WebHostConfig()
+    let selection = try selectedScene(
+      from: selections,
+      requestedSceneID: webConfiguration.sceneID
+    )
     let scene = WebHostSceneDescriptor(
       id: selection.identifier.rawValue,
       title: selection.title,
@@ -117,6 +125,24 @@ public enum WebHostRunner {
       await session.stop()
       throw error
     }
+  }
+
+  @MainActor
+  private static func selectedScene(
+    from selections: [SelectedWindowScene],
+    requestedSceneID: WindowIdentifier?
+  ) throws -> SelectedWindowScene {
+    if let requestedSceneID {
+      guard let selection = selections.first(where: { $0.identifier == requestedSceneID }) else {
+        throw WebHostRunnerError.sceneNotFound(
+          requestedSceneID,
+          available: selections.map(\.identifier)
+        )
+      }
+      return selection
+    }
+
+    return selections.first(where: \.isDefault) ?? selections[0]
   }
 
   @MainActor

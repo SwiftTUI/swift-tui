@@ -12,6 +12,7 @@ struct WebHostServerTests {
   func defaultPortPolicyUsesPreferredRangeWhileExplicitZeroIsKernelAssigned() {
     #expect(WebHostConfig().candidatePorts == Array(9123...9132))
     #expect(WebHostConfig(port: 0).candidatePorts == [0])
+    #expect(WebHostConfig().sceneID == nil)
   }
 
   @Test("binding to port 0 produces a reachable loopback URL")

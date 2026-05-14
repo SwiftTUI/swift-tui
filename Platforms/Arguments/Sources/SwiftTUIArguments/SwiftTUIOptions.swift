@@ -108,6 +108,12 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   )
   public var open: Bool = false
 
+  @Option(
+    name: .customLong("scene"),
+    help: "Scene identifier to launch when serving with --web. [env: SWIFTTUI_WEB_SCENE]"
+  )
+  public var scene: String?
+
   // ─── Logging / diagnostics ─────────────────────────────────────
 
   @Flag(

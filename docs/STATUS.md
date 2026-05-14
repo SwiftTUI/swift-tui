@@ -82,7 +82,8 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
 - `WASIRunner` in `SwiftTUIWASI` for manifest generation and WASI-hosted scene launch
 - `WebHostRunner` and `WebHostCLIRunner` in `SwiftTUIWebHost` /
   `SwiftTUIWebHostCLI` for
-  localhost-browser launch and terminal/WebHost launch routing
+  localhost-browser launch, selected-scene WebHost routing, and
+  terminal/WebHost launch routing
 - The same authored `App` can feed terminal-native execution, WASI execution,
   localhost-browser WebHost execution, or host-managed embedding through root
   package platform products

@@ -95,7 +95,8 @@ extension SwiftTUIOptions {
         return RuntimeConfiguration.WebConfig(
           port: port,
           bind: bind,
-          openBrowser: open
+          openBrowser: open,
+          sceneID: scene.map { WindowIdentifier($0) }
         )
       }
       return baseline.web
