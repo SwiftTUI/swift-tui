@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
-| `SwiftTUIRuntime` | 50 | 539 |
+| `SwiftTUIRuntime` | 52 | 573 |
 | `SwiftTUIViews` | 255 | 9637 |
 | `SwiftTUIAnimatedImage` | 5 | 157 |
 | `SwiftTUICharts` | 29 | 1851 |
@@ -39,7 +39,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIRuntime
 
-### Canonical surface (50)
+### Canonical surface (52)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
@@ -64,6 +64,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `MouseButton` — enum — 4 members
 - `MouseEvent` — struct — 14 members
 - `PasteEvent` — struct — 3 members
+- `PresentationMetrics` — typealias
 - `PresentationSurface` — protocol — 18 members
 - `RunLoop` — class — 6 members
 - `RunLoopExitReason` — enum — 4 members
@@ -74,7 +75,8 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SceneBuilder` — enum — 10 members
 - `SceneDescriptor` — struct — 6 members
 - `SceneManifest` — struct — 5 members
-- `SemanticPresentationFrame` — struct — 6 members
+- `SemanticHostFrame` — struct — 7 members
+- `SemanticHostFrameCapabilities` — struct — 31 members
 - `SignalReading` — protocol — 1 member
 - `Standard` — enum — 12 members
 - `StateKeyHandler` — typealias

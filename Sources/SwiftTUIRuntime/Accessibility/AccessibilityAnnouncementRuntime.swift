@@ -12,8 +12,17 @@ extension RunLoop: AccessibilityAnnouncementSink {
   }
 
   private var publishesAccessibilityAnnouncements: Bool {
-    runtimeConfiguration.output == .accessible
-      || presentationSurface is any DamageAwareSemanticPresentationSurface
+    if runtimeConfiguration.output == .accessible {
+      return true
+    }
+    guard
+      let semanticHostFrameSurface =
+        presentationSurface as? any SemanticHostFramePresentationSurface
+    else {
+      return false
+    }
+    return semanticHostFrameSurface.semanticHostFrameCapabilities
+      .contains(.accessibilityAnnouncements)
   }
 
   package func drainPendingAccessibilityAnnouncements() -> [AccessibilityAnnouncement] {

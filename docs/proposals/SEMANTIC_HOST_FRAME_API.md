@@ -1,8 +1,8 @@
 # Semantic Host-Frame API
 
-**Status:** Proposal draft. This is not an approved implementation plan.
-It formalizes the damage-bearing semantic presentation contract that now exists
-across retained native hosts, WebHost, WASI, and runtime accessibility output.
+**Status:** Implemented as the semantic host-frame presentation contract.
+It formalizes the damage-bearing semantic presentation contract used across
+retained native hosts, WebHost, WASI, and runtime accessibility output.
 
 **Owner:** unassigned.
 
@@ -14,12 +14,12 @@ across retained native hosts, WebHost, WASI, and runtime accessibility output.
 
 ## Summary
 
-SwiftTUI now has a frame-shaped value that carries raster output, semantic data,
-focused identity, and raster damage together. That is the right direction, but
-the surrounding protocol is still named after one historical optimization:
-`DamageAwareSemanticPresentationSurface`.
+SwiftTUI has a frame-shaped value that carries producer sequence, raster output,
+semantic data, focused identity, and raster damage together. The formal API
+names this as the semantic host-frame contract instead of naming it after one
+raster-damage optimization.
 
-The formal API should instead describe the broader contract:
+The formal API describes the broader contract:
 
 ```text
 RunLoop producer -> semantic host frame -> host-frame presentation surface consumer
@@ -32,27 +32,31 @@ that needs both drawn pixels and semantic routes for native accessibility,
 browser ARIA, hit testing, focus, selection, scroll, diagnostics, testing, and
 future host-side rendering decisions.
 
-## Current Shape
+## Implementation Resolution
 
-The current implementation already has the important parts:
+The implemented shape is:
 
 | Role | Current code | Notes |
 |---|---|---|
-| Producer | `RunLoop.presentCommittedFrame` | Builds one `SemanticPresentationFrame` after semantics and rasterization, before terminal cursor focus policy. |
-| Frame value | `SemanticPresentationFrame` | Public value containing `RasterSurface`, `SemanticSnapshot`, focused `Identity?`, and optional `PresentationDamage`. |
-| Semantic frame consumer protocol | `DamageAwareSemanticPresentationSurface` | SPI protocol; the name wrongly makes damage sound like the primary capability. |
+| Producer | `RunLoop.presentCommittedFrame` | Builds one `SemanticHostFrame` after semantics and rasterization, before terminal cursor focus policy. |
+| Frame value | `SemanticHostFrame` | Public value containing a producer sequence, `RasterSurface`, `SemanticSnapshot`, focused `Identity?`, and optional `PresentationDamage`. |
+| Semantic frame consumer protocol | `SemanticHostFramePresentationSurface` | SPI protocol for surfaces that consume full semantic host frames. |
+| Capability declaration | `SemanticHostFrameCapabilities` | Public option set that declares host-frame side effects such as accessibility announcements. |
 | Retained native consumer | `HostedRasterSurface` | Public retained surface used by `HostedSceneSession` and SwiftUIHost. |
 | WebHost consumer | `WebSocketSurfaceTransport` | Serializes semantic frames over the localhost WebSocket bridge. |
 | WASI/browser consumer | `WebSurfaceTransport` | Serializes semantic frames through the `web-surface` transport. |
-| Announcement side effect | `AccessibilityAnnouncementRuntime` | Currently publishes queued announcements when output is `.accessible` or the presentation surface conforms to the semantic-damage protocol. |
+| Announcement side effect | `AccessibilityAnnouncementRuntime` | Publishes queued announcements for `.accessible` output or semantic host-frame surfaces declaring `.accessibilityAnnouncements`. |
 
-That gives us a working protocol but not yet a well-named public model.
+The final value type is `SemanticHostFrame`, with `sequence`, `raster`, and
+`semantics` properties. `PresentationMetrics` is the host-facing typealias for
+the existing presentation metrics value.
 
 ## Goals
 
 - Name the API around the semantic host-frame contract, not around damage.
-- Keep the frame atomic: raster output, semantic snapshot, focused identity, and
-  raster damage are delivered together for one committed frame.
+- Keep the frame atomic: producer sequence, raster output, semantic snapshot,
+  focused identity, and raster damage are delivered together for one committed
+  frame.
 - Treat `PresentationDamage` as a raster repaint hint only. It is not a
   semantic-tree diff, accessibility diff, or interaction-region diff.
 - Define producer and consumer responsibilities explicitly enough that new hosts
@@ -95,13 +99,15 @@ It contains:
 - the full `SemanticSnapshot` produced during the semantics phase
 - the runtime-focused `Identity?`
 - optional `PresentationDamage` describing changed raster ranges
+- a monotonically increasing producer sequence
 
 ### Producer
 
 The producer is the runtime component that owns frame assembly and ordering.
-Today this is `RunLoop` at the commit boundary. Producers must deliver frames in
-commit order and must not split raster and semantic data into independent
-callbacks for the same consumer.
+Today this is `RunLoop` at the commit boundary. Producers must assign a
+monotonically increasing `sequence`, deliver frames in commit order, and must
+not split raster and semantic data into independent callbacks for the same
+consumer.
 
 ### Consumer
 
@@ -117,10 +123,11 @@ records into canvas and ARIA state.
 
 ## Proposed API Shape
 
-The formal API should be named around host frames:
+The formal API is named around host frames:
 
 ```swift
 public struct SemanticHostFrame: Equatable, Sendable {
+  public var sequence: UInt64
   public var raster: RasterSurface
   public var semantics: SemanticSnapshot
   public var focusedIdentity: Identity?
@@ -136,24 +143,13 @@ public protocol SemanticHostFramePresentationSurface: PresentationSurface {
 }
 ```
 
-The exact source-compatibility strategy can be decided during implementation.
-Two acceptable paths:
-
-- Rename `SemanticPresentationFrame` to `SemanticHostFrame` before the public
-  release locks this surface.
-- Keep `SemanticPresentationFrame` as the public type, add host-frame
-  terminology in docs, and rename only the protocol to
-  `SemanticHostFramePresentationSurface`.
-
-The proposal prefers the first path because it makes the API self-describing.
-If source compatibility is already more important than naming cleanup, the
-second path still fixes the most dangerous part: the protocol should not keep
-`DamageAware` in its formal name.
+The implementation uses this preferred spelling directly. No compatibility
+alias is kept for the previous frame type or protocol name.
 
 ### Capability Declaration
 
-Capabilities should describe the side effects a consumer wants the runtime to
-perform, not which fields the frame contains. V1 frames remain complete.
+Capabilities describe the side effects a consumer wants the runtime to perform,
+not which fields the frame contains. V1 frames remain complete.
 
 ```swift
 public struct SemanticHostFrameCapabilities: OptionSet, Sendable {
@@ -170,30 +166,27 @@ For example, `HostedRasterSurface` and browser transports would likely declare
 announcements. A diagnostics-only consumer might receive frames without asking
 the runtime to queue announcement-invalidating frames.
 
-The current logic:
+A bare conformance check:
 
 ```swift
-presentationSurface is any DamageAwareSemanticPresentationSurface
+presentationSurface is any SemanticHostFramePresentationSurface
 ```
 
-should become a capability check. That prevents protocol conformance from
-silently changing accessibility behavior.
+is not enough to publish announcements. Announcement publication now checks
+`semanticHostFrameCapabilities.contains(.accessibilityAnnouncements)`.
 
 ### Metrics Naming
 
 The existing method returns `TerminalPresentationMetrics`. A broad host-frame
-API should not permanently expose terminal vocabulary at the host boundary.
-Implementation can keep the underlying type while introducing one of:
+API does not need to permanently expose terminal vocabulary at the host
+boundary. The implementation keeps the underlying type while introducing:
 
 ```swift
 public typealias PresentationMetrics = TerminalPresentationMetrics
 ```
 
-or a future neutral value such as `PresentationCommitMetrics`.
-
-The proposal recommends adding a neutral name as part of the formalization even
-if it is initially a typealias. That keeps this migration focused on names and
-contracts instead of metrics redesign.
+That keeps this migration focused on names and contracts instead of metrics
+redesign.
 
 ## Frame Contract
 
@@ -206,9 +199,12 @@ receiving the frame, but the SwiftTUI runtime handoff is one value.
 
 ### Ordering
 
-Frames are delivered in commit order. If a future async host drops stale frames,
-it must drop whole frames. It must not combine raster from one committed frame
-with semantics from another.
+Frames are delivered in commit order and carry an explicit `sequence`.
+`RunLoop` starts semantic host-frame sequences at `0` for a producer session and
+increments the value for each committed semantic host-frame presentation. If an
+async host drops stale frames, it must compare whole-frame sequence values and
+drop whole frames. It must not combine raster from one committed frame with
+semantics from another.
 
 ### Raster Damage
 
@@ -243,63 +239,59 @@ state chosen by the focus tracker, while the snapshot records semantic regions
 that can participate in focus. Keeping it separate avoids mutating semantic
 extraction output during commit.
 
-## Implementation Plan
+## Implemented Changes
 
-1. Add the neutral API names.
-   Introduce `SemanticHostFramePresentationSurface` and either
-   `SemanticHostFrame` or a documented alias for `SemanticPresentationFrame`.
+1. Added the neutral API names.
+   Introduced `SemanticHostFramePresentationSurface` and `SemanticHostFrame`.
 
-2. Move existing consumers.
-   Update `HostedRasterSurface`, `WebSocketSurfaceTransport`, and
-   `WebSurfaceTransport` to conform to the new protocol. Keep the old
-   `DamageAwareSemanticPresentationSurface` name only as a temporary SPI alias
-   if needed by in-flight branches.
+2. Moved existing consumers.
+   Updated `HostedRasterSurface`, `WebSocketSurfaceTransport`, and
+   `WebSurfaceTransport` to conform to the new protocol.
 
-3. Add capabilities.
-   Give semantic host-frame consumers a default capability set and replace the
+3. Added capabilities.
+   Gave semantic host-frame consumers a default capability set and replaced the
    current announcement-publication conformance check with an explicit
    `.accessibilityAnnouncements` check.
 
-4. Neutralize metrics naming.
-   Add `PresentationMetrics` as the host-facing name for the existing metrics
-   value, or introduce a small adapter if a direct typealias is too confusing.
+4. Neutralized metrics naming.
+   Added `PresentationMetrics` as the host-facing name for the existing metrics
+   value through a typealias.
 
-5. Document producer and consumer rules.
-   Update `TERMINOLOGY.md`, `HOST_RENDERING_PIPELINES.md`, and the DocC host
+5. Documented producer and consumer rules.
+   Updated `TERMINOLOGY.md`, `HOST_RENDERING_PIPELINES.md`, and the DocC host
    integration page to describe semantic host frames as the non-terminal host
    contract.
 
-6. Delete transitional names.
-   Once all in-repo consumers and tests use the formal names, remove
-   `DamageAwareSemanticPresentationSurface`.
+6. Deleted transitional names.
+   In-repo consumers and tests use the formal names.
 
-## Test Plan
+## Validation Coverage
 
 - Runtime dispatch test: a semantic host-frame surface receives the frame path
   before raster-damage and raster-only fallback surfaces.
-- Atomic payload test: the received frame contains the raster surface, semantic
-  snapshot, focused identity, and raster damage from the same committed frame.
+- Atomic payload test: the received frame contains the sequence, raster surface,
+  semantic snapshot, focused identity, and raster damage from the same committed
+  frame.
+- Sequence test: runtime-produced semantic host frames carry contiguous
+  producer sequence values starting at `0`.
 - Announcement capability test: queued accessibility announcements publish for
   `.accessible` output and for consumers declaring `.accessibilityAnnouncements`,
   but not merely because a surface conforms to an unrelated protocol.
-- WebHost/WASI serialization tests: serialized frame records still contain full
-  semantic data and optional raster damage.
+- WebHost/WASI serialization tests: serialized semantic frame records still
+  contain sequence, full semantic data, and optional raster damage.
 - SwiftUIHost test: retained native host state updates from one host frame and
   does not rely on separate semantic or damage callbacks.
-- Public API baseline update: the final names are intentional and no
-  `DamageAwareSemanticPresentationSurface` entry remains.
+- Public API baseline update: the final names are intentional.
 
-## Open Questions
+## Resolved Decisions
 
-- Should the final value type be `SemanticHostFrame` or should the existing
-  `SemanticPresentationFrame` name be retained for compatibility?
-- Should `semanticSnapshot` be renamed to `semantics` in the final public type?
-- Should capabilities stay SPI until external host authors appear, or should
-  they be public with the first formal host-frame API?
-- Is `PresentationMetrics` sufficient as a typealias, or should metrics be
-  split into terminal-specific and host-neutral components?
-- Do host-frame consumers need an explicit frame sequence number in V1, or is
-  call ordering enough until stale-frame dropping is introduced?
+- The final value type is `SemanticHostFrame`.
+- The frame properties are `raster` and `semantics`.
+- `SemanticHostFrameCapabilities` is public because `HostedRasterSurface` is a
+  public host-facing surface.
+- `PresentationMetrics` is a typealias for `TerminalPresentationMetrics`.
+- V1 uses an explicit `UInt64` frame sequence number in each
+  `SemanticHostFrame`.
 
 ## Acceptance Criteria
 

@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -199,6 +199,79 @@ struct LiveRegionAnnouncerTests {
     #expect(output.contains("button: Save"))
     #expect(output.contains("assertive: Saved"))
   }
+
+  @Test("semantic host-frame runtime appends imperative announcements when requested")
+  func semanticHostFrameRuntimeAppendsImperativeAnnouncementsWhenRequested() async throws {
+    let surface = LiveRegionSemanticHostFrameSurface(
+      capabilities: [.accessibilityAnnouncements]
+    )
+    let rootIdentity = testIdentity("HostFrameAnnouncementRoot")
+    let runLoop = imperativeAnnouncementRunLoop(
+      rootIdentity: rootIdentity,
+      surface: surface,
+      runtimeConfiguration: .default
+    )
+
+    let result = try await runLoop.run()
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(
+      surface.frames.contains { frame in
+        frame.semantics.accessibilityAnnouncements.contains {
+          $0.message == "Saved" && $0.politeness == .assertive
+        }
+      })
+  }
+
+  @Test("semantic host-frame runtime suppresses imperative announcements without capability")
+  func semanticHostFrameRuntimeSuppressesImperativeAnnouncementsWithoutCapability() async throws {
+    let surface = LiveRegionSemanticHostFrameSurface(capabilities: [])
+    let rootIdentity = testIdentity("HostFrameNoAnnouncementRoot")
+    let runLoop = imperativeAnnouncementRunLoop(
+      rootIdentity: rootIdentity,
+      surface: surface,
+      runtimeConfiguration: .default
+    )
+
+    let result = try await runLoop.run()
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(!surface.frames.isEmpty)
+    #expect(surface.frames.allSatisfy { $0.semantics.accessibilityAnnouncements.isEmpty })
+  }
+}
+
+@MainActor
+private func imperativeAnnouncementRunLoop<Surface: PresentationSurface>(
+  rootIdentity: Identity,
+  surface: Surface,
+  runtimeConfiguration: RuntimeConfiguration
+) -> RunLoop<Int, ImperativeAnnouncementButtonView> {
+  RunLoop(
+    rootIdentity: rootIdentity,
+    presentationSurface: surface,
+    terminalInputReader: LiveRegionScriptedInputReader(events: [
+      .key(KeyPress(.return)),
+      .key(KeyPress(.character("d"), modifiers: .ctrl)),
+    ]),
+    stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+    focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+    runtimeConfiguration: runtimeConfiguration,
+    proposal: .init(width: 40, height: 8),
+    viewBuilder: ScopedMapper { _ in
+      ImperativeAnnouncementButtonView()
+    }
+  )
+}
+
+private struct ImperativeAnnouncementButtonView: View {
+  var body: some View {
+    Button("Save") {
+      AccessibilityAnnouncer.announce("Saved", politeness: .assertive)
+    }
+    .id(testIdentity("ImperativeAnnouncementButton"))
+    .accessibilityLabel("Save")
+  }
 }
 
 @MainActor
@@ -279,6 +352,45 @@ private final class LiveRegionTestSurface: PresentationSurface {
       bytesWritten: 0,
       linesTouched: surface.lines.count,
       cellsChanged: 0
+    )
+  }
+}
+
+private final class LiveRegionSemanticHostFrameSurface:
+  PresentationSurface, SemanticHostFramePresentationSurface
+{
+  let surfaceSize = CellSize(width: 40, height: 8)
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+  let semanticHostFrameCapabilities: SemanticHostFrameCapabilities
+  private(set) var frames: [SemanticHostFrame] = []
+  private(set) var presentedSurfaces: [RasterSurface] = []
+
+  init(capabilities: SemanticHostFrameCapabilities) {
+    semanticHostFrameCapabilities = capabilities
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    presentedSurfaces.append(surface)
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: surface,
+      damage: nil
+    )
+  }
+
+  @discardableResult
+  func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
+    frames.append(frame)
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: frame.raster,
+      damage: frame.rasterDamage
     )
   }
 }

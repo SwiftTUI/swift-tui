@@ -29,6 +29,14 @@ All modes flow through the same runtime invalidation path. Resize, terminal
 style, and lifecycle events are normalized into the same control-message
 contract regardless of where the host fetches them.
 
+Host-managed presentation surfaces that consume semantics receive
+``SemanticHostFrame`` values. A semantic host frame is the atomic handoff for one
+committed frame: producer sequence, raster output, the semantic snapshot,
+focused identity, and optional raster damage travel together so hosts do not
+combine presentation data from different commits. ``SemanticHostFrameCapabilities``
+declares which host-frame side effects the bridge supports, including
+imperative accessibility announcements.
+
 ## See Also
 
 - <doc:Running-Apps>

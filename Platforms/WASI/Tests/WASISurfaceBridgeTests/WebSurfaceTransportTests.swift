@@ -91,9 +91,10 @@ struct WebSurfaceTransportTests {
     let mixed = group.child("mixed")
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        SemanticPresentationFrame(
-          surface: Self.basicSurface(),
-          semanticSnapshot: SemanticSnapshot(
+        SemanticHostFrame(
+          sequence: 11,
+          raster: Self.basicSurface(),
+          semantics: SemanticSnapshot(
             accessibilityNodes: [
               AccessibilityNode(
                 identity: group,
@@ -135,6 +136,7 @@ struct WebSurfaceTransportTests {
     )
 
     #expect(frame["version"] as? Int == 2)
+    #expect(frame["sequence"] as? Int == 11)
     let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
     #expect(tree.count == 4)
 
@@ -171,9 +173,10 @@ struct WebSurfaceTransportTests {
   func encoderEmitsAccessibilityAnnouncements() throws {
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        SemanticPresentationFrame(
-          surface: Self.basicSurface(),
-          semanticSnapshot: SemanticSnapshot(
+        SemanticHostFrame(
+          sequence: 12,
+          raster: Self.basicSurface(),
+          semantics: SemanticSnapshot(
             accessibilityAnnouncements: [
               AccessibilityAnnouncement(message: "Saved", politeness: .assertive),
               AccessibilityAnnouncement(message: "Queued", politeness: .polite),
@@ -185,6 +188,7 @@ struct WebSurfaceTransportTests {
     )
 
     #expect(frame["version"] as? Int == 2)
+    #expect(frame["sequence"] as? Int == 12)
     let announcements = try #require(frame["accessibilityAnnouncements"] as? [[String: Any]])
     #expect(announcements.count == 2)
     #expect(announcements[0]["message"] as? String == "Saved")

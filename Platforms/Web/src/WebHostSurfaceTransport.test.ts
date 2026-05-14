@@ -86,7 +86,8 @@ test("decoder preserves presentation damage records", () => {
 test("decoder accepts v2 accessibility trees", () => {
   const decoder = new WebHostOutputDecoder();
   const records = decoder.feed(encoder.encode(
-    '\u001Esurface:{"version":2,"width":2,"height":1,"styles":[null],"rows":[[]],'
+    '\u001Esurface:{"version":2,"sequence":9,"width":2,"height":1,'
+      + '"styles":[null],"rows":[[]],'
       + '"accessibilityTree":[{"id":"root/button","parentId":"root","rect":[0,0,2,1],'
       + '"role":"button","label":"Save","hint":"Writes the file",'
       + '"cursorAnchor":[1,0],"isFocused":true},'
@@ -96,6 +97,7 @@ test("decoder accepts v2 accessibility trees", () => {
 
   const frame = surfaceFrame(records[0]);
   expect(frame.version).toBe(2);
+  expect(frame.sequence).toBe(9);
   expect(frame.accessibilityTree).toEqual([
     {
       id: "root/button",

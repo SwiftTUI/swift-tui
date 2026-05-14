@@ -10,10 +10,11 @@ public final class HostedRasterSurface:
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
+    var nextFrameSequence: UInt64
   }
 
   private let state: Mutex<State>
-  private let frameHandler: @Sendable (SemanticPresentationFrame) -> Void
+  private let frameHandler: @Sendable (SemanticHostFrame) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
 
   public let capabilityProfile: TerminalCapabilityProfile
@@ -43,7 +44,7 @@ public final class HostedRasterSurface:
     appearance: TerminalAppearance,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
-    onFrame: @escaping @MainActor @Sendable (SemanticPresentationFrame) -> Void,
+    onFrame: @escaping @MainActor @Sendable (SemanticHostFrame) -> Void,
     onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil
   ) {
     self.capabilityProfile = capabilityProfile
@@ -61,7 +62,8 @@ public final class HostedRasterSurface:
           theme: theme
         ),
         graphicsCapabilities: .none,
-        pointerInputCapabilities: .cellOnly
+        pointerInputCapabilities: .cellOnly,
+        nextFrameSequence: 0
       )
     )
   }
@@ -128,29 +130,40 @@ public final class HostedRasterSurface:
   public func present(
     _ surface: RasterSurface
   ) throws -> TerminalPresentationMetrics {
-    try present(
-      SemanticPresentationFrame(
-        surface: surface,
-        semanticSnapshot: .init(),
+    let sequence = state.withLock { state in
+      let sequence = state.nextFrameSequence
+      state.nextFrameSequence &+= 1
+      return sequence
+    }
+    return try present(
+      SemanticHostFrame(
+        sequence: sequence,
+        raster: surface,
+        semantics: .init(),
         focusedIdentity: nil
       )
     )
   }
 
   private func submit(
-    _ frame: SemanticPresentationFrame
+    _ frame: SemanticHostFrame
   ) {
+    state.withLock { state in
+      if frame.sequence >= state.nextFrameSequence {
+        state.nextFrameSequence = frame.sequence &+ 1
+      }
+    }
     frameHandler(frame)
   }
 }
 
 @_spi(Runners)
-extension HostedRasterSurface: DamageAwareSemanticPresentationSurface {
+extension HostedRasterSurface: SemanticHostFramePresentationSurface {
   @discardableResult
-  public func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics {
+  public func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     submit(frame)
     return TerminalPresentationMetrics.rasterHostMetrics(
-      for: frame.surface,
+      for: frame.raster,
       damage: frame.rasterDamage
     )
   }

@@ -135,14 +135,14 @@ public final class SwiftUIHostSceneHost {
   }
 
   private func receiveFrame(
-    _ frame: SemanticPresentationFrame
+    _ frame: SemanticHostFrame
   ) {
-    latestSurface = frame.surface
-    latestSemanticSnapshot = frame.semanticSnapshot
+    latestSurface = frame.raster
+    latestSemanticSnapshot = frame.semantics
     focusedAccessibilityIdentity = frame.focusedIdentity
     latestPresentationDamage = frame.rasterDamage
     NativeAccessibilityAnnouncementPoster.post(
-      accessibilityAnnouncer.announcements(for: frame.semanticSnapshot)
+      accessibilityAnnouncer.announcements(for: frame.semantics)
     )
   }
 

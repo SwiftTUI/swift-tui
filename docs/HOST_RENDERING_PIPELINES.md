@@ -235,8 +235,8 @@ if output == .json:
   JSONFrameRenderer writes machine-readable frame JSON
 else if output == .accessible:
   LinearAccessibilityRenderer writes semantic text
-else if surface is DamageAwareSemanticPresentationSurface:
-  present(SemanticPresentationFrame(raster, semanticSnapshot, focusedIdentity, rasterDamage))
+else if surface is SemanticHostFramePresentationSurface:
+  present(SemanticHostFrame(sequence, raster, semantics, focusedIdentity, rasterDamage))
 else if surface is DamageAwarePresentationSurface:
   present(raster, damage)
 else:
@@ -435,20 +435,24 @@ It then constructs a `HostedSceneSession` with:
 - runtime issue sink
 - focus presentation callback
 
-`HostedRasterSurface` conforms to `DamageAwareSemanticPresentationSurface`. When
-`RunLoop.presentCommittedFrame(...)` reaches the damage-aware semantic branch,
-the host receives a single `SemanticPresentationFrame` containing:
+`HostedRasterSurface` conforms to `SemanticHostFramePresentationSurface`. When
+`RunLoop.presentCommittedFrame(...)` reaches the semantic host-frame branch,
+the host receives a single `SemanticHostFrame` containing:
 
 ```text
 RasterSurface
 SemanticSnapshot
 focused Identity
 raster PresentationDamage?
+producer sequence
 ```
 
 No ANSI is generated. No terminal fd exists. The surface handler stores the
 latest raster surface, semantic snapshot, focused accessibility identity, and
-raster damage hint on `SwiftUIHostSceneHost`.
+raster damage hint on `SwiftUIHostSceneHost`. The `SemanticHostFrame.sequence`
+is monotonically increasing for the runtime producer so retained hosts and
+bridges can recognize stale asynchronous work without relying on callback
+ordering alone.
 
 `SwiftUIHostAppView` bridges that host into native UI with an
 `NSViewRepresentable` or `UIViewRepresentable`. The representable configures
@@ -553,7 +557,7 @@ SwiftTUIWebHostCLI optional routing
 -> SceneSession.run(...)
 -> RunLoop
 -> DefaultRenderer
--> WebSocketSurfaceTransport.present(SemanticPresentationFrame)
+-> WebSocketSurfaceTransport.present(SemanticHostFrame)
 -> WebSurfaceFrameEncoder
 -> WebSocket bytes
 -> WebSocketSceneBridge
@@ -588,7 +592,7 @@ while giving opt-in binaries a single launch import.
 7. Runs the selected scene through `SceneSession.run(...)`.
 
 `WebSocketSurfaceTransport` conforms to
-`DamageAwareSemanticPresentationSurface`. It advertises a web-capable terminal
+`SemanticHostFramePresentationSurface`. It advertises a web-capable terminal
 profile:
 
 - Unicode glyphs
@@ -600,10 +604,13 @@ profile:
 
 On presentation, it encodes:
 
+- host-frame sequence
 - raster width and height
 - style table
 - row cells as `[x, text, span, styleIndex]`
 - image attachments
+- raster damage when available
+- accessibility tree and announcements when present
 - optional presentation damage as dirty text rows and full-repaint flags
 - accessibility tree
 - accessibility announcements
@@ -693,7 +700,7 @@ Browser createWebHostApp(...)
 -> SceneSession.run(...)
 -> RunLoop
 -> DefaultRenderer
--> WebSurfaceTransport.present(SemanticPresentationFrame)
+-> WebSurfaceTransport.present(SemanticHostFrame)
 -> WebSurfaceFrameEncoder
 -> stdout bytes
 -> BrowserWASIBridge WebHostOutputDecoder
@@ -729,8 +736,8 @@ transport mode is surface. It creates:
 - `InProcessSignalReader` for resize/style wakeups
 - runtime issue sink that writes runtime issue records through the transport
 
-`WebSurfaceTransport` conforms to the same damage-aware semantic surface
-protocol as local WebHost. It writes the same record family consumed by
+`WebSurfaceTransport` conforms to the same semantic host-frame presentation
+surface protocol as local WebHost. It writes the same record family consumed by
 `WebHostOutputDecoder`: surface, clipboard, runtime issue, and text records.
 Surface records include optional presentation damage, and the encoder is shared
 at the Swift level with the WebHost transport through the `WASISurfaceBridge`
@@ -907,8 +914,10 @@ stdio disposal.
 2. Add host behavior at the `PresentationSurface`, `TerminalInputReading`,
    `SignalReading`, or `HostedSceneSession` seams.
 3. If a surface needs accessibility data, implement
-   `DamageAwareSemanticPresentationSurface` so semantic presentation always
-   carries redraw hints.
+   `SemanticHostFramePresentationSurface` so semantic presentation carries
+   raster redraw hints beside the semantic snapshot. Declare
+   `.accessibilityAnnouncements` only when the host bridge can publish queued
+   announcements.
 4. Resize/style updates should update surface state and have an explicit wake
    contract.
 5. Keep `SwiftTUIRuntime` below runner and host products. Host products should

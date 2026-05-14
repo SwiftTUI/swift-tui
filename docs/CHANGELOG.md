@@ -16,6 +16,14 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-14
+
+- Formalized the semantic host-frame presentation contract: the runtime now
+  produces sequenced `SemanticHostFrame` values for semantic host-frame
+  consumers, retained native, WebHost, and WASI surfaces use the formal protocol
+  name, and accessibility announcement publication is controlled by explicit
+  host-frame capabilities instead of incidental protocol conformance.
+
 ## 2026-05-13
 
 - Promoted presentation damage into the shared host presentation contract:

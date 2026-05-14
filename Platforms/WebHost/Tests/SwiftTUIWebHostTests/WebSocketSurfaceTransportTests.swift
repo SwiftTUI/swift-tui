@@ -5,8 +5,8 @@ import Testing
 @testable import SwiftTUIWebHost
 
 struct WebSocketSurfaceTransportTests {
-  @Test("damage-aware semantic present emits a v2 web-surface frame with accessibilityTree")
-  func damageAwareSemanticPresentEmitsV2FrameWithAccessibilityTree() async throws {
+  @Test("semantic host-frame present emits a v2 web-surface frame with accessibilityTree")
+  func semanticHostFramePresentEmitsV2FrameWithAccessibilityTree() async throws {
     let sink = RecordingByteSink()
     let transport = WebSocketSurfaceTransport(
       surfaceSize: .init(width: 2, height: 1),
@@ -16,9 +16,10 @@ struct WebSocketSurfaceTransportTests {
     let button = root.child("button")
 
     let metrics = try transport.present(
-      SemanticPresentationFrame(
-        surface: Self.basicSurface("OK"),
-        semanticSnapshot: SemanticSnapshot(
+      SemanticHostFrame(
+        sequence: 21,
+        raster: Self.basicSurface("OK"),
+        semantics: SemanticSnapshot(
           accessibilityNodes: [
             AccessibilityNode(
               identity: button,
@@ -36,14 +37,15 @@ struct WebSocketSurfaceTransportTests {
     let record = try #require(await sink.strings().first)
     let frame = try decodedSurfaceFrame(record)
     #expect(frame["version"] as? Int == 2)
+    #expect(frame["sequence"] as? Int == 21)
     let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
     #expect(tree.first?["id"] as? String == "root/button")
     #expect(tree.first?["isFocused"] as? Bool == true)
     #expect(metrics.bytesWritten == record.utf8.count)
   }
 
-  @Test("damage-aware semantic present emits damage and partial repaint metrics")
-  func damageAwareSemanticPresentEmitsDamageAndPartialMetrics() async throws {
+  @Test("semantic host-frame present emits damage and partial repaint metrics")
+  func semanticHostFramePresentEmitsDamageAndPartialMetrics() async throws {
     let sink = RecordingByteSink()
     let transport = WebSocketSurfaceTransport(
       surfaceSize: .init(width: 2, height: 2),
@@ -55,11 +57,12 @@ struct WebSocketSurfaceTransportTests {
       ]
     )
 
-    let damageAwareTransport: any DamageAwareSemanticPresentationSurface = transport
-    let metrics = try damageAwareTransport.present(
-      SemanticPresentationFrame(
-        surface: Self.basicSurface("OK"),
-        semanticSnapshot: SemanticSnapshot(),
+    let hostFrameSurface: any SemanticHostFramePresentationSurface = transport
+    let metrics = try hostFrameSurface.present(
+      SemanticHostFrame(
+        sequence: 22,
+        raster: Self.basicSurface("OK"),
+        semantics: SemanticSnapshot(),
         focusedIdentity: nil,
         rasterDamage: damage
       )
@@ -67,6 +70,8 @@ struct WebSocketSurfaceTransportTests {
 
     let record = try #require(await sink.strings().first)
     let frame = try decodedSurfaceFrame(record)
+    #expect(frame["version"] as? Int == 2)
+    #expect(frame["sequence"] as? Int == 22)
     let decodedDamage = try #require(frame["damage"] as? [String: Any])
     let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
     let textRow = try #require(textRows.first)

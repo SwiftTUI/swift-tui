@@ -1451,11 +1451,16 @@ extension RunLoop {
     }
 
     let metrics: TerminalPresentationMetrics
-    if let semanticDamageHost = presentationSurface as? any DamageAwareSemanticPresentationSurface {
-      metrics = try semanticDamageHost.present(
-        SemanticPresentationFrame(
-          surface: artifacts.rasterSurface,
-          semanticSnapshot: artifacts.semanticSnapshot,
+    if let semanticHostFrameSurface =
+      presentationSurface as? any SemanticHostFramePresentationSurface
+    {
+      let sequence = nextSemanticHostFrameSequence
+      nextSemanticHostFrameSequence &+= 1
+      metrics = try semanticHostFrameSurface.present(
+        SemanticHostFrame(
+          sequence: sequence,
+          raster: artifacts.rasterSurface,
+          semantics: artifacts.semanticSnapshot,
           focusedIdentity: focusTracker.currentFocusIdentity,
           rasterDamage: damage
         )
