@@ -184,6 +184,8 @@ convenience product.
 - `MeasuredNode`: size decisions under a proposal, including child measurements
 - `PlacedNode`: final geometry, content bounds, and semantic role
 - `SemanticSnapshot`: focus, interaction, action, selection, and scroll routing
+- `SemanticHostFrame`: committed host handoff containing raster output,
+  semantics, focused identity, optional raster damage, and a producer sequence
 - `DrawNode`: draw commands for text, shapes, rules, lists, tables, and indicators
 - `RasterSurface`: final cell grid plus style runs
 - `CommitPlan`: runtime-facing semantic, lifecycle, and handler work

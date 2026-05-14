@@ -18,9 +18,10 @@ struct WebSurfaceSPITests {
     let child = root.child("button")
     let frame = try decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        SemanticPresentationFrame(
-          surface: Self.basicSurface(),
-          semanticSnapshot: SemanticSnapshot(
+        SemanticHostFrame(
+          sequence: 7,
+          raster: Self.basicSurface(),
+          semantics: SemanticSnapshot(
             accessibilityNodes: [
               AccessibilityNode(
                 identity: child,
@@ -37,6 +38,7 @@ struct WebSurfaceSPITests {
     )
 
     #expect(frame["version"] as? Int == 2)
+    #expect(frame["sequence"] as? Int == 7)
     let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
     #expect(tree.count == 1)
     #expect(tree[0]["id"] as? String == "root/button")

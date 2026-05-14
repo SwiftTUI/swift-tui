@@ -73,9 +73,6 @@ Active design proposals that are still shaping decisions:
 - [proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md](proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md) — investigation draft for making `Platforms/Web`
   consumable as browser/runtime and build packages such as `@swifttui/web` and
   `@swifttui/build`
-- [proposals/SEMANTIC_HOST_FRAME_API.md](proposals/SEMANTIC_HOST_FRAME_API.md) — proposal draft for formalizing the semantic
-  host-frame producer/consumer contract that carries raster output, semantic
-  snapshots, focus, and raster damage together
 - [proposals/PUBLIC_PRODUCTS_DRAFT.md](proposals/PUBLIC_PRODUCTS_DRAFT.md) — implemented release-facing product/import contract for one-import terminal apps, `SwiftTUIRuntime` composition, explicit host products, and first-class domain utility targets
 - [proposals/ARGUMENT_PARSING.md](proposals/ARGUMENT_PARSING.md) — standard framework flags/env vars, including the WebHost `--web` / `--open` configuration surface
 - [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) — scoped design work for a first-class Zellij-style terminal workspace surface above `TerminalView`
@@ -93,7 +90,8 @@ Dated, agent-executable implementation plans live in [`plans/`](plans/), front-m
 
 Implementation and post-mortem records retained for context:
 
-- [plans/2026-05-13-001-host-presentation-damage-plan.md](plans/2026-05-13-001-host-presentation-damage-plan.md) — shipped host presentation damage promotion: `PresentationDamage` is an optional public host hint, damage-aware semantic presentation preserves accessibility data and damage, SwiftUIHost redraws dirty native rects, and WebHost/WASI redraw dirty browser-canvas regions while still sending complete frame records
+- [proposals/SEMANTIC_HOST_FRAME_API.md](proposals/SEMANTIC_HOST_FRAME_API.md) — implemented semantic host-frame producer/consumer contract that carries producer sequence, raster output, semantic snapshots, focus, host-frame capabilities, and raster damage together
+- [plans/2026-05-13-001-host-presentation-damage-plan.md](plans/2026-05-13-001-host-presentation-damage-plan.md) — shipped host presentation damage promotion: `PresentationDamage` is an optional public host hint, semantic host-frame presentation preserves accessibility data and damage, SwiftUIHost redraws dirty native rects, and WebHost/WASI redraw dirty browser-canvas regions while still sending complete frame records
 - [plans/2026-05-12-002-late-preference-reconciliation-plan.md](plans/2026-05-12-002-late-preference-reconciliation-plan.md) — shipped runtime late preference reconciliation seam, with toolbar hosts absorbing `.toolbarItem(...)` values emitted by realized `GeometryReader` content before commit
 - [plans/2026-05-12-001-popover-presentation-plan.md](plans/2026-05-12-001-popover-presentation-plan.md) — shipped anchored popover presentation implementation record for Boolean and item-driven `.popover`, TipKit-inspired `.popoverTip`, source-relative terminal placement, Escape dismissal, and the gallery `Popovers` tab
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — shipped anchored popover and TipKit-inspired `popoverTip` API proposal

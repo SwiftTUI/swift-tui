@@ -122,7 +122,7 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
 #endif
 
 package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPresentationSurface,
-  DamageAwareSemanticPresentationSurface, Sendable
+  SemanticHostFramePresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -266,7 +266,7 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
   }
 
   @discardableResult
-  package func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics {
+  package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     let bytes = state.withLock { state in
       Array(
         WebSurfaceFrameEncoder.encode(
@@ -277,7 +277,7 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
     }
     try writeBytes(bytes)
     return .rasterHostMetrics(
-      for: frame.surface,
+      for: frame.raster,
       damage: frame.rasterDamage,
       bytesWritten: bytes.count
     )
@@ -746,6 +746,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   ) -> String {
     encode(
       surface,
+      sequence: nil,
       semanticSnapshot: nil,
       focusedIdentity: nil,
       damage: damage,
@@ -754,7 +755,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 
   @_spi(WebHost) public static func encode(
-    _ frame: SemanticPresentationFrame
+    _ frame: SemanticHostFrame
   ) -> String {
     var knownImageIDs: Set<String> = []
     return encode(
@@ -764,12 +765,13 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 
   @_spi(WebHost) public static func encode(
-    _ frame: SemanticPresentationFrame,
+    _ frame: SemanticHostFrame,
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
-      frame.surface,
-      semanticSnapshot: Optional(frame.semanticSnapshot),
+      frame.raster,
+      sequence: frame.sequence,
+      semanticSnapshot: frame.semantics,
       focusedIdentity: frame.focusedIdentity,
       damage: frame.rasterDamage,
       knownImageIDs: &knownImageIDs
@@ -778,6 +780,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
 
   private static func encode(
     _ surface: RasterSurface,
+    sequence: UInt64?,
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage?,
@@ -800,11 +803,16 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     let accessibilityAnnouncements = semanticSnapshot.map {
       encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
     }
-    let version =
-      accessibilityTree?.isEmpty == false || accessibilityAnnouncements?.isEmpty == false ? 2 : 1
+    let hasV2Fields =
+      sequence != nil || accessibilityTree?.isEmpty == false
+      || accessibilityAnnouncements?.isEmpty == false
+    let version = hasV2Fields ? 2 : 1
 
     var json = "\u{001E}surface:{"
     json += "\"version\":\(version)"
+    if let sequence {
+      json += ",\"sequence\":\(sequence)"
+    }
     json += ",\"width\":\(max(0, surface.size.width))"
     json += ",\"height\":\(max(0, surface.size.height))"
     json += ",\"styles\":["

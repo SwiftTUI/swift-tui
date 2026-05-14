@@ -90,6 +90,7 @@ export interface WebHostSurfaceDamage {
 
 export interface WebHostSurfaceFrame {
   version: 1 | 2;
+  sequence?: number;
   width: number;
   height: number;
   styles: Array<WebHostSurfaceStyle | null>;
@@ -332,6 +333,10 @@ function isWebHostSurfaceFrame(
   }
   const frame = value as Partial<WebHostSurfaceFrame>;
   return (frame.version === 1 || frame.version === 2)
+    && (
+      frame.sequence === undefined
+        || (Number.isSafeInteger(frame.sequence) && frame.sequence >= 0)
+    )
     && typeof frame.width === "number"
     && typeof frame.height === "number"
     && Array.isArray(frame.styles)

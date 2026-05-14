@@ -23,7 +23,7 @@ package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConve
 
 package final class WebSocketSurfaceTransport: PresentationSurface,
   ClipboardWritingPresentationSurface,
-  DamageAwareSemanticPresentationSurface, Sendable
+  SemanticHostFramePresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -145,7 +145,7 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
   }
 
   @discardableResult
-  package func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics {
+  package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     let bytes = state.withLock { state in
       Array(
         WebSurfaceFrameEncoder.encode(
@@ -156,7 +156,7 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
     }
     try sendBytes(bytes)
     return .rasterHostMetrics(
-      for: frame.surface,
+      for: frame.raster,
       damage: frame.rasterDamage,
       bytesWritten: bytes.count
     )

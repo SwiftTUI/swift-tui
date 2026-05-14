@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -350,6 +350,70 @@ struct AccessibilityRuntimePolicyTests {
     #expect(terminal.movedCursorPoints.last == cursorAnchor)
     #expect(!(terminal.latestSurface?.lines.joined(separator: "\n").contains("bc_") ?? false))
   }
+
+  @Test("run loop prefers semantic host-frame surface over raster damage surface")
+  func runLoopPrefersSemanticHostFrameSurfaceOverRasterDamageSurface() throws {
+    let surface = SemanticHostFrameDispatchSurface()
+    let rootIdentity = testIdentity("SemanticHostFrameDispatchRoot")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = semanticHostFrameDispatchRunLoop(
+      rootIdentity: rootIdentity,
+      surface: surface,
+      focusTracker: focusTracker
+    )
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let frame = try #require(surface.semanticFrames.last)
+    #expect(surface.rasterOnlyPresentations == 0)
+    #expect(surface.rasterDamagePresentations == 0)
+    #expect(frame.sequence == 0)
+    #expect(frame.raster.lines.joined(separator: "\n").contains("Run"))
+    #expect(
+      frame.semantics.focusRegions.map(\.identity).contains(testIdentity("SemanticHostButton")))
+    #expect(frame.focusedIdentity == testIdentity("SemanticHostButton"))
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(surface.semanticFrames.count >= 2)
+    let hasContiguousSequences = surface.semanticFrames.enumerated().allSatisfy { index, frame in
+      frame.sequence == UInt64(index)
+    }
+    #expect(hasContiguousSequences)
+  }
+}
+
+@MainActor
+private func semanticHostFrameDispatchRunLoop(
+  rootIdentity: Identity,
+  surface: SemanticHostFrameDispatchSurface,
+  focusTracker: FocusTracker
+) -> RunLoop<Int, SemanticHostFrameButtonView> {
+  RunLoop(
+    rootIdentity: rootIdentity,
+    presentationSurface: surface,
+    terminalInputReader: CursorFocusTestInputReader(),
+    signalReader: CursorFocusTestSignalReader(),
+    scheduler: FrameScheduler(),
+    stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+    focusTracker: focusTracker,
+    runtimeConfiguration: .default,
+    proposal: .init(width: surface.surfaceSize.width, height: surface.surfaceSize.height),
+    viewBuilder: ScopedMapper { _ in
+      SemanticHostFrameButtonView()
+    }
+  )
+}
+
+private struct SemanticHostFrameButtonView: View {
+  var body: some View {
+    Button("Run") {}
+      .id(testIdentity("SemanticHostButton"))
+  }
 }
 
 @MainActor
@@ -432,6 +496,54 @@ private final class CursorFocusTestTerminalHost: PresentationSurface,
 private final class CursorFocusTestInputReader: TerminalInputReading {
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { $0.finish() }
+  }
+}
+
+private final class SemanticHostFrameDispatchSurface:
+  PresentationSurface, DamageAwarePresentationSurface, SemanticHostFramePresentationSurface
+{
+  let surfaceSize = CellSize(width: 24, height: 6)
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+  let semanticHostFrameCapabilities: SemanticHostFrameCapabilities = []
+  private(set) var semanticFrames: [SemanticHostFrame] = []
+  private(set) var rasterOnlyPresentations = 0
+  private(set) var rasterDamagePresentations = 0
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    rasterOnlyPresentations += 1
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: surface,
+      damage: nil
+    )
+  }
+
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
+    rasterDamagePresentations += 1
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: surface,
+      damage: damage
+    )
+  }
+
+  @discardableResult
+  func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
+    semanticFrames.append(frame)
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: frame.raster,
+      damage: frame.rasterDamage
+    )
   }
 }
 

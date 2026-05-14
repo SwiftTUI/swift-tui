@@ -175,7 +175,9 @@ classifications:
     - SwiftTUI.MouseEvent
     - SwiftTUI.PasteEvent
     - SwiftTUI.PresentationSurface
-    - SwiftTUI.SemanticPresentationFrame
+    - SwiftTUI.PresentationMetrics
+    - SwiftTUI.SemanticHostFrame
+    - SwiftTUI.SemanticHostFrameCapabilities
     - SwiftTUI.SignalReading
     - SwiftTUI.Standard
     - SwiftTUI.StateKeyHandler

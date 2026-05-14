@@ -339,6 +339,9 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
   }
 }
 
+/// Host-facing name for metrics describing a committed presentation frame.
+public typealias PresentationMetrics = TerminalPresentationMetrics
+
 /// Abstraction over a presentation target used by `RunLoop`.
 ///
 /// Conformers can be terminal devices that emit ANSI bytes (`TerminalHost`,
@@ -370,35 +373,83 @@ package protocol DamageAwarePresentationSurface: PresentationSurface {
   ) throws -> TerminalPresentationMetrics
 }
 
+/// Capabilities requested by a surface that consumes semantic host frames.
+public struct SemanticHostFrameCapabilities: OptionSet, Sendable {
+  public let rawValue: UInt8
+
+  public init(rawValue: UInt8) {
+    self.rawValue = rawValue
+  }
+
+  /// The surface can use raster damage hints to avoid full repaint work.
+  public static let rasterDamage = Self(rawValue: 1 << 0)
+
+  /// The surface consumes the frame's accessibility tree.
+  public static let accessibilityTree = Self(rawValue: 1 << 1)
+
+  /// The surface can publish imperative accessibility announcements.
+  public static let accessibilityAnnouncements = Self(rawValue: 1 << 2)
+
+  /// The surface consumes interaction regions for host-side routing.
+  public static let interactionRouting = Self(rawValue: 1 << 3)
+
+  /// The surface consumes focus regions or focused identity.
+  public static let focusRouting = Self(rawValue: 1 << 4)
+
+  /// Default capability set for current semantic host-frame consumers.
+  public static let standard: Self = [
+    .rasterDamage,
+    .accessibilityTree,
+    .accessibilityAnnouncements,
+    .interactionRouting,
+    .focusRouting,
+  ]
+}
+
 /// A committed raster frame plus the semantic data needed by non-terminal hosts.
+///
+/// ``sequence`` is monotonically increasing for each runtime producer. Hosts
+/// can use it to detect stale asynchronous work without inferring freshness
+/// from callback ordering.
 ///
 /// ``rasterDamage`` describes changed raster rows/ranges relative to the
 /// previous committed raster frame. It is not a semantic-tree diff.
-public struct SemanticPresentationFrame: Equatable, Sendable {
-  public var surface: RasterSurface
-  public var semanticSnapshot: SemanticSnapshot
+public struct SemanticHostFrame: Equatable, Sendable {
+  public var sequence: UInt64
+  public var raster: RasterSurface
+  public var semantics: SemanticSnapshot
   public var focusedIdentity: Identity?
   public var rasterDamage: PresentationDamage?
 
   public init(
-    surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
+    sequence: UInt64,
+    raster: RasterSurface,
+    semantics: SemanticSnapshot,
     focusedIdentity: Identity?,
     rasterDamage: PresentationDamage? = nil
   ) {
-    self.surface = surface
-    self.semanticSnapshot = semanticSnapshot
+    self.sequence = sequence
+    self.raster = raster
+    self.semantics = semantics
     self.focusedIdentity = focusedIdentity
     self.rasterDamage = rasterDamage
   }
 }
 
 @_spi(Runners)
-public protocol DamageAwareSemanticPresentationSurface:
+public protocol SemanticHostFramePresentationSurface:
   PresentationSurface
 {
+  var semanticHostFrameCapabilities: SemanticHostFrameCapabilities { get }
+
   @discardableResult
-  func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics
+  func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics
+}
+
+extension SemanticHostFramePresentationSurface {
+  public var semanticHostFrameCapabilities: SemanticHostFrameCapabilities {
+    .standard
+  }
 }
 
 extension PresentationSurface {

@@ -171,6 +171,7 @@ struct HostedSceneSessionTests {
     }
 
     #expect(surfaceRecorder.latestSurface == semanticRecorder.latestSurface)
+    #expect(semanticRecorder.frames.first?.sequence == 0)
 
     let stopExitReason = try await session.stopAndWait()
     let taskExitReason = try await task.value
@@ -339,7 +340,7 @@ struct HostedSceneSessionTests {
       surfaceSize: .init(width: 24, height: 6),
       appearance: .fallback,
       onFrame: { frame in
-        surfaceRecorder?.record(frame.surface)
+        surfaceRecorder?.record(frame.raster)
         semanticRecorder?.record(
           frame
         )
@@ -375,6 +376,7 @@ private final class SurfaceRecorder {
 private final class SemanticFrameRecorder {
   private(set) var frames:
     [(
+      sequence: UInt64,
       surface: RasterSurface,
       snapshot: SemanticSnapshot,
       focused: Identity?,
@@ -395,12 +397,13 @@ private final class SemanticFrameRecorder {
   }
 
   func record(
-    _ frame: SemanticPresentationFrame
+    _ frame: SemanticHostFrame
   ) {
     frames.append(
       (
-        surface: frame.surface,
-        snapshot: frame.semanticSnapshot,
+        sequence: frame.sequence,
+        surface: frame.raster,
+        snapshot: frame.semantics,
         focused: frame.focusedIdentity,
         damage: frame.rasterDamage
       )

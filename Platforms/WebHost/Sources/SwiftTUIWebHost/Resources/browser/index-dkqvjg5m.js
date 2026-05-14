@@ -365,6 +365,16 @@ class WebHostOutputDecoder {
       return { type: "text", text: `${line}
 ` };
     }
+    if (line.startsWith(`${recordPrefix}runtimeIssue:`)) {
+      try {
+        const record = JSON.parse(line.slice(`${recordPrefix}runtimeIssue:`.length));
+        if (isWebHostRuntimeIssue(record)) {
+          return { type: "runtimeIssue", issue: record };
+        }
+      } catch {}
+      return { type: "text", text: `${line}
+` };
+    }
     if (!line.startsWith(`${recordPrefix}surface:`)) {
       return { type: "text", text: `${line}
 ` };
@@ -381,6 +391,13 @@ class WebHostOutputDecoder {
 }
 function isWebHostClipboardRecord(value) {
   return !!value && typeof value === "object" && typeof value.text === "string";
+}
+function isWebHostRuntimeIssue(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value;
+  return (record.severity === "warning" || record.severity === "error") && typeof record.code === "string" && typeof record.message === "string" && typeof record.description === "string" && (record.identity === undefined || typeof record.identity === "string") && (record.source === undefined || typeof record.source === "string");
 }
 function encodeResizeControlMessage(columns, rows, cellWidth, cellHeight) {
   const normalizedColumns = Math.max(1, Math.round(columns));
@@ -431,7 +448,7 @@ function isWebHostSurfaceFrame(value) {
     return false;
   }
   const frame = value;
-  return (frame.version === 1 || frame.version === 2) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.rows) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements));
+  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.rows) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements));
 }
 function isWebHostAccessibilityNodes(value) {
   return Array.isArray(value) && value.every(isWebHostAccessibilityNode);
@@ -465,6 +482,19 @@ function isWebHostSurfaceImage(value) {
   }
   const image = value;
   return typeof image.id === "string" && isWebHostSurfaceImageFormat(image.format) && isWebHostSurfaceRect(image.bounds) && isWebHostSurfaceRect(image.visibleBounds) && isWebHostSurfaceScalingMode(image.scalingMode) && (image.pixelSize === undefined || isWebHostSurfaceSize(image.pixelSize)) && (image.dataBase64 === undefined || typeof image.dataBase64 === "string");
+}
+function isWebHostSurfaceDamage(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const damage = value;
+  return Array.isArray(damage.textRows) && damage.textRows.every(isWebHostSurfaceDamageTextRow) && typeof damage.requiresFullTextRepaint === "boolean" && typeof damage.requiresFullGraphicsReplay === "boolean";
+}
+function isWebHostSurfaceDamageTextRow(value) {
+  return Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && Array.isArray(value[1]) && value[1].every(isWebHostSurfaceDamageRange);
+}
+function isWebHostSurfaceDamageRange(value) {
+  return Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && typeof value[1] === "number";
 }
 function isWebHostSurfaceImageFormat(value) {
   return value === "png" || value === "jpeg" || value === "gif";
@@ -662,6 +692,9 @@ class WebSocketSceneBridge {
         break;
       case "clipboard":
         sink.writeClipboard?.(record.text);
+        break;
+      case "runtimeIssue":
+        sink.notifyRuntimeIssue?.(record.issue);
         break;
       case "text":
         sink.writeOutput?.(record.text);
@@ -1350,7 +1383,7 @@ class AccessibilityTreeMounter {
     this.announcerElement.setAttribute("aria-atomic", "true");
     applyScreenReaderOnlyStyle(this.announcerElement);
   }
-  present(nodes, metrics, announcements = []) {
+  present(nodes, metrics, announcements = [], options = {}) {
     this.element.replaceChildren();
     this.nodesById.clear();
     for (const node of nodes) {
@@ -1367,8 +1400,8 @@ class AccessibilityTreeMounter {
     }
     this.announceLiveRegionChanges(nodes, announcements);
     const focused = nodes.find((node) => node.isFocused);
-    if (focused) {
-      this.nodesById.get(focused.id)?.focus?.();
+    if ((options.synchronizeFocus ?? true) && focused) {
+      this.nodesById.get(focused.id)?.focus?.({ preventScroll: true });
     }
   }
   elementForNode(node, metrics) {
@@ -1533,6 +1566,8 @@ class WebHostSceneRuntime {
   terminalMount;
   bridge;
   onInput;
+  synchronizeAccessibilityFocus;
+  captureWheelInput;
   imageCache = new Map;
   currentStyle;
   canvas;
@@ -1553,6 +1588,8 @@ class WebHostSceneRuntime {
     this.currentStyle = normalizeWebHostTerminalStyle(options.style);
     this.bridge = options.bridge;
     this.onInput = options.onInput;
+    this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
+    this.captureWheelInput = options.captureWheelInput ?? true;
     this.element = document.createElement("section");
     this.element.className = "webhost-scene";
     this.element.dataset.sceneId = options.descriptor.id;
@@ -1582,6 +1619,7 @@ class WebHostSceneRuntime {
     this.bridge?.bindOutput({
       presentSurface: (frame) => this.presentSurface(frame),
       writeClipboard: (text) => this.writeClipboard(text),
+      notifyRuntimeIssue: (issue) => this.notifyRuntimeIssue(issue),
       writeOutput: (text) => this.writeOutput(text),
       writeError: (text) => this.writeOutput(text)
     });
@@ -1596,7 +1634,9 @@ class WebHostSceneRuntime {
     this.applyVisibility();
     if (visible) {
       this.resizeToMount();
-      this.terminalMount.focus?.();
+      if (this.synchronizeAccessibilityFocus) {
+        this.terminalMount.focus?.({ preventScroll: true });
+      }
     }
   }
   setStyle(style) {
@@ -1624,6 +1664,9 @@ class WebHostSceneRuntime {
     }
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
   }
+  notifyRuntimeIssue(issue) {
+    console.log(issue.description);
+  }
   async writeClipboard(text) {
     const clipboard = globalThis.navigator?.clipboard;
     if (!clipboard?.writeText) {
@@ -1642,11 +1685,12 @@ class WebHostSceneRuntime {
     this.element.remove();
   }
   presentSurface(frame) {
+    const previousFrame = this.currentFrame;
     this.currentFrame = frame;
     this.columns = Math.max(1, Math.round(frame.width));
     this.rows = Math.max(1, Math.round(frame.height));
-    this.resizeCanvas();
-    this.draw();
+    const resized = this.resizeCanvas();
+    this.draw(previousFrame && !resized ? frame.damage : undefined);
     this.syncAccessibilityTree();
   }
   applyStyle(style) {
@@ -1711,7 +1755,7 @@ class WebHostSceneRuntime {
       }
       const button = pointerButton(event.button);
       this.activePointerButton = button;
-      this.terminalMount.focus?.();
+      this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
       this.onInput(encodeMouseInputMessage({
         kind: "down",
@@ -1751,6 +1795,9 @@ class WebHostSceneRuntime {
       }));
     };
     const handleWheel = (event) => {
+      if (!this.captureWheelInput) {
+        return;
+      }
       const location = this.cellLocation(event);
       if (!location) {
         return;
@@ -1807,15 +1854,23 @@ class WebHostSceneRuntime {
   }
   resizeCanvas() {
     if (!this.canvas) {
-      return;
+      return false;
     }
     const cssWidth = Math.max(1, this.columns * this.cellWidth);
     const cssHeight = Math.max(1, this.rows * this.cellHeight);
     const scale = globalThis.window?.devicePixelRatio || 1;
-    this.canvas.width = Math.ceil(cssWidth * scale);
-    this.canvas.height = Math.ceil(cssHeight * scale);
-    this.canvas.style.width = `${cssWidth}px`;
-    this.canvas.style.height = `${cssHeight}px`;
+    const width = Math.ceil(cssWidth * scale);
+    const height = Math.ceil(cssHeight * scale);
+    const styleWidth = `${cssWidth}px`;
+    const styleHeight = `${cssHeight}px`;
+    if (this.canvas.width === width && this.canvas.height === height && this.canvas.style.width === styleWidth && this.canvas.style.height === styleHeight) {
+      return false;
+    }
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.canvas.style.width = styleWidth;
+    this.canvas.style.height = styleHeight;
+    return true;
   }
   measureCells() {
     const canvas = this.canvas ?? document.createElement("canvas");
@@ -1829,7 +1884,7 @@ class WebHostSceneRuntime {
     this.cellWidth = Math.max(1, Math.ceil(context.measureText("W").width));
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
-  draw() {
+  draw(damage) {
     const canvas = this.canvas;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) {
@@ -1838,22 +1893,40 @@ class WebHostSceneRuntime {
     const scale = globalThis.window?.devicePixelRatio || 1;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.textBaseline = "alphabetic";
-    context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
-    context.fillStyle = webTUITerminalBackgroundColor(this.currentStyle);
-    context.fillRect(0, 0, this.columns * this.cellWidth, this.rows * this.cellHeight);
     const frame = this.currentFrame;
+    const dirtyRects = frame ? this.dirtyRectsForDamage(damage, frame) : undefined;
+    if (dirtyRects?.length === 0) {
+      return;
+    }
+    context.fillStyle = webTUITerminalBackgroundColor(this.currentStyle);
+    if (dirtyRects) {
+      for (const rect of dirtyRects) {
+        context.clearRect(rect.x, rect.y, rect.width, rect.height);
+        context.fillRect(rect.x, rect.y, rect.width, rect.height);
+      }
+    } else {
+      context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
+      context.fillRect(0, 0, this.columns * this.cellWidth, this.rows * this.cellHeight);
+    }
     if (!frame) {
       return;
     }
+    this.drawRows(context, frame, dirtyRects);
+    this.drawImages(context, frame.images ?? [], dirtyRects);
+  }
+  drawRows(context, frame, dirtyRects) {
     for (let y = 0;y < frame.rows.length; y += 1) {
       const row = frame.rows[y] ?? [];
       for (const cell of row) {
         const [x, text, span, styleIndex] = cell;
+        const cellRect = this.cellRect(x, y, span);
+        if (dirtyRects && !dirtyRects.some((rect) => rectsIntersect(rect, cellRect))) {
+          continue;
+        }
         const style = frame.styles[styleIndex] ?? undefined;
         this.drawCell(context, x, y, text, span, style);
       }
     }
-    this.drawImages(context, frame.images ?? []);
   }
   syncAccessibilityTree() {
     const tree = this.accessibilityTree;
@@ -1863,14 +1936,16 @@ class WebHostSceneRuntime {
     tree.present(this.currentFrame.accessibilityTree ?? [], {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight
-    }, this.currentFrame.accessibilityAnnouncements ?? []);
+    }, this.currentFrame.accessibilityAnnouncements ?? [], {
+      synchronizeFocus: this.synchronizeAccessibilityFocus
+    });
   }
-  drawImages(context, images) {
+  drawImages(context, images, dirtyRects) {
     for (const image of images) {
-      this.drawImage(context, image);
+      this.drawImage(context, image, dirtyRects);
     }
   }
-  drawImage(context, image) {
+  drawImage(context, image, dirtyRects) {
     const decodedImage = this.cachedImage(image);
     if (!decodedImage) {
       return;
@@ -1878,6 +1953,15 @@ class WebHostSceneRuntime {
     const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
     const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
     if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      return;
+    }
+    const imageRect = {
+      x: clipX * this.cellWidth,
+      y: clipY * this.cellHeight,
+      width: clipWidth * this.cellWidth,
+      height: clipHeight * this.cellHeight
+    };
+    if (dirtyRects && !dirtyRects.some((rect) => rectsIntersect(rect, imageRect))) {
       return;
     }
     context.save();
@@ -1937,6 +2021,38 @@ class WebHostSceneRuntime {
     this.drawTextLine(context, rectX, rectY, width, style?.underline, "underline", foreground);
     this.drawTextLine(context, rectX, rectY, width, style?.strikethrough, "strike", foreground);
     context.globalAlpha = 1;
+  }
+  dirtyRectsForDamage(damage, frame) {
+    if (!damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay) {
+      return;
+    }
+    const rects = [];
+    for (const [row, ranges] of damage.textRows) {
+      if (row < 0 || row >= frame.height) {
+        continue;
+      }
+      if (ranges.length === 0) {
+        rects.push(this.cellRect(0, row, frame.width));
+        continue;
+      }
+      for (const [start, end] of ranges) {
+        const lowerBound = Math.max(0, Math.min(frame.width, Math.floor(start)));
+        const upperBound = Math.max(lowerBound, Math.min(frame.width, Math.ceil(end)));
+        if (lowerBound >= upperBound) {
+          continue;
+        }
+        rects.push(this.cellRect(lowerBound, row, upperBound - lowerBound));
+      }
+    }
+    return rects;
+  }
+  cellRect(x, y, span) {
+    return {
+      x: x * this.cellWidth,
+      y: y * this.cellHeight,
+      width: Math.max(1, span) * this.cellWidth,
+      height: this.cellHeight
+    };
   }
   drawTextLine(context, x, y, width, line, placement, fallbackColor) {
     if (!line) {
@@ -2077,6 +2193,9 @@ function normalizedWheelDelta(delta) {
     return -1;
   }
   return 0;
+}
+function rectsIntersect(lhs, rhs) {
+  return lhs.x < rhs.x + rhs.width && lhs.x + lhs.width > rhs.x && lhs.y < rhs.y + rhs.height && lhs.y + lhs.height > rhs.y;
 }
 function resolvedForeground(style, terminalStyle) {
   if ((style?.em ?? 0) & 16) {
