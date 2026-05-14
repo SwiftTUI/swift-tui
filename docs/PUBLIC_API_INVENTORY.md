@@ -196,6 +196,7 @@ runtime-facing public surface is canonical:
 - `SceneDescriptor`
 - `SceneManifest`
 - `HostedRasterSurface`
+- `SemanticPresentationFrame`
 - `HostedSceneSession`
 
 ### `AnimatedImage`

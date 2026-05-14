@@ -266,27 +266,19 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
   }
 
   @discardableResult
-  package func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
+  package func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics {
     let bytes = state.withLock { state in
       Array(
         WebSurfaceFrameEncoder.encode(
-          surface,
-          semanticSnapshot: semanticSnapshot,
-          focusedIdentity: focusedIdentity,
-          damage: damage,
+          frame,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
     }
     try writeBytes(bytes)
     return .rasterHostMetrics(
-      for: surface,
-      damage: damage,
+      for: frame.surface,
+      damage: frame.rasterDamage,
       bytesWritten: bytes.count
     )
   }
@@ -762,33 +754,24 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 
   @_spi(WebHost) public static func encode(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity? = nil,
-    damage: PresentationDamage? = nil
+    _ frame: SemanticPresentationFrame
   ) -> String {
     var knownImageIDs: Set<String> = []
     return encode(
-      surface,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
-      damage: damage,
+      frame,
       knownImageIDs: &knownImageIDs
     )
   }
 
   @_spi(WebHost) public static func encode(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity? = nil,
-    damage: PresentationDamage? = nil,
+    _ frame: SemanticPresentationFrame,
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
-      surface,
-      semanticSnapshot: Optional(semanticSnapshot),
-      focusedIdentity: focusedIdentity,
-      damage: damage,
+      frame.surface,
+      semanticSnapshot: Optional(frame.semanticSnapshot),
+      focusedIdentity: frame.focusedIdentity,
+      damage: frame.rasterDamage,
       knownImageIDs: &knownImageIDs
     )
   }

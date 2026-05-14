@@ -338,15 +338,10 @@ struct HostedSceneSessionTests {
     HostedRasterSurface(
       surfaceSize: .init(width: 24, height: 6),
       appearance: .fallback,
-      onSurface: { surface in
-        surfaceRecorder?.record(surface)
-      },
-      onSemanticFrameWithDamage: { surface, semanticSnapshot, focusedIdentity, damage in
+      onFrame: { frame in
+        surfaceRecorder?.record(frame.surface)
         semanticRecorder?.record(
-          surface: surface,
-          semanticSnapshot: semanticSnapshot,
-          focusedIdentity: focusedIdentity,
-          damage: damage
+          frame
         )
       },
       onClipboardWrite: { text in
@@ -400,17 +395,14 @@ private final class SemanticFrameRecorder {
   }
 
   func record(
-    surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
+    _ frame: SemanticPresentationFrame
   ) {
     frames.append(
       (
-        surface: surface,
-        snapshot: semanticSnapshot,
-        focused: focusedIdentity,
-        damage: damage
+        surface: frame.surface,
+        snapshot: frame.semanticSnapshot,
+        focused: frame.focusedIdentity,
+        damage: frame.rasterDamage
       )
     )
   }

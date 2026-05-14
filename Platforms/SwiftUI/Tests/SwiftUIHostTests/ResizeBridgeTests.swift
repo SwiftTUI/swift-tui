@@ -41,7 +41,7 @@ func bridge_forwards_resize_and_style_updates() async throws {
     surfaceSize: .init(width: 80, height: 24),
     appearance: style.renderStyle.appearance,
     theme: style.renderStyle.theme,
-    onSurface: { _ in }
+    onFrame: { _ in }
   )
 
   bridge.attach(session: session, surface: surface)
@@ -110,7 +110,7 @@ func bridge_forwards_pointer_events_in_order() {
   let surface = HostedRasterSurface(
     surfaceSize: .init(width: 80, height: 24),
     appearance: .fallback,
-    onSurface: { _ in }
+    onFrame: { _ in }
   )
   let location = Point(x: 4, y: 2)
 

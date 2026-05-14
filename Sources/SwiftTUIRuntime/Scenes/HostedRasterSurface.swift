@@ -3,7 +3,7 @@ import Synchronization
 
 /// Raster and semantic presentation surface for retained non-terminal hosts.
 public final class HostedRasterSurface:
-  PresentationSurface, DamageAwarePresentationSurface, ClipboardWritingPresentationSurface, Sendable
+  PresentationSurface, ClipboardWritingPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -13,9 +13,7 @@ public final class HostedRasterSurface:
   }
 
   private let state: Mutex<State>
-  private let surfaceHandler: @Sendable (RasterSurface) -> Void
-  private let semanticFrameHandler:
-    @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) -> Void
+  private let frameHandler: @Sendable (SemanticPresentationFrame) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
 
   public let capabilityProfile: TerminalCapabilityProfile
@@ -45,27 +43,13 @@ public final class HostedRasterSurface:
     appearance: TerminalAppearance,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
-    onSurface: @escaping @MainActor @Sendable (RasterSurface) -> Void,
-    onSemanticFrameWithDamage:
-      (
-        @MainActor @Sendable (RasterSurface, SemanticSnapshot, Identity?, PresentationDamage?) ->
-          Void
-      )? =
-      nil,
+    onFrame: @escaping @MainActor @Sendable (SemanticPresentationFrame) -> Void,
     onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil
   ) {
     self.capabilityProfile = capabilityProfile
-    surfaceHandler = { surface in
+    frameHandler = { frame in
       Task { @MainActor in
-        onSurface(surface)
-      }
-    }
-    semanticFrameHandler = { surface, semanticSnapshot, focusedIdentity, damage in
-      guard let onSemanticFrameWithDamage else {
-        return
-      }
-      Task { @MainActor in
-        onSemanticFrameWithDamage(surface, semanticSnapshot, focusedIdentity, damage)
+        onFrame(frame)
       }
     }
     clipboardWriter = onClipboardWrite
@@ -144,42 +128,30 @@ public final class HostedRasterSurface:
   public func present(
     _ surface: RasterSurface
   ) throws -> TerminalPresentationMetrics {
-    try present(surface, damage: nil)
-  }
-
-  @discardableResult
-  package func present(
-    _ surface: RasterSurface,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
-    submit(surface)
-    return TerminalPresentationMetrics.rasterHostMetrics(
-      for: surface,
-      damage: damage
+    try present(
+      SemanticPresentationFrame(
+        surface: surface,
+        semanticSnapshot: .init(),
+        focusedIdentity: nil
+      )
     )
   }
 
   private func submit(
-    _ surface: RasterSurface
+    _ frame: SemanticPresentationFrame
   ) {
-    surfaceHandler(surface)
+    frameHandler(frame)
   }
 }
 
 @_spi(Runners)
 extension HostedRasterSurface: DamageAwareSemanticPresentationSurface {
   @discardableResult
-  public func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
-    submit(surface)
-    semanticFrameHandler(surface, semanticSnapshot, focusedIdentity, damage)
+  public func present(_ frame: SemanticPresentationFrame) throws -> TerminalPresentationMetrics {
+    submit(frame)
     return TerminalPresentationMetrics.rasterHostMetrics(
-      for: surface,
-      damage: damage
+      for: frame.surface,
+      damage: frame.rasterDamage
     )
   }
 }

@@ -61,6 +61,10 @@ Use **presentation surface** for `PresentationSurface` implementations such as
 `WebSocketSurfaceTransport`. A presentation surface may be created by a runner
 or retained by a host, but it is not itself a product-level runner or host.
 
+Use `SemanticPresentationFrame` for the single value handed to non-terminal
+surfaces that consume raster output together with semantic snapshot data and
+raster damage hints.
+
 ## Hosted Scene Session
 
 A `HostedSceneSession` is a retained runtime session for one selected scene. It

@@ -4942,9 +4942,10 @@ SwiftTUIRuntime.HostedRasterSurface.clearScreen()
 SwiftTUIRuntime.HostedRasterSurface.disableRawMode()
 SwiftTUIRuntime.HostedRasterSurface.enableRawMode()
 SwiftTUIRuntime.HostedRasterSurface.graphicsCapabilities
-SwiftTUIRuntime.HostedRasterSurface.init(surfaceSize:appearance:theme:capabilityProfile:onSurface:onSemanticFrameWithDamage:onClipboardWrite:)
+SwiftTUIRuntime.HostedRasterSurface.init(surfaceSize:appearance:theme:capabilityProfile:onFrame:onClipboardWrite:)
 SwiftTUIRuntime.HostedRasterSurface.moveCursor(to:)
 SwiftTUIRuntime.HostedRasterSurface.pointerInputCapabilities
+SwiftTUIRuntime.HostedRasterSurface.present(_:)
 SwiftTUIRuntime.HostedRasterSurface.present(_:)
 SwiftTUIRuntime.HostedRasterSurface.setPointerHoverEnabled(_:)
 SwiftTUIRuntime.HostedRasterSurface.surfaceSize
@@ -5171,6 +5172,13 @@ SwiftTUIRuntime.SceneManifest.init(defaultSceneID:scenes:)
 SwiftTUIRuntime.SceneManifest.init(for:)
 SwiftTUIRuntime.SceneManifest.init(from:)
 SwiftTUIRuntime.SceneManifest.scenes
+SwiftTUIRuntime.SemanticPresentationFrame
+SwiftTUIRuntime.SemanticPresentationFrame.!=(_:_:)
+SwiftTUIRuntime.SemanticPresentationFrame.focusedIdentity
+SwiftTUIRuntime.SemanticPresentationFrame.init(surface:semanticSnapshot:focusedIdentity:rasterDamage:)
+SwiftTUIRuntime.SemanticPresentationFrame.rasterDamage
+SwiftTUIRuntime.SemanticPresentationFrame.semanticSnapshot
+SwiftTUIRuntime.SemanticPresentationFrame.surface
 SwiftTUIRuntime.SignalReading
 SwiftTUIRuntime.SignalReading.events()
 SwiftTUIRuntime.Standard

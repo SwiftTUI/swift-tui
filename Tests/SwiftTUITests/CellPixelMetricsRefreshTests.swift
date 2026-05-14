@@ -75,7 +75,7 @@ struct CellPixelMetricsRefreshTests {
     let surface = HostedRasterSurface(
       surfaceSize: CellSize(width: 80, height: 24),
       appearance: .fallback,
-      onSurface: { _ in }
+      onFrame: { _ in }
     )
 
     surface.updateSurfaceCapabilities(
@@ -92,7 +92,7 @@ struct CellPixelMetricsRefreshTests {
     let surface = HostedRasterSurface(
       surfaceSize: CellSize(width: 80, height: 24),
       appearance: .fallback,
-      onSurface: { _ in }
+      onFrame: { _ in }
     )
     surface.updateSurfaceCapabilities(
       cellPixelSize: PixelSize(width: 10, height: 20),
@@ -113,7 +113,7 @@ struct CellPixelMetricsRefreshTests {
     let surface = HostedRasterSurface(
       surfaceSize: CellSize(width: 80, height: 24),
       appearance: .fallback,
-      onSurface: { _ in }
+      onFrame: { _ in }
     )
     let capabilities = PointerInputCapabilities(
       precision: .subCell(

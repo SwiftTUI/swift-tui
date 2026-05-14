@@ -179,8 +179,8 @@ private func hostedSurface(recorder: SurfaceRecorder) -> HostedRasterSurface {
   HostedRasterSurface(
     surfaceSize: .init(width: 32, height: 8),
     appearance: .fallback,
-    onSurface: { surface in
-      recorder.record(surface)
+    onFrame: { frame in
+      recorder.record(frame.surface)
     }
   )
 }
