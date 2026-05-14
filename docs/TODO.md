@@ -33,3 +33,7 @@
   build packages such as `@swifttui/web` and `@swifttui/build`, using
   [proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md](proposals/PLATFORMS_WEB_CONSUMABLE_PACKAGES.md)
   as the investigation record.
+- Decide the final semantic host-frame API names, capabilities, and migration
+  path, using
+  [proposals/SEMANTIC_HOST_FRAME_API.md](proposals/SEMANTIC_HOST_FRAME_API.md)
+  as the proposal record.
