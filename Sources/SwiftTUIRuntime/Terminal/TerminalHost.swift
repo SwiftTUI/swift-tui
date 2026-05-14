@@ -342,9 +342,8 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
 /// Abstraction over a presentation target used by `RunLoop`.
 ///
 /// Conformers can be terminal devices that emit ANSI bytes (`TerminalHost`,
-/// `WebTerminalHost`), closure-backed streamers (`StreamingTerminalHost`),
-/// or pure raster sinks that hand `RasterSurface` values to a non-terminal
-/// host such as a SwiftUI canvas.
+/// `WebTerminalHost`), web transports, or pure raster sinks that hand
+/// `RasterSurface` values to a non-terminal host such as a SwiftUI canvas.
 public protocol PresentationSurface: AnyObject {
   var surfaceSize: CellSize { get }
   var capabilityProfile: TerminalCapabilityProfile { get }
@@ -371,18 +370,9 @@ package protocol DamageAwarePresentationSurface: PresentationSurface {
   ) throws -> TerminalPresentationMetrics
 }
 
-@_spi(Runners) public protocol SemanticPresentationSurface: PresentationSurface {
-  @discardableResult
-  func present(
-    _ surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?
-  ) throws -> TerminalPresentationMetrics
-}
-
 @_spi(Runners)
 public protocol DamageAwareSemanticPresentationSurface:
-  SemanticPresentationSurface
+  PresentationSurface
 {
   @discardableResult
   func present(

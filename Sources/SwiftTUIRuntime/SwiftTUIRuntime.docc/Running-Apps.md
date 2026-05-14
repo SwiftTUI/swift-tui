@@ -87,8 +87,9 @@ For WASI apps, import `SwiftTUIWASI` and either rely on its default
 ### Host products
 
 For host-managed embedding, keep the authored `App` in `SwiftTUIRuntime`, then
-let a host product build `SceneManifest` values and retain one or more
-`HostedSceneSession` values.
+let a host product build `SceneManifest` values, retain one or more
+`HostedSceneSession` values, and provide explicit presentation surfaces such as
+`HostedRasterSurface`.
 
 `SwiftUIHost` uses that path to embed SwiftTUI scenes inside a SwiftUI
 app on Apple platforms. `Platforms/Web` uses the same authored scene model for

@@ -5,8 +5,8 @@ import Testing
 @testable import SwiftTUIWebHost
 
 struct WebSocketSurfaceTransportTests {
-  @Test("semantic present emits a v2 web-surface frame with accessibilityTree")
-  func semanticPresentEmitsV2FrameWithAccessibilityTree() async throws {
+  @Test("damage-aware semantic present emits a v2 web-surface frame with accessibilityTree")
+  func damageAwareSemanticPresentEmitsV2FrameWithAccessibilityTree() async throws {
     let sink = RecordingByteSink()
     let transport = WebSocketSurfaceTransport(
       surfaceSize: .init(width: 2, height: 1),
@@ -28,7 +28,8 @@ struct WebSocketSurfaceTransportTests {
           )
         ]
       ),
-      focusedIdentity: button
+      focusedIdentity: button,
+      damage: nil
     )
 
     let record = try #require(await sink.strings().first)

@@ -125,8 +125,8 @@ the same encoder and browser mounter.
 ## Stage 5: Wire Embedded Host And WASI Examples
 
 - [x] Route committed semantic snapshots to the web-surface encoder through the
-  shared `SemanticPresentationSurface` path used by the WASI runner; the future
-  embedded host gets the same frames by conforming its surface transport.
+  shared damage-bearing semantic presentation path used by the WASI runner; the
+  future embedded host gets the same frames by conforming its surface transport.
 - [x] Update `Examples/WebExample` to mount the browser accessibility tree.
 - [x] Add one end-to-end test fixture that proves a rendered button produces a
   browser-side role and label.

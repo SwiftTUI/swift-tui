@@ -163,6 +163,7 @@ classifications:
     - SwiftTUI.FileOpenError
     - SwiftTUI.FrameDiagnosticRecord
     - SwiftTUI.FrameDiagnosticsLogger
+    - SwiftTUI.HostedRasterSurface
     - SwiftTUI.HostedSceneSessionError
     - SwiftTUI.InProcessSignalReader
     - SwiftTUI.InputEvent

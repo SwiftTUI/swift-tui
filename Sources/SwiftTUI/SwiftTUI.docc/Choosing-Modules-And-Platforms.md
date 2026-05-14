@@ -116,8 +116,8 @@ dynamically discover WebHost support.
 
 Use `SwiftTUIRuntime` for shared app declarations when another product owns the
 outer shell. Host products build `SceneManifest` values and retain
-`HostedSceneSession` values instead of relying on the terminal convenience
-`App.main()`.
+`HostedSceneSession` values with explicit presentation surfaces such as
+`HostedRasterSurface` instead of relying on the terminal convenience `App.main()`.
 
 ```swift
 import SwiftTUIRuntime

@@ -195,6 +195,7 @@ runtime-facing public surface is canonical:
 - `AnyScene` as the explicit scene-erasure escape hatch
 - `SceneDescriptor`
 - `SceneManifest`
+- `HostedRasterSurface`
 - `HostedSceneSession`
 
 ### `AnimatedImage`
@@ -226,7 +227,7 @@ Platform-specific execution and embedding are root package products:
     default `App.main()` story for binaries that intentionally combine terminal
     and WebHost behavior
 - host products and packages:
-  - `SwiftUIHost` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
+  - `SwiftUIHost` hosts retained `HostedSceneSession` values with `HostedRasterSurface` inside a SwiftUI app shell
   - `Platforms/Web` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
 - terminal-program embedding products:
   - `SwiftTUITerminal` exposes `TerminalView`, `TerminalSession`, and

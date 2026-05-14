@@ -75,7 +75,9 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
 ### Scene and multi-scene surface
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `SwiftTUI`
-- `SceneDescriptor`, `SceneManifest`, and `HostedSceneSession` in `SwiftTUI` for host product tooling and retained non-terminal hosting
+- `SceneDescriptor`, `SceneManifest`, `HostedRasterSurface`, and
+  `HostedSceneSession` in `SwiftTUI` for host product tooling and retained
+  non-terminal hosting
 - `TerminalRunner` in `SwiftTUICLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
 - `WASIRunner` in `SwiftTUIWASI` for manifest generation and WASI-hosted scene launch
 - `WebHostRunner` and `WebHostCLIRunner` in `SwiftTUIWebHost` /
@@ -129,8 +131,8 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
   and terminal embedding. `Platforms/` is the source layout for those targets,
   while `Platforms/Web` remains the Bun browser package.
 - Host products and packages use `SwiftTUIRuntime` scene manifests plus
-  `HostedSceneSession` and own their own platform shell integration, scene
-  switching chrome, and style surfaces.
+  `HostedRasterSurface` / `HostedSceneSession` and own their own platform shell
+  integration, scene switching chrome, and style surfaces.
 - Host products own one active host style object at a time and
   can swap it at runtime; the root TUI app renders semantic tokens without
   knowing which host theme is active.

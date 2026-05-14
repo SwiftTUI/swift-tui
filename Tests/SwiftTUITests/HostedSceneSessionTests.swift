@@ -1,5 +1,4 @@
 import SwiftTUIViews
-import Synchronization
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -57,31 +56,29 @@ struct HostedSceneSessionTests {
     }
   }
 
-  @Test("hosted scene session rerenders on resize without exiting")
-  func hostedSceneSessionRerendersOnResize() async throws {
-    let recorder = OutputRecorder()
+  @Test("hosted scene session rerenders when the hosted raster surface refreshes")
+  func hostedSceneSessionRerendersOnSurfaceRefresh() async throws {
+    let recorder = SurfaceRecorder()
+    let surface = hostedSurface(surfaceRecorder: recorder)
     let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onOutput: { output in
-        recorder.record(output)
-      }
+      surface: surface
     )
 
     let task = Task {
       try await session.start()
     }
 
-    try await waitUntil("first frame") {
-      recorder.frameCount >= 1
+    try await waitUntil("first surface") {
+      recorder.surfaceCount >= 1
     }
 
-    session.resize(to: .init(width: 32, height: 8))
+    surface.updateSurfaceSize(.init(width: 32, height: 8))
+    session.requestSurfaceRefresh()
 
-    try await waitUntil("second frame") {
-      recorder.frameCount >= 2
+    try await waitUntil("second surface") {
+      recorder.surfaceCount >= 2 && recorder.latestSurface?.size == .init(width: 32, height: 8)
     }
 
     session.sendInput([0x04])  // Ctrl+D
@@ -90,17 +87,13 @@ struct HostedSceneSessionTests {
     #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
-  @Test("hosted surface session publishes raster surfaces and accepts direct input events")
+  @Test("hosted scene session publishes raster surfaces and accepts direct input events")
   func hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents() async throws {
     let recorder = SurfaceRecorder()
     let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onSurface: { surface in
-        recorder.record(surface)
-      }
+      surface: hostedSurface(surfaceRecorder: recorder)
     )
 
     let task = Task {
@@ -119,22 +112,17 @@ struct HostedSceneSessionTests {
     #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
-  @Test("hosted surface session forwards focused text clipboard writes")
-  func hostedSurfaceSessionForwardsFocusedTextClipboardWrites() async throws {
+  @Test("hosted raster surface forwards focused text clipboard writes")
+  func hostedRasterSurfaceForwardsFocusedTextClipboardWrites() async throws {
     let surfaceRecorder = SurfaceRecorder()
     let clipboardRecorder = ClipboardRecorder()
     let session = try HostedSceneSession(
       for: ClipboardSurfaceApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onSurface: { surface in
-        surfaceRecorder.record(surface)
-      },
-      onClipboardWrite: { text in
-        clipboardRecorder.record(text)
-        return true
-      }
+      surface: hostedSurface(
+        surfaceRecorder: surfaceRecorder,
+        clipboardRecorder: clipboardRecorder
+      )
     )
 
     let task = Task {
@@ -157,25 +145,17 @@ struct HostedSceneSessionTests {
     #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
-  @Test("hosted surface session publishes semantic snapshots beside raster surfaces")
-  func hostedSurfaceSessionPublishesSemanticSnapshotsBesideRasterSurfaces() async throws {
+  @Test("hosted raster surface publishes damage-bearing semantic frames beside raster surfaces")
+  func hostedRasterSurfacePublishesDamageBearingSemanticFramesBesideRasterSurfaces() async throws {
     let surfaceRecorder = SurfaceRecorder()
     let semanticRecorder = SemanticFrameRecorder()
     let session = try HostedSceneSession(
       for: AccessibilitySurfaceApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onSurface: { surface in
-        surfaceRecorder.record(surface)
-      },
-      onSemanticFrame: { surface, semanticSnapshot, focusedIdentity in
-        semanticRecorder.record(
-          surface: surface,
-          semanticSnapshot: semanticSnapshot,
-          focusedIdentity: focusedIdentity
-        )
-      }
+      surface: hostedSurface(
+        surfaceRecorder: surfaceRecorder,
+        semanticRecorder: semanticRecorder
+      )
     )
 
     let task = Task {
@@ -199,17 +179,30 @@ struct HostedSceneSessionTests {
     #expect(taskExitReason == .inputEnded)
   }
 
-  @Test("hosted surface session rerenders on resize")
-  func hostedSurfaceSessionRerendersOnResize() async throws {
+  @Test("hosted scene session throws when the requested scene does not exist")
+  func hostedSceneSessionThrowsForUnknownScene() throws {
+    do {
+      _ = try HostedSceneSession(
+        for: HostedApp(),
+        sceneID: WindowIdentifier("missing"),
+        surface: hostedSurface()
+      )
+      Issue.record("Expected a missing-scene error")
+    } catch let error as HostedSceneSessionError {
+      #expect(error == .sceneNotFound(WindowIdentifier("missing")))
+    } catch {
+      Issue.record("Unexpected error: \(error)")
+    }
+  }
+
+  @Test("hosted scene session schedules a new frame after direct style updates")
+  func hostedSceneSessionRerendersOnStyleUpdate() async throws {
     let recorder = SurfaceRecorder()
+    let surface = hostedSurface(surfaceRecorder: recorder)
     let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onSurface: { surface in
-        recorder.record(surface)
-      }
+      surface: surface
     )
 
     let task = Task {
@@ -220,98 +213,7 @@ struct HostedSceneSessionTests {
       recorder.surfaceCount >= 1
     }
 
-    session.resize(to: .init(width: 32, height: 8), cellPixelSize: .init(width: 8, height: 16))
-
-    try await waitUntil("second surface") {
-      recorder.surfaceCount >= 2 && recorder.latestSurface?.size == .init(width: 32, height: 8)
-    }
-
-    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
-    let exitReason = try await task.value
-
-    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
-  }
-
-  @Test("hosted surface session throws when the requested scene does not exist")
-  func hostedSurfaceSessionThrowsForUnknownScene() throws {
-    do {
-      _ = try HostedSceneSession(
-        for: HostedApp(),
-        sceneID: WindowIdentifier("missing"),
-        initialSize: .init(width: 24, height: 6),
-        appearance: .fallback,
-        onSurface: { _ in }
-      )
-      Issue.record("Expected a missing-scene error")
-    } catch let error as HostedSceneSessionError {
-      #expect(error == .sceneNotFound(WindowIdentifier("missing")))
-    } catch {
-      Issue.record("Unexpected error: \(error)")
-    }
-  }
-
-  @Test("hosted scene session schedules a new frame on appearance update")
-  func hostedSceneSessionRerendersOnAppearanceUpdate() async throws {
-    let recorder = OutputRecorder()
-    let session = try HostedSceneSession(
-      for: HostedApp(),
-      sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onOutput: { output in
-        recorder.record(output)
-      }
-    )
-
-    let task = Task {
-      try await session.start()
-    }
-
-    try await waitUntil("first frame") {
-      recorder.frameCount >= 1
-    }
-
-    session.updateAppearance(
-      TerminalAppearance(
-        foregroundColor: .black,
-        backgroundColor: .white,
-        tintColor: .blue,
-        source: .override
-      )
-    )
-
-    try await waitUntil("second frame") {
-      recorder.frameCount >= 2
-    }
-
-    session.sendInput([0x04])  // Ctrl+D
-    let exitReason = try await task.value
-
-    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
-  }
-
-  @Test("hosted scene session schedules a new frame on style update")
-  func hostedSceneSessionRerendersOnStyleUpdate() async throws {
-    let recorder = OutputRecorder()
-    let session = try HostedSceneSession(
-      for: HostedApp(),
-      sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onOutput: { output in
-        recorder.record(output)
-      }
-    )
-
-    let task = Task {
-      try await session.start()
-    }
-
-    try await waitUntil("first frame") {
-      recorder.frameCount >= 1
-    }
-
-    session.updateStyle(
+    surface.updateStyle(
       .init(
         appearance: .init(
           foregroundColor: .black,
@@ -337,9 +239,10 @@ struct HostedSceneSessionTests {
         )
       )
     )
+    session.requestSurfaceRefresh()
 
-    try await waitUntil("second frame") {
-      recorder.frameCount >= 2
+    try await waitUntil("second surface") {
+      recorder.surfaceCount >= 2
     }
 
     session.sendInput([0x04])  // Ctrl+D
@@ -348,33 +251,13 @@ struct HostedSceneSessionTests {
     #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
   }
 
-  @Test("hosted scene session throws when the requested scene does not exist")
-  func hostedSceneSessionThrowsForUnknownScene() throws {
-    do {
-      _ = try HostedSceneSession(
-        for: HostedApp(),
-        sceneID: WindowIdentifier("missing"),
-        initialSize: .init(width: 24, height: 6),
-        appearance: .fallback,
-        onOutput: { _ in }
-      )
-      Issue.record("Expected a missing-scene error")
-    } catch let error as HostedSceneSessionError {
-      #expect(error == .sceneNotFound(WindowIdentifier("missing")))
-    } catch {
-      Issue.record("Unexpected error: \(error)")
-    }
-  }
-
   @Test("hosted scene session publishes committed focus presentation changes")
   func hostedSceneSessionPublishesFocusPresentationChanges() async throws {
     let recorder = FocusPresentationRecorder()
     let session = try HostedSceneSession(
       for: FocusPresentationApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onOutput: { _ in },
+      surface: hostedSurface(),
       onFocusPresentationChange: { presentation in
         recorder.record(presentation)
       }
@@ -410,9 +293,7 @@ struct HostedSceneSessionTests {
     let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onOutput: { _ in }
+      surface: hostedSurface()
     )
 
     let exitReason = try await session.stopAndWait()
@@ -422,25 +303,22 @@ struct HostedSceneSessionTests {
   }
 
   @Test(
-    "hosted scene session stopAndWait owns shutdown after the original start waiter is cancelled")
+    "hosted scene session stopAndWait owns shutdown after the original start waiter is cancelled"
+  )
   func hostedSceneSessionStopAndWaitOwnsShutdownAfterCancelledStartWaiter() async throws {
-    let recorder = OutputRecorder()
+    let recorder = SurfaceRecorder()
     let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
-      initialSize: .init(width: 24, height: 6),
-      appearance: .fallback,
-      onOutput: { output in
-        recorder.record(output)
-      }
+      surface: hostedSurface(surfaceRecorder: recorder)
     )
 
     let task = Task {
       try await session.start()
     }
 
-    try await waitUntil("first frame") {
-      recorder.frameCount >= 1
+    try await waitUntil("first surface") {
+      recorder.surfaceCount >= 1
     }
 
     task.cancel()
@@ -451,21 +329,31 @@ struct HostedSceneSessionTests {
     #expect(stopExitReason == .inputEnded)
     #expect(taskExitReason == .inputEnded)
   }
-}
 
-private final class OutputRecorder: Sendable {
-  private let frameCountStorage = Mutex(0)
-
-  var frameCount: Int {
-    frameCountStorage.withLock { $0 }
-  }
-
-  func record(
-    _ output: String
-  ) {
-    if output.contains("\u{001B}[2J") {
-      frameCountStorage.withLock { $0 += 1 }
-    }
+  private func hostedSurface(
+    surfaceRecorder: SurfaceRecorder? = nil,
+    semanticRecorder: SemanticFrameRecorder? = nil,
+    clipboardRecorder: ClipboardRecorder? = nil
+  ) -> HostedRasterSurface {
+    HostedRasterSurface(
+      surfaceSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onSurface: { surface in
+        surfaceRecorder?.record(surface)
+      },
+      onSemanticFrameWithDamage: { surface, semanticSnapshot, focusedIdentity, damage in
+        semanticRecorder?.record(
+          surface: surface,
+          semanticSnapshot: semanticSnapshot,
+          focusedIdentity: focusedIdentity,
+          damage: damage
+        )
+      },
+      onClipboardWrite: { text in
+        clipboardRecorder?.record(text)
+        return clipboardRecorder != nil
+      }
+    )
   }
 }
 
@@ -491,7 +379,12 @@ private final class SurfaceRecorder {
 @MainActor
 private final class SemanticFrameRecorder {
   private(set) var frames:
-    [(surface: RasterSurface, snapshot: SemanticSnapshot, focused: Identity?)] =
+    [(
+      surface: RasterSurface,
+      snapshot: SemanticSnapshot,
+      focused: Identity?,
+      damage: PresentationDamage?
+    )] =
       []
 
   var frameCount: Int {
@@ -509,13 +402,15 @@ private final class SemanticFrameRecorder {
   func record(
     surface: RasterSurface,
     semanticSnapshot: SemanticSnapshot,
-    focusedIdentity: Identity?
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?
   ) {
     frames.append(
       (
         surface: surface,
         snapshot: semanticSnapshot,
-        focused: focusedIdentity
+        focused: focusedIdentity,
+        damage: damage
       )
     )
   }
