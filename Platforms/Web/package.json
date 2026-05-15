@@ -1,17 +1,27 @@
 {
-  "name": "webhost",
+  "name": "@swifttui/web",
   "version": "0.1.0",
   "module": "index.ts",
-  "exports": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./manifest": "./manifest.ts",
+    "./style.css": "./style.css",
+    "./testing": "./testing.ts",
+    "./wasi": "./wasi.ts",
+    "./wasi-worker": "./wasi-worker.ts",
+    "./websocket": "./websocket.ts"
+  },
   "type": "module",
-  "private": true,
   "scripts": {
-    "build:manifest": "bun run index.ts build:manifest",
-    "build:wasm": "bun run index.ts build:wasm",
-    "build:web": "bun run index.ts build:web",
-    "build": "bun run index.ts build",
-    "dev": "bun run index.ts dev",
+    "build:manifest": "bun run --cwd ../WebBuild build:manifest -- --dist ../Web/dist",
+    "build:wasm": "bun run --cwd ../WebBuild build:wasm -- --dist ../Web/dist",
+    "build:web": "bun run cli.ts build:web",
+    "build": "bun run cli.ts build",
+    "dev": "bun run cli.ts dev",
     "test": "bun test"
+  },
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "^0.4.2"
   },
   "devDependencies": {
     "@types/bun": "latest"

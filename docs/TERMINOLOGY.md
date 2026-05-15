@@ -43,8 +43,10 @@ accessibility bridging, scene-switching chrome, or retained
 Current host products and packages:
 
 - `SwiftUIHost`: embeds SwiftTUI scenes in a native SwiftUI app shell.
-- `Platforms/Web`: Bun package that embeds SwiftTUI WASI scenes in a browser
-  canvas.
+- `Platforms/Web`: `@swifttui/web` browser-runtime workspace package that
+  embeds SwiftTUI WASI scenes in a browser canvas.
+- `Platforms/WebBuild`: `@swifttui/build` build-tooling workspace package for
+  manifest generation and WASI packaging.
 
 `SwiftTUIWebHost` is intentionally compound: it provides a runner that starts a
 localhost server and a browser host that presents the running scene. When

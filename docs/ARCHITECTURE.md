@@ -48,6 +48,8 @@
 - host products and packages retain authored `SwiftTUIRuntime` apps inside
   platform-managed shells: `SwiftUIHost` for native SwiftUI, `SwiftTUIWebHost`
   for localhost-browser launch, and `Platforms/Web` for browser deployment
+- `Platforms/WebBuild` owns browser-deployment build tooling for
+  `Platforms/Web`
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
 - terminal-program embedding lives in `SwiftTUITerminal` and

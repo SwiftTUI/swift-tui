@@ -130,7 +130,9 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
 - `SwiftTUI` is the terminal app convenience product; platform integration
   lives in sibling root package products for explicit runners, hosts, WebHost,
   and terminal embedding. `Platforms/` is the source layout for those targets,
-  while `Platforms/Web` remains the Bun browser package.
+  while `Platforms/Web` is the `@swifttui/web` browser-runtime workspace and
+  `Platforms/WebBuild` is the `@swifttui/build` browser build-tooling
+  workspace.
 - Host products and packages use `SwiftTUIRuntime` scene manifests plus
   `HostedRasterSurface` / `HostedSceneSession` and own their own platform shell
   integration, scene switching chrome, and style surfaces.

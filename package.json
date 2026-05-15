@@ -14,6 +14,7 @@
   },
   "workspaces": [
     "Platforms/Web",
+    "Platforms/WebBuild",
     "Examples/WebExample",
     "Website"
   ],

@@ -13,7 +13,8 @@ products they need:
 
 See [TERMINOLOGY.md](TERMINOLOGY.md) for the full vocabulary. The `Platforms/`
 directory is now source layout for root package targets, except
-`Platforms/Web`, which remains the Bun browser package.
+`Platforms/Web` and `Platforms/WebBuild`, which are the browser-runtime and
+browser-build Bun workspace packages.
 
 ## Root Package Products
 
@@ -48,7 +49,10 @@ The source directories remain useful ownership boundaries:
 - `Platforms/WebHost`: `SwiftTUIWebHost` and `SwiftTUIWebHostCLI`
 - `Platforms/Embedding`: `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`,
   and `SwiftTUIPTYPrimitives`
-- `Platforms/Web`: Bun package for deploy-to-browser hosting
+- `Platforms/Web`: `@swifttui/web` browser runtime package for
+  deploy-to-browser hosting
+- `Platforms/WebBuild`: `@swifttui/build` build-time package for manifest and
+  WASI packaging
 
 ## Consumer Composition
 
@@ -153,9 +157,10 @@ is only the source directory that contains their target implementations.
 - Host products still own scene switching UI and style surfaces. The root
   runtime exposes scene manifests and hosted sessions, not a full
   cross-platform app shell.
-- `Platforms/Web` build scripts drive the repo-default `swiftly` toolchain
-  and the repo Bun workspace. See [TOOLCHAINS.md](TOOLCHAINS.md) for the
-  toolchain requirement.
+- `Platforms/WebBuild` drives the repo-default `swiftly` toolchain for manifest
+  and WASI packaging; `Platforms/Web` keeps Bun-based runtime bundling scripts
+  for repo development. See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain
+  requirement.
 - `SwiftTUIWebHost` serves a single scene in v1. Multi-scene browser chrome,
   multi-viewer control transfer, TLS, QR codes, and recording remain follow-up
   work.

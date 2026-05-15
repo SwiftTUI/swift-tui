@@ -1,11 +1,20 @@
+import { access } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { runCommand } from "./runCommand.ts";
 import { swiftCommandPrefix } from "./swiftCommandPrefix.ts";
 
 export interface ResolveSwiftArtifactsOptions {
   configuration?: WasmBuildConfiguration;
+  extraLinkerFlags?: readonly string[];
+  extraSwiftBuildArgs?: readonly string[];
+  extraSwiftcFlags?: readonly string[];
+  initialMemory?: number | string;
+  maxMemory?: number | string;
   packagePath: string;
   product: string;
+  stackSize?: number | string;
+  swiftCommand?: readonly string[];
+  swiftSDK?: string;
 }
 
 export type WasmBuildConfiguration = "debug" | "release";
@@ -24,11 +33,17 @@ export const requiredWasmSwiftFlags = [
   "-disable-llvm-merge-functions-pass",
 ] as const;
 
+export const defaultWasmSwiftSDK = "swift-6.3.1-RELEASE_wasm";
+export const defaultInitialMemory = "536870912";
+export const defaultMaxMemory = "4294967296";
+export const defaultStackSize = "1048576";
+
 export async function resolveSwiftArtifacts(
   options: ResolveSwiftArtifactsOptions
 ): Promise<SwiftArtifactPaths> {
   const configuration = options.configuration ?? "release";
   const swiftlyWorkingDirectory = await resolveSwiftlyWorkingDirectory(options.packagePath);
+  const swiftCommand = [...(options.swiftCommand ?? swiftCommandPrefix())];
   const environment = {
     ...process.env
   };
@@ -43,18 +58,21 @@ export async function resolveSwiftArtifacts(
     "--package-path",
     options.packagePath,
     "--swift-sdk",
-    "swift-6.3.1-RELEASE_wasm",
+    options.swiftSDK ?? defaultWasmSwiftSDK,
     "-c",
     configuration,
     ...requiredSwiftFlags(configuration),
+    ...swiftcFlags(options.extraSwiftcFlags),
     "-Xlinker",
-    "--initial-memory=536870912",
+    `--initial-memory=${options.initialMemory ?? defaultInitialMemory}`,
     "-Xlinker",
-    "--max-memory=4294967296",
+    `--max-memory=${options.maxMemory ?? defaultMaxMemory}`,
     "-Xlinker",
     "-z",
     "-Xlinker",
-    "stack-size=1048576",
+    `stack-size=${options.stackSize ?? defaultStackSize}`,
+    ...linkerFlags(options.extraLinkerFlags),
+    ...(options.extraSwiftBuildArgs ?? []),
   ];
 
   if (configuration === "release") {
@@ -62,13 +80,13 @@ export async function resolveSwiftArtifacts(
   }
 
   const buildCommand = [
-    ...swiftCommandPrefix(),
+    ...swiftCommand,
     ...swiftBuildArgs,
     "--product",
     options.product,
   ];
   const showBinPathCommand = [
-    ...swiftCommandPrefix(),
+    ...swiftCommand,
     ...swiftBuildArgs,
     "--show-bin-path",
   ];
@@ -129,6 +147,14 @@ function requiredSwiftFlags(configuration: WasmBuildConfiguration): readonly str
     case "release":
       return requiredWasmSwiftFlags;
   }
+}
+
+function swiftcFlags(flags: readonly string[] | undefined): string[] {
+  return (flags ?? []).flatMap((flag) => ["-Xswiftc", flag]);
+}
+
+function linkerFlags(flags: readonly string[] | undefined): string[] {
+  return (flags ?? []).flatMap((flag) => ["-Xlinker", flag]);
 }
 
 function logWasmBuildConfiguration(config: WasmBuildConfigurationLog): void {
@@ -204,7 +230,7 @@ async function resolveSwiftlyWorkingDirectory(
   let currentPath = resolve(startPath);
 
   while (true) {
-    if (await Bun.file(join(currentPath, ".swift-version")).exists()) {
+    if (await fileExists(join(currentPath, ".swift-version"))) {
       return currentPath;
     }
 
@@ -214,5 +240,14 @@ async function resolveSwiftlyWorkingDirectory(
     }
 
     currentPath = parentPath;
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
   }
 }

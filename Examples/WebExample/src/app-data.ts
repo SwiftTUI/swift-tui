@@ -1,4 +1,4 @@
-import type { WebHostSceneManifest, WebHostTerminalStyle } from "webhost";
+import type { WebHostSceneManifest, WebHostTerminalStyle } from "@swifttui/web";
 
 export const fallbackManifest: WebHostSceneManifest = {
   defaultSceneId: "main",

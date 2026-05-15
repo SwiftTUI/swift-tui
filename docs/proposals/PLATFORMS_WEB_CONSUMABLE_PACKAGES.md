@@ -1,9 +1,10 @@
 # Platforms/Web Consumable Package Learnings
 
-**Status:** Investigation draft. This is not an approved implementation plan.
-It captures the current limitations of `Platforms/Web` as an external consumer
-surface and sketches package-shape options such as `@swifttui/web` and
-`@swifttui/build`.
+**Status:** Implemented internally. `Platforms/Web` is now the browser-runtime
+workspace package `@swifttui/web`, while `Platforms/WebBuild` is the build-time
+workspace package `@swifttui/build`. npm publishing, compiled release
+artifacts, and SwiftPM plugin wrapping remain release-engineering work, not
+active TODOs.
 
 **Owner:** unassigned.
 
@@ -29,16 +30,43 @@ The question here is whether an external repo can consume the browser host as a
 normal web-project dependency, and what would need to change before
 `Platforms/Web` is more than repo-maintainer infrastructure.
 
+## Decision
+
+Split `Platforms/Web` before publishing or documenting it as a general external
+package. The old repo-private `webhost` workspace package has been replaced by
+the split runtime/build workspaces.
+
+The target public shape is:
+
+- a browser-runtime package, `@swifttui/web`, with browser-safe entrypoints,
+  style assets, scene manifest loading, canvas/ARIA hosting, WebSocket scene
+  bridges, and WASI scene bridge support;
+- a build-time package, `@swifttui/build`, with the manifest, WASI build, wasm
+  validation, packaging APIs, and CLI/programmatic build APIs; and
+- a later Swift-facing build wrapper or SwiftPM plugin for Swift-only projects,
+  after the runtime/build package boundary is stable.
+
+Do not publish the pre-split `webhost` package shape. It mixed browser runtime
+exports with Bun/Node build code, exposed raw TypeScript sources, assumed the
+repo workspace, and left load-bearing WASI worker glue in `Examples/WebExample`.
+
+This decision keeps static browser deployment separate from the native
+localhost-browser `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` path. They may share
+renderer code and wire formats, but they should remain separate consumer
+stories.
+
 ## Current SwiftTUI Shape
 
-The current browser-deploy path has three parts:
+The current browser-deploy path has four parts:
 
 - A Swift executable imports `SwiftTUIWASI`.
 - `WASIRunner` prints a scene manifest in `TUIGUI_MODE=manifest`, and executes
   one selected scene when compiled for WASI.
-- `Platforms/Web` builds the Swift package to `.wasm`, packages
-  `scene-manifest.json` and `assets/app.wasm`, and bundles a browser runtime
-  that draws `web-surface` frames into a canvas with ARIA side output.
+- `Platforms/WebBuild` builds the Swift package to `.wasm`, packages
+  `scene-manifest.json` and `assets/app.wasm`, and validates the wasm through
+  the browser `WebAssembly.compile` API.
+- `Platforms/Web` bundles the browser runtime that draws `web-surface` frames
+  into a canvas with ARIA side output.
 
 The path is functional. A throwaway external SwiftPM package was able to build
 through:
@@ -62,22 +90,18 @@ a good external product yet.
 
 ## Current Consumer Problems
 
-### The Package Is Private
+### Package Boundary
 
-`Platforms/Web/package.json` declares `"private": true` and exposes raw
-`index.ts`. `Examples/WebExample` says to `bun add webhost`, but `webhost` is
-currently a repo workspace package, not a published dependency an outside repo
-can add from npm.
+`Platforms/Web/package.json` now declares `@swifttui/web` and exports runtime
+subpaths. `Platforms/WebBuild/package.json` declares `@swifttui/build` and owns
+build helpers. These packages are workspace-consumable today; npm publishing and
+compiled release artifacts are still future release work.
 
-### Runtime And Build Code Share One Export
+### Runtime And Build Code Are Split
 
-`Platforms/Web/index.ts` exports browser runtime APIs and build helpers from
-the same module. It also imports Node APIs and uses Bun APIs in the same
-entrypoint that browser consumers import from.
-
-That is a development artifact. A browser runtime package should not pull in
-build-time concerns, and a build package should not require browser runtime
-types to be loaded by default.
+`Platforms/Web/index.ts` exports browser runtime APIs only. Build helpers moved
+to `@swifttui/build`, and a package-boundary test keeps public runtime
+entrypoints from importing `@swifttui/build` or `node:` modules.
 
 ### Bun Is Both Package Manager And Runtime Assumption
 
@@ -91,9 +115,9 @@ The current scripts use:
 - `bun build`
 - `bun test`
 
-That is fine for this repo, but it makes "use SwiftTUI from a Vite/npm/pnpm
-web project" harder than necessary. It also means the system is not currently
-package-manager-agnostic.
+Repo-local scripts still use Bun. The build package core no longer uses Bun
+globals for process spawning, file IO, PATH lookup, or wasm validation, but the
+release artifact pipeline for npm/pnpm/Yarn consumers remains future work.
 
 ### Swift Toolchain Assumptions Are Hard-Coded
 
@@ -104,10 +128,10 @@ The WASI build helper currently hard-codes:
 - release flags including `-Osize` and disabling LLVM merge functions
 - fixed initial memory, max memory, and stack size
 
-Those defaults are useful. They should remain the recommended defaults. But an
-external build tool needs explicit override points for the Swift executable,
-SDK ID, configuration, memory, stack size, extra Swift flags, and extra linker
-flags.
+Those defaults remain the recommended defaults. `@swifttui/build` now exposes
+override points for the Swift command, SDK ID, configuration, memory, stack
+size, extra Swift compiler flags, extra linker flags, and extra Swift build
+arguments.
 
 ### Manifest Generation Runs The App Natively
 
@@ -132,13 +156,14 @@ This should be documented and probably improved. Possible improvements include:
 `createWasmSceneRuntimeFactory` lives in the example, not in the reusable web
 package. External users currently have to copy too much example code.
 
-If this is a public product, the WASI runtime factory and worker glue should be
-owned by the web runtime package or by a documented adapter package.
+The reusable WASI runtime factory, shared input queue, and worker implementation
+now live under `@swifttui/web/wasi` and `@swifttui/web/wasi-worker`. The example
+keeps only its app-specific frontend shell and thin worker entrypoint.
 
-## Proposed Package Split
+## Accepted Package Split
 
-This investigation points toward two JavaScript packages plus one optional
-Swift-facing tool path.
+The implemented internal direction is two JavaScript workspace packages plus one
+optional future Swift-facing tool path.
 
 ### `@swifttui/web`
 
@@ -167,14 +192,16 @@ Possible exports:
 
 ```text
 @swifttui/web
+@swifttui/web/manifest
 @swifttui/web/style.css
 @swifttui/web/wasi
+@swifttui/web/wasi-worker
 @swifttui/web/websocket
 @swifttui/web/testing
 ```
 
-The current `Platforms/Web` browser runtime is close to this, but it needs a
-clean package boundary and compiled artifacts.
+The current `Platforms/Web` browser runtime has the clean package boundary.
+Compiled npm artifacts remain release work.
 
 ### `@swifttui/build`
 
@@ -299,31 +326,34 @@ lesson here is separation: Textual's web-serving mode does not make every
 Textual app a static web project. SwiftTUI should keep the local WebHost and
 the static WASI web host distinct, even if they share renderer code.
 
-## Proposed Phasing
+## Implementation Phasing Status
+
+These phases record the order of work. Remaining release work should get scoped
+plans before it is added to `TODO.md`.
 
 ### Phase 0: Document The Current Contract
 
-- Add a clear external-browser-build guide that does not imply `webhost` is
-  already a published package.
-- Document the native manifest-generation requirement.
-- Document required COOP/COEP headers and why `SharedArrayBuffer` is needed.
-- Add a minimal external smoke fixture that builds a package outside this repo.
+- [x] Add docs that no longer imply `webhost` is a published package.
+- [x] Document the native manifest-generation requirement.
+- [x] Document required COOP/COEP headers and why `SharedArrayBuffer` is needed.
+- [ ] Add a minimal external smoke fixture that builds a package outside this
+  repo.
 
 ### Phase 1: Split Runtime And Build Entrypoints Internally
 
-- Move build helpers behind a separate internal entrypoint.
-- Keep browser runtime imports free of Node and Bun APIs.
-- Move the WebExample WASI runtime factory into reusable package code or a
-  documented adapter module.
-- Add tests that fail if browser runtime entrypoints import build modules.
+- [x] Move build helpers into `@swifttui/build`.
+- [x] Keep browser runtime imports free of Node and Bun build APIs.
+- [x] Move the WebExample WASI runtime factory into `@swifttui/web/wasi`.
+- [x] Add tests that fail if browser runtime entrypoints import build modules.
 
 ### Phase 2: Make Build Tooling Node-Compatible
 
-- Replace Bun-only build helpers with Node-compatible APIs where practical.
-- Keep Bun scripts as repo convenience wrappers.
-- Add npm/pnpm/Vite fixture coverage.
-- Expose options for Swift executable, Swift SDK ID, release flags, memory, and
-  output layout.
+- [x] Replace Bun-only build helper internals with Node-compatible APIs where
+  practical.
+- [x] Keep Bun scripts as repo convenience wrappers.
+- [ ] Add npm/pnpm/Vite fixture coverage.
+- [x] Expose options for Swift executable, Swift SDK ID, release flags, memory,
+  and output layout.
 
 ### Phase 3: Publish JavaScript Packages
 
@@ -339,7 +369,10 @@ the static WASI web host distinct, even if they share renderer code.
   runtime, or both.
 - Make the Swift-only quickstart explicit and tested.
 
-## Open Questions
+## Implementation Questions For Future Plans
+
+These questions should be resolved inside future scoped implementation plans,
+not by reopening this broad investigation.
 
 - Should `@swifttui/web` include the WASI worker and shared-stdin queue, or
   should those live in `@swifttui/web/wasi` as a subpath?
@@ -357,10 +390,10 @@ the static WASI web host distinct, even if they share renderer code.
 - Should the public web runtime expose lower-level canvas/render primitives, or
   only the app-level `createWebHostApp` API?
 
-## Non-Goals For This Investigation Draft
+## Non-Goals
 
 - No npm package name is reserved by this document.
-- No implementation is approved by this document.
+- No immediate implementation tranche is opened by this document.
 - No replacement for `SwiftTUIWebHostCLI` is proposed here.
 - No promise is made that Bun will be removed from repo-local development.
 - No browser visual redesign is proposed here.

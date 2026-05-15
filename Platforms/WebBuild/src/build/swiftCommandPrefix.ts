@@ -1,5 +1,7 @@
+import { findExecutable } from "./runCommand.ts";
+
 export function swiftCommandPrefix(): string[] {
-  if (Bun.which("swiftly")) {
+  if (findExecutable("swiftly")) {
     return ["swiftly", "run", "swift"];
   }
 

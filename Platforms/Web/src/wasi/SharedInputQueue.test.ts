@@ -4,7 +4,7 @@ import {
   SharedInputQueueReader,
   SharedInputQueueWriter,
   createSharedInputQueue,
-} from "./wasi-input-queue.ts";
+} from "./SharedInputQueue.ts";
 
 test("shared input queue preserves write order across partial reads", () => {
   const queue = createSharedInputQueue(8);

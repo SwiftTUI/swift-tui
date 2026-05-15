@@ -13,7 +13,8 @@ future file moves.
 - `Platforms/`: source directories for root Swift package platform products:
   executable runners (`CLI`, `WASI`), host products (`SwiftUI`, `WebHost`),
   shared argument parsing (`Arguments`), and terminal-program embedding
-  support (`Embedding`). `Platforms/Web` is the Bun browser package.
+  support (`Embedding`). `Platforms/Web` and `Platforms/WebBuild` are Bun
+  workspace packages for browser runtime and browser build tooling.
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
   `swift-hash`, `swift-png`, `swift-jpeg`, and `swift-gif`
@@ -48,8 +49,9 @@ future file moves.
   - shared platform support products:
     - `SwiftTUIArguments`
     - `WASISurfaceBridge`
-  - browser package:
+  - browser packages:
     - `Platforms/Web`
+    - `Platforms/WebBuild`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
@@ -233,7 +235,13 @@ combines runner and browser-host responsibilities:
 ## Host Products And Browser Package
 
 - `Platforms/SwiftUI`: native SwiftUI host product built on `SceneManifest` and `HostedSceneSession`, with native AppKit/UIKit clipboard writes
-- `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas and typed clipboard records into `navigator.clipboard`
+- `Platforms/Web`: `@swifttui/web` browser-runtime workspace package that
+  consumes a `SwiftTUIWASI` build and manifest, using the `web-surface`
+  transport to draw raster output onto a canvas and typed clipboard records into
+  `navigator.clipboard`
+- `Platforms/WebBuild`: `@swifttui/build` build-tooling workspace package that
+  generates scene manifests, builds SwiftTUI apps for WASI, validates
+  `app.wasm`, and packages browser deployment assets
 
 `Platforms/WebHost` is covered above because it is both a runner product and a
 localhost browser host bridge for native binaries.

@@ -18,7 +18,7 @@ import {
   WebHostSceneRuntime,
   type WebHostAppController,
   type WebHostSceneRuntimeOptions,
-} from "webhost";
+} from "@swifttui/web";
 import "./index.css";
 import {
   defaultStyle,
@@ -30,7 +30,7 @@ import {
   createWasmSceneRuntimeFactory,
   type WasmSceneRuntimeHandle,
   type WasmSceneResizeEvent,
-} from "./scene-runtime.ts";
+} from "@swifttui/web/wasi";
 
 const terminalAppManifestUrl = new URL(terminalAppManifestPath, import.meta.url);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
@@ -214,6 +214,7 @@ async function createController(
     const wasmRuntimeFactory = createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
       onSceneResize,
       onRuntimeCreated,
+      workerModuleURL: new URL("./wasm-scene-worker.js", import.meta.url),
     });
 
     return await createWebHostApp({
