@@ -5,6 +5,9 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
+runner_name=${STUI_TEST_RUNNER_NAME:-test-all}
+example_scope=${STUI_TEST_EXAMPLE_SCOPE:-all}
+
 write_full_log_report() {
   body_log=$1
   results_report=$2
@@ -13,7 +16,7 @@ write_full_log_report() {
   exit_code=$5
 
   generated_at=$(date '+%Y-%m-%d %H:%M:%S %z')
-  marker_file=$(mktemp "/tmp/swift-tui-test-all-markers.XXXXXX")
+  marker_file=$(mktemp "/tmp/swift-tui-$runner_name-markers.XXXXXX")
 
   awk '
     /^==> / {
@@ -68,15 +71,19 @@ write_full_log_report() {
 
 if [ "${STUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
   timestamp=$(date '+%Y%m%d-%H%M%S')
-  full_log_path="/tmp/swift-tui-test-all-$timestamp-$$.log"
-  body_log=$(mktemp "/tmp/swift-tui-test-all-body.XXXXXX")
-  status_file=$(mktemp "/tmp/swift-tui-test-all-status.XXXXXX")
-  results_report=$(mktemp "/tmp/swift-tui-test-all-results.XXXXXX")
-  command_text="sh $0"
+  full_log_path="/tmp/swift-tui-$runner_name-$timestamp-$$.log"
+  body_log=$(mktemp "/tmp/swift-tui-$runner_name-body.XXXXXX")
+  status_file=$(mktemp "/tmp/swift-tui-$runner_name-status.XXXXXX")
+  results_report=$(mktemp "/tmp/swift-tui-$runner_name-results.XXXXXX")
+  if [ -n "${STUI_TEST_COMMAND_TEXT:-}" ]; then
+    command_text=$STUI_TEST_COMMAND_TEXT
+  else
+    command_text="sh $0"
 
-  for argument; do
-    command_text="$command_text $argument"
-  done
+    for argument; do
+      command_text="$command_text $argument"
+    done
+  fi
 
   cleanup_capture() {
     rm -f "$body_log" "$status_file" "$results_report"
@@ -144,7 +151,7 @@ usage() {
   cat <<'EOF'
 Usage: Scripts/test_all.sh [--skip-bun-install]
 
-Runs the full checked-in repo verification surface:
+Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
   - accessibility guardrails for raw glyphs, color-state styling, and visual content
   - public-API baseline freshness check
@@ -157,10 +164,19 @@ Runs the full checked-in repo verification surface:
   - focused SwiftUIHost tests on Apple platforms
   - Platforms/Web Bun tests
   - Platforms/WebBuild Bun tests
+  - Examples/argparse help smoke
   - Examples/gallery tests
   - Examples/layouts tests
   - Examples/file-previewer tests
+  - Examples/gifcat tests
+  - Examples/gifeditor tests
+  - Examples/gitviz tests
+  - Examples/LayoutsSwiftUI build on Apple platforms
+  - Examples/minimal smoke
+  - Examples/SwiftUIExample/TerminalApp build
+  - Examples/SwiftUIExample Xcode build on Apple platforms
   - Examples/terminal-workspace tests
+  - Examples/WebHostExample tests
   - Tools/TermUIPerf tests
   - Examples/WebExample Bun tests
   - Examples/WebExample browser integration test
@@ -175,6 +191,9 @@ On Linux, the script also:
   - skips focused SwiftUIHost tests because the target is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
+
+For the curated repo gate, use Scripts/test_gate.sh. That runner keeps the same
+non-example surface but only includes Examples/gallery from the examples set.
 EOF
 }
 
@@ -290,6 +309,9 @@ for argument in "$@"; do
   --skip-bun-install)
     skip_bun_install=1
     ;;
+  --example-scope=*)
+    example_scope=${argument#--example-scope=}
+    ;;
   -h | --help)
     usage
     exit 0
@@ -302,6 +324,15 @@ for argument in "$@"; do
     ;;
   esac
 done
+
+case "$example_scope" in
+all | gate)
+  ;;
+*)
+  >&2 echo "Unknown example scope: $example_scope"
+  exit 1
+  ;;
+esac
 
 run_swift() {
   swiftly run swift "$@"
@@ -586,42 +617,111 @@ run_step \
   "cd Platforms/WebBuild && bun test" \
   bun test
 
+if [ "$example_scope" = "all" ]; then
+  run_function_step \
+    "Run Examples/argparse help smoke" \
+    "$(swift_command_text run --package-path Examples/argparse argparse-demo --help)" \
+    run_swift run --package-path Examples/argparse argparse-demo --help
+fi
+
 run_function_step \
   "Run Examples/gallery tests" \
   "$(swift_command_text test --package-path Examples/gallery)" \
   run_swift test --package-path Examples/gallery
 
-run_function_step \
-  "Run Examples/layouts tests" \
-  "$(swift_command_text test --package-path Examples/layouts)" \
-  run_swift test --package-path Examples/layouts
+if [ "$example_scope" = "all" ]; then
+  run_function_step \
+    "Run Examples/layouts tests" \
+    "$(swift_command_text test --package-path Examples/layouts)" \
+    run_swift test --package-path Examples/layouts
 
-run_function_step \
-  "Run Examples/file-previewer tests" \
-  "$(swift_command_text test --package-path Examples/file-previewer)" \
-  run_swift test --package-path Examples/file-previewer
+  run_function_step \
+    "Run Examples/file-previewer tests" \
+    "$(swift_command_text test --package-path Examples/file-previewer)" \
+    run_swift test --package-path Examples/file-previewer
 
-run_function_step \
-  "Run Examples/terminal-workspace tests" \
-  "$(swift_command_text test --package-path Examples/terminal-workspace)" \
-  run_swift test --package-path Examples/terminal-workspace
+  run_function_step \
+    "Run Examples/gifcat tests" \
+    "$(swift_command_text test --package-path Examples/gifcat)" \
+    run_swift test --package-path Examples/gifcat
+
+  run_function_step \
+    "Run Examples/gifeditor tests" \
+    "$(swift_command_text test --package-path Examples/gifeditor)" \
+    run_swift test --package-path Examples/gifeditor
+
+  run_function_step \
+    "Run Examples/gitviz tests" \
+    "$(swift_command_text test --package-path Examples/gitviz)" \
+    run_swift test --package-path Examples/gitviz
+
+  if [ "$is_linux" -eq 1 ]; then
+    skip_step \
+      "Build Examples/LayoutsSwiftUI" \
+      "LayoutsSwiftUI imports SwiftUI and is only available on Apple platforms"
+  else
+    run_function_step \
+      "Build Examples/LayoutsSwiftUI" \
+      "$(swift_command_text build --package-path Examples/LayoutsSwiftUI)" \
+      run_swift build --package-path Examples/LayoutsSwiftUI
+  fi
+
+  run_function_step \
+    "Run Examples/minimal smoke" \
+    "$(swift_command_text run --package-path Examples/minimal minimal)" \
+    run_swift run --package-path Examples/minimal minimal
+
+  run_function_step \
+    "Build Examples/SwiftUIExample/TerminalApp" \
+    "$(swift_command_text build --package-path Examples/SwiftUIExample/TerminalApp)" \
+    run_swift build --package-path Examples/SwiftUIExample/TerminalApp
+
+  if [ "$is_linux" -eq 1 ]; then
+    skip_step \
+      "Build Examples/SwiftUIExample macOS app" \
+      "SwiftUIExample's Xcode app is only available on Apple platforms"
+  else
+    run_step \
+      "Build Examples/SwiftUIExample macOS app" \
+      "$repo_root" \
+      "xcodebuild -project Examples/SwiftUIExample/SwiftUIExample.xcodeproj -scheme SwiftUIExample -configuration Debug -destination generic/platform=macOS build" \
+      xcodebuild \
+        -project Examples/SwiftUIExample/SwiftUIExample.xcodeproj \
+        -scheme SwiftUIExample \
+        -configuration Debug \
+        -destination generic/platform=macOS \
+        build
+  fi
+
+  run_function_step \
+    "Run Examples/terminal-workspace tests" \
+    "$(swift_command_text test --package-path Examples/terminal-workspace)" \
+    run_swift test --package-path Examples/terminal-workspace
+
+  run_function_step \
+    "Run Examples/WebHostExample tests" \
+    "$(swift_command_text test --package-path Examples/WebHostExample)" \
+    run_swift test --package-path Examples/WebHostExample
+fi
 
 run_function_step \
   "Run Tools/TermUIPerf tests" \
   "$(swift_command_text test --package-path Tools/TermUIPerf)" \
   run_swift test --package-path Tools/TermUIPerf
 
-# run_step \
-#   "Run Examples/WebExample Bun tests" \
-#   "$repo_root/Examples/WebExample" \
-#   "cd Examples/WebExample && bun test" \
-#   bun test
-#
-# run_step \
-#   "Run Examples/WebExample browser integration test" \
-#   "$repo_root/Examples/WebExample" \
-#   "cd Examples/WebExample && bun run test:browser" \
-#   bun run test:browser
+if [ "$example_scope" = "all" ]; then
+  run_step \
+    "Run Examples/WebExample Bun tests" \
+    "$repo_root/Examples/WebExample" \
+    "cd Examples/WebExample && bun test" \
+    bun test
+
+  run_step \
+    "Run Examples/WebExample browser integration test" \
+    "$repo_root/Examples/WebExample" \
+    "cd Examples/WebExample && bun run test:browser" \
+    bun run test:browser
+fi
 
 if [ "$any_failed" -eq 0 ]; then
   print_summary

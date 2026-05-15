@@ -63,7 +63,9 @@ not as the default place for every new assertion.
   of fixed sleeps or guessed frame counts.
 - Focused suites are for triage and localization. `bun run test` remains the
   completion gate for changes that touch shared runtime behavior, repo-wide
-  test infrastructure, or tooling.
+  test infrastructure, tooling, or `Examples/gallery`. Use `bun run test:all`
+  when a change touches example packages beyond `Examples/gallery` or when you
+  need exhaustive example coverage.
 
 ## Fixture Updates
 
@@ -111,4 +113,7 @@ When updating fixtures:
   real hosted path that failed in practice?
 - If the test waits for runtime progress, does it wait on an observable
   condition with a timeout instead of sleeping for a guessed duration?
-- If the change touched shared runtime behavior or repo tooling, did the final tree pass `bun run test`?
+- If the change touched shared runtime behavior or repo tooling, did the final
+  tree pass `bun run test`?
+- If the change touched maintained examples beyond `Examples/gallery`, did the
+  final tree pass `bun run test:all` or the affected exhaustive example steps?

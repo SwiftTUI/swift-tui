@@ -17,7 +17,8 @@ git hash that anchors the referenced material.
 ## Build & Test Commands
 
 ```bash
-bun run test                                       # Full repo test surface + environment checks
+bun run test                                       # Repo gate: shared surface + gallery example
+bun run test:all                                   # Exhaustive test surface, including all examples
 swiftly run swift build                            # Build all root-package targets
 swiftly run swift test                             # Run root-package tests
 swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests             # One test suite
@@ -26,8 +27,9 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/       
 ```
 
 Always run `bun run test` after changes that touch shared code, platform
-products, example packages, or repo tooling, and confirm it passes before
-considering work complete.
+products, the gallery example, or repo tooling, and confirm it passes before
+considering work complete. Run `bun run test:all` for broad example coverage or
+when changing example packages beyond `Examples/gallery`.
 
 See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
 (`swiftly`, wasm SDK, Bun, Xcode, Android NDK).
