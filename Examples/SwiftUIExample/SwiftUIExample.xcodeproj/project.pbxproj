@@ -104,7 +104,7 @@
 			mainGroup = F7FC7A712F7B19A400737CB1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUIHost" */,
+				F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../.." */,
 				F79998F12F7D41B30067E544 /* XCLocalSwiftPackageReference "TerminalApp" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -374,9 +374,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = TerminalApp;
 		};
-		F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUIHost" */ = {
+		F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../GUI/SwiftUIHost;
+			relativePath = ../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
