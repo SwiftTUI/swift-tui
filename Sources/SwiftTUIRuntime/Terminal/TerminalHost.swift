@@ -1787,6 +1787,8 @@ extension PresentationSurface {
       let followUpTimeoutMilliseconds = 40
       let breaksOnEmptyRead: Bool
       let maxIterations: Int
+      var kittyProbeSawPrimaryDeviceAttributes = false
+      var kittyProbeEmptyReadsAfterPrimaryDeviceAttributes = 0
       switch query {
       case .kittySupport:
         initialTimeoutMilliseconds = 250
@@ -1810,19 +1812,30 @@ extension PresentationSurface {
           if breaksOnEmptyRead {
             break
           }
+          if kittyProbeSawPrimaryDeviceAttributes {
+            kittyProbeEmptyReadsAfterPrimaryDeviceAttributes += 1
+            if kittyProbeEmptyReadsAfterPrimaryDeviceAttributes >= 2 {
+              return buffer
+            }
+          }
           continue
         }
         buffer.append(contentsOf: bytes)
 
         switch query {
-        case .kittySupport:
+        case .kittySupport(let id):
           // The kitty probe request piggybacks a `\e[c` (primary device
           // attributes) query after the kitty query so non-kitty terminals
           // still produce a response we can synchronize on. We wait for the
-          // DA response before returning so the caller can harvest both
-          // the kitty result and the DA attributes from a single round trip.
-          if parsePrimaryDeviceAttributes(from: buffer) != nil {
+          // Kitty response itself when it exists; some terminals deliver the
+          // DA reply before the Kitty OK, and returning on DA alone caches a
+          // false "no Kitty" result for the entire session.
+          if parseKittySupportResponse(in: buffer, id: id) == true {
             return buffer
+          }
+          if parsePrimaryDeviceAttributes(from: buffer) != nil {
+            kittyProbeSawPrimaryDeviceAttributes = true
+            kittyProbeEmptyReadsAfterPrimaryDeviceAttributes = 0
           }
         case .primaryDeviceAttributes:
           if parsePrimaryDeviceAttributes(from: buffer) != nil {

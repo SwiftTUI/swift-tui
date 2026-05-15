@@ -1285,6 +1285,58 @@ struct TerminalGraphicsProtocolTests {
       }
     )
   }
+
+  @Test(
+    "kitty support probe waits for Kitty response when DA arrives first"
+  )
+  func kittySupportProbeWaitsForKittyResponseWhenDAArrivesFirst() throws {
+    // Some terminals answer the piggybacked primary-device-attributes query
+    // before the Kitty graphics query. Returning as soon as DA is visible
+    // permanently caches "no Kitty" for the session and leaves image tabs on
+    // the half-block fallback path.
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}[?62;c".utf8),
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 4, height: 2),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 4)
+    )
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
+      imageAttachments: [
+        makeRasterImageAttachment(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: 2, height: 2),
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 2))
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    #expect(
+      controller.writes.contains { write in
+        write.contains("_Ga=T") && write.contains("f=100")
+      }
+    )
+  }
 }
 
 private let onePixelWhiteJPEG: [UInt8] = [
