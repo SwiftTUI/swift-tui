@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Classic "GeometryReader eats everything" gotcha.  An unconstrained
 /// `GeometryReader` placed in an `HStack` alongside a sibling `Text`

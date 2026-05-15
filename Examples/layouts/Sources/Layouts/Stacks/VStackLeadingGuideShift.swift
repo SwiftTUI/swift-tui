@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A `VStack(alignment: .leading)` with four labelled rows, where the
 /// middle row overrides its `.leading` alignment guide to shift

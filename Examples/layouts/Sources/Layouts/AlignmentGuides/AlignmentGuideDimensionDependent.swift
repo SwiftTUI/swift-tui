@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Three boxed children of mixed heights (1/2/3 content rows)
 /// inside an `HStack(alignment: .bottom)`. The HStack pulls each

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Two side-by-side `AnyLayout` containers wrapping the same three
 /// children (`[A]`, `[B]`, `[C]`).  The first container erases a

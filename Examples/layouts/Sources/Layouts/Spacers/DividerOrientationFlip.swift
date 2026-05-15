@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Pins the orientation flip on `Divider`: a divider draws a
 /// HORIZONTAL rule when nested in a `VStack`, and a VERTICAL rule

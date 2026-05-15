@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A four-row form whose `label:value` rows all share a single
 /// colon column, regardless of label length, by right-aligning the

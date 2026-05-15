@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Demonstrates that `.ignoresSafeArea(.bottom)` reclaims space an
 /// outer `.safeAreaPadding(.bottom, N)` reserved from the ambient

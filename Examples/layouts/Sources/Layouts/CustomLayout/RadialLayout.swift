@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A custom `Layout` that places its children around a ring at the
 /// cardinal compass directions (East, South, West, North) — the

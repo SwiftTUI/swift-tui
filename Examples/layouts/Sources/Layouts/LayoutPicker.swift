@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Full-screen picker: a sectioned list of every ``LayoutEntry`` in
 /// ``LayoutCatalog/all``, grouped by ``LayoutEntry/Category``.

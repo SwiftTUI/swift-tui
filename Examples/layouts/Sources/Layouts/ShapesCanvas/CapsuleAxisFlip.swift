@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Two `Capsule`s drawn side-by-side, demonstrating that the rounded
 /// ends snap to the **shorter axis** of the frame.

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A 20-row `List` constrained inside a `.frame(height: 5)` viewport.
 ///

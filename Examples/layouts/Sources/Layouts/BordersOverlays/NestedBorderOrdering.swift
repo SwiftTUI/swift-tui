@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Two concentric borders built by alternating `.padding(1).border(...)`
 /// twice: the inner `.border(.single)` hugs the content, a `.padding(1)`

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Demonstrates that a fixed `.frame(width: 30, height: 5)` behaves the
 /// same whether it sits inside a "tight" HStack (where a sibling and a

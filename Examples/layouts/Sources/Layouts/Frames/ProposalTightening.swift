@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A `GeometryReader` wrapped in a `.frame(width: 30, height: 3)`. The
 /// outer terminal width is much larger (≥ 60), but the fixed frame

@@ -1,10 +1,9 @@
-# Layouts Example
+# Layouts SwiftUI Comparison Example
 
-56 focused layout examples of the public `SwiftTUI` surface,
-reachable from a full-screen push/pop picker. Each layout is pinned
-with a smoke test; `.behaviour`-tagged layouts add targeted
-behaviour tests that pin the specific measure/place rule the layout
-is meant to demonstrate.
+56 focused layout examples rendered side by side: native SwiftUI on the left
+and the matching SwiftTUI implementation embedded through `SwiftUIHost` on the
+right. The matching SwiftTUI package owns the raster smoke and behaviour tests
+for the shared catalog IDs.
 
 Design and taxonomy live in
 [../../docs/plans/2026-04-24-001-layouts-example-plan.md](../../docs/plans/2026-04-24-001-layouts-example-plan.md).
@@ -16,8 +15,8 @@ cd Examples/LayoutsSwiftUI
 swiftly run swift run layouts-swiftui-demo
 ```
 
-The app launches directly into the picker. `↑↓` move, `⏎` opens a
-layout, `esc` pops back, `⌃C` quits.
+The app launches directly into a sidebar and comparison detail. Selecting a
+layout updates both panes to the same catalog ID.
 
 ## Build
 
@@ -26,8 +25,8 @@ cd Examples/LayoutsSwiftUI
 swiftly run swift build
 ```
 
-This SwiftUI reference package does not have a test target; the corresponding
-SwiftTUI layouts package owns the raster behaviour tests.
+This package does not have a test target; the corresponding SwiftTUI layouts
+package owns the raster behaviour tests.
 
 ## Findings
 

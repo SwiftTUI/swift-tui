@@ -19,7 +19,7 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-tui", path: "../.."),
+    .package(name: "swift-tui", path: "../..")
   ],
   targets: [
     .executableTarget(
@@ -32,7 +32,7 @@ let package = Package(
     .target(
       name: "Layouts",
       dependencies: [
-        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIRuntime", package: "swift-tui"),
         .product(name: "SwiftTUICharts", package: "swift-tui"),
       ]
     ),

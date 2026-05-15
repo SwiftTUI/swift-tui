@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Two bordered boxes side-by-side that share the same `BorderBlend`
 /// palette but differ only in the static `phase` parameter:
