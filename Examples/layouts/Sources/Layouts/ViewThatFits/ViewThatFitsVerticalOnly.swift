@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Three side-by-side `ViewThatFits(in: .vertical)` containers, each
 /// fed a different outer height via `.frame(height:)`.  The candidate

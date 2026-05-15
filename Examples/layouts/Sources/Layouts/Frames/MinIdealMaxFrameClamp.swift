@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A single `.frame(minWidth: 20, idealWidth: 40, maxWidth: 60)` view
 /// shown under three parent proposals:

@@ -27,8 +27,6 @@ Examples/layouts/Sources/Layouts/BordersOverlays/PerSideBorderColors.swift
 Examples/layouts/Sources/Layouts/Spacers/DividerOrientationFlip.swift
 Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift
 Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer.swift
-Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift
-Sources/SwiftTUIRuntime/Terminal/TerminalPresentation.swift
 Sources/SwiftTUICharts/CalendarHeatmap.swift
 Sources/SwiftTUICharts/CalendarHeatmapSupport.swift
 Sources/SwiftTUICharts/ChartChromeSupport.swift
@@ -41,6 +39,8 @@ Sources/SwiftTUICore/Draw/DrawExtractor+Lists.swift
 Sources/SwiftTUICore/Styling/BorderSet.swift
 Sources/SwiftTUICore/Styling/CollectionStylePresentations.swift
 Sources/SwiftTUICore/Styling/TileStyle.swift
+Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift
+Sources/SwiftTUIRuntime/Terminal/TerminalPresentation.swift
 Sources/SwiftTUIViews/Controls/AdjustableValueControls.swift
 Sources/SwiftTUIViews/Controls/MetricTrackSupport.swift
 Sources/SwiftTUIViews/Controls/ProgressView.swift

@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Pins that a vertical `ScrollView` takes its proposed height and
 /// measures its content against that viewport: content taller than

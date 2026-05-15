@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Demonstrates that `.clipped()` crops content that paints past the
 /// modified view's measured frame.  A `Text("aaaa…")` (16 cells of `a`)

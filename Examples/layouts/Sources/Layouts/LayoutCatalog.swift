@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Source-of-truth list of every layout in the Layouts example app.
 ///

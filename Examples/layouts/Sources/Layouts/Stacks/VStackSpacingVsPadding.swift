@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Two side-by-side panels that contrast `VStack(spacing:)` with
 /// per-child `.padding()` INSIDE a border:

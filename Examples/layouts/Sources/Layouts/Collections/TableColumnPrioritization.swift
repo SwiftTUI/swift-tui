@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A `Table` with four explicit-width columns inside a narrow
 /// `.frame(width: 30)` parent. The point is that the table renders

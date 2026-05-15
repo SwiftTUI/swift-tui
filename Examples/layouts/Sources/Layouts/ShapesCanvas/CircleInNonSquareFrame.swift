@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A `Circle` filled with red inside a deliberately non-square
 /// `.frame(width: 12, height: 5)` container.

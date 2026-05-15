@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// A bordered 20×5 box with a single-character badge (`●`) pinned to
 /// the bottom-trailing corner via `.overlay(alignment: .bottomTrailing)`.

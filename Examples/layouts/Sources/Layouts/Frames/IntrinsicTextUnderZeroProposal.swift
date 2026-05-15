@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Two copies of the same `Text("intrinsic content")`. The first is
 /// rendered plain; the second is wrapped in a `.frame(width: 0,

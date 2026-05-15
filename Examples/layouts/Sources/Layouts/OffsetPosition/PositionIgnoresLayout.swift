@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// Demonstrates that `.position(x:y:)` anchors the CENTER of its child
 /// at an absolute point in the wrapper's coordinate space, ignoring any

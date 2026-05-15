@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftTUIRuntime
 
 /// An HStack of three children whose middle child has
 /// `layoutPriority(1)` while the outer two default to priority `0`.
