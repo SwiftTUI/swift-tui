@@ -3,8 +3,8 @@ import { join, resolve } from "node:path";
 import {
   buildAppWasm,
   generateSceneManifest,
-} from "webhost";
-import type { WasmBuildConfiguration } from "webhost";
+} from "@swifttui/build";
+import type { WasmBuildConfiguration } from "@swifttui/build";
 
 const packagePath = resolve(import.meta.dir, "../TerminalApp");
 const outputDirectory = resolve(import.meta.dir, "../TerminalApp/dist");

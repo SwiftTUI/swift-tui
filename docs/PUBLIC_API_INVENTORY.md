@@ -232,6 +232,7 @@ Platform-specific execution and embedding are root package products:
 - host products and packages:
   - `SwiftUIHost` hosts retained `HostedSceneSession` values with `HostedRasterSurface` inside a SwiftUI app shell
   - `Platforms/Web` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
+  - `Platforms/WebBuild` owns the TypeScript build helpers for manifest generation, Swift WASI builds, browser wasm validation, and static browser packaging
 - terminal-program embedding products:
   - `SwiftTUITerminal` exposes `TerminalView`, `TerminalSession`, and
     `TerminalProcessSession`
@@ -245,8 +246,8 @@ Platform-specific execution and embedding are root package products:
 that serves a bundled browser runtime from the native process and drives it over
 the shared `web-surface` v2 WebSocket protocol.
 
-These are supported root package products, except `Platforms/Web`, which remains
-the Bun browser package.
+These are supported root package products, except `Platforms/Web` and
+`Platforms/WebBuild`, which are Bun workspace packages.
 
 The WebHost surface is compile-time opt-in. A terminal-only app that imports
 only `SwiftTUI` links no WebHost server, FlyingFox dependency, or browser

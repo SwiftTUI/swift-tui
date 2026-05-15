@@ -62,7 +62,8 @@ swiftly install --use 6.3.1
 
 ## Bun
 
-`Platforms/Web` and `Examples/WebExample` use Bun for all package management, test, and bundling work.
+`Platforms/Web`, `Platforms/WebBuild`, and `Examples/WebExample` use Bun for all
+package management, test, and bundling work.
 
 Examples:
 
@@ -70,6 +71,9 @@ Examples:
 cd Platforms/Web
 bun test
 bun run build -- --app <AppProduct>
+
+cd Platforms/WebBuild
+bun test
 
 cd Examples/WebExample
 bun test

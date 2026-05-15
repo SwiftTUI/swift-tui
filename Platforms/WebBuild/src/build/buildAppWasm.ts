@@ -1,15 +1,16 @@
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { optimizePackagedWasm } from "./optimizePackagedWasm.ts";
 import {
   resolveSwiftArtifacts,
+  type ResolveSwiftArtifactsOptions,
   type SwiftArtifactPaths,
   type WasmBuildConfiguration,
 } from "./resolveSwiftArtifacts.ts";
 import { stripPackagedWasm } from "./stripPackagedWasm.ts";
 import { formatWasmTypeDiagnostics } from "./wasmTypeDiagnostics.ts";
 
-export interface BuildAppWasmOptions {
+export interface BuildAppWasmOptions extends ResolveSwiftArtifactsOptions {
   configuration?: WasmBuildConfiguration;
   packagePath: string;
   outputDirectory: string;
@@ -19,11 +20,7 @@ export interface BuildAppWasmOptions {
 export async function buildAppWasm(
   options: BuildAppWasmOptions
 ): Promise<SwiftArtifactPaths> {
-  const artifacts = await resolveSwiftArtifacts({
-    configuration: options.configuration,
-    packagePath: options.packagePath,
-    product: options.product,
-  });
+  const artifacts = await resolveSwiftArtifacts(options);
 
   const packagedWasmPath = join(options.outputDirectory, "assets", "app.wasm");
   await mkdir(join(options.outputDirectory, "assets"), { recursive: true });
@@ -46,15 +43,15 @@ interface PackageBrowserValidatedWasmOptions {
 export async function packageBrowserValidatedWasm(
   options: PackageBrowserValidatedWasmOptions
 ): Promise<void> {
-  const sourceBytes = await Bun.file(options.sourceWasmPath).arrayBuffer();
-  await Bun.write(options.outputWasmPath, sourceBytes);
+  const sourceBytes = await readFile(options.sourceWasmPath);
+  await writeFile(options.outputWasmPath, sourceBytes);
 
   const optimize = options.optimize ?? optimizePackagedWasm;
   try {
     await optimize(options.outputWasmPath);
     await validateBrowserWasm(options.outputWasmPath, "optimized wasm");
   } catch (error) {
-    await Bun.write(options.outputWasmPath, sourceBytes);
+    await writeFile(options.outputWasmPath, sourceBytes);
     const message = error instanceof Error ? error.message : String(error);
 
     try {
@@ -82,7 +79,7 @@ export async function packageBrowserValidatedWasm(
   } catch (error) {
     // Stripping is a size optimization only. Keep the known-good raw wasm
     // whenever toolchain-specific objcopy output fails browser validation.
-    await Bun.write(options.outputWasmPath, sourceBytes);
+    await writeFile(options.outputWasmPath, sourceBytes);
     const message = error instanceof Error ? error.message : String(error);
     const warning = [
       `warning: keeping unstripped wasm at ${options.outputWasmPath}`,
@@ -96,7 +93,7 @@ async function validateBrowserWasm(
   wasmPath: string,
   description: string
 ): Promise<void> {
-  const bytes = await Bun.file(wasmPath).bytes();
+  const bytes = await readFile(wasmPath);
   try {
     // Validate against the same JS API the browser uses before we publish it.
     await WebAssembly.compile(bytes);

@@ -1,12 +1,18 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { loadWebHostSceneManifest, webTUISceneManifestToJSON, type WebHostSceneManifest } from "../WebHostSceneManifest.ts";
+import {
+  loadWebHostSceneManifest,
+  webTUISceneManifestToJSON,
+  type WebHostSceneManifest,
+} from "@swifttui/web/manifest";
+import { runCommand } from "./runCommand.ts";
 import { swiftCommandPrefix } from "./swiftCommandPrefix.ts";
 
 export interface GenerateSceneManifestOptions {
   packagePath: string;
   outputPath: string;
   appExecutable: string;
+  swiftCommand?: readonly string[];
 }
 
 export async function generateSceneManifest(
@@ -15,38 +21,26 @@ export async function generateSceneManifest(
   const output = await runManifestCommand(options);
   const manifest = await loadWebHostSceneManifest(output.trim());
   await mkdir(dirname(options.outputPath), { recursive: true });
-  await Bun.write(options.outputPath, webTUISceneManifestToJSON(manifest));
+  await writeFile(options.outputPath, webTUISceneManifestToJSON(manifest));
   return manifest;
 }
 
 async function runManifestCommand(
   options: GenerateSceneManifestOptions
 ): Promise<string> {
-  const proc = Bun.spawn({
-    cmd: [
-      ...swiftCommandPrefix(),
+  return await runCommand(
+    [
+      ...(options.swiftCommand ?? swiftCommandPrefix()),
       "run",
       "--package-path",
       options.packagePath,
       options.appExecutable,
     ],
-    env: {
-      ...process.env,
-      TUIGUI_MODE: "manifest",
-    },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    throw new Error([stdout, stderr].filter(Boolean).join("\n").trim() || "manifest generation failed");
-  }
-
-  return stdout;
+    {
+      env: {
+        ...process.env,
+        TUIGUI_MODE: "manifest",
+      },
+    }
+  );
 }

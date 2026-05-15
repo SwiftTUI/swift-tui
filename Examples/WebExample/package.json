@@ -14,8 +14,8 @@
     "test:browser": "playwright install chromium && bun run build && bun test ./src/browser-integration.browser.ts --timeout 120000"
   },
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.4.2",
-    "webhost": "workspace:*"
+    "@swifttui/build": "workspace:*",
+    "@swifttui/web": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

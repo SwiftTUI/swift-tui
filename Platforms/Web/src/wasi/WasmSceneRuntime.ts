@@ -1,17 +1,17 @@
 import {
   WebHostSceneRuntime,
   type WebHostSceneRuntimeOptions,
-} from "webhost";
+} from "../WebHostSceneRuntime.ts";
 import {
   encodeResizeControlMessage,
   type BrowserWASIBridge,
-} from "webhost";
+} from "./BrowserWASIBridge.ts";
 
 import {
   SharedInputQueueWriter,
   createSharedInputQueue,
   type SharedInputQueueBuffers,
-} from "./wasi-input-queue.ts";
+} from "./SharedInputQueue.ts";
 
 const workerModuleURL = new URL("./wasm-scene-worker.js", import.meta.url);
 
@@ -55,6 +55,7 @@ export interface WasmSceneRuntimeHandle {
 export interface WasmSceneRuntimeFactoryOptions {
   onSceneResize?(event: WasmSceneResizeEvent): void;
   onRuntimeCreated?(runtime: WasmSceneRuntimeHandle): void;
+  workerModuleURL?: string | URL;
 }
 
 export function createWasmSceneRuntimeFactory(
@@ -72,6 +73,7 @@ class WasmSceneRuntime extends WebHostSceneRuntime {
   private readonly bridge?: BrowserWASIBridge;
   private readonly wasmURL: URL;
   private readonly onSceneResize?: (event: WasmSceneResizeEvent) => void;
+  private readonly workerModuleURL: string | URL;
   private readonly inputQueue?: SharedInputQueueBuffers;
   private readonly inputWriter?: SharedInputQueueWriter;
 
@@ -91,7 +93,7 @@ class WasmSceneRuntime extends WebHostSceneRuntime {
       inputQueue = createSharedInputQueue();
       inputWriter = new SharedInputQueueWriter(inputQueue);
     } catch (error) {
-      console.error("[WebExample] failed to create shared stdin queue", error);
+      console.error("[SwiftTUIWeb] failed to create shared stdin queue", error);
     }
 
     super({
@@ -100,7 +102,7 @@ class WasmSceneRuntime extends WebHostSceneRuntime {
         try {
           inputWriter?.write(chunk);
         } catch (error) {
-          console.error("[WebExample] failed to enqueue terminal input", error);
+          console.error("[SwiftTUIWeb] failed to enqueue terminal input", error);
         }
       },
     });
@@ -108,6 +110,7 @@ class WasmSceneRuntime extends WebHostSceneRuntime {
     this.bridge = options.bridge;
     this.wasmURL = wasmURL;
     this.onSceneResize = factoryOptions.onSceneResize;
+    this.workerModuleURL = factoryOptions.workerModuleURL ?? workerModuleURL;
     this.inputQueue = inputQueue;
     this.inputWriter = inputWriter;
   }
@@ -142,18 +145,18 @@ class WasmSceneRuntime extends WebHostSceneRuntime {
 
     if (!this.inputQueue || !this.inputWriter || !this.bridge) {
       this.writeOutput(
-        "\r\nWebExampleApp requires SharedArrayBuffer-backed stdin. Serve the app with COOP/COEP headers.\r\n"
+        "\r\nSwiftTUI WASI browser runtime requires SharedArrayBuffer-backed stdin. Serve the app with COOP/COEP headers.\r\n"
       );
       return;
     }
 
-    this.worker = new Worker(workerModuleURL, { type: "module" });
+    this.worker = new Worker(this.workerModuleURL, { type: "module" });
     this.worker.addEventListener("message", (event: MessageEvent<WorkerMessage>) => {
       this.handleWorkerMessage(event.data);
     });
     this.worker.addEventListener("error", (event) => {
       this.bridge?.stderr.write(
-        `\nWebExample worker failed: ${event.message || "unknown worker error"}\n`
+        `\nSwiftTUI WASI worker failed: ${event.message || "unknown worker error"}\n`
       );
     });
 
@@ -187,11 +190,11 @@ class WasmSceneRuntime extends WebHostSceneRuntime {
       break;
     case "exit":
       if (message.code !== 0) {
-        this.bridge?.stderr.write(`\nWebExampleApp exited with code ${message.code}.\n`);
+        this.bridge?.stderr.write(`\nSwiftTUI WASI app exited with code ${message.code}.\n`);
       }
       break;
     case "error":
-      this.bridge?.stderr.write(`\nFailed to start WebExampleApp: ${message.message}\n`);
+      this.bridge?.stderr.write(`\nFailed to start SwiftTUI WASI app: ${message.message}\n`);
       break;
     }
   }

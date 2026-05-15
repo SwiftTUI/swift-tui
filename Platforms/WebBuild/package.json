@@ -1,0 +1,27 @@
+{
+  "name": "@swifttui/build",
+  "version": "0.1.0",
+  "module": "index.ts",
+  "bin": {
+    "swifttui-web": "./cli.ts"
+  },
+  "exports": {
+    ".": "./index.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "build:manifest": "bun run cli.ts build:manifest",
+    "build:wasm": "bun run cli.ts build:wasm",
+    "build": "bun run cli.ts build",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@swifttui/web": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

@@ -1,11 +1,16 @@
-# WebHost
+# `@swifttui/web`
 
-Browser wrapper for SwiftTUI apps.
+Browser runtime package for SwiftTUI apps.
+
+This package owns browser-safe runtime APIs: scene manifest loading, canvas
+rendering, ARIA mounting, WebSocket scene bridges, and WASI scene bridges. Build
+tooling lives in the sibling [`@swifttui/build`](../WebBuild) workspace package.
 
 ## Toolchains
 
-Use Bun for this package, and use the repo-default `swiftly` Swift 6.3.1
-toolchain for every Swift command that the build pipeline triggers.
+Use Bun for repo-local development of this package, and use the repo-default
+`swiftly` Swift 6.3.1 toolchain for every Swift command that the build pipeline
+triggers.
 
 Quick check:
 
@@ -14,7 +19,7 @@ swiftly run swift --version
 ```
 
 Native-only development should also work in Xcode, but the documented package
-and wasm build path for this wrapper uses `swiftly` plus Bun.
+and wasm build path uses `swiftly` plus Bun.
 
 This package now lives in the repo's Bun workspace. Run `bun install` from the
 repo root or from any workspace package directory, and Bun will maintain one
@@ -34,7 +39,7 @@ self-describing.
 ## API
 
 ```ts
-import { createWebHostApp } from "./index.ts";
+import { createWebHostApp } from "@swifttui/web";
 
 const controller = await createWebHostApp({
   mount: document.getElementById("app")!,
@@ -60,6 +65,20 @@ await controller.switchScene("dashboard");
 controller.setStyle({ cursorBlink: true, theme: { tint: "#79c0ff" } });
 ```
 
+For a static WASI-hosted app, use the WASI subpath:
+
+```ts
+import { createWasmSceneRuntimeFactory } from "@swifttui/web/wasi";
+```
+
+Worker entrypoints can delegate to:
+
+```ts
+import { startWasmSceneWorker } from "@swifttui/web/wasi-worker";
+
+startWasmSceneWorker();
+```
+
 ## Scripts
 
 - `bun test`
@@ -69,8 +88,10 @@ controller.setStyle({ cursorBlink: true, theme: { tint: "#79c0ff" } });
 - `bun run build -- --app <AppExecutable>`
 - `bun run dev`
 
-`build:wasm` and `build` default to `--configuration release`. Pass
-`--configuration debug` for local debug-oriented wasm builds.
+`build:manifest`, `build:wasm`, and `build` delegate manifest/WASI packaging to
+`@swifttui/build`. `build:wasm` and `build` default to
+`--configuration release`; pass `--configuration debug` for local
+debug-oriented wasm builds.
 
 The build flow is intentionally small:
 

@@ -28,15 +28,15 @@ Two cooperating parts:
 The whole pattern is ~60 lines of load-bearing code in
 [`src/frontend.ts`](src/frontend.ts):
 
-- `createWebHostApp({ mount, manifestUrl, sceneRuntimeFactory, ... })` —
-  the WebHost entry point
-- `createWasmSceneRuntimeFactory(wasmUrl, ...)` — wires the WASI
-  bootstrap that runs `WebExampleApp` inside each scene runtime
+- `createWebHostApp({ mount, manifestUrl, sceneRuntimeFactory, ... })` from
+  `@swifttui/web` — the WebHost entry point
+- `createWasmSceneRuntimeFactory(wasmUrl, ...)` from `@swifttui/web/wasi` —
+  wires the WASI bootstrap that runs `WebExampleApp` inside each scene runtime
 
-Everything else in `src/frontend.ts` is page chrome (the scene picker
-around a viewport-sized mount). A host page that adopts this pattern can
-render whatever surrounding chrome it likes — only the `.terminal-shell`
-element + the `data-*` hooks consumed by WebHost are load-bearing.
+Everything else in `src/frontend.ts` is page chrome (the scene picker around a
+viewport-sized mount). A host page that adopts this pattern can render whatever
+surrounding chrome it likes — only the `.terminal-shell` element + the `data-*`
+hooks consumed by WebHost are load-bearing.
 
 ## What to copy when adopting this pattern
 
@@ -49,7 +49,7 @@ The minimum a host needs:
 3. A host that serves `Cross-Origin-Opener-Policy: same-origin` and
    `Cross-Origin-Embedder-Policy: require-corp` so
    `SharedArrayBuffer`-backed stdin works.
-4. `bun add webhost` in the host workspace.
+4. Workspace dependencies on `@swifttui/web` and `@swifttui/build`.
 5. The mount sequence from `src/frontend.ts:bootstrap()` —
    `createWebHostApp` + `createWasmSceneRuntimeFactory`.
 
@@ -76,9 +76,9 @@ the canonical environment story.
 bun install
 ```
 
-`WebExample`, `Platforms/Web`, and the top-level `Website` share the
-repo's Bun workspace. Running `bun install` from the repo root is
-preferred, but it also works from this directory.
+`WebExample`, `Platforms/Web`, `Platforms/WebBuild`, and the top-level
+`Website` share the repo's Bun workspace. Running `bun install` from the repo
+root is preferred, but it also works from this directory.
 
 ## Development
 
@@ -120,9 +120,7 @@ Examples/WebExample/
     ├── index.css                  ← embedding stylesheet (.terminal-* + .example-*)
     ├── frontend.ts                ← bootstrap, mount, scene picker
     ├── app-data.ts                ← manifest paths + fallback manifest
-    ├── scene-runtime.ts           ← WebHost scene runtime factory
-    ├── wasm-scene-worker.ts       ← per-scene wasm worker
-    ├── wasi-input-queue.ts        ← stdin shim for SharedArrayBuffer-backed input
+    ├── wasm-scene-worker.ts       ← thin @swifttui/web/wasi-worker entrypoint
     ├── browser-integration.browser.ts  ← browser-side glue
     ├── built-app-server.ts        ← production server
     ├── build-pages.ts             ← composes pages-dist/
@@ -134,6 +132,8 @@ Examples/WebExample/
 
 - [`Platforms/Web`](../../Platforms/Web) — the Bun browser-side workspace this
   example consumes
+- [`Platforms/WebBuild`](../../Platforms/WebBuild) — the manifest and WASI
+  packaging workspace this example consumes
 - [`WASISurfaceBridge`](../../Platforms/WASI/Sources/WASISurfaceBridge) and
   [`SwiftTUIWASI`](../../Platforms/WASI/Sources/SwiftTUIWASI) — root package
   products that provide the transport and runner this example builds against

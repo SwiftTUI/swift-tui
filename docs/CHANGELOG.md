@@ -18,6 +18,14 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-14
 
+- Implemented the internal `Platforms/Web` package split: `@swifttui/web` now
+  owns browser runtime and WASI scene-runtime APIs, `@swifttui/build` owns
+  manifest/WASI packaging helpers, WebExample consumes both packages, and public
+  runtime entrypoints are tested against importing build tooling.
+- Closed the local-browser WebHost v1 polish investigation and removed it from
+  active TODO tracking; future work should be filed as scoped follow-up items
+  instead of keeping the broad investigation open. See `c3c6459d`
+  [docs/proposals/LOCAL_BROWSER_HOST_LEARNINGS.md](proposals/LOCAL_BROWSER_HOST_LEARNINGS.md).
 - Formalized the semantic host-frame presentation contract: the runtime now
   produces sequenced `SemanticHostFrame` values for semantic host-frame
   consumers, retained native, WebHost, and WASI surfaces use the formal protocol

@@ -1,9 +1,9 @@
-import { runCommand } from "./runCommand.ts";
+import { findExecutable, runCommand } from "./runCommand.ts";
 
 export async function stripPackagedWasm(
   wasmPath: string
 ): Promise<void> {
-  const objcopyPath = Bun.which("llvm-objcopy");
+  const objcopyPath = findExecutable("llvm-objcopy");
   if (!objcopyPath) {
     throw new Error(
       "missing llvm-objcopy in PATH; install the swiftly-managed toolchain before packaging wasm"
