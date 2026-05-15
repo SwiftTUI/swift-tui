@@ -30,15 +30,15 @@ public struct HorizontalScrollWithInfiniteChild: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Horizontal scroll with infinite child").foregroundStyle(.secondary)
       ScrollView(.horizontal) {
-        HStack(spacing: 1) {
+        HStack(spacing: cell(1)) {
           ForEach(0..<5, id: \.self) { i in
             Text("item \(i)").frame(maxWidth: .infinity)
           }
         }
       }
-      .frame(width: 20)
+      .frame(width: cell(20))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

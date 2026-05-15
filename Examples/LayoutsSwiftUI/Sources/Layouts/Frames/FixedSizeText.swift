@@ -16,20 +16,20 @@ public struct FixedSizeText: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("FixedSize text").foregroundStyle(.secondary)
-      VStack(alignment: .leading, spacing: 1) {
+      VStack(alignment: .leading, spacing: cell(1)) {
         Text("without .fixedSize():").foregroundStyle(.secondary)
         Text("thelongerstring")
-          .frame(width: 10)
+          .frame(width: cell(10))
           .border(Color.gray)
         Text("with .fixedSize():").foregroundStyle(.secondary)
         Text("thelongerstring")
           .fixedSize()
-          .frame(width: 10)
+          .frame(width: cell(10))
           .border(Color.gray)
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

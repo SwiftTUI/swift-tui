@@ -32,7 +32,7 @@ public struct AnyLayoutHVSwap: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Any layout HV swap").foregroundStyle(.secondary)
 
       Text("VStackLayout").foregroundStyle(.secondary)
@@ -44,13 +44,13 @@ public struct AnyLayoutHVSwap: View {
       .border(Color.gray)
 
       Text("HStackLayout").foregroundStyle(.secondary)
-      AnyLayout(HStackLayout(spacing: 1)) {
+      AnyLayout(HStackLayout(spacing: cell(1))) {
         Text("[A]")
         Text("[B]")
         Text("[C]")
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

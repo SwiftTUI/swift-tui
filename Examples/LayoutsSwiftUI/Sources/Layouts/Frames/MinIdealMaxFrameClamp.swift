@@ -15,22 +15,22 @@ public struct MinIdealMaxFrameClamp: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Min ideal max frame clamp").foregroundStyle(.secondary)
-      clampedBox.frame(width: 10)
-      clampedBox.frame(width: 40)
-      clampedBox.frame(width: 80)
+      clampedBox.frame(width: cell(10))
+      clampedBox.frame(width: cell(40))
+      clampedBox.frame(width: cell(80))
     }
-    .padding(1)
+    .padding(cell(1))
   }
 
   private var clampedBox: some View {
     Text("clamped")
       .frame(
-        minWidth: 20,
-        idealWidth: 40,
-        maxWidth: 60,
-        minHeight: 3,
+        minWidth: cell(20),
+        idealWidth: cell(40),
+        maxWidth: cell(60),
+        minHeight: cell(3),
         alignment: .center
       )
       .border(Color.gray)

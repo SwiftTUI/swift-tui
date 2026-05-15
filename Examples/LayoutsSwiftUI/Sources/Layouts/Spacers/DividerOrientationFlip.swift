@@ -16,9 +16,9 @@ public struct DividerOrientationFlip: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Divider orientation flip").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 4) {
+      HStack(alignment: .top, spacing: cell(4)) {
         VStack(alignment: .leading, spacing: 0) {
           Text("V-1")
           Divider()

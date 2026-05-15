@@ -22,25 +22,25 @@ public struct BackgroundVsOverlayPaintOrder: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Background vs overlay paint order").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 4) {
+      HStack(alignment: .top, spacing: cell(4)) {
         VStack(alignment: .leading, spacing: 0) {
           Text("background:").foregroundStyle(.secondary)
           Text("X")
-            .frame(width: 3, height: 1)
+            .frame(width: cell(3), height: cell(1))
             .background(Color.red)
         }
         VStack(alignment: .leading, spacing: 0) {
           Text("overlay:").foregroundStyle(.secondary)
           Text("X")
-            .frame(width: 3, height: 1)
+            .frame(width: cell(3), height: cell(1))
             .overlay {
               Rectangle().fill(Color.blue)
             }
         }
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

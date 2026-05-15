@@ -39,12 +39,12 @@ public struct ColonAlignedForm: View {
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 
   private func row(label: String, value: String) -> some View {
     HStack(spacing: 0) {
-      Text("\(label):").frame(width: 8, alignment: .trailing)
+      Text("\(label):").frame(width: cell(8), alignment: .trailing)
       Text(" \(value)")
     }
   }

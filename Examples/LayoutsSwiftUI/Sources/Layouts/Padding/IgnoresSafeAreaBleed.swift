@@ -34,6 +34,6 @@ public struct IgnoresSafeAreaBleed: View {
       }
     }
     .ignoresSafeArea(edges: .bottom)
-    .safeAreaPadding(.bottom, 3)
+    .safeAreaPadding(.bottom, cell(3))
   }
 }

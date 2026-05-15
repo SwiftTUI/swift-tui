@@ -12,15 +12,15 @@ public struct OverlayAlignmentBadge: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Overlay alignment badge").foregroundStyle(.secondary)
       Text("box content")
-        .frame(width: 20, height: 5)
+        .frame(width: cell(20), height: cell(5))
         .border(Color.gray)
         .overlay(alignment: .bottomTrailing) {
           Text("●").foregroundStyle(Color.red)
         }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

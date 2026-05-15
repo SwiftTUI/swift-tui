@@ -38,9 +38,9 @@ public struct ScrollViewWithSafeAreaInset: View {
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(height: 10)
+      .frame(height: cell(10))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

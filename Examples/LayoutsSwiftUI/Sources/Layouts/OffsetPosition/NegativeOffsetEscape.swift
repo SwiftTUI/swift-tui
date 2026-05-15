@@ -16,14 +16,14 @@ public struct NegativeOffsetEscape: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Negative offset escape").foregroundStyle(.secondary)
       HStack(spacing: 0) {
-        Text("#####").frame(width: 5, height: 1)
-        Text("[ESC]").offset(x: -2)
+        Text("#####").frame(width: cell(5), height: cell(1))
+        Text("[ESC]").offset(x: cell(-2))
       }
     }
-    .padding(4)
+    .padding(cell(4))
     .border(Color.gray)
   }
 }

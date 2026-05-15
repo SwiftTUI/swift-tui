@@ -30,7 +30,7 @@ public struct ViewThatFitsAxisChoice: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("View that fits axis choice")
       Group {
         Text("at width 60:").foregroundStyle(.secondary)
@@ -39,7 +39,7 @@ public struct ViewThatFitsAxisChoice: View {
           Text("[MEDIUM]")
           Text("[S]")
         }
-        .frame(width: 60)
+        .frame(width: cell(60))
         .border(Color.gray)
 
         Text("at width 12:").foregroundStyle(.secondary)
@@ -48,7 +48,7 @@ public struct ViewThatFitsAxisChoice: View {
           Text("[MEDIUM]")
           Text("[S]")
         }
-        .frame(width: 12)
+        .frame(width: cell(12))
         .border(Color.gray)
 
         Text("at width 4:").foregroundStyle(.secondary)
@@ -57,10 +57,10 @@ public struct ViewThatFitsAxisChoice: View {
           Text("[MEDIUM]")
           Text("[S]")
         }
-        .frame(width: 4)
+        .frame(width: cell(4))
         .border(Color.gray)
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

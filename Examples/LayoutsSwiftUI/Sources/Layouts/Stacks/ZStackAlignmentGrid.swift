@@ -17,7 +17,7 @@ public struct ZStackAlignmentGrid: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("ZStack alignment grid").foregroundStyle(.secondary)
       ZStack {
         Text("TL").frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -28,6 +28,6 @@ public struct ZStackAlignmentGrid: View {
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

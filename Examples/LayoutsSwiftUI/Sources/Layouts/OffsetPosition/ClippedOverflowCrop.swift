@@ -13,13 +13,13 @@ public struct ClippedOverflowCrop: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Clipped overflow crop").foregroundStyle(.secondary)
       Text("aaaaaaaaaaaaaaaa")
         .fixedSize()
-        .frame(width: 8, height: 1)
+        .frame(width: cell(8), height: cell(1))
         .clipped()
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

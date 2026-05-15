@@ -16,10 +16,10 @@ public struct FrameFixedInsideUnbounded: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Frame fixed inside unbounded").foregroundStyle(.secondary)
       Text("inside a tight HStack:").foregroundStyle(.secondary)
-      HStack(spacing: 1) {
+      HStack(spacing: cell(1)) {
         Text("label").foregroundStyle(.secondary)
         fixedBox
         Spacer()
@@ -30,12 +30,12 @@ public struct FrameFixedInsideUnbounded: View {
         Spacer()
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 
   private var fixedBox: some View {
     Text("fixed 30x5")
-      .frame(width: 30, height: 5, alignment: .center)
+      .frame(width: cell(30), height: cell(5), alignment: .center)
       .border(Color.gray)
   }
 }

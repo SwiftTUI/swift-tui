@@ -16,24 +16,24 @@ public struct BorderBlendStaticPhase: View {
   private static let palette: [Color] = [.red, .yellow, .green, .cyan]
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Border blend static phase").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 3) {
+      HStack(alignment: .top, spacing: cell(3)) {
         VStack(alignment: .leading, spacing: 0) {
           Text("phase 0.0").foregroundStyle(.secondary)
           Text("X")
-            .padding(2)
+            .padding(cell(2))
             .overlay(blendBorder(phase: 0.0))
         }
         VStack(alignment: .leading, spacing: 0) {
           Text("phase 0.5").foregroundStyle(.secondary)
           Text("X")
-            .padding(2)
+            .padding(cell(2))
             .overlay(blendBorder(phase: 0.5))
         }
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 
   private func blendBorder(phase: Double) -> some View {

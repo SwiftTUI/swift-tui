@@ -9,18 +9,18 @@ public struct HStackAlignmentTriad: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("HStack alignment triad").foregroundStyle(.secondary)
       row("top", alignment: .top)
       row("center", alignment: .center)
       row("bottom", alignment: .bottom)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 
   private func row(_ label: String, alignment: VerticalAlignment) -> some View {
-    HStack(alignment: alignment, spacing: 1) {
-      Text(label).frame(width: 7, alignment: .leading)
+    HStack(alignment: alignment, spacing: cell(1)) {
+      Text(label).frame(width: cell(7), alignment: .leading)
       Text("tall\ntall\ntall").border(Color.gray)
       Text("short").border(Color.gray)
     }

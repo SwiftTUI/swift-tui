@@ -16,13 +16,13 @@ public struct GeometryReaderInHStackHogs: View {
   public var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Geometry reader in HStack hogs").foregroundStyle(.secondary)
-      HStack(spacing: 1) {
+      HStack(spacing: cell(1)) {
         GeometryReader { _ in Text("[G]") }
         Text("[SIBLING]")
       }
-      .frame(height: 5)
+      .frame(height: cell(5))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

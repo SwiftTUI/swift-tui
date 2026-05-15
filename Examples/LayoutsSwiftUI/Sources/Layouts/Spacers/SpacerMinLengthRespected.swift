@@ -29,13 +29,13 @@ public struct SpacerMinLengthRespected: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Spacer min length respected").foregroundStyle(.secondary)
       HStack(spacing: 0) {
         Text("[L]")
         Spacer()
         Text("[M]")
-        Spacer(minLength: 20)
+        Spacer(minLength: cell(20))
         Text("[R]")
       }
     }

@@ -17,14 +17,14 @@ public struct NestedBorderOrdering: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Nested border ordering").foregroundStyle(.secondary)
       Text("X")
-        .padding(1)
+        .padding(cell(1))
         .border(Color.gray)
-        .padding(1)
+        .padding(cell(1))
         .border(Color.gray, width: 2)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

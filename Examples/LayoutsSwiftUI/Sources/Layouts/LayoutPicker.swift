@@ -60,11 +60,11 @@ public struct LayoutPicker: View {
       )
       .foregroundStyle(.tertiary)
     }
-    .padding(.horizontal, 1)
+    .padding(.horizontal, cell(1))
   }
 
   private var footer: some View {
     Text("↑↓ move  ·  ⏎ open  ·  click open  ·  ⌃C quit").foregroundStyle(.secondary)
-      .padding(.horizontal, 1)
+      .padding(.horizontal, cell(1))
   }
 }

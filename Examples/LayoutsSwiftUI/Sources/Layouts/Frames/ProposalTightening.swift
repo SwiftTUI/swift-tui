@@ -15,15 +15,15 @@ public struct ProposalTightening: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Proposal tightening").foregroundStyle(.secondary)
       Text("outside geometry reader").foregroundStyle(.secondary)
       GeometryReader { proxy in
-        Text("w=\(proxy.size.width)")
+        Text("w=\(cellCount(proxy.size.width))")
       }
-      .frame(width: 30, height: 3)
+      .frame(width: cell(30), height: cell(3))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

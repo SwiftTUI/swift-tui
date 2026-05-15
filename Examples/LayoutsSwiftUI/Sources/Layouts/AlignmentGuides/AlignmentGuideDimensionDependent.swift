@@ -34,15 +34,15 @@ public struct AlignmentGuideDimensionDependent: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Alignment guide dimension dependent").foregroundStyle(.secondary)
-      HStack(alignment: .bottom, spacing: 2) {
+      HStack(alignment: .bottom, spacing: cell(2)) {
         Text("[A]").border(Color.gray)
         Text("[B]\n[B]").border(Color.gray)
         Text("[C]\n[C]\n[C]").border(Color.gray)
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

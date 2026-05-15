@@ -14,23 +14,23 @@ public struct PerSideBorderColors: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Per-side border colors").foregroundStyle(.secondary)
       Text("X")
-        .padding(2)
+        .padding(cell(2))
         .overlay(alignment: .top) {
-          Rectangle().fill(Color.red).frame(height: 2)
+          Rectangle().fill(Color.red).frame(height: cell(2))
         }
         .overlay(alignment: .trailing) {
-          Rectangle().fill(Color.yellow).frame(width: 2)
+          Rectangle().fill(Color.yellow).frame(width: cell(2))
         }
         .overlay(alignment: .bottom) {
-          Rectangle().fill(Color.green).frame(height: 2)
+          Rectangle().fill(Color.green).frame(height: cell(2))
         }
         .overlay(alignment: .leading) {
-          Rectangle().fill(Color.blue).frame(width: 2)
+          Rectangle().fill(Color.blue).frame(width: cell(2))
         }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

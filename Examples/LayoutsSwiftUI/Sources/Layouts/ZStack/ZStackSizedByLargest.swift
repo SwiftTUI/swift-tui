@@ -14,10 +14,10 @@ public struct ZStackSizedByLargest: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("ZStack sized by largest").foregroundStyle(.secondary)
       ZStack {
-        Text("·").frame(width: 3, height: 1)
-        Rectangle().fill(Color.gray).frame(width: 30, height: 10)
+        Text("·").frame(width: cell(3), height: cell(1))
+        Rectangle().fill(Color.gray).frame(width: cell(30), height: cell(10))
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

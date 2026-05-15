@@ -12,13 +12,13 @@ public struct FixedSizeOneAxis: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("FixedSize one axis").foregroundStyle(.secondary)
       Text("abc def ghi jkl mno pqr")
         .fixedSize(horizontal: false, vertical: true)
-        .frame(width: 8)
+        .frame(width: cell(8))
         .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

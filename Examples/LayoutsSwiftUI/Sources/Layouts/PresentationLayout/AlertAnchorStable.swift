@@ -32,7 +32,7 @@ public struct AlertAnchorStable: View {
         Text("body row \(i)")
       }
     }
-    .padding(1)
+    .padding(cell(1))
     .alert(
       "Title",
       isPresented: $isShowingAlert,

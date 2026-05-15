@@ -24,13 +24,13 @@ public struct CapsuleAxisFlip: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Capsule axis flip").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 4) {
-        Capsule().fill(Color.blue).frame(width: 20, height: 3)
-        Capsule().fill(Color.green).frame(width: 3, height: 20)
+      HStack(alignment: .top, spacing: cell(4)) {
+        Capsule().fill(Color.blue).frame(width: cell(20), height: cell(3))
+        Capsule().fill(Color.green).frame(width: cell(3), height: cell(20))
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

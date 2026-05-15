@@ -32,9 +32,9 @@ public struct ListInShortFrame: View {
         }
       }
       .listStyle(.plain)
-      .frame(height: 5)
+      .frame(height: cell(5))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

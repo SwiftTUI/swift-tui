@@ -23,7 +23,7 @@ public struct FlexibleFrameAlignmentGrid: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Flexible frame alignment grid").foregroundStyle(.secondary)
       ZStack {
         Text("TL").frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -36,9 +36,9 @@ public struct FlexibleFrameAlignmentGrid: View {
         Text("BC").frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         Text("BR").frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
       }
-      .frame(width: 60, height: 20)
+      .frame(width: cell(60), height: cell(20))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

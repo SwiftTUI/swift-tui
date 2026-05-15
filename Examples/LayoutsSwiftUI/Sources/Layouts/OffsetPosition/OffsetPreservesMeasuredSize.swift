@@ -13,14 +13,14 @@ public struct OffsetPreservesMeasuredSize: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Offset preserves measured size").foregroundStyle(.secondary)
       HStack(spacing: 0) {
-        Text("[A]").frame(width: 3)
-        Text("[B]").frame(width: 3).offset(x: 6)
-        Text("[C]").frame(width: 3)
+        Text("[A]").frame(width: cell(3))
+        Text("[B]").frame(width: cell(3)).offset(x: cell(6))
+        Text("[C]").frame(width: cell(3))
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }
