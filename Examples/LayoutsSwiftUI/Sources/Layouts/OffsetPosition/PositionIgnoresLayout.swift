@@ -21,7 +21,7 @@ public struct PositionIgnoresLayout: View {
       Text("Position ignores layout").foregroundStyle(.secondary)
       ZStack {
         Rectangle().fill(Color.blue)
-        Text("[PIN]").position(x: 60, y: 5)
+        Text("[PIN]").position(x: cell(60), y: cell(5))
       }
     }
   }

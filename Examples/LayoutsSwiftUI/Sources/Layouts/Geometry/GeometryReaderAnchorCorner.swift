@@ -18,11 +18,11 @@ public struct GeometryReaderAnchorCorner: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Geometry reader anchor corner").foregroundStyle(.secondary)
       GeometryReader { proxy in
-        Text("[X]").position(x: proxy.size.width - 2, y: 0)
+        Text("[X]").position(x: proxy.size.width - cell(2), y: 0)
       }
-      .frame(width: 40, height: 5)
+      .frame(width: cell(40), height: cell(5))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

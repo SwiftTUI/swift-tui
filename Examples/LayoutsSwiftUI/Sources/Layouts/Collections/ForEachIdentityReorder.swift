@@ -35,7 +35,7 @@ public struct ForEachIdentityReorder: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("For each identity reorder").foregroundStyle(.secondary)
       Text("order A").foregroundStyle(.secondary)
       VStack(alignment: .leading, spacing: 0) {
@@ -52,6 +52,6 @@ public struct ForEachIdentityReorder: View {
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

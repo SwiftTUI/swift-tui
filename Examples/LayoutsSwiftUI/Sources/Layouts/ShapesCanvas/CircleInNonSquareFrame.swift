@@ -29,9 +29,9 @@ public struct CircleInNonSquareFrame: View {
       Text("Circle in non square frame").foregroundStyle(.secondary)
       Circle()
         .fill(Color.red)
-        .frame(width: 12, height: 5)
+        .frame(width: cell(12), height: cell(5))
         .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

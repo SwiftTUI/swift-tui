@@ -32,14 +32,14 @@ public struct TableColumnPrioritization: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Table column prioritization").foregroundStyle(.secondary)
       Table(Self.rows) {
-        TableColumn("A") { Text($0.a) }.width(4)
-        TableColumn("B") { Text($0.b) }.width(4)
-        TableColumn("C") { Text($0.c) }.width(4)
-        TableColumn("D") { Text($0.d) }.width(4)
+        TableColumn("A") { Text($0.a) }.width(cell(4))
+        TableColumn("B") { Text($0.b) }.width(cell(4))
+        TableColumn("C") { Text($0.c) }.width(cell(4))
+        TableColumn("D") { Text($0.d) }.width(cell(4))
       }
-      .frame(width: 30)
+      .frame(width: cell(30))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

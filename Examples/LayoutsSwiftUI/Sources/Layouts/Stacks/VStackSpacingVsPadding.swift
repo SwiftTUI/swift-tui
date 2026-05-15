@@ -25,11 +25,11 @@ public struct VStackSpacingVsPadding: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("VStack spacing vs padding").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 4) {
+      HStack(alignment: .top, spacing: cell(4)) {
         // Left: VStack(spacing: 2) — gap lives between borders.
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: cell(2)) {
           Text("spacing").foregroundStyle(.secondary)
           Text("alpha").border(Color.gray)
           Text("beta").border(Color.gray)
@@ -39,12 +39,12 @@ public struct VStackSpacingVsPadding: View {
         // INSIDE its border, widening the ring around the content.
         VStack(alignment: .leading, spacing: 0) {
           Text("padding").foregroundStyle(.secondary)
-          Text("alpha").padding(1).border(Color.gray)
-          Text("beta").padding(1).border(Color.gray)
-          Text("gamma").padding(1).border(Color.gray)
+          Text("alpha").padding(cell(1)).border(Color.gray)
+          Text("beta").padding(cell(1)).border(Color.gray)
+          Text("gamma").padding(cell(1)).border(Color.gray)
         }
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

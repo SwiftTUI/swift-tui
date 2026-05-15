@@ -19,10 +19,10 @@ public struct ZStackPaintOrderOverlap: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("ZStack paint order overlap").foregroundStyle(.secondary)
       ZStack {
-        Rectangle().fill(Color.red).frame(width: 10, height: 4)
-        Rectangle().fill(Color.blue).frame(width: 10, height: 4)
+        Rectangle().fill(Color.red).frame(width: cell(10), height: cell(4))
+        Rectangle().fill(Color.blue).frame(width: cell(10), height: cell(4))
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

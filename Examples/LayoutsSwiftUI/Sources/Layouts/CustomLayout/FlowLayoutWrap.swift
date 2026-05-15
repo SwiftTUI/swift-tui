@@ -27,23 +27,23 @@ public struct FlowLayoutWrap: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Flow layout wrap").foregroundStyle(.secondary)
       Text("at width 30").foregroundStyle(.secondary)
-      FlowLayout(spacing: 1) {
+      FlowLayout(spacing: cell(1)) {
         ForEach(0..<8, id: \.self) { i in
           Text("[item \(i)]")
         }
       }
-      .frame(width: 30)
+      .frame(width: cell(30))
       .border(Color.gray)
       Text("at width 60").foregroundStyle(.secondary)
-      FlowLayout(spacing: 1) {
+      FlowLayout(spacing: cell(1)) {
         ForEach(0..<8, id: \.self) { i in
           Text("[item \(i)]")
         }
       }
-      .frame(width: 60)
+      .frame(width: cell(60))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }
 
@@ -114,11 +114,5 @@ struct FlowLayout: Layout {
   private func finiteWidth(_ dim: CGFloat?) -> CGFloat? {
     guard let dim, dim.isFinite else { return nil }
     return dim
-  }
-}
-
-extension FlowLayout {
-  init(spacing: Int) {
-    self.spacing = CGFloat(spacing)
   }
 }

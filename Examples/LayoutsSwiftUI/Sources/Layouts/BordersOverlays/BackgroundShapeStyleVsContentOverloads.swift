@@ -19,25 +19,25 @@ public struct BackgroundShapeStyleVsContentOverloads: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Background ShapeStyle vs Content overloads").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 3) {
+      HStack(alignment: .top, spacing: cell(3)) {
         VStack(alignment: .leading, spacing: 0) {
           Text(".background(.red):").foregroundStyle(.secondary)
           Text("hello")
-            .frame(width: 10, height: 2)
+            .frame(width: cell(10), height: cell(2))
             .background(Color.red)
         }
         VStack(alignment: .leading, spacing: 0) {
           Text(".background { Rectangle } :").foregroundStyle(.secondary)
           Text("hello")
-            .frame(width: 10, height: 2)
+            .frame(width: cell(10), height: cell(2))
             .background {
               Rectangle().fill(Color.red)
             }
         }
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

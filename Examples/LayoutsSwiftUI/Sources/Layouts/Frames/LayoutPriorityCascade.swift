@@ -24,15 +24,15 @@ public struct LayoutPriorityCascade: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Layout priority cascade").foregroundStyle(.secondary)
-      HStack(spacing: 1) {
+      HStack(spacing: cell(1)) {
         Text("XXXXXXXXXXXX").layoutPriority(0)
         Text("K").layoutPriority(1)
         Text("YYYYYYYYYYYY").layoutPriority(0)
         Text("Z").layoutPriority(2)
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

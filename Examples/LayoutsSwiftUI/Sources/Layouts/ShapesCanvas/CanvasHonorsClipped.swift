@@ -21,10 +21,10 @@ public struct CanvasHonorsClipped: View {
         path.addLine(to: CGPoint(x: size.width * 3, y: size.height / 2))
         context.stroke(path, with: .color(.cyan))
       }
-      .frame(width: 10, height: 4)
+      .frame(width: cell(10), height: cell(4))
       .clipped()
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

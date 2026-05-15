@@ -30,16 +30,16 @@ public struct ViewThatFitsBoundaryInclusive: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("View that fits boundary inclusive")
-      HStack(alignment: .top, spacing: 4) {
+      HStack(alignment: .top, spacing: cell(4)) {
         VStack(alignment: .leading, spacing: 0) {
           Text("at width 5:").foregroundStyle(.secondary)
           ViewThatFits {
             Text("HELLO")
             Text("HI")
           }
-          .frame(width: 5)
+          .frame(width: cell(5))
           .border(Color.gray)
         }
         VStack(alignment: .leading, spacing: 0) {
@@ -48,11 +48,11 @@ public struct ViewThatFitsBoundaryInclusive: View {
             Text("HELLO")
             Text("HI")
           }
-          .frame(width: 4)
+          .frame(width: cell(4))
           .border(Color.gray)
         }
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

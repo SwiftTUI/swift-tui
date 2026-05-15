@@ -34,9 +34,9 @@ public struct VerticalScrollMeasuresContent: View {
           }
         }
       }
-      .frame(height: 8)
+      .frame(height: cell(8))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

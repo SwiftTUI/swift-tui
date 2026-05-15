@@ -12,12 +12,12 @@ public struct AsymmetricPaddingInsets: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Asymmetric padding insets").foregroundStyle(.secondary)
       Text("[content]")
-        .padding(EdgeInsets(top: 0, leading: 4, bottom: 2, trailing: 0))
+        .padding(EdgeInsets(top: 0, leading: cell(4), bottom: cell(2), trailing: 0))
         .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

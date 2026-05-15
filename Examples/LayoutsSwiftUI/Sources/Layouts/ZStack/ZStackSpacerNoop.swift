@@ -24,6 +24,6 @@ public struct ZStackSpacerNoop: View {
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

@@ -15,17 +15,17 @@ public struct PaddingBorderOrdering: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Padding border ordering").foregroundStyle(.secondary)
-      HStack(alignment: .top, spacing: 4) {
+      HStack(alignment: .top, spacing: cell(4)) {
         Text("A")
-          .padding(1)
+          .padding(cell(1))
           .border(Color.gray)
         Text("A")
           .border(Color.gray)
-          .padding(1)
+          .padding(cell(1))
       }
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

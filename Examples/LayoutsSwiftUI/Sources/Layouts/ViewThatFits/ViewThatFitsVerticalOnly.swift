@@ -25,7 +25,7 @@ public struct ViewThatFitsVerticalOnly: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("View that fits vertical only")
 
       Text("at height 5:").foregroundStyle(.secondary)
@@ -41,7 +41,7 @@ public struct ViewThatFitsVerticalOnly: View {
         }
         Text("[SHORT1]")
       }
-      .frame(width: 12, height: 5)
+      .frame(width: cell(12), height: cell(5))
       .border(Color.gray)
 
       Text("at height 2:").foregroundStyle(.secondary)
@@ -57,7 +57,7 @@ public struct ViewThatFitsVerticalOnly: View {
         }
         Text("[SHORT1]")
       }
-      .frame(width: 12, height: 2)
+      .frame(width: cell(12), height: cell(2))
       .border(Color.gray)
 
       Text("at height 1:").foregroundStyle(.secondary)
@@ -73,9 +73,9 @@ public struct ViewThatFitsVerticalOnly: View {
         }
         Text("[SHORT1]")
       }
-      .frame(width: 12, height: 1)
+      .frame(width: cell(12), height: cell(1))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

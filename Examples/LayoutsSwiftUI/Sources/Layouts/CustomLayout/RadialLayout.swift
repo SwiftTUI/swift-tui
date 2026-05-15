@@ -29,16 +29,16 @@ public struct RadialLayout: View {
   public var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Radial layout").foregroundStyle(.secondary)
-      RingLayout(radius: 6) {
+      RingLayout(radius: cell(6)) {
         Text("[E]")  // east  — 0°
         Text("[S]")  // south — 90°
         Text("[W]")  // west  — 180°
         Text("[N]")  // north — 270°
       }
-      .frame(width: 24, height: 16)
+      .frame(width: cell(24), height: cell(16))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }
 
@@ -63,7 +63,7 @@ struct RingLayout: Layout {
     // The layout fills the proposed bounds.  Fall back to a size
     // sufficient to contain the ring when proposed dimensions are
     // unspecified.
-    let diameter = max(1, 2 * radius + 1)
+    let diameter = max(cell(1), 2 * radius + cell(1))
     let width = unwrap(proposal.width, fallback: diameter)
     let height = unwrap(proposal.height, fallback: diameter)
     return CGSize(width: width, height: height)
@@ -100,11 +100,5 @@ struct RingLayout: Layout {
   private func unwrap(_ dim: CGFloat?, fallback: CGFloat) -> CGFloat {
     guard let dim, dim.isFinite else { return fallback }
     return dim
-  }
-}
-
-extension RingLayout {
-  init(radius: Int) {
-    self.radius = CGFloat(radius)
   }
 }

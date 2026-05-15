@@ -29,7 +29,7 @@ public struct ThreeSpacerSharing: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Three spacer sharing").foregroundStyle(.secondary)
       HStack(spacing: 0) {
         Spacer()

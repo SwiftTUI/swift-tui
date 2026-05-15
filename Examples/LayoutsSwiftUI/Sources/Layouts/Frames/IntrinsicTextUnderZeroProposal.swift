@@ -14,13 +14,13 @@ public struct IntrinsicTextUnderZeroProposal: View {
   public init() {}
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: cell(1)) {
       Text("Intrinsic text under zero proposal").foregroundStyle(.secondary)
       Text("plain copy:").foregroundStyle(.secondary)
       Text("intrinsic content")
       Text("zero-frame copy:").foregroundStyle(.secondary)
       Text("intrinsic content").frame(width: 0, height: 0)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

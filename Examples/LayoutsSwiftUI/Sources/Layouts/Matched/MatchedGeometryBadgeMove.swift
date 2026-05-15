@@ -26,15 +26,15 @@ public struct MatchedGeometryBadgeMove: View {
   public var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Matched geometry badge move").foregroundStyle(.secondary)
-      HStack(spacing: 4) {
+      HStack(spacing: cell(4)) {
         ZStack {
-          Rectangle().fill(Color.gray).frame(width: 10, height: 5)
+          Rectangle().fill(Color.gray).frame(width: cell(10), height: cell(5))
           if isLeft {
             Text("[BADGE]").matchedGeometryEffect(id: "badge", in: ns)
           }
         }
         ZStack {
-          Rectangle().fill(Color.gray).frame(width: 10, height: 5)
+          Rectangle().fill(Color.gray).frame(width: cell(10), height: cell(5))
           if !isLeft {
             Text("[BADGE]").matchedGeometryEffect(id: "badge", in: ns)
           }
@@ -42,6 +42,6 @@ public struct MatchedGeometryBadgeMove: View {
       }
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

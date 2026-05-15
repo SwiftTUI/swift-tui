@@ -19,9 +19,9 @@ public struct VStackLeadingGuideShift: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("VStack leading guide shift").foregroundStyle(.secondary)
       Text("plain above")
-      Text("shifted").alignmentGuide(.leading) { _ in 4 }
+      Text("shifted").alignmentGuide(.leading) { _ in cell(4) }
       Text("plain below")
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }

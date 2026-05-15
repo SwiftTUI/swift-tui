@@ -15,11 +15,11 @@ public struct GeometryReaderTakesProposal: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Geometry reader takes proposal").foregroundStyle(.secondary)
       GeometryReader { proxy in
-        Text("w=\(proxy.size.width) h=\(proxy.size.height)")
+        Text("w=\(cellCount(proxy.size.width)) h=\(cellCount(proxy.size.height))")
       }
-      .frame(width: 40, height: 10)
+      .frame(width: cell(40), height: cell(10))
       .border(Color.gray)
     }
-    .padding(1)
+    .padding(cell(1))
   }
 }
