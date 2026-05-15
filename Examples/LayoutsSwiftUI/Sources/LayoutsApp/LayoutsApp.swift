@@ -16,6 +16,7 @@ struct LayoutsApp: SwiftUI::App {
 
 struct LayoutsRoot: SwiftUI::View {
   @SwiftUI::State private var selectedID = NativeLayoutCatalog.all.first?.id
+  @SwiftUI.FocusState private var receivesLayoutNavigation: Bool
 
   var body: some SwiftUI::View {
     SwiftUI.HStack(spacing: 0) {
@@ -31,6 +32,20 @@ struct LayoutsRoot: SwiftUI::View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
+    .focusable(true)
+    .focused($receivesLayoutNavigation)
+    .defaultFocus($receivesLayoutNavigation, true)
+    .onAppear {
+      receivesLayoutNavigation = true
+    }
+    .onKeyPress(.upArrow) {
+      moveSelection(by: -1)
+      return .handled
+    }
+    .onKeyPress(.downArrow) {
+      moveSelection(by: 1)
+      return .handled
+    }
   }
 
   private var selectedEntry: NativeLayoutEntry? {
@@ -39,6 +54,27 @@ struct LayoutsRoot: SwiftUI::View {
     }
 
     return NativeLayoutCatalog.entry(id: selectedID)
+  }
+
+  private func moveSelection(by offset: Int) {
+    guard !NativeLayoutCatalog.all.isEmpty else {
+      selectedID = nil
+      return
+    }
+
+    guard
+      let selectedID,
+      let currentIndex = NativeLayoutCatalog.all.firstIndex(where: { $0.id == selectedID })
+    else {
+      selectedID = NativeLayoutCatalog.all.first?.id
+      return
+    }
+
+    let nextIndex = min(
+      max(currentIndex + offset, NativeLayoutCatalog.all.startIndex),
+      NativeLayoutCatalog.all.index(before: NativeLayoutCatalog.all.endIndex)
+    )
+    self.selectedID = NativeLayoutCatalog.all[nextIndex].id
   }
 }
 
@@ -58,20 +94,31 @@ private struct LayoutSidebar: SwiftUI::View {
 
       SwiftUI.Divider()
 
-      SwiftUI.ScrollView {
-        SwiftUI.LazyVStack(alignment: .leading, spacing: 14) {
-          SwiftUI.ForEach(NativeLayoutEntry.Category.allCases, id: \.rawValue) { category in
-            let entries = NativeLayoutCatalog.all.filter { $0.category == category }
-            if !entries.isEmpty {
-              LayoutSidebarSection(
-                category: category,
-                entries: entries,
-                selectedID: $selectedID
-              )
+      SwiftUI.ScrollViewReader { proxy in
+        SwiftUI.ScrollView {
+          SwiftUI.LazyVStack(alignment: .leading, spacing: 14) {
+            SwiftUI.ForEach(NativeLayoutEntry.Category.allCases, id: \.rawValue) { category in
+              let entries = NativeLayoutCatalog.all.filter { $0.category == category }
+              if !entries.isEmpty {
+                LayoutSidebarSection(
+                  category: category,
+                  entries: entries,
+                  selectedID: $selectedID
+                )
+              }
             }
           }
+          .padding(12)
         }
-        .padding(12)
+        .onChange(of: selectedID) { _, newValue in
+          guard let newValue else {
+            return
+          }
+
+          withAnimation {
+            proxy.scrollTo(newValue, anchor: .center)
+          }
+        }
       }
     }
     .background(.background)
@@ -101,6 +148,7 @@ private struct LayoutSidebarSection: SwiftUI::View {
               isSelected: selectedID == entry.id
             )
           }
+          .id(entry.id)
           .buttonStyle(.plain)
         }
       }
