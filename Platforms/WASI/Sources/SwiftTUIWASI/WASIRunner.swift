@@ -137,7 +137,7 @@ public enum WASIRunner {
         }
       }
 
-      var resources = SceneSessionResources(
+      let resources = SceneSessionResources(
         presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,

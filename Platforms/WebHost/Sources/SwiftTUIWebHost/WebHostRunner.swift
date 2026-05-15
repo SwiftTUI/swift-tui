@@ -94,7 +94,7 @@ public enum WebHostRunner {
     )
     let inputReader = WebSocketInputReader(source: session.channel, transport: transport)
     let sceneTask = Task { @MainActor in
-      var resources = SceneSessionResources(
+      let resources = SceneSessionResources(
         presentationSurface: transport,
         terminalInputReader: inputReader,
         surfaceName: "web",

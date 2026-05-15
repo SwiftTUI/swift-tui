@@ -105,7 +105,7 @@ public enum TerminalRunner {
         KeyboardOnlyInputAdapter(inputReader: inputReader)
       }
 
-    var resources = SceneSessionResources(
+    let resources = SceneSessionResources(
       presentationSurface: presentationSurface,
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,

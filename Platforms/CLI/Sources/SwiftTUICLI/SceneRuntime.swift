@@ -56,7 +56,7 @@ final class SceneRuntime {
         isTTY: isTTY
       )
       .applying(configuration)
-      var resources = SceneSessionResources(
+      let resources = SceneSessionResources(
         presentationSurface: TerminalHost(capabilityProfile: capabilityProfile),
         terminalInputReader: InputReader(),
         signalReader: defaultSignalReader(),
@@ -75,7 +75,7 @@ final class SceneRuntime {
         isTTY: isTTY
       )
       .applying(configuration)
-      var resources = SceneSessionResources(
+      let resources = SceneSessionResources(
         presentationSurface: TerminalHost(
           inputFileDescriptor: pty.masterFD,
           outputFileDescriptor: pty.masterFD,

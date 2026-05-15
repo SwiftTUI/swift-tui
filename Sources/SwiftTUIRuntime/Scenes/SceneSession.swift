@@ -4,7 +4,7 @@ import SwiftTUIViews
   @_spi(Runners) public init() {}
 }
 
-@_spi(Runners) public struct SceneSessionResources {
+@_spi(Runners) public final class SceneSessionResources {
   @_spi(Runners) public let presentationSurface: any PresentationSurface
   @_spi(Runners) public let terminalInputReader: any TerminalInputReading
   @_spi(Runners) public let signalReader: (any SignalReading)?

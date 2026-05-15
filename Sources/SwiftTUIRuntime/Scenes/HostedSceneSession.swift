@@ -113,7 +113,7 @@ public final class HostedSceneSession {
       return try await runTask.value
     }
 
-    var resources = SceneSessionResources(
+    let resources = SceneSessionResources(
       presentationSurface: surface,
       terminalInputReader: inputReader,
       signalReader: signalReader,
