@@ -23,3 +23,12 @@ Useful controls:
 The example persists layout and command metadata to
 `~/.swift-tui-terminal-workspace.json`. It intentionally restores fresh
 processes on launch; detach/reattach is future workspace-session work.
+
+## Test
+
+```bash
+swiftly run swift test --package-path Examples/terminal-workspace
+```
+
+The focused test pins the initial dev/ops workspace shape and pane identifiers
+so the example remains useful as the workspace product evolves.

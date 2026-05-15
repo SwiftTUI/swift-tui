@@ -67,7 +67,7 @@ jobs:
           bun install --frozen-lockfile
 
 
-      - name: Test all linux-compatible packages
+      - name: Run repo gate
         shell: bash
         run: |
           set -euo pipefail

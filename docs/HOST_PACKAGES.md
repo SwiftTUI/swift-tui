@@ -196,13 +196,18 @@ is only the source directory that contains their target implementations.
 Relevant verification lives in:
 
 ```bash
+Scripts/test_gate.sh
 Scripts/test_all.sh
 ```
 
-`Scripts/test_all.sh` is the canonical full-repo check. From the repo root you
-can also invoke the same flow with `bun run test`. The runner verifies the
-Swift and Bun environment first, then runs the root products, example packages,
-and web tooling that are checked into this repository.
+`Scripts/test_gate.sh` is the canonical repo gate. From the repo root you can
+also invoke the same flow with `bun run test`. The runner verifies the Swift
+and Bun environment first, then runs the root products, platform packages,
+tooling, and `Examples/gallery`.
+
+`Scripts/test_all.sh` is the exhaustive check. From the repo root you can also
+invoke it with `bun run test:all`. It runs the gate surface plus every
+maintained example package/app and browser/WASI example coverage.
 
 The compile-time WebHost boundary is also checked directly:
 

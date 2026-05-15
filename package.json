@@ -9,7 +9,8 @@
     "perf:compare": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf compare",
     "perf:list": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf list-scenarios",
     "perf:run": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf run",
-    "test": "sh ./Scripts/test_all.sh",
+    "test": "sh ./Scripts/test_gate.sh",
+    "test:gate": "sh ./Scripts/test_gate.sh",
     "test:all": "sh ./Scripts/test_all.sh"
   },
   "workspaces": [

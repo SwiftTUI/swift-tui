@@ -146,8 +146,9 @@ root package products:
 - terminal-program embedding via `SwiftTUITerminal` and
   `SwiftTUIPTYPrimitives`
 - first-class terminal workspaces via `SwiftTUITerminalWorkspace`
-- deploy-to-browser hosting through `Platforms/Web`, which remains a Bun
-  package that consumes a `SwiftTUIWASI` build
+- deploy-to-browser hosting through `Platforms/Web` (`@swifttui/web`) and
+  `Platforms/WebBuild` (`@swifttui/build`), which consume a `SwiftTUIWASI`
+  build
 
 In repo terminology, a runner owns process startup or launch routing, while a
 host owns an external presentation environment or embedding lifecycle. See
@@ -156,6 +157,28 @@ host owns an external presentation environment or embedding lifecycle. See
 `SwiftTUIRuntime` is the platform-neutral runtime product. It provides the
 shared runtime, `SceneManifest`, and `HostedSceneSession`; runner and host
 behavior is exposed through sibling products in the same root package.
+
+## Examples
+
+The maintained examples are indexed in [Examples/README.md](Examples/README.md).
+That index is the fastest way to pick the right sample for a product surface,
+run command, host mode, or focused test package.
+
+| Example | What it demonstrates | Run |
+| --- | --- | --- |
+| [minimal](Examples/minimal) | Lowest-level snapshot rendering with `DefaultRenderer` and `TerminalSurfaceRenderer` | `swiftly run swift run --package-path Examples/minimal minimal` |
+| [argparse](Examples/argparse) | `SwiftTUICommand`, consumer flags, standard framework flags, and shell completions | `swiftly run swift run --package-path Examples/argparse argparse-demo --help` |
+| [gallery](Examples/gallery) | Primary component workbench for tabs, controls, input, images, charts, animation, popovers, file drop, and WebHost opt-in | `swiftly run swift run --package-path Examples/gallery gallery-demo` |
+| [layouts](Examples/layouts) | SwiftTUI layout catalog with behavior tests for stacks, frames, geometry, scrolling, overlays, shapes, and custom layouts | `swiftly run swift run --package-path Examples/layouts layouts-demo` |
+| [LayoutsSwiftUI](Examples/LayoutsSwiftUI) | SwiftUI reference port of the layout catalog for side-by-side behavior comparison | `swiftly run swift run --package-path Examples/LayoutsSwiftUI layouts-swiftui-demo` |
+| [file-previewer](Examples/file-previewer) | Miller-column browser with embedded terminal-process previews through `SwiftTUITerminal` | `swiftly run swift run --package-path Examples/file-previewer FilePreviewerApp` |
+| [terminal-workspace](Examples/terminal-workspace) | Zellij-style tabs, split panes, retained terminal sessions, command palette, and persisted layout metadata | `swiftly run swift run --package-path Examples/terminal-workspace terminal-workspace` |
+| [gitviz](Examples/gitviz) | Non-interactive `SwiftTUICharts` command suite over git history | `swiftly run swift run --package-path Examples/gitviz gitviz dashboard --path .` |
+| [gifcat](Examples/gifcat) | Terminal-native animated GIF playback with `SwiftTUIAnimatedImage` | `swiftly run swift run --package-path Examples/gifcat gifcat nyan.gif` |
+| [gifeditor](Examples/gifeditor) | Full terminal GIF editor with canvas drawing, layers, timeline, pointer input, and GIF import/export | `swiftly run swift run --package-path Examples/gifeditor gifeditor` |
+| [SwiftUIExample](Examples/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes through `SwiftUIHost` | Open `Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
+| [WebHostExample](Examples/WebHostExample) | Smallest app that opts into the localhost browser runner via `SwiftTUIWebHostCLI` | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
+| [WebExample](Examples/WebExample) | Static browser/WASI deployment using `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` | `bun --cwd Examples/WebExample dev` |
 
 ## Development Requirements
 
@@ -167,16 +190,23 @@ Currently fully supported:
 
 ```bash
 swiftly run swift test
+Scripts/test_gate.sh
 Scripts/test_all.sh
 ```
 
 `swiftly run swift test` covers the root package, including the Swift platform
-products. `Scripts/test_all.sh` is the single repo-level entrypoint for the full
-checked-in test surface across root products, example packages, and web
-tooling, and it verifies the Swift and Bun environment first. On Linux, it
-exports `DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only `SwiftUIHost`
-tests. If you're already using the repo's root Bun workspace, `bun run test` is
-a thin entrypoint to the same script.
+products. `Scripts/test_gate.sh` is the repo gate: it verifies the environment,
+policy checks, root products, platform packages, tooling, and `Examples/gallery`.
+If you're already using the repo's root Bun workspace, `bun run test` is a thin
+entrypoint to that gate.
+
+`Scripts/test_all.sh` is the exhaustive test surface. It runs the same shared
+suite plus every maintained example package/app, including browser/WASI
+coverage for `Examples/WebExample`. Use `bun run test:all` for the same
+exhaustive runner from the root Bun workspace.
+
+On Linux, both runners export `DISABLE_EXPLICIT_PLATFORMS=1` and skip
+Apple-only host checks.
 
 For development tests, use `swiftly run swift ...` explicitly. Do not use bare
 `swift test` or `xcrun swift test`; they can pick up an Xcode-selected toolchain
