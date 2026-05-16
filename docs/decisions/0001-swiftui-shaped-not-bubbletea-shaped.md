@@ -43,6 +43,27 @@ framework keeps the SwiftUI-shaped authoring story only if it still
 produces a good terminal experience. Otherwise it reinterprets toward
 the terminal-native default.
 
+## SwiftUI API Subset Policy
+
+SwiftTUI reimplements a subset of SwiftUI, readapted to the terminal.
+When a SwiftUI API is absent from SwiftTUI, the absence should fall into
+one of a few categories:
+
+- It is on the list, or should be on the list, but is not implemented yet.
+- It is hard to map to TUI capabilities and the project does not yet have a
+  good terminal-native philosophy for it.
+- It is a deprecated SwiftUI API.
+- It is not a data-oriented SwiftUI API.
+
+The last point is principled. SwiftUI has APIs that, in this project's
+judgment, are bad fits for SwiftTUI even if they remain in SwiftUI for
+backward compatibility, progressive disclosure, or UIKit-developer
+expectations. Environment-based dismiss and view-based `NavigationLink`
+presentations are examples: they are familiar SwiftUI entry points, but they
+hide routing and presentation ownership in places that make terminal apps
+harder to reason about. SwiftTUI should prefer explicit, data-oriented
+presentation and navigation state when that produces a clearer terminal API.
+
 ## Consequences
 
 **Enabled:**
