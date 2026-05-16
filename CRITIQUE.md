@@ -33,7 +33,7 @@ critiques landed, the highest-leverage adoption basics have moved substantially:
 The live critique is therefore no longer "no license, no CI, no release." The
 remaining highest-value work is now:
 
-1. prove the restored CI externally and make it enforceable
+1. retire CI-only quarantines and restore the full Linux repo gate
 2. enforce public documentation coverage with a ratchet
 3. decide whether coverage reporting remains informational or becomes a threshold
 4. settle the platform-product DocC strategy
@@ -50,9 +50,9 @@ remaining highest-value work is now:
 
 ## Ranked Current Critique
 
-### 1. CI Is Configured, But Enforcement Still Needs External Proof
+### 1. CI Is Configured, And Main Is Protected
 
-Status: **P0 / partially addressed / external verification needed**
+Status: **P0 / mostly addressed / alpha-governance follow-up remains**
 
 The local workflow file has been materially repaired:
 `.github/workflows/run-tests-linux.yml` now has `push`, `pull_request`, and
@@ -74,18 +74,28 @@ runtime/socket/terminal/PTY/WebHost/gallery tests, with retirement tracked in
 `docs/TODO.md`. The Linux external gate is temporarily bounded to a portability
 smoke while the hanging Linux full-gate path is isolated.
 
+`main` is now protected by an active repository ruleset for the default branch.
+The ruleset requires the `Policy checks`, `Linux repo gate`, `macOS repo gate`,
+and `iOS package build` GitHub Actions checks with strict up-to-date status,
+blocks deletion and non-fast-forward updates, requires signed commits and linear
+history, and requires pull request review plus review-thread resolution before
+merges. Repository settings allow squash and rebase merges, matching the
+ruleset.
+
+Organization-admin bypass remains enabled by policy during the alpha line. This
+is intentional until `0.9.0`, the planned first public beta release, when the
+project should revisit bypass policy alongside the contributor-expansion and API
+stabilization push toward a SemVer-compatible `1.0.0`.
+
 Remaining critique:
 
-- Verify the latest GitHub Actions runs are green.
-- Verify branch protection requires the restored checks on `main`.
 - Decide whether the macOS runner label `macos-26` is the intended public CI
   floor or a temporary runner choice.
 - Decide whether policy checks should be a separate required status from the
   slower repo gate.
 
-Ambiguity required to act: branch protection and required status checks are
-GitHub repository settings, not source-tree state. Someone with repo admin
-access must decide and apply them.
+Ambiguity required to act: future tightening of organization-admin bypass is a
+project-governance decision scheduled for the `0.9.0` public beta line.
 
 ### 2. Personal Workflow Tooling No Longer Leaks Into Project Dependencies
 
@@ -449,23 +459,21 @@ checks.
 These are the decisions most likely to block implementation or cause churn if
 skipped.
 
-1. Should CI branch protection be mandatory for `main`, and which statuses are
-   required?
-2. Should coverage reporting be informational first, or should it enforce a
+1. Should coverage reporting be informational first, or should it enforce a
    threshold immediately?
-3. Does every public product need a DocC catalog, or are platform products
+2. Does every public product need a DocC catalog, or are platform products
    intentionally prose-documented?
-4. Are historical plans allowed to retain stale paths as historical records, or
+3. Are historical plans allowed to retain stale paths as historical records, or
    must all tracked docs remain path-current?
-5. Is the project name final despite the ecosystem collision?
+4. Is the project name final despite the ecosystem collision?
 
 ## Suggested Next Tranche
 
-The highest-signal next work is now external enforcement and documentation
-ratchets, not navigation/dismissal/product-boundary churn:
+The highest-signal next work is now CI stabilization and documentation ratchets,
+not navigation/dismissal/product-boundary churn:
 
-1. Verify GitHub Actions are green and branch protection requires the intended
-   statuses.
+1. Retire the CI-only Swift test quarantine and restore the Linux external gate
+   from portability smoke to the full repo-gate surface.
 2. Add public documentation coverage with a ratchet rather than an immediate
    zero-baseline strict gate.
 3. Decide whether coverage reporting stays informational or becomes a threshold.

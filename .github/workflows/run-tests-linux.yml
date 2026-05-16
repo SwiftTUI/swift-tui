@@ -246,25 +246,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export STUI_SWIFT_TEST_SKIP_REGEX='toastAutoDismissRerendersWithoutAdditionalInput'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|injectedTerminalInputScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|duplicateIdentifiersRejected'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|staleSocketPathsReplaced'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|mostRecentSelectionUsesTimestamps'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|shutdownRemovesSocketPath'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|hostedSceneSessionRerendersOnSurfaceRefresh'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|spawnEcho'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|snapshotShowsOutput'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|catLargeFileDoesNotBlowByteBudget'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|latencyInjectedPresentationStaysResponsive'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsV2FrameWithAccessibilityTree'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsDamageAndPartialMetrics'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|sinkBackpressurePreservesPresentRecordOrder'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedClipboardRecords'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedRuntimeIssueRecords'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|realTerminalHostDeletingTopTodoRowKeepsTodoVisible'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible'
           sh ./Scripts/test_gate.sh --skip-bun-install
 
   ios-build:

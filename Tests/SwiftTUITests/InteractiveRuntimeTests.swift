@@ -3581,10 +3581,13 @@ private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwar
   }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
-  private(set) var visibleFrames: [String] = []
-  private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
-  private var lastSubmittedSurface: RasterSurface?
-  private var visibleSurface: RasterSurface?
+  var visibleFrames: [String] {
+    state.value.visibleFrames
+  }
+  var presentationMetrics: [TerminalPresentationMetrics] {
+    state.value.presentationMetrics
+  }
+  private let state = LockedBox(DamageRecordingTerminalHostState())
   private let surfaceSizeProvider: () -> CellSize
 
   init(
@@ -3612,114 +3615,125 @@ private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwar
     _ surface: RasterSurface,
     damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics {
-    let renderer = TerminalSurfaceRenderer(
-      capabilityProfile: capabilityProfile
-    )
-    let plan = TerminalPresentationPlanner(
-      capabilityProfile: capabilityProfile
-    ).plan(
-      previousSurface: lastSubmittedSurface,
-      currentSurface: surface,
-      damage: damage
-    )
+    state.withLock { state in
+      let renderer = TerminalSurfaceRenderer(
+        capabilityProfile: capabilityProfile
+      )
+      let plan = TerminalPresentationPlanner(
+        capabilityProfile: capabilityProfile
+      ).plan(
+        previousSurface: state.lastSubmittedSurface,
+        currentSurface: surface,
+        damage: damage
+      )
 
-    switch plan.strategy {
-    case .fullRepaint:
-      visibleSurface = surface
-    case .incremental:
-      if var visibleSurface {
-        let previousSurface = lastSubmittedSurface ?? visibleSurface
-        let rowCount = max(
-          max(previousSurface.cells.count, surface.cells.count),
-          max(previousSurface.size.height, surface.size.height)
-        )
-        let rowsToDiff =
-          if let damage {
-            damage.dirtyRows
-              .filter { $0 >= 0 && $0 < rowCount }
-              .sorted()
-          } else {
-            Array(0..<rowCount)
-          }
-
-        let requiredWidth = max(
-          visibleSurface.size.width,
-          surface.size.width,
-          previousSurface.size.width
-        )
-        let requiredHeight = max(
-          visibleSurface.size.height,
-          surface.size.height,
-          previousSurface.size.height
-        )
-        if visibleSurface.cells.count < requiredHeight {
-          visibleSurface.cells.append(
-            contentsOf: Array(
-              repeating: Array(repeating: RasterCell.empty, count: requiredWidth),
-              count: requiredHeight - visibleSurface.cells.count
-            )
+      switch plan.strategy {
+      case .fullRepaint:
+        state.visibleSurface = surface
+      case .incremental:
+        if var visibleSurface = state.visibleSurface {
+          let previousSurface = state.lastSubmittedSurface ?? visibleSurface
+          let rowCount = max(
+            max(previousSurface.cells.count, surface.cells.count),
+            max(previousSurface.size.height, surface.size.height)
           )
-        }
-        for row in visibleSurface.cells.indices
-        where visibleSurface.cells[row].count < requiredWidth {
-          visibleSurface.cells[row].append(
-            contentsOf: Array(
-              repeating: RasterCell.empty,
-              count: requiredWidth - visibleSurface.cells[row].count
-            )
-          )
-        }
-        visibleSurface.size = .init(width: requiredWidth, height: requiredHeight)
+          let rowsToDiff =
+            if let damage {
+              damage.dirtyRows
+                .filter { $0 >= 0 && $0 < rowCount }
+                .sorted()
+            } else {
+              Array(0..<rowCount)
+            }
 
-        for row in rowsToDiff {
-          let previousRow = row < previousSurface.cells.count ? previousSurface.cells[row] : []
-          let currentRow = row < surface.cells.count ? surface.cells[row] : []
-          let width = max(
-            previousSurface.size.width,
+          let requiredWidth = max(
+            visibleSurface.size.width,
             surface.size.width,
-            previousRow.count,
-            currentRow.count
+            previousSurface.size.width
           )
-          let spans = renderer.diffSpans(
-            previousRow: previousRow,
-            currentRow: currentRow,
-            width: width
+          let requiredHeight = max(
+            visibleSurface.size.height,
+            surface.size.height,
+            previousSurface.size.height
           )
+          if visibleSurface.cells.count < requiredHeight {
+            visibleSurface.cells.append(
+              contentsOf: Array(
+                repeating: Array(repeating: RasterCell.empty, count: requiredWidth),
+                count: requiredHeight - visibleSurface.cells.count
+              )
+            )
+          }
+          for row in visibleSurface.cells.indices
+          where visibleSurface.cells[row].count < requiredWidth {
+            visibleSurface.cells[row].append(
+              contentsOf: Array(
+                repeating: RasterCell.empty,
+                count: requiredWidth - visibleSurface.cells[row].count
+              )
+            )
+          }
+          visibleSurface.size = .init(width: requiredWidth, height: requiredHeight)
 
-          for span in spans {
-            for column in span {
-              let cell =
-                if column < currentRow.count {
-                  currentRow[column]
-                } else {
-                  RasterCell.empty
-                }
-              visibleSurface.cells[row][column] = cell
+          for row in rowsToDiff {
+            let previousRow = row < previousSurface.cells.count ? previousSurface.cells[row] : []
+            let currentRow = row < surface.cells.count ? surface.cells[row] : []
+            let width = max(
+              previousSurface.size.width,
+              surface.size.width,
+              previousRow.count,
+              currentRow.count
+            )
+            let spans = renderer.diffSpans(
+              previousRow: previousRow,
+              currentRow: currentRow,
+              width: width
+            )
+
+            for span in spans {
+              for column in span {
+                let cell =
+                  if column < currentRow.count {
+                    currentRow[column]
+                  } else {
+                    RasterCell.empty
+                  }
+                visibleSurface.cells[row][column] = cell
+              }
             }
           }
+
+          state.visibleSurface = visibleSurface
+        } else {
+          state.visibleSurface = surface
         }
-
-        self.visibleSurface = visibleSurface
-      } else {
-        visibleSurface = surface
       }
+
+      let renderedVisibleSurface = renderer.render(state.visibleSurface ?? surface)
+      state.visibleFrames.append(
+        renderedVisibleSurface.replacingOccurrences(of: "\r\n", with: "\n")
+      )
+      state.lastSubmittedSurface = surface
+
+      let metrics = TerminalPresentationMetrics(
+        bytesWritten: 0,
+        linesTouched: plan.linesTouched,
+        cellsChanged: plan.cellsChanged,
+        strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+      )
+      state.presentationMetrics.append(metrics)
+      return metrics
     }
-
-    let renderedVisibleSurface = renderer.render(visibleSurface ?? surface)
-    visibleFrames.append(renderedVisibleSurface.replacingOccurrences(of: "\r\n", with: "\n"))
-    lastSubmittedSurface = surface
-
-    let metrics = TerminalPresentationMetrics(
-      bytesWritten: 0,
-      linesTouched: plan.linesTouched,
-      cellsChanged: plan.cellsChanged,
-      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
-    )
-    presentationMetrics.append(metrics)
-    return metrics
   }
 
   func write(_: String) throws {}
+}
+
+private struct DamageRecordingTerminalHostState: Sendable {
+  var visibleFrames: [String] = []
+  var presentationMetrics: [TerminalPresentationMetrics] = []
+  var lastSubmittedSurface: RasterSurface?
+  var visibleSurface: RasterSurface?
 }
 
 private func writeAllBytes(
