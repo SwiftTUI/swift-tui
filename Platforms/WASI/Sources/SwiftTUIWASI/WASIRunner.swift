@@ -1,5 +1,5 @@
 @_spi(Runners) import SwiftTUIRuntime
-@_spi(WebHost) import WASISurfaceBridge
+import WASISurfaceBridge
 
 #if canImport(Darwin)
   import Darwin

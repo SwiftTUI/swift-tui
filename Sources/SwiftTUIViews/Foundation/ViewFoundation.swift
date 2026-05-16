@@ -375,43 +375,45 @@ func resolveView<V: View>(
   let erased: Any = view
   var accessedStateSlots = 0
   let resolved = ViewUpdateGuard.withViewUpdate {
-    ViewNodeContext.withValue(graphNode) {
-      if erased is any ResolvableView {
-        let resolve = {
-          normalizeResolvedElements(
+    EnvironmentValuesStorage.$current.withValue(context.environmentValues) {
+      ViewNodeContext.withValue(graphNode) {
+        if erased is any ResolvableView {
+          let resolve = {
+            normalizeResolvedElements(
+              resolveViewElements(view, in: context),
+              in: context
+            )
+          }
+
+          guard let authoringContextOverride else {
+            return resolve()
+          }
+
+          let authoringContext = rebasedAuthoringContext(
+            authoringContextOverride,
+            viewNode: graphNode
+          )
+          return withAuthoringContext(authoringContext) {
+            resolve()
+          }
+        }
+
+        let authoringContext =
+          authoringContextOverride.map {
+            rebasedAuthoringContext($0, viewNode: graphNode)
+          }
+          ?? makeAuthoringContext(
+            for: context,
+            viewNode: graphNode
+          )
+        return withAuthoringContext(authoringContext) {
+          let resolved = normalizeResolvedElements(
             resolveViewElements(view, in: context),
             in: context
           )
+          accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
+          return resolved
         }
-
-        guard let authoringContextOverride else {
-          return resolve()
-        }
-
-        let authoringContext = rebasedAuthoringContext(
-          authoringContextOverride,
-          viewNode: graphNode
-        )
-        return withAuthoringContext(authoringContext) {
-          resolve()
-        }
-      }
-
-      let authoringContext =
-        authoringContextOverride.map {
-          rebasedAuthoringContext($0, viewNode: graphNode)
-        }
-        ?? makeAuthoringContext(
-          for: context,
-          viewNode: graphNode
-        )
-      return withAuthoringContext(authoringContext) {
-        let resolved = normalizeResolvedElements(
-          resolveViewElements(view, in: context),
-          in: context
-        )
-        accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
-        return resolved
       }
     }
   }

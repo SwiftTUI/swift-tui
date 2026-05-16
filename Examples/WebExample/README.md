@@ -134,9 +134,10 @@ Examples/WebExample/
   example consumes
 - [`Platforms/WebBuild`](../../Platforms/WebBuild) — the manifest and WASI
   packaging workspace this example consumes
-- [`WASISurfaceBridge`](../../Platforms/WASI/Sources/WASISurfaceBridge) and
-  [`SwiftTUIWASI`](../../Platforms/WASI/Sources/SwiftTUIWASI) — root package
-  products that provide the transport and runner this example builds against
+- [`SwiftTUIWASI`](../../Platforms/WASI/Sources/SwiftTUIWASI) — the root package
+  product that provides the WASI runner this example builds against
+- [`WASISurfaceBridge`](../../Platforms/WASI/Sources/WASISurfaceBridge) — the
+  package-only transport target shared by the WASI runner and native WebHost
 - [`docs/HOST_PACKAGES.md`](../../docs/HOST_PACKAGES.md) — the root package
   platform product model
 - [`docs/decisions/0016-platform-products-live-in-root-package.md`](../../docs/decisions/0016-platform-products-live-in-root-package.md) — the ADR for that model

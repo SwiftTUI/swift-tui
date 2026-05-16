@@ -250,6 +250,10 @@ private enum StackAxisKey: EnvironmentKey {
   static let defaultValue: SwiftTUICore.Axis? = nil
 }
 
+package enum EnvironmentValuesStorage {
+  @TaskLocal static var current: EnvironmentValues?
+}
+
 /// The inherited environment available while resolving a view subtree.
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: any EnvironmentValueBox]
@@ -341,6 +345,24 @@ public struct EnvironmentValues: Equatable, Sendable {
     MainActor.assumeIsolated {
       ViewNodeContext.current?.recordObservableRead(observableID)
     }
+  }
+}
+
+@propertyWrapper
+@MainActor
+/// Reads an inherited environment value from the current view context.
+public struct Environment<Value: Sendable> {
+  private let keyPath: KeyPath<EnvironmentValues, Value>
+
+  /// Creates an environment-value reader for `keyPath`.
+  public init(
+    _ keyPath: KeyPath<EnvironmentValues, Value>
+  ) {
+    self.keyPath = keyPath
+  }
+
+  public var wrappedValue: Value {
+    (EnvironmentValuesStorage.current ?? EnvironmentValues())[keyPath: keyPath]
   }
 }
 
@@ -629,7 +651,9 @@ public struct ResolveContext: Equatable, Sendable {
   package func trackingObservableAccess<T>(
     _ apply: () -> T
   ) -> T {
-    observationBridge?.track(identity: identity, apply) ?? apply()
+    EnvironmentValuesStorage.$current.withValue(environmentValues) {
+      observationBridge?.track(identity: identity, apply) ?? apply()
+    }
   }
 
   private static func contextualEnvironmentValues(

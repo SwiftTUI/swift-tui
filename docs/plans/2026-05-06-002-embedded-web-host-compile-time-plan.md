@@ -153,8 +153,9 @@ Testing, Bun tests, package-graph guard scripts, and the repo-wide
 - `Platforms/CLI/Tests/SwiftTUICLITests/`
   - Cover terminal-only rejection.
 - `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift`
-  - Expose encoder/parser/control-message seams as SPI or public API suitable
-    for the peer WebHost package.
+  - Keep encoder/parser/control-message seams package-only when WebHost lives in
+    this package; promote to SPI only if a real peer package boundary requires
+    it.
 - `Platforms/WASI/Tests/WASISurfaceBridgeTests/`
   - Lock the exposed encoder/parser behavior.
 - `Platforms/Web/src/WebHostApp.ts`
@@ -315,14 +316,15 @@ copying the protocol.
 **Files:**
 - Modify: `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift`
 - Modify: `Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceTransportTests.swift`
-- Create: `Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceSPITests.swift`
+- Create: `Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfacePackageTests.swift`
 
-- [x] Promote the minimum encoder/parser surface needed by peer packages.
+- [x] Promote the minimum encoder/parser surface needed by the WebHost target.
 
   Preferred access shape: keep the existing type names and promote only
   `WebSurfaceFrameEncoder`, `WebSurfaceInputParser`, and
-  `WebSurfaceInputControlMessage` as `@_spi(WebHost) public` declarations
-  with the same methods and cases used by the current WASI tests.
+  `WebSurfaceInputControlMessage` as package-access declarations while WebHost
+  remains in the root package. Use SPI only if this bridge crosses a real
+  package boundary.
 
   Keep field names and record framing byte-for-byte identical to existing
   fixtures.
@@ -444,7 +446,7 @@ bidirectional byte stream without an HTTP server.
 - [x] Implement `WebSocketSurfaceTransport`.
 
   It conforms to `PresentationSurface` and `DamageAwareSemanticPresentationSurface`.
-  It uses `WebSurfaceFrameEncoder` from the promoted WASI SPI and sends full
+  It uses `WebSurfaceFrameEncoder` from the package-only WASI bridge and sends full
   record-separator-prefixed `surface:` JSON records to `WebHostByteSink`.
 
 - [x] Implement `WebSocketInputReader`.
@@ -851,10 +853,10 @@ default.
 - **FlyingFox API drift.** Keep all server-library-specific code behind
   `WebHostServer`. If FlyingFox's WebSocket API does not match the proposal,
   adapt only `WebHostFlyingFoxServer.swift`.
-- **Swift package access.** `WASISurfaceBridge` currently uses `package`
-  access for encoder/parser types. Stage 1 must promote only the required
-  surface, preferably as SPI, so WebHost can reuse it without duplicating the
-  wire format.
+- **Swift package access.** `WASISurfaceBridge` keeps encoder/parser types at
+  package access so in-package WebHost targets can reuse the wire format
+  without publishing a consumer API. Promote the minimum surface to SPI only if
+  WebHost moves behind a real external package boundary.
 - **Browser runtime coupling to WASI.** `Platforms/Web` currently uses
   `BrowserWASIBridge`. Stage 5 must add a WebSocket bridge without regressing
   WASI.

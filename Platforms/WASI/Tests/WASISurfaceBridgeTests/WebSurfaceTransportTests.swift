@@ -2,7 +2,7 @@ import Foundation
 @_spi(Runners) import SwiftTUI
 import Testing
 
-@_spi(WebHost) @testable import WASISurfaceBridge
+@testable import WASISurfaceBridge
 
 @Suite
 struct WebSurfaceTransportTests {

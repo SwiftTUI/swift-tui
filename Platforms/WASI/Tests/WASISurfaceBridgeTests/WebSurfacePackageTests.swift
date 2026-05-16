@@ -1,19 +1,20 @@
 import Foundation
 @_spi(Runners) import SwiftTUI
 import Testing
-@_spi(WebHost) import WASISurfaceBridge
+
+@testable import WASISurfaceBridge
 
 @Suite
-struct WebSurfaceSPITests {
-  @Test("SPI encoder keeps raster-only frames on web-surface version 1")
-  func spiEncoderKeepsRasterOnlyFramesOnVersionOne() throws {
+struct WebSurfacePackageTests {
+  @Test("package encoder keeps raster-only frames on web-surface version 1")
+  func packageEncoderKeepsRasterOnlyFramesOnVersionOne() throws {
     let frame = try decodedSurfaceFrame(WebSurfaceFrameEncoder.encode(Self.basicSurface()))
     #expect(frame["version"] as? Int == 1)
     #expect(frame["accessibilityTree"] == nil)
   }
 
-  @Test("SPI encoder emits version 2 when accessibility nodes are present")
-  func spiEncoderEmitsVersionTwoWithAccessibilityNodes() throws {
+  @Test("package encoder emits version 2 when accessibility nodes are present")
+  func packageEncoderEmitsVersionTwoWithAccessibilityNodes() throws {
     let root = Identity(components: ["root"])
     let child = root.child("button")
     let frame = try decodedSurfaceFrame(
@@ -45,8 +46,8 @@ struct WebSurfaceSPITests {
     #expect(tree[0]["isFocused"] as? Bool == true)
   }
 
-  @Test("SPI parser decodes resize, style, key, mouse, and paste records")
-  func spiParserDecodesControlAndInputRecords() throws {
+  @Test("package parser decodes resize, style, key, mouse, and paste records")
+  func packageParserDecodesControlAndInputRecords() throws {
     var parser = WebSurfaceInputParser()
     let style = TerminalRenderStyle(
       appearance: .init(
@@ -87,8 +88,8 @@ struct WebSurfaceSPITests {
     #expect(mouse.location.rawPixel == PixelPoint(x: 31.5, y: 76.5))
   }
 
-  @Test("SPI parser ignores malformed records")
-  func spiParserIgnoresMalformedRecords() {
+  @Test("package parser ignores malformed records")
+  func packageParserIgnoresMalformedRecords() {
     var parser = WebSurfaceInputParser()
     let parsed = parser.feed(
       bytes(

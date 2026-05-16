@@ -1,7 +1,7 @@
 @unsafe @preconcurrency import Dispatch
 @_spi(Runners) import SwiftTUIRuntime
 import Synchronization
-@_spi(WebHost) import WASISurfaceBridge
+import WASISurfaceBridge
 
 package protocol WebHostByteSink: Sendable {
   func send(_ bytes: [UInt8]) async throws

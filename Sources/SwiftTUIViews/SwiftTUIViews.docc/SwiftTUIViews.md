@@ -13,7 +13,7 @@ It provides:
   ``View/modifier(_:)``, and ``ModifiedContent``
 - typed builders through ``ViewBuilder``
 - graph-scoped state and data flow through ``State``, ``Binding``, and ``Bindable``
-- environment and focused-value access through ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
+- environment and focused-value access through ``Environment``, ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
 - geometry-bound preferences through `Anchor`, `AnchorSource`, and
   ``GeometryProxy``
 - focus coordination through ``FocusState``

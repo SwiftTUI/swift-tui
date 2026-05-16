@@ -76,6 +76,7 @@ classifications:
     - SwiftTUIViews.DragGesture
     - SwiftTUIViews.Ellipse
     - SwiftTUIViews.EmptyView
+    - SwiftTUIViews.Environment
     - SwiftTUIViews.EnvironmentKey
     - SwiftTUIViews.EnvironmentReader
     - SwiftTUIViews.EnvironmentValues

@@ -130,7 +130,6 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUITerminal", targets: ["SwiftTUITerminal"]),
     .library(name: "SwiftTUITerminalWorkspace", targets: ["SwiftTUITerminalWorkspace"]),
     .library(name: "SwiftTUICLI", targets: ["SwiftTUICLI"]),
-    .library(name: "WASISurfaceBridge", targets: ["WASISurfaceBridge"]),
     .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
     .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
     .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),

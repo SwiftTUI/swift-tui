@@ -48,6 +48,7 @@ future file moves.
     - `SwiftTUIPTYPrimitives`
   - shared platform support products:
     - `SwiftTUIArguments`
+  - package-only platform support targets:
     - `WASISurfaceBridge`
   - browser packages:
     - `Platforms/Web`
@@ -188,12 +189,14 @@ behavior.
 
 ## `Platforms/WASI`
 
-This source directory backs two root package library products:
+This source directory backs the `SwiftTUIWASI` root package library product plus
+the package-only `WASISurfaceBridge` transport target:
 
 - `SwiftTUIWASI` — process-owning launcher. App authors `import SwiftTUIWASI` to get `App.main()`.
   - `SwiftTUIWASI.swift`: re-export surface for the WASI launcher product
   - `WASIRunner.swift`: manifest mode plus WASI scene selection and launch
-- `WASISurfaceBridge` — pure raster-surface transport, importable on its own without the launcher.
+- `WASISurfaceBridge` — pure raster-surface transport shared inside the package by
+  `SwiftTUIWASI` and `SwiftTUIWebHost`; not an exported consumer product.
   - `WebSurfaceTransport.swift`: `web-surface` stdout encoder (`WebSurfaceFrameEncoder`),
     `WebSurfaceTransport` (presentation surface), and `WebSurfaceInputReader` /
     `WebSurfaceInputParser` for the resize/style/key/mouse stdin protocol that

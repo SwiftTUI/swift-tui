@@ -26,10 +26,13 @@ native host, and terminal-embedding code.
 
 ## Decision
 
-All first-party Swift platform integrations are root `Package.swift` products:
-`SwiftTUICLI`, `SwiftTUIArguments`, `SwiftTUIWASI`, `WASISurfaceBridge`,
-`SwiftUIHost`, `SwiftTUIWebHost`, `SwiftTUIWebHostCLI`,
-`SwiftTUITerminal`, and `SwiftTUIPTYPrimitives`.
+All first-party Swift platform integrations with consumer-facing import
+surfaces are root `Package.swift` products: `SwiftTUICLI`,
+`SwiftTUIArguments`, `SwiftTUIWASI`, `SwiftUIHost`, `SwiftTUIWebHost`,
+`SwiftTUIWebHostCLI`, `SwiftTUITerminal`, and `SwiftTUIPTYPrimitives`.
+Low-level shared transport targets that are only used inside the root package,
+such as `WASISurfaceBridge`, stay as package-only targets rather than exported
+library products.
 
 The source directories stay under `Platforms/` as ownership boundaries, not as
 nested SwiftPM packages. `Platforms/Web` remains a Bun package because it is a
@@ -39,7 +42,9 @@ the products they need.
 
 ## Status
 
-Accepted. This supersedes ADR-0007.
+Accepted. This supersedes ADR-0007. Amended on 2026-05-16 to keep
+`WASISurfaceBridge` as package-only shared transport plumbing instead of a
+consumer-facing library product.
 
 ## Consequences
 

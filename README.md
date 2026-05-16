@@ -175,8 +175,9 @@ root package products:
   explicit composition with `SwiftTUIRuntime` plus `SwiftTUICLI`
 - terminal plus localhost-browser WebHost execution via the opt-in
   `SwiftTUIWebHostCLI` runner product
-- WASI execution via the `SwiftTUIWASI` runner product, with
-  `WASISurfaceBridge` available for transport-only consumers
+- WASI execution via the `SwiftTUIWASI` runner product; the shared
+  `WASISurfaceBridge` transport target is package-only plumbing used by
+  `SwiftTUIWASI` and `SwiftTUIWebHost`
 - host-managed native embedding via the `SwiftUIHost` product on Apple
   platforms
 - terminal-program embedding via `SwiftTUITerminal` and

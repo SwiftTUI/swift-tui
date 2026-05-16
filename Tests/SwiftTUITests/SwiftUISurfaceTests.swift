@@ -38,6 +38,23 @@ extension EnvironmentValues {
   }
 }
 
+private struct SampleThemeEnvironmentLabel: View {
+  let prefix: String
+  @Environment(\.sampleTheme) private var sampleTheme
+
+  var body: some View {
+    Text("\(prefix): \(sampleTheme.accent)")
+  }
+}
+
+private struct SurfaceNameEnvironmentLabel: View {
+  @Environment(\.surfaceName) private var surfaceName
+
+  var body: some View {
+    Text("Surface: \(surfaceName)")
+  }
+}
+
 private enum RaisedCenterAlignmentID: AlignmentID {
   static func defaultValue(in context: ViewDimensions) -> Int {
     context[VerticalAlignment.center]
@@ -1118,13 +1135,9 @@ struct SwiftUISurfaceTests {
 
     let artifacts = DefaultRenderer().render(
       VStack(alignment: .leading, spacing: 0) {
-        EnvironmentReader(\.sampleTheme) { theme in
-          Text("Root: \(theme.accent)")
-        }
+        SampleThemeEnvironmentLabel(prefix: "Root")
         Group {
-          EnvironmentReader(\.sampleTheme) { theme in
-            Text("Inner: \(theme.accent)")
-          }
+          SampleThemeEnvironmentLabel(prefix: "Inner")
         }
         .environment(
           \.sampleTheme,
@@ -1150,13 +1163,11 @@ struct SwiftUISurfaceTests {
   @Test("transformEnvironment mutates inherited values for descendants")
   func transformEnvironmentMutatesInheritedValues() {
     let resolved = Resolver().resolve(
-      EnvironmentReader(\.surfaceName) { name in
-        Text("Surface: \(name)")
-      }
-      .transformEnvironment(\.surfaceName) { name in
-        name += "-styled"
-      }
-      .environment(\.surfaceName, "terminal"),
+      SurfaceNameEnvironmentLabel()
+        .transformEnvironment(\.surfaceName) { name in
+          name += "-styled"
+        }
+        .environment(\.surfaceName, "terminal"),
       in: .init(identity: testIdentity("Root"))
     )
 

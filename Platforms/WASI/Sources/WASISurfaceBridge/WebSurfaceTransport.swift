@@ -365,21 +365,21 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 }
 
-@_spi(WebHost) public enum WebSurfaceInputControlMessage: Equatable, Sendable {
+package enum WebSurfaceInputControlMessage: Equatable, Sendable {
   case resize(CellSize, cellPixelSize: PixelSize?)
   case style(TerminalRenderStyle)
 }
 
-@_spi(WebHost) public struct WebSurfaceInputParser {
+package struct WebSurfaceInputParser {
   private static let introducer: UInt8 = 0x1E
 
   private var bufferedCommand: [UInt8]?
   private var terminalInputParser = TerminalInputParser()
   private var cellPixelSize: PixelSize?
 
-  @_spi(WebHost) public init() {}
+  package init() {}
 
-  @_spi(WebHost) public mutating func feed(
+  package mutating func feed(
     _ bytes: [UInt8]
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
     var payload: [UInt8] = []
@@ -691,14 +691,14 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 }
 
-@_spi(WebHost) public enum WebSurfaceFrameEncoder {
-  @_spi(WebHost) public static func encodeClipboard(
+package enum WebSurfaceFrameEncoder {
+  package static func encodeClipboard(
     _ text: String
   ) -> String {
     "\u{001E}clipboard:{\"text\":\(jsonString(text))}\n"
   }
 
-  @_spi(WebHost) public static func encodeRuntimeIssue(
+  package static func encodeRuntimeIssue(
     _ issue: RuntimeIssue
   ) -> String {
     var fields = [
@@ -716,7 +716,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     return "\u{001E}runtimeIssue:{\(fields.joined(separator: ","))}\n"
   }
 
-  @_spi(WebHost) public static func encode(
+  package static func encode(
     _ surface: RasterSurface
   ) -> String {
     var knownImageIDs: Set<String> = []
@@ -727,7 +727,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     )
   }
 
-  @_spi(WebHost) public static func encode(
+  package static func encode(
     _ surface: RasterSurface,
     damage: PresentationDamage?
   ) -> String {
@@ -739,7 +739,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     )
   }
 
-  @_spi(WebHost) public static func encode(
+  package static func encode(
     _ surface: RasterSurface,
     damage: PresentationDamage? = nil,
     knownImageIDs: inout Set<String>
@@ -754,7 +754,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     )
   }
 
-  @_spi(WebHost) public static func encode(
+  package static func encode(
     _ frame: SemanticHostFrame
   ) -> String {
     var knownImageIDs: Set<String> = []
@@ -764,7 +764,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     )
   }
 
-  @_spi(WebHost) public static func encode(
+  package static func encode(
     _ frame: SemanticHostFrame,
     knownImageIDs: inout Set<String>
   ) -> String {

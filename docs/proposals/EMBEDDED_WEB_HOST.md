@@ -681,8 +681,8 @@ Pros:
 - Terminal-only apps never depend on `SwiftTUIWebHost`, FlyingFox, or
   browser resources. There is no optional runtime hook from `SwiftTUICLI`
   into the web host.
-- WASI bridge code (`WASISurfaceBridge`) is already a peer-package
-  library; the new runner depends on `SwiftTUI` directly *and* on
+- WASI bridge code (`WASISurfaceBridge`) is package-only shared transport
+  plumbing; the WebHost runner depends on `SwiftTUIRuntime` directly *and* on
   `WASISurfaceBridge` for the encoder/parser.
 - Independent CI for HTTP/WS code without churning the root package.
 
@@ -1529,7 +1529,7 @@ let package = Package(
       name: "SwiftTUIWebHost",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "WASISurfaceBridge", package: "swift-tui"),
+        "WASISurfaceBridge",
         .product(name: "FlyingFox", package: "FlyingFox"),
         .product(name: "FlyingSocks", package: "FlyingFox"),
       ],
