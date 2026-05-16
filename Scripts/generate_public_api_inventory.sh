@@ -86,6 +86,9 @@ GENERATE_ARGS=(
   --baseline-md "docs/PUBLIC_API_BASELINE.md"
   --baseline-flat "docs/.public-api-baseline.txt"
 )
+if [[ "$(uname -s)" == "Linux" ]]; then
+  GENERATE_ARGS+=(--allow-missing-module SwiftUIHost)
+fi
 if [[ "${CHECK_ONLY}" -eq 1 ]]; then
   GENERATE_ARGS+=(--check)
 fi

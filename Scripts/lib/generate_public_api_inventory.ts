@@ -33,6 +33,7 @@ interface Args {
   baselineMd: string;
   baselineFlat: string;
   check: boolean;
+  allowMissingModules: string[];
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -53,7 +54,18 @@ function parseArgs(argv: readonly string[]): Args {
     baselineMd: required("--baseline-md"),
     baselineFlat: required("--baseline-flat"),
     check: argv.includes("--check"),
+    allowMissingModules: values(argv, "--allow-missing-module"),
   };
+}
+
+function values(argv: readonly string[], flag: string): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === flag && argv[i + 1]) {
+      result.push(argv[i + 1]!);
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -446,12 +458,14 @@ interface DriftReport {
   pendingReview: ReadonlyArray<{ module: ModuleName; qualifiedName: string }>;
   removedButPresent: ReadonlyArray<{ module: ModuleName; qualifiedName: string }>;
   baselineStale: boolean;
+  partialBaseline: boolean;
 }
 
 async function checkDrift(
   reports: ReadonlyArray<ModuleReport>,
   paths: { baselineMd: string; baselineFlat: string },
   rendered: { md: string; flat: string },
+  options: { partialBaseline: boolean },
 ): Promise<DriftReport> {
   const pendingReview: { module: ModuleName; qualifiedName: string }[] = [];
   const removedButPresent: { module: ModuleName; qualifiedName: string }[] = [];
@@ -474,16 +488,43 @@ async function checkDrift(
 
   const existingMd = await readFileIfExists(paths.baselineMd);
   const existingFlat = await readFileIfExists(paths.baselineFlat);
-  const baselineStale =
-    existingMd !== rendered.md || existingFlat !== rendered.flat;
+  const baselineStale = options.partialBaseline
+    ? filterFlatBaseline(existingFlat, reports) !== rendered.flat
+    : existingMd !== rendered.md || existingFlat !== rendered.flat;
 
-  return { pendingReview, removedButPresent, baselineStale };
+  return {
+    pendingReview,
+    removedButPresent,
+    baselineStale,
+    partialBaseline: options.partialBaseline,
+  };
 }
 
 async function readFileIfExists(path: string): Promise<string | undefined> {
   const f = Bun.file(path);
   if (!(await f.exists())) return undefined;
   return await f.text();
+}
+
+function filterFlatBaseline(
+  contents: string | undefined,
+  reports: ReadonlyArray<ModuleReport>,
+): string | undefined {
+  if (contents === undefined) return undefined;
+  const presentModules = new Set(reports.map((report) => report.module));
+  const lines = contents
+    .split("\n")
+    .filter((line) => {
+      const moduleName = line.split(".")[0];
+      return presentModules.has(moduleName as ModuleName);
+    });
+  return lines.join("\n") + "\n";
+}
+
+function extractGeneratedAt(contents: string | undefined): string | undefined {
+  return contents?.match(
+    /<!-- Generated: ([0-9]{4}-[0-9]{2}-[0-9]{2}) -->/,
+  )?.[1];
 }
 
 // ---------------------------------------------------------------------------
@@ -503,15 +544,21 @@ async function writeFileEnsuringDir(path: string, contents: string): Promise<voi
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const overrides = await loadOverrides(args.overrides);
-  const generatedAt = new Date().toISOString().slice(0, 10);
+  const existingBaselineMd = await readFileIfExists(args.baselineMd);
+  const generatedAt = args.check
+    ? extractGeneratedAt(existingBaselineMd) ??
+      new Date().toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
 
   const reports: ModuleReport[] = [];
+  const missingModules: ModuleName[] = [];
   for (const module of ALL_MODULES) {
     const graph = await loadSymbolGraph(args.symbolgraphDir, module);
     if (!graph) {
       console.error(
         `[generate_public_api_inventory] WARN: no symbol graph for ${module}`,
       );
+      missingModules.push(module);
       continue;
     }
     reports.push(
@@ -525,19 +572,55 @@ async function main(): Promise<void> {
     );
   }
 
+  if (missingModules.length > 0) {
+    const allowedMissing = new Set(args.allowMissingModules);
+    const unexpectedMissing = missingModules.filter(
+      (module) => !allowedMissing.has(module),
+    );
+    if (!args.check) {
+      console.error(
+        "[generate_public_api_inventory] Refusing to regenerate a partial public API baseline.",
+      );
+      console.error(
+        `[generate_public_api_inventory] Missing module(s): ${missingModules.join(", ")}`,
+      );
+      process.exit(1);
+    }
+    if (unexpectedMissing.length > 0) {
+      console.error(
+        "[generate_public_api_inventory] Missing required module symbol graph(s): " +
+          unexpectedMissing.join(", "),
+      );
+      process.exit(1);
+    }
+    console.error(
+      `[generate_public_api_inventory] Performing partial check without allowed missing module(s): ${missingModules.join(", ")}`,
+    );
+  }
+
   const renderedMd = renderBaselineMarkdown(reports, overrides.notes, generatedAt);
   const renderedFlat = renderFlatBaseline(reports);
-  const drift = await checkDrift(reports, args, {
-    md: renderedMd,
-    flat: renderedFlat,
-  });
+  const drift = await checkDrift(
+    reports,
+    args,
+    {
+      md: renderedMd,
+      flat: renderedFlat,
+    },
+    {
+      partialBaseline: missingModules.length > 0,
+    },
+  );
 
   if (args.check) {
     const failures: string[] = [];
     if (drift.baselineStale) {
-      failures.push(
-        "Public API baseline is stale. Run Scripts/generate_public_api_inventory.sh to regenerate.",
-      );
+      const message = drift.partialBaseline
+        ? "Public API baseline is stale for modules emitted on this platform. " +
+          "Regenerate on a platform that emits every public module."
+        : "Public API baseline is stale. " +
+          "Run Scripts/generate_public_api_inventory.sh to regenerate.";
+      failures.push(message);
     }
     if (drift.pendingReview.length > 0) {
       failures.push(
