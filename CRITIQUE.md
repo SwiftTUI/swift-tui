@@ -71,7 +71,8 @@ iOS package build selects an Xcode installation with Swift 6.3 support instead
 of the runner's older default Xcode. The external repo gates now also carry an
 explicit CI-only skip regex for named unstable
 runtime/socket/terminal/PTY/WebHost/gallery tests, with retirement tracked in
-`docs/TODO.md`.
+`docs/TODO.md`. The Linux external gate is temporarily bounded to a portability
+smoke while the hanging Linux full-gate path is isolated.
 
 Remaining critique:
 

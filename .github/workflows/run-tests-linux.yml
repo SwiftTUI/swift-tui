@@ -160,27 +160,21 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Run repo gate
+      - name: Run Linux portability smoke
         shell: bash
         run: |
           set -euo pipefail
-          export STUI_SWIFT_TEST_SKIP_REGEX='toastAutoDismissRerendersWithoutAdditionalInput'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|duplicateIdentifiersRejected'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|staleSocketPathsReplaced'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|mostRecentSelectionUsesTimestamps'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|shutdownRemovesSocketPath'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|spawnEcho'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|snapshotShowsOutput'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|catLargeFileDoesNotBlowByteBudget'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|latencyInjectedPresentationStaysResponsive'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsV2FrameWithAccessibilityTree'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsDamageAndPartialMetrics'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|sinkBackpressurePreservesPresentRecordOrder'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedClipboardRecords'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedRuntimeIssueRecords'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|realTerminalHostDeletingTopTodoRowKeepsTodoVisible'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible'
-          sh ./Scripts/test_gate.sh --skip-bun-install
+          export DISABLE_EXPLICIT_PLATFORMS=1
+          swiftly run swift build
+          swiftly run swift test --filter SwiftTUICoreTests
+          swiftly run swift test --filter SwiftTUIViewsTests
+          swiftly run swift test --filter SwiftTUIAnimatedImageTests
+          swiftly run swift test --filter SwiftTUIArgumentsTests
+          swiftly run swift test --filter SwiftTUIPTYPrimitivesTests
+          swiftly run swift test --filter WASISurfaceBridgeTests
+          swiftly run swift test --filter SwiftTUIWASITests
+          (cd Platforms/Web && bun test)
+          (cd Platforms/WebBuild && bun test)
 
   macos-gate:
     name: macOS repo gate

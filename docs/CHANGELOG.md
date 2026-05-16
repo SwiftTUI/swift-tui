@@ -37,7 +37,9 @@ in the durable docs, plans, source, or tests linked from an entry.
   iOS package build selects an Xcode image with Swift 6.3 support instead of the
   runner default. The external repo gates also apply an explicit CI-only skip
   regex for named unstable runtime/socket/terminal/PTY/WebHost/gallery tests,
-  with follow-up tracked in [TODO.md](TODO.md).
+  with follow-up tracked in [TODO.md](TODO.md), and the Linux external gate is
+  bounded to a portability smoke while the hanging Linux full-gate path is
+  isolated.
 - Closed the first critique-remediation slice: removed the AI CLI from root Bun
   dependencies, made `mise.toml` local ignored tooling, added root test-target
   and rendered-fixture matrix guardrails to the repo gate, made rendered fixture

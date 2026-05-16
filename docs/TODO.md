@@ -40,6 +40,9 @@
   by stabilizing the named flaky runtime, socket readiness, terminal latency,
   PTY child-process, WebHost byte-sink, and gallery terminal-host tests that
   currently require `STUI_SWIFT_TEST_SKIP_REGEX` in the external repo gates.
+- Restore the Linux external gate from its bounded portability smoke back to the
+  full `Scripts/test_gate.sh` surface after the hanging Linux runtime/terminal
+  test path is isolated and stabilized.
 - Scope the host-native text input contract for value/selection transport and
   IME/composition before promoting those behaviors beyond current terminal and
   browser clipboard support. See
