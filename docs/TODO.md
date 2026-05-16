@@ -23,3 +23,21 @@
   planned, actively investigated, or awaiting a decision must have a
   corresponding item here. If there is no item here, the status text should make
   clear that the topic is shipped, contextual, or explicitly deferred.
+
+## Unresolved Decisions
+
+- Decide whether command collisions across different scope kinds need a
+  precedence rule beyond the current shallowest-wins focus-chain dispatch. See
+  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
+- Decide whether state-predicate command scopes need first-class authoring DSL
+  surface or should remain implicit through their anchor nodes. See
+  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
+
+## Planned Work
+
+- Scope the host-native text input contract for value/selection transport and
+  IME/composition before promoting those behaviors beyond current terminal and
+  browser clipboard support. See
+  [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md).
+- Define the restart/reattach contract for `SwiftTUITerminalWorkspace` before
+  adding persisted child-process reattachment.

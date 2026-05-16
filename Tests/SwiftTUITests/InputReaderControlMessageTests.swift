@@ -114,20 +114,20 @@ struct InputReaderControlMessageTests {
         source: .override
       ),
       theme: .init(
-        foreground: .hex("#101820"),
-        background: .hex("#F5F5F5"),
-        tint: .hex("#0F4C81"),
-        separator: .hex("#C8CDD4"),
-        selection: .hex("#DCE7F7"),
-        placeholder: .hex("#8A94A6"),
-        link: .hex("#0F4C81"),
-        fill: .hex("#EEF2F6"),
-        windowBackground: .hex("#E6EBF2"),
-        success: .hex("#0F9D58"),
-        warning: .hex("#F4B400"),
-        danger: .hex("#DB4437"),
-        info: .hex("#4285F4"),
-        muted: .hex("#6B7280")
+        foreground: try! .hex("#101820"),
+        background: try! .hex("#F5F5F5"),
+        tint: try! .hex("#0F4C81"),
+        separator: try! .hex("#C8CDD4"),
+        selection: try! .hex("#DCE7F7"),
+        placeholder: try! .hex("#8A94A6"),
+        link: try! .hex("#0F4C81"),
+        fill: try! .hex("#EEF2F6"),
+        windowBackground: try! .hex("#E6EBF2"),
+        success: try! .hex("#0F9D58"),
+        warning: try! .hex("#F4B400"),
+        danger: try! .hex("#DB4437"),
+        info: try! .hex("#4285F4"),
+        muted: try! .hex("#6B7280")
       )
     )
     let encoded = try #require(TerminalRenderStyleCodec.encodeBase64(style))

@@ -16,6 +16,20 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-16
+
+- Prepared the first release-facing alpha posture for `0.1.0`: added root
+  license, contribution, security, and release-policy files; restored vendored
+  license/provenance files for UnixSignals and swift-figlet; added package
+  license metadata; documented install, support, and product-tier guidance; and
+  populated the live TODO tracker with remaining unresolved decisions.
+- Repaired P0 correctness hazards around public bindings, invalid color input,
+  stale SwiftUI host frames, WebHost sink backpressure, and default launcher
+  error reporting.
+- Restored automatic CI coverage for push and pull request traffic with
+  `swiftly`-aligned Linux/macOS gates, policy checks, and an iOS package build
+  check.
+
 ## 2026-05-14
 
 - Implemented the internal `Platforms/Web` package split: `@swifttui/web` now

@@ -498,7 +498,11 @@ extension App {
       environment: ProcessInfo.processInfo.environment,
       isStdoutTTY: isatty(STDOUT_FILENO) != 0
     )
-    try! await TerminalRunner.run(Self.self, configuration: configuration)
+    do {
+      try await TerminalRunner.run(Self.self, configuration: configuration)
+    } catch {
+      exitLaunch(withError: error)
+    }
   }
 }
 
@@ -568,4 +572,15 @@ private final class KeyboardOnlyInputAdapter: TerminalInputReading {
       }
     }
   }
+}
+
+private func exitLaunch(withError error: any Error) -> Never {
+  FileHandle.standardError.write(Data("\(error)\n".utf8))
+  #if canImport(Darwin)
+    Darwin.exit(1)
+  #elseif canImport(Glibc)
+    Glibc.exit(1)
+  #else
+    fatalError(String(describing: error))
+  #endif
 }

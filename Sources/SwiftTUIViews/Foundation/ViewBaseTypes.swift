@@ -1,5 +1,5 @@
-public import SwiftTUICore
 public import Observation
+public import SwiftTUICore
 
 /// A proposed size passed into layout and rendering operations.
 public typealias ProposedViewSize = ProposedSize
@@ -26,16 +26,12 @@ public struct Binding<Value> {
   }
 
   /// Creates a binding from explicit getter and setter closures.
-  @preconcurrency
   public init(
-    @_inheritActorContext get: @escaping @isolated(any) @Sendable () -> Value,
-    @_inheritActorContext set: @escaping @isolated(any) @Sendable (Value) -> Void
+    get: @escaping @MainActor @Sendable () -> Value,
+    set: @escaping @MainActor @Sendable (Value) -> Void
   ) {
-    // Binding dereferences remain @MainActor in this package's authoring model.
-    // The public initializer still matches SwiftUI-style actor-inheriting closure
-    // signatures so call sites compose naturally from authored view contexts.
-    self.getter = unsafe unsafeBitCast(get, to: (@MainActor @Sendable () -> Value).self)
-    self.setter = unsafe unsafeBitCast(set, to: (@MainActor @Sendable (Value) -> Void).self)
+    self.getter = get
+    self.setter = set
   }
 
   @MainActor

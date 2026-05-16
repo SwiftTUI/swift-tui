@@ -153,6 +153,7 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
+  - stable-doc source-path guardrails
   - accessibility guardrails for raw glyphs, color-state styling, and visual content
   - public-API baseline freshness check
   - focused root SwiftPM framework tests
@@ -514,6 +515,12 @@ run_step \
   "$repo_root" \
   "./Scripts/check_public_surface_policies.sh" \
   ./Scripts/check_public_surface_policies.sh
+
+run_step \
+  "Check stable doc source paths" \
+  "$repo_root" \
+  "./Scripts/check_stable_doc_source_paths.sh" \
+  ./Scripts/check_stable_doc_source_paths.sh
 
 run_step \
   "Check concurrency-safety policies" \

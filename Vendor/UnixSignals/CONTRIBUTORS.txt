@@ -1,0 +1,8 @@
+This vendored UnixSignals subset is derived from the Swift Service Lifecycle
+project.
+
+Upstream: https://github.com/swift-server/swift-service-lifecycle
+Source revision recorded for this license restoration:
+2fd7a348e9d0333979108c2da83642a64df6cb2c
+
+Project attribution is preserved in NOTICE.txt.

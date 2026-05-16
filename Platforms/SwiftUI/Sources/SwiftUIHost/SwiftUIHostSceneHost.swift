@@ -26,6 +26,9 @@ public final class SwiftUIHostSceneHost {
   @ObservationIgnored
   private var accessibilityAnnouncer = HostedAccessibilityAnnouncer()
 
+  @ObservationIgnored
+  private var latestSemanticHostFrameSequence: UInt64?
+
   public init<A: SwiftTUIRuntime.App>(
     app: A,
     descriptor: SwiftUIHostSceneDescriptor,
@@ -91,6 +94,7 @@ public final class SwiftUIHostSceneHost {
     focusPresentation = .none
     focusedAccessibilityIdentity = nil
     latestPresentationDamage = nil
+    latestSemanticHostFrameSequence = nil
     accessibilityAnnouncer.reset()
     manualKeyboardPresentationRequested = false
     bridge.updateKeyboardPresentation(
@@ -134,9 +138,19 @@ public final class SwiftUIHostSceneHost {
     bridge
   }
 
+  func receiveFrameForTesting(
+    _ frame: SemanticHostFrame
+  ) {
+    receiveFrame(frame)
+  }
+
   private func receiveFrame(
     _ frame: SemanticHostFrame
   ) {
+    if let latestSemanticHostFrameSequence, frame.sequence <= latestSemanticHostFrameSequence {
+      return
+    }
+    latestSemanticHostFrameSequence = frame.sequence
     latestSurface = frame.raster
     latestSemanticSnapshot = frame.semantics
     focusedAccessibilityIdentity = frame.focusedIdentity

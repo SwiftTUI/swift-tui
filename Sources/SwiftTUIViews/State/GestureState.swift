@@ -1,4 +1,5 @@
 public import SwiftTUICore
+import Synchronization
 
 /// The typed location a `GestureStateBox` binds to inside a running
 /// resolve pass. Parallels `DynamicStateLocation` in State.swift and
@@ -25,6 +26,10 @@ public final class GestureStateBox<Value> {
     self.seed = seed
     self.localValue = seed
     self.slotOrdinal = slotOrdinal
+  }
+
+  deinit {
+    GestureStateGraphBindingRegistry.shared.forget(boxID: ObjectIdentifier(self))
   }
 
   /// The true initial seed value -- used by `makeLocation` to capture
@@ -121,25 +126,36 @@ public final class GestureStateBox<Value> {
 
 }
 
-@MainActor
-private final class GestureStateGraphBindingRegistry {
+private final class GestureStateGraphBindingRegistry: Sendable {
   static let shared = GestureStateGraphBindingRegistry()
 
-  private var currentIdentityByBoxAndGraph: [ObjectIdentifier: [ViewGraphScopeID: Identity]] = [:]
+  private let currentIdentityByBoxAndGraph = Mutex<
+    [ObjectIdentifier: [ViewGraphScopeID: Identity]]
+  >([:])
 
   func remember(
     _ identity: Identity,
     for boxID: ObjectIdentifier,
     graphID: ViewGraphScopeID
   ) {
-    currentIdentityByBoxAndGraph[boxID, default: [:]][graphID] = identity
+    currentIdentityByBoxAndGraph.withLock { identities in
+      identities[boxID, default: [:]][graphID] = identity
+    }
   }
 
   func currentIdentity(
     for boxID: ObjectIdentifier,
     graphID: ViewGraphScopeID
   ) -> Identity? {
-    currentIdentityByBoxAndGraph[boxID]?[graphID]
+    currentIdentityByBoxAndGraph.withLock { identities in
+      identities[boxID]?[graphID]
+    }
+  }
+
+  func forget(boxID: ObjectIdentifier) {
+    currentIdentityByBoxAndGraph.withLock { identities in
+      identities[boxID] = nil
+    }
   }
 }
 

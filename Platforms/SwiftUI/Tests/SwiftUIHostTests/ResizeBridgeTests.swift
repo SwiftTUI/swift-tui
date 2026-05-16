@@ -75,23 +75,23 @@ func bridge_forwards_resize_and_style_updates() async throws {
 
   let swappedStyle = SwiftUIHostTerminalStyle(
     palette: .init(
-      foreground: .hex("#5A5B5C"),
-      background: .hex("#6A6B6C"),
-      cursor: .hex("#7A7B7C"),
-      selectionBackground: .hex("#8A8B8C"),
-      selectionForeground: .hex("#9A9B9C"),
+      foreground: try! .hex("#5A5B5C"),
+      background: try! .hex("#6A6B6C"),
+      cursor: try! .hex("#7A7B7C"),
+      selectionBackground: try! .hex("#8A8B8C"),
+      selectionForeground: try! .hex("#9A9B9C"),
       ansi: .default
     ),
     theme: Theme(
-      foreground: .hex("#5A5B5C"),
-      background: .hex("#6A6B6C"),
-      tint: .hex("#7A7B7C")
+      foreground: try! .hex("#5A5B5C"),
+      background: try! .hex("#6A6B6C"),
+      tint: try! .hex("#7A7B7C")
     )
   )
 
   bridge.apply(style: swappedStyle)
-  #expect(surface.appearance.foregroundColor == .hex("#5A5B5C"))
-  #expect(surface.appearance.backgroundColor == .hex("#6A6B6C"))
+  #expect(surface.appearance.foregroundColor == (try! .hex("#5A5B5C")))
+  #expect(surface.appearance.backgroundColor == (try! .hex("#6A6B6C")))
   #expect(surface.theme == swappedStyle.theme)
   #expect(session.refreshCount == 3)
 

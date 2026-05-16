@@ -4,6 +4,12 @@ import SwiftTUICLI
 public import SwiftTUIRuntime
 import SwiftTUIWebHost
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
+
 public enum WebHostCLIRunner {
   @MainActor
   public static func run<A: App>(_ appType: A.Type) async throws {
@@ -69,7 +75,7 @@ extension App {
     do {
       try await WebHostCLIRunner.run(Self.self)
     } catch {
-      fatalError(String(describing: error))
+      exitLaunch(withError: error)
     }
   }
 }
@@ -103,4 +109,15 @@ extension App where Self: SwiftTUICommand {
       exit(withError: error)
     }
   }
+}
+
+private func exitLaunch(withError error: any Error) -> Never {
+  FileHandle.standardError.write(Data("\(error)\n".utf8))
+  #if canImport(Darwin)
+    Darwin.exit(1)
+  #elseif canImport(Glibc)
+    Glibc.exit(1)
+  #else
+    fatalError(String(describing: error))
+  #endif
 }

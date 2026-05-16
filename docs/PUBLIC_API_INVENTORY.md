@@ -51,7 +51,7 @@ Important public-surface rules after the lowering migration:
   `PrimitiveViewModifier` or explicitly set `Body == Never`.
 - `View`, `Scene`, and `App` are `@MainActor` authoring protocols.
 - APIs that evaluate authored `body` trees, including `Resolver.resolve(...)` and `DefaultRenderer.render(...)`, are `@MainActor`.
-- Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
+- Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` now requires explicitly `@MainActor` get/set closures, `.task(...)` uses actor-inheriting closure signatures, and button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
 - Dynamic-property callbacks preserve the graph-scoped state identity captured
   at registration time. `DefaultRenderer` still preserves same-instance
   snapshot behavior when no invalidating runtime graph exists.

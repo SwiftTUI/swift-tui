@@ -71,6 +71,58 @@ func scene_host_receives_snapshot_with_accessibility_hidden_subtrees_pruned() as
 }
 
 @MainActor
+@Test
+func scene_host_drops_stale_semantic_host_frames() throws {
+  let host = try SwiftUIHostSceneHost(
+    app: AccessibilityHostApp(),
+    descriptor: .init(id: "main", title: "Main", isDefault: true),
+    style: .default
+  )
+  let root = Identity(components: ["root"])
+
+  host.receiveFrameForTesting(
+    SemanticHostFrame(
+      sequence: 2,
+      raster: RasterSurface(size: .init(width: 3, height: 1), lines: ["new"]),
+      semantics: SemanticSnapshot(
+        accessibilityNodes: [
+          AccessibilityNode(
+            identity: root.child("new"),
+            parentIdentity: root,
+            rect: .init(origin: .zero, size: .init(width: 3, height: 1)),
+            role: .status,
+            label: "new"
+          )
+        ]
+      ),
+      focusedIdentity: root.child("new")
+    )
+  )
+  host.receiveFrameForTesting(
+    SemanticHostFrame(
+      sequence: 1,
+      raster: RasterSurface(size: .init(width: 3, height: 1), lines: ["old"]),
+      semantics: SemanticSnapshot(
+        accessibilityNodes: [
+          AccessibilityNode(
+            identity: root.child("old"),
+            parentIdentity: root,
+            rect: .init(origin: .zero, size: .init(width: 3, height: 1)),
+            role: .status,
+            label: "old"
+          )
+        ]
+      ),
+      focusedIdentity: root.child("old")
+    )
+  )
+
+  #expect(host.latestSurface?.renderedText.contains("new") == true)
+  #expect(host.latestSemanticSnapshot?.accessibilityNodes.first?.label == "new")
+  #expect(host.focusedAccessibilityIdentity == root.child("new"))
+}
+
+@MainActor
 private struct AccessibilityHostApp: SwiftTUIRuntime.App {
   var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {

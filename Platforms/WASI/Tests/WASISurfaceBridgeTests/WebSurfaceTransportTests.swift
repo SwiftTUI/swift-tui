@@ -295,9 +295,9 @@ struct WebSurfaceTransportTests {
     var parser = WebSurfaceInputParser()
     let style = TerminalRenderStyle(
       appearance: .init(
-        foregroundColor: .hex("#102030"),
-        backgroundColor: .hex("#405060"),
-        tintColor: .hex("#708090"),
+        foregroundColor: try! .hex("#102030"),
+        backgroundColor: try! .hex("#405060"),
+        tintColor: try! .hex("#708090"),
         source: .override
       )
     )

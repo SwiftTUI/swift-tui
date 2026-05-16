@@ -137,16 +137,18 @@ struct TodoTab: View {
   }
 
   private func doneBinding(for item: TodoItem) -> Binding<Bool> {
-    Binding<Bool>(
-      get: {
-        items.first(where: { $0.id == item.id })?.done ?? false
-      },
-      set: { newValue in
-        guard let index = items.firstIndex(where: { $0.id == item.id }) else {
-          return
-        }
-        items[index].done = newValue
+    let get: @MainActor @Sendable () -> Bool = {
+      items.first(where: { $0.id == item.id })?.done ?? false
+    }
+    let set: @MainActor @Sendable (Bool) -> Void = { newValue in
+      guard let index = items.firstIndex(where: { $0.id == item.id }) else {
+        return
       }
+      items[index].done = newValue
+    }
+    return Binding<Bool>(
+      get: get,
+      set: set
     )
   }
 }

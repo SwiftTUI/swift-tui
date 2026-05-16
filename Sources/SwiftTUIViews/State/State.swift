@@ -1,4 +1,5 @@
 package import SwiftTUICore
+import Synchronization
 
 struct ViewGraphScopeID: Hashable, Sendable {
   fileprivate let rawValue: UInt
@@ -312,6 +313,10 @@ private final class StateBox<Value> {
     retainedValuesByIdentity = [:]
   }
 
+  deinit {
+    StateGraphBindingRegistry.shared.forget(boxID: ObjectIdentifier(self))
+  }
+
   func currentSeedValue() -> Value {
     seedValue
   }
@@ -371,25 +376,36 @@ private final class StateBox<Value> {
   }
 }
 
-@MainActor
-private final class StateGraphBindingRegistry {
+private final class StateGraphBindingRegistry: Sendable {
   static let shared = StateGraphBindingRegistry()
 
-  private var currentIdentityByBoxAndGraph: [ObjectIdentifier: [ViewGraphScopeID: Identity]] = [:]
+  private let currentIdentityByBoxAndGraph = Mutex<
+    [ObjectIdentifier: [ViewGraphScopeID: Identity]]
+  >([:])
 
   func remember(
     _ identity: Identity,
     for boxID: ObjectIdentifier,
     graphID: ViewGraphScopeID
   ) {
-    currentIdentityByBoxAndGraph[boxID, default: [:]][graphID] = identity
+    currentIdentityByBoxAndGraph.withLock { identities in
+      identities[boxID, default: [:]][graphID] = identity
+    }
   }
 
   func currentIdentity(
     for boxID: ObjectIdentifier,
     graphID: ViewGraphScopeID
   ) -> Identity? {
-    currentIdentityByBoxAndGraph[boxID]?[graphID]
+    currentIdentityByBoxAndGraph.withLock { identities in
+      identities[boxID]?[graphID]
+    }
+  }
+
+  func forget(boxID: ObjectIdentifier) {
+    currentIdentityByBoxAndGraph.withLock { identities in
+      identities[boxID] = nil
+    }
   }
 }
 

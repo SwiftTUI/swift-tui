@@ -60,20 +60,20 @@ struct InjectedTerminalInputReaderTests {
         source: .override
       ),
       theme: .init(
-        foreground: .hex("#ECEFF4"),
-        background: .hex("#1E222A"),
-        tint: .hex("#56B6C2"),
-        separator: .hex("#4C566A"),
-        selection: .hex("#2E3440"),
-        placeholder: .hex("#7F8794"),
-        link: .hex("#5BA3FF"),
-        fill: .hex("#2B303B"),
-        windowBackground: .hex("#15181E"),
-        success: .hex("#61C67B"),
-        warning: .hex("#EBB33C"),
-        danger: .hex("#E05757"),
-        info: .hex("#56B6C2"),
-        muted: .hex("#8C92AC")
+        foreground: try! .hex("#ECEFF4"),
+        background: try! .hex("#1E222A"),
+        tint: try! .hex("#56B6C2"),
+        separator: try! .hex("#4C566A"),
+        selection: try! .hex("#2E3440"),
+        placeholder: try! .hex("#7F8794"),
+        link: try! .hex("#5BA3FF"),
+        fill: try! .hex("#2B303B"),
+        windowBackground: try! .hex("#15181E"),
+        success: try! .hex("#61C67B"),
+        warning: try! .hex("#EBB33C"),
+        danger: try! .hex("#E05757"),
+        info: try! .hex("#56B6C2"),
+        muted: try! .hex("#8C92AC")
       )
     )
     let encoded = try #require(TerminalRenderStyleCodec.encodeBase64(style))

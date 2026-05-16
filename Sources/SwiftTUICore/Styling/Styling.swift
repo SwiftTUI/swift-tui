@@ -72,8 +72,8 @@ extension Color: ShapeStyle {
   public static func hex(
     _ hex: String,
     profile: RGBColorProfile = .sRGB
-  ) -> Self {
-    try! .init(hex: hex, profile: profile)
+  ) throws -> Self {
+    try .init(hex: hex, profile: profile)
   }
 
   public func opacity(_ opacity: Double) -> Color {
@@ -269,15 +269,15 @@ public struct Theme: Equatable, Sendable, Codable {
   public var muted: Color
 
   public init(
-    foreground: Color = .hex("#ECEFF4"),
-    background: Color = .hex("#1E222A"),
+    foreground: Color = try! .hex("#ECEFF4"),
+    background: Color = try! .hex("#1E222A"),
     tint: Color = .cyan,
-    separator: Color = .hex("#4C566A"),
-    selection: Color = .hex("#2E3440"),
+    separator: Color = try! .hex("#4C566A"),
+    selection: Color = try! .hex("#2E3440"),
     placeholder: Color = .gray,
     link: Color = .blue,
-    fill: Color = .hex("#2B303B"),
-    windowBackground: Color = .hex("#15181E"),
+    fill: Color = try! .hex("#2B303B"),
+    windowBackground: Color = try! .hex("#15181E"),
     success: Color = .green,
     warning: Color = .yellow,
     danger: Color = .red,
