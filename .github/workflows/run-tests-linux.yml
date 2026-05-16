@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ca-certificates curl git ripgrep unzip
+          sudo apt-get install -y --no-install-recommends ca-certificates curl git libcurl4-openssl-dev ripgrep unzip
 
       - name: Install swiftly and Swift toolchain
         shell: bash
@@ -106,7 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ca-certificates curl git ripgrep unzip
+          sudo apt-get install -y --no-install-recommends ca-certificates curl git libcurl4-openssl-dev ripgrep unzip
 
       - name: Install swiftly and Swift toolchain
         shell: bash
@@ -178,7 +178,7 @@ jobs:
           set -euo pipefail
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
           installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           swift_version="$(tr -d '[:space:]' < .swift-version)"
@@ -233,6 +233,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode with Swift 6.3 support
+        shell: bash
+        run: |
+          set -euo pipefail
+          for xcode in \
+            /Applications/Xcode_26.4.1.app \
+            /Applications/Xcode_26.4.app \
+            /Applications/Xcode_26.3.app \
+            /Applications/Xcode_26.5.app \
+            /Applications/Xcode_26.5_beta_2.app
+          do
+            if [[ -d "$xcode" ]]; then
+              developer_dir="$xcode/Contents/Developer"
+              echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+              DEVELOPER_DIR="$developer_dir" xcodebuild -version
+              DEVELOPER_DIR="$developer_dir" xcrun swift --version
+              exit 0
+            fi
+          done
+
+          echo "No Xcode installation with Swift 6.3 support was found." >&2
+          ls -1 /Applications/Xcode*.app >&2 || true
+          exit 1
 
       - name: Build SwiftUI host for generic iOS
         shell: bash

@@ -239,9 +239,9 @@ ensure_swiftly() {
       exit 0
     fi
 
-    if ! command -v curl >/dev/null 2>&1; then
+    if ! command -v curl >/dev/null 2>&1 || ! dpkg -s libcurl4-openssl-dev >/dev/null 2>&1; then
       apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates
+      DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates libcurl4-openssl-dev
     fi
 
     tmpdir=\$(mktemp -d)
