@@ -31,11 +31,11 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`, `Spinner`
 - `ToastStyle`, `PopoverAttachmentAnchor`, `PopoverTip`, and `PopoverTipAction`
-- `Layout`, `SendableLayout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `Anchor`, `AnchorSource`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`, and `ResetFocusAction`
+- `Layout`, `SendableLayout`, `LayoutValueKey`, `Binding`, `Environment`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `Anchor`, `AnchorSource`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`, and `ResetFocusAction`
 - image-source and runtime-policy environment configuration such as
   `EnvironmentValues.imageResourceRoots` and
   `EnvironmentValues.accessibilityReduceMotion`
-- `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
+- `@State`, `@Binding`, `@Environment`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
 - canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.anchorPreference(key:value:transform:)`, `.transformAnchorPreference(_:value:transform:)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.prefersDefaultFocus(_:in:)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusScope(_:)`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.popover(...)`, `.popoverTip(...)`, `.toast(...)`, `.navigationDestination(isPresented:)`, `.navigationDestination(item:)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 - low-level `Standard` output/file helpers and `FileOpenError` for runtime

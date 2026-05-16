@@ -37,7 +37,7 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
 - `Image` backed by PNG and baseline JPEG, with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`. Format is detected from magic bytes.
 - `AnimatedImage` as a peer product for finite pre-composed frame animation plus GIF import/export.
 - Environment, observation, focus, and preferences including `@State`,
-  `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`,
+  `@Binding`, `@Environment`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`,
   `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference
   readers, anchor preferences, `OpenLinkAction`, actor-context-aware
   `.task(...)`, default-focus modifiers, and graph-scoped imperative state

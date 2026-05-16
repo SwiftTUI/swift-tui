@@ -52,6 +52,23 @@ struct DependencyTrackingTests {
     )
   }
 
+  @Test("@Environment reads populate graph dependencies")
+  func environmentPropertyWrapperReadsPopulateDependencies() throws {
+    var environmentValues = EnvironmentValues()
+    environmentValues.dependencyTrackedValue = "tracked"
+
+    let dependencies = try resolveDependencies(
+      EnvironmentPropertyWrapperDependencyProbe(),
+      environmentValues: environmentValues
+    )
+
+    #expect(
+      dependencies.environmentReads == [
+        ObjectIdentifier(DependencyTrackingKey.self)
+      ]
+    )
+  }
+
   @Test("observable-backed reads populate graph dependencies")
   func observableReadsPopulateDependencies() throws {
     let model = DependencyObservableModel()
@@ -81,6 +98,14 @@ private struct EnvironmentDependencyProbe: View {
     EnvironmentReader(\.dependencyTrackedValue) { value in
       Text(value)
     }
+  }
+}
+
+private struct EnvironmentPropertyWrapperDependencyProbe: View {
+  @Environment(\.dependencyTrackedValue) private var value
+
+  var body: some View {
+    Text(value)
   }
 }
 

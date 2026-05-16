@@ -19,7 +19,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
 | `SwiftTUIRuntime` | 52 | 574 |
-| `SwiftTUIViews` | 255 | 9637 |
+| `SwiftTUIViews` | 256 | 9640 |
 | `SwiftTUIAnimatedImage` | 5 | 157 |
 | `SwiftTUICharts` | 29 | 1851 |
 | `SwiftTUIArguments` | 4 | 114 |
@@ -96,7 +96,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (255)
+### Canonical surface (256)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -164,6 +164,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `DropDestinationRegistrationModifier` — struct — 2 members
 - `Ellipse` — struct — 138 members
 - `EmptyView` — struct — 126 members
+- `Environment` — struct — 2 members
 - `EnvironmentKey` — protocol — 2 members
 - `EnvironmentReader` — struct — 126 members
 - `EnvironmentTransformModifier` — struct — 2 members

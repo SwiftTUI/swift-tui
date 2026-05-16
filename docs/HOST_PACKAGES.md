@@ -27,7 +27,6 @@ The root `Package.swift` exposes the framework and platform products together:
 - `SwiftTUICLI`: terminal-native executable runner
 - `SwiftTUIArguments`: shared framework flag and environment parsing
 - `SwiftTUIWASI`: WASI executable runner and manifest mode
-- `WASISurfaceBridge`: pure `web-surface` transport for WASI/Web integrations
 - `SwiftUIHost`: native SwiftUI scene host on Apple platforms
 - `SwiftTUIWebHost`: localhost browser WebHost runner and bridge
 - `SwiftTUIWebHostCLI`: combined terminal/WebHost runner
@@ -44,7 +43,8 @@ The source directories remain useful ownership boundaries:
 - `Platforms/Arguments`: `SwiftTUIArguments`
 - `Sources/SwiftTUIRuntime`: platform-neutral runtime, scene, terminal
   presentation, and hosted-session seams
-- `Platforms/WASI`: `SwiftTUIWASI` and `WASISurfaceBridge`
+- `Platforms/WASI`: `SwiftTUIWASI` plus the package-only `WASISurfaceBridge`
+  transport target used by WASI/WebHost internals
 - `Platforms/SwiftUI`: `SwiftUIHost`
 - `Platforms/WebHost`: `SwiftTUIWebHost` and `SwiftTUIWebHostCLI`
 - `Platforms/Embedding`: `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`,
@@ -68,8 +68,8 @@ Consumers choose one launch composition at compile time:
 - terminal plus local-browser apps use `SwiftTUIWebHostCLI` as an import
   replacement; normal launches use `TerminalRunner`, while `--web` uses
   `WebHostRunner`
-- WASI apps import `SwiftTUIWASI`; transport-only browser consumers can import
-  `WASISurfaceBridge`
+- WASI apps import `SwiftTUIWASI`; the shared web-surface encoder/parser lives
+  in the package-only `WASISurfaceBridge` target and is not a consumer product
 - native Apple apps import `SwiftUIHost` to retain `HostedSceneSession` values
   with `HostedRasterSurface` inside SwiftUI app lifecycle
 - apps that embed external terminal programs import `SwiftTUITerminal`
@@ -97,6 +97,9 @@ The platform-integration-facing root work is landed:
   default terminal `App.main()` story
 - `SwiftTUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest` plus
   WASI scene launch
+- `WASISurfaceBridge` is a package-only target that shares the `web-surface`
+  encoder, parser, and WASI presentation transport between `SwiftTUIWASI` and
+  `SwiftTUIWebHost`
 - `SwiftTUIWebHost` owns the opt-in WebHost runner and localhost browser host
   bridge for local binaries that should render in a browser
 - `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing without

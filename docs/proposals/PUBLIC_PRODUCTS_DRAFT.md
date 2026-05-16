@@ -188,7 +188,6 @@ own host policy. They should not depend on the terminal convenience product.
 | `SwiftUIHost` or future `SwiftTUISwiftUI` | `import SwiftTUIRuntime` + `import SwiftUIHost` | Native SwiftUI app embedding. No terminal dependencies. |
 | `SwiftTUIWASI` | `import SwiftTUIRuntime` + `import SwiftTUIWASI` | WASI launch and manifest behavior. No POSIX terminal runner. |
 | `SwiftTUIWebHost` | `import SwiftTUIRuntime` + `import SwiftTUIWebHost` | Localhost browser host only. No terminal runner required. |
-| `WASISurfaceBridge` | `import WASISurfaceBridge` | Pure `web-surface` transport support. No terminal dependencies. |
 | `SwiftTUITerminal` | `import SwiftTUIRuntime` + `import SwiftTUITerminal` | Terminal-emulator and child-process embedding. Domain-specific, not part of regular app convenience. |
 | `SwiftTUITerminalWorkspace` | `import SwiftTUIRuntime` + `import SwiftTUITerminalWorkspace` | Tabbed/split-pane workspace surface above `TerminalView`. Domain-specific, not part of regular app convenience. |
 
@@ -221,7 +220,7 @@ SwiftTUI
 
 SwiftTUIWebHost
   -> SwiftTUIRuntime
-  -> WASISurfaceBridge
+  -> WASISurfaceBridge package-only target
   -> FlyingFox + browser resources
 
 SwiftTUIWebHostCLI
@@ -236,7 +235,7 @@ SwiftUIHost
 
 SwiftTUIWASI
   -> SwiftTUIRuntime
-  -> WASISurfaceBridge
+  -> WASISurfaceBridge package-only target
 
 SwiftTUICharts
   -> SwiftTUICore
@@ -270,9 +269,10 @@ The implementation closes the original release-shape mismatches:
 - `SwiftTUICLI` remains the lower-level terminal runner product, while
   `import SwiftTUI` makes the default terminal `App.main()` visible for normal
   apps.
-- `SwiftUIHost`, `SwiftTUIWASI`, `WASISurfaceBridge`, `SwiftTUIWebHost`, and
-  `SwiftTUITerminal` depend on `SwiftTUIRuntime` instead of the terminal
-  convenience product.
+- `SwiftUIHost`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and `SwiftTUITerminal`
+  depend on `SwiftTUIRuntime` instead of the terminal convenience product.
+- `WASISurfaceBridge` remains shared web-surface plumbing, but it is
+  package-only rather than a public product/import recommendation.
 - The WebHost compile-time boundary is preserved. `SwiftTUIWebHostCLI` is the
   explicit combined product for binaries that intentionally support `--web`.
 

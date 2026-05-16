@@ -95,7 +95,6 @@ const PRIMARY_MODULES = [
   "SwiftTUITerminal",
   "SwiftTUITerminalWorkspace",
   "SwiftTUICLI",
-  "WASISurfaceBridge",
   "SwiftTUIWASI",
   "SwiftTUIWebHost",
   "SwiftTUIWebHostCLI",

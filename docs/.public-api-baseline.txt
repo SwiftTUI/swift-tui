@@ -7844,6 +7844,9 @@ SwiftTUIViews.EmptyView.transition(_:)
 SwiftTUIViews.EmptyView.truncationMode(_:)
 SwiftTUIViews.EmptyView.underline(_:color:)
 SwiftTUIViews.EmptyView.underline(_:pattern:color:)
+SwiftTUIViews.Environment
+SwiftTUIViews.Environment.init(_:)
+SwiftTUIViews.Environment.wrappedValue
 SwiftTUIViews.EnvironmentKey
 SwiftTUIViews.EnvironmentKey.Value
 SwiftTUIViews.EnvironmentKey.defaultValue

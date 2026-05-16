@@ -740,8 +740,8 @@ transport mode is surface. It creates:
 surface protocol as local WebHost. It writes the same record family consumed by
 `WebHostOutputDecoder`: surface, clipboard, runtime issue, and text records.
 Surface records include optional presentation damage, and the encoder is shared
-at the Swift level with the WebHost transport through the `WASISurfaceBridge`
-target.
+at the Swift level with the WebHost transport through the package-only
+`WASISurfaceBridge` target.
 
 ### Inbound Input And Resize Flow
 

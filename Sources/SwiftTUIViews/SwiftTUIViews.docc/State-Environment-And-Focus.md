@@ -33,7 +33,7 @@ SwiftTUI tracks observable reads through the same invalidation bridge used by th
 
 ## Environment
 
-Use ``EnvironmentValues`` and ``EnvironmentReader`` when values should be inherited structurally through the tree. Use ``GeometryReader`` when authored content should react to the geometry assigned by layout, including the root terminal surface when the reader is placed at the root.
+Use ``Environment`` or ``EnvironmentReader`` with ``EnvironmentValues`` when values should be inherited structurally through the tree. Use ``GeometryReader`` when authored content should react to the geometry assigned by layout, including the root terminal surface when the reader is placed at the root.
 
 Environment updates can affect:
 
@@ -59,6 +59,7 @@ The runtime is keyboard-first, but focus also matters for:
 - ``State``
 - ``Binding``
 - ``Bindable``
+- ``Environment``
 - ``EnvironmentValues``
 - ``EnvironmentReader``
 - ``GeometryReader``
