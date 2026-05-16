@@ -31,7 +31,9 @@ in the durable docs, plans, source, or tests linked from an entry.
   scratch directory instead of the repo's normal `.build` tree, Linux policy
   checks still enforce public-symbol classifications for emitted modules while
   leaving exact baseline drift detection to platforms that emit every public
-  module, macOS Swiftly setup skips the latest-toolchain detour, and the generic
+  module, synthesized SDK-inherited symbol graph entries are excluded from the
+  committed public API baseline, macOS Swiftly setup skips the latest-toolchain
+  detour, macOS gates install `ripgrep` for repo policy scripts, and the generic
   iOS package build selects an Xcode image with Swift 6.3 support instead of the
   runner default.
 - Closed the first critique-remediation slice: removed the AI CLI from root Bun

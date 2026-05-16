@@ -18,20 +18,20 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
-| `SwiftTUIRuntime` | 52 | 574 |
-| `SwiftTUIViews` | 256 | 9578 |
-| `SwiftTUIAnimatedImage` | 5 | 156 |
-| `SwiftTUICharts` | 29 | 1838 |
-| `SwiftTUIArguments` | 4 | 114 |
-| `SwiftTUIPTYPrimitives` | 6 | 34 |
-| `SwiftTUITerminal` | 12 | 293 |
-| `SwiftTUITerminalWorkspace` | 14 | 259 |
-| `SwiftTUICLI` | 5 | 24 |
-| `SwiftTUIWASI` | 2 | 8 |
-| `SwiftTUIWebHost` | 3 | 19 |
+| `SwiftTUIRuntime` | 52 | 485 |
+| `SwiftTUIViews` | 256 | 1361 |
+| `SwiftTUIAnimatedImage` | 5 | 29 |
+| `SwiftTUICharts` | 29 | 206 |
+| `SwiftTUIArguments` | 4 | 46 |
+| `SwiftTUIPTYPrimitives` | 6 | 28 |
+| `SwiftTUITerminal` | 12 | 121 |
+| `SwiftTUITerminalWorkspace` | 14 | 118 |
+| `SwiftTUICLI` | 5 | 22 |
+| `SwiftTUIWASI` | 2 | 6 |
+| `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 1 | 5 |
-| `SwiftUIHost` | 7 | 886 |
-| `SwiftTUICore` | 265 | 2633 |
+| `SwiftUIHost` | 7 | 61 |
+| `SwiftTUICore` | 265 | 2132 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -42,56 +42,56 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
-- `AppLaunchError` — enum — 4 members
+- `AppLaunchError` — enum — 2 members
 - `ClipboardWritingPresentationSurface` — protocol — 1 member
 - `ConditionalScene` — struct — 5 members
 - `DefaultRenderer` — struct — 9 members
 - `EmptyScene` — struct — 3 members
-- `ExitKeyBindings` — struct — 6 members
-- `FileOpenError` — enum — 3 members
+- `ExitKeyBindings` — struct — 5 members
+- `FileOpenError` — enum — 2 members
 - `FrameDiagnosticRecord` — struct — 75 members
 - `FrameDiagnosticsLogger` — class — 2 members
-- `HostedRasterSurface` — class — 21 members
+- `HostedRasterSurface` — class — 19 members
 - `HostedSceneSession` — class — 11 members
-- `HostedSceneSessionError` — enum — 4 members
+- `HostedSceneSessionError` — enum — 2 members
 - `InProcessSignalReader` — class — 4 members
-- `InputEvent` — enum — 6 members
+- `InputEvent` — enum — 5 members
 - `InputReader` — class — 3 members
 - `InputReading` — protocol — 1 member
-- `KeyHandlingResult` — enum — 4 members
+- `KeyHandlingResult` — enum — 3 members
 - `KeyParser` — struct — 2 members
-- `MouseButton` — enum — 4 members
-- `MouseEvent` — struct — 14 members
-- `PasteEvent` — struct — 3 members
+- `MouseButton` — enum — 3 members
+- `MouseEvent` — struct — 12 members
+- `PasteEvent` — struct — 2 members
 - `PresentationMetrics` — typealias
 - `PresentationSurface` — protocol — 18 members
 - `RunLoop` — class — 6 members
-- `RunLoopExitReason` — enum — 4 members
-- `RunLoopResult` — struct — 5 members
-- `RuntimeConfiguration` — struct — 71 members
-- `RuntimeRenderMode` — enum — 12 members
+- `RunLoopExitReason` — enum — 3 members
+- `RunLoopResult` — struct — 4 members
+- `RuntimeConfiguration` — struct — 56 members
+- `RuntimeRenderMode` — enum — 9 members
 - `Scene` — protocol — 2 members
 - `SceneBuilder` — enum — 10 members
-- `SceneDescriptor` — struct — 6 members
+- `SceneDescriptor` — struct — 5 members
 - `SceneManifest` — struct — 5 members
-- `SemanticHostFrame` — struct — 7 members
-- `SemanticHostFrameCapabilities` — struct — 31 members
+- `SemanticHostFrame` — struct — 6 members
+- `SemanticHostFrameCapabilities` — struct — 8 members
 - `SignalReading` — protocol — 1 member
 - `Standard` — enum — 12 members
 - `StateKeyHandler` — typealias
-- `TerminalCapabilityProfile` — struct — 31 members
-- `TerminalControlMessage` — enum — 3 members
-- `TerminalGraphicsCapabilities` — struct — 17 members
+- `TerminalCapabilityProfile` — struct — 24 members
+- `TerminalControlMessage` — enum — 2 members
+- `TerminalGraphicsCapabilities` — struct — 13 members
 - `TerminalHost` — class — 16 members
-- `TerminalHostError` — enum — 8 members
+- `TerminalHostError` — enum — 7 members
 - `TerminalInputParser` — struct — 2 members
 - `TerminalInputReading` — protocol — 1 member
-- `TerminalPresentationMetrics` — struct — 34 members
+- `TerminalPresentationMetrics` — struct — 24 members
 - `TerminalSurfaceRenderer` — struct — 3 members
 - `TupleScene` — struct — 2 members
 - `VariadicScene` — struct — 2 members
 - `WindowGroup` — struct — 9 members
-- `WindowIdentifier` — struct — 13 members
+- `WindowIdentifier` — struct — 6 members
 
 ## SwiftTUIViews
 
@@ -99,116 +99,116 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
-- `AnchorPreferenceTransformModifier` — struct — 2 members
-- `AnchorPreferenceWritingModifier` — struct — 2 members
-- `Animation` — struct — 21 members
-- `AnimationCompletionCriteria` — struct — 3 members
+- `AnchorPreferenceTransformModifier` — struct
+- `AnchorPreferenceWritingModifier` — struct
+- `Animation` — struct — 20 members
+- `AnimationCompletionCriteria` — struct — 2 members
 - `AnimationContext` — struct — 3 members
 - `AnimationEnvironmentSnapshot` — struct — 1 member
 - `AnimationState` — struct — 2 members
 - `AnyButtonStyle` — struct — 8 members
-- `AnyLayout` — struct — 10 members
-- `AnyListStyle` — struct — 9 members
-- `AnyOutlineStyle` — struct — 10 members
+- `AnyLayout` — struct — 9 members
+- `AnyListStyle` — struct — 8 members
+- `AnyOutlineStyle` — struct — 9 members
 - `AnyPickerStyle` — struct — 8 members
 - `AnyTabViewStyle` — struct — 7 members
 - `AnyTextFieldStyle` — struct — 6 members
 - `AnyToastStyle` — struct — 7 members
 - `AnyTransition` — struct — 9 members
-- `AnyView` — struct — 126 members
-- `AppearLifecycleModifier` — struct — 2 members
-- `ASCIIOutlineStyle` — struct — 5 members
-- `AutomaticButtonStyle` — struct — 4 members
-- `AutomaticListStyle` — struct — 5 members
-- `AutomaticOutlineStyle` — struct — 5 members
-- `AutomaticPickerStyle` — struct — 5 members
-- `AutomaticTabViewStyle` — struct — 7 members
+- `AnyView` — struct — 2 members
+- `AppearLifecycleModifier` — struct
+- `ASCIIOutlineStyle` — struct — 4 members
+- `AutomaticButtonStyle` — struct — 3 members
+- `AutomaticListStyle` — struct — 4 members
+- `AutomaticOutlineStyle` — struct — 4 members
+- `AutomaticPickerStyle` — struct — 4 members
+- `AutomaticTabViewStyle` — struct — 4 members
 - `AutomaticTextFieldStyle` — struct — 3 members
-- `Axis` — enum — 4 members
-- `BackgroundModifier` — struct — 2 members
+- `Axis` — enum — 3 members
+- `BackgroundModifier` — struct
 - `Bindable` — struct — 5 members
 - `Binding` — struct — 5 members
-- `BoolDefaultFocusModifier` — struct — 2 members
-- `BooleanNavigationDestinationModifier` — struct — 2 members
-- `BoolFocusBindingModifier` — struct — 2 members
-- `BorderedButtonStyle` — struct — 4 members
+- `BoolDefaultFocusModifier` — struct
+- `BooleanNavigationDestinationModifier` — struct
+- `BoolFocusBindingModifier` — struct
+- `BorderedButtonStyle` — struct — 3 members
 - `BorderedProminentButtonStyle` — struct — 4 members
-- `BorderModifier` — struct — 2 members
-- `BuiltinPaletteSheetPresentationModifier` — struct — 2 members
-- `BuiltinPromptPresentationModifier` — struct — 2 members
-- `BuiltinSheetPresentationModifier` — struct — 2 members
-- `Button` — struct — 130 members
+- `BorderModifier` — struct
+- `BuiltinPaletteSheetPresentationModifier` — struct
+- `BuiltinPromptPresentationModifier` — struct
+- `BuiltinSheetPresentationModifier` — struct
+- `Button` — struct — 6 members
 - `ButtonStyle` — protocol — 6 members
-- `ButtonStyleConfiguration` — struct — 136 members
-- `Canvas` — struct — 129 members
-- `CanvasClosureDrawing` — struct — 4 members
-- `Capsule` — struct — 137 members
-- `ChangeLifecycleModifier` — struct — 2 members
-- `Circle` — struct — 137 members
+- `ButtonStyleConfiguration` — struct — 12 members
+- `Canvas` — struct — 5 members
+- `CanvasClosureDrawing` — struct — 3 members
+- `Capsule` — struct — 2 members
+- `ChangeLifecycleModifier` — struct
+- `Circle` — struct — 2 members
 - `ClipboardWriteAction` — struct — 4 members
-- `ConditionalContent` — struct — 128 members
-- `ContentShapeModifier` — struct — 2 members
-- `ControlGroup` — struct — 127 members
-- `CoordinateSpace` — struct — 11 members
+- `ConditionalContent` — struct — 4 members
+- `ContentShapeModifier` — struct
+- `ControlGroup` — struct — 3 members
+- `CoordinateSpace` — struct — 9 members
 - `CustomAnimation` — protocol — 5 members
-- `DangerToastStyle` — struct — 3 members
-- `DefaultBottomToolbarStyle` — struct — 4 members
-- `DefaultFocusScopeModifier` — struct — 2 members
-- `DefaultTopToolbarStyle` — struct — 4 members
-- `DisappearLifecycleModifier` — struct — 2 members
-- `DisclosureGroup` — struct — 127 members
-- `Divider` — struct — 126 members
-- `DragGesture` — struct — 22 members
-- `DrawMetadataModifier` — struct — 2 members
-- `DropDestinationRegistrationModifier` — struct — 2 members
-- `Ellipse` — struct — 137 members
-- `EmptyView` — struct — 125 members
+- `DangerToastStyle` — struct — 2 members
+- `DefaultBottomToolbarStyle` — struct — 3 members
+- `DefaultFocusScopeModifier` — struct
+- `DefaultTopToolbarStyle` — struct — 3 members
+- `DisappearLifecycleModifier` — struct
+- `DisclosureGroup` — struct — 3 members
+- `Divider` — struct — 2 members
+- `DragGesture` — struct — 16 members
+- `DrawMetadataModifier` — struct
+- `DropDestinationRegistrationModifier` — struct
+- `Ellipse` — struct — 2 members
+- `EmptyView` — struct — 1 member
 - `Environment` — struct — 2 members
 - `EnvironmentKey` — protocol — 2 members
-- `EnvironmentReader` — struct — 125 members
-- `EnvironmentTransformModifier` — struct — 2 members
-- `EnvironmentValues` — struct — 30 members
-- `EnvironmentWritingModifier` — struct — 2 members
-- `ExclusiveGesture` — struct — 11 members
-- `FileOpenError` — enum — 3 members
-- `FlexibleFrameModifier` — struct — 2 members
-- `FocusContainment` — enum — 3 members
+- `EnvironmentReader` — struct — 1 member
+- `EnvironmentTransformModifier` — struct
+- `EnvironmentValues` — struct — 29 members
+- `EnvironmentWritingModifier` — struct
+- `ExclusiveGesture` — struct — 6 members
+- `FileOpenError` — enum — 2 members
+- `FlexibleFrameModifier` — struct
+- `FocusContainment` — enum — 2 members
 - `FocusedBinding` — struct — 3 members
 - `FocusedValue` — struct — 2 members
-- `FocusedValueWritingModifier` — struct — 2 members
+- `FocusedValueWritingModifier` — struct
 - `FocusState` — struct — 7 members
-- `ForEach` — struct — 129 members
-- `ForeignSurface` — struct — 126 members
-- `FrameModifier` — struct — 2 members
-- `GeometryProxy` — struct — 9 members
-- `GeometryReader` — struct — 125 members
+- `ForEach` — struct — 5 members
+- `ForeignSurface` — struct — 2 members
+- `FrameModifier` — struct
+- `GeometryProxy` — struct — 8 members
+- `GeometryReader` — struct — 1 member
 - `Gesture` — protocol — 8 members
-- `GestureAttachmentModifier` — struct — 2 members
+- `GestureAttachmentModifier` — struct
 - `GestureBuilder` — enum — 1 member
-- `GestureMask` — struct — 29 members
+- `GestureMask` — struct — 6 members
 - `GestureState` — struct — 4 members
 - `GestureStateBinding` — struct — 2 members
 - `GestureStateBox` — class — 6 members
-- `GestureStateGesture` — struct — 12 members
-- `Group` — struct — 125 members
-- `GroupBox` — struct — 127 members
-- `HorizontalAlignmentGuideModifier` — struct — 2 members
-- `HStack` — struct — 127 members
-- `HStackLayout` — struct — 8 members
-- `IDModifier` — struct — 2 members
-- `IgnoreSafeAreaModifier` — struct — 2 members
-- `Image` — struct — 133 members
-- `InfoToastStyle` — struct — 3 members
-- `InlinePickerStyle` — struct — 5 members
-- `InsetGroupedListStyle` — struct — 5 members
-- `InsetShape` — struct — 139 members
+- `GestureStateGesture` — struct — 7 members
+- `Group` — struct — 1 member
+- `GroupBox` — struct — 3 members
+- `HorizontalAlignmentGuideModifier` — struct
+- `HStack` — struct — 3 members
+- `HStackLayout` — struct — 5 members
+- `IDModifier` — struct
+- `IgnoreSafeAreaModifier` — struct
+- `Image` — struct — 9 members
+- `InfoToastStyle` — struct — 2 members
+- `InlinePickerStyle` — struct — 4 members
+- `InsetGroupedListStyle` — struct — 4 members
+- `InsetShape` — struct — 6 members
 - `InsettableShape` — protocol — 1 member
-- `ItemNavigationDestinationModifier` — struct — 2 members
-- `KeyCommandRegistrationModifier` — struct — 2 members
-- `KeyPressMatch` — struct — 4 members
-- `KeyPressModifier` — struct — 2 members
-- `Label` — struct — 127 members
-- `LabeledContent` — struct — 127 members
+- `ItemNavigationDestinationModifier` — struct
+- `KeyCommandRegistrationModifier` — struct
+- `KeyPressMatch` — struct — 3 members
+- `KeyPressModifier` — struct
+- `Label` — struct — 3 members
+- `LabeledContent` — struct — 3 members
 - `Layout` — protocol — 8 members
 - `LayoutPoint` — typealias
 - `LayoutRect` — typealias
@@ -216,90 +216,90 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `LayoutSubview` — struct — 8 members
 - `LayoutSubviews` — typealias
 - `LayoutValueKey` — protocol — 2 members
-- `LayoutValueModifier` — struct — 2 members
-- `LazyHStack` — struct — 127 members
-- `LazyVStack` — struct — 127 members
-- `Link` — struct — 128 members
-- `LinkButtonStyle` — struct — 4 members
-- `List` — struct — 134 members
+- `LayoutValueModifier` — struct
+- `LazyHStack` — struct — 3 members
+- `LazyVStack` — struct — 3 members
+- `Link` — struct — 4 members
+- `LinkButtonStyle` — struct — 3 members
+- `List` — struct — 10 members
 - `ListStyle` — protocol — 1 member
 - `LiteralTabsTabViewStyle` — struct — 7 members
-- `LongPressGesture` — struct — 11 members
-- `MatchedGeometryModifier` — struct — 2 members
-- `Menu` — struct — 126 members
+- `LongPressGesture` — struct — 6 members
+- `MatchedGeometryModifier` — struct
+- `Menu` — struct — 2 members
 - `MenuPickerStyle` — struct — 5 members
-- `ModifiedContent` — struct — 148 members
-- `NamedCoordinateSpaceModifier` — struct — 2 members
+- `ModifiedContent` — struct — 10 members
+- `NamedCoordinateSpaceModifier` — struct
 - `Namespace` — struct — 3 members
-- `NavigationStack` — struct — 133 members
+- `NavigationStack` — struct — 3 members
 - `neverBody()` — func
-- `OffsetModifier` — struct — 2 members
+- `OffsetModifier` — struct
 - `OpenLinkAction` — struct — 4 members
-- `OptionalDefaultFocusModifier` — struct — 2 members
-- `OptionalFocusBindingModifier` — struct — 2 members
-- `OutlineGroup` — struct — 129 members
+- `OptionalDefaultFocusModifier` — struct
+- `OptionalFocusBindingModifier` — struct
+- `OutlineGroup` — struct — 5 members
 - `OutlineStyle` — protocol — 1 member
-- `OverlayModifier` — struct — 2 members
-- `PaddingModifier` — struct — 2 members
-- `PaletteCommandRegistrationModifier` — struct — 2 members
-- `Panel` — struct — 133 members
-- `PhaseAnimator` — struct — 127 members
-- `Picker` — struct — 127 members
+- `OverlayModifier` — struct
+- `PaddingModifier` — struct
+- `PaletteCommandRegistrationModifier` — struct
+- `Panel` — struct — 3 members
+- `PhaseAnimator` — struct — 3 members
+- `Picker` — struct — 3 members
 - `PickerStyle` — protocol — 8 members
-- `PickerStyleConfiguration` — struct — 140 members
-- `PlainButtonStyle` — struct — 4 members
-- `PlainListStyle` — struct — 5 members
-- `PlainOutlineStyle` — struct — 5 members
+- `PickerStyleConfiguration` — struct — 16 members
+- `PlainButtonStyle` — struct — 3 members
+- `PlainListStyle` — struct — 4 members
+- `PlainOutlineStyle` — struct — 4 members
 - `PlainTextFieldStyle` — struct — 3 members
-- `PointerHoverModifier` — struct — 2 members
-- `PointerPath` — struct — 88 members
-- `PopoverAttachmentAnchor` — enum — 3 members
+- `PointerHoverModifier` — struct
+- `PointerPath` — struct — 9 members
+- `PopoverAttachmentAnchor` — enum — 2 members
 - `PopoverTip` — protocol — 9 members
-- `PopoverTipAction` — struct — 4 members
-- `PositionModifier` — struct — 2 members
-- `PowerlineTabViewStyle` — struct — 7 members
-- `PreferenceBackgroundValueModifier` — struct — 2 members
-- `PreferenceChangeModifier` — struct — 2 members
-- `PreferenceOverlayValueModifier` — struct — 2 members
-- `PreferenceTransformModifier` — struct — 2 members
-- `PreferenceWritingModifier` — struct — 2 members
-- `PreferredDefaultFocusModifier` — struct — 2 members
-- `PresentationChrome` — enum — 4 members
-- `ProgressView` — struct — 134 members
+- `PopoverTipAction` — struct — 3 members
+- `PositionModifier` — struct
+- `PowerlineTabViewStyle` — struct — 4 members
+- `PreferenceBackgroundValueModifier` — struct
+- `PreferenceChangeModifier` — struct
+- `PreferenceOverlayValueModifier` — struct
+- `PreferenceTransformModifier` — struct
+- `PreferenceWritingModifier` — struct
+- `PreferredDefaultFocusModifier` — struct
+- `PresentationChrome` — enum — 3 members
+- `ProgressView` — struct — 10 members
 - `ProposedViewSize` — typealias
-- `RadioGroupPickerStyle` — struct — 5 members
-- `Rectangle` — struct — 137 members
+- `RadioGroupPickerStyle` — struct — 4 members
+- `Rectangle` — struct — 2 members
 - `ResetFocusAction` — struct — 5 members
-- `ResolveContext` — struct — 10 members
+- `ResolveContext` — struct — 9 members
 - `Resolver` — struct — 2 members
 - `RoundedBorderTextFieldStyle` — struct — 3 members
-- `RoundedOutlineStyle` — struct — 5 members
-- `RoundedRectangle` — struct — 138 members
-- `SafeAreaInsetModifier` — struct — 2 members
-- `SafeAreaPaddingModifier` — struct — 2 members
-- `ScrollPosition` — struct — 8 members
-- `ScrollView` — struct — 129 members
+- `RoundedOutlineStyle` — struct — 4 members
+- `RoundedRectangle` — struct — 3 members
+- `SafeAreaInsetModifier` — struct
+- `SafeAreaPaddingModifier` — struct
+- `ScrollPosition` — struct — 7 members
+- `ScrollView` — struct — 5 members
 - `ScrollViewProxy` — struct — 5 members
-- `ScrollViewReader` — struct — 125 members
-- `Section` — struct — 127 members
-- `SecureField` — struct — 128 members
-- `SegmentedPickerStyle` — struct — 5 members
-- `SemanticMetadataModifier` — struct — 2 members
+- `ScrollViewReader` — struct — 1 member
+- `Section` — struct — 3 members
+- `SecureField` — struct — 4 members
+- `SegmentedPickerStyle` — struct — 4 members
+- `SemanticMetadataModifier` — struct
 - `SendableLayout` — protocol — 3 members
 - `Shape` — protocol — 13 members
-- `Slider` — struct — 128 members
-- `Spacer` — struct — 126 members
-- `SpatialTapGesture` — struct — 15 members
-- `Spinner` — struct — 177 members
+- `Slider` — struct — 4 members
+- `Spacer` — struct — 2 members
+- `SpatialTapGesture` — struct — 9 members
+- `Spinner` — struct — 50 members
 - `Standard` — enum — 12 members
 - `State` — struct — 4 members
-- `Stepper` — struct — 128 members
-- `SuccessToastStyle` — struct — 3 members
-- `Tab` — struct — 126 members
-- `Table` — struct — 127 members
-- `TableColumn` — struct — 6 members
-- `TableRow` — struct — 125 members
-- `TabView` — struct — 126 members
+- `Stepper` — struct — 4 members
+- `SuccessToastStyle` — struct — 2 members
+- `Tab` — struct — 2 members
+- `Table` — struct — 3 members
+- `TableColumn` — struct — 5 members
+- `TableRow` — struct — 1 member
+- `TabView` — struct — 2 members
 - `TabViewOverflowMenuPresentation` — struct — 15 members
 - `TabViewOverflowTriggerConfiguration` — struct — 7 members
 - `TabViewStyle` — protocol — 14 members
@@ -307,105 +307,105 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TabViewStyleItemConfiguration` — struct — 5 members
 - `TabViewStyleOption` — struct — 2 members
 - `TabViewStylePresentation` — struct — 4 members
-- `TagValueModifier` — struct — 2 members
-- `TapGesture` — struct — 9 members
-- `TaskLifecycleModifier` — struct — 2 members
-- `TerminationRequestModifier` — struct — 2 members
-- `Text` — struct — 155 members
-- `TextEditor` — struct — 126 members
-- `TextField` — struct — 128 members
+- `TagValueModifier` — struct
+- `TapGesture` — struct — 5 members
+- `TaskLifecycleModifier` — struct
+- `TerminationRequestModifier` — struct
+- `Text` — struct — 33 members
+- `TextEditor` — struct — 2 members
+- `TextField` — struct — 4 members
 - `TextFieldStyle` — protocol — 4 members
-- `TextFieldStyleConfiguration` — struct — 261 members
-- `TextFigure` — struct — 132 members
-- `ToastModifier` — struct — 2 members
+- `TextFieldStyleConfiguration` — struct — 13 members
+- `TextFigure` — struct — 8 members
+- `ToastModifier` — struct
 - `ToastStyle` — protocol — 3 members
 - `ToastStyleConfiguration` — struct — 1 member
 - `ToastStylePresentation` — struct — 11 members
-- `Toggle` — struct — 127 members
-- `ToolbarItemConfig` — struct — 12 members
-- `ToolbarItemContributionModifier` — struct — 2 members
-- `ToolbarModifier` — struct — 2 members
-- `ToolbarPlacement` — enum — 3 members
+- `Toggle` — struct — 3 members
+- `ToolbarItemConfig` — struct — 11 members
+- `ToolbarItemContributionModifier` — struct
+- `ToolbarModifier` — struct
+- `ToolbarPlacement` — enum — 2 members
 - `ToolbarStyle` — protocol — 5 members
 - `Transaction` — struct — 3 members
-- `TransactionModifier` — struct — 2 members
+- `TransactionModifier` — struct
 - `Transition` — protocol — 4 members
 - `TransitionContent` — struct — 1 member
-- `TransitionPhase` — enum — 5 members
+- `TransitionPhase` — enum — 4 members
 - `TransitionProperties` — struct — 2 members
-- `TransitionRegistrationModifier` — struct — 2 members
-- `TupleView` — struct — 125 members
-- `UnderlineTabViewStyle` — struct — 7 members
-- `ValueAnimationModifier` — struct — 2 members
-- `VariadicView` — struct — 125 members
-- `VerticalAlignmentGuideModifier` — struct — 2 members
+- `TransitionRegistrationModifier` — struct
+- `TupleView` — struct — 1 member
+- `UnderlineTabViewStyle` — struct — 4 members
+- `ValueAnimationModifier` — struct
+- `VariadicView` — struct — 1 member
+- `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
 - `View` — protocol — 135 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
-- `ViewModifierContent` — struct — 125 members
-- `ViewSpacing` — struct — 5 members
-- `ViewThatFits` — struct — 126 members
-- `VStack` — struct — 127 members
-- `VStackLayout` — struct — 8 members
-- `WarningToastStyle` — struct — 3 members
+- `ViewModifierContent` — struct — 1 member
+- `ViewSpacing` — struct — 4 members
+- `ViewThatFits` — struct — 2 members
+- `VStack` — struct — 3 members
+- `VStackLayout` — struct — 5 members
+- `WarningToastStyle` — struct — 2 members
 - `withAnimation(_:_:)` — func
 - `withAnimation(_:completionCriteria:_:completion:)` — func
-- `ZStack` — struct — 126 members
-- `ZStackLayout` — struct — 7 members
+- `ZStack` — struct — 2 members
+- `ZStackLayout` — struct — 4 members
 
 ## SwiftTUIAnimatedImage
 
 ### Canonical surface (5)
 
 - `AnimatedGIF` — enum — 3 members
-- `AnimatedImage` — struct — 131 members
-- `AnimatedImageFrame` — struct — 6 members
-- `AnimatedImagePixel` — struct — 6 members
-- `AnimatedImageSequence` — struct — 5 members
+- `AnimatedImage` — struct — 7 members
+- `AnimatedImageFrame` — struct — 5 members
+- `AnimatedImagePixel` — struct — 5 members
+- `AnimatedImageSequence` — struct — 4 members
 
 ## SwiftTUICharts
 
 ### Canonical surface (29)
 
-- `BannerTone` — struct — 6 members
-- `BarChart` — struct — 130 members
-- `BarChartEntry` — struct — 5 members
-- `BulletChart` — struct — 132 members
-- `CalendarHeatmap` — struct — 137 members
-- `CalendarHeatmapWeekStart` — enum — 3 members
-- `ColumnChart` — struct — 130 members
-- `ComparisonChart` — struct — 130 members
-- `ComparisonEntry` — struct — 7 members
-- `DateAxisStride` — enum — 6 members
-- `DateValue` — struct — 4 members
-- `HeatStrip` — struct — 129 members
-- `Legend` — struct — 129 members
-- `LegendItem` — struct — 4 members
-- `LineChart` — struct — 138 members
-- `LineChartBaseline` — enum — 3 members
-- `LineChartLegendConfig` — struct — 12 members
-- `LineChartPoint` — struct — 5 members
-- `LineChartSeries` — struct — 6 members
-- `LineChartSeriesStyle` — enum — 4 members
-- `LineChartXAxis` — struct — 20 members
-- `LineChartYAxis` — struct — 13 members
-- `Meter` — struct — 131 members
-- `Sparkline` — struct — 129 members
-- `StackedBarChart` — struct — 130 members
-- `ThresholdBand` — struct — 4 members
-- `ThresholdGauge` — struct — 131 members
-- `Timeline` — struct — 126 members
-- `TimelineEntry` — struct — 5 members
+- `BannerTone` — struct — 5 members
+- `BarChart` — struct — 6 members
+- `BarChartEntry` — struct — 4 members
+- `BulletChart` — struct — 8 members
+- `CalendarHeatmap` — struct — 13 members
+- `CalendarHeatmapWeekStart` — enum — 2 members
+- `ColumnChart` — struct — 6 members
+- `ComparisonChart` — struct — 6 members
+- `ComparisonEntry` — struct — 6 members
+- `DateAxisStride` — enum — 5 members
+- `DateValue` — struct — 3 members
+- `HeatStrip` — struct — 5 members
+- `Legend` — struct — 5 members
+- `LegendItem` — struct — 3 members
+- `LineChart` — struct — 14 members
+- `LineChartBaseline` — enum — 2 members
+- `LineChartLegendConfig` — struct — 10 members
+- `LineChartPoint` — struct — 4 members
+- `LineChartSeries` — struct — 5 members
+- `LineChartSeriesStyle` — enum — 3 members
+- `LineChartXAxis` — struct — 17 members
+- `LineChartYAxis` — struct — 11 members
+- `Meter` — struct — 7 members
+- `Sparkline` — struct — 5 members
+- `StackedBarChart` — struct — 6 members
+- `ThresholdBand` — struct — 3 members
+- `ThresholdGauge` — struct — 7 members
+- `Timeline` — struct — 2 members
+- `TimelineEntry` — struct — 4 members
 
 ## SwiftTUIArguments
 
 ### Canonical surface (4)
 
-- `CompletionsCommand` — struct — 70 members
+- `CompletionsCommand` — struct — 13 members
 - `SwiftTUIApp` — typealias
 - `SwiftTUICommand` — protocol — 8 members
-- `SwiftTUIOptions` — struct — 32 members
+- `SwiftTUIOptions` — struct — 21 members
 
 ## SwiftTUIPTYPrimitives
 
@@ -413,46 +413,46 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 - `closeFD(_:)` — func
 - `openPTY()` — func
-- `PTYError` — enum — 10 members
+- `PTYError` — enum — 9 members
 - `PTYHandles` — struct — 4 members
-- `PTYPair` — class — 14 members
+- `PTYPair` — class — 9 members
 - `ptyResize(masterFD:cols:rows:)` — func
 
 ## SwiftTUITerminal
 
 ### Canonical surface (12)
 
-- `ChildProcessPty` — class — 16 members
-- `TerminalBufferKind` — enum — 3 members
-- `TerminalEmulator` — class — 12 members
-- `TerminalEmulatorEvent` — enum — 10 members
-- `TerminalEmulatorKey` — struct — 54 members
-- `TerminalEmulatorMouse` — struct — 20 members
-- `TerminalExitReason` — enum — 4 members
-- `TerminalLifecycle` — enum — 4 members
-- `TerminalMouseMode` — enum — 6 members
+- `ChildProcessPty` — class — 10 members
+- `TerminalBufferKind` — enum — 2 members
+- `TerminalEmulator` — class — 7 members
+- `TerminalEmulatorEvent` — enum — 9 members
+- `TerminalEmulatorKey` — struct — 27 members
+- `TerminalEmulatorMouse` — struct — 17 members
+- `TerminalExitReason` — enum — 3 members
+- `TerminalLifecycle` — enum — 3 members
+- `TerminalMouseMode` — enum — 5 members
 - `TerminalProcessSession` — class — 13 members
 - `TerminalSession` — protocol — 11 members
-- `TerminalView` — struct — 128 members
+- `TerminalView` — struct — 2 members
 
 ## SwiftTUITerminalWorkspace
 
 ### Canonical surface (14)
 
-- `TerminalPaneID` — struct — 8 members
-- `TerminalPaneSpec` — struct — 13 members
-- `TerminalSplit` — struct — 7 members
-- `TerminalSplitAxis` — enum — 4 members
-- `TerminalWorkspaceAction` — enum — 12 members
-- `TerminalWorkspaceDirection` — enum — 6 members
+- `TerminalPaneID` — struct — 5 members
+- `TerminalPaneSpec` — struct — 12 members
+- `TerminalSplit` — struct — 6 members
+- `TerminalSplitAxis` — enum — 3 members
+- `TerminalWorkspaceAction` — enum — 11 members
+- `TerminalWorkspaceDirection` — enum — 5 members
 - `TerminalWorkspaceLayout` — enum — 3 members
-- `TerminalWorkspaceNode` — enum — 8 members
-- `TerminalWorkspacePaneFrame` — struct — 4 members
+- `TerminalWorkspaceNode` — enum — 7 members
+- `TerminalWorkspacePaneFrame` — struct — 3 members
 - `TerminalWorkspaceSessionStore` — class — 7 members
-- `TerminalWorkspaceState` — struct — 28 members
-- `TerminalWorkspaceTab` — struct — 9 members
-- `TerminalWorkspaceTabID` — struct — 8 members
-- `TerminalWorkspaceView` — struct — 128 members
+- `TerminalWorkspaceState` — struct — 27 members
+- `TerminalWorkspaceTab` — struct — 8 members
+- `TerminalWorkspaceTabID` — struct — 5 members
+- `TerminalWorkspaceView` — struct — 2 members
 
 ## SwiftTUICLI
 
@@ -462,22 +462,22 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ScenePty` — class — 5 members
 - `SignalReader` — class — 2 members
 - `TerminalRunner` — enum — 4 members
-- `TerminalRunnerError` — enum — 4 members
+- `TerminalRunnerError` — enum — 2 members
 
 ## SwiftTUIWASI
 
 ### Canonical surface (2)
 
 - `WASIRunner` — enum — 2 members
-- `WASIRunnerError` — enum — 4 members
+- `WASIRunnerError` — enum — 2 members
 
 ## SwiftTUIWebHost
 
 ### Canonical surface (3)
 
-- `WebHostConfig` — struct — 7 members
+- `WebHostConfig` — struct — 6 members
 - `WebHostRunner` — enum — 4 members
-- `WebHostRunnerError` — enum — 5 members
+- `WebHostRunnerError` — enum — 3 members
 
 ## SwiftTUIWebHostCLI
 
@@ -490,12 +490,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 ### Canonical surface (7)
 
 - `SwiftUIHostAppState` — class — 9 members
-- `SwiftUIHostAppView` — struct — 821 members
-- `SwiftUIHostCursorStyle` — enum — 7 members
-- `SwiftUIHostSceneDescriptor` — struct — 5 members
+- `SwiftUIHostAppView` — struct — 2 members
+- `SwiftUIHostCursorStyle` — enum — 4 members
+- `SwiftUIHostSceneDescriptor` — struct — 4 members
 - `SwiftUIHostSceneHost` — class — 16 members
-- `SwiftUIHostTerminalPalette` — struct — 9 members
-- `SwiftUIHostTerminalStyle` — struct — 12 members
+- `SwiftUIHostTerminalPalette` — struct — 8 members
+- `SwiftUIHostTerminalStyle` — struct — 11 members
 
 ## SwiftTUICore
 
@@ -505,271 +505,271 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ### Canonical surface (265)
 
-- `AccessibilityAnnouncement` — struct — 4 members
-- `AccessibilityNode` — struct — 11 members
-- `AccessibilityPoliteness` — enum — 5 members
-- `AccessibilityRole` — enum — 40 members
+- `AccessibilityAnnouncement` — struct — 3 members
+- `AccessibilityNode` — struct — 10 members
+- `AccessibilityPoliteness` — enum — 4 members
+- `AccessibilityRole` — enum — 39 members
 - `ActionScope` — protocol
 - `adapt(_:to:method:)` — func
-- `Alignment` — struct — 17 members
+- `Alignment` — struct — 16 members
 - `AlignmentID` — protocol — 1 member
-- `Anchor` — struct — 1 member
-- `AnchorSource` — struct — 11 members
+- `Anchor` — struct
+- `AnchorSource` — struct — 10 members
 - `Animatable` — protocol — 2 members
-- `AnimatableArray` — struct — 14 members
-- `AnimatablePair` — struct — 16 members
+- `AnimatableArray` — struct — 10 members
+- `AnimatablePair` — struct — 12 members
 - `AnyGestureRecognizer` — class — 4 members
 - `AnyGestureStateBinding` — class — 4 members
-- `AnyID` — struct — 3 members
-- `AnyShapeStyle` — enum — 11 members
-- `AppearanceSource` — enum — 10 members
-- `Axis` — enum — 6 members
-- `AxisSet` — struct — 27 members
-- `BaseStyle` — struct — 11 members
-- `BlendMode` — enum — 12 members
-- `BorderBackgroundStyle` — struct — 10 members
-- `BorderBlend` — struct — 6 members
-- `BorderEdgeStyle` — struct — 10 members
-- `BorderSet` — struct — 38 members
-- `BrailleCanvas` — struct — 17 members
-- `BrailleCell` — struct — 8 members
-- `ButtonBorderShape` — enum — 3 members
-- `ButtonRole` — enum — 5 members
-- `CanvasCell` — struct — 5 members
+- `AnyID` — struct — 2 members
+- `AnyShapeStyle` — enum — 9 members
+- `AppearanceSource` — enum — 5 members
+- `Axis` — enum — 3 members
+- `AxisSet` — struct — 4 members
+- `BaseStyle` — struct — 10 members
+- `BlendMode` — enum — 7 members
+- `BorderBackgroundStyle` — struct — 9 members
+- `BorderBlend` — struct — 5 members
+- `BorderEdgeStyle` — struct — 9 members
+- `BorderSet` — struct — 37 members
+- `BrailleCanvas` — struct — 16 members
+- `BrailleCell` — struct — 7 members
+- `ButtonBorderShape` — enum — 2 members
+- `ButtonRole` — enum — 4 members
+- `CanvasCell` — struct — 4 members
 - `CanvasContext` — struct — 35 members
 - `CanvasDrawing` — protocol — 1 member
-- `CanvasGrid` — struct — 21 members
-- `CanvasPayload` — struct — 5 members
-- `CanvasPixelGridDrawing` — struct — 7 members
-- `CanvasPixelGridMode` — enum — 4 members
-- `CellPixelMetrics` — struct — 11 members
-- `CellPoint` — struct — 5 members
-- `CellRect` — struct — 12 members
-- `CellSize` — struct — 5 members
-- `ChildAllocation` — struct — 4 members
-- `ChromaticAdaptationMethod` — enum — 8 members
-- `Chromaticity` — struct — 5 members
-- `CollectionContainerChromePresentation` — struct — 8 members
-- `CollectionStylePresentation` — struct — 15 members
-- `Color` — struct — 51 members
-- `ColorError` — enum — 8 members
-- `ColorResolutionError` — enum — 4 members
-- `ColorSchemeContrast` — enum — 8 members
-- `CommitPlan` — struct — 6 members
+- `CanvasGrid` — struct — 19 members
+- `CanvasPayload` — struct — 4 members
+- `CanvasPixelGridDrawing` — struct — 6 members
+- `CanvasPixelGridMode` — enum — 3 members
+- `CellPixelMetrics` — struct — 9 members
+- `CellPoint` — struct — 4 members
+- `CellRect` — struct — 11 members
+- `CellSize` — struct — 4 members
+- `ChildAllocation` — struct — 3 members
+- `ChromaticAdaptationMethod` — enum — 3 members
+- `Chromaticity` — struct — 4 members
+- `CollectionContainerChromePresentation` — struct — 7 members
+- `CollectionStylePresentation` — struct — 14 members
+- `Color` — struct — 43 members
+- `ColorError` — enum — 6 members
+- `ColorResolutionError` — enum — 2 members
+- `ColorSchemeContrast` — enum — 3 members
+- `CommitPlan` — struct — 5 members
 - `CommitPlanner` — struct — 2 members
-- `CompositingSpace` — enum — 6 members
-- `ContainerAllocationSnapshot` — struct — 5 members
-- `ContainerChrome` — struct — 4 members
-- `ControlChrome` — struct — 9 members
-- `ControlProminence` — enum — 3 members
-- `CustomLayoutHandle` — class — 5 members
+- `CompositingSpace` — enum — 5 members
+- `ContainerAllocationSnapshot` — struct — 4 members
+- `ContainerChrome` — struct — 3 members
+- `ControlChrome` — struct — 8 members
+- `ControlProminence` — enum — 2 members
+- `CustomLayoutHandle` — class — 4 members
 - `CustomLayoutProxy` — protocol — 5 members
-- `DeltaEMethod` — enum — 10 members
-- `DrawCommand` — enum — 15 members
+- `DeltaEMethod` — enum — 5 members
+- `DrawCommand` — enum — 14 members
 - `DrawExtractor` — struct — 2 members
-- `DrawNode` — struct — 8 members
-- `DropContext` — struct — 5 members
-- `DroppedPath` — struct — 9 members
-- `Edge` — enum — 42 members
-- `EdgeInsets` — struct — 19 members
-- `EmptyAnimatableData` — struct — 12 members
-- `EnvironmentSnapshot` — struct — 6 members
-- `EventModifiers` — struct — 30 members
+- `DrawNode` — struct — 7 members
+- `DropContext` — struct — 4 members
+- `DroppedPath` — struct — 6 members
+- `Edge` — enum — 16 members
+- `EdgeInsets` — struct — 18 members
+- `EmptyAnimatableData` — struct — 8 members
+- `EnvironmentSnapshot` — struct — 5 members
+- `EventModifiers` — struct — 5 members
 - `FocusedValueKey` — protocol — 1 member
-- `FocusedValues` — struct — 4 members
-- `FocusInteractions` — enum — 4 members
-- `FocusPresentation` — struct — 13 members
-- `FocusRegion` — struct — 5 members
+- `FocusedValues` — struct — 3 members
+- `FocusInteractions` — enum — 3 members
+- `FocusPresentation` — struct — 11 members
+- `FocusRegion` — struct — 4 members
 - `FocusTracker` — class — 10 members
-- `ForeignGrid` — struct — 5 members
+- `ForeignGrid` — struct — 4 members
 - `ForeignSurfacePayload` — protocol — 1 member
-- `FrameArtifacts` — struct — 11 members
-- `FrameContext` — struct — 8 members
-- `FrameDiagnostics` — struct — 32 members
-- `FrameDropEligibility` — struct — 46 members
-- `FrameMainActorTimings` — struct — 4 members
-- `FramePhaseTimings` — struct — 10 members
-- `FrameRenderGenerations` — struct — 7 members
+- `FrameArtifacts` — struct — 10 members
+- `FrameContext` — struct — 7 members
+- `FrameDiagnostics` — struct — 31 members
+- `FrameDropEligibility` — struct — 40 members
+- `FrameMainActorTimings` — struct — 3 members
+- `FramePhaseTimings` — struct — 9 members
+- `FrameRenderGenerations` — struct — 6 members
 - `FrameScheduler` — class — 10 members
 - `FrameScheduling` — protocol — 8 members
-- `FrameWorkerTimings` — struct — 7 members
-- `GamutMappingPolicy` — enum — 13 members
+- `FrameWorkerTimings` — struct — 6 members
+- `GamutMappingPolicy` — enum — 8 members
 - `GestureRecognizerBuildContext` — struct — 2 members
-- `GestureRecognizerEventDisposition` — enum — 4 members
-- `GestureRecognizerPhase` — enum — 8 members
-- `Gradient` — struct — 13 members
-- `HandlerInstallation` — struct — 3 members
-- `HexFormat` — enum — 12 members
-- `HexLetterCase` — enum — 8 members
-- `HorizontalAlignment` — struct — 8 members
-- `HoverPhase` — enum — 4 members
-- `HueInterpolationPath` — enum — 10 members
-- `Identity` — struct — 23 members
-- `IdentityComponent` — struct — 6 members
-- `ImageAssetReference` — enum — 4 members
-- `ImagePayload` — struct — 7 members
-- `ImageScalingMode` — enum — 7 members
-- `ImageSource` — enum — 4 members
-- `InteractionRegion` — struct — 9 members
+- `GestureRecognizerEventDisposition` — enum — 3 members
+- `GestureRecognizerPhase` — enum — 7 members
+- `Gradient` — struct — 11 members
+- `HandlerInstallation` — struct — 2 members
+- `HexFormat` — enum — 7 members
+- `HexLetterCase` — enum — 3 members
+- `HorizontalAlignment` — struct — 7 members
+- `HoverPhase` — enum — 3 members
+- `HueInterpolationPath` — enum — 5 members
+- `Identity` — struct — 14 members
+- `IdentityComponent` — struct — 5 members
+- `ImageAssetReference` — enum — 3 members
+- `ImagePayload` — struct — 6 members
+- `ImageScalingMode` — enum — 4 members
+- `ImageSource` — enum — 3 members
+- `InteractionRegion` — struct — 8 members
 - `interpolateHue(from:to:t:path:)` — func
 - `Invalidating` — protocol — 1 member
-- `KeyEvent` — enum — 13 members
-- `KeyPress` — struct — 4 members
-- `KeyPressResult` — enum — 3 members
-- `LabColor` — struct — 7 members
-- `LayoutBehavior` — enum — 17 members
+- `KeyEvent` — enum — 12 members
+- `KeyPress` — struct — 3 members
+- `KeyPressResult` — enum — 2 members
+- `LabColor` — struct — 6 members
+- `LayoutBehavior` — enum — 16 members
 - `LayoutEngine` — struct — 6 members
 - `layoutText(for:options:)` — func
 - `layoutText(for:width:lineLimit:truncationMode:wrappingStrategy:)` — func
-- `LazyStackAllocationSnapshot` — struct — 8 members
-- `LChColor` — struct — 7 members
-- `LifecycleCommitEntry` — struct — 4 members
-- `LifecycleCommitOperation` — enum — 6 members
+- `LazyStackAllocationSnapshot` — struct — 7 members
+- `LChColor` — struct — 6 members
+- `LifecycleCommitEntry` — struct — 3 members
+- `LifecycleCommitOperation` — enum — 5 members
 - `LifecycleEvent` — typealias
-- `LifecycleMetadata` — struct — 7 members
+- `LifecycleMetadata` — struct — 6 members
 - `LifecycleOperation` — typealias
-- `LinearGradient` — struct — 11 members
-- `LinkDestination` — struct — 9 members
-- `ListChromeScope` — enum — 3 members
-- `ListItemPayload` — struct — 18 members
-- `ListPayload` — struct — 14 members
-- `ListSeparatorPreferences` — struct — 4 members
-- `MatchedGeometryConfig` — struct — 4 members
-- `MatchedGeometryKey` — struct — 5 members
-- `MatchedGeometryNamespace` — struct — 4 members
-- `Matrix3x3` — struct — 17 members
-- `MeasuredNode` — struct — 7 members
+- `LinearGradient` — struct — 9 members
+- `LinkDestination` — struct — 6 members
+- `ListChromeScope` — enum — 2 members
+- `ListItemPayload` — struct — 14 members
+- `ListPayload` — struct — 13 members
+- `ListSeparatorPreferences` — struct — 3 members
+- `MatchedGeometryConfig` — struct — 3 members
+- `MatchedGeometryKey` — struct — 4 members
+- `MatchedGeometryNamespace` — struct — 3 members
+- `Matrix3x3` — struct — 16 members
+- `MeasuredNode` — struct — 6 members
 - `MeasurementCache` — class — 6 members
-- `MeasurementCacheMetrics` — struct — 9 members
-- `MixingMethod` — enum — 8 members
-- `MonotonicInstant` — struct — 16 members
-- `NavigationRoute` — struct — 3 members
-- `NodeLifecycleInfo` — struct — 4 members
-- `NodeSemanticInfo` — struct — 3 members
-- `NoOpRoot` — struct — 4 members
-- `OklabColor` — struct — 6 members
-- `OklchColor` — struct — 6 members
-- `OutlineStylePresentation` — struct — 12 members
+- `MeasurementCacheMetrics` — struct — 8 members
+- `MixingMethod` — enum — 7 members
+- `MonotonicInstant` — struct — 7 members
+- `NavigationRoute` — struct — 2 members
+- `NodeLifecycleInfo` — struct — 3 members
+- `NodeSemanticInfo` — struct — 2 members
+- `NoOpRoot` — struct — 3 members
+- `OklabColor` — struct — 5 members
+- `OklchColor` — struct — 5 members
+- `OutlineStylePresentation` — struct — 11 members
 - `parseDroppedPaths(_:)` — func
-- `Path` — struct — 15 members
-- `Phase` — enum — 11 members
-- `PixelPoint` — struct — 5 members
-- `PixelSize` — struct — 5 members
-- `PlacedNode` — struct — 14 members
-- `Point` — struct — 9 members
-- `PointerInputCapabilities` — struct — 7 members
-- `PointerLocation` — struct — 7 members
-- `PointerPrecision` — enum — 4 members
-- `PointerPrecisionPolicy` — enum — 5 members
-- `PointerPrecisionSource` — enum — 4 members
+- `Path` — struct — 13 members
+- `Phase` — enum — 8 members
+- `PixelPoint` — struct — 4 members
+- `PixelSize` — struct — 4 members
+- `PlacedNode` — struct — 13 members
+- `Point` — struct — 8 members
+- `PointerInputCapabilities` — struct — 6 members
+- `PointerLocation` — struct — 6 members
+- `PointerPrecision` — enum — 3 members
+- `PointerPrecisionPolicy` — enum — 4 members
+- `PointerPrecisionSource` — enum — 3 members
 - `pow(_:_:)` — func
 - `PreferenceKey` — protocol — 3 members
-- `PreformattedTextLine` — struct — 4 members
-- `PreformattedTextRun` — struct — 4 members
-- `PresentationDamage` — struct — 13 members
-- `PresentationDamageDiagnostics` — struct — 9 members
-- `ProposedDimension` — enum — 5 members
-- `ProposedSize` — struct — 6 members
-- `RadialGradient` — struct — 13 members
-- `RasterCell` — struct — 9 members
-- `RasterImageAttachment` — struct — 10 members
+- `PreformattedTextLine` — struct — 3 members
+- `PreformattedTextRun` — struct — 3 members
+- `PresentationDamage` — struct — 11 members
+- `PresentationDamageDiagnostics` — struct — 8 members
+- `ProposedDimension` — enum — 4 members
+- `ProposedSize` — struct — 5 members
+- `RadialGradient` — struct — 11 members
+- `RasterCell` — struct — 8 members
+- `RasterImageAttachment` — struct — 9 members
 - `Rasterizer` — struct — 2 members
-- `RasterStyleRun` — struct — 7 members
-- `RasterSurface` — struct — 10 members
-- `Rect` — struct — 10 members
-- `ReferenceWhite` — struct — 13 members
+- `RasterStyleRun` — struct — 6 members
+- `RasterSurface` — struct — 9 members
+- `Rect` — struct — 9 members
+- `ReferenceWhite` — struct — 12 members
 - `Renderer` — struct — 17 members
-- `RenderGeneration` — struct — 13 members
-- `ResolvedImageAsset` — struct — 6 members
-- `ResolvedNode` — struct — 15 members
-- `ResolvedTextStyle` — struct — 12 members
+- `RenderGeneration` — struct — 4 members
+- `ResolvedImageAsset` — struct — 5 members
+- `ResolvedNode` — struct — 14 members
+- `ResolvedTextStyle` — struct — 11 members
 - `resolveStyleColorResult(style:theme:appearance:depthLimit:)` — func
-- `RGBColorProfile` — struct — 19 members
-- `RGBPrimaries` — struct — 6 members
-- `RichTextPayload` — struct — 4 members
-- `RichTextRun` — struct — 5 members
-- `RouteID` — struct — 5 members
-- `RouteKind` — enum — 3 members
-- `RuntimeIssue` — struct — 8 members
-- `RuntimeIssueSeverity` — enum — 6 members
+- `RGBColorProfile` — struct — 18 members
+- `RGBPrimaries` — struct — 5 members
+- `RichTextPayload` — struct — 3 members
+- `RichTextRun` — struct — 4 members
+- `RouteID` — struct — 4 members
+- `RouteKind` — enum — 2 members
+- `RuntimeIssue` — struct — 7 members
+- `RuntimeIssueSeverity` — enum — 3 members
 - `RuntimeIssueSink` — struct — 2 members
-- `RuntimeRegistrationDiagnostics` — struct — 6 members
-- `ScheduledFrame` — struct — 9 members
-- `ScrollIndicatorVisibility` — enum — 4 members
-- `ScrollRole` — enum — 5 members
-- `ScrollRoute` — struct — 5 members
-- `SectionRole` — enum — 6 members
-- `SelectionRoute` — struct — 4 members
-- `SelectionTag` — struct — 4 members
+- `RuntimeRegistrationDiagnostics` — struct — 5 members
+- `ScheduledFrame` — struct — 8 members
+- `ScrollIndicatorVisibility` — enum — 3 members
+- `ScrollRole` — enum — 4 members
+- `ScrollRoute` — struct — 4 members
+- `SectionRole` — enum — 5 members
+- `SelectionRoute` — struct — 3 members
+- `SelectionTag` — struct — 3 members
 - `SemanticExtractor` — struct — 2 members
-- `SemanticMetadata` — struct — 20 members
-- `SemanticRole` — enum — 9 members
-- `SemanticShapeStyle` — struct — 19 members
-- `SemanticSnapshot` — struct — 11 members
-- `SemanticStyleRole` — enum — 18 members
-- `ShapeFillMode` — enum — 3 members
-- `ShapeGeometry` — enum — 6 members
-- `ShapeOperation` — enum — 3 members
-- `ShapePayload` — struct — 5 members
+- `SemanticMetadata` — struct — 19 members
+- `SemanticRole` — enum — 6 members
+- `SemanticShapeStyle` — struct — 3 members
+- `SemanticSnapshot` — struct — 10 members
+- `SemanticStyleRole` — enum — 15 members
+- `ShapeFillMode` — enum — 2 members
+- `ShapeGeometry` — enum — 5 members
+- `ShapeOperation` — enum — 2 members
+- `ShapePayload` — struct — 4 members
 - `ShapeStyle` — protocol — 35 members
-- `Size` — struct — 5 members
+- `Size` — struct — 4 members
 - `SnapshotRenderer` — struct — 10 members
-- `Spacing` — struct — 5 members
+- `Spacing` — struct — 4 members
 - `StateContainer` — class — 6 members
-- `StrokeStyle` — struct — 18 members
-- `StyleEnvironmentSnapshot` — struct — 9 members
-- `TabItemLabel` — struct — 7 members
-- `TableBorderGlyphs` — struct — 19 members
-- `TableCellAlignment` — enum — 7 members
-- `TableCellPayload` — struct — 4 members
-- `TableColumnAlignment` — enum — 4 members
-- `TableColumnPayload` — struct — 6 members
-- `TableHeaderVisibility` — enum — 4 members
-- `TablePayload` — struct — 16 members
-- `TableRowPayload` — struct — 8 members
-- `TaskDescriptor` — struct — 4 members
-- `TaskPriority` — enum — 9 members
-- `TerminalAppearance` — struct — 14 members
-- `TerminalChromeStyle` — struct — 25 members
-- `TerminalEnvironmentMatch` — struct — 11 members
-- `TerminalMouseInputCompatibilityEntry` — struct — 9 members
-- `TerminalMouseInputCompatibilityEvidence` — enum — 4 members
-- `TerminalMouseInputCompatibilityMatrix` — struct — 6 members
-- `TerminalMouseInputMode` — enum — 4 members
-- `TerminalMouseInputResolution` — enum — 4 members
-- `TerminalMouseInputTrustPolicy` — enum — 6 members
-- `TerminalPalette` — struct — 25 members
-- `TerminalRenderStyle` — struct — 6 members
-- `TerminalTone` — enum — 10 members
-- `TerminationDisposition` — enum — 3 members
-- `TerminationRequest` — enum — 4 members
-- `TextCluster` — struct — 4 members
-- `TextFigureColorMode` — struct — 9 members
+- `StrokeStyle` — struct — 16 members
+- `StyleEnvironmentSnapshot` — struct — 8 members
+- `TabItemLabel` — struct — 6 members
+- `TableBorderGlyphs` — struct — 18 members
+- `TableCellAlignment` — enum — 4 members
+- `TableCellPayload` — struct — 3 members
+- `TableColumnAlignment` — enum — 3 members
+- `TableColumnPayload` — struct — 5 members
+- `TableHeaderVisibility` — enum — 3 members
+- `TablePayload` — struct — 15 members
+- `TableRowPayload` — struct — 7 members
+- `TaskDescriptor` — struct — 3 members
+- `TaskPriority` — enum — 6 members
+- `TerminalAppearance` — struct — 13 members
+- `TerminalChromeStyle` — struct — 13 members
+- `TerminalEnvironmentMatch` — struct — 9 members
+- `TerminalMouseInputCompatibilityEntry` — struct — 8 members
+- `TerminalMouseInputCompatibilityEvidence` — enum — 3 members
+- `TerminalMouseInputCompatibilityMatrix` — struct — 5 members
+- `TerminalMouseInputMode` — enum — 3 members
+- `TerminalMouseInputResolution` — enum — 3 members
+- `TerminalMouseInputTrustPolicy` — enum — 5 members
+- `TerminalPalette` — struct — 24 members
+- `TerminalRenderStyle` — struct — 5 members
+- `TerminalTone` — enum — 7 members
+- `TerminationDisposition` — enum — 2 members
+- `TerminationRequest` — enum — 3 members
+- `TextCluster` — struct — 3 members
+- `TextFigureColorMode` — struct — 8 members
 - `TextFigureFont` — typealias
-- `TextFigurePayload` — struct — 6 members
-- `TextLayoutLine` — struct — 5 members
-- `TextLayoutOptions` — struct — 6 members
-- `TextLayoutResult` — struct — 5 members
-- `TextLineStyle` — struct — 19 members
-- `TextStyle` — struct — 44 members
-- `TextTruncationMode` — enum — 7 members
-- `TextWrappingStrategy` — enum — 5 members
-- `Theme` — struct — 21 members
-- `TileStyle` — struct — 30 members
-- `TransactionSnapshot` — struct — 3 members
-- `TransferFunction` — enum — 10 members
-- `UnitPoint` — struct — 15 members
-- `UnitRect` — struct — 5 members
-- `UnitSize` — struct — 5 members
-- `Vector` — struct — 5 members
-- `Vector3` — struct — 6 members
+- `TextFigurePayload` — struct — 5 members
+- `TextLayoutLine` — struct — 4 members
+- `TextLayoutOptions` — struct — 5 members
+- `TextLayoutResult` — struct — 4 members
+- `TextLineStyle` — struct — 15 members
+- `TextStyle` — struct — 20 members
+- `TextTruncationMode` — enum — 4 members
+- `TextWrappingStrategy` — enum — 2 members
+- `Theme` — struct — 20 members
+- `TileStyle` — struct — 26 members
+- `TransactionSnapshot` — struct — 2 members
+- `TransferFunction` — enum — 9 members
+- `UnitPoint` — struct — 14 members
+- `UnitRect` — struct — 4 members
+- `UnitSize` — struct — 4 members
+- `Vector` — struct — 4 members
+- `Vector3` — struct — 5 members
 - `VectorArithmetic` — protocol — 2 members
-- `VerticalAlignment` — struct — 10 members
-- `VerticalEdgeSet` — struct — 28 members
+- `VerticalAlignment` — struct — 9 members
+- `VerticalEdgeSet` — struct — 5 members
 - `ViewDimensions` — struct — 5 members
-- `Visibility` — enum — 7 members
-- `WakeCause` — enum — 9 members
-- `XYZColor` — struct — 7 members
+- `Visibility` — enum — 4 members
+- `WakeCause` — enum — 6 members
+- `XYZColor` — struct — 6 members
 
 ## SwiftTUIPTYCPrimitives
 

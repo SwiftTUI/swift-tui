@@ -64,9 +64,11 @@ Swiftly's required `libcurl4-openssl-dev` dependency before selecting Swift
 API inventory generation now uses an isolated symbol-graph scratch directory
 instead of the repo's normal `.build` tree and Linux policy checks still
 enforce public-symbol classifications for emitted modules while leaving exact
-baseline drift detection to platforms that emit every public module; and the
-generic iOS package build selects an Xcode installation with Swift 6.3 support
-instead of the runner's older default Xcode.
+baseline drift detection to platforms that emit every public module; synthesized
+SDK-inherited symbol graph entries are excluded from the committed public API
+baseline; macOS gates install `ripgrep` for repo policy scripts; and the generic
+iOS package build selects an Xcode installation with Swift 6.3 support instead
+of the runner's older default Xcode.
 
 Remaining critique:
 
