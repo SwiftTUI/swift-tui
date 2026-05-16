@@ -35,17 +35,10 @@
 
 ## Planned Work
 
-- Retire the CI-only Swift test quarantine in
-  [.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml)
-  by stabilizing the named flaky runtime, socket readiness, terminal latency,
-  PTY child-process, WebHost byte-sink, and gallery terminal-host tests that
-  currently require `STUI_SWIFT_TEST_SKIP_REGEX` in the external repo gates.
-- Restore the Linux external gate from its bounded portability smoke back to the
-  full `Scripts/test_gate.sh` surface after the hanging Linux runtime/terminal
-  test path is isolated and stabilized.
 - Scope the host-native text input contract for value/selection transport and
   IME/composition before promoting those behaviors beyond current terminal and
   browser clipboard support. See
   [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md).
 - Define the restart/reattach contract for `SwiftTUITerminalWorkspace` before
   adding persisted child-process reattachment.
+- [ ] BUG: the cursor is positioned off by a line in the gallery demo's Multiline editor

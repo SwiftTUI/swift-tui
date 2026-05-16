@@ -33,11 +33,10 @@ critiques landed, the highest-leverage adoption basics have moved substantially:
 The live critique is therefore no longer "no license, no CI, no release." The
 remaining highest-value work is now:
 
-1. retire CI-only quarantines and restore the full Linux repo gate
-2. enforce public documentation coverage with a ratchet
-3. decide whether coverage reporting remains informational or becomes a threshold
-4. settle the platform-product DocC strategy
-5. reduce maintenance load in the largest runtime files and stale historical docs
+1. enforce public documentation coverage with a ratchet
+2. decide whether coverage reporting remains informational or becomes a threshold
+3. settle the platform-product DocC strategy
+4. reduce maintenance load in the largest runtime files and stale historical docs
 
 ## Severity Legend
 
@@ -52,7 +51,7 @@ remaining highest-value work is now:
 
 ### 1. CI Is Configured, And Main Is Protected
 
-Status: **P0 / mostly addressed / alpha-governance follow-up remains**
+Status: **Closed / alpha-governance follow-up remains**
 
 The local workflow file has been materially repaired:
 `.github/workflows/run-tests-linux.yml` now has `push`, `pull_request`, and
@@ -68,11 +67,13 @@ baseline drift detection to platforms that emit every public module; synthesized
 SDK-inherited symbol graph entries are excluded from the committed public API
 baseline; macOS gates install `ripgrep` for repo policy scripts; and the generic
 iOS package build selects an Xcode installation with Swift 6.3 support instead
-of the runner's older default Xcode. The external repo gates now also carry an
-explicit CI-only skip regex for named unstable
-runtime/socket/terminal/PTY/WebHost/gallery tests, with retirement tracked in
-`docs/TODO.md`. The Linux external gate is temporarily bounded to a portability
-smoke while the hanging Linux full-gate path is isolated.
+of the runner's older default Xcode. The external repo gates no longer carry a
+CI-only Swift test skip regex, and the Linux external gate now runs the full
+`Scripts/test_gate.sh` surface instead of the temporary portability smoke. The
+Linux full gate has been verified locally through `Scripts/linux.sh` after
+stabilizing the async frame-tail scheduling assertion, fixing the Glibc
+`getrusage` import used by `TermUIPerf`, and bounding Linux public API symbol
+graph extraction parallelism.
 
 `main` is now protected by an active repository ruleset for the default branch.
 The ruleset requires the `Policy checks`, `Linux repo gate`, `macOS repo gate`,
@@ -469,13 +470,11 @@ skipped.
 
 ## Suggested Next Tranche
 
-The highest-signal next work is now CI stabilization and documentation ratchets,
-not navigation/dismissal/product-boundary churn:
+The highest-signal next work is now documentation ratchets and governance
+decisions, not navigation/dismissal/product-boundary churn:
 
-1. Retire the CI-only Swift test quarantine and restore the Linux external gate
-   from portability smoke to the full repo-gate surface.
-2. Add public documentation coverage with a ratchet rather than an immediate
+1. Add public documentation coverage with a ratchet rather than an immediate
    zero-baseline strict gate.
-3. Decide whether coverage reporting stays informational or becomes a threshold.
-4. Decide the platform-product DocC strategy.
-5. Start the large-runtime-file decomposition only after the gate stays green.
+2. Decide whether coverage reporting stays informational or becomes a threshold.
+3. Decide the platform-product DocC strategy.
+4. Start the large-runtime-file decomposition only after the gate stays green.

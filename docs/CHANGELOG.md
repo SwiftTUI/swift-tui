@@ -18,6 +18,13 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Retired the external repo-gate quarantine: the macOS gate no longer exports a
+  CI-only Swift test skip regex, the Linux gate now runs the full
+  `Scripts/test_gate.sh` surface instead of a bounded portability smoke, Linux
+  public-API symbol graph extraction uses bounded SwiftPM parallelism, the
+  `TermUIPerf` CPU sampler builds against Swift 6.3's Glibc `getrusage`
+  imports, and async frame-tail ordering tests now accept either legal
+  coalesced or intermediate-frame commit paths.
 - Recorded the public API policy that `NavigationStack` and
   `.navigationDestination(...)` intentionally keep SwiftUI names while remaining
   binding-driven terminal destination APIs, and that `@Environment(\.dismiss)`

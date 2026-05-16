@@ -160,21 +160,11 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Run Linux portability smoke
+      - name: Run repo gate
         shell: bash
         run: |
           set -euo pipefail
-          export DISABLE_EXPLICIT_PLATFORMS=1
-          swiftly run swift build
-          swiftly run swift test --filter SwiftTUICoreTests
-          swiftly run swift test --filter SwiftTUIViewsTests
-          swiftly run swift test --filter SwiftTUIAnimatedImageTests
-          swiftly run swift test --filter SwiftTUIArgumentsTests
-          swiftly run swift test --filter SwiftTUIPTYPrimitivesTests
-          swiftly run swift test --filter WASISurfaceBridgeTests
-          swiftly run swift test --filter SwiftTUIWASITests
-          (cd Platforms/Web && bun test)
-          (cd Platforms/WebBuild && bun test)
+          sh ./Scripts/test_gate.sh --skip-bun-install
 
   macos-gate:
     name: macOS repo gate
