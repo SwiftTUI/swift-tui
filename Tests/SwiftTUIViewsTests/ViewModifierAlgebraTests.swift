@@ -33,6 +33,20 @@ struct ViewModifierAlgebraTests {
 
   @Test("id rewrites identity through modifier application")
   func idRewritesIdentityThroughModifierApplication() {
+    let rootIdentity = testIdentity("ViewModifier", "IDRoot")
+    let resolved = Resolver().resolve(
+      Text("Hello")
+        .padding(1)
+        .id("ExplicitID"),
+      in: .init(identity: rootIdentity)
+    )
+
+    #expect(resolved.identity == rootIdentity.explicitID("ExplicitID"))
+    #expect(resolved.kind == .view("Padding"))
+  }
+
+  @Test("package exact Identity overload rewrites to a runtime identity")
+  func packageExactIdentityOverloadRewritesToRuntimeIdentity() {
     let explicitIdentity = testIdentity("ViewModifier", "ExplicitID")
     let resolved = Resolver().resolve(
       Text("Hello")

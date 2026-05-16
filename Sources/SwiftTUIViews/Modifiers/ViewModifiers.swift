@@ -18,8 +18,12 @@ extension View {
     AnyView(self)
   }
 
-  public func id(_ identity: Identity) -> some View {
-    modifier(IDModifier(identity: identity))
+  public func id<ID: Hashable>(_ id: ID) -> some View {
+    modifier(IDModifier(id: id))
+  }
+
+  package func id(_ identity: Identity) -> some View {
+    modifier(ExactIdentityModifier(identity: identity))
   }
 
   package func layoutMetadata(_ metadata: LayoutMetadata) -> some View {
@@ -513,7 +517,23 @@ package func focusStructureMetadata(
   )
 }
 
-public struct IDModifier: PrimitiveViewModifier {
+public struct IDModifier<ID: Hashable>: PrimitiveViewModifier {
+  package var id: ID
+
+  package init(id: ID) {
+    self.id = id
+  }
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let explicitIdentity = context.identity.explicitID(id)
+    return [content.resolve(in: context.replacingIdentity(with: explicitIdentity))]
+  }
+}
+
+package struct ExactIdentityModifier: PrimitiveViewModifier {
   package var identity: Identity
 
   package func resolve<Base: View>(

@@ -308,11 +308,15 @@ The framework should keep two categories:
 2. Identity-rewriting modifiers  
    Example: `.id(_:)`.  
    These intentionally remap identity and therefore remain special at the
-   lowering layer.
+   lowering layer. Public `.id(_:)` accepts any `Hashable` value, matching
+   SwiftUI's source-level shape, and derives an explicit identity under the
+   current tree position.
 
 This does not require a public identity-rewriting API. It only means the
-package primitive modifier implementation for `.id(_:)` must keep its dedicated
-identity replacement behavior.
+package primitive modifier implementation must keep dedicated identity
+rewriting behavior. Exact replacement with a concrete `Identity` remains
+package-only runtime plumbing for tests and framework-owned focus/action
+anchors.
 
 ## Built-In Modifier Representation
 

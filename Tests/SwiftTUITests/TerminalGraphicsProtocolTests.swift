@@ -1,5 +1,6 @@
 import Foundation
 import PNG
+import SwiftTUIAnimatedImage
 import Testing
 
 @testable import SwiftTUICore
@@ -462,6 +463,41 @@ struct TerminalGraphicsProtocolTests {
     let combined = rootFrameChunks.map(payloadForKittyChunk).joined()
     let decoded = try #require(Data(base64Encoded: combined))
     #expect(decoded.count == 4)
+  }
+
+  @Test("Kitty rendering transmits every decoded GIF frame as a distinct embedded image")
+  func kittyRenderingTransmitsEveryDecodedGIFFrame() throws {
+    let sequence = try AnimatedGIF.decode(contentsOf: repoFixturePath("nyan.gif"))
+    let renderer = TerminalImageRenderer(repository: ImageAssetRepository())
+    let graphicsCapabilities = TerminalGraphicsCapabilities(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    var transmittedKittyImages: Set<UInt32> = []
+    var writeSteps: [String] = []
+
+    for (index, frame) in sequence.frames.enumerated() {
+      let attachment = makeRasterImageAttachment(
+        pngBytes: frame.imageData,
+        pixelSize: frame.pixelSize,
+        bounds: .init(origin: .zero, size: .init(width: 9, height: 5)),
+        identity: testIdentity("Root", "NyanFrame\(index)")
+      )
+      writeSteps.append(
+        contentsOf: renderer.graphicsWriteSteps(
+          for: [attachment],
+          capabilityProfile: .trueColor,
+          graphicsCapabilities: graphicsCapabilities,
+          transmittedKittyImages: &transmittedKittyImages
+        )
+      )
+    }
+
+    let output = writeSteps.joined()
+    #expect(sequence.frames.count == 12)
+    #expect(countOccurrences(of: "_Ga=T", in: output) == sequence.frames.count)
+    #expect(!output.contains("_Ga=p"))
   }
 
   @Test("kitty image placement crops source pixels for negative scroll offsets")
@@ -1470,6 +1506,17 @@ private func countOccurrences(of needle: String, in haystack: String) -> Int {
     }
   }
   return count
+}
+
+private func repoFixturePath(
+  _ name: String
+) -> String {
+  URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent(name)
+    .path
 }
 
 private final class GraphicsProtocolMockTerminalController:
