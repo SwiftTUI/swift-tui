@@ -44,7 +44,7 @@ jobs:
           swift_version="$(tr -d '[:space:]' < .swift-version)"
           swiftly install --use --assume-yes "$swift_version"
           swiftly run swift --version
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$SWIFTLY_HOME_DIR/bin" >> "$GITHUB_PATH"
           echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
 
       - name: Setup Bun
@@ -122,7 +122,7 @@ jobs:
           swift_version="$(tr -d '[:space:]' < .swift-version)"
           swiftly install --use --assume-yes "$swift_version"
           swiftly run swift --version
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$SWIFTLY_HOME_DIR/bin" >> "$GITHUB_PATH"
           echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
 
       - name: Setup Bun
