@@ -9,7 +9,6 @@ trap 'rm -f "$paths_file"' EXIT
 printf '%s\0' "$repo_root/README.md" >"$paths_file"
 find "$repo_root/docs" -maxdepth 1 -name '*.md' \
   ! -name 'CHANGELOG.md' \
-  ! -name 'CRITIQUE*.md' \
   -print0 >>"$paths_file"
 find "$repo_root/Sources" -path '*.docc/*.md' -print0 >>"$paths_file"
 

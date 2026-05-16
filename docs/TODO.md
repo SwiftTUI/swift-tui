@@ -26,6 +26,42 @@
 
 ## Unresolved Decisions
 
+- Decide whether the `macos-26` GitHub Actions runner label is the intended
+  public macOS CI floor or only a temporary runner choice. See
+  [../.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml).
+- Decide whether policy checks should remain a separate required status from the
+  slower repo gates. See
+  [../.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml).
+- Revisit organization-admin branch-protection bypass policy at the `0.9.0`
+  public beta line. See [RELEASES.md](RELEASES.md).
+- Decide whether `bun run test:coverage` remains informational or starts
+  enforcing a failing threshold. See
+  [../Scripts/report_test_coverage.sh](../Scripts/report_test_coverage.sh).
+- Decide the public documentation ratchet shape before enabling strict
+  doc-comment linting across the whole package. See
+  [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
+- Decide whether every public platform product needs a DocC catalog, or whether
+  platform products are intentionally documented by prose guides only. See
+  [README.md](README.md) and [HOST_PACKAGES.md](HOST_PACKAGES.md).
+- Decide whether large-runtime-file decomposition should start with terminal
+  presentation-surface protocols, `DefaultRenderer` / frame-tail support,
+  animation tracking, graph state, or web-surface transport seams. See
+  [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
+- Decide whether seven-phase pipeline cleanup should aim for type-pure phase
+  products or the smaller policy of eliminating unsynchronized metadata mirrors.
+  See [ARCHITECTURE.md](ARCHITECTURE.md).
+- Decide whether historical plans and proposals may retain stale source paths as
+  historical records, or whether all tracked docs must remain path-current. See
+  [../Scripts/check_stable_doc_source_paths.sh](../Scripts/check_stable_doc_source_paths.sh).
+- Decide whether current example surface and test-scope language is enough, or
+  whether examples need formal support tiers such as flagship, regression,
+  integration reference, and experimental. See
+  [../Examples/README.md](../Examples/README.md).
+- Decide whether the project name remains `SwiftTUI` despite ecosystem name
+  collisions. If it stays, add a concise README distinction from similarly named
+  Swift terminal UI projects. See [../README.md](../README.md).
+- Decide whether to delete or move the historical `0.0.1` tag, or preserve it
+  with the current release-policy warning. See [RELEASES.md](RELEASES.md).
 - Decide whether command collisions across different scope kinds need a
   precedence rule beyond the current shallowest-wins focus-chain dispatch. See
   [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
@@ -35,6 +71,37 @@
 
 ## Planned Work
 
+- Add a public documentation coverage ratchet for the consumer-selected surface:
+  style protocols, built-in styles, presentation modifiers, text inputs,
+  navigation, host runners, and product entrypoints. Re-enable
+  `NeverUseForceTry` separately once the remaining call sites are audited. See
+  [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) and
+  [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
+- If coverage remains informational, publish the coverage JSON as a CI artifact
+  so trend data is retained. If a threshold is chosen, wire the threshold into
+  the gate deliberately rather than treating the first report as the baseline.
+  See [../Scripts/report_test_coverage.sh](../Scripts/report_test_coverage.sh).
+- After the platform-product DocC decision, either add catalogs for public
+  platform products such as `SwiftTUICLI`, `SwiftTUITerminal`,
+  `SwiftTUITerminalWorkspace`, `SwiftTUIWASI`, `SwiftTUIWebHost`,
+  `SwiftTUIWebHostCLI`, and `SwiftUIHost`, or document that prose guides are
+  the intended public documentation surface. Keep website/docs generation
+  aligned with the decision. See [README.md](README.md).
+- After choosing a first decomposition target and confirming the gate is green,
+  split the selected large runtime seam by stable concepts with focused tests.
+  Candidate seams include terminal presentation surfaces, `DefaultRenderer` /
+  frame-tail support, animation property and transition tracking, graph state,
+  and web-surface codec/transport boundaries. See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
+- Reduce duplicated phase metadata between resolved and placed nodes under the
+  chosen pipeline policy. Cover retained-layout and late-preference behavior
+  before changing the shared structure. See [ARCHITECTURE.md](ARCHITECTURE.md).
+- Apply the historical-doc path policy once decided: either archive historical
+  plans clearly or keep the stable-doc source-path checker focused on current
+  source-of-truth docs. See
+  [../Scripts/check_stable_doc_source_paths.sh](../Scripts/check_stable_doc_source_paths.sh).
+- If formal example support tiers are adopted, update the examples index with
+  the agreed tier labels while keeping the current gate-vs-exhaustive test-scope
+  caveat. See [../Examples/README.md](../Examples/README.md).
 - Scope the host-native text input contract for value/selection transport and
   IME/composition before promoting those behaviors beyond current terminal and
   browser clipboard support. See
