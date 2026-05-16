@@ -60,9 +60,11 @@ The local workflow file has been materially repaired:
 and macOS repo gates; and includes a generic iOS package build. Follow-up CI
 log review also repaired runner bootstrap drift: Linux jobs now install
 Swiftly's required `libcurl4-openssl-dev` dependency before selecting Swift
-6.3.1 and export Swiftly's actual Linux bin directory for later steps, while
-the generic iOS package build selects an Xcode installation with Swift 6.3
-support instead of the runner's older default Xcode.
+6.3.1 and export Swiftly's actual Linux bin directory for later steps; public
+API inventory generation now uses an isolated symbol-graph scratch directory
+instead of the repo's normal `.build` tree; and the generic iOS package build
+selects an Xcode installation with Swift 6.3 support instead of the runner's
+older default Xcode.
 
 Remaining critique:
 

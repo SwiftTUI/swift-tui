@@ -45,18 +45,35 @@ for arg in "$@"; do
   esac
 done
 
-# Symbol graph output lives under .build/<arch>/symbolgraph by default.
-# We re-run dump-symbol-graph fresh each time so the output matches HEAD.
+# Symbol graph output lives under the selected scratch directory. Keep this
+# isolated from the repo's normal `.build` tree so stale test products cannot
+# leak into CI policy checks.
 echo "[generate_public_api_inventory] Running swift package dump-symbol-graph..." >&2
-swiftly run swift package dump-symbol-graph --minimum-access-level public >/dev/null
+SYMBOLGRAPH_SCRATCH_DIR=".build/public-api-symbolgraph"
+DUMP_LOG="$(mktemp -t swift-tui-symbolgraph.XXXXXX)"
+trap 'rm -f "${DUMP_LOG}"' EXIT
+rm -rf "${SYMBOLGRAPH_SCRATCH_DIR}"
+if ! swiftly run swift package \
+  --scratch-path "${SYMBOLGRAPH_SCRATCH_DIR}" \
+  dump-symbol-graph \
+  --minimum-access-level public \
+  >"${DUMP_LOG}" 2>&1; then
+  if grep -Eq "Failed to emit symbol graph for '.*Package(Discovered)?Tests'" "${DUMP_LOG}"; then
+    echo "[generate_public_api_inventory] Ignoring SwiftPM synthetic package-test symbol graph failure." >&2
+    grep -E "Failed to emit symbol graph" "${DUMP_LOG}" >&2 || true
+  else
+    cat "${DUMP_LOG}" >&2
+    exit 1
+  fi
+fi
 
 # Locate the symbolgraph directory the SwiftPM driver chose (per-arch).
 SYMBOLGRAPH_DIR="$(
-  find .build -type d -name symbolgraph -prune -print 2>/dev/null \
+  find "${SYMBOLGRAPH_SCRATCH_DIR}" -type d -name symbolgraph -prune -print 2>/dev/null \
     | head -n 1
 )"
 if [[ -z "${SYMBOLGRAPH_DIR:-}" ]] || [[ ! -d "${SYMBOLGRAPH_DIR}" ]]; then
-  echo "[generate_public_api_inventory] Could not locate symbolgraph output directory under .build/" >&2
+  echo "[generate_public_api_inventory] Could not locate symbolgraph output directory under ${SYMBOLGRAPH_SCRATCH_DIR}/" >&2
   exit 1
 fi
 
