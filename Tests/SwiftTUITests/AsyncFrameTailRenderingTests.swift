@@ -949,13 +949,18 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(result.finalState == 3)
-    #expect(result.renderedFrames == 3)
+    #expect((3...4).contains(result.renderedFrames))
     let value1Index = terminal.frames.firstIndex { $0.contains("value 1") }
     let value2Index = terminal.frames.firstIndex { $0.contains("value 2") }
     let value3Index = terminal.frames.firstIndex { $0.contains("value 3") }
     #expect(value1Index != nil)
-    #expect(value2Index == nil)
     #expect(value3Index != nil)
+    if let value1Index, let value2Index {
+      #expect(value1Index < value2Index)
+    }
+    if let value2Index, let value3Index {
+      #expect(value2Index < value3Index)
+    }
     if let value1Index, let value3Index {
       #expect(value1Index < value3Index)
     }

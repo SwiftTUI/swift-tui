@@ -53,8 +53,20 @@ SYMBOLGRAPH_SCRATCH_DIR=".build/public-api-symbolgraph"
 DUMP_LOG="$(mktemp -t swift-tui-symbolgraph.XXXXXX)"
 trap 'rm -f "${DUMP_LOG}"' EXIT
 rm -rf "${SYMBOLGRAPH_SCRATCH_DIR}"
+
+SWIFT_PACKAGE_ARGS=(
+  --scratch-path "${SYMBOLGRAPH_SCRATCH_DIR}"
+)
+PUBLIC_API_SWIFT_JOBS="${STUI_PUBLIC_API_SWIFT_JOBS:-}"
+if [[ -z "${PUBLIC_API_SWIFT_JOBS}" && "$(uname -s)" == "Linux" ]]; then
+  PUBLIC_API_SWIFT_JOBS=4
+fi
+if [[ -n "${PUBLIC_API_SWIFT_JOBS}" ]]; then
+  SWIFT_PACKAGE_ARGS+=(--jobs "${PUBLIC_API_SWIFT_JOBS}")
+fi
+
 if ! swiftly run swift package \
-  --scratch-path "${SYMBOLGRAPH_SCRATCH_DIR}" \
+  "${SWIFT_PACKAGE_ARGS[@]}" \
   dump-symbol-graph \
   --minimum-access-level public \
   >"${DUMP_LOG}" 2>&1; then
