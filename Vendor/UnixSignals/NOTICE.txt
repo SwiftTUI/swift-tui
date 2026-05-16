@@ -1,0 +1,19 @@
+The ServiceLifecycle Project
+===========================
+
+This vendored UnixSignals subset is derived from the Swift Service Lifecycle
+project:
+
+* https://github.com/swift-server/swift-service-lifecycle
+
+Copyright 2019-2023 The ServiceLifecycle Project
+
+The ServiceLifecycle Project licenses its files under the Apache License,
+version 2.0. See LICENSE.txt in this directory.
+
+This license restoration recorded upstream revision
+2fd7a348e9d0333979108c2da83642a64df6cb2c.
+
+This product contains derivations of Lock and LockedValueBox implementations
+from SwiftNIO and uses swift-async-algorithms in upstream form. Both upstream
+projects are distributed under the Apache License, version 2.0.

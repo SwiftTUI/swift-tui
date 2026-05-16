@@ -19,7 +19,7 @@ proxy to placement geometry so `terminalSize` can remain host-surface metadata.
 
 ### What the runtime already knows about pixels
 
-Despite the authored API being cell-only, the runtime already detects and stores cell-pixel dimensions. `TerminalGraphicsCapabilities.cellPixelSize: Size?` is populated on startup using a three-method fallback in `Sources/SwiftTUI/TerminalHost.swift`:
+Despite the authored API being cell-only, the runtime already detects and stores cell-pixel dimensions. `TerminalGraphicsCapabilities.cellPixelSize: Size?` is populated on startup using a three-method fallback in `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`:
 
 1. `ioctl(TIOCGWINSZ)` with `ws_xpixel`/`ws_ypixel` when the kernel reports them
 2. A DECRQSS-style `CSI 16 t` query for cell pixel size

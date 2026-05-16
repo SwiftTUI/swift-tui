@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <div class="copy">
       <span class="tag reveal" style="--i:0">
         <span class="dot"></span>
-        <span>live demo · running below this line</span>
+        <span>0.1.0 alpha · live demo below</span>
       </span>
 
       <h1 class="reveal" style="--i:1">
@@ -51,7 +51,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
           <a class="ver-link" href="#quickstart">quickstart →</a>
         </div>
         <pre class="install-body mono"><code><span class="cm">// add to dependencies</span>
-.package(url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>, branch: <span class="s">"main"</span>)
+.package(
+  url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>,
+  .upToNextMinor(from: <span class="s">"0.1.0"</span>)
+)
 
 <span class="cm">// add to your executable target</span>
 .product(name: <span class="s">"SwiftTUI"</span>, package: <span class="s">"SwiftTUI"</span>)</code></pre>
@@ -59,6 +62,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
       <ul class="meta reveal mono" style="--i:5">
         <li><span class="k">requires</span><span class="v">Swift 6.3 · macOS 15+ / iOS 18+ package platforms · Linux/WASI paths</span></li>
+        <li><span class="k">stability</span><span class="v"><em>0.1.0 alpha</em> · source-breaking changes may land before 1.0</span></li>
         <li><span class="k">runs in</span><span class="v">terminal · WASI browser package · localhost WebHost · SwiftUI host</span></li>
         <li><span class="k">model</span><span class="v">SwiftUI-shaped · <em>@MainActor</em> view bodies · graph-scoped state</span></li>
         <li><span class="k">deferred</span><span class="v"><em>NavigationLink</em> · public <em>NavigationPath</em> · host-native IME / selection</span></li>

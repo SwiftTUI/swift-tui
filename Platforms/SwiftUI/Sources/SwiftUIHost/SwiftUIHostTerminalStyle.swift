@@ -31,11 +31,11 @@ public struct SwiftUIHostTerminalPalette: Equatable, Sendable {
   }
 
   public static let `default` = Self(
-    foreground: .hex("#ECEFF4"),
-    background: .hex("#1E222A"),
-    cursor: .hex("#56B6C2"),
-    selectionBackground: .hex("#2E3440"),
-    selectionForeground: .hex("#ECEFF4"),
+    foreground: try! .hex("#ECEFF4"),
+    background: try! .hex("#1E222A"),
+    cursor: try! .hex("#56B6C2"),
+    selectionBackground: try! .hex("#2E3440"),
+    selectionForeground: try! .hex("#ECEFF4"),
     ansi: .default
   )
 

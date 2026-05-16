@@ -287,7 +287,8 @@ The runtime is materially incremental in common steady-state paths, but it is no
 
 ### Cell pixel size refresh
 
-`POSIXTerminalHost` (`TerminalHost` class in `Sources/SwiftTUI/TerminalHost.swift`)
+`POSIXTerminalHost` (`TerminalHost` class in
+`Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`)
 re-reads `cellPixelSize` on every access to `baselineGraphicsCapabilities()` via
 `ioctl(TIOCGWINSZ)` — a single cheap syscall. Escape-sequence probes
 (`CSI 16 t`, `CSI 14 t`, Kitty support, sixel capability) remain one-shot at

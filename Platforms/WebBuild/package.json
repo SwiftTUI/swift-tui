@@ -1,6 +1,7 @@
 {
   "name": "@swifttui/build",
   "version": "0.1.0",
+  "license": "MIT",
   "module": "index.ts",
   "bin": {
     "swifttui-web": "./cli.ts"
@@ -19,7 +20,7 @@
     "@swifttui/web": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "1.3.13"
   },
   "peerDependencies": {
     "typescript": "^5"

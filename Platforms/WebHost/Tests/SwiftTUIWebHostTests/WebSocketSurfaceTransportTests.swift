@@ -100,6 +100,19 @@ struct WebSocketSurfaceTransportTests {
     #expect(records[1].contains("\"B\""))
   }
 
+  @Test("sink backpressure has a bounded failure path")
+  func sinkBackpressureTimesOut() async throws {
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: StalledByteSink(),
+      sendTimeoutNanoseconds: 10_000_000
+    )
+
+    #expect(throws: WebHostByteSinkError.self) {
+      try transport.present(Self.basicSurface("AA"))
+    }
+  }
+
   @MainActor
   @Test("transport sends typed clipboard records")
   func transportSendsTypedClipboardRecords() async throws {
@@ -157,6 +170,15 @@ private actor RecordingByteSink: WebHostByteSink {
 
   func strings() -> [String] {
     sent.map { String(decoding: $0, as: UTF8.self) }
+  }
+}
+
+private struct StalledByteSink: WebHostByteSink {
+  func send(_: [UInt8]) async throws {
+    while !Task.isCancelled {
+      try await Task.sleep(for: .milliseconds(100))
+    }
+    throw CancellationError()
   }
 }
 

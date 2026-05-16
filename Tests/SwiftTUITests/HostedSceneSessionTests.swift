@@ -223,20 +223,20 @@ struct HostedSceneSessionTests {
           source: .override
         ),
         theme: .init(
-          foreground: .hex("#0F172A"),
-          background: .hex("#F8FAFC"),
-          tint: .hex("#2563EB"),
-          separator: .hex("#CBD5E1"),
-          selection: .hex("#DBEAFE"),
-          placeholder: .hex("#94A3B8"),
-          link: .hex("#2563EB"),
-          fill: .hex("#F1F5F9"),
-          windowBackground: .hex("#E2E8F0"),
-          success: .hex("#16A34A"),
-          warning: .hex("#D97706"),
-          danger: .hex("#DC2626"),
-          info: .hex("#0284C7"),
-          muted: .hex("#64748B")
+          foreground: try! .hex("#0F172A"),
+          background: try! .hex("#F8FAFC"),
+          tint: try! .hex("#2563EB"),
+          separator: try! .hex("#CBD5E1"),
+          selection: try! .hex("#DBEAFE"),
+          placeholder: try! .hex("#94A3B8"),
+          link: try! .hex("#2563EB"),
+          fill: try! .hex("#F1F5F9"),
+          windowBackground: try! .hex("#E2E8F0"),
+          success: try! .hex("#16A34A"),
+          warning: try! .hex("#D97706"),
+          danger: try! .hex("#DC2626"),
+          info: try! .hex("#0284C7"),
+          muted: try! .hex("#64748B")
         )
       )
     )

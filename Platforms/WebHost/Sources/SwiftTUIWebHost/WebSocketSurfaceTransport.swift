@@ -10,6 +10,7 @@ package protocol WebHostByteSink: Sendable {
 package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConvertible {
   case sendFailed(String)
   case sendDidNotComplete
+  case sendTimedOut
 
   package var description: String {
     switch self {
@@ -17,6 +18,8 @@ package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConve
       return "WebHost byte sink failed: \(message)"
     case .sendDidNotComplete:
       return "WebHost byte sink did not complete."
+    case .sendTimedOut:
+      return "WebHost byte sink timed out."
     }
   }
 }
@@ -35,6 +38,7 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
 
   private let state: Mutex<State>
   private let sink: any WebHostByteSink
+  private let sendTimeoutNanoseconds: UInt64
   private let sendLock = Mutex(())
 
   package let capabilityProfile = TerminalCapabilityProfile(
@@ -49,9 +53,11 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
   package init(
     surfaceSize: CellSize,
     sink: any WebHostByteSink,
-    renderStyle: TerminalRenderStyle = .init(appearance: .fallback)
+    renderStyle: TerminalRenderStyle = .init(appearance: .fallback),
+    sendTimeoutNanoseconds: UInt64 = 10_000_000_000
   ) {
     self.sink = sink
+    self.sendTimeoutNanoseconds = sendTimeoutNanoseconds
     state = Mutex(
       State(
         surfaceSize: surfaceSize,
@@ -193,7 +199,7 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
       let result = Mutex<Result<Void, WebHostByteSinkError>?>(nil)
       let sink = self.sink
 
-      Task {
+      let task = Task {
         do {
           try await sink.send(bytes)
           result.withLock { result in
@@ -207,7 +213,13 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
         semaphore.signal()
       }
 
-      semaphore.wait()
+      let timeout = DispatchTimeInterval.nanoseconds(
+        Int(min(sendTimeoutNanoseconds, UInt64(Int.max)))
+      )
+      if semaphore.wait(timeout: .now() + timeout) == .timedOut {
+        task.cancel()
+        throw WebHostByteSinkError.sendTimedOut
+      }
       try result.withLock { result in
         result ?? .failure(.sendDidNotComplete)
       }.get()

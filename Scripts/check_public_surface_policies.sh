@@ -90,9 +90,9 @@ if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
   fail "DefaultRenderer.render must stay @MainActor."
 fi
 
-if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
+if ! rg -U -n -P --quiet -- 'public init\s*\(\s*get: @escaping @MainActor @Sendable \(\) -> Value,\s*set: @escaping @MainActor @Sendable \(Value\) -> Void' \
   Sources/SwiftTUIViews/Foundation/ViewBaseTypes.swift; then
-  fail "Binding.init(get:set:) must keep its actor-inheriting SwiftUI-style signature."
+  fail "Binding.init(get:set:) must keep honest @MainActor get/set closures."
 fi
 
 if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift; then

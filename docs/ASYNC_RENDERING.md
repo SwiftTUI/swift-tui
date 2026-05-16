@@ -267,15 +267,15 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
 
 ## Code Anchors
 
-- `Sources/SwiftTUI/SwiftTUI.swift`: `DefaultRenderer`,
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`: `DefaultRenderer`,
   `FrameTailRenderer`, `FrameHeadDraft`, render generation sequencing, worker
   timings, and frame finish.
-- `Sources/SwiftTUI/RunLoop+Rendering.swift`: async render loop, input
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`: async render loop, input
   coalescing, queued-tail cancellation, visual-only completed-frame drops,
   ordered commit for blocked candidates, and diagnostics emission.
 - `Sources/SwiftTUICore/Scheduler.swift`: render-intent coalescing and cancelled
   animation-intent replay into replacement work.
-- `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
+- `Sources/SwiftTUIRuntime/Diagnostics/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
   tail cancellation, stale policy, dropped completed frames, and geometry
   resolution misses.

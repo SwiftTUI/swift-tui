@@ -20,7 +20,7 @@ SwiftTUI now follows SwiftUI-style actor isolation for authored view trees.
 
 - `View` bodies are `@MainActor`
 - `Resolver.resolve(...)` and `DefaultRenderer.render(...)` evaluate view trees on the main actor
-- `Binding.init(get:set:)` and `.task(...)` inherit the current actor context, while button actions, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`
+- `Binding.init(get:set:)` requires explicitly `@MainActor` get/set closures, `.task(...)` inherits the current actor context, and button actions, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`
 - because `View.body` itself is `@MainActor`, ordinary authored view code still uses those APIs from the main actor
 
 The pure `SwiftTUICore` pipeline remains nonisolated. If you need off-main

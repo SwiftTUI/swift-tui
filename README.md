@@ -1,5 +1,41 @@
 # SwiftTUI
 
+SwiftTUI is a pre-1.0, single-maintainer, AI-assisted Swift package. The
+`0.x` line is usable for real terminal interfaces, but minor releases may still
+make source-breaking API adjustments while the public surface is being proven.
+
+## Install
+
+Depend on the current alpha release instead of `main`:
+
+```swift
+// Package.swift
+.package(
+  url: "https://github.com/GoodHatsLLC/SwiftTUI",
+  .upToNextMinor(from: "0.1.0")
+)
+```
+
+For a terminal app executable target, add the convenience product:
+
+```swift
+.product(name: "SwiftTUI", package: "SwiftTUI")
+```
+
+Use `SwiftTUIRuntime` plus explicit host/runner products when embedding or
+building non-terminal launch paths. See [docs/RELEASES.md](docs/RELEASES.md)
+for release policy and support details.
+
+## Support Matrix
+
+| Surface | Status |
+| --- | --- |
+| macOS 15+ package development | Primary supported path |
+| Linux terminal package builds/tests | Supported through `swiftly` and `bun run test` |
+| iOS 18+ package builds | Supported for host-compatible products; PTY products are excluded |
+| WASI/browser deployment | Supported through `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` |
+| `SwiftTUITerminal` / PTY embedding | macOS and Linux only |
+
 ## Overview
 
 At the lowest public runtime level, you can resolve and render any `View` into
@@ -179,6 +215,19 @@ run command, host mode, or focused test package.
 | [SwiftUIExample](Examples/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes through `SwiftUIHost` | Open `Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
 | [WebHostExample](Examples/WebHostExample) | Smallest app that opts into the localhost browser runner via `SwiftTUIWebHostCLI` | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
 | [WebExample](Examples/WebExample) | Static browser/WASI deployment using `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` | `bun --cwd Examples/WebExample dev` |
+
+## Product Tiers
+
+| Product/package | Use when |
+| --- | --- |
+| `SwiftTUI` | You are building a terminal-native executable and want the default `App.main()` runner |
+| `SwiftTUIRuntime` | You are composing a custom runner or host without terminal convenience behavior |
+| `SwiftTUICLI` / `SwiftTUIWASI` | You need an explicit terminal or WASI runner product |
+| `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` | You intentionally opt into localhost browser hosting from a native process |
+| `SwiftUIHost` | You embed SwiftTUI scenes in a host-managed SwiftUI surface |
+| `SwiftTUITerminal` / `SwiftTUITerminalWorkspace` | You embed terminal child processes or build split-pane terminal workspaces |
+| `SwiftTUIAnimatedImage` / `SwiftTUICharts` | You need the peer animated-image or charting utility surfaces |
+| `@swifttui/web` / `@swifttui/build` | You are packaging browser/WASI deployments |
 
 ## Development Requirements
 

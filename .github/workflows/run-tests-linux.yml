@@ -1,41 +1,56 @@
-name: Run tests for Linux
+name: Repo Gate
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  BUN_VERSION: "1.3.13"
+  SWIFTLY_VERSION: "1.1.1"
+
 jobs:
-  build-examples:
-    name: Build ${{ matrix.example }}
+  policy-checks:
+    name: Policy checks
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        example:
-          - gallery
 
     steps:
-
-      - uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.3"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Linux test dependencies
+      - name: Install Linux dependencies
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y ripgrep
+          sudo apt-get install -y --no-install-recommends ca-certificates curl git ripgrep unzip
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SWIFTLY_HOME_DIR="${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}"
+          swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
+          curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
+          tar -zxf "${swiftly_archive}"
+          ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache SwiftPM
         uses: actions/cache@v4
@@ -43,9 +58,10 @@ jobs:
           path: |
             ~/.cache/org.swift.swiftpm
             ~/.swiftpm
-          key: ${{ runner.os }}-swiftpm-${{ matrix.example }}-${{ hashFiles(format('Examples/{0}/Package.resolved', matrix.example)) }}
+          key: ${{ runner.os }}-swiftpm-policy-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-swiftpm-${{ matrix.example }}-
+            ${{ runner.os }}-swiftpm-policy-
+            ${{ runner.os }}-swiftpm-
 
       - name: Cache Bun deps
         uses: actions/cache@v4
@@ -53,23 +69,177 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-            GUI/WebTUIGUI/node_modules
             Examples/WebExample/node_modules
-          key: ${{ runner.os }}-bun-webexample-${{ hashFiles('bun.lock') }}
+            Platforms/Web/node_modules
+            Platforms/WebBuild/node_modules
+            Website/node_modules
+          key: ${{ runner.os }}-bun-policy-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-webexample-
+            ${{ runner.os }}-bun-policy-
+            ${{ runner.os }}-bun-
 
       - name: Install Bun workspace deps
         shell: bash
-        run: |
-          set -euo pipefail
-          hash -r
-          bun install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
-
-      - name: Run repo gate
+      - name: Run policy checks
         shell: bash
         run: |
           set -euo pipefail
+          ./Scripts/check_public_surface_policies.sh
+          ./Scripts/check_stable_doc_source_paths.sh
+          ./Scripts/check_concurrency_safety_policies.sh
+          ./Scripts/check_accessibility_guardrails.sh
+          ./Scripts/check_webhost_package_boundary.sh
+          ./Scripts/generate_public_api_inventory.sh --check
 
-          bun run test
+  linux-gate:
+    name: Linux repo gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ca-certificates curl git ripgrep unzip
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SWIFTLY_HOME_DIR="${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}"
+          swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
+          curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
+          tar -zxf "${swiftly_archive}"
+          ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-gate-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            Examples/WebExample/node_modules
+            Platforms/Web/node_modules
+            Platforms/WebBuild/node_modules
+            Website/node_modules
+          key: ${{ runner.os }}-bun-gate-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-gate-
+            ${{ runner.os }}-bun-
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Run repo gate
+        shell: bash
+        run: sh ./Scripts/test_gate.sh --skip-bun-install
+
+  macos-gate:
+    name: macOS repo gate
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-gate-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            Examples/WebExample/node_modules
+            Platforms/Web/node_modules
+            Platforms/WebBuild/node_modules
+            Website/node_modules
+          key: ${{ runner.os }}-bun-gate-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-gate-
+            ${{ runner.os }}-bun-
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Run repo gate
+        shell: bash
+        run: sh ./Scripts/test_gate.sh --skip-bun-install
+
+  ios-build:
+    name: iOS package build
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build SwiftUI host for generic iOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -scheme SwiftUIHost \
+            -destination 'generic/platform=iOS' \
+            -skipPackagePluginValidation \
+            build

@@ -75,6 +75,7 @@ around runtime feature concerns:
 ```
 Sources/SwiftTUIRuntime/
   Accessibility/ — runtime accessibility policy adapters for terminal targets
+  Configuration/ — runtime configuration, environment resolution, and launch option normalization
   RunLoop/      — runtime coordinator, event dispatch, pointer routing, render scheduling
   Lifecycle/    — post-present lifecycle staging, task running, animation control
   Scenes/       — App protocol, scene traversal, scene manifest, hosted scene sessions

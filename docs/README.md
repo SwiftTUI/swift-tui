@@ -27,6 +27,7 @@ The repository [README.md](../README.md) is the public landing page.
 - [ASYNC_RENDERING.md](ASYNC_RENDERING.md) — async presentation and frame-tail offload
 - [VISION.md](VISION.md) — philosophy, scope, and deferred work
 - [TOOLCHAINS.md](TOOLCHAINS.md) — Swift, wasm, Bun, Xcode, Android toolchain story
+- [RELEASES.md](RELEASES.md) — alpha release, tag, gate, and support policy
 
 ## Reference
 
@@ -37,6 +38,7 @@ The repository [README.md](../README.md) is the public landing page.
   runtime policy, target bridges, guardrails, and remaining gaps
 - [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) — canonical public surface, removed surface, and package-only seams
 - [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md) — guardrails for public API additions, `AnyView` / `AnyScene` policy
+- [RELEASES.md](RELEASES.md) — current release policy and platform support matrix
 - [ANYVIEW_INTERNALS.md](ANYVIEW_INTERNALS.md) — maintainer guide for
   `AnyView` graph behavior, acceptable internal erasure, and dangerous patterns
 - [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md) — fixture, determinism, regression, and test-topology rules

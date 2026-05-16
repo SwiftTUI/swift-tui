@@ -28,32 +28,32 @@ struct TerminalRenderStyleCodecTests {
   func encodesCanonicalJSONWithTheme() throws {
     let style = TerminalRenderStyle(
       appearance: .init(
-        foregroundColor: .hex("#102030"),
-        backgroundColor: .hex("#405060"),
-        tintColor: .hex("#708090"),
+        foregroundColor: try! .hex("#102030"),
+        backgroundColor: try! .hex("#405060"),
+        tintColor: try! .hex("#708090"),
         palette: [
-          7: .hex("#777777"),
-          0: .hex("#000000"),
-          15: .hex("#FFFFFF"),
+          7: try! .hex("#777777"),
+          0: try! .hex("#000000"),
+          15: try! .hex("#FFFFFF"),
         ],
         colorSchemeContrast: .increased,
         source: .override
       ),
       theme: .init(
-        foreground: .hex("#ABCDEF"),
-        background: .hex("#012345"),
-        tint: .hex("#456789"),
-        separator: .hex("#111111"),
-        selection: .hex("#222222"),
-        placeholder: .hex("#333333"),
-        link: .hex("#444444"),
-        fill: .hex("#555555"),
-        windowBackground: .hex("#666666"),
-        success: .hex("#777777"),
-        warning: .hex("#888888"),
-        danger: .hex("#999999"),
-        info: .hex("#AAAAAA"),
-        muted: .hex("#BBBBBB")
+        foreground: try! .hex("#ABCDEF"),
+        background: try! .hex("#012345"),
+        tint: try! .hex("#456789"),
+        separator: try! .hex("#111111"),
+        selection: try! .hex("#222222"),
+        placeholder: try! .hex("#333333"),
+        link: try! .hex("#444444"),
+        fill: try! .hex("#555555"),
+        windowBackground: try! .hex("#666666"),
+        success: try! .hex("#777777"),
+        warning: try! .hex("#888888"),
+        danger: try! .hex("#999999"),
+        info: try! .hex("#AAAAAA"),
+        muted: try! .hex("#BBBBBB")
       )
     )
 
@@ -70,13 +70,13 @@ struct TerminalRenderStyleCodecTests {
   func omitsThemeAndSortsPaletteKeys() throws {
     let style = TerminalRenderStyle(
       appearance: .init(
-        foregroundColor: .hex("#112233"),
-        backgroundColor: .hex("#445566"),
-        tintColor: .hex("#778899"),
+        foregroundColor: try! .hex("#112233"),
+        backgroundColor: try! .hex("#445566"),
+        tintColor: try! .hex("#778899"),
         palette: [
-          10: .hex("#0A0A0A"),
-          2: .hex("#020202"),
-          1: .hex("#010101"),
+          10: try! .hex("#0A0A0A"),
+          2: try! .hex("#020202"),
+          1: try! .hex("#010101"),
         ],
         colorSchemeContrast: .standard,
         source: .override
@@ -156,45 +156,45 @@ private func fixtureDirectoryURL() -> URL {
 private func webTUIDefaultRenderStyle() -> TerminalRenderStyle {
   .init(
     appearance: .init(
-      foregroundColor: .hex("#eceff4"),
-      backgroundColor: .hex("#1e222a"),
-      tintColor: .hex("#56b6c2"),
+      foregroundColor: try! .hex("#eceff4"),
+      backgroundColor: try! .hex("#1e222a"),
+      tintColor: try! .hex("#56b6c2"),
       palette: [
-        0: .hex("#20242c"),
-        1: .hex("#e05757"),
-        2: .hex("#61c67b"),
-        3: .hex("#ebb33c"),
-        4: .hex("#5ba3ff"),
-        5: .hex("#b46eff"),
-        6: .hex("#56b6c2"),
-        7: .hex("#eceff4"),
-        8: .hex("#8c92ac"),
-        9: .hex("#ff7b72"),
-        10: .hex("#7ee787"),
-        11: .hex("#f2cc60"),
-        12: .hex("#79c0ff"),
-        13: .hex("#d2a8ff"),
-        14: .hex("#7de2d1"),
-        15: .hex("#ffffff"),
+        0: try! .hex("#20242c"),
+        1: try! .hex("#e05757"),
+        2: try! .hex("#61c67b"),
+        3: try! .hex("#ebb33c"),
+        4: try! .hex("#5ba3ff"),
+        5: try! .hex("#b46eff"),
+        6: try! .hex("#56b6c2"),
+        7: try! .hex("#eceff4"),
+        8: try! .hex("#8c92ac"),
+        9: try! .hex("#ff7b72"),
+        10: try! .hex("#7ee787"),
+        11: try! .hex("#f2cc60"),
+        12: try! .hex("#79c0ff"),
+        13: try! .hex("#d2a8ff"),
+        14: try! .hex("#7de2d1"),
+        15: try! .hex("#ffffff"),
       ],
       colorSchemeContrast: .increased,
       source: .override
     ),
     theme: .init(
-      foreground: .hex("#eceff4"),
-      background: .hex("#1e222a"),
-      tint: .hex("#56b6c2"),
-      separator: .hex("#8c92ac"),
-      selection: .hex("#2e3440"),
-      placeholder: .hex("#8c92ac"),
-      link: .hex("#5ba3ff"),
-      fill: .hex("#2b303b"),
-      windowBackground: .hex("#1e222a"),
-      success: .hex("#61c67b"),
-      warning: .hex("#ebb33c"),
-      danger: .hex("#e05757"),
-      info: .hex("#56b6c2"),
-      muted: .hex("#8c92ac")
+      foreground: try! .hex("#eceff4"),
+      background: try! .hex("#1e222a"),
+      tint: try! .hex("#56b6c2"),
+      separator: try! .hex("#8c92ac"),
+      selection: try! .hex("#2e3440"),
+      placeholder: try! .hex("#8c92ac"),
+      link: try! .hex("#5ba3ff"),
+      fill: try! .hex("#2b303b"),
+      windowBackground: try! .hex("#1e222a"),
+      success: try! .hex("#61c67b"),
+      warning: try! .hex("#ebb33c"),
+      danger: try! .hex("#e05757"),
+      info: try! .hex("#56b6c2"),
+      muted: try! .hex("#8c92ac")
     )
   )
 }

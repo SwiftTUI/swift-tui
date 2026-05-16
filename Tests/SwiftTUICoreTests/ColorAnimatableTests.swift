@@ -2,6 +2,13 @@ import Testing
 
 @testable import SwiftTUICore
 
+@Test("Color.hex throws instead of trapping on invalid caller input")
+func colorHexThrowsOnInvalidInput() {
+  #expect(throws: ColorError.self) {
+    _ = try Color.hex("#GGG")
+  }
+}
+
 @Test("Color animatableData round-trips via OKLab")
 func colorAnimatableRoundTrip() {
   var red = Color.red
