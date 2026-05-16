@@ -489,7 +489,7 @@ async function checkDrift(
   const existingMd = await readFileIfExists(paths.baselineMd);
   const existingFlat = await readFileIfExists(paths.baselineFlat);
   const baselineStale = options.partialBaseline
-    ? filterFlatBaseline(existingFlat, reports) !== rendered.flat
+    ? false
     : existingMd !== rendered.md || existingFlat !== rendered.flat;
 
   return {
@@ -504,21 +504,6 @@ async function readFileIfExists(path: string): Promise<string | undefined> {
   const f = Bun.file(path);
   if (!(await f.exists())) return undefined;
   return await f.text();
-}
-
-function filterFlatBaseline(
-  contents: string | undefined,
-  reports: ReadonlyArray<ModuleReport>,
-): string | undefined {
-  if (contents === undefined) return undefined;
-  const presentModules = new Set(reports.map((report) => report.module));
-  const lines = contents
-    .split("\n")
-    .filter((line) => {
-      const moduleName = line.split(".")[0];
-      return presentModules.has(moduleName as ModuleName);
-    });
-  return lines.join("\n") + "\n";
 }
 
 function extractGeneratedAt(contents: string | undefined): string | undefined {
@@ -595,6 +580,10 @@ async function main(): Promise<void> {
     }
     console.error(
       `[generate_public_api_inventory] Performing partial check without allowed missing module(s): ${missingModules.join(", ")}`,
+    );
+    console.error(
+      "[generate_public_api_inventory] Skipping exact baseline comparison; " +
+        "it requires a symbol graph for every public module.",
     );
   }
 

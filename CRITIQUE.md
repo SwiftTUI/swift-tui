@@ -62,11 +62,11 @@ log review also repaired runner bootstrap drift: Linux jobs now install
 Swiftly's required `libcurl4-openssl-dev` dependency before selecting Swift
 6.3.1 and export Swiftly's actual Linux bin directory for later steps; public
 API inventory generation now uses an isolated symbol-graph scratch directory
-instead of the repo's normal `.build` tree and Linux policy checks explicitly
-treat the macOS-only `SwiftUIHost` graph as absent while still comparing the
-public modules emitted on Linux; and the generic iOS package build selects an
-Xcode installation with Swift 6.3 support instead of the runner's older default
-Xcode.
+instead of the repo's normal `.build` tree and Linux policy checks still
+enforce public-symbol classifications for emitted modules while leaving exact
+baseline drift detection to platforms that emit every public module; and the
+generic iOS package build selects an Xcode installation with Swift 6.3 support
+instead of the runner's older default Xcode.
 
 Remaining critique:
 
