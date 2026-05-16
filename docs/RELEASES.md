@@ -32,6 +32,18 @@ Use `bun run test:all` for releases that materially affect example packages
 beyond `Examples/gallery`, browser/WASI packaging, or cross-platform host
 behavior.
 
+## Branch Protection And Beta Hardening
+
+`main` is protected by a repository ruleset. The rule should require the repo's
+CI checks, block branch deletion and non-fast-forward updates, require signed
+commits and linear history, and require pull request review before merges.
+
+Organization-admin bypass is intentionally left enabled during the alpha line.
+The project will revisit that bypass at `0.9.0`, which is planned as the first
+public beta release. The goal for the beta line is to add more contributors and
+stabilize any remaining API surface needed to provide a SemVer-compatible
+`1.0.0` release as soon as safely possible.
+
 ## Platform Support
 
 The root package declares macOS 15+ and iOS 18+ package platforms. Local

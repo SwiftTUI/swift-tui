@@ -47,7 +47,11 @@ public enum CPUSampler {
   public static func readCurrentUsage() throws -> ProcessCPUReading {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
       var usage = rusage()
-      let result = getrusage(RUSAGE_SELF, &usage)
+      #if canImport(Glibc)
+        let result = getrusage(__rusage_who_t(RUSAGE_SELF.rawValue), &usage)
+      #else
+        let result = getrusage(RUSAGE_SELF, &usage)
+      #endif
       guard result == 0 else {
         throw CPUSamplerError.getrusageFailed(errno: errno)
       }
