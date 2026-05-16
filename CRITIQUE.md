@@ -34,9 +34,9 @@ The live critique is therefore no longer "no license, no CI, no release." The
 remaining highest-value work is now:
 
 1. prove the restored CI externally and make it enforceable
-2. close the remaining SwiftUI-shaped API honesty gaps
-3. decide the public `WASISurfaceBridge` product boundary
-4. enforce public documentation coverage with a ratchet
+2. enforce public documentation coverage with a ratchet
+3. decide whether coverage reporting remains informational or becomes a threshold
+4. settle the platform-product DocC strategy
 5. reduce maintenance load in the largest runtime files and stale historical docs
 
 ## Severity Legend
@@ -152,40 +152,38 @@ Direction:
 
 Ambiguity required to act: coverage thresholds are still a governance decision.
 
-### 6. Remaining SwiftUI-Shaped API Gaps Need Honest Product Decisions
+### 6. SwiftUI-Shaped Navigation And Dismissal Policy Is Recorded
 
-Status: **P1 / partially addressed / ambiguous**
+Status: **Closed**
 
-Some original API findings are now closed: `@Environment` exists,
-`View.id(_:)` accepts arbitrary `Hashable`, and the `Binding` actor-isolation
-hole is gone. The remaining high-signal API gaps are about compatibility
-expectations.
+The major API ambiguity in this tranche is closed without renaming the shipped
+navigation surface.
 
-Open items:
+Current decision:
 
-- No public `DismissAction` / `@Environment(\.dismiss)` equivalent was found,
-  even though presentation internals have dismiss closures and an escape
-  dismiss stack.
-- `NavigationStack` and `.navigationDestination` remain intentionally
-  binding-driven destination presentation, not SwiftUI's path/link model.
-- `.sheet` still has only `isPresented:` forms; `popover(item:)` exists, but
-  `sheet(item:)` and `onDismiss:` overloads do not.
-- Public style protocols still require `snapshotLabel`, which exposes a
-  diagnostics/testing concern to custom-style authors.
+- Keep the SwiftUI names `NavigationStack` and `.navigationDestination(...)`.
+- Document that SwiftTUI's terminal contract is intentionally binding-driven:
+  Boolean and item bindings own destination presentation.
+- Keep public `NavigationLink`, public `NavigationPath`, and environment
+  navigation controllers outside the shipped v1 surface.
+- Explicitly exclude `@Environment(\.dismiss)` by policy. Presented content
+  should dismiss through owner-controlled bindings, explicit callbacks, or the
+  runtime dismiss stack such as Escape handling.
 
-Direction:
+Current evidence:
 
-- Add a public dismiss environment action, or explicitly document why presented
-  content must receive dismissal through bindings/closures.
-- Decide whether navigation keeps SwiftUI names with stronger warnings, adds
-  path/link APIs, or renames the current concept to destination presentation.
-- Add `.sheet(item:)` and `onDismiss:` if SwiftUI familiarity remains the goal.
-- Move `snapshotLabel` behind an internal/package diagnostics protocol or derive
-  it at the test/rendering boundary.
+- `docs/decisions/0001-swiftui-shaped-not-bubbletea-shaped.md` codifies the
+  keep-the-SwiftUI-name policy for `NavigationStack` and the exclusion of
+  `@Environment(\.dismiss)`.
+- `docs/proposals/NAVIGATION_DESTINATION_PRESENTATION.md` records the shipped
+  name and dismissal policy next to the v1 navigation proposal.
+- `docs/STATUS.md` and `docs/PUBLIC_API_INVENTORY.md` describe the same public
+  surface.
 
-Ambiguity required to act: navigation is the major decision. Renaming, adding
-SwiftUI-style navigation, and documenting divergence have different source
-compatibility costs.
+Residual additive API polish, such as `.sheet(item:)`, `onDismiss:` overloads,
+or moving `snapshotLabel` behind a diagnostics-only seam, can be triaged as
+ordinary public-surface cleanup. It no longer blocks the navigation/dismissal
+policy decision.
 
 ### 7. Public Documentation Coverage Is Still Not Enforced
 
@@ -214,27 +212,22 @@ Direction:
 Ambiguity required to act: choose a ratchet shape before flipping strict doc
 linting, otherwise this becomes an enormous unrelated cleanup.
 
-### 8. `WASISurfaceBridge` Is Still A Public Product With No Ordinary Public API
+### 8. `WASISurfaceBridge` Product Boundary Is Settled
 
-Status: **P2 / open**
+Status: **Closed**
 
-The README and host docs now describe `WASISurfaceBridge` as package-only
-plumbing rather than a consumer product. That fixes the most misleading prose,
-but the product still exists in `Package.swift`.
+`WASISurfaceBridge` is package-only plumbing, not an ordinary external SwiftPM
+product.
 
 Current evidence:
 
-- `Package.swift` still declares `.library(name: "WASISurfaceBridge", ...)`.
-- Docs now call it package-only plumbing used by `SwiftTUIWASI` and
-  `SwiftTUIWebHost`.
+- `Package.swift` declares `WASISurfaceBridge` as a target consumed by
+  `SwiftTUIWASI` and `SwiftTUIWebHost`, not as a public `.library` product.
+- The README describes the `WASISurfaceBridge` transport target as package-only
+  plumbing used by `SwiftTUIWASI` and `SwiftTUIWebHost`.
 
-Direction:
-
-- Either remove the public library product and keep it as an internal target, or
-  give it a real public transport API and stability tier.
-
-Ambiguity required to act: decide whether any external package is supposed to
-depend on `WASISurfaceBridge` directly.
+Regression guard: do not add a standalone public `WASISurfaceBridge` product
+unless the bridge gets a documented public transport API and stability tier.
 
 ### 9. Platform Product DocC Coverage Is Still Uneven
 
@@ -445,28 +438,21 @@ skipped.
    required?
 2. Should coverage reporting be informational first, or should it enforce a
    threshold immediately?
-3. Should SwiftTUI navigation keep SwiftUI names while documenting divergence,
-   rename the current API, or add path/link compatibility?
-4. Should presented content get a public SwiftUI-like `DismissAction`, or should
-   dismissal remain binding/closure driven?
-5. Should `WASISurfaceBridge` remain an external SwiftPM product with real
-   public API, or become internal package plumbing only?
-6. Does every public product need a DocC catalog, or are platform products
+3. Does every public product need a DocC catalog, or are platform products
    intentionally prose-documented?
-7. Are historical plans allowed to retain stale paths as historical records, or
+4. Are historical plans allowed to retain stale paths as historical records, or
    must all tracked docs remain path-current?
-8. Is the project name final despite the ecosystem collision?
+5. Is the project name final despite the ecosystem collision?
 
 ## Suggested Next Tranche
 
-The highest-signal next work is now decision-driven API and product-boundary
-work, not more local gate repair:
+The highest-signal next work is now external enforcement and documentation
+ratchets, not navigation/dismissal/product-boundary churn:
 
-1. Decide the navigation/dismiss/WASISurfaceBridge ambiguities before starting
-   public API churn.
-2. Verify GitHub Actions are green and branch protection requires the intended
+1. Verify GitHub Actions are green and branch protection requires the intended
    statuses.
-3. Add public documentation coverage with a ratchet rather than an immediate
+2. Add public documentation coverage with a ratchet rather than an immediate
    zero-baseline strict gate.
-4. Decide whether coverage reporting stays informational or becomes a threshold.
+3. Decide whether coverage reporting stays informational or becomes a threshold.
+4. Decide the platform-product DocC strategy.
 5. Start the large-runtime-file decomposition only after the gate stays green.

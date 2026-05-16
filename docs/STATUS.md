@@ -93,6 +93,10 @@ are part of the public `View` surface. The full ActionScope/commands rollout —
   `navigationDestination(isPresented:)` and `navigationDestination(item:)`;
   `NavigationLink`, public `NavigationPath`, and automatic Back chrome remain
   intentionally out of the shipped surface
+- The `NavigationStack` and `.navigationDestination(...)` names are retained
+  intentionally as SwiftUI-shaped names for a narrower terminal contract;
+  `@Environment(\.dismiss)` remains excluded by policy in favor of explicit
+  binding or callback ownership plus runtime Escape dismissal
 - terminal-native `alert`, `confirmationDialog`, and popover presentation in the canonical `View` surface
 
 ### Charts

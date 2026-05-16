@@ -64,6 +64,20 @@ hide routing and presentation ownership in places that make terminal apps
 harder to reason about. SwiftTUI should prefer explicit, data-oriented
 presentation and navigation state when that produces a clearer terminal API.
 
+That policy does not require renaming every terminal-native reinterpretation.
+When the authored role remains recognizably SwiftUI-shaped, SwiftTUI keeps the
+SwiftUI spelling and records the narrower terminal contract. `NavigationStack`
+and `.navigationDestination(...)` are the canonical shipped example: the names
+are intentionally retained, while the source of truth is explicit Boolean or
+item bindings instead of public `NavigationLink`, public `NavigationPath`, or an
+environment navigation controller.
+
+`@Environment(\.dismiss)` is intentionally excluded by the same policy. Terminal
+presentation dismissal should stay owned by explicit bindings, explicit
+callbacks, and runtime dismiss-stack behavior such as Escape handling. A future
+API can add a dismissal surface only if it preserves that ownership clarity; the
+absence of SwiftUI's environment dismiss action is not an accidental gap.
+
 ## Consequences
 
 **Enabled:**
@@ -83,10 +97,11 @@ presentation and navigation state when that produces a clearer terminal API.
   triples even when terminal apps are commonly written that way.
 - It does not adopt domain-specific authoring DSLs (e.g. dedicated
   command-table builders).
-- Some SwiftUI concepts are deferred until their terminal-native
-  reinterpretation is clear. `NavigationStack` is the canonical example —
-  it will land only when the terminal-specific interaction model reads
-  like the same product.
+- Some SwiftUI concepts remain deferred or rejected until their
+  terminal-native reinterpretation is clear. `NavigationStack` has landed under
+  this rule with binding-driven destinations; `NavigationLink`, public
+  `NavigationPath`, and `@Environment(\.dismiss)` remain outside the shipped
+  policy surface.
 
 **Discipline imposed:**
 

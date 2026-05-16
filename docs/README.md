@@ -82,8 +82,8 @@ Active design proposals that are still shaping decisions:
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy
 - [proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](proposals/CPU_LATENCY_EVALUATION_PIPELINE.md) — CPU-versus-latency measurement system for async rendering and future runtime optimizations
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
-- [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md) — shipped binding-driven `NavigationStack` destination presentation surface that intentionally excludes
-  `NavigationLink`
+- [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md) — shipped binding-driven `NavigationStack` destination presentation surface that intentionally keeps SwiftUI names while excluding
+  `NavigationLink`, public `NavigationPath`, and `@Environment(\.dismiss)`
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:

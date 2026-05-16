@@ -156,6 +156,10 @@ for the model and the implementation record.
 - `NavigationStack<ID, Root>` primitive plus
   `.navigationDestination(isPresented:)` and `.navigationDestination(item:)`
   modifiers (`View`)
+  These intentionally keep SwiftUI names while documenting a narrower
+  terminal-native contract: destinations are binding-driven, with no public
+  `NavigationLink`, public `NavigationPath`, or `@Environment(\.dismiss)`
+  dismissal/navigation controller in the shipped surface.
 - `FocusContainment` enum plus `.focusContainment(_:)` on `Panel`
 - `Scene`-conforming types conform to `ActionScope`
 - `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers conform to `ActionScope`

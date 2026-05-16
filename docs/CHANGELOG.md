@@ -18,6 +18,12 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Recorded the public API policy that `NavigationStack` and
+  `.navigationDestination(...)` intentionally keep SwiftUI names while remaining
+  binding-driven terminal destination APIs, and that `@Environment(\.dismiss)`
+  remains intentionally excluded in favor of explicit owner-controlled
+  dismissal. Closed the `WASISurfaceBridge` critique as already settled by its
+  package-only target boundary.
 - Closed the first critique-remediation slice: removed the AI CLI from root Bun
   dependencies, made `mise.toml` local ignored tooling, added root test-target
   and rendered-fixture matrix guardrails to the repo gate, made rendered fixture
