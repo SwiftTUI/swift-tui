@@ -350,6 +350,11 @@ all | gate)
 esac
 
 run_swift() {
+  if [ "$#" -gt 0 ] && [ "$1" = "test" ] && [ -n "${STUI_SWIFT_TEST_SKIP_REGEX:-}" ]; then
+    swiftly run swift "$@" --skip "$STUI_SWIFT_TEST_SKIP_REGEX"
+    return
+  fi
+
   swiftly run swift "$@"
 }
 

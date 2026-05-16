@@ -35,6 +35,11 @@
 
 ## Planned Work
 
+- Retire the CI-only Swift test quarantine in
+  [.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml)
+  by stabilizing the named flaky runtime, socket readiness, terminal latency,
+  WebHost byte-sink, and gallery terminal-host tests that currently require
+  `STUI_SWIFT_TEST_SKIP_REGEX` in the external repo gates.
 - Scope the host-native text input contract for value/selection transport and
   IME/composition before promoting those behaviors beyond current terminal and
   browser clipboard support. See
