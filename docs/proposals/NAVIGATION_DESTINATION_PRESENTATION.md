@@ -694,6 +694,26 @@ Focused tests should land before or with implementation.
 - Mouse activation can present by mutating an item binding.
 - Selection can update a preview pane without changing navigation depth.
 
+## Name And Dismissal Policy
+
+The shipped surface deliberately keeps the SwiftUI names `NavigationStack` and
+`.navigationDestination(...)`. The terminal model is narrower than SwiftUI's
+path/link model, but the authoring role is still a stack-owned destination
+presentation surface. Renaming it would make ordinary SwiftUI authors learn a
+second name for the same family of work without making the source-of-truth rule
+clearer.
+
+The documented divergence is the state contract: SwiftTUI v1 destinations are
+driven by explicit Boolean and item bindings. Public `NavigationLink`, public
+`NavigationPath`, value-to-destination routing, and public environment
+push/pop/dismiss controllers are not part of this stage.
+
+Dismissal follows the same rule. Destination content is dismissed by mutating
+the binding that presented it, by an explicit owner callback, or by runtime
+dismiss-stack handling such as Escape. `@Environment(\.dismiss)` is
+intentionally excluded by policy rather than waiting as an unnamed missing
+piece.
+
 ## Deferred Work
 
 The items below are not in v1, but they are not all deferred for the same
