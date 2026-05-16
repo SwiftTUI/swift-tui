@@ -6,7 +6,7 @@ struct WASIRunnerTests {
   @Test("native execution without manifest mode reports an explicit error")
   func nativeExecutionWithoutManifestModeReportsError() {
     #if canImport(WASILibc)
-      #expect(Bool(true))
+      #expect(resolveWASITransportMode(environmentValue: { _ in nil }) == .surface)
     #else
       #expect(
         WASIRunnerError.nativeExecutionUnsupported.description.contains("manifest mode")

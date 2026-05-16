@@ -179,14 +179,11 @@ public struct FrameArtifacts: Equatable, Sendable {
   /// Identities whose ``DrawNode`` had a non-empty visible rect after
   /// all ancestor clip bounds were applied during rasterization.
   ///
-  /// The runtime uses this set to gate animation tick scheduling on
-  /// viewport visibility: if every identity affected by an in-flight
-  /// animation falls outside this set, the animation is conceptually
-  /// active but geometrically quiescent (its subtree is clipped by a
-  /// ``ScrollView``, an inactive tab, etc.), and scheduling another
-  /// deadline would only burn CPU.  When any non-animation invalidation
-  /// wakes the scheduler — scroll, resize, tab switch, state change —
-  /// the next frame re-evaluates this set and the tick loop resumes.
+  /// The runtime retains this set as a geometric visibility signal for
+  /// diagnostics and scheduling policy. Animation deadlines are no longer
+  /// suppressed solely because an identity is absent from this set; the
+  /// scheduler may still use it to understand whether an animating subtree
+  /// painted any cells in the current frame.
   ///
   /// Note: this is a geometric predicate (would the identity paint any
   /// cells given the current clip), not an observation of incremental

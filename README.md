@@ -242,6 +242,7 @@ Currently fully supported:
 swiftly run swift test
 Scripts/test_gate.sh
 Scripts/test_all.sh
+bun run test:coverage
 ```
 
 `swiftly run swift test` covers the root package, including the Swift platform
@@ -254,6 +255,10 @@ entrypoint to that gate.
 suite plus every maintained example package/app, including browser/WASI
 coverage for `Examples/WebExample`. Use `bun run test:all` for the same
 exhaustive runner from the root Bun workspace.
+
+`bun run test:coverage` runs the root SwiftPM tests with SwiftPM code coverage
+enabled and prints the exported coverage JSON path plus the reported line
+coverage. Coverage is informational; there is no checked-in threshold gate yet.
 
 On Linux, both runners export `DISABLE_EXPLICIT_PLATFORMS=1` and skip
 Apple-only host checks.

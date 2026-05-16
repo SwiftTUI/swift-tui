@@ -126,6 +126,18 @@ host_os=$(uname -s)
 is_linux=0
 step_index=0
 
+for name in \
+  PARALLEL_RECORD_RENDERED_FIXTURES \
+  STUI_RECORD_RENDERED_TEXT_FIXTURES \
+  STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
+  eval "is_set=\${$name+x}"
+  if [ -n "$is_set" ]; then
+    >&2 echo "$name must not be set when running the repo gate."
+    >&2 echo "Use Scripts/record_rendered_text_fixtures.sh to update rendered fixtures."
+    exit 1
+  fi
+done
+
 tmp_root=${TMPDIR:-/tmp}
 log_root=$(mktemp -d "$tmp_root/swift-tui-test-all.XXXXXX")
 results_file=$log_root/results.txt
@@ -154,6 +166,8 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
   - stable-doc source-path guardrails
+  - root Package.swift test-target coverage guardrails
+  - rendered-text fixture matrix guardrails
   - accessibility guardrails for raw glyphs, color-state styling, and visual content
   - public-API baseline freshness check
   - focused root SwiftPM framework tests
@@ -432,6 +446,20 @@ check_bun_environment() {
   bun --version
 }
 
+check_fixture_recording_environment_disabled() {
+  for name in \
+    PARALLEL_RECORD_RENDERED_FIXTURES \
+    STUI_RECORD_RENDERED_TEXT_FIXTURES \
+    STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
+    eval "is_set=\${$name+x}"
+    if [ -n "$is_set" ]; then
+      >&2 echo "$name must not be set when running the repo gate."
+      >&2 echo "Use Scripts/record_rendered_text_fixtures.sh to update rendered fixtures."
+      return 1
+    fi
+  done
+}
+
 print_failure_logs() {
   while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
     [ "$status" = "FAIL" ] || continue
@@ -502,6 +530,11 @@ run_function_step \
   "bun --version" \
   check_bun_environment
 
+run_function_step \
+  "Check rendered fixture recording is disabled" \
+  "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|STUI_RECORD_RENDERED_TEXT_FIXTURES|STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
+  check_fixture_recording_environment_disabled
+
 if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
   run_step \
     "Install Bun workspace dependencies" \
@@ -521,6 +554,18 @@ run_step \
   "$repo_root" \
   "./Scripts/check_stable_doc_source_paths.sh" \
   ./Scripts/check_stable_doc_source_paths.sh
+
+run_step \
+  "Check root test-target coverage" \
+  "$repo_root" \
+  "./Scripts/check_root_test_target_coverage.sh" \
+  ./Scripts/check_root_test_target_coverage.sh
+
+run_step \
+  "Check rendered text fixture matrix" \
+  "$repo_root" \
+  "./Scripts/check_rendered_text_fixture_matrix.sh" \
+  ./Scripts/check_rendered_text_fixture_matrix.sh
 
 run_step \
   "Check concurrency-safety policies" \
@@ -580,6 +625,11 @@ run_function_step \
   "Run SwiftTUITerminal tests" \
   "$(swift_command_text test --filter SwiftTUITerminalTests)" \
   run_swift test --filter SwiftTUITerminalTests
+
+run_function_step \
+  "Run SwiftTUITerminalWorkspace tests" \
+  "$(swift_command_text test --filter SwiftTUITerminalWorkspaceTests)" \
+  run_swift test --filter SwiftTUITerminalWorkspaceTests
 
 run_function_step \
   "Run SwiftTUIPTYPrimitives tests" \

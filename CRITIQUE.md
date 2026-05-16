@@ -34,9 +34,9 @@ The live critique is therefore no longer "no license, no CI, no release." The
 remaining highest-value work is now:
 
 1. prove the restored CI externally and make it enforceable
-2. clean up supply-chain/tooling drift
-3. make the test gate complete and harder to rebaseline accidentally
-4. close the remaining SwiftUI-shaped API honesty gaps
+2. close the remaining SwiftUI-shaped API honesty gaps
+3. decide the public `WASISurfaceBridge` product boundary
+4. enforce public documentation coverage with a ratchet
 5. reduce maintenance load in the largest runtime files and stale historical docs
 
 ## Severity Legend
@@ -48,7 +48,7 @@ remaining highest-value work is now:
 - **Closed**: materially addressed in the current tree
 - **Ambiguous**: needs a product or governance decision before implementation
 
-## Ranked Live Critique
+## Ranked Current Critique
 
 ### 1. CI Is Configured, But Enforcement Still Needs External Proof
 
@@ -72,104 +72,85 @@ Ambiguity required to act: branch protection and required status checks are
 GitHub repository settings, not source-tree state. Someone with repo admin
 access must decide and apply them.
 
-### 2. Personal Workflow Tooling Still Leaks Into Project Dependencies
+### 2. Personal Workflow Tooling No Longer Leaks Into Project Dependencies
 
-Status: **P1 / open**
+Status: **Closed**
 
-`package.json` still lists `@openai/codex` under `dependencies`. No repo script
-or package import found in this pass requires it as project functionality.
+The root Bun workspace no longer installs `@openai/codex` as project
+functionality.
 
 Current evidence:
 
-- `package.json` has `"@openai/codex": "^0.121.0"` under `dependencies`.
-- The repo already discloses that the project is AI-assisted in README and
-  `CONTRIBUTING.md`; keeping an AI CLI as an install dependency is a different
-  issue.
+- `package.json` has no `dependencies` section.
+- `bun.lock` no longer contains `@openai/codex` or its platform packages.
 
-Direction:
+Regression guard: keep personal AI tools out of checked-in project dependency
+graphs unless a repo-owned script truly needs them.
 
-- Remove `@openai/codex` from `package.json` and `bun.lock`, or move it to a
-  clearly local/dev-only path if there is a repo-owned command that truly needs
-  it.
+### 3. Local Tool-Manager Configuration Is No Longer An Endorsed Entrypoint
 
-Ambiguity required to act: none, unless there is an unstated workflow script that
-depends on this package.
-
-### 3. Toolchain Pinning And `mise` Tasks Contradict The Swiftly Policy
-
-Status: **P1 / open**
+Status: **Closed**
 
 The repo's written policy says repo-local Swift work uses
-`swiftly run swift ...`. `mise.toml` still pins `bun` and `prek` to `latest` and
-contains release-looking tasks that call bare `swift build`.
+`swiftly run swift ...`. The stale tracked `mise.toml` release tasks have been
+removed, and `mise.toml` is now ignored as private local tooling.
 
 Current evidence:
 
-- `mise.toml` uses `bun = "latest"` and `prek = "latest"`.
-- `mise.toml` tasks use `swift build -c release`.
-- `docs/TOOLCHAINS.md` and README tell contributors to use
-  `swiftly run swift ...`.
+- `mise.toml` is not tracked.
+- `.gitignore` ignores local `mise.toml`.
+- `docs/TOOLCHAINS.md` and README continue to make `swiftly run swift ...` the
+  repo path.
 
-Direction:
+Regression guard: if a tool-manager file becomes an endorsed project entrypoint
+later, it should be pinned and call `swiftly run swift ...`.
 
-- Either delete the stale `mise` release tasks or make them call
-  `swiftly run swift`.
-- Pin contributor tool versions used by CI/release paths.
-- Leave `latest` only in explicitly local convenience paths.
+### 4. The Test Gate Now Covers Declared Root Test Targets
 
-Ambiguity required to act: decide whether `mise.toml` is an endorsed project
-entrypoint or only a maintainer convenience file.
+Status: **Closed**
 
-### 4. The Test Gate Still Appears To Miss A Declared Test Target
-
-Status: **P1 / open**
-
-`Package.swift` declares `SwiftTUITerminalWorkspaceTests`, but the explicit
-filter list in `Scripts/test_all.sh` does not include it. `Scripts/test_gate.sh`
-delegates to `Scripts/test_all.sh`, so this is still a live gate-completeness
-concern.
+`Scripts/test_all.sh` now runs `SwiftTUITerminalWorkspaceTests`, and a
+meta-check keeps the hand-maintained filter list aligned with root
+`Package.swift` test targets.
 
 Current evidence:
 
-- `Package.swift` declares `SwiftTUITerminalWorkspaceTests`.
-- `Scripts/test_all.sh` lists filters for many suites, including
-  `SwiftTUITerminalTests`, but not `SwiftTUITerminalWorkspaceTests`.
+- `Scripts/test_all.sh` includes `SwiftTUITerminalWorkspaceTests`.
+- `Scripts/check_root_test_target_coverage.sh` fails when a root test target is
+  declared but not covered by `Scripts/test_all.sh`.
+- `Scripts/test_gate.sh` delegates to `Scripts/test_all.sh`, so the curated gate
+  inherits the same guardrail.
 
-Direction:
+Regression guard: keep the meta-check in the gate before adding new root test
+targets.
 
-- Add the missing filter immediately.
-- Prefer a meta-check that every `testTarget` in `Package.swift` is either in
-  the runner or explicitly excluded with a documented reason.
-- Consider replacing the hand-maintained root-package filter list with a plain
-  root `swift test` where feasible.
+### 5. Coverage And Fixture Discipline Have Baseline Guardrails
 
-Ambiguity required to act: none.
+Status: **P1 / mostly addressed / threshold decision remains**
 
-### 5. Coverage And Fixture Discipline Are Still Weak As Gates
-
-Status: **P1 / open**
-
-The suite is broad, but there is still no code-coverage signal, rendered-text
-fixtures can still be re-recorded by environment variable, and the WASI branch
-contains a real-platform assertion that asserts only `Bool(true)`.
+The suite now has an informational coverage command, fixture recording is routed
+through an explicit script instead of the old direct environment variable, the
+gate fails if recording mode is enabled, and the WASI tautology assertion has
+been replaced.
 
 Current evidence:
 
-- No current script/workflow reference to `--enable-code-coverage` or `llvm-cov`.
-- `RenderedTextFixtureMode` still uses `PARALLEL_RECORD_RENDERED_FIXTURES`.
-- `Platforms/WASI/Tests/SwiftTUIWASITests/WASIRunnerTests.swift` still has
-  `#expect(Bool(true))` under `canImport(WASILibc)`.
+- `bun run test:coverage` runs `Scripts/report_test_coverage.sh`, which invokes
+  `swiftly run swift test --enable-code-coverage` and prints coverage output.
+- `Scripts/record_rendered_text_fixtures.sh` is the fixture update entrypoint.
+- `Scripts/test_all.sh` fails if rendered fixture recording variables are set.
+- `Scripts/check_rendered_text_fixture_matrix.sh` is part of the gate.
+- The WASI runner test now asserts default transport-mode behavior under
+  `canImport(WASILibc)`.
 
 Direction:
 
-- Add coverage reporting before arguing about thresholds.
-- Make fixture recording explicit-only, preferably through a dedicated script or
-  non-gate mode, and fail the gate if recording is enabled.
-- Replace the WASI tautology with a real WASI assertion or mark the branch as a
-  known unsupported test path with an explicit reason.
+- Decide later whether coverage should stay informational or become a failing
+  threshold.
+- Consider publishing the coverage JSON as a CI artifact once external workflow
+  status is verified.
 
-Ambiguity required to act: decide whether coverage is informational first or a
-failing threshold from day one.
+Ambiguity required to act: coverage thresholds are still a governance decision.
 
 ### 6. Remaining SwiftUI-Shaped API Gaps Need Honest Product Decisions
 
@@ -347,20 +328,16 @@ or a smaller "no unsynchronized mirrors" policy.
 Status: **P2 / partially addressed**
 
 The repo now has a stable-doc source-path checker and durable docs are in better
-shape. However, stale behavioral/source-path material still exists in historical
-plans and at least one active package comment.
+shape. The active `drawnIdentities` behavioral comment has been corrected, but
+stale source-path material still exists in historical plans.
 
 Current evidence:
 
-- `FrameArtifacts.drawnIdentities` still says the runtime gates animation tick
-  scheduling on viewport visibility.
-- `RunLoop+Rendering.swift` says that viewport gate is gone.
 - Many `docs/plans` and historical proposal files still refer to old
   `Sources/SwiftTUI/...` paths.
 
 Direction:
 
-- Fix active source comments immediately.
 - Treat historical plans differently from durable docs: either archive them
   clearly, or allow stale paths there and keep the stable-doc checker focused on
   current source-of-truth docs.
@@ -464,38 +441,32 @@ checks.
 These are the decisions most likely to block implementation or cause churn if
 skipped.
 
-1. Is `mise.toml` an endorsed contributor/release entrypoint or a private
-   convenience file?
-2. Should CI branch protection be mandatory for `main`, and which statuses are
+1. Should CI branch protection be mandatory for `main`, and which statuses are
    required?
-3. Should coverage reporting be informational first, or should it enforce a
+2. Should coverage reporting be informational first, or should it enforce a
    threshold immediately?
-4. Should rendered fixture updates remain environment-variable driven, or move
-   to a dedicated explicit recording command?
-5. Should SwiftTUI navigation keep SwiftUI names while documenting divergence,
+3. Should SwiftTUI navigation keep SwiftUI names while documenting divergence,
    rename the current API, or add path/link compatibility?
-6. Should presented content get a public SwiftUI-like `DismissAction`, or should
+4. Should presented content get a public SwiftUI-like `DismissAction`, or should
    dismissal remain binding/closure driven?
-7. Should `WASISurfaceBridge` remain an external SwiftPM product with real
+5. Should `WASISurfaceBridge` remain an external SwiftPM product with real
    public API, or become internal package plumbing only?
-8. Does every public product need a DocC catalog, or are platform products
+6. Does every public product need a DocC catalog, or are platform products
    intentionally prose-documented?
-9. Are historical plans allowed to retain stale paths as historical records, or
+7. Are historical plans allowed to retain stale paths as historical records, or
    must all tracked docs remain path-current?
-10. Is the project name final despite the ecosystem collision?
+8. Is the project name final despite the ecosystem collision?
 
 ## Suggested Next Tranche
 
-The highest-signal next work is a small remediation tranche, not a broad
-architecture rewrite:
+The highest-signal next work is now decision-driven API and product-boundary
+work, not more local gate repair:
 
-1. Remove `@openai/codex` from project dependencies.
-2. Fix or delete `mise.toml` release tasks and pin endorsed tool versions.
-3. Add `SwiftTUITerminalWorkspaceTests` to the gate and add a target-coverage
-   meta-check.
-4. Make rendered fixture recording explicit-only.
-5. Replace the WASI `#expect(Bool(true))` branch.
-6. Add coverage reporting without failing thresholds.
-7. Fix the stale `drawnIdentities` comment.
-8. Decide the navigation/dismiss/WASISurfaceBridge ambiguities before starting
+1. Decide the navigation/dismiss/WASISurfaceBridge ambiguities before starting
    public API churn.
+2. Verify GitHub Actions are green and branch protection requires the intended
+   statuses.
+3. Add public documentation coverage with a ratchet rather than an immediate
+   zero-baseline strict gate.
+4. Decide whether coverage reporting stays informational or becomes a threshold.
+5. Start the large-runtime-file decomposition only after the gate stays green.
