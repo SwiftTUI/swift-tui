@@ -29,10 +29,11 @@ in the durable docs, plans, source, or tests linked from an entry.
   selecting Swift 6.3.1 and export Swiftly's actual Linux bin directory for
   later steps, public API inventory generation uses an isolated symbol-graph
   scratch directory instead of the repo's normal `.build` tree, Linux policy
-  checks compare the emitted public modules while explicitly allowing the
-  macOS-only `SwiftUIHost` graph to be absent, macOS Swiftly setup skips the
-  latest-toolchain detour, and the generic iOS package build selects an Xcode
-  image with Swift 6.3 support instead of the runner default.
+  checks still enforce public-symbol classifications for emitted modules while
+  leaving exact baseline drift detection to platforms that emit every public
+  module, macOS Swiftly setup skips the latest-toolchain detour, and the generic
+  iOS package build selects an Xcode image with Swift 6.3 support instead of the
+  runner default.
 - Closed the first critique-remediation slice: removed the AI CLI from root Bun
   dependencies, made `mise.toml` local ignored tooling, added root test-target
   and rendered-fixture matrix guardrails to the repo gate, made rendered fixture
