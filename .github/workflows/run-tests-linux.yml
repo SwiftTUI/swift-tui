@@ -187,6 +187,14 @@ jobs:
           echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
           echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
 
+      - name: Install macOS test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            brew install ripgrep
+          fi
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:

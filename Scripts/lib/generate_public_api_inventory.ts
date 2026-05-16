@@ -282,6 +282,7 @@ function buildModuleReport(
 
   // First pass: top-level types.
   for (const sym of graph.symbols) {
+    if (isSynthesizedSymbol(sym)) continue;
     if (sym.accessLevel !== "public" && sym.accessLevel !== "open") continue;
     if (sym.pathComponents.length !== 1) continue;
     if (!TYPE_KIND_IDS.has(sym.kind.identifier)) {
@@ -310,6 +311,7 @@ function buildModuleReport(
 
   // Second pass: members.
   for (const sym of graph.symbols) {
+    if (isSynthesizedSymbol(sym)) continue;
     if (sym.accessLevel !== "public" && sym.accessLevel !== "open") continue;
     if (sym.pathComponents.length < 2) continue;
     const ownerName = sym.pathComponents[0]!;
@@ -334,6 +336,10 @@ function buildModuleReport(
   );
 
   return { module, topLevel };
+}
+
+function isSynthesizedSymbol(sym: SymbolGraphSymbol): boolean {
+  return sym.identifier.precise.includes("::SYNTHESIZED::");
 }
 
 // ---------------------------------------------------------------------------
