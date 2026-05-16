@@ -36,8 +36,8 @@ in the durable docs, plans, source, or tests linked from an entry.
   detour, macOS gates install `ripgrep` for repo policy scripts, and the generic
   iOS package build selects an Xcode image with Swift 6.3 support instead of the
   runner default. The external repo gates also apply an explicit CI-only skip
-  regex for named unstable runtime/socket/terminal/WebHost/gallery tests, with
-  follow-up tracked in [TODO.md](TODO.md).
+  regex for named unstable runtime/socket/terminal/PTY/WebHost/gallery tests,
+  with follow-up tracked in [TODO.md](TODO.md).
 - Closed the first critique-remediation slice: removed the AI CLI from root Bun
   dependencies, made `mise.toml` local ignored tooling, added root test-target
   and rendered-fixture matrix guardrails to the repo gate, made rendered fixture
