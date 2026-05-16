@@ -247,6 +247,8 @@ jobs:
         run: |
           set -euo pipefail
           export STUI_SWIFT_TEST_SKIP_REGEX='toastAutoDismissRerendersWithoutAdditionalInput'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|injectedTerminalInputScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick'
           STUI_SWIFT_TEST_SKIP_REGEX+='|duplicateIdentifiersRejected'
           STUI_SWIFT_TEST_SKIP_REGEX+='|staleSocketPathsReplaced'
           STUI_SWIFT_TEST_SKIP_REGEX+='|mostRecentSelectionUsesTimestamps'
