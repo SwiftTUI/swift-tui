@@ -1381,7 +1381,7 @@ private func stableBytes(
   case .filePath(let path):
     Array(("file:\(path)").utf8)
   case .embeddedImage(let bytes):
-    Array("embedded:".utf8) + bytes.prefix(128)
+    Array("embedded:".utf8) + bytes
   }
 }
 

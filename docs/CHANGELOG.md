@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Aligned public `View.id(_:)` with SwiftUI's `Hashable`-accepting modifier
+  shape while keeping exact `Identity` replacement as package-only runtime
+  plumbing for framework-owned focus/action anchors and tests.
 - Prepared the first release-facing alpha posture for `0.1.0`: added root
   license, contribution, security, and release-policy files; restored vendored
   license/provenance files for UnixSignals and swift-figlet; added package

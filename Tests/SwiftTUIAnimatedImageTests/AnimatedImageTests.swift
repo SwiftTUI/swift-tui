@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUI
 import SwiftTUIAnimatedImage
 import Testing
@@ -23,6 +24,16 @@ struct AnimatedImageTests {
     #expect(decoded.frames.map(\.pixels) == sequence.frames.map(\.pixels))
   }
 
+  @Test("Repo Nyan GIF decodes every source frame as a distinct composed frame")
+  func repoNyanGIFDecodesEverySourceFrameAsDistinctComposedFrame() throws {
+    let sequence = try AnimatedGIF.decode(contentsOf: Self.repoFixturePath("nyan.gif"))
+    let uniqueComposedFrames = Set(sequence.frames.map { $0.pixels })
+
+    #expect(sequence.frames.count == 12)
+    #expect(uniqueComposedFrames.count == sequence.frames.count)
+    #expect(sequence.frameDelays.count == sequence.frames.count)
+  }
+
   @Test("AnimatedImage renders supplied frames through static image attachments")
   func animatedImageRendersSuppliedFramesThroughStaticImageAttachments() throws {
     let frame = Self.frame(red: 255, green: 255, blue: 255)
@@ -36,20 +47,30 @@ struct AnimatedImageTests {
     #expect(attachment.pixelSize == .init(width: 1, height: 1))
   }
 
-  @Test("AnimatedImage advances through supplied frames")
-  func animatedImageAdvancesThroughSuppliedFrames() async throws {
+  @Test("AnimatedImage advances through every GIF-decoded frame")
+  func animatedImageAdvancesThroughEveryGIFDecodedFrame() async throws {
     let frames = [
       Self.frame(red: 255, green: 0, blue: 0),
       Self.frame(red: 0, green: 0, blue: 255),
+      Self.frame(red: 0, green: 255, blue: 0),
+      Self.frame(red: 255, green: 255, blue: 0),
     ]
     let sequence = AnimatedImageSequence(
       frames: frames,
-      frameDelays: [.milliseconds(20), .milliseconds(20)]
+      frameDelays: [
+        .milliseconds(20),
+        .milliseconds(20),
+        .milliseconds(20),
+        .milliseconds(20),
+      ]
     )
-    let expectedSecondFrame = ImageAssetReference.embeddedImage(frames[1].imageData)
+    let gifDecodedSequence = try AnimatedGIF.decode(data: AnimatedGIF.encode(sequence))
+    let expectedFrameReferences = gifDecodedSequence.frames.map {
+      ImageAssetReference.embeddedImage($0.imageData)
+    }
     let host = AnimatedImageRecordingHost(size: CellSize(width: 4, height: 2))
     let inputReader = AnimatedImageConditionalInputReader {
-      host.observedReferences.contains(expectedSecondFrame)
+      expectedFrameReferences.allSatisfy { host.observedReferences.contains($0) }
     }
     let rootIdentity = Identity(components: ["animated-image.tests"])
     let terminalSize = host.surfaceSize
@@ -73,7 +94,7 @@ struct AnimatedImageTests {
       environmentValues: environment,
       proposal: ProposedSize(width: terminalSize.width, height: terminalSize.height),
       viewBuilder: { _, _ in
-        AnimatedImage(sequence)
+        AnimatedImage(gifDecodedSequence)
       }
     )
 
@@ -83,8 +104,10 @@ struct AnimatedImageTests {
       result.exitReason
         == RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
     )
-    #expect(host.observedReferences.contains(expectedSecondFrame))
-    #expect(result.renderedFrames >= 2)
+    for expectedReference in expectedFrameReferences {
+      #expect(host.observedReferences.contains(expectedReference))
+    }
+    #expect(result.renderedFrames >= expectedFrameReferences.count)
   }
 
   @Test("AnimatedImage renders first frame without playback task under reduced motion")
@@ -126,6 +149,17 @@ struct AnimatedImageTests {
       height: 1,
       pixels: [AnimatedImagePixel(red: red, green: green, blue: blue)]
     )
+  }
+
+  private static func repoFixturePath(
+    _ name: String
+  ) -> String {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent(name)
+      .path
   }
 }
 

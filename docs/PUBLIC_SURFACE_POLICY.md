@@ -163,6 +163,10 @@ Checked-in Swift sources should stay inside the structured concurrency model.
   `extension View` body witnesses. Framework primitives must opt into
   package-only primitive ownership through `PrimitiveView` or a view-like
   protocol such as `Shape`.
+- Public identity follows SwiftUI's source-level shape: `View.id(_:)` accepts
+  any `Hashable` value and derives an explicit identity under the current
+  tree position. Exact `Identity` replacement is package-only runtime plumbing,
+  not the app-authoring contract.
 - Public modifiers are first-class through `ViewModifier`, `View.modifier(_:)`,
   and `ModifiedContent`.
 - Concrete built-in modifier value types may be public when they participate in
