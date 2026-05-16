@@ -57,7 +57,11 @@ Status: **P0 / partially addressed / external verification needed**
 The local workflow file has been materially repaired:
 `.github/workflows/run-tests-linux.yml` now has `push`, `pull_request`, and
 `workflow_dispatch` triggers; installs Swiftly; runs policy checks; runs Linux
-and macOS repo gates; and includes a generic iOS package build.
+and macOS repo gates; and includes a generic iOS package build. Follow-up CI
+log review also repaired runner bootstrap drift: Linux jobs now install
+Swiftly's required `libcurl4-openssl-dev` dependency before selecting Swift
+6.3.1, and the generic iOS package build selects an Xcode installation with
+Swift 6.3 support instead of the runner's older default Xcode.
 
 Remaining critique:
 

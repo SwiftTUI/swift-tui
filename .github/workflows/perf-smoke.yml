@@ -22,7 +22,7 @@ jobs:
           set -euo pipefail
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
           installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           SWIFT_VERSION="$(tr -d '[:space:]' < .swift-version)"

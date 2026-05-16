@@ -24,6 +24,11 @@ in the durable docs, plans, source, or tests linked from an entry.
   remains intentionally excluded in favor of explicit owner-controlled
   dismissal. Closed the `WASISurfaceBridge` critique as already settled by its
   package-only target boundary.
+- Repaired GitHub CI bootstrap drift observed in external Actions logs: Linux
+  jobs now install Swiftly's required libcurl development package before
+  selecting Swift 6.3.1, macOS Swiftly setup skips the latest-toolchain detour,
+  and the generic iOS package build selects an Xcode image with Swift 6.3
+  support instead of the runner default.
 - Closed the first critique-remediation slice: removed the AI CLI from root Bun
   dependencies, made `mise.toml` local ignored tooling, added root test-target
   and rendered-fixture matrix guardrails to the repo gate, made rendered fixture

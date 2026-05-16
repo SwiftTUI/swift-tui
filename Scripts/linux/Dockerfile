@@ -42,6 +42,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # System dependencies. The upstream swift image ships a slim Ubuntu base, so
 # we add the tools the SwiftTUI Linux + WebExample workflows actually use:
 #   - curl/unzip:    bun installer + general fetch
+#   - libcurl dev:   Swiftly's downloaded Swift toolchains require it
 #   - ca-certificates+git: SwiftPM dependency resolution over HTTPS
 #   - ripgrep:       used by repo tests + matches the GH Actions runner setup
 #   - binaryen:      provides wasm-opt for Examples/WebExample
@@ -55,6 +56,7 @@ RUN apt-get update \
       ca-certificates \
       curl \
       git \
+      libcurl4-openssl-dev \
       unzip \
       ripgrep \
       binaryen \
