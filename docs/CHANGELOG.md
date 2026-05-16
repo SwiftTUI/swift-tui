@@ -18,6 +18,12 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Closed the first critique-remediation slice: removed the AI CLI from root Bun
+  dependencies, made `mise.toml` local ignored tooling, added root test-target
+  and rendered-fixture matrix guardrails to the repo gate, made rendered fixture
+  recording explicit, replaced the WASI tautology assertion, added
+  informational coverage reporting, and corrected the stale `drawnIdentities`
+  scheduling comment.
 - Aligned public `View.id(_:)` with SwiftUI's `Hashable`-accepting modifier
   shape while keeping exact `Identity` replacement as package-only runtime
   plumbing for framework-owned focus/action anchors and tests.

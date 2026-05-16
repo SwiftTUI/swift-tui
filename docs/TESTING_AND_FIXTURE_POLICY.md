@@ -12,6 +12,10 @@ hooks instead of the Swift test suite:
 - `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the Foundation-free `Core`, `View`, and `SwiftTUI` library layers
 - `Scripts/check_public_surface_policies.sh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
 - `Scripts/check_concurrency_safety_policies.sh`: forbids `@unchecked Sendable` and `nonisolated(unsafe)` in checked-in Swift sources so concurrency-safety regressions fail before test execution
+- `Scripts/check_root_test_target_coverage.sh`: verifies every root
+  `Package.swift` test target is covered by `Scripts/test_all.sh`
+- `Scripts/check_rendered_text_fixture_matrix.sh`: verifies every rendered-text
+  fixture directory carries the full supported terminal-capability matrix
 - `Scripts/check_accessibility_guardrails.sh`: pins reviewed raw-glyph,
   color-state, and visual-content source files and requires manual listening
   docs under `Tests/SwiftTUITests/Accessibility/`
@@ -24,9 +28,9 @@ There is not currently a dedicated checked-in source-layout hook. The source
 map in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) is therefore kept in sync through
 review, docs maintenance, and the broader public-surface policy checks.
 
-Rendered-text fixture matrix completeness is currently enforced by
-`RenderedTextFixtureSupportTests` and the fixture-verification helpers in the
-test suite, not by a separate pre-commit hook.
+Rendered-text fixture matrix completeness is enforced by
+`Scripts/check_rendered_text_fixture_matrix.sh`, `RenderedTextFixtureSupportTests`,
+and the fixture-verification helpers in the test suite.
 
 ## Test Topology
 
@@ -84,9 +88,14 @@ Fixture updates need an explanation when:
 When updating fixtures:
 
 1. Capture the reason for the change in the commit or PR description.
-2. Re-run the relevant capability matrix or scenario set.
+2. Run `Scripts/record_rendered_text_fixtures.sh`; do not enable fixture
+   recording in the repo gate.
 3. Check for accidental drift in adjacent fixtures.
 4. Prefer the smallest possible fixture rewrite that proves the intended behavior.
+
+Use `bun run test:coverage` when you need a root-package coverage signal. The
+coverage report is informational; the repo does not currently enforce a
+percentage threshold.
 
 ## Performance Gates
 

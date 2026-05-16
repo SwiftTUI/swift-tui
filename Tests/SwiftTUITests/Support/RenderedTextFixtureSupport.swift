@@ -10,17 +10,26 @@ enum RenderedTextFixtureMode: Sendable {
   case record
   case verify
 
-  static let recordEnvironmentVariable = "PARALLEL_RECORD_RENDERED_FIXTURES"
+  private static let recordEnvironmentVariable = "STUI_RECORD_RENDERED_TEXT_FIXTURES"
+  private static let recordScriptEnvironmentVariable =
+    "STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT"
+  static let recordCommand = "Scripts/record_rendered_text_fixtures.sh"
 
   var isRecording: Bool {
     switch self {
     case .automatic:
-      ProcessInfo.processInfo.environment[Self.recordEnvironmentVariable] == "1"
+      Self.recordingRequestedByExplicitScript
     case .record:
       true
     case .verify:
       false
     }
+  }
+
+  private static var recordingRequestedByExplicitScript: Bool {
+    let environment = ProcessInfo.processInfo.environment
+    return environment[recordEnvironmentVariable] == "1"
+      && environment[recordScriptEnvironmentVariable] == "1"
   }
 }
 
@@ -269,7 +278,8 @@ private func serializeRenderedSnapshot(
 
   let body = renderedLines.enumerated().map { index, line in
     let lineNumber = String(index + 1)
-    let padded = String(repeating: "0", count: max(0, lineNumberWidth - lineNumber.count))
+    let padded =
+      String(repeating: "0", count: max(0, lineNumberWidth - lineNumber.count))
       + lineNumber
     return "\(padded)│\(displayLine(line))"
   }
@@ -456,7 +466,7 @@ private enum RenderedTextFixtureIssue: Error, CustomStringConvertible {
       Fixture directory: \(fixtureCaseDirectory.path)
       Expected: \(expectedFixtureFileNames.sorted().joined(separator: ", "))
       Actual: \(actualFixtureFileNames.sorted().joined(separator: ", "))
-      Re-run with \(RenderedTextFixtureMode.recordEnvironmentVariable)=1 to update fixtures.
+      Run \(RenderedTextFixtureMode.recordCommand) to update fixtures.
       """
 
     case .missingFixture(let fixtureName, let configurationName, let fixtureURL, let previewURL):
@@ -464,7 +474,7 @@ private enum RenderedTextFixtureIssue: Error, CustomStringConvertible {
       Missing rendered fixture for \(fixtureName)/\(configurationName).
       Expected fixture: \(fixtureURL.path)
       Actual snapshot: \(previewURL.path)
-      Re-run with \(RenderedTextFixtureMode.recordEnvironmentVariable)=1 to create fixtures.
+      Run \(RenderedTextFixtureMode.recordCommand) to create fixtures.
       """
 
     case .fixtureMismatch(let fixtureName, let configurationName, let fixtureURL, let previewURL):
@@ -472,7 +482,7 @@ private enum RenderedTextFixtureIssue: Error, CustomStringConvertible {
       Rendered fixture mismatch for \(fixtureName)/\(configurationName).
       Expected fixture: \(fixtureURL.path)
       Actual snapshot: \(previewURL.path)
-      Re-run with \(RenderedTextFixtureMode.recordEnvironmentVariable)=1 to update fixtures.
+      Run \(RenderedTextFixtureMode.recordCommand) to update fixtures.
       """
     }
   }
