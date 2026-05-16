@@ -27,6 +27,18 @@ Severity is assigned **relative to how the project presents itself** — a publi
 documented framework with a marketing site and published-looking packages — not
 relative to "a personal weekend project," which would not warrant most of this.
 
+**Revision note (2026-05-15).** After the initial version, this assessment was
+reconciled against an independent critique produced separately for the same
+repository (`CRITIQUE_CODEX.md`). Every point of divergence was re-verified
+against the codebase rather than merged on trust. The reconciliation **corrected
+one finding** (U5 — see its note) and **added ten** (U17–U21, A9–A10, C7–C9).
+Almost all of the additions are in host-boundary code — `SwiftUIHost`, the
+`WebHost` transports, and the default `@main` launchers — which the original
+six-agent pass sampled only lightly; the divergence between the two critiques
+was, in effect, a map of each pass's blind spots. Where the two critiques
+disagreed on interpretation rather than fact, the reading better supported by
+the code was adopted.
+
 ---
 
 ## Executive summary
@@ -57,11 +69,11 @@ disqualifying and must be closed before any further promotion).
 | Severity | Count | Meaning |
 |----------|-------|---------|
 | Critical | 4  | Blocks adoption or legal use; or removes all automated safety. |
-| High     | 12 | Serious defect, correctness hazard, or major gap vs. stated goals. |
-| Medium   | 25 | Real problem worth scheduled work; erodes quality or trust. |
-| Low      | 16 | Minor; worth fixing opportunistically. |
+| High     | 13 | Serious defect, correctness hazard, or major gap vs. stated goals. |
+| Medium   | 32 | Real problem worth scheduled work; erodes quality or trust. |
+| Low      | 18 | Minor; worth fixing opportunistically. |
 | Nit      | 4  | Cosmetic. |
-| **Total**| **61** | |
+| **Total**| **71** | |
 
 ---
 
@@ -112,7 +124,11 @@ root (`ls LICENSE*` → no matches; `git ls-files | grep -i licen` returns only
 three *vendored* licences). No `license` field in the root `package.json`, in the
 `@swifttui/web` / `@swifttui/build` manifests, or in `Package.swift`. The README
 explicitly instructs readers to "depend on the `SwiftTUI` product," and a live API
-reference is published at swifttui.io.
+reference is published at swifttui.io. Worse, the marketing site itself links to
+a licence that does not exist: `Website/src/components/SiteFooter.astro` renders a
+footer "License" link to `github.com/GoodHatsLLC/SwiftTUI/blob/main/LICENSE`, and
+`Website/src/pages/index.astro` repeats that URL in JSON-LD structured data — both
+resolve to a 404.
 
 **Why it matters.** Under default copyright law, source published with no licence
 grants **no** right to use, copy, modify, or distribute it. Every instruction in
@@ -135,7 +151,10 @@ No GitHub releases, no semver progression, no release notes.
 temporary tooling-hack commit, by an anonymized/misconfigured git identity, now 500
 commits stale. Anyone pinning a SwiftPM dependency to `0.0.1` gets that. There is
 effectively no released version of SwiftTUI — which directly contradicts the
-maturity implied by the live docs site.
+maturity implied by the live docs site. There is also no release *process*: no
+release workflow, no release checklist comparable to the local test gate, and the
+only install snippet anywhere — on the website — pins `branch: "main"` rather than
+a tag (U17). There is currently no stable, versioned way to depend on this project.
 
 **Direction.** Cut a genuine `0.1.0` from a clean commit with release notes; adopt
 semver; delete or re-point the misleading `0.0.1` tag.
@@ -239,7 +258,11 @@ the change." Honesty about being solo is more credible than implying a team.
 stars** — *the* well-known SwiftUI-inspired terminal-UI framework, years old — plus
 `bannzai/SwiftTUI`, `finnvoor/SwiftTUI`, `rxtech-lab/SwiftTUI`. This project took
 the identical project name, identical umbrella module name, and identical
-`import SwiftTUI` statement, in the identical problem domain.
+`import SwiftTUI` statement, in the identical problem domain. The collision
+reaches the repository name itself: the project's website links to
+`github.com/GoodHatsLLC/SwiftTUI`, so the GitHub repository is named `SwiftTUI` —
+directly colliding with `rensbreur/SwiftTUI` — even though the local directory and
+the SwiftPM package are `swift-tui`.
 
 **Why it matters.** A project intended to be adopted must be findable and
 unambiguous. "Should I use SwiftTUI?" is now a question with at least five
@@ -461,6 +484,11 @@ local patches.
 `prek`, `swift-format`, `cspell` (and `codex` arrives via I5). `mise.toml` pins
 `bun` and `prek` to `latest`; `swiftly` is unpinned in most install paths. Only
 `.swift-version` (6.3.1) and the wasm SDK checksum are genuinely pinned.
+Separately, `mise.toml`'s own `release_core` and `release_ex_web` tasks invoke
+**bare `swift build`**, directly violating the repo's own rule (`AGENTS.md`,
+`docs/TOOLCHAINS.md`) that repo-local builds go through `swiftly run swift` — so a
+contributor running the endorsed-looking `mise run release_core` silently uses the
+wrong toolchain.
 
 **Why it matters.** Three layers resolve to `latest`, so two contributors
 onboarding a week apart get different toolchains — undermining the reproducibility
@@ -676,6 +704,50 @@ project).
 `swift-tui-webhost` and `swift-tui-terminal` as separate packages — they are the
 two integrations whose external dependencies a core consumer never wants.
 
+#### A9 · `SwiftUIHost` ignores the `SemanticHostFrame.sequence` staleness contract · **Medium**
+
+**Evidence.** `SemanticHostFrame` (`TerminalHost.swift:409-437`) carries
+`sequence: UInt64`, documented as "monotonically increasing for each runtime
+producer. Hosts can use it to detect stale asynchronous work without inferring
+freshness from callback ordering." The producer assigns it (`HostedRasterSurface`
+keeps a `nextFrameSequence` counter). But `HostedRasterSurface` delivers each
+frame through an **unstructured** `Task { @MainActor in onFrame(frame) }`
+(`HostedRasterSurface.swift:51-55`), and the first-party consumer
+`SwiftUIHostSceneHost.receiveFrame` (`SwiftUIHostSceneHost.swift:137-147`)
+overwrites `latestSurface`, `latestSemanticSnapshot`, `focusedAccessibilityIdentity`,
+and `latestPresentationDamage` **without reading `frame.sequence`**.
+
+**Why it matters.** Unstructured `Task`s carry no ordering guarantee, so two
+in-flight frames can be applied out of order and an older frame can overwrite a
+newer one — a flash of stale UI. The framework deliberately designed `sequence`
+as the defense against exactly this, and its own flagship host does not use it.
+Either the contract matters (and `SwiftUIHost` has a latent ordering bug) or it
+does not (and the documented contract misleads).
+
+**Direction.** Store the last-consumed `sequence` in `SwiftUIHostSceneHost` and
+drop frames that are not strictly newer. If ordering is in fact guaranteed by
+another mechanism, document that and say why `sequence` is unnecessary.
+
+#### A10 · A core frame-pipeline type carries a doc comment describing removed behavior · **Low**
+
+**Evidence.** `FrameArtifacts.drawnIdentities` (`FrameArtifacts.swift:179-196`) is
+documented as: "The runtime uses this set to gate animation tick scheduling on
+viewport visibility … scheduling another deadline would only burn CPU." But
+`RunLoop+Rendering.swift:985-997` states the opposite of current behavior: "The
+viewport gate that used to guard this path … **is gone** … Phase 4 split the tick
+result so `hasPendingWork` is the unambiguous 'schedule another frame' signal." A
+grep finds `drawnIdentities` still populated but no longer read to gate
+scheduling.
+
+**Why it matters.** Unlike a stale file *path* (A5), this is a stale *behavioral*
+description on a `package` core data product — it tells a reader the runtime does
+something it explicitly stopped doing. A maintainer reasoning about animation
+scheduling from this comment would be actively misled.
+
+**Direction.** Rewrite the `drawnIdentities` comment to its current role (or, if
+it now has no live consumer, say so). The docs/source drift check recommended in
+A5 would catch this class of error.
+
 ---
 
 ## U · Public API & usability
@@ -756,20 +828,32 @@ directly (matching the storage and the existing `package` initializer), or store
 the closures as `@isolated(any)` and make `wrappedValue` hop. Do not paper over the
 mismatch with a bitcast.
 
-#### U5 · The README's "import only `SwiftTUI`" guidance is contradicted by the project's own examples · **Medium**
+#### U5 · The `SwiftTUI`-vs-`SwiftTUIRuntime` import distinction is real, correct, and undocumented · **Medium**
 
-**Evidence.** The README and `PUBLIC_SURFACE_POLICY.md` present `import SwiftTUI` as
-canonical for terminal apps. Across `Examples/`, `import SwiftTUIRuntime` appears
-~77× versus `import SwiftTUI` ~45×; in the flagship `gallery` example, **0 of 17**
-view files import `SwiftTUI`.
+**Evidence.** The README and `PUBLIC_SURFACE_POLICY.md` present `import SwiftTUI`
+as canonical for terminal apps; across `Examples/`, `import SwiftTUIRuntime`
+appears far more often (~77× vs ~45×), and in the flagship `gallery` example
+**0 of 17** view files import `SwiftTUI`. Verified cause:
+`Examples/gallery/Package.swift` splits the example into a `GalleryDemo`
+*executable* target (which depends on `SwiftTUI` + `SwiftTUIWebHostCLI`) and a
+`GalleryDemoViews` *library* target (which depends on `SwiftTUIRuntime`). A
+reusable view library importing `SwiftTUIRuntime` rather than `SwiftTUI` is in
+fact the *correct* choice — `SwiftTUI` re-exports `SwiftTUICLI`/`SwiftTUIArguments`,
+which a view library has no reason to link.
 
-**Why it matters.** A new user is told one thing and shown another by the
-maintainer's own showcase code. The intended one-import simplification is not
-actually realized.
+**Why it matters.** *(This corrects a sharper claim in the first draft, which
+framed the example imports as the maintainer contradicting their own guidance.)*
+It is not a contradiction — it is a legitimate architectural split: executables
+import `SwiftTUI`; reusable view packages import `SwiftTUIRuntime`. The real
+defect is that this distinction is **explained nowhere** — not in the README, not
+in the gallery's own README, not in `PUBLIC_SURFACE_POLICY.md`. A newcomer
+studying the flagship example's view code sees `import SwiftTUIRuntime`
+everywhere and copies it into their *application*, where `import SwiftTUI` is the
+intended entry point.
 
-**Direction.** Make the examples consistently `import SwiftTUI`, or, if
-`SwiftTUIRuntime` is the intended import for view-only packages, say so and stop
-calling `SwiftTUI` "the one import."
+**Direction.** Document the rule explicitly in the README and the examples index:
+executable apps import `SwiftTUI`; reusable view packages import `SwiftTUIRuntime`
+when they intentionally avoid runner behavior.
 
 #### U6 · `@main` behavior depends invisibly on which module is imported · **Medium**
 
@@ -908,6 +992,106 @@ return concrete `ModifiedContent` while ~35 siblings return `some View`.
 
 **Direction.** Rename `Standard.Error` and the `Stand.swift` file; align the two
 outlier modifiers to `some View`.
+
+#### U17 · The README gives no installation instructions; the only install snippet pins `branch: "main"` · **Medium**
+
+**Evidence.** The README shows run commands and app code but never the
+`.package(...)` dependency declaration an external consumer must add to their own
+`Package.swift`. The only install snippet in the entire project is on the
+marketing site — `Website/src/components/Hero.astro:54` — and it reads
+`.package(url: "https://github.com/GoodHatsLLC/SwiftTUI", branch: "main")`. The
+DocC module guide mentions "one dependency on the root `swift-tui` package" but
+shows no manifest wiring.
+
+**Why it matters.** A framework's most basic adoption question — "how do I add
+this to my project?" — is unanswered in the README and answered on the website
+only by pinning an unversioned moving branch. `branch: "main"` means every
+`swift package update` pulls whatever HEAD happens to be, against a project doing
+~25 commits/day with no release (G2) and no licence (G1). There is no safe,
+stable, legal way to depend on SwiftTUI today.
+
+**Direction.** Add an "Installation" section to the README with a real dependency
+snippet. Once a release exists, pin a tag or version range, not `branch: "main"`;
+if `main` is genuinely the only option for now, label the project alpha at the
+snippet.
+
+#### U18 · For a terminal-UI framework, the README shows no rendered output · **Low**
+
+**Evidence.** The README's first code block builds a view and calls
+`print(output)`, but the rendered terminal output itself is never shown. There is
+no screenshot, no asciinema cast, and no static text-render preview anywhere in
+the README. The marketing site has a live demo; the README — what GitHub and
+SwiftPM surface — has none.
+
+**Why it matters.** For a *UI* framework, visual evidence is part of the value
+proposition and part of how a reader decides whether to try it. A terminal UI is
+also trivially capturable as a screenshot or a fenced text block, so the omission
+is low-cost to fix.
+
+**Direction.** Put one stable rendered example (a screenshot or a fenced block of
+actual output) in the README's first screen and link to the live browser/WASI
+demo.
+
+#### U19 · Fourteen products are presented as undifferentiated peers with no support tiers · **Medium**
+
+**Evidence.** `Package.swift` exports 14 library products — daily-use modules,
+host runners, transport bridges, argument parsing, PTY primitives,
+terminal-workspace APIs — all declared at the same level. SwiftPM and Xcode
+present `SwiftTUIPTYPrimitives`, `WASISurfaceBridge`, `SwiftTUIArguments`,
+`SwiftTUICLI`, and `SwiftTUIRuntime` as peers of `SwiftTUI` in the dependency
+picker, with nothing signalling which one a typical app should start from.
+
+**Why it matters.** A new consumer opening the package sees 14 equally-weighted
+choices and no front door. The project *intends* "start with `SwiftTUI`"
+(`PUBLIC_SURFACE_POLICY.md`), but nothing in the surface a tool actually presents
+makes that dominant. This compounds U5 and the ~16,500-public-symbol surface
+noted in the API domain assessment.
+
+**Direction.** Keep the products, but label tiers consistently wherever products
+are listed — primary app surface, add-on content products, host/runner products,
+integration primitives — and make "start with `SwiftTUI`" visually dominant in
+the README and package docs.
+
+#### U20 · `WASISurfaceBridge` is a public product with zero public API · **Medium**
+
+**Evidence.** `WASISurfaceBridge` is a `.library` product in `Package.swift` and
+is described in the README ("`WASISurfaceBridge` available for transport-only
+consumers") and `docs/HOST_PACKAGES.md` as an importable product. But
+`docs/PUBLIC_API_BASELINE.md:30` reports it as 0 top-level / 0 total public
+symbols, and a grep confirms zero ordinary `public` declarations in its sources —
+its useful types (`WebSurfaceInputParser`, `WebSurfaceFrameEncoder`) are all
+`@_spi(WebHost) public`, reachable only via `@_spi(WebHost) import`.
+
+**Why it matters.** To an ordinary consumer, `import WASISurfaceBridge` yields
+nothing callable. The module is genuinely useful as an internal SPI-sharing layer
+for `SwiftTUIWebHost`, but advertising it to "transport-only consumers" as an
+adoptable public product is misleading — it reads as accidental packaging.
+
+**Direction.** Either give it a real public transport API with a documented
+stability tier, or stop listing it as a consumer-facing product and describe it
+as the internal SPI module it is.
+
+#### U21 · DocC catalogs exist for only 6 of 16 products; the published archive covers 3 · **Medium**
+
+**Evidence.** `docs/README.md` says per-target API reference lives in `*.docc`
+catalogs under `Sources/`. A `find` shows six first-party catalogs —
+`SwiftTUICore`, `SwiftTUIViews`, `SwiftTUI`, `SwiftTUICharts`, `SwiftTUIRuntime`,
+`SwiftTUIAnimatedImage` — and **none** for any of the ten `Platforms/` products
+(`SwiftTUICLI`, `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`,
+`SwiftTUIArguments`, `SwiftTUIPTYPrimitives`, `WASISurfaceBridge`, `SwiftTUIWASI`,
+`SwiftTUIWebHost`, `SwiftTUIWebHostCLI`, `SwiftUIHost`). The README's
+combined-archive command — the one that powers the public site — targets only
+`SwiftTUIViews`, `SwiftTUI`, and `SwiftTUICharts`, omitting even `SwiftTUIRuntime`
+and `SwiftTUIAnimatedImage`, which *do* have catalogs.
+
+**Why it matters.** For a 14-product framework, "DocC covers some products" is a
+discoverability gap: a consumer looking up `SwiftUIHost` or `SwiftTUITerminal` on
+the API site finds nothing, and the published archive is narrower still than the
+catalogs that exist.
+
+**Direction.** Either add DocC catalogs for the public platform products, or state
+explicitly in `docs/README.md` and on the site that those products are covered by
+prose guides only.
 
 ---
 
@@ -1106,6 +1290,79 @@ used purely as a comment anchor.
 **Direction.** Delete the alias or document it as an intentional shim; replace the
 empty `if` with a plain comment.
 
+#### C7 · WebHost bridges async output into a synchronous `present()` with an unbounded, un-cancellable wait · **High**
+
+**Evidence.** `WebSocketSurfaceTransport.present(_:)` is a synchronous
+`PresentationSurface` entry point (`WebSocketSurfaceTransport.swift:148`). It calls
+`sendBytes`, which (lines 184-215) creates a `DispatchSemaphore(value: 0)`, spawns
+an unstructured `Task { try await sink.send(bytes); semaphore.signal() }`, and then
+calls `semaphore.wait()` — **with no timeout and no cancellation path**. The
+underlying sink (`WebHostServer.send`) is genuinely `async`.
+
+**Why it matters.** This is a sync-over-async bridge with no escape valve. If the
+WebSocket sink stalls — browser backpressure, a frozen tab, a half-open
+connection — the thread that called `present()` parks indefinitely, and because
+`present()` is on the runtime's frame-commit path, runtime presentation stops.
+Blocking a thread on a `DispatchSemaphore` while waiting for an unstructured
+`Task` is also the classic shape that deadlocks under executor contention. There
+is no timeout, no `DispatchTimeoutResult` branch, and no failure the runtime can
+observe short of the connection eventually erroring.
+
+**Direction.** Make host presentation `async` at the `PresentationSurface` seam so
+the WebHost path needs no bridge; or, if the seam must stay synchronous, give the
+wait a bounded timeout plus an explicit "presentation stalled" failure the runtime
+can act on.
+
+#### C8 · The default `@main` launchers trap on recoverable user and configuration errors · **Medium**
+
+**Evidence.** The bare-`App` default entry point is
+`public static func main() async { … try! await TerminalRunner.run(Self.self, …) }`
+(`TerminalRunner.swift:501`). The WebHost equivalent is
+`do { try await WebHostCLIRunner.run(Self.self) } catch { fatalError(String(describing: error)) }`
+(`WebHostCLIRunner.swift:68-74`). `TerminalRunner.run` throws genuinely recoverable
+conditions — `TerminalRunnerError.webHostNotLinked` ("`--web` requires the opt-in
+WebHost runner …"), multiple-scene errors, host-setup failures — and `try!` /
+`fatalError` turn each into a crash. The *`SwiftTUICommand`* variants of both
+`main()` already do this correctly (`catch { exit(withError: error) }`), so the
+project has the right pattern and applies it inconsistently.
+
+**Why it matters.** This is the framework's default `@main` entry point — the
+first code path every `@main struct: App` consumer runs. A user who passes `--web`
+to a terminal-only binary, or declares two scenes, gets a crash dump instead of a
+one-line stderr diagnostic and a non-zero exit. For a framework default that is
+blunt, and gratuitous: the correct pattern is already present on the sibling code
+path.
+
+**Direction.** Route default-entry errors through stderr plus a non-zero exit,
+matching the `SwiftTUICommand` path. Reserve traps for genuinely impossible
+invariants — the engine's internal `preconditionFailure`s on missing frame
+artifacts (`RunLoop+Rendering.swift:220`, `:839`) are a defensible separate
+category.
+
+#### C9 · `StateGraphBindingRegistry.shared` is a process-global registry with no cleanup path · **Medium**
+
+**Evidence.** `State.swift:375-394` defines `StateGraphBindingRegistry`, a
+`@MainActor` class with a `static let shared` singleton holding
+`currentIdentityByBoxAndGraph: [ObjectIdentifier: [ViewGraphScopeID: Identity]]`.
+Its only methods are `remember` (insert) and `currentIdentity` (read) — there is
+no `forget`/`prune`/`remove`, and a grep confirms none exists (the type is
+`private` to `State.swift`, so any cleanup would have to live there). Entries
+keyed by `ObjectIdentifier(StateBox)` are added on `remember` and never removed.
+
+**Why it matters.** Two consequences. (1) *Unbounded growth:* a long-lived hosted
+session — a `SwiftUIHost` app running for hours, mounting and unmounting many
+stateful views — accumulates registry entries for the life of the process.
+(2) *A subtler hazard:* the `ObjectIdentifier` of a deallocated class instance can
+be reused by a later allocation at the same address, so a stale entry from a freed
+`StateBox` could be read as belonging to a *different*, live box that lands at
+that address — if its `ViewGraphScopeID` also matches. This sits adjacent to an
+area the project has already patched once (the merged `@State`-session
+vulnerability fix).
+
+**Direction.** Tie registry cleanup to view-graph teardown or `StateBox`
+deinitialization, and add a test that mounts and unmounts many stateful identities
+and asserts the registry does not grow without bound.
+
 ---
 
 ## What the project gets right
@@ -1170,7 +1427,10 @@ everything else.
    iOS build (I3); run `prek`/`check_*.sh` as a required PR job (I4); enable branch
    protection on `main`.
 4. **Fix the genuine correctness hazards.** `Color.hex(_:)` → throwing or optional
-   (C1); replace the `Binding.init` `unsafeBitCast` with an honest signature (U4).
+   (C1); replace the `Binding.init` `unsafeBitCast` with an honest signature (U4);
+   remove the unbounded `DispatchSemaphore` wait in the WebHost transport (C7);
+   make the default `@main` launchers report errors instead of trapping (C8); and
+   honour the `SemanticHostFrame.sequence` staleness contract in `SwiftUIHost` (A9).
 5. **Calibrate the self-presentation.** Add a pre-1.0 / single-maintainer /
    AI-assisted stability banner to the README (G5, G10); cut a real `0.1.0` and
    retire the `TEMP` `0.0.1` tag (G2); populate or delete `TODO.md` (G3); reword the
@@ -1209,6 +1469,14 @@ Critical and High findings were verified first-hand. Key results:
 | No `@Environment` wrapper (U1) | `git grep propertyWrapper Sources/SwiftTUIViews/Environment/` → none. |
 | Lint rules disabled (I10) | read `.swift-format.json` `rules` block directly. |
 | Name collision (G8) | `gh search repos SwiftTUI` → `rensbreur/SwiftTUI` 1,504★, plus 4 others. |
+| Website links a 404 licence (G1) | `Website/src/components/SiteFooter.astro:45` and `index.astro:35` link to a `main` `LICENSE` that does not exist. |
+| WebHost blocking transport (C7) | `WebSocketSurfaceTransport.swift:184-215` — `sendBytes` calls `semaphore.wait()` with no timeout. |
+| Default launcher traps (C8) | `TerminalRunner.swift:501` uses `try!`; `WebHostCLIRunner.swift:72` does `catch { fatalError(...) }`. |
+| `SwiftUIHost` ignores frame sequence (A9) | `SemanticHostFrame.sequence` documented `TerminalHost.swift:409`; `SwiftUIHostSceneHost.swift:137` never reads it. |
+| State registry has no cleanup (C9) | `State.swift:375-394` — `StateGraphBindingRegistry` exposes only `remember`/`currentIdentity`. |
+| `WASISurfaceBridge` empty product (U20) | `PUBLIC_API_BASELINE.md:30` reports 0 top-level and 0 total public symbols; types are `@_spi(WebHost)`. |
+| DocC product coverage (U21) | `find` → 6 first-party `.docc` catalogs; the 10 `Platforms/` products have none. |
+| `drawnIdentities` stale comment (A10) | `RunLoop+Rendering.swift:985-997` states the viewport gate "is gone"; `FrameArtifacts.swift:182` still documents it. |
 
 **Limitations of this assessment.** The build and test suite were not run; CI
 failure is inferred from `gh` run history and the `swiftly`/`setup-swift` mismatch.
