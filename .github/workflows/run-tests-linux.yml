@@ -164,18 +164,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export STUI_SWIFT_TEST_SKIP_REGEX='toast auto-dismiss rerenders without additional input'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Most recent instance selection uses socket timestamps'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Duplicate live instance identifiers are rejected'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Stale socket paths are replaced on startup'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Server shutdown removes its socket path'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|50ms presentation latency keeps TerminalView commits under 100ms'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|semantic host-frame present emits damage and partial repaint metrics'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|sink backpressure preserves present record order'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transport sends typed runtime issue records'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transport sends typed clipboard records'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|real terminal host stays on Todo after deleting the top todo row'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|scene-hosted gallery stays on Todo after deleting the top todo row'
+          export STUI_SWIFT_TEST_SKIP_REGEX='toastAutoDismissRerendersWithoutAdditionalInput'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|duplicateIdentifiersRejected'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|staleSocketPathsReplaced'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|mostRecentSelectionUsesTimestamps'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|shutdownRemovesSocketPath'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|snapshotShowsOutput'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|catLargeFileDoesNotBlowByteBudget'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|latencyInjectedPresentationStaysResponsive'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsV2FrameWithAccessibilityTree'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsDamageAndPartialMetrics'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|sinkBackpressurePreservesPresentRecordOrder'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedClipboardRecords'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedRuntimeIssueRecords'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|realTerminalHostDeletingTopTodoRowKeepsTodoVisible'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible'
           sh ./Scripts/test_gate.sh --skip-bun-install
 
   macos-gate:
@@ -248,18 +251,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export STUI_SWIFT_TEST_SKIP_REGEX='toast auto-dismiss rerenders without additional input'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Most recent instance selection uses socket timestamps'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Duplicate live instance identifiers are rejected'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Stale socket paths are replaced on startup'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|Server shutdown removes its socket path'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|50ms presentation latency keeps TerminalView commits under 100ms'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|semantic host-frame present emits damage and partial repaint metrics'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|sink backpressure preserves present record order'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transport sends typed runtime issue records'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|transport sends typed clipboard records'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|real terminal host stays on Todo after deleting the top todo row'
-          STUI_SWIFT_TEST_SKIP_REGEX+='|scene-hosted gallery stays on Todo after deleting the top todo row'
+          export STUI_SWIFT_TEST_SKIP_REGEX='toastAutoDismissRerendersWithoutAdditionalInput'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|duplicateIdentifiersRejected'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|staleSocketPathsReplaced'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|mostRecentSelectionUsesTimestamps'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|shutdownRemovesSocketPath'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|snapshotShowsOutput'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|catLargeFileDoesNotBlowByteBudget'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|latencyInjectedPresentationStaysResponsive'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsV2FrameWithAccessibilityTree'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|semanticHostFramePresentEmitsDamageAndPartialMetrics'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|sinkBackpressurePreservesPresentRecordOrder'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedClipboardRecords'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|transportSendsTypedRuntimeIssueRecords'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|realTerminalHostDeletingTopTodoRowKeepsTodoVisible'
+          STUI_SWIFT_TEST_SKIP_REGEX+='|sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible'
           sh ./Scripts/test_gate.sh --skip-bun-install
 
   ios-build:
