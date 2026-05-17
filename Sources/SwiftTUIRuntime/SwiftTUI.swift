@@ -122,16 +122,21 @@ public struct DefaultRenderer {
   package func abortPreparedFrameHead(
     _ draft: FrameHeadDraft
   ) {
+    guard let checkpoints = draft.checkpoints else {
+      preconditionFailure(
+        "Cannot abort a one-shot frame head — it has no checkpoints."
+      )
+    }
     draft.registrationDraft.discard()
-    viewGraph.restoreCheckpoint(draft.viewGraphCheckpoint)
-    frameState.restoreCheckpoint(draft.frameStateCheckpoint)
-    presentationPortalState.restoreCheckpoint(draft.presentationPortalCheckpoint)
+    viewGraph.restoreCheckpoint(checkpoints.viewGraph)
+    frameState.restoreCheckpoint(checkpoints.frameState)
+    presentationPortalState.restoreCheckpoint(checkpoints.presentationPortal)
     if let observationBridge = draft.observationBridge,
-      let checkpoint = draft.observationBridgeCheckpoint
+      let checkpoint = checkpoints.observationBridge
     {
       observationBridge.restoreCheckpoint(checkpoint)
     }
-    animationController.abortFrameHeadTransaction(draft.animationCheckpoint)
+    animationController.abortFrameHeadTransaction(checkpoints.animation)
   }
 
   @MainActor
@@ -793,11 +798,14 @@ public struct DefaultRenderer {
       clock: clock,
       renderGeneration: renderGeneration,
       registrationDraft: registrationDraft,
-      viewGraphCheckpoint: viewGraphCheckpoint,
-      frameStateCheckpoint: frameStateCheckpoint,
-      presentationPortalCheckpoint: presentationPortalCheckpoint,
+      checkpoints: FrameHeadCheckpoints(
+        viewGraph: viewGraphCheckpoint,
+        frameState: frameStateCheckpoint,
+        presentationPortal: presentationPortalCheckpoint,
+        observationBridge: observationBridgeCheckpoint,
+        animation: animationCheckpoint
+      ),
       observationBridge: resolveContext.observationBridge,
-      observationBridgeCheckpoint: observationBridgeCheckpoint,
       resolveContext: resolveContext,
       graphRootIdentity: presentationPortalContext.identity,
       frameContext: frameContext,
@@ -805,8 +813,7 @@ public struct DefaultRenderer {
       frameTailInput: frameTailInput,
       runtimeIssues: [],
       animationTimestamp: animationTimestamp,
-      resolveDuration: resolveDuration,
-      animationCheckpoint: animationCheckpoint
+      resolveDuration: resolveDuration
     )
   }
 
@@ -1196,7 +1203,7 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    animationController.commitFrameHeadTransaction(candidate.draft.animationCheckpoint)
+    animationController.commitFrameHeadTransaction(candidate.draft.checkpoints!.animation)
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
