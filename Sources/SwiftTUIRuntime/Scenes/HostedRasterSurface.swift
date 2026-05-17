@@ -3,7 +3,8 @@ import Synchronization
 
 /// Raster and semantic presentation surface for retained non-terminal hosts.
 public final class HostedRasterSurface:
-  PresentationSurface, ClipboardWritingPresentationSurface, Sendable
+  PresentationSurfaceMetricsProvider, RasterPresentationSurface,
+  ClipboardWritingPresentationSurface, Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -109,16 +110,6 @@ public final class HostedRasterSurface:
       state.pointerInputCapabilities = pointerInputCapabilities
     }
   }
-
-  public func enableRawMode() throws {}
-
-  public func disableRawMode() throws {}
-
-  public func write(_: String) throws {}
-
-  public func clearScreen() throws {}
-
-  public func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   @MainActor

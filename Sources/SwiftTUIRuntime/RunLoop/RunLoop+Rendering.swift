@@ -1,6 +1,11 @@
 import SwiftTUICore
 import SwiftTUIViews
 
+package enum PresentationSurfaceRoleError: Error, Equatable, Sendable {
+  case missingTerminalCommandSurface
+  case missingRasterPresentationSurface
+}
+
 package struct FocusSyncRerenderBudget: Equatable, Sendable {
   package let maximumRerenders: Int
   package private(set) var rerenderCount: Int
@@ -448,7 +453,11 @@ extension RunLoop {
     guard shouldEnable != terminalPointerHoverEnabled else {
       return
     }
-    try presentationSurface.setPointerHoverEnabled(shouldEnable)
+    if let terminalCommandSurface =
+      presentationSurface as? any TerminalCommandPresentationSurface
+    {
+      try terminalCommandSurface.setPointerHoverEnabled(shouldEnable)
+    }
     terminalPointerHoverEnabled = shouldEnable
   }
 
@@ -1470,8 +1479,10 @@ extension RunLoop {
         artifacts.rasterSurface,
         damage: damage
       )
+    } else if let rasterSurface = presentationSurface as? any RasterPresentationSurface {
+      metrics = try rasterSurface.present(artifacts.rasterSurface)
     } else {
-      metrics = try presentationSurface.present(artifacts.rasterSurface)
+      throw PresentationSurfaceRoleError.missingRasterPresentationSurface
     }
     try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
     return metrics
@@ -1486,7 +1497,13 @@ extension RunLoop {
       semanticSnapshot: artifacts.semanticSnapshot,
       focusedIdentity: focusedIdentity
     )
-    try presentationSurface.write(output)
+    guard
+      let terminalCommandSurface =
+        presentationSurface as? any TerminalCommandPresentationSurface
+    else {
+      throw PresentationSurfaceRoleError.missingTerminalCommandSurface
+    }
+    try terminalCommandSurface.write(output)
     return metrics(forWrittenOutput: output)
   }
 
@@ -1500,7 +1517,13 @@ extension RunLoop {
       return TerminalPresentationMetrics()
     }
 
-    try presentationSurface.write(output)
+    guard
+      let terminalCommandSurface =
+        presentationSurface as? any TerminalCommandPresentationSurface
+    else {
+      throw PresentationSurfaceRoleError.missingTerminalCommandSurface
+    }
+    try terminalCommandSurface.write(output)
     return metrics(forWrittenOutput: output)
   }
 

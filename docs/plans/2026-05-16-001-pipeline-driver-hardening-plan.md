@@ -490,6 +490,12 @@ configurability.
 properly isolate it), and treat deep layout recursion as the unbounded-input
 hazard it is.
 
+**Status:** Active in
+[`docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md`](./2026-05-17-004-stage-6-worker-recursion-hardening-plan.md).
+The first tranche isolates and ADR-justifies the large-stack worker, closes the
+`@safe` policy bypass, and documents the WASI fallback. The remaining tranche is
+the recursive layout bound or explicit-stack rewrite.
+
 **Addresses:** P4 (Findings 6, 7), P5 (Finding 6).
 
 **Depends on:** Stage 0's guard subset for the worker/layout seam. Runs parallel
@@ -544,6 +550,9 @@ semantics are documented or gated; layout recursion is bounded or stack-based.
 **Goal:** Decompose `PresentationSurface` so non-terminal hosts (WebHost,
 SwiftUIHost, JSON, accessible) no longer inherit raw-mode and cursor-write
 obligations to receive a committed frame.
+
+**Status:** Shipped in
+[`docs/plans/2026-05-17-003-stage-7-presentation-seam-plan.md`](./2026-05-17-003-stage-7-presentation-seam-plan.md).
 
 **Addresses:** P9 (Finding 15).
 
@@ -717,11 +726,12 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 ## Suggested first action
 
-Stage 0, Stage 1, and Stage 2 now have detailed shipped plans. Start the next
-implementation slice with **Stage 3** on Track A, or Stage 6/7 on Track B if
-parallel hardening is preferred. Stage 3 composes the driver against the
-freshness, semantic-host, retained-reuse, and commit/drop contracts that Stage 0
-now pins.
+Stage 0, Stage 1, Stage 2, and Stage 7 now have detailed shipped plans. Stage 6
+has an active detailed plan for the remaining worker/recursion hardening. Start
+the next implementation slice with **Stage 3** on Track A, or continue Stage 6
+on Track B if parallel hardening is preferred. Stage 3 composes the driver
+against the freshness, semantic-host, retained-reuse, and commit/drop contracts
+that Stage 0 now pins.
 
 ## Related docs
 

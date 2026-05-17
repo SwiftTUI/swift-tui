@@ -176,7 +176,9 @@ classifications:
     - SwiftTUI.MouseEvent
     - SwiftTUI.PasteEvent
     - SwiftTUI.PresentationSurface
+    - SwiftTUI.PresentationSurfaceMetricsProvider
     - SwiftTUI.PresentationMetrics
+    - SwiftTUI.RasterPresentationSurface
     - SwiftTUI.SemanticHostFrame
     - SwiftTUI.SemanticHostFrameCapabilities
     - SwiftTUI.SignalReading
@@ -186,6 +188,7 @@ classifications:
     - SwiftTUI.TerminalGraphicsCapabilities
     - SwiftTUI.TerminalHost
     - SwiftTUI.TerminalHostError
+    - SwiftTUI.TerminalCommandPresentationSurface
     - SwiftTUI.TerminalInputParser
     - SwiftTUI.TerminalInputReading
     - SwiftTUI.TerminalPresentationMetrics
