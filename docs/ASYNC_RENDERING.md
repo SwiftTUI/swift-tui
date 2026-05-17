@@ -136,14 +136,16 @@ Cancellation after worker layout starts is not implemented and is intentionally
 out of scope. A started worker frame must still finish its worker work before the
 main actor can either commit or discard its completed candidate.
 
-Completed worker results are classified by `FrameDropEligibility`, including
-runtime focus/preference/animation, retained-baseline, presentation-recovery,
-graphics-replay, and diagnostics barriers. The completed-frame policy drops only
-stale candidates with an empty blocker set and `.emptyVisualOnly`
-reconciliation. Non-empty skipped-frame side-effect reconciliation is not
-implemented. `FrameDropEligibility.canDrop` remains false; runtime code uses the
-explicit completed-frame policy and reconciliation result instead. Off-main
-resolve is not fully scoped.
+Completed worker results are classified by `FrameDropEligibility`, whose
+diagnostic blockers exhaustively map into a closed `CompletedFrameImpact`
+product covering lifecycle/task, runtime registration, focus, scroll,
+preference, animation, worker/cache, retained-baseline, presentation-recovery,
+graphics-replay, diagnostics, and unclassified barriers. The completed-frame
+policy drops only stale candidates whose impact is visual-only and whose
+reconciliation is `.emptyVisualOnly`. Non-empty skipped-frame side-effect
+reconciliation is not implemented. `FrameDropEligibility.canDrop` remains false;
+runtime code uses the explicit completed-frame policy and reconciliation result
+instead. Off-main resolve is not fully scoped.
 
 ## Shipped Option 3 Boundary
 
@@ -224,12 +226,11 @@ The runtime now drops completed worker results only for the narrow visual-only
 case defined in
 [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md):
 async frame finish is split into candidate creation plus explicit commit,
-completed candidates are classified before commit, stale candidates with no
-lifecycle, task, focus, preference, scroll, animation, handler, custom-layout
-cache, retained-baseline, presentation repaint, graphics, or diagnostic barriers
-are discarded, and every skipped completed frame routes through an explicit
-reconciliation object. The only allowed reconciliation mode is empty visual-only;
-non-empty skipped-frame side-effect reconciliation remains a later proposal.
+completed candidates are classified before commit, stale candidates with
+visual-only `CompletedFrameImpact` are discarded, and every skipped completed
+frame routes through an explicit reconciliation object. The only allowed
+reconciliation mode is empty visual-only; non-empty skipped-frame side-effect
+reconciliation remains a later proposal.
 
 ## Progress Map
 
@@ -307,8 +308,9 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
   resolution misses.
 - `Sources/SwiftTUICore/FrameHeadRegistrationDraft.swift`: scratch runtime
   registrations and commit-time restoration from the committed graph.
-- `Sources/SwiftTUICore/FrameDropEligibility.swift`: conservative classifier for
-  completed-frame drop blockers.
+- `Sources/SwiftTUICore/Pipeline/FrameDropEligibility.swift`: conservative
+  classifier for completed-frame drop blockers and the closed completed-frame
+  impact product.
 - `Sources/SwiftTUICore/LayoutDependentContent.swift`: layout-time realization
   boundaries, realization context, and per-pass realization cache.
 - `Sources/SwiftTUIViews/GeometryReading/GeometryReader.swift`: public adopter that

@@ -283,7 +283,6 @@ public struct DefaultRenderer {
   private let presentationPortalState: PresentationPortalState
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
-  private let completedFramePolicy: CompletedFramePolicy
 
   private let frameTailRenderer: FrameTailRenderer
 
@@ -309,7 +308,6 @@ public struct DefaultRenderer {
     presentationPortalState = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
-    completedFramePolicy = .dropCompletedVisualOnly
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -1297,7 +1295,7 @@ public struct DefaultRenderer {
       previewArtifacts: artifacts,
       eligibility: eligibility,
       newestDesiredGeneration: newestDesiredGeneration,
-      dropDecision: (completedFramePolicy ?? self.completedFramePolicy).decide(
+      dropDecision: (completedFramePolicy ?? .dropCompletedVisualOnly).decide(
         candidateGeneration: draft.renderGeneration,
         newestDesiredGeneration: newestDesiredGeneration,
         eligibility: eligibility

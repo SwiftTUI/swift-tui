@@ -134,6 +134,92 @@ public struct FrameDropEligibility: Equatable, Sendable {
     case unobservable
   }
 
+  /// Closed non-visual impact categories used for completed-frame drop
+  /// decisions.
+  ///
+  /// ``Blocker`` remains the diagnostics vocabulary. This product is the
+  /// smaller correctness surface: every blocker must map through the exhaustive
+  /// switch in ``init(blocker:)`` before a completed frame can be considered
+  /// visual-only.
+  package struct CompletedFrameImpact: Equatable, Sendable {
+    package var lifecycle = false
+    package var runtimeRegistrations = false
+    package var focus = false
+    package var scroll = false
+    package var preferences = false
+    package var animation = false
+    package var workerOrCache = false
+    package var retainedBaselines = false
+    package var presentationRecovery = false
+    package var diagnostics = false
+    package var unclassified = false
+
+    package init() {}
+
+    package init(blocker: Blocker) {
+      self.init()
+      switch blocker {
+      case .lifecycleAppear, .lifecycleDisappear, .lifecycleChange, .taskStart, .taskCancel:
+        lifecycle = true
+      case .handlerInstallations:
+        runtimeRegistrations = true
+      case .customLayoutFallback, .workerCustomLayoutCacheUpdate:
+        workerOrCache = true
+      case .focusGraph, .focusBindingSync, .focusedValueSync:
+        focus = true
+      case .scrollSync:
+        scroll = true
+      case .preferenceObservationDelta:
+        preferences = true
+      case .animationCompletion, .animationTransition, .animationTransaction:
+        animation = true
+      case .retainedLayoutBaseline, .retainedRasterBaseline:
+        retainedBaselines = true
+      case .presentationFullRepaint, .graphicsReplay:
+        presentationRecovery = true
+      case .diagnosticsFullRecord:
+        diagnostics = true
+      case .unobservable:
+        unclassified = true
+      }
+    }
+
+    package init(blockers: Set<Blocker>) {
+      self.init()
+      for blocker in blockers {
+        formUnion(Self(blocker: blocker))
+      }
+    }
+
+    package var isVisualOnly: Bool {
+      !lifecycle
+        && !runtimeRegistrations
+        && !focus
+        && !scroll
+        && !preferences
+        && !animation
+        && !workerOrCache
+        && !retainedBaselines
+        && !presentationRecovery
+        && !diagnostics
+        && !unclassified
+    }
+
+    package mutating func formUnion(_ other: Self) {
+      lifecycle = lifecycle || other.lifecycle
+      runtimeRegistrations = runtimeRegistrations || other.runtimeRegistrations
+      focus = focus || other.focus
+      scroll = scroll || other.scroll
+      preferences = preferences || other.preferences
+      animation = animation || other.animation
+      workerOrCache = workerOrCache || other.workerOrCache
+      retainedBaselines = retainedBaselines || other.retainedBaselines
+      presentationRecovery = presentationRecovery || other.presentationRecovery
+      diagnostics = diagnostics || other.diagnostics
+      unclassified = unclassified || other.unclassified
+    }
+  }
+
   /// Inputs for candidate-level classification.
   public struct Candidate: Equatable, Sendable {
     /// The completed frame artifacts to classify.
@@ -161,6 +247,9 @@ public struct FrameDropEligibility: Equatable, Sendable {
   /// The candidate-level decision.
   public let decision: Decision
 
+  /// Closed non-visual impact categories used to derive ``decision``.
+  package let impact: CompletedFrameImpact
+
   /// The set of barriers this frame's artifacts surface.  Observational
   /// classifiers keep this non-empty by inserting `.unobservable`; fully
   /// classified candidates can return an empty set.
@@ -174,15 +263,37 @@ public struct FrameDropEligibility: Equatable, Sendable {
   }
 
   public init(blockers: Set<Blocker>) {
+    self.init(
+      blockers: blockers,
+      impact: CompletedFrameImpact(blockers: blockers)
+    )
+  }
+
+  private init(
+    blockers: Set<Blocker>,
+    impact: CompletedFrameImpact
+  ) {
     if blockers.isEmpty {
       decision = .canDropVisualOnly
     } else {
       decision = .mustCommit(blockers: blockers)
     }
+    self.impact = impact
   }
 
   public init(decision: Decision) {
+    self.init(
+      decision: decision,
+      impact: Self.impact(for: decision)
+    )
+  }
+
+  private init(
+    decision: Decision,
+    impact: CompletedFrameImpact
+  ) {
     self.decision = decision
+    self.impact = impact
   }
 
   /// Whether this frame is safe to drop.
@@ -227,42 +338,61 @@ public struct FrameDropEligibility: Equatable, Sendable {
   public static func classify(_ candidate: Candidate) -> Self {
     let artifacts = candidate.artifacts
     var blockers: Set<Blocker> = []
+    var impact = CompletedFrameImpact()
+    func record(_ blocker: Blocker) {
+      blockers.insert(blocker)
+      impact.formUnion(CompletedFrameImpact(blocker: blocker))
+    }
+
     for entry in artifacts.commitPlan.lifecycle {
       switch entry.operation {
       case .appear:
-        blockers.insert(.lifecycleAppear)
+        record(.lifecycleAppear)
       case .disappear:
-        blockers.insert(.lifecycleDisappear)
+        record(.lifecycleDisappear)
       case .change:
-        blockers.insert(.lifecycleChange)
+        record(.lifecycleChange)
       case .taskStart:
-        blockers.insert(.taskStart)
+        record(.taskStart)
       case .taskCancel:
-        blockers.insert(.taskCancel)
+        record(.taskCancel)
       }
     }
     if !artifacts.commitPlan.handlerInstallations.isEmpty {
-      blockers.insert(.handlerInstallations)
+      record(.handlerInstallations)
     }
     if artifacts.diagnostics.customLayoutFallbackCount > 0 {
-      blockers.insert(.customLayoutFallback)
+      record(.customLayoutFallback)
     }
-    blockers.formUnion(candidate.additionalBlockers)
-    blockers.formUnion(artifacts.diagnostics.dropEligibilityBlockers)
+    for blocker in candidate.additionalBlockers {
+      record(blocker)
+    }
+    for blocker in artifacts.diagnostics.dropEligibilityBlockers {
+      record(blocker)
+    }
     if let damage = artifacts.diagnostics.presentationDamage {
       if damage.requiresFullTextRepaint {
-        blockers.insert(.presentationFullRepaint)
+        record(.presentationFullRepaint)
       }
       if damage.requiresFullGraphicsReplay || damage.graphicsInvalidationCount > 0 {
-        blockers.insert(.graphicsReplay)
+        record(.graphicsReplay)
       }
+    }
+    if impact.isVisualOnly, candidate.hasCompleteBarrierSignals {
+      return Self(decision: .canDropVisualOnly, impact: impact)
     }
     if blockers.isEmpty {
-      if candidate.hasCompleteBarrierSignals {
-        return Self(decision: .canDropVisualOnly)
-      }
-      blockers.insert(.unobservable)
+      record(.unobservable)
     }
-    return Self(blockers: blockers)
+    return Self(blockers: blockers, impact: impact)
+  }
+
+  private static func impact(for decision: Decision) -> CompletedFrameImpact {
+    switch decision {
+    case .canDropVisualOnly:
+      return CompletedFrameImpact()
+    case .mustCommit(let blockers):
+      return CompletedFrameImpact(blockers: blockers)
+    }
   }
 }

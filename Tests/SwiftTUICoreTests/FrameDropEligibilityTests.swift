@@ -161,7 +161,16 @@ struct FrameDropEligibilityTests {
       ))
     #expect(eligibility.decision == .canDropVisualOnly)
     #expect(eligibility.blockers == [])
+    #expect(eligibility.impact.isVisualOnly)
     #expect(eligibility.canDrop == false)
+  }
+
+  @Test("every blocker maps to non-visual completed-frame impact")
+  func everyBlockerMapsToNonVisualCompletedFrameImpact() {
+    for blocker in FrameDropEligibility.Blocker.allCases {
+      let impact = FrameDropEligibility.CompletedFrameImpact(blockers: [blocker])
+      #expect(!impact.isVisualOnly, "\(blocker) must map to a non-visual impact")
+    }
   }
 
   @Test("an incomplete visual-only candidate remains mustCommit")
@@ -174,6 +183,7 @@ struct FrameDropEligibilityTests {
       ))
     #expect(eligibility.decision == .mustCommit(blockers: [.unobservable]))
     #expect(eligibility.blockers == [.unobservable])
+    #expect(!eligibility.impact.isVisualOnly)
   }
 
   @Test("a fully classified candidate with blockers remains mustCommit")
@@ -191,6 +201,7 @@ struct FrameDropEligibilityTests {
           blockers: [.focusBindingSync, .preferenceObservationDelta]
         ))
     #expect(eligibility.blockers == [.focusBindingSync, .preferenceObservationDelta])
+    #expect(!eligibility.impact.isVisualOnly)
   }
 
   @Test("a frame with multiple kinds of work reports all of them")
@@ -212,6 +223,7 @@ struct FrameDropEligibilityTests {
       eligibility.blockers == [
         .lifecycleAppear, .handlerInstallations, .customLayoutFallback,
       ])
+    #expect(!eligibility.impact.isVisualOnly)
     #expect(eligibility.canDrop == false)
   }
 
@@ -228,6 +240,7 @@ struct FrameDropEligibilityTests {
     let eligibility = FrameDropEligibility(blockers: [])
     #expect(eligibility.decision == .canDropVisualOnly)
     #expect(eligibility.blockers == [])
+    #expect(eligibility.impact.isVisualOnly)
     #expect(eligibility.canDrop == false)
   }
 }
