@@ -36,6 +36,12 @@ for release policy and support details.
 | WASI/browser deployment | Supported through `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` |
 | `SwiftTUITerminal` / PTY embedding | macOS and Linux only |
 
+## License
+
+SwiftTUI first-party code is licensed under the GNU Affero General Public
+License v3.0 only (`AGPL-3.0-only`). Vendored third-party code under
+`Vendor/` keeps its own license and provenance notices.
+
 ## Overview
 
 At the lowest public runtime level, you can resolve and render any `View` into

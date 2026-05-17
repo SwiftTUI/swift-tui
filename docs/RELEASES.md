@@ -18,6 +18,12 @@ breaks when the public surface is still being proven.
 )
 ```
 
+## License
+
+SwiftTUI first-party code is released under the GNU Affero General Public
+License v3.0 only (`AGPL-3.0-only`). Third-party source under `Vendor/` keeps
+the original upstream license terms recorded beside each vendored component.
+
 ## Release Gate
 
 A release tag should point at a clean commit that has passed:
