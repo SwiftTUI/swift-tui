@@ -97,13 +97,16 @@ Active design proposals that are still shaping decisions:
   `NavigationLink`, public `NavigationPath`, and `@Environment(\.dismiss)`
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
-Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
+Dated, agent-executable implementation plans live in [`plans/`](plans/),
+front-matter-tagged with `status:` (`active`, `design-approved`, `shipped`, or
+`reverted`). Current active/design-approved plans:
 
-- [plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md](plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md) — active governance reconciliation for the shipped pipeline-driver hardening roadmap, aligning architecture docs, ADRs, the audit record, TODO, and changelog with the composed runtime pipeline
-- [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
+- None.
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-16-001-pipeline-driver-hardening-plan.md](plans/2026-05-16-001-pipeline-driver-hardening-plan.md) and [plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md](plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md) — shipped pipeline-driver hardening roadmap and governance reconciliation: the runtime now uses a composed driver while the seven phase products remain the inspection and ownership model
+- [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — shipped V1 scroll control scope with `ScrollViewReader`, `ScrollViewProxy`, identity/anchor commands, and explicit deferred host-observation follow-ups
 - [plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md](plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md) and [plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md](plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md) — shipped Stage 6 worker/recursion hardening and explicit layout work-stack migration
 - [proposals/SEMANTIC_HOST_FRAME_API.md](proposals/SEMANTIC_HOST_FRAME_API.md) — implemented semantic host-frame producer/consumer contract that carries producer sequence, raster output, semantic snapshots, focus, host-frame capabilities, and raster damage together
 - [plans/2026-05-17-003-stage-7-presentation-seam-plan.md](plans/2026-05-17-003-stage-7-presentation-seam-plan.md) — shipped Stage 7 host-presentation seam split: semantic host-frame consumers now use focused metrics/semantic roles without inheriting terminal raw-mode, cursor, or byte-writing obligations

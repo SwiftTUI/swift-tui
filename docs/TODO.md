@@ -47,9 +47,6 @@
 
 ## Planned Work
 
-- Complete Stage 8 governance reconciliation for the shipped pipeline-driver
-  hardening roadmap. See
-  [plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md](plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md).
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
 - Apply the historical-doc path policy once decided: either archive historical
