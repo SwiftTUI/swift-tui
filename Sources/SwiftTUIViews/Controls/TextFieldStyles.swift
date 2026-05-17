@@ -1,5 +1,6 @@
 public import SwiftTUICore
 
+/// Defines how single-line and secure text fields render their label and field content.
 public protocol TextFieldStyle: Sendable {
   associatedtype Body: View
 
@@ -126,6 +127,7 @@ package func textInputChrome(
   )
 }
 
+/// Type-erased storage for a concrete text-field style.
 public struct AnyTextFieldStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   private let box: any AnyTextFieldStyleBox
@@ -169,6 +171,7 @@ public struct AnyTextFieldStyle: Sendable, CustomStringConvertible, CustomDebugS
   }
 }
 
+/// The environment-driven default text-field style.
 public struct AutomaticTextFieldStyle: Sendable, TextFieldStyle {
   public init() {}
 
@@ -184,6 +187,7 @@ public struct AutomaticTextFieldStyle: Sendable, TextFieldStyle {
   }
 }
 
+/// A text-field style that renders only the field content.
 public struct PlainTextFieldStyle: Sendable, TextFieldStyle {
   public init() {}
 
@@ -199,6 +203,7 @@ public struct PlainTextFieldStyle: Sendable, TextFieldStyle {
   }
 }
 
+/// A text-field style that draws rounded border chrome around the field content.
 public struct RoundedBorderTextFieldStyle: Sendable, TextFieldStyle {
   public init() {}
 

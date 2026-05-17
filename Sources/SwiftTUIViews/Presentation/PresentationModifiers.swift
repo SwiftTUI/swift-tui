@@ -155,6 +155,7 @@ package func sheetPromptPresentationSpec(
 }
 
 extension View {
+  /// Presents an alert with a default dismiss action.
   public func alert<S: StringProtocol>(
     _ title: S,
     isPresented: Binding<Bool>
@@ -178,6 +179,7 @@ extension View {
     )
   }
 
+  /// Presents an alert with custom actions and message content.
   public func alert<S: StringProtocol, Actions: View, Message: View>(
     _ title: S,
     isPresented: Binding<Bool>,
@@ -198,6 +200,7 @@ extension View {
     )
   }
 
+  /// Presents a confirmation dialog with a default dismiss action.
   public func confirmationDialog<S: StringProtocol>(
     _ title: S,
     isPresented: Binding<Bool>
@@ -221,6 +224,7 @@ extension View {
     )
   }
 
+  /// Presents a confirmation dialog with custom actions and message content.
   public func confirmationDialog<S: StringProtocol, Actions: View, Message: View>(
     _ title: S,
     isPresented: Binding<Bool>,
@@ -241,6 +245,7 @@ extension View {
     )
   }
 
+  /// Presents custom sheet content without a title.
   public func sheet<SheetContent: View>(
     isPresented: Binding<Bool>,
     @ViewBuilder content sheetContent: () -> SheetContent
@@ -257,6 +262,7 @@ extension View {
     )
   }
 
+  /// Presents titled custom sheet content.
   public func sheet<S: StringProtocol, SheetContent: View>(
     _ title: S,
     isPresented: Binding<Bool>,
@@ -796,6 +802,7 @@ package struct PromptPresentationSurface: View, ActionScope {
 
 // MARK: - Toast / Transient Notification System
 
+/// Type-erased storage for a concrete toast style.
 public struct AnyToastStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   private let box: any AnyToastStyleBox
@@ -836,6 +843,7 @@ public struct AnyToastStyle: Sendable, CustomStringConvertible, CustomDebugStrin
   }
 }
 
+/// Defines the chrome used for transient toast notifications.
 public protocol ToastStyle: Sendable {
   var snapshotLabel: String { get }
 
@@ -891,6 +899,7 @@ public struct ToastStylePresentation: Sendable {
   }
 }
 
+/// The standard informational toast style.
 public struct InfoToastStyle: ToastStyle {
   public init() {}
 
@@ -904,6 +913,7 @@ public struct InfoToastStyle: ToastStyle {
   }
 }
 
+/// The standard success toast style.
 public struct SuccessToastStyle: ToastStyle {
   public init() {}
 
@@ -917,6 +927,7 @@ public struct SuccessToastStyle: ToastStyle {
   }
 }
 
+/// The standard warning toast style.
 public struct WarningToastStyle: ToastStyle {
   public init() {}
 
@@ -930,6 +941,7 @@ public struct WarningToastStyle: ToastStyle {
   }
 }
 
+/// The standard destructive or error toast style.
 public struct DangerToastStyle: ToastStyle {
   public init() {}
 

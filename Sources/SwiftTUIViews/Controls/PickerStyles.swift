@@ -1,5 +1,6 @@
 public import SwiftTUICore
 
+/// Defines keyboard behavior and rendered body for a picker.
 public protocol PickerStyle: Sendable {
   associatedtype Body: View
 
@@ -105,6 +106,7 @@ public struct PickerStyleConfiguration: Sendable {
   }
 }
 
+/// Type-erased storage for a concrete picker style.
 public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   private let box: any AnyPickerStyleBox
@@ -168,6 +170,7 @@ public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStri
   }
 }
 
+/// The environment-driven default picker style.
 public struct AutomaticPickerStyle: Sendable, PickerStyle {
   public init() {}
 
@@ -197,6 +200,7 @@ public struct AutomaticPickerStyle: Sendable, PickerStyle {
   }
 }
 
+/// A vertically arranged picker style that keeps options inline.
 public struct InlinePickerStyle: Sendable, PickerStyle {
   public init() {}
 
@@ -226,6 +230,7 @@ public struct InlinePickerStyle: Sendable, PickerStyle {
   }
 }
 
+/// A compact horizontal picker style for mutually exclusive options.
 public struct SegmentedPickerStyle: Sendable, PickerStyle {
   public init() {}
 
@@ -255,6 +260,7 @@ public struct SegmentedPickerStyle: Sendable, PickerStyle {
   }
 }
 
+/// A vertical radio-button picker style.
 public struct RadioGroupPickerStyle: Sendable, PickerStyle {
   public init() {}
 
@@ -284,6 +290,7 @@ public struct RadioGroupPickerStyle: Sendable, PickerStyle {
   }
 }
 
+/// A collapsed picker style that opens a menu-like option list.
 public struct MenuPickerStyle: Sendable, PickerStyle {
   public init() {}
 

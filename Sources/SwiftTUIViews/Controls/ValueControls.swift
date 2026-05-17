@@ -118,6 +118,7 @@ extension Toggle {
   }
 }
 
+/// Edits a single-line string binding using terminal keyboard input.
 public struct TextField<Label: View>: PrimitiveView, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?

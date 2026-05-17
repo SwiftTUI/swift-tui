@@ -26,9 +26,6 @@
 
 ## Unresolved Decisions
 
-- Decide the public documentation ratchet shape before enabling strict
-  doc-comment linting across the whole package. See
-  [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
 - Decide whether large-runtime-file decomposition should start with terminal
   presentation-surface protocols, `DefaultRenderer` / frame-tail support,
   animation tracking, graph state, or web-surface transport seams. See
@@ -57,12 +54,8 @@
 
 ## Planned Work
 
-- Add a public documentation coverage ratchet for the consumer-selected surface:
-  style protocols, built-in styles, presentation modifiers, text inputs,
-  navigation, host runners, and product entrypoints. Re-enable
-  `NeverUseForceTry` separately once the remaining call sites are audited. See
-  [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) and
-  [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
+- Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
+  [../.swift-format.json](../.swift-format.json).
 - After choosing a first decomposition target and confirming the gate is green,
   split the selected large runtime seam by stable concepts with focused tests.
   Candidate seams include terminal presentation surfaces, `DefaultRenderer` /

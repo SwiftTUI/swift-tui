@@ -1,5 +1,6 @@
 @_spi(Testing) public import SwiftTUICore
 
+/// Type-erased storage for a concrete tab-view style.
 public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   private let box: any AnyTabViewStyleBox
@@ -60,22 +61,27 @@ public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStr
   }
 }
 
+/// The environment-driven default tab-view style.
 public struct AutomaticTabViewStyle: Sendable {
   public init() {}
 }
 
+/// A tab-view style that underlines the selected tab.
 public struct UnderlineTabViewStyle: Sendable {
   public init() {}
 }
 
+/// A tab-view style that renders labels as literal terminal tabs.
 public struct LiteralTabsTabViewStyle: Sendable {
   public init() {}
 }
 
+/// A tab-view style that renders connected powerline-style tab segments.
 public struct PowerlineTabViewStyle: Sendable {
   public init() {}
 }
 
+/// Defines tab strip, overflow, and active tab rendering.
 public protocol TabViewStyle: Sendable {
   associatedtype TabBody: View
   associatedtype OverflowTriggerBody: View
