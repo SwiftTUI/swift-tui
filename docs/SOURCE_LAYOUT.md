@@ -123,7 +123,8 @@ Sources/SwiftTUIRuntime/
 
 ### Terminal
 
-- `Terminal/TerminalHost.swift`: defines the `PresentationSurface` protocol, `SemanticHostFrame`, and fd-backed `TerminalHost`
+- `Terminal/PresentationSurface.swift`: host presentation contracts, `TerminalPresentationMetrics`, and `SemanticHostFrame`
+- `Terminal/TerminalHost.swift`: fd-backed `TerminalHost`, `WebTerminalHost`, and terminal process lifecycle helpers
 - `Terminal/TerminalClipboard.swift`: shared clipboard-writing host capability
   and terminal OSC 52 encoding
 - `Terminal/TerminalCursorFocusPresentationSurface.swift`: terminal-only cursor focus marker and cursor visibility helpers
