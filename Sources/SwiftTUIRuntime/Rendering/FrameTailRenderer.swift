@@ -225,11 +225,11 @@ package enum FrameHeadMode {
 /// Present only on drafts prepared with `FrameHeadMode.abortable`; a one-shot
 /// draft carries `nil`. `abortPreparedFrameHead` requires this bundle.
 package struct FrameHeadCheckpoints {
-  var viewGraph: ViewGraph.Checkpoint
-  var frameState: FrameResolveState.Checkpoint
-  var presentationPortal: PresentationPortalState.Checkpoint
-  var observationBridge: ObservationBridge.Checkpoint?
-  var animation: AnimationController.Checkpoint
+  let viewGraph: ViewGraph.Checkpoint
+  let frameState: FrameResolveState.Checkpoint
+  let presentationPortal: PresentationPortalState.Checkpoint
+  let observationBridge: ObservationBridge.Checkpoint?
+  let animation: AnimationController.Checkpoint
 }
 
 /// Checkpointed main-actor frame head prepared before tail work starts.
