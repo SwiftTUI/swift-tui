@@ -91,6 +91,7 @@ Active design proposals that are still shaping decisions:
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy
 - [proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](proposals/CPU_LATENCY_EVALUATION_PIPELINE.md) — CPU-versus-latency measurement system for async rendering and future runtime optimizations
 - [proposals/PIPELINE_BOUNDARY_HARDENING.md](proposals/PIPELINE_BOUNDARY_HARDENING.md) — proposed vision and staged approach for hardening phase-product ownership, mirrored metadata, retained reuse, and async frame-tail boundaries
+- [proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md](proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md) — accepted Stage 6 destination for migrating built-in layout measurement and placement from recursive walks to explicit work stacks
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md) — shipped binding-driven `NavigationStack` destination presentation surface that intentionally keeps SwiftUI names while excluding
   `NavigationLink`, public `NavigationPath`, and `@Environment(\.dismiss)`
@@ -98,7 +99,7 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md](plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md) — active Stage 6 worker/recursion hardening: the first tranche isolates the large-stack frame-tail layout worker and closes the `@safe` policy gap; recursive layout bounding remains open
+- [plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md](plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md) — active Stage 6 worker/recursion hardening: the first tranche isolates the large-stack frame-tail layout worker and closes the `@safe` policy gap; the remaining tranche is the accepted explicit layout work-stack migration
 - [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:

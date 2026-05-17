@@ -21,15 +21,22 @@ depends_on:
 **Goal:** Bring the off-main layout worker and deep-layout recursion story under
 an explicit policy. The immediate shipped tranche isolates the retained
 large-stack worker, closes the `@safe` policy bypass, and records the WASI
-synchronous fallback. The remaining tranche must either bound or remove the
-layout recursion that forced the large stack before replacing the Darwin worker
+synchronous fallback. The remaining tranche must remove unbounded built-in
+layout recursion with explicit work stacks before replacing the Darwin worker
 with a task-only implementation.
+
+**Migration decision:** the long-term destination is the full explicit
+work-stack migration in
+[`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
+Depth limits may be used as temporary crash guards or diagnostics during the
+migration, but the completed Stage 6 architecture is iterative built-in
+measurement and placement.
 
 **Architecture:** The async frame-tail path has two different queues: a normal
 renderer queue and a special layout worker. The layout worker exists because
 deep built-in layout can still recurse enough to need a larger-than-default
-thread stack. Until that recursion is bounded or converted to explicit stacks,
-removing the Darwin worker is riskier than isolating it.
+thread stack. Until that recursion is converted to explicit stacks, removing
+the Darwin worker is riskier than isolating it.
 
 ## Task 1 - Baseline And Audit
 
@@ -70,11 +77,12 @@ bun run test
 
 ## Task 5 - Remaining Recursion Work
 
-- [ ] Convert the hot recursive layout measurement/placement walks to explicit
-  work stacks, or introduce a graceful depth limit that cannot crash the
-  process.
-- [ ] Once recursion is bounded, re-evaluate replacing the Darwin large-stack
-  worker with a structured task or custom executor implementation.
+- [ ] Execute the full explicit layout work-stack migration described in
+  [`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
+- [ ] Treat any graceful depth limit as an interim guard or custom-layout
+  compatibility boundary, not as the final built-in layout architecture.
+- [ ] Once built-in recursion is eliminated, re-evaluate replacing the Darwin
+  large-stack worker with a structured task or custom executor implementation.
 - [ ] Add regression coverage that would fail if a new deep layout path bypasses
   the bounded/iterative traversal policy.
 
@@ -95,5 +103,5 @@ This Stage 6 plan is complete only when:
 - `@safe`, `@unchecked Sendable`, and `nonisolated(unsafe)` are blocked by the
   local concurrency-safety policy;
 - WASI's synchronous fallback is documented;
-- layout recursion is either bounded or converted to explicit work stacks; and
+- built-in layout recursion has migrated to explicit work stacks; and
 - the focused worker/stack tests plus `bun run test` pass.
