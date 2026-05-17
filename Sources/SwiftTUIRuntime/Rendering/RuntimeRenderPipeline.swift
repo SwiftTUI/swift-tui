@@ -16,33 +16,10 @@ enum RuntimeRenderStageName: String, CaseIterable, Sendable {
   ]
 }
 
-enum FrameHeadDeclaredEffect: String, CaseIterable, Sendable {
-  case viewGraph
-  case frameState
-  case presentationPortalState
-  case observationBridge
-  case animationController
-}
-
-struct FrameHeadDeclaredEffectSet: Equatable, Sendable {
-  var effects: Set<FrameHeadDeclaredEffect>
-
-  static let runtimeHead = Self(
-    effects: [
-      .viewGraph,
-      .frameState,
-      .presentationPortalState,
-      .observationBridge,
-    ]
-  )
-}
-
 struct RuntimeFrameHeadStage: Equatable, Sendable {
-  var declaredEffects: FrameHeadDeclaredEffectSet
   var isTransactionalWhenAbortable: Bool
 
   static let defaultRuntimeHead = Self(
-    declaredEffects: .runtimeHead,
     isTransactionalWhenAbortable: true
   )
 }

@@ -26,7 +26,7 @@ touch.
 | 1 | The formalized `Renderer<Root>` pipeline is unused outside tests | Resolved by Stage 3: the generic helper was removed and `DefaultRenderer` now runs `RuntimeRenderPipeline`. |
 | 2 | `renderView` does not execute seven ordered phases | Resolved by Stage 3 and Stage 8: docs now distinguish runtime composition from phase-product order. |
 | 3 | Sync and async render heads are ~120 duplicated lines | Resolved by Stage 1, then enforced by the Stage 3 composition. |
-| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Follow-up planned: Stage 3 declares the effect set; narrowing is tracked in [`2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md`](../plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md). |
+| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Resolved by the Finding 4 follow-up: prepared heads now use draft/commit boundaries and the declared rollback-effect model was removed. |
 | 5 | The "strict ordered pipeline" is a bounded fixpoint loop | Resolved by Stage 2: late-preference reconciliation is named and bounded. |
 | 6 | Hand-rolled `pthread`; concurrency escape-hatch policy bypassed | Resolved by Stage 6: worker ownership and recursion safety were hardened. |
 | 7 | Off-main frame-tail rendering is a synchronous no-op on WASI | Documented by Stage 6 as a compatibility boundary. |
@@ -559,8 +559,8 @@ bugs. Candidate tests:
 
 The original suggested next step was to land P2, add the lowest-risk P7/P11
 contract guards, then decide P1a versus P1b. That sequence has landed in favor
-of P1b. The remaining follow-ups outside this roadmap are Finding 4's deferred
-effect-set narrowing and Finding 10's `FrameDiagnostics` decomposition.
+of P1b. The remaining follow-up outside this roadmap is Finding 10's
+`FrameDiagnostics` decomposition.
 
 ## Related docs
 

@@ -19,17 +19,10 @@ struct RuntimeRenderPipelineTests {
       ])
   }
 
-  @Test("runtime frame head declares its transactional effects")
-  func runtimeFrameHeadDeclaresTransactionalEffects() {
+  @Test("runtime frame head remains abortable without declared rollback effects")
+  func runtimeFrameHeadRemainsAbortableWithoutDeclaredRollbackEffects() {
     let pipeline = RuntimeRenderPipeline()
 
     #expect(pipeline.headStage.isTransactionalWhenAbortable)
-    #expect(
-      pipeline.headStage.declaredEffects.effects == [
-        .viewGraph,
-        .frameState,
-        .presentationPortalState,
-        .observationBridge,
-      ])
   }
 }

@@ -7,8 +7,8 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PipelineContractTests {
-  @Test("runtime frame head declaration names the current rollback effects")
-  func runtimeFrameHeadDeclarationNamesCurrentRollbackEffects() {
+  @Test("runtime frame head contract has no declared rollback effects")
+  func runtimeFrameHeadContractHasNoDeclaredRollbackEffects() {
     let pipeline = RuntimeRenderPipeline()
 
     #expect(
@@ -20,14 +20,6 @@ struct PipelineContractTests {
         .commit,
       ])
     #expect(pipeline.headStage.isTransactionalWhenAbortable)
-    #expect(
-      pipeline.headStage.declaredEffects.effects
-        == Set<FrameHeadDeclaredEffect>([
-          .viewGraph,
-          .frameState,
-          .presentationPortalState,
-          .observationBridge,
-        ]))
   }
 
   @Test("sync and async artifacts stay equivalent with committed registrations")

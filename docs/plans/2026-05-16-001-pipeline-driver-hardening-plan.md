@@ -343,12 +343,11 @@ be introduced without losing the convention-protected invariants.
    (Finding 4) — as a typed effect set on the stage itself, and the
    checkpoint/rollback must become a single named transactional-stage construct
    that the async strategy wraps the head in, instead of machinery threaded by
-   hand through `prepareFrameHead` / `abortPreparedFrameHead`. This is
-   *relocate-and-declare*, not *eliminate*: the five checkpoints still exist and
-   still roll back, but they become a visible composition element. It converts
-   Finding 4's "unexplained residue" into a declared contract, and makes ADR
-   0004's missing invariant — "live registries equal what restore-from-graph
-   would build" — natural to express as a Stage 0 guard.
+   hand through `prepareFrameHead` / `abortPreparedFrameHead`. This was the
+   Stage 3 bridge: it converted Finding 4's "unexplained residue" into a
+   declared contract. The later Finding 4 plan narrowed that contract and
+   removed the declared effect set after the affected state moved behind draft
+   and commit boundaries.
 4. Make `DefaultRenderer` execute the composed pipeline, replacing the
    imperative body of `renderView`. The shipped implementation keeps
    `RuntimeRenderPipeline` as a stateless local composition value at each render
@@ -388,15 +387,11 @@ be introduced without losing the convention-protected invariants.
 - Composition can cost allocations the monolith avoids; the fused-tail node and
   profiling (Task 9) are mandatory, not optional.
 - Finding 4 (resolve mutates five subsystems; commit is not the side-effect
-  boundary) is **declared, not fixed**, here. Task 3 makes the head a
+  boundary) was **declared, not fixed**, here. Task 3 made the head a
   declared-effect stage and the checkpoint/rollback an explicit transactional
-  construct — but this stage does **not** narrow resolve's effect set, move side
-  effects toward commit, or retry ADR 0004's abort. Those revert reasons —
-  irreversible gesture-recognizer teardown on registry reset, completion
-  closures that cannot be un-fired — survive P1b untouched, and attempting them
-  here would load a second hard problem onto the hottest path. The Stage 3 ADR
-  records that "commit is the side-effect boundary" remains aspirational and
-  names the deferred follow-on (below) as the path to it.
+  construct. The later Finding 4 plan narrowed that effect model and removed
+  the declared rollback-effect set once the affected state moved behind draft
+  and commit boundaries.
 
 **Exit criteria:** No production frame bypasses the composed pipeline; the ~13
 render entry points collapse to {execution strategy} × {one composition};
@@ -699,29 +694,30 @@ asserts a pipeline shape the code does not have.
 | P10 — `FrameArtifacts` as inspection product | 16 | Stage 0 (doc) + Stage 8 |
 | P11 — architecture-contract tests | 13, 17 | Stage 0 |
 | — governance drift | 12 | Stage 8 |
-| — resolve side-effect boundary | 4 | declared in Stage 3 (Task 3); narrowing deferred |
+| — resolve side-effect boundary | 4 | declared in Stage 3 (Task 3); narrowed by the Finding 4 follow-up |
 | — `FrameDiagnostics` god struct | 10 | **unscheduled gap — see note below** |
 | P1a — demote the seven-phase claim | 1 | superseded by P1b (Stage 3) |
 
 Every audit *proposal* (P1–P11) maps to a stage. Three findings have no
 proposal of their own. Finding 12 (governance drift) is closed by Stage 8.
-Finding 4 (resolve side-effect boundary) is *declared* by Stage 3's Task 3, and
-its further *narrowing* is a named deferred follow-on. Finding 10
-(`FrameDiagnostics` god struct) is an open gap this plan does not yet schedule.
+Finding 4 (resolve side-effect boundary) was *declared* by Stage 3's Task 3 and
+then narrowed by the Finding 4 follow-up. Finding 10 (`FrameDiagnostics` god
+struct) is an open gap this plan does not yet schedule.
 P1a is intentionally not scheduled: the P1b decision (Stage 3) makes the docs
 true by changing the code instead of the prose, and Stage 8 performs the doc
 reconciliation P1a would have done alone.
 
-## Deferred follow-on — narrow the resolve effect set (Finding 4)
+## Completed follow-on — narrow the resolve effect set (Finding 4)
 
-Not a stage of this plan; a separate effort that **depends on Stage 3** landing.
-Stage 3 *declares* the head's five-subsystem effect set; it does not shrink it.
-The next plan is
+Not a stage of this plan; a separate effort that **depended on Stage 3**
+landing. Stage 3 *declared* the head's five-subsystem effect set; it did not
+shrink it. The follow-up plan is
 [`2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md`](2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md).
-That plan audits, with the declared effect set in hand, which of `viewGraph`,
+That plan audited, with the declared effect set in hand, which of `viewGraph`,
 `frameState`, `presentationPortalState`, `observationBridge`, and
-`animationController` genuinely must mutate in the head versus could defer
-toward commit.
+`animationController` genuinely had to mutate in the head versus could defer
+toward commit. It moved the affected publication paths behind draft and commit
+boundaries, then removed the declared rollback-effect model.
 
 This is deliberately deferred, not scoped out:
 
