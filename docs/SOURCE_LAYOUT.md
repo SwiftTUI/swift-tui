@@ -116,7 +116,10 @@ Sources/SwiftTUIRuntime/
 
 - `Lifecycle/LifecycleCoordinator.swift`: post-present lifecycle staging
 - `Lifecycle/TaskRunner.swift`: lifecycle-owned task execution and cancellation
-- `Lifecycle/AnimationController.swift` and `Lifecycle/AnyAnimatable.swift`: animation coordination
+- `Lifecycle/AnimationModels.swift`: animatable slots, snapshots, active animation records, and removal-entry state
+- `Lifecycle/PlacedAnimationOverlay.swift`: placed-tree removal, insertion, and matched-geometry overlay application
+- `Lifecycle/AnimationController.swift`: renderer-owned animation state machine, ticking, transition detection, and completion draining
+- `Lifecycle/AnyAnimatable.swift`: type-erased animatable value interpolation
 
 ### Scenes
 
