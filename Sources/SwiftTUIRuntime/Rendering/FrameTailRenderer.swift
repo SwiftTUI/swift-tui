@@ -208,6 +208,30 @@ final class FrameTailJobCancellationToken: Sendable {
   }
 }
 
+/// Selects execution-strategy-specific work when preparing a frame head.
+package enum FrameHeadMode {
+  /// Synchronous one-shot render: captures no checkpoints and no worker-safe
+  /// indexed-child snapshot, because a one-shot head is never aborted and its
+  /// frame tail runs synchronously on the main actor.
+  case oneShot
+  /// Asynchronous render whose head may be aborted before tail work starts.
+  /// Captures the five-subsystem checkpoint bundle and the worker-safe
+  /// indexed-child snapshot.
+  case abortable
+}
+
+/// The five-subsystem checkpoint bundle captured for an abortable frame head.
+///
+/// Present only on drafts prepared with `FrameHeadMode.abortable`; a one-shot
+/// draft carries `nil`. `abortPreparedFrameHead` requires this bundle.
+package struct FrameHeadCheckpoints {
+  var viewGraph: ViewGraph.Checkpoint
+  var frameState: FrameResolveState.Checkpoint
+  var presentationPortal: PresentationPortalState.Checkpoint
+  var observationBridge: ObservationBridge.Checkpoint?
+  var animation: AnimationController.Checkpoint
+}
+
 /// Checkpointed main-actor frame head prepared before tail work starts.
 ///
 /// A draft owns preview resolve-side state that can be discarded only if the
@@ -217,11 +241,9 @@ package struct FrameHeadDraft {
   var clock: ContinuousClock?
   var renderGeneration: RenderGeneration
   var registrationDraft: FrameHeadRegistrationDraft
-  var viewGraphCheckpoint: ViewGraph.Checkpoint
-  var frameStateCheckpoint: FrameResolveState.Checkpoint
-  var presentationPortalCheckpoint: PresentationPortalState.Checkpoint
+  /// The abort checkpoint bundle. `nil` for one-shot heads.
+  var checkpoints: FrameHeadCheckpoints?
   var observationBridge: ObservationBridge?
-  var observationBridgeCheckpoint: ObservationBridge.Checkpoint?
   var resolveContext: ResolveContext
   var graphRootIdentity: Identity
   var frameContext: FrameContext
@@ -230,7 +252,6 @@ package struct FrameHeadDraft {
   var runtimeIssues: [RuntimeIssue]
   var animationTimestamp: MonotonicInstant
   var resolveDuration: Duration
-  var animationCheckpoint: AnimationController.Checkpoint
 }
 
 struct AsyncFrameTailDraftOutput {
