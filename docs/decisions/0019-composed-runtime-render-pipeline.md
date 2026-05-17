@@ -40,15 +40,18 @@ The frame tail remains fused. Measure, place, semantics, draw, and raster are
 still visible in `FrameArtifacts` and diagnostics, but the runtime schedules
 them as one performance node.
 
-The head is a declared-effect transactional stage. It names the five existing
-mutable subsystems: `viewGraph`, `frameState`, `presentationPortalState`,
-`observationBridge`, and `animationController`. Async cancellation still uses
-the existing checkpoint/rollback mechanics; this ADR relocates and names that
-contract, it does not narrow the effect set.
+The head remains an abortable transactional stage, but it no longer exposes a
+declared rollback-effect set. The follow-on Finding 4 work moved presentation,
+observation, animation, registration publication, and frame-input state behind
+draft or commit boundaries. Internal graph/frame selector restore mechanics are
+implementation details of prepared-frame discard, not a runtime pipeline
+contract.
 
 ## Status
 
 Accepted on 2026-05-17 as Stage 3 of the pipeline-driver hardening roadmap.
+Amended on 2026-05-17 after the Finding 4 resolve-effect narrowing plan removed
+the declared frame-head effect model.
 
 ## Consequences
 
@@ -59,9 +62,9 @@ Accepted on 2026-05-17 as Stage 3 of the pipeline-driver hardening roadmap.
   renderer-owned mutable state.
 - The old generic renderer is removed from public API instead of being relabeled
   as architecture.
-- "Commit is the only side-effect boundary" remains aspirational. Moving the
-  head's live mutations toward commit is tracked in the
-  [Finding 4 resolve-effect plan](../plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md),
-  not part of Stage 3.
+- Commit is the side-effect boundary for lifecycle, task, registration, focus,
+  presentation, and animation effects. A prepared frame head can still be
+  discarded before commit, but its internal draft/checkpoint mechanics do not
+  publish user-visible runtime state.
 - Future stages can refine raster reuse and completed-frame drop policy against
   one runtime composition instead of multiple forked render bodies.

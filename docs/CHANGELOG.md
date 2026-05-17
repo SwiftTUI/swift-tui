@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Completed Finding 4 resolve-effect narrowing: prepared frame heads now publish
+  runtime-visible observation, presentation, animation, registration, focus, and
+  lifecycle/task effects only through commit, and the runtime pipeline no longer
+  exposes a declared rollback-effect set.
 - Relicensed SwiftTUI first-party code from MIT to the GNU Affero General
   Public License v3.0 only while preserving vendored third-party license and
   provenance notices under `Vendor/`.
