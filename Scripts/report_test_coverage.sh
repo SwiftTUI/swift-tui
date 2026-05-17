@@ -5,6 +5,10 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
+if [ "$(uname -s)" = "Linux" ]; then
+  export DISABLE_EXPLICIT_PLATFORMS=1
+fi
+
 swiftly run swift test --enable-code-coverage "$@"
 coverage_json=$(swiftly run swift test --show-codecov-path)
 
@@ -30,4 +34,12 @@ if [ -n "$line_coverage" ]; then
   echo "Line coverage: $line_coverage%"
 else
   echo "Line coverage: unavailable in SwiftPM coverage JSON"
+fi
+
+if [ -n "${STUI_COVERAGE_ARTIFACT_PATH:-}" ]; then
+  artifact_path=$STUI_COVERAGE_ARTIFACT_PATH
+  artifact_dir=$(dirname "$artifact_path")
+  mkdir -p "$artifact_dir"
+  cp "$coverage_json" "$artifact_path"
+  echo "Coverage artifact: $artifact_path"
 fi

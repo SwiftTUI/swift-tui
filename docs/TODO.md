@@ -26,9 +26,6 @@
 
 ## Unresolved Decisions
 
-- Decide whether `bun run test:coverage` remains informational or starts
-  enforcing a failing threshold. See
-  [../Scripts/report_test_coverage.sh](../Scripts/report_test_coverage.sh).
 - Decide the public documentation ratchet shape before enabling strict
   doc-comment linting across the whole package. See
   [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
@@ -66,10 +63,6 @@
   `NeverUseForceTry` separately once the remaining call sites are audited. See
   [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md) and
   [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
-- If coverage remains informational, publish the coverage JSON as a CI artifact
-  so trend data is retained. If a threshold is chosen, wire the threshold into
-  the gate deliberately rather than treating the first report as the baseline.
-  See [../Scripts/report_test_coverage.sh](../Scripts/report_test_coverage.sh).
 - After choosing a first decomposition target and confirming the gate is green,
   split the selected large runtime seam by stable concepts with focused tests.
   Candidate seams include terminal presentation surfaces, `DefaultRenderer` /
