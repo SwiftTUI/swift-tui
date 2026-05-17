@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted direction. Detailed implementation will proceed in staged plans under
-Stage 6 of
+Accepted direction. Detailed implementation is tracked in
+[`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](../plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md),
+under Stage 6 of
 [`2026-05-16-001-pipeline-driver-hardening-plan.md`](../plans/2026-05-16-001-pipeline-driver-hardening-plan.md).
 
 This proposal closes the Stage 6 design choice: the long-term destination is a
@@ -367,4 +368,3 @@ This proposal is complete when:
 - the frame-tail worker has been replaced or re-justified without stack-size as
   the reason; and
 - focused stack/worker tests plus `bun run test` pass.
-

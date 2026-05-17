@@ -6,6 +6,7 @@ date: 2026-05-17
 depends_on:
   - "2026-05-16-001-pipeline-driver-hardening-plan.md"
   - "2026-05-17-002-stage-0-contract-guards-plan.md"
+  - "../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md"
   - "../proposals/PIPELINE_DRIVER_AUDIT.md"
   - "../proposals/OFF_MAIN_PIPELINE_RENDERING.md"
   - "../proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md"
@@ -28,6 +29,8 @@ with a task-only implementation.
 **Migration decision:** the long-term destination is the full explicit
 work-stack migration in
 [`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
+The detailed work plan is
+[`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md).
 Depth limits may be used as temporary crash guards or diagnostics during the
 migration, but the completed Stage 6 architecture is iterative built-in
 measurement and placement.
@@ -77,7 +80,9 @@ bun run test
 
 ## Task 5 - Remaining Recursion Work
 
-- [ ] Execute the full explicit layout work-stack migration described in
+- [ ] Execute
+  [`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md),
+  which implements the full explicit layout work-stack migration described in
   [`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
 - [ ] Treat any graceful depth limit as an interim guard or custom-layout
   compatibility boundary, not as the final built-in layout architecture.

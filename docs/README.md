@@ -100,6 +100,7 @@ Active design proposals that are still shaping decisions:
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
 - [plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md](plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md) — active Stage 6 worker/recursion hardening: the first tranche isolates the large-stack frame-tail layout worker and closes the `@safe` policy gap; the remaining tranche is the accepted explicit layout work-stack migration
+- [plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md](plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md) — active detailed implementation plan for Stage 6 Task 5: migrating built-in layout measurement and placement to explicit work stacks before re-evaluating the large-stack worker
 - [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:
