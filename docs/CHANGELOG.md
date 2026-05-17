@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Resolved the macOS CI-floor decision: GitHub Actions `macos-26` is the
+  intended public macOS support floor for development and release gates, while
+  older macOS hosts are not release-blocking support targets.
 - Added a Swift Package Index manifest so SPI-hosted documentation builds the
   same public DocC target set as the website archive, with example apps still
   excluded.

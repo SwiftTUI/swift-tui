@@ -96,7 +96,9 @@ Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 - Swift 6.3 with strict memory safety and Swift 6 language mode
 - Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`,
   `MemberImportVisibility`, `InternalImportsByDefault`, and others
-- Platforms: macOS 15+, iOS 18+
+- SwiftPM package platforms: macOS 15+, iOS 18+
+- Supported macOS development and CI floor: macOS 26 (`macos-26` on GitHub
+  Actions)
 
 ## AnyView Policy
 

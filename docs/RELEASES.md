@@ -46,9 +46,13 @@ stabilize any remaining API surface needed to provide a SemVer-compatible
 
 ## Platform Support
 
-The root package declares macOS 15+ and iOS 18+ package platforms. Local
-development is primarily macOS with Swift 6.3.1 managed by `swiftly`; Linux and
-WASI paths are supported through the documented package and script entrypoints.
+The root package declares macOS 15+ and iOS 18+ package platforms, but the
+public macOS development and CI support floor is macOS 26. GitHub Actions
+`macos-26` is the supported macOS gate environment; older macOS hosts may work
+when they provide compatible Swift and Xcode tooling, but failures there are not
+release blockers. Local development is primarily macOS with Swift 6.3.1 managed
+by `swiftly`; Linux and WASI paths are supported through the documented package
+and script entrypoints.
 
 `SwiftTUITerminal` and `SwiftTUIPTYPrimitives` are macOS/Linux products and are
 not available for iOS or WASI. Browser runtime packages live in

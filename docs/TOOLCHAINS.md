@@ -25,6 +25,14 @@ Do not use `xcrun swift` for the repo's package builds, tests, DocC generation,
 or wasm packaging. `xcrun` may resolve to an Xcode-selected toolchain that does
 not match the repo's pinned Swift 6.3.1 environment.
 
+## macOS CI Floor
+
+The public macOS development and CI support floor is macOS 26. GitHub Actions
+jobs that validate macOS behavior use the `macos-26` runner label intentionally;
+it is not just a transient hosted-runner choice. Older macOS hosts may still
+build compatible package products when their Swift and Xcode tooling is new
+enough, but the release gate does not treat those hosts as supported blockers.
+
 ## WASM
 
 The wasm-facing package work also uses the same `swiftly`-managed Swift 6.3.1

@@ -30,7 +30,7 @@ for release policy and support details.
 
 | Surface | Status |
 | --- | --- |
-| macOS 15+ package development | Primary supported path |
+| macOS 26+ package development and CI | Primary supported Apple-host path; GitHub `macos-26` is the public macOS CI floor |
 | Linux terminal package builds/tests | Supported through `swiftly` and `bun run test` |
 | iOS 18+ package builds | Supported for host-compatible products; PTY products are excluded |
 | WASI/browser deployment | Supported through `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` |
@@ -233,7 +233,7 @@ run command, host mode, or focused test package.
 ## Development Requirements
 
 Currently fully supported:
-- macOS 15+ for local package development on Apple platforms
+- macOS 26+ for local package development on Apple platforms
 - Swift 6.3.1 managed through `swiftly`
 
 ## Build And Test
@@ -262,6 +262,10 @@ coverage. Coverage is informational; there is no checked-in threshold gate yet.
 
 On Linux, both runners export `DISABLE_EXPLICIT_PLATFORMS=1` and skip
 Apple-only host checks.
+
+On macOS, the public CI support floor is GitHub Actions `macos-26`. Older macOS
+hosts may work when they provide compatible Swift and Xcode tooling, but failures
+there are not release-gate blockers.
 
 For development tests, use `swiftly run swift ...` explicitly. Do not use bare
 `swift test` or `xcrun swift test`; they can pick up an Xcode-selected toolchain

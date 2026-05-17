@@ -26,9 +26,6 @@
 
 ## Unresolved Decisions
 
-- Decide whether the `macos-26` GitHub Actions runner label is the intended
-  public macOS CI floor or only a temporary runner choice. See
-  [../.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml).
 - Decide whether policy checks should remain a separate required status from the
   slower repo gates. See
   [../.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml).
