@@ -517,11 +517,12 @@ internal override is supplied.
 properly isolate it), and treat deep layout recursion as the unbounded-input
 hazard it is.
 
-**Status:** Active in
+**Status:** Shipped in
 [`docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md`](./2026-05-17-004-stage-6-worker-recursion-hardening-plan.md).
-The first tranche isolates and ADR-justifies the large-stack worker, closes the
-`@safe` policy bypass, and documents the WASI fallback. The remaining tranche is
-the full explicit layout work-stack migration described in
+The final tranche migrated built-in layout measurement and placement to explicit
+work stacks, bounded custom-layout compatibility recursion with diagnostics,
+replaced the Darwin pthread/large-stack worker with a serial Dispatch worker,
+and documents the WASI fallback. The detailed implementation record is
 [`docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md)
 and tracked in
 [`docs/plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md).
@@ -537,47 +538,40 @@ start as soon as Stage 0 is green and run alongside Track A.
 
 **Tasks:**
 
-1. Audit and migrate layout-engine recursion depth (P5): convert built-in
+1. [x] Audit and migrate layout-engine recursion depth (P5): convert built-in
    recursive layout measurement and placement walks to explicit work stacks.
    Temporary graceful depth limits may be used as interim guards or
    custom-layout compatibility boundaries, but the final built-in layout
-   architecture is iterative. The 8 MB stack and `StackSafetyRegressionTests`
-   are mitigation, not a fix — a sufficiently nested view tree remains an
-   unbounded-input crash until the migration lands.
-2. Replace the hand-rolled `pthread` worker
-   (`Rendering/FrameTailRenderer.swift:377`–`378`, `pthread_create` with a
-   manual 8 MB stack, `pthread_join` in `deinit`,
-   `Unmanaged.passRetained`/`fromOpaque`, `DispatchSemaphore`+`Mutex`) with a
-   task-based or `Executor`-based worker.
-3. If Task 1 proves a deep stack is genuinely required, isolate all unsafe
+   architecture is iterative.
+2. [x] Replace the hand-rolled `pthread` worker with a serial Dispatch worker.
+3. [x] If Task 1 proves a deep stack is genuinely required, isolate all unsafe
    thread code behind a single audited type, and amend the
    `structured-concurrency-escape-hatches` `prek.toml` hook to also cover `@safe`
    — closing the loophole the audit found (the policy is "satisfied on a
    technicality").
-4. Write an ADR justifying whichever path is taken.
-5. Decide the WASI behavior (Finding 7): the `#else` branch
-   (`FrameTailRenderer.swift:485`) runs off-main rendering inline and
-   synchronously — "one API, three semantics." Either document the synchronous
-   fallback as accepted, or gate the async API off where it cannot be honored.
+4. [x] Write an ADR justifying whichever path is taken.
+5. [x] Decide the WASI behavior: the no-Dispatch fallback remains synchronous
+   and documented until the renderer API grows a gated async capability model.
 
 **Key files:**
-- Modify: `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift:311,377,471,485`
+- Modify: `Sources/SwiftTUIRuntime/Rendering/FrameTailLayoutWorker.swift`
+- Modify: `Sources/SwiftTUICore/Measure/LayoutEngine+MeasurementWorkStack.swift`
+- Modify: `Sources/SwiftTUICore/Place/LayoutEngine+PlacementWorkStack.swift`
 - Modify: `prek.toml` (escape-hatch hook banlist)
 - Reference: `Tests/SwiftTUICoreTests/StackSafetyRegressionTests.swift`,
   `docs/plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md`,
   `docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`,
   `docs/proposals/OFF_MAIN_PIPELINE_RENDERING.md`,
   `docs/proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md`
-- Create: `docs/decisions/00NN-off-main-layout-worker-concurrency.md`
+- Reference: `docs/decisions/0020-off-main-layout-worker-concurrency.md`
 
-**Risks:** The 8 MB stack exists because layout recurses deeply; removing the
-`pthread` without first bounding recursion could reintroduce stack overflow on a
-default-sized task stack. The recursion audit is first for that reason.
+**Risks:** Public custom layout can still call back into `LayoutEngine`; this is
+kept as a bounded compatibility boundary rather than evidence of built-in layout
+recursion.
 
-**Exit criteria:** No hand-rolled `pthread` outside a single audited,
-ADR-justified type; the escape-hatch hook covers `@safe`; WASI's divergent
-semantics are documented or gated; built-in layout recursion has migrated to
-explicit work stacks.
+**Exit criteria:** No hand-rolled `pthread` worker remains; the escape-hatch
+hook covers `@safe`; WASI's divergent semantics are documented; built-in layout
+recursion has migrated to explicit work stacks.
 
 ---
 
@@ -752,12 +746,9 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 ## Suggested first action
 
-Stage 0 through Stage 5 now have detailed shipped plans, completing Track A.
-Stage 7 is shipped on Track B, and Stage 6 has an active detailed plan with the
-worker isolated and ADR-justified. Continue **Stage 6** by executing
-[`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md);
-Stage 8 governance reconciliation can follow once the remaining hardening
-implementation lands.
+Stage 0 through Stage 7 now have shipped implementation records across Track A
+and Track B. Stage 8 governance reconciliation can follow as the next roadmap
+slice.
 
 ## Related docs
 
