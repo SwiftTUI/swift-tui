@@ -84,6 +84,19 @@ Example apps remain separate mini packages. They depend on the repo root with:
 
 and select products with `.product(name: ..., package: "swift-tui")`.
 
+## Documentation Coverage
+
+Every root package product listed above is intended for external users to link
+or import, so each product must have a DocC catalog and must be included in the
+combined DocC archive generated for the public website. The canonical target
+list is [`../Scripts/lib/public_docc_targets.txt`](../Scripts/lib/public_docc_targets.txt);
+it may also include support targets whose symbols are part of the published
+reference. The root [`../.spi.yml`](../.spi.yml) mirrors the same target set for
+Swift Package Index-hosted documentation.
+
+Example apps remain runnable samples and regression surfaces. They do not need
+DocC catalogs, and the repo gate fails if an example package adds one.
+
 ## Shipped Architecture
 
 The platform-integration-facing root work is landed:

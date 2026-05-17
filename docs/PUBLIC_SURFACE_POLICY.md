@@ -73,6 +73,14 @@ exported as package products unless they have graduated into the canonical
 public story. Example apps should stay in their own mini packages and depend on
 the root `swift-tui` package rather than becoming root products.
 
+Root package products intended for external users to link or import must have a
+DocC catalog and must be generated into the public website's combined DocC
+archive. The website DocC target list may include support targets whose symbols
+are part of the published reference. The root `.spi.yml` must mirror that target
+set for Swift Package Index-hosted documentation. Example apps under `Examples/`
+are intentionally excluded from DocC coverage; their role is to demonstrate and
+test products, not to present a separate public API reference.
+
 ## Low-Level Construction Policy
 
 The `*` authoring nodes are not part of the public authoring story.

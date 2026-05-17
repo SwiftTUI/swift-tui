@@ -40,9 +40,6 @@
 - Decide the public documentation ratchet shape before enabling strict
   doc-comment linting across the whole package. See
   [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md).
-- Decide whether every public platform product needs a DocC catalog, or whether
-  platform products are intentionally documented by prose guides only. See
-  [README.md](README.md) and [HOST_PACKAGES.md](HOST_PACKAGES.md).
 - Decide whether large-runtime-file decomposition should start with terminal
   presentation-surface protocols, `DefaultRenderer` / frame-tail support,
   animation tracking, graph state, or web-surface transport seams. See
@@ -81,12 +78,6 @@
   so trend data is retained. If a threshold is chosen, wire the threshold into
   the gate deliberately rather than treating the first report as the baseline.
   See [../Scripts/report_test_coverage.sh](../Scripts/report_test_coverage.sh).
-- After the platform-product DocC decision, either add catalogs for public
-  platform products such as `SwiftTUICLI`, `SwiftTUITerminal`,
-  `SwiftTUITerminalWorkspace`, `SwiftTUIWASI`, `SwiftTUIWebHost`,
-  `SwiftTUIWebHostCLI`, and `SwiftUIHost`, or document that prose guides are
-  the intended public documentation surface. Keep website/docs generation
-  aligned with the decision. See [README.md](README.md).
 - After choosing a first decomposition target and confirming the gate is green,
   split the selected large runtime seam by stable concepts with focused tests.
   Candidate seams include terminal presentation surfaces, `DefaultRenderer` /

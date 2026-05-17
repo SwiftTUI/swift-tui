@@ -27,10 +27,13 @@ bun install
 bun run dev            # http://localhost:4321
 bun run build:wasm     # release WebExample, q11 Brotli wasm
 bun run build:wasm:dev # debug WebExample, q9 Brotli wasm
-bun run build:full     # release WebExample + Astro dist/
-bun run build:dev      # debug WebExample + Astro dist/
+bun run build:docc     # combined DocC archive for linkable public products
+bun run build:full     # release WebExample + DocC + Astro dist/
+bun run build:dev      # debug WebExample + DocC + Astro dist/
 ```
 
 From the repo root, `bun run build:wasm`, `bun run build:wasm:dev`,
 `bun run build:website`, and `bun run build:website:dev` run the same Website
-scripts.
+scripts. The full website builds generate DocC for every externally linkable
+root package product and copy the archive into `Website/dist/docs/`; example
+apps under `Examples/` are intentionally excluded from DocC coverage.

@@ -166,6 +166,7 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
   - stable-doc source-path guardrails
+  - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
   - rendered-text fixture matrix guardrails
   - accessibility guardrails for raw glyphs, color-state styling, and visual content
@@ -559,6 +560,12 @@ run_step \
   "$repo_root" \
   "./Scripts/check_stable_doc_source_paths.sh" \
   ./Scripts/check_stable_doc_source_paths.sh
+
+run_step \
+  "Check DocC coverage policy" \
+  "$repo_root" \
+  "./Scripts/check_docc_coverage.sh" \
+  ./Scripts/check_docc_coverage.sh
 
 run_step \
   "Check root test-target coverage" \
