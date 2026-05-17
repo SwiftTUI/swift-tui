@@ -535,71 +535,73 @@ public struct DefaultRenderer {
     )
     return await RuntimeRenderPipeline().renderCancellable(
       head: draft,
-      animationInjection: { draft in
-        renderer.injectAnimations(
-          into: draft,
-          mode: .abortable
-        )
-      },
-      latePreferenceReconciliation: { draft in
-        await renderer.renderCancellableFrameTailLayoutStage(
-          draft,
-          shouldCancelQueued: shouldCancelQueued
-        )
-      },
-      fusedFrameTail: { draft, layoutStage in
-        await renderer.renderCancellableFusedFrameTail(
-          draft: draft,
-          layoutStage: layoutStage
-        )
-      },
-      cancelledBeforeStart: { draft in
-        renderer.abortPreparedFrameHead(draft)
-        return CancellableRenderOutcome(
-          artifacts: nil,
-          runtimeIssues: draft.runtimeIssues,
-          renderGeneration: draft.renderGeneration,
-          newestDesiredGeneration: nil,
-          tailJobState: .cancelledBeforeStart,
-          tailCancelReason: "newer_render_intent",
-          completedFrameDropDecision: nil
-        )
-      },
-      commitOrDrop: { draft, tailOutput in
-        let newestGeneration = newestDesiredGeneration() ?? draft.renderGeneration
-        let candidate = renderer.makeCompletedFrameCandidate(
-          draft: draft,
-          tailOutput: tailOutput,
-          newestDesiredGeneration: newestGeneration,
-          completedFramePolicy: completedFramePolicy,
-          additionalBlockers: completedFrameAdditionalBlockers
-        )
-        if candidate.dropDecision.canSkipCompletedFrame {
-          renderer.discardCompletedFrameCandidate(
-            candidate,
-            reconciliation: candidate.dropDecision.reconciliation
+      handlers: CancellableRenderStageHandlers(
+        animationInjection: { draft in
+          renderer.injectAnimations(
+            into: draft,
+            mode: .abortable
           )
+        },
+        latePreferenceReconciliation: { draft in
+          await renderer.renderCancellableFrameTailLayoutStage(
+            draft,
+            shouldCancelQueued: shouldCancelQueued
+          )
+        },
+        fusedFrameTail: { draft, layoutStage in
+          await renderer.renderCancellableFusedFrameTail(
+            draft: draft,
+            layoutStage: layoutStage
+          )
+        },
+        cancelledBeforeStart: { draft in
+          renderer.abortPreparedFrameHead(draft)
           return CancellableRenderOutcome(
             artifacts: nil,
-            runtimeIssues: candidate.previewArtifacts.diagnostics.runtime.issues,
+            runtimeIssues: draft.runtimeIssues,
+            renderGeneration: draft.renderGeneration,
+            newestDesiredGeneration: nil,
+            tailJobState: .cancelledBeforeStart,
+            tailCancelReason: "newer_render_intent",
+            completedFrameDropDecision: nil
+          )
+        },
+        commitOrDrop: { draft, tailOutput in
+          let newestGeneration = newestDesiredGeneration() ?? draft.renderGeneration
+          let candidate = renderer.makeCompletedFrameCandidate(
+            draft: draft,
+            tailOutput: tailOutput,
+            newestDesiredGeneration: newestGeneration,
+            completedFramePolicy: completedFramePolicy,
+            additionalBlockers: completedFrameAdditionalBlockers
+          )
+          if candidate.dropDecision.canSkipCompletedFrame {
+            renderer.discardCompletedFrameCandidate(
+              candidate,
+              reconciliation: candidate.dropDecision.reconciliation
+            )
+            return CancellableRenderOutcome(
+              artifacts: nil,
+              runtimeIssues: candidate.previewArtifacts.diagnostics.runtime.issues,
+              renderGeneration: draft.renderGeneration,
+              newestDesiredGeneration: newestGeneration,
+              tailJobState: .droppedCompleted,
+              tailCancelReason: nil,
+              completedFrameDropDecision: candidate.dropDecision
+            )
+          }
+          let artifacts = renderer.commitCompletedFrameCandidate(candidate)
+          return CancellableRenderOutcome(
+            artifacts: artifacts,
+            runtimeIssues: artifacts.diagnostics.runtime.issues,
             renderGeneration: draft.renderGeneration,
             newestDesiredGeneration: newestGeneration,
-            tailJobState: .droppedCompleted,
+            tailJobState: .completed,
             tailCancelReason: nil,
             completedFrameDropDecision: candidate.dropDecision
           )
         }
-        let artifacts = renderer.commitCompletedFrameCandidate(candidate)
-        return CancellableRenderOutcome(
-          artifacts: artifacts,
-          runtimeIssues: artifacts.diagnostics.runtime.issues,
-          renderGeneration: draft.renderGeneration,
-          newestDesiredGeneration: newestGeneration,
-          tailJobState: .completed,
-          tailCancelReason: nil,
-          completedFrameDropDecision: candidate.dropDecision
-        )
-      }
+      )
     )
   }
 
@@ -618,31 +620,33 @@ public struct DefaultRenderer {
     )
     return RuntimeRenderPipeline().renderOneShot(
       head: draft,
-      animationInjection: { draft in
-        renderer.injectAnimations(
-          into: draft,
-          mode: .oneShot
-        )
-      },
-      latePreferenceReconciliation: { input, clock in
-        renderer.renderLayoutResolvingLatePreferences(
-          input,
-          clock: clock
-        )
-      },
-      fusedFrameTail: { draft, reconciledTailLayout in
-        renderer.renderFusedFrameTail(
-          draft: draft,
-          reconciledTailLayout: reconciledTailLayout
-        )
-      },
-      commit: { draft, reconciledTailLayout, tail in
-        renderer.commitOneShotFrame(
-          draft: draft,
-          reconciledTailLayout: reconciledTailLayout,
-          tail: tail
-        )
-      }
+      handlers: OneShotRenderStageHandlers(
+        animationInjection: { draft in
+          renderer.injectAnimations(
+            into: draft,
+            mode: .oneShot
+          )
+        },
+        latePreferenceReconciliation: { input, clock in
+          renderer.renderLayoutResolvingLatePreferences(
+            input,
+            clock: clock
+          )
+        },
+        fusedFrameTail: { draft, reconciledTailLayout in
+          renderer.renderFusedFrameTail(
+            draft: draft,
+            reconciledTailLayout: reconciledTailLayout
+          )
+        },
+        commit: { draft, reconciledTailLayout, tail in
+          renderer.commitOneShotFrame(
+            draft: draft,
+            reconciledTailLayout: reconciledTailLayout,
+            tail: tail
+          )
+        }
+      )
     )
   }
 
@@ -825,29 +829,31 @@ public struct DefaultRenderer {
     )
     return await RuntimeRenderPipeline().renderAsync(
       head: draft,
-      animationInjection: { draft in
-        renderer.injectAnimations(
-          into: draft,
-          mode: .abortable
-        )
-      },
-      latePreferenceReconciliation: { draft in
-        await renderer.renderAsyncFrameTailLayoutStage(draft)
-      },
-      fusedFrameTail: { draft, layoutStage in
-        await renderer.renderAsyncFusedFrameTail(
-          draft: draft,
-          layoutStage: layoutStage
-        )
-      },
-      commit: { draft, tailOutput in
-        let candidate = renderer.makeCompletedFrameCandidate(
-          draft: draft,
-          tailOutput: tailOutput,
-          newestDesiredGeneration: draft.renderGeneration
-        )
-        return renderer.commitCompletedFrameCandidate(candidate)
-      }
+      handlers: AsyncRenderStageHandlers(
+        animationInjection: { draft in
+          renderer.injectAnimations(
+            into: draft,
+            mode: .abortable
+          )
+        },
+        latePreferenceReconciliation: { draft in
+          await renderer.renderAsyncFrameTailLayoutStage(draft)
+        },
+        fusedFrameTail: { draft, layoutStage in
+          await renderer.renderAsyncFusedFrameTail(
+            draft: draft,
+            layoutStage: layoutStage
+          )
+        },
+        commit: { draft, tailOutput in
+          let candidate = renderer.makeCompletedFrameCandidate(
+            draft: draft,
+            tailOutput: tailOutput,
+            newestDesiredGeneration: draft.renderGeneration
+          )
+          return renderer.commitCompletedFrameCandidate(candidate)
+        }
+      )
     )
   }
 
