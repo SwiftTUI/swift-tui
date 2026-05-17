@@ -2,15 +2,18 @@
 
 ## Overview
 
-Every frame in SwiftTUI moves through the same ordered phases:
+Every frame product in `SwiftTUICore` moves through the same ordered phase
+products:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-`SwiftTUICore` owns every phase after authored views have already been lowered
-from `SwiftTUIViews` and before `SwiftTUIRuntime` presents the result to a
-terminal or host product.
+`SwiftTUICore` owns those products after authored views have already been
+lowered from `SwiftTUIViews` and before `SwiftTUIRuntime` presents the result
+to a terminal or host product. The runtime may schedule measure, place,
+semantics, draw, and raster as a fused frame-tail performance node, but the
+products retain distinct ownership and diagnostics.
 
 ## Phase Roles
 

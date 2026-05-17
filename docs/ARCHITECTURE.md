@@ -74,14 +74,40 @@ per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 
 ## Frame Pipeline
 
-The implementation centers on this strict phase order:
+SwiftTUI now has two related pipeline contracts: the runtime driver that
+schedules work, and the phase-product model that owns typed frame artifacts.
+
+`DefaultRenderer` executes one composed runtime pipeline:
+
+```text
+head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
+```
+
+- The head evaluates the authored root and declares the live subsystems it may
+  mutate during the transaction.
+- Animation injection is a named post-head stage that rewrites the resolved
+  tree for the current animation transaction.
+- Late-preference reconciliation is a bounded loop-bearing stage that may
+  rerun layout until placement-time preferences converge or the documented
+  limit is reached.
+- The fused frame tail runs measure, place, semantics, draw, and raster as one
+  performance node.
+- Commit packages and applies the runtime-facing side-effect plan.
+
+Sync, async, and cancellable rendering are execution strategies over that one
+composition. The async strategies may offload frame-tail work and may drop only
+completed visual-only frames under the shipped stale-frame policy.
+
+Within that composition, the typed phase products still flow in this order:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-That ordering is visible in `DefaultRenderer`, `RuntimeRenderPipeline`,
-`FrameArtifacts`, and the regression suites.
+This product ordering is visible in `RuntimeRenderPipeline` stage metadata,
+`FrameArtifacts`, diagnostics, and the regression suites. It is not a claim
+that the production runtime schedules seven independent closure stages for each
+frame.
 
 ## Coordinate Domains
 
@@ -184,14 +210,20 @@ adapters over those primitives.
 
 ## Why The Phase Split Matters
 
-Keeping the phases explicit gives the project a few durable advantages:
+Keeping the phase products explicit gives the project a few durable advantages:
 
 - tests can pin exact behavior at the right abstraction boundary
 - layout and semantics do not need terminal escape-sequence knowledge
 - runtime presentation can evolve without rewriting layout
 - diagnostics can report where work was computed versus reused
 
-The first and last bullets are what motivates the strict phase order in code. Collapsing two phases would force regression tests to overspecify (asserting on combined output instead of one phase) and would blur the diagnostic signal that distinguishes "we reused this" from "we recomputed this." Both costs accrue silently and only show up when a regression resists localization. The split is the cheaper path.
+The first and last bullets motivate the typed product split and the composed
+runtime driver. Fusing runtime scheduling nodes is allowed when it is the honest
+performance shape, but collapsing product ownership would force regression tests
+to overspecify combined output and would blur the diagnostic signal that
+distinguishes "we reused this" from "we recomputed this." Both costs accrue
+silently and only show up when a regression resists localization. The product
+split is the cheaper path.
 
 ## Runtime Model
 
@@ -240,9 +272,17 @@ convenience product.
 
 ## Important Data Products
 
-The seven phases stay separate, but later phases intentionally carry named
-snapshots of earlier data when that is the clearest contract. Duplicated data is
-allowed only when it has an owner, projection path, and freshness proof.
+The runtime driver may fuse scheduling nodes, but the phase products stay
+separate. Later products intentionally carry named snapshots of earlier data
+when that is the clearest contract. Duplicated data is allowed only when it has
+an owner, projection path, and freshness proof.
+
+`FrameArtifacts` is a broad inspection bundle, not proof that runtime
+scheduling exposes every product as an independent stage. Host adapters and
+tests should prefer the product that owns the contract they need, such as
+`SemanticSnapshot`, `SemanticHostFrame`, `CommitPlan`, or
+`PresentationDamage`, and use `FrameArtifacts` when the whole current-frame
+bundle is genuinely the subject under inspection.
 
 | Product | Owns | Carries or derives | Boundary contract |
 | --- | --- | --- | --- |

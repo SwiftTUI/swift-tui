@@ -295,13 +295,14 @@ tree.
 
 ## `SwiftTUICore`
 
-`SwiftTUICore` is organized around the seven-phase pipeline contract
+`SwiftTUICore` is organized around the seven phase-product contracts
 (`resolve → measure → place → semantics → draw → raster → commit`) plus
-cross-cutting buckets. The top-level layout mirrors the doctrine:
+cross-cutting buckets. The runtime may schedule some products through a fused
+frame-tail node, but the source layout mirrors product ownership:
 
 ```
 Sources/SwiftTUICore/
-  Pipeline/    — orchestrators that drive the seven phases
+  Pipeline/    — scheduling, snapshots, and completed-frame drop policy helpers
   Resolve/     — view-graph machinery and resolved-tree types
   Measure/     — layout proposals, layout engine, and measured-node types
   Place/       — placement output and the placement engine pass

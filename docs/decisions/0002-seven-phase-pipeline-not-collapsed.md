@@ -1,19 +1,27 @@
 ---
 adr: "0002"
 title: "Seven-phase pipeline, not collapsed"
-status: accepted
+status: superseded
 date: 2026-04-29
 sources:
   - docs/ARCHITECTURE.md
   - docs/RUNTIME.md
-  - Sources/Core/Core.docc/Rendering-Pipeline.md
+  - Sources/SwiftTUICore/SwiftTUICore.docc/Rendering-Pipeline.md
+  - docs/decisions/0019-composed-runtime-render-pipeline.md
+superseded_by:
+  - docs/decisions/0019-composed-runtime-render-pipeline.md
 ---
 
 # ADR-0002: Seven-phase pipeline, not collapsed
 
+> Superseded for runtime-driver governance by
+> [ADR-0019](0019-composed-runtime-render-pipeline.md). This ADR remains the
+> historical record for defending the typed phase-product split.
+
 ## Context
 
-A frame in SwiftTUI moves through seven distinct phases:
+At the phase-product level, a frame in SwiftTUI moves through seven distinct
+typed products:
 
 ```
 resolve → measure → place → semantics → draw → raster → commit
@@ -21,13 +29,25 @@ resolve → measure → place → semantics → draw → raster → commit
 
 Each phase produces a typed artifact (`ResolvedNode`, `MeasuredNode`,
 `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`,
-`CommitPlan`) and is implemented in `Sources/Core/`.
+`CommitPlan`) and keeps a distinct ownership contract.
 
 The cheaper alternative would be to collapse adjacent phases that have
 no semantic boundary today: measure+place into one geometry pass,
 draw+raster into one rendering pass, semantics+draw into one extraction
 pass. Each collapse saves a few hundred lines of plumbing, removes a
 type, and makes the data flow shorter.
+
+The original ADR did not distinguish that type split from the production
+runtime driver. The driver now has its own accepted record:
+[ADR-0019](0019-composed-runtime-render-pipeline.md). `DefaultRenderer`
+executes the shipped runtime composition:
+
+```
+head → animation injection → late-preference reconciliation → fused frame tail → commit
+```
+
+The fused tail produces the typed products above, but the runtime does not
+schedule seven independent closure stages for each frame.
 
 ## Decision
 
@@ -37,9 +57,9 @@ exercised by distinct test suites.
 
 ## Status
 
-Accepted. The pipeline order is visible in `DefaultRenderer`,
-`FrameArtifacts`, `Pipeline`, and the per-phase regression suites under
-`Tests/CoreTests/`.
+Superseded on 2026-05-17 for runtime-driver governance by
+[ADR-0019](0019-composed-runtime-render-pipeline.md). The phase-product split
+remains accepted; the production driver shape is governed by ADR 0019.
 
 ## Consequences
 
@@ -55,9 +75,8 @@ Accepted. The pipeline order is visible in `DefaultRenderer`,
   previews, snapshots, ASCII output, ANSI16, ANSI256, or true-color
   terminals without rewriting layout.
 - **Runtime presentation can evolve without rewriting layout.** Async
-  frame-tail offload (see ADR-0004's open questions) only had to touch
-  measure/place/semantics/draw/raster, not the whole frame. The
-  `commit` boundary is the cancellation surface.
+  frame-tail offload and the later composed runtime driver were able to fuse
+  scheduling while preserving measure/place/semantics/draw/raster products.
 - **Diagnostics can attribute work to phases.** `FrameDiagnostics`
   records resolve reuse, measurement cache hits, and presentation
   damage independently. When something regresses we know whether it was
@@ -78,6 +97,9 @@ Accepted. The pipeline order is visible in `DefaultRenderer`,
   styling live in the rasterizer.
 - Adding state that flows across phases requires a new typed artifact
   field, not a side-channel.
+- Documentation must not use `FrameArtifacts` breadth or the old generic
+  `Renderer<Root>` helper as evidence that the runtime driver exposes seven
+  independent scheduling stages.
 
 The bet: **regression tests that resist localization** and
 **diagnostic signals that distinguish reuse from recomputation** are

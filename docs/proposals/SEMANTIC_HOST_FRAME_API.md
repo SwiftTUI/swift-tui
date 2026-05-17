@@ -67,7 +67,7 @@ the existing presentation metrics value.
   raster damage.
 - Move accessibility-announcement publication away from a hidden protocol-name
   side effect.
-- Preserve the seven-phase pipeline boundary:
+- Preserve the phase-product boundary:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit

@@ -1,10 +1,12 @@
 # Pipeline Driver Audit
 
-**Status:** Findings document, 2026-05-16. An investigation into the gap between
-the *formalized* render pipeline the repository advertises and the *driver* that
-actually executes every frame. This document overrides architecture claims
-where they conflict; findings here are evidence-based with `file:line`
-references.
+**Status:** Historical findings document, opened 2026-05-16. The investigation
+captured the gap between the *formalized* render pipeline the repository
+advertised and the *driver* that actually executed every frame before the
+pipeline-driver hardening roadmap. Stage 8 of that roadmap reconciled the
+current architecture docs with the shipped composed driver. The findings below
+remain the evidence record for the pre-hardening state; they no longer override
+[`ARCHITECTURE.md`](../ARCHITECTURE.md).
 
 **Scope:** the render driver and the adjacent contracts that decide whether the
 advertised pipeline is enforceable — `DefaultRenderer` / `renderView`, the
@@ -15,7 +17,29 @@ hardens the *phase-product types*. This document concerns the *control flow that
 crosses those boundaries at runtime* — the part boundary hardening does not
 touch.
 
-**Owner:** unassigned.
+**Owner:** closed by the pipeline-driver hardening roadmap.
+
+## Stage 8 outcome summary
+
+| # | Finding | Outcome |
+| --- | --- | --- |
+| 1 | The formalized `Renderer<Root>` pipeline is unused outside tests | Resolved by Stage 3: the generic helper was removed and `DefaultRenderer` now runs `RuntimeRenderPipeline`. |
+| 2 | `renderView` does not execute seven ordered phases | Resolved by Stage 3 and Stage 8: docs now distinguish runtime composition from phase-product order. |
+| 3 | Sync and async render heads are ~120 duplicated lines | Resolved by Stage 1, then enforced by the Stage 3 composition. |
+| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Deferred: Stage 3 declares the effect set; narrowing it remains a separate follow-on. |
+| 5 | The "strict ordered pipeline" is a bounded fixpoint loop | Resolved by Stage 2: late-preference reconciliation is named and bounded. |
+| 6 | Hand-rolled `pthread`; concurrency escape-hatch policy bypassed | Resolved by Stage 6: worker ownership and recursion safety were hardened. |
+| 7 | Off-main frame-tail rendering is a synchronous no-op on WASI | Documented by Stage 6 as a compatibility boundary. |
+| 8 | `FrameDropEligibility.Blocker` is a ~24-flag correctness surface | Resolved by Stage 5: completed-frame decisions use the shipped impact product. |
+| 9 | ~13 render entry points span the {sync,async,cancellable,reconciled} cube | Resolved by Stage 3: sync, async, and cancellable are execution strategies over one composition. |
+| 10 | `FrameDiagnostics` is a ~30-field god struct with dual code paths | Open: intentionally unscheduled by the roadmap. |
+| 11 | Animation is an unnamed phase that mutates the resolved tree | Resolved by Stage 2 and composed by Stage 3. |
+| 12 | Governance documentation has already diverged from the implementation | Resolved by Stage 8. |
+| 13 | Retained reuse freshness depends on hand-maintained equivalence/projection rules | Hardened by Stage 0 guardrails; future fields still need classification. |
+| 14 | Raster damage is advisory; missing invalidation can underpaint silently | Resolved by Stage 4: fresh raster and incremental repaint are split. |
+| 15 | `PresentationSurface` is terminal-shaped even for semantic/non-terminal hosts | Resolved by Stage 7: host presentation roles are split. |
+| 16 | `FrameArtifacts` is an inspection bundle, not a narrow phase contract | Resolved by Stage 0 source docs and Stage 8 architecture wording. |
+| 17 | Tests protect known incidents more than the advertised architecture | Hardened by Stage 0 contract guards. |
 
 ## Why this exists
 
@@ -531,14 +555,12 @@ bugs. Candidate tests:
 - incremental raster repaint is byte-for-byte equivalent to fresh raster for a
   curated mutation matrix.
 
-## Suggested next step
+## Remaining follow-ups
 
-Land P2 first — it is mechanical, removes a live drift hazard, and is a clean
-prerequisite for P1b. In parallel, land the lowest-risk contract tests from P7
-and P11; those tests make the larger P1 decision safer because they pin the
-freshness and commit semantics that the current monolith protects only by
-convention. Then decide P1a vs P1b deliberately, because that decision sets
-whether `docs/` describes the renderer or merely accompanies it.
+The original suggested next step was to land P2, add the lowest-risk P7/P11
+contract guards, then decide P1a versus P1b. That sequence has landed in favor
+of P1b. The remaining follow-ups outside this roadmap are Finding 4's deferred
+effect-set narrowing and Finding 10's `FrameDiagnostics` decomposition.
 
 ## Related docs
 

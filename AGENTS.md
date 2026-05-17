@@ -42,13 +42,19 @@ Do not run repo-local builds or tests with bare `swift` or `xcrun swift`; use
 SwiftTUI  ->  SwiftTUIViews  ->  SwiftTUICore
 ```
 
-- **SwiftTUICore** — pure, terminal-IO-free pipeline
+- **SwiftTUICore** — pure, terminal-IO-free phase products
 - **SwiftTUIViews** — SwiftUI-shaped authoring surface
 - **SwiftTUI** — terminal runtime; re-exports SwiftTUIViews and SwiftTUICore via `@_exported import`
 - **SwiftTUICharts** — compact chart/metric track; separate product
 - **SwiftTUIAnimatedImage** — finite pre-composed animated image track; GIF codec owner
 
-Every frame flows through seven strict phases:
+`DefaultRenderer` executes one composed runtime pipeline:
+
+```
+head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
+```
+
+The fused tail still produces the seven typed phase products in order:
 
 ```
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
