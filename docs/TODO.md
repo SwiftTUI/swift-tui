@@ -49,6 +49,10 @@
 
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
+- Audit the remaining pipeline phase boundaries for duplicated or mirrored
+  metadata, then harden them one scoped boundary at a time with retained-layout,
+  draw, semantics, and stack-safety coverage. See
+  [proposals/PIPELINE_BOUNDARY_HARDENING.md](proposals/PIPELINE_BOUNDARY_HARDENING.md).
 - Apply the historical-doc path policy once decided: either archive historical
   plans clearly or keep the stable-doc source-path checker focused on current
   source-of-truth docs. See

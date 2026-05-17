@@ -90,6 +90,7 @@ Active design proposals that are still shaping decisions:
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — draft anchored popover and TipKit-inspired `popoverTip` API proposal
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy
 - [proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](proposals/CPU_LATENCY_EVALUATION_PIPELINE.md) — CPU-versus-latency measurement system for async rendering and future runtime optimizations
+- [proposals/PIPELINE_BOUNDARY_HARDENING.md](proposals/PIPELINE_BOUNDARY_HARDENING.md) — proposed vision and staged approach for hardening phase-product ownership, mirrored metadata, retained reuse, and async frame-tail boundaries
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/NAVIGATION_DESTINATION_PRESENTATION.md](proposals/NAVIGATION_DESTINATION_PRESENTATION.md) — shipped binding-driven `NavigationStack` destination presentation surface that intentionally keeps SwiftUI names while excluding
   `NavigationLink`, public `NavigationPath`, and `@Environment(\.dismiss)`
