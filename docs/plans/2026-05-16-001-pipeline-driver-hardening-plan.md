@@ -458,6 +458,9 @@ as soundness-critical where it gates painting.
 **Goal:** Shrink the 20-plus-flag `FrameDropEligibility.Blocker` surface so a new
 feature cannot silently drop a frame carrying a real lifecycle or task event.
 
+**Status:** Shipped. Detailed plan:
+[`docs/plans/2026-05-17-005-stage-5-frame-drop-surface-plan.md`](./2026-05-17-005-stage-5-frame-drop-surface-plan.md).
+
 **Addresses:** P6 (Finding 8).
 
 **Depends on:** Stage 3.
@@ -497,6 +500,14 @@ or the enum survives with a guard test that fails on an unclassified new
 side-effect/barrier type; the shipped visual-only completed-frame drop behavior
 still works; the `completedFramePolicy` field is honest about its
 configurability.
+
+**Outcome:** Droppability is now derived from
+`FrameDropEligibility.CompletedFrameImpact`, a closed impact product that every
+diagnostic `Blocker` maps through exhaustively. The `Blocker` enum remains the
+diagnostics vocabulary. `DefaultRenderer` no longer stores a private
+constant-like `completedFramePolicy`; completed-frame candidate creation
+defaults to `.dropCompletedVisualOnly` at the decision point unless an explicit
+internal override is supplied.
 
 ---
 
@@ -717,19 +728,18 @@ This plan does not yet place it; that is an open decision below.
 
 These are deliberately deferred to the detailed plans, not pre-decided here:
 
-1. **Stage 5** — invert the frame-drop model into a closed impact product vs
-   keep the enum with a guard test.
-2. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
+1. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
    whether recursion can be bounded first.
-3. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
+2. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
    `collectsDiagnostics` render path) is handled: folded into a follow-up
    dual-path-collapse task, given its own stage, or left to a separate plan.
 
 ## Suggested first action
 
-Stage 0 through Stage 3 now have detailed shipped plans. Continue Track A with
-**Stage 4** raster-reuse soundness, or take Stage 6/7 on Track B if parallel
-hardening is preferred.
+Stage 0 through Stage 5 now have detailed shipped plans, completing Track A.
+Continue with **Stage 6** worker/recursion hardening or **Stage 7** presentation
+seam splitting on Track B; Stage 8 governance reconciliation can follow once
+the remaining hardening choices are settled.
 
 ## Related docs
 

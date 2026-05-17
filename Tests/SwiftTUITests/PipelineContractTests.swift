@@ -251,11 +251,30 @@ struct PipelineContractTests {
     }
   }
 
-  @Test(.disabled("closed by Stage 5: closed frame-drop impact model"))
+  @Test("frame drop classification is closed over committed effects")
   func frameDropClassificationIsClosedOverCommittedEffects() {
-    Issue.record(
-      "Stage 5 must replace the current open blocker enum with a closed impact product or guard."
-    )
+    for blocker in FrameDropEligibility.Blocker.allCases {
+      let artifacts = makePipelineContractArtifacts(dropEligibilityBlockers: [blocker])
+      let eligibility = FrameDropEligibility.classify(
+        .init(
+          artifacts: artifacts,
+          hasCompleteBarrierSignals: true
+        ))
+
+      #expect(
+        eligibility.decision != .canDropVisualOnly,
+        "\(blocker) must force a completed frame to commit or reconcile"
+      )
+      #expect(!eligibility.impact.isVisualOnly)
+    }
+
+    let visualOnly = FrameDropEligibility.classify(
+      .init(
+        artifacts: makePipelineContractArtifacts(dropEligibilityBlockers: []),
+        hasCompleteBarrierSignals: true
+      ))
+    #expect(visualOnly.decision == .canDropVisualOnly)
+    #expect(visualOnly.impact.isVisualOnly)
   }
 
   @Test(.disabled("closed by Stage 6: worker and recursion safety"))

@@ -18,6 +18,12 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Shipped Stage 5 of the pipeline-driver hardening roadmap: completed-frame
+  drop decisions now derive from a closed impact product, every diagnostic
+  blocker exhaustively maps into that product, the Stage 5 pipeline contract is
+  active, and the renderer's default visual-only stale-frame policy is applied
+  at the completed-candidate decision point instead of stored as a private
+  constant-like field.
 - Shipped Stage 4 of the pipeline-driver hardening roadmap: fresh rasterization
   is now a named `DrawNode -> RasterSurface` path, incremental repaint is gated
   by typed soundness-critical damage, unsuitable damage falls back to full fresh
