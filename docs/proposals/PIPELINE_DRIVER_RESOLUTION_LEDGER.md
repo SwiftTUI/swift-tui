@@ -8,7 +8,7 @@ checkout, and the verifying commit hash is recorded.
 | Finding | Mechanism | DoD command | Verified-by commit |
 | --- | --- | --- | --- |
 | F1  | _pending_ | _pending_ | _pending_ |
-| F2  | _pending_ | _pending_ | _pending_ |
+| F2  | code+test | `grep -n "rerenderedForFocusSync" Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift` shows the focus-sync rerender flag declared once (`FocusSyncConvergenceState`) and read/written only through the shared `processFocusSyncIteration` / `applyAcquiredFrame`; both `renderPendingFrames` and `renderPendingFramesAsync` are thin delegators | 6d70ca63 |
 | F3  | _pending_ | _pending_ | _pending_ |
 | F4  | _pending_ | _pending_ | _pending_ |
 | F5  | _pending_ | _pending_ | _pending_ |
