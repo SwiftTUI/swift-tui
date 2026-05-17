@@ -38,11 +38,17 @@ behavior.
 CI checks, block branch deletion and non-fast-forward updates, require signed
 commits and linear history, and require pull request review before merges.
 
-Organization-admin bypass is intentionally left enabled during the alpha line.
-The project will revisit that bypass at `0.9.0`, which is planned as the first
-public beta release. The goal for the beta line is to add more contributors and
+Organization-admin bypass is intentionally left enabled as maintainer policy.
+This keeps a single accountable maintainer able to repair stuck automation,
+recover from misconfigured rulesets, and land urgent release or security fixes
+without first weakening the repository rules for everyone. Admin bypasses should
+remain exceptional and should still land as signed, linear commits that pass the
+release gate before tagging.
+
+The goal for the `0.9.0` public beta line is to add more contributors and
 stabilize any remaining API surface needed to provide a SemVer-compatible
-`1.0.0` release as soon as safely possible.
+`1.0.0` release as soon as safely possible. That beta milestone does not by
+itself require removing the admin bypass.
 
 ## Platform Support
 

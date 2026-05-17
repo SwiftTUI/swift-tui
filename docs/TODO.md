@@ -26,8 +26,6 @@
 
 ## Unresolved Decisions
 
-- Revisit organization-admin branch-protection bypass policy at the `0.9.0`
-  public beta line. See [RELEASES.md](RELEASES.md).
 - Decide whether `bun run test:coverage` remains informational or starts
   enforcing a failing threshold. See
   [../Scripts/report_test_coverage.sh](../Scripts/report_test_coverage.sh).
