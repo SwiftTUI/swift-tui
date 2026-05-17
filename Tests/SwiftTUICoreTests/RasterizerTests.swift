@@ -302,6 +302,140 @@ struct RasterizerTests {
       ])
   }
 
+  @Test("incremental raster reuse falls back to fresh raster for incompatible surface size")
+  func incrementalRasterReuseFallsBackForIncompatibleSurfaceSize() {
+    let rasterizer = Rasterizer()
+    let previous = coreRasterRoot(
+      width: 4,
+      height: 1,
+      children: [coreRasterTextNode(id: "row", row: 0, text: "OLD", width: 4)]
+    )
+    let current = coreRasterRoot(
+      width: 5,
+      height: 1,
+      children: [coreRasterTextNode(id: "row", row: 0, text: "NEW", width: 5)]
+    )
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: .zero)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [0..<5])])
+    )
+
+    #expect(result.surface == fresh.surface)
+    #expect(result.presentationDamage == nil)
+  }
+
+  @Test("incremental raster reuse falls back to fresh raster for empty damage rows")
+  func incrementalRasterReuseFallsBackForEmptyDamageRows() {
+    let rasterizer = Rasterizer()
+    let previous = coreRasterRoot(
+      children: [coreRasterTextNode(id: "row", row: 0, text: "OLD", width: 4)]
+    )
+    let current = coreRasterRoot(
+      children: [coreRasterTextNode(id: "row", row: 0, text: "NEW", width: 4)]
+    )
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: .zero)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [])
+    )
+
+    #expect(result.surface == fresh.surface)
+    #expect(result.presentationDamage == nil)
+  }
+
+  @Test("incremental raster reuse falls back to fresh raster for full text repaint")
+  func incrementalRasterReuseFallsBackForFullTextRepaint() {
+    let rasterizer = Rasterizer()
+    let previous = coreRasterRoot(
+      children: [
+        coreRasterTextNode(id: "dirty", row: 0, text: "A", width: 4),
+        coreRasterTextNode(id: "missed", row: 1, text: "OLD", width: 4),
+      ]
+    )
+    let current = coreRasterRoot(
+      children: [
+        coreRasterTextNode(id: "dirty", row: 0, text: "B", width: 4),
+        coreRasterTextNode(id: "missed", row: 1, text: "NEW", width: 4),
+      ]
+    )
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: .zero)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(
+        textRows: [.init(row: 0, columnRanges: [0..<4])],
+        requiresFullTextRepaint: true
+      )
+    )
+
+    #expect(result.surface == fresh.surface)
+    #expect(result.presentationDamage == nil)
+  }
+
+  @Test("incremental raster reuse falls back to fresh raster for full graphics replay")
+  func incrementalRasterReuseFallsBackForFullGraphicsReplay() {
+    let rasterizer = Rasterizer()
+    let previous = coreRasterRoot(
+      children: [
+        coreRasterTextNode(id: "dirty", row: 0, text: "A", width: 4),
+        coreRasterImageNode(id: "image", row: 1, source: "old.png"),
+      ]
+    )
+    let current = coreRasterRoot(
+      children: [
+        coreRasterTextNode(id: "dirty", row: 0, text: "B", width: 4),
+        coreRasterImageNode(id: "image", row: 1, source: "new.png"),
+      ]
+    )
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: .zero)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(
+        textRows: [.init(row: 0, columnRanges: [0..<4])],
+        requiresFullGraphicsReplay: true
+      )
+    )
+
+    #expect(result.surface == fresh.surface)
+    #expect(result.presentationDamage == nil)
+  }
+
   // MARK: - Visible-identity collection
 
   @Test("visible identity collection records only identities not fully clipped")
@@ -420,4 +554,65 @@ struct RasterizerTests {
     )
     #expect(frame2.visibleIdentities.contains(movingIdentity))
   }
+}
+
+private func coreRasterRoot(
+  width: Int = 6,
+  height: Int = 3,
+  children: [DrawNode]
+) -> DrawNode {
+  DrawNode(
+    identity: testIdentity("RasterizerFallbackRoot"),
+    bounds: .init(origin: .zero, size: .init(width: width, height: height)),
+    children: children
+  )
+}
+
+private func coreRasterTextNode(
+  id: String,
+  row: Int,
+  text: String,
+  width: Int
+) -> DrawNode {
+  let bounds = CellRect(
+    origin: .init(x: 0, y: row),
+    size: .init(width: width, height: 1)
+  )
+  return DrawNode(
+    identity: testIdentity("RasterizerFallback", id),
+    bounds: bounds,
+    commands: [
+      .text(
+        bounds: bounds,
+        content: text,
+        style: .init(),
+        lineLimit: nil,
+        truncationMode: .tail,
+        wrappingStrategy: .wordBoundary
+      )
+    ]
+  )
+}
+
+private func coreRasterImageNode(
+  id: String,
+  row: Int,
+  source: String
+) -> DrawNode {
+  let bounds = CellRect(
+    origin: .init(x: 0, y: row),
+    size: .init(width: 4, height: 1)
+  )
+  let identity = testIdentity("RasterizerFallback", id)
+  return DrawNode(
+    identity: identity,
+    bounds: bounds,
+    commands: [
+      .image(
+        bounds: bounds,
+        identity: identity,
+        payload: .init(source: .path(source))
+      )
+    ]
+  )
 }

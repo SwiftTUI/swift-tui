@@ -407,6 +407,9 @@ agreed tolerance of the pre-stage baseline; the four named suites, focused
 **Goal:** Separate the pure `DrawNode -> RasterSurface` conversion from the
 incremental-repaint reuse adapter, so the optimization cannot silently underpaint.
 
+**Status:** Shipped. Detailed plan:
+[`docs/plans/2026-05-17-004-stage-4-raster-reuse-soundness-plan.md`](./2026-05-17-004-stage-4-raster-reuse-soundness-plan.md).
+
 **Addresses:** P8 (Finding 14).
 
 **Depends on:** Stage 3.
@@ -433,9 +436,12 @@ composed node and the contract test for "incremental repaint == fresh raster"
    fresh raster for a curated mutation matrix") to assert against both paths.
 
 **Key files:**
-- Modify: `Sources/SwiftTUICore/Raster/Rasterizer.swift:55`,
-  `Sources/SwiftTUICore/Raster/Rasterizer+Damage.swift:60`,
-  `Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift:97`
+- Modified: `Sources/SwiftTUICore/Raster/Rasterizer.swift`
+- Referenced: `Sources/SwiftTUICore/Raster/Rasterizer+Damage.swift`,
+  `Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift`
+- Modified: `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- Modified: `Tests/SwiftTUITests/PipelineContractTests.swift`,
+  `Tests/SwiftTUICoreTests/RasterizerTests.swift`
 
 **Risks:** The incremental path is performance-critical; the fresh-raster
 fallback must trigger only on genuinely unsound damage, not routinely, or the
