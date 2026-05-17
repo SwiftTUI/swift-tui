@@ -209,11 +209,15 @@ the package-only `WASISurfaceBridge` transport target:
   - `WASIRunner.swift`: manifest mode plus WASI scene selection and launch
 - `WASISurfaceBridge` — pure raster-surface transport shared inside the package by
   `SwiftTUIWASI` and `SwiftTUIWebHost`; not an exported consumer product.
-  - `WebSurfaceTransport.swift`: `web-surface` stdout encoder (`WebSurfaceFrameEncoder`),
-    `WebSurfaceTransport` (presentation surface), and `WebSurfaceInputReader` /
-    `WebSurfaceInputParser` for the resize/style/key/mouse stdin protocol that
-    `Platforms/Web`'s `BrowserWASIBridge` consumes; also emits typed clipboard
-    records for browser clipboard adapters
+  - `WebSurfaceTransport.swift`: `WebSurfaceTransport` presentation surface
+    that writes typed `web-surface` records to a file descriptor
+  - `WebSurfaceFrameEncoder.swift`: `web-surface` stdout encoder, semantic
+    host-frame JSON, image payload encoding, runtime issues, and clipboard records
+  - `WebSurfaceInput.swift`: `WebSurfaceInputReader` / `WebSurfaceInputParser`
+    for the resize/style/key/mouse stdin protocol that `Platforms/Web`'s
+    `BrowserWASIBridge` consumes
+  - `WebSurfaceIO.swift`: shared POSIX/WASI fd wrappers and errno helpers for
+    the package-only web-surface bridge
 
 ## `Platforms/WebHost`
 
