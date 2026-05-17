@@ -178,7 +178,8 @@ coverage for Stage 3. `FrameArtifacts` field authority is documented.
 
 **Goal:** Eliminate the ~120 lines of duplicated head logic between the sync
 `renderView` and async `prepareFrameHead`, so P1b composes a head that exists in
-exactly one form.
+exactly one form. See detailed plan:
+[`docs/plans/2026-05-16-002-stage-1-unify-render-head-plan.md`](./2026-05-16-002-stage-1-unify-render-head-plan.md).
 
 **Addresses:** P2 (Finding 3).
 
@@ -215,6 +216,7 @@ two copies that can silently drift.
 **Key files:**
 - Modify: `Sources/SwiftTUIRuntime/SwiftTUI.swift` (`renderView`,
   `prepareFrameHead`, `abortPreparedFrameHead` at `:122`)
+- Detailed plan: `docs/plans/2026-05-16-002-stage-1-unify-render-head-plan.md`
 
 **Risks:** The sync path currently has *no* checkpoint capture and does not need
 the async worker-source snapshot. Unifying must not impose either
