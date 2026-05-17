@@ -99,6 +99,7 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
+- [plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md](plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md) — active governance reconciliation for the shipped pipeline-driver hardening roadmap, aligning architecture docs, ADRs, the audit record, TODO, and changelog with the composed runtime pipeline
 - [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:

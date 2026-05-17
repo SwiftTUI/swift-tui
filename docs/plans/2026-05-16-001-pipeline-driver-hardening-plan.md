@@ -1,7 +1,7 @@
 ---
 title: "refactor: pipeline driver hardening"
 type: refactor
-status: proposed
+status: active
 date: 2026-05-16
 depends_on:
   - "../proposals/PIPELINE_DRIVER_AUDIT.md"
@@ -633,6 +633,9 @@ terminal obligations; `presentCommittedFrame` dispatch is explicit.
 
 **Goal:** Make the documentation true again now that the driver is the composed
 pipeline, and close the governance-drift finding.
+
+**Status:** Active. Detailed plan:
+[`docs/plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md`](./2026-05-17-007-stage-8-governance-reconciliation-plan.md).
 
 **Addresses:** Finding 12, finish P10 (Finding 16), supersede ADR 0002.
 
