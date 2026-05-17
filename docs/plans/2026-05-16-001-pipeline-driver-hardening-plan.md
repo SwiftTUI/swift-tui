@@ -714,11 +714,11 @@ reconciliation P1a would have done alone.
 
 ## Deferred follow-on — narrow the resolve effect set (Finding 4)
 
-Not a stage of this plan; a separate future effort that **depends on Stage 3**
-landing. Stage 3 *declares* the head's five-subsystem effect set; it does not
-shrink it. The path to the audit's Finding 4 — making "commit the side-effect
-boundary" — and to reviving ADR 0004's abandoned abortable head (its Stage 3D)
-is to audit, with the declared effect set in hand, which of `viewGraph`,
+Not a stage of this plan; a separate effort that **depends on Stage 3** landing.
+Stage 3 *declares* the head's five-subsystem effect set; it does not shrink it.
+The next plan is
+[`2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md`](2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md).
+That plan audits, with the declared effect set in hand, which of `viewGraph`,
 `frameState`, `presentationPortalState`, `observationBridge`, and
 `animationController` genuinely must mutate in the head versus could defer
 toward commit.

@@ -60,7 +60,8 @@ Accepted on 2026-05-17 as Stage 3 of the pipeline-driver hardening roadmap.
 - The old generic renderer is removed from public API instead of being relabeled
   as architecture.
 - "Commit is the only side-effect boundary" remains aspirational. Moving the
-  head's live mutations toward commit is a future architectural change, not part
-  of Stage 3.
+  head's live mutations toward commit is tracked in the
+  [Finding 4 resolve-effect plan](../plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md),
+  not part of Stage 3.
 - Future stages can refine raster reuse and completed-frame drop policy against
   one runtime composition instead of multiple forked render bodies.

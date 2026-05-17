@@ -7,6 +7,30 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PipelineContractTests {
+  @Test("runtime frame head declaration names the current rollback effects")
+  func runtimeFrameHeadDeclarationNamesCurrentRollbackEffects() {
+    let pipeline = RuntimeRenderPipeline()
+
+    #expect(
+      pipeline.stageOrder == [
+        .head,
+        .animationInjection,
+        .latePreferenceReconciliation,
+        .fusedFrameTail,
+        .commit,
+      ])
+    #expect(pipeline.headStage.isTransactionalWhenAbortable)
+    #expect(
+      pipeline.headStage.declaredEffects.effects
+        == Set<FrameHeadDeclaredEffect>([
+          .viewGraph,
+          .frameState,
+          .presentationPortalState,
+          .observationBridge,
+          .animationController,
+        ]))
+  }
+
   @Test("sync and async artifacts stay equivalent with committed registrations")
   func syncAndAsyncArtifactsStayEquivalentWithCommittedRegistrations() async {
     let rootIdentity = testIdentity("PipelineContractParityRoot")
