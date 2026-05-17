@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Relicensed SwiftTUI first-party code from MIT to the GNU Affero General
+  Public License v3.0 only while preserving vendored third-party license and
+  provenance notices under `Vendor/`.
 - Completed Stage 8 and closed the pipeline-driver hardening roadmap:
   `11125a29` [ARCHITECTURE.md](ARCHITECTURE.md),
   `11125a29` [ADR 0002](decisions/0002-seven-phase-pipeline-not-collapsed.md),
