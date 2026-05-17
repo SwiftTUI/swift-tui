@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Split the package-only WASI web-surface bridge into presentation transport,
+  frame encoder, input parser/reader, and fd I/O helper files so browser/WASI
+  codec boundaries are documented and source-owned separately.
 - Split `ViewGraph` state records and checkpoint payloads into
   `ViewGraphState.swift` while keeping graph mutation and lifecycle/reuse logic
   in `ViewGraph.swift`.

@@ -52,9 +52,6 @@
 
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
-- Finish the selected large-runtime-file decomposition sequence with a scoped
-  split for web-surface codec/transport boundaries. See
-  [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 - Reduce duplicated phase metadata between resolved and placed nodes under the
   chosen pipeline policy. Cover retained-layout and late-preference behavior
   before changing the shared structure. See [ARCHITECTURE.md](ARCHITECTURE.md).
