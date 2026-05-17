@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Split terminal presentation-surface contracts out of the fd-backed terminal
+  host implementation so host-facing metrics, semantic frame handoff, and
+  presentation-surface defaults have a dedicated source owner.
 - Chose the curated public documentation ratchet instead of global
   doc-comment linting, added a shared repo-policy check for the selected
   consumer-facing declarations, documented the policy, and added focused

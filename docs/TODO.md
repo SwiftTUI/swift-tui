@@ -26,10 +26,6 @@
 
 ## Unresolved Decisions
 
-- Decide whether large-runtime-file decomposition should start with terminal
-  presentation-surface protocols, `DefaultRenderer` / frame-tail support,
-  animation tracking, graph state, or web-surface transport seams. See
-  [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 - Decide whether seven-phase pipeline cleanup should aim for type-pure phase
   products or the smaller policy of eliminating unsynchronized metadata mirrors.
   See [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -56,11 +52,10 @@
 
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
-- After choosing a first decomposition target and confirming the gate is green,
-  split the selected large runtime seam by stable concepts with focused tests.
-  Candidate seams include terminal presentation surfaces, `DefaultRenderer` /
-  frame-tail support, animation property and transition tracking, graph state,
-  and web-surface codec/transport boundaries. See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
+- Finish the selected large-runtime-file decomposition sequence with scoped
+  splits for `DefaultRenderer` / frame-tail support, animation property and
+  transition tracking, graph state, and web-surface codec/transport boundaries.
+  See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 - Reduce duplicated phase metadata between resolved and placed nodes under the
   chosen pipeline policy. Cover retained-layout and late-preference behavior
   before changing the shared structure. See [ARCHITECTURE.md](ARCHITECTURE.md).
