@@ -283,6 +283,8 @@ These migration-era APIs are no longer public:
 - `Package.makeResolver()`
 - `Package.makeViewResolver()`
 - `Package.makeNoOpRenderer()`
+- `NoOpRoot`
+- `Renderer<Root>`
 - `StateViewBuilder`
 - the `AnyViewNode`-based `RunLoop` initializer
 - `DefaultRenderer.render<V: ViewNode>`

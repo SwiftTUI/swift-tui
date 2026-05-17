@@ -78,7 +78,7 @@ Sources/SwiftTUIRuntime/
   Accessibility/ — runtime accessibility policy adapters for terminal targets
   Configuration/ — runtime configuration, environment resolution, and launch option normalization
   RunLoop/      — runtime coordinator, event dispatch, pointer routing, render scheduling
-  Rendering/    — retained frame-tail rendering, worker dispatch, and async tail diagnostics
+  Rendering/    — runtime pipeline composition, retained frame-tail rendering, worker dispatch, and async tail diagnostics
   Lifecycle/    — post-present lifecycle staging, task running, animation control
   Scenes/       — App protocol, scene traversal, scene manifest, hosted scene sessions
   Terminal/     — terminal host, presentation, appearance + capability detection, image rendering
@@ -113,6 +113,9 @@ Sources/SwiftTUIRuntime/
   worker dispatch, tail diagnostics, async cancellation support, and the
   `FrameTailInput` / `FrameTailLayoutOutput` / `FrameTailOutput` boundary
   products that distinguish baseline placed trees from decorated placed trees
+- `Rendering/RuntimeRenderPipeline.swift`: the composed runtime render pipeline
+  that orders head, animation injection, late-preference reconciliation, fused
+  frame tail, and commit for sync, async, and cancellable strategies
 
 ### Lifecycle and animation
 
@@ -315,7 +318,8 @@ Sources/SwiftTUICore/
 
 ### Pipeline orchestrators
 
-- `Pipeline/Pipeline.swift` and `Pipeline/Snapshots.swift`: snapshot pipeline orchestration
+- `Pipeline/Snapshots.swift`: snapshot rendering helpers for tests and
+  diagnostics
 - `Pipeline/Scheduler.swift`: invalidation and wake scheduling
 - `Pipeline/FrameDropEligibility.swift`: conservative classifier for which
   frames may be dropped under back-pressure

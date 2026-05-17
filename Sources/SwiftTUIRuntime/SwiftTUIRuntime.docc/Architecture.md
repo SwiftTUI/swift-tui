@@ -86,7 +86,8 @@ The implementation centers on this strict phase order:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-That ordering is visible in ``DefaultRenderer``, `FrameArtifacts`, `Pipeline`, and the regression suites.
+That ordering is visible in ``DefaultRenderer``, `RuntimeRenderPipeline`,
+`FrameArtifacts`, and the regression suites.
 
 ## Coordinate Domains
 
