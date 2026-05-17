@@ -1082,6 +1082,9 @@ final class FrameTailRenderer: Sendable {
     placed: PlacedNode,
     retainedLayout: RetainedLayoutSession?
   ) -> PresentationDamage? {
+    // This is the proof boundary for raster reuse. Returning `nil` forces a
+    // fresh raster and full presentation diff; a non-nil value means the
+    // localized rows below cover every cell that may have changed.
     guard let retainedLayout,
       let previousFrameIndex = retainedLayout.previousFrameIndex
     else {

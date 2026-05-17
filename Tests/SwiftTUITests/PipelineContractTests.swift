@@ -152,11 +152,103 @@ struct PipelineContractTests {
     #expect(updated.rasterSurface.lines.joined(separator: "\n").contains("Action"))
   }
 
-  @Test(.disabled("closed by Stage 4: raster reuse soundness split"))
+  @Test("incremental raster reuse matches fresh raster for mutation matrix")
   func incrementalRasterReuseMatchesFreshRasterForMutationMatrix() {
-    Issue.record(
-      "Stage 4 must compare curated incremental raster mutations byte-for-byte with fresh raster."
-    )
+    let rasterizer = Rasterizer()
+    let mutations: [PipelineRasterReuseMutation] = [
+      .init(
+        name: "single row text edit",
+        previous: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "value", row: 0, text: "Value 1", width: 10)
+          ]),
+        current: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "value", row: 0, text: "Value 2", width: 10)
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [0..<10])])
+      ),
+      .init(
+        name: "text shrink clears trailing cells",
+        previous: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+          ]),
+        current: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "shrinking", row: 0, text: "ABX", width: 4)
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [2..<4])])
+      ),
+      .init(
+        name: "moved row clears old bounds and paints new bounds",
+        previous: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "moving", row: 0, text: "MOVE", width: 6)
+          ]),
+        current: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "moving", row: 2, text: "MOVE", width: 6)
+          ]),
+        damage: .init(
+          textRows: [
+            .init(row: 0, columnRanges: [0..<6]),
+            .init(row: 2, columnRanges: [0..<6]),
+          ])
+      ),
+      .init(
+        name: "clean sibling outside dirty rows is retained",
+        previous: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "dirty", row: 0, text: "old", width: 6),
+            pipelineRasterTextNode(id: "clean", row: 2, text: "keep", width: 6),
+          ]),
+        current: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "dirty", row: 0, text: "new", width: 6),
+            pipelineRasterTextNode(id: "clean", row: 2, text: "keep", width: 6),
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [0..<6])])
+      ),
+      .init(
+        name: "image attachment outside dirty rows is retained",
+        previous: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "dirtyImageSibling", row: 0, text: "old", width: 6),
+            pipelineRasterImageNode(id: "image", row: 2, source: "demo.png"),
+          ]),
+        current: pipelineRasterRoot(
+          children: [
+            pipelineRasterTextNode(id: "dirtyImageSibling", row: 0, text: "new", width: 6),
+            pipelineRasterImageNode(id: "image", row: 2, source: "demo.png"),
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [0..<6])])
+      ),
+    ]
+
+    for mutation in mutations {
+      let previousSurface = rasterizer.rasterize(
+        mutation.previous,
+        minimumSize: mutation.minimumSize
+      )
+      let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+        mutation.current,
+        minimumSize: mutation.minimumSize,
+        previousSurface: nil,
+        damage: nil
+      )
+      let incremental = rasterizer.rasterizeCollectingVisibleIdentities(
+        mutation.current,
+        minimumSize: mutation.minimumSize,
+        previousSurface: previousSurface,
+        damage: mutation.damage
+      )
+
+      #expect(
+        incremental.surface == fresh.surface,
+        "incremental raster output differed from fresh output for \(mutation.name)"
+      )
+    }
   }
 
   @Test(.disabled("closed by Stage 5: closed frame-drop impact model"))
@@ -238,6 +330,73 @@ private struct PipelineContractAccessibilityView: View {
       .id(identity)
       .accessibilityLabel(label)
   }
+}
+
+private struct PipelineRasterReuseMutation {
+  var name: String
+  var previous: DrawNode
+  var current: DrawNode
+  var damage: PresentationDamage
+  var minimumSize = CellSize(width: 12, height: 4)
+}
+
+private func pipelineRasterRoot(
+  children: [DrawNode]
+) -> DrawNode {
+  DrawNode(
+    identity: testIdentity("PipelineContractRasterRoot"),
+    bounds: .init(origin: .zero, size: .init(width: 12, height: 4)),
+    children: children
+  )
+}
+
+private func pipelineRasterTextNode(
+  id: String,
+  row: Int,
+  text: String,
+  width: Int
+) -> DrawNode {
+  let bounds = CellRect(
+    origin: .init(x: 0, y: row),
+    size: .init(width: width, height: 1)
+  )
+  return DrawNode(
+    identity: testIdentity("PipelineContractRaster", id),
+    bounds: bounds,
+    commands: [
+      .text(
+        bounds: bounds,
+        content: text,
+        style: .init(),
+        lineLimit: nil,
+        truncationMode: .tail,
+        wrappingStrategy: .wordBoundary
+      )
+    ]
+  )
+}
+
+private func pipelineRasterImageNode(
+  id: String,
+  row: Int,
+  source: String
+) -> DrawNode {
+  let bounds = CellRect(
+    origin: .init(x: 0, y: row),
+    size: .init(width: 4, height: 1)
+  )
+  let identity = testIdentity("PipelineContractRaster", id)
+  return DrawNode(
+    identity: identity,
+    bounds: bounds,
+    commands: [
+      .image(
+        bounds: bounds,
+        identity: identity,
+        payload: .init(source: .path(source))
+      )
+    ]
+  )
 }
 
 private final class PipelineContractSemanticSurface:

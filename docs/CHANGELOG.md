@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Shipped Stage 4 of the pipeline-driver hardening roadmap: fresh rasterization
+  is now a named `DrawNode -> RasterSurface` path, incremental repaint is gated
+  by typed soundness-critical damage, unsuitable damage falls back to full fresh
+  raster with no partial damage leak, and the raster reuse mutation matrix is an
+  active contract test instead of a disabled placeholder.
 - Shipped Stage 3 of the pipeline-driver hardening roadmap: `DefaultRenderer`
   now executes a composed runtime render pipeline for sync, async, and
   cancellable strategies; animation injection is an explicit post-head stage;

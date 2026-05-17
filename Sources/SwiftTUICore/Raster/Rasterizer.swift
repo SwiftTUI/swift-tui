@@ -1,11 +1,50 @@
 /// Converts draw commands into a terminal cell surface.
 public struct Rasterizer: Sendable {
   internal static let emptyCompositingStyle = ResolvedTextStyle()
+  package typealias RasterizationResult = (
+    surface: RasterSurface,
+    visibleIdentities: Set<Identity>,
+    presentationDamage: PresentationDamage?
+  )
+
   internal enum ResolvedShapeColorMode {
     case constant(Color?)
     case sampled(LinearGradient)
     case sampledRadial(RadialGradient)
     case tile(TileStyle)
+  }
+
+  /// Proof token for the incremental repaint adapter.
+  ///
+  /// The rasterizer can reject damage that is visibly incompatible with
+  /// retained reuse, but the runtime remains responsible for only passing row
+  /// damage after it has proven those rows cover every changed cell.
+  internal struct SoundRasterDamage: Sendable {
+    var presentationDamage: PresentationDamage
+    var dirtyRows: Set<Int>
+
+    init?(
+      presentationDamage: PresentationDamage,
+      previousSurface: RasterSurface,
+      surfaceSize: CellSize
+    ) {
+      guard previousSurface.size == surfaceSize else {
+        return nil
+      }
+      guard !presentationDamage.requiresFullTextRepaint,
+        !presentationDamage.requiresFullGraphicsReplay
+      else {
+        return nil
+      }
+
+      let dirtyRows = presentationDamage.dirtyRows
+      guard !dirtyRows.isEmpty else {
+        return nil
+      }
+
+      self.presentationDamage = presentationDamage
+      self.dirtyRows = dirtyRows
+    }
   }
 
   public init() {}
@@ -57,56 +96,102 @@ public struct Rasterizer: Sendable {
     minimumSize: CellSize,
     previousSurface: RasterSurface?,
     damage: PresentationDamage?
-  ) -> (
-    surface: RasterSurface,
-    visibleIdentities: Set<Identity>,
-    presentationDamage: PresentationDamage?
-  ) {
+  ) -> RasterizationResult {
+    let surfaceSize = rasterSurfaceSize(for: draw, minimumSize: minimumSize)
+    guard surfaceSize.width > 0, surfaceSize.height > 0 else {
+      return (RasterSurface(), [], nil)
+    }
+
+    if let previousSurface,
+      let damage,
+      let soundDamage = SoundRasterDamage(
+        presentationDamage: damage,
+        previousSurface: previousSurface,
+        surfaceSize: surfaceSize
+      )
+    {
+      return rasterizeIncrementallyCollectingVisibleIdentities(
+        draw,
+        surfaceSize: surfaceSize,
+        previousSurface: previousSurface,
+        soundDamage: soundDamage
+      )
+    }
+
+    return rasterizeFreshCollectingVisibleIdentities(
+      draw,
+      surfaceSize: surfaceSize
+    )
+  }
+
+  private func rasterSurfaceSize(
+    for draw: DrawNode,
+    minimumSize: CellSize
+  ) -> CellSize {
     let extent = maximumExtent(for: draw, clip: nil)
-    let surfaceSize = CellSize(
+    return CellSize(
       width: max(extent.x, max(0, minimumSize.width)),
       height: max(extent.y, max(0, minimumSize.height))
     )
-    guard surfaceSize.width > 0, surfaceSize.height > 0 else {
-      return (RasterSurface(), [], damage)
+  }
+
+  private func rasterizeFreshCollectingVisibleIdentities(
+    _ draw: DrawNode,
+    surfaceSize: CellSize
+  ) -> RasterizationResult {
+    var cells = Array(
+      repeating: Array(repeating: RasterCell.empty, count: surfaceSize.width),
+      count: surfaceSize.height
+    )
+    var imageAttachments: [RasterImageAttachment] = []
+    var visibleIdentities: Set<Identity> = []
+
+    paint(
+      node: draw,
+      cells: &cells,
+      imageAttachments: &imageAttachments,
+      clip: nil,
+      dirtyRows: nil,
+      dirtyRowRange: nil,
+      visibleIdentities: &visibleIdentities
+    )
+
+    return (
+      RasterSurface(
+        size: surfaceSize,
+        cells: cells,
+        imageAttachments: imageAttachments
+      ),
+      visibleIdentities,
+      nil
+    )
+  }
+
+  private func rasterizeIncrementallyCollectingVisibleIdentities(
+    _ draw: DrawNode,
+    surfaceSize: CellSize,
+    previousSurface: RasterSurface,
+    soundDamage: SoundRasterDamage
+  ) -> RasterizationResult {
+    let damage = soundDamage.presentationDamage
+    let dirtyRows = soundDamage.dirtyRows
+    var cells = previousSurface.cells
+    var imageAttachments = previousSurface.imageAttachments.filter { attachment in
+      !visibleBounds(attachment.visibleBounds, intersectsAnyOf: dirtyRows)
     }
+    clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
 
-    let dirtyRows: Set<Int>?
-    let damageToRefine: PresentationDamage?
-    var cells: [[RasterCell]]
-    var imageAttachments: [RasterImageAttachment]
-
-    if let previousSurface, let damage,
-      previousSurface.size == surfaceSize,
-      !damage.dirtyRows.isEmpty
-    {
-      cells = previousSurface.cells
-      dirtyRows = damage.dirtyRows
-      imageAttachments = previousSurface.imageAttachments.filter { attachment in
-        !visibleBounds(attachment.visibleBounds, intersectsAnyOf: damage.dirtyRows)
-      }
-      damageToRefine = damage
-      clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
+    let dirtyRowRange: (min: Int, max: Int)
+    if let lo = dirtyRows.min(), let hi = dirtyRows.max() {
+      dirtyRowRange = (min: lo, max: hi)
     } else {
-      cells = Array(
-        repeating: Array(repeating: RasterCell.empty, count: surfaceSize.width),
-        count: surfaceSize.height
+      return rasterizeFreshCollectingVisibleIdentities(
+        draw,
+        surfaceSize: surfaceSize
       )
-      imageAttachments = []
-      dirtyRows = nil
-      damageToRefine = nil
     }
 
     var visibleIdentities: Set<Identity> = []
-
-    // Pre-compute the dirty-row range once so the per-node culling check
-    // in `paint(node:...)` is O(1) instead of O(|dirtyRows|).
-    let dirtyRowRange: (min: Int, max: Int)?
-    if let dirtyRows, let lo = dirtyRows.min(), let hi = dirtyRows.max() {
-      dirtyRowRange = (min: lo, max: hi)
-    } else {
-      dirtyRowRange = nil
-    }
 
     paint(
       node: draw,
@@ -124,21 +209,14 @@ public struct Rasterizer: Sendable {
       imageAttachments: imageAttachments
     )
 
-    let refinedDamage =
-      if let previousSurface, let damageToRefine {
-        refinedPresentationDamage(
-          from: damageToRefine,
-          previousSurface: previousSurface,
-          currentSurface: surface
-        )
-      } else {
-        damage
-      }
-
     return (
       surface,
       visibleIdentities,
-      refinedDamage
+      refinedPresentationDamage(
+        from: damage,
+        previousSurface: previousSurface,
+        currentSurface: surface
+      )
     )
   }
 }

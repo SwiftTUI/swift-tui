@@ -267,6 +267,18 @@ The runtime is materially incremental in common steady-state paths, but it is no
 - Cache reuse is guarded by a structural input snapshot, not just identity and proposal
 - `RetainedLayoutSession` can reuse clean measured and placed subtrees when the invalidation set, subtree equality, proposals, bounds, and layout behavior all allow it
 
+### Raster
+
+- Fresh rasterization is the canonical `DrawNode -> RasterSurface` conversion
+- Incremental raster reuse is an adapter over the previous raster surface plus
+  soundness-critical presentation damage
+- `FrameTailRenderer.presentationDamage(...)` is the runtime proof boundary for
+  localized reuse; when retained layout cannot prove every changed cell is
+  covered by dirty rows, it returns `nil`
+- The rasterizer rejects retained reuse for incompatible surface size, empty
+  dirty rows, full text repaint, and full graphics replay, then falls back to a
+  fresh raster with no partial presentation damage
+
 ### Presentation
 
 - `WindowGroup` roots render through a full-canvas window host that sizes itself to the current terminal proposal and clips drawing to terminal bounds
