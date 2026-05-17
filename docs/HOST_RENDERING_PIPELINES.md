@@ -58,7 +58,7 @@ authoritative, projected, cached, or diagnostic, see
 
 The core rule is: layout, semantics, draw, and raster do not know whether the
 result will be ANSI bytes, a SwiftUI/CoreGraphics view, or a browser canvas.
-Host-specific behavior starts at the `PresentationSurface` boundary and in the
+Host-specific behavior starts at the presentation role boundary and in the
 host-specific input/resize bridge.
 
 `DefaultRenderer` owns the concrete renderer components:
@@ -133,7 +133,7 @@ The same `RunLoop` also consumes:
 The host-specific parts are therefore:
 
 1. How the app or scene is selected.
-2. Which `PresentationSurface` is provided.
+2. Which presentation surface roles are provided.
 3. Which input reader is provided.
 4. How resize/style changes update the surface and wake the run loop.
 5. How `RasterSurface` and `SemanticSnapshot` leave the runtime.
@@ -236,14 +236,14 @@ The presentation branch is:
 
 ```text
 if output == .json:
-  JSONFrameRenderer writes machine-readable frame JSON
+  JSONFrameRenderer writes machine-readable frame JSON via TerminalCommandPresentationSurface
 else if output == .accessible:
-  LinearAccessibilityRenderer writes semantic text
+  LinearAccessibilityRenderer writes semantic text via TerminalCommandPresentationSurface
 else if surface is SemanticHostFramePresentationSurface:
   present(SemanticHostFrame(sequence, raster, semantics, focusedIdentity, rasterDamage))
 else if surface is DamageAwarePresentationSurface:
   present(raster, damage)
-else:
+else if surface is RasterPresentationSurface:
   present(raster)
 ```
 
@@ -439,9 +439,10 @@ It then constructs a `HostedSceneSession` with:
 - runtime issue sink
 - focus presentation callback
 
-`HostedRasterSurface` conforms to `SemanticHostFramePresentationSurface`. When
-`RunLoop.presentCommittedFrame(...)` reaches the semantic host-frame branch,
-the host receives a single `SemanticHostFrame` containing:
+`HostedRasterSurface` conforms to the metrics, raster, and semantic host-frame
+roles. It does not conform to the terminal aggregate `PresentationSurface`.
+When `RunLoop.presentCommittedFrame(...)` reaches the semantic host-frame
+branch, the host receives a single `SemanticHostFrame` containing:
 
 ```text
 RasterSurface
@@ -595,9 +596,9 @@ while giving opt-in binaries a single launch import.
 6. Creates `WebSocketInputReader`.
 7. Runs the selected scene through `SceneSession.run(...)`.
 
-`WebSocketSurfaceTransport` conforms to
-`SemanticHostFramePresentationSurface`. It advertises a web-capable terminal
-profile:
+`WebSocketSurfaceTransport` conforms to the metrics, raster, and semantic
+host-frame roles. It does not conform to the terminal aggregate
+`PresentationSurface`. It advertises a web-capable terminal profile:
 
 - Unicode glyphs
 - true color
@@ -915,8 +916,8 @@ stdio disposal.
 
 1. Keep terminal escape-sequence adaptation out of layout, semantics, draw, and
    raster.
-2. Add host behavior at the `PresentationSurface`, `TerminalInputReading`,
-   `SignalReading`, or `HostedSceneSession` seams.
+2. Add host behavior at the focused presentation surface role,
+   `TerminalInputReading`, `SignalReading`, or `HostedSceneSession` seams.
 3. If a surface needs accessibility data, implement
    `SemanticHostFramePresentationSurface` so semantic presentation carries
    raster redraw hints beside the semantic snapshot. Declare

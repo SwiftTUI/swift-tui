@@ -5,7 +5,7 @@ import SwiftTUIViews
 }
 
 @_spi(Runners) public final class SceneSessionResources {
-  @_spi(Runners) public let presentationSurface: any PresentationSurface
+  @_spi(Runners) public let presentationSurface: any PresentationSurfaceMetricsProvider
   @_spi(Runners) public let terminalInputReader: any TerminalInputReading
   @_spi(Runners) public let signalReader: (any SignalReading)?
   @_spi(Runners) public let scheduler: any FrameScheduling
@@ -18,7 +18,7 @@ import SwiftTUIViews
     (@MainActor @Sendable (FocusPresentation) -> Void)?
 
   @_spi(Runners) public init(
-    presentationSurface: any PresentationSurface,
+    presentationSurface: any PresentationSurfaceMetricsProvider,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -38,6 +38,31 @@ import SwiftTUIViews
     self.runtimeIssueSink = nil
     self.runtimeConfiguration = runtimeConfiguration
     self.focusPresentationHandler = focusPresentationHandler
+  }
+
+  @_spi(Runners) public convenience init(
+    presentationSurface: any PresentationSurface,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    surfaceName: String = "terminal",
+    environmentValues: [String: String] = [:],
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
+  ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
+    self.init(
+      presentationSurface: metricsSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      surfaceName: surfaceName,
+      environmentValues: environmentValues,
+      diagnosticsLogger: diagnosticsLogger,
+      runtimeConfiguration: runtimeConfiguration,
+      focusPresentationHandler: focusPresentationHandler
+    )
   }
 }
 

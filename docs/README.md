@@ -98,11 +98,13 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
+- [plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md](plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md) — active Stage 6 worker/recursion hardening: the first tranche isolates the large-stack frame-tail layout worker and closes the `@safe` policy gap; recursive layout bounding remains open
 - [plans/2026-05-09-003-deeper-scroll-control-scope.md](plans/2026-05-09-003-deeper-scroll-control-scope.md) — planned first-class scroll control scope, recommending `ScrollViewReader` / `ScrollViewProxy` identity and anchor scrolling before semantic `ScrollPosition` bindings or host observation hooks
 
 Implementation and post-mortem records retained for context:
 
 - [proposals/SEMANTIC_HOST_FRAME_API.md](proposals/SEMANTIC_HOST_FRAME_API.md) — implemented semantic host-frame producer/consumer contract that carries producer sequence, raster output, semantic snapshots, focus, host-frame capabilities, and raster damage together
+- [plans/2026-05-17-003-stage-7-presentation-seam-plan.md](plans/2026-05-17-003-stage-7-presentation-seam-plan.md) — shipped Stage 7 host-presentation seam split: semantic host-frame consumers now use focused metrics/semantic roles without inheriting terminal raw-mode, cursor, or byte-writing obligations
 - [plans/2026-05-13-001-host-presentation-damage-plan.md](plans/2026-05-13-001-host-presentation-damage-plan.md) — shipped host presentation damage promotion: `PresentationDamage` is an optional public host hint, semantic host-frame presentation preserves accessibility data and damage, SwiftUIHost redraws dirty native rects, and WebHost/WASI redraw dirty browser-canvas regions while still sending complete frame records
 - [plans/2026-05-12-002-late-preference-reconciliation-plan.md](plans/2026-05-12-002-late-preference-reconciliation-plan.md) — shipped runtime late preference reconciliation seam, with toolbar hosts absorbing `.toolbarItem(...)` values emitted by realized `GeometryReader` content before commit
 - [plans/2026-05-12-001-popover-presentation-plan.md](plans/2026-05-12-001-popover-presentation-plan.md) — shipped anchored popover presentation implementation record for Boolean and item-driven `.popover`, TipKit-inspired `.popoverTip`, source-relative terminal placement, Escape dismissal, and the gallery `Popovers` tab

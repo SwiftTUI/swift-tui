@@ -110,9 +110,12 @@ Sources/SwiftTUIRuntime/
 ### Rendering
 
 - `Rendering/FrameTailRenderer.swift`: retained frame-tail state, render-tail
-  worker dispatch, tail diagnostics, async cancellation support, and the
+  orchestration, tail diagnostics, async cancellation support, and the
   `FrameTailInput` / `FrameTailLayoutOutput` / `FrameTailOutput` boundary
   products that distinguish baseline placed trees from decorated placed trees
+- `Rendering/FrameTailLayoutWorker.swift`: isolated frame-tail layout worker;
+  Darwin currently uses an ADR-justified large-stack pthread until recursive
+  layout paths are bounded or converted to explicit work stacks
 
 ### Lifecycle and animation
 
@@ -129,12 +132,12 @@ Sources/SwiftTUIRuntime/
 - `Scenes/SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `Scenes/SceneManifest.swift`: `SceneDescriptor`, `SceneManifest`, and manifest generation from authored scenes
 - `Scenes/HostedSceneSession.swift`: retained hosted scene runtime for host products and other non-terminal hosts
-- `Scenes/HostedRasterSurface.swift`: native raster/semantic `PresentationSurface` for host products that do not write ANSI bytes
+- `Scenes/HostedRasterSurface.swift`: native metrics/raster/semantic host surface for products that do not write ANSI bytes
 - `Scenes/SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 
 ### Terminal
 
-- `Terminal/PresentationSurface.swift`: host presentation contracts, `TerminalPresentationMetrics`, and `SemanticHostFrame`
+- `Terminal/PresentationSurface.swift`: focused host presentation roles, terminal aggregate `PresentationSurface`, `TerminalPresentationMetrics`, and `SemanticHostFrame`
 - `Terminal/TerminalHost.swift`: fd-backed `TerminalHost`, `WebTerminalHost`, and terminal process lifecycle helpers
 - `Terminal/TerminalClipboard.swift`: shared clipboard-writing host capability
   and terminal OSC 52 encoding
@@ -238,8 +241,8 @@ combines runner and browser-host responsibilities:
     token/cookie validation, static bundle serving, and close-frame handling
   - `WebHostToken.swift` and `WebHostOriginPolicy.swift`: auth token and
     origin-boundary helpers
-  - `WebSocketSurfaceTransport.swift`: `PresentationSurface` implementation
-    that writes `web-surface` frames over a WebHost channel
+  - `WebSocketSurfaceTransport.swift`: metrics/raster/semantic host surface that
+    writes `web-surface` frames over a WebHost channel
   - `WebSocketInputReader.swift`: `TerminalInputReading` implementation that
     parses browser input/control records from the WebHost channel
   - `WebHostBrowserBundle.swift`: SwiftPM resource lookup and content-type

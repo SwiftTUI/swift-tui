@@ -385,6 +385,59 @@ struct AccessibilityRuntimePolicyTests {
     }
     #expect(hasContiguousSequences)
   }
+
+  @Test("run loop accepts semantic host-frame surfaces without terminal obligations")
+  func runLoopAcceptsSemanticOnlyHostFrameSurface() throws {
+    let surface = SemanticOnlyHostFrameSurface()
+    let rootIdentity = testIdentity("SemanticOnlyRoot")
+    let valueIdentity = testIdentity("SemanticOnlyValue")
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [valueIdentity]
+    )
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop<Int, SemanticOnlyStateView>(
+      rootIdentity: rootIdentity,
+      presentationSurface: surface,
+      terminalInputReader: CursorFocusTestInputReader(),
+      signalReader: CursorFocusTestSignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: focusTracker,
+      runtimeConfiguration: .default,
+      proposal: .init(width: surface.surfaceSize.width, height: surface.surfaceSize.height),
+      viewBuilder: ScopedMapper { input in
+        SemanticOnlyStateView(value: input.state, identity: valueIdentity)
+      }
+    )
+    let erasedSurface: AnyObject = surface
+
+    #expect(!(erasedSurface is any PresentationSurface))
+    #expect(!(erasedSurface is any RasterPresentationSurface))
+    #expect(!(erasedSurface is any TerminalCommandPresentationSurface))
+
+    stateContainer.invalidator = runLoop.scheduler
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    stateContainer.mutate { $0 = 1 }
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(surface.frames.count >= 2)
+    let firstFrame = try #require(surface.frames.first)
+    let secondFrame = try #require(surface.frames.last)
+    #expect(firstFrame.sequence == 0)
+    #expect(secondFrame.sequence == UInt64(surface.frames.count - 1))
+    #expect(secondFrame.raster.lines.joined(separator: "\n").contains("Value 1"))
+    #expect(
+      secondFrame.semantics.focusRegions.map(\.identity).contains(valueIdentity)
+    )
+    #expect(secondFrame.focusedIdentity == valueIdentity)
+    #expect(firstFrame.rasterDamage == nil)
+  }
 }
 
 @MainActor
@@ -413,6 +466,16 @@ private struct SemanticHostFrameButtonView: View {
   var body: some View {
     Button("Run") {}
       .id(testIdentity("SemanticHostButton"))
+  }
+}
+
+private struct SemanticOnlyStateView: View {
+  var value: Int
+  var identity: Identity
+
+  var body: some View {
+    Button("Value \(value)") {}
+      .id(identity)
   }
 }
 
@@ -540,6 +603,25 @@ private final class SemanticHostFrameDispatchSurface:
   @discardableResult
   func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     semanticFrames.append(frame)
+    return TerminalPresentationMetrics.rasterHostMetrics(
+      for: frame.raster,
+      damage: frame.rasterDamage
+    )
+  }
+}
+
+private final class SemanticOnlyHostFrameSurface:
+  PresentationSurfaceMetricsProvider, SemanticHostFramePresentationSurface
+{
+  let surfaceSize = CellSize(width: 24, height: 6)
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+  let semanticHostFrameCapabilities: SemanticHostFrameCapabilities = .standard
+  private(set) var frames: [SemanticHostFrame] = []
+
+  @discardableResult
+  func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
+    frames.append(frame)
     return TerminalPresentationMetrics.rasterHostMetrics(
       for: frame.raster,
       damage: frame.rasterDamage

@@ -157,7 +157,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
 
   package let rootIdentity: Identity
   package let renderer: DefaultRenderer
-  package let presentationSurface: any PresentationSurface
+  package let presentationSurface: any PresentationSurfaceMetricsProvider
   package let terminalInputReader: any TerminalInputReading
   package let signalReader: (any SignalReading)?
   package let scheduler: any FrameScheduling
@@ -246,7 +246,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    presentationSurface: any PresentationSurface,
+    presentationSurface: any PresentationSurfaceMetricsProvider,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -291,6 +291,45 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     )
   }
 
+  package convenience init(
+    rootIdentity: Identity,
+    renderer: DefaultRenderer = .init(),
+    presentationSurface: any PresentationSurface,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    stateContainer: StateContainer<State>,
+    focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
+    keyHandler: StateKeyHandler<State>? = nil,
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
+    viewBuilder: DeferredStateBodyBuilder<State, Content>
+  ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
+    self.init(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: metricsSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      stateContainer: stateContainer,
+      focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
+      keyHandler: keyHandler,
+      environment: environment,
+      environmentValues: environmentValues,
+      runtimeConfiguration: runtimeConfiguration,
+      proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
+      viewBuilder: viewBuilder
+    )
+  }
+
   @MainActor
   package func reportRuntimeIssue(_ issue: RuntimeIssue) {
     guard reportedRuntimeIssues.insert(issue).inserted else {
@@ -308,7 +347,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    presentationSurface: any PresentationSurface,
+    presentationSurface: any PresentationSurfaceMetricsProvider,
     inputReader: any InputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -343,11 +382,50 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     )
   }
 
+  package convenience init(
+    rootIdentity: Identity,
+    renderer: DefaultRenderer = .init(),
+    presentationSurface: any PresentationSurface,
+    inputReader: any InputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    stateContainer: StateContainer<State>,
+    focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
+    keyHandler: StateKeyHandler<State>? = nil,
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
+    viewBuilder: DeferredStateBodyBuilder<State, Content>
+  ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
+    self.init(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: metricsSurface,
+      inputReader: inputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      stateContainer: stateContainer,
+      focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
+      keyHandler: keyHandler,
+      environment: environment,
+      environmentValues: environmentValues,
+      runtimeConfiguration: runtimeConfiguration,
+      proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
+      viewBuilder: viewBuilder
+    )
+  }
+
   /// Creates a run loop from a strongly typed `View` builder.
   public convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    presentationSurface: any PresentationSurface,
+    presentationSurface: any PresentationSurfaceMetricsProvider,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -382,6 +460,82 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     )
   }
 
+  /// Creates a run loop from a strongly typed `View` builder.
+  public convenience init(
+    rootIdentity: Identity,
+    renderer: DefaultRenderer = .init(),
+    presentationSurface: any PresentationSurface,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    stateContainer: StateContainer<State>,
+    focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
+    keyHandler: StateKeyHandler<State>? = nil,
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
+    viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
+  ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
+    self.init(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: metricsSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      stateContainer: stateContainer,
+      focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
+      keyHandler: keyHandler,
+      environment: environment,
+      environmentValues: environmentValues,
+      proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
+      viewBuilder: viewBuilder
+    )
+  }
+
+  /// Creates a run loop from a strongly typed `View` builder and a keyboard-only
+  /// input source.
+  public convenience init(
+    rootIdentity: Identity,
+    renderer: DefaultRenderer = .init(),
+    presentationSurface: any PresentationSurfaceMetricsProvider,
+    inputReader: any InputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    stateContainer: StateContainer<State>,
+    focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
+    keyHandler: StateKeyHandler<State>? = nil,
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
+    viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
+  ) {
+    self.init(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: presentationSurface,
+      terminalInputReader: KeyboardInputAdapter(inputReader: inputReader),
+      signalReader: signalReader,
+      scheduler: scheduler,
+      stateContainer: stateContainer,
+      focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
+      keyHandler: keyHandler,
+      environment: environment,
+      environmentValues: environmentValues,
+      proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
+      viewBuilder: viewBuilder
+    )
+  }
+
   /// Creates a run loop from a strongly typed `View` builder and a keyboard-only
   /// input source.
   public convenience init(
@@ -401,11 +555,12 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
   ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
     self.init(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      presentationSurface: presentationSurface,
-      terminalInputReader: KeyboardInputAdapter(inputReader: inputReader),
+      presentationSurface: metricsSurface,
+      inputReader: inputReader,
       signalReader: signalReader,
       scheduler: scheduler,
       stateContainer: stateContainer,
@@ -445,14 +600,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     observationBridge.attachInvalidator(scheduler)
 
     let usesRawTerminalMode = runtimeConfiguration.output == .tui
+    let terminalCommandSurface =
+      presentationSurface as? any TerminalCommandPresentationSurface
     if usesRawTerminalMode {
-      try presentationSurface.enableRawMode()
+      try terminalCommandSurface?.enableRawMode()
       synchronizeInputCapabilities()
     }
     defer {
       lifecycleCoordinator.shutdown()
       if usesRawTerminalMode {
-        try? presentationSurface.disableRawMode()
+        try? terminalCommandSurface?.disableRawMode()
       }
     }
 
