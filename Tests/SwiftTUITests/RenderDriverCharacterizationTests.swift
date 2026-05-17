@@ -40,7 +40,18 @@ struct RenderDriverCharacterizationTests {
     for entry in Self.matrix {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(entry.view, proposal: proposal)
-      #expect(artifacts.rasterSurface.size.width >= 0, "\(entry.name): raster surface must exist")
+      if entry.name == "empty" {
+        // EmptyView legitimately rasterizes to zero width; >= 0 is sufficient.
+        #expect(
+          artifacts.rasterSurface.size.width >= 0,
+          "\(entry.name): raster surface must exist")
+      } else {
+        // A content-bearing view rendered into a 40×20 proposal must produce a
+        // non-zero-width surface. A zero-width result indicates a degenerate raster.
+        #expect(
+          artifacts.rasterSurface.size.width > 0,
+          "\(entry.name): content-bearing view must produce a positive-width raster surface")
+      }
       #expect(
         artifacts.diagnostics.counts.resolvedNodes > 0,
         "\(entry.name): resolved tree must be non-empty")
