@@ -1,7 +1,7 @@
 ---
 title: "refactor: Stage 6 - harden frame-tail worker and recursion policy"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-17
 depends_on:
   - "2026-05-16-001-pipeline-driver-hardening-plan.md"
@@ -20,26 +20,23 @@ depends_on:
 > it addresses audit proposal **P4/P5** (Findings 6 and 7).
 
 **Goal:** Bring the off-main layout worker and deep-layout recursion story under
-an explicit policy. The immediate shipped tranche isolates the retained
-large-stack worker, closes the `@safe` policy bypass, and records the WASI
-synchronous fallback. The remaining tranche must remove unbounded built-in
-layout recursion with explicit work stacks before replacing the Darwin worker
-with a task-only implementation.
+an explicit policy. The shipped result isolates the frame-tail worker, closes the
+`@safe` policy bypass, records the WASI synchronous fallback, migrates built-in
+layout to explicit work stacks, and removes the Darwin pthread/large-stack
+worker.
 
 **Migration decision:** the long-term destination is the full explicit
 work-stack migration in
 [`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
 The detailed work plan is
 [`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md).
-Depth limits may be used as temporary crash guards or diagnostics during the
-migration, but the completed Stage 6 architecture is iterative built-in
-measurement and placement.
+Depth limits remain only at the public/custom-layout compatibility boundary; the
+completed Stage 6 architecture is iterative built-in measurement and placement.
 
 **Architecture:** The async frame-tail path has two different queues: a normal
-renderer queue and a special layout worker. The layout worker exists because
-deep built-in layout can still recurse enough to need a larger-than-default
-thread stack. Until that recursion is converted to explicit stacks, removing
-the Darwin worker is riskier than isolating it.
+renderer queue and a serial layout worker. Built-in layout stack safety now lives
+in the explicit measurement and placement work stacks, not in a larger native
+thread stack.
 
 ## Task 1 - Baseline And Audit
 
@@ -59,8 +56,8 @@ bun run test
 
 - [x] Move the frame-tail layout worker out of `FrameTailRenderer.swift` into a
   dedicated private implementation file.
-- [x] Keep the Darwin 8 MiB pthread stack because layout recursion is not yet
-  bounded.
+- [x] Initially kept the Darwin 8 MiB pthread stack before the explicit layout
+  work stacks landed.
 - [x] Keep `FrameTailRenderer.swift` focused on retained tail state, async tail
   orchestration, diagnostics, and cancellation.
 
@@ -73,22 +70,23 @@ bun run test
 
 ## Task 4 - Record The Platform Decision
 
-- [x] Add ADR 0020 documenting why the pthread worker remains for now.
+- [x] Add ADR 0020 documenting the temporary pthread worker and later serial
+  worker replacement.
 - [x] Record the WASI behavior: the no-thread/no-Dispatch fallback is
   synchronous by design until the renderer API grows a gated async capability
   model.
 
 ## Task 5 - Remaining Recursion Work
 
-- [ ] Execute
+- [x] Execute
   [`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md),
   which implements the full explicit layout work-stack migration described in
   [`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
-- [ ] Treat any graceful depth limit as an interim guard or custom-layout
+- [x] Treat any graceful depth limit as an interim guard or custom-layout
   compatibility boundary, not as the final built-in layout architecture.
-- [ ] Once built-in recursion is eliminated, re-evaluate replacing the Darwin
+- [x] Once built-in recursion is eliminated, re-evaluate replacing the Darwin
   large-stack worker with a structured task or custom executor implementation.
-- [ ] Add regression coverage that would fail if a new deep layout path bypasses
+- [x] Add regression coverage that would fail if a new deep layout path bypasses
   the bounded/iterative traversal policy.
 
 ## Verification
@@ -104,7 +102,7 @@ bun run test
 
 This Stage 6 plan is complete only when:
 
-- the pthread code is isolated and ADR-justified;
+- the pthread code has been removed from the frame-tail layout worker;
 - `@safe`, `@unchecked Sendable`, and `nonisolated(unsafe)` are blocked by the
   local concurrency-safety policy;
 - WASI's synchronous fallback is documented;

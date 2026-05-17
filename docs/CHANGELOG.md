@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Completed Stage 6 of the pipeline-driver hardening roadmap: built-in layout
+  measurement and placement now use explicit work stacks, custom-layout callback
+  recursion has a bounded diagnostic compatibility boundary, the Darwin
+  large-stack pthread worker was replaced with a serial Dispatch worker, and
+  the repo gate includes a layout work-stack guardrail.
 - Hardened the first Stage 6 Track B tranche: moved the frame-tail layout worker
   into a dedicated source file, removed the `@safe` escape hatch, extended the
   concurrency-safety policy to ban future `@safe` use, and recorded the retained

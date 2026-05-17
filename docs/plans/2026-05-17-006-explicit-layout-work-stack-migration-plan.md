@@ -1,7 +1,7 @@
 ---
 title: "refactor: Stage 6 Task 5 - migrate layout to explicit work stacks"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-17
 depends_on:
   - "2026-05-17-004-stage-6-worker-recursion-hardening-plan.md"
@@ -12,9 +12,7 @@ depends_on:
 # Stage 6 Task 5 - Explicit Layout Work-Stack Migration Plan
 
 > **For agentic workers:** Execute this plan task-by-task. Keep the checkboxes
-> current as work lands. Do not replace the Darwin large-stack frame-tail worker
-> until the built-in measurement and placement migrations are complete and
-> verified. Use `swiftly run swift ...`, not bare `swift`.
+> current as work lands. Use `swiftly run swift ...`, not bare `swift`.
 
 This plan implements the accepted direction in
 [`EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
@@ -600,28 +598,40 @@ swiftly run swift test --filter SwiftTUICoreTests.StackSafetyRegressionTests
 
 Close the Stage 6 migration after implementation and worker follow-up land.
 
-- [ ] Run the full repo gate:
+- [x] Run the full repo gate:
 
 ```bash
 bun run test
 ```
 
-- [ ] Run broader coverage if layout behavior or examples changed materially:
+- [x] Run broader coverage if layout behavior or examples changed materially:
 
 ```bash
 bun run test:all
 ```
 
-- [ ] Update `ASYNC_RENDERING.md` to remove or revise the large-stack caveat.
-- [ ] Update `docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md`
+- Verification note: `bun run test:all` initially failed in
+  `Examples/layouts`, `Examples/gifcat`, and `Examples/gifeditor` with
+  SwiftPM testing-helper signal exits from stale incremental `.build` state
+  after file moves. Cleaning those example `.build` directories and rerunning
+  the failed slices passed:
+
+```bash
+swiftly run swift test --package-path Examples/layouts
+swiftly run swift test --package-path Examples/gifcat
+swiftly run swift test --package-path Examples/gifeditor
+```
+
+- [x] Update `ASYNC_RENDERING.md` to remove or revise the large-stack caveat.
+- [x] Update `docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md`
   to mark Task 5 complete.
-- [ ] Update
+- [x] Update
   `docs/plans/2026-05-16-001-pipeline-driver-hardening-plan.md` Stage 6 status.
-- [ ] Move the completed TODO entry into `docs/CHANGELOG.md` with concise,
+- [x] Move the completed TODO entry into `docs/CHANGELOG.md` with concise,
   self-standing wording and commit-hash-prefixed doc links where required by
   `AGENTS.md`.
-- [ ] Update `docs/README.md` planned/active plan listings.
-- [ ] Keep
+- [x] Update `docs/README.md` planned/active plan listings.
+- [x] Keep
   `docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md` as the design record.
 
 **Acceptance criteria:**
