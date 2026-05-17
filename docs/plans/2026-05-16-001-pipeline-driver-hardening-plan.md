@@ -522,7 +522,9 @@ hazard it is.
 The first tranche isolates and ADR-justifies the large-stack worker, closes the
 `@safe` policy bypass, and documents the WASI fallback. The remaining tranche is
 the full explicit layout work-stack migration described in
-[`docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
+[`docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md)
+and tracked in
+[`docs/plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md).
 
 **Addresses:** P4 (Findings 6, 7), P5 (Finding 6).
 
@@ -562,6 +564,7 @@ start as soon as Stage 0 is green and run alongside Track A.
 - Modify: `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift:311,377,471,485`
 - Modify: `prek.toml` (escape-hatch hook banlist)
 - Reference: `Tests/SwiftTUICoreTests/StackSafetyRegressionTests.swift`,
+  `docs/plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md`,
   `docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`,
   `docs/proposals/OFF_MAIN_PIPELINE_RENDERING.md`,
   `docs/proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md`
@@ -751,9 +754,10 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 Stage 0 through Stage 5 now have detailed shipped plans, completing Track A.
 Stage 7 is shipped on Track B, and Stage 6 has an active detailed plan with the
-worker isolated and ADR-justified. Continue **Stage 6** by executing the full
-explicit layout work-stack migration; Stage 8 governance reconciliation can
-follow once the remaining hardening implementation lands.
+worker isolated and ADR-justified. Continue **Stage 6** by executing
+[`2026-05-17-006-explicit-layout-work-stack-migration-plan.md`](./2026-05-17-006-explicit-layout-work-stack-migration-plan.md);
+Stage 8 governance reconciliation can follow once the remaining hardening
+implementation lands.
 
 ## Related docs
 

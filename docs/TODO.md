@@ -53,9 +53,11 @@
   Stage 6 worker/recursion hardening. Track A stages 0 through 5 and Stage 7
   presentation-seam hardening are shipped; Stage 6's first worker-isolation
   tranche is active and the full explicit layout work-stack migration remains.
-  See
-  [plans/2026-05-16-001-pipeline-driver-hardening-plan.md](plans/2026-05-16-001-pipeline-driver-hardening-plan.md)
-  and
+  See the parent roadmap
+  [plans/2026-05-16-001-pipeline-driver-hardening-plan.md](plans/2026-05-16-001-pipeline-driver-hardening-plan.md),
+  the detailed migration plan
+  [plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md](plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md),
+  and the design proposal
   [proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md](proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
 - Apply the historical-doc path policy once decided: either archive historical
   plans clearly or keep the stable-doc source-path checker focused on current
