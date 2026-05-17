@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Shipped Stage 0 of the pipeline-driver hardening roadmap: retained-reuse
+  projection guards, `ResolvedNode` phase-ownership classification, pipeline
+  contract tests, disabled later-stage guard placeholders, and
+  `FrameArtifacts` field-authority documentation now pin the contracts needed
+  before composed-driver refactors.
 - Completed the pipeline boundary hardening work: durable architecture docs now
   classify phase-product ownership and projections, source-layout docs point to
   the boundary helper types, async rendering docs distinguish baseline and
