@@ -89,6 +89,24 @@ the safety net for unrelated work; they gate the stage that names them. Track B
 contributors can work concurrently with Track A once the Stage 0 guard subset
 for their touched seam is green.
 
+**Stage map:**
+
+| Stage | Focus | Proposals | Track | Depends on | Risk |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Pin the contracts with tests | P7, P11, P10 (doc) | gate | — | Low |
+| 1 | Unify the render head | P2 | A | Stage 0 guard subset | Low |
+| 2 | Name + bound the hidden stages | P3 | A | Stage 1 | Medium |
+| 3 | Compose the pipeline (P1b) | P1b | A | Stages 0, 1, 2 | High |
+| 4 | Make raster reuse sound | P8 | A | Stage 3 | Medium |
+| 5 | Close the frame-drop surface | P6 | A | Stage 3 | High |
+| 6 | Concurrency + recursion safety | P4, P5 | B | Stage 0 guard subset | Med–High |
+| 7 | Split the presentation seam | P9 | B | Stage 0 guard subset | Medium |
+| 8 | Reconcile governance docs | P10, Finding 12 | — | Stage 3 landed | Low |
+
+Track A is strictly sequential (each stage consumes the prior one's structure).
+Track B stages are mutually independent and independent of Track A — a second
+contributor can run them in parallel. Stage 8 waits for Stage 3.
+
 ---
 
 ## Stage 0 — Pin the contracts before touching the driver
@@ -99,6 +117,8 @@ changes in this stage.
 
 **Addresses:** P7 (Finding 13), P11 (Findings 13/17), P10 documentation half
 (Finding 16).
+
+**Depends on:** Nothing — this stage gates the others.
 
 **Why first:** The audit's "Suggested next step" is explicit — land low-risk
 P7/P11 tests in parallel with P2 because they "pin the freshness and commit
@@ -162,6 +182,9 @@ exactly one form.
 
 **Addresses:** P2 (Finding 3).
 
+**Depends on:** Stage 0's must-pass guard subset (shared head freshness, commit
+and drop semantics).
+
 **Why here:** Mechanical, independently valuable, and a hard prerequisite for
 Stage 3 — you cannot compose a "resolve phase" cleanly while it is forked into
 two copies that can silently drift.
@@ -211,6 +234,8 @@ late-preference reconciliation loop — into first-class, named units, and remov
 the magic reconciliation-pass bound.
 
 **Addresses:** P3 (Findings 5 and 11).
+
+**Depends on:** Stage 1.
 
 **Why here:** Stage 3 composes named stages. The loop and animation injection
 must become explicit, named entities *before* composition, or the composed
@@ -263,6 +288,8 @@ and 9 together. **This is the structural core of the plan.**
 
 **Addresses:** P1b (Findings 1, 3, 9).
 
+**Depends on:** Stages 0, 1, and 2.
+
 **Why here:** Stages 0–2 made this safe: behavior is pinned by contract tests,
 the head exists once, and the hidden stages are named. Only now can composition
 be introduced without losing the convention-protected invariants.
@@ -280,22 +307,34 @@ be introduced without losing the convention-protected invariants.
    Stage 1) → `animation injection` (Stage 2) → `late-preference layout loop`
    (Stage 2, a loop-bearing composed stage) → `fused frame tail`
    (measure+place+semantics+draw+raster) → `commit`.
-3. Make `DefaultRenderer` construct the composed pipeline once and execute it,
+3. Model the head as a *declared-effect* stage. The head must explicitly name
+   the subsystems it mutates — `viewGraph`, `frameState`,
+   `presentationPortalState`, `observationBridge`, `animationController`
+   (Finding 4) — as a typed effect set on the stage itself, and the
+   checkpoint/rollback must become a single named transactional-stage construct
+   that the async strategy wraps the head in, instead of machinery threaded by
+   hand through `prepareFrameHead` / `abortPreparedFrameHead`. This is
+   *relocate-and-declare*, not *eliminate*: the five checkpoints still exist and
+   still roll back, but they become a visible composition element. It converts
+   Finding 4's "unexplained residue" into a declared contract, and makes ADR
+   0004's missing invariant — "live registries equal what restore-from-graph
+   would build" — natural to express as a Stage 0 guard.
+4. Make `DefaultRenderer` construct the composed pipeline once and execute it,
    replacing the imperative body of `renderView`.
-4. Reframe sync / async / cancellable as *execution strategies* over the single
+5. Reframe sync / async / cancellable as *execution strategies* over the single
    composition rather than ~13 forked functions (`render`, `renderAsync`,
    `renderAsyncCancellable`, `renderView`, `renderViewAsync`, `prepareFrameHead`,
    the `renderFrameTailAsync` overloads, etc. — see Finding 9).
-5. Migrate every production entry point onto the composed pipeline; delete or
+6. Migrate every production entry point onto the composed pipeline; delete or
    relabel the now-redundant forked functions.
-6. Resolve the `Renderer<Root>` contradiction: the type referenced *only* by
+7. Resolve the `Renderer<Root>` contradiction: the type referenced *only* by
    `PipelineTests` and `Phase0FoundationTests` is now either the live driver or
    deleted — no third "documented but dead" renderer remains.
-7. Preserve the shipped async boundaries from `ASYNC_RENDERING.md`: composition
+8. Preserve the shipped async boundaries from `ASYNC_RENDERING.md`: composition
    must not revive the reverted registration-staging approach, move ordinary
    resolve off-main, cancel started worker work, or treat raw
    `FrameDropEligibility` as permission to skip commit.
-8. Profile allocations and frame latency against a pre-Stage-3 baseline.
+9. Profile allocations and frame latency against a pre-Stage-3 baseline.
    Composition can cost allocations the monolith avoids; the fused-tail node
    from Task 1 is the mitigation — confirm it works.
 
@@ -311,12 +350,17 @@ be introduced without losing the convention-protected invariants.
   `LayoutAndRenderingPipelineTests`, `AsyncFrameTailRenderingTests`,
   `DiagnosticsAndCacheTests` — all must stay green at every commit.
 - Composition can cost allocations the monolith avoids; the fused-tail node and
-  profiling (Task 7) are mandatory, not optional.
-- The five-subsystem checkpoint/rollback machinery (Finding 4) is a residue of
-  the reverted ADR 0004 attempt. This stage does **not** attempt a pure
-  side-effect-free resolve — that is out of scope. It carries the checkpoint
-  machinery into the composed `head` stage unchanged, and records in the ADR
-  that "commit is the side-effect boundary" remains aspirational.
+  profiling (Task 9) are mandatory, not optional.
+- Finding 4 (resolve mutates five subsystems; commit is not the side-effect
+  boundary) is **declared, not fixed**, here. Task 3 makes the head a
+  declared-effect stage and the checkpoint/rollback an explicit transactional
+  construct — but this stage does **not** narrow resolve's effect set, move side
+  effects toward commit, or retry ADR 0004's abort. Those revert reasons —
+  irreversible gesture-recognizer teardown on registry reset, completion
+  closures that cannot be un-fired — survive P1b untouched, and attempting them
+  here would load a second hard problem onto the hottest path. The Stage 3 ADR
+  records that "commit is the side-effect boundary" remains aspirational and
+  names the deferred follow-on (below) as the path to it.
 
 **Exit criteria:** No production frame bypasses the composed pipeline; the ~13
 render entry points collapse to {execution strategy} × {one composition};
@@ -332,6 +376,8 @@ agreed tolerance of the pre-stage baseline; the four named suites, focused
 incremental-repaint reuse adapter, so the optimization cannot silently underpaint.
 
 **Addresses:** P8 (Finding 14).
+
+**Depends on:** Stage 3.
 
 **Why here:** Best done after Stage 3, when the raster stage is an explicit
 composed node and the contract test for "incremental repaint == fresh raster"
@@ -375,6 +421,8 @@ as soundness-critical where it gates painting.
 feature cannot silently drop a frame carrying a real lifecycle or task event.
 
 **Addresses:** P6 (Finding 8).
+
+**Depends on:** Stage 3.
 
 **Why here:** The async/cancellable execution strategy from Stage 3 owns frame
 dropping; reworking the eligibility model is cleaner once that strategy is one
@@ -421,6 +469,9 @@ properly isolate it), and treat deep layout recursion as the unbounded-input
 hazard it is.
 
 **Addresses:** P4 (Findings 6, 7), P5 (Finding 6).
+
+**Depends on:** Stage 0's guard subset for the worker/layout seam. Runs parallel
+to Track A.
 
 **Why parallelizable:** This stage touches `FrameTailRenderer.swift` and the
 layout engine's recursion — no shared code with the driver composition. It can
@@ -474,6 +525,9 @@ obligations to receive a committed frame.
 
 **Addresses:** P9 (Finding 15).
 
+**Depends on:** Stage 0's guard subset for the presentation seam. Runs parallel
+to Track A.
+
 **Why parallelizable:** Touches the presentation/runtime layer, not the driver.
 Independent of Track A; can run alongside it after Stage 0.
 
@@ -520,6 +574,8 @@ terminal obligations; `presentCommittedFrame` dispatch is explicit.
 pipeline, and close the governance-drift finding.
 
 **Addresses:** Finding 12, finish P10 (Finding 16), supersede ADR 0002.
+
+**Depends on:** Stage 3 landed; ideally Stages 4–7 landed too.
 
 **Why last:** Until Stage 3 lands, the docs *should not* be rewritten to claim a
 composed pipeline. This stage records what is now true, not what is aspirational.
@@ -575,11 +631,49 @@ asserts a pipeline shape the code does not have.
 | P10 — `FrameArtifacts` as inspection product | 16 | Stage 0 (doc) + Stage 8 |
 | P11 — architecture-contract tests | 13, 17 | Stage 0 |
 | — governance drift | 12 | Stage 8 |
+| — resolve side-effect boundary | 4 | declared in Stage 3 (Task 3); narrowing deferred |
+| — `FrameDiagnostics` god struct | 10 | **unscheduled gap — see note below** |
 | P1a — demote the seven-phase claim | 1 | superseded by P1b (Stage 3) |
 
-Every audit proposal maps to a stage. P1a is intentionally not scheduled: the
-P1b decision (Stage 3) makes the docs true by changing the code instead of the
-prose, and Stage 8 performs the doc reconciliation P1a would have done alone.
+Every audit *proposal* (P1–P11) maps to a stage. Three findings have no
+proposal of their own. Finding 12 (governance drift) is closed by Stage 8.
+Finding 4 (resolve side-effect boundary) is *declared* by Stage 3's Task 3, and
+its further *narrowing* is a named deferred follow-on. Finding 10
+(`FrameDiagnostics` god struct) is an open gap this plan does not yet schedule.
+P1a is intentionally not scheduled: the P1b decision (Stage 3) makes the docs
+true by changing the code instead of the prose, and Stage 8 performs the doc
+reconciliation P1a would have done alone.
+
+## Deferred follow-on — narrow the resolve effect set (Finding 4)
+
+Not a stage of this plan; a separate future effort that **depends on Stage 3**
+landing. Stage 3 *declares* the head's five-subsystem effect set; it does not
+shrink it. The path to the audit's Finding 4 — making "commit the side-effect
+boundary" — and to reviving ADR 0004's abandoned abortable head (its Stage 3D)
+is to audit, with the declared effect set in hand, which of `viewGraph`,
+`frameState`, `presentationPortalState`, `observationBridge`, and
+`animationController` genuinely must mutate in the head versus could defer
+toward commit.
+
+This is deliberately deferred, not scoped out:
+
+- ADR 0004's revert was an *implementation* divergence — `finishFrame` restored
+  handlers from per-frame draft registries instead of from the committed graph,
+  silently dropping alias-only nodes on `.resetAll` — not a proof of
+  impossibility. Its post-mortem gives a concrete next-attempt recipe (restore
+  from the graph; keep the draft as a side-channel only).
+- But the genuinely irreversible effects it names — gesture-recognizer teardown
+  on registry reset, completion closures that fire user code — are real and
+  unsolved, so this must be its own plan with its own ADR, not a Stage 3 task.
+- The post-mortem is explicit that the next attempt must budget end-to-end
+  `RunLoop.run()` interactive coverage (scroll bursts, drag sequences, click
+  resolution); deterministic unit tests did not catch the original regression.
+
+Separately, **Finding 10** (`FrameDiagnostics` is a ~30-field `Equatable`
+god struct, and `collectsDiagnostics` creates a second render path) also has no
+proposal. Its dual-path concern overlaps Stage 3 — composition should not ship
+two divergent render paths — while its god-struct decomposition is independent.
+This plan does not yet place it; that is an open decision below.
 
 ## Open decisions to settle inside the stages
 
@@ -591,13 +685,17 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
    author-facing diagnostic.
 3. **Stage 3** — extend `Renderer<Root>` into the driver, or supersede and
    delete it.
-4. **Stage 3** — whether the checkpoint/rollback machinery (Finding 4) is
-   carried unchanged (assumed here) or revisited; a pure side-effect-free
-   resolve is explicitly **out of scope** for this plan given ADR 0004's revert.
+4. **Stage 3** — the shape of the head's declared effect set and the
+   transactional-stage construct (Task 3). Narrowing that effect set, and any
+   retry of ADR 0004's abort, are deferred follow-on work (see above), not
+   decided here.
 5. **Stage 5** — invert the frame-drop model into a closed impact product vs
    keep the enum with a guard test.
 6. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
    whether recursion can be bounded first.
+7. **Pre-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
+   `collectsDiagnostics` render path) is handled: folded into Stage 3 as a
+   dual-path-collapse task, given its own stage, or left to a separate plan.
 
 ## Suggested first action
 
