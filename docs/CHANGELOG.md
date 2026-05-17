@@ -18,6 +18,13 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Completed Stage 8 and closed the pipeline-driver hardening roadmap:
+  `11125a29` [ARCHITECTURE.md](ARCHITECTURE.md),
+  `11125a29` [ADR 0002](decisions/0002-seven-phase-pipeline-not-collapsed.md),
+  and `11125a29` [PIPELINE_DRIVER_AUDIT.md](proposals/PIPELINE_DRIVER_AUDIT.md) now describe
+  the shipped composed runtime driver, preserve the seven phase products as the
+  inspection model, and leave only the resolve-effect narrowing and
+  `FrameDiagnostics` decomposition as explicit follow-ups.
 - Completed Stage 6 of the pipeline-driver hardening roadmap: built-in layout
   measurement and placement now use explicit work stacks, custom-layout callback
   recursion has a bounded diagnostic compatibility boundary, the Darwin

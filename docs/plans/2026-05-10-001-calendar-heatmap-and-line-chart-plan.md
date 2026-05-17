@@ -1,7 +1,7 @@
 ---
 title: "feat(charts): add CalendarHeatmap and LineChart primitives"
 type: feature
-status: pending
+status: shipped
 date: 2026-05-10
 depends_on: "docs/proposals/CALENDAR_HEATMAP_AND_LINE_CHART.md"
 ---

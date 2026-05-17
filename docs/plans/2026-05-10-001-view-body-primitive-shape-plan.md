@@ -1,7 +1,7 @@
 ---
 title: "fix: move primitive View and ViewModifier bodies behind the correct protocol seams"
 type: fix
-status: implemented
+status: shipped
 date: 2026-05-10
 depends_on:
   - "../PUBLIC_SURFACE_POLICY.md"

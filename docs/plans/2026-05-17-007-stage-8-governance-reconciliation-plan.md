@@ -1,7 +1,7 @@
 ---
 title: "docs: reconcile pipeline governance"
 type: docs
-status: active
+status: shipped
 date: 2026-05-17
 depends_on:
   - "./2026-05-16-001-pipeline-driver-hardening-plan.md"
@@ -83,17 +83,27 @@ scheduled at runtime.
   - P9 resolved by Stage 7.
   - P10 resolved by Stage 0 source docs plus Stage 8 architecture wording.
   - Finding 4 narrowing and Finding 10 remain explicitly deferred/open.
-- [ ] Mark this Stage 8 plan and the parent roadmap as shipped; update the
+- [x] Mark this Stage 8 plan and the parent roadmap as shipped; update the
   docs index and TODO/CHANGELOG records.
-- [ ] Run documentation checks and the repo gate.
+- [x] Run documentation checks and the repo gate.
 
 ## Validation
 
-- `rg -n "visible in .*Pipeline|visible in .*DefaultRenderer|renderView does not execute|dead code|docs describe" docs AGENTS.md Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc`
-  should not find current-state assertions that contradict the shipped driver.
+Passed on 2026-05-17:
+
+- `git diff --check`
+- Current-source contradiction search:
+
+  ```bash
+  rg -n 'visible in .*Pipeline|visible in .*DefaultRenderer|Every frame flows through seven strict phases|the production runtime schedules seven independent|Renderer<Root>` helper as evidence|Pipeline/    .+seven phases|FrameArtifacts.*architectural evidence|FrameArtifacts.*architecture contract' AGENTS.md docs/ARCHITECTURE.md docs/SOURCE_LAYOUT.md docs/decisions Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc Sources/SwiftTUICore/SwiftTUICore.docc
+  ```
+
+  found only negating guardrail language in the updated architecture/ADR text,
+  not a current-state assertion that contradicts the shipped driver.
 - `bun Scripts/check_doc_frontmatter.ts`
 - `Scripts/check_stable_doc_source_paths.sh`
-- `bun run test`
+- `bun run test` (full log:
+  `/tmp/swift-tui-test-gate-20260517-081201-88333.log`)
 
 ## Exit Criteria
 

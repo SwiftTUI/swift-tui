@@ -1,3 +1,12 @@
+---
+title: "refactor: absorb palette commands through palette sheet subtree"
+type: refactor
+status: shipped
+date: 2026-05-11
+depends_on:
+  - "../proposals/ACTION_SCOPES_AND_COMMANDS.md"
+---
+
 # Palette Sheet Subtree Absorption Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

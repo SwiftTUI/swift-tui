@@ -1,7 +1,7 @@
 ---
 title: "refactor: make raster reuse sound"
 type: refactor
-status: completed
+status: shipped
 date: 2026-05-17
 depends_on:
   - "./2026-05-16-001-pipeline-driver-hardening-plan.md"

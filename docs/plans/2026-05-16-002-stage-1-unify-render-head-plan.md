@@ -1,7 +1,7 @@
 ---
 title: "refactor: Stage 1 — unify the render head"
 type: refactor
-status: proposed
+status: shipped
 date: 2026-05-16
 depends_on:
   - "2026-05-16-001-pipeline-driver-hardening-plan.md"

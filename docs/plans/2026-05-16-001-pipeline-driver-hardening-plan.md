@@ -1,7 +1,7 @@
 ---
 title: "refactor: pipeline driver hardening"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-16
 depends_on:
   - "../proposals/PIPELINE_DRIVER_AUDIT.md"
@@ -194,7 +194,9 @@ authority is documented.
 
 **Goal:** Eliminate the ~120 lines of duplicated head logic between the sync
 `renderView` and async `prepareFrameHead`, so P1b composes a head that exists in
-exactly one form. See detailed plan:
+exactly one form.
+
+**Status:** Shipped. Detailed plan:
 [`docs/plans/2026-05-16-002-stage-1-unify-render-head-plan.md`](./2026-05-16-002-stage-1-unify-render-head-plan.md).
 
 **Addresses:** P2 (Finding 3).
@@ -249,7 +251,9 @@ regression suites green.
 
 **Goal:** Promote the two unnamed pipeline stages — animation injection and the
 late-preference reconciliation loop — into first-class, named units, and remove
-the magic reconciliation-pass bound. See detailed plan:
+the magic reconciliation-pass bound.
+
+**Status:** Shipped. Detailed plan:
 [`docs/plans/2026-05-17-001-stage-2-name-hidden-stages-plan.md`](./2026-05-17-001-stage-2-name-hidden-stages-plan.md).
 
 **Addresses:** P3 (Findings 5 and 11).
@@ -634,7 +638,7 @@ terminal obligations; `presentCommittedFrame` dispatch is explicit.
 **Goal:** Make the documentation true again now that the driver is the composed
 pipeline, and close the governance-drift finding.
 
-**Status:** Active. Detailed plan:
+**Status:** Shipped. Detailed plan:
 [`docs/plans/2026-05-17-007-stage-8-governance-reconciliation-plan.md`](./2026-05-17-007-stage-8-governance-reconciliation-plan.md).
 
 **Addresses:** Finding 12, finish P10 (Finding 16), supersede ADR 0002.
