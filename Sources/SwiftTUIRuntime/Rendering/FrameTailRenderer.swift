@@ -211,7 +211,7 @@ package enum FrameHeadMode {
   /// frame tail runs synchronously on the main actor.
   case oneShot
   /// Asynchronous render whose head may be aborted before tail work starts.
-  /// Captures the five-subsystem checkpoint bundle and the worker-safe
+  /// Captures the remaining live-state checkpoint bundle and the worker-safe
   /// indexed-child snapshot.
   case abortable
 }
@@ -225,9 +225,6 @@ package struct FrameHeadCheckpoints {
   /// Previous-frame selector memory only. Current-frame resolve inputs are
   /// carried by the prepared head and overwritten by the next frame.
   let frameState: FrameResolveState.Checkpoint
-  let presentationPortal: PresentationPortalState.Checkpoint
-  let observationBridge: ObservationBridge.Checkpoint?
-  let animation: AnimationController.Checkpoint
 }
 
 /// Checkpointed main-actor frame head prepared before tail work starts.
@@ -240,9 +237,11 @@ package struct FrameHeadDraft {
   var renderGeneration: RenderGeneration
   var graphDraft: ViewGraphFrameDraft
   var registrationDraft: FrameHeadRegistrationDraft
+  var presentationPortalDraft: PresentationPortalDraft
+  var observationDraft: ObservationBridgeDraft?
+  var animationDraft: AnimationFrameDraft
   /// The abort checkpoint bundle. `nil` for one-shot heads.
   var checkpoints: FrameHeadCheckpoints?
-  var observationBridge: ObservationBridge?
   var resolveContext: ResolveContext
   var graphRootIdentity: Identity
   var frameContext: FrameContext

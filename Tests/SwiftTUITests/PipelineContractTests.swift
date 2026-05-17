@@ -27,7 +27,6 @@ struct PipelineContractTests {
           .frameState,
           .presentationPortalState,
           .observationBridge,
-          .animationController,
         ]))
   }
 

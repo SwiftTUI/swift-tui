@@ -1212,7 +1212,7 @@ package final class PresentationPortalState {
     fileprivate var registry: PresentationCoordinatorRegistry.Checkpoint
   }
 
-  private let registry = PresentationCoordinatorRegistry()
+  private var registry = PresentationCoordinatorRegistry()
 
   package init() {}
 
@@ -1222,6 +1222,19 @@ package final class PresentationPortalState {
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     registry.restoreCheckpoint(checkpoint.registry)
+  }
+
+  package func makeDraft() -> PresentationPortalDraft {
+    PresentationPortalDraft(
+      liveState: self,
+      checkpoint: makeCheckpoint()
+    )
+  }
+
+  fileprivate func publish(
+    _ draft: PresentationPortalDraft
+  ) {
+    registry = draft.registry
   }
 
   package func injectHandles(
@@ -1248,6 +1261,63 @@ package final class PresentationPortalState {
 
   package func dismissStack() -> DismissStack {
     registry.dismissStack()
+  }
+}
+
+@MainActor
+package final class PresentationPortalDraft {
+  private let liveState: PresentationPortalState
+  fileprivate let registry = PresentationCoordinatorRegistry()
+  private var didCommit = false
+  private var didDiscard = false
+
+  fileprivate init(
+    liveState: PresentationPortalState,
+    checkpoint: PresentationPortalState.Checkpoint
+  ) {
+    self.liveState = liveState
+    registry.restoreCheckpoint(checkpoint.registry)
+  }
+
+  package func injectHandles(
+    into environmentValues: inout EnvironmentValues,
+    hostIdentity: Identity,
+    invalidator: (any Invalidating)?
+  ) {
+    precondition(!didCommit && !didDiscard)
+    registry.injectHandles(
+      into: &environmentValues,
+      hostIdentity: hostIdentity,
+      invalidator: invalidator
+    )
+  }
+
+  package func reconcile(
+    _ declarations: [PresentationCoordinatorDeclaration]
+  ) {
+    precondition(!didCommit && !didDiscard)
+    registry.reconcile(declarations)
+  }
+
+  package func overlayEntries() -> [OverlayStackEntry] {
+    precondition(!didCommit && !didDiscard)
+    return registry.overlayEntries()
+  }
+
+  package func dismissStack() -> DismissStack {
+    precondition(!didCommit && !didDiscard)
+    return registry.dismissStack()
+  }
+
+  package func commit() {
+    precondition(!didCommit && !didDiscard)
+    liveState.publish(self)
+    didCommit = true
+  }
+
+  package func discard() {
+    precondition(!didCommit && !didDiscard)
+    didDiscard = true
   }
 }
 
@@ -1308,12 +1378,12 @@ package func presentationPortalIdentity(
 
 package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableView {
   package var content: Content
-  package var portalState: PresentationPortalState
+  package var portalState: PresentationPortalDraft
   package var contentRootIdentity: Identity
 
   package init(
     content: Content,
-    portalState: PresentationPortalState,
+    portalState: PresentationPortalDraft,
     contentRootIdentity: Identity
   ) {
     self.content = content
@@ -1344,7 +1414,7 @@ package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableV
 @MainActor
 private func reconcilePresentationDeclarations(
   from baseNode: ResolvedNode,
-  into portalState: PresentationPortalState
+  into portalState: PresentationPortalDraft
 ) {
   let declarations = baseNode.preferenceValues[
     PresentationCoordinatorDeclarationPreferenceKey.self]
@@ -1354,7 +1424,7 @@ private func reconcilePresentationDeclarations(
 @MainActor
 package func composePresentationPortalTree(
   baseNode: ResolvedNode,
-  portalState: PresentationPortalState,
+  portalState: PresentationPortalDraft,
   in context: ResolveContext
 ) -> ResolvedNode {
   // The portal root is a graph-owned wrapper. Reconcile from the

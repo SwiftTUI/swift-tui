@@ -2711,6 +2711,56 @@ struct AsyncFrameTailRenderingTests {
     }
   }
 
+  @Test("prepared frame-head keeps transition animations draft-owned until commit")
+  func preparedFrameHeadKeepsTransitionAnimationsDraftOwnedUntilCommit() throws {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("AsyncFrameHeadTransitionDraftRoot")
+    let proposal = ProposedSize(width: 30, height: 4)
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    let box = renderer.internalAnimationController.register(animation)
+    let batchID = AnimationBatchID(44_001)
+
+    _ = renderer.render(
+      AsyncFrameHeadTransitionDraftView(show: false),
+      context: .init(identity: rootIdentity),
+      proposal: proposal,
+      collectsDiagnostics: false
+    )
+    #expect(renderer.internalAnimationController.activeInsertionOffsetCount == 0)
+
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(box)
+    transaction.animationBatchID = batchID
+    let animatedContext = ResolveContext(
+      identity: rootIdentity,
+      transaction: transaction,
+      invalidatedIdentities: [rootIdentity]
+    )
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      AsyncFrameHeadTransitionDraftView(show: true),
+      context: animatedContext,
+      proposal: proposal
+    )
+
+    #expect(draft.animationDraft.controller.activeInsertionOffsetCount > 0)
+    #expect(renderer.internalAnimationController.activeInsertionOffsetCount == 0)
+    #expect(
+      !renderer.internalAnimationController.frameDropEligibilityBlockers
+        .contains(.animationTransition)
+    )
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+    #expect(renderer.internalAnimationController.activeInsertionOffsetCount == 0)
+
+    _ = renderer.render(
+      AsyncFrameHeadTransitionDraftView(show: true),
+      context: animatedContext,
+      proposal: proposal,
+      collectsDiagnostics: false
+    )
+    #expect(renderer.internalAnimationController.activeInsertionOffsetCount > 0)
+  }
+
   @Test("prepared frame-tail abort keeps worker custom layout cache updates uncommitted")
   func preparedFrameTailAbortKeepsWorkerCustomLayoutCacheUpdatesUncommitted() async {
     let rootIdentity = testIdentity("AsyncFrameHeadAbortWorkerCacheRoot")
@@ -3196,6 +3246,21 @@ private struct AsyncFrameHeadDraftKeyCommandView: View {
       isEnabled: value != 0
     ) {
       recorder.record("draft")
+    }
+  }
+}
+
+private struct AsyncFrameHeadTransitionDraftView: View {
+  var show: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("anchor")
+      if show {
+        Text("draft transition")
+          .id(testIdentity("AsyncFrameHeadTransitionDraftLeaf"))
+          .transition(.move(edge: .leading))
+      }
     }
   }
 }

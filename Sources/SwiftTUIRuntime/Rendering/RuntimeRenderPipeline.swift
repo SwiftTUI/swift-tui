@@ -28,7 +28,12 @@ struct FrameHeadDeclaredEffectSet: Equatable, Sendable {
   var effects: Set<FrameHeadDeclaredEffect>
 
   static let runtimeHead = Self(
-    effects: Set(FrameHeadDeclaredEffect.allCases)
+    effects: [
+      .viewGraph,
+      .frameState,
+      .presentationPortalState,
+      .observationBridge,
+    ]
   )
 }
 
