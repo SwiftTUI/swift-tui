@@ -49,6 +49,19 @@ private struct LatePreferenceReconciliationPolicy: Sendable {
   var boundExceededBehavior: BoundExceededBehavior
 }
 
+@MainActor
+private final class CommittedPresentationDismissStack {
+  private var stack = DismissStack()
+
+  func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
+    stack.topmostEscapeDismissAction()
+  }
+
+  func store(_ stack: DismissStack) {
+    self.stack = stack
+  }
+}
+
 private struct AsyncFrameTailLayoutPass {
   var layout: FrameTailLayoutOutput?
   var suspensionDuration: Duration
@@ -289,6 +302,7 @@ public struct DefaultRenderer {
   private let viewGraph: ViewGraph
   private let frameState: FrameResolveState
   private let presentationPortalState: PresentationPortalState
+  private let committedPresentationDismissStack: CommittedPresentationDismissStack
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
 
@@ -314,6 +328,7 @@ public struct DefaultRenderer {
     viewGraph = .init()
     frameState = .init()
     presentationPortalState = .init()
+    committedPresentationDismissStack = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
     frameTailRenderer = .init(
@@ -338,7 +353,7 @@ public struct DefaultRenderer {
   /// Escape-dismissible portal entry, or nil when none is active.
   @MainActor
   package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
-    presentationPortalState.dismissStack().topmostEscapeDismissAction()
+    committedPresentationDismissStack.topmostEscapeDismissAction()
   }
 
   /// Package-only accessor so the run loop can route framework-reserved
@@ -780,6 +795,7 @@ public struct DefaultRenderer {
       artifacts,
       baselinePlacedTree: tail.baselinePlaced
     )
+    storeCommittedPresentationPortalState()
     return artifacts
   }
 
@@ -1369,7 +1385,13 @@ public struct DefaultRenderer {
       artifacts,
       baselinePlacedTree: tail.baselinePlaced
     )
+    storeCommittedPresentationPortalState()
     return artifacts
+  }
+
+  @MainActor
+  private func storeCommittedPresentationPortalState() {
+    committedPresentationDismissStack.store(presentationPortalState.dismissStack())
   }
 
   @MainActor
