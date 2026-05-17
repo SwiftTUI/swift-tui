@@ -245,8 +245,8 @@ Status: complete.
   runtime pipeline model.
 - Update ADR/proposal/status docs to state that commit is the side-effect
   boundary without qualification for user/runtime-visible effects.
-- Record queued-tail cancellation as the next follow-up now that prepared heads
-  are discardable without a declared rollback-effect contract.
+- Verify queued-tail cancellation against the now-discardable prepared-head
+  contract.
 
 Evidence:
 
@@ -256,9 +256,10 @@ Evidence:
   contract without pinning a rollback-effect list.
 - Updated architecture, ADR 0019, the pipeline audit, the original hardening
   plan, and the live tracker so Finding 4 is no longer described as deferred.
-- Left queued-tail cancellation out of this implementation slice; it is now a
-  follow-up scheduling/runtime policy task rather than a resolve-effect
-  narrowing prerequisite.
+- Verified queued-tail cancellation is already shipped through
+  `DefaultRenderer.renderAsyncCancellable`, `FrameTailJobCancellationToken`,
+  `RunLoop` cancelled-intent replay, and
+  `AsyncFrameTailRenderingTests.queuedFrameTailCancelsBeforeWorkerLayoutStarts`.
 
 ## Stop Conditions
 
