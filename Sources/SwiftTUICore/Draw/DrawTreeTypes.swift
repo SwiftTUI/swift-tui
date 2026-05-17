@@ -272,6 +272,12 @@ extension DrawCommand {
 }
 
 /// A node in the draw tree emitted before rasterization.
+///
+/// Draw extraction owns lowered paint commands, post-child paint commands, and
+/// the style/environment snapshots rasterization needs to paint those commands.
+/// Geometry and resolved metadata are read from the current placed tree and
+/// projected here; `DrawNode` is not a retained layout or semantic source of
+/// truth.
 public struct DrawNode: Equatable, Sendable {
   public var identity: Identity
   public var environmentSnapshot: EnvironmentSnapshot

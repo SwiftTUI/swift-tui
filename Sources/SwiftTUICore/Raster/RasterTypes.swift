@@ -62,6 +62,11 @@ public struct RasterCell: Equatable, Sendable {
 }
 
 /// A 2D grid of terminal cells produced by rasterization.
+///
+/// Raster owns the final cell grid, style runs as cell styles, attachments,
+/// image attachments, and raster metadata. It carries no layout or semantic
+/// authority: presentation damage and drawn-identity diagnostics are retained
+/// beside the surface, not read back as pipeline truth.
 public struct RasterSurface: Equatable, Sendable {
   public var size: CellSize
   public var cells: [[RasterCell]]

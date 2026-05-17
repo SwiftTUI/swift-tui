@@ -21,6 +21,9 @@ private final class FrameTailRetainedState: Sendable {
   func input(
     invalidatedIdentities: Set<Identity>
   ) -> FrameTailRetainedInput {
+    // Retained input is previous committed-frame state only: baseline layout
+    // products for retained measurement/placement, plus the previous committed
+    // raster surface for presentation damage. It never previews a candidate.
     state.withLock { state in
       .init(
         retainedLayout: RetainedLayoutSession(
@@ -59,10 +62,17 @@ private final class FrameTailRetainedState: Sendable {
 }
 
 struct FrameTailRetainedInput {
+  /// Previous committed baseline layout products for retained measure/place.
   var retainedLayout: RetainedLayoutSession
+  /// Previous committed raster surface used only for presentation damage.
   var previousRasterSurface: RasterSurface?
 }
 
+/// Worker-safe input for measure/place through raster work.
+///
+/// The resolved tree is the current frame's canonical resolved product. Retained
+/// data is previous committed baseline state; it is not a preview of any
+/// in-flight candidate.
 struct FrameTailInput {
   var generation: RenderGeneration
   var resolved: ResolvedNode
@@ -86,6 +96,9 @@ struct FrameTailDiagnostics {
 struct FrameTailLayoutOutput {
   var generation: RenderGeneration
   var measured: MeasuredNode
+  /// Canonical pre-overlay placed tree produced by layout. This is the retained
+  /// layout baseline and animation-capture input; it must not contain transient
+  /// removal overlays.
   var baselinePlaced: PlacedNode
   var measureDuration: Duration
   var placeDuration: Duration
@@ -123,7 +136,10 @@ private struct FrameTailRasterOutput {
 struct FrameTailOutput {
   var generation: RenderGeneration
   var measured: MeasuredNode
+  /// Effective current-frame placed tree consumed by semantics, draw, raster,
+  /// and commit. This may include transient animation overlays.
   var placed: PlacedNode
+  /// Canonical pre-overlay layout product retained for future layout reuse.
   var baselinePlaced: PlacedNode
   var semantics: SemanticSnapshot
   var draw: DrawNode
@@ -192,6 +208,11 @@ final class FrameTailJobCancellationToken: Sendable {
   }
 }
 
+/// Checkpointed main-actor frame head prepared before tail work starts.
+///
+/// A draft owns preview resolve-side state that can be discarded only if the
+/// corresponding tail job is still queued. Once the tail starts, ordered commit
+/// decides whether its completed candidate can commit or be dropped.
 package struct FrameHeadDraft {
   var clock: ContinuousClock?
   var renderGeneration: RenderGeneration
@@ -213,20 +234,32 @@ package struct FrameHeadDraft {
 }
 
 struct AsyncFrameTailDraftOutput {
+  /// Tail input that was actually consumed by the worker path.
   var frameTailInput: FrameTailInput
+  /// Canonical baseline layout output before overlay decoration.
   var layout: FrameTailLayoutOutput
+  /// Effective tail output after overlay decoration, semantics, draw, and raster.
   var tail: FrameTailOutput
+  /// Resolved tree after late layout-dependent content reconciliation.
   var resolved: ResolvedNode
   var runtimeIssues: [RuntimeIssue]
   var renderSuspensionDuration: Duration
 }
 
+/// Completed async frame before actual commit.
+///
+/// The candidate contains enough data to classify stale visual-only drops. It
+/// must not mutate live runtime side effects unless it flows through ordered
+/// commit.
 struct CompletedFrameCandidate {
   var draft: FrameHeadDraft
   var tailOutput: AsyncFrameTailDraftOutput
   var resolved: ResolvedNode
   var workerTimings: FrameWorkerTimings?
   var collectsDiagnostics: Bool
+  /// Commit preview used only for drop classification. The live graph and
+  /// runtime registrations are checkpoint-restored after building it; actual
+  /// side effects are applied only by `commitCompletedFrameCandidate`.
   var previewArtifacts: FrameArtifacts
   var eligibility: FrameDropEligibility
   var newestDesiredGeneration: RenderGeneration
@@ -900,6 +933,10 @@ final class FrameTailRenderer: Sendable {
       animationOverlaySnapshot,
       to: &placed
     )
+    // Past this point `placed` is the effective decorated tree for semantic,
+    // draw, raster, and commit consumers. The retained layout baseline remains
+    // `layout.baselinePlaced` and is the only placed tree stored for future
+    // retained placement.
     let presentationDamage = presentationDamage(
       rootIdentity: input.rootIdentity,
       placed: placed,

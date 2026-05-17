@@ -7,6 +7,14 @@ public enum SemanticRole: String, Equatable, Sendable {
   case overlay
 }
 
+/// Resolved-to-placed metadata projection.
+///
+/// Placement owns geometry, but semantics, draw, lifecycle, and animation still
+/// need a current snapshot of selected resolved metadata after retained
+/// placement reuse. This value names that projection and is the only
+/// construction/synchronization path for mirrors copied from `ResolvedNode` into
+/// `PlacedNode`. It deliberately does not prescribe `PlacedNode`'s physical
+/// storage shape.
 package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var kind: NodeKind
   package var environmentSnapshot: EnvironmentSnapshot
@@ -67,6 +75,11 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
 }
 
 /// A node after layout has assigned concrete bounds.
+///
+/// Placement owns final bounds, content bounds, clipping, z-order, child
+/// placement, and subtree counts. The resolved-derived fields are projections
+/// refreshed through `PlacedNodeResolvedMetadata`; they are not independent
+/// sources of resolved truth.
 public struct PlacedNode: Equatable, Sendable {
   public var identity: Identity
   package var kind: NodeKind

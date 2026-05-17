@@ -110,7 +110,9 @@ Sources/SwiftTUIRuntime/
 ### Rendering
 
 - `Rendering/FrameTailRenderer.swift`: retained frame-tail state, render-tail
-  worker dispatch, tail diagnostics, and async cancellation support
+  worker dispatch, tail diagnostics, async cancellation support, and the
+  `FrameTailInput` / `FrameTailLayoutOutput` / `FrameTailOutput` boundary
+  products that distinguish baseline placed trees from decorated placed trees
 
 ### Lifecycle and animation
 
@@ -352,7 +354,8 @@ Sources/SwiftTUICore/
   image intrinsic-size helpers
 - `Measure/LayoutEngine+RetainedLayout.swift`: retained-resolve reuse
   (`retainedMeasurement`, `retainedPlacement`,
-  `synchronizeRetainedPhaseMetadata`)
+  `synchronizeRetainedPhaseMetadata`); this is the retained-layout freshness
+  boundary that pairs relaxed equivalence with current metadata refresh
 - `Measure/LayoutEngine+Insets.swift`: inset/outset helpers and safe-area
   inset accounting
 - `Measure/LayoutEngine+Alignment.swift`, `Measure/LayoutEngine+List.swift`,
@@ -365,17 +368,20 @@ Sources/SwiftTUICore/
 - `Measure/LayoutMetadata.swift`: per-node layout metadata
 - `Measure/CustomLayout.swift`: custom-layout proxy and worker-snapshot types
 - `Measure/NodeLayoutInfo.swift`: grouped layout-relevant node metadata used by
-  `MeasurementCache` plus draw-payload measurement-equivalence helpers
+  `MeasurementCache` plus draw-payload measurement-equivalence helpers; this is
+  the resolved-to-measure cache-key contract
 
 ### Place
 
 - `Place/LayoutEngine+Placement.swift`: the placement pass of the layout engine
-- `Place/PlacedNode.swift`: place-phase output node, `SemanticRole`, and the
-  grouped resolved-metadata synchronization snapshot
+- `Place/PlacedNode.swift`: place-phase output node, `SemanticRole`, and
+  `PlacedNodeResolvedMetadata`, the grouped resolved-to-placed projection used
+  by placement construction and retained-placement synchronization
 
 ### Semantics
 
-- `Semantics/Semantics.swift`: semantic extraction and route generation
+- `Semantics/Semantics.swift`: semantic extraction and route generation from
+  the effective current-frame placed tree, including transient-overlay filtering
 - `Semantics/SemanticSnapshot.swift`: focus regions, interaction regions, scroll/selection/navigation routes, semantic snapshot
 - `Semantics/SemanticRoleTypes.swift` and `Semantics/BuiltinPointerRoutes.swift`:
   closed semantic roles and structured pointer routes
@@ -390,7 +396,8 @@ Sources/SwiftTUICore/
 ### Draw
 
 - `Draw/DrawExtractor.swift`, `Draw/DrawExtractor+Lists.swift`,
-  `Draw/DrawExtractor+Tables.swift`: draw extraction
+  `Draw/DrawExtractor+Tables.swift`: draw extraction and the placed-to-draw
+  projection for paint inputs
 - `Draw/DrawTreeTypes.swift`: draw-tree data types including `DrawCommand`,
   `DrawNode`, `PreformattedTextRun`, and `PreformattedTextLine`
 - `Draw/RenderMetadataTypes.swift`: per-node draw metadata, text/style payload
@@ -404,16 +411,20 @@ Sources/SwiftTUICore/
 ### Raster
 
 - `Raster/Rasterizer.swift` and `Raster/Rasterizer+CellSampling.swift`: raster lowering
-- `Raster/RasterTypes.swift`: raster surface types
+- `Raster/RasterTypes.swift`: raster surface types; `RasterSurface` owns cells
+  and attachments only, while presentation damage and drawn identities remain
+  sidecar hints/diagnostics
 
 ### Commit
 
 - `Commit/CommitPlanner.swift`: lifecycle diffing and commit packaging
 - `Commit/CommitPlan.swift`: `TaskPriority`, `TaskDescriptor`, `LifecycleCommit*`,
-  `HandlerInstallation`, and the `CommitPlan` aggregate
-- `Commit/FrameArtifacts.swift`: per-frame artifacts, `FrameContext`, and `FrameDiagnostics`
+  `HandlerInstallation`, and the `CommitPlan` side-effect aggregate
+- `Commit/FrameArtifacts.swift`: per-frame artifacts, `FrameContext`, and
+  `FrameDiagnostics`; artifacts preserve products and sidecar diagnostics, not
+  new phase ownership
 - `Commit/RetainedResolveFrame.swift`: retained-frame index and layout-session
-  state for resolve-reuse
+  state for resolve-reuse and retained-layout baseline lookup
 - `Commit/FrameMetrics.swift`: cache metrics and per-phase work accounting
 - `Commit/FrameTimings.swift`: per-phase timings and render-generation tracking
 - `Commit/PresentationDamage.swift`: refined presentation-damage diagnostics

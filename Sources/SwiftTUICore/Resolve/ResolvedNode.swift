@@ -503,6 +503,15 @@ public struct MatchedGeometryConfig: Equatable, Sendable {
 }
 
 /// A node produced by the resolve phase before measurement.
+///
+/// Resolve owns the lowered tree shape, identity, environment, transaction,
+/// layout behavior, metadata, handlers, draw payloads, and authored-state
+/// snapshots that later phases consume.  Fields such as `preferenceValues`,
+/// `subtreeNodeCount`, and `supportsRetainedReuse` are derived cache inputs
+/// maintained beside the authoritative resolved data.  Later phase products may
+/// mirror subsets of this data, but every retained reuse path must refresh those
+/// mirrors from the current `ResolvedNode` before semantics, draw, lifecycle, or
+/// animation code observes them.
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
   package var kind: NodeKind

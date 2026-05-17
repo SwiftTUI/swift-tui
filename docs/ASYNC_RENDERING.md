@@ -23,6 +23,27 @@ main actor: commit -> present -> lifecycle
 writer queue: terminal write(2)
 ```
 
+The async path uses the same phase-product vocabulary as the synchronous
+renderer:
+
+- `FrameHeadDraft` is a checkpointed main-actor preview of resolve, runtime
+  registration collection, observation tracking, animation state, and tail
+  input. It is discardable only before the corresponding tail job starts.
+- `FrameTailInput` carries the current resolved tree plus retained baseline
+  inputs. The retained layout session indexes previous committed baseline
+  products, while the previous raster surface is a presentation-damage input.
+- `FrameTailLayoutOutput.baselinePlaced` is the canonical pre-overlay placed
+  tree produced by layout. It is the animation capture input and retained layout
+  baseline.
+- `FrameTailOutput.placed` is the effective current-frame placed tree consumed
+  by semantics, draw, raster, and commit. It may include transient animation
+  overlays. `FrameTailOutput.baselinePlaced` remains the tree stored for future
+  retained placement.
+- `CompletedFrameCandidate.previewArtifacts` exists only for conservative drop
+  classification. Actual lifecycle, task, registration, focus, retained
+  baseline, and presentation side effects are applied by ordered candidate
+  commit.
+
 The important invariant is ordered commit for any worker frame that carries
 runtime side effects. Queued frame-tail jobs may be cancelled before worker
 layout starts when a newer render intent is already pending; the corresponding

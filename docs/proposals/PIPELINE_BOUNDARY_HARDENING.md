@@ -2,7 +2,15 @@
 
 ## Status
 
-Draft proposal.
+Implemented in the durable docs and focused boundary tests. The current
+source-of-truth ownership model lives in
+[`ARCHITECTURE.md`](../ARCHITECTURE.md#important-data-products), source
+ownership anchors live in [`SOURCE_LAYOUT.md`](../SOURCE_LAYOUT.md), and the
+async frame-tail vocabulary lives in
+[`ASYNC_RENDERING.md`](../ASYNC_RENDERING.md#current-contract).
+
+This proposal remains as background for the staged reasoning that led to the
+current contracts.
 
 This document proposes a direction for hardening SwiftTUI's frame pipeline
 boundaries. It is intentionally not a step-by-step implementation plan. The

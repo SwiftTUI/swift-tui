@@ -52,6 +52,14 @@ Layout products are integer-cell based. Pointer and Canvas APIs can still carry
 continuous ``Point`` values because the runtime normalizes pointer input after
 semantic routing and Canvas packs continuous cell-space samples during raster.
 
+Later phases may carry named snapshots of earlier data, but those snapshots are
+not independent owners. `PlacedNodeResolvedMetadata` names the resolved metadata
+mirrored into placed nodes, `SemanticSnapshot` is a derived routing product,
+`DrawNode` is a placed-to-paint projection, and `RasterSurface` owns only the
+final cell grid plus raster attachments. Retained layout reuse must pair any
+relaxed equivalence predicate with a refresh path before downstream phases read
+the reused product.
+
 ## Related Symbols
 
 - ``FrameArtifacts``

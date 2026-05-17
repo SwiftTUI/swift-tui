@@ -787,24 +787,55 @@ struct LayoutEngineTests {
   @Test("retained placement synchronizes geometry-stable resolved metadata")
   func retainedPlacementSynchronizesGeometryStableResolvedMetadata() {
     let engine = LayoutEngine()
+    let environment = EnvironmentSnapshot(
+      debugSignature: "retained-sync",
+      values: ["scope": "current"]
+    )
+    let layoutMetadata = LayoutMetadata(lineLimit: 1)
     var initialDrawMetadata = DrawMetadata()
     initialDrawMetadata.baseStyle.foregroundStyle = .color(Color.red)
     var updatedDrawMetadata = DrawMetadata()
     updatedDrawMetadata.baseStyle.foregroundStyle = .color(Color.blue)
+    let initialLayoutBehavior = LayoutBehavior.border(
+      .rounded,
+      placement: .outset,
+      foreground: nil,
+      background: nil,
+      blend: BorderBlend([.red, .blue]),
+      blendPhase: 0.1,
+      sides: .all
+    )
+    let updatedLayoutBehavior = LayoutBehavior.border(
+      .rounded,
+      placement: .outset,
+      foreground: nil,
+      background: nil,
+      blend: BorderBlend([.red, .blue]),
+      blendPhase: 0.8,
+      sides: .all
+    )
 
     let initial = leaf(
       "metadata",
       size: .init(width: 5, height: 1),
+      environmentSnapshot: environment,
+      layoutBehavior: initialLayoutBehavior,
+      layoutMetadata: layoutMetadata,
       drawMetadata: initialDrawMetadata,
       semanticMetadata: .init(accessibilityLabel: "old"),
-      lifecycleMetadata: .init(appearHandlerIDs: ["old-appear"])
+      lifecycleMetadata: .init(appearHandlerIDs: ["old-appear"]),
+      drawPayload: .text("Same")
     )
     var updated = leaf(
       "metadata",
       size: .init(width: 5, height: 1),
+      environmentSnapshot: environment,
+      layoutBehavior: updatedLayoutBehavior,
+      layoutMetadata: layoutMetadata,
       drawMetadata: updatedDrawMetadata,
       semanticMetadata: .init(accessibilityLabel: "new"),
-      lifecycleMetadata: .init(appearHandlerIDs: ["new-appear"])
+      lifecycleMetadata: .init(appearHandlerIDs: ["new-appear"]),
+      drawPayload: .text("Same")
     )
     updated.isTransient = true
     updated.matchedGeometry = MatchedGeometryConfig(
@@ -846,9 +877,14 @@ struct LayoutEngineTests {
 
     #expect(passContext.workMetrics.placedNodesComputed == 0)
     #expect(passContext.workMetrics.placedNodesReused == 1)
+    #expect(placed.kind == updated.kind)
+    #expect(placed.environmentSnapshot == environment)
+    #expect(placed.layoutMetadata == layoutMetadata)
     #expect(placed.drawMetadata.baseStyle.foregroundStyle == .color(Color.blue))
     #expect(placed.semanticMetadata.accessibilityLabel == "new")
     #expect(placed.lifecycleMetadata.appearHandlerIDs == ["new-appear"])
+    #expect(placed.drawPayload == .text("Same"))
+    #expect(placed.layoutBehavior == updatedLayoutBehavior)
     #expect(placed.isTransient)
     #expect(placed.matchedGeometry == updated.matchedGeometry)
   }
@@ -857,6 +893,9 @@ struct LayoutEngineTests {
 private func leaf(
   _ name: String,
   size: CellSize,
+  kind: NodeKind = .view("Test"),
+  environmentSnapshot: EnvironmentSnapshot = .init(),
+  layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
   drawMetadata: DrawMetadata = DrawMetadata(),
   semanticMetadata: SemanticMetadata = SemanticMetadata(),
@@ -865,7 +904,9 @@ private func leaf(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("Test"),
+    kind: kind,
+    environmentSnapshot: environmentSnapshot,
+    layoutBehavior: layoutBehavior,
     layoutMetadata: layoutMetadata,
     drawMetadata: drawMetadata,
     semanticMetadata: semanticMetadata,

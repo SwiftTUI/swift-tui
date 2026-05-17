@@ -163,6 +163,13 @@ public struct FrameContext: Equatable, Sendable {
     invalidationSummary.intersectsSubtree(at: identity)
   }
 }
+/// Aggregate frame product for inspection, retained reuse, and runtime handoff.
+///
+/// The individual phase products keep their own ownership contracts. This
+/// bundle preserves the current-frame products together with diagnostics,
+/// presentation hints, and the commit plan. Retained-layout indexes must use a
+/// canonical baseline placed tree rather than an animation-decorated placed tree
+/// when storing these artifacts for a later frame.
 public struct FrameArtifacts: Equatable, Sendable {
   public var resolvedTree: ResolvedNode
   public var measuredTree: MeasuredNode

@@ -239,15 +239,31 @@ convenience product.
 
 ## Important Data Products
 
-- `ResolvedNode`: resolved structure plus merged environment and metadata
-- `MeasuredNode`: size decisions under a proposal, including child measurements
-- `PlacedNode`: final geometry, content bounds, and the synchronized
-  resolved metadata needed by later phases
-- `SemanticSnapshot`: focus, interaction, action, selection, and scroll routing
-- `DrawNode`: draw commands for text, shapes, rules, lists, tables, and indicators
-- `RasterSurface`: final cell grid plus style runs
-- `CommitPlan`: runtime-facing semantic, lifecycle, and handler work
-- `FrameArtifacts`: the full frame bundle plus diagnostics for testing and inspection
+The seven phases stay separate, but later phases intentionally carry named
+snapshots of earlier data when that is the clearest contract. Duplicated data is
+allowed only when it has an owner, projection path, and freshness proof.
+
+| Product | Owns | Carries or derives | Boundary contract |
+| --- | --- | --- | --- |
+| `ResolvedNode` | Lowered structure, identity, environment, transaction, layout behavior, layout/draw/semantic/lifecycle metadata, draw payload, preferences, indexed-child hooks, layout-dependent content, transient state, matched geometry | Derived `preferenceValues`, `subtreeNodeCount`, and `supportsRetainedReuse` cache inputs | Authoritative source for resolved metadata. `NodeLayoutInfo`, `NodeSemanticInfo`, `NodeDrawInfo`, and `NodeLifecycleInfo` name grouped views of the data. |
+| `MeasuredNode` | Proposal, measured size, child measurements, container allocation snapshots | Resolve identity for cache/placement correlation | Measurement cache is keyed by `ResolvedNode.isEquivalentForMeasurement`; visual-only changes may be ignored only when measurement output is unchanged. |
+| `PlacedNode` | Bounds, content bounds, clipping, z-index, child placement, subtree counts | Current resolved-derived mirrors for semantics, draw, lifecycle, and animation | `PlacedNodeResolvedMetadata` is the resolved-to-placed projection. Retained placement must call `synchronizeRetainedPhaseMetadata` before reuse exposes a placed tree downstream. |
+| `SemanticSnapshot` | Interaction regions, focus regions, navigation/scroll/selection routes, named coordinate spaces, accessibility nodes, live announcements, warnings | Placed geometry plus refreshed semantic/environment/draw metadata | Derived route snapshot only; it is not a metadata carrier. Transient animation overlays are filtered during extraction. |
+| `DrawNode` | Draw commands, post-child draw commands, draw metadata snapshot, environment snapshot, bounds, clipping, children | Placed geometry plus refreshed draw/layout/style inputs | Placed-to-draw projection owns paint inputs for rasterization, not layout or semantic truth. |
+| `RasterSurface` | Cell grid, resolved cell styles, attachments, image attachments, raster metadata | None used as upstream truth | Presentation damage and drawn identities are hints/diagnostics beside the surface, not layout or semantic inputs. |
+| `CommitPlan` | Ordered lifecycle and handler-installation work | The already-derived `SemanticSnapshot` for runtime consumers | Commit is the main-actor side-effect boundary. Preview commit is checkpoint-restored; actual commit applies lifecycle, tasks, registrations, focus, and presentation effects. |
+| `FrameArtifacts` | Full current-frame bundle and diagnostics | Presentation damage, drawn identities, render generations, runtime diagnostics | Retained layout indexes canonical baseline layout products. Animation-decorated placed trees may be committed for the current frame but must not become retained layout baselines. |
+
+The focused boundary tests live near the seams they protect:
+
+- `Tests/SwiftTUICoreTests/LayoutEngineTests.swift` covers retained placement
+  metadata synchronization.
+- `Tests/SwiftTUITests/DiagnosticsAndCacheTests.swift` covers retained
+  measurement/placement freshness through the default renderer.
+- `Tests/SwiftTUITests/AnimationControllerTests.swift` covers baseline placed
+  tree storage versus transient animation overlays.
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` covers sync/async
+  artifact parity and completed-frame drop boundaries.
 
 ## Styling And Presentation
 
