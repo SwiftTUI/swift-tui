@@ -134,6 +134,23 @@ public struct PlacedNode: Equatable, Sendable {
     subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
   }
 
+  package mutating func synchronizeResolvedPhaseMetadata(
+    from resolved: ResolvedNode,
+    semanticRole: SemanticRole
+  ) {
+    kind = resolved.kind
+    environmentSnapshot = resolved.environmentSnapshot
+    self.semanticRole = semanticRole
+    layoutMetadata = resolved.layoutMetadata
+    drawMetadata = resolved.drawMetadata
+    semanticMetadata = resolved.semanticMetadata
+    lifecycleMetadata = resolved.lifecycleMetadata
+    drawPayload = resolved.drawPayload
+    layoutBehavior = resolved.layoutBehavior
+    isTransient = resolved.isTransient
+    matchedGeometry = resolved.matchedGeometry
+  }
+
   package func collectLifecycleNodes(
     into nodes: inout [LifecycleStateNode]
   ) {

@@ -26,9 +26,6 @@
 
 ## Unresolved Decisions
 
-- Decide whether seven-phase pipeline cleanup should aim for type-pure phase
-  products or the smaller policy of eliminating unsynchronized metadata mirrors.
-  See [ARCHITECTURE.md](ARCHITECTURE.md).
 - Decide whether historical plans and proposals may retain stale source paths as
   historical records, or whether all tracked docs must remain path-current. See
   [../Scripts/check_stable_doc_source_paths.sh](../Scripts/check_stable_doc_source_paths.sh).
@@ -52,9 +49,10 @@
 
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
-- Reduce duplicated phase metadata between resolved and placed nodes under the
-  chosen pipeline policy. Cover retained-layout and late-preference behavior
-  before changing the shared structure. See [ARCHITECTURE.md](ARCHITECTURE.md).
+- Continue reducing duplicated phase metadata between resolved and placed nodes
+  after the synchronized-mirror policy is in place. Cover retained-layout and
+  late-preference behavior before changing the shared structure. See
+  [ARCHITECTURE.md](ARCHITECTURE.md).
 - Apply the historical-doc path policy once decided: either archive historical
   plans clearly or keep the stable-doc source-path checker focused on current
   source-of-truth docs. See
