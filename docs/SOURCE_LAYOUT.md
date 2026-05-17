@@ -326,12 +326,13 @@ Sources/SwiftTUICore/
 - `Resolve/NodeKind.swift`: `NodeKind` enum (root / scene / view classification)
 - `Resolve/NodeLifecycleInfo.swift`: grouped lifecycle metadata accessor on
   `ResolvedNode`
-- `Resolve/ViewGraph.swift`, `Resolve/ViewNode.swift`, `Resolve/ViewNodeContext.swift`,
+- `Resolve/ViewGraph.swift`, `Resolve/ViewGraphState.swift`,
+  `Resolve/ViewNode.swift`, `Resolve/ViewNodeContext.swift`,
   `Resolve/StateSlot.swift`, `Resolve/StructuralDiff.swift`,
   `Resolve/ChildDescriptor.swift`, `Resolve/DependencyTracker.swift`,
   `Resolve/DependencySet.swift`, `Resolve/NodeHandlers.swift`,
   `Resolve/NodeLifecycle.swift`, `Resolve/RegistrationAliasDiagnostics.swift`:
-  the graph that drives resolution, dependency tracking, and structural diffing
+  the graph state, checkpointing, dependency tracking, and structural diffing
 - `Resolve/LayoutDependentContent.swift`: realization policy for content
   authored during resolve but sized only after layout
 
