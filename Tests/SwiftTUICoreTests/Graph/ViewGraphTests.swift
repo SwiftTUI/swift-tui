@@ -509,8 +509,8 @@ struct ViewGraphTests {
     #expect(dropCounter.count == 1)
   }
 
-  @Test("frame-head registration draft commit restores from committed graph")
-  func frameHeadRegistrationDraftCommitRestoresFromCommittedGraph() {
+  @Test("view graph frame draft commit restores from committed graph")
+  func viewGraphFrameDraftCommitRestoresFromCommittedGraph() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let targetIdentity = testIdentity("Root", "Target")
@@ -541,8 +541,8 @@ struct ViewGraphTests {
       ) != nil
     )
 
-    let draft = FrameHeadRegistrationDraft(liveRegistrations: liveRegistrations)
-    draft.draftRegistrations.commandRegistry?.registerKeyCommand(
+    let registrationDraft = FrameHeadRegistrationDraft()
+    registrationDraft.draftRegistrations.commandRegistry?.registerKeyCommand(
       at: aliasIdentity,
       binding: draftBinding,
       description: "Draft",
@@ -550,8 +550,12 @@ struct ViewGraphTests {
     ) {
       draftCounter.increment()
     }
-    draft.recordResetAll()
-    draft.commitRestoring(from: graph, resolved: resolved)
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    graphDraft.recordDirtyEvaluationPlan(nil)
+    graphDraft.commitRuntimeRegistrations(from: graph)
 
     #expect(
       liveRegistrations.commandRegistry?.keyCommand(
@@ -566,6 +570,84 @@ struct ViewGraphTests {
       ) == true
     )
     #expect(originalCounter.count == 1)
+    #expect(draftCounter.count == 0)
+  }
+
+  @Test("view graph frame draft discard restores graph without live registry mutation")
+  func viewGraphFrameDraftDiscardRestoresGraphWithoutLiveRegistryMutation() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    let originalBinding = KeyBinding(key: .character("o"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    let originalCounter = RegistrationCounter()
+    let draftCounter = RegistrationCounter()
+
+    seedCommandGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      childIdentity: childIdentity,
+      binding: originalBinding,
+      description: "Original",
+      counter: originalCounter
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: graph.makeCheckpoint()
+    )
+
+    graph.beginFrame()
+    let childNode = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
+    childNode.recordCommandRegistration(
+      commandSnapshot(
+        identity: childIdentity,
+        binding: draftBinding,
+        description: "Draft",
+        counter: draftCounter
+      )
+    )
+    graph.finishEvaluation(
+      childNode,
+      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      accessedStateSlots: 0
+    )
+    graphDraft.recordDirtyEvaluationPlan(.init(frontierIdentities: [childIdentity]))
+
+    graphDraft.discard(from: graph)
+
+    #expect(
+      liveRegistrations.commandRegistry?.keyCommand(
+        at: childIdentity,
+        matching: draftBinding
+      ) == nil
+    )
+    #expect(
+      liveRegistrations.commandRegistry?.dispatch(
+        key: originalBinding,
+        along: [rootIdentity, childIdentity]
+      ) == true
+    )
+    #expect(originalCounter.count == 1)
+
+    let restoredRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: restoredRegistrations)
+    #expect(
+      restoredRegistrations.commandRegistry?.keyCommand(
+        at: childIdentity,
+        matching: draftBinding
+      ) == nil
+    )
+    #expect(
+      restoredRegistrations.commandRegistry?.keyCommand(
+        at: childIdentity,
+        matching: originalBinding
+      ) != nil
+    )
     #expect(draftCounter.count == 0)
   }
 

@@ -51,7 +51,7 @@ side-effect boundary."
 
 | Effect | Current mutation in frame head | Can move now? | Destination |
 | --- | --- | --- | --- |
-| `viewGraph` | `beginFrame`, invalidation, evaluator installation, dirty evaluation, snapshot reuse, lifecycle pre-work, and node registration capture. | No wholesale move. This is the main retained-graph owner. | Introduce a prepared graph-frame draft or equivalent graph transaction whose node/evaluator/registration mutations are not visible to live runtime registries until commit. |
+| `viewGraph` | `ViewGraphFrameDraft` now owns the abort checkpoint and committed runtime-registration publication plan. `ViewGraph` still performs node/evaluator/lifecycle mutations during frame-head preparation, so this remains a declared head effect. | Partially complete for F4-D. | Continue narrowing graph mutations behind the graph draft until node/evaluator/lifecycle state is draft-owned and no broad graph checkpoint is needed. |
 | `frameState` | `prepareInputs(from:proposal:)` now returns value-owned current-frame inputs; the retained state only tracks previous-frame selector memory used to decide whether root evaluation is required. | Complete for F4-C. | Keep `FrameResolveInputs` as the prepared-head input surface while later stages move graph, observation, presentation, and animation products behind drafts. |
 | `presentationPortalState` | Portal coordinator handles are injected during resolution and may update coordinator registries. | Not without a draft portal registry. | Add a portal-state draft/checkpoint wrapper that records presented overlay changes and installs them only when the commit plan is accepted. |
 | `observationBridge` | The bridge attaches the current `ViewGraph`, begins a tracking pass, and records observed identities for invalidation callbacks. | Not yet. Observation callbacks can race with prepared-frame visibility. | Make observation tracking pass-owned: a prepared frame records observations into a draft table and commit swaps them in. Callbacks before commit must still target the committed pass. |
@@ -140,6 +140,9 @@ Evidence:
 
 ### F4-D: Draft runtime registrations and graph transaction
 
+Status: complete for runtime-registration publication; graph node mutation still
+remains in the declared frame-head effect set.
+
 Turn the current graph-restoration lesson into a real draft boundary:
 
 - Preserve `ViewGraph.restoreCurrentFrameRuntimeRegistrations(into:)` as the
@@ -152,6 +155,21 @@ Turn the current graph-restoration lesson into a real draft boundary:
 
 Exit criterion: `FrameHeadRegistrationDraft` no longer needs to reset live
 registries during commit because no draft handlers were visible to live state.
+
+Evidence:
+
+- Added `ViewGraphFrameDraft`, which owns the abort-time `ViewGraph` checkpoint
+  and the runtime-registration publication plan for unchanged, full, and
+  selective dirty frames.
+- Reduced `FrameHeadRegistrationDraft` to a scratch registration collector used
+  only for draft drop-eligibility classification; it no longer stores live
+  registries, records live mutations, or commits by resetting live registries.
+- Commit now finalizes the graph, then publishes runtime registrations from the
+  committed graph via `ViewGraphFrameDraft.commitRuntimeRegistrations(from:)`.
+  Abort discards the graph draft and restores its checkpoint without touching
+  live runtime registries.
+- Added graph tests for committed graph publication and discard without live
+  registry mutation.
 
 ### F4-E: Observation and presentation drafts
 
