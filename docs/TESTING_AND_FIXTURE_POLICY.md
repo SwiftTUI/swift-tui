@@ -94,8 +94,9 @@ When updating fixtures:
 4. Prefer the smallest possible fixture rewrite that proves the intended behavior.
 
 Use `bun run test:coverage` when you need a root-package coverage signal. The
-coverage report is informational; the repo does not currently enforce a
-percentage threshold.
+coverage report is informational; the repo does not enforce a percentage
+threshold. CI retains the generated SwiftPM JSON as the `swiftpm-coverage-json`
+artifact for trend inspection.
 
 ## Performance Gates
 

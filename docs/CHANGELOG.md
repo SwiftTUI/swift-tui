@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Kept `bun run test:coverage` informational instead of adding a failing
+  percentage threshold, and added CI retention of the generated SwiftPM
+  coverage JSON as the `swiftpm-coverage-json` artifact for trend inspection.
 - Made organization-admin branch-protection bypass an intentional maintainer
   policy rather than a `0.9.0` beta revisit item; bypasses remain exceptional
   and do not relax signed, linear, release-gated commits before tags.

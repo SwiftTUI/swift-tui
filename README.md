@@ -258,7 +258,9 @@ exhaustive runner from the root Bun workspace.
 
 `bun run test:coverage` runs the root SwiftPM tests with SwiftPM code coverage
 enabled and prints the exported coverage JSON path plus the reported line
-coverage. Coverage is informational; there is no checked-in threshold gate yet.
+coverage. Coverage is informational; there is no checked-in threshold gate. CI
+retains the generated SwiftPM JSON as the `swiftpm-coverage-json` artifact for
+trend inspection.
 
 On Linux, both runners export `DISABLE_EXPLICIT_PLATFORMS=1` and skip
 Apple-only host checks.
