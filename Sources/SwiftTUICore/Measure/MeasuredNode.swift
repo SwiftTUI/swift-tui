@@ -55,6 +55,11 @@ public struct LazyStackAllocationSnapshot: Equatable, Sendable {
 package typealias LazyStackViewportContext = ScrollViewportContext
 
 /// A resolved node after the measure phase has chosen concrete sizes.
+///
+/// Measure owns the proposal, measured size, child measurements, and
+/// container-allocation snapshots used by placement. `identity` is carried from
+/// resolve only to correlate retained cache entries and child placement; this
+/// type does not carry resolved metadata forward to later phases.
 public struct MeasuredNode: Equatable, Sendable {
   public var identity: Identity
   public var proposal: ProposedSize

@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Completed the pipeline boundary hardening work: durable architecture docs now
+  classify phase-product ownership and projections, source-layout docs point to
+  the boundary helper types, async rendering docs distinguish baseline and
+  decorated placed products, and focused retained-layout tests cover current
+  metadata freshness through reuse.
 - Routed `PlacedNode`'s resolved-derived field synchronization through one
   metadata snapshot while preserving the existing accessor surface for later
   phases.

@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 private enum FocusedReuseKey: FocusedValueKey {
@@ -886,6 +886,54 @@ struct DiagnosticsAndCacheTests {
       second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount
     )
     #expect(second.diagnostics.placedNodesReused == second.diagnostics.placedNodeCount)
+  }
+
+  @Test("semantic-only metadata changes reuse layout and refresh semantic routes")
+  func semanticOnlyMetadataChangesReuseLayoutAndRefreshSemanticRoutes() throws {
+    let box = LockedBox(false)
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+
+    func makeRoot() -> some View {
+      Text("Tap")
+        .semanticMetadata(
+          .init(
+            isFocusable: box.value,
+            participatesInPointerHitTesting: box.value,
+            accessibilityLabel: box.value ? "Current tap target" : "Old tap target"
+          )
+        )
+    }
+
+    let first = renderer.render(
+      makeRoot(),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    box.value = true
+
+    let second = renderer.render(
+      makeRoot(),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(first.semanticSnapshot.focusRegions.isEmpty)
+    #expect(first.semanticSnapshot.interactionRegions.isEmpty)
+    #expect(
+      first.semanticSnapshot.accessibilityNodes.first?.label == "Old tap target"
+    )
+    #expect(second.diagnostics.measuredNodesComputed == 0)
+    #expect(second.diagnostics.placedNodesComputed == 0)
+    #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
+    #expect(second.diagnostics.placedNodesReused == second.diagnostics.placedNodeCount)
+    let focusRegion = try #require(second.semanticSnapshot.focusRegions.first)
+    let interactionRegion = try #require(second.semanticSnapshot.interactionRegions.first)
+    let accessibilityNode = try #require(second.semanticSnapshot.accessibilityNodes.first)
+
+    #expect(focusRegion.identity == testIdentity("Root"))
+    #expect(interactionRegion.identity == testIdentity("Root"))
+    #expect(accessibilityNode.label == "Current tap target")
   }
 
   @Test("text content changes still invalidate layout reuse")

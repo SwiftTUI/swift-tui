@@ -15,6 +15,22 @@ private struct BorderMask {
   var strokeWidth: Int
 }
 
+/// Placed-to-draw projection for one node.
+///
+/// The draw phase owns the command tree it emits, but it reads geometry,
+/// clipping policy, layout text policy, draw metadata, environment style, and
+/// payload snapshots from the current placed node. Grouping those reads keeps
+/// the projection boundary explicit without changing `PlacedNode` storage.
+private struct DrawPhaseProjection {
+  var identity: Identity
+  var environmentSnapshot: EnvironmentSnapshot
+  var bounds: CellRect
+  var layoutMetadata: LayoutMetadata
+  var drawMetadata: DrawMetadata
+  var drawPayload: DrawPayload
+  var layoutBehavior: LayoutBehavior
+}
+
 private enum ExtractionStep {
   case descend(
     node: PlacedNode,
@@ -120,12 +136,13 @@ extension DrawExtractor {
     inheritedBorderMask: BorderMask?,
     isInBackgroundSubtree: Bool
   ) -> DrawNode {
-    let identity = placed.identity
-    let environmentSnapshot = placed.environmentSnapshot
-    let bounds = placed.bounds
-    let layoutMetadata = placed.layoutMetadata
-    let drawMetadata = placed.drawMetadata
-    let drawPayload = placed.drawPayload
+    let projection = drawPhaseProjection(from: placed)
+    let identity = projection.identity
+    let environmentSnapshot = projection.environmentSnapshot
+    let bounds = projection.bounds
+    let layoutMetadata = projection.layoutMetadata
+    let drawMetadata = projection.drawMetadata
+    let drawPayload = projection.drawPayload
     var commands: [DrawCommand] = []
     let drawsRule: Bool
 
@@ -308,7 +325,7 @@ extension DrawExtractor {
       let blend,
       let blendPhase,
       let sides
-    ) = placed.layoutBehavior {
+    ) = projection.layoutBehavior {
       let borderCommand: DrawCommand = .border(
         bounds: bounds,
         set: set,
@@ -339,6 +356,20 @@ extension DrawExtractor {
       ),
       postCommands: postCommands,
       children: childNodes
+    )
+  }
+
+  private func drawPhaseProjection(
+    from placed: borrowing PlacedNode
+  ) -> DrawPhaseProjection {
+    DrawPhaseProjection(
+      identity: placed.identity,
+      environmentSnapshot: placed.environmentSnapshot,
+      bounds: placed.bounds,
+      layoutMetadata: placed.layoutMetadata,
+      drawMetadata: placed.drawMetadata,
+      drawPayload: placed.drawPayload,
+      layoutBehavior: placed.layoutBehavior
     )
   }
 
@@ -384,6 +415,9 @@ extension DrawExtractor {
   private func borderMask(
     for placed: borrowing PlacedNode
   ) -> BorderMask? {
+    // Draw-only projection for background/overlay masking. This is not a
+    // retained-layout input; retained placement is keyed by the canonical placed
+    // tree and refreshed resolved metadata before draw extraction reads it.
     if case .shape(let payload) = placed.drawPayload,
       case .stroke(_, let strokeStyle, let strokeBorder, _) = payload.operation,
       strokeBorder

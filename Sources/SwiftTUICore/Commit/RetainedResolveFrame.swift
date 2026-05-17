@@ -16,6 +16,12 @@ package struct ScrollViewportContext: Equatable, Sendable {
   }
 }
 
+/// Identity index of the previous committed frame's canonical pipeline products.
+///
+/// When this index is produced by frame-tail retained state, `placedByIdentity`
+/// is expected to come from the baseline placed tree stored before animation
+/// overlays were injected. That keeps retained placement keyed to canonical
+/// layout, while overlays are re-applied from animation state each frame.
 package struct RetainedFrameIndex: Sendable {
   package let resolvedByIdentity: [Identity: ResolvedNode]
   package let measuredByIdentity: [Identity: MeasuredNode]
@@ -415,4 +421,3 @@ package struct WorkerCustomLayoutCacheUpdate: Sendable {
     applyHandler()
   }
 }
-

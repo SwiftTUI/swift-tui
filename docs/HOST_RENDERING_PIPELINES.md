@@ -52,6 +52,10 @@ The phases remain host-neutral:
 | `raster` | `RasterSurface` | Produces the cell grid, style runs, continuation cells, and image attachments. |
 | `commit` | `CommitPlan` | Packages lifecycle, task, and handler-installation work for the runtime. |
 
+For the phase-product ownership inventory, including which fields are
+authoritative, projected, cached, or diagnostic, see
+[ARCHITECTURE.md](ARCHITECTURE.md#important-data-products).
+
 The core rule is: layout, semantics, draw, and raster do not know whether the
 result will be ANSI bytes, a SwiftUI/CoreGraphics view, or a browser canvas.
 Host-specific behavior starts at the `PresentationSurface` boundary and in the

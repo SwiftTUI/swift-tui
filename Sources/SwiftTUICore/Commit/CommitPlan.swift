@@ -52,6 +52,11 @@ public struct HandlerInstallation: Equatable, Sendable {
 }
 
 /// The runtime-facing result of the commit phase.
+///
+/// Commit packages the already-derived semantic snapshot with lifecycle and
+/// handler-installation work that the runtime must apply in order. The semantic
+/// snapshot is carried for runtime consumers; lifecycle and handler entries are
+/// the commit-owned side-effect plan.
 public struct CommitPlan: Equatable, Sendable {
   public var transaction: TransactionSnapshot
   public var semanticSnapshot: SemanticSnapshot
@@ -70,4 +75,3 @@ public struct CommitPlan: Equatable, Sendable {
     self.handlerInstallations = handlerInstallations
   }
 }
-

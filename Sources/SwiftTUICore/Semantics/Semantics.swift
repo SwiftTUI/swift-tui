@@ -4,6 +4,11 @@ public struct SemanticExtractor: Sendable {
   public init() {}
 
   /// Extracts semantic routing data from `placed`.
+  ///
+  /// The input is the effective placed tree for the current frame: retained
+  /// placement has already refreshed resolved-derived mirrors, and animation
+  /// overlays may already be injected. Transient overlay nodes are filtered
+  /// here so routing remains tied to the committed tree.
   public func extract(from placed: PlacedNode) -> SemanticSnapshot {
     var interactionRegions: [InteractionRegion] = []
     var focusRegions: [FocusRegion] = []
