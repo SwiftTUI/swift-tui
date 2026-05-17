@@ -263,18 +263,8 @@ extension LayoutEngine {
         return overlaySize(from: childMeasurements)
       }
       return childMeasurements[primaryIndex].measuredSize
-    case .viewThatFits(let axes):
-      guard
-        let selectedIndex = selectedChildIndex(
-          for: resolved,
-          proposal: proposal,
-          axes: axes,
-          passContext: passContext
-        ), childMeasurements.indices.contains(selectedIndex)
-      else {
-        return .zero
-      }
-      return childMeasurements[selectedIndex].measuredSize
+    case .viewThatFits:
+      return childMeasurements.first?.measuredSize ?? .zero
     case .custom(let handle):
       return handle.measureContainer(
         engine: self,

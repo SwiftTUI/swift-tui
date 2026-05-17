@@ -353,8 +353,8 @@ Sources/SwiftTUICore/
 
 - `Measure/LayoutEngine.swift`: the public `LayoutEngine` struct and
   `measure`/`place`/`dimensions` entry points
-- `Measure/LayoutEngine+Measurement.swift`: measurement dispatch
-  (`measureChildren` and helpers)
+- `Measure/LayoutEngine+MeasurementWorkStack.swift`: explicit work-stack
+  measurement dispatcher and measurement continuations
 - `Measure/LayoutEngine+CellSize.swift`: `measuredSize` plus flexible-frame
   resolution and overlay sizing
 - `Measure/LayoutEngine+IntrinsicSize.swift`: text, figure, rule, shape, and

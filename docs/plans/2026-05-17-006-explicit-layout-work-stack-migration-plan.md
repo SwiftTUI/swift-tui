@@ -154,7 +154,7 @@ Add tests that exercise actual layout measurement and placement.
   - `layoutDependentPlacementMeasuresRealizedChildrenThroughLayoutEngine`
   - `indexedLazyStackPlacementMeasuresVisibleChildrenThroughLayoutEngine`
 
-- [ ] Add a way for later tasks to prove a path used the iterative engine. Prefer
+- [x] Add a way for later tasks to prove a path used the iterative engine. Prefer
   package-internal test hooks or diagnostics over timing or crash-only tests.
 - [x] Do not land a test whose only failure mode is process stack overflow. If a
   local crash repro is useful during development, keep it out of the committed
@@ -182,12 +182,12 @@ swiftly run swift test --filter SwiftTUICoreTests.StackSafetyRegressionTests
 Introduce the iterative measurement engine without migrating all behavior at
 once.
 
-- [ ] Add internal work-stack implementation files, for example:
+- [x] Add internal work-stack implementation files, for example:
 
   - `Sources/SwiftTUICore/Measure/LayoutEngine+MeasurementWorkStack.swift`
   - `Sources/SwiftTUICore/Measure/LayoutEngine+MeasurementFrames.swift`
 
-- [ ] Define explicit measurement frame and continuation types. They should
+- [x] Define explicit measurement frame and continuation types. They should
   carry at least:
 
   - resolved node;
@@ -198,9 +198,9 @@ once.
   - cache/reuse state needed to finish the node;
   - layout-behavior-specific continuation payload.
 
-- [ ] Keep public `LayoutEngine.measure` stable.
-- [ ] Route a narrow behavior subset through the work-stack path first.
-- [ ] Preserve the current measurement pipeline order for each node:
+- [x] Keep public `LayoutEngine.measure` stable.
+- [x] Route a narrow behavior subset through the work-stack path first.
+- [x] Preserve the current measurement pipeline order for each node:
 
   1. retained measurement lookup;
   2. measurement cache lookup;
@@ -213,9 +213,16 @@ once.
   9. container allocation snapshot;
   10. cache store.
 
-- [ ] Add package-internal instrumentation for tests to prove a migrated
+- [x] Add package-internal instrumentation for tests to prove a migrated
   built-in path used the work-stack engine.
-- [ ] Keep the old recursive helpers callable only as temporary fallbacks.
+- [x] Remove old recursive helpers or keep them callable only as temporary
+  fallbacks.
+
+**Implementation note:** `LayoutEngine.measure` now routes through
+`LayoutEngine+MeasurementWorkStack.swift` for all built-in measurement cases.
+The old recursive measurement dispatcher and child-selection helpers were
+removed rather than retained as fallbacks. Public custom-layout callbacks remain
+the explicit compatibility boundary for user-authored recursive calls.
 
 **Acceptance criteria:**
 
@@ -234,9 +241,9 @@ swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
 
 Move simple measurement paths to the iterative measurement engine.
 
-- [ ] Convert intrinsic leaves with no children.
-- [ ] Convert one-child intrinsic containers.
-- [ ] Convert simple wrapper cases:
+- [x] Convert intrinsic leaves with no children.
+- [x] Convert one-child intrinsic containers.
+- [x] Convert simple wrapper cases:
 
   - `.padding`
   - `.safeAreaIgnoring`
@@ -246,7 +253,7 @@ Move simple measurement paths to the iterative measurement engine.
   - `.offset`
   - `.position`
 
-- [ ] Preserve proposal transforms exactly:
+- [x] Preserve proposal transforms exactly:
 
   - inset/outset proposal transforms;
   - fixed frame proposal replacement;
@@ -254,10 +261,10 @@ Move simple measurement paths to the iterative measurement engine.
   - fixed-size metadata application before child measurement;
   - clamping proposal behavior after measured-size calculation.
 
-- [ ] Preserve measured-size calculation by reusing existing pure helpers where
+- [x] Preserve measured-size calculation by reusing existing pure helpers where
   possible.
-- [ ] Update deep wrapper-chain tests to assert the iterative path.
-- [ ] Increase wrapper-chain depth to the final regression target once the path
+- [x] Update deep wrapper-chain tests to assert the iterative path.
+- [x] Increase wrapper-chain depth to the final regression target once the path
   is fully iterative.
 
 **Acceptance criteria:**
@@ -280,12 +287,12 @@ swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
 
 Move branching built-in measurement paths to explicit continuations.
 
-- [ ] Convert `.intrinsic` nodes with multiple children.
-- [ ] Convert `.overlay`.
-- [ ] Convert `.decoration`.
-- [ ] Convert `.safeAreaInset`.
-- [ ] Convert `.viewThatFits`.
-- [ ] Preserve special child ordering:
+- [x] Convert `.intrinsic` nodes with multiple children.
+- [x] Convert `.overlay`.
+- [x] Convert `.decoration`.
+- [x] Convert `.safeAreaInset`.
+- [x] Convert `.viewThatFits`.
+- [x] Preserve special child ordering:
 
   - overlay children are measured in source order;
   - decoration primary child is measured before decorations;
@@ -293,9 +300,9 @@ Move branching built-in measurement paths to explicit continuations.
   - safe-area inset adornment is measured before base content;
   - fallback paths for missing primary/inset children match current behavior.
 
-- [ ] Preserve measured-child storage semantics, including any retained-layout
+- [x] Preserve measured-child storage semantics, including any retained-layout
   projection rules.
-- [ ] Add or update tests for:
+- [x] Add or update tests for:
 
   - deep branching overlay/decoration trees;
   - safe-area inset measurement ordering;
@@ -320,7 +327,7 @@ swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningT
 
 Move the most complex built-in measurement path to explicit states.
 
-- [ ] Split stack measurement into named internal phases:
+- [x] Split stack measurement into named internal phases:
 
   - ideal child measurement;
   - spacing budget;
@@ -333,18 +340,18 @@ Move the most complex built-in measurement path to explicit states.
   - lazy-stack allocation snapshot;
   - final measured-size calculation.
 
-- [ ] Replace `children.map { measure(...) }` and enumerated child
+- [x] Replace `children.map { measure(...) }` and enumerated child
   remeasurement with explicit child-measurement work.
-- [ ] Convert fixed-size cross-axis reconciliation so remeasured children are
+- [x] Convert fixed-size cross-axis reconciliation so remeasured children are
   enqueued instead of recursively measured.
-- [ ] Convert `subtreeHasFlexibleContent` to an iterative traversal.
-- [ ] Convert `minimumMainSize` / `derivedMinimumMainSize` traversal to an
+- [x] Convert `subtreeHasFlexibleContent` to an iterative traversal.
+- [x] Convert `minimumMainSize` / `derivedMinimumMainSize` traversal to an
   iterative traversal or an explicit stack-state calculation.
-- [ ] Preserve no-op remeasurement pruning for rigid children.
-- [ ] Preserve indexed child source behavior and child source snapshot
+- [x] Preserve no-op remeasurement pruning for rigid children.
+- [x] Preserve indexed child source behavior and child source snapshot
   assumptions.
-- [ ] Add deep stack-chain tests that assert iterative stack measurement.
-- [ ] Add regression coverage for:
+- [x] Add deep stack-chain tests that assert iterative stack measurement.
+- [x] Add regression coverage for:
 
   - flexible child expansion;
   - compression;

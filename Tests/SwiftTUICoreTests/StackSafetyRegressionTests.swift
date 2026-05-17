@@ -161,6 +161,24 @@ struct StackSafetyRegressionTests {
     #expect(placed.bounds.size == measured.measuredSize)
   }
 
+  @Test("deep wrapper chains measure through explicit layout work stack")
+  func deepWrapperChainsMeasureThroughExplicitLayoutWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let resolved = makeDeepLayoutWrapperChain(depth: 1024)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 12, height: 4),
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.measurementWorkStackSteps > 0)
+    #expect(measured.subtreeNodeCount == resolved.subtreeNodeCount)
+    #expect(measured.measuredSize.width > 0)
+    #expect(measured.measuredSize.height > 0)
+  }
+
   @Test("deep stack chains measure and place through layout engine")
   func deepStackChainsMeasureAndPlaceThroughLayoutEngine() {
     let engine = LayoutEngine()
@@ -178,6 +196,24 @@ struct StackSafetyRegressionTests {
     #expect(placed.bounds.size == measured.measuredSize)
   }
 
+  @Test("deep stack chains measure through explicit layout work stack")
+  func deepStackChainsMeasureThroughExplicitLayoutWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let resolved = makeDeepStackLayoutChain(depth: 64)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 64, height: 64),
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.measurementWorkStackSteps > 0)
+    #expect(measured.subtreeNodeCount == resolved.subtreeNodeCount)
+    #expect(measured.measuredSize.width > 0)
+    #expect(measured.measuredSize.height > 0)
+  }
+
   @Test("deep branching built-in trees measure and place through layout engine")
   func deepBranchingBuiltInTreesMeasureAndPlaceThroughLayoutEngine() {
     let engine = LayoutEngine()
@@ -193,6 +229,24 @@ struct StackSafetyRegressionTests {
     #expect(placed.subtreeNodeCount > 0)
     #expect(placed.subtreeNodeCount <= measured.subtreeNodeCount)
     #expect(placed.bounds.size == measured.measuredSize)
+  }
+
+  @Test("deep branching built-in trees measure through explicit layout work stack")
+  func deepBranchingBuiltInTreesMeasureThroughExplicitLayoutWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let resolved = makeDeepBranchingLayoutTree(depth: 64)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 20, height: 8),
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.measurementWorkStackSteps > 0)
+    #expect(measured.subtreeNodeCount == resolved.subtreeNodeCount)
+    #expect(measured.measuredSize.width > 0)
+    #expect(measured.measuredSize.height > 0)
   }
 
   @MainActor

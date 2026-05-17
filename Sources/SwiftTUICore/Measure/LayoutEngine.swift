@@ -23,87 +23,11 @@ public struct LayoutEngine: Sendable {
     proposal: ProposedSize = .unspecified,
     passContext: LayoutPassContext?
   ) -> MeasuredNode {
-    let hasInvalidatedIndexedDescendant = hasInvalidatedIndexedDescendant(
-      for: resolved,
+    measureIterative(
+      resolved,
+      proposal: proposal,
       passContext: passContext
     )
-
-    if let retained = retainedMeasurement(
-      for: resolved,
-      proposal: proposal,
-      retainedLayout: passContext?.retainedLayout,
-      hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant
-    ) {
-      passContext?.updateWorkMetrics {
-        $0.measuredNodesReused += retained.subtreeNodeCount
-      }
-      return retained
-    }
-
-    if !hasInvalidatedIndexedDescendant,
-      let cached = cache?.lookup(resolved: resolved, proposal: proposal)
-    {
-      passContext?.updateWorkMetrics {
-        $0.measuredNodesReused += cached.subtreeNodeCount
-      }
-      return cached
-    }
-
-    passContext?.updateWorkMetrics {
-      $0.measuredNodesComputed += 1
-    }
-
-    if let boundary = resolved.layoutDependentContent {
-      let node = MeasuredNode(
-        identity: resolved.identity,
-        proposal: proposal,
-        measuredSize: boundary.sizingPolicy.measuredSize(for: proposal),
-        childMeasurements: [],
-        containerAllocationSnapshot: nil
-      )
-      cache?.store(node, for: resolved)
-      return node
-    }
-
-    let effectiveProposal = proposalApplyingFixedSizeMetadata(
-      resolved.layoutMetadata,
-      to: proposal
-    )
-    let childMeasurements = measureChildren(
-      for: resolved,
-      parentProposal: effectiveProposal,
-      passContext: passContext
-    )
-    let storedChildMeasurements = storedChildMeasurements(
-      for: resolved,
-      measuredChildren: childMeasurements
-    )
-    let clampingProposal = clampingProposal(
-      for: resolved,
-      effectiveProposal: effectiveProposal
-    )
-    let node = MeasuredNode(
-      identity: resolved.identity,
-      proposal: proposal,
-      measuredSize: clampedSize(
-        measuredSize(
-          for: resolved,
-          childMeasurements: childMeasurements,
-          proposal: effectiveProposal,
-          passContext: passContext
-        ),
-        proposal: clampingProposal
-      ),
-      childMeasurements: storedChildMeasurements,
-      containerAllocationSnapshot: containerAllocationSnapshot(
-        for: resolved,
-        childMeasurements: childMeasurements,
-        proposal: effectiveProposal,
-        passContext: passContext
-      )
-    )
-    cache?.store(node, for: resolved)
-    return node
   }
 
   /// Places a measured tree at `origin`.

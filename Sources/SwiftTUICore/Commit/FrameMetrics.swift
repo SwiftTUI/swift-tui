@@ -106,6 +106,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
   package var measuredNodesReused: Int
   package var placedNodesComputed: Int
   package var placedNodesReused: Int
+  package var measurementWorkStackSteps: Int
   package var layoutDependentRealizations: Int
   package var layoutDependentRealizationCacheHits: Int
   package var layoutDependentMainActorFallbacks: Int
@@ -116,6 +117,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     measuredNodesReused: Int = 0,
     placedNodesComputed: Int = 0,
     placedNodesReused: Int = 0,
+    measurementWorkStackSteps: Int = 0,
     layoutDependentRealizations: Int = 0,
     layoutDependentRealizationCacheHits: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
@@ -125,6 +127,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     self.measuredNodesReused = measuredNodesReused
     self.placedNodesComputed = placedNodesComputed
     self.placedNodesReused = placedNodesReused
+    self.measurementWorkStackSteps = measurementWorkStackSteps
     self.layoutDependentRealizations = layoutDependentRealizations
     self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
