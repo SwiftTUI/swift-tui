@@ -95,61 +95,12 @@ public struct LayoutEngine: Sendable {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext? = nil
   ) -> PlacedNode {
-    if let retained = retainedPlacement(
-      for: resolved,
-      measured: measured,
-      bounds: bounds,
-      viewportContext: viewportContext,
-      retainedLayout: passContext?.retainedLayout
-    ) {
-      passContext?.updateWorkMetrics {
-        $0.placedNodesReused += retained.subtreeNodeCount
-      }
-      passContext?.recordPlacedFrames(in: retained)
-      return retained
-    }
-
-    passContext?.updateWorkMetrics {
-      $0.placedNodesComputed += 1
-    }
-
-    passContext?.recordPlacedFrame(
-      identity: resolved.identity,
-      bounds: bounds,
-      namedCoordinateSpaceName: resolved.semanticMetadata.namedCoordinateSpaceName
-    )
-
-    let hasChildren =
-      if resolved.layoutDependentContent != nil {
-        true
-      } else if let source = resolved.indexedChildSource {
-        source.count > 0
-      } else {
-        !resolved.children.isEmpty
-      }
-
-    if !hasChildren {
-      return placedNode(
-        from: resolved,
-        bounds: bounds,
-        measured: measured,
-        children: []
-      )
-    }
-
-    let placedChildren = childPlacements(
-      for: resolved,
+    placeIterative(
+      resolved,
       measured: measured,
       in: bounds,
       viewportContext: viewportContext,
       passContext: passContext
-    )
-
-    return placedNode(
-      from: resolved,
-      bounds: bounds,
-      measured: measured,
-      children: placedChildren
     )
   }
 
