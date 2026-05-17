@@ -216,12 +216,14 @@ package enum FrameHeadMode {
   case abortable
 }
 
-/// The five-subsystem checkpoint bundle captured for an abortable frame head.
+/// The checkpoint bundle captured for an abortable frame head.
 ///
 /// Present only on drafts prepared with `FrameHeadMode.abortable`; a one-shot
 /// draft carries `nil`. `abortPreparedFrameHead` requires this bundle.
 package struct FrameHeadCheckpoints {
   let viewGraph: ViewGraph.Checkpoint
+  /// Previous-frame selector memory only. Current-frame resolve inputs are
+  /// carried by the prepared head and overwritten by the next frame.
   let frameState: FrameResolveState.Checkpoint
   let presentationPortal: PresentationPortalState.Checkpoint
   let observationBridge: ObservationBridge.Checkpoint?

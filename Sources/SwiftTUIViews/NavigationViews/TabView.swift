@@ -463,9 +463,7 @@ private func tabViewAvailableWidth(
       - context.environmentValues.safeAreaInsets.horizontal
   )
   let proposalWidth: Int? =
-    if let frameState = context.frameState,
-      case .finite(let width) = frameState.proposal.width
-    {
+    if case .finite(let width) = context.effectiveProposal.width {
       max(0, width)
     } else {
       nil
