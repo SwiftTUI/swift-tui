@@ -663,12 +663,20 @@ public struct DefaultRenderer {
     return commitCompletedFrameCandidate(candidate)
   }
 
+  /// Resolves `root` and prepares the shared frame head consumed by both the
+  /// synchronous one-shot renderer and the abortable async renderer.
+  ///
+  /// `mode` selects execution-strategy-specific work: `.abortable` captures the
+  /// five-subsystem checkpoint bundle (before each subsystem is mutated) and
+  /// the worker-safe indexed-child snapshot; `.oneShot` skips both, so a
+  /// synchronous render pays neither the checkpoint nor the snapshot cost.
   @MainActor
-  private func prepareFrameHead<V: View>(
+  private func computeFrameHead<V: View>(
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
-    collectsDiagnostics: Bool
+    collectsDiagnostics: Bool,
+    mode: FrameHeadMode
   ) -> FrameHeadDraft {
     let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
     let renderGeneration = renderGenerationSequencer.next()
@@ -682,11 +690,28 @@ public struct DefaultRenderer {
     )
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
-    let frameStateCheckpoint = frameState.makeCheckpoint()
-    let presentationPortalCheckpoint = presentationPortalState.makeCheckpoint()
-    let observationBridgeCheckpoint = resolveContext.observationBridge?.makeCheckpoint()
+
+    // Abortable heads checkpoint frameState / portal / observation BEFORE
+    // `frameState.update` mutates them. One-shot heads never abort, so skip.
+    let frameStateCheckpoint: FrameResolveState.Checkpoint?
+    let presentationPortalCheckpoint: PresentationPortalState.Checkpoint?
+    let observationBridgeCheckpoint: ObservationBridge.Checkpoint?
+    switch mode {
+    case .oneShot:
+      frameStateCheckpoint = nil
+      presentationPortalCheckpoint = nil
+      observationBridgeCheckpoint = nil
+    case .abortable:
+      frameStateCheckpoint = frameState.makeCheckpoint()
+      presentationPortalCheckpoint = presentationPortalState.makeCheckpoint()
+      observationBridgeCheckpoint = resolveContext.observationBridge?.makeCheckpoint()
+    }
     frameState.update(from: resolveContext, proposal: proposal)
-    let viewGraphCheckpoint = viewGraph.makeCheckpoint()
+
+    // The viewGraph checkpoint is captured AFTER `frameState.update` but
+    // BEFORE `beginFrame`, for the same abort reason.
+    let viewGraphCheckpoint: ViewGraph.Checkpoint? =
+      mode == .abortable ? viewGraph.makeCheckpoint() : nil
     viewGraph.beginFrame()
     let canUseSelectiveEvaluation =
       frameState.selectiveEvaluationEnabled
@@ -724,9 +749,14 @@ public struct DefaultRenderer {
       viewGraph.queueDirty([presentationPortalContext.identity])
     }
     let (_, resolveDuration): (Void, Duration)
-    let animationCheckpoint = animationController.beginFrameHeadTransaction()
+    // Abortable heads open an animation frame-head transaction so completion
+    // closures can be deferred or discarded; one-shot heads do not.
+    let animationCheckpoint: AnimationController.Checkpoint? =
+      mode == .abortable ? animationController.beginFrameHeadTransaction() : nil
     animationController.beginTransitionCollection()
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
+      // Nothing is dirty — skip evaluation entirely and reuse the existing
+      // tree snapshot. The root evaluator and registrations are untouched.
       resolveDuration = .zero
     } else {
       let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
@@ -751,6 +781,10 @@ public struct DefaultRenderer {
       context: resolveContext
     )
 
+    // Animation: capture from/to for changed animatable properties, then apply
+    // interpolated values to the resolved tree before measure. This is the
+    // only pipeline insertion for animation — measure/place/draw/raster run
+    // unchanged on the mutated tree.
     let animationTimestamp = MonotonicInstant.now()
     animationController.processResolvedTree(
       resolved,
@@ -782,7 +816,12 @@ public struct DefaultRenderer {
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext
     )
-    if frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput) {
+    // Worker-safe snapshotting of lazy indexed child sources is only needed
+    // when the frame tail runs off-main. One-shot renders run the tail
+    // synchronously on the main actor, so they skip it.
+    if mode == .abortable,
+      frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput)
+    {
       resolved = indexedChildSourceWorkerSnapshot(of: resolved)
       frameTailInput = FrameTailInput(
         generation: renderGeneration,
@@ -794,17 +833,27 @@ public struct DefaultRenderer {
       )
     }
 
+    let checkpoints: FrameHeadCheckpoints?
+    switch mode {
+    case .oneShot:
+      checkpoints = nil
+    case .abortable:
+      // Force-unwraps are safe: every `.abortable` branch above assigned its
+      // checkpoint non-nil.
+      checkpoints = FrameHeadCheckpoints(
+        viewGraph: viewGraphCheckpoint!,
+        frameState: frameStateCheckpoint!,
+        presentationPortal: presentationPortalCheckpoint!,
+        observationBridge: observationBridgeCheckpoint,
+        animation: animationCheckpoint!
+      )
+    }
+
     return FrameHeadDraft(
       clock: clock,
       renderGeneration: renderGeneration,
       registrationDraft: registrationDraft,
-      checkpoints: FrameHeadCheckpoints(
-        viewGraph: viewGraphCheckpoint,
-        frameState: frameStateCheckpoint,
-        presentationPortal: presentationPortalCheckpoint,
-        observationBridge: observationBridgeCheckpoint,
-        animation: animationCheckpoint
-      ),
+      checkpoints: checkpoints,
       observationBridge: resolveContext.observationBridge,
       resolveContext: resolveContext,
       graphRootIdentity: presentationPortalContext.identity,
@@ -814,6 +863,22 @@ public struct DefaultRenderer {
       runtimeIssues: [],
       animationTimestamp: animationTimestamp,
       resolveDuration: resolveDuration
+    )
+  }
+
+  @MainActor
+  private func prepareFrameHead<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    collectsDiagnostics: Bool
+  ) -> FrameHeadDraft {
+    computeFrameHead(
+      root,
+      context: context,
+      proposal: proposal,
+      collectsDiagnostics: collectsDiagnostics,
+      mode: .abortable
     )
   }
 
