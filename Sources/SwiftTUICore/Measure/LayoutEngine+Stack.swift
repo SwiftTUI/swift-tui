@@ -1,119 +1,4 @@
 extension LayoutEngine {
-  package func measureStackChildren(
-    for resolved: ResolvedNode,
-    parentProposal: ProposedSize,
-    axis: Axis,
-    spacing: Int?,
-    passContext: LayoutPassContext?
-  ) -> [MeasuredNode] {
-    measureStackChildren(
-      for: stackChildren(for: resolved),
-      parentProposal: parentProposal,
-      axis: axis,
-      spacing: spacing,
-      passContext: passContext
-    )
-  }
-
-  package func measureStackChildren(
-    for children: [ResolvedNode],
-    parentProposal: ProposedSize,
-    axis: Axis,
-    spacing: Int?,
-    passContext: LayoutPassContext?
-  ) -> [MeasuredNode] {
-    let idealProposal = stackProposal(
-      axis: axis,
-      main: .unspecified,
-      cross: crossDimension(of: parentProposal, for: axis)
-    )
-    let idealMeasurements = children.map { child in
-      measure(child, proposal: idealProposal, passContext: passContext)
-    }
-
-    guard case .finite(let proposedMain) = mainDimension(of: parentProposal, for: axis) else {
-      // Parent did not propose a finite main dimension (the classic
-      // `.fixedSize()` case, or an unconstrained root).  SwiftUI's stack
-      // still reconciles the cross axis to the widest child's ideal and
-      // then re-measures every child with that cross width.  Without
-      // that re-measure, internal `Spacer`s and `frame(maxWidth: .infinity)`
-      // inside row children stay collapsed because the children only ever
-      // see `.unspecified` on their main axis.
-      //
-      // We only do this when the parent's cross axis is also unspecified,
-      // which is what distinguishes "fixedSize / unconstrained parent"
-      // from a parent that has already decided on a cross width.  For the
-      // already-finite-cross path we keep the existing (faster) behaviour.
-      guard case .unspecified = crossDimension(of: parentProposal, for: axis) else {
-        return idealMeasurements
-      }
-      return reconcileUnspecifiedStackCrossAxis(
-        children,
-        measurements: idealMeasurements,
-        axis: axis,
-        passContext: passContext
-      )
-    }
-
-    let spacingBudget = resolvedStackSpacings(
-      for: children,
-      axis: axis,
-      spacingOverride: spacing
-    ).reduce(0, +)
-    let availableMain = max(0, proposedMain - spacingBudget)
-    let idealMainSizes = idealMeasurements.map { mainDimension(of: $0.measuredSize, for: axis) }
-    var allocatedMainSizes = idealMainSizes
-    let idealMainTotal = idealMainSizes.reduce(0, +)
-
-    if idealMainTotal < availableMain {
-      distributeExtraSpaceToFlexibleChildren(
-        children,
-        into: &allocatedMainSizes,
-        axis: axis,
-        extraSpace: availableMain - idealMainTotal
-      )
-    } else if idealMainTotal > availableMain {
-      compressStackChildren(
-        children,
-        idealMeasurements: idealMeasurements,
-        axis: axis,
-        allocatedMainSizes: &allocatedMainSizes,
-        overflow: idealMainTotal - availableMain
-      )
-    }
-
-    let allocatedMeasurements = children.enumerated().map { index, child in
-      var measurement = measure(
-        child,
-        proposal: stackProposal(
-          axis: axis,
-          main: .finite(allocatedMainSizes[index]),
-          cross: crossDimension(of: parentProposal, for: axis)
-        ),
-        passContext: passContext
-      )
-      if isSpacer(child) {
-        measurement.measuredSize = settingMainDimension(
-          of: measurement.measuredSize,
-          for: axis,
-          to: allocatedMainSizes[index]
-        )
-      }
-      return measurement
-    }
-
-    guard case .unspecified = crossDimension(of: parentProposal, for: axis) else {
-      return allocatedMeasurements
-    }
-
-    return reconcileUnspecifiedStackCrossAxis(
-      children,
-      measurements: allocatedMeasurements,
-      axis: axis,
-      passContext: passContext
-    )
-  }
-
   package func stackChildren(
     for resolved: ResolvedNode
   ) -> [ResolvedNode] {
@@ -579,58 +464,9 @@ extension LayoutEngine {
     child.kind == .view("Spacer")
   }
 
-  internal func reconcileUnspecifiedStackCrossAxis(
-    _ children: [ResolvedNode],
-    measurements: [MeasuredNode],
-    axis: Axis,
-    passContext: LayoutPassContext?
-  ) -> [MeasuredNode] {
-    let maxCross = measurements.reduce(0) { partial, measurement in
-      max(partial, crossDimension(of: measurement.measuredSize, for: axis))
-    }
-    guard maxCross > 0 else {
-      return measurements
-    }
-
-    // Fast path: if every child's cross already matches the max, there
-    // is no slack for a flexible child (Spacer, frame(maxWidth:.infinity))
-    // to claim, so re-measuring with a finite cross produces the same
-    // result. Skipping the second pass keeps homogeneous stacks out of
-    // the measurement cache's resize-cost path.
-    let needsReconciliation = measurements.contains { measurement in
-      crossDimension(of: measurement.measuredSize, for: axis) < maxCross
-    }
-    guard needsReconciliation else {
-      return measurements
-    }
-
-    // Only re-measure children that could actually adapt to the wider
-    // cross axis. Children already at the max have no slack to claim,
-    // and rigid text-like leaves (Text, TextFigure, RichText, Rule)
-    // return the same measurement at any cross that is wider than their
-    // ideal. Skipping them keeps the clean siblings of an asymmetric
-    // stack out of the re-measurement path so their placed tree can
-    // still be reused across frames.
-    return measurements.enumerated().map { index, measurement in
-      let currentCross = crossDimension(of: measurement.measuredSize, for: axis)
-      guard currentCross < maxCross else {
-        return measurement
-      }
-      if stackChildRemeasurementIsNoop(children[index], parentStackAxis: axis) {
-        return measurement
-      }
-      let reProposal = stackProposal(
-        axis: axis,
-        main: .finite(mainDimension(of: measurement.measuredSize, for: axis)),
-        cross: .finite(maxCross)
-      )
-      return measure(children[index], proposal: reProposal, passContext: passContext)
-    }
-  }
-
-  /// Whether re-measuring `child` with a wider cross dimension (for
-  /// the fixedSize stack reconciliation pass in `measureStackChildren`)
-  /// is guaranteed to produce the same measurement as its ideal pass.
+  /// Whether re-measuring `child` with a wider cross dimension during stack
+  /// reconciliation is guaranteed to produce the same measurement as its ideal
+  /// pass.
   ///
   /// The reconciliation pass only helps when the subtree contains
   /// something that can actually claim the extra space along the
@@ -656,90 +492,102 @@ extension LayoutEngine {
     _ node: ResolvedNode,
     axis: Axis
   ) -> Bool {
-    if node.layoutDependentContent != nil {
-      return true
-    }
+    var stack: [ResolvedNode] = [node]
 
-    switch node.layoutBehavior {
-    case .intrinsic:
-      switch node.drawPayload {
-      case .rule:
-        // A Divider/Rule fills the cross axis of its enclosing stack
-        // (stored in `drawMetadata.ruleStackAxis`). A rule inside a
-        // VStack expands horizontally; a rule inside an HStack
-        // expands vertically. It counts as flexible on any axis that
-        // isn't its own stack axis.
-        if let ruleStackAxis = node.drawMetadata.ruleStackAxis {
-          return ruleStackAxis != axis
-        }
-        return false
-      case .shape, .canvas:
-        // Raw shape primitives (Rectangle, RoundedRectangle, …) and
-        // Canvas views size to the proposal on every axis, so they
-        // will expand to any finite cross the reconciliation hands
-        // them.
+    while let current = stack.popLast() {
+      if current.layoutDependentContent != nil {
         return true
+      }
+
+      switch current.layoutBehavior {
+      case .intrinsic:
+        switch current.drawPayload {
+        case .rule:
+          // A Divider/Rule fills the cross axis of its enclosing stack
+          // (stored in `drawMetadata.ruleStackAxis`). A rule inside a
+          // VStack expands horizontally; a rule inside an HStack
+          // expands vertically. It counts as flexible on any axis that
+          // isn't its own stack axis.
+          if let ruleStackAxis = current.drawMetadata.ruleStackAxis {
+            if ruleStackAxis != axis {
+              return true
+            }
+            continue
+          }
+        case .shape, .canvas:
+          // Raw shape primitives (Rectangle, RoundedRectangle, …) and
+          // Canvas views size to the proposal on every axis, so they
+          // will expand to any finite cross the reconciliation hands
+          // them.
+          return true
+        default:
+          break
+        }
+      case .flexibleFrame(let minW, _, let maxW, let minH, _, let maxH, _):
+        let (axisMin, axisMax): (ProposedDimension?, ProposedDimension?) =
+          switch axis {
+          case .horizontal: (minW, maxW)
+          case .vertical: (minH, maxH)
+          }
+        if case .infinity = axisMax {
+          return true
+        }
+        if case .finite(let lo) = axisMin ?? .finite(0),
+          case .finite(let hi) = axisMax ?? .finite(0),
+          hi > lo
+        {
+          return true
+        }
+      case .frame(let width, let height, _):
+        // A fixed-size frame pins its axis regardless of child
+        // flexibility, so that axis is not flexible. The other axis
+        // still passes through to the child.
+        let explicit: Int? =
+          switch axis {
+          case .horizontal: width
+          case .vertical: height
+          }
+        if explicit != nil {
+          continue
+        }
+      case .stack(let stackAxis, _, _, _), .lazyStack(let stackAxis, _, _, _):
+        if stackAxis == axis, current.children.contains(where: isSpacer) {
+          return true
+        }
+      case .decoration(let primaryIndex, _):
+        // A decoration (background/overlay) sizes its non-primary
+        // children to match the primary child, so only the primary
+        // contributes flexibility. Walking into background Rectangles
+        // would otherwise spuriously mark Text-with-background as
+        // flexible on every axis.
+        guard current.children.indices.contains(primaryIndex) else {
+          continue
+        }
+        stack.append(current.children[primaryIndex])
+        continue
+      case .overlay:
+        // Overlay's first child is the content; additional children
+        // are overlays pinned to the content's size. Only the content
+        // contributes flexibility.
+        guard let content = current.children.first else {
+          continue
+        }
+        stack.append(content)
+        continue
+      case .safeAreaInset:
+        guard let base = current.children.first else {
+          continue
+        }
+        stack.append(base)
+        continue
       default:
         break
       }
-    case .flexibleFrame(let minW, _, let maxW, let minH, _, let maxH, _):
-      let (axisMin, axisMax): (ProposedDimension?, ProposedDimension?) =
-        switch axis {
-        case .horizontal: (minW, maxW)
-        case .vertical: (minH, maxH)
-        }
-      if case .infinity = axisMax {
-        return true
-      }
-      if case .finite(let lo) = axisMin ?? .finite(0),
-        case .finite(let hi) = axisMax ?? .finite(0),
-        hi > lo
-      {
-        return true
-      }
-    case .frame(let width, let height, _):
-      // A fixed-size frame pins its axis regardless of child
-      // flexibility, so that axis is not flexible. The other axis
-      // still passes through to the child.
-      let explicit: Int? =
-        switch axis {
-        case .horizontal: width
-        case .vertical: height
-        }
-      if explicit != nil {
-        return false
-      }
-    case .stack(let stackAxis, _, _, _), .lazyStack(let stackAxis, _, _, _):
-      if stackAxis == axis, node.children.contains(where: isSpacer) {
-        return true
-      }
-    case .decoration(let primaryIndex, _):
-      // A decoration (background/overlay) sizes its non-primary
-      // children to match the primary child, so only the primary
-      // contributes flexibility. Walking into background Rectangles
-      // would otherwise spuriously mark Text-with-background as
-      // flexible on every axis.
-      guard node.children.indices.contains(primaryIndex) else {
-        return false
-      }
-      return subtreeHasFlexibleContent(node.children[primaryIndex], axis: axis)
-    case .overlay:
-      // Overlay's first child is the content; additional children
-      // are overlays pinned to the content's size. Only the content
-      // contributes flexibility.
-      guard let content = node.children.first else {
-        return false
-      }
-      return subtreeHasFlexibleContent(content, axis: axis)
-    case .safeAreaInset:
-      guard let base = node.children.first else {
-        return false
-      }
-      return subtreeHasFlexibleContent(base, axis: axis)
-    default:
-      break
+
+      stack.append(contentsOf: current.children)
     }
-    return node.children.contains { subtreeHasFlexibleContent($0, axis: axis) }
+
+    return false
   }
 
   package func isFixedSize(
@@ -771,20 +619,72 @@ extension LayoutEngine {
     idealMeasurement: MeasuredNode,
     axis: Axis
   ) -> Int {
-    if isFixedSize(node.layoutMetadata, on: axis) || isSpacer(node) {
-      return mainDimension(of: idealMeasurement.measuredSize, for: axis)
+    struct MinimumFrame {
+      var node: ResolvedNode
+      var idealMeasurement: MeasuredNode
+      var visited: Bool
     }
 
-    let stackChildren = stackChildren(for: node)
-    let childMinimums = zip(stackChildren, idealMeasurement.childMeasurements).map {
-      child, measurement in
-      minimumMainSize(
-        for: child,
-        idealMeasurement: measurement,
+    var work: [MinimumFrame] = [
+      .init(node: node, idealMeasurement: idealMeasurement, visited: false)
+    ]
+    var minimums: [Identity: Int] = [:]
+
+    while let frame = work.popLast() {
+      if isFixedSize(frame.node.layoutMetadata, on: axis) || isSpacer(frame.node) {
+        minimums[frame.node.identity] = mainDimension(
+          of: frame.idealMeasurement.measuredSize,
+          for: axis
+        )
+        continue
+      }
+
+      let stackChildren = stackChildren(for: frame.node)
+      let childPairs = Array(zip(stackChildren, frame.idealMeasurement.childMeasurements))
+
+      if !frame.visited {
+        work.append(
+          .init(
+            node: frame.node,
+            idealMeasurement: frame.idealMeasurement,
+            visited: true
+          )
+        )
+        for (child, measurement) in childPairs.reversed() {
+          work.append(.init(node: child, idealMeasurement: measurement, visited: false))
+        }
+        continue
+      }
+
+      let childMinimums = childPairs.map { child, measurement in
+        max(
+          minimumMainDimension(
+            for: child.layoutMetadata,
+            axis: axis
+          ) ?? 0,
+          minimums[child.identity]
+            ?? mainDimension(of: measurement.measuredSize, for: axis)
+        )
+      }
+      minimums[frame.node.identity] = derivedMinimumMainSize(
+        for: frame.node,
+        idealMeasurement: frame.idealMeasurement,
+        childMinimums: childMinimums,
+        stackChildren: stackChildren,
         axis: axis
       )
     }
 
+    return minimums[node.identity] ?? 0
+  }
+
+  private func derivedMinimumMainSize(
+    for node: ResolvedNode,
+    idealMeasurement: MeasuredNode,
+    childMinimums: [Int],
+    stackChildren: [ResolvedNode],
+    axis: Axis
+  ) -> Int {
     switch node.layoutBehavior {
     case .intrinsic:
       if case .textFigure(let payload) = node.drawPayload {
@@ -828,7 +728,8 @@ extension LayoutEngine {
         return max(baseMinimum, insetMinimum)
       }
     case .stack(
-      axis: let stackAxis, let spacing,
+      axis: let stackAxis,
+      let spacing,
       horizontalAlignment: _,
       verticalAlignment: _
     ):
@@ -842,7 +743,8 @@ extension LayoutEngine {
       }
       return childMinimums.max() ?? 0
     case .lazyStack(
-      axis: let stackAxis, let spacing,
+      axis: let stackAxis,
+      let spacing,
       horizontalAlignment: _,
       verticalAlignment: _
     ):
@@ -860,7 +762,10 @@ extension LayoutEngine {
       return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
     case .border(let set, let placement, _, _, _, _, let sides):
       let insets = borderLayoutInsets(
-        set: set, placement: placement, sides: sides)
+        set: set,
+        placement: placement,
+        sides: sides
+      )
       let contentMinimum = childMinimums.first ?? 0
       return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
     case .frame(let width, let height, _):

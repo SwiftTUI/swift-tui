@@ -571,6 +571,61 @@ struct LayoutEngineTests {
     #expect(placed.children.map(\.identity) == [testIdentity("fit")])
   }
 
+  @Test("safe area inset measures adornment before base and stores source-facing order")
+  func safeAreaInsetMeasuresAdornmentBeforeBaseAndStoresSourceFacingOrder() {
+    let engine = LayoutEngine()
+    let base = leaf("safe-area-base", size: .init(width: 10, height: 10))
+    let adornment = leaf("safe-area-adornment", size: .init(width: 8, height: 2))
+    let resolved = ResolvedNode(
+      identity: testIdentity("safe-area-inset"),
+      kind: .view("SafeAreaInset"),
+      children: [base, adornment],
+      layoutBehavior: .safeAreaInset(
+        edge: .top,
+        alignment: .center,
+        spacing: 1,
+        safeArea: .init()
+      )
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 10)
+    )
+
+    #expect(measured.childMeasurements.map(\.identity) == [base.identity, adornment.identity])
+    #expect(measured.childMeasurements[0].proposal == .init(width: 10, height: 7))
+    #expect(
+      measured.childMeasurements[1].proposal
+        == .init(width: .finite(10), height: .unspecified)
+    )
+  }
+
+  @Test("decoration falls back to source-order child measurement when primary is missing")
+  func decorationFallsBackToSourceOrderChildMeasurementWhenPrimaryIsMissing() {
+    let engine = LayoutEngine()
+    let first = leaf("decoration-fallback-first", size: .init(width: 2, height: 1))
+    let second = leaf("decoration-fallback-second", size: .init(width: 4, height: 1))
+    let resolved = ResolvedNode(
+      identity: testIdentity("decoration-fallback"),
+      kind: .view("Decoration"),
+      children: [first, second],
+      layoutBehavior: .decoration(primaryIndex: 5, alignment: .center)
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 3)
+    )
+
+    #expect(measured.childMeasurements.map(\.identity) == [first.identity, second.identity])
+    #expect(
+      measured.childMeasurements.map(\.proposal)
+        == [.init(width: 10, height: 3), .init(width: 10, height: 3)]
+    )
+    #expect(measured.measuredSize == .init(width: 4, height: 1))
+  }
+
   @Test("padding reduces the child proposal and places the child at the inset origin")
   func paddingReducesProposalAndOffsetsPlacement() throws {
     let engine = LayoutEngine()
