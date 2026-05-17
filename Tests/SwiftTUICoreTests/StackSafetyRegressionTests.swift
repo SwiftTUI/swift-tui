@@ -144,6 +144,99 @@ struct StackSafetyRegressionTests {
     #expect(surface.cells[0][0].character == "A")
   }
 
+  @Test("deep wrapper chains measure and place through layout engine")
+  func deepWrapperChainsMeasureAndPlaceThroughLayoutEngine() {
+    let engine = LayoutEngine()
+    let resolved = makeDeepLayoutWrapperChain(depth: 8)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 12, height: 4)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.measuredSize.width > 0)
+    #expect(measured.measuredSize.height > 0)
+    #expect(placed.subtreeNodeCount == measured.subtreeNodeCount)
+    #expect(placed.bounds.size == measured.measuredSize)
+  }
+
+  @Test("deep stack chains measure and place through layout engine")
+  func deepStackChainsMeasureAndPlaceThroughLayoutEngine() {
+    let engine = LayoutEngine()
+    let resolved = makeDeepStackLayoutChain(depth: 6)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 16, height: 16)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.subtreeNodeCount == resolved.subtreeNodeCount)
+    #expect(placed.subtreeNodeCount > 0)
+    #expect(placed.subtreeNodeCount <= measured.subtreeNodeCount)
+    #expect(placed.bounds.size == measured.measuredSize)
+  }
+
+  @Test("deep branching built-in trees measure and place through layout engine")
+  func deepBranchingBuiltInTreesMeasureAndPlaceThroughLayoutEngine() {
+    let engine = LayoutEngine()
+    let resolved = makeDeepBranchingLayoutTree(depth: 6)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 20, height: 8)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.subtreeNodeCount == resolved.subtreeNodeCount)
+    #expect(placed.subtreeNodeCount > 0)
+    #expect(placed.subtreeNodeCount <= measured.subtreeNodeCount)
+    #expect(placed.bounds.size == measured.measuredSize)
+  }
+
+  @MainActor
+  @Test("layout-dependent placement measures realized children through layout engine")
+  func layoutDependentPlacementMeasuresRealizedChildrenThroughLayoutEngine() {
+    let engine = LayoutEngine()
+    let child = makeLayoutLeaf("layout-dependent-child", size: .init(width: 3, height: 1))
+    let resolved = makeLayoutDependentNode(children: [child])
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 3)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.measuredSize == .init(width: 10, height: 3))
+    #expect(placed.children.count == 1)
+    #expect(placed.children.first?.identity == child.identity)
+    #expect(placed.children.first?.bounds.size == child.intrinsicSize)
+  }
+
+  @Test("indexed lazy stack placement measures visible children through layout engine")
+  func indexedLazyStackPlacementMeasuresVisibleChildrenThroughLayoutEngine() {
+    let engine = LayoutEngine()
+    let children = (0..<8).map {
+      makeLayoutLeaf("indexed-lazy-child-\($0)", size: .init(width: 2, height: 1))
+    }
+    let resolved = makeIndexedLazyStackLayoutTree(
+      "indexed-lazy-root",
+      axis: .vertical,
+      children: children
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 8, height: 4)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.containerAllocationSnapshot?.lazyStack != nil)
+    #expect(placed.children.count == children.count)
+    #expect(placed.children.map(\.identity) == children.map(\.identity))
+  }
+
   @Test("post-layout render node metadata stays within stack-safety budgets")
   func renderNodeLayoutsStayWithinBudget() {
     #expect(MemoryLayout<DrawMetadata>.size <= 128)
@@ -315,4 +408,212 @@ private func makeDeepDrawTree(depth: Int) -> DrawNode {
   }
 
   return node
+}
+
+private func makeLayoutLeaf(
+  _ name: String,
+  size: CellSize
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view("Leaf"),
+    intrinsicSize: size
+  )
+}
+
+private func makeDeepLayoutWrapperChain(depth: Int) -> ResolvedNode {
+  var node = makeLayoutLeaf("wrapper-leaf", size: .init(width: 1, height: 1))
+
+  for index in stride(from: depth - 1, through: 0, by: -1) {
+    node = ResolvedNode(
+      identity: testIdentity("wrapper", "\(index)"),
+      kind: .view("Wrapper"),
+      children: [node],
+      layoutBehavior: wrapperBehavior(for: index)
+    )
+  }
+
+  return node
+}
+
+private func wrapperBehavior(for index: Int) -> LayoutBehavior {
+  switch index % 7 {
+  case 0:
+    return .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 1))
+  case 1:
+    return .safeAreaIgnoring(.init())
+  case 2:
+    return .border(
+      .single,
+      placement: .inset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+  case 3:
+    return .frame(width: nil, height: nil, alignment: .center)
+  case 4:
+    return .flexibleFrame(
+      minWidth: nil,
+      idealWidth: nil,
+      maxWidth: .infinity,
+      minHeight: nil,
+      idealHeight: nil,
+      maxHeight: .infinity,
+      alignment: .center
+    )
+  case 5:
+    return .offset(x: 1, y: 0)
+  default:
+    return .position(x: 0, y: 0)
+  }
+}
+
+private func makeDeepStackLayoutChain(depth: Int) -> ResolvedNode {
+  var node = makeLayoutLeaf("stack-leaf", size: .init(width: 1, height: 1))
+
+  for index in stride(from: depth - 1, through: 0, by: -1) {
+    let sibling = makeLayoutLeaf("stack-sibling-\(index)", size: .init(width: 1, height: 1))
+    node = ResolvedNode(
+      identity: testIdentity("stack", "\(index)"),
+      kind: .view(index.isMultiple(of: 2) ? "VStack" : "HStack"),
+      children: [node, sibling],
+      layoutBehavior: .stack(
+        axis: index.isMultiple(of: 2) ? .vertical : .horizontal,
+        spacing: 0,
+        horizontalAlignment: .leading,
+        verticalAlignment: .top
+      )
+    )
+  }
+
+  return node
+}
+
+private func makeDeepBranchingLayoutTree(depth: Int) -> ResolvedNode {
+  var node = makeLayoutLeaf("branch-leaf", size: .init(width: 2, height: 1))
+
+  for index in stride(from: depth - 1, through: 0, by: -1) {
+    let adornment = makeLayoutLeaf("branch-adornment-\(index)", size: .init(width: 1, height: 1))
+    switch index % 4 {
+    case 0:
+      node = ResolvedNode(
+        identity: testIdentity("branch-overlay", "\(index)"),
+        kind: .view("Overlay"),
+        children: [node, adornment],
+        layoutBehavior: .overlay(alignment: .center)
+      )
+    case 1:
+      node = ResolvedNode(
+        identity: testIdentity("branch-decoration", "\(index)"),
+        kind: .view("Decoration"),
+        children: [adornment, node],
+        layoutBehavior: .decoration(primaryIndex: 1, alignment: .center)
+      )
+    case 2:
+      node = ResolvedNode(
+        identity: testIdentity("branch-inset", "\(index)"),
+        kind: .view("SafeAreaInset"),
+        children: [node, adornment],
+        layoutBehavior: .safeAreaInset(
+          edge: .top,
+          alignment: .center,
+          spacing: 0,
+          safeArea: .init()
+        )
+      )
+    default:
+      node = ResolvedNode(
+        identity: testIdentity("branch-view-that-fits", "\(index)"),
+        kind: .view("ViewThatFits"),
+        children: [node, adornment],
+        layoutBehavior: .viewThatFits([.horizontal, .vertical])
+      )
+    }
+  }
+
+  return node
+}
+
+@MainActor
+private func makeLayoutDependentNode(children: [ResolvedNode]) -> ResolvedNode {
+  let identity = testIdentity("layout-dependent-root")
+  let realizer = TestLayoutDependentContentRealizer(children: children)
+  let boundary = LayoutDependentContentBoundary(
+    identity: identity,
+    sizingPolicy: .fillsProposal(unspecifiedIdeal: .init(width: 4, height: 2)),
+    safeAreaInsets: .init(),
+    cellPixelMetrics: .estimated,
+    pointerInputCapabilities: .cellOnly,
+    debugName: "TestLayoutDependentContent",
+    handle: LayoutDependentContentHandle(realizer)
+  )
+  return ResolvedNode(
+    identity: identity,
+    kind: .view("LayoutDependent"),
+    layoutDependentContent: boundary
+  )
+}
+
+@MainActor
+private final class TestLayoutDependentContentRealizer: LayoutDependentContentRealizer {
+  let children: [ResolvedNode]
+
+  init(children: [ResolvedNode]) {
+    self.children = children
+  }
+
+  var debugName: String {
+    "TestLayoutDependentContent"
+  }
+
+  func realize(in _: LayoutRealizationContext) -> [ResolvedNode] {
+    children
+  }
+}
+
+private func makeIndexedLazyStackLayoutTree(
+  _ name: String,
+  axis: Axis,
+  children: [ResolvedNode]
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    layoutBehavior: .lazyStack(
+      axis: axis,
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    ),
+    indexedChildSource: TestStackSafetyIndexedChildSource(
+      identityRoot: testIdentity(name),
+      children: children
+    )
+  )
+}
+
+private struct TestStackSafetyIndexedChildSource: IndexedChildSource {
+  let identityRoot: Identity
+  let measurementSignature: String
+  private let children: [ResolvedNode]
+
+  init(
+    identityRoot: Identity,
+    children: [ResolvedNode]
+  ) {
+    self.identityRoot = identityRoot
+    self.children = children
+    self.measurementSignature = children.map(\.identity.path).joined(separator: "|")
+  }
+
+  var count: Int {
+    children.count
+  }
+
+  func child(at index: Int) -> ResolvedNode {
+    children[index]
+  }
 }
