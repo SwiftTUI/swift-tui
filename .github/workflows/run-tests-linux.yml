@@ -84,14 +84,7 @@ jobs:
 
       - name: Run policy checks
         shell: bash
-        run: |
-          set -euo pipefail
-          ./Scripts/check_public_surface_policies.sh
-          ./Scripts/check_stable_doc_source_paths.sh
-          ./Scripts/check_concurrency_safety_policies.sh
-          ./Scripts/check_accessibility_guardrails.sh
-          ./Scripts/check_webhost_package_boundary.sh
-          ./Scripts/generate_public_api_inventory.sh --check
+        run: ./Scripts/check_repo_policy_phase.sh
 
   linux-gate:
     name: Linux repo gate

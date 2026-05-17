@@ -26,9 +26,6 @@
 
 ## Unresolved Decisions
 
-- Decide whether policy checks should remain a separate required status from the
-  slower repo gates. See
-  [../.github/workflows/run-tests-linux.yml](../.github/workflows/run-tests-linux.yml).
 - Revisit organization-admin branch-protection bypass policy at the `0.9.0`
   public beta line. See [RELEASES.md](RELEASES.md).
 - Decide whether `bun run test:coverage` remains informational or starts
