@@ -509,6 +509,66 @@ struct ViewGraphTests {
     #expect(dropCounter.count == 1)
   }
 
+  @Test("frame-head registration draft commit restores from committed graph")
+  func frameHeadRegistrationDraftCommitRestoresFromCommittedGraph() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let targetIdentity = testIdentity("Root", "Target")
+    let aliasIdentity = testIdentity("Root", "Alias")
+    let originalBinding = KeyBinding(key: .character("o"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    let originalCounter = RegistrationCounter()
+    let draftCounter = RegistrationCounter()
+
+    seedAliasCommandGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      targetIdentity: targetIdentity,
+      aliasIdentity: aliasIdentity,
+      binding: originalBinding,
+      description: "Original",
+      counter: originalCounter
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    #expect(
+      liveRegistrations.commandRegistry?.keyCommand(
+        at: aliasIdentity,
+        matching: originalBinding
+      ) != nil
+    )
+
+    let draft = FrameHeadRegistrationDraft(liveRegistrations: liveRegistrations)
+    draft.draftRegistrations.commandRegistry?.registerKeyCommand(
+      at: aliasIdentity,
+      binding: draftBinding,
+      description: "Draft",
+      isEnabled: true
+    ) {
+      draftCounter.increment()
+    }
+    draft.recordResetAll()
+    draft.commitRestoring(from: graph, resolved: resolved)
+
+    #expect(
+      liveRegistrations.commandRegistry?.keyCommand(
+        at: aliasIdentity,
+        matching: draftBinding
+      ) == nil
+    )
+    #expect(
+      liveRegistrations.commandRegistry?.dispatch(
+        key: originalBinding,
+        along: [rootIdentity, aliasIdentity]
+      ) == true
+    )
+    #expect(originalCounter.count == 1)
+    #expect(draftCounter.count == 0)
+  }
+
   @Test("checkpoint restore reverts command registration changes")
   func checkpointRestoreRevertsCommandRegistrationChanges() {
     let graph = ViewGraph()

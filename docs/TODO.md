@@ -47,6 +47,9 @@
 
 ## Planned Work
 
+- Continue Finding 4 resolve-effect narrowing through the protective
+  interactive coverage and draft-boundary stages in
+  [plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md](plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md).
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
 - Apply the historical-doc path policy once decided: either archive historical

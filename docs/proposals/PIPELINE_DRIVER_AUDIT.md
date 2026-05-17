@@ -26,7 +26,7 @@ touch.
 | 1 | The formalized `Renderer<Root>` pipeline is unused outside tests | Resolved by Stage 3: the generic helper was removed and `DefaultRenderer` now runs `RuntimeRenderPipeline`. |
 | 2 | `renderView` does not execute seven ordered phases | Resolved by Stage 3 and Stage 8: docs now distinguish runtime composition from phase-product order. |
 | 3 | Sync and async render heads are ~120 duplicated lines | Resolved by Stage 1, then enforced by the Stage 3 composition. |
-| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Deferred: Stage 3 declares the effect set; narrowing it remains a separate follow-on. |
+| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Follow-up planned: Stage 3 declares the effect set; narrowing is tracked in [`2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md`](../plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md). |
 | 5 | The "strict ordered pipeline" is a bounded fixpoint loop | Resolved by Stage 2: late-preference reconciliation is named and bounded. |
 | 6 | Hand-rolled `pthread`; concurrency escape-hatch policy bypassed | Resolved by Stage 6: worker ownership and recursion safety were hardened. |
 | 7 | Off-main frame-tail rendering is a synchronous no-op on WASI | Documented by Stage 6 as a compatibility boundary. |
