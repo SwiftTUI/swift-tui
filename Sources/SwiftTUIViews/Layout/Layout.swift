@@ -885,7 +885,7 @@ public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier {
 }
 
 @MainActor
-private final class LayoutProxyBox: CustomLayoutProxy {
+private final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
   private struct CacheKey: Hashable {
     var identity: Identity
     var proposal: ProposedSize
@@ -932,9 +932,27 @@ private final class LayoutProxyBox: CustomLayoutProxy {
     node: ResolvedNode,
     proposal: ProposedSize
   ) -> CellSize {
+    measureContainer(
+      engine: engine,
+      node: node,
+      proposal: proposal,
+      passContext: nil
+    )
+  }
+
+  nonisolated package func measureContainer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> CellSize {
     MainActor.assumeIsolated {
       let subviews = node.children.map { child in
-        LayoutSubview(child: child, engine: engine)
+        LayoutSubview(
+          child: child,
+          engine: engine,
+          passContext: passContext
+        )
       }
       var cache = ensureCache(
         for: node,

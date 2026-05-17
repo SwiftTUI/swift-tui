@@ -136,7 +136,7 @@ private struct LatePreferenceReconciliationStage {
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
     let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    let runtimeIssues = rootRuntimeIssues(in: reconciliation.resolved)
+    let runtimeIssues = layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
 
     guard reconciliation.requiresRelayout else {
       var finalInput = input
@@ -175,7 +175,7 @@ private struct LatePreferenceReconciliationStage {
         input: finalInput,
         layout: layout,
         resolved: reconciliation.resolved,
-        runtimeIssues: rootRuntimeIssues(in: reconciliation.resolved)
+        runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
       )
     }
 
@@ -187,7 +187,7 @@ private struct LatePreferenceReconciliationStage {
         input: finalInput,
         layout: layout,
         resolved: realized,
-        runtimeIssues: [
+        runtimeIssues: input.layoutPassContext.runtimeIssues + [
           latePreferenceReconciliationLimitIssue(
             rootIdentity: input.rootIdentity,
             maximumRelayoutPasses: policy.maximumRelayoutPasses
@@ -213,6 +213,14 @@ private struct LatePreferenceReconciliationStage {
       )
     )
   }
+}
+
+@MainActor
+private func layoutRuntimeIssues(
+  input: FrameTailInput,
+  resolved: ResolvedNode
+) -> [RuntimeIssue] {
+  input.layoutPassContext.runtimeIssues + rootRuntimeIssues(in: resolved)
 }
 
 @MainActor
@@ -1087,7 +1095,7 @@ public struct DefaultRenderer {
         frameTailInput: draft.frameTailInput,
         layout: layout,
         resolved: draft.resolved,
-        runtimeIssues: rootRuntimeIssues(in: draft.resolved),
+        runtimeIssues: layoutRuntimeIssues(input: draft.frameTailInput, resolved: draft.resolved),
         suspensionDuration: layoutPass.suspensionDuration
       )
     }

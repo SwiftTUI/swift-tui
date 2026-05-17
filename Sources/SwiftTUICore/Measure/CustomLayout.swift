@@ -33,6 +33,43 @@ extension CustomLayoutProxy {
   }
 }
 
+package protocol LayoutPassContextCustomLayoutProxy: CustomLayoutProxy {
+  func measureContainer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> CellSize
+
+  func measureChildren(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> [MeasuredNode]
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode]
+}
+
+extension LayoutPassContextCustomLayoutProxy {
+  package func measureChildren(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> [MeasuredNode] {
+    node.children.map { child in
+      engine.measure(child, proposal: proposal, passContext: passContext)
+    }
+  }
+}
+
 /// Execution mode advertised by a custom layout handle.
 package enum CustomLayoutExecutionCapability: Equatable, Sendable {
   case mainActorOnly
@@ -223,6 +260,14 @@ public final class CustomLayoutHandle: Sendable {
         passContext: passContext
       )
     }
+    if let proxy = proxy as? any LayoutPassContextCustomLayoutProxy {
+      return proxy.measureContainer(
+        engine: engine,
+        node: node,
+        proposal: proposal,
+        passContext: passContext
+      )
+    }
     return proxy.measureContainer(
       engine: engine,
       node: node,
@@ -244,6 +289,19 @@ public final class CustomLayoutHandle: Sendable {
         passContext: passContext
       )
     }
+    if let proxy = proxy as? any LayoutPassContextCustomLayoutProxy {
+      return proxy.measureChildren(
+        engine: engine,
+        node: node,
+        proposal: proposal,
+        passContext: passContext
+      )
+    }
+    if passContext != nil {
+      return node.children.map { child in
+        engine.measure(child, proposal: proposal, passContext: passContext)
+      }
+    }
     return proxy.measureChildren(
       engine: engine,
       node: node,
@@ -260,6 +318,15 @@ public final class CustomLayoutHandle: Sendable {
   ) -> [PlacedNode] {
     if let workerProxy {
       return workerProxy.placeSubviews(
+        engine: engine,
+        node: node,
+        measured: measured,
+        in: bounds,
+        passContext: passContext
+      )
+    }
+    if let proxy = proxy as? any LayoutPassContextCustomLayoutProxy {
+      return proxy.placeSubviews(
         engine: engine,
         node: node,
         measured: measured,
@@ -294,4 +361,3 @@ extension CustomLayoutHandle: Equatable {
     lhs === rhs
   }
 }
-

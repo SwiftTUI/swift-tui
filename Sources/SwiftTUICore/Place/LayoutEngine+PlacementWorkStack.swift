@@ -126,6 +126,27 @@ extension LayoutEngine {
     }
 
     if case .custom(let handle) = node.layoutBehavior {
+      guard
+        passContext?.enterCustomLayoutCompatibilityBoundary(
+          identity: node.identity,
+          debugName: handle.debugName,
+          phase: .placement
+        ) ?? true
+      else {
+        results.append(
+          placedNode(
+            from: node,
+            bounds: bounds,
+            measured: measured,
+            children: []
+          )
+        )
+        return
+      }
+      defer {
+        passContext?.exitCustomLayoutCompatibilityBoundary()
+      }
+
       let children = handle.placeSubviews(
         engine: self,
         node: node,

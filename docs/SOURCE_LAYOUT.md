@@ -116,9 +116,9 @@ Sources/SwiftTUIRuntime/
 - `Rendering/RuntimeRenderPipeline.swift`: the composed runtime render pipeline
   that orders head, animation injection, late-preference reconciliation, fused
   frame tail, and commit for sync, async, and cancellable strategies
-- `Rendering/FrameTailLayoutWorker.swift`: isolated frame-tail layout worker;
-  Darwin currently uses an ADR-justified large-stack pthread until recursive
-  layout paths are bounded or converted to explicit work stacks
+- `Rendering/FrameTailLayoutWorker.swift`: serial frame-tail layout worker and
+  no-Dispatch platform fallback; built-in layout stack safety lives in
+  `SwiftTUICore` explicit measurement and placement work stacks
 
 ### Lifecycle and animation
 

@@ -375,11 +375,220 @@ struct StackSafetyRegressionTests {
     #expect(placed.children.map(\.identity) == children.map(\.identity))
   }
 
+  @Test("custom layout compatibility depth limit records runtime issues")
+  func customLayoutCompatibilityDepthLimitRecordsRuntimeIssues() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext(customLayoutCompatibilityDepthLimit: 2)
+    let resolved = makeRecursiveCustomLayoutChain(depth: 80)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 8, height: 4),
+      passContext: passContext
+    )
+    _ = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: passContext
+    )
+
+    #expect(
+      passContext.runtimeIssues.contains {
+        $0.code == "layout.customLayoutDepthLimitExceeded"
+          && $0.message.contains("measurement")
+      }
+    )
+    #expect(
+      passContext.runtimeIssues.contains {
+        $0.code == "layout.customLayoutDepthLimitExceeded"
+          && $0.message.contains("placement")
+      }
+    )
+  }
+
+  @Test("direct core custom layout calls apply deterministic compatibility limit")
+  func directCoreCustomLayoutCallsApplyDeterministicCompatibilityLimit() {
+    let engine = LayoutEngine()
+    let resolved = makeRecursiveCustomLayoutChain(depth: 20)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 8, height: 4)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.identity == resolved.identity)
+    #expect(placed.identity == resolved.identity)
+  }
+
+  @Test("worker-safe custom layout children measure through explicit work stack")
+  func workerSafeCustomLayoutChildrenMeasureThroughExplicitWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let children = [
+      makeLayoutLeaf("worker-custom-child-0", size: .init(width: 2, height: 1)),
+      makeLayoutLeaf("worker-custom-child-1", size: .init(width: 3, height: 1)),
+    ]
+    let resolved = makeWorkerSafeCustomLayoutNode(children: children)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 8, height: 4),
+      passContext: passContext
+    )
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.measurementWorkStackSteps > 0)
+    #expect(passContext.workMetrics.placementWorkStackSteps > 0)
+    #expect(placed.children.map(\.identity) == children.map(\.identity))
+  }
+
   @Test("post-layout render node metadata stays within stack-safety budgets")
   func renderNodeLayoutsStayWithinBudget() {
     #expect(MemoryLayout<DrawMetadata>.size <= 128)
     #expect(MemoryLayout<PlacedNode>.size <= 768)
     #expect(MemoryLayout<DrawNode>.size <= 256)
+  }
+}
+
+private let recursiveCustomLayoutProxy = RecursiveCustomLayoutProxy()
+
+private func makeRecursiveCustomLayoutChain(depth: Int) -> ResolvedNode {
+  var node = makeLayoutLeaf("recursive-custom-leaf", size: .init(width: 1, height: 1))
+
+  for index in stride(from: depth - 1, through: 0, by: -1) {
+    node = ResolvedNode(
+      identity: testIdentity("recursive-custom", "\(index)"),
+      kind: .view("RecursiveCustomLayout"),
+      children: [node],
+      layoutBehavior: .custom(CustomLayoutHandle(recursiveCustomLayoutProxy))
+    )
+  }
+
+  return node
+}
+
+private final class RecursiveCustomLayoutProxy: LayoutPassContextCustomLayoutProxy {
+  var debugName: String {
+    "RecursiveCustomLayoutProxy"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> CellSize {
+    .init(width: 1, height: 1)
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize,
+    passContext _: LayoutPassContext?
+  ) -> CellSize {
+    .init(width: 1, height: 1)
+  }
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: CellRect
+  ) -> [PlacedNode] {
+    placeSubviews(
+      engine: engine,
+      node: node,
+      measured: measured,
+      in: bounds,
+      passContext: nil
+    )
+  }
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    node.children.map { child in
+      let childMeasurement = engine.measure(
+        child,
+        proposal: measured.proposal,
+        passContext: passContext
+      )
+      return engine.place(
+        child,
+        measured: childMeasurement,
+        in: CellRect(origin: bounds.origin, size: childMeasurement.measuredSize),
+        passContext: passContext
+      )
+    }
+  }
+}
+
+private func makeWorkerSafeCustomLayoutNode(children: [ResolvedNode]) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity("worker-custom-root"),
+    kind: .view("WorkerSafeCustomLayout"),
+    children: children,
+    layoutBehavior: .custom(
+      CustomLayoutHandle(
+        RecursiveCustomLayoutProxy(),
+        workerProxy: StackSafetyWorkerCustomLayoutProxy()
+      )
+    )
+  )
+}
+
+private struct StackSafetyWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
+  var debugName: String {
+    "StackSafetyWorkerCustomLayoutProxy"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize,
+    passContext _: LayoutPassContext?
+  ) -> CellSize {
+    .init(width: 3, height: 2)
+  }
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    var y = bounds.origin.y
+    return node.children.map { child in
+      let childMeasurement = engine.measure(
+        child,
+        proposal: measured.proposal,
+        passContext: passContext
+      )
+      defer {
+        y += childMeasurement.measuredSize.height
+      }
+      return engine.place(
+        child,
+        measured: childMeasurement,
+        in: CellRect(
+          origin: .init(x: bounds.origin.x, y: y),
+          size: childMeasurement.measuredSize
+        ),
+        passContext: passContext
+      )
+    }
   }
 }
 

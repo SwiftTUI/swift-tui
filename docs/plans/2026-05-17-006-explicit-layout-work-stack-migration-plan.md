@@ -486,21 +486,21 @@ swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
 
 Make the custom-layout boundary explicit after built-in layout is iterative.
 
-- [ ] Audit every `CustomLayoutHandle` and `WorkerCustomLayoutProxy` path that
+- [x] Audit every `CustomLayoutHandle` and `WorkerCustomLayoutProxy` path that
   can call back into `LayoutEngine.measure` or `LayoutEngine.place`.
-- [ ] Define stack-aware child measurement and placement operations for
+- [x] Define stack-aware child measurement and placement operations for
   worker-safe/framework-owned custom layout. The operations should enqueue work
   through the iterative engine rather than recursively entering built-in layout.
-- [ ] Preserve ordinary public custom layout fallback behavior.
-- [ ] Add a deterministic compatibility depth policy for public recursive
+- [x] Preserve ordinary public custom layout fallback behavior.
+- [x] Add a deterministic compatibility depth policy for public recursive
   `engine.measure` / `engine.place` calls that remain available to custom
   layout.
-- [ ] Extend layout diagnostics so runtime frames can carry a stable runtime
+- [x] Extend layout diagnostics so runtime frames can carry a stable runtime
   issue when the compatibility depth limit is exceeded.
-- [ ] Decide and document the behavior for direct Core-only `LayoutEngine`
+- [x] Decide and document the behavior for direct Core-only `LayoutEngine`
   calls with no runtime `LayoutPassContext`. The behavior must be deterministic
   and must not crash the process.
-- [ ] Add tests for:
+- [x] Add tests for:
 
   - worker-safe custom layout measuring children through the iterative engine;
   - ordinary public custom layout fallback still working;
@@ -527,21 +527,21 @@ swiftly run swift test --filter SwiftTUIViewsTests
 Delete old recursive built-in traversal paths or make them impossible to call
 from built-in layout.
 
-- [ ] Search for direct child `measure` and `place` calls in built-in layout
+- [x] Search for direct child `measure` and `place` calls in built-in layout
   behavior implementations.
-- [ ] Remove temporary recursive fallback code from migrated built-in paths.
-- [ ] Keep any remaining recursive calls only at documented custom-layout
+- [x] Remove temporary recursive fallback code from migrated built-in paths.
+- [x] Keep any remaining recursive calls only at documented custom-layout
   compatibility boundaries.
-- [ ] Add a guardrail if the final call graph has a practical mechanical check.
+- [x] Add a guardrail if the final call graph has a practical mechanical check.
   Possible forms:
 
   - a focused script under `Scripts/`;
   - a unit test that inspects package-internal instrumentation;
   - comments at the few allowed escape hatches plus regression tests.
 
-- [ ] Update stack-safety tests so a new built-in recursive path fails
+- [x] Update stack-safety tests so a new built-in recursive path fails
   deterministically without relying on a stack overflow crash.
-- [ ] Update `SOURCE_LAYOUT.md` if files were added, moved, or renamed.
+- [x] Update `SOURCE_LAYOUT.md` if files were added, moved, or renamed.
 
 **Acceptance criteria:**
 
@@ -561,25 +561,25 @@ swiftly run swift test --filter SwiftTUICoreTests.StackSafetyRegressionTests
 
 Revisit ADR 0020 once built-in layout no longer needs a large stack.
 
-- [ ] Prove deep built-in layout tests pass without depending on the Darwin
+- [x] Prove deep built-in layout tests pass without depending on the Darwin
   pthread worker's 8 MiB stack.
-- [ ] Evaluate the replacement shape:
+- [x] Evaluate the replacement shape:
 
   - structured `Task` on the normal cooperative executor;
   - a custom executor justified by scheduling/isolation needs;
   - retaining the isolated worker for a reason other than stack size.
 
-- [ ] Prefer removing the custom pthread worker if no non-stack reason remains.
-- [ ] Preserve ordered async frame-tail semantics:
+- [x] Prefer removing the custom pthread worker if no non-stack reason remains.
+- [x] Preserve ordered async frame-tail semantics:
 
   - queued tail jobs may cancel before worker layout starts;
   - started worker jobs are awaited;
   - non-droppable completed frames commit in order;
   - stale visual-only completed frames follow the existing drop policy.
 
-- [ ] Update or replace `FrameTailLayoutWorker.swift`.
-- [ ] Update ADR 0020 or add a follow-up ADR recording the new decision.
-- [ ] Update WASI wording if the worker semantics change.
+- [x] Update or replace `FrameTailLayoutWorker.swift`.
+- [x] Update ADR 0020 or add a follow-up ADR recording the new decision.
+- [x] Update WASI wording if the worker semantics change.
 
 **Acceptance criteria:**
 
