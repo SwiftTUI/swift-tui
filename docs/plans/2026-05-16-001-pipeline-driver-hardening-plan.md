@@ -132,6 +132,9 @@ self-consistent; tests written *before* prove the refactor preserved behavior.
    - **must-pass baseline guards** needed before Stage 1/3 driver edits;
    - **stage-specific pending guards** that may be disabled on current `main`,
      but block the later stage that is named in their disabled reason.
+   Existing green tests are not candidates for tolerated regression. Only newly
+   added Stage 0 guard tests may be disabled, and only when they expose an
+   already-known gap and name the later stage that owns closing it.
 2. Add a retained-reuse invariant suite (P7): a test that fails when a
    resolved-derived field mirrored into `PlacedNode` is absent from a projection
    synchronization test; a test that exercises `synchronizeRetainedPhaseMetadata`
@@ -148,6 +151,12 @@ self-consistent; tests written *before* prove the refactor preserved behavior.
    - retained layout reuse updates every non-geometry resolved projection;
    - incremental raster repaint is byte-for-byte equal to fresh raster for a
      curated mutation matrix.
+   The Stage 3 must-pass subset must include head freshness, sync/async artifact
+   parity, commit/drop semantics, semantic host-frame continuity, retained reuse
+   freshness, and the normal repo gate. Disabled guards for raster reuse,
+   frame-drop surface closure, worker/recursion hardening, or presentation
+   seam splitting must name Stage 4, Stage 5, Stage 6, or Stage 7 respectively
+   and do not count as Stage 3 coverage.
 5. Document `FrameArtifacts` field authority (P10, doc half only — no code):
    classify each field as canonical phase product, decorated/baseline-sensitive
    projection, advisory hint, side-effect plan, or diagnostics. Add this as a
@@ -163,14 +172,16 @@ self-consistent; tests written *before* prove the refactor preserved behavior.
   `docs/ARCHITECTURE.md`
 
 **Risks:** Some contract tests may *fail on current `main`* — that is a finding,
-not a blocker. If a contract test cannot pass on the current code, record it as
-a known gap the relevant later stage must close, and mark the test
-`@Test(.disabled("closed by Stage N"))` rather than weakening the assertion.
+not a blocker only for newly introduced Stage 0 guards. If a new contract test
+cannot pass on the current code, record it as a known gap the relevant later
+stage must close, and mark the test `@Test(.disabled("closed by Stage N"))`
+rather than weakening the assertion. Existing green tests must stay green.
 
 **Exit criteria:** New invariant/contract suites exist and run; the must-pass
 baseline guards pass on current `main`; every disabled stage-specific guard has
 a named later stage and disabled-reason; no disabled guard is counted as
-coverage for Stage 3. `FrameArtifacts` field authority is documented.
+coverage for Stage 3; no existing green test regresses. `FrameArtifacts` field
+authority is documented.
 
 ---
 
@@ -685,19 +696,17 @@ This plan does not yet place it; that is an open decision below.
 
 These are deliberately deferred to the detailed plans, not pre-decided here:
 
-1. **Stage 0** — exact must-pass guard subset for the Stage 1 head unification
-   versus disabled stage-specific guards that only gate later stages.
-2. **Stage 3** — extend `Renderer<Root>` into the driver, or supersede and
+1. **Stage 3** — extend `Renderer<Root>` into the driver, or supersede and
    delete it.
-3. **Stage 3** — the shape of the head's declared effect set and the
+2. **Stage 3** — the shape of the head's declared effect set and the
    transactional-stage construct (Task 3). Narrowing that effect set, and any
    retry of ADR 0004's abort, are deferred follow-on work (see above), not
    decided here.
-4. **Stage 5** — invert the frame-drop model into a closed impact product vs
+3. **Stage 5** — invert the frame-drop model into a closed impact product vs
    keep the enum with a guard test.
-5. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
+4. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
    whether recursion can be bounded first.
-6. **Pre-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
+5. **Pre-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
    `collectsDiagnostics` render path) is handled: folded into Stage 3 as a
    dual-path-collapse task, given its own stage, or left to a separate plan.
 
