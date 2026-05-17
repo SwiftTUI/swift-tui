@@ -2,13 +2,274 @@
 @_exported import SwiftTUICore
 @_exported import SwiftTUIViews
 
+/// Mutates the resolved tree with in-flight animation values after resolve and
+/// before measure.
+///
+/// This is the runtime's explicit animation-injection stage. It is not a new
+/// public phase product; it is the single insertion point where resolved
+/// animatable values are rewritten before the measure/place tail observes them.
+private struct AnimationInjectionStage {
+  var controller: AnimationController
+
+  @MainActor
+  func apply(
+    to resolved: inout ResolvedNode,
+    transaction: TransactionSnapshot,
+    timestamp: MonotonicInstant
+  ) {
+    controller.processResolvedTree(
+      resolved,
+      transaction: transaction,
+      timestamp: timestamp
+    )
+    _ = controller.applyInterpolations(
+      to: &resolved,
+      at: timestamp
+    )
+  }
+}
+
+private struct LatePreferenceReconciliationPolicy: Sendable {
+  enum BoundExceededBehavior: Sendable {
+    /// Emit a runtime warning and commit the last fully laid-out tree with the
+    /// latest realized layout-dependent content.
+    case warnAndCommitLastLayout
+  }
+
+  /// The toolbar-only shipped reconciler can need a first layout plus bounded
+  /// relayouts when toolbar chrome changes available geometry. Keep the
+  /// historical runtime bound explicit until more late-preference consumers
+  /// justify a derived dependency-depth bound.
+  static let toolbarHostRuntimeBound = Self(
+    maximumRelayoutPasses: 4,
+    boundExceededBehavior: .warnAndCommitLastLayout
+  )
+
+  var maximumRelayoutPasses: Int
+  var boundExceededBehavior: BoundExceededBehavior
+}
+
+private struct AsyncFrameTailLayoutPass {
+  var layout: FrameTailLayoutOutput?
+  var suspensionDuration: Duration
+}
+
+private struct AsyncLatePreferenceReconciliationOutput {
+  var layout: ReconciledFrameTailLayout?
+  var suspensionDuration: Duration
+}
+
+private enum LatePreferenceReconciliationStep {
+  case finished(ReconciledFrameTailLayout)
+  case needsRelayout(FrameTailInput)
+}
+
+/// Loop-bearing stage that reconciles preferences emitted by realized
+/// layout-dependent content before semantics, draw, raster, and commit.
+private struct LatePreferenceReconciliationStage {
+  var policy: LatePreferenceReconciliationPolicy
+
+  @MainActor
+  func run(
+    initialInput: FrameTailInput,
+    renderLayout: (FrameTailInput) -> FrameTailLayoutOutput
+  ) -> ReconciledFrameTailLayout {
+    var input = initialInput
+    var layout = renderLayout(input)
+
+    for _ in 0..<policy.maximumRelayoutPasses {
+      switch reconciliationStep(input: input, layout: layout) {
+      case .finished(let reconciled):
+        return reconciled
+      case .needsRelayout(let nextInput):
+        input = nextInput
+        layout = renderLayout(input)
+      }
+    }
+
+    return reconciliationLimitExceeded(input: input, layout: layout)
+  }
+
+  @MainActor
+  func runAsync(
+    initialInput: FrameTailInput,
+    renderLayout: (FrameTailInput) async -> AsyncFrameTailLayoutPass
+  ) async -> AsyncLatePreferenceReconciliationOutput {
+    var input = initialInput
+    var totalSuspensionDuration = Duration.zero
+    var layoutPass = await renderLayout(input)
+    totalSuspensionDuration += layoutPass.suspensionDuration
+    guard var layout = layoutPass.layout else {
+      return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
+    }
+
+    for _ in 0..<policy.maximumRelayoutPasses {
+      switch reconciliationStep(input: input, layout: layout) {
+      case .finished(let reconciled):
+        return .init(
+          layout: reconciled,
+          suspensionDuration: totalSuspensionDuration
+        )
+      case .needsRelayout(let nextInput):
+        input = nextInput
+        layoutPass = await renderLayout(input)
+        totalSuspensionDuration += layoutPass.suspensionDuration
+        guard let nextLayout = layoutPass.layout else {
+          return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
+        }
+        layout = nextLayout
+      }
+    }
+
+    return .init(
+      layout: reconciliationLimitExceeded(input: input, layout: layout),
+      suspensionDuration: totalSuspensionDuration
+    )
+  }
+
+  @MainActor
+  private func reconciliationStep(
+    input: FrameTailInput,
+    layout: FrameTailLayoutOutput
+  ) -> LatePreferenceReconciliationStep {
+    let realized = input.resolved.applyingLayoutDependentRealizations(
+      input.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let runtimeIssues = rootRuntimeIssues(in: reconciliation.resolved)
+
+    guard reconciliation.requiresRelayout else {
+      var finalInput = input
+      finalInput.resolved = reconciliation.resolved
+      return .finished(
+        ReconciledFrameTailLayout(
+          input: finalInput,
+          layout: layout,
+          resolved: reconciliation.resolved,
+          runtimeIssues: runtimeIssues
+        )
+      )
+    }
+
+    return .needsRelayout(
+      relayoutInput(
+        basedOn: input,
+        resolved: reconciliation.resolved
+      )
+    )
+  }
+
+  @MainActor
+  private func reconciliationLimitExceeded(
+    input: FrameTailInput,
+    layout: FrameTailLayoutOutput
+  ) -> ReconciledFrameTailLayout {
+    let realized = input.resolved.applyingLayoutDependentRealizations(
+      input.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    if !reconciliation.requiresRelayout {
+      var finalInput = input
+      finalInput.resolved = reconciliation.resolved
+      return ReconciledFrameTailLayout(
+        input: finalInput,
+        layout: layout,
+        resolved: reconciliation.resolved,
+        runtimeIssues: rootRuntimeIssues(in: reconciliation.resolved)
+      )
+    }
+
+    switch policy.boundExceededBehavior {
+    case .warnAndCommitLastLayout:
+      var finalInput = input
+      finalInput.resolved = realized
+      return ReconciledFrameTailLayout(
+        input: finalInput,
+        layout: layout,
+        resolved: realized,
+        runtimeIssues: [
+          latePreferenceReconciliationLimitIssue(
+            rootIdentity: input.rootIdentity,
+            maximumRelayoutPasses: policy.maximumRelayoutPasses
+          )
+        ]
+      )
+    }
+  }
+
+  private func relayoutInput(
+    basedOn input: FrameTailInput,
+    resolved: ResolvedNode
+  ) -> FrameTailInput {
+    FrameTailInput(
+      generation: input.generation,
+      resolved: resolved,
+      proposal: input.proposal,
+      rootIdentity: input.rootIdentity,
+      retained: input.retained,
+      layoutPassContext: LayoutPassContext(
+        retainedLayout: input.retained.retainedLayout,
+        invalidatedIdentities: input.layoutPassContext.invalidatedIdentities
+      )
+    )
+  }
+}
+
+@MainActor
+private func rootRuntimeIssues(
+  in resolved: ResolvedNode
+) -> [RuntimeIssue] {
+  let unhostedToolbarItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+  guard !unhostedToolbarItems.isEmpty else {
+    return []
+  }
+
+  let titles =
+    unhostedToolbarItems
+    .map(\.title)
+    .filter { !$0.isEmpty }
+  let titleSummary =
+    if titles.isEmpty {
+      ""
+    } else {
+      " Items: \(titles.joined(separator: ", "))."
+    }
+  let sourceIdentity =
+    unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
+  return [
+    RuntimeIssue(
+      severity: .warning,
+      code: "toolbar.unhostedItems",
+      message:
+        "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
+      identity: sourceIdentity,
+      source: ".toolbarItem(...)"
+    )
+  ]
+}
+
+private func latePreferenceReconciliationLimitIssue(
+  rootIdentity: Identity,
+  maximumRelayoutPasses: Int
+) -> RuntimeIssue {
+  RuntimeIssue(
+    severity: .warning,
+    code: "latePreference.reconciliationLimitExceeded",
+    message:
+      "Late preference reconciliation did not converge within \(maximumRelayoutPasses) passes; the frame was committed from the last fully laid-out tree without applying the final late preference changes.",
+    identity: rootIdentity,
+    source: "late preference reconciliation"
+  )
+}
+
 /// Renders authored terminal views through the full frame pipeline.
 ///
 /// `DefaultRenderer` is the public one-shot entry point for turning a `View`
 /// into `FrameArtifacts` for previews, snapshot tests, diagnostics, or custom
 /// presentation.
 public struct DefaultRenderer {
-  private static let maxLatePreferenceReconciliationPasses = 4
+  private static let latePreferenceReconciliationPolicy =
+    LatePreferenceReconciliationPolicy.toolbarHostRuntimeBound
 
   public let resolver: Resolver
   public let layoutEngine: LayoutEngine
@@ -467,79 +728,14 @@ public struct DefaultRenderer {
     _ initialInput: FrameTailInput,
     clock: ContinuousClock?
   ) -> ReconciledFrameTailLayout {
-    var input = initialInput
-    var layout = frameTailRenderer.renderLayout(
-      input,
-      clock: clock
-    )
-
-    for _ in 0..<Self.maxLatePreferenceReconciliationPasses {
-      let realized = input.resolved.applyingLayoutDependentRealizations(
-        input.layoutPassContext.layoutDependentRealizationsByIdentity
-      )
-      let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-      let runtimeIssues = rootRuntimeIssues(in: reconciliation.resolved)
-
-      guard reconciliation.requiresRelayout else {
-        var finalInput = input
-        finalInput.resolved = reconciliation.resolved
-        return ReconciledFrameTailLayout(
-          input: finalInput,
-          layout: layout,
-          resolved: reconciliation.resolved,
-          runtimeIssues: runtimeIssues
-        )
-      }
-
-      input = relayoutInput(
-        basedOn: input,
-        resolved: reconciliation.resolved
-      )
-      layout = frameTailRenderer.renderLayout(
+    LatePreferenceReconciliationStage(
+      policy: Self.latePreferenceReconciliationPolicy
+    ).run(initialInput: initialInput) { input in
+      frameTailRenderer.renderLayout(
         input,
         clock: clock
       )
     }
-
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    if !reconciliation.requiresRelayout {
-      var finalInput = input
-      finalInput.resolved = reconciliation.resolved
-      return ReconciledFrameTailLayout(
-        input: finalInput,
-        layout: layout,
-        resolved: reconciliation.resolved,
-        runtimeIssues: rootRuntimeIssues(in: reconciliation.resolved)
-      )
-    }
-    var finalInput = input
-    finalInput.resolved = realized
-    return ReconciledFrameTailLayout(
-      input: finalInput,
-      layout: layout,
-      resolved: realized,
-      runtimeIssues: [latePreferenceReconciliationLimitIssue(rootIdentity: input.rootIdentity)]
-    )
-  }
-
-  private func relayoutInput(
-    basedOn input: FrameTailInput,
-    resolved: ResolvedNode
-  ) -> FrameTailInput {
-    FrameTailInput(
-      generation: input.generation,
-      resolved: resolved,
-      proposal: input.proposal,
-      rootIdentity: input.rootIdentity,
-      retained: input.retained,
-      layoutPassContext: LayoutPassContext(
-        retainedLayout: input.retained.retainedLayout,
-        invalidatedIdentities: input.layoutPassContext.invalidatedIdentities
-      )
-    )
   }
 
   @MainActor
@@ -683,19 +879,11 @@ public struct DefaultRenderer {
       context: resolveContext
     )
 
-    // Animation: capture from/to for changed animatable properties, then apply
-    // interpolated values to the resolved tree before measure. This is the
-    // only pipeline insertion for animation — measure/place/draw/raster run
-    // unchanged on the mutated tree.
     let animationTimestamp = MonotonicInstant.now()
-    animationController.processResolvedTree(
-      resolved,
+    AnimationInjectionStage(controller: animationController).apply(
+      to: &resolved,
       transaction: context.transaction,
       timestamp: animationTimestamp
-    )
-    _ = animationController.applyInterpolations(
-      to: &resolved,
-      at: animationTimestamp
     )
 
     let frameTailRetainedInput = frameTailRenderer.retainedInput(
@@ -921,84 +1109,16 @@ public struct DefaultRenderer {
     _ initialInput: FrameTailInput,
     clock: ContinuousClock?,
     cancellationToken: FrameTailJobCancellationToken?
-  ) async -> (layout: ReconciledFrameTailLayout?, suspensionDuration: Duration) {
-    var input = initialInput
-    var totalSuspensionDuration = Duration.zero
-    var layoutResult = await renderFrameTailLayoutAsync(
-      input,
-      clock: clock,
-      cancellationToken: cancellationToken
-    )
-    totalSuspensionDuration += layoutResult.suspensionDuration
-    guard var layout = layoutResult.layout else {
-      return (nil, totalSuspensionDuration)
-    }
-
-    for _ in 0..<Self.maxLatePreferenceReconciliationPasses {
-      let realized = input.resolved.applyingLayoutDependentRealizations(
-        input.layoutPassContext.layoutDependentRealizationsByIdentity
-      )
-      let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-      let runtimeIssues = rootRuntimeIssues(in: reconciliation.resolved)
-
-      guard reconciliation.requiresRelayout else {
-        var finalInput = input
-        finalInput.resolved = reconciliation.resolved
-        return (
-          ReconciledFrameTailLayout(
-            input: finalInput,
-            layout: layout,
-            resolved: reconciliation.resolved,
-            runtimeIssues: runtimeIssues
-          ),
-          totalSuspensionDuration
-        )
-      }
-
-      input = relayoutInput(
-        basedOn: input,
-        resolved: reconciliation.resolved
-      )
-      layoutResult = await renderFrameTailLayoutAsync(
+  ) async -> AsyncLatePreferenceReconciliationOutput {
+    await LatePreferenceReconciliationStage(
+      policy: Self.latePreferenceReconciliationPolicy
+    ).runAsync(initialInput: initialInput) { input in
+      await renderFrameTailLayoutAsync(
         input,
         clock: clock,
         cancellationToken: cancellationToken
       )
-      totalSuspensionDuration += layoutResult.suspensionDuration
-      guard let nextLayout = layoutResult.layout else {
-        return (nil, totalSuspensionDuration)
-      }
-      layout = nextLayout
     }
-
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    if !reconciliation.requiresRelayout {
-      var finalInput = input
-      finalInput.resolved = reconciliation.resolved
-      return (
-        ReconciledFrameTailLayout(
-          input: finalInput,
-          layout: layout,
-          resolved: reconciliation.resolved,
-          runtimeIssues: rootRuntimeIssues(in: reconciliation.resolved)
-        ),
-        totalSuspensionDuration
-      )
-    }
-    var finalInput = input
-    finalInput.resolved = realized
-    return (
-      ReconciledFrameTailLayout(
-        input: finalInput,
-        layout: layout,
-        resolved: realized,
-        runtimeIssues: [latePreferenceReconciliationLimitIssue(rootIdentity: input.rootIdentity)]
-      ),
-      totalSuspensionDuration
-    )
   }
 
   @MainActor
@@ -1006,7 +1126,7 @@ public struct DefaultRenderer {
     _ input: FrameTailInput,
     clock: ContinuousClock?,
     cancellationToken: FrameTailJobCancellationToken?
-  ) async -> (layout: FrameTailLayoutOutput?, suspensionDuration: Duration) {
+  ) async -> AsyncFrameTailLayoutPass {
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let layoutSuspends = frameTailRenderer.canOffloadLayout(input)
     let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
@@ -1027,7 +1147,10 @@ public struct DefaultRenderer {
       } else {
         Duration.zero
       }
-    return (layout, layoutSuspensionDuration)
+    return AsyncFrameTailLayoutPass(
+      layout: layout,
+      suspensionDuration: layoutSuspensionDuration
+    )
   }
 
   @MainActor
@@ -1421,52 +1544,6 @@ public struct DefaultRenderer {
     let start = clock.now
     let value = operation()
     return (value, start.duration(to: clock.now))
-  }
-
-  @MainActor
-  private func rootRuntimeIssues(
-    in resolved: ResolvedNode
-  ) -> [RuntimeIssue] {
-    let unhostedToolbarItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
-    guard !unhostedToolbarItems.isEmpty else {
-      return []
-    }
-
-    let titles =
-      unhostedToolbarItems
-      .map(\.title)
-      .filter { !$0.isEmpty }
-    let titleSummary =
-      if titles.isEmpty {
-        ""
-      } else {
-        " Items: \(titles.joined(separator: ", "))."
-      }
-    let sourceIdentity =
-      unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
-    return [
-      RuntimeIssue(
-        severity: .warning,
-        code: "toolbar.unhostedItems",
-        message:
-          "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
-        identity: sourceIdentity,
-        source: ".toolbarItem(...)"
-      )
-    ]
-  }
-
-  private func latePreferenceReconciliationLimitIssue(
-    rootIdentity: Identity
-  ) -> RuntimeIssue {
-    RuntimeIssue(
-      severity: .warning,
-      code: "latePreference.reconciliationLimitExceeded",
-      message:
-        "Late preference reconciliation did not converge within \(Self.maxLatePreferenceReconciliationPasses) passes; the frame was committed from the last fully laid-out tree without applying the final late preference changes.",
-      identity: rootIdentity,
-      source: "late preference reconciliation"
-    )
   }
 
   private func wrapInContainerSafeArea(
