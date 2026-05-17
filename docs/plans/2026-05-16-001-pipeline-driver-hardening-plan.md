@@ -113,7 +113,8 @@ contributor can run them in parallel. Stage 8 waits for Stage 3.
 
 **Goal:** Build the architecture-contract and retained-reuse invariant tests so
 that every later refactor has a mechanical safety net. No production behavior
-changes in this stage.
+changes in this stage. See detailed plan:
+[`docs/plans/2026-05-17-002-stage-0-contract-guards-plan.md`](./2026-05-17-002-stage-0-contract-guards-plan.md).
 
 **Addresses:** P7 (Finding 13), P11 (Findings 13/17), P10 documentation half
 (Finding 16).
@@ -170,6 +171,8 @@ self-consistent; tests written *before* prove the refactor preserved behavior.
   `Sources/SwiftTUICore/Measure/LayoutEngine+RetainedLayout.swift:89`
 - Modify: `Sources/SwiftTUICore/Commit/FrameArtifacts.swift` (doc comments),
   `docs/ARCHITECTURE.md`
+- Detailed plan:
+  `docs/plans/2026-05-17-002-stage-0-contract-guards-plan.md`
 
 **Risks:** Some contract tests may *fail on current `main`* — that is a finding,
 not a blocker only for newly introduced Stage 0 guards. If a new contract test
@@ -712,12 +715,11 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 ## Suggested first action
 
-Start by expanding **Stage 0** and **Stage 1** into detailed plans. Stage 1
-(P2) is mechanical and removes a live drift hazard, but its implementation
-should land only with the Stage 0 guard subset that covers shared head freshness
-and commit/drop semantics. Stage 0's broader P7/P11 tests then continue to pin
-the freshness, raster, semantic-host, and commit contracts that make Stage 3
-verifiable.
+Start by executing the detailed **Stage 0** plan. Stage 1 (P2) is mechanical
+and removes a live drift hazard, but its implementation should land only with
+the Stage 0 guard subset that covers shared head freshness and commit/drop
+semantics. Stage 0's broader P7/P11 tests then continue to pin the freshness,
+raster, semantic-host, and commit contracts that make Stage 3 verifiable.
 
 ## Related docs
 
