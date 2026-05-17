@@ -128,10 +128,10 @@ an integer cell as a fallback.
 
 - The same layout engine turns measured nodes into `PlacedNode` trees
 - Placement is the authoritative geometry source for interaction regions, content bounds, scrolling extents, and later composition
-- `PlacedNode` carries an intentional snapshot of resolved metadata needed by
-  later phases. New placement and retained-placement reuse must both route
-  through the same resolved-to-placed synchronization path so geometry-stable
-  metadata changes cannot leave stale placed mirrors behind.
+- `PlacedNode` uses one grouped resolved-metadata snapshot for synchronization
+  into later-phase fields. New placement and retained-placement reuse both
+  route through the same resolved-to-placed synchronization path so
+  geometry-stable metadata changes cannot leave stale placed mirrors behind.
 
 ### Semantics
 
@@ -241,8 +241,8 @@ convenience product.
 
 - `ResolvedNode`: resolved structure plus merged environment and metadata
 - `MeasuredNode`: size decisions under a proposal, including child measurements
-- `PlacedNode`: final geometry, content bounds, semantic role, and the
-  synchronized resolved-metadata snapshot needed by later phases
+- `PlacedNode`: final geometry, content bounds, and the synchronized
+  resolved metadata needed by later phases
 - `SemanticSnapshot`: focus, interaction, action, selection, and scroll routing
 - `DrawNode`: draw commands for text, shapes, rules, lists, tables, and indicators
 - `RasterSurface`: final cell grid plus style runs

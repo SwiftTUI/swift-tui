@@ -26,6 +26,34 @@ struct StackSafetyRegressionTests {
     #expect(!copy.clipsToBounds)
   }
 
+  @Test("placed node resolved metadata preserves value semantics after copies mutate")
+  func placedNodeResolvedMetadataPreservesValueSemantics() {
+    var original = PlacedNode(
+      identity: testIdentity("placed-metadata"),
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      semanticMetadata: .init(accessibilityLabel: "original"),
+      layoutBehavior: .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1))
+    )
+    original.drawMetadata.foregroundStyle = .semantic(.foreground)
+
+    var copy = original
+    var resolvedMetadata = copy.resolvedMetadata
+    resolvedMetadata.semanticMetadata.accessibilityLabel = "copy"
+    resolvedMetadata.drawMetadata.foregroundStyle = .semantic(.tint)
+    resolvedMetadata.layoutBehavior = .offset(x: 1, y: 0)
+    copy.resolvedMetadata = resolvedMetadata
+
+    #expect(original.semanticMetadata.accessibilityLabel == "original")
+    #expect(original.drawMetadata.foregroundStyle == .semantic(.foreground))
+    #expect(
+      original.layoutBehavior == .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1))
+    )
+
+    #expect(copy.semanticMetadata.accessibilityLabel == "copy")
+    #expect(copy.drawMetadata.foregroundStyle == .semantic(.tint))
+    #expect(copy.layoutBehavior == .offset(x: 1, y: 0))
+  }
+
   @Test("resolved node descendant search remains stack-safe on deep trees")
   func resolvedNodeDescendantSearchRemainStackSafe() {
     let depth = 1024

@@ -351,7 +351,8 @@ Sources/SwiftTUICore/
 - `Measure/LayoutEngine+IntrinsicSize.swift`: text, figure, rule, shape, and
   image intrinsic-size helpers
 - `Measure/LayoutEngine+RetainedLayout.swift`: retained-resolve reuse
-  (`retainedMeasurement`, `retainedPlacement`, `refreshDrawMetadata`)
+  (`retainedMeasurement`, `retainedPlacement`,
+  `synchronizeRetainedPhaseMetadata`)
 - `Measure/LayoutEngine+Insets.swift`: inset/outset helpers and safe-area
   inset accounting
 - `Measure/LayoutEngine+Alignment.swift`, `Measure/LayoutEngine+List.swift`,
@@ -369,7 +370,8 @@ Sources/SwiftTUICore/
 ### Place
 
 - `Place/LayoutEngine+Placement.swift`: the placement pass of the layout engine
-- `Place/PlacedNode.swift`: place-phase output node and `SemanticRole`
+- `Place/PlacedNode.swift`: place-phase output node, `SemanticRole`, and the
+  grouped resolved-metadata synchronization snapshot
 
 ### Semantics
 
