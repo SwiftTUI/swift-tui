@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Confirmed queued-tail cancellation remained shipped after Finding 4 narrowing:
+  not-yet-started frame-tail jobs cancel before worker layout starts, discard the
+  prepared frame head, and replay render invalidation intent into replacement
+  scheduler work.
 - Completed Finding 4 resolve-effect narrowing: prepared frame heads now publish
   runtime-visible observation, presentation, animation, registration, focus, and
   lifecycle/task effects only through commit, and the runtime pipeline no longer

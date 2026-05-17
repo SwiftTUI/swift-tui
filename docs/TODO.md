@@ -47,11 +47,6 @@
 
 ## Planned Work
 
-- Revisit queued-tail cancellation now that prepared frame heads can be
-  discarded without a declared rollback-effect contract. Scope whether
-  not-yet-started frame-tail jobs can be canceled by discarding the prepared
-  head and replaying the latest render intent. See
-  [plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md](plans/2026-05-17-008-finding-4-resolve-effect-narrowing-plan.md).
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
 - Apply the historical-doc path policy once decided: either archive historical
