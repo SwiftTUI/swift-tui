@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Resolved the seven-phase pipeline cleanup decision in favor of a staged
+  policy: first eliminate unsynchronized resolved-to-placed metadata mirrors,
+  then continue reducing duplicated phase metadata incrementally.
 - Split the package-only WASI web-surface bridge into presentation transport,
   frame encoder, input parser/reader, and fd I/O helper files so browser/WASI
   codec boundaries are documented and source-owned separately.

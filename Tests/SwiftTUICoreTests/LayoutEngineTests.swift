@@ -783,18 +783,93 @@ struct LayoutEngineTests {
     #expect(passContext.workMetrics.placedNodesComputed == 0)
     #expect(passContext.workMetrics.placedNodesReused == 4)
   }
+
+  @Test("retained placement synchronizes geometry-stable resolved metadata")
+  func retainedPlacementSynchronizesGeometryStableResolvedMetadata() {
+    let engine = LayoutEngine()
+    var initialDrawMetadata = DrawMetadata()
+    initialDrawMetadata.baseStyle.foregroundStyle = .color(Color.red)
+    var updatedDrawMetadata = DrawMetadata()
+    updatedDrawMetadata.baseStyle.foregroundStyle = .color(Color.blue)
+
+    let initial = leaf(
+      "metadata",
+      size: .init(width: 5, height: 1),
+      drawMetadata: initialDrawMetadata,
+      semanticMetadata: .init(accessibilityLabel: "old"),
+      lifecycleMetadata: .init(appearHandlerIDs: ["old-appear"])
+    )
+    var updated = leaf(
+      "metadata",
+      size: .init(width: 5, height: 1),
+      drawMetadata: updatedDrawMetadata,
+      semanticMetadata: .init(accessibilityLabel: "new"),
+      lifecycleMetadata: .init(appearHandlerIDs: ["new-appear"])
+    )
+    updated.isTransient = true
+    updated.matchedGeometry = MatchedGeometryConfig(
+      key: MatchedGeometryKey(id: "hero"),
+      isSource: false
+    )
+
+    let measured = engine.measure(initial, proposal: .init(width: 8, height: 1))
+    let bounds = CellRect(origin: .zero, size: measured.measuredSize)
+    let initialPlaced = engine.place(
+      initial,
+      measured: measured,
+      in: bounds,
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: initial,
+      measuredTree: measured,
+      placedTree: initialPlaced,
+      semanticSnapshot: .init(),
+      drawTree: .init(identity: initial.identity, bounds: bounds),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let retainedLayout = RetainedLayoutSession(
+      previousFrameIndex: .init(frame: previousFrame),
+      invalidatedIdentities: []
+    )
+    let passContext = LayoutPassContext(retainedLayout: retainedLayout)
+    let updatedMeasured = engine.measure(updated, proposal: .init(width: 8, height: 1))
+
+    let placed = engine.place(
+      updated,
+      measured: updatedMeasured,
+      in: bounds,
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.placedNodesComputed == 0)
+    #expect(passContext.workMetrics.placedNodesReused == 1)
+    #expect(placed.drawMetadata.baseStyle.foregroundStyle == .color(Color.blue))
+    #expect(placed.semanticMetadata.accessibilityLabel == "new")
+    #expect(placed.lifecycleMetadata.appearHandlerIDs == ["new-appear"])
+    #expect(placed.isTransient)
+    #expect(placed.matchedGeometry == updated.matchedGeometry)
+  }
 }
 
 private func leaf(
   _ name: String,
   size: CellSize,
   layoutMetadata: LayoutMetadata = .init(),
+  drawMetadata: DrawMetadata = DrawMetadata(),
+  semanticMetadata: SemanticMetadata = SemanticMetadata(),
+  lifecycleMetadata: LifecycleMetadata = .init(),
   drawPayload: DrawPayload = .none
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
     kind: .view("Test"),
     layoutMetadata: layoutMetadata,
+    drawMetadata: drawMetadata,
+    semanticMetadata: semanticMetadata,
+    lifecycleMetadata: lifecycleMetadata,
     drawPayload: drawPayload,
     intrinsicSize: size
   )

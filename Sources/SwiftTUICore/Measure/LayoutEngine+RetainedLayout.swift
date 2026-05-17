@@ -57,15 +57,11 @@ extension LayoutEngine {
       guard measurementMatches else {
         return nil
       }
-      // `isEquivalentForPlacement` deliberately ignores `drawMetadata`
-      // so that visual-only mutations — animation controller color
-      // interpolation in particular — don't invalidate layout reuse.
-      // But that means the cached `previousPlaced` carries the
-      // PREVIOUS frame's drawMetadata, which is wrong for any tick
-      // frame where the controller mutated colors/opacity/padding
-      // on the resolved tree.  Refresh the visual metadata from the
-      // current resolved tree while preserving the cached bounds.
-      return refreshDrawMetadata(placed: previousPlaced, from: resolved)
+      // `isEquivalentForPlacement` deliberately ignores resolved metadata
+      // that does not affect geometry so visual, semantic, lifecycle, and
+      // animation tick mutations can reuse layout. Refresh those mirrors from
+      // the current resolved tree while preserving cached bounds.
+      return synchronizeRetainedPhaseMetadata(placed: previousPlaced, from: resolved)
     }
 
     guard
@@ -81,37 +77,33 @@ extension LayoutEngine {
       y: bounds.origin.y - previousPlaced.bounds.origin.y
     )
     if delta == .zero {
-      return refreshDrawMetadata(placed: previousPlaced, from: resolved)
+      return synchronizeRetainedPhaseMetadata(placed: previousPlaced, from: resolved)
     }
 
-    return refreshDrawMetadata(
+    return synchronizeRetainedPhaseMetadata(
       placed: translatedPlacement(previousPlaced, by: delta),
       from: resolved
     )
   }
 
   /// Walks a reused placed subtree in parallel with the current
-  /// resolved subtree and copies visual metadata (drawMetadata,
-  /// semanticMetadata, lifecycleMetadata, environmentSnapshot,
-  /// isTransient) from the current resolved node onto the cached
-  /// placed node.  The trees are guaranteed structurally identical
-  /// by `isEquivalentForPlacement`, so we can zip them safely.
+  /// resolved subtree and copies all resolved metadata mirrored by
+  /// ``PlacedNode`` from the current resolved node onto the cached
+  /// placed node. The trees are guaranteed structurally identical by
+  /// `isEquivalentForPlacement`, so we can zip them safely.
   ///
   /// This lets the layout engine reuse cached placement (bounds,
-  /// sizes) while still picking up tick-frame visual mutations from
-  /// the animation controller.
-  internal func refreshDrawMetadata(
+  /// sizes) while still picking up geometry-stable metadata mutations
+  /// from the current frame.
+  internal func synchronizeRetainedPhaseMetadata(
     placed: PlacedNode,
     from resolved: ResolvedNode
   ) -> PlacedNode {
     var node = placed
-    node.drawMetadata = resolved.drawMetadata
-    node.semanticMetadata = resolved.semanticMetadata
-    node.lifecycleMetadata = resolved.lifecycleMetadata
-    node.environmentSnapshot = resolved.environmentSnapshot
-    node.layoutBehavior = resolved.layoutBehavior
-    node.isTransient = resolved.isTransient
-    node.matchedGeometry = resolved.matchedGeometry
+    node.synchronizeResolvedPhaseMetadata(
+      from: resolved,
+      semanticRole: semanticRole(for: resolved)
+    )
 
     guard node.children.count == resolved.children.count else {
       // Structural mismatch — should not happen because
@@ -121,7 +113,7 @@ extension LayoutEngine {
     }
     let refreshedChildren = zip(node.children, resolved.children).map {
       (placedChild, resolvedChild) in
-      refreshDrawMetadata(placed: placedChild, from: resolvedChild)
+      synchronizeRetainedPhaseMetadata(placed: placedChild, from: resolvedChild)
     }
     node.children = refreshedChildren
     return node
