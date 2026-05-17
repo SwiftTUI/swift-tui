@@ -64,9 +64,12 @@ lifecycle commit.
 - A private per-renderer `FrameTailRenderer` owns frame-tail layout/raster work,
   retained tail state, previous-surface reuse, and worker timing diagnostics.
 - The special frame-tail layout worker lives in
-  `FrameTailLayoutWorker.swift`. Darwin still uses an isolated 8 MiB pthread
-  stack because recursive layout paths are not yet bounded; ADR 0020 records
-  that decision and the WASI synchronous fallback.
+  `FrameTailLayoutWorker.swift`. Dispatch platforms use a lazy serial worker;
+  WASI keeps the documented synchronous fallback.
+- Built-in layout measurement and placement use explicit work stacks rather
+  than recursive child traversal. Public custom-layout callbacks remain a
+  bounded compatibility boundary that reports runtime issues when the depth
+  limit is exceeded.
 - Built-in layout can run on the frame-tail layout worker.
 - Public custom layouts can opt in to worker layout with `SendableLayout`.
 - Framework-owned layouts that can satisfy the worker contract have moved to
@@ -301,8 +304,8 @@ reconciliation remains a later proposal.
 - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`: retained
   frame-tail state, `FrameTailRenderer`, `FrameHeadDraft`, render generation
   sequencing, worker timings, and async tail cancellation support.
-- `Sources/SwiftTUIRuntime/Rendering/FrameTailLayoutWorker.swift`: isolated
-  layout worker implementation and platform fallback behavior.
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailLayoutWorker.swift`: serial
+  frame-tail layout worker implementation and platform fallback behavior.
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`: async render loop, input
   coalescing, queued-tail cancellation, visual-only completed-frame drops,
   ordered commit for blocked candidates, and diagnostics emission.

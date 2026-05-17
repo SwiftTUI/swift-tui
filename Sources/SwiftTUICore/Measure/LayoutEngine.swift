@@ -11,10 +11,11 @@ public struct LayoutEngine: Sendable {
     _ resolved: ResolvedNode,
     proposal: ProposedSize = .unspecified
   ) -> MeasuredNode {
-    measure(
+    let passContext = LayoutPassContext()
+    return measure(
       resolved,
       proposal: proposal,
-      passContext: nil
+      passContext: passContext
     )
   }
 
@@ -36,11 +37,12 @@ public struct LayoutEngine: Sendable {
     measured: MeasuredNode,
     origin: CellPoint = .zero
   ) -> PlacedNode {
-    place(
+    let passContext = LayoutPassContext()
+    return place(
       resolved,
       measured: measured,
       in: CellRect(origin: origin, size: measured.measuredSize),
-      passContext: nil
+      passContext: passContext
     )
   }
 
@@ -50,11 +52,12 @@ public struct LayoutEngine: Sendable {
     measured: MeasuredNode,
     in bounds: CellRect
   ) -> PlacedNode {
-    place(
+    let passContext = LayoutPassContext()
+    return place(
       resolved,
       measured: measured,
       in: bounds,
-      passContext: nil
+      passContext: passContext
     )
   }
 
@@ -64,12 +67,13 @@ public struct LayoutEngine: Sendable {
     origin: CellPoint = .zero,
     passContext: LayoutPassContext?
   ) -> PlacedNode {
-    place(
+    let effectivePassContext = passContext
+    return place(
       resolved,
       measured: measured,
       in: CellRect(origin: origin, size: measured.measuredSize),
-      viewportContext: passContext?.scrollViewportContext,
-      passContext: passContext
+      viewportContext: effectivePassContext?.scrollViewportContext,
+      passContext: effectivePassContext
     )
   }
 
@@ -79,12 +83,13 @@ public struct LayoutEngine: Sendable {
     in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> PlacedNode {
-    place(
+    let effectivePassContext = passContext
+    return place(
       resolved,
       measured: measured,
       in: bounds,
-      viewportContext: passContext?.scrollViewportContext,
-      passContext: passContext
+      viewportContext: effectivePassContext?.scrollViewportContext,
+      passContext: effectivePassContext
     )
   }
 
@@ -108,7 +113,8 @@ public struct LayoutEngine: Sendable {
     of resolved: ResolvedNode,
     proposal: ProposedSize = .unspecified
   ) -> ViewDimensions {
-    dimensions(of: resolved, proposal: proposal, passContext: nil)
+    let passContext = LayoutPassContext()
+    return dimensions(of: resolved, proposal: proposal, passContext: passContext)
   }
 
   package func dimensions(
@@ -119,5 +125,4 @@ public struct LayoutEngine: Sendable {
     let measured = measure(resolved, proposal: proposal, passContext: passContext)
     return viewDimensions(for: resolved, measured: measured)
   }
-
 }

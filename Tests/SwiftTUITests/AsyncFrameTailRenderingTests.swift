@@ -573,6 +573,23 @@ struct AsyncFrameTailRenderingTests {
     #expect(issue?.severity == .warning)
   }
 
+  @Test("custom layout compatibility depth issues are preserved on the async renderer")
+  func customLayoutCompatibilityDepthIssuesArePreservedOnAsyncRenderer() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailRecursiveCustomLayout(depth: 80),
+      context: .init(identity: testIdentity("AsyncRecursiveCustomLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+    let issues = artifacts.diagnostics.runtimeIssues.filter {
+      $0.code == "layout.customLayoutDepthLimitExceeded"
+    }
+
+    #expect(!issues.isEmpty)
+    #expect(issues.contains { $0.message.contains("measurement") })
+    #expect(issues.contains { $0.message.contains("placement") })
+    #expect(issues.first?.severity == .error)
+  }
+
   @Test("public SendableLayout opt-in runs layout on the frame-tail worker")
   func publicSendableLayoutOptInRunsLayoutOnFrameTailWorker() async throws {
     let rootIdentity = testIdentity("AsyncSendableLayoutRoot")
@@ -2990,6 +3007,98 @@ private struct AsyncFrameTailCustomLayout: Layout {
         proposal: .init(width: size.width, height: size.height)
       )
       y += size.height
+    }
+  }
+}
+
+private struct AsyncFrameTailRecursiveCustomLayout: PrimitiveView, ResolvableView {
+  var depth: Int
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    [makeAsyncRecursiveCustomLayoutNode(identity: context.identity, depth: depth)]
+  }
+}
+
+private let asyncRecursiveCustomLayoutProxy = AsyncRecursiveCustomLayoutProxy()
+
+private func makeAsyncRecursiveCustomLayoutNode(
+  identity: Identity,
+  depth: Int
+) -> ResolvedNode {
+  var node = ResolvedNode(
+    identity: identity.child("leaf"),
+    kind: .view("Leaf"),
+    intrinsicSize: .init(width: 1, height: 1)
+  )
+
+  for index in stride(from: depth - 1, through: 0, by: -1) {
+    node = ResolvedNode(
+      identity: index == 0 ? identity : identity.child("recursive-\(index)"),
+      kind: .view("AsyncRecursiveCustomLayout"),
+      children: [node],
+      layoutBehavior: .custom(CustomLayoutHandle(asyncRecursiveCustomLayoutProxy))
+    )
+  }
+
+  return node
+}
+
+private final class AsyncRecursiveCustomLayoutProxy: LayoutPassContextCustomLayoutProxy {
+  var debugName: String {
+    "AsyncRecursiveCustomLayoutProxy"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> CellSize {
+    .init(width: 1, height: 1)
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize,
+    passContext _: LayoutPassContext?
+  ) -> CellSize {
+    .init(width: 1, height: 1)
+  }
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: CellRect
+  ) -> [PlacedNode] {
+    placeSubviews(
+      engine: engine,
+      node: node,
+      measured: measured,
+      in: bounds,
+      passContext: nil
+    )
+  }
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    node.children.map { child in
+      let childMeasurement = engine.measure(
+        child,
+        proposal: measured.proposal,
+        passContext: passContext
+      )
+      return engine.place(
+        child,
+        measured: childMeasurement,
+        in: CellRect(origin: bounds.origin, size: childMeasurement.measuredSize),
+        passContext: passContext
+      )
     }
   }
 }

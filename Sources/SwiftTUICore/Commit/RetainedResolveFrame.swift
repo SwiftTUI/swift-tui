@@ -262,7 +262,12 @@ package final class LayoutPassContext: Sendable {
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
     var placedFrameTable: PlacedFrameTable
+    var customLayoutCompatibilityDepth: Int
+    var customLayoutCompatibilityDepthLimit: Int
+    var runtimeIssues: [RuntimeIssue]
   }
+
+  package static let defaultCustomLayoutCompatibilityDepthLimit = 4
 
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
@@ -271,7 +276,8 @@ package final class LayoutPassContext: Sendable {
   package init(
     retainedLayout: RetainedLayoutSession? = nil,
     invalidatedIdentities: Set<Identity> = [],
-    scrollViewportContext: ScrollViewportContext? = nil
+    scrollViewportContext: ScrollViewportContext? = nil,
+    customLayoutCompatibilityDepthLimit: Int = defaultCustomLayoutCompatibilityDepthLimit
   ) {
     self.retainedLayout = retainedLayout
     self.invalidatedIdentities = invalidatedIdentities
@@ -282,7 +288,10 @@ package final class LayoutPassContext: Sendable {
         workMetrics: .init(),
         workerCustomLayoutCacheUpdates: [],
         layoutDependentRealizations: [],
-        placedFrameTable: .init(diagnosticsRecorder: geometryDiagnosticsRecorder)
+        placedFrameTable: .init(diagnosticsRecorder: geometryDiagnosticsRecorder),
+        customLayoutCompatibilityDepth: 0,
+        customLayoutCompatibilityDepthLimit: customLayoutCompatibilityDepthLimit,
+        runtimeIssues: []
       )
     )
   }
@@ -301,6 +310,10 @@ package final class LayoutPassContext: Sendable {
 
   package var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate] {
     state.withLock { $0.workerCustomLayoutCacheUpdates }
+  }
+
+  package var runtimeIssues: [RuntimeIssue] {
+    state.withLock { $0.runtimeIssues }
   }
 
   package var layoutDependentRealizationsByIdentity: [Identity: [ResolvedNode]] {
@@ -357,6 +370,43 @@ package final class LayoutPassContext: Sendable {
     }
   }
 
+  package func enterCustomLayoutCompatibilityBoundary(
+    identity: Identity,
+    debugName: String,
+    phase: CustomLayoutCompatibilityPhase
+  ) -> Bool {
+    state.withLock { state in
+      guard state.customLayoutCompatibilityDepth < state.customLayoutCompatibilityDepthLimit else {
+        let issue = RuntimeIssue(
+          severity: .error,
+          code: "layout.customLayoutDepthLimitExceeded",
+          message:
+            "Custom layout \(phase.rawValue) exceeded the compatibility depth limit of "
+            + "\(state.customLayoutCompatibilityDepthLimit).",
+          identity: identity,
+          source: debugName
+        )
+        if !state.runtimeIssues.contains(issue) {
+          state.runtimeIssues.append(issue)
+        }
+        return false
+      }
+
+      state.customLayoutCompatibilityDepth += 1
+      return true
+    }
+  }
+
+  package func exitCustomLayoutCompatibilityBoundary() {
+    state.withLock { state in
+      precondition(
+        state.customLayoutCompatibilityDepth > 0,
+        "custom layout compatibility depth underflow"
+      )
+      state.customLayoutCompatibilityDepth -= 1
+    }
+  }
+
   package func realizeLayoutDependentContent(
     in context: LayoutRealizationContext,
     using realize: () -> [ResolvedNode]
@@ -383,6 +433,11 @@ package final class LayoutPassContext: Sendable {
     }
     return children
   }
+}
+
+package enum CustomLayoutCompatibilityPhase: String, Sendable {
+  case measurement
+  case placement
 }
 
 package struct WorkerCustomLayoutCacheUpdate: Sendable {

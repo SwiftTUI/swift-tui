@@ -166,6 +166,7 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
   - stable-doc source-path guardrails
+  - explicit layout work-stack guardrails
   - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
   - rendered-text fixture matrix guardrails
@@ -552,6 +553,12 @@ if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_
 fi
 
 run_repo_policy_phase "$repo_root" test-all
+
+run_step \
+  "Run layout work-stack guardrails" \
+  "$repo_root" \
+  "Scripts/check_layout_work_stack_guardrails.sh" \
+  Scripts/check_layout_work_stack_guardrails.sh
 
 run_function_step \
   "Run SwiftTUICore tests" \

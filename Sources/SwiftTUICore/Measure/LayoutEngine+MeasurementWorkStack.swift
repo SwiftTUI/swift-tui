@@ -620,6 +620,28 @@ extension LayoutEngine {
         work: &work
       )
     case .custom(let handle):
+      guard
+        passContext?.enterCustomLayoutCompatibilityBoundary(
+          identity: node.identity,
+          debugName: handle.debugName,
+          phase: .measurement
+        ) ?? true
+      else {
+        results.append(
+          MeasuredNode(
+            identity: node.identity,
+            proposal: proposal,
+            measuredSize: .zero,
+            childMeasurements: [],
+            containerAllocationSnapshot: nil
+          )
+        )
+        return
+      }
+      defer {
+        passContext?.exitCustomLayoutCompatibilityBoundary()
+      }
+
       let childMeasurements = handle.measureChildren(
         engine: self,
         node: node,

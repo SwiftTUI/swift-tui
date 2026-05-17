@@ -1,42 +1,43 @@
 ---
 adr: "0020"
-title: "Frame-tail layout worker remains isolated until layout recursion is bounded"
+title: "Frame-tail layout worker after explicit layout stacks"
 status: accepted
 date: 2026-05-17
 sources:
   - docs/plans/2026-05-16-001-pipeline-driver-hardening-plan.md
   - docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md
+  - docs/plans/2026-05-17-006-explicit-layout-work-stack-migration-plan.md
   - docs/proposals/PIPELINE_DRIVER_AUDIT.md
   - docs/proposals/OFF_MAIN_PIPELINE_RENDERING.md
   - docs/proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md
 ---
 
-# ADR-0020: Frame-tail layout worker remains isolated until layout recursion is bounded
+# ADR-0020: Frame-tail layout worker after explicit layout stacks
 
 ## Context
 
-The async frame-tail renderer has a special Darwin layout worker backed by
-`pthread_create` and an 8 MiB stack. The audit correctly flagged this as a
-structured-concurrency exception and also noted that the old policy missed
-`@safe`, allowing the worker to satisfy the hook while still hiding unsafe
-thread calls.
+The async frame-tail renderer originally kept a Darwin layout worker backed by
+`pthread_create` and an 8 MiB stack. The audit flagged that as a
+structured-concurrency exception. The first Stage 6 tranche accepted the worker
+temporarily because built-in measurement and placement still had recursive child
+traversal paths.
 
-The large stack is not an arbitrary implementation detail. Current stack-safety
-tests cover several deep post-layout traversals, but the layout engine still has
-recursive measurement and placement paths. A task-only replacement would move
-those paths back onto a default worker stack before the recursion hazard is
-bounded.
+The explicit layout work-stack migration removed that stack-size reason:
+built-in measurement and placement now run through explicit work stacks, and the
+remaining custom-layout callback boundary is bounded and diagnostic. The worker
+still provides useful serial isolation for frame-tail layout work, but it no
+longer needs a manually sized native thread stack.
 
 ## Decision
 
-Keep the Darwin large-stack layout worker for now, but isolate it in
-`Sources/SwiftTUIRuntime/Rendering/FrameTailLayoutWorker.swift` and remove
-`@safe` from the implementation. Unsafe pthread operations remain explicit
-`unsafe` expressions inside that file.
+Use a lazy serial `DispatchQueue` worker in
+`Sources/SwiftTUIRuntime/Rendering/FrameTailLayoutWorker.swift` on platforms
+with Dispatch. Do not use `pthread_create`, `pthread_join`, or manual stack-size
+configuration for frame-tail layout.
 
-Extend the concurrency-safety policy to ban `@safe` alongside
-`@unchecked Sendable` and `nonisolated(unsafe)` so future escape hatches cannot
-be introduced silently.
+Keep the concurrency-safety policy ban on `@safe`, `@unchecked Sendable`, and
+`nonisolated(unsafe)` escape hatches so this worker cannot regain hidden unsafe
+threading.
 
 Accept the no-thread/no-Dispatch fallback as synchronous for WASI. The fallback
 does not claim off-main execution; it exists so the same rendering API can build
@@ -45,10 +46,13 @@ for async frame-tail work.
 
 ## Consequences
 
-The hand-rolled pthread code is still present, but it is now isolated,
-ADR-justified, and covered by a policy that prevents the previous `@safe`
-bypass from spreading.
+The hand-rolled pthread code has been removed from the frame-tail layout
+worker. The async renderer keeps ordered tail-job semantics through the serial
+worker, and stack-safety now depends on the explicit layout work stacks plus the
+bounded custom-layout compatibility boundary rather than on a larger native
+thread stack.
 
-The remaining Stage 6 work is explicit: bound or eliminate the recursive layout
-paths, then re-evaluate a structured task or executor replacement for the
-Darwin worker.
+The remaining limitation is not built-in layout recursion. Ordinary public
+custom layouts can still call back into `LayoutEngine`; those calls are bounded
+by the compatibility-depth policy and surface runtime issues when the limit is
+exceeded.
