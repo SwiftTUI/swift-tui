@@ -2144,6 +2144,333 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.events.contains("drop:1"))
   }
 
+  @Test("blocked async frame head keeps committed scroll route live for scroll bursts")
+  func blockedAsyncFrameHeadKeepsCommittedScrollRouteLiveForScrollBursts() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadScrollBurstRoot")
+    let scrollIdentity = testIdentity("AsyncFrameHeadScrollBurstRoot", "Scroll")
+    let terminal = AsyncFrameTailTerminalHost()
+    let positionBox = AsyncFrameHeadScrollPositionBox()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadScrollableDraftView(
+          value: value,
+          scrollIdentity: scrollIdentity,
+          positionBox: positionBox
+        )
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    let scrollRoute = try #require(
+      runLoop.latestSemanticSnapshot.scrollRoutes.first { route in
+        route.identity == scrollIdentity
+      }
+    )
+    let scrollLocation = asyncFrameHeadCenterPoint(of: scrollRoute.viewportRect)
+    let initialFrameCount = terminal.frames.count
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    for _ in 0..<3 {
+      _ = runLoop.handle(
+        .input(
+          .mouse(
+            .init(
+              kind: .scrolled(deltaX: 0, deltaY: 1),
+              location: scrollLocation
+            )
+          )
+        )
+      )
+    }
+
+    #expect(positionBox.position.y == 3)
+    #expect(terminal.frames.count == initialFrameCount)
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(positionBox.position.y == 3)
+    #expect(terminal.frames.last?.contains("scroll 1-3") == true)
+  }
+
+  @Test("blocked async frame head keeps committed click action live until commit")
+  func blockedAsyncFrameHeadKeepsCommittedClickActionLiveUntilCommit() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadClickRoot")
+    let buttonIdentity = testIdentity("AsyncFrameHeadClickRoot", "Button")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadDraftButtonActionView(
+          value: value,
+          buttonIdentity: buttonIdentity,
+          recorder: recorder
+        )
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    let buttonRect = try #require(
+      runLoop.latestSemanticSnapshot.interactionRegions.first { region in
+        region.routeID == primaryRouteID(for: buttonIdentity)
+      }?.rect
+    )
+    let clickLocation = asyncFrameHeadCenterPoint(of: buttonRect)
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    recorder.reset()
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: clickLocation))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: clickLocation))))
+    #expect(recorder.events.contains("click:0"))
+    #expect(!recorder.events.contains("click:1"))
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    recorder.reset()
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: clickLocation))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: clickLocation))))
+    #expect(recorder.events == ["click:1"])
+  }
+
+  @Test("blocked async frame head keeps active committed drag recognizer live")
+  func blockedAsyncFrameHeadKeepsActiveCommittedDragRecognizerLive() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadDragRoot")
+    let dragIdentity = testIdentity("AsyncFrameHeadDragRoot", "Drag")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadDraftDragView(
+          value: value,
+          dragIdentity: dragIdentity,
+          recorder: recorder
+        )
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    let dragRect = try #require(
+      runLoop.latestSemanticSnapshot.interactionRegions.first { region in
+        region.identity == dragIdentity
+      }?.rect
+        ?? runLoop.latestSemanticSnapshot.interactionRegions.first?.rect
+    )
+    let startLocation = asyncFrameHeadCenterPoint(of: dragRect)
+    let dragLocation = Point(
+      x: startLocation.x + 2,
+      y: startLocation.y
+    )
+
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: startLocation))))
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    recorder.reset()
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    _ = runLoop.handle(.input(.mouse(.init(kind: .dragged(.primary), location: dragLocation))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: dragLocation))))
+    #expect(recorder.events.contains("drag:0"))
+    #expect(recorder.events.contains("drag-ended:0"))
+    #expect(!recorder.events.contains("drag:1"))
+    #expect(!recorder.events.contains("drag-ended:1"))
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    recorder.reset()
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: startLocation))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .dragged(.primary), location: dragLocation))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: dragLocation))))
+    #expect(recorder.events.contains("drag:1"))
+    #expect(recorder.events.contains("drag-ended:1"))
+  }
+
+  @Test("blocked async frame head keeps draft sheet out of Escape dismissal")
+  func blockedAsyncFrameHeadKeepsDraftSheetOutOfEscapeDismissal() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadDraftSheetRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadDraftSheetView(
+          value: value,
+          recorder: recorder
+        )
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    #expect(terminal.frames.last?.contains("Draft Sheet") == false)
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    recorder.reset()
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    _ = runLoop.handle(.input(.key(KeyPress(.escape))))
+    #expect(recorder.events.isEmpty)
+    #expect(terminal.frames.last?.contains("Draft Sheet") == false)
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(terminal.frames.last?.contains("Draft Sheet") == true)
+    _ = runLoop.handle(.input(.key(KeyPress(.escape))))
+    #expect(recorder.events == ["sheet-dismiss:1:false"])
+  }
+
   @Test("prepared frame-head abort restores broad reset state")
   func preparedFrameHeadAbortRestoresBroadResetState() async throws {
     let rootIdentity = testIdentity("AsyncFrameHeadAbortBroadResetRoot")
@@ -2977,6 +3304,94 @@ private struct AsyncFrameHeadDraftDropDestinationView: View {
   }
 }
 
+private final class AsyncFrameHeadScrollPositionBox: Sendable {
+  private let storage = LockedBox(ScrollPosition.zero)
+
+  var position: ScrollPosition {
+    get { storage.value }
+    set { storage.value = newValue }
+  }
+}
+
+private struct AsyncFrameHeadScrollableDraftView: View {
+  var value: Int
+  var scrollIdentity: Identity
+  var positionBox: AsyncFrameHeadScrollPositionBox
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      position: Binding(
+        get: { positionBox.position },
+        set: { positionBox.position = $0 }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<20) { index in
+          Text("scroll \(value)-\(index)")
+        }
+      }
+    }
+    .id(scrollIdentity)
+    .frame(width: 14, height: 3, alignment: .topLeading)
+  }
+}
+
+private struct AsyncFrameHeadDraftButtonActionView: View {
+  var value: Int
+  var buttonIdentity: Identity
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Button("Click \(value)") {
+      recorder.record("click:\(value)")
+    }
+    .id(buttonIdentity)
+    .frame(width: 10, height: 1, alignment: .topLeading)
+  }
+}
+
+private struct AsyncFrameHeadDraftDragView: View {
+  var value: Int
+  var dragIdentity: Identity
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Text("Drag \(value)")
+      .id(dragIdentity)
+      .frame(width: 8, height: 1, alignment: .topLeading)
+      .gesture(
+        DragGesture()
+          .onChanged { _ in
+            recorder.record("drag:\(value)")
+          }
+          .onEnded { _ in
+            recorder.record("drag-ended:\(value)")
+          }
+      )
+  }
+}
+
+private struct AsyncFrameHeadDraftSheetView: View {
+  var value: Int
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Text("base \(value)")
+      .sheet(
+        "Draft Sheet",
+        isPresented: Binding(
+          get: { value != 0 },
+          set: { isPresented in
+            recorder.record("sheet-dismiss:\(value):\(isPresented)")
+          }
+        )
+      ) {
+        Text("Draft Sheet \(value)")
+      }
+  }
+}
+
 private struct AsyncFrameTailCustomLayout: Layout {
   func makeCache(subviews _: LayoutSubviews) {}
 
@@ -3513,6 +3928,16 @@ private func focusLeafmostAsyncFrameHeadAbortScaffoldRegion<State, V: View>(
     return
   }
   _ = runLoop.focusTracker.setFocus(to: leafmost.identity)
+}
+
+private func asyncFrameHeadCenterPoint(
+  of rect: CellRect
+) -> Point {
+  Point(
+    CellPoint(
+      x: rect.origin.x + max(0, rect.size.width / 2),
+      y: rect.origin.y + max(0, rect.size.height / 2)
+    ))
 }
 
 @MainActor

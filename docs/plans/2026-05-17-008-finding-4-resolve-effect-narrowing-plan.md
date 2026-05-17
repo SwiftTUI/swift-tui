@@ -91,7 +91,24 @@ Add `RunLoop`-level coverage before moving effects:
   must be discarded for abandoned prepared heads.
 
 This stage may add test hooks, but only hooks that expose state already used by
-runtime composition. Avoid production behavior changes here.
+runtime composition. Avoid production behavior changes here unless the coverage
+proves a draft effect is already visible to live input; in that case, keep the
+fix limited to preserving the committed input surface.
+
+Status: complete.
+
+Evidence:
+
+- Existing `AsyncFrameTailRenderingTests` coverage already guarded blocked
+  frame-head key-command dispatch, drop-destination dispatch, selective sibling
+  command state, animation completion deferral, and abandoned prepared-head
+  animation completion discard.
+- Added composed `RunLoop` guards for scroll bursts, click action routing,
+  active drag-recognizer continuity, and presentation Escape dismissal while an
+  async frame head is blocked before raster/commit.
+- The presentation guard exposed a real draft leak. `DefaultRenderer` now keeps
+  Escape dismissal routed through the last committed presentation portal state
+  until the candidate frame commits.
 
 ### F4-C: Resolve input split
 
