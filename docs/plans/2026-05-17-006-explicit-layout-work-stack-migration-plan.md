@@ -93,13 +93,13 @@ calling a task group complete when the group changes shared runtime behavior.
 
 ## Task 0 - Preflight And Current Recursion Inventory
 
-- [ ] Confirm the worktree is clean or isolate unrelated changes before editing:
+- [x] Confirm the worktree is clean or isolate unrelated changes before editing:
 
 ```bash
 git status --short --branch
 ```
 
-- [ ] Re-run the current recursion inventory and record any new edges discovered
+- [x] Re-run the current recursion inventory and record any new edges discovered
   since this plan was written:
 
 ```bash
@@ -108,19 +108,21 @@ rg -n "measure\\(|place\\(|subtreeHasFlexibleContent|minimumMainSize|recordPlace
   -g '*.swift'
 ```
 
-- [ ] Verify the current known hotspots are still accurate:
+- [x] Verify the current known hotspots are still accurate:
 
   - `Sources/SwiftTUICore/Measure/LayoutEngine.swift`
   - `Sources/SwiftTUICore/Measure/LayoutEngine+Measurement.swift`
   - `Sources/SwiftTUICore/Measure/LayoutEngine+Stack.swift`
   - `Sources/SwiftTUICore/Measure/LayoutEngine+CellSize.swift`
+  - `Sources/SwiftTUICore/Measure/LayoutEngine+Alignment.swift`
   - `Sources/SwiftTUICore/Measure/CustomLayout.swift`
   - `Sources/SwiftTUICore/Place/LayoutEngine+Placement.swift`
+  - `Sources/SwiftTUICore/Measure/LayoutEngine+RetainedLayout.swift`
   - `Sources/SwiftTUICore/Commit/RetainedResolveFrame.swift`
 
-- [ ] Confirm existing stack-safety tests still prove post-layout traversals, not
+- [x] Confirm existing stack-safety tests still prove post-layout traversals, not
   real `LayoutEngine.measure` / `LayoutEngine.place` stack safety.
-- [ ] If the inventory finds additional built-in recursive paths, add them to
+- [x] If the inventory finds additional built-in recursive paths, add them to
   this plan before implementation.
 
 **Acceptance criteria:**
@@ -132,9 +134,9 @@ rg -n "measure\\(|place\\(|subtreeHasFlexibleContent|minimumMainSize|recordPlace
 
 Add tests that exercise actual layout measurement and placement.
 
-- [ ] Add a focused test file or extend
+- [x] Add a focused test file or extend
   `Tests/SwiftTUICoreTests/StackSafetyRegressionTests.swift`.
-- [ ] Add helpers that build real `ResolvedNode` trees without using the public
+- [x] Add helpers that build real `ResolvedNode` trees without using the public
   view DSL. The helpers should support:
 
   - deep one-child wrapper chains;
@@ -144,7 +146,7 @@ Add tests that exercise actual layout measurement and placement.
   - layout-dependent content nodes that realize children during placement;
   - indexed lazy-stack nodes that measure visible children during placement.
 
-- [ ] Add non-crashing baseline correctness tests at moderate depth:
+- [x] Add non-crashing baseline correctness tests at moderate depth:
 
   - `deepWrapperChainsMeasureAndPlaceThroughLayoutEngine`
   - `deepStackChainsMeasureAndPlaceThroughLayoutEngine`
@@ -154,10 +156,10 @@ Add tests that exercise actual layout measurement and placement.
 
 - [ ] Add a way for later tasks to prove a path used the iterative engine. Prefer
   package-internal test hooks or diagnostics over timing or crash-only tests.
-- [ ] Do not land a test whose only failure mode is process stack overflow. If a
+- [x] Do not land a test whose only failure mode is process stack overflow. If a
   local crash repro is useful during development, keep it out of the committed
   gate or guard it behind an explicit local-only mechanism.
-- [ ] Establish target depths for final regression coverage. The final depths
+- [x] Establish target depths for final regression coverage. The final depths
   should be high enough to exceed realistic authored nesting and low enough to
   keep CI runtime stable.
 
