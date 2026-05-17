@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Made organization-admin branch-protection bypass an intentional maintainer
+  policy rather than a `0.9.0` beta revisit item; bypasses remain exceptional
+  and do not relax signed, linear, release-gated commits before tags.
 - Kept policy checks as a separate required CI status and routed both that job
   and the local repo gate through one shared policy-check phase so the fast
   signal cannot drift from the gate.
