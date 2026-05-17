@@ -78,6 +78,7 @@ Sources/SwiftTUIRuntime/
   Accessibility/ — runtime accessibility policy adapters for terminal targets
   Configuration/ — runtime configuration, environment resolution, and launch option normalization
   RunLoop/      — runtime coordinator, event dispatch, pointer routing, render scheduling
+  Rendering/    — retained frame-tail rendering, worker dispatch, and async tail diagnostics
   Lifecycle/    — post-present lifecycle staging, task running, animation control
   Scenes/       — App protocol, scene traversal, scene manifest, hosted scene sessions
   Terminal/     — terminal host, presentation, appearance + capability detection, image rendering
@@ -105,6 +106,11 @@ Sources/SwiftTUIRuntime/
 - `RunLoop/RunLoop+GestureDeadlines.swift`: gesture-deadline coordination
 - `RunLoop/RuntimeRenderMode.swift`: render-mode taxonomy
 - `RunLoop/SkippedFrameReconciliation.swift`: dropped-frame reconciliation
+
+### Rendering
+
+- `Rendering/FrameTailRenderer.swift`: retained frame-tail state, render-tail
+  worker dispatch, tail diagnostics, and async cancellation support
 
 ### Lifecycle and animation
 
@@ -156,7 +162,9 @@ Sources/SwiftTUIRuntime/
 
 ### Umbrella
 
-- `SwiftTUI.swift`: `@_exported` re-export of `SwiftTUICore` and `SwiftTUIViews` plus `DefaultRenderer` (retained-frame, resolve-reuse, portal-root integration, and presentation-aware frame artifacts)
+- `SwiftTUI.swift`: `@_exported` re-export of `SwiftTUICore` and
+  `SwiftTUIViews` plus `DefaultRenderer` orchestration and frame-head commit
+  handling
 - `SwiftTUIRuntime.docc/`: module landing page and runtime guides
 
 ## `SwiftTUI`

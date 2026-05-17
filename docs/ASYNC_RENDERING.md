@@ -267,9 +267,11 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
 
 ## Code Anchors
 
-- `Sources/SwiftTUIRuntime/SwiftTUI.swift`: `DefaultRenderer`,
-  `FrameTailRenderer`, `FrameHeadDraft`, render generation sequencing, worker
-  timings, and frame finish.
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`: `DefaultRenderer`, frame-head
+  preparation, completed-frame policy, and frame finish.
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`: retained
+  frame-tail state, `FrameTailRenderer`, `FrameHeadDraft`, render generation
+  sequencing, worker timings, and async tail cancellation support.
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`: async render loop, input
   coalescing, queued-tail cancellation, visual-only completed-frame drops,
   ordered commit for blocked candidates, and diagnostics emission.

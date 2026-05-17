@@ -18,6 +18,10 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Split retained frame-tail rendering support out of `SwiftTUI.swift` so
+  `DefaultRenderer` now owns frame-head orchestration while render-tail worker
+  dispatch, diagnostics, retained baselines, and async cancellation support have
+  a dedicated runtime source owner.
 - Split terminal presentation-surface contracts out of the fd-backed terminal
   host implementation so host-facing metrics, semantic frame handoff, and
   presentation-surface defaults have a dedicated source owner.
