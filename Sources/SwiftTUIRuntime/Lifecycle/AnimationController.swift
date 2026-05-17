@@ -103,6 +103,15 @@ package final class AnimationController: Sendable {
 
   package init() {}
 
+  fileprivate convenience init(restoring checkpoint: Checkpoint) {
+    self.init()
+    restore(checkpoint)
+  }
+
+  package func makeFrameDraft() -> AnimationFrameDraft {
+    AnimationFrameDraft(liveController: self)
+  }
+
   package func beginFrameHeadTransaction() -> Checkpoint {
     precondition(
       !isFrameHeadTransactionActive,
@@ -116,6 +125,15 @@ package final class AnimationController: Sendable {
   }
 
   package func commitFrameHeadTransaction(_ checkpoint: Checkpoint) {
+    let completions = finishFrameHeadTransaction(checkpoint)
+    for completion in completions {
+      completion()
+    }
+  }
+
+  fileprivate func finishFrameHeadTransaction(
+    _ checkpoint: Checkpoint
+  ) -> [@Sendable () -> Void] {
     precondition(
       isFrameHeadTransactionActive,
       "No AnimationController frame-head transaction is active."
@@ -124,9 +142,7 @@ package final class AnimationController: Sendable {
     lastFrameHeadCompletionCount = completions.count
     isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
     deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
-    for completion in completions {
-      completion()
-    }
+    return completions
   }
 
   package func abortFrameHeadTransaction(_ checkpoint: Checkpoint) {
@@ -137,7 +153,7 @@ package final class AnimationController: Sendable {
     restore(checkpoint)
   }
 
-  private func makeCheckpoint() -> Checkpoint {
+  fileprivate func makeCheckpoint() -> Checkpoint {
     Checkpoint(
       previousSnapshots: previousSnapshots,
       previousTreeRoot: previousTreeRoot,
@@ -185,6 +201,12 @@ package final class AnimationController: Sendable {
     isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
     deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
     lastFrameHeadCompletionCount = checkpoint.lastFrameHeadCompletionCount
+  }
+
+  fileprivate func publishCommittedState(
+    from draftController: AnimationController
+  ) {
+    restore(draftController.makeCheckpoint())
   }
 
   /// Stores a snapshot of the placed tree at the end of the frame so
@@ -1879,6 +1901,43 @@ package final class AnimationController: Sendable {
     isFrameHeadTransactionActive = false
     deferredFrameHeadCompletions.removeAll(keepingCapacity: true)
     lastFrameHeadCompletionCount = 0
+  }
+}
+
+@MainActor
+package final class AnimationFrameDraft {
+  private let liveController: AnimationController
+  package let controller: AnimationController
+  private let transactionCheckpoint: AnimationController.Checkpoint
+  private var didCommit = false
+  private var didDiscard = false
+
+  fileprivate init(liveController: AnimationController) {
+    let draftController = AnimationController(
+      restoring: liveController.makeCheckpoint()
+    )
+    self.liveController = liveController
+    controller = draftController
+    transactionCheckpoint = draftController.beginFrameHeadTransaction()
+  }
+
+  package var frameDropEligibilityBlockers: Set<FrameDropEligibility.Blocker> {
+    controller.frameDropEligibilityBlockers
+  }
+
+  package func commit() {
+    precondition(!didCommit && !didDiscard)
+    let completions = controller.finishFrameHeadTransaction(transactionCheckpoint)
+    liveController.publishCommittedState(from: controller)
+    didCommit = true
+    for completion in completions {
+      completion()
+    }
+  }
+
+  package func discard() {
+    precondition(!didCommit && !didDiscard)
+    didDiscard = true
   }
 }
 

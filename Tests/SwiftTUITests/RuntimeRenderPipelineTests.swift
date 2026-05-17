@@ -30,7 +30,6 @@ struct RuntimeRenderPipelineTests {
         .frameState,
         .presentationPortalState,
         .observationBridge,
-        .animationController,
       ])
   }
 }

@@ -1,5 +1,5 @@
-package import SwiftTUICore
 import Observation
+package import SwiftTUICore
 
 @MainActor
 package final class ObservationBridge: Equatable {
@@ -7,6 +7,7 @@ package final class ObservationBridge: Equatable {
   private var observedPasses: [Identity: UInt64] = [:]
   private weak var invalidator: (any Invalidating)?
   private weak var viewGraph: ViewGraph?
+  private weak var activeDraft: ObservationBridgeDraft?
 
   package init() {}
 
@@ -33,12 +34,30 @@ package final class ObservationBridge: Equatable {
     currentPass &+= 1
   }
 
+  package func makeDraft(
+    attaching viewGraph: ViewGraph?
+  ) -> ObservationBridgeDraft {
+    precondition(activeDraft == nil)
+    let draft = ObservationBridgeDraft(
+      bridge: self,
+      viewGraph: viewGraph,
+      pass: currentPass &+ 1
+    )
+    activeDraft = draft
+    return draft
+  }
+
   package func track<T>(
     identity: Identity,
     _ apply: () -> T
   ) -> T {
-    let pass = currentPass
-    observedPasses[identity] = pass
+    let pass: UInt64
+    if let activeDraft {
+      pass = activeDraft.recordObserved(identity)
+    } else {
+      pass = currentPass
+      observedPasses[identity] = pass
+    }
 
     return withObservationTracking {
       apply()
@@ -69,6 +88,65 @@ package final class ObservationBridge: Equatable {
     }
     viewGraph?.queueDirtyForObservationChange(observedBy: identity)
     invalidator?.requestInvalidation(of: [identity])
+  }
+
+  fileprivate func finishRecording(
+    _ draft: ObservationBridgeDraft
+  ) {
+    if activeDraft === draft {
+      activeDraft = nil
+    }
+  }
+
+  fileprivate func publish(
+    _ draft: ObservationBridgeDraft
+  ) {
+    finishRecording(draft)
+    currentPass = draft.pass
+    for (identity, pass) in draft.observedPasses {
+      observedPasses[identity] = pass
+    }
+    viewGraph = draft.viewGraph
+  }
+}
+
+@MainActor
+package final class ObservationBridgeDraft {
+  private let bridge: ObservationBridge
+  fileprivate weak var viewGraph: ViewGraph?
+  fileprivate let pass: UInt64
+  fileprivate var observedPasses: [Identity: UInt64] = [:]
+  private var didCommit = false
+  private var didDiscard = false
+
+  fileprivate init(
+    bridge: ObservationBridge,
+    viewGraph: ViewGraph?,
+    pass: UInt64
+  ) {
+    self.bridge = bridge
+    self.viewGraph = viewGraph
+    self.pass = pass
+  }
+
+  fileprivate func recordObserved(
+    _ identity: Identity
+  ) -> UInt64 {
+    precondition(!didCommit && !didDiscard)
+    observedPasses[identity] = pass
+    return pass
+  }
+
+  package func commit() {
+    precondition(!didCommit && !didDiscard)
+    bridge.publish(self)
+    didCommit = true
+  }
+
+  package func discard() {
+    precondition(!didCommit && !didDiscard)
+    bridge.finishRecording(self)
+    didDiscard = true
   }
 }
 

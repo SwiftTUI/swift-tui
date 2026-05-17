@@ -1,8 +1,8 @@
 import Observation
 import Testing
 
-@_spi(Runners) @testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -100,6 +100,54 @@ struct Phase4ObservationAndEnvironmentTests {
     model.count = 1
 
     #expect(invalidator.requests.isEmpty)
+  }
+
+  @Test("prepared observation draft is invisible until commit")
+  func preparedObservationDraftIsInvisibleUntilCommit() {
+    let model = Phase4ObservableCounter()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var context = ResolveContext(identity: testIdentity("Root"))
+    context.observationBridge = bridge
+
+    _ = renderer.render(
+      ConditionalObservableRoot(showCounter: false, model: model),
+      context: context
+    )
+    bridge.prune(keeping: renderer.liveIdentitySnapshot())
+    invalidator.clear()
+
+    var draftContext = ResolveContext(
+      identity: testIdentity("Root"),
+      invalidatedIdentities: [testIdentity("Root")]
+    )
+    draftContext.observationBridge = bridge
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      ConditionalObservableRoot(showCounter: true, model: model),
+      context: draftContext
+    )
+
+    model.count = 1
+    #expect(invalidator.requests.isEmpty)
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+
+    model.count = 2
+    #expect(invalidator.requests.isEmpty)
+
+    _ = renderer.render(
+      ConditionalObservableRoot(showCounter: true, model: model),
+      context: draftContext
+    )
+    bridge.prune(keeping: renderer.liveIdentitySnapshot())
+    invalidator.clear()
+
+    model.count = 3
+
+    #expect(invalidator.requests == [[testIdentity("ObservedCounter")]])
   }
 
   @Test("bindable projection edits observable models through text field controls")

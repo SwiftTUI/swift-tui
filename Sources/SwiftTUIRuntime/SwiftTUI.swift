@@ -9,7 +9,7 @@
 /// public phase product; it is the single insertion point where resolved
 /// animatable values are rewritten before the measure/place tail observes them.
 private struct AnimationInjectionStage {
-  var controller: AnimationController
+  var animationDraft: AnimationFrameDraft
 
   @MainActor
   func apply(
@@ -17,6 +17,7 @@ private struct AnimationInjectionStage {
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant
   ) {
+    let controller = animationDraft.controller
     controller.processResolvedTree(
       resolved,
       transaction: transaction,
@@ -26,6 +27,21 @@ private struct AnimationInjectionStage {
       to: &resolved,
       at: timestamp
     )
+  }
+}
+
+@MainActor
+private func withAnimationDraftSinks<Result>(
+  _ animationDraft: AnimationFrameDraft,
+  operation: () -> Result
+) -> Result {
+  let controller = animationDraft.controller
+  return AnimationRegistrationStorage.$currentTaskSink.withValue(controller) {
+    TransitionRegistrationStorage.$currentTaskSink.withValue(controller) {
+      AnimationCompletionStorage.$currentTaskSink.withValue(controller) {
+        operation()
+      }
+    }
   }
 }
 
@@ -413,15 +429,11 @@ public struct DefaultRenderer {
     }
     draft.registrationDraft.discard()
     draft.graphDraft.discard(from: viewGraph)
+    draft.presentationPortalDraft.discard()
+    draft.observationDraft?.discard()
+    draft.animationDraft.discard()
     frameState.restoreCheckpoint(checkpoints.frameState)
     frameInputs.clear()
-    presentationPortalState.restoreCheckpoint(checkpoints.presentationPortal)
-    if let observationBridge = draft.observationBridge,
-      let checkpoint = checkpoints.observationBridge
-    {
-      observationBridge.restoreCheckpoint(checkpoint)
-    }
-    animationController.abortFrameHeadTransaction(checkpoints.animation)
   }
 
   @MainActor
@@ -667,6 +679,7 @@ public struct DefaultRenderer {
     // application would inject another overlay on top, growing the tree
     // each tick and leaving ghosted artefacts visible after the animation
     // completes.
+    let animationController = draft.animationDraft.controller
     animationController.capturePlacedTree(layout.baselinePlaced)
     // Snapshot any pending placed-level animation overlays. The snapshot
     // advances controller-owned animation state on the main actor, then the
@@ -711,6 +724,7 @@ public struct DefaultRenderer {
       runtimeRegistrationDiagnostics = draft.graphDraft.commitRuntimeRegistrations(
         from: viewGraph
       )
+      commitFrameHeadDraftEffects(draft)
       return commitPlanner.plan(
         resolved: resolved,
         placed: tail.placed,
@@ -719,6 +733,7 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
+    draft.animationDraft.commit()
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
@@ -882,26 +897,20 @@ public struct DefaultRenderer {
       liveRegistrations: resolveContext.runtimeRegistrations,
       checkpoint: mode == .abortable ? viewGraph.makeCheckpoint() : nil
     )
+    let animationDraft = animationController.makeFrameDraft()
     resolveContext = resolveContext.replacingRuntimeRegistrations(
       registrationDraft.draftRegistrations
     )
     resolveContext.imageAssetResolver = imageRepository.resolver()
 
-    // Abortable heads checkpoint previous-frame selector / portal / observation
-    // state before preparing current-frame resolve inputs. One-shot heads never
-    // abort, so skip.
+    // Abortable heads checkpoint previous-frame selector state before preparing
+    // current-frame resolve inputs. One-shot heads never abort, so skip.
     let frameStateCheckpoint: FrameResolveState.Checkpoint?
-    let presentationPortalCheckpoint: PresentationPortalState.Checkpoint?
-    let observationBridgeCheckpoint: ObservationBridge.Checkpoint?
     switch mode {
     case .oneShot:
       frameStateCheckpoint = nil
-      presentationPortalCheckpoint = nil
-      observationBridgeCheckpoint = nil
     case .abortable:
       frameStateCheckpoint = frameState.makeCheckpoint()
-      presentationPortalCheckpoint = presentationPortalState.makeCheckpoint()
-      observationBridgeCheckpoint = resolveContext.observationBridge?.makeCheckpoint()
     }
     let resolveInputs = frameState.prepareInputs(
       from: resolveContext,
@@ -920,17 +929,19 @@ public struct DefaultRenderer {
       viewGraph.invalidate(resolveInputs.invalidatedIdentities)
     }
     resolveContext.viewGraph = viewGraph
-    resolveContext.observationBridge?.attachViewGraph(viewGraph)
-    resolveContext.observationBridge?.beginTrackingPass()
+    let observationDraft = resolveContext.observationBridge?.makeDraft(
+      attaching: viewGraph
+    )
     let presentationPortalContext = resolveContext.replacingIdentity(
       with: presentationPortalIdentity(for: resolveContext.identity)
     )
     let hasExistingPresentationPortalRoot = viewGraph.containsNode(
       for: presentationPortalContext.identity
     )
+    let presentationPortalDraft = presentationPortalState.makeDraft()
     let wrappedRoot = PresentationPortalRoot(
       content: root,
-      portalState: presentationPortalState,
+      portalState: presentationPortalDraft,
       contentRootIdentity: resolveContext.identity
     )
     viewGraph.setRootEvaluator(rootIdentity: presentationPortalContext.identity) {
@@ -946,11 +957,7 @@ public struct DefaultRenderer {
       viewGraph.queueDirty([presentationPortalContext.identity])
     }
     let (_, resolveDuration): (Void, Duration)
-    // Abortable heads open an animation frame-head transaction so completion
-    // closures can be deferred or discarded; one-shot heads do not.
-    let animationCheckpoint: AnimationController.Checkpoint? =
-      mode == .abortable ? animationController.beginFrameHeadTransaction() : nil
-    animationController.beginTransitionCollection()
+    animationDraft.controller.beginTransitionCollection()
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
       // Nothing is dirty — skip evaluation entirely and reuse the existing
       // tree snapshot. The root evaluator and registrations are untouched.
@@ -960,12 +967,14 @@ public struct DefaultRenderer {
       graphDraft.recordDirtyEvaluationPlan(dirtyEvaluationPlan)
 
       (_, resolveDuration) = measurePhase(clock: clock) {
-        viewGraph.evaluateDirtyNodes(
-          using: dirtyEvaluationPlan
-        )
+        withAnimationDraftSinks(animationDraft) {
+          viewGraph.evaluateDirtyNodes(
+            using: dirtyEvaluationPlan
+          )
+        }
       }
     }
-    animationController.finishTransitionCollection()
+    animationDraft.controller.finishTransitionCollection()
     let resolved = wrapInContainerSafeArea(
       renderPipelineTree(from: viewGraph.snapshot()),
       context: resolveContext
@@ -1000,10 +1009,7 @@ public struct DefaultRenderer {
       // Force-unwraps are safe: every `.abortable` branch above assigned its
       // checkpoint non-nil.
       checkpoints = FrameHeadCheckpoints(
-        frameState: frameStateCheckpoint!,
-        presentationPortal: presentationPortalCheckpoint!,
-        observationBridge: observationBridgeCheckpoint,
-        animation: animationCheckpoint!
+        frameState: frameStateCheckpoint!
       )
     }
 
@@ -1012,8 +1018,10 @@ public struct DefaultRenderer {
       renderGeneration: renderGeneration,
       graphDraft: graphDraft,
       registrationDraft: registrationDraft,
+      presentationPortalDraft: presentationPortalDraft,
+      observationDraft: observationDraft,
+      animationDraft: animationDraft,
       checkpoints: checkpoints,
-      observationBridge: resolveContext.observationBridge,
       resolveContext: resolveContext,
       graphRootIdentity: presentationPortalContext.identity,
       frameContext: frameContext,
@@ -1033,7 +1041,7 @@ public struct DefaultRenderer {
     var draft = draft
     var resolved = draft.resolved
     let animationTimestamp = MonotonicInstant.now()
-    AnimationInjectionStage(controller: animationController).apply(
+    AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
       to: &resolved,
       transaction: draft.frameContext.transaction,
       timestamp: animationTimestamp
@@ -1136,6 +1144,7 @@ public struct DefaultRenderer {
   ) async -> AsyncFrameTailDraftOutput {
     let layout = layoutStage.layout
     let placed = layout.baselinePlaced
+    let animationController = draft.animationDraft.controller
     animationController.capturePlacedTree(layout.baselinePlaced)
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
@@ -1339,6 +1348,7 @@ public struct DefaultRenderer {
       runtimeRegistrationDiagnostics = candidate.draft.graphDraft.commitRuntimeRegistrations(
         from: viewGraph
       )
+      commitFrameHeadDraftEffects(candidate.draft)
       return commitPlanner.plan(
         resolved: candidate.resolved,
         placed: tail.placed,
@@ -1347,12 +1357,7 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    guard let checkpoints = candidate.draft.checkpoints else {
-      preconditionFailure(
-        "Cannot commit a one-shot frame head — it has no checkpoints."
-      )
-    }
-    animationController.commitFrameHeadTransaction(checkpoints.animation)
+    candidate.draft.animationDraft.commit()
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
@@ -1387,6 +1392,14 @@ public struct DefaultRenderer {
   @MainActor
   private func storeCommittedPresentationPortalState() {
     committedPresentationDismissStack.store(presentationPortalState.dismissStack())
+  }
+
+  @MainActor
+  private func commitFrameHeadDraftEffects(
+    _ draft: FrameHeadDraft
+  ) {
+    draft.observationDraft?.commit()
+    draft.presentationPortalDraft.commit()
   }
 
   @MainActor
@@ -1526,17 +1539,18 @@ public struct DefaultRenderer {
       FrameDropEligibility.Candidate(
         artifacts: classificationArtifacts,
         additionalBlockers: additionalBlockers.union(
-          frameHeadRegistrationDropBlockers(draft)
+          frameHeadDropBlockers(draft)
         ),
         hasCompleteBarrierSignals: true
       ))
   }
 
   @MainActor
-  private func frameHeadRegistrationDropBlockers(
+  private func frameHeadDropBlockers(
     _ draft: FrameHeadDraft
   ) -> Set<FrameDropEligibility.Blocker> {
     draft.registrationDraft.draftDropEligibilityBlockers()
+      .union(draft.animationDraft.frameDropEligibilityBlockers)
   }
 
   @MainActor
