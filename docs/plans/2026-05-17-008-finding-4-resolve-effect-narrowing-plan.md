@@ -1,3 +1,10 @@
+---
+title: "refactor: finding 4 resolve-effect narrowing"
+type: refactor
+status: shipped
+date: 2026-05-17
+---
+
 # Finding 4 Resolve-Effect Narrowing Plan
 
 ## Context
