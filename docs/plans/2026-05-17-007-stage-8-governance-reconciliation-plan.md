@@ -66,13 +66,13 @@ scheduled at runtime.
 
 ## Tasks
 
-- [ ] Update architecture docs to state the shipped runtime composition,
+- [x] Update architecture docs to state the shipped runtime composition,
   execution strategies, and phase-product inspection model.
-- [ ] Update AGENTS and Runtime DocC architecture text so short-form and
+- [x] Update AGENTS and Runtime DocC architecture text so short-form and
   published docs match the durable architecture doc.
-- [ ] Amend ADR 0002 to mark the runtime-driver portion superseded by ADR 0019
+- [x] Amend ADR 0002 to mark the runtime-driver portion superseded by ADR 0019
   while preserving the accepted phase-product split.
-- [ ] Annotate the audit summary and proposal sections with shipped, deferred,
+- [x] Annotate the audit summary and proposal sections with shipped, deferred,
   or open outcomes:
   - P1/P2/P3 resolved by Stages 1-3.
   - P4/P5 resolved by Stage 6, with WASI fallback documented as a compatibility

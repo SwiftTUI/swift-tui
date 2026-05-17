@@ -1,13 +1,13 @@
 # Architecture
 
-A tour of the package boundaries, the strict frame pipeline, and the data products that flow between phases.
+A tour of the package boundaries, the composed runtime pipeline, and the data products that flow between phases.
 
 ## Overview
 
 SwiftTUI is split into focused targets so that pure pipeline work, authoring
 work, runtime work, terminal convenience, platform hosts, and domain products
 can each evolve without blurring concerns. This article documents those
-boundaries and the seven-phase frame pipeline that connects them.
+boundaries, the runtime pipeline, and the phase products that connect them.
 
 ## Target Boundaries
 
@@ -80,14 +80,26 @@ For a deeper look at how those pieces fit together at the host boundary, see <do
 
 ## Frame Pipeline
 
-The implementation centers on this strict phase order:
+`DefaultRenderer` executes one composed runtime pipeline:
+
+```text
+head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
+```
+
+Sync, async, and cancellable rendering are execution strategies over that one
+composition. The fused frame tail is the performance node that runs measure,
+place, semantics, draw, and raster.
+
+Within that composition, the typed phase products still flow in this order:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-That ordering is visible in ``DefaultRenderer``, `RuntimeRenderPipeline`,
-`FrameArtifacts`, and the regression suites.
+This product ordering is visible in `RuntimeRenderPipeline` stage metadata,
+``FrameArtifacts``, diagnostics, and the regression suites. It is not a claim
+that the production runtime schedules seven independent closure stages for each
+frame.
 
 ## Coordinate Domains
 
@@ -190,7 +202,8 @@ convenience product.
 - `DrawNode`: draw commands for text, shapes, rules, lists, tables, and indicators
 - `RasterSurface`: final cell grid plus style runs
 - `CommitPlan`: runtime-facing semantic, lifecycle, and handler work
-- `FrameArtifacts`: the full frame bundle plus diagnostics for testing and inspection
+- `FrameArtifacts`: the full current-frame inspection bundle plus diagnostics.
+  Prefer phase-specific products or `SemanticHostFrame` for host contracts.
 
 ## Styling And Presentation
 

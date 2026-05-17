@@ -20,14 +20,14 @@ implementation that the codebase supports.
 
 ## Context
 
-The frame pipeline is one of the repo's central contracts:
+The phase-product pipeline is one of the repo's central contracts:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-That split is visible in `DefaultRenderer`, `FrameTailRenderer`, `Renderer`,
-`FrameArtifacts`, and the phase-specific products:
+That split is visible in `RuntimeRenderPipeline` stage metadata,
+`FrameTailRenderer`, `FrameArtifacts`, and the phase-specific products:
 
 - `ResolvedNode`
 - `MeasuredNode`
