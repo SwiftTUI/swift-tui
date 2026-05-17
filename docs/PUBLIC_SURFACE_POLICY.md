@@ -81,6 +81,27 @@ set for Swift Package Index-hosted documentation. Example apps under `Examples/`
 are intentionally excluded from DocC coverage; their role is to demonstrate and
 test products, not to present a separate public API reference.
 
+## Documentation Ratchet
+
+The repo uses a curated public documentation ratchet before enabling global
+doc-comment linting. The ratchet covers the consumer-facing surface that new
+external users are expected to encounter first: style protocols, built-in
+styles, presentation modifiers, text inputs, navigation, host runners, and
+product entrypoints.
+
+[`../Scripts/lib/public_documentation_ratchet.txt`](../Scripts/lib/public_documentation_ratchet.txt)
+is the reviewed target list. `Scripts/check_public_documentation_ratchet.sh`
+enforces that every listed declaration keeps a source `///` summary and runs in
+the shared repo policy phase. Add new supported consumer-facing declarations to
+that manifest when they graduate into the canonical story.
+
+Do not use this ratchet as a substitute for the DocC catalog policy above:
+externally linkable products still need DocC catalogs and must be included in
+the website and Swift Package Index documentation builds. Conversely, do not
+enable global `AllPublicDeclarationsHaveDocumentation` until package-only seams
+and compatibility symbols have been audited enough that the rule will improve
+the public story instead of forcing low-value comments onto internals.
+
 ## Low-Level Construction Policy
 
 The `*` authoring nodes are not part of the public authoring story.

@@ -1,0 +1,76 @@
+# Curated public declarations that must keep source documentation.
+# Format: description|source-path|line-regex
+#
+# This ratchet intentionally covers the consumer-facing surface selected in
+# docs/PUBLIC_SURFACE_POLICY.md instead of enabling global doc-comment linting.
+
+ShapeStyle protocol|Sources/SwiftTUICore/Styling/Styling.swift|^public protocol ShapeStyle\b
+AnyShapeStyle eraser|Sources/SwiftTUICore/Styling/Styling.swift|^public enum AnyShapeStyle\b
+ToolbarStyle protocol|Sources/SwiftTUIViews/ActionScopes/Toolbar.swift|^public protocol ToolbarStyle\b
+DefaultTopToolbarStyle built-in|Sources/SwiftTUIViews/ActionScopes/Toolbar.swift|^public struct DefaultTopToolbarStyle\b
+DefaultBottomToolbarStyle built-in|Sources/SwiftTUIViews/ActionScopes/Toolbar.swift|^public struct DefaultBottomToolbarStyle\b
+ButtonStyle protocol|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public protocol ButtonStyle\b
+AnyButtonStyle eraser|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct AnyButtonStyle\b
+AutomaticButtonStyle built-in|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct AutomaticButtonStyle\b
+PlainButtonStyle built-in|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct PlainButtonStyle\b
+BorderedButtonStyle built-in|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct BorderedButtonStyle\b
+BorderedProminentButtonStyle built-in|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct BorderedProminentButtonStyle\b
+LinkButtonStyle built-in|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct LinkButtonStyle\b
+TextFieldStyle protocol|Sources/SwiftTUIViews/Controls/TextFieldStyles.swift|^public protocol TextFieldStyle\b
+AnyTextFieldStyle eraser|Sources/SwiftTUIViews/Controls/TextFieldStyles.swift|^public struct AnyTextFieldStyle\b
+AutomaticTextFieldStyle built-in|Sources/SwiftTUIViews/Controls/TextFieldStyles.swift|^public struct AutomaticTextFieldStyle\b
+PlainTextFieldStyle built-in|Sources/SwiftTUIViews/Controls/TextFieldStyles.swift|^public struct PlainTextFieldStyle\b
+RoundedBorderTextFieldStyle built-in|Sources/SwiftTUIViews/Controls/TextFieldStyles.swift|^public struct RoundedBorderTextFieldStyle\b
+PickerStyle protocol|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public protocol PickerStyle\b
+AnyPickerStyle eraser|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public struct AnyPickerStyle\b
+AutomaticPickerStyle built-in|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public struct AutomaticPickerStyle\b
+InlinePickerStyle built-in|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public struct InlinePickerStyle\b
+SegmentedPickerStyle built-in|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public struct SegmentedPickerStyle\b
+RadioGroupPickerStyle built-in|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public struct RadioGroupPickerStyle\b
+MenuPickerStyle built-in|Sources/SwiftTUIViews/Controls/PickerStyles.swift|^public struct MenuPickerStyle\b
+ListStyle protocol|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public protocol ListStyle\b
+AnyListStyle eraser|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct AnyListStyle\b
+AutomaticListStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct AutomaticListStyle\b
+PlainListStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct PlainListStyle\b
+InsetGroupedListStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct InsetGroupedListStyle\b
+OutlineStyle protocol|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public protocol OutlineStyle\b
+AnyOutlineStyle eraser|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct AnyOutlineStyle\b
+AutomaticOutlineStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct AutomaticOutlineStyle\b
+RoundedOutlineStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct RoundedOutlineStyle\b
+PlainOutlineStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct PlainOutlineStyle\b
+ASCIIOutlineStyle built-in|Sources/SwiftTUIViews/Collections/CollectionStyles.swift|^public struct ASCIIOutlineStyle\b
+TabViewStyle protocol|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public protocol TabViewStyle\b
+AnyTabViewStyle eraser|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct AnyTabViewStyle\b
+AutomaticTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct AutomaticTabViewStyle\b
+UnderlineTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct UnderlineTabViewStyle\b
+LiteralTabsTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct LiteralTabsTabViewStyle\b
+PowerlineTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct PowerlineTabViewStyle\b
+ToastStyle protocol|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^public protocol ToastStyle\b
+AnyToastStyle eraser|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^public struct AnyToastStyle\b
+InfoToastStyle built-in|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^public struct InfoToastStyle\b
+SuccessToastStyle built-in|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^public struct SuccessToastStyle\b
+WarningToastStyle built-in|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^public struct WarningToastStyle\b
+DangerToastStyle built-in|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^public struct DangerToastStyle\b
+TextField control|Sources/SwiftTUIViews/Controls/ValueControls.swift|^public struct TextField\b
+TextEditor control|Sources/SwiftTUIViews/Input/TextEditor.swift|^public struct TextEditor\b
+SecureField control|Sources/SwiftTUIViews/Input/SecureField.swift|^public struct SecureField\b
+Tab declaration view|Sources/SwiftTUIViews/NavigationViews/Tab.swift|^public struct Tab\b
+TabView control|Sources/SwiftTUIViews/NavigationViews/TabView.swift|^public struct TabView\b
+NavigationStack control|Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift|^public struct NavigationStack\b
+alert modifier|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^\s*public func alert\b
+confirmationDialog modifier|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^\s*public func confirmationDialog\b
+sheet modifier|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^\s*public func sheet\b
+popover modifier|Sources/SwiftTUIViews/Presentation/PopoverPresentation.swift|^\s*public func popover\b
+popoverTip modifier|Sources/SwiftTUIViews/Presentation/PopoverPresentation.swift|^\s*public func popoverTip\b
+toast modifier|Sources/SwiftTUIViews/Presentation/PresentationModifiers.swift|^\s*public func toast\b
+navigationDestination modifier|Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift|^\s*public func navigationDestination\b
+App protocol|Sources/SwiftTUIRuntime/Scenes/App.swift|^public protocol App\b
+Scene protocol|Sources/SwiftTUIRuntime/Scenes/App.swift|^public protocol Scene\b
+WindowGroup scene|Sources/SwiftTUIRuntime/Scenes/App.swift|^public struct WindowGroup\b
+TerminalRunner entrypoint|Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift|^public enum TerminalRunner\b
+TerminalRunner App main|Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift|^\s*public static func main\(\) async\b
+WASIRunner entrypoint|Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift|^public enum WASIRunner\b
+WASIRunner App main|Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift|^\s*public static func main\(\) async throws\b
+WebHostRunner entrypoint|Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift|^public enum WebHostRunner\b
+WebHostCLIRunner entrypoint|Platforms/WebHost/Sources/SwiftTUIWebHostCLI/WebHostCLIRunner.swift|^public enum WebHostCLIRunner\b
+WebHostCLI App main|Platforms/WebHost/Sources/SwiftTUIWebHostCLI/WebHostCLIRunner.swift|^\s*public static func main\(\) async\b

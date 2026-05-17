@@ -73,6 +73,7 @@ extension NavigationStack where ID == AnyID {
 }
 
 extension View {
+  /// Registers a Boolean-driven destination for the nearest navigation stack.
   public func navigationDestination<Destination: View>(
     isPresented: Binding<Bool>,
     @ViewBuilder destination: () -> Destination
@@ -87,6 +88,7 @@ extension View {
     )
   }
 
+  /// Registers an item-driven destination for the nearest navigation stack.
   public func navigationDestination<Item: Identifiable & Sendable, Destination: View>(
     item: Binding<Item?>,
     @ViewBuilder destination: @escaping @MainActor (Item) -> Destination

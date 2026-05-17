@@ -1,5 +1,6 @@
 public import SwiftTUICore
 
+/// Defines the visual body and interaction prominence for a button.
 public protocol ButtonStyle: Sendable {
   associatedtype Body: View
 
@@ -85,6 +86,7 @@ public struct ButtonStyleConfiguration: Sendable {
   }
 }
 
+/// Type-erased storage for a concrete button style.
 public struct AnyButtonStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   private let box: any AnyButtonStyleBox
@@ -143,6 +145,7 @@ public struct AnyButtonStyle: Sendable, CustomStringConvertible, CustomDebugStri
   }
 }
 
+/// The environment-driven default button style.
 public struct AutomaticButtonStyle: Sendable, ButtonStyle {
   public init() {}
 
@@ -170,6 +173,7 @@ public struct AutomaticButtonStyle: Sendable, ButtonStyle {
   }
 }
 
+/// A minimal button style without surrounding border chrome.
 public struct PlainButtonStyle: Sendable, ButtonStyle {
   public init() {}
 
@@ -192,6 +196,7 @@ public struct PlainButtonStyle: Sendable, ButtonStyle {
   }
 }
 
+/// A bordered button style that reserves terminal-cell chrome around the label.
 public struct BorderedButtonStyle: Sendable, ButtonStyle {
   public init() {}
 
@@ -219,6 +224,7 @@ public struct BorderedButtonStyle: Sendable, ButtonStyle {
   }
 }
 
+/// A bordered button style with increased control prominence.
 public struct BorderedProminentButtonStyle: Sendable, ButtonStyle {
   public init() {}
 
@@ -253,6 +259,7 @@ public struct BorderedProminentButtonStyle: Sendable, ButtonStyle {
   }
 }
 
+/// A link-shaped button style for navigation or external-link actions.
 public struct LinkButtonStyle: Sendable, ButtonStyle {
   public init() {}
 

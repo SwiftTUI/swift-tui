@@ -10,12 +10,15 @@ import SwiftTUIWebHost
   import Glibc
 #endif
 
+/// Routes a SwiftTUI app between terminal-native and localhost WebHost launch.
 public enum WebHostCLIRunner {
+  /// Constructs an app on the main actor and launches it using parsed CLI options.
   @MainActor
   public static func run<A: App>(_ appType: A.Type) async throws {
     try await run(appType.init())
   }
 
+  /// Constructs an app on the main actor and launches it with explicit configuration.
   @MainActor
   public static func run<A: App>(
     _ appType: A.Type,
@@ -24,12 +27,14 @@ public enum WebHostCLIRunner {
     try await run(appType.init(), configuration: configuration)
   }
 
+  /// Parses CLI options and launches an app through terminal or WebHost mode.
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
     let options = try SwiftTUIOptions.parse(Array(CommandLine.arguments.dropFirst()))
     try await run(app, configuration: options.runtimeConfiguration())
   }
 
+  /// Launches an app through terminal or WebHost mode with explicit configuration.
   @MainActor
   public static func run<A: App>(
     _ app: A,

@@ -1,5 +1,6 @@
 @_spi(Runners) public import SwiftTUIRuntime
 
+/// Errors thrown while selecting or launching a WebHost scene.
 public enum WebHostRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
   case multipleScenesUnsupported(count: Int)
   case sceneNotFound(WindowIdentifier, available: [WindowIdentifier])
@@ -19,12 +20,15 @@ public enum WebHostRunnerError: Error, Equatable, Sendable, CustomStringConverti
   }
 }
 
+/// Launches a SwiftTUI app through the localhost WebHost runtime.
 public enum WebHostRunner {
+  /// Constructs an app on the main actor and runs it through WebHost.
   @MainActor
   public static func run<A: App>(_ appType: A.Type) async throws {
     try await run(appType.init())
   }
 
+  /// Constructs an app on the main actor and runs it with explicit runtime configuration.
   @MainActor
   public static func run<A: App>(
     _ appType: A.Type,
@@ -33,11 +37,13 @@ public enum WebHostRunner {
     try await run(appType.init(), configuration: configuration)
   }
 
+  /// Runs an app through WebHost with the default runtime configuration.
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
     try await run(app, configuration: .default)
   }
 
+  /// Runs an app through WebHost with explicit runtime configuration.
   @MainActor
   public static func run<A: App>(
     _ app: A,

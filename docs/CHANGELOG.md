@@ -16,6 +16,14 @@ in the durable docs, plans, source, or tests linked from an entry.
   `4ee7a8f9` [TODO.md](TODO.md).
 - Keep completed-work summaries out of `TODO.md`.
 
+## 2026-05-17
+
+- Chose the curated public documentation ratchet instead of global
+  doc-comment linting, added a shared repo-policy check for the selected
+  consumer-facing declarations, documented the policy, and added focused
+  source summaries for the ratcheted style, presentation, text input,
+  navigation, runner, and entrypoint surface.
+
 ## 2026-05-16
 
 - Kept `bun run test:coverage` informational instead of adding a failing
