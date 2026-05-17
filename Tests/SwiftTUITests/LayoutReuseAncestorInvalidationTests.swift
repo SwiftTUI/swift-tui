@@ -34,11 +34,11 @@ struct LayoutReuseAncestorInvalidationTests {
       )
     )
 
-    #expect(updated.diagnostics.resolvedNodesReused == 0)
-    #expect(updated.diagnostics.measuredNodesComputed == 0)
-    #expect(updated.diagnostics.measuredNodesReused == 3)
-    #expect(updated.diagnostics.placedNodesComputed == 1)
-    #expect(updated.diagnostics.placedNodesReused == 2)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.work.measuredNodesComputed == 0)
+    #expect(updated.diagnostics.work.measuredNodesReused == 3)
+    #expect(updated.diagnostics.work.placedNodesComputed == 1)
+    #expect(updated.diagnostics.work.placedNodesReused == 2)
   }
 
   @Test("nested invalidation still reuses clean sibling subtrees")
@@ -84,9 +84,9 @@ struct LayoutReuseAncestorInvalidationTests {
       )
     )
 
-    #expect(updated.diagnostics.measuredNodesComputed == 3)
-    #expect(updated.diagnostics.measuredNodesReused == 4)
-    #expect(updated.diagnostics.placedNodesComputed == 3)
-    #expect(updated.diagnostics.placedNodesReused == 4)
+    #expect(updated.diagnostics.work.measuredNodesComputed == 3)
+    #expect(updated.diagnostics.work.measuredNodesReused == 4)
+    #expect(updated.diagnostics.work.placedNodesComputed == 3)
+    #expect(updated.diagnostics.work.placedNodesReused == 4)
   }
 }

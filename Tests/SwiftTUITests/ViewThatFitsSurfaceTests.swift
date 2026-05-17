@@ -29,7 +29,7 @@ struct ViewThatFitsSurfaceTests {
     )
 
     #expect(realizationCount == 0)
-    #expect(artifacts.diagnostics.layoutDependentRealizations == 0)
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 0)
     #expect(artifacts.rasterSurface.lines.contains("fit"))
   }
 
@@ -62,7 +62,7 @@ struct ViewThatFitsSurfaceTests {
 
     let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(realizationCount == 1)
-    #expect(artifacts.diagnostics.layoutDependentRealizations == 1)
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
     #expect(rendered.contains("fit 8x1"))
     #expect(!rendered.contains("wide"))
   }

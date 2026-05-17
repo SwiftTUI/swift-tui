@@ -256,7 +256,7 @@ struct AnchorPreferenceSurfaceTests {
         line.contains("anchor=0,1")
       }
     )
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
     let diagnostics = second.diagnostics.geometryResolutionDiagnostics
     #expect(diagnostics.anchorResolutionMissCount == 0)
   }
@@ -319,7 +319,7 @@ struct AnchorPreferenceSurfaceTests {
         line.contains("space=0,-1")
       }
     )
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
     let diagnostics = second.diagnostics.geometryResolutionDiagnostics
     #expect(diagnostics.missingNamedCoordinateSpaceCount == 0)
     #expect(diagnostics.duplicateNamedCoordinateSpaceCount == 0)

@@ -16,10 +16,10 @@ struct TimingDiagnosticsTests {
       context: .init(identity: testIdentity("TimingRoot"))
     )
 
-    #expect(artifacts.diagnostics.phaseTimings != nil)
-    #expect(artifacts.diagnostics.workerTimings != nil)
-    #expect(artifacts.diagnostics.mainActorTimings?.suspended == .zero)
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(artifacts.diagnostics.timing.phaseTimings != nil)
+    #expect(artifacts.diagnostics.timing.workerTimings != nil)
+    #expect(artifacts.diagnostics.timing.mainActorTimings?.suspended == .zero)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
   }
 }

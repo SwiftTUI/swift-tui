@@ -137,8 +137,7 @@ extension RunLoop {
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
           context: resolveContext(for: scheduledFrame),
-          proposal: proposal(),
-          collectsDiagnostics: hasDiagnosticsLogger
+          proposal: proposal()
         )
         artifacts = renderedArtifacts
 
@@ -224,7 +223,7 @@ extension RunLoop {
       guard var artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
-      reportRuntimeIssues(artifacts.diagnostics.runtimeIssues)
+      reportRuntimeIssues(artifacts.diagnostics.runtime.issues)
       mergeLifecycleCarryForward(
         focusSyncLifecycleCarryForward,
         into: &artifacts.commitPlan.lifecycle
@@ -318,16 +317,16 @@ extension RunLoop {
 
       if let diagnosticsLogger {
         let diag = artifacts.diagnostics
-        let damageDiagnostics = diag.presentationDamage
+        let damageDiagnostics = diag.presentation.damage
         let geometryDiagnostics = diag.geometryResolutionDiagnostics
-        let cacheMetrics = diag.measurementCache
+        let cacheMetrics = diag.work.measurementCache
         let cacheHitRate: Double? =
           if let cacheMetrics, cacheMetrics.lookups > 0 {
             Double(cacheMetrics.hits) / Double(cacheMetrics.lookups)
           } else {
             nil
           }
-        let pipelineTotal = diag.phaseTimings?.total ?? .zero
+        let pipelineTotal = diag.timing.phaseTimings?.total ?? .zero
         let causeSummary = scheduledFrame.causes
           .map(\.rawValue)
           .sorted()
@@ -349,19 +348,19 @@ extension RunLoop {
             frameNumber: renderedFrames,
             causeSummary: causeSummary,
             focusSyncRerenders: focusSyncBudget.rerenderCount,
-            invalidatedIdentityCount: diag.invalidatedIdentities.count,
-            resolvedNodeCount: diag.resolvedNodeCount,
-            resolvedNodesComputed: diag.resolvedNodesComputed,
-            resolvedNodesReused: diag.resolvedNodesReused,
-            measuredNodeCount: diag.measuredNodeCount,
-            measuredNodesComputed: diag.measuredNodesComputed,
-            measuredNodesReused: diag.measuredNodesReused,
-            placedNodeCount: diag.placedNodeCount,
-            drawNodeCount: diag.drawNodeCount,
-            interactionRegionCount: diag.interactionRegionCount,
-            focusRegionCount: diag.focusRegionCount,
-            phaseTimings: diag.phaseTimings,
-            renderGenerations: diag.renderGenerations,
+            invalidatedIdentityCount: diag.input.invalidatedIdentities.count,
+            resolvedNodeCount: diag.counts.resolvedNodes,
+            resolvedNodesComputed: diag.work.resolvedNodesComputed,
+            resolvedNodesReused: diag.work.resolvedNodesReused,
+            measuredNodeCount: diag.counts.measuredNodes,
+            measuredNodesComputed: diag.work.measuredNodesComputed,
+            measuredNodesReused: diag.work.measuredNodesReused,
+            placedNodeCount: diag.counts.placedNodes,
+            drawNodeCount: diag.counts.drawNodes,
+            interactionRegionCount: diag.counts.interactionRegions,
+            focusRegionCount: diag.counts.focusRegions,
+            phaseTimings: diag.timing.phaseTimings,
+            renderGenerations: diag.timing.renderGenerations,
             desiredGeneration: renderIntentDiagnostics.desiredGeneration,
             coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
             coalescedWakeCauses: formattedWakeCauses(
@@ -375,13 +374,13 @@ extension RunLoop {
             animationControllerActiveAnimationCount: renderer
               .internalAnimationController.activeAnimationCount,
             animationControllerHasPendingWork: animationTick.hasPendingWork,
-            workerTimings: diag.workerTimings,
-            mainActorTimings: diag.mainActorTimings,
-            customLayoutFallbackCount: diag.customLayoutFallbackCount,
-            firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
-            layoutDependentRealizations: diag.layoutDependentRealizations,
-            layoutDependentRealizationCacheHits: diag.layoutDependentRealizationCacheHits,
-            layoutDependentMainActorFallbacks: diag.layoutDependentMainActorFallbacks,
+            workerTimings: diag.timing.workerTimings,
+            mainActorTimings: diag.timing.mainActorTimings,
+            customLayoutFallbackCount: diag.work.customLayoutFallbackCount,
+            firstCustomLayoutFallbackIdentity: diag.work.firstCustomLayoutFallbackIdentity?.path,
+            layoutDependentRealizations: diag.work.layoutDependentRealizations,
+            layoutDependentRealizationCacheHits: diag.work.layoutDependentRealizationCacheHits,
+            layoutDependentMainActorFallbacks: diag.work.layoutDependentMainActorFallbacks,
             geometryAnchorResolutionMissCount: geometryDiagnostics.anchorResolutionMissCount,
             firstGeometryAnchorResolutionMissIdentity: geometryDiagnostics
               .firstAnchorResolutionMissIdentity?.path,
@@ -393,11 +392,11 @@ extension RunLoop {
               .duplicateNamedCoordinateSpaceCount,
             firstGeometryDuplicateNamedCoordinateSpaceName: geometryDiagnostics
               .firstDuplicateNamedCoordinateSpaceName,
-            runtimePointerHandlerCount: diag.runtimeRegistrations.pointerHandlerCount,
-            runtimePointerHoverHandlerCount: diag.runtimeRegistrations.pointerHoverHandlerCount,
-            runtimeGestureRecognizerCount: diag.runtimeRegistrations.gestureRecognizerCount,
-            runtimeGestureStateBindingCount: diag.runtimeRegistrations.gestureStateBindingCount,
-            runtimeIssues: diag.runtimeIssues,
+            runtimePointerHandlerCount: diag.runtime.registrations.pointerHandlerCount,
+            runtimePointerHoverHandlerCount: diag.runtime.registrations.pointerHoverHandlerCount,
+            runtimeGestureRecognizerCount: diag.runtime.registrations.gestureRecognizerCount,
+            runtimeGestureStateBindingCount: diag.runtime.registrations.gestureStateBindingCount,
+            runtimeIssues: diag.runtime.issues,
             staleFramePolicy: "commit_ordered",
             tailJobState: FrameTailJobState.completed.rawValue,
             tailCancelReason: "-",
@@ -753,8 +752,7 @@ extension RunLoop {
                 focusedIdentity: focusTracker.currentFocusIdentity
               )),
             context: resolveContext(for: scheduledFrame),
-            proposal: proposal(),
-            collectsDiagnostics: hasDiagnosticsLogger
+            proposal: proposal()
           )
           tailJobState = .completed
         } else if eventPump == nil {
@@ -765,8 +763,7 @@ extension RunLoop {
                 focusedIdentity: focusTracker.currentFocusIdentity
               )),
             context: resolveContext(for: scheduledFrame),
-            proposal: proposal(),
-            collectsDiagnostics: hasDiagnosticsLogger
+            proposal: proposal()
           )
           tailJobState = .completed
         } else {
@@ -778,7 +775,6 @@ extension RunLoop {
               )),
             context: resolveContext(for: scheduledFrame),
             proposal: proposal(),
-            collectsDiagnostics: hasDiagnosticsLogger,
             newestDesiredGeneration: {
               RenderGeneration(
                 self.scheduler.hasPendingFrame(at: .now())
@@ -933,7 +929,7 @@ extension RunLoop {
       guard var artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
-      reportRuntimeIssues(artifacts.diagnostics.runtimeIssues)
+      reportRuntimeIssues(artifacts.diagnostics.runtime.issues)
       mergeLifecycleCarryForward(
         focusSyncLifecycleCarryForward,
         into: &artifacts.commitPlan.lifecycle
@@ -1027,16 +1023,16 @@ extension RunLoop {
 
       if let diagnosticsLogger {
         let diag = artifacts.diagnostics
-        let damageDiagnostics = diag.presentationDamage
+        let damageDiagnostics = diag.presentation.damage
         let geometryDiagnostics = diag.geometryResolutionDiagnostics
-        let cacheMetrics = diag.measurementCache
+        let cacheMetrics = diag.work.measurementCache
         let cacheHitRate: Double? =
           if let cacheMetrics, cacheMetrics.lookups > 0 {
             Double(cacheMetrics.hits) / Double(cacheMetrics.lookups)
           } else {
             nil
           }
-        let pipelineTotal = diag.phaseTimings?.total ?? .zero
+        let pipelineTotal = diag.timing.phaseTimings?.total ?? .zero
         let causeSummary = scheduledFrame.causes
           .map(\.rawValue)
           .sorted()
@@ -1058,19 +1054,19 @@ extension RunLoop {
             frameNumber: renderedFrames,
             causeSummary: causeSummary,
             focusSyncRerenders: focusSyncBudget.rerenderCount,
-            invalidatedIdentityCount: diag.invalidatedIdentities.count,
-            resolvedNodeCount: diag.resolvedNodeCount,
-            resolvedNodesComputed: diag.resolvedNodesComputed,
-            resolvedNodesReused: diag.resolvedNodesReused,
-            measuredNodeCount: diag.measuredNodeCount,
-            measuredNodesComputed: diag.measuredNodesComputed,
-            measuredNodesReused: diag.measuredNodesReused,
-            placedNodeCount: diag.placedNodeCount,
-            drawNodeCount: diag.drawNodeCount,
-            interactionRegionCount: diag.interactionRegionCount,
-            focusRegionCount: diag.focusRegionCount,
-            phaseTimings: diag.phaseTimings,
-            renderGenerations: diag.renderGenerations,
+            invalidatedIdentityCount: diag.input.invalidatedIdentities.count,
+            resolvedNodeCount: diag.counts.resolvedNodes,
+            resolvedNodesComputed: diag.work.resolvedNodesComputed,
+            resolvedNodesReused: diag.work.resolvedNodesReused,
+            measuredNodeCount: diag.counts.measuredNodes,
+            measuredNodesComputed: diag.work.measuredNodesComputed,
+            measuredNodesReused: diag.work.measuredNodesReused,
+            placedNodeCount: diag.counts.placedNodes,
+            drawNodeCount: diag.counts.drawNodes,
+            interactionRegionCount: diag.counts.interactionRegions,
+            focusRegionCount: diag.counts.focusRegions,
+            phaseTimings: diag.timing.phaseTimings,
+            renderGenerations: diag.timing.renderGenerations,
             desiredGeneration: renderIntentDiagnostics.desiredGeneration,
             coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
             coalescedWakeCauses: formattedWakeCauses(
@@ -1084,13 +1080,13 @@ extension RunLoop {
             animationControllerActiveAnimationCount: renderer
               .internalAnimationController.activeAnimationCount,
             animationControllerHasPendingWork: animationTick.hasPendingWork,
-            workerTimings: diag.workerTimings,
-            mainActorTimings: diag.mainActorTimings,
-            customLayoutFallbackCount: diag.customLayoutFallbackCount,
-            firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
-            layoutDependentRealizations: diag.layoutDependentRealizations,
-            layoutDependentRealizationCacheHits: diag.layoutDependentRealizationCacheHits,
-            layoutDependentMainActorFallbacks: diag.layoutDependentMainActorFallbacks,
+            workerTimings: diag.timing.workerTimings,
+            mainActorTimings: diag.timing.mainActorTimings,
+            customLayoutFallbackCount: diag.work.customLayoutFallbackCount,
+            firstCustomLayoutFallbackIdentity: diag.work.firstCustomLayoutFallbackIdentity?.path,
+            layoutDependentRealizations: diag.work.layoutDependentRealizations,
+            layoutDependentRealizationCacheHits: diag.work.layoutDependentRealizationCacheHits,
+            layoutDependentMainActorFallbacks: diag.work.layoutDependentMainActorFallbacks,
             geometryAnchorResolutionMissCount: geometryDiagnostics.anchorResolutionMissCount,
             firstGeometryAnchorResolutionMissIdentity: geometryDiagnostics
               .firstAnchorResolutionMissIdentity?.path,
@@ -1102,11 +1098,11 @@ extension RunLoop {
               .duplicateNamedCoordinateSpaceCount,
             firstGeometryDuplicateNamedCoordinateSpaceName: geometryDiagnostics
               .firstDuplicateNamedCoordinateSpaceName,
-            runtimePointerHandlerCount: diag.runtimeRegistrations.pointerHandlerCount,
-            runtimePointerHoverHandlerCount: diag.runtimeRegistrations.pointerHoverHandlerCount,
-            runtimeGestureRecognizerCount: diag.runtimeRegistrations.gestureRecognizerCount,
-            runtimeGestureStateBindingCount: diag.runtimeRegistrations.gestureStateBindingCount,
-            runtimeIssues: diag.runtimeIssues,
+            runtimePointerHandlerCount: diag.runtime.registrations.pointerHandlerCount,
+            runtimePointerHoverHandlerCount: diag.runtime.registrations.pointerHoverHandlerCount,
+            runtimeGestureRecognizerCount: diag.runtime.registrations.gestureRecognizerCount,
+            runtimeGestureStateBindingCount: diag.runtime.registrations.gestureStateBindingCount,
+            runtimeIssues: diag.runtime.issues,
             staleFramePolicy: "commit_ordered",
             tailJobState: tailJobState.rawValue,
             tailCancelReason: "-",

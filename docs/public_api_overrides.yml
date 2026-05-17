@@ -506,6 +506,13 @@ classifications:
     - SwiftTUICore.ForeignSurfacePayload
     - SwiftTUICore.FrameArtifacts
     - SwiftTUICore.FrameContext
+    - SwiftTUICore.FrameDiagnosticCounts
+    - SwiftTUICore.FrameDiagnosticDrop
+    - SwiftTUICore.FrameDiagnosticInput
+    - SwiftTUICore.FrameDiagnosticPresentation
+    - SwiftTUICore.FrameDiagnosticRuntime
+    - SwiftTUICore.FrameDiagnosticTiming
+    - SwiftTUICore.FrameDiagnosticWork
     - SwiftTUICore.FrameDiagnostics
     - SwiftTUICore.FrameDropEligibility
     - SwiftTUICore.FrameMainActorTimings

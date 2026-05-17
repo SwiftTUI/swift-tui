@@ -34,10 +34,10 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.presentation.bytesWritten == 0)
     #expect(second.presentation.linesTouched == 0)
     #expect(second.presentation.cellsChanged == 0)
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesComputed == 0)
-    #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
-    #expect(second.diagnostics.placedNodesReused == second.diagnostics.placedNodeCount)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(second.diagnostics.work.placedNodesComputed == 0)
+    #expect(second.diagnostics.work.measuredNodesReused == second.diagnostics.counts.measuredNodes)
+    #expect(second.diagnostics.work.placedNodesReused == second.diagnostics.counts.placedNodes)
   }
 
   @Test("focused button press only recomputes the changing counter row")
@@ -67,10 +67,12 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
     #expect(second.presentation.linesTouched < first.presentation.linesTouched)
     #expect(second.presentation.cellsChanged < first.presentation.cellsChanged)
-    #expect(second.diagnostics.measuredNodesComputed < first.diagnostics.measuredNodesComputed)
-    #expect(second.diagnostics.placedNodesComputed < first.diagnostics.placedNodesComputed)
-    #expect(second.diagnostics.measuredNodesReused > 0)
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(
+      second.diagnostics.work.measuredNodesComputed < first.diagnostics.work.measuredNodesComputed)
+    #expect(
+      second.diagnostics.work.placedNodesComputed < first.diagnostics.work.placedNodesComputed)
+    #expect(second.diagnostics.work.measuredNodesReused > 0)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
   }
 
   @Test("single-character text input produces a narrow incremental update")
@@ -100,10 +102,12 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
     #expect(second.presentation.linesTouched < first.presentation.linesTouched)
     #expect(second.presentation.cellsChanged < first.presentation.cellsChanged)
-    #expect(second.diagnostics.measuredNodesComputed < first.diagnostics.measuredNodesComputed)
-    #expect(second.diagnostics.placedNodesComputed < first.diagnostics.placedNodesComputed)
-    #expect(second.diagnostics.measuredNodesReused > 0)
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(
+      second.diagnostics.work.measuredNodesComputed < first.diagnostics.work.measuredNodesComputed)
+    #expect(
+      second.diagnostics.work.placedNodesComputed < first.diagnostics.work.placedNodesComputed)
+    #expect(second.diagnostics.work.measuredNodesReused > 0)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
   }
 
   @Test("single-cell row edit preserves a one-line one-cell incremental update")
@@ -163,10 +167,11 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.presentation.strategy == .incremental)
     #expect(second.presentation.bytesWritten > 0)
     #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesComputed < first.diagnostics.placedNodesComputed)
-    #expect(second.diagnostics.measuredNodesReused > 0)
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(
+      second.diagnostics.work.placedNodesComputed < first.diagnostics.work.placedNodesComputed)
+    #expect(second.diagnostics.work.measuredNodesReused > 0)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
   }
 
   @Test("lazy scroll movement reduces placement work on viewport shifts")
@@ -208,9 +213,9 @@ struct Phase1BenchmarkScenariosTests {
 
     #expect(eagerSecond.presentation.strategy == .incremental)
     #expect(lazySecond.presentation.strategy == .incremental)
-    #expect(lazySecond.diagnostics.measuredNodesComputed == 0)
-    #expect(lazySecond.diagnostics.measuredNodesReused > 0)
-    #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
+    #expect(lazySecond.diagnostics.work.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.work.measuredNodesReused > 0)
+    #expect(lazySecond.diagnostics.counts.placedNodes < eagerSecond.diagnostics.counts.placedNodes)
     #expect(lazySecond.presentation.bytesWritten <= eagerSecond.presentation.bytesWritten)
   }
 
@@ -252,8 +257,10 @@ struct Phase1BenchmarkScenariosTests {
     )
 
     #expect(lazySecond.presentation.strategy == .incremental)
-    #expect(lazySecond.diagnostics.resolvedNodeCount < stableSecond.diagnostics.resolvedNodeCount)
-    #expect(lazySecond.diagnostics.measuredNodeCount < stableSecond.diagnostics.measuredNodeCount)
+    #expect(
+      lazySecond.diagnostics.counts.resolvedNodes < stableSecond.diagnostics.counts.resolvedNodes)
+    #expect(
+      lazySecond.diagnostics.counts.measuredNodes < stableSecond.diagnostics.counts.measuredNodes)
   }
 
   @Test("trailing tail shrink lowers through erase-to-end-of-line without widening the damage")
@@ -300,13 +307,13 @@ struct Phase1BenchmarkScenariosTests {
       LargeStaticTreeBenchmarkView(rowCount: 160),
       context: .init(identity: Phase1BenchmarkIdentity.root)
     )
-    let timings = try #require(frame.diagnostics.phaseTimings)
+    let timings = try #require(frame.diagnostics.timing.phaseTimings)
 
     #expect(frame.presentation.strategy == .fullRepaint)
-    #expect(frame.diagnostics.resolvedNodeCount > 160)
-    #expect(frame.diagnostics.measuredNodeCount > 160)
-    #expect(frame.diagnostics.placedNodeCount > 160)
-    #expect(frame.diagnostics.drawNodeCount > 160)
+    #expect(frame.diagnostics.counts.resolvedNodes > 160)
+    #expect(frame.diagnostics.counts.measuredNodes > 160)
+    #expect(frame.diagnostics.counts.placedNodes > 160)
+    #expect(frame.diagnostics.counts.drawNodes > 160)
     #expect(timings.total >= timings.resolve)
     #expect(timings.total >= timings.measure)
     #expect(timings.total >= timings.place)

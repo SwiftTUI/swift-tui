@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Completed the source-breaking Finding 10 diagnostics cleanup: public
+  `FrameDiagnostics` is now grouped by input, counts, work, presentation,
+  timing, runtime, and drop records; `DefaultRenderer` no longer exposes
+  `collectsDiagnostics`; frame artifact equality ignores diagnostics sidecars;
+  and the public API baseline records the new diagnostic group symbols.
 - Confirmed queued-tail cancellation remained shipped after Finding 4 narrowing:
   not-yet-started frame-tail jobs cancel before worker layout starts, discard the
   prepared frame head, and replay render invalidation intent into replacement

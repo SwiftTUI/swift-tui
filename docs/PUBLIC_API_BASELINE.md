@@ -31,7 +31,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 1 | 5 |
 | `SwiftUIHost` | 7 | 61 |
-| `SwiftTUICore` | 263 | 2110 |
+| `SwiftTUICore` | 270 | 2132 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -506,7 +506,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (263)
+### Canonical surface (270)
 
 - `AccessibilityAnnouncement` — struct — 3 members
 - `AccessibilityNode` — struct — 10 members
@@ -586,9 +586,16 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FocusTracker` — class — 10 members
 - `ForeignGrid` — struct — 4 members
 - `ForeignSurfacePayload` — protocol — 1 member
-- `FrameArtifacts` — struct — 10 members
+- `FrameArtifacts` — struct — 11 members
 - `FrameContext` — struct — 7 members
-- `FrameDiagnostics` — struct — 31 members
+- `FrameDiagnosticCounts` — struct — 9 members
+- `FrameDiagnosticDrop` — struct — 2 members
+- `FrameDiagnosticInput` — struct — 3 members
+- `FrameDiagnosticPresentation` — struct — 2 members
+- `FrameDiagnosticRuntime` — struct — 3 members
+- `FrameDiagnostics` — struct — 8 members
+- `FrameDiagnosticTiming` — struct — 5 members
+- `FrameDiagnosticWork` — struct — 13 members
 - `FrameDropEligibility` — struct — 40 members
 - `FrameMainActorTimings` — struct — 3 members
 - `FramePhaseTimings` — struct — 9 members

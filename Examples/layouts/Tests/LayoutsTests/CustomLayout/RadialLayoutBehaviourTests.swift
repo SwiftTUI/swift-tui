@@ -207,10 +207,10 @@ struct RadialLayoutBehaviourTests {
       width: 20,
       height: 12
     )
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
     #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("[E]"))

@@ -35,14 +35,12 @@ struct PipelineContractTests {
     let syncArtifacts = DefaultRenderer().render(
       root(),
       context: .init(identity: rootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
     let asyncArtifacts = await DefaultRenderer().renderAsync(
       root(),
       context: .init(identity: rootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
 
     #expect(syncArtifacts == asyncArtifacts)
@@ -506,7 +504,9 @@ private func makePipelineContractArtifacts(
     bounds: .init(origin: .zero, size: .zero)
   )
   let draw = DrawNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
-  let diagnostics = FrameDiagnostics(dropEligibilityBlockers: dropEligibilityBlockers)
+  let diagnostics = FrameDiagnostics(
+    drop: .init(eligibilityBlockers: dropEligibilityBlockers)
+  )
 
   return FrameArtifacts(
     resolvedTree: resolved,

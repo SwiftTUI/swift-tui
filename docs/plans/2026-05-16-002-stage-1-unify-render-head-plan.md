@@ -11,6 +11,11 @@ depends_on:
 
 # Stage 1 — Unify the Render Head Implementation Plan
 
+> **Historical note:** This shipped plan preserves the Stage 1 implementation
+> context. The later Finding 10 cleanup removed `collectsDiagnostics` and made
+> diagnostics unconditional, so references to that parameter below describe the
+> pre-cleanup API shape.
+
 > **For agentic workers:** Execute this plan task-by-task with
 > `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
 > Steps use checkbox (`- [ ]`) syntax. This is **Stage 1** of

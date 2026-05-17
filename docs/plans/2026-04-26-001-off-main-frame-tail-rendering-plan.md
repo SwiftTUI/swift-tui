@@ -360,8 +360,9 @@ Stage 4 result:
   per-renderer `FrameTailRenderer`.
 - The worker uses a serial `DispatchQueue` where available and falls back to
   inline execution when Dispatch is unavailable.
-- `FrameDiagnostics.workerTimings` and `FrameDiagnosticsLogger` now expose
-  layout/raster enqueue and compute timings plus completion-to-commit delay.
+- `FrameDiagnostics.timing.workerTimings` and `FrameDiagnosticsLogger` now
+  expose layout/raster enqueue and compute timings plus completion-to-commit
+  delay.
 - The public synchronous render path still waits for the worker. Main-actor
   suspension is deferred to Stage 5.
 

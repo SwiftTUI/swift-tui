@@ -266,7 +266,7 @@ struct GeometryReaderSurfaceTests {
     )
 
     #expect(realizationCount == 1)
-    #expect(artifacts.diagnostics.layoutDependentRealizations == 1)
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("12x4") })
   }
 

@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// Regression pins for the "gallery freezes on the chasing-light panel"
@@ -215,7 +215,7 @@ struct AnimationRepeatForeverGrowthTests {
         ),
         proposal: ProposedSize(width: .finite(40), height: .finite(20))
       )
-      measureCounts.append(artifacts.diagnostics.measuredNodesComputed)
+      measureCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
       activeAnimationCounts.append(controller.activeAnimationCount)
     }
 
@@ -334,9 +334,9 @@ struct AnimationRepeatForeverGrowthTests {
         currentLifecycleRegistry: runLoop.localLifecycleRegistry,
         currentTaskRegistry: runLoop.localTaskRegistry
       )
-      resolvedNodeTotals.append(artifacts.diagnostics.resolvedNodeCount)
-      placedNodeTotals.append(artifacts.diagnostics.placedNodeCount)
-      measuredNodeCounts.append(artifacts.diagnostics.measuredNodesComputed)
+      resolvedNodeTotals.append(artifacts.diagnostics.counts.resolvedNodes)
+      placedNodeTotals.append(artifacts.diagnostics.counts.placedNodes)
+      measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
       activeCounts.append(controller.activeAnimationCount)
       let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
       appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
@@ -483,10 +483,10 @@ struct AnimationRepeatForeverGrowthTests {
         currentLifecycleRegistry: runLoop.localLifecycleRegistry,
         currentTaskRegistry: runLoop.localTaskRegistry
       )
-      resolvedNodeTotals.append(artifacts.diagnostics.resolvedNodeCount)
-      placedNodeTotals.append(artifacts.diagnostics.placedNodeCount)
-      resolvedNodeCounts.append(artifacts.diagnostics.resolvedNodesComputed)
-      measuredNodeCounts.append(artifacts.diagnostics.measuredNodesComputed)
+      resolvedNodeTotals.append(artifacts.diagnostics.counts.resolvedNodes)
+      placedNodeTotals.append(artifacts.diagnostics.counts.placedNodes)
+      resolvedNodeCounts.append(artifacts.diagnostics.work.resolvedNodesComputed)
+      measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
       activeCounts.append(controller.activeAnimationCount)
       let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
       appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)

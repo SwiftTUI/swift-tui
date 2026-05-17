@@ -271,14 +271,16 @@ private func makeArtifacts(
   )
   let draw = DrawNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
   let diagnostics = FrameDiagnostics(
-    presentationDamage: presentationDamage.map {
-      .init(
-        damage: $0,
-        surfaceWidth: 0
-      )
-    },
-    customLayoutFallbackCount: customLayoutFallbackCount,
-    dropEligibilityBlockers: dropEligibilityBlockers
+    work: .init(customLayoutFallbackCount: customLayoutFallbackCount),
+    presentation: .init(
+      damage: presentationDamage.map {
+        .init(
+          damage: $0,
+          surfaceWidth: 0
+        )
+      }
+    ),
+    drop: .init(eligibilityBlockers: dropEligibilityBlockers)
   )
   let commitPlan = CommitPlan(
     transaction: .init(),

@@ -1,9 +1,48 @@
-public struct FrameDiagnostics: Equatable, Sendable {
+public struct FrameDiagnosticInput: Equatable, Sendable {
   public var proposal: ProposedSize
   public var invalidatedIdentities: Set<Identity>
-  public var resolvedNodeCount: Int
-  public var measuredNodeCount: Int
-  public var placedNodeCount: Int
+
+  public init(
+    proposal: ProposedSize = .unspecified,
+    invalidatedIdentities: Set<Identity> = []
+  ) {
+    self.proposal = proposal
+    self.invalidatedIdentities = invalidatedIdentities
+  }
+}
+
+public struct FrameDiagnosticCounts: Equatable, Sendable {
+  public var resolvedNodes: Int
+  public var measuredNodes: Int
+  public var placedNodes: Int
+  public var drawNodes: Int
+  public var interactionRegions: Int
+  public var focusRegions: Int
+  public var scrollRoutes: Int
+  public var selectionRoutes: Int
+
+  public init(
+    resolvedNodes: Int = 0,
+    measuredNodes: Int = 0,
+    placedNodes: Int = 0,
+    drawNodes: Int = 0,
+    interactionRegions: Int = 0,
+    focusRegions: Int = 0,
+    scrollRoutes: Int = 0,
+    selectionRoutes: Int = 0
+  ) {
+    self.resolvedNodes = resolvedNodes
+    self.measuredNodes = measuredNodes
+    self.placedNodes = placedNodes
+    self.drawNodes = drawNodes
+    self.interactionRegions = interactionRegions
+    self.focusRegions = focusRegions
+    self.scrollRoutes = scrollRoutes
+    self.selectionRoutes = selectionRoutes
+  }
+}
+
+public struct FrameDiagnosticWork: Equatable, Sendable {
   public var resolvedNodesComputed: Int
   public var resolvedNodesReused: Int
   public var measuredNodesComputed: Int
@@ -13,30 +52,11 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var layoutDependentRealizations: Int
   public var layoutDependentRealizationCacheHits: Int
   public var layoutDependentMainActorFallbacks: Int
-  public var drawNodeCount: Int
-  public var interactionRegionCount: Int
-  public var focusRegionCount: Int
-  public var scrollRouteCount: Int
-  public var selectionRouteCount: Int
-  public var presentationDamage: PresentationDamageDiagnostics?
-  public var phaseTimings: FramePhaseTimings?
-  public var renderGenerations: FrameRenderGenerations
-  public var workerTimings: FrameWorkerTimings?
-  public var mainActorTimings: FrameMainActorTimings?
   public var measurementCache: MeasurementCacheMetrics?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
-  public var runtimeRegistrations: RuntimeRegistrationDiagnostics
-  public var runtimeIssues: [RuntimeIssue]
-  public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
-  package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
 
   public init(
-    proposal: ProposedSize = .unspecified,
-    invalidatedIdentities: Set<Identity> = [],
-    resolvedNodeCount: Int = 0,
-    measuredNodeCount: Int = 0,
-    placedNodeCount: Int = 0,
     resolvedNodesComputed: Int = 0,
     resolvedNodesReused: Int = 0,
     measuredNodesComputed: Int = 0,
@@ -46,28 +66,10 @@ public struct FrameDiagnostics: Equatable, Sendable {
     layoutDependentRealizations: Int = 0,
     layoutDependentRealizationCacheHits: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
-    drawNodeCount: Int = 0,
-    interactionRegionCount: Int = 0,
-    focusRegionCount: Int = 0,
-    scrollRouteCount: Int = 0,
-    selectionRouteCount: Int = 0,
-    presentationDamage: PresentationDamageDiagnostics? = nil,
-    phaseTimings: FramePhaseTimings? = nil,
-    renderGenerations: FrameRenderGenerations = .init(),
-    workerTimings: FrameWorkerTimings? = nil,
-    mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil,
     customLayoutFallbackCount: Int = 0,
-    firstCustomLayoutFallbackIdentity: Identity? = nil,
-    runtimeRegistrations: RuntimeRegistrationDiagnostics = .init(),
-    runtimeIssues: [RuntimeIssue] = [],
-    dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
+    firstCustomLayoutFallbackIdentity: Identity? = nil
   ) {
-    self.proposal = proposal
-    self.invalidatedIdentities = invalidatedIdentities
-    self.resolvedNodeCount = resolvedNodeCount
-    self.measuredNodeCount = measuredNodeCount
-    self.placedNodeCount = placedNodeCount
     self.resolvedNodesComputed = resolvedNodesComputed
     self.resolvedNodesReused = resolvedNodesReused
     self.measuredNodesComputed = measuredNodesComputed
@@ -77,22 +79,88 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.layoutDependentRealizations = layoutDependentRealizations
     self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
-    self.drawNodeCount = drawNodeCount
-    self.interactionRegionCount = interactionRegionCount
-    self.focusRegionCount = focusRegionCount
-    self.scrollRouteCount = scrollRouteCount
-    self.selectionRouteCount = selectionRouteCount
-    self.presentationDamage = presentationDamage
+    self.measurementCache = measurementCache
+    self.customLayoutFallbackCount = customLayoutFallbackCount
+    self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
+  }
+}
+
+public struct FrameDiagnosticPresentation: Equatable, Sendable {
+  public var damage: PresentationDamageDiagnostics?
+
+  public init(damage: PresentationDamageDiagnostics? = nil) {
+    self.damage = damage
+  }
+}
+
+public struct FrameDiagnosticTiming: Equatable, Sendable {
+  public var phaseTimings: FramePhaseTimings?
+  public var renderGenerations: FrameRenderGenerations
+  public var workerTimings: FrameWorkerTimings?
+  public var mainActorTimings: FrameMainActorTimings?
+
+  public init(
+    phaseTimings: FramePhaseTimings? = nil,
+    renderGenerations: FrameRenderGenerations = .init(),
+    workerTimings: FrameWorkerTimings? = nil,
+    mainActorTimings: FrameMainActorTimings? = nil
+  ) {
     self.phaseTimings = phaseTimings
     self.renderGenerations = renderGenerations
     self.workerTimings = workerTimings
     self.mainActorTimings = mainActorTimings
-    self.measurementCache = measurementCache
-    self.customLayoutFallbackCount = customLayoutFallbackCount
-    self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
-    self.runtimeRegistrations = runtimeRegistrations
-    self.runtimeIssues = runtimeIssues
-    self.dropEligibilityBlockers = dropEligibilityBlockers
+  }
+}
+
+public struct FrameDiagnosticRuntime: Equatable, Sendable {
+  public var registrations: RuntimeRegistrationDiagnostics
+  public var issues: [RuntimeIssue]
+
+  public init(
+    registrations: RuntimeRegistrationDiagnostics = .init(),
+    issues: [RuntimeIssue] = []
+  ) {
+    self.registrations = registrations
+    self.issues = issues
+  }
+}
+
+public struct FrameDiagnosticDrop: Equatable, Sendable {
+  public var eligibilityBlockers: Set<FrameDropEligibility.Blocker>
+
+  public init(
+    eligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
+  ) {
+    self.eligibilityBlockers = eligibilityBlockers
+  }
+}
+
+public struct FrameDiagnostics: Sendable {
+  public var input: FrameDiagnosticInput
+  public var counts: FrameDiagnosticCounts
+  public var work: FrameDiagnosticWork
+  public var presentation: FrameDiagnosticPresentation
+  public var timing: FrameDiagnosticTiming
+  public var runtime: FrameDiagnosticRuntime
+  public var drop: FrameDiagnosticDrop
+  package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
+
+  public init(
+    input: FrameDiagnosticInput = .init(),
+    counts: FrameDiagnosticCounts = .init(),
+    work: FrameDiagnosticWork = .init(),
+    presentation: FrameDiagnosticPresentation = .init(),
+    timing: FrameDiagnosticTiming = .init(),
+    runtime: FrameDiagnosticRuntime = .init(),
+    drop: FrameDiagnosticDrop = .init()
+  ) {
+    self.input = input
+    self.counts = counts
+    self.work = work
+    self.presentation = presentation
+    self.timing = timing
+    self.runtime = runtime
+    self.drop = drop
   }
 }
 
@@ -261,6 +329,20 @@ public struct FrameArtifacts: Equatable, Sendable {
   }
 }
 
+extension FrameArtifacts {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.resolvedTree == rhs.resolvedTree
+      && lhs.measuredTree == rhs.measuredTree
+      && lhs.placedTree == rhs.placedTree
+      && lhs.semanticSnapshot == rhs.semanticSnapshot
+      && lhs.drawTree == rhs.drawTree
+      && lhs.rasterSurface == rhs.rasterSurface
+      && lhs.presentationDamage == rhs.presentationDamage
+      && lhs.drawnIdentities == rhs.drawnIdentities
+      && lhs.commitPlan == rhs.commitPlan
+  }
+}
+
 extension FrameDiagnostics {
   package static func summarize(
     resolved: ResolvedNode,
@@ -283,40 +365,50 @@ extension FrameDiagnostics {
   ) -> Self {
     let customLayoutFallback = customLayoutFallbackSummary(resolved)
     var diagnostics = Self(
-      proposal: measured.proposal,
-      invalidatedIdentities: invalidatedIdentities,
-      resolvedNodeCount: resolved.subtreeNodeCount,
-      measuredNodeCount: measured.subtreeNodeCount,
-      placedNodeCount: placed.subtreeNodeCount,
-      resolvedNodesComputed: resolveWork?.resolvedNodesComputed ?? 0,
-      resolvedNodesReused: resolveWork?.resolvedNodesReused ?? 0,
-      measuredNodesComputed: layoutWork?.measuredNodesComputed ?? 0,
-      measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
-      placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
-      placedNodesReused: layoutWork?.placedNodesReused ?? 0,
-      layoutDependentRealizations: layoutWork?.layoutDependentRealizations ?? 0,
-      layoutDependentRealizationCacheHits: layoutWork?.layoutDependentRealizationCacheHits ?? 0,
-      layoutDependentMainActorFallbacks: layoutWork?.layoutDependentMainActorFallbacks ?? 0,
-      drawNodeCount: draw.subtreeNodeCount,
-      interactionRegionCount: semantics.interactionRegions.count,
-      focusRegionCount: semantics.focusRegions.count,
-      scrollRouteCount: semantics.scrollRoutes.count,
-      selectionRouteCount: semantics.selectionRoutes.count,
-      presentationDamage: presentationDamage.map {
-        .init(
-          damage: $0,
-          surfaceWidth: presentationSurfaceWidth
-        )
-      },
-      phaseTimings: phaseTimings,
-      renderGenerations: renderGenerations,
-      workerTimings: workerTimings,
-      mainActorTimings: mainActorTimings,
-      measurementCache: measurementCache,
-      customLayoutFallbackCount: customLayoutFallback.count,
-      firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity,
-      runtimeIssues: runtimeIssues,
-      dropEligibilityBlockers: dropEligibilityBlockers
+      input: .init(
+        proposal: measured.proposal,
+        invalidatedIdentities: invalidatedIdentities
+      ),
+      counts: .init(
+        resolvedNodes: resolved.subtreeNodeCount,
+        measuredNodes: measured.subtreeNodeCount,
+        placedNodes: placed.subtreeNodeCount,
+        drawNodes: draw.subtreeNodeCount,
+        interactionRegions: semantics.interactionRegions.count,
+        focusRegions: semantics.focusRegions.count,
+        scrollRoutes: semantics.scrollRoutes.count,
+        selectionRoutes: semantics.selectionRoutes.count
+      ),
+      work: .init(
+        resolvedNodesComputed: resolveWork?.resolvedNodesComputed ?? 0,
+        resolvedNodesReused: resolveWork?.resolvedNodesReused ?? 0,
+        measuredNodesComputed: layoutWork?.measuredNodesComputed ?? 0,
+        measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
+        placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
+        placedNodesReused: layoutWork?.placedNodesReused ?? 0,
+        layoutDependentRealizations: layoutWork?.layoutDependentRealizations ?? 0,
+        layoutDependentRealizationCacheHits: layoutWork?.layoutDependentRealizationCacheHits ?? 0,
+        layoutDependentMainActorFallbacks: layoutWork?.layoutDependentMainActorFallbacks ?? 0,
+        measurementCache: measurementCache,
+        customLayoutFallbackCount: customLayoutFallback.count,
+        firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
+      ),
+      presentation: .init(
+        damage: presentationDamage.map {
+          .init(
+            damage: $0,
+            surfaceWidth: presentationSurfaceWidth
+          )
+        }
+      ),
+      timing: .init(
+        phaseTimings: phaseTimings,
+        renderGenerations: renderGenerations,
+        workerTimings: workerTimings,
+        mainActorTimings: mainActorTimings
+      ),
+      runtime: .init(issues: runtimeIssues),
+      drop: .init(eligibilityBlockers: dropEligibilityBlockers)
     )
     diagnostics.geometryResolutionDiagnostics =
       layoutWork?.geometryResolutionDiagnostics ?? .init()

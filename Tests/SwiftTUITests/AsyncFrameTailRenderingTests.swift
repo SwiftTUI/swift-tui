@@ -467,11 +467,11 @@ struct AsyncFrameTailRenderingTests {
     await gate.waitUntilBlocked()
     gate.release()
     let artifacts = await renderTask.value
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
-    let mainActorTimings = try #require(artifacts.diagnostics.mainActorTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let mainActorTimings = try #require(artifacts.diagnostics.timing.mainActorTimings)
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 1)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == rootIdentity)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 1)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == rootIdentity)
     guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
       Issue.record("expected custom layout root")
       return
@@ -499,12 +499,12 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 32, height: 6)
     )
 
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
-    let mainActorTimings = try #require(artifacts.diagnostics.mainActorTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let mainActorTimings = try #require(artifacts.diagnostics.timing.mainActorTimings)
     let workerLayoutState = recorder.state
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
     guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
       Issue.record("expected custom layout root")
       return
@@ -541,9 +541,9 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 24, height: 5)
     )
 
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
-    #expect(artifacts.diagnostics.layoutDependentRealizations == 1)
-    #expect(artifacts.diagnostics.layoutDependentMainActorFallbacks == 1)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
+    #expect(artifacts.diagnostics.work.layoutDependentMainActorFallbacks == 1)
     #expect(workerTimings.layoutCompute == .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
@@ -566,9 +566,9 @@ struct AsyncFrameTailRenderingTests {
       context: .init(identity: testIdentity("AsyncLateToolbarRoot")),
       proposal: .init(width: 24, height: 4)
     )
-    let issue = artifacts.diagnostics.runtimeIssues.first
+    let issue = artifacts.diagnostics.runtime.issues.first
 
-    #expect(artifacts.diagnostics.runtimeIssues.count == 1)
+    #expect(artifacts.diagnostics.runtime.issues.count == 1)
     #expect(issue?.code == "toolbar.unhostedItems")
     #expect(issue?.severity == .warning)
   }
@@ -580,7 +580,7 @@ struct AsyncFrameTailRenderingTests {
       context: .init(identity: testIdentity("AsyncRecursiveCustomLayoutRoot")),
       proposal: .init(width: 24, height: 4)
     )
-    let issues = artifacts.diagnostics.runtimeIssues.filter {
+    let issues = artifacts.diagnostics.runtime.issues.filter {
       $0.code == "layout.customLayoutDepthLimitExceeded"
     }
 
@@ -604,12 +604,12 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 32, height: 6)
     )
 
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
-    let mainActorTimings = try #require(artifacts.diagnostics.mainActorTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let mainActorTimings = try #require(artifacts.diagnostics.timing.mainActorTimings)
     let layoutState = recorder.state
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
     guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
       Issue.record("expected custom layout root")
       return
@@ -645,11 +645,11 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 32, height: 6)
     )
 
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let layoutState = recorder.state
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
     #expect(layoutState.measureRanOnMainThread == false)
     #expect(layoutState.placeRanOnMainThread == false)
     #expect(workerTimings.layoutCompute != .zero)
@@ -692,11 +692,11 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 24, height: 6)
     )
 
-    #expect(first.diagnostics.measuredNodesComputed > 0)
-    #expect(first.diagnostics.placedNodesComputed > 0)
-    #expect(second.diagnostics.customLayoutFallbackCount == 0)
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesComputed == 0)
+    #expect(first.diagnostics.work.measuredNodesComputed > 0)
+    #expect(first.diagnostics.work.placedNodesComputed > 0)
+    #expect(second.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(second.diagnostics.work.placedNodesComputed == 0)
   }
 
   @Test("public SendableLayout focus sync rerender converges on the runtime path")
@@ -786,18 +786,18 @@ struct AsyncFrameTailRenderingTests {
       context: .init(identity: identity),
       proposal: proposal
     )
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
 
     #expect(
-      artifacts.diagnostics.customLayoutFallbackCount == 0,
+      artifacts.diagnostics.work.customLayoutFallbackCount == 0,
       """
       expected \(identity.path) to avoid custom-layout fallback; \
-      first fallback was \(artifacts.diagnostics.firstCustomLayoutFallbackIdentity?.path ?? "nil")
+      first fallback was \(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity?.path ?? "nil")
       \(raster)
       """
     )
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
     #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(raster.contains(marker))
@@ -832,7 +832,7 @@ struct AsyncFrameTailRenderingTests {
       context: .init(identity: testIdentity("AsyncLazyIndexedScrollViewLayoutRoot")),
       proposal: .init(width: 24, height: 4)
     )
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
 
     let lazyStack = try #require(artifacts.resolvedTree.children.first)
@@ -860,11 +860,11 @@ struct AsyncFrameTailRenderingTests {
       context: .init(identity: testIdentity("AsyncLazyIndexedCustomLayoutRoot")),
       proposal: .init(width: 24, height: 4)
     )
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount == 1)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity != nil)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 1)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity != nil)
     #expect(workerTimings.layoutCompute == .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(raster.contains("custom lazy"))
@@ -1616,9 +1616,9 @@ struct AsyncFrameTailRenderingTests {
       context: .init(identity: testIdentity("AsyncTimingRoot"))
     )
 
-    #expect(artifacts.diagnostics.phaseTimings != nil)
-    #expect(artifacts.diagnostics.workerTimings != nil)
-    #expect(artifacts.diagnostics.mainActorTimings != nil)
+    #expect(artifacts.diagnostics.timing.phaseTimings != nil)
+    #expect(artifacts.diagnostics.timing.workerTimings != nil)
+    #expect(artifacts.diagnostics.timing.mainActorTimings != nil)
   }
 
   @Test("sync and async renderer artifacts stay equivalent")
@@ -1650,14 +1650,12 @@ struct AsyncFrameTailRenderingTests {
     let syncArtifacts = DefaultRenderer().render(
       root(),
       context: .init(identity: rootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
     let asyncArtifacts = await DefaultRenderer().renderAsync(
       root(),
       context: .init(identity: rootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
 
     #expect(syncArtifacts == asyncArtifacts)
@@ -1665,14 +1663,12 @@ struct AsyncFrameTailRenderingTests {
     let syncCommandArtifacts = DefaultRenderer().render(
       commandRoot(),
       context: .init(identity: commandRootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
     let asyncCommandArtifacts = await DefaultRenderer().renderAsync(
       commandRoot(),
       context: .init(identity: commandRootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
 
     #expect(syncCommandArtifacts == asyncCommandArtifacts)
@@ -1695,8 +1691,7 @@ struct AsyncFrameTailRenderingTests {
         recorder: recorder
       ),
       context: context,
-      proposal: .init(width: 24, height: 5),
-      collectsDiagnostics: false
+      proposal: .init(width: 24, height: 5)
     )
     let commandScope = try #require(
       commandRegistry.snapshot().keyCommandsByScope.first {
@@ -1714,8 +1709,7 @@ struct AsyncFrameTailRenderingTests {
         recorder: recorder
       ),
       context: updateContext,
-      proposal: .init(width: 24, height: 5),
-      collectsDiagnostics: false
+      proposal: .init(width: 24, height: 5)
     )
 
     #expect(commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == true)
@@ -2723,8 +2717,7 @@ struct AsyncFrameTailRenderingTests {
     _ = renderer.render(
       AsyncFrameHeadTransitionDraftView(show: false),
       context: .init(identity: rootIdentity),
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
     #expect(renderer.internalAnimationController.activeInsertionOffsetCount == 0)
 
@@ -2755,8 +2748,7 @@ struct AsyncFrameTailRenderingTests {
     _ = renderer.render(
       AsyncFrameHeadTransitionDraftView(show: true),
       context: animatedContext,
-      proposal: proposal,
-      collectsDiagnostics: false
+      proposal: proposal
     )
     #expect(renderer.internalAnimationController.activeInsertionOffsetCount > 0)
   }
@@ -2871,7 +2863,6 @@ struct AsyncFrameTailRenderingTests {
       Text("ordered"),
       context: .init(identity: rootIdentity),
       proposal: .init(width: 16, height: 3),
-      collectsDiagnostics: true,
       shouldCancelQueued: { false }
     )
 
@@ -2901,8 +2892,7 @@ struct AsyncFrameTailRenderingTests {
         recorder: recorder
       ),
       context: context,
-      proposal: .init(width: 24, height: 5),
-      collectsDiagnostics: false
+      proposal: .init(width: 24, height: 5)
     )
     let commandScope = try #require(
       commandRegistry.snapshot().keyCommandsByScope.first {
@@ -3010,8 +3000,8 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 24, height: 3)
     )
 
-    let firstGenerations = first.diagnostics.renderGenerations
-    let secondGenerations = second.diagnostics.renderGenerations
+    let firstGenerations = first.diagnostics.timing.renderGenerations
+    let secondGenerations = second.diagnostics.timing.renderGenerations
 
     #expect(firstGenerations.render.rawValue == 1)
     #expect(secondGenerations.render.rawValue == 2)
