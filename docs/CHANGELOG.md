@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Split `ViewGraph` state records and checkpoint payloads into
+  `ViewGraphState.swift` while keeping graph mutation and lifecycle/reuse logic
+  in `ViewGraph.swift`.
 - Split animation model records and placed-overlay application out of
   `AnimationController.swift`, leaving the controller file focused on animation
   state-machine ownership, ticking, transition detection, and completion
