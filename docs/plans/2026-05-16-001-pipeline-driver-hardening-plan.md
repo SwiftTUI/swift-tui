@@ -308,6 +308,10 @@ the bound-exceeded policy is decided in an ADR and implemented.
 order is enforced by composition, not asserted by prose. Collapse Findings 1, 3,
 and 9 together. **This is the structural core of the plan.**
 
+**Status:** Shipped. Detailed plan:
+[`docs/plans/2026-05-17-003-stage-3-compose-pipeline-plan.md`](./2026-05-17-003-stage-3-compose-pipeline-plan.md).
+ADR: [`0019`](../decisions/0019-composed-runtime-render-pipeline.md).
+
 **Addresses:** P1b (Findings 1, 3, 9).
 
 **Depends on:** Stages 0, 1, and 2.
@@ -341,8 +345,12 @@ be introduced without losing the convention-protected invariants.
    Finding 4's "unexplained residue" into a declared contract, and makes ADR
    0004's missing invariant — "live registries equal what restore-from-graph
    would build" — natural to express as a Stage 0 guard.
-4. Make `DefaultRenderer` construct the composed pipeline once and execute it,
-   replacing the imperative body of `renderView`.
+4. Make `DefaultRenderer` execute the composed pipeline, replacing the
+   imperative body of `renderView`. The shipped implementation keeps
+   `RuntimeRenderPipeline` as a stateless local composition value at each render
+   call site instead of storing it on `DefaultRenderer`, because a stored
+   pipeline value regressed temporary one-shot renderer lifetimes in the gallery
+   text-input smoke path.
 5. Reframe sync / async / cancellable as *execution strategies* over the single
    composition rather than ~13 forked functions (`render`, `renderAsync`,
    `renderAsyncCancellable`, `renderView`, `renderViewAsync`, `prepareFrameHead`,
@@ -361,11 +369,13 @@ be introduced without losing the convention-protected invariants.
    from Task 1 is the mitigation — confirm it works.
 
 **Key files:**
-- Modify: `Sources/SwiftTUICore/Pipeline/Pipeline.swift`,
-  `Sources/SwiftTUIRuntime/SwiftTUI.swift` (`DefaultRenderer`, `render` at
-  `:190`, `renderView` at `:295`, and the async entry points)
+- Created: `Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift`
+- Modified: `Sources/SwiftTUIRuntime/SwiftTUI.swift` (`DefaultRenderer`,
+  `render`, `renderAsync`, `renderAsyncCancellable`, frame head, and frame-tail
+  stage helpers)
+- Deleted: `Sources/SwiftTUICore/Pipeline/Pipeline.swift`
 - Reference: `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
-- Create: `docs/decisions/00NN-composed-render-pipeline-p1b.md`
+- ADR: `docs/decisions/0019-composed-runtime-render-pipeline.md`
 
 **Risks (highest in the plan):**
 - Deep refactor of the hottest code path. Stage behind `PipelineTests`,
@@ -701,27 +711,19 @@ This plan does not yet place it; that is an open decision below.
 
 These are deliberately deferred to the detailed plans, not pre-decided here:
 
-1. **Stage 3** — extend `Renderer<Root>` into the driver, or supersede and
-   delete it.
-2. **Stage 3** — the shape of the head's declared effect set and the
-   transactional-stage construct (Task 3). Narrowing that effect set, and any
-   retry of ADR 0004's abort, are deferred follow-on work (see above), not
-   decided here.
-3. **Stage 5** — invert the frame-drop model into a closed impact product vs
+1. **Stage 5** — invert the frame-drop model into a closed impact product vs
    keep the enum with a guard test.
-4. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
+2. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
    whether recursion can be bounded first.
-5. **Pre-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
-   `collectsDiagnostics` render path) is handled: folded into Stage 3 as a
+3. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
+   `collectsDiagnostics` render path) is handled: folded into a follow-up
    dual-path-collapse task, given its own stage, or left to a separate plan.
 
 ## Suggested first action
 
-Stage 0, Stage 1, and Stage 2 now have detailed shipped plans. Start the next
-implementation slice with **Stage 3** on Track A, or Stage 6/7 on Track B if
-parallel hardening is preferred. Stage 3 composes the driver against the
-freshness, semantic-host, retained-reuse, and commit/drop contracts that Stage 0
-now pins.
+Stage 0 through Stage 3 now have detailed shipped plans. Continue Track A with
+**Stage 4** raster-reuse soundness, or take Stage 6/7 on Track B if parallel
+hardening is preferred.
 
 ## Related docs
 

@@ -287,11 +287,6 @@ struct CompletedFrameCandidate {
   var dropDecision: CompletedFrameDropDecision
 }
 
-enum CancellableFrameTailResult {
-  case output(AsyncFrameTailDraftOutput)
-  case cancelledBeforeStart
-}
-
 private struct FrameTailWorkerResult<Value> {
   var value: Value
   var enqueueToStart: Duration

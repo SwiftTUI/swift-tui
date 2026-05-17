@@ -290,6 +290,9 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
 
 - `Sources/SwiftTUIRuntime/SwiftTUI.swift`: `DefaultRenderer`, frame-head
   preparation, completed-frame policy, and frame finish.
+- `Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift`: composed
+  sync, async, and cancellable execution strategies over the runtime render
+  stages.
 - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`: retained
   frame-tail state, `FrameTailRenderer`, `FrameHeadDraft`, render generation
   sequencing, worker timings, and async tail cancellation support.

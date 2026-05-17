@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Shipped Stage 3 of the pipeline-driver hardening roadmap: `DefaultRenderer`
+  now executes a composed runtime render pipeline for sync, async, and
+  cancellable strategies; animation injection is an explicit post-head stage;
+  the frame head declares its transactional effect set; and the old generic
+  public `Renderer<Root>` helper was removed instead of remaining a dead driver.
 - Shipped Stage 0 of the pipeline-driver hardening roadmap: retained-reuse
   projection guards, `ResolvedNode` phase-ownership classification, pipeline
   contract tests, disabled later-stage guard placeholders, and

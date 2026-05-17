@@ -564,7 +564,6 @@ classifications:
     - SwiftTUICore.NavigationRoute
     - SwiftTUICore.NodeLifecycleInfo
     - SwiftTUICore.NodeSemanticInfo
-    - SwiftTUICore.NoOpRoot
     - SwiftTUICore.OklabColor
     - SwiftTUICore.OklchColor
     - SwiftTUICore.OutlineStylePresentation
@@ -596,7 +595,6 @@ classifications:
     - SwiftTUICore.RasterSurface
     - SwiftTUICore.Rect
     - SwiftTUICore.ReferenceWhite
-    - SwiftTUICore.Renderer
     - SwiftTUICore.RenderGeneration
     - SwiftTUICore.ResolvedImageAsset
     - SwiftTUICore.ResolvedNode
