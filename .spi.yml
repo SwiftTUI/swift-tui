@@ -1,0 +1,20 @@
+version: 1
+builder:
+  configs:
+    - documentation_targets:
+        # Keep SwiftTUI first as the primary hosted documentation entry point.
+        - SwiftTUI
+        - SwiftTUIViews
+        - SwiftTUIRuntime
+        - SwiftTUICore
+        - SwiftTUIArguments
+        - SwiftTUICLI
+        - SwiftTUIPTYPrimitives
+        - SwiftTUITerminal
+        - SwiftTUITerminalWorkspace
+        - SwiftTUIWASI
+        - SwiftTUIWebHost
+        - SwiftTUIWebHostCLI
+        - SwiftUIHost
+        - SwiftTUIAnimatedImage
+        - SwiftTUICharts

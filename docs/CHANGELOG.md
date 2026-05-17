@@ -18,6 +18,13 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Added a Swift Package Index manifest so SPI-hosted documentation builds the
+  same public DocC target set as the website archive, with example apps still
+  excluded.
+- Settled the DocC coverage policy: externally linkable root package products
+  require DocC catalogs and are generated into the public website's combined
+  DocC archive, while example apps are intentionally excluded from DocC
+  coverage.
 - Retired the external repo-gate quarantine: the macOS gate no longer exports a
   CI-only Swift test skip regex, the Linux gate now runs the full
   `Scripts/test_gate.sh` surface instead of a bounded portability smoke, Linux

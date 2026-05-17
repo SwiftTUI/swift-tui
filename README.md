@@ -313,21 +313,24 @@ swiftly run swift package generate-documentation --target SwiftTUI
 Or build the combined archive that powers the public site:
 
 ```bash
-swiftly run swift package \
-  --allow-writing-to-directory .build-docs \
-  generate-documentation \
-  --target SwiftTUIViews --target SwiftTUI --target SwiftTUICharts \
-  --enable-experimental-combined-documentation \
-  --transform-for-static-hosting \
-  --output-path .build-docs
+Scripts/build_docc_archive.sh --hosting-base-path docs --output-path .build-docs
 ```
+
+Every root package product intended for external users to link or import must
+have a DocC catalog and be listed in
+`Scripts/lib/public_docc_targets.txt`; that manifest may also include support
+targets whose symbols are part of the published reference. The root `.spi.yml`
+mirrors that target set for Swift Package Index-hosted documentation. Example
+apps under `Examples/` are runnable samples and regression surfaces; they do
+not need DocC catalogs. `bun run build:website` generates the combined DocC
+archive as part of the web build and copies it into `Website/dist/docs/`.
 
 ## Documentation
 
 Start with [docs/README.md](docs/README.md) — it is the canonical index for every
 design doc, active proposal, and background note in this repository. Per-module
-API reference lives in the `*.docc` catalogs under `Sources/`, generated with
-the DocC command above.
+API reference lives in the `*.docc` catalogs under `Sources/` and `Platforms/`,
+generated with the DocC command above.
 
 For the current incomplete work queue, use [docs/TODO.md](docs/TODO.md). It is
 additive to the durable docs: keep it concise, link to supporting documents,

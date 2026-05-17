@@ -161,18 +161,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .build-docs
-          swiftly run swift package \
-            --allow-writing-to-directory .build-docs \
-            generate-documentation \
-            --target SwiftTUICore \
-            --target SwiftTUIViews \
-            --target SwiftTUI \
-            --target SwiftTUICharts \
-            --enable-experimental-combined-documentation \
-            --transform-for-static-hosting \
-            --hosting-base-path docs \
-            --output-path .build-docs
+          ./Scripts/build_docc_archive.sh --hosting-base-path docs --output-path .build-docs
 
       # Same artifact layout as GH Pages, just without the /SwiftTUI prefix.
       - name: Compose Cloudflare Pages artifact

@@ -5,11 +5,20 @@ Landed work that no longer changes decisions has been folded into the
 surviving source-of-truth docs rather than kept around as historical roadmaps
 or superseded plans.
 
-Per-target API reference lives in the `*.docc` catalogs under `Sources/`:
+Per-target API reference lives in the `*.docc` catalogs under `Sources/` and
+`Platforms/`:
 
 ```bash
-swiftly run swift package generate-documentation --target SwiftTUI
+Scripts/build_docc_archive.sh --hosting-base-path docs --output-path .build-docs
 ```
+
+Every root package product intended for external users to link or import must
+have a catalog and appear in
+[`../Scripts/lib/public_docc_targets.txt`](../Scripts/lib/public_docc_targets.txt).
+That manifest may also include support targets whose symbols are part of the
+published reference. The root [`../.spi.yml`](../.spi.yml) mirrors the same
+target set for Swift Package Index-hosted documentation.
+Example apps under [`../Examples/`](../Examples/) do not need DocC coverage.
 
 The repository [README.md](../README.md) is the public landing page.
 [AGENTS.md](../AGENTS.md) is the short guide for agentic assistants.
