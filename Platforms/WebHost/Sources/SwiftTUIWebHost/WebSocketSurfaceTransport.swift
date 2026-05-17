@@ -24,7 +24,8 @@ package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConve
   }
 }
 
-package final class WebSocketSurfaceTransport: PresentationSurface,
+package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvider,
+  RasterPresentationSurface,
   ClipboardWritingPresentationSurface,
   SemanticHostFramePresentationSurface, Sendable
 {
@@ -107,16 +108,6 @@ package final class WebSocketSurfaceTransport: PresentationSurface,
       state.renderStyle = style
     }
   }
-
-  package func enableRawMode() throws {}
-
-  package func disableRawMode() throws {}
-
-  package func write(_: String) throws {}
-
-  package func clearScreen() throws {}
-
-  package func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   @MainActor

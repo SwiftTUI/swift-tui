@@ -18,6 +18,14 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Hardened the first Stage 6 Track B tranche: moved the frame-tail layout worker
+  into a dedicated source file, removed the `@safe` escape hatch, extended the
+  concurrency-safety policy to ban future `@safe` use, and recorded the retained
+  large-stack worker plus WASI synchronous fallback in ADR 0020.
+- Shipped Stage 7 of the pipeline-driver hardening roadmap: host presentation is
+  now split into focused metrics, terminal command, raster, damage-aware raster,
+  and semantic host-frame roles while `PresentationSurface` remains the terminal
+  aggregate for compatibility.
 - Shipped Stage 5 of the pipeline-driver hardening roadmap: completed-frame
   drop decisions now derive from a closed impact product, every diagnostic
   blocker exhaustively maps into that product, the Stage 5 pipeline contract is

@@ -328,7 +328,8 @@ The standing runtime checks are deterministic scenario tests rather than wall-cl
 - Surface size changes, including terminal resize
 - Raster attachment changes
 - Raster metadata changes
-- Any host that relies on the default `PresentationSurface.present(_:)` implementation instead of `TerminalHost`
+- Any terminal-command host that relies on the default `RasterPresentationSurface.present(_:)`
+  implementation instead of `TerminalHost`
 - The current `ScrollView` viewport-shift benchmark path
 
 ## Crash Recovery
