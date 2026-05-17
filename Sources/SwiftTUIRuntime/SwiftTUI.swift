@@ -1203,7 +1203,12 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    animationController.commitFrameHeadTransaction(candidate.draft.checkpoints!.animation)
+    guard let checkpoints = candidate.draft.checkpoints else {
+      preconditionFailure(
+        "Cannot commit a one-shot frame head — it has no checkpoints."
+      )
+    }
+    animationController.commitFrameHeadTransaction(checkpoints.animation)
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
