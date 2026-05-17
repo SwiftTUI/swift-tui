@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-16
 
+- Kept policy checks as a separate required CI status and routed both that job
+  and the local repo gate through one shared policy-check phase so the fast
+  signal cannot drift from the gate.
 - Resolved the macOS CI-floor decision: GitHub Actions `macos-26` is the
   intended public macOS support floor for development and release gates, while
   older macOS hosts are not release-blocking support targets.

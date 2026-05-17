@@ -421,6 +421,8 @@ run_function_step() {
   fi
 }
 
+. "$repo_root/Scripts/lib/repo_policy_checks.sh"
+
 skip_step() {
   title=$1
   reason=$2
@@ -549,59 +551,7 @@ if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_
     bun install --frozen-lockfile
 fi
 
-run_step \
-  "Check public-surface policies" \
-  "$repo_root" \
-  "./Scripts/check_public_surface_policies.sh" \
-  ./Scripts/check_public_surface_policies.sh
-
-run_step \
-  "Check stable doc source paths" \
-  "$repo_root" \
-  "./Scripts/check_stable_doc_source_paths.sh" \
-  ./Scripts/check_stable_doc_source_paths.sh
-
-run_step \
-  "Check DocC coverage policy" \
-  "$repo_root" \
-  "./Scripts/check_docc_coverage.sh" \
-  ./Scripts/check_docc_coverage.sh
-
-run_step \
-  "Check root test-target coverage" \
-  "$repo_root" \
-  "./Scripts/check_root_test_target_coverage.sh" \
-  ./Scripts/check_root_test_target_coverage.sh
-
-run_step \
-  "Check rendered text fixture matrix" \
-  "$repo_root" \
-  "./Scripts/check_rendered_text_fixture_matrix.sh" \
-  ./Scripts/check_rendered_text_fixture_matrix.sh
-
-run_step \
-  "Check concurrency-safety policies" \
-  "$repo_root" \
-  "./Scripts/check_concurrency_safety_policies.sh" \
-  ./Scripts/check_concurrency_safety_policies.sh
-
-run_step \
-  "Check accessibility guardrails" \
-  "$repo_root" \
-  "./Scripts/check_accessibility_guardrails.sh" \
-  ./Scripts/check_accessibility_guardrails.sh
-
-run_step \
-  "Check WebHost package boundary" \
-  "$repo_root" \
-  "./Scripts/check_webhost_package_boundary.sh" \
-  ./Scripts/check_webhost_package_boundary.sh
-
-run_step \
-  "Check public-API baseline" \
-  "$repo_root" \
-  "./Scripts/generate_public_api_inventory.sh --check" \
-  ./Scripts/generate_public_api_inventory.sh --check
+run_repo_policy_phase "$repo_root" test-all
 
 run_function_step \
   "Run SwiftTUICore tests" \
