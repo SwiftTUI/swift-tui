@@ -1,7 +1,7 @@
 ---
 title: "test: Stage 0 - pipeline contract guards"
 type: test
-status: proposed
+status: shipped
 date: 2026-05-17
 depends_on:
   - "2026-05-16-001-pipeline-driver-hardening-plan.md"
@@ -87,7 +87,7 @@ Run the current safety nets before adding new guards. If any command is already
 red on `main`, stop and resolve or record the unrelated failure before writing
 new assertions.
 
-- [ ] Run the sync/async and layout pipeline suites:
+- [x] Run the sync/async and layout pipeline suites:
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
@@ -95,13 +95,17 @@ swiftly run swift test --filter SwiftTUITests.LayoutAndRenderingPipelineTests
 swiftly run swift test --filter SwiftTUICoreTests.PipelineTests
 ```
 
-- [ ] Run the existing commit/drop and runtime host-frame guards:
+- [x] Run the existing commit/drop and runtime host-frame guards:
 
 ```bash
 swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests
 swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
 swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
+bun run test
 ```
+
+The repo gate passed with full log:
+`/tmp/swift-tui-test-gate-20260517-030652-26140.log`.
 
 Expected: all pass. These are existing green tests and must not regress.
 
@@ -109,7 +113,7 @@ Expected: all pass. These are existing green tests and must not regress.
 
 Create `Tests/SwiftTUICoreTests/RetainedReuseInvariantTests.swift`.
 
-- [ ] Add a direct projection round-trip test:
+- [x] Add a direct projection round-trip test:
   - Build a `PlacedNodeResolvedMetadata` with non-default values for every
     current field: `kind`, `environmentSnapshot`, `semanticRole`,
     `layoutMetadata`, `drawMetadata`, `semanticMetadata`, `lifecycleMetadata`,
@@ -118,7 +122,7 @@ Create `Tests/SwiftTUICoreTests/RetainedReuseInvariantTests.swift`.
   - Assert `placed.resolvedMetadata == metadata`.
   - Mutate `placed.resolvedMetadata` to a second non-default metadata value and
     assert the getter returns that second value.
-- [ ] Add a retained-subtree synchronization test:
+- [x] Add a retained-subtree synchronization test:
   - Build a previous placed subtree and a current resolved subtree with the same
     identities and child shape.
   - Give the current resolved subtree different non-geometry metadata on parent
@@ -127,7 +131,7 @@ Create `Tests/SwiftTUICoreTests/RetainedReuseInvariantTests.swift`.
   - Assert parent and child `resolvedMetadata` match the current resolved tree's
     projected metadata while bounds, content bounds, clipping, z-index, and
     child placement are preserved.
-- [ ] Add a field-list tripwire:
+- [x] Add a field-list tripwire:
   - Keep a local `expectedPlacedResolvedMetadataFields` manifest in the test.
   - Parse `PlacedNode.swift` for `package var` declarations inside
     `PlacedNodeResolvedMetadata`.
@@ -143,8 +147,8 @@ Add a mechanical guard for new `ResolvedNode` stored properties. Prefer a small
 source-parser helper inside the test over reflection, because Swift reflection
 does not reliably expose package-private stored-property names.
 
-- [ ] Add `Tests/SwiftTUICoreTests/ResolvedNodePhaseOwnershipTests.swift`.
-- [ ] Create a local manifest mapping each stored property on `ResolvedNode` to
+- [x] Add `Tests/SwiftTUICoreTests/ResolvedNodePhaseOwnershipTests.swift`.
+- [x] Create a local manifest mapping each stored property on `ResolvedNode` to
   one of these categories:
   - `identity`
   - `structure`
@@ -157,10 +161,10 @@ does not reliably expose package-private stored-property names.
   - `commit`
   - `diagnostics`
   - `derivedCache`
-- [ ] Parse the `public struct ResolvedNode` body for stored `public`,
+- [x] Parse the `public struct ResolvedNode` body for stored `public`,
   `package`, and private backing vars. Exclude computed properties and methods.
-- [ ] Assert every parsed stored property has exactly one classification.
-- [ ] Add a short comment above the manifest explaining that adding a
+- [x] Assert every parsed stored property has exactly one classification.
+- [x] Add a short comment above the manifest explaining that adding a
   `ResolvedNode` field is an architecture decision, not a storage-only change.
 
 This is a must-pass baseline guard. If parsing edge cases make the helper too
@@ -172,30 +176,30 @@ do not leave the classification as prose only.
 Create `Tests/SwiftTUITests/PipelineContractTests.swift` for composed-runtime
 contracts that should survive Stage 1 and Stage 3 refactors.
 
-- [ ] Add a must-pass head freshness wrapper around the existing sync/async
+- [x] Add a must-pass head freshness wrapper around the existing sync/async
   parity coverage:
   - Render the same view through `render` and `renderAsync` with diagnostics
     disabled.
   - Assert `FrameArtifacts` equality.
   - Include a view with command or focused-value publication so the guard is not
     only a raster comparison.
-- [ ] Add a must-pass commit/drop contract:
+- [x] Add a must-pass commit/drop contract:
   - Reuse the existing `FrameDropEligibilityTests` blocker list where possible.
   - Assert every currently modeled committed side-effect blocker produces
     `.mustCommit`.
   - Keep `canDrop == false` as the current behavior until Stage 5 explicitly
     changes the closed impact model.
-- [ ] Add a must-pass semantic host-frame continuity guard:
+- [x] Add a must-pass semantic host-frame continuity guard:
   - Drive a run loop with a `SemanticHostFramePresentationSurface`.
   - Render at least two invalidated frames.
   - Assert sequence numbers are contiguous and each semantic host frame carries
     raster, semantics, focused identity, and damage consistently.
-- [ ] Add a must-pass focus/default-focus freshness guard:
+- [x] Add a must-pass focus/default-focus freshness guard:
   - Render a view whose default focus target changes after state or identity
     churn.
   - Assert the committed semantic snapshot and focus tracker converge on the
     current target, not a stale snapshot.
-- [ ] Add a retained reuse freshness guard if Task 2's core-level tests do not
+- [x] Add a retained reuse freshness guard if Task 2's core-level tests do not
   already cover a full renderer path:
   - Render a stable-geometry view twice with changed non-geometry metadata.
   - Assert the second frame's semantics/draw/lifecycle-facing projection reflects
@@ -208,7 +212,7 @@ These tests are the Stage 3 must-pass subset together with the repo gate.
 Add only the disabled tests that are useful as executable future requirements.
 Each disabled reason must name the closing stage and the concrete gap.
 
-- [ ] Stage 4 disabled guard:
+- [x] Stage 4 disabled guard:
 
 ```swift
 @Test(.disabled("closed by Stage 4: raster reuse soundness split"))
@@ -217,7 +221,7 @@ Each disabled reason must name the closing stage and the concrete gap.
 Curated incremental-raster mutation matrix must compare incremental repaint
 output byte-for-byte with a fresh raster.
 
-- [ ] Stage 5 disabled guard:
+- [x] Stage 5 disabled guard:
 
 ```swift
 @Test(.disabled("closed by Stage 5: closed frame-drop impact model"))
@@ -227,7 +231,7 @@ All committed side-effect kinds, including any future side-effect records not
 visible from `FrameArtifacts` alone, must force non-droppable frames or be
 classified by a closed impact product.
 
-- [ ] Stage 6 disabled guard:
+- [x] Stage 6 disabled guard:
 
 ```swift
 @Test(.disabled("closed by Stage 6: worker and recursion safety"))
@@ -236,7 +240,7 @@ classified by a closed impact product.
 Worker dispatch and deep tree processing must avoid unbounded hand-rolled
 threads or unbounded recursive destruction on the frame-tail path.
 
-- [ ] Stage 7 disabled guard:
+- [x] Stage 7 disabled guard:
 
 ```swift
 @Test(.disabled("closed by Stage 7: presentation seam split"))
@@ -254,7 +258,7 @@ guards.
 Update `Sources/SwiftTUICore/Commit/FrameArtifacts.swift` and
 `docs/ARCHITECTURE.md`. This is documentation-only.
 
-- [ ] Add a doc-comment authority table near `FrameArtifacts`:
+- [x] Add a doc-comment authority table near `FrameArtifacts`:
   - Canonical phase products: `resolvedTree`, `measuredTree`,
     `semanticSnapshot`, `drawTree`, `rasterSurface`.
   - Decorated/baseline-sensitive projection: `placedTree`; retained-layout
@@ -263,15 +267,15 @@ Update `Sources/SwiftTUICore/Commit/FrameArtifacts.swift` and
   - Advisory hints: `presentationDamage`, `drawnIdentities`.
   - Side-effect plan: `commitPlan`.
   - Diagnostics: `diagnostics`.
-- [ ] Update `docs/ARCHITECTURE.md`'s data-products table to point at that
+- [x] Update `docs/ARCHITECTURE.md`'s data-products table to point at that
   authority table and repeat the baseline/decorated placed-tree rule in one
   sentence.
-- [ ] Do not change `FrameArtifacts` storage, initializers, visibility, or
+- [x] Do not change `FrameArtifacts` storage, initializers, visibility, or
   equality in Stage 0.
 
 ## Task 7 - Verify And Ship Stage 0
 
-- [ ] Run focused new suites:
+- [x] Run focused new suites:
 
 ```bash
 swiftly run swift test --filter SwiftTUICoreTests.RetainedReuseInvariantTests
@@ -279,7 +283,7 @@ swiftly run swift test --filter SwiftTUICoreTests.ResolvedNodePhaseOwnershipTest
 swiftly run swift test --filter SwiftTUITests.PipelineContractTests
 ```
 
-- [ ] Re-run baseline suites:
+- [x] Re-run baseline suites:
 
 ```bash
 swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
@@ -290,18 +294,18 @@ swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
 swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
 ```
 
-- [ ] Run the repo gate:
+- [x] Run the repo gate:
 
 ```bash
 bun run test
 ```
 
-- [ ] Mark this plan `status: shipped`.
-- [ ] Update the roadmap and `docs/TODO.md`:
+- [x] Mark this plan `status: shipped`.
+- [x] Update the roadmap and `docs/TODO.md`:
   - Stage 0 should be marked shipped or linked to the shipped commit.
   - The TODO entry should move from "execute Stage 0" to the next unblocked
     stage.
-- [ ] Add a concise `docs/CHANGELOG.md` entry when removing a completed TODO.
+- [x] Add a concise `docs/CHANGELOG.md` entry when removing a completed TODO.
 
 ## Exit Criteria
 
@@ -322,3 +326,27 @@ bun run test
 - No raster reuse refactor.
 - No worker/recursion implementation change.
 - No presentation seam split.
+
+## Shipped Record
+
+Stage 0 adds must-pass retained-reuse projection guards, a
+`ResolvedNode` phase-ownership manifest guard, and pipeline contract tests for
+sync/async parity, frame-drop blockers, semantic host-frame continuity,
+focus/default-focus freshness, and retained semantic metadata freshness. The
+later-stage raster, frame-drop closure, worker/recursion, and presentation seam
+guards are present as disabled Swift Testing cases with Stage 4, Stage 5,
+Stage 6, and Stage 7 ownership in their disabled reasons.
+
+Verification:
+
+```bash
+swiftly run swift test --filter SwiftTUICoreTests.RetainedReuseInvariantTests
+swiftly run swift test --filter SwiftTUICoreTests.ResolvedNodePhaseOwnershipTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.LayoutAndRenderingPipelineTests
+swiftly run swift test --filter SwiftTUICoreTests.PipelineTests
+swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests
+swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
+swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
+```

@@ -116,6 +116,8 @@ that every later refactor has a mechanical safety net. No production behavior
 changes in this stage. See detailed plan:
 [`docs/plans/2026-05-17-002-stage-0-contract-guards-plan.md`](./2026-05-17-002-stage-0-contract-guards-plan.md).
 
+**Status:** Shipped.
+
 **Addresses:** P7 (Finding 13), P11 (Findings 13/17), P10 documentation half
 (Finding 16).
 
@@ -715,11 +717,11 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 ## Suggested first action
 
-Start by executing the detailed **Stage 0** plan. Stage 1 (P2) is mechanical
-and removes a live drift hazard, but its implementation should land only with
-the Stage 0 guard subset that covers shared head freshness and commit/drop
-semantics. Stage 0's broader P7/P11 tests then continue to pin the freshness,
-raster, semantic-host, and commit contracts that make Stage 3 verifiable.
+Stage 0, Stage 1, and Stage 2 now have detailed shipped plans. Start the next
+implementation slice with **Stage 3** on Track A, or Stage 6/7 on Track B if
+parallel hardening is preferred. Stage 3 composes the driver against the
+freshness, semantic-host, retained-reuse, and commit/drop contracts that Stage 0
+now pins.
 
 ## Related docs
 
