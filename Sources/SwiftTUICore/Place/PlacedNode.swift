@@ -7,6 +7,65 @@ public enum SemanticRole: String, Equatable, Sendable {
   case overlay
 }
 
+package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
+  package var kind: NodeKind
+  package var environmentSnapshot: EnvironmentSnapshot
+  package var semanticRole: SemanticRole
+  package var layoutMetadata: LayoutMetadata
+  package var drawMetadata: DrawMetadata
+  package var semanticMetadata: SemanticMetadata
+  package var lifecycleMetadata: LifecycleMetadata
+  package var drawPayload: DrawPayload
+  package var layoutBehavior: LayoutBehavior
+  package var isTransient: Bool
+  package var matchedGeometry: MatchedGeometryConfig?
+
+  package init(
+    kind: NodeKind = .view("Unknown"),
+    environmentSnapshot: EnvironmentSnapshot = .init(),
+    semanticRole: SemanticRole = .generic,
+    layoutMetadata: LayoutMetadata = .init(),
+    drawMetadata: DrawMetadata = DrawMetadata(),
+    semanticMetadata: SemanticMetadata = SemanticMetadata(),
+    lifecycleMetadata: LifecycleMetadata = .init(),
+    drawPayload: DrawPayload = .none,
+    layoutBehavior: LayoutBehavior = .intrinsic,
+    isTransient: Bool = false,
+    matchedGeometry: MatchedGeometryConfig? = nil
+  ) {
+    self.kind = kind
+    self.environmentSnapshot = environmentSnapshot
+    self.semanticRole = semanticRole
+    self.layoutMetadata = layoutMetadata
+    self.drawMetadata = drawMetadata
+    self.semanticMetadata = semanticMetadata
+    self.lifecycleMetadata = lifecycleMetadata
+    self.drawPayload = drawPayload
+    self.layoutBehavior = layoutBehavior
+    self.isTransient = isTransient
+    self.matchedGeometry = matchedGeometry
+  }
+
+  package init(
+    resolved: ResolvedNode,
+    semanticRole: SemanticRole
+  ) {
+    self.init(
+      kind: resolved.kind,
+      environmentSnapshot: resolved.environmentSnapshot,
+      semanticRole: semanticRole,
+      layoutMetadata: resolved.layoutMetadata,
+      drawMetadata: resolved.drawMetadata,
+      semanticMetadata: resolved.semanticMetadata,
+      lifecycleMetadata: resolved.lifecycleMetadata,
+      drawPayload: resolved.drawPayload,
+      layoutBehavior: resolved.layoutBehavior,
+      isTransient: resolved.isTransient,
+      matchedGeometry: resolved.matchedGeometry
+    )
+  }
+}
+
 /// A node after layout has assigned concrete bounds.
 public struct PlacedNode: Equatable, Sendable {
   public var identity: Identity
@@ -56,7 +115,7 @@ public struct PlacedNode: Equatable, Sendable {
   /// inline would grow ``PlacedNode`` by ~1.6 kB per node (because
   /// `LayoutBehavior` has non-indirect large cases like `.stack` and
   /// `.flexibleFrame`) and recursively destroying deep trees would
-  /// then overflow the thread stack.  `nil` is the common case: only
+  /// then overflow the thread stack. `nil` is the common case: only
   /// border wrappers actually populate this field.
   package var _boxedLayoutBehavior: Boxed<LayoutBehavior>?
   public var layoutBehavior: LayoutBehavior {
@@ -81,6 +140,56 @@ public struct PlacedNode: Equatable, Sendable {
   /// controller can compute matched-geometry bounds during
   /// capture+diff.
   public var matchedGeometry: MatchedGeometryConfig?
+  package var resolvedMetadata: PlacedNodeResolvedMetadata {
+    get {
+      PlacedNodeResolvedMetadata(
+        kind: kind,
+        environmentSnapshot: environmentSnapshot,
+        semanticRole: semanticRole,
+        layoutMetadata: layoutMetadata,
+        drawMetadata: drawMetadata,
+        semanticMetadata: semanticMetadata,
+        lifecycleMetadata: lifecycleMetadata,
+        drawPayload: drawPayload,
+        layoutBehavior: layoutBehavior,
+        isTransient: isTransient,
+        matchedGeometry: matchedGeometry
+      )
+    }
+    set {
+      applyResolvedMetadata(newValue)
+    }
+  }
+
+  package init(
+    identity: Identity,
+    resolvedMetadata: PlacedNodeResolvedMetadata,
+    bounds: CellRect,
+    contentBounds: CellRect? = nil,
+    clipBounds: CellRect? = nil,
+    zIndex: Double = 0,
+    children: [PlacedNode] = []
+  ) {
+    self.init(
+      identity: identity,
+      kind: resolvedMetadata.kind,
+      environmentSnapshot: resolvedMetadata.environmentSnapshot,
+      bounds: bounds,
+      contentBounds: contentBounds,
+      clipBounds: clipBounds,
+      zIndex: zIndex,
+      children: children,
+      semanticRole: resolvedMetadata.semanticRole,
+      layoutMetadata: resolvedMetadata.layoutMetadata,
+      drawMetadata: resolvedMetadata.drawMetadata,
+      semanticMetadata: resolvedMetadata.semanticMetadata,
+      lifecycleMetadata: resolvedMetadata.lifecycleMetadata,
+      drawPayload: resolvedMetadata.drawPayload,
+      layoutBehavior: resolvedMetadata.layoutBehavior,
+      isTransient: resolvedMetadata.isTransient,
+      matchedGeometry: resolvedMetadata.matchedGeometry
+    )
+  }
 
   package init(
     identity: Identity,
@@ -130,6 +239,20 @@ public struct PlacedNode: Equatable, Sendable {
     recomputeSubtreeNodeCount()
   }
 
+  private mutating func applyResolvedMetadata(_ metadata: PlacedNodeResolvedMetadata) {
+    kind = metadata.kind
+    environmentSnapshot = metadata.environmentSnapshot
+    semanticRole = metadata.semanticRole
+    layoutMetadata = metadata.layoutMetadata
+    drawMetadata = metadata.drawMetadata
+    semanticMetadata = metadata.semanticMetadata
+    lifecycleMetadata = metadata.lifecycleMetadata
+    drawPayload = metadata.drawPayload
+    layoutBehavior = metadata.layoutBehavior
+    isTransient = metadata.isTransient
+    matchedGeometry = metadata.matchedGeometry
+  }
+
   private mutating func recomputeSubtreeNodeCount() {
     subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
   }
@@ -138,17 +261,7 @@ public struct PlacedNode: Equatable, Sendable {
     from resolved: ResolvedNode,
     semanticRole: SemanticRole
   ) {
-    kind = resolved.kind
-    environmentSnapshot = resolved.environmentSnapshot
-    self.semanticRole = semanticRole
-    layoutMetadata = resolved.layoutMetadata
-    drawMetadata = resolved.drawMetadata
-    semanticMetadata = resolved.semanticMetadata
-    lifecycleMetadata = resolved.lifecycleMetadata
-    drawPayload = resolved.drawPayload
-    layoutBehavior = resolved.layoutBehavior
-    isTransient = resolved.isTransient
-    matchedGeometry = resolved.matchedGeometry
+    resolvedMetadata = .init(resolved: resolved, semanticRole: semanticRole)
   }
 
   package func collectLifecycleNodes(

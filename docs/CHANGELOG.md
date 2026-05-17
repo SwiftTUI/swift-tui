@@ -18,6 +18,9 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Routed `PlacedNode`'s resolved-derived field synchronization through one
+  metadata snapshot while preserving the existing accessor surface for later
+  phases.
 - Resolved the seven-phase pipeline cleanup decision in favor of a staged
   policy: first eliminate unsynchronized resolved-to-placed metadata mirrors,
   then continue reducing duplicated phase metadata incrementally.

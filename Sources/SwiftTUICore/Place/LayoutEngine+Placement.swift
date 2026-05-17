@@ -810,17 +810,16 @@ extension LayoutEngine {
       children: children
     )
 
-    var node = PlacedNode(
+    return PlacedNode(
       identity: resolved.identity,
+      resolvedMetadata: .init(
+        resolved: resolved,
+        semanticRole: semanticRole(for: resolved)
+      ),
       bounds: bounds,
       contentBounds: contentBounds,
       children: children
     )
-    node.synchronizeResolvedPhaseMetadata(
-      from: resolved,
-      semanticRole: semanticRole(for: resolved)
-    )
-    return node
   }
 
   package func combinedContentBounds(

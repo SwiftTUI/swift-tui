@@ -49,10 +49,6 @@
 
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
-- Continue reducing duplicated phase metadata between resolved and placed nodes
-  after the synchronized-mirror policy is in place. Cover retained-layout and
-  late-preference behavior before changing the shared structure. See
-  [ARCHITECTURE.md](ARCHITECTURE.md).
 - Apply the historical-doc path policy once decided: either archive historical
   plans clearly or keep the stable-doc source-path checker focused on current
   source-of-truth docs. See
