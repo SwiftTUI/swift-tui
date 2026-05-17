@@ -521,7 +521,8 @@ hazard it is.
 [`docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md`](./2026-05-17-004-stage-6-worker-recursion-hardening-plan.md).
 The first tranche isolates and ADR-justifies the large-stack worker, closes the
 `@safe` policy bypass, and documents the WASI fallback. The remaining tranche is
-the recursive layout bound or explicit-stack rewrite.
+the full explicit layout work-stack migration described in
+[`docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`](../proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md).
 
 **Addresses:** P4 (Findings 6, 7), P5 (Finding 6).
 
@@ -534,10 +535,13 @@ start as soon as Stage 0 is green and run alongside Track A.
 
 **Tasks:**
 
-1. Audit layout-engine recursion depth (P5): either bound recursion with a
-   graceful error, or convert the hot recursive layout walks to an explicit work
-   stack. The 8 MB stack and `StackSafetyRegressionTests` are mitigation, not a
-   fix — a sufficiently nested view tree remains an unbounded-input crash.
+1. Audit and migrate layout-engine recursion depth (P5): convert built-in
+   recursive layout measurement and placement walks to explicit work stacks.
+   Temporary graceful depth limits may be used as interim guards or
+   custom-layout compatibility boundaries, but the final built-in layout
+   architecture is iterative. The 8 MB stack and `StackSafetyRegressionTests`
+   are mitigation, not a fix — a sufficiently nested view tree remains an
+   unbounded-input crash until the migration lands.
 2. Replace the hand-rolled `pthread` worker
    (`Rendering/FrameTailRenderer.swift:377`–`378`, `pthread_create` with a
    manual 8 MB stack, `pthread_join` in `deinit`,
@@ -558,6 +562,7 @@ start as soon as Stage 0 is green and run alongside Track A.
 - Modify: `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift:311,377,471,485`
 - Modify: `prek.toml` (escape-hatch hook banlist)
 - Reference: `Tests/SwiftTUICoreTests/StackSafetyRegressionTests.swift`,
+  `docs/proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md`,
   `docs/proposals/OFF_MAIN_PIPELINE_RENDERING.md`,
   `docs/proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md`
 - Create: `docs/decisions/00NN-off-main-layout-worker-concurrency.md`
@@ -568,7 +573,8 @@ default-sized task stack. The recursion audit is first for that reason.
 
 **Exit criteria:** No hand-rolled `pthread` outside a single audited,
 ADR-justified type; the escape-hatch hook covers `@safe`; WASI's divergent
-semantics are documented or gated; layout recursion is bounded or stack-based.
+semantics are documented or gated; built-in layout recursion has migrated to
+explicit work stacks.
 
 ---
 
@@ -737,10 +743,7 @@ This plan does not yet place it; that is an open decision below.
 
 These are deliberately deferred to the detailed plans, not pre-decided here:
 
-1. **Stage 6** — bound recursive layout with a graceful cap vs convert hot
-   recursive measurement/placement walks to explicit work stacks. The worker is
-   currently isolated and ADR-justified until that recursion decision is closed.
-2. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
+1. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
    `collectsDiagnostics` render path) is handled: folded into a follow-up
    dual-path-collapse task, given its own stage, or left to a separate plan.
 
@@ -748,9 +751,9 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 Stage 0 through Stage 5 now have detailed shipped plans, completing Track A.
 Stage 7 is shipped on Track B, and Stage 6 has an active detailed plan with the
-worker isolated and ADR-justified. Continue **Stage 6** by bounding or rewriting
-recursive layout; Stage 8 governance reconciliation can follow once the
-remaining hardening choice is settled.
+worker isolated and ADR-justified. Continue **Stage 6** by executing the full
+explicit layout work-stack migration; Stage 8 governance reconciliation can
+follow once the remaining hardening implementation lands.
 
 ## Related docs
 
