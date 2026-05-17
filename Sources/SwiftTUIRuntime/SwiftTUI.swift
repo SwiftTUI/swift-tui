@@ -303,127 +303,29 @@ public struct DefaultRenderer {
     proposal: ProposedSize,
     collectsDiagnostics: Bool = true
   ) -> FrameArtifacts {
-    let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
-    let renderGeneration = renderGenerationSequencer.next()
-
-    var resolveContext = context
-    let registrationDraft = FrameHeadRegistrationDraft(
-      liveRegistrations: resolveContext.runtimeRegistrations
-    )
-    resolveContext = resolveContext.replacingRuntimeRegistrations(
-      registrationDraft.draftRegistrations
-    )
-    resolveContext.imageAssetResolver = imageRepository.resolver()
-    resolveContext.frameState = frameState
-    frameState.update(from: resolveContext, proposal: proposal)
-    viewGraph.beginFrame()
-    let canUseSelectiveEvaluation =
-      frameState.selectiveEvaluationEnabled
-      && !frameState.environmentRequiresRootEvaluation
-      && !context.invalidatedIdentities.contains(resolveContext.identity)
-    if canUseSelectiveEvaluation {
-      viewGraph.invalidateAndQueueDirty(context.invalidatedIdentities)
-    } else {
-      viewGraph.invalidate(context.invalidatedIdentities)
-    }
-    resolveContext.viewGraph = viewGraph
-    resolveContext.observationBridge?.attachViewGraph(viewGraph)
-    resolveContext.observationBridge?.beginTrackingPass()
-    let presentationPortalContext = resolveContext.replacingIdentity(
-      with: presentationPortalIdentity(for: resolveContext.identity)
-    )
-    let hasExistingPresentationPortalRoot = viewGraph.containsNode(
-      for: presentationPortalContext.identity
-    )
-    let wrappedRoot = PresentationPortalRoot(
-      content: root,
-      portalState: presentationPortalState,
-      contentRootIdentity: resolveContext.identity
-    )
-    viewGraph.setRootEvaluator(rootIdentity: presentationPortalContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
-    }
-    viewGraph.setEvaluator(for: presentationPortalContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
-    }
-    if !hasExistingPresentationPortalRoot
-      || !canUseSelectiveEvaluation
-      || !context.invalidatedIdentities.isEmpty
-    {
-      viewGraph.queueDirty([presentationPortalContext.identity])
-    }
-    let (_, resolveDuration): (Void, Duration)
-    animationController.beginTransitionCollection()
-    if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
-      // Nothing is dirty — skip evaluation entirely and reuse the
-      // existing tree snapshot.  The root evaluator and registrations
-      // are untouched.
-      resolveDuration = .zero
-    } else {
-      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
-      if let dirtyEvaluationPlan {
-        registrationDraft.recordRemoveSubtrees(
-          rootedAt: dirtyEvaluationPlan.frontierIdentities
-        )
-      } else {
-        registrationDraft.recordResetAll()
-      }
-
-      (_, resolveDuration) = measurePhase(clock: clock) {
-        viewGraph.evaluateDirtyNodes(
-          using: dirtyEvaluationPlan
-        )
-      }
-    }
-    animationController.finishTransitionCollection()
-    var resolved = renderPipelineTree(from: viewGraph.snapshot())
-    resolved = wrapInContainerSafeArea(
-      resolved,
-      context: resolveContext
-    )
-
-    // Animation: capture from/to for changed animatable properties, then
-    // apply interpolated values to the resolved tree before measure.
-    // This is the only pipeline insertion for animation — the rest of
-    // measure/place/draw/raster runs unchanged on the mutated tree.
-    let animationTimestamp = MonotonicInstant.now()
-    animationController.processResolvedTree(
-      resolved,
-      transaction: context.transaction,
-      timestamp: animationTimestamp
-    )
-    _ = animationController.applyInterpolations(
-      to: &resolved,
-      at: animationTimestamp
-    )
-
-    let frameTailRetainedInput = frameTailRenderer.retainedInput(
-      invalidatedIdentities: context.invalidatedIdentities
-    )
-    let layoutPassContext = LayoutPassContext(
-      retainedLayout: frameTailRetainedInput.retainedLayout,
-      invalidatedIdentities: context.invalidatedIdentities
-    )
-    let frameContext = FrameContext(
-      environment: context.environment,
-      transaction: context.transaction,
-      invalidatedIdentities: context.invalidatedIdentities
-    )
-    let initialFrameTailInput = FrameTailInput(
-      generation: renderGeneration,
-      resolved: resolved,
+    let draft = computeFrameHead(
+      root,
+      context: context,
       proposal: proposal,
-      rootIdentity: resolveContext.identity,
-      retained: frameTailRetainedInput,
-      layoutPassContext: layoutPassContext
+      collectsDiagnostics: collectsDiagnostics,
+      mode: .oneShot
     )
+    let clock = draft.clock
+    let resolveContext = draft.resolveContext
+    let registrationDraft = draft.registrationDraft
+    let renderGeneration = draft.renderGeneration
+    let resolveDuration = draft.resolveDuration
+    let frameContext = draft.frameContext
+    let graphRootIdentity = draft.graphRootIdentity
+    let animationTimestamp = draft.animationTimestamp
+
     let reconciledTailLayout = renderLayoutResolvingLatePreferences(
-      initialFrameTailInput,
+      draft.frameTailInput,
       clock: clock
     )
     let frameTailInput = reconciledTailLayout.input
     let tailLayout = reconciledTailLayout.layout
-    resolved = reconciledTailLayout.resolved
+    let resolved = reconciledTailLayout.resolved
     let runtimeIssues = reconciledTailLayout.runtimeIssues
     let placed = tailLayout.baselinePlaced
     // Capture the BASELINE placed tree (pre-overlay) for two things:
@@ -465,7 +367,7 @@ public struct DefaultRenderer {
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: presentationPortalContext.identity,
+        rootIdentity: graphRootIdentity,
         resolved: resolved,
         placed: tail.placed
       )
