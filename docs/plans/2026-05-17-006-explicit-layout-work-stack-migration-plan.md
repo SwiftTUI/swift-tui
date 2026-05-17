@@ -380,12 +380,12 @@ swiftly run swift test --filter SwiftTUITests.Layout
 
 Introduce iterative placement scaffolding before converting all placement cases.
 
-- [ ] Add internal work-stack implementation files, for example:
+- [x] Add internal work-stack implementation files, for example:
 
   - `Sources/SwiftTUICore/Place/LayoutEngine+PlacementWorkStack.swift`
   - `Sources/SwiftTUICore/Place/LayoutEngine+PlacementFrames.swift`
 
-- [ ] Define explicit placement frame and continuation types. They should carry
+- [x] Define explicit placement frame and continuation types. They should carry
   at least:
 
   - resolved node;
@@ -396,8 +396,8 @@ Introduce iterative placement scaffolding before converting all placement cases.
   - child-placement phase state;
   - accumulated placed children.
 
-- [ ] Keep public `LayoutEngine.place` stable.
-- [ ] Preserve the current placement order for each node:
+- [x] Keep public `LayoutEngine.place` stable.
+- [x] Preserve the current placement order for each node:
 
   1. retained placement lookup;
   2. work-metric update;
@@ -406,8 +406,13 @@ Introduce iterative placement scaffolding before converting all placement cases.
   5. content-bounds calculation;
   6. `PlacedNode` construction.
 
-- [ ] Add instrumentation for tests to prove a migrated built-in path used the
+- [x] Add instrumentation for tests to prove a migrated built-in path used the
   placement work stack.
+
+**Implementation note:** `LayoutEngine.place` now routes through
+`LayoutEngine+PlacementWorkStack.swift`. The placement work stack records
+`placementWorkStackSteps`, preserves retained placement reuse, and leaves
+`LayoutEngine+Placement.swift` as pure placed-node construction helpers.
 
 **Acceptance criteria:**
 
@@ -427,10 +432,10 @@ swiftly run swift test --filter SwiftTUITests.AnchorPreferenceSurfaceTests
 
 Move built-in placement cases to the iterative placement engine.
 
-- [ ] Convert intrinsic child placement.
-- [ ] Convert overlay alignment placement.
-- [ ] Convert stack and lazy-stack placement.
-- [ ] Convert wrapper placement:
+- [x] Convert intrinsic child placement.
+- [x] Convert overlay alignment placement.
+- [x] Convert stack and lazy-stack placement.
+- [x] Convert wrapper placement:
 
   - `.padding`
   - `.safeAreaIgnoring`
@@ -443,15 +448,22 @@ Move built-in placement cases to the iterative placement engine.
   - `.decoration`
   - `.viewThatFits`
 
-- [ ] Convert layout-dependent content placement so realized children are
+- [x] Convert layout-dependent content placement so realized children are
   measured and placed through explicit work, not recursive built-in calls.
-- [ ] Convert indexed lazy-stack visible child placement so placement-time
+- [x] Convert indexed lazy-stack visible child placement so placement-time
   measurement is explicit work.
-- [ ] Preserve viewport clipping and visible-range behavior.
-- [ ] Preserve alignment-guide and `viewDimensions` behavior.
-- [ ] Convert `LayoutPassContext.recordPlacedFrames(in:)` to an iterative
+- [x] Preserve viewport clipping and visible-range behavior.
+- [x] Preserve alignment-guide and `viewDimensions` behavior.
+- [x] Convert `LayoutPassContext.recordPlacedFrames(in:)` to an iterative
   traversal if retained placement reuse can still recurse through deep placed
   trees.
+
+**Implementation note:** Built-in child placement no longer calls back into
+`LayoutEngine.place`; placement requests are queued and finished through
+explicit work items. Layout-dependent content and indexed lazy-stack placement
+still measure during placement, but those calls hit the iterative measurement
+engine. Retained placed-frame recording now walks reused placed subtrees with an
+explicit stack.
 
 **Acceptance criteria:**
 

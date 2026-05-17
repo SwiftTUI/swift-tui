@@ -380,7 +380,10 @@ Sources/SwiftTUICore/
 
 ### Place
 
-- `Place/LayoutEngine+Placement.swift`: the placement pass of the layout engine
+- `Place/LayoutEngine+PlacementWorkStack.swift`: explicit work-stack placement
+  dispatcher and placement request continuations
+- `Place/LayoutEngine+Placement.swift`: placed-node construction and placement
+  utility helpers
 - `Place/PlacedNode.swift`: place-phase output node, `SemanticRole`, and
   `PlacedNodeResolvedMetadata`, the grouped resolved-to-placed projection used
   by placement construction and retained-placement synchronization

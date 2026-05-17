@@ -345,34 +345,15 @@ package final class LayoutPassContext: Sendable {
     in node: PlacedNode
   ) {
     state.withLock {
-      $0.placedFrameTable.record(
-        identity: node.identity,
-        bounds: node.bounds,
-        namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
-      )
-      for child in node.children {
-        Self.recordPlacedFrames(
-          in: child,
-          table: &$0.placedFrameTable
+      var work = [node]
+      while let current = work.popLast() {
+        $0.placedFrameTable.record(
+          identity: current.identity,
+          bounds: current.bounds,
+          namedCoordinateSpaceName: current.semanticMetadata.namedCoordinateSpaceName
         )
+        work.append(contentsOf: current.children.reversed())
       }
-    }
-  }
-
-  private static func recordPlacedFrames(
-    in node: PlacedNode,
-    table: inout PlacedFrameTable
-  ) {
-    table.record(
-      identity: node.identity,
-      bounds: node.bounds,
-      namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
-    )
-    for child in node.children {
-      recordPlacedFrames(
-        in: child,
-        table: &table
-      )
     }
   }
 

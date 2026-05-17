@@ -161,6 +161,28 @@ struct StackSafetyRegressionTests {
     #expect(placed.bounds.size == measured.measuredSize)
   }
 
+  @Test("deep wrapper chains place through explicit layout work stack")
+  func deepWrapperChainsPlaceThroughExplicitLayoutWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let resolved = makeDeepLayoutWrapperChain(depth: 1024)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 12, height: 4)
+    )
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.placementWorkStackSteps > 0)
+    #expect(placed.subtreeNodeCount == measured.subtreeNodeCount)
+    #expect(placed.bounds.size == measured.measuredSize)
+  }
+
   @Test("deep wrapper chains measure through explicit layout work stack")
   func deepWrapperChainsMeasureThroughExplicitLayoutWorkStack() {
     let engine = LayoutEngine()
@@ -191,6 +213,29 @@ struct StackSafetyRegressionTests {
     let placed = engine.place(resolved, measured: measured, origin: .zero)
 
     #expect(measured.subtreeNodeCount == resolved.subtreeNodeCount)
+    #expect(placed.subtreeNodeCount > 0)
+    #expect(placed.subtreeNodeCount <= measured.subtreeNodeCount)
+    #expect(placed.bounds.size == measured.measuredSize)
+  }
+
+  @Test("deep stack chains place through explicit layout work stack")
+  func deepStackChainsPlaceThroughExplicitLayoutWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let resolved = makeDeepStackLayoutChain(depth: 128)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 128, height: 128)
+    )
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.placementWorkStackSteps > 0)
     #expect(placed.subtreeNodeCount > 0)
     #expect(placed.subtreeNodeCount <= measured.subtreeNodeCount)
     #expect(placed.bounds.size == measured.measuredSize)
@@ -231,6 +276,29 @@ struct StackSafetyRegressionTests {
     #expect(placed.bounds.size == measured.measuredSize)
   }
 
+  @Test("deep branching built-in trees place through explicit layout work stack")
+  func deepBranchingBuiltInTreesPlaceThroughExplicitLayoutWorkStack() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext()
+    let resolved = makeDeepBranchingLayoutTree(depth: 64)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 20, height: 8)
+    )
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: passContext
+    )
+
+    #expect(passContext.workMetrics.placementWorkStackSteps > 0)
+    #expect(placed.subtreeNodeCount > 0)
+    #expect(placed.subtreeNodeCount <= measured.subtreeNodeCount)
+    #expect(placed.bounds.size == measured.measuredSize)
+  }
+
   @Test("deep branching built-in trees measure through explicit layout work stack")
   func deepBranchingBuiltInTreesMeasureThroughExplicitLayoutWorkStack() {
     let engine = LayoutEngine()
@@ -260,9 +328,17 @@ struct StackSafetyRegressionTests {
       resolved,
       proposal: .init(width: 10, height: 3)
     )
-    let placed = engine.place(resolved, measured: measured, origin: .zero)
+    let placeContext = LayoutPassContext()
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: placeContext
+    )
 
     #expect(measured.measuredSize == .init(width: 10, height: 3))
+    #expect(placeContext.workMetrics.measurementWorkStackSteps > 0)
+    #expect(placeContext.workMetrics.placementWorkStackSteps > 0)
     #expect(placed.children.count == 1)
     #expect(placed.children.first?.identity == child.identity)
     #expect(placed.children.first?.bounds.size == child.intrinsicSize)
@@ -284,9 +360,17 @@ struct StackSafetyRegressionTests {
       resolved,
       proposal: .init(width: 8, height: 4)
     )
-    let placed = engine.place(resolved, measured: measured, origin: .zero)
+    let placeContext = LayoutPassContext()
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      origin: .zero,
+      passContext: placeContext
+    )
 
     #expect(measured.containerAllocationSnapshot?.lazyStack != nil)
+    #expect(placeContext.workMetrics.measurementWorkStackSteps > 0)
+    #expect(placeContext.workMetrics.placementWorkStackSteps > 0)
     #expect(placed.children.count == children.count)
     #expect(placed.children.map(\.identity) == children.map(\.identity))
   }
