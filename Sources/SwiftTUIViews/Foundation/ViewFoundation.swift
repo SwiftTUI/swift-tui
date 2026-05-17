@@ -328,13 +328,10 @@ func resolveView<V: View>(
   in context: ResolveContext,
   authoringContextOverride: AuthoringContext?
 ) -> ResolvedNode {
-  // When a shared FrameResolveState is available, refresh the per-frame
-  // invalidation set so evaluator closures captured on prior frames see
-  // the current frame's dirty identities.
-  var context = context
-  if let fs = context.frameState {
-    context.invalidatedIdentities = fs.invalidatedIdentities
-  }
+  // Reused evaluator closures may have captured this context on a prior frame.
+  // Refresh the pass-owned inputs before resolving so invalidation helpers and
+  // transaction-aware reuse checks observe the current frame.
+  let context = context.applyingCurrentFrameResolveInputs()
   context.viewGraph?.setSuppressesStructuralLifecycle(
     context.suppressesStructuralLifecycle,
     for: context.identity

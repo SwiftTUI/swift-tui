@@ -412,7 +412,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
-  package var frameState: FrameResolveState?
+  package var frameInputs: FrameResolveInputBox?
   package var suppressesStructuralLifecycle: Bool
   /// Forwards deadline requests to the frame scheduler.
   /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
@@ -515,7 +515,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.resolveWorkTracker = resolveWorkTracker
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
-    childContext.frameState = frameState
+    childContext.frameInputs = frameInputs
     childContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     childContext.requestDeadline = requestDeadline
     return childContext
@@ -560,7 +560,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.resolveWorkTracker = resolveWorkTracker
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
-    replacedContext.frameState = frameState
+    replacedContext.frameInputs = frameInputs
     replacedContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     replacedContext.requestDeadline = requestDeadline
     return replacedContext
@@ -607,16 +607,40 @@ public struct ResolveContext: Equatable, Sendable {
       || erased == \EnvironmentValues.isEnabled
   }
 
-  /// Returns the effective per-frame invalidation set, preferring the shared
-  /// ``FrameResolveState`` when available (updated each frame by the renderer).
+  /// Returns the current-frame resolve inputs when the renderer supplied them.
+  @MainActor
+  package var effectiveFrameResolveInputs: FrameResolveInputs? {
+    frameInputs?.inputs
+  }
+
+  /// Returns this context refreshed with current-frame resolve inputs.
+  @MainActor
+  package func applyingCurrentFrameResolveInputs() -> Self {
+    guard let inputs = effectiveFrameResolveInputs else {
+      return self
+    }
+    var refreshed = self
+    refreshed.invalidatedIdentities = inputs.invalidatedIdentities
+    refreshed.invalidationSummary = inputs.invalidationSummary
+    refreshed.transaction = inputs.transaction
+    return refreshed
+  }
+
+  /// Returns the effective per-frame invalidation set, preferring renderer-owned
+  /// frame inputs when available.
   @MainActor
   package var effectiveInvalidatedIdentities: Set<Identity> {
-    frameState?.invalidatedIdentities ?? invalidatedIdentities
+    effectiveFrameResolveInputs?.invalidatedIdentities ?? invalidatedIdentities
   }
 
   @MainActor
   package var effectiveInvalidationSummary: InvalidationSummary {
-    frameState?.invalidationSummary ?? invalidationSummary
+    effectiveFrameResolveInputs?.invalidationSummary ?? invalidationSummary
+  }
+
+  @MainActor
+  package var effectiveProposal: ProposedSize {
+    effectiveFrameResolveInputs?.proposal ?? .unspecified
   }
 
   /// Returns whether `identity` is directly invalidated in this context.

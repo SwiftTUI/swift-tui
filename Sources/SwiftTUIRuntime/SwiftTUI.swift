@@ -301,6 +301,7 @@ public struct DefaultRenderer {
   private let imageRepository: ImageAssetRepository
   private let viewGraph: ViewGraph
   private let frameState: FrameResolveState
+  private let frameInputs: FrameResolveInputBox
   private let presentationPortalState: PresentationPortalState
   private let committedPresentationDismissStack: CommittedPresentationDismissStack
   private let animationController: AnimationController
@@ -327,6 +328,7 @@ public struct DefaultRenderer {
     imageRepository = sharedImageAssetRepository
     viewGraph = .init()
     frameState = .init()
+    frameInputs = .init()
     presentationPortalState = .init()
     committedPresentationDismissStack = .init()
     animationController = .init()
@@ -412,6 +414,7 @@ public struct DefaultRenderer {
     draft.registrationDraft.discard()
     viewGraph.restoreCheckpoint(checkpoints.viewGraph)
     frameState.restoreCheckpoint(checkpoints.frameState)
+    frameInputs.clear()
     presentationPortalState.restoreCheckpoint(checkpoints.presentationPortal)
     if let observationBridge = draft.observationBridge,
       let checkpoint = checkpoints.observationBridge
@@ -884,10 +887,10 @@ public struct DefaultRenderer {
       registrationDraft.draftRegistrations
     )
     resolveContext.imageAssetResolver = imageRepository.resolver()
-    resolveContext.frameState = frameState
 
-    // Abortable heads checkpoint frameState / portal / observation BEFORE
-    // `frameState.update` mutates them. One-shot heads never abort, so skip.
+    // Abortable heads checkpoint previous-frame selector / portal / observation
+    // state before preparing current-frame resolve inputs. One-shot heads never
+    // abort, so skip.
     let frameStateCheckpoint: FrameResolveState.Checkpoint?
     let presentationPortalCheckpoint: PresentationPortalState.Checkpoint?
     let observationBridgeCheckpoint: ObservationBridge.Checkpoint?
@@ -901,21 +904,23 @@ public struct DefaultRenderer {
       presentationPortalCheckpoint = presentationPortalState.makeCheckpoint()
       observationBridgeCheckpoint = resolveContext.observationBridge?.makeCheckpoint()
     }
-    frameState.update(from: resolveContext, proposal: proposal)
+    let resolveInputs = frameState.prepareInputs(
+      from: resolveContext,
+      proposal: proposal
+    )
+    frameInputs.store(resolveInputs)
+    resolveContext.frameInputs = frameInputs
 
-    // The viewGraph checkpoint is captured AFTER `frameState.update` but
-    // BEFORE `beginFrame`, for the same abort reason.
+    // The viewGraph checkpoint is captured after current-frame input
+    // preparation but before `beginFrame`, for the same abort reason.
     let viewGraphCheckpoint: ViewGraph.Checkpoint? =
       mode == .abortable ? viewGraph.makeCheckpoint() : nil
     viewGraph.beginFrame()
-    let canUseSelectiveEvaluation =
-      frameState.selectiveEvaluationEnabled
-      && !frameState.environmentRequiresRootEvaluation
-      && !context.invalidatedIdentities.contains(resolveContext.identity)
+    let canUseSelectiveEvaluation = resolveInputs.usesSelectiveEvaluation
     if canUseSelectiveEvaluation {
-      viewGraph.invalidateAndQueueDirty(context.invalidatedIdentities)
+      viewGraph.invalidateAndQueueDirty(resolveInputs.invalidatedIdentities)
     } else {
-      viewGraph.invalidate(context.invalidatedIdentities)
+      viewGraph.invalidate(resolveInputs.invalidatedIdentities)
     }
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
@@ -939,7 +944,7 @@ public struct DefaultRenderer {
     }
     if !hasExistingPresentationPortalRoot
       || !canUseSelectiveEvaluation
-      || !context.invalidatedIdentities.isEmpty
+      || !resolveInputs.invalidatedIdentities.isEmpty
     {
       viewGraph.queueDirty([presentationPortalContext.identity])
     }
@@ -976,21 +981,21 @@ public struct DefaultRenderer {
     )
 
     let frameTailRetainedInput = frameTailRenderer.retainedInput(
-      invalidatedIdentities: context.invalidatedIdentities
+      invalidatedIdentities: resolveInputs.invalidatedIdentities
     )
     let layoutPassContext = LayoutPassContext(
       retainedLayout: frameTailRetainedInput.retainedLayout,
-      invalidatedIdentities: context.invalidatedIdentities
+      invalidatedIdentities: resolveInputs.invalidatedIdentities
     )
     let frameContext = FrameContext(
-      environment: context.environment,
-      transaction: context.transaction,
-      invalidatedIdentities: context.invalidatedIdentities
+      environment: resolveInputs.environment,
+      transaction: resolveInputs.transaction,
+      invalidatedIdentities: resolveInputs.invalidatedIdentities
     )
     let frameTailInput = FrameTailInput(
       generation: renderGeneration,
       resolved: resolved,
-      proposal: proposal,
+      proposal: resolveInputs.proposal,
       rootIdentity: resolveContext.identity,
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext

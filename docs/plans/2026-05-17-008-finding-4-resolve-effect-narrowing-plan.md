@@ -52,7 +52,7 @@ side-effect boundary."
 | Effect | Current mutation in frame head | Can move now? | Destination |
 | --- | --- | --- | --- |
 | `viewGraph` | `beginFrame`, invalidation, evaluator installation, dirty evaluation, snapshot reuse, lifecycle pre-work, and node registration capture. | No wholesale move. This is the main retained-graph owner. | Introduce a prepared graph-frame draft or equivalent graph transaction whose node/evaluator/registration mutations are not visible to live runtime registries until commit. |
-| `frameState` | `update(from:proposal:)` refreshes invalidation, environment, transaction, focus, proposal, and selective-evaluation flags before graph evaluation. | Partially. The input bundle can be separated before deeper graph work. | Split immutable `FrameResolveInputs` from mutable cross-frame state, then make prepared heads carry the per-frame values without mutating shared state until commit or checkpoint-free discard. |
+| `frameState` | `prepareInputs(from:proposal:)` now returns value-owned current-frame inputs; the retained state only tracks previous-frame selector memory used to decide whether root evaluation is required. | Complete for F4-C. | Keep `FrameResolveInputs` as the prepared-head input surface while later stages move graph, observation, presentation, and animation products behind drafts. |
 | `presentationPortalState` | Portal coordinator handles are injected during resolution and may update coordinator registries. | Not without a draft portal registry. | Add a portal-state draft/checkpoint wrapper that records presented overlay changes and installs them only when the commit plan is accepted. |
 | `observationBridge` | The bridge attaches the current `ViewGraph`, begins a tracking pass, and records observed identities for invalidation callbacks. | Not yet. Observation callbacks can race with prepared-frame visibility. | Make observation tracking pass-owned: a prepared frame records observations into a draft table and commit swaps them in. Callbacks before commit must still target the committed pass. |
 | `animationController` | Begins a frame-head transaction, collects transitions, and defers completion closures in abortable mode. | Closest to ready, but still tied to resolved-tree processing and completion ordering. | Keep the explicit transaction, then narrow it so all completion execution and transition publication occur at commit. Aborted heads should only discard the transaction object. |
@@ -112,6 +112,8 @@ Evidence:
 
 ### F4-C: Resolve input split
 
+Status: complete.
+
 Extract a value-owned input bundle from `FrameResolveState.update`:
 
 - Create a per-frame value containing invalidation summary, environment values,
@@ -124,6 +126,17 @@ Extract a value-owned input bundle from `FrameResolveState.update`:
 Exit criterion: `frameState` is no longer part of the abortable head checkpoint,
 or its checkpoint contains only previous-frame selector memory rather than
 current-frame values.
+
+Evidence:
+
+- `FrameResolveInputs` carries invalidation summary, environment snapshots,
+  focused values, transaction, proposal, and the selective-evaluation decision.
+- `FrameResolveState` checkpoints now contain only previous-frame selector
+  memory (`forceRootEvaluation`, focused identity, pressed identity, and
+  proposal).
+- Reused evaluator contexts refresh from `FrameResolveInputBox` before
+  resolving, and proposal-sensitive TabView layout reads the same prepared
+  input bundle.
 
 ### F4-D: Draft runtime registrations and graph transaction
 
