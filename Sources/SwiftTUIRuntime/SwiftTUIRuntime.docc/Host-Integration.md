@@ -37,6 +37,11 @@ combine presentation data from different commits. ``SemanticHostFrameCapabilitie
 declares which host-frame side effects the bridge supports, including
 imperative accessibility announcements.
 
+Terminal-backed hosts usually implement the aggregate ``PresentationSurface``.
+Non-terminal hosts can instead compose the narrower roles they need, such as
+``PresentationSurfaceMetricsProvider`` plus semantic or raster presentation, so
+they do not need terminal raw-mode or byte-writing methods.
+
 ## See Also
 
 - <doc:Running-Apps>

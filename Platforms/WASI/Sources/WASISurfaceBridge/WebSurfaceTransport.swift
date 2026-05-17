@@ -1,8 +1,10 @@
 @_spi(Runners) package import SwiftTUIRuntime
 import Synchronization
 
-package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPresentationSurface,
-  SemanticHostFramePresentationSurface, Sendable
+package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
+  RasterPresentationSurface, ClipboardWritingPresentationSurface,
+  SemanticHostFramePresentationSurface,
+  Sendable
 {
   private struct State: Sendable {
     var surfaceSize: CellSize
@@ -101,16 +103,6 @@ package final class WebSurfaceTransport: PresentationSurface, ClipboardWritingPr
       state.renderStyle = style
     }
   }
-
-  package func enableRawMode() throws {}
-
-  package func disableRawMode() throws {}
-
-  package func write(_: String) throws {}
-
-  package func clearScreen() throws {}
-
-  package func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   @MainActor

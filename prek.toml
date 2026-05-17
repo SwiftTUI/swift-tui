@@ -32,7 +32,7 @@ hooks = [
   },
   {
     id = "structured-concurrency-escape-hatches",
-    name = "forbid unchecked concurrency escape hatches",
+    name = "forbid unchecked concurrency and @safe escape hatches",
     entry = "./Scripts/check_concurrency_safety_policies.sh",
     language = "system",
     files = '^(Package\.swift|(Sources|Tests|Runners|Examples)/.*\.swift)$',

@@ -139,30 +139,47 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
 /// Host-facing name for metrics describing a committed presentation frame.
 public typealias PresentationMetrics = TerminalPresentationMetrics
 
-/// Abstraction over a presentation target used by `RunLoop`.
+/// Provides surface metrics needed to resolve and lay out frames.
 ///
-/// Conformers can be terminal devices that emit ANSI bytes (`TerminalHost`,
-/// `WebTerminalHost`), web transports, or pure raster sinks that hand
-/// `RasterSurface` values to a non-terminal host such as a SwiftUI canvas.
-public protocol PresentationSurface: AnyObject {
+/// Metrics providers can be terminal devices, web transports, native host
+/// surfaces, or pure semantic-frame consumers. This role intentionally excludes
+/// terminal raw-mode and byte-writing obligations.
+public protocol PresentationSurfaceMetricsProvider: AnyObject {
   var surfaceSize: CellSize { get }
   var capabilityProfile: TerminalCapabilityProfile { get }
   var appearance: TerminalAppearance { get }
   var theme: Theme? { get }
   var graphicsCapabilities: TerminalGraphicsCapabilities { get }
   var pointerInputCapabilities: PointerInputCapabilities { get }
+}
 
+/// Terminal-control role for presentation targets that emit terminal bytes.
+public protocol TerminalCommandPresentationSurface: AnyObject {
   func enableRawMode() throws
   func disableRawMode() throws
   func write(_ output: String) throws
   func clearScreen() throws
   func moveCursor(to point: CellPoint) throws
   func setPointerHoverEnabled(_ enabled: Bool) throws
+}
+
+/// Presents committed raster frames.
+public protocol RasterPresentationSurface: AnyObject {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics
 }
 
-package protocol DamageAwarePresentationSurface: PresentationSurface {
+/// Terminal-shaped aggregate presentation target used by terminal hosts.
+///
+/// Non-terminal hosts should conform to the narrower roles they need, such as
+/// ``PresentationSurfaceMetricsProvider`` and
+/// ``SemanticHostFramePresentationSurface``.
+public protocol PresentationSurface:
+  PresentationSurfaceMetricsProvider, TerminalCommandPresentationSurface,
+  RasterPresentationSurface
+{}
+
+package protocol DamageAwarePresentationSurface: RasterPresentationSurface {
   @discardableResult
   func present(
     _ surface: RasterSurface,
@@ -235,7 +252,7 @@ public struct SemanticHostFrame: Equatable, Sendable {
 
 @_spi(Runners)
 public protocol SemanticHostFramePresentationSurface:
-  PresentationSurface
+  PresentationSurfaceMetricsProvider
 {
   var semanticHostFrameCapabilities: SemanticHostFrameCapabilities { get }
 
@@ -247,6 +264,24 @@ extension SemanticHostFramePresentationSurface {
   public var semanticHostFrameCapabilities: SemanticHostFrameCapabilities {
     .standard
   }
+}
+
+extension PresentationSurfaceMetricsProvider {
+  public var theme: Theme? {
+    nil
+  }
+
+  public var graphicsCapabilities: TerminalGraphicsCapabilities {
+    .none
+  }
+
+  public var pointerInputCapabilities: PointerInputCapabilities {
+    .cellOnly
+  }
+}
+
+extension TerminalCommandPresentationSurface {
+  public func setPointerHoverEnabled(_: Bool) throws {}
 }
 
 extension PresentationSurface {

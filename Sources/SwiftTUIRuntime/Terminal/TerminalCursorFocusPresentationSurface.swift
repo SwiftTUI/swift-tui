@@ -1,6 +1,6 @@
 import SwiftTUICore
 
-package protocol TerminalCursorFocusPresentationSurface: PresentationSurface {
+package protocol TerminalCursorFocusPresentationSurface: TerminalCommandPresentationSurface {
   func presentAccessibilityCursorFocus(at point: CellPoint?) throws
 }
 

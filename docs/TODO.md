@@ -49,9 +49,10 @@
 
 - Re-enable `NeverUseForceTry` once the remaining call sites are audited. See
   [../.swift-format.json](../.swift-format.json).
-- Continue the staged pipeline-driver hardening roadmap with Stage 6 worker and
-  recursion hardening or Stage 7 presentation seam splitting on Track B. Track A
-  stages 0 through 5 are shipped and now gate those refactors. See
+- Continue the staged pipeline-driver hardening roadmap with the remaining
+  Stage 6 worker/recursion hardening. Track A stages 0 through 5 and Stage 7
+  presentation-seam hardening are shipped; Stage 6's first worker-isolation
+  tranche is active and the recursive layout bound/rewrite remains. See
   [plans/2026-05-16-001-pipeline-driver-hardening-plan.md](plans/2026-05-16-001-pipeline-driver-hardening-plan.md).
 - Apply the historical-doc path policy once decided: either archive historical
   plans clearly or keep the stable-doc source-path checker focused on current

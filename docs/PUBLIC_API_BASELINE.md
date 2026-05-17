@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
-| `SwiftTUIRuntime` | 52 | 485 |
+| `SwiftTUIRuntime` | 55 | 489 |
 | `SwiftTUIViews` | 256 | 1361 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
@@ -38,7 +38,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIRuntime
 
-### Canonical surface (52)
+### Canonical surface (55)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
@@ -51,7 +51,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FileOpenError` — enum — 2 members
 - `FrameDiagnosticRecord` — struct — 75 members
 - `FrameDiagnosticsLogger` — class — 2 members
-- `HostedRasterSurface` — class — 19 members
+- `HostedRasterSurface` — class — 14 members
 - `HostedSceneSession` — class — 11 members
 - `HostedSceneSessionError` — enum — 2 members
 - `InProcessSignalReader` — class — 4 members
@@ -64,8 +64,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `MouseEvent` — struct — 12 members
 - `PasteEvent` — struct — 2 members
 - `PresentationMetrics` — typealias
-- `PresentationSurface` — protocol — 18 members
-- `RunLoop` — class — 6 members
+- `PresentationSurface` — protocol — 5 members
+- `PresentationSurfaceMetricsProvider` — protocol — 9 members
+- `RasterPresentationSurface` — protocol — 1 member
+- `RunLoop` — class — 8 members
 - `RunLoopExitReason` — enum — 3 members
 - `RunLoopResult` — struct — 4 members
 - `RuntimeConfiguration` — struct — 56 members
@@ -80,6 +82,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Standard` — enum — 12 members
 - `StateKeyHandler` — typealias
 - `TerminalCapabilityProfile` — struct — 24 members
+- `TerminalCommandPresentationSurface` — protocol — 7 members
 - `TerminalControlMessage` — enum — 2 members
 - `TerminalGraphicsCapabilities` — struct — 13 members
 - `TerminalHost` — class — 16 members

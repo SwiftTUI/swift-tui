@@ -203,6 +203,9 @@ runtime-facing public surface is canonical:
 - `SemanticHostFrame`
 - `SemanticHostFrameCapabilities`
 - `PresentationMetrics`
+- `PresentationSurfaceMetricsProvider`, `RasterPresentationSurface`,
+  `TerminalCommandPresentationSurface`, and `PresentationSurface` as the
+  terminal aggregate over those roles
 - `HostedSceneSession`
 
 ### `AnimatedImage`

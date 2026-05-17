@@ -517,6 +517,12 @@ internal override is supplied.
 properly isolate it), and treat deep layout recursion as the unbounded-input
 hazard it is.
 
+**Status:** Active in
+[`docs/plans/2026-05-17-004-stage-6-worker-recursion-hardening-plan.md`](./2026-05-17-004-stage-6-worker-recursion-hardening-plan.md).
+The first tranche isolates and ADR-justifies the large-stack worker, closes the
+`@safe` policy bypass, and documents the WASI fallback. The remaining tranche is
+the recursive layout bound or explicit-stack rewrite.
+
 **Addresses:** P4 (Findings 6, 7), P5 (Finding 6).
 
 **Depends on:** Stage 0's guard subset for the worker/layout seam. Runs parallel
@@ -571,6 +577,9 @@ semantics are documented or gated; layout recursion is bounded or stack-based.
 **Goal:** Decompose `PresentationSurface` so non-terminal hosts (WebHost,
 SwiftUIHost, JSON, accessible) no longer inherit raw-mode and cursor-write
 obligations to receive a committed frame.
+
+**Status:** Shipped in
+[`docs/plans/2026-05-17-003-stage-7-presentation-seam-plan.md`](./2026-05-17-003-stage-7-presentation-seam-plan.md).
 
 **Addresses:** P9 (Finding 15).
 
@@ -728,8 +737,9 @@ This plan does not yet place it; that is an open decision below.
 
 These are deliberately deferred to the detailed plans, not pre-decided here:
 
-1. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
-   whether recursion can be bounded first.
+1. **Stage 6** — bound recursive layout with a graceful cap vs convert hot
+   recursive measurement/placement walks to explicit work stacks. The worker is
+   currently isolated and ADR-justified until that recursion decision is closed.
 2. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
    `collectsDiagnostics` render path) is handled: folded into a follow-up
    dual-path-collapse task, given its own stage, or left to a separate plan.
@@ -737,9 +747,10 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 ## Suggested first action
 
 Stage 0 through Stage 5 now have detailed shipped plans, completing Track A.
-Continue with **Stage 6** worker/recursion hardening or **Stage 7** presentation
-seam splitting on Track B; Stage 8 governance reconciliation can follow once
-the remaining hardening choices are settled.
+Stage 7 is shipped on Track B, and Stage 6 has an active detailed plan with the
+worker isolated and ADR-justified. Continue **Stage 6** by bounding or rewriting
+recursive layout; Stage 8 governance reconciliation can follow once the
+remaining hardening choice is settled.
 
 ## Related docs
 

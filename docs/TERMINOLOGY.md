@@ -58,10 +58,13 @@ scope.
 
 A presentation surface is the low-level frame sink used by `RunLoop`.
 
-Use **presentation surface** for `PresentationSurface` implementations such as
-`TerminalHost`, `HostedRasterSurface`, `WebSurfaceTransport`, and
-`WebSocketSurfaceTransport`. A presentation surface may be created by a runner
-or retained by a host, but it is not itself a product-level runner or host.
+Use **presentation surface** for implementations of the focused presentation
+roles, such as `TerminalHost`, `HostedRasterSurface`, `WebSurfaceTransport`,
+and `WebSocketSurfaceTransport`. Terminal-backed surfaces usually conform to
+the aggregate `PresentationSurface`; non-terminal surfaces can conform to
+narrower metrics, raster, and semantic host-frame roles. A presentation surface
+may be created by a runner or retained by a host, but it is not itself a
+product-level runner or host.
 
 Use `SemanticHostFrame` for the single value handed to non-terminal
 surfaces that consume raster output together with semantic snapshot data and
