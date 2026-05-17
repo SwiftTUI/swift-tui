@@ -233,7 +233,8 @@ regression suites green.
 
 **Goal:** Promote the two unnamed pipeline stages — animation injection and the
 late-preference reconciliation loop — into first-class, named units, and remove
-the magic reconciliation-pass bound.
+the magic reconciliation-pass bound. See detailed plan:
+[`docs/plans/2026-05-17-001-stage-2-name-hidden-stages-plan.md`](./2026-05-17-001-stage-2-name-hidden-stages-plan.md).
 
 **Addresses:** P3 (Findings 5 and 11).
 
@@ -268,8 +269,11 @@ model will once again hide them inside a fused function.
 
 **Key files:**
 - Modify: `Sources/SwiftTUIRuntime/SwiftTUI.swift:11,390,559`
-- Create: `docs/decisions/00NN-late-preference-reconciliation-bound.md`
+- Create: `docs/decisions/0018-late-preference-reconciliation-bound.md`
 - Reference: existing `docs/plans/2026-05-12-002-late-preference-reconciliation-plan.md`
+- Detailed plan:
+  `docs/plans/2026-05-17-001-stage-2-name-hidden-stages-plan.md`
+- ADR: `docs/decisions/0018-late-preference-reconciliation-bound.md`
 
 **Risks:** Changing the bound-exceeded behavior from "log and render" to "hard
 diagnostic" is a behavior change for any view with a deep preference dependency
@@ -683,19 +687,17 @@ These are deliberately deferred to the detailed plans, not pre-decided here:
 
 1. **Stage 0** — exact must-pass guard subset for the Stage 1 head unification
    versus disabled stage-specific guards that only gate later stages.
-2. **Stage 2** — bound-exceeded policy: silent logged degradation vs hard
-   author-facing diagnostic.
-3. **Stage 3** — extend `Renderer<Root>` into the driver, or supersede and
+2. **Stage 3** — extend `Renderer<Root>` into the driver, or supersede and
    delete it.
-4. **Stage 3** — the shape of the head's declared effect set and the
+3. **Stage 3** — the shape of the head's declared effect set and the
    transactional-stage construct (Task 3). Narrowing that effect set, and any
    retry of ADR 0004's abort, are deferred follow-on work (see above), not
    decided here.
-5. **Stage 5** — invert the frame-drop model into a closed impact product vs
+4. **Stage 5** — invert the frame-drop model into a closed impact product vs
    keep the enum with a guard test.
-6. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
+5. **Stage 6** — replace `pthread` outright vs isolate-and-ADR; depends on
    whether recursion can be bounded first.
-7. **Pre-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
+6. **Pre-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
    `collectsDiagnostics` render path) is handled: folded into Stage 3 as a
    dual-path-collapse task, given its own stage, or left to a separate plan.
 
