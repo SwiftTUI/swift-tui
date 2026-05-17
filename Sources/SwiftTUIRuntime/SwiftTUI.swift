@@ -650,26 +650,34 @@ public struct DefaultRenderer {
     )
   }
 
+  /// Shared fused-frame-tail head: captures the baseline placed tree for the
+  /// animation controller and snapshots any pending placed-level animation
+  /// overlays.
+  ///
+  /// Both the synchronous (`renderFusedFrameTail`) and asynchronous
+  /// (`renderAsyncFusedFrameTail`) tail strategies run exactly this work before
+  /// they diverge — the sync path calls `renderRaster`, the async path calls
+  /// `renderRasterAsync`. Extracting it keeps the two strategies from
+  /// duplicating the placed-tree capture / overlay-snapshot orchestration
+  /// (F11).
+  ///
+  /// Capture the BASELINE placed tree (pre-overlay) for two things:
+  /// 1. The animation controller's removal-snapshot lookup on the next frame
+  ///    (`capturePlacedTree`).
+  /// 2. The retained-layout store, so future tick frames reuse the canonical
+  ///    layout and not an animation-decorated tree.
+  ///
+  /// If we used the post-overlay placed tree, subsequent ticks would hit
+  /// retainedPlacement and return the cached tree including the stale transient
+  /// overlay — then overlay snapshot application would inject another overlay
+  /// on top, growing the tree each tick and leaving ghosted artefacts visible
+  /// after the animation completes.
   @MainActor
-  private func renderFusedFrameTail(
+  private func prepareAnimationOverlaySnapshot(
     draft: FrameHeadDraft,
-    reconciledTailLayout: ReconciledFrameTailLayout
-  ) -> FrameTailOutput {
-    let layout = reconciledTailLayout.layout
+    layout: FrameTailLayoutOutput
+  ) -> (placed: PlacedNode, overlay: PlacedAnimationOverlaySnapshot) {
     let placed = layout.baselinePlaced
-    // Capture the BASELINE placed tree (pre-overlay) for two things:
-    // 1. The animation controller's removal-snapshot lookup on the
-    //    next frame (capturePlacedTree).
-    // 2. The retained-layout store below, so future tick frames
-    //    reuse the canonical layout and not an animation-decorated
-    //    tree.
-    //
-    // If we stored the post-overlay placed tree, subsequent ticks
-    // would hit retainedPlacement and return the cached tree
-    // including the stale transient overlay — then overlay snapshot
-    // application would inject another overlay on top, growing the tree
-    // each tick and leaving ghosted artefacts visible after the animation
-    // completes.
     let animationController = draft.animationDraft.controller
     animationController.capturePlacedTree(layout.baselinePlaced)
     // Snapshot any pending placed-level animation overlays. The snapshot
@@ -678,6 +686,19 @@ public struct DefaultRenderer {
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
       at: draft.animationTimestamp
+    )
+    return (placed, animationOverlaySnapshot)
+  }
+
+  @MainActor
+  private func renderFusedFrameTail(
+    draft: FrameHeadDraft,
+    reconciledTailLayout: ReconciledFrameTailLayout
+  ) -> FrameTailOutput {
+    let layout = reconciledTailLayout.layout
+    let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
+      draft: draft,
+      layout: layout
     )
     return frameTailRenderer.renderRaster(
       reconciledTailLayout.input,
@@ -1124,12 +1145,9 @@ public struct DefaultRenderer {
     layoutStage: AsyncFrameTailLayoutStageOutput
   ) async -> AsyncFrameTailDraftOutput {
     let layout = layoutStage.layout
-    let placed = layout.baselinePlaced
-    let animationController = draft.animationDraft.controller
-    animationController.capturePlacedTree(layout.baselinePlaced)
-    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
-      for: placed,
-      at: draft.animationTimestamp
+    let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
+      draft: draft,
+      layout: layout
     )
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let rasterSuspensionStart = draft.clock?.now
