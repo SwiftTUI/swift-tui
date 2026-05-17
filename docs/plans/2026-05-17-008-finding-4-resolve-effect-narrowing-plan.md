@@ -53,9 +53,9 @@ side-effect boundary."
 | --- | --- | --- | --- |
 | `viewGraph` | `ViewGraphFrameDraft` now owns the abort checkpoint and committed runtime-registration publication plan. `ViewGraph` still performs node/evaluator/lifecycle mutations during frame-head preparation, so this remains a declared head effect. | Partially complete for F4-D. | Continue narrowing graph mutations behind the graph draft until node/evaluator/lifecycle state is draft-owned and no broad graph checkpoint is needed. |
 | `frameState` | `prepareInputs(from:proposal:)` now returns value-owned current-frame inputs; the retained state only tracks previous-frame selector memory used to decide whether root evaluation is required. | Complete for F4-C. | Keep `FrameResolveInputs` as the prepared-head input surface while later stages move graph, observation, presentation, and animation products behind drafts. |
-| `presentationPortalState` | Portal coordinator handles are injected during resolution and may update coordinator registries. | Not without a draft portal registry. | Add a portal-state draft/checkpoint wrapper that records presented overlay changes and installs them only when the commit plan is accepted. |
-| `observationBridge` | The bridge attaches the current `ViewGraph`, begins a tracking pass, and records observed identities for invalidation callbacks. | Not yet. Observation callbacks can race with prepared-frame visibility. | Make observation tracking pass-owned: a prepared frame records observations into a draft table and commit swaps them in. Callbacks before commit must still target the committed pass. |
-| `animationController` | Begins a frame-head transaction, collects transitions, and defers completion closures in abortable mode. | Closest to ready, but still tied to resolved-tree processing and completion ordering. | Keep the explicit transaction, then narrow it so all completion execution and transition publication occur at commit. Aborted heads should only discard the transaction object. |
+| `presentationPortalState` | `PresentationPortalDraft` now owns coordinator-handle injection, declarative reconciliation, overlay entries, and dismiss-stack changes for the prepared frame. | Complete for F4-E. | Keep portal visibility draft-owned until commit; later F4-G can remove the declared effect once the remaining graph and animation effects are also draft-owned. |
+| `observationBridge` | `ObservationBridgeDraft` now owns the prepared tracking pass and observed identity table. Observation callbacks still consult the committed pass table until the draft commits. | Complete for F4-E. | Keep observation routes draft-owned until commit; later F4-G can remove the declared effect once the remaining graph and animation effects are also draft-owned. |
+| `animationController` | `AnimationFrameDraft` now owns transition collection, resolved-tree animation diffing, placed-overlay sampling, and deferred frame-head completions for the prepared frame. | Complete for F4-F. | Publish the draft controller state only after the commit plan is accepted; discard abandoned drafts without restoring the live controller. |
 
 ## Work Stages
 
@@ -173,6 +173,10 @@ Evidence:
 
 ### F4-E: Observation and presentation drafts
 
+Status: complete for observation routes and presentation portal visibility; both
+effects remain listed in `FrameHeadDeclaredEffect.runtimeHead` until F4-G removes
+the declaration as a batch.
+
 Move the two context-coupled subsystems behind drafts:
 
 - Observation: record observed identities and callback pass IDs in a prepared
@@ -183,7 +187,29 @@ Move the two context-coupled subsystems behind drafts:
 Exit criterion: abandoning a prepared head cannot change observation invalidation
 routes or presentation portal visibility.
 
+Evidence:
+
+- Added `ObservationBridgeDraft`, which records the prepared tracking pass and
+  observed identities without publishing them to `ObservationBridge` until the
+  frame commits. Observation callbacks before commit still check the committed
+  pass table and are ignored for draft-only observations.
+- Added `PresentationPortalDraft`, which receives portal handle injection,
+  declarative coordinator reconciliation, overlay entries, and dismiss-stack
+  state during resolve. Commit installs the draft registry as the live
+  `PresentationPortalState` registry so handles captured during the committed
+  frame continue to address live coordinator state; abort discards it without
+  restoring a live checkpoint.
+- Removed presentation-portal and observation-bridge checkpoints from
+  `FrameHeadCheckpoints`; abort now discards their drafts instead of calling
+  broad restore routines.
+- Added focused observation coverage proving a prepared observation draft is
+  invisible until commit. Existing blocked async presentation coverage continues
+  to prove draft sheets stay out of Escape dismissal until commit.
+
 ### F4-F: Animation transaction finalization
+
+Status: complete; `animationController` is no longer listed in
+`FrameHeadDeclaredEffect.runtimeHead`.
 
 Finish the animation side of the boundary:
 
@@ -194,6 +220,19 @@ Finish the animation side of the boundary:
 
 Exit criterion: `animationController` is no longer in the declared head effect
 set.
+
+Evidence:
+
+- Added `AnimationFrameDraft`, which clones the committed animation controller
+  state for a prepared frame and routes transition registration, animation
+  diffing, placed-overlay sampling, and completion deferral into that draft.
+- Commit publishes the draft controller state to the live renderer controller
+  and then executes deferred frame-head completions. Abort and completed-frame
+  drop discard the draft without restoring a live animation checkpoint.
+- Removed the animation checkpoint from `FrameHeadCheckpoints` and removed
+  `animationController` from `FrameHeadDeclaredEffect.runtimeHead`.
+- Added focused coverage proving a prepared transition animation is visible in
+  the draft controller but not in the live controller until commit.
 
 ### F4-G: Remove the declared head effect set
 
