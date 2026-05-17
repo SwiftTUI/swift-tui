@@ -100,9 +100,11 @@ post-acquisition body is the non-`async` `applyAcquiredFrame`; only artifact
 Concretely:
 
 - `applyAcquiredFrame(...)` — private `@MainActor`, non-`async`. Takes the
-  converged `FrameArtifacts`, the per-frame focus/scroll change flags, the
-  `FrameTailJobState`, the `CompletedFrameDropDecision?`, and the
-  `ScheduledFrame` / diagnostics context. Contains every `structural` line.
+  converged `FrameArtifacts`, the `FocusSyncConvergenceState` (focus/scroll
+  change flags, rerender budget, and lifecycle carry-forward), the
+  `FrameAcquisitionState` (tail-job state and completed-frame drop decision),
+  and the `ScheduledFrame` / diagnostics context. Contains every `structural`
+  line.
 - `renderPendingFrames(renderedFrames:)` — keeps its exact
   `throws` (non-`async`) signature. Loops over ready frames; runs the
   focus-sync convergence loop with a synchronous `renderer.render`

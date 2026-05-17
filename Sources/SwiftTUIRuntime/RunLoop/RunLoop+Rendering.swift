@@ -332,7 +332,6 @@ extension RunLoop {
       } else {
         artifacts.presentationDamage
       }
-    var presentationMetrics = TerminalPresentationMetrics()
     let presentStart: ContinuousClock.Instant?
     let presentClock: ContinuousClock?
     if hasDiagnosticsLogger {
@@ -343,7 +342,7 @@ extension RunLoop {
       presentClock = nil
       presentStart = nil
     }
-    presentationMetrics = try presentCommittedFrame(
+    let presentationMetrics = try presentCommittedFrame(
       artifacts,
       damage: presentationDamage
     )
@@ -820,7 +819,7 @@ extension RunLoop {
           eventPump: eventPump,
           renderIntentDiagnostics: renderIntentDiagnostics,
           renderedFrames: renderedFrames,
-          convergence: &convergence
+          convergence: convergence
         )
         switch acquired {
         case .skipped:
@@ -890,7 +889,7 @@ extension RunLoop {
     eventPump: EventPump?,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     renderedFrames: Int,
-    convergence: inout FocusSyncConvergenceState
+    convergence: FocusSyncConvergenceState
   ) async -> FrameAcquisitionOutcome {
     if renderMode == .sync {
       let renderedArtifacts = renderer.render(
