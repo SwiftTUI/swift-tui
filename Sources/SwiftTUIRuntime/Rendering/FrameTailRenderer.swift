@@ -216,12 +216,12 @@ package enum FrameHeadMode {
   case abortable
 }
 
-/// The checkpoint bundle captured for an abortable frame head.
+/// The non-graph checkpoint bundle captured for an abortable frame head.
 ///
 /// Present only on drafts prepared with `FrameHeadMode.abortable`; a one-shot
-/// draft carries `nil`. `abortPreparedFrameHead` requires this bundle.
+/// draft carries `nil`. The graph checkpoint is owned by
+/// ``ViewGraphFrameDraft``.
 package struct FrameHeadCheckpoints {
-  let viewGraph: ViewGraph.Checkpoint
   /// Previous-frame selector memory only. Current-frame resolve inputs are
   /// carried by the prepared head and overwritten by the next frame.
   let frameState: FrameResolveState.Checkpoint
@@ -238,6 +238,7 @@ package struct FrameHeadCheckpoints {
 package struct FrameHeadDraft {
   var clock: ContinuousClock?
   var renderGeneration: RenderGeneration
+  var graphDraft: ViewGraphFrameDraft
   var registrationDraft: FrameHeadRegistrationDraft
   /// The abort checkpoint bundle. `nil` for one-shot heads.
   var checkpoints: FrameHeadCheckpoints?

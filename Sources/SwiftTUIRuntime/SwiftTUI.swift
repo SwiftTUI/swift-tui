@@ -412,7 +412,7 @@ public struct DefaultRenderer {
       )
     }
     draft.registrationDraft.discard()
-    viewGraph.restoreCheckpoint(checkpoints.viewGraph)
+    draft.graphDraft.discard(from: viewGraph)
     frameState.restoreCheckpoint(checkpoints.frameState)
     frameInputs.clear()
     presentationPortalState.restoreCheckpoint(checkpoints.presentationPortal)
@@ -641,7 +641,6 @@ public struct DefaultRenderer {
           draft: draft,
           reconciledTailLayout: reconciledTailLayout,
           tail: tail,
-          originalContext: context,
           collectsDiagnostics: collectsDiagnostics
         )
       }
@@ -690,7 +689,6 @@ public struct DefaultRenderer {
     draft: FrameHeadDraft,
     reconciledTailLayout: ReconciledFrameTailLayout,
     tail: FrameTailOutput,
-    originalContext: ResolveContext,
     collectsDiagnostics: Bool
   ) -> FrameArtifacts {
     let layout = reconciledTailLayout.layout
@@ -710,9 +708,8 @@ public struct DefaultRenderer {
         resolved: resolved,
         placed: tail.placed
       )
-      runtimeRegistrationDiagnostics = draft.registrationDraft.commitRestoring(
-        from: viewGraph,
-        resolved: resolved
+      runtimeRegistrationDiagnostics = draft.graphDraft.commitRuntimeRegistrations(
+        from: viewGraph
       )
       return commitPlanner.plan(
         resolved: resolved,
@@ -790,7 +787,7 @@ public struct DefaultRenderer {
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
-    originalContext.localScrollPositionRegistry?.updateGeometry(
+    draft.graphDraft.updateCommittedScrollGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
@@ -880,8 +877,10 @@ public struct DefaultRenderer {
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
-    let registrationDraft = FrameHeadRegistrationDraft(
-      liveRegistrations: resolveContext.runtimeRegistrations
+    let registrationDraft = FrameHeadRegistrationDraft()
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: resolveContext.runtimeRegistrations,
+      checkpoint: mode == .abortable ? viewGraph.makeCheckpoint() : nil
     )
     resolveContext = resolveContext.replacingRuntimeRegistrations(
       registrationDraft.draftRegistrations
@@ -911,10 +910,8 @@ public struct DefaultRenderer {
     frameInputs.store(resolveInputs)
     resolveContext.frameInputs = frameInputs
 
-    // The viewGraph checkpoint is captured after current-frame input
-    // preparation but before `beginFrame`, for the same abort reason.
-    let viewGraphCheckpoint: ViewGraph.Checkpoint? =
-      mode == .abortable ? viewGraph.makeCheckpoint() : nil
+    // The graph draft owns the viewGraph checkpoint captured before
+    // `beginFrame`, for the same abort reason.
     viewGraph.beginFrame()
     let canUseSelectiveEvaluation = resolveInputs.usesSelectiveEvaluation
     if canUseSelectiveEvaluation {
@@ -960,13 +957,7 @@ public struct DefaultRenderer {
       resolveDuration = .zero
     } else {
       let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
-      if let dirtyEvaluationPlan {
-        registrationDraft.recordRemoveSubtrees(
-          rootedAt: dirtyEvaluationPlan.frontierIdentities
-        )
-      } else {
-        registrationDraft.recordResetAll()
-      }
+      graphDraft.recordDirtyEvaluationPlan(dirtyEvaluationPlan)
 
       (_, resolveDuration) = measurePhase(clock: clock) {
         viewGraph.evaluateDirtyNodes(
@@ -1009,7 +1000,6 @@ public struct DefaultRenderer {
       // Force-unwraps are safe: every `.abortable` branch above assigned its
       // checkpoint non-nil.
       checkpoints = FrameHeadCheckpoints(
-        viewGraph: viewGraphCheckpoint!,
         frameState: frameStateCheckpoint!,
         presentationPortal: presentationPortalCheckpoint!,
         observationBridge: observationBridgeCheckpoint,
@@ -1020,6 +1010,7 @@ public struct DefaultRenderer {
     return FrameHeadDraft(
       clock: clock,
       renderGeneration: renderGeneration,
+      graphDraft: graphDraft,
       registrationDraft: registrationDraft,
       checkpoints: checkpoints,
       observationBridge: resolveContext.observationBridge,
@@ -1345,9 +1336,8 @@ public struct DefaultRenderer {
         resolved: candidate.resolved,
         placed: tail.placed
       )
-      runtimeRegistrationDiagnostics = candidate.draft.registrationDraft.commitRestoring(
-        from: viewGraph,
-        resolved: candidate.resolved
+      runtimeRegistrationDiagnostics = candidate.draft.graphDraft.commitRuntimeRegistrations(
+        from: viewGraph
       )
       return commitPlanner.plan(
         resolved: candidate.resolved,
@@ -1382,7 +1372,7 @@ public struct DefaultRenderer {
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
-    candidate.draft.registrationDraft.updateCommittedScrollGeometry(
+    candidate.draft.graphDraft.updateCommittedScrollGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
