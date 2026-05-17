@@ -83,7 +83,13 @@ is a *sequenced executor*: each `render*` entry point iterates the canonical
 exhaustive `switch`, invoking the caller-supplied handler stored in a small
 per-strategy `...StageHandlers` struct. Stage order is enforced by that
 executor loop — not by prose or a `precondition` — so the ordering cannot drift
-without forcing every `switch` to be updated.
+without forcing every `switch` to be updated. The executor is not simpler or
+shorter than the code it replaced: the three strategy-specific handler structs
+(`OneShotRenderStageHandlers`, `AsyncRenderStageHandlers`,
+`CancellableRenderStageHandlers`) are a reshaping of the former closure
+parameters, retained because sync, async, and cancellable strategies differ in
+closure type and cannot share one handler. The extra code buys the compile-time
+guarantee that a mis-ordered or partial stage sequence is unrepresentable.
 
 ```text
 head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit

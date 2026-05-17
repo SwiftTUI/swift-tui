@@ -61,9 +61,21 @@ be updated, so the ordering cannot drift silently. The `headStage` field, the
 unread `RuntimeFrameHeadStage` config type are all deleted — there is no
 expressible pipeline that runs a non-canonical order.
 
+**Cost of the executor**: Option B is not simpler or shorter than the code it
+replaces. `RuntimeRenderPipeline.swift` grew from ~115 lines to ~223 lines
+(~108 net added). The three `...StageHandlers` structs
+(`OneShotRenderStageHandlers`, `AsyncRenderStageHandlers`,
+`CancellableRenderStageHandlers`) are a reshaping of the former caller-closure
+parameters, retained because the three render strategies' closures genuinely
+differ (sync vs async vs cancellable) and cannot be unified into one handler
+type without losing type fidelity. The genuine value purchased by this extra
+code is **F12 structural enforcement**: an out-of-order frame is
+unrepresentable, and adding, removing, or reordering a stage forces every
+exhaustive `switch` to be updated at compile time.
+
 Option A (delete the pipeline type and let the three `render*` functions call
 the stages directly) was the measured fallback. It was **not** taken: the
-allocation-budget guard (`RenderPipelineStructureTests.composedRenderAllocationBudget`,
+time-budget guard (`RenderPipelineStructureTests.composedRenderTimeBudget`,
 1000 frames of a 20-row `VStack`/`ForEach` at 80×40) measured ~4.45s pre-refactor
 and ~4.64s post-refactor in a debug build — well within the 2× regression budget.
 Option B added no measurable hot-path cost, so the real-composition executor
