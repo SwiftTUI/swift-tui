@@ -114,8 +114,8 @@ struct ToolbarTests {
       view,
       context: ResolveContext(identity: testIdentity("toolbar-unhosted-root"))
     )
-    let issue = artifacts.diagnostics.runtimeIssues.first
-    #expect(artifacts.diagnostics.runtimeIssues.count == 1)
+    let issue = artifacts.diagnostics.runtime.issues.first
+    #expect(artifacts.diagnostics.runtime.issues.count == 1)
     #expect(issue?.code == "toolbar.unhostedItems")
     #expect(issue?.severity == .warning)
     #expect(issue?.identity != nil)
@@ -141,7 +141,7 @@ struct ToolbarTests {
       panel,
       context: .init(identity: testIdentity("toolbar-hosted-root"))
     )
-    #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
+    #expect(artifacts.diagnostics.runtime.issues.isEmpty)
   }
 
   @Test("Late toolbar items inside GeometryReader emit unhosted runtime issues")
@@ -161,9 +161,9 @@ struct ToolbarTests {
       context: .init(identity: testIdentity("toolbar-late-unhosted-root")),
       proposal: .init(width: 24, height: 4)
     )
-    let issue = artifacts.diagnostics.runtimeIssues.first
+    let issue = artifacts.diagnostics.runtime.issues.first
 
-    #expect(artifacts.diagnostics.runtimeIssues.count == 1)
+    #expect(artifacts.diagnostics.runtime.issues.count == 1)
     #expect(issue?.code == "toolbar.unhostedItems")
     #expect(issue?.severity == .warning)
     #expect(issue?.identity != nil)
@@ -198,7 +198,7 @@ struct ToolbarTests {
     let bodyRow = lines.firstIndex { $0.contains("body 30x5") }
     let sizeRow = lines.firstIndex { $0.contains("Size 30x5") }
 
-    #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
+    #expect(artifacts.diagnostics.runtime.issues.isEmpty)
     #expect(bodyRow != nil)
     #expect(sizeRow != nil)
     if let bodyRow, let sizeRow {
@@ -286,7 +286,7 @@ struct ToolbarTests {
     )
     let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    #expect(artifacts.diagnostics.runtimeIssues.isEmpty)
+    #expect(artifacts.diagnostics.runtime.issues.isEmpty)
     #expect(!rendered.contains("Wide"))
     #expect(rendered.contains("fit"))
   }

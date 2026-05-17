@@ -83,7 +83,8 @@ scheduled at runtime.
   - P9 resolved by Stage 7.
   - P10 resolved by Stage 0 source docs plus Stage 8 architecture wording.
   - Finding 4 narrowing was deferred at Stage 8 and is now complete in the
-    follow-up plan; Finding 10 remains explicitly open.
+    follow-up plan; Finding 10 was completed later by the source-breaking
+    diagnostics cleanup.
 - [x] Mark this Stage 8 plan and the parent roadmap as shipped; update the
   docs index and TODO/CHANGELOG records.
 - [x] Run documentation checks and the repo gate.

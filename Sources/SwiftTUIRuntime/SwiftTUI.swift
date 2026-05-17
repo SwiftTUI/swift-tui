@@ -406,8 +406,7 @@ public struct DefaultRenderer {
     prepareFrameHead(
       root,
       context: context,
-      proposal: proposal,
-      collectsDiagnostics: true
+      proposal: proposal
     )
   }
 
@@ -456,8 +455,7 @@ public struct DefaultRenderer {
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
-      newestDesiredGeneration: draft.renderGeneration,
-      collectsDiagnostics: true
+      newestDesiredGeneration: draft.renderGeneration
     )
     discardCompletedFrameCandidate(
       candidate,
@@ -474,8 +472,7 @@ public struct DefaultRenderer {
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
-      newestDesiredGeneration: draft.renderGeneration,
-      collectsDiagnostics: true
+      newestDesiredGeneration: draft.renderGeneration
     )
     return candidate.dropDecision
   }
@@ -492,14 +489,12 @@ public struct DefaultRenderer {
   public func render<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified,
-    collectsDiagnostics: Bool = true
+    proposal: ProposedSize = .unspecified
   ) -> FrameArtifacts {
     renderView(
       root,
       context: context,
-      proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics
+      proposal: proposal
     )
   }
 
@@ -509,14 +504,12 @@ public struct DefaultRenderer {
   public func renderAsync<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified,
-    collectsDiagnostics: Bool = true
+    proposal: ProposedSize = .unspecified
   ) async -> FrameArtifacts {
     await renderViewAsync(
       root,
       context: context,
-      proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics
+      proposal: proposal
     )
   }
 
@@ -525,7 +518,6 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
-    collectsDiagnostics: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
     completedFramePolicy: CompletedFramePolicy? = nil,
     completedFrameAdditionalBlockers:
@@ -539,7 +531,6 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics,
       mode: .abortable
     )
     return await RuntimeRenderPipeline().renderCancellable(
@@ -580,7 +571,6 @@ public struct DefaultRenderer {
           draft: draft,
           tailOutput: tailOutput,
           newestDesiredGeneration: newestGeneration,
-          collectsDiagnostics: collectsDiagnostics,
           completedFramePolicy: completedFramePolicy,
           additionalBlockers: completedFrameAdditionalBlockers
         )
@@ -591,7 +581,7 @@ public struct DefaultRenderer {
           )
           return CancellableRenderOutcome(
             artifacts: nil,
-            runtimeIssues: candidate.previewArtifacts.diagnostics.runtimeIssues,
+            runtimeIssues: candidate.previewArtifacts.diagnostics.runtime.issues,
             renderGeneration: draft.renderGeneration,
             newestDesiredGeneration: newestGeneration,
             tailJobState: .droppedCompleted,
@@ -602,7 +592,7 @@ public struct DefaultRenderer {
         let artifacts = renderer.commitCompletedFrameCandidate(candidate)
         return CancellableRenderOutcome(
           artifacts: artifacts,
-          runtimeIssues: artifacts.diagnostics.runtimeIssues,
+          runtimeIssues: artifacts.diagnostics.runtime.issues,
           renderGeneration: draft.renderGeneration,
           newestDesiredGeneration: newestGeneration,
           tailJobState: .completed,
@@ -617,15 +607,13 @@ public struct DefaultRenderer {
   private func renderView<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize,
-    collectsDiagnostics: Bool = true
+    proposal: ProposedSize
   ) -> FrameArtifacts {
     let renderer = self
     let draft = renderer.computeFrameHead(
       root,
       context: context,
       proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics,
       mode: .oneShot
     )
     return RuntimeRenderPipeline().renderOneShot(
@@ -652,8 +640,7 @@ public struct DefaultRenderer {
         renderer.commitOneShotFrame(
           draft: draft,
           reconciledTailLayout: reconciledTailLayout,
-          tail: tail,
-          collectsDiagnostics: collectsDiagnostics
+          tail: tail
         )
       }
     )
@@ -701,8 +688,7 @@ public struct DefaultRenderer {
   private func commitOneShotFrame(
     draft: FrameHeadDraft,
     reconciledTailLayout: ReconciledFrameTailLayout,
-    tail: FrameTailOutput,
-    collectsDiagnostics: Bool
+    tail: FrameTailOutput
   ) -> FrameArtifacts {
     let layout = reconciledTailLayout.layout
     let resolved = reconciledTailLayout.resolved
@@ -741,50 +727,45 @@ public struct DefaultRenderer {
     let dropEligibilityBlockers = frameTailCommitDropBlockers(
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
-    var diagnostics: FrameDiagnostics
-    if collectsDiagnostics {
-      let phaseTimings = FramePhaseTimings(
-        resolve: draft.resolveDuration,
-        measure: tail.diagnostics.measureDuration,
-        place: tail.diagnostics.placeDuration,
-        semantics: tail.diagnostics.semanticsDuration,
-        draw: tail.diagnostics.drawDuration,
-        raster: tail.diagnostics.rasterDuration,
-        commit: commitDuration
-      )
-      let mainActorTimings = FrameMainActorTimings(
-        blocked: phaseTimings.total,
-        suspended: .zero
-      )
-      diagnostics = FrameDiagnostics.summarize(
-        resolved: resolved,
-        measured: tail.measured,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        draw: tail.draw,
-        invalidatedIdentities: draft.frameContext.invalidatedIdentities,
-        resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
-        layoutWork: tail.diagnostics.layoutWork,
-        presentationDamage: tail.presentationDamage,
-        presentationSurfaceWidth: tail.raster.size.width,
-        phaseTimings: phaseTimings,
-        renderGenerations: .init(
-          render: draft.renderGeneration,
-          layoutInput: reconciledTailLayout.input.generation,
-          layoutOutput: layout.generation,
-          rasterInput: reconciledTailLayout.input.generation,
-          rasterOutput: tail.generation
-        ),
-        workerTimings: workerTimings,
-        mainActorTimings: mainActorTimings,
-        measurementCache: tail.diagnostics.measurementCache,
-        runtimeIssues: reconciledTailLayout.runtimeIssues,
-        dropEligibilityBlockers: dropEligibilityBlockers
-      )
-    } else {
-      diagnostics = .init(runtimeIssues: reconciledTailLayout.runtimeIssues)
-    }
-    diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
+    let phaseTimings = FramePhaseTimings(
+      resolve: draft.resolveDuration,
+      measure: tail.diagnostics.measureDuration,
+      place: tail.diagnostics.placeDuration,
+      semantics: tail.diagnostics.semanticsDuration,
+      draw: tail.diagnostics.drawDuration,
+      raster: tail.diagnostics.rasterDuration,
+      commit: commitDuration
+    )
+    let mainActorTimings = FrameMainActorTimings(
+      blocked: phaseTimings.total,
+      suspended: .zero
+    )
+    var diagnostics = FrameDiagnostics.summarize(
+      resolved: resolved,
+      measured: tail.measured,
+      placed: tail.placed,
+      semantics: tail.semantics,
+      draw: tail.draw,
+      invalidatedIdentities: draft.frameContext.invalidatedIdentities,
+      resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
+      layoutWork: tail.diagnostics.layoutWork,
+      presentationDamage: tail.presentationDamage,
+      presentationSurfaceWidth: tail.raster.size.width,
+      phaseTimings: phaseTimings,
+      renderGenerations: .init(
+        render: draft.renderGeneration,
+        layoutInput: reconciledTailLayout.input.generation,
+        layoutOutput: layout.generation,
+        rasterInput: reconciledTailLayout.input.generation,
+        rasterOutput: tail.generation
+      ),
+      workerTimings: workerTimings,
+      mainActorTimings: mainActorTimings,
+      measurementCache: tail.diagnostics.measurementCache,
+      runtimeIssues: reconciledTailLayout.runtimeIssues,
+      dropEligibilityBlockers: dropEligibilityBlockers
+    )
+    diagnostics.runtime.registrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,
@@ -833,15 +814,13 @@ public struct DefaultRenderer {
   private func renderViewAsync<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize,
-    collectsDiagnostics: Bool = true
+    proposal: ProposedSize
   ) async -> FrameArtifacts {
     let renderer = self
     let draft = renderer.computeFrameHead(
       root,
       context: context,
       proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics,
       mode: .abortable
     )
     return await RuntimeRenderPipeline().renderAsync(
@@ -865,8 +844,7 @@ public struct DefaultRenderer {
         let candidate = renderer.makeCompletedFrameCandidate(
           draft: draft,
           tailOutput: tailOutput,
-          newestDesiredGeneration: draft.renderGeneration,
-          collectsDiagnostics: collectsDiagnostics
+          newestDesiredGeneration: draft.renderGeneration
         )
         return renderer.commitCompletedFrameCandidate(candidate)
       }
@@ -885,10 +863,9 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
-    collectsDiagnostics: Bool,
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
-    let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
+    let clock = ContinuousClock()
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
@@ -1069,14 +1046,12 @@ public struct DefaultRenderer {
   private func prepareFrameHead<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize,
-    collectsDiagnostics: Bool
+    proposal: ProposedSize
   ) -> FrameHeadDraft {
     let draft = computeFrameHead(
       root,
       context: context,
       proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics,
       mode: .abortable
     )
     return injectAnimations(
@@ -1286,7 +1261,6 @@ public struct DefaultRenderer {
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
     newestDesiredGeneration: RenderGeneration,
-    collectsDiagnostics: Bool,
     completedFramePolicy: CompletedFramePolicy? = nil,
     additionalBlockers:
       @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
@@ -1307,8 +1281,7 @@ public struct DefaultRenderer {
       resolved: resolved,
       commit: commit,
       commitDuration: commitDuration,
-      workerTimings: workerTimings,
-      collectsDiagnostics: collectsDiagnostics
+      workerTimings: workerTimings
     )
     let eligibility = completedFrameEligibility(
       artifacts: artifacts,
@@ -1320,7 +1293,6 @@ public struct DefaultRenderer {
       tailOutput: tailOutput,
       resolved: resolved,
       workerTimings: workerTimings,
-      collectsDiagnostics: collectsDiagnostics,
       previewArtifacts: artifacts,
       eligibility: eligibility,
       newestDesiredGeneration: newestDesiredGeneration,
@@ -1369,7 +1341,6 @@ public struct DefaultRenderer {
       commit: commit,
       commitDuration: commitDuration,
       workerTimings: candidate.workerTimings,
-      collectsDiagnostics: candidate.collectsDiagnostics,
       runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
     )
 
@@ -1452,7 +1423,6 @@ public struct DefaultRenderer {
     commit: CommitPlan,
     commitDuration: Duration,
     workerTimings: FrameWorkerTimings?,
-    collectsDiagnostics: Bool,
     runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics = .init()
   ) -> FrameArtifacts {
     let layout = tailOutput.layout
@@ -1460,54 +1430,48 @@ public struct DefaultRenderer {
     let dropEligibilityBlockers = frameTailCommitDropBlockers(
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
-    var diagnostics: FrameDiagnostics
-    if collectsDiagnostics {
-      let phaseTimings = FramePhaseTimings(
-        resolve: draft.resolveDuration,
-        measure: tail.diagnostics.measureDuration,
-        place: tail.diagnostics.placeDuration,
-        semantics: tail.diagnostics.semanticsDuration,
-        draw: tail.diagnostics.drawDuration,
-        raster: tail.diagnostics.rasterDuration,
-        commit: commitDuration
-      )
-      let mainActorTimings = FrameMainActorTimings(
-        blocked: draft.resolveDuration
-          + (layout.ranOffMain
-            ? .zero
-            : tail.diagnostics.measureDuration + tail.diagnostics.placeDuration)
-          + commitDuration,
-        suspended: tailOutput.renderSuspensionDuration
-      )
-      diagnostics = FrameDiagnostics.summarize(
-        resolved: resolved,
-        measured: tail.measured,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        draw: tail.draw,
-        invalidatedIdentities: draft.frameContext.invalidatedIdentities,
-        resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
-        layoutWork: tail.diagnostics.layoutWork,
-        presentationDamage: tail.presentationDamage,
-        presentationSurfaceWidth: tail.raster.size.width,
-        phaseTimings: phaseTimings,
-        renderGenerations: .init(
-          render: draft.renderGeneration,
-          layoutInput: tailOutput.frameTailInput.generation,
-          layoutOutput: layout.generation,
-          rasterInput: tailOutput.frameTailInput.generation,
-          rasterOutput: tail.generation
-        ),
-        workerTimings: workerTimings,
-        mainActorTimings: mainActorTimings,
-        measurementCache: tail.diagnostics.measurementCache,
-        runtimeIssues: tailOutput.runtimeIssues,
-        dropEligibilityBlockers: dropEligibilityBlockers
-      )
-    } else {
-      diagnostics = .init(runtimeIssues: tailOutput.runtimeIssues)
-    }
-    diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
+    let phaseTimings = FramePhaseTimings(
+      resolve: draft.resolveDuration,
+      measure: tail.diagnostics.measureDuration,
+      place: tail.diagnostics.placeDuration,
+      semantics: tail.diagnostics.semanticsDuration,
+      draw: tail.diagnostics.drawDuration,
+      raster: tail.diagnostics.rasterDuration,
+      commit: commitDuration
+    )
+    let mainActorTimings = FrameMainActorTimings(
+      blocked: draft.resolveDuration
+        + (layout.ranOffMain
+          ? .zero : tail.diagnostics.measureDuration + tail.diagnostics.placeDuration)
+        + commitDuration,
+      suspended: tailOutput.renderSuspensionDuration
+    )
+    var diagnostics = FrameDiagnostics.summarize(
+      resolved: resolved,
+      measured: tail.measured,
+      placed: tail.placed,
+      semantics: tail.semantics,
+      draw: tail.draw,
+      invalidatedIdentities: draft.frameContext.invalidatedIdentities,
+      resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
+      layoutWork: tail.diagnostics.layoutWork,
+      presentationDamage: tail.presentationDamage,
+      presentationSurfaceWidth: tail.raster.size.width,
+      phaseTimings: phaseTimings,
+      renderGenerations: .init(
+        render: draft.renderGeneration,
+        layoutInput: tailOutput.frameTailInput.generation,
+        layoutOutput: layout.generation,
+        rasterInput: tailOutput.frameTailInput.generation,
+        rasterOutput: tail.generation
+      ),
+      workerTimings: workerTimings,
+      mainActorTimings: mainActorTimings,
+      measurementCache: tail.diagnostics.measurementCache,
+      runtimeIssues: tailOutput.runtimeIssues,
+      dropEligibilityBlockers: dropEligibilityBlockers
+    )
+    diagnostics.runtime.registrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,
@@ -1531,7 +1495,7 @@ public struct DefaultRenderer {
     additionalBlockers: Set<FrameDropEligibility.Blocker>
   ) -> FrameDropEligibility {
     var classificationArtifacts = artifacts
-    classificationArtifacts.diagnostics.dropEligibilityBlockers.subtract([
+    classificationArtifacts.diagnostics.drop.eligibilityBlockers.subtract([
       .retainedLayoutBaseline,
       .retainedRasterBaseline,
     ])

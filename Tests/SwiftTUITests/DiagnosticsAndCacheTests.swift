@@ -241,8 +241,8 @@ struct DiagnosticsAndCacheTests {
 
     let first = renderer.render(root, context: .init(identity: testIdentity("Root")))
     let second = renderer.render(root, context: .init(identity: testIdentity("Root")))
-    let firstMetrics = try #require(first.diagnostics.measurementCache)
-    let secondMetrics = try #require(second.diagnostics.measurementCache)
+    let firstMetrics = try #require(first.diagnostics.work.measurementCache)
+    let secondMetrics = try #require(second.diagnostics.work.measurementCache)
 
     #expect(firstMetrics.generation == 0)
     #expect(firstMetrics.entries == 3)
@@ -250,10 +250,10 @@ struct DiagnosticsAndCacheTests {
     #expect(firstMetrics.hits == 0)
     #expect(firstMetrics.misses == 3)
     #expect(firstMetrics.stores == 3)
-    #expect(first.diagnostics.measuredNodesComputed == 3)
-    #expect(first.diagnostics.measuredNodesReused == 0)
-    #expect(first.diagnostics.placedNodesComputed == 3)
-    #expect(first.diagnostics.placedNodesReused == 0)
+    #expect(first.diagnostics.work.measuredNodesComputed == 3)
+    #expect(first.diagnostics.work.measuredNodesReused == 0)
+    #expect(first.diagnostics.work.placedNodesComputed == 3)
+    #expect(first.diagnostics.work.placedNodesReused == 0)
 
     #expect(secondMetrics.generation == 0)
     #expect(secondMetrics.entries == 3)
@@ -263,10 +263,10 @@ struct DiagnosticsAndCacheTests {
     #expect(secondMetrics.stores == 3)
     #expect(second.measuredTree == first.measuredTree)
     #expect(second.placedTree == first.placedTree)
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.measuredNodesReused == 3)
-    #expect(second.diagnostics.placedNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesReused == 3)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(second.diagnostics.work.measuredNodesReused == 3)
+    #expect(second.diagnostics.work.placedNodesComputed == 0)
+    #expect(second.diagnostics.work.placedNodesReused == 3)
   }
 
   @Test("default renderer recomputes layout when the proposal changes across frames")
@@ -289,10 +289,11 @@ struct DiagnosticsAndCacheTests {
 
     #expect(first.measuredTree.measuredSize == .init(width: 6, height: 1))
     #expect(second.measuredTree.measuredSize == .init(width: 3, height: 4))
-    #expect(second.diagnostics.measuredNodesComputed == second.diagnostics.measuredNodeCount)
-    #expect(second.diagnostics.measuredNodesReused == 0)
-    #expect(second.diagnostics.placedNodesComputed == second.diagnostics.placedNodeCount)
-    #expect(second.diagnostics.placedNodesReused == 0)
+    #expect(
+      second.diagnostics.work.measuredNodesComputed == second.diagnostics.counts.measuredNodes)
+    #expect(second.diagnostics.work.measuredNodesReused == 0)
+    #expect(second.diagnostics.work.placedNodesComputed == second.diagnostics.counts.placedNodes)
+    #expect(second.diagnostics.work.placedNodesReused == 0)
   }
 
   @Test(
@@ -331,8 +332,8 @@ struct DiagnosticsAndCacheTests {
 
     #expect(first.measuredTree.measuredSize == .init(width: 4, height: 2))
     #expect(second.measuredTree.measuredSize == .init(width: 4, height: 1))
-    #expect(second.diagnostics.measuredNodesComputed > 0)
-    #expect(second.diagnostics.placedNodesComputed > 0)
+    #expect(second.diagnostics.work.measuredNodesComputed > 0)
+    #expect(second.diagnostics.work.placedNodesComputed > 0)
   }
 
   @Test("default renderer reuses measurement and placement work across ScrollView position changes")
@@ -378,10 +379,11 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.measuredNodesReused > 0)
-    #expect(second.diagnostics.placedNodesComputed < first.diagnostics.placedNodesComputed)
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(second.diagnostics.work.measuredNodesReused > 0)
+    #expect(
+      second.diagnostics.work.placedNodesComputed < first.diagnostics.work.placedNodesComputed)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
   }
 
   @Test("retained placement respects ScrollView position changes")
@@ -508,11 +510,11 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("LazyRoot"))
     )
 
-    #expect(eagerSecond.diagnostics.measuredNodesComputed == 0)
-    #expect(lazySecond.diagnostics.measuredNodesComputed == 0)
-    #expect(lazySecond.diagnostics.measuredNodesReused > 0)
-    #expect(eagerSecond.diagnostics.placedNodesReused > 0)
-    #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
+    #expect(eagerSecond.diagnostics.work.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.work.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.work.measuredNodesReused > 0)
+    #expect(eagerSecond.diagnostics.work.placedNodesReused > 0)
+    #expect(lazySecond.diagnostics.counts.placedNodes < eagerSecond.diagnostics.counts.placedNodes)
   }
 
   @Test("single-ForEach lazy stacks lower off-screen resolution and measurement work on scroll")
@@ -586,8 +588,10 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("LazyRoot"))
     )
 
-    #expect(lazySecond.diagnostics.resolvedNodeCount < stableSecond.diagnostics.resolvedNodeCount)
-    #expect(lazySecond.diagnostics.measuredNodeCount < stableSecond.diagnostics.measuredNodeCount)
+    #expect(
+      lazySecond.diagnostics.counts.resolvedNodes < stableSecond.diagnostics.counts.resolvedNodes)
+    #expect(
+      lazySecond.diagnostics.counts.measuredNodes < stableSecond.diagnostics.counts.measuredNodes)
   }
 
   @Test("default renderer invalidates changed subtrees even when identities stay stable")
@@ -614,7 +618,7 @@ struct DiagnosticsAndCacheTests {
         invalidatedIdentities: [testIdentity("Root", "VStack[1]")]
       )
     )
-    let secondMetrics = try #require(second.diagnostics.measurementCache)
+    let secondMetrics = try #require(second.diagnostics.work.measurementCache)
 
     #expect(first.measuredTree.measuredSize == .init(width: 5, height: 3))
     #expect(second.measuredTree.measuredSize == .init(width: 7, height: 3))
@@ -630,13 +634,13 @@ struct DiagnosticsAndCacheTests {
     #expect(secondMetrics.misses == 3)
     #expect(secondMetrics.invalidations == 2)
     #expect(secondMetrics.stores == 5)
-    #expect(second.diagnostics.invalidatedIdentities == [testIdentity("Root", "VStack[1]")])
-    #expect(second.diagnostics.resolvedNodesComputed == 3)
-    #expect(second.diagnostics.resolvedNodesReused == 1)
-    #expect(second.diagnostics.measuredNodesComputed == 2)
-    #expect(second.diagnostics.measuredNodesReused == 1)
-    #expect(second.diagnostics.placedNodesComputed == 2)
-    #expect(second.diagnostics.placedNodesReused == 1)
+    #expect(second.diagnostics.input.invalidatedIdentities == [testIdentity("Root", "VStack[1]")])
+    #expect(second.diagnostics.work.resolvedNodesComputed == 3)
+    #expect(second.diagnostics.work.resolvedNodesReused == 1)
+    #expect(second.diagnostics.work.measuredNodesComputed == 2)
+    #expect(second.diagnostics.work.measuredNodesReused == 1)
+    #expect(second.diagnostics.work.placedNodesComputed == 2)
+    #expect(second.diagnostics.work.placedNodesReused == 1)
   }
 
   @Test("default renderer reuses clean siblings when a dirty subtree is invalidated")
@@ -666,12 +670,12 @@ struct DiagnosticsAndCacheTests {
 
     #expect(updated.measuredTree.childMeasurements[0].measuredSize == .init(width: 6, height: 1))
     #expect(updated.measuredTree.childMeasurements[1].measuredSize == .init(width: 7, height: 1))
-    #expect(updated.diagnostics.resolvedNodesComputed == 3)
-    #expect(updated.diagnostics.resolvedNodesReused == 1)
-    #expect(updated.diagnostics.measuredNodesComputed == 2)
-    #expect(updated.diagnostics.measuredNodesReused == 1)
-    #expect(updated.diagnostics.placedNodesComputed == 2)
-    #expect(updated.diagnostics.placedNodesReused == 1)
+    #expect(updated.diagnostics.work.resolvedNodesComputed == 3)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 1)
+    #expect(updated.diagnostics.work.measuredNodesComputed == 2)
+    #expect(updated.diagnostics.work.measuredNodesReused == 1)
+    #expect(updated.diagnostics.work.placedNodesComputed == 2)
+    #expect(updated.diagnostics.work.placedNodesReused == 1)
   }
 
   @Test("selective dirty frames preserve local action and key handlers on reused controls")
@@ -842,8 +846,8 @@ struct DiagnosticsAndCacheTests {
         testIdentity("Root", "Branches[1]")
       ]
     )
-    #expect(updated.diagnostics.resolvedNodesComputed == 5)
-    #expect(updated.diagnostics.resolvedNodesReused == 1)
+    #expect(updated.diagnostics.work.resolvedNodesComputed == 5)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 1)
   }
 
   @Test("draw-only style changes reuse measurement and placement work")
@@ -877,15 +881,15 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(first.diagnostics.measuredNodesComputed > 0)
-    #expect(second.diagnostics.resolvedNodesComputed > 0)
-    #expect(second.diagnostics.resolvedNodesReused == 0)
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesComputed == 0)
+    #expect(first.diagnostics.work.measuredNodesComputed > 0)
+    #expect(second.diagnostics.work.resolvedNodesComputed > 0)
+    #expect(second.diagnostics.work.resolvedNodesReused == 0)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(second.diagnostics.work.placedNodesComputed == 0)
     #expect(
-      second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount
+      second.diagnostics.work.measuredNodesReused == second.diagnostics.counts.measuredNodes
     )
-    #expect(second.diagnostics.placedNodesReused == second.diagnostics.placedNodeCount)
+    #expect(second.diagnostics.work.placedNodesReused == second.diagnostics.counts.placedNodes)
   }
 
   @Test("semantic-only metadata changes reuse layout and refresh semantic routes")
@@ -923,10 +927,10 @@ struct DiagnosticsAndCacheTests {
     #expect(
       first.semanticSnapshot.accessibilityNodes.first?.label == "Old tap target"
     )
-    #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesComputed == 0)
-    #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
-    #expect(second.diagnostics.placedNodesReused == second.diagnostics.placedNodeCount)
+    #expect(second.diagnostics.work.measuredNodesComputed == 0)
+    #expect(second.diagnostics.work.placedNodesComputed == 0)
+    #expect(second.diagnostics.work.measuredNodesReused == second.diagnostics.counts.measuredNodes)
+    #expect(second.diagnostics.work.placedNodesReused == second.diagnostics.counts.placedNodes)
     let focusRegion = try #require(second.semanticSnapshot.focusRegions.first)
     let interactionRegion = try #require(second.semanticSnapshot.interactionRegions.first)
     let accessibilityNode = try #require(second.semanticSnapshot.accessibilityNodes.first)
@@ -962,11 +966,11 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(second.diagnostics.resolvedNodesComputed > 0)
-    #expect(second.diagnostics.measuredNodesComputed > 0)
-    #expect(second.diagnostics.placedNodesComputed > 0)
-    #expect(second.diagnostics.measuredNodesReused < second.diagnostics.measuredNodeCount)
-    #expect(second.diagnostics.placedNodesReused < second.diagnostics.placedNodeCount)
+    #expect(second.diagnostics.work.resolvedNodesComputed > 0)
+    #expect(second.diagnostics.work.measuredNodesComputed > 0)
+    #expect(second.diagnostics.work.placedNodesComputed > 0)
+    #expect(second.diagnostics.work.measuredNodesReused < second.diagnostics.counts.measuredNodes)
+    #expect(second.diagnostics.work.placedNodesReused < second.diagnostics.counts.placedNodes)
   }
 
   @Test("default renderer handles structural insertions and removals without stale subtree reuse")

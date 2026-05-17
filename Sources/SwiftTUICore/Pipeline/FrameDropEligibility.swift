@@ -361,16 +361,16 @@ public struct FrameDropEligibility: Equatable, Sendable {
     if !artifacts.commitPlan.handlerInstallations.isEmpty {
       record(.handlerInstallations)
     }
-    if artifacts.diagnostics.customLayoutFallbackCount > 0 {
+    if artifacts.diagnostics.work.customLayoutFallbackCount > 0 {
       record(.customLayoutFallback)
     }
     for blocker in candidate.additionalBlockers {
       record(blocker)
     }
-    for blocker in artifacts.diagnostics.dropEligibilityBlockers {
+    for blocker in artifacts.diagnostics.drop.eligibilityBlockers {
       record(blocker)
     }
-    if let damage = artifacts.diagnostics.presentationDamage {
+    if let damage = artifacts.diagnostics.presentation.damage {
       if damage.requiresFullTextRepaint {
         record(.presentationFullRepaint)
       }

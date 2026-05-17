@@ -31,8 +31,8 @@ struct Phase5ReliabilityGatesTests {
     #expect(second.presentation.graphicsReplayScope == .none)
     #expect(second.presentation.editOperationLowering == .none)
     #expect(second.presentation.editOperationCount == 0)
-    #expect(second.diagnostics.measuredNodesReused > 0)
-    #expect(second.diagnostics.placedNodesReused > 0)
+    #expect(second.diagnostics.work.measuredNodesReused > 0)
+    #expect(second.diagnostics.work.placedNodesReused > 0)
   }
 
   @MainActor

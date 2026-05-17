@@ -393,10 +393,10 @@ Add explicit worker queue latency once useful:
 - time spent computing tail work,
 - time from worker completion to main-actor commit.
 
-Implementation status: `FrameDiagnostics.workerTimings` records enqueue,
+Implementation status: `FrameDiagnostics.timing.workerTimings` records enqueue,
 compute, and completion-to-main-commit timings for the worker portions.
-`FrameDiagnostics.mainActorTimings` records main-actor blocked render time and
-async worker-suspension time. `FrameDiagnosticsLogger` also records
+`FrameDiagnostics.timing.mainActorTimings` records main-actor blocked render
+time and async worker-suspension time. `FrameDiagnosticsLogger` also records
 `input_events_during_render_suspension` so blocked-tail tests can prove input
 was accepted while commit remained ordered.
 

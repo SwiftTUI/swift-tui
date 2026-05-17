@@ -42,8 +42,8 @@ struct Phase4ObservationAndEnvironmentTests {
       context: updatedContext
     )
     #expect(updatedArtifacts.rasterSurface.lines.contains("Count 1"))
-    #expect(updatedArtifacts.diagnostics.measuredNodesReused >= 1)
-    #expect(updatedArtifacts.diagnostics.placedNodesReused >= 1)
+    #expect(updatedArtifacts.diagnostics.work.measuredNodesReused >= 1)
+    #expect(updatedArtifacts.diagnostics.work.placedNodesReused >= 1)
   }
 
   @Test("observation bridge suppresses stale callbacks after repeated rerenders")
@@ -316,8 +316,8 @@ struct Phase4ObservationAndEnvironmentTests {
 
     #expect(updatedArtifacts.rasterSurface.lines.contains("Alpha"))
     #expect(updatedArtifacts.rasterSurface.lines.contains("Gamma"))
-    #expect(updatedArtifacts.diagnostics.measuredNodesReused >= 1)
-    #expect(updatedArtifacts.diagnostics.placedNodesReused >= 1)
+    #expect(updatedArtifacts.diagnostics.work.measuredNodesReused >= 1)
+    #expect(updatedArtifacts.diagnostics.work.placedNodesReused >= 1)
   }
 
   @Test("nested environment overrides stay local to their subtree snapshots")

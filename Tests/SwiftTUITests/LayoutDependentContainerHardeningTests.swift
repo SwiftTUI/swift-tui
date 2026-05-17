@@ -58,7 +58,7 @@ struct LayoutDependentContainerHardeningTests {
     let secondRendered = second.rasterSurface.lines.joined(separator: "\n")
     #expect(firstRendered.contains("geo 0,1 20x1"))
     #expect(secondRendered.contains("geo 0,0 20x1"))
-    #expect(second.diagnostics.layoutDependentRealizations == 1)
+    #expect(second.diagnostics.work.layoutDependentRealizations == 1)
     let geometryDiagnostics = second.diagnostics.geometryResolutionDiagnostics
     #expect(geometryDiagnostics.anchorResolutionMissCount == 0)
     #expect(geometryDiagnostics.missingNamedCoordinateSpaceCount == 0)
@@ -90,7 +90,7 @@ struct LayoutDependentContainerHardeningTests {
 
     let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(realizedRows == [0])
-    #expect(artifacts.diagnostics.layoutDependentRealizations == 1)
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
     #expect(rendered.contains("row 0 12x1"))
     #expect(!rendered.contains("row 1"))
     #expect(!rendered.contains("row 2"))

@@ -55,7 +55,7 @@ struct ResolveReuseAncestorInvalidationTests {
     )
 
     let rendered = updated.rasterSurface.lines.joined(separator: "\n")
-    #expect(updated.diagnostics.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
     #expect(rendered.contains("Styling"))
     #expect(!rendered.contains("Overview"))
   }
@@ -89,8 +89,8 @@ struct ResolveReuseAncestorInvalidationTests {
       )
     )
 
-    #expect(updated.diagnostics.resolvedNodesReused == 0)
-    #expect(updated.diagnostics.resolvedNodesComputed > 0)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
   }
 
   @Test("ancestor invalidation recomputes List row labels derived from root state")

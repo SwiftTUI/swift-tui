@@ -695,14 +695,14 @@ asserts a pipeline shape the code does not have.
 | P11 — architecture-contract tests | 13, 17 | Stage 0 |
 | — governance drift | 12 | Stage 8 |
 | — resolve side-effect boundary | 4 | declared in Stage 3 (Task 3); narrowed by the Finding 4 follow-up |
-| — `FrameDiagnostics` god struct | 10 | **unscheduled gap — see note below** |
+| — `FrameDiagnostics` god struct | 10 | completed follow-on |
 | P1a — demote the seven-phase claim | 1 | superseded by P1b (Stage 3) |
 
-Every audit *proposal* (P1–P11) maps to a stage. Three findings have no
-proposal of their own. Finding 12 (governance drift) is closed by Stage 8.
-Finding 4 (resolve side-effect boundary) was *declared* by Stage 3's Task 3 and
-then narrowed by the Finding 4 follow-up. Finding 10 (`FrameDiagnostics` god
-struct) is an open gap this plan does not yet schedule.
+Every audit *proposal* (P1–P11) maps to a stage. Three findings had no proposal
+of their own. Finding 12 (governance drift) is closed by Stage 8. Finding 4
+(resolve side-effect boundary) was *declared* by Stage 3's Task 3 and then
+narrowed by the Finding 4 follow-up. Finding 10 (`FrameDiagnostics` god struct)
+was closed by the later source-breaking diagnostics cleanup.
 P1a is intentionally not scheduled: the P1b decision (Stage 3) makes the docs
 true by changing the code instead of the prose, and Stage 8 performs the doc
 reconciliation P1a would have done alone.
@@ -733,25 +733,40 @@ This is deliberately deferred, not scoped out:
   `RunLoop.run()` interactive coverage (scroll bursts, drag sequences, click
   resolution); deterministic unit tests did not catch the original regression.
 
-Separately, **Finding 10** (`FrameDiagnostics` is a ~30-field `Equatable`
-god struct, and `collectsDiagnostics` creates a second render path) also has no
-proposal. Its dual-path concern overlaps Stage 3 — composition should not ship
-two divergent render paths — while its god-struct decomposition is independent.
-This plan does not yet place it; that is an open decision below.
+## Completed follow-on — decompose frame diagnostics (Finding 10)
 
-## Open decisions to settle inside the stages
+Not a stage of this plan; a separate source-breaking cleanup that depended on
+the runtime composition work landing first. The cleanup made diagnostics an
+unconditional sidecar instead of a selectable render path: `DefaultRenderer` no
+longer exposes `collectsDiagnostics`, sync/async render paths always produce
+diagnostics, and `FrameArtifacts` equality now compares frame products while
+ignoring diagnostics.
 
-These are deliberately deferred to the detailed plans, not pre-decided here:
+The public `FrameDiagnostics` shape is now grouped by purpose:
 
-1. **Post-Stage 3** — where Finding 10 (`FrameDiagnostics` god struct, dual
-   `collectsDiagnostics` render path) is handled: folded into a follow-up
-   dual-path-collapse task, given its own stage, or left to a separate plan.
+- `input` for invalidation and input-path counters.
+- `counts` for phase product counts.
+- `work` for reuse, cache, layout, raster, and commit counters.
+- `presentation` for damage summaries.
+- `timing` for worker and main-actor timing records.
+- `runtime` for issue and registry sidecars.
+- `drop` for completed-frame drop blockers.
+
+The public API baseline records the source break explicitly.
+
+## Decisions settled by follow-up work
+
+These were deliberately deferred to detailed plans rather than pre-decided in
+the roadmap:
+
+1. **Post-Stage 3** — Finding 10 was handled as a follow-up source-breaking API
+   cleanup after the composed runtime driver had landed.
 
 ## Suggested first action
 
-Stage 0 through Stage 7 now have shipped implementation records across Track A
-and Track B. Stage 8 governance reconciliation can follow as the next roadmap
-slice.
+Stage 0 through Stage 8 and both follow-on efforts are complete. New pipeline
+driver work should start from a fresh TODO or proposal rather than extending
+this roadmap.
 
 ## Related docs
 

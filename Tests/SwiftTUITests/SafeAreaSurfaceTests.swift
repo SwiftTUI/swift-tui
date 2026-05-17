@@ -170,7 +170,7 @@ struct SafeAreaSurfaceTests {
     let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("inset 20x2 safe 1"))
     #expect(rendered.contains("base 20x6 safe 1"))
-    #expect(artifacts.diagnostics.layoutDependentRealizations == 2)
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 2)
 
     let insetWrapper = try #require(artifacts.placedTree.children.first)
     let base = try #require(insetWrapper.children.first)

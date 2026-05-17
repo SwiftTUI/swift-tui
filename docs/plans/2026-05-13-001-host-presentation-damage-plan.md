@@ -47,8 +47,9 @@ and the repo-wide `bun run test` gate.
 - `DefaultRenderer` and `RunLoop` already compute `PresentationDamage`.
 - `PresentationDamage` and `DamageAwarePresentationSurface` are currently
   package-level implementation seams.
-- `FrameArtifacts.diagnostics.presentationDamage` exposes counts and full
-  repaint flags publicly, but not the row/range damage payload itself.
+- `FrameArtifacts.presentationDamage` exposes the row/range damage payload
+  publicly, and `FrameDiagnostics.presentation.damage` exposes the grouped
+  summary used by diagnostics and snapshots.
 - `RunLoop.presentCommittedFrame(...)` checks the damage-bearing semantic
   protocol before non-semantic damage-aware raster hosts.
 - `HostedRasterSurface` uses the damage-bearing semantic path for SwiftUIHost

@@ -254,10 +254,12 @@ The runtime is materially incremental in common steady-state paths, but it is no
 
 ### Resolve
 
-- Invalidated identities are visible in `ResolveContext`, `FrameContext`, and `FrameDiagnostics`
-- `FrameDiagnostics.presentationDamage` records the refined paint candidate that survived raster
-  narrowing: dirty row count, range-aware row count, span count, candidate cell count, and whether
-  the frame escalated to full-text or full-graphics fallback
+- Invalidated identities are visible in `ResolveContext`, `FrameContext`, and
+  `FrameDiagnostics.input`
+- `FrameDiagnostics.presentation.damage` records the refined paint candidate
+  that survived raster narrowing: dirty row count, range-aware row count, span
+  count, candidate cell count, and whether the frame escalated to full-text or
+  full-graphics fallback
 - Localized dirty frames can reuse clean resolved subtrees when subtree identity, environment, and transaction still match
 - Resolve reuse is conservative: root-invalidated frames and fully cold frames still resolve normally
 

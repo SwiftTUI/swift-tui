@@ -275,7 +275,6 @@ struct CompletedFrameCandidate {
   var tailOutput: AsyncFrameTailDraftOutput
   var resolved: ResolvedNode
   var workerTimings: FrameWorkerTimings?
-  var collectsDiagnostics: Bool
   /// Commit preview used only for drop classification. The live graph and
   /// runtime registrations are checkpoint-restored after building it; actual
   /// side effects are applied only by `commitCompletedFrameCandidate`.

@@ -32,7 +32,7 @@ touch.
 | 7 | Off-main frame-tail rendering is a synchronous no-op on WASI | Documented by Stage 6 as a compatibility boundary. |
 | 8 | `FrameDropEligibility.Blocker` is a ~24-flag correctness surface | Resolved by Stage 5: completed-frame decisions use the shipped impact product. |
 | 9 | ~13 render entry points span the {sync,async,cancellable,reconciled} cube | Resolved by Stage 3: sync, async, and cancellable are execution strategies over one composition. |
-| 10 | `FrameDiagnostics` is a ~30-field god struct with dual code paths | Open: intentionally unscheduled by the roadmap. |
+| 10 | `FrameDiagnostics` is a ~30-field god struct with dual code paths | Resolved by the source-breaking cleanup: diagnostics are grouped records, `collectsDiagnostics` is gone, and artifact equality ignores diagnostics sidecars. |
 | 11 | Animation is an unnamed phase that mutates the resolved tree | Resolved by Stage 2 and composed by Stage 3. |
 | 12 | Governance documentation has already diverged from the implementation | Resolved by Stage 8. |
 | 13 | Retained reuse freshness depends on hand-maintained equivalence/projection rules | Hardened by Stage 0 guardrails; future fields still need classification. |
@@ -257,13 +257,20 @@ real phase abstraction (Finding 1) would have done.
 
 ## Finding 10 — `FrameDiagnostics` god struct
 
-`FrameDiagnostics` (`Commit/FrameArtifacts.swift:1`) has ~30 stored properties
-and a ~30-parameter `init`. It is `Equatable, Sendable`, so every frame
-allocates and structurally compares it. Adding one diagnostic touches the
-struct, the `init`, `summarize(...)`, and `SnapshotRenderer`. The
-`collectsDiagnostics: Bool` flag exists to skip building it — confirming the
-cost is known — and creates a second render path that can diverge from the
+Historical state: `FrameDiagnostics` (`Commit/FrameArtifacts.swift`) had ~30
+stored properties and a ~30-parameter `init`. It was `Equatable, Sendable`, so
+every frame could allocate and structurally compare it. Adding one diagnostic
+touched the struct, the `init`, `summarize(...)`, and `SnapshotRenderer`. The
+`collectsDiagnostics: Bool` flag existed to skip building it — confirming the
+cost was known — and created a second render path that could diverge from the
 first.
+
+Resolution: the source-breaking cleanup decomposed diagnostics into grouped
+input, count, work, presentation, timing, runtime, and drop records. Rendering
+now always builds diagnostics, `DefaultRenderer` no longer exposes
+`collectsDiagnostics`, `FrameDiagnostics` is no longer `Equatable`, and
+`FrameArtifacts` equality compares the frame products while ignoring diagnostic
+sidecars.
 
 ## Finding 11 — Animation is an unnamed phase
 
@@ -558,9 +565,9 @@ bugs. Candidate tests:
 ## Remaining follow-ups
 
 The original suggested next step was to land P2, add the lowest-risk P7/P11
-contract guards, then decide P1a versus P1b. That sequence has landed in favor
-of P1b. The remaining follow-up outside this roadmap is Finding 10's
-`FrameDiagnostics` decomposition.
+contract guards, then decide P1a versus P1b. That sequence landed in favor of
+P1b. The later follow-up work also closed Finding 4 and Finding 10, so this
+audit no longer carries an open implementation follow-up.
 
 ## Related docs
 
