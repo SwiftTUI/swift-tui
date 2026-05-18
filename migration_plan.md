@@ -508,6 +508,42 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 23: DefaultRenderer Committed Frame Commit Path
+
+- Objective: make `DefaultRenderer`'s actual commit body easier to follow by
+  sharing one-shot and async committed-frame artifact assembly, renaming the
+  completed-frame artifact helper to the more accurate committed-frame helper,
+  and extracting live commit effects and committed-frame publication helpers.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/CommittedFrameArtifactBuilder.swift`
+- Dependencies: Packet 22 isolated async frame acquisition. A read-only
+  renderer audit confirmed that the safest next extraction was the actual
+  commit shared surface only, not stale-frame policy, preview reconciliation,
+  or the pipeline executor.
+- Invariants: public renderer APIs stay unchanged; completed-candidate preview
+  still uses `previewLifecycleEvents` and never finalizes the live graph; dropped
+  completed candidates still abort without worker-cache updates or committed
+  publication; completed async commits still materialize prepared state before
+  finalizing; one-shot worker timing is captured before commit effects; actual
+  commit still finalizes the frame, commits frame-head draft effects, plans the
+  commit, applies worker custom-layout cache updates once, prunes the
+  measurement cache, updates scroll geometry, stores the retained baseline
+  placed tree, and stores the committed presentation dismiss stack.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
+  - `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - `swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests`
+  - `swiftly run swift test --filter SwiftTUITests.TimingDiagnosticsTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests`
+  - `swiftly run swift test --filter SwiftTUITests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

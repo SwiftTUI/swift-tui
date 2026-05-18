@@ -71,6 +71,22 @@ Approved constraints:
   timing derivation, and drop-eligibility classification into
   `CompletedFrameArtifactBuilder.swift`, and moved `CompletedFrameCandidate`
   out of `FrameTailRenderer.swift` into completed-frame rendering support.
+- Packet 17 completed: extracted run-loop frame diagnostic record construction
+  into `RunLoop+FrameDiagnostics.swift`.
+- Packet 18 completed: extracted terminal input support types, protocols,
+  capability models, and coalescing support out of `InputReader.swift`.
+- Packet 19 completed: extracted late-preference reconciliation policy and
+  mechanics into `LatePreferenceReconciliation.swift`.
+- Packet 20 completed: extracted frame-head transaction and draft support into
+  `FrameHeadDraftTransaction.swift`.
+- Packet 21 completed: extracted run-loop focus and scroll convergence into
+  `RunLoop+FocusSync.swift`.
+- Packet 22 completed: extracted async run-loop frame acquisition into
+  `RunLoop+FrameAcquisition.swift`.
+- Packet 23 completed: renamed completed-frame artifact support to
+  `CommittedFrameArtifactBuilder.swift`, shared one-shot and async committed
+  artifact assembly, and extracted `DefaultRenderer` commit effects and
+  committed-frame publication helpers.
 
 ## Baseline Validation
 
@@ -465,34 +481,63 @@ Packet 22 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-053644-24624.log`
   - Result: PASS
 
+Packet 23 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.TimingDiagnosticsTests`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests`
+  - Result: PASS, 1305 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-054930-58630.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 23: renderer commit path consolidation. Read-only runtime review ranked
-this after run-loop acquisition because `DefaultRenderer` still has closely
-related sync one-shot commit and async completed-candidate commit duties spread
-through `SwiftTUI.swift` and `CompletedFrameArtifactBuilder.swift`. The next
-packet should look for a shared commit helper that reduces drift without moving
-draft materialization/suspension or changing public renderer APIs.
+Packet 24: terminal-host raw-mode session boundary. Read-only runtime review
+ranked this after renderer commit consolidation because `TerminalHost` still
+owns raw-mode enable/disable sequencing, cleanup registration, terminal
+control-mode transitions, and lifecycle state around process-exit cleanup.
+The next packet should isolate that session boundary without changing emitted
+escape sequences, host lifecycle, or process-exit cleanup behavior.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
-- `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
-- possibly a new same-folder rendering helper
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- possibly a new same-folder terminal raw-mode/session helper
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
-- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
-- `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
-- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
-- `swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalCapabilityProfileApplyingTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
 - `bun run test`
 
 ## Failed Attempts
 
-None.
+- Packet 23 first full `bun run test` attempt failed in the full
+  `SwiftTUITests` runtime suite with three `AsyncLifecycleGenerationTests`
+  readiness timeouts. The failed gate log was
+  `/tmp/swift-tui-test-gate-20260518-054640-45870.log`.
+- The failed suite passed immediately in isolation, the full `SwiftTUITests`
+  target then passed, and the final full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-054930-58630.log`.
 
 ## Known Risks
 
