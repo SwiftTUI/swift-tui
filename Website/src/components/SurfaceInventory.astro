@@ -1,5 +1,5 @@
 ---
-type Row = { name: string; note?: string; flag?: "shipped" | "constraint" | "deferred" };
+type Row = { name: string; note?: string };
 type Group = { title: string; rows: Row[] };
 
 const authoring: Group[] = [
@@ -47,7 +47,7 @@ const runtime: Group[] = [
       { name: "RunLoop · TerminalHost · TerminalCapabilityProfile", note: "capability-aware interactive sessions" },
       { name: "App · Scene · WindowGroup · TabView", note: "@MainActor scene declarations" },
       { name: "SceneManifest · HostedSceneSession", note: "retained hosted sessions for host packages" },
-      { name: "NavigationStack destinations", note: "binding-driven; NavigationLink deferred" },
+      { name: "NavigationStack destinations", note: "binding-driven destination presentation" },
       { name: "Pty-backed secondary scenes", note: "Unix-domain-socket discovery" },
     ],
   },
@@ -57,14 +57,6 @@ const runtime: Group[] = [
       { name: "BarChart · ColumnChart · StackedBarChart · ComparisonChart", note: "" },
       { name: "LineChart · Sparkline · Timeline · HeatStrip · CalendarHeatmap", note: "" },
       { name: "BulletChart · ThresholdGauge · Meter · Legend", note: "" },
-    ],
-  },
-  {
-    title: "Deferred · by design",
-    rows: [
-      { name: "NavigationLink · public NavigationPath · automatic Back chrome", flag: "deferred" },
-      { name: "host-native text selection transport · IME / composition", flag: "deferred" },
-      { name: "terminal workspace process reattachment", flag: "deferred" },
     ],
   },
 ];
@@ -106,17 +98,16 @@ const runtime: Group[] = [
 
       <div class="col">
         <div class="col-head mono">
-          <span>RUNTIME · SCENES · CHARTS · DEFERRED</span>
+          <span>RUNTIME · SCENES · CHARTS</span>
         </div>
         {runtime.map((group) => (
-          <section class={`group ${group.title.startsWith("Deferred") ? "group--deferred" : ""}`}>
+          <section class="group">
             <h4 class="group-title mono">{group.title}</h4>
             <ul class="rows">
               {group.rows.map((row) => (
-                <li class={`row ${row.flag === "deferred" ? "row--deferred" : ""}`}>
+                <li class="row">
                   <div class="row-head">
                     <span class="name mono">{row.name}</span>
-                    {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
                   </div>
                   {row.note && <span class="note">{row.note}</span>}
                 </li>
@@ -187,10 +178,6 @@ const runtime: Group[] = [
     background: var(--ink-4);
     flex: 0 0 auto;
   }
-  .group--deferred .group-title { color: var(--warn); }
-  .group--deferred .group-title::before {
-    background: rgba(245, 158, 11, 0.55);
-  }
 
   .rows { list-style: none; margin: 0; padding: 0; }
   .row {
@@ -217,22 +204,6 @@ const runtime: Group[] = [
     letter-spacing: -0.005em;
     line-height: 1.5;
     max-width: 60ch;
-  }
-  .row.row--deferred .name { color: var(--ink-3); }
-  .flag {
-    font-size: 9.5px;
-    letter-spacing: 0.12em;
-    padding: 1px 6px;
-    border-radius: 3px;
-    border: 1px solid var(--line-strong);
-    color: var(--ink-3);
-    text-transform: uppercase;
-    line-height: 1.6;
-  }
-  .flag--deferred {
-    color: var(--warn);
-    border-color: rgba(245, 158, 11, 0.4);
-    background: rgba(245, 158, 11, 0.06);
   }
 
   @media (max-width: 1080px) {
