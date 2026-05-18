@@ -101,8 +101,9 @@ head -> animation injection -> late-preference reconciliation -> fused frame tai
 - Animation injection is a named post-head stage that rewrites the resolved
   tree for the current animation transaction.
 - Late-preference reconciliation is the first bounded loop-bearing stage. It
-  may rerun layout until placement-time preferences converge or the documented
-  limit is reached.
+  may rerun layout until placement-time preferences converge or the
+  current-tree-derived pass budget is reached; exhaustion commits one final
+  relayout of the latest reconciled tree and reports a runtime issue.
 - The fused frame tail runs measure, place, semantics, draw, and raster as one
   performance node.
 - Commit materializes the staged frame head, then packages and applies the
@@ -115,8 +116,9 @@ completed visual-only frames under the shipped stale-frame policy.
 The interactive `RunLoop` adds the second bounded loop-bearing stage:
 focus-sync convergence. After a strategy acquires candidate artifacts, the
 driver may rerender the same scheduled frame when focus regions, focus
-requests/defaults, focused values, or scroll positions change, up to the
-`FocusSyncRerenderBudget` ceiling.
+requests/defaults, focused values, or scroll positions change. Its rerender
+budget is derived from the acquired semantic graph rather than a fixed global
+ceiling.
 
 Within that composition and the interactive wrapper, the typed phase products
 still flow in this order:
