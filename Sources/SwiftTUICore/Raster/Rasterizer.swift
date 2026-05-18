@@ -1,6 +1,8 @@
 /// Converts draw commands into a terminal cell surface.
 public struct Rasterizer: Sendable {
   internal static let emptyCompositingStyle = ResolvedTextStyle()
+  private let verifyIncrementalRepaint: Bool
+
   package typealias RasterizationResult = (
     surface: RasterSurface,
     visibleIdentities: Set<Identity>,
@@ -47,7 +49,13 @@ public struct Rasterizer: Sendable {
     }
   }
 
-  public init() {}
+  public init() {
+    self.verifyIncrementalRepaint = false
+  }
+
+  package init(verifyIncrementalRepaint: Bool) {
+    self.verifyIncrementalRepaint = verifyIncrementalRepaint
+  }
 
   /// Rasterizes a draw tree into a ``RasterSurface``.
   public func rasterize(_ draw: DrawNode) -> RasterSurface {
@@ -208,6 +216,11 @@ public struct Rasterizer: Sendable {
       cells: cells,
       imageAttachments: imageAttachments
     )
+    verifyIncrementalRepaintIfNeeded(
+      draw,
+      surfaceSize: surfaceSize,
+      incrementalSurface: surface
+    )
 
     return (
       surface,
@@ -217,6 +230,28 @@ public struct Rasterizer: Sendable {
         previousSurface: previousSurface,
         currentSurface: surface
       )
+    )
+  }
+
+  private func verifyIncrementalRepaintIfNeeded(
+    _ draw: DrawNode,
+    surfaceSize: CellSize,
+    incrementalSurface: RasterSurface
+  ) {
+    guard verifyIncrementalRepaint else {
+      return
+    }
+
+    let freshSurface = rasterizeFreshCollectingVisibleIdentities(
+      draw,
+      surfaceSize: surfaceSize
+    ).surface
+    guard freshSurface != incrementalSurface else {
+      return
+    }
+
+    assertionFailure(
+      "Incremental raster damage produced a different surface than fresh rasterization."
     )
   }
 }
