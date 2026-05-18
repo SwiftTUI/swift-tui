@@ -1,11 +1,6 @@
 import SwiftTUICore
 import SwiftTUIViews
 
-package enum PresentationSurfaceRoleError: Error, Equatable, Sendable {
-  case missingTerminalCommandSurface
-  case missingRasterPresentationSurface
-}
-
 package struct FocusSyncRerenderBudget: Equatable, Sendable {
   package let maximumRerenders: Int
   package private(set) var rerenderCount: Int
@@ -1391,54 +1386,6 @@ extension RunLoop {
     }
   }
 
-  private func applyTerminalCursorFocusPolicy(
-    semanticSnapshot: SemanticSnapshot
-  ) throws {
-    guard runtimeConfiguration.output == .tui else {
-      return
-    }
-    guard
-      let terminalSurface = presentationSurface as? any TerminalCursorFocusPresentationSurface
-    else {
-      return
-    }
-
-    let focusedNode = focusedAccessibilityNode(in: semanticSnapshot)
-    let usesTextInputCursor =
-      focusedNode?.cursorAnchor != nil
-      || currentFocusPresentation.prefersTextInput
-    guard runtimeConfiguration.cursorFollowsFocus || usesTextInputCursor else {
-      return
-    }
-
-    let cursorPoint =
-      if runtimeConfiguration.cursorFollowsFocus {
-        AccessibilityRuntimePolicy().focusedCursorPoint(
-          in: semanticSnapshot,
-          focusedIdentity: focusTracker.currentFocusIdentity
-        )
-      } else {
-        focusedNode?.cursorAnchor
-      }
-    try terminalSurface.presentAccessibilityCursorFocus(at: cursorPoint)
-  }
-
-  private var usesTerminalCursorForTextInput: Bool {
-    runtimeConfiguration.output == .tui
-      && presentationSurface is any TerminalCursorFocusPresentationSurface
-  }
-
-  private func focusedAccessibilityNode(
-    in semanticSnapshot: SemanticSnapshot
-  ) -> AccessibilityNode? {
-    guard let focusedIdentity = focusTracker.currentFocusIdentity else {
-      return nil
-    }
-    return semanticSnapshot.accessibilityNodes.first { node in
-      node.identity == focusedIdentity
-    }
-  }
-
   private func appendPendingAccessibilityAnnouncements(
     to artifacts: inout FrameArtifacts
   ) {
@@ -1447,105 +1394,5 @@ extension RunLoop {
       return
     }
     artifacts.semanticSnapshot.accessibilityAnnouncements.append(contentsOf: announcements)
-  }
-
-  private func presentCommittedFrame(
-    _ artifacts: FrameArtifacts,
-    damage: PresentationDamage?
-  ) throws -> TerminalPresentationMetrics {
-    if runtimeConfiguration.output == .json {
-      return try presentJSONFrame(
-        artifacts,
-        focusedIdentity: focusTracker.currentFocusIdentity
-      )
-    }
-
-    if runtimeConfiguration.output == .accessible {
-      return try presentLinearAccessibilityFrame(
-        semanticSnapshot: artifacts.semanticSnapshot
-      )
-    }
-
-    let metrics: TerminalPresentationMetrics
-    if let semanticHostFrameSurface =
-      presentationSurface as? any SemanticHostFramePresentationSurface
-    {
-      let sequence = nextSemanticHostFrameSequence
-      nextSemanticHostFrameSequence &+= 1
-      metrics = try semanticHostFrameSurface.present(
-        SemanticHostFrame(
-          sequence: sequence,
-          raster: artifacts.rasterSurface,
-          semantics: artifacts.semanticSnapshot,
-          focusedIdentity: focusTracker.currentFocusIdentity,
-          rasterDamage: damage
-        )
-      )
-    } else if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
-      metrics = try damageAwareHost.present(
-        artifacts.rasterSurface,
-        damage: damage
-      )
-    } else if let rasterSurface = presentationSurface as? any RasterPresentationSurface {
-      metrics = try rasterSurface.present(artifacts.rasterSurface)
-    } else {
-      throw PresentationSurfaceRoleError.missingRasterPresentationSurface
-    }
-    try applyTerminalCursorFocusPolicy(semanticSnapshot: artifacts.semanticSnapshot)
-    return metrics
-  }
-
-  private func presentJSONFrame(
-    _ artifacts: FrameArtifacts,
-    focusedIdentity: Identity?
-  ) throws -> TerminalPresentationMetrics {
-    let output = JSONFrameRenderer().render(
-      surface: artifacts.rasterSurface,
-      semanticSnapshot: artifacts.semanticSnapshot,
-      focusedIdentity: focusedIdentity
-    )
-    guard
-      let terminalCommandSurface =
-        presentationSurface as? any TerminalCommandPresentationSurface
-    else {
-      throw PresentationSurfaceRoleError.missingTerminalCommandSurface
-    }
-    try terminalCommandSurface.write(output)
-    return metrics(forWrittenOutput: output)
-  }
-
-  private func presentLinearAccessibilityFrame(
-    semanticSnapshot: SemanticSnapshot
-  ) throws -> TerminalPresentationMetrics {
-    let output =
-      LinearAccessibilityRenderer().render(semanticSnapshot)
-      + liveRegionAnnouncer.renderAnnouncements(for: semanticSnapshot)
-    guard !output.isEmpty else {
-      return TerminalPresentationMetrics()
-    }
-
-    guard
-      let terminalCommandSurface =
-        presentationSurface as? any TerminalCommandPresentationSurface
-    else {
-      throw PresentationSurfaceRoleError.missingTerminalCommandSurface
-    }
-    try terminalCommandSurface.write(output)
-    return metrics(forWrittenOutput: output)
-  }
-
-  private func metrics(
-    forWrittenOutput output: String
-  ) -> TerminalPresentationMetrics {
-    let bytesWritten = output.utf8.count
-    let linesTouched = output.utf8.reduce(0) { partial, byte in
-      partial + (byte == 0x0A ? 1 : 0)
-    }
-    return TerminalPresentationMetrics(
-      bytesWritten: bytesWritten,
-      linesTouched: linesTouched,
-      cellsChanged: max(0, bytesWritten - linesTouched),
-      strategy: .fullRepaint
-    )
   }
 }

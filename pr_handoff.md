@@ -33,6 +33,11 @@ Packet 5 should be reviewed as runtime acquisition control-flow extraction:
 
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
 
+Packet 6 should be reviewed as runtime presentation handoff extraction:
+
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -135,6 +140,26 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-030508-85414.log
 ```
 
+Packet 6 validation passed:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
+swiftly run swift test --filter SwiftTUITests.JSONFrameRendererTests
+swiftly run swift test --filter SwiftTUITests.LinearAccessibilityRendererTests
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-031025-5025.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -151,8 +176,10 @@ about behavioral drift, output drift, concurrency changes, and fixture churn.
 Each packet should be independently revertible. Packets 1 and 2 are same-area
 terminal presentation changes. Packet 3 is a frame-tail damage-resolution split.
 Packet 4 is a core artifact file split. Packet 5 is a runtime acquisition
-control-flow extraction. Revert newest-first if a terminal output, raster reuse,
-frame-tail, diagnostics, async-cancellation, or public API regression appears.
+control-flow extraction. Packet 6 is a runtime presentation handoff extraction.
+Revert newest-first if a terminal output, raster reuse, frame-tail, diagnostics,
+async-cancellation, cursor-focus, JSON/accessibility output, or public API
+regression appears.
 
 ## AI Assistance Disclosure
 
