@@ -893,6 +893,16 @@ package final class ViewGraph {
     )
   }
 
+  package func previewLifecycleEvents(
+    resolved: ResolvedNode,
+    placed: PlacedNode?
+  ) -> [LifecycleEvent] {
+    frameLifecycleEventPlan(
+      resolved: resolved,
+      placed: placed
+    ).events
+  }
+
   package func finalizeFrame(
     rootIdentity: Identity,
     resolved: ResolvedNode,
@@ -911,39 +921,13 @@ package final class ViewGraph {
       node.setLifecycleState(.alive)
     }
 
-    let viewportLifecycleEvents = viewportLifecycleEvents(
-      from: resolved,
+    let lifecyclePlan = frameLifecycleEventPlan(
+      resolved: resolved,
       placed: placed
     )
-    let (
-      viewportTaskCancels,
-      viewportDisappears,
-      viewportAppears,
-      viewportChanges,
-      viewportTaskStarts
-    ) =
-      partitionLifecycleEvents(viewportLifecycleEvents)
-    let changeEvents = frameOrder.compactMap { identity -> LifecycleEvent? in
-      guard let node = nodesByIdentity[identity], !node.pendingChangeHandlerIDs.isEmpty else {
-        return nil
-      }
-      return .init(
-        identity: identity,
-        operation: .change(handlerIDs: node.pendingChangeHandlerIDs)
-      )
-    }
-    latestLifecycleEvents =
-      stableTaskCancelEvents
-      + structuralTaskCancelEvents
-      + viewportTaskCancels
-      + structuralDisappearEvents
-      + viewportDisappears
-      + structuralAppearEvents
-      + viewportAppears
-      + changeEvents
-      + viewportChanges
-      + stableTaskStartEvents
-      + viewportTaskStarts
+    latestLifecycleEvents = lifecyclePlan.events
+    viewportLifecycleNodesByIdentity = lifecyclePlan.viewportLifecycleNodesByIdentity
+    viewportLifecycleOrder = lifecyclePlan.viewportLifecycleOrder
 
     liveIdentities.formUnion(frameOrder)
     invalidatedIdentities.removeAll(keepingCapacity: true)
@@ -1508,9 +1492,66 @@ package final class ViewGraph {
     }
   }
 
+  private struct FrameLifecycleEventPlan {
+    var events: [LifecycleEvent]
+    var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
+    var viewportLifecycleOrder: [Identity]
+  }
+
+  private struct ViewportLifecycleEventPlan {
+    var events: [LifecycleEvent]
+    var nodesByIdentity: [Identity: LifecycleStateNode]
+    var order: [Identity]
+  }
+
+  private func frameLifecycleEventPlan(
+    resolved: ResolvedNode,
+    placed: PlacedNode?
+  ) -> FrameLifecycleEventPlan {
+    let viewportPlan = viewportLifecycleEventPlan(
+      from: resolved,
+      placed: placed
+    )
+    let (
+      viewportTaskCancels,
+      viewportDisappears,
+      viewportAppears,
+      viewportChanges,
+      viewportTaskStarts
+    ) =
+      partitionLifecycleEvents(viewportPlan.events)
+    let changeEvents = frameOrder.compactMap { identity -> LifecycleEvent? in
+      guard let node = nodesByIdentity[identity], !node.pendingChangeHandlerIDs.isEmpty else {
+        return nil
+      }
+      return .init(
+        identity: identity,
+        operation: .change(handlerIDs: node.pendingChangeHandlerIDs)
+      )
+    }
+
+    return FrameLifecycleEventPlan(
+      events:
+        stableTaskCancelEvents
+        + structuralTaskCancelEvents
+        + viewportTaskCancels
+        + structuralDisappearEvents
+        + viewportDisappears
+        + structuralAppearEvents
+        + viewportAppears
+        + changeEvents
+        + viewportChanges
+        + stableTaskStartEvents
+        + viewportTaskStarts,
+      viewportLifecycleNodesByIdentity: viewportPlan.nodesByIdentity,
+      viewportLifecycleOrder: viewportPlan.order
+    )
+  }
+
   private func collectViewportLifecycleEvents(
     from resolved: ResolvedNode,
     placed: PlacedNode?,
+    viewportLifecycleNodesByIdentity: inout [Identity: LifecycleStateNode],
     seenIdentities: inout Set<Identity>,
     order: inout [Identity],
     taskCancels: inout [LifecycleEvent],
@@ -1522,6 +1563,7 @@ package final class ViewGraph {
     {
       recordViewportLifecycleVisibility(
         of: placed,
+        viewportLifecycleNodesByIdentity: &viewportLifecycleNodesByIdentity,
         seenIdentities: &seenIdentities,
         order: &order,
         taskCancels: &taskCancels,
@@ -1537,6 +1579,7 @@ package final class ViewGraph {
         placed: placed?.children.indices.contains(index) == true
           ? placed?.children[index]
           : nil,
+        viewportLifecycleNodesByIdentity: &viewportLifecycleNodesByIdentity,
         seenIdentities: &seenIdentities,
         order: &order,
         taskCancels: &taskCancels,
@@ -1546,10 +1589,11 @@ package final class ViewGraph {
     }
   }
 
-  private func viewportLifecycleEvents(
+  private func viewportLifecycleEventPlan(
     from resolved: ResolvedNode,
     placed: PlacedNode?
-  ) -> [LifecycleEvent] {
+  ) -> ViewportLifecycleEventPlan {
+    var nodesByIdentity = viewportLifecycleNodesByIdentity
     var seenIdentities: Set<Identity> = []
     var order: [Identity] = []
     var taskCancels: [LifecycleEvent] = []
@@ -1560,6 +1604,7 @@ package final class ViewGraph {
     collectViewportLifecycleEvents(
       from: resolved,
       placed: placed,
+      viewportLifecycleNodesByIdentity: &nodesByIdentity,
       seenIdentities: &seenIdentities,
       order: &order,
       taskCancels: &taskCancels,
@@ -1568,7 +1613,7 @@ package final class ViewGraph {
     )
 
     for identity in viewportLifecycleOrder.reversed() where !seenIdentities.contains(identity) {
-      guard let previousNode = viewportLifecycleNodesByIdentity.removeValue(forKey: identity) else {
+      guard let previousNode = nodesByIdentity.removeValue(forKey: identity) else {
         continue
       }
       if let task = previousNode.task {
@@ -1589,8 +1634,11 @@ package final class ViewGraph {
       }
     }
 
-    viewportLifecycleOrder = order
-    return taskCancels + disappears + appears + taskStarts
+    return ViewportLifecycleEventPlan(
+      events: taskCancels + disappears + appears + taskStarts,
+      nodesByIdentity: nodesByIdentity,
+      order: order
+    )
   }
 
   private func partitionLifecycleEvents(
@@ -1634,6 +1682,7 @@ package final class ViewGraph {
 
   private func recordViewportLifecycleVisibility(
     of node: PlacedNode,
+    viewportLifecycleNodesByIdentity: inout [Identity: LifecycleStateNode],
     seenIdentities: inout Set<Identity>,
     order: inout [Identity],
     taskCancels: inout [LifecycleEvent],
@@ -1682,6 +1731,7 @@ package final class ViewGraph {
     for child in node.children {
       recordViewportLifecycleVisibility(
         of: child,
+        viewportLifecycleNodesByIdentity: &viewportLifecycleNodesByIdentity,
         seenIdentities: &seenIdentities,
         order: &order,
         taskCancels: &taskCancels,

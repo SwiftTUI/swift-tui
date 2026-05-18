@@ -1525,15 +1525,12 @@ public struct DefaultRenderer {
   ) -> (commit: CommitPlan, duration: Duration) {
     let tail = tailOutput.tail
     draft.transaction.materializePreparedState()
-    let checkpoint = viewGraph.makeCheckpoint()
     defer {
-      viewGraph.restoreCheckpoint(checkpoint)
       draft.transaction.suspendPreparedState()
     }
 
     return measurePhase(clock: draft.clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: draft.graphRootIdentity,
+      let lifecycleEvents = viewGraph.previewLifecycleEvents(
         resolved: resolved,
         placed: tail.placed
       )
