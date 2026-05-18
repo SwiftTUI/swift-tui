@@ -1949,7 +1949,7 @@ git commit --allow-empty -m "chore: ledger audit — all 14 findings code/test-r
 
 **Spirit:** the implementer cannot be the final judge of their own remediation.
 
-- [ ] **Step 1: Dispatch a fresh re-audit subagent**
+- [x] **Step 1: Dispatch a fresh re-audit subagent**
 
 Dispatch a subagent (via `superpowers:subagent-driven-development` or the Agent
 tool) with **no implementation context**, given only:
@@ -1961,19 +1961,54 @@ the finding is still observable in the code at HEAD. Do not trust the resolution
 ledger. Report each finding as STILL-OBSERVABLE or RESOLVED with the file/symbol
 evidence you checked."*
 
-- [ ] **Step 2: Reconcile**
+- [x] **Step 2: Reconcile**
 
 For any finding the re-audit reports STILL-OBSERVABLE, reopen it: its ledger row
 reverts to `_pending_` and a follow-up task is added to the appropriate phase.
 Do not argue with the re-audit — if a finding is still observable, the
 remediation is incomplete.
 
-- [ ] **Step 3: Record the re-audit outcome**
+Independent re-audit at `a595e125` reported F3, F4, F6, F8, F9, F10, F11,
+F13, and F14 as STILL-OBSERVABLE. Those ledger rows were reopened to
+`_pending_`.
+
+Follow-up tasks added from the independent re-audit:
+
+- [ ] **F3 reopened:** make the frame-head computation no longer mutate
+  runtime subsystems before commit, or remove the observable rollback seam the
+  audit found (`FrameHeadTransaction.discard()` / `computeFrameHead` mutation).
+- [ ] **F4 reopened:** remove the observable double-finalize path for completed
+  async frames; completed-frame preview must not call `viewGraph.finalizeFrame`
+  before the real commit.
+- [ ] **F6 reopened:** remove the observable underived fixed iteration limits
+  from late-preference reconciliation and focus synchronization, or replace
+  them with a mechanically derived convergence contract that no longer commits
+  stale overflow frames.
+- [ ] **F8 reopened:** stop calling `FrameDiagnostics.summarize(...)`
+  unconditionally during artifact construction when no diagnostics consumer has
+  read diagnostics.
+- [ ] **F9 reopened:** eliminate or truly exercise the no-Dispatch
+  `FrameTailLayoutWorker` synchronous fallback so the WASI semantics are not an
+  untested branch.
+- [ ] **F10 reopened:** collapse or structurally unify scheduler invalidation,
+  ViewGraph dirty work, and `RunLoop.previousRenderedState` so coherence no
+  longer rests on convention plus one regression test.
+- [ ] **F11 reopened:** reduce the observable render-tail entry surface; sync,
+  async, cancellable, late-preference, layout, and completed-frame candidate
+  helpers must route through a smaller shared control-flow surface.
+- [ ] **F13 reopened:** make fresh-vs-incremental raster verification active
+  whenever incremental damage suppresses painting, not only behind an opt-in
+  test initializer.
+- [ ] **F14 reopened:** make the process artifact discoverable enough that an
+  independent audit constrained to the follow-up audit and repo can verify the
+  process remediation without trusting prior chat context.
+
+- [x] **Step 3: Record the re-audit outcome**
 
 Append the re-audit result summary to `PIPELINE_DRIVER_RESOLUTION_LEDGER.md`
 under a "## Independent re-audit" heading.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
