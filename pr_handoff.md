@@ -484,10 +484,23 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-053009-4450.log
 ```
 
-Required repo gate before completion:
+Packet 22 focused validation passed:
 
 ```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests
+swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests
+swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests
+swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
 bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-053644-24624.log
 ```
 
 ## Risks
@@ -515,6 +528,7 @@ Packet 18 is input reader pure support type extraction.
 Packet 19 is late-preference reconciliation extraction.
 Packet 20 is frame-head draft transaction extraction.
 Packet 21 is run-loop focus-sync convergence extraction.
+Packet 22 is run-loop frame acquisition extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -530,7 +544,9 @@ public input-event/protocol surface, late-preference pass budget, toolbar
 runtime issue, layout-dependent realization, frame-head checkpoint restore,
 draft commit/discard, one-shot abort precondition, focus-sync rerender budget,
 focused-value propagation, default-focus request, scroll-position convergence,
-or focus-sync lifecycle carry-forward regression appears.
+focus-sync lifecycle carry-forward, queued-tail cancellation, dropped-completed
+frame diagnostics, cancelled-intent replay, async-no-cancel, or async-no-drop
+regression appears.
 
 ## AI Assistance Disclosure
 

@@ -445,29 +445,49 @@ Packet 21 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-053009-4450.log`
   - Result: PASS
 
+Packet 22 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS, 22 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-053644-24624.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 22: run-loop frame acquisition split. Read-only runtime review ranked
-this after focus-sync because `RunLoop+Rendering.swift` still mixes the frame
-driver with async artifact acquisition, queued-tail cancellation, dropped-frame
-diagnostics, and event-pump fairness. The next packet should move acquisition
-outcomes and strategy-specific async acquisition/drop handling into a
-same-folder run-loop helper while keeping the frame loop and final commit body
-in `RunLoop+Rendering.swift`.
+Packet 23: renderer commit path consolidation. Read-only runtime review ranked
+this after run-loop acquisition because `DefaultRenderer` still has closely
+related sync one-shot commit and async completed-candidate commit duties spread
+through `SwiftTUI.swift` and `CompletedFrameArtifactBuilder.swift`. The next
+packet should look for a shared commit helper that reduces drift without moving
+draft materialization/suspension or changing public renderer APIs.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
-- likely `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift`
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
+- possibly a new same-folder rendering helper
 
 Validation:
 
 - `swiftly run swift build`
 - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
-- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
-- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
-- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
-- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+- `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+- `swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests`
 - `bun run test`
 
 ## Failed Attempts
