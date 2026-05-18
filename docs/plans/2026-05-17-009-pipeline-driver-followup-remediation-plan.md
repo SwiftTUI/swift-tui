@@ -1752,7 +1752,7 @@ git add Tests/SwiftTUITests/FrameTailWorkerFallbackTests.swift Tests/SwiftTUIWAS
 git commit -m "test: cover frame-tail layout worker fallback path (F9)"
 ```
 
-- [ ] **Step 5: F9 DoD** — `swift test --filter FrameTailWorkerFallbackTests` PASSES, and the WASI lane has a `renderAsync` smoke test. Record F9 ledger row (Mechanism `test`).
+- [x] **Step 5: F9 DoD** — `swift test --filter FrameTailWorkerFallbackTests` PASSES, and the WASI lane has a `renderAsync` smoke test. Record F9 ledger row (Mechanism `test`).
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
