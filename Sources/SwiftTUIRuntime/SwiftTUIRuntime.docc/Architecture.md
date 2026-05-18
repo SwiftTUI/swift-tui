@@ -221,4 +221,4 @@ convenience product.
 - <doc:Runtime>
 - <doc:Vision>
 - <doc:Host-Integration>
-- [Architecture details](https://github.com/GoodHatsLLC/SwiftTUI/blob/main/docs/ARCHITECTURE.md)
+- [Architecture details](https://github.com/SwiftTUI/swift-tui/blob/main/docs/ARCHITECTURE.md)

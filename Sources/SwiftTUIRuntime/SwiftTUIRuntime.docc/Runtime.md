@@ -198,4 +198,4 @@ The CLI runner installs a crash guard before the session enters raw mode. If the
 - <doc:Vision>
 - <doc:Host-Integration>
 - <doc:Running-Apps>
-- [Render pipeline](https://github.com/GoodHatsLLC/SwiftTUI/blob/main/docs/RENDER-PIPELINE.md)
+- [Render pipeline](https://github.com/SwiftTUI/swift-tui/blob/main/docs/RENDER-PIPELINE.md)

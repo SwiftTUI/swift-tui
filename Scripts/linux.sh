@@ -14,7 +14,7 @@ CONTAINER_TOOL=""
 # Default to the prebuilt image published by .github/workflows/build-linux-image.yml.
 # Override with LINUX_IMAGE=swift:6.3.1 (or any other base) to fall back to lazy
 # provisioning of swiftly, bun, and the Wasm SDK at runtime.
-IMAGE="${LINUX_IMAGE:-ghcr.io/goodhatsllc/swift-tui-linux:latest}"
+IMAGE="${LINUX_IMAGE:-ghcr.io/swifttui/swift-tui-linux:latest}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
 CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}}"
 CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/workspace}"

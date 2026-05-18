@@ -71,7 +71,7 @@ const steps = [
   name: <span class="s">"HelloTUI"</span>,
   dependencies: [
     .package(
-      url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>,
+      url: <span class="s">"https://github.com/SwiftTUI/swift-tui"</span>,
       .upToNextMinor(from: <span class="s">"0.1.0"</span>)
     ),
   ],
@@ -79,7 +79,7 @@ const steps = [
     .executableTarget(
       name: <span class="s">"HelloTUI"</span>,
       dependencies: [
-        .product(name: <span class="s">"SwiftTUI"</span>, package: <span class="s">"SwiftTUI"</span>),
+        .product(name: <span class="s">"SwiftTUI"</span>, package: <span class="s">"swift-tui"</span>),
       ]
     ),
   ]
