@@ -87,6 +87,13 @@ Packet 15 should be reviewed as animation property-value application extraction:
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationPropertyValueApplication.swift`
 
+Packet 16 should be reviewed as completed-frame artifact support extraction:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CompletedFrameCandidate.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -369,6 +376,26 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-044249-87972.log
 ```
 
+Packet 16 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests
+swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
+swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests
+swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-045323-8675.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -394,6 +421,7 @@ extraction. Packet 12 is terminal presentation planning extraction.
 Packet 13 is animation tree-query extraction.
 Packet 14 is animation transition-overlay extraction.
 Packet 15 is animation property-value application extraction.
+Packet 16 is completed-frame artifact support extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -402,8 +430,9 @@ WebSurface full-repaint byte accounting, presentation damage planning, Kitty
 graphics replay planning, matched-geometry traversal, removal subtree lookup,
 removal overlay transient marking, removal offset composition, removal
 reinjection ordering, property animation writeback, flexible-frame dimension
-slot preservation, shape-style destination routing, or public API regression
-appears.
+slot preservation, shape-style destination routing, completed-frame preview
+side-effect isolation, completed-frame drop classification, diagnostics timing
+fields, or public API regression appears.
 
 ## AI Assistance Disclosure
 

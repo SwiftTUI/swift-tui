@@ -67,6 +67,10 @@ Approved constraints:
   `AnimationPropertyValueApplication.swift`, keeping controller state,
   scheduling, custom-state writeback, and batch bookkeeping in
   `AnimationController`.
+- Packet 16 completed: extracted completed-frame artifact assembly, worker
+  timing derivation, and drop-eligibility classification into
+  `CompletedFrameArtifactBuilder.swift`, and moved `CompletedFrameCandidate`
+  out of `FrameTailRenderer.swift` into completed-frame rendering support.
 
 ## Baseline Validation
 
@@ -327,26 +331,45 @@ Packet 15 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-044249-87972.log`
   - Result: PASS
 
+Packet 16 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-045323-8675.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 16: re-rank the remaining shared runtime debt after Packet 15. Current
-candidate areas are the `DefaultRenderer` completed-frame/candidate commit flow
-in `SwiftTUI.swift`, the remaining run-loop focus-sync/frame-acquisition
-orchestration, and input parsing/stream ownership. Prefer the next slice that
-preserves public API and can be verified with focused runtime tests plus the
-repo gate.
+Packet 17: run-loop frame diagnostics extraction. Read-only run-loop review
+ranked the diagnostic record construction in `RunLoop+Rendering.swift` as a
+high-locality next slice: it should move committed-frame, cancelled-before-start,
+and dropped-completed diagnostic record construction into a same-folder helper
+without changing frame loop control or presentation ordering.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/SwiftTUI.swift` or
-  `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`, pending local
-  evidence and subagent review.
-- New same-subsystem helper file only if it keeps behavior and API stable.
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnostics.swift`
 
 Validation:
 
-- Focused runtime, frame-pipeline, and host/session tests selected from touched
-  subsystem evidence.
+- Focused run-loop diagnostics, async frame-tail, pipeline parity, and input
+  batching tests selected from touched subsystem evidence.
 - `bun run test`
 
 ## Failed Attempts
