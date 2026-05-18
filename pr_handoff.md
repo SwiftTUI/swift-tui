@@ -159,6 +159,12 @@ Packet 28 should be reviewed as placed animation overlay sampling extraction:
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
 - `Sources/SwiftTUIRuntime/Lifecycle/PlacedAnimationOverlaySampling.swift`
 
+Packet 29 should be reviewed as DefaultRenderer frame-tail coordination
+extraction:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -697,6 +703,23 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-083720-85404.log
 ```
 
+Packet 29 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests\.(RuntimeRenderPipelineTests|RenderPipelineStructureTests|PipelineContractTests|AsyncFrameTailRenderingTests|BoundedReconciliationTests|RenderDriverCharacterizationTests|RenderDriverInstrumentationCostTests)
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead
+swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents
+swiftly run swift test --filter SwiftTUITests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-093634-11184.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -713,6 +736,18 @@ full repo gate passed on rerun. Failed gate log:
 
 ```text
 /tmp/swift-tui-test-gate-20260518-062300-55078.log
+```
+
+One Packet 29 full-gate attempt failed in the full `SwiftTUITests` runtime
+target with two timeout issues:
+`HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents`
+and
+`AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead`.
+Both tests passed immediately in isolation, the full `SwiftTUITests` target
+passed, and the full repo gate passed on rerun. Failed gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-090939-98987.log
 ```
 
 ## Risks
@@ -747,6 +782,7 @@ Packet 25 is input event decoding extraction.
 Packet 26 is terminal input parser file split.
 Packet 27 is terminal input descriptor-reading extraction.
 Packet 28 is placed animation overlay sampling extraction.
+Packet 29 is DefaultRenderer frame-tail coordination extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -775,7 +811,9 @@ coordinate decoding, bracketed-paste envelope, key parser regression, read
 would-block/EOF classification, drained-bytes-before-EOF behavior, or
 non-would-block input failure handling, placed removal overlay sampling,
 insertion offset sampling, matched-geometry offset sampling, animation
-custom-state writeback, or animation batch release
+custom-state writeback, animation batch release, late-preference
+reconciliation, prepared-state materialization, queued-tail cancellation, or
+frame-tail raster handoff
 appears.
 
 ## AI Assistance Disclosure
