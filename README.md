@@ -1,51 +1,83 @@
 # SwiftTUI
 
-SwiftTUI is pre-1.0.  
-`0.x` line is usable for real terminal interfaces, but minor releases may still
-make source-breaking API adjustments while the public surface is being proven.
+**SwiftUI semantics, drawn in terminal cells.**
 
-## Install
+![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI-1E90FF)
+![Status](https://img.shields.io/badge/status-0.1.0%20alpha-DAA520)
+![License](https://img.shields.io/badge/license-AGPL--3.0--only-3DA639)
 
-Depend on the current alpha release instead of `main`:
+SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
+You author `View`, `Scene`, and `App` values exactly the way you would for
+SwiftUI — `VStack`, `Text`, `@State`, `ProgressView`, view modifiers — and
+SwiftTUI resolves, lays out, and renders them as terminal text, a browser
+canvas, or a raster surface embedded in a host app.
+
+There is no `curses`, no virtual DOM, and no global constraint solver. Every
+view is lowered through a strict, inspectable pipeline — resolve → measure →
+place → semantics → draw → raster → commit — so layout is deterministic and
+every frame is snapshot-testable.
+
+**One `App` declaration, four execution modes.** The same authored scene runs
+as a terminal executable, as a browser deployment compiled to WASI, through a
+native localhost WebHost launch, or embedded inside a host-managed SwiftUI
+surface — without rewriting view code.
+
+## Why SwiftTUI
+
+- **You already know the API.** Stacks, frames, `@State`, `@Environment`,
+  `ProgressView`, `LabeledContent`, custom `Layout` types, and view modifiers
+  behave the way SwiftUI taught you to expect.
+- **Deterministic, testable frames.** Rendering is a pure function of the view
+  tree and a size proposal. The same input always produces the same cells,
+  which makes snapshot tests trivial and regressions cheap to catch.
+- **Accessible by construction.** A semantic substrate sits under every frame,
+  driving a linear accessible output path, `--no-color` / `--ascii` fallbacks,
+  and reduce-motion behavior — see [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
+- **Portable.** Terminal, browser, and embedded hosts are sibling products of
+  one package; opting into a heavier surface (a web server, a terminal
+  emulator) is explicit and never linked unless you ask for it.
+- **Batteries included.** Argument parsing, charts, animated images, embedded
+  terminal panes, and split-pane workspaces ship as peer products.
+
+## Requirements
+
+| | |
+| --- | --- |
+| Swift toolchain | Swift 6.3 (`swift-tools-version: 6.3`) |
+| Apple package platforms | macOS 15+, iOS 18+ |
+| Terminal / WASI builds | Linux and WASI supported via the Swift open-source toolchain |
+| Local development | macOS 26+ with Swift 6.3.1, managed through `swiftly` |
+
+`SwiftTUITerminal` / PTY embedding is macOS and Linux only. See
+[docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) for the full
+platform-by-product matrix.
+
+## Installation
+
+Add SwiftTUI to your `Package.swift`. While the package is pre-1.0, pin to the
+current alpha with `.upToNextMinor` so a minor release cannot break your build:
 
 ```swift
-// Package.swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
   .upToNextMinor(from: "0.1.0")
 )
 ```
 
-For a terminal app executable target, add the convenience product:
+For a terminal-native executable, depend on the `SwiftTUI` convenience product:
 
 ```swift
 .product(name: "SwiftTUI", package: "swift-tui")
 ```
 
-Use `SwiftTUIRuntime` plus explicit host/runner products when embedding or
-building non-terminal launch paths. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-for the release policy and support details.
+That single import re-exports the platform-neutral runtime, the standard
+argument-parsing surface, and the terminal runner.
 
-## Support Matrix
+## Building a terminal app
 
-| Surface | Status |
-| --- | --- |
-| macOS 26+ package development and CI | Primary supported Apple-host path; GitHub `macos-26` is the public macOS CI floor |
-| Linux terminal package builds/tests | Supported through `swiftly` and `bun run test` |
-| iOS 18+ package builds | Supported for host-compatible products; PTY products are excluded |
-| WASI/browser deployment | Supported through `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` |
-| `SwiftTUITerminal` / PTY embedding | macOS and Linux only |
-
-## License
-
-SwiftTUI first-party code is licensed under the GNU Affero General Public
-License v3.0 only (`AGPL-3.0-only`). Vendored third-party code under
-`Vendor/` keeps its own license and provenance notices.
-
-## Overview
-
-At the lowest public runtime level, you can resolve and render any `View` into
-terminal text:
+Author a view, then an `@main` `App` — the same shapes you would write for
+SwiftUI:
 
 ```swift
 import SwiftTUI
@@ -53,8 +85,7 @@ import SwiftTUI
 struct BuildSummary: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("Deploy Queue")
-        .bold()
+      Text("Deploy Queue").bold()
       Divider()
       ProgressView("Release", value: 18, total: 24)
       LabeledContent("Window", value: "staging")
@@ -64,34 +95,6 @@ struct BuildSummary: View {
   }
 }
 
-let output = await MainActor.run {
-  let renderer = DefaultRenderer()
-  let frame = renderer.render(
-    BuildSummary(),
-    proposal: .init(width: 40, height: 8)
-  )
-
-  return TerminalSurfaceRenderer(
-    capabilityProfile: .previewUnicode
-  ).render(frame.rasterSurface)
-}
-
-print(output)
-```
-
-`DefaultRenderer` is intentionally snapshot-friendly. Reusing the same
-stateful view instance in no-invalidator tests or previews can carry
-imperative writes into later snapshots of that instance. Interactive
-`RunLoop` sessions scope those same dynamic-property writes to the runtime
-view graph that registered the callback, so reused view values do not leak
-state across live sessions.
-
-For full interactive terminal applications, depend on the `SwiftTUI` product
-and import only `SwiftTUI`:
-
-```swift
-import SwiftTUI
-
 @main
 struct DemoApp: App {
   var body: some Scene {
@@ -102,42 +105,20 @@ struct DemoApp: App {
 }
 ```
 
-`SwiftTUI` re-exports the platform-neutral runtime, standard argument parsing,
-and the terminal runner. When you want an explicit launcher instead of
-`@main`, call:
+`swift run` builds and launches it; the app takes the alternate screen until
+you exit, then restores your shell. When you want an explicit launcher instead
+of `@main`, call the terminal runner directly:
 
 ```swift
 try await TerminalRunner.run(DemoApp.self)
 ```
 
-For binaries that intentionally support `--web`, import the opt-in combined
-runner product instead:
+### Standard CLI flags
 
-```swift
-import SwiftTUIWebHostCLI
-
-@main
-struct DemoApp: App {
-  var body: some Scene {
-    WindowGroup("Deploy Dashboard") {
-      BuildSummary()
-    }
-  }
-}
-```
-
-`SwiftTUIWebHostCLI` routes normal launches to the terminal runner and routes
-`--web` launches through the localhost WebHost runner/browser bridge. Apps that
-import only `SwiftTUI` do not compile or link the web server, FlyingFox, or
-browser bundle; `--web` is rejected before terminal raw-mode setup.
-
-### Argument parsing
-
-Apps that want CLI flags plus the framework's standard flag surface
-(`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--web`,
-`--cursor-follows-focus`, `--json`, `--linear`, `-v`, `--debug`, ...) add
-`SwiftTUICommand` alongside `App`. The protocol and framework options are
-available from the same `SwiftTUI` import:
+Conform your `App` to `SwiftTUICommand` to get the framework's standard flag
+surface (`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--json`,
+`--linear`, `--debug`, …) alongside your own options. Both the protocol and the
+options come from the same `SwiftTUI` import:
 
 ```swift
 import SwiftTUI
@@ -156,202 +137,161 @@ struct MyApp: App, SwiftTUICommand {
 }
 ```
 
-> **Note on flag-to-behavior wiring:** `--no-color`, `--force-color`, `--ascii`,
-> `--plain`, `--accessible`, `--reduce-motion`, `--no-progress`, and
-> `--cursor-follows-focus` now affect runtime behavior. `--web`, `--port`,
-> `--bind`, `--open`, and `--scene` are consumed by the opt-in `SwiftTUIWebHostCLI`
-> runner. `--debug` enables the existing frame diagnostics logger. `--json`
-> emits machine-readable frame JSON, and standalone `--linear` selects the
-> accessible linear output path. `--scene` selects which declared `WindowGroup`
-> identifier the single-scene WebHost launch should run.
+Apps without `SwiftTUICommand` still honor `NO_COLOR`, `LANG=C`, and the
+`SWIFTTUI_*` environment variables automatically. See
+[Examples/argparse](Examples/argparse) for a working demo.
 
-Bare-mode apps (no `SwiftTUICommand` conformance) still honor `NO_COLOR`,
-`LANG=C`, and the `SWIFTTUI_*` environment variables automatically. See
-[Examples/argparse](Examples/argparse) for a working consumer-flags +
-framework-flags demo.
+### Lower-level rendering
 
-The same authored `App` and `Scene` declarations can then flow into these
-root package products:
+If you need a single deterministic frame rather than an interactive session —
+for snapshots, previews, or non-interactive command output — resolve a `View`
+directly with `DefaultRenderer` and `TerminalSurfaceRenderer`. See
+[Examples/minimal](Examples/minimal) for the pattern and
+[docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) for the frame model.
 
-- terminal-native execution via the `SwiftTUI` convenience product, or
-  explicit composition with `SwiftTUIRuntime` plus `SwiftTUICLI`
-- terminal plus localhost-browser WebHost execution via the opt-in
-  `SwiftTUIWebHostCLI` runner product
-- WASI execution via the `SwiftTUIWASI` runner product; the shared
-  `WASISurfaceBridge` transport target is package-only plumbing used by
-  `SwiftTUIWASI` and `SwiftTUIWebHost`
-- host-managed native embedding via the `SwiftUIHost` product on Apple
-  platforms
-- terminal-program embedding via `SwiftTUITerminal` and
-  `SwiftTUIPTYPrimitives`
-- first-class terminal workspaces via `SwiftTUITerminalWorkspace`
-- deploy-to-browser hosting through `Platforms/Web` (`@swifttui/web`) and
-  `Platforms/WebBuild` (`@swifttui/build`), which consume a `SwiftTUIWASI`
-  build
+## Using SwiftTUI from the web
 
-In repo terminology, a runner owns process startup or launch routing, while a
-host owns an external presentation environment or embedding lifecycle. See
-[docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) for that boundary.
+The same `App` and `Scene` declarations deploy to the browser — no terminal
+emulator, no rewrite. SwiftTUI compiles your app to WASI and streams a
+structured raster surface that a small browser host draws into a `<canvas>`.
 
-`SwiftTUIRuntime` is the platform-neutral runtime product. It provides the
-shared runtime, `SceneManifest`, and `HostedSceneSession`; runner and host
-behavior is exposed through sibling products in the same root package.
+Two npm packages make this a first-class web-consumer story:
+
+| Package | Role |
+| --- | --- |
+| [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) | Browser runtime — manifest loading, canvas rendering, ARIA mounting, WASI/WebSocket scene bridges |
+| [`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) | Build tooling — the `swifttui-web` CLI that compiles a SwiftTUI app into a WASI `app.wasm` and `scene-manifest.json` |
+
+Add both to your web project:
+
+```bash
+npm install @swifttui/web @swifttui/build
+```
+
+Compile your SwiftTUI `App` to WASI with the `swifttui-web` CLI — it drives the
+Swift toolchain and emits `app.wasm` plus a `scene-manifest.json` into your
+output directory:
+
+```bash
+npx swifttui-web build
+```
+
+Then mount the built app onto a DOM element:
+
+```ts
+import { createWebHostApp } from "@swifttui/web";
+import { createWasmSceneRuntimeFactory } from "@swifttui/web/wasi";
+
+const controller = await createWebHostApp({
+  mount: document.querySelector(".terminal-shell")!,
+  manifestUrl: new URL("./scene-manifest.json", import.meta.url),
+  sceneRuntimeFactory: createWasmSceneRuntimeFactory(
+    new URL("./assets/app.wasm", import.meta.url),
+  ),
+});
+```
+
+The host page only needs to serve `Cross-Origin-Opener-Policy: same-origin`
+and `Cross-Origin-Embedder-Policy: require-corp` so the `SharedArrayBuffer`-backed
+stdin works; everything around the mount element is your own page chrome.
+
+[Examples/WebExample](Examples/WebExample) is the reference template — a
+complete Bun-served browser app whose load-bearing embedding code is roughly 60
+lines. Copy that pattern to adopt SwiftTUI in a web project.
+
+If you only want a native process that can *also* open a browser window on
+`--web`, skip the build pipeline and import `SwiftTUIWebHostCLI` instead; it
+routes normal launches to the terminal runner and `--web` launches through the
+localhost WebHost bridge.
+
+## Execution modes & products
+
+Author once; pick the product that matches how you ship.
+
+| Product | Use when |
+| --- | --- |
+| `SwiftTUI` | Building a terminal-native executable with the default `App.main()` runner |
+| `SwiftTUIRuntime` | Composing a custom runner or host on the platform-neutral runtime |
+| `SwiftTUICLI` / `SwiftTUIWASI` | You need an explicit terminal or WASI runner product |
+| `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` | Opting a native process into localhost browser hosting |
+| `SwiftUIHost` | Embedding SwiftTUI scenes inside a host-managed SwiftUI surface (Apple platforms) |
+| `SwiftTUITerminal` / `SwiftTUITerminalWorkspace` | Embedding terminal child processes or building split-pane workspaces |
+| `SwiftTUIAnimatedImage` / `SwiftTUICharts` | You need the peer animated-image or charting surfaces |
+| `@swifttui/web` / `@swifttui/build` | Packaging a browser/WASI deployment |
+
+A *runner* owns process startup or launch routing; a *host* owns an external
+presentation environment. [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md)
+covers that boundary and the platform support matrix.
 
 ## Examples
 
-The maintained examples are indexed in [Examples/README.md](Examples/README.md).
-That index is the fastest way to pick the right sample for a product surface,
-run command, host mode, or focused test package.
+The maintained examples are indexed in
+[Examples/README.md](Examples/README.md) — the fastest way to find a sample for
+a given product surface or run mode.
 
-| Example | What it demonstrates | Run |
+| Example | Demonstrates | Run |
 | --- | --- | --- |
-| [minimal](Examples/minimal) | Lowest-level snapshot rendering with `DefaultRenderer` and `TerminalSurfaceRenderer` | `swiftly run swift run --package-path Examples/minimal minimal` |
-| [argparse](Examples/argparse) | `SwiftTUICommand`, consumer flags, standard framework flags, and shell completions | `swiftly run swift run --package-path Examples/argparse argparse-demo --help` |
-| [gallery](Examples/gallery) | Primary component workbench for tabs, controls, input, images, charts, animation, popovers, file drop, and WebHost opt-in | `swiftly run swift run --package-path Examples/gallery gallery-demo` |
-| [layouts](Examples/layouts) | SwiftTUI layout catalog with behavior tests for stacks, frames, geometry, scrolling, overlays, shapes, and custom layouts | `swiftly run swift run --package-path Examples/layouts layouts-demo` |
-| [LayoutsSwiftUI](Examples/LayoutsSwiftUI) | Native SwiftUI layout catalog beside the embedded SwiftTUI catalog through `SwiftUIHost` | `swiftly run swift run --package-path Examples/LayoutsSwiftUI layouts-swiftui-demo` |
-| [file-previewer](Examples/file-previewer) | Miller-column browser with embedded terminal-process previews through `SwiftTUITerminal` | `swiftly run swift run --package-path Examples/file-previewer FilePreviewerApp` |
-| [terminal-workspace](Examples/terminal-workspace) | Zellij-style tabs, split panes, retained terminal sessions, command palette, and persisted layout metadata | `swiftly run swift run --package-path Examples/terminal-workspace terminal-workspace` |
+| [minimal](Examples/minimal) | Lowest-level snapshot rendering | `swiftly run swift run --package-path Examples/minimal minimal` |
+| [argparse](Examples/argparse) | `SwiftTUICommand`, consumer + framework flags, completions | `swiftly run swift run --package-path Examples/argparse argparse-demo --help` |
+| [gallery](Examples/gallery) | Component workbench: tabs, controls, input, images, charts, animation | `swiftly run swift run --package-path Examples/gallery gallery-demo` |
+| [layouts](Examples/layouts) | Layout catalog: stacks, frames, geometry, scrolling, overlays, shapes | `swiftly run swift run --package-path Examples/layouts layouts-demo` |
+| [LayoutsSwiftUI](Examples/LayoutsSwiftUI) | Native SwiftUI layout catalog beside the embedded SwiftTUI one | `swiftly run swift run --package-path Examples/LayoutsSwiftUI layouts-swiftui-demo` |
+| [file-previewer](Examples/file-previewer) | Miller-column browser with embedded terminal previews | `swiftly run swift run --package-path Examples/file-previewer FilePreviewerApp` |
+| [terminal-workspace](Examples/terminal-workspace) | Zellij-style tabs, split panes, command palette, persisted layout | `swiftly run swift run --package-path Examples/terminal-workspace terminal-workspace` |
 | [gitviz](Examples/gitviz) | Non-interactive `SwiftTUICharts` command suite over git history | `swiftly run swift run --package-path Examples/gitviz gitviz dashboard --path .` |
-| [gifcat](Examples/gifcat) | Terminal-native animated GIF playback with `SwiftTUIAnimatedImage` | `swiftly run swift run --package-path Examples/gifcat gifcat nyan.gif` |
-| [gifeditor](Examples/gifeditor) | Full terminal GIF editor with canvas drawing, layers, timeline, pointer input, and GIF import/export | `swiftly run swift run --package-path Examples/gifeditor gifeditor` |
-| [SwiftUIExample](Examples/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes through `SwiftUIHost` | Open `Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
-| [WebHostExample](Examples/WebHostExample) | Smallest app that opts into the localhost browser runner via `SwiftTUIWebHostCLI` | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
-| [WebExample](Examples/WebExample) | Static browser/WASI deployment using `SwiftTUIWASI`, `@swifttui/web`, and `@swifttui/build` | `bun --cwd Examples/WebExample dev` |
+| [gifcat](Examples/gifcat) | Terminal-native animated GIF playback | `swiftly run swift run --package-path Examples/gifcat gifcat nyan.gif` |
+| [gifeditor](Examples/gifeditor) | Full terminal GIF editor: canvas, layers, timeline, import/export | `swiftly run swift run --package-path Examples/gifeditor gifeditor` |
+| [SwiftUIExample](Examples/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via `SwiftUIHost` | Open `Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
+| [WebHostExample](Examples/WebHostExample) | Smallest app that opts into the localhost browser runner | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
+| [WebExample](Examples/WebExample) | Static browser/WASI deployment with `@swifttui/web` + `@swifttui/build` | `bun --cwd Examples/WebExample dev` |
 
-## Product Tiers
+## Documentation
 
-| Product/package | Use when |
-| --- | --- |
-| `SwiftTUI` | You are building a terminal-native executable and want the default `App.main()` runner |
-| `SwiftTUIRuntime` | You are composing a custom runner or host without terminal convenience behavior |
-| `SwiftTUICLI` / `SwiftTUIWASI` | You need an explicit terminal or WASI runner product |
-| `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` | You intentionally opt into localhost browser hosting from a native process |
-| `SwiftUIHost` | You embed SwiftTUI scenes in a host-managed SwiftUI surface |
-| `SwiftTUITerminal` / `SwiftTUITerminalWorkspace` | You embed terminal child processes or build split-pane terminal workspaces |
-| `SwiftTUIAnimatedImage` / `SwiftTUICharts` | You need the peer animated-image or charting utility surfaces |
-| `@swifttui/web` / `@swifttui/build` | You are packaging browser/WASI deployments |
+Live API reference: <https://swifttui.io/docs/documentation/swifttui/>
 
-## Development Requirements
+[docs/README.md](docs/README.md) is the canonical index for architecture and
+project documentation. Common entry points:
 
-Currently fully supported:
-- macOS 26+ for local package development on Apple platforms
-- Swift 6.3.1 managed through `swiftly`
+- [docs/VISION.md](docs/VISION.md) — what SwiftTUI is for.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules, products, layout model.
+- [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) — the frame pipeline and frame-drop policy.
+- [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) — execution modes and platform support.
+- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — the semantic substrate.
+- [docs/PUBLIC-API.md](docs/PUBLIC-API.md) — the public surface policy.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — toolchains, the test gate, the release process.
 
-## Build And Test
-
-```bash
-swiftly run swift test
-Scripts/test_gate.sh
-Scripts/test_all.sh
-bun run test:coverage
-```
-
-`swiftly run swift test` covers the root package, including the Swift platform
-products. `Scripts/test_gate.sh` is the repo gate: it verifies the environment,
-policy checks, root products, platform packages, tooling, and `Examples/gallery`.
-If you're already using the repo's root Bun workspace, `bun run test` is a thin
-entrypoint to that gate.
-
-`Scripts/test_all.sh` is the exhaustive test surface. It runs the same shared
-suite plus every maintained example package/app, including browser/WASI
-coverage for `Examples/WebExample`. Use `bun run test:all` for the same
-exhaustive runner from the root Bun workspace.
-
-`bun run test:coverage` runs the root SwiftPM tests with SwiftPM code coverage
-enabled and prints the exported coverage JSON path plus the reported line
-coverage. Coverage is informational; there is no checked-in threshold gate. CI
-retains the generated SwiftPM JSON as the `swiftpm-coverage-json` artifact for
-trend inspection.
-
-On Linux, both runners export `DISABLE_EXPLICIT_PLATFORMS=1` and skip
-Apple-only host checks.
-
-On macOS, the public CI support floor is GitHub Actions `macos-26`. Older macOS
-hosts may work when they provide compatible Swift and Xcode tooling, but failures
-there are not release-gate blockers.
-
-For development tests, use `swiftly run swift ...` explicitly. Do not use bare
-`swift test` or `xcrun swift test`; they can pick up an Xcode-selected toolchain
-or stale artifacts that do not match the repo's pinned Swift `6.3.1`
-environment.
-
-## Performance Evaluation
-
-Use the repo-local perf tool when changing async rendering, frame scheduling,
-presentation, layout fallback behavior, or other runtime paths where input
-latency and CPU cost need to be compared. See
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for how the harness fits the gate.
-
-List the checked-in scenarios:
-
-```bash
-bun run perf:list
-```
-
-Run a quick same-binary sync versus async comparison:
-
-```bash
-bun run perf:run -- --scenario gallery-animation-click --modes sync,async --iterations 3
-```
-
-The run command prints one artifact directory per mode under `.perf/runs/`.
-Compare the printed sync directory with the printed async directory:
-
-```bash
-bun run perf:compare -- .perf/runs/<sync-run> .perf/runs/<async-run>
-```
-
-Each run directory contains `run.json`, `frames.tsv`, `events.tsv`, `cpu.tsv`,
-and `summary.json`. Keep the full directory when citing a result; the TSV files
-explain why the summary moved.
-
-## API Documentation
-
-Live API reference is published at:
-
-- <https://swifttui.io/docs/documentation/swifttui/>
-
-To build the docs locally, generate per-module DocC archives with:
+Build per-module DocC archives locally with:
 
 ```bash
 swiftly run swift package generate-documentation --target SwiftTUI
 ```
 
-Or build the combined archive that powers the public site:
+## Project status
+
+SwiftTUI is pre-1.0. The `0.x` line is usable for real terminal interfaces, but
+minor releases may still make source-breaking API adjustments while the public
+surface is being proven — keep your dependency pinned with `.upToNextMinor`. It
+is currently an alpha, single-maintainer, AI-assisted project. See
+[docs/VISION-GAP.md](docs/VISION-GAP.md) for where the code differs from intent
+and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the release policy.
+
+## Contributing
+
+Small, well-scoped issues and pull requests are easiest to review. The repo
+uses the pinned Swift 6.3.1 toolchain through `swiftly`; build and test with:
 
 ```bash
-Scripts/build_docc_archive.sh --hosting-base-path docs --output-path .build-docs
+swiftly run swift test
+bun run test
 ```
 
-Every root package product intended for external users to link or import must
-have a DocC catalog and be listed in
-`Scripts/lib/public_docc_targets.txt`; that manifest may also include support
-targets whose symbols are part of the published reference. The root `.spi.yml`
-mirrors that target set for Swift Package Index-hosted documentation. Example
-apps under `Examples/` are runnable samples and regression surfaces; they do
-not need DocC catalogs. `bun run build:website` generates the combined DocC
-archive as part of the web build and copies it into `Website/dist/docs/`.
+`bun run test` is the repo gate. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
+[AGENTS.md](AGENTS.md) for the full build, test, style, and pull-request rules,
+and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the exhaustive test surface
+and the performance-evaluation harness.
 
-## Documentation
+## License
 
-[docs/README.md](docs/README.md) is the canonical index for the architecture
-and project documentation. Per-module API reference lives in the `*.docc`
-catalogs under `Sources/`, generated with the DocC command above.
-
-Common entry points:
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): modules, products, source
-  layout, and the layout model.
-- [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md): the frame pipeline,
-  off-main rendering, and frame-drop policy.
-- [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md): the four execution
-  modes and the platform support matrix.
-- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md): the semantic substrate and its
-  consumers.
-- [docs/PUBLIC-API.md](docs/PUBLIC-API.md): the public surface policy.
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): toolchains, the test gate, and the
-  release process.
-- [docs/VISION.md](docs/VISION.md) and [docs/VISION-GAP.md](docs/VISION-GAP.md):
-  what SwiftTUI is for, and where the code currently differs from that intent.
-- [Examples/README.md](Examples/README.md): maintained example apps.
+SwiftTUI first-party code is licensed under the GNU Affero General Public
+License v3.0 only (`AGPL-3.0-only`). Vendored third-party code under `Vendor/`
+keeps its own license and provenance notices. See [LICENSE](LICENSE).
