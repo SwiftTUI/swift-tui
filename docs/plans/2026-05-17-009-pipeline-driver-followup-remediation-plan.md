@@ -1498,7 +1498,7 @@ git commit -m "refactor: consolidate frame-head staging into FrameHeadTransactio
 
 ## Task 7.3: Record the outcome and reconcile the doc
 
-- [ ] **Step 1: Write ADR-0022**
+- [x] **Step 1: Write ADR-0022**
 
 ```markdown
 ---
@@ -1529,9 +1529,9 @@ states the head is a staged transaction and commit is its closing boundary.
 Abort totality is guarded by `ResolvePurityTests.abortLeavesNoResidue`.
 ```
 
-- [ ] **Step 2: Update `ARCHITECTURE.md`** — replace the "Commit is the main-actor side-effect boundary" claim with the staged-transaction description. CB-2 downstream edit.
+- [x] **Step 2: Update `ARCHITECTURE.md`** — replace the "Commit is the main-actor side-effect boundary" claim with the staged-transaction description. CB-2 downstream edit.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/decisions/0022-resolve-side-effect-staging.md docs/ARCHITECTURE.md
