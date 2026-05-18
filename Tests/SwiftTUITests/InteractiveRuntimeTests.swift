@@ -1023,11 +1023,13 @@ struct InteractiveRuntimeTests {
     #expect(!initialChild.isSelfInvalidated)
     #expect(initialChild.subtreeAffected)
 
-    #expect(updatedRoot.invalidatedIdentities == [childIdentity])
-    #expect(!updatedRoot.isSelfInvalidated)
+    // External state drift is folded into the scheduled invalidation signal,
+    // so the root identity joins the child invalidation requested by the action.
+    #expect(updatedRoot.invalidatedIdentities == [rootIdentity, childIdentity])
+    #expect(updatedRoot.isSelfInvalidated)
     #expect(updatedRoot.subtreeAffected)
 
-    #expect(updatedChild.invalidatedIdentities == [childIdentity])
+    #expect(updatedChild.invalidatedIdentities == [rootIdentity, childIdentity])
     #expect(updatedChild.isSelfInvalidated)
     #expect(updatedChild.subtreeAffected)
   }

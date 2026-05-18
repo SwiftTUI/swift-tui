@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -56,6 +57,24 @@ struct DirtyTrackingCoherenceTests {
     #expect(!runLoop.hasGraphDirtyWork)
     #expect(runLoop.previousRenderedState == stateContainer.state)
   }
+
+  @Test("External state drift is reconciled through scheduled invalidations")
+  func externalStateDriftUsesScheduledInvalidationSignal() throws {
+    let root = try repositoryRoot()
+    let source = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift"
+      ),
+      encoding: .utf8
+    )
+
+    #expect(source.contains("scheduledFrameByReconcilingExternalState"))
+    #expect(
+      !source.contains(
+        "if previousRenderedState != currentState {\n        renderer.forceRootEvaluation()"
+      )
+    )
+  }
 }
 
 @MainActor
@@ -73,7 +92,7 @@ private struct DirtyTrackingCounterView: View {
 }
 
 @MainActor
-extension RunLoop {
+extension SwiftTUIRuntime.RunLoop {
   fileprivate var hasGraphDirtyWork: Bool {
     let graph = renderer.debugRuntimeSubsystemSnapshot().viewGraph
     return !graph.invalidatedIdentities.isEmpty || !graph.graphLocalDirtyIdentities.isEmpty
@@ -106,4 +125,21 @@ private final class DirtyTrackingSignalReader: SignalReading {
       continuation.finish()
     }
   }
+}
+
+private func repositoryRoot() throws -> URL {
+  var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  while directory.path != "/" {
+    if FileManager.default.fileExists(
+      atPath: directory.appendingPathComponent("Package.swift").path
+    ) {
+      return directory
+    }
+    directory.deleteLastPathComponent()
+  }
+  throw DirtyTrackingSourceError.missingPackageRoot
+}
+
+private enum DirtyTrackingSourceError: Error {
+  case missingPackageRoot
 }

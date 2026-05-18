@@ -392,6 +392,7 @@ public struct ResolveContext: Equatable, Sendable {
     }
   }
   package var invalidationSummary: InvalidationSummary
+  package var forceRootEvaluation: Bool
   package var resolveWorkTracker: ResolveWorkTracker?
   package var localActionRegistry: LocalActionRegistry?
   package var localGestureRegistry: LocalGestureRegistry?
@@ -492,6 +493,7 @@ public struct ResolveContext: Equatable, Sendable {
       transaction: transaction,
       invalidatedIdentities: invalidatedIdentities,
       invalidationSummary: invalidationSummary,
+      forceRootEvaluation: forceRootEvaluation,
       localActionRegistry: localActionRegistry,
       localKeyHandlerRegistry: localKeyHandlerRegistry,
       localLifecycleRegistry: localLifecycleRegistry,
@@ -537,6 +539,7 @@ public struct ResolveContext: Equatable, Sendable {
       transaction: transaction,
       invalidatedIdentities: invalidatedIdentities,
       invalidationSummary: invalidationSummary,
+      forceRootEvaluation: forceRootEvaluation,
       localActionRegistry: localActionRegistry,
       localKeyHandlerRegistry: localKeyHandlerRegistry,
       localLifecycleRegistry: localLifecycleRegistry,
@@ -703,6 +706,7 @@ extension ResolveContext {
     transaction: TransactionSnapshot = .init(),
     invalidatedIdentities: Set<Identity> = [],
     invalidationSummary: InvalidationSummary? = nil,
+    forceRootEvaluation: Bool = false,
     localActionRegistry: LocalActionRegistry? = nil,
     localFocusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
     localKeyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
@@ -726,6 +730,7 @@ extension ResolveContext {
     self.invalidationSummary =
       invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)
+    self.forceRootEvaluation = forceRootEvaluation
     resolveWorkTracker = .init()
     self.localActionRegistry = localActionRegistry
     self.localGestureRegistry = nil
@@ -783,6 +788,7 @@ extension ResolveContext {
       && lhs.environmentValues == rhs.environmentValues
       && lhs.transaction == rhs.transaction
       && lhs.invalidatedIdentities == rhs.invalidatedIdentities
+      && lhs.forceRootEvaluation == rhs.forceRootEvaluation
       && lhs.localActionRegistry == rhs.localActionRegistry
       && lhs.localDefaultFocusRegistry == rhs.localDefaultFocusRegistry
       && lhs.localFocusBindingRegistry == rhs.localFocusBindingRegistry
