@@ -353,23 +353,38 @@ Packet 16 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-045323-8675.log`
   - Result: PASS
 
+Packet 17 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS, 22 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-050134-20208.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 17: run-loop frame diagnostics extraction. Read-only run-loop review
-ranked the diagnostic record construction in `RunLoop+Rendering.swift` as a
-high-locality next slice: it should move committed-frame, cancelled-before-start,
-and dropped-completed diagnostic record construction into a same-folder helper
-without changing frame loop control or presentation ordering.
+Packet 18: re-rank remaining production debt after the run-loop diagnostics
+gate. Current candidates from prior reviews are `InputReader` parser/type
+separation and additional `RunLoop` control-flow decomposition. The next packet
+should start from the highest-centrality code still mixing policy, parsing, and
+side effects after Packet 17 is committed.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
-- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnostics.swift`
+- likely `Sources/SwiftTUIRuntime/Input/InputReader.swift` plus a same-folder
+  parser/model helper, or another narrow `RunLoop` helper.
 
 Validation:
 
-- Focused run-loop diagnostics, async frame-tail, pipeline parity, and input
-  batching tests selected from touched subsystem evidence.
+- Focused tests selected from touched subsystem evidence.
 - `bun run test`
 
 ## Failed Attempts

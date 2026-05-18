@@ -324,6 +324,33 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 17: RunLoop Frame Diagnostics
+
+- Objective: make the runtime frame loop easier to read by moving committed,
+  cancelled-before-start, and dropped-completed diagnostic record construction
+  into a same-folder helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+  - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnostics.swift`
+- Dependencies: Packet 16 isolated completed-frame artifact support. Read-only
+  run-loop review identified diagnostics record assembly as the highest-locality
+  remaining `RunLoop+Rendering` block because it is verbose, mostly data
+  mapping, and separable from frame control flow.
+- Invariants: frame scheduling, async acquisition, focus-sync convergence,
+  lifecycle carry-forward, cancelled-frame intent replay, completed-frame drop
+  policy, presentation ordering, progress-probe events, and public diagnostics
+  fields remain unchanged. The skipped-frame diagnostics path still drains
+  render-suspension input counters once per logged skipped record, and committed
+  frames still include the full-record drop-eligibility blocker.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

@@ -396,6 +396,22 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-045323-8675.log
 ```
 
+Packet 17 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests
+swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-050134-20208.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -422,6 +438,7 @@ Packet 13 is animation tree-query extraction.
 Packet 14 is animation transition-overlay extraction.
 Packet 15 is animation property-value application extraction.
 Packet 16 is completed-frame artifact support extraction.
+Packet 17 is run-loop frame diagnostics extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -432,7 +449,8 @@ removal overlay transient marking, removal offset composition, removal
 reinjection ordering, property animation writeback, flexible-frame dimension
 slot preservation, shape-style destination routing, completed-frame preview
 side-effect isolation, completed-frame drop classification, diagnostics timing
-fields, or public API regression appears.
+fields, skipped-frame diagnostic record, render-suspension input counting, or
+public API regression appears.
 
 ## AI Assistance Disclosure
 
