@@ -91,6 +91,10 @@ Approved constraints:
   reporting state, and process-exit cleanup registration into
   `TerminalRawModeSession.swift`, leaving terminal byte ordering and POSIX
   mutation in `TerminalHost.swift`.
+- Packet 25 completed: extracted repeated control-message filtering and
+  terminal parser feeding from `InputReader.swift` into
+  `TerminalInputEventDecoding.swift`, leaving WASI polling and DispatchSource
+  stream loops in place.
 
 ## Baseline Validation
 
@@ -529,31 +533,52 @@ Packet 24 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-055729-85446.log`
   - Result: PASS
 
+Packet 25 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - Result: PASS, 23 tests
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-060611-5894.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 25: input reader stream/parser split. Packet 18 extracted pure input
-support types, but `InputReader` still carries stream-drain loops, parser
-feeding, coalescing, capability control-message handling, and terminal-read
-error boundaries in one production file. The next packet should isolate the
-stream-drain/parsing boundary without changing public input-event APIs,
-coalescing semantics, or terminal capability propagation.
+Packet 26: terminal input parser file split. Packet 25 isolated the feed
+pipeline, but `InputReader.swift` still contains the public
+`TerminalInputParser`, keyboard parser, bracketed-paste helpers, CSI modifier
+parsing, SGR mouse parsing, and the concrete stream reader in one file. The
+next packet should move parser types and pure parsing helpers into a dedicated
+input parser file without changing public parser behavior or stream-reader
+behavior.
 
 Expected owned files pending local discovery:
 
 - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
-- possibly a new same-folder input stream/parser helper
+- `Sources/SwiftTUIRuntime/Input/TerminalInputParser.swift`
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
-- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
 - `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
 - `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
 - `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
 - `bun run test`
 
 ## Failed Attempts

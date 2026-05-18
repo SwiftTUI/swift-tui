@@ -594,8 +594,11 @@ extension InputReader {
           }
         }
       ) { continuation in
-        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
-        var controlParser = ControlMessageParser()
+        var decoder = TerminalInputEventDecoder<InputEvent>(
+          mouseCoordinateMode: mouseCoordinateMode
+        ) { parser, input in
+          parser.feed(input)
+        }
         var pendingMouseEvents: [InputEvent] = []
 
         func flushPendingMouseEvents() {
@@ -616,14 +619,14 @@ extension InputReader {
 
           if bytesRead > 0 {
             let chunk = Array(buffer.prefix(Int(bytesRead)))
-            let filtered = controlParser.feed(chunk)
+            let decoded = decoder.decode(chunk)
 
-            for message in filtered.messages {
+            for message in decoded.controlMessages {
               flushPendingMouseEvents()
               controlHandler(message)
             }
 
-            for event in parser.feed(filtered.payload) {
+            for event in decoded.events {
               switch event {
               case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
                 pendingMouseEvents.append(.mouse(mouseEvent))
@@ -664,8 +667,10 @@ extension InputReader {
           }
         }
       ) { continuation in
-        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
-        var controlParser = ControlMessageParser()
+        var decoder = TerminalInputEventDecoder<Event>(
+          mouseCoordinateMode: mouseCoordinateMode,
+          transform: transform
+        )
 
         while !Task.isCancelled {
           var buffer = Array(repeating: UInt8(0), count: 512)
@@ -673,13 +678,13 @@ extension InputReader {
 
           if bytesRead > 0 {
             let chunk = Array(buffer.prefix(Int(bytesRead)))
-            let filtered = controlParser.feed(chunk)
+            let decoded = decoder.decode(chunk)
 
-            for message in filtered.messages {
+            for message in decoded.controlMessages {
               controlHandler(message)
             }
 
-            for event in transform(&parser, filtered.payload) {
+            for event in decoded.events {
               continuation.yield(event)
             }
             await Task.yield()
@@ -704,8 +709,11 @@ extension InputReader {
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
-        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
-        var controlParser = ControlMessageParser()
+        var decoder = TerminalInputEventDecoder<InputEvent>(
+          mouseCoordinateMode: mouseCoordinateMode
+        ) { parser, input in
+          parser.feed(input)
+        }
         let coalescingState = MouseEventCoalescingState()
         var scheduledFlush: DispatchWorkItem?
 
@@ -773,13 +781,13 @@ extension InputReader {
           }
 
           if !input.isEmpty {
-            let filtered = controlParser.feed(input)
-            for message in filtered.messages {
+            let decoded = decoder.decode(input)
+            for message in decoded.controlMessages {
               flushPendingMouseEvents()
               controlHandler(message)
             }
 
-            for event in parser.feed(filtered.payload) {
+            for event in decoded.events {
               switch event {
               case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
                 appendMouseEventAndArmFlushIfNeeded(.mouse(mouseEvent))
@@ -820,8 +828,10 @@ extension InputReader {
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
-        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
-        var controlParser = ControlMessageParser()
+        var decoder = TerminalInputEventDecoder<Event>(
+          mouseCoordinateMode: mouseCoordinateMode,
+          transform: transform
+        )
 
         source.setEventHandler {
           var input: [UInt8] = []
@@ -851,12 +861,12 @@ extension InputReader {
           }
 
           if !input.isEmpty {
-            let filtered = controlParser.feed(input)
-            for message in filtered.messages {
+            let decoded = decoder.decode(input)
+            for message in decoded.controlMessages {
               controlHandler(message)
             }
 
-            for event in transform(&parser, filtered.payload) {
+            for event in decoded.events {
               continuation.yield(event)
             }
           }
