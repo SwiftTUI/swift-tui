@@ -544,6 +544,38 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 24: Terminal Host Raw-Mode Session Boundary
+
+- Objective: keep `TerminalHost` focused on terminal lifecycle orchestration by
+  moving saved terminal state and process-exit cleanup registration into a
+  small raw-mode session helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalRawModeSession.swift`
+- Dependencies: Packet 23 consolidated the renderer commit path. Runtime review
+  ranked this as the next terminal-host cleanup because raw-mode saved state,
+  pointer reporting state, and process-exit cleanup registration were still
+  interleaved with enter/exit byte ordering and POSIX mutations.
+- Invariants: public host APIs stay unchanged; raw-mode enter and exit escape
+  sequence ordering remains stable; `TerminalHost` still owns termios mutation,
+  nonblocking input setup, presentation writer draining, and terminal writes;
+  process-exit cleanup reset bytes remain byte-for-byte stable; cleanup
+  registration refresh still happens when SGR-pixels hover changes while raw
+  mode is enabled; normal disable unregisters cleanup before manual teardown;
+  enable failure rollback restores file flags and termios state and unregisters
+  cleanup; presentation session reset still occurs on raw-mode session
+  boundaries.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalCapabilityProfileApplyingTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
