@@ -94,4 +94,53 @@ struct FrameSchedulerIntentCoalescingTests {
     let frame = scheduler.consumeReadyFrame()
     #expect(frame?.intentRequestCount == 2)
   }
+
+  @Test("pending frame waiter wakes for a new request before a future deadline")
+  @MainActor
+  func pendingFrameWaiterWakesForRequestBeforeFutureDeadline() async throws {
+    let scheduler = FrameScheduler()
+    scheduler.requestDeadline(.now().advanced(by: .seconds(1)))
+
+    let waiter = Task { @MainActor in
+      await (scheduler as any PendingFrameAwaiting).waitForPendingFrame(at: .now())
+    }
+    defer {
+      waiter.cancel()
+    }
+
+    try await Task.sleep(nanoseconds: 25_000_000)
+    scheduler.requestInvalidation(of: [testIdentity("EarlyInvalidation")])
+
+    try await valueWithTimeout("pending frame waiter", timeoutNanoseconds: 250_000_000) {
+      await waiter.value
+    }
+  }
+}
+
+private func valueWithTimeout<Value: Sendable>(
+  _ label: String,
+  timeoutNanoseconds: UInt64,
+  _ operation: @escaping @Sendable () async throws -> Value
+) async throws -> Value {
+  try await withThrowingTaskGroup(of: Value.self) { group in
+    group.addTask {
+      try await operation()
+    }
+    group.addTask {
+      try await Task.sleep(nanoseconds: timeoutNanoseconds)
+      throw FrameSchedulerIntentCoalescingTimeout(label: label)
+    }
+
+    let value = try await group.next()!
+    group.cancelAll()
+    return value
+  }
+}
+
+private struct FrameSchedulerIntentCoalescingTimeout: Error, CustomStringConvertible {
+  var label: String
+
+  var description: String {
+    "Timed out waiting for \(label)"
+  }
 }

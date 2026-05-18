@@ -284,16 +284,10 @@ private struct LatePreferenceReconciliationStage {
         resolved: reconciliation.resolved
       )
       let finalLayout = renderLayout(finalInput)
-      return ReconciledFrameTailLayout(
+      return finalLayoutAfterBoundExceeded(
         input: finalInput,
         layout: finalLayout,
-        resolved: finalInput.resolved,
-        runtimeIssues: layoutRuntimeIssues(input: finalInput, resolved: finalInput.resolved) + [
-          latePreferenceReconciliationLimitIssue(
-            rootIdentity: input.rootIdentity,
-            relayoutPassBudget: budget
-          )
-        ]
+        budget: budget
       )
     }
   }
@@ -332,18 +326,37 @@ private struct LatePreferenceReconciliationStage {
       return .init(layout: nil, suspensionDuration: finalLayoutPass.suspensionDuration)
     }
     return .init(
-      layout: ReconciledFrameTailLayout(
+      layout: finalLayoutAfterBoundExceeded(
         input: finalInput,
         layout: finalLayout,
-        resolved: finalInput.resolved,
-        runtimeIssues: layoutRuntimeIssues(input: finalInput, resolved: finalInput.resolved) + [
-          latePreferenceReconciliationLimitIssue(
-            rootIdentity: input.rootIdentity,
-            relayoutPassBudget: budget
-          )
-        ]
+        budget: budget
       ),
       suspensionDuration: finalLayoutPass.suspensionDuration
+    )
+  }
+
+  @MainActor
+  private func finalLayoutAfterBoundExceeded(
+    input: FrameTailInput,
+    layout: FrameTailLayoutOutput,
+    budget: Int
+  ) -> ReconciledFrameTailLayout {
+    let realized = input.resolved.applyingLayoutDependentRealizations(
+      input.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    var finalInput = input
+    finalInput.resolved = reconciliation.resolved
+    return ReconciledFrameTailLayout(
+      input: finalInput,
+      layout: layout,
+      resolved: reconciliation.resolved,
+      runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved) + [
+        latePreferenceReconciliationLimitIssue(
+          rootIdentity: input.rootIdentity,
+          relayoutPassBudget: budget
+        )
+      ]
     )
   }
 
