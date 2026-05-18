@@ -48,4 +48,4 @@ they do not need terminal raw-mode or byte-writing methods.
 - <doc:Architecture>
 - <doc:Runtime>
 - <doc:Vision>
-- [Platform and Host Integration](https://github.com/GoodHatsLLC/SwiftTUI/blob/main/docs/HOSTS-AND-PLATFORMS.md)
+- [Platform and Host Integration](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md)

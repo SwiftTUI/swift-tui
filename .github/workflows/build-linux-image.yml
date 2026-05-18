@@ -47,7 +47,7 @@ env:
   # GHCR requires lowercase namespaces; hard-code the org rather than
   # toLower'ing github.repository_owner so a fork doesn't accidentally try
   # to push to its own namespace without packages:write being set up.
-  IMAGE_NAME: ghcr.io/goodhatsllc/swift-tui-linux
+  IMAGE_NAME: ghcr.io/swifttui/swift-tui-linux
 
 jobs:
   build:

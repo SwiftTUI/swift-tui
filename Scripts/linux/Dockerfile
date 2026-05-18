@@ -26,7 +26,7 @@ ARG BUN_INSTALL=/usr/local/bun
 
 LABEL org.opencontainers.image.title="swift-tui-linux" \
       org.opencontainers.image.description="Swift toolchain + Bun + Wasm SDK + binaryen for SwiftTUI Linux/web builds" \
-      org.opencontainers.image.source="https://github.com/GoodHatsLLC/SwiftTUI" \
+      org.opencontainers.image.source="https://github.com/SwiftTUI/swift-tui" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 
 ENV BUN_INSTALL=${BUN_INSTALL} \

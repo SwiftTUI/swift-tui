@@ -5,7 +5,7 @@
 {
   "name": "SwiftTUI Linux",
 
-  "image": "ghcr.io/goodhatsllc/swift-tui-linux:latest",
+  "image": "ghcr.io/swifttui/swift-tui-linux:latest",
 
   // Mount the repo at /workspace to match the Dockerfile WORKDIR and the
   // linux.sh CONTAINER_DIR default. The "cached" consistency is a no-op on

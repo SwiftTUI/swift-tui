@@ -6,7 +6,7 @@ SLA, but security reports should still be handled privately first.
 ## Reporting
 
 Use GitHub's private vulnerability reporting for
-`GoodHatsLLC/SwiftTUI` when available. If that path is unavailable, contact the
+`SwiftTUI/swift-tui` when available. If that path is unavailable, contact the
 maintainers privately before opening a public issue; `security@swifttui.io` is
 the intended contact for release-facing security reports.
 

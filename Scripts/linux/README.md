@@ -40,7 +40,7 @@ These four files cooperate as follows:
                         └────────────────┬──────────────────────┘
                                          │ (publishes)
                                          ▼
-                          ghcr.io/goodhatsllc/swift-tui-linux:latest
+                          ghcr.io/swifttui/swift-tui-linux:latest
                                          ▲
                 ┌────────────────────────┼────────────────────────┐
                 │                                                 │
@@ -124,7 +124,7 @@ it. You don't need to babysit it.
 When you run `./Scripts/linux.sh test`, the script:
 
 1. Checks for `docker` (or falls back to `podman`).
-2. Pulls `ghcr.io/goodhatsllc/swift-tui-linux:latest` if you don't have it
+2. Pulls `ghcr.io/swifttui/swift-tui-linux:latest` if you don't have it
    locally.
 3. Creates a named volume `swift-tui-…-swiftpm-cache` for SwiftPM's
    dependency + build artifact cache.
@@ -177,7 +177,7 @@ Each successful push job emits:
 Pin to `:sha-…` from `linux.sh`:
 
 ```bash
-LINUX_IMAGE=ghcr.io/goodhatsllc/swift-tui-linux:sha-abc1234 \
+LINUX_IMAGE=ghcr.io/swifttui/swift-tui-linux:sha-abc1234 \
   ./Scripts/linux.sh start
 ```
 
@@ -219,7 +219,7 @@ attempt. Do it locally:
 
 `build` defaults to tagging the image with whatever `LINUX_IMAGE` is — so by
 default you'll overwrite the `:latest` tag on your local machine. Override
-with `LINUX_IMAGE_BUILD_TAG=ghcr.io/goodhatsllc/swift-tui-linux:experiment`
+with `LINUX_IMAGE_BUILD_TAG=ghcr.io/swifttui/swift-tui-linux:experiment`
 to keep the published image around.
 
 ---
@@ -300,7 +300,7 @@ volume. Use it when:
 - You're freeing disk space
 
 The image itself isn't affected by `nuke`; remove it with
-`docker image rm ghcr.io/goodhatsllc/swift-tui-linux:latest` if needed.
+`docker image rm ghcr.io/swifttui/swift-tui-linux:latest` if needed.
 
 ---
 
@@ -345,7 +345,7 @@ the container was created against an older script version — `reset` and
 Means the container failed to start. Look at recent logs:
 
 ```bash
-docker logs swift-tui-ghcr.io-goodhatsllc-swift-tui-linux--latest
+docker logs swift-tui-ghcr.io-swifttui-swift-tui-linux--latest
 ```
 
 Most common cause: image manifest changed and the named container is bound
@@ -381,7 +381,7 @@ command is:
 ```bash
 docker build \
   -f Scripts/linux/Dockerfile \
-  -t ghcr.io/goodhatsllc/swift-tui-linux:latest \
+  -t ghcr.io/swifttui/swift-tui-linux:latest \
   --build-arg SWIFT_VERSION=6.3.1 \
   --build-arg SWIFTLY_VERSION=1.1.1 \
   Scripts/linux
