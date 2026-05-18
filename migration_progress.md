@@ -425,30 +425,49 @@ Packet 20 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-052405-85109.log`
   - Result: PASS
 
+Packet 21 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AppRuntimeTests`
+  - Result: PASS, 24 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+  - Result: PASS, 73 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `swiftly run swift test --filter SwiftTUICoreTests.FocusTrackerTests`
+  - Result: PASS, 11 tests
+- `swiftly run swift test --filter SwiftTUICoreTests.LocalScrollPositionRegistryTests`
+  - Result: PASS, 8 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-053009-4450.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 21: run-loop focus-sync convergence split. Read-only runtime review
-ranked this after the frame-head file split because `RunLoop+Rendering.swift`
-still mixes the frame driver with the focus/scroll convergence state and
-per-iteration synchronization body. The next packet should move the focus-sync
-budget/state/outcome and convergence iteration helpers into a same-folder
-run-loop helper without changing scheduler, acquisition, commit, or
-presentation ordering.
+Packet 22: run-loop frame acquisition split. Read-only runtime review ranked
+this after focus-sync because `RunLoop+Rendering.swift` still mixes the frame
+driver with async artifact acquisition, queued-tail cancellation, dropped-frame
+diagnostics, and event-pump fairness. The next packet should move acquisition
+outcomes and strategy-specific async acquisition/drop handling into a
+same-folder run-loop helper while keeping the frame loop and final commit body
+in `RunLoop+Rendering.swift`.
 
 Expected owned files pending local discovery:
 
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
-- likely `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FocusSync.swift`
+- likely `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift`
 
 Validation:
 
 - `swiftly run swift build`
 - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
-- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
-- `swiftly run swift test --filter SwiftTUITests.AppRuntimeTests`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
-- `swiftly run swift test --filter SwiftTUICoreTests.FocusTrackerTests`
-- `swiftly run swift test --filter SwiftTUICoreTests.LocalScrollPositionRegistryTests`
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
 - `bun run test`
 
 ## Failed Attempts

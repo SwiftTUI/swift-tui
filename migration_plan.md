@@ -438,6 +438,40 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 21: RunLoop Focus-Sync Convergence
+
+- Objective: make the runtime frame driver easier to follow by moving
+  focus/scroll convergence state, rerender budget handling, lifecycle
+  carry-forward collection, and the per-rendered-tree convergence body into a
+  same-folder run-loop helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+  - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FocusSync.swift`
+- Dependencies: Packet 20 completed the frame-head support split. Read-only
+  run-loop review identified focus-sync convergence as the next central runtime
+  block because both sync and async frame drivers share this body and the logic
+  obscured the scheduler/acquisition/commit shape.
+- Invariants: sync and async rendering still call the same convergence helper;
+  focus-sync rerenders still force root evaluation; side-effect order inside a
+  convergence iteration remains latest semantic snapshot publication, gesture
+  pruning, pointer-hover update, vanished pointer capture/hover release, focus
+  region update, explicit focus request, default focus request, focus binding
+  sync, focused-value update, scroll-position sync, diagnostic flag folding,
+  lifecycle carry-forward, and rerender-budget accounting; budget exhaustion
+  still commits the latest frame while asserting; focus-sync rerenders still
+  disable presentation damage; cancelled/dropped async tails still carry
+  lifecycle entries forward.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AppRuntimeTests`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FocusTrackerTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.LocalScrollPositionRegistryTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
