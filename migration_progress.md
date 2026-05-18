@@ -187,11 +187,34 @@ Packet 9 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-033507-95996.log`
   - Result: PASS
 
+Packet 10 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.CellPixelMetricsRefreshTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-034357-16939.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 10: continue the terminal rendering pass by reviewing the remaining
-terminal-image facade and adjacent terminal presentation types for final
-ownership cleanup before moving to the next high-debt runtime subsystem.
+Packet 11: continue the terminal rendering pass by extracting the remaining
+terminal-host escape-sequence and raw-mode cleanup responsibilities, or stop
+early if discovery shows the next highest-value production slice is now outside
+`TerminalHost`.
 
 Expected owned files pending local discovery:
 
