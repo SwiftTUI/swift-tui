@@ -49,6 +49,12 @@ Packet 8 should be reviewed as Sixel image command and sampling extraction:
 - `Sources/SwiftTUIRuntime/Terminal/TerminalImageSixelRendering.swift`
 - `Sources/SwiftTUIRuntime/Terminal/TerminalImageSampling.swift`
 
+Packet 9 should be reviewed as fallback image overlay extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalImageFallbackRendering.swift`
+- `Scripts/lib/accessibility_raw_glyph_sources.txt`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -201,6 +207,22 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-032834-69653.log
 ```
 
+Packet 9 validation passed:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+./Scripts/check_accessibility_guardrails.sh
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-033507-95996.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -219,10 +241,11 @@ terminal presentation changes. Packet 3 is a frame-tail damage-resolution split.
 Packet 4 is a core artifact file split. Packet 5 is a runtime acquisition
 control-flow extraction. Packet 6 is a runtime presentation handoff extraction.
 Packet 7 is a Kitty image command extraction. Packet 8 is a Sixel image command
-and shared sampling extraction. Revert newest-first if a terminal output, raster
-reuse, frame-tail, diagnostics, async-cancellation, cursor-focus,
-JSON/accessibility output, image-protocol, fallback image, or public API
-regression appears.
+and shared sampling extraction. Packet 9 is fallback image overlay extraction.
+Revert newest-first if a terminal output, raster reuse, frame-tail,
+diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
+image-protocol, fallback image, raw-glyph manifest, or public API regression
+appears.
 
 ## AI Assistance Disclosure
 
