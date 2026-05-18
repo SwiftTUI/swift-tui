@@ -67,6 +67,19 @@ Each phase ends with a Gate task. The Gate task:
 
 A phase is not complete until its Gate task is committed. Do not begin the next phase before the prior Gate is green.
 
+**Clean gate retry after build/test-helper crashes.** Phase 7 observed that
+after runtime changes, SwiftPM test-helper processes can crash with signal
+codes while test suites are starting, even when no assertion failure is
+reported. If a phase gate fails with `swiftpm-testing-helper` signal exits or
+similar build-product corruption symptoms, fully delete repo `.build`
+directories and rerun `bun run test` from the clean build state before
+classifying the phase as failed. The Phase 7 clean rerun passed after:
+
+```bash
+find . -name .build -type d -prune -exec rm -rf {} +
+bun run test
+```
+
 **The branch prek gate.** The repository carries pre-existing `swift-format`
 drift on ~70 files unrelated to this plan (a swift-format version mismatch
 predating this branch — confirmed 2026-05-17). `prek run --all-files` is
