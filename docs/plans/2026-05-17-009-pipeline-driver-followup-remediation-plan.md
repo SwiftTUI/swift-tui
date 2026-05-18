@@ -1974,9 +1974,15 @@ F13, and F14 as STILL-OBSERVABLE. Those ledger rows were reopened to
 
 Follow-up tasks added from the independent re-audit:
 
-- [ ] **F3 reopened:** make the frame-head computation no longer mutate
+- [x] **F3 reopened:** make the frame-head computation no longer mutate
   runtime subsystems before commit, or remove the observable rollback seam the
   audit found (`FrameHeadTransaction.discard()` / `computeFrameHead` mutation).
+  Completed by `c04d5ac1`: abortable heads now capture prepared graph and
+  frame-input checkpoints, suspend live runtime state back to the committed
+  baseline before returning, and materialize prepared state only for preview or
+  commit. `swiftly run swift test --filter ResolvePurityTests`,
+  `PipelineDriverParityTests`, `RenderDriverCharacterizationTests`, and
+  `AsyncFrameTailRenderingTests` passed.
 - [ ] **F4 reopened:** remove the observable double-finalize path for completed
   async frames; completed-frame preview must not call `viewGraph.finalizeFrame`
   before the real commit.
