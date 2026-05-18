@@ -143,6 +143,11 @@ package final class ObservationBridgeDraft {
     didCommit = true
   }
 
+  package func suspendRecording() {
+    precondition(!didCommit && !didDiscard)
+    bridge.finishRecording(self)
+  }
+
   package func discard() {
     precondition(!didCommit && !didDiscard)
     bridge.finishRecording(self)

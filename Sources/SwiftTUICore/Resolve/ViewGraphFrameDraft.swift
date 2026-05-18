@@ -14,6 +14,7 @@ package final class ViewGraphFrameDraft {
 
   private let liveRegistrations: RuntimeRegistrationSet
   private let checkpoint: ViewGraph.Checkpoint?
+  private var preparedCheckpoint: ViewGraph.Checkpoint?
   private(set) package var runtimeRegistrationPublication: RuntimeRegistrationPublication =
     .unchanged
   private var didCommit = false
@@ -34,6 +35,30 @@ package final class ViewGraphFrameDraft {
     } else {
       runtimeRegistrationPublication = .all
     }
+  }
+
+  package func recordPreparedCheckpoint(from viewGraph: ViewGraph) {
+    precondition(!didCommit && !didDiscard)
+    guard checkpoint != nil else {
+      return
+    }
+    preparedCheckpoint = viewGraph.makeCheckpoint()
+  }
+
+  package func materializePreparedState(in viewGraph: ViewGraph) {
+    precondition(!didCommit && !didDiscard)
+    guard let preparedCheckpoint else {
+      return
+    }
+    viewGraph.restoreCheckpoint(preparedCheckpoint)
+  }
+
+  package func restoreBaselineState(in viewGraph: ViewGraph) {
+    precondition(!didCommit && !didDiscard)
+    guard let checkpoint else {
+      return
+    }
+    viewGraph.restoreCheckpoint(checkpoint)
   }
 
   @discardableResult
@@ -66,9 +91,7 @@ package final class ViewGraphFrameDraft {
 
   package func discard(from viewGraph: ViewGraph) {
     precondition(!didCommit && !didDiscard)
-    if let checkpoint {
-      viewGraph.restoreCheckpoint(checkpoint)
-    }
+    restoreBaselineState(in: viewGraph)
     didDiscard = true
   }
 

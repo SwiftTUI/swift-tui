@@ -299,9 +299,15 @@ package enum FrameHeadMode {
 package struct FrameHeadCheckpoints {
   /// Previous-frame selector memory only. Current-frame resolve inputs are
   /// carried by the prepared head and overwritten by the next frame.
-  let frameState: FrameResolveState.Checkpoint
+  let baselineFrameState: FrameResolveState.Checkpoint
   /// Current-frame input box contents visible to retained evaluator closures.
-  let frameInputs: FrameResolveInputBox.Checkpoint
+  let baselineFrameInputs: FrameResolveInputBox.Checkpoint
+  /// Prepared selector state captured after resolve, restored only while
+  /// previewing or committing this draft.
+  let preparedFrameState: FrameResolveState.Checkpoint
+  /// Prepared frame input box contents captured after resolve, restored only
+  /// while previewing or committing this draft.
+  let preparedFrameInputs: FrameResolveInputBox.Checkpoint
 }
 
 @MainActor
@@ -351,6 +357,27 @@ package final class FrameHeadTransaction {
     return diagnostics
   }
 
+  package func materializePreparedState() {
+    precondition(!didCommit && !didDiscard)
+    guard let checkpoints else {
+      return
+    }
+    graphDraft.materializePreparedState(in: viewGraph)
+    frameState.restoreCheckpoint(checkpoints.preparedFrameState)
+    frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
+  }
+
+  package func suspendPreparedState() {
+    precondition(!didCommit && !didDiscard)
+    guard let checkpoints else {
+      return
+    }
+    graphDraft.restoreBaselineState(in: viewGraph)
+    observationDraft?.suspendRecording()
+    frameState.restoreCheckpoint(checkpoints.baselineFrameState)
+    frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+  }
+
   package func discard() {
     precondition(!didCommit && !didDiscard)
     guard let checkpoints else {
@@ -363,8 +390,8 @@ package final class FrameHeadTransaction {
     presentationPortalDraft.discard()
     observationDraft?.discard()
     animationDraft.discard()
-    frameState.restoreCheckpoint(checkpoints.frameState)
-    frameInputs.restoreCheckpoint(checkpoints.frameInputs)
+    frameState.restoreCheckpoint(checkpoints.baselineFrameState)
+    frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
     didDiscard = true
   }
 
