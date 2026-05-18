@@ -39,7 +39,7 @@ Sources/SwiftTUICore/Draw/DrawExtractor+Lists.swift
 Sources/SwiftTUICore/Styling/BorderSet.swift
 Sources/SwiftTUICore/Styling/CollectionStylePresentations.swift
 Sources/SwiftTUICore/Styling/TileStyle.swift
-Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift
+Sources/SwiftTUIRuntime/Terminal/TerminalImageFallbackRendering.swift
 Sources/SwiftTUIRuntime/Terminal/TerminalPresentation.swift
 Sources/SwiftTUIViews/Controls/AdjustableValueControls.swift
 Sources/SwiftTUIViews/Controls/MetricTrackSupport.swift

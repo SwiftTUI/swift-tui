@@ -44,6 +44,10 @@ Approved constraints:
   construction, and command encoding into `TerminalImageSixelRendering.swift`,
   and moved shared image scaling and quantization helpers into
   `TerminalImageSampling.swift`.
+- Packet 9 completed: extracted fallback overlay mode selection, cache sizing
+  helpers, ANSI/ASCII overlay generation, and raw-glyph manifest ownership into
+  `TerminalImageFallbackRendering.swift`, while keeping overlay application and
+  cache ownership in `TerminalImageRenderer`.
 
 ## Baseline Validation
 
@@ -169,15 +173,29 @@ Packet 8 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-032834-69653.log`
   - Result: PASS
 
+Packet 9 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `./Scripts/check_accessibility_guardrails.sh`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-033507-95996.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 9: continue the terminal image rendering split by isolating ANSI/ASCII
-fallback overlay construction from `TerminalImageRendering.swift`.
+Packet 10: continue the terminal rendering pass by reviewing the remaining
+terminal-image facade and adjacent terminal presentation types for final
+ownership cleanup before moving to the next high-debt runtime subsystem.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift`
-- A new terminal fallback helper file under `Sources/SwiftTUIRuntime/Terminal/`
+- To be selected from production-code size/coupling evidence.
 
 Validation:
 
