@@ -304,7 +304,7 @@ struct RasterizerTests {
 
   @Test("Incremental repaint equals fresh raster across a mutation matrix")
   func incrementalRepaintEqualsFreshRaster() {
-    let rasterizer = Rasterizer(verifyIncrementalRepaint: true)
+    let rasterizer = Rasterizer()
     let mutations: [CoreRasterRepaintMutation] = [
       .init(
         name: "single row text edit",
@@ -417,6 +417,41 @@ struct RasterizerTests {
         "incremental repaint differed from fresh raster for \(mutation.name)"
       )
     }
+  }
+
+  @Test("default incremental verification falls back to fresh raster for incomplete damage")
+  func defaultIncrementalVerificationFallsBackToFreshRasterForIncompleteDamage() {
+    let rasterizer = Rasterizer()
+    let minimumSize = CellSize(width: 6, height: 1)
+    let previous = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+      ])
+    let current = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+      ])
+
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: nil,
+      damage: nil
+    )
+    let verified = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
+    )
+
+    #expect(verified.surface == fresh.surface)
+    #expect(verified.presentationDamage == nil)
   }
 
   @Test("incremental raster reuse falls back to fresh raster for incompatible surface size")
