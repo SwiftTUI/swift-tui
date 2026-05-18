@@ -94,6 +94,45 @@ Packet 16 should be reviewed as completed-frame artifact support extraction:
 - `Sources/SwiftTUIRuntime/Rendering/CompletedFrameCandidate.swift`
 - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
 
+Packet 17 should be reviewed as run-loop frame diagnostics extraction:
+
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnostics.swift`
+
+Packet 18 should be reviewed as input support type extraction:
+
+- `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+- `Sources/SwiftTUIRuntime/Input/InputReading.swift`
+- `Sources/SwiftTUIRuntime/Input/TerminalInputEvents.swift`
+- `Sources/SwiftTUIRuntime/Input/TerminalInputCapabilities.swift`
+- `Sources/SwiftTUIRuntime/Input/TerminalInputCoalescing.swift`
+
+Packet 19 should be reviewed as late-preference reconciliation extraction:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/LatePreferenceReconciliation.swift`
+
+Packet 20 should be reviewed as frame-head draft transaction extraction:
+
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameHeadDraftTransaction.swift`
+
+Packet 21 should be reviewed as run-loop focus-sync extraction:
+
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FocusSync.swift`
+
+Packet 22 should be reviewed as run-loop frame acquisition extraction:
+
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift`
+
+Packet 23 should be reviewed as renderer commit path consolidation:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CommittedFrameArtifactBuilder.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -503,6 +542,36 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-053644-24624.log
 ```
 
+Packet 23 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests
+swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests
+swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests
+swiftly run swift test --filter SwiftTUITests.TimingDiagnosticsTests
+swiftly run swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests
+swiftly run swift test --filter SwiftTUITests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-054930-58630.log
+```
+
+One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
+`AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
+isolation immediately after, the full `SwiftTUITests` target passed, and the
+full repo gate passed on rerun. Failed gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-054640-45870.log
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict
@@ -529,6 +598,7 @@ Packet 19 is late-preference reconciliation extraction.
 Packet 20 is frame-head draft transaction extraction.
 Packet 21 is run-loop focus-sync convergence extraction.
 Packet 22 is run-loop frame acquisition extraction.
+Packet 23 is renderer commit path consolidation.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -545,8 +615,10 @@ runtime issue, layout-dependent realization, frame-head checkpoint restore,
 draft commit/discard, one-shot abort precondition, focus-sync rerender budget,
 focused-value propagation, default-focus request, scroll-position convergence,
 focus-sync lifecycle carry-forward, queued-tail cancellation, dropped-completed
-frame diagnostics, cancelled-intent replay, async-no-cancel, or async-no-drop
-regression appears.
+frame diagnostics, cancelled-intent replay, async-no-cancel, async-no-drop,
+committed-frame artifact diagnostics, one-shot worker timing, prepared-state
+materialization, committed scroll geometry, retained baseline placement, or
+presentation dismiss-stack regression appears.
 
 ## AI Assistance Disclosure
 

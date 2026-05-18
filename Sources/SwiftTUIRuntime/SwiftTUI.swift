@@ -111,6 +111,12 @@ private enum CompletedFrameCandidateResolution {
   case dropped(runtimeIssues: [RuntimeIssue], dropDecision: CompletedFrameDropDecision)
 }
 
+private struct CommittedFrameEffects {
+  var commitPlan: CommitPlan
+  var commitDuration: Duration
+  var runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics
+}
+
 package struct CompletedFrameCandidateCommitPlanComparison {
   package var previewCommit: CommitPlan
   package var committedCommit: CommitPlan
@@ -589,102 +595,31 @@ public struct DefaultRenderer {
   ) -> FrameArtifacts {
     let layout = reconciledTailLayout.layout
     let resolved = reconciledTailLayout.resolved
-    var workerTimings = tail.diagnostics.workerTimings
-    if var timings = workerTimings,
-      let clock = draft.clock,
-      let workerCompletedAt = tail.workerCompletedAt
-    {
-      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
-      workerTimings = timings
-    }
-    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
-    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: draft.graphRootIdentity,
-        resolved: resolved,
-        placed: tail.placed
-      )
-      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
-      return commitPlanner.plan(
-        resolved: resolved,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        transaction: draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+    let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
+      draft: draft,
+      tail: tail
     )
-    let dropEligibilityBlockers = CompletedFrameArtifactBuilder.frameTailCommitDropBlockers(
-      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
-    )
-    let phaseTimings = FramePhaseTimings(
-      resolve: draft.resolveDuration,
-      measure: tail.diagnostics.measureDuration,
-      place: tail.diagnostics.placeDuration,
-      semantics: tail.diagnostics.semanticsDuration,
-      draw: tail.diagnostics.drawDuration,
-      raster: tail.diagnostics.rasterDuration,
-      commit: commitDuration
-    )
-    let mainActorTimings = FrameMainActorTimings(
-      blocked: phaseTimings.total,
-      suspended: .zero
-    )
-    var diagnostics = FrameDiagnostics.fromCachedPhaseProducts(
+    let effects = commitFrameEffects(
+      draft: draft,
       resolved: resolved,
-      measured: tail.measured,
       placed: tail.placed,
       semantics: tail.semantics,
-      draw: tail.draw,
-      invalidatedIdentities: draft.frameContext.invalidatedIdentities,
-      resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
-      layoutWork: tail.diagnostics.layoutWork,
-      presentationDamage: tail.presentationDamage,
-      presentationSurfaceWidth: tail.raster.size.width,
-      phaseTimings: phaseTimings,
-      renderGenerations: .init(
-        render: draft.renderGeneration,
-        layoutInput: reconciledTailLayout.input.generation,
-        layoutOutput: layout.generation,
-        rasterInput: reconciledTailLayout.input.generation,
-        rasterOutput: tail.generation
-      ),
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
+    )
+    let artifacts = CommittedFrameArtifactBuilder.makeOneShotArtifacts(
+      draft: draft,
+      reconciledTailLayout: reconciledTailLayout,
+      tail: tail,
+      commit: effects.commitPlan,
+      commitDuration: effects.commitDuration,
       workerTimings: workerTimings,
-      mainActorTimings: mainActorTimings,
-      measurementCache: tail.diagnostics.measurementCache,
-      runtimeIssues: reconciledTailLayout.runtimeIssues,
-      dropEligibilityBlockers: dropEligibilityBlockers
+      runtimeRegistrationDiagnostics: effects.runtimeRegistrationDiagnostics
     )
-    diagnostics.runtime.registrations = runtimeRegistrationDiagnostics
-    let artifacts = FrameArtifacts(
-      resolvedTree: resolved,
-      measuredTree: tail.measured,
-      placedTree: tail.placed,
-      semanticSnapshot: tail.semantics,
-      drawTree: tail.draw,
-      rasterSurface: tail.raster,
-      presentationDamage: tail.presentationDamage,
-      drawnIdentities: tail.drawnIdentities,
-      commitPlan: commit,
-      diagnostics: diagnostics
-    )
-
-    draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    draft.graphDraft.updateCommittedScrollGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    frameTailRenderer.storeCommittedFrame(
+    publishCommittedFrame(
       artifacts,
+      draft: draft,
       baselinePlacedTree: tail.baselinePlaced
     )
-    storeCommittedPresentationPortalState()
     return artifacts
   }
 
@@ -1227,7 +1162,7 @@ public struct DefaultRenderer {
       @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
   ) -> CompletedFrameCandidate {
     let resolved = tailOutput.resolved
-    let workerTimings = CompletedFrameArtifactBuilder.workerTimings(
+    let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
       draft: draft,
       tailOutput: tailOutput
     )
@@ -1236,7 +1171,7 @@ public struct DefaultRenderer {
       tailOutput: tailOutput,
       resolved: resolved
     )
-    let artifacts = CompletedFrameArtifactBuilder.makeArtifacts(
+    let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
       draft: draft,
       tailOutput: tailOutput,
       resolved: resolved,
@@ -1244,7 +1179,7 @@ public struct DefaultRenderer {
       commitDuration: commitDuration,
       workerTimings: workerTimings
     )
-    let eligibility = CompletedFrameArtifactBuilder.eligibility(
+    let eligibility = CommittedFrameArtifactBuilder.eligibility(
       artifacts: artifacts,
       draft: draft,
       additionalBlockers: additionalBlockers(artifacts)
@@ -1302,50 +1237,85 @@ public struct DefaultRenderer {
     let layout = candidate.tailOutput.layout
     let tail = candidate.tailOutput.tail
     candidate.draft.transaction.materializePreparedState()
-    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
-    let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: candidate.draft.graphRootIdentity,
-        resolved: candidate.resolved,
-        placed: tail.placed
-      )
-      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(candidate.draft)
-      return commitPlanner.plan(
-        resolved: candidate.resolved,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        transaction: candidate.draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+    let effects = commitFrameEffects(
+      draft: candidate.draft,
+      resolved: candidate.resolved,
+      placed: tail.placed,
+      semantics: tail.semantics,
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
-    let artifacts = CompletedFrameArtifactBuilder.makeArtifacts(
+    let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
       draft: candidate.draft,
       tailOutput: candidate.tailOutput,
       resolved: candidate.resolved,
-      commit: commit,
-      commitDuration: commitDuration,
+      commit: effects.commitPlan,
+      commitDuration: effects.commitDuration,
       workerTimings: candidate.workerTimings,
-      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
+      runtimeRegistrationDiagnostics: effects.runtimeRegistrationDiagnostics
     )
 
-    candidate.draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
+    publishCommittedFrame(
+      artifacts,
+      draft: candidate.draft,
+      baselinePlacedTree: tail.baselinePlaced
+    )
+    return artifacts
+  }
+
+  @MainActor
+  private func commitFrameEffects(
+    draft: FrameHeadDraft,
+    resolved: ResolvedNode,
+    placed: PlacedNode,
+    semantics: SemanticSnapshot,
+    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
+  ) -> CommittedFrameEffects {
+    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
+    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: draft.graphRootIdentity,
+        resolved: resolved,
+        placed: placed
+      )
+      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
+      return commitPlanner.plan(
+        resolved: resolved,
+        placed: placed,
+        semantics: semantics,
+        transaction: draft.frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
+      )
+    }
+    applyWorkerCustomLayoutCacheUpdates(workerCustomLayoutCacheUpdates)
+    frameTailRenderer.pruneMeasurementCache(
+      keeping: viewGraph.liveIdentitySnapshot()
+    )
+    return CommittedFrameEffects(
+      commitPlan: commit,
+      commitDuration: commitDuration,
+      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
+    )
+  }
+
+  @MainActor
+  private func publishCommittedFrame(
+    _ artifacts: FrameArtifacts,
+    draft: FrameHeadDraft,
+    baselinePlacedTree: PlacedNode
+  ) {
+    draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
-    candidate.draft.graphDraft.updateCommittedScrollGeometry(
+    draft.graphDraft.updateCommittedScrollGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
     frameTailRenderer.storeCommittedFrame(
       artifacts,
-      baselinePlacedTree: tail.baselinePlaced
+      baselinePlacedTree: baselinePlacedTree
     )
     storeCommittedPresentationPortalState()
-    return artifacts
   }
 
   @MainActor
