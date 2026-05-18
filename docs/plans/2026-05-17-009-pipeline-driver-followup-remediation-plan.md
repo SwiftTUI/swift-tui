@@ -1569,10 +1569,10 @@ once (confirm by inspection — the six loose `discard()` calls are gone).
 
 ## Task 7.5: Phase 7 Gate
 
-- [ ] **Step 1:** `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F3 ledger row complete; DoD passes.
-- [ ] **Step 4:** `git commit --allow-empty -m "chore: phase 7 gate green (F3)"`
+- [x] **Step 1:** `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F3 ledger row complete; DoD passes.
+- [x] **Step 4:** `git commit --allow-empty -m "chore: phase 7 gate green (F3)"`
 
 ---
 
