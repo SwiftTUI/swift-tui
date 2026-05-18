@@ -6,84 +6,64 @@ const authoring: Group[] = [
   {
     title: "Layout & containers",
     rows: [
-      { name: "VStack · HStack · ZStack", note: "stacked layout with spacing & alignment" },
-      { name: "LazyVStack · LazyHStack", note: "viewport-lazy placement, single-ForEach full-lazy rows" },
-      { name: "ScrollView · List · OutlineGroup", note: "hierarchical lists, tables, and outlines" },
-      { name: "Table · Section · GroupBox", note: "" },
-      { name: "ViewThatFits · GeometryReader", note: "" },
-      { name: "Layout (custom)", note: "public protocol for custom layout participation" },
+      { name: "VStack · HStack · ZStack · Spacer · Divider", note: "" },
+      { name: "LazyVStack · LazyHStack · ScrollView", note: "viewport-lazy placement" },
+      { name: "List · OutlineGroup · Table · Section · GroupBox", note: "" },
+      { name: "Layout · AnyLayout · ViewThatFits · GeometryReader", note: "public protocol for custom layout" },
     ],
   },
   {
     title: "Controls & primitives",
     rows: [
-      { name: "Text · TextFigure", note: "FIGlet rendering that respects the proposed size, with embedded fonts" },
-      { name: "Button · Link · Label", note: "sanitized OSC 8 hyperlinks when supported" },
-      { name: "Toggle · Stepper · Slider", note: "" },
-      { name: "TextField · TextEditor · SecureField", note: "" },
-      { name: "Picker · Menu · DisclosureGroup", note: "" },
-      { name: "ProgressView · Spacer · Divider · ControlGroup", note: "" },
-      { name: "Image", note: "PNG · baseline JPEG · Kitty / Sixel / ANSI fallback" },
-      { name: "SwiftTUIAnimatedImage", note: "finite animated images plus GIF import/export as a peer product" },
+      { name: "Text · TextFigure · Label · Image", note: "FIGlet figures · PNG / baseline JPEG images" },
+      { name: "Button · Link · Toggle · Slider · Stepper", note: "sanitized OSC 8 hyperlinks when supported" },
+      { name: "TextField · TextEditor · SecureField · Picker · Menu", note: "" },
+      { name: "ProgressView · DisclosureGroup · ControlGroup", note: "" },
     ],
   },
   {
     title: "Presentation & workflow",
     rows: [
-      { name: "alert · confirmationDialog", note: "terminal-native modal surfaces" },
-      { name: "sheet · popover · popoverTip · toast", note: "modal sheets · source-attached popovers · non-modal toasts" },
-      { name: "paletteSheet", note: "command-palette sheet that absorbs scoped palette commands" },
-      { name: "Portal · OverlayStack · DismissStack", note: "shared overlay primitives behind every presentation surface" },
-      { name: "Panel · .keyCommand · .paletteCommand", note: "action scopes and commands" },
+      { name: "alert · confirmationDialog · sheet · popover · toast", note: "terminal-native modal & non-modal surfaces" },
+      { name: "paletteSheet · Panel · .keyCommand · .paletteCommand", note: "action scopes and commands" },
       { name: ".toolbar · .toolbarItem", note: "" },
     ],
   },
   {
-    title: "Environment · observation · focus",
+    title: "State · observation · focus",
     rows: [
-      { name: "@State · @Binding · @Bindable", note: "graph-scoped invalidation and observation path" },
-      { name: "@FocusState · FocusedValues · @FocusedValue · @FocusedBinding", note: "" },
-      { name: "PreferenceKey · anchor preferences", note: "subtree readers, OpenLinkAction, .task(...)" },
+      { name: "@State · @Binding · @Bindable", note: "graph-scoped invalidation and observation" },
+      { name: "@FocusState · @FocusedValue · @FocusedBinding", note: "" },
+      { name: "@Environment · PreferenceKey · anchor preferences", note: "" },
     ],
   },
 ];
 
 const runtime: Group[] = [
   {
-    title: "Runtime surface",
+    title: "Runtime & scenes",
     rows: [
-      { name: "DefaultRenderer", note: "snapshot rendering and main-actor pipeline inspection" },
-      { name: "RunLoop", note: "interactive terminal sessions" },
-      { name: "TerminalHost · TerminalRenderStyle", note: "capability-aware presentation, theme swap" },
-      { name: "Keyboard · mouse · signals", note: "Unix signal handling and runtime scheduling" },
-      { name: "Identity-driven lifecycle diffs", note: "appear · disappear · task start · cancel" },
-    ],
-  },
-  {
-    title: "Scenes",
-    rows: [
-      { name: "App · Scene · WindowGroup · WindowIdentifier", note: "@MainActor scene declarations" },
-      { name: "SceneDescriptor · SceneManifest", note: "for tooling and retained hosted sessions" },
-      { name: "HostedSceneSession", note: "host-package retention point" },
-      { name: "TabView", note: "terminal-native shell composition" },
-      { name: "NavigationStack destinations", note: "binding-driven destination presentation; NavigationLink remains deferred" },
-      { name: "Pty-backed secondary scenes", note: "Unix-domain-socket discovery, lazy unattached rendering" },
+      { name: "DefaultRenderer · FrameArtifacts", note: "snapshot rendering and frame inspection" },
+      { name: "RunLoop · TerminalHost · TerminalCapabilityProfile", note: "capability-aware interactive sessions" },
+      { name: "App · Scene · WindowGroup · TabView", note: "@MainActor scene declarations" },
+      { name: "SceneManifest · HostedSceneSession", note: "retained hosted sessions for host packages" },
+      { name: "NavigationStack destinations", note: "binding-driven; NavigationLink deferred" },
+      { name: "Pty-backed secondary scenes", note: "Unix-domain-socket discovery" },
     ],
   },
   {
     title: "Charts",
     rows: [
-      { name: "BarChart · ColumnChart · ComparisonChart", note: "" },
-      { name: "Sparkline · Timeline · HeatStrip", note: "" },
-      { name: "ThresholdGauge · BulletChart · Meter · Legend", note: "" },
-      { name: "StackedBarChart · CalendarHeatmap · LineChart", note: "" },
+      { name: "BarChart · ColumnChart · StackedBarChart · ComparisonChart", note: "" },
+      { name: "LineChart · Sparkline · Timeline · HeatStrip · CalendarHeatmap", note: "" },
+      { name: "BulletChart · ThresholdGauge · Meter · Legend", note: "" },
     ],
   },
   {
     title: "Deferred · by design",
     rows: [
       { name: "NavigationLink · public NavigationPath · automatic Back chrome", flag: "deferred" },
-      { name: "host-native text selection transport · IME/composition", flag: "deferred" },
+      { name: "host-native text selection transport · IME / composition", flag: "deferred" },
       { name: "terminal workspace process reattachment", flag: "deferred" },
     ],
   },
@@ -95,9 +75,10 @@ const runtime: Group[] = [
       <span class="eyebrow"><span class="num">/03</span>Public surface</span>
       <h2>A deliberate subset of SwiftUI.</h2>
       <p class="lede">
-        Layout primitives first. State and environment second. Runtime correctness third.
-        Broader orchestration only after the foundation is firm.
-        Terminal-only chrome that would bend the public authoring story does not belong in core.
+        Layout, state, focus, and presentation &mdash; plus the runtime and
+        scene types that drive them, and a peer charts product. Terminal-only
+        chrome that would bend the public authoring story stays out of core.
+        The full per-symbol reference lives in the DocC catalogs.
       </p>
     </header>
 
@@ -105,7 +86,6 @@ const runtime: Group[] = [
       <div class="col">
         <div class="col-head mono">
           <span>AUTHORING</span>
-          <span class="counter">{authoring.reduce((n, g) => n + g.rows.length, 0)} entries</span>
         </div>
         {authoring.map((group) => (
           <section class="group">
@@ -115,7 +95,6 @@ const runtime: Group[] = [
                 <li class="row">
                   <div class="row-head">
                     <span class="name mono">{row.name}</span>
-                    {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
                   </div>
                   {row.note && <span class="note">{row.note}</span>}
                 </li>
@@ -128,7 +107,6 @@ const runtime: Group[] = [
       <div class="col">
         <div class="col-head mono">
           <span>RUNTIME · SCENES · CHARTS · DEFERRED</span>
-          <span class="counter">{runtime.reduce((n, g) => n + g.rows.length, 0)} entries</span>
         </div>
         {runtime.map((group) => (
           <section class={`group ${group.title.startsWith("Deferred") ? "group--deferred" : ""}`}>
@@ -184,11 +162,6 @@ const runtime: Group[] = [
     color: var(--ink-3);
     font-size: 11px;
     letter-spacing: 0.18em;
-  }
-  .col-head .counter {
-    color: var(--ink-4);
-    letter-spacing: 0.04em;
-    font-size: 10.5px;
   }
 
   .group {

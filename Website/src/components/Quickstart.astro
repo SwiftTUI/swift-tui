@@ -2,18 +2,18 @@
 const steps = [
   {
     n: "01",
-    label: "add the package",
-    desc: "One dependency in Package.swift. Add the SwiftTUI product to your executable target for a terminal-native app.",
+    label: "create the package",
+    desc: "A Package.swift with one dependency on SwiftTUI and one executable target.",
   },
   {
     n: "02",
     label: "author an @main App",
-    desc: "A struct conforming to App, with a Scene composed from the SwiftUI-shaped primitives you already know.",
+    desc: "A struct conforming to App, with a Scene built from the SwiftUI-shaped primitives you already know.",
   },
   {
     n: "03",
     label: "swift run",
-    desc: "Standard SwiftPM. The seven-phase pipeline (resolve, measure, place, semantics, draw, raster, commit) runs on every frame.",
+    desc: "Standard SwiftPM. Your app takes the alternate screen until you exit.",
   },
 ];
 ---
@@ -21,17 +21,14 @@ const steps = [
   <div class="shell">
     <header class="head">
       <span class="eyebrow"><span class="num">/05</span>Quickstart</span>
-      <h2>Add the package. Author an <span class="mono">App</span>. <span class="mono">swift run</span>.</h2>
+      <h2>Two files. One <span class="mono">swift run</span>.</h2>
       <p class="lede">
-        Three SwiftPM steps. No code generators, no build scripts, no
-        native binaries to download. The same app authoring model targets
-        terminal-native binaries and host-managed surfaces. For WASI, pass a
-        wasm <span class="mono">--swift-sdk</span> on the same
-        <span class="mono">swift build</span> invocation; the authoring code does not change.
+        No code generators, no build scripts, no binaries to download &mdash;
+        just SwiftPM. Copy the two files below into a new directory and run it.
       </p>
       <p class="prereq mono">
         <span class="prereq-label">prereq</span>
-        <span>Swift 6.3 toolchain on PATH &mdash; install it however you already manage Swift versions.</span>
+        <span>A Swift 6.3 toolchain on <span class="mono">PATH</span> &mdash; install it however you already manage Swift.</span>
       </p>
     </header>
 
@@ -53,46 +50,72 @@ const steps = [
           <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
           <span class="t-title">~/Projects/HelloTUI</span>
         </div>
-        <pre class="t-body mono"><code><span class="cm"># 1 · resolve dependencies</span>
-<span class="p">$</span> swift package resolve
-  <span class="ok">✓</span> SwiftTUI resolved
-
-<span class="cm"># 2 · build &amp; run — your app owns the terminal until it exits</span>
+        <pre class="t-body mono"><code><span class="cm"># build &amp; run — your app owns the terminal until you exit</span>
 <span class="p">$</span> swift run HelloTUI
 <span class="ok">›</span> alternate screen opens
-<span class="ok">›</span> resolve · measure · place · semantics · draw · raster <span class="bar">·</span> <span class="commit">commit</span></code></pre>
+<span class="ok">›</span> resolve · measure · place · semantics · draw · raster <span class="bar">·</span> <span class="commit">commit</span>
+<span class="ok">›</span> press <span class="commit">Ctrl-D</span> to exit — your shell is restored</code></pre>
       </article>
     </div>
 
-    <article class="hello">
-      <div class="hello-bar mono">
-        <span class="path">Sources/HelloTUI/HelloTUI.swift</span>
-        <span class="meta">@main &middot; terminal-native</span>
-      </div>
-      <pre class="hello-body mono"><code><span class="kw">import</span> <span class="ty">SwiftTUI</span>
+    <div class="files">
+      <article class="file">
+        <div class="file-bar mono">
+          <span class="path">Package.swift</span>
+          <span class="meta">swift-tools-version: 6.3</span>
+        </div>
+        <pre class="file-body mono"><code><span class="cm">// swift-tools-version: 6.3</span>
+<span class="kw">import</span> <span class="ty">PackageDescription</span>
+
+<span class="kw">let</span> package = <span class="ty">Package</span>(
+  name: <span class="s">"HelloTUI"</span>,
+  dependencies: [
+    .package(
+      url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>,
+      .upToNextMinor(from: <span class="s">"0.1.0"</span>)
+    ),
+  ],
+  targets: [
+    .executableTarget(
+      name: <span class="s">"HelloTUI"</span>,
+      dependencies: [
+        .product(name: <span class="s">"SwiftTUI"</span>, package: <span class="s">"SwiftTUI"</span>),
+      ]
+    ),
+  ]
+)</code></pre>
+      </article>
+
+      <article class="file">
+        <div class="file-bar mono">
+          <span class="path">Sources/HelloTUI/HelloTUI.swift</span>
+          <span class="meta">@main · terminal-native</span>
+        </div>
+        <pre class="file-body mono"><code><span class="kw">import</span> <span class="ty">SwiftTUI</span>
 
 <span class="at">@main</span> <span class="kw">struct</span> <span class="ty">HelloTUI</span>: <span class="ty">App</span> &#123;
   <span class="kw">var</span> body: <span class="kw">some</span> <span class="ty">Scene</span> &#123;
     <span class="ty">WindowGroup</span>(<span class="s">"Hello"</span>) &#123;
       <span class="ty">VStack</span>(alignment: .leading, spacing: <span class="n">1</span>) &#123;
         <span class="ty">Text</span>(<span class="s">"Hello, terminal."</span>).bold()
-        <span class="ty">Text</span>(<span class="s">"Press q to quit."</span>).foregroundStyle(.secondary)
+        <span class="ty">Text</span>(<span class="s">"Press Ctrl-D to quit."</span>)
+          .foregroundStyle(.muted)
       &#125;
       .padding(<span class="n">1</span>)
     &#125;
   &#125;
 &#125;</code></pre>
-    </article>
+      </article>
+    </div>
 
     <p class="trailer">
-      Targeting <span class="mono">wasm32-wasi</span>? Pass
-      <span class="mono">--swift-sdk</span> for your wasm SDK on the same
-      <span class="mono">swift build</span> invocation &mdash; the authoring code is
-      unchanged. Embedding inside a host? Retain a
+      Targeting the browser? Pass <span class="mono">--swift-sdk</span> for a wasm
+      SDK on the same <span class="mono">swift build</span> &mdash; the authoring
+      code is unchanged. Embedding in a host app? Retain a
       <span class="mono">HostedSceneSession</span> through
-      <span class="mono">SwiftUIHost</span>, or opt into
-      <span class="mono">SwiftTUIWebHostCLI</span> for localhost browser launch;
-      the same <span class="mono">App</span> body drives both.
+      <span class="mono">SwiftUIHost</span>, or add
+      <span class="mono">SwiftTUIWebHostCLI</span> for a localhost browser
+      launch. Same <span class="mono">App</span> body, every target.
     </p>
   </div>
 </section>
@@ -214,20 +237,25 @@ const steps = [
     white-space: pre;
   }
   .t-body .p  { color: var(--accent); margin-right: 6px; }
-  .t-body .s  { color: var(--accent); }
   .t-body .cm { color: var(--ink-4); font-style: italic; }
   .t-body .ok { color: var(--accent); margin-right: 6px; }
   .t-body .bar { color: var(--ink-4); }
   .t-body .commit { color: var(--accent); font-weight: 600; }
 
-  .hello {
-    margin-top: 4px;
+  .files {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .file {
     border: 1px solid var(--line-strong);
     border-radius: 12px;
     overflow: hidden;
     background: var(--panel);
+    display: flex;
+    flex-direction: column;
   }
-  .hello-bar {
+  .file-bar {
     display: flex;
     align-items: center;
     padding: 10px 14px;
@@ -237,21 +265,23 @@ const steps = [
     background: var(--panel-2);
     gap: 10px;
   }
-  .hello-bar .path { color: var(--ink-2); }
-  .hello-bar .meta { margin-left: auto; color: var(--ink-4); }
-  .hello-body {
+  .file-bar .path { color: var(--ink-2); }
+  .file-bar .meta { margin-left: auto; color: var(--ink-4); }
+  .file-body {
     margin: 0;
     padding: 18px 18px 22px;
     font-size: 12.5px;
     line-height: 1.7;
     color: var(--ink);
     overflow-x: auto;
+    flex: 1;
   }
-  .hello-body .kw { color: #d28cff; }
-  .hello-body .ty { color: #6ddfff; }
-  .hello-body .at { color: #f59e0b; }
-  .hello-body .s  { color: var(--accent); }
-  .hello-body .n  { color: #f59e0b; }
+  .file-body .kw { color: #d28cff; }
+  .file-body .ty { color: #6ddfff; }
+  .file-body .at { color: #f59e0b; }
+  .file-body .s  { color: var(--accent); }
+  .file-body .n  { color: #f59e0b; }
+  .file-body .cm { color: var(--ink-4); font-style: italic; }
 
   .trailer {
     margin-top: 24px;
@@ -263,5 +293,6 @@ const steps = [
 
   @media (max-width: 1080px) {
     .grid { grid-template-columns: 1fr; }
+    .files { grid-template-columns: 1fr; }
   }
 </style>
