@@ -412,6 +412,33 @@ extension IndexedChildSource {
   package var workerResolvedChildren: [ResolvedNode]? { nil }
 }
 
+package struct CustomLayoutFallbackSummary: Equatable, Sendable {
+  package var count: Int
+  package var firstIdentity: Identity?
+
+  package init(
+    count: Int = 0,
+    firstIdentity: Identity? = nil
+  ) {
+    self.count = count
+    self.firstIdentity = firstIdentity
+  }
+
+  package mutating func record(_ identity: Identity) {
+    count += 1
+    if firstIdentity == nil {
+      firstIdentity = identity
+    }
+  }
+
+  package mutating func merge(_ other: Self) {
+    count += other.count
+    if firstIdentity == nil {
+      firstIdentity = other.firstIdentity
+    }
+  }
+}
+
 /// Sendable resolved-child snapshot for lazy indexed containers that have
 /// already materialized their authored children on the main actor.
 package struct IndexedChildSourceSnapshot: IndexedChildSource {
@@ -543,6 +570,7 @@ public struct ResolvedNode: Equatable, Sendable {
       _storedChildren = newValue
       recomputePreferenceValues()
       recomputeSubtreeNodeCount()
+      recomputeCustomLayoutFallbackSummary()
       recomputeSupportsRetainedReuse()
     }
   }
@@ -573,6 +601,7 @@ public struct ResolvedNode: Equatable, Sendable {
     get { _storedLayoutBehavior }
     set {
       _storedLayoutBehavior = newValue
+      recomputeCustomLayoutFallbackSummary()
       recomputeSupportsRetainedReuse()
     }
   }
@@ -585,6 +614,7 @@ public struct ResolvedNode: Equatable, Sendable {
   /// changing the variant itself), where the reuse bit is stable.
   package mutating func setLayoutBehaviorPreservingDerivedState(_ newBehavior: LayoutBehavior) {
     _storedLayoutBehavior = newBehavior
+    recomputeCustomLayoutFallbackSummary()
   }
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata {
@@ -598,6 +628,7 @@ public struct ResolvedNode: Equatable, Sendable {
   public var intrinsicSize: CellSize?
   package var indexedChildSource: (any IndexedChildSource)? {
     didSet {
+      recomputeCustomLayoutFallbackSummary()
       recomputeSupportsRetainedReuse()
     }
   }
@@ -608,6 +639,7 @@ public struct ResolvedNode: Equatable, Sendable {
   }
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
+  package private(set) var customLayoutFallbackSummary: CustomLayoutFallbackSummary
   public var supportsRetainedReuse: Bool
   /// Matched-geometry configuration set by
   /// `View.matchedGeometryEffect(id:in:isSource:)`.  When two
@@ -666,8 +698,10 @@ public struct ResolvedNode: Equatable, Sendable {
     self.layoutDependentContent = layoutDependentContent
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
+    customLayoutFallbackSummary = .init()
     self.supportsRetainedReuse = true
     recomputeSubtreeNodeCount()
+    recomputeCustomLayoutFallbackSummary()
     recomputeSupportsRetainedReuse()
   }
 
@@ -705,8 +739,10 @@ public struct ResolvedNode: Equatable, Sendable {
     self.layoutDependentContent = layoutDependentContent
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
+    customLayoutFallbackSummary = .init()
     self.supportsRetainedReuse = true
     recomputeSubtreeNodeCount()
+    recomputeCustomLayoutFallbackSummary()
     recomputeSupportsRetainedReuse()
   }
 
@@ -716,6 +752,15 @@ public struct ResolvedNode: Equatable, Sendable {
 
   private mutating func recomputeSubtreeNodeCount() {
     subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
+  }
+
+  private mutating func recomputeCustomLayoutFallbackSummary() {
+    customLayoutFallbackSummary = Self.computeCustomLayoutFallbackSummary(
+      identity: identity,
+      layoutBehavior: layoutBehavior,
+      children: children,
+      indexedChildSource: indexedChildSource
+    )
   }
 
   private mutating func recomputeSupportsRetainedReuse() {
@@ -735,6 +780,29 @@ public struct ResolvedNode: Equatable, Sendable {
       combined.merge(child.preferenceValues)
     }
     return combined
+  }
+
+  private static func computeCustomLayoutFallbackSummary(
+    identity: Identity,
+    layoutBehavior: LayoutBehavior,
+    children: [ResolvedNode],
+    indexedChildSource: (any IndexedChildSource)?
+  ) -> CustomLayoutFallbackSummary {
+    var summary = CustomLayoutFallbackSummary()
+    if case .custom(let handle) = layoutBehavior,
+      !handle.canRunOnWorker
+    {
+      summary.record(identity)
+    }
+    if let workerChildren = indexedChildSource?.workerResolvedChildren {
+      for child in workerChildren {
+        summary.merge(child.customLayoutFallbackSummary)
+      }
+    }
+    for child in children {
+      summary.merge(child.customLayoutFallbackSummary)
+    }
+    return summary
   }
 
   private static func computeSupportsRetainedReuse(
