@@ -1,4 +1,5 @@
 import Foundation
+@_spi(Testing) import SwiftTUICore
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -44,6 +45,43 @@ struct BoundedReconciliationTests {
     #expect(!rendered.contains("First pass"))
   }
 
+  @Test("Bound exhaustion commits the final layout-dependent realization")
+  func boundExhaustionCommitsFinalLayoutDependentRealization() {
+    let panel =
+      Panel(id: "oscillating") {
+        GeometryReader { proxy in
+          let isEvenHeight = proxy.size.height % 2 == 0
+          Text("body-height-\(proxy.size.height)")
+            .toolbarItem(
+              .init(
+                title: isEvenHeight ? "s" : "long-toolbar-title",
+                action: {}
+              )
+            )
+        }
+      }
+      .toolbar(style: OscillatingHeightToolbarStyle())
+      .frame(width: 30, height: 4)
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("bounded-reconciliation-overflow-root")),
+      proposal: .init(width: 30, height: 4)
+    )
+    let limitIssues = artifacts.diagnostics.runtime.issues.filter {
+      $0.code == "latePreference.reconciliationLimitExceeded"
+    }
+    let resolvedBodyText = textPayloads(in: artifacts.resolvedTree).filter {
+      $0.hasPrefix("body-height-")
+    }
+    let placedBodyText = textPayloads(in: artifacts.placedTree).filter {
+      $0.hasPrefix("body-height-")
+    }
+
+    #expect(!limitIssues.isEmpty)
+    #expect(resolvedBodyText == placedBodyText)
+  }
+
   @Test("Fixpoint loop limits are derived and do not document stale overflow commits")
   func fixpointLoopLimitsAreDerivedAndDoNotCommitStaleOverflow() throws {
     let root = try repositoryRoot()
@@ -81,4 +119,72 @@ private func repositoryRoot() throws -> URL {
 
 private enum BoundedReconciliationSourceError: Error {
   case missingPackageRoot
+}
+
+private struct OscillatingHeightToolbarStyle: ToolbarStyle {
+  var itemLayout: OscillatingHeightToolbarItemLayout { .init() }
+  var placement: ToolbarPlacement { .bottom }
+}
+
+private struct OscillatingHeightToolbarItemLayout: Layout {
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout ()
+  ) -> LayoutSize {
+    let width = subviews.reduce(0) { width, subview in
+      width + subview.sizeThatFits(.unspecified).width
+    }
+    return .init(width: width, height: width > 8 ? 2 : 1)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout ()
+  ) {
+    for subview in subviews {
+      subview.place(
+        at: bounds.origin,
+        proposal: .init(width: bounds.size.width, height: bounds.size.height)
+      )
+    }
+  }
+}
+
+private func textPayloads(in node: ResolvedNode) -> [String] {
+  var texts: [String] = []
+  collectTextPayloads(in: node, into: &texts)
+  return texts
+}
+
+private func collectTextPayloads(
+  in node: ResolvedNode,
+  into texts: inout [String]
+) {
+  if case .text(let text) = node.drawPayload {
+    texts.append(text)
+  }
+  for child in node.children {
+    collectTextPayloads(in: child, into: &texts)
+  }
+}
+
+private func textPayloads(in node: PlacedNode) -> [String] {
+  var texts: [String] = []
+  collectTextPayloads(in: node, into: &texts)
+  return texts
+}
+
+private func collectTextPayloads(
+  in node: PlacedNode,
+  into texts: inout [String]
+) {
+  if case .text(let text) = node.drawPayload {
+    texts.append(text)
+  }
+  for child in node.children {
+    collectTextPayloads(in: child, into: &texts)
+  }
 }

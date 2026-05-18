@@ -467,7 +467,8 @@ struct TerminalGraphicsProtocolTests {
 
   @Test("Kitty rendering transmits every decoded GIF frame as a distinct embedded image")
   func kittyRenderingTransmitsEveryDecodedGIFFrame() throws {
-    let sequence = try AnimatedGIF.decode(contentsOf: repoFixturePath("nyan.gif"))
+    let sequence = try AnimatedGIF.decode(
+      contentsOf: repoFixturePath("Examples/gifeditor/nyan.gif"))
     let renderer = TerminalImageRenderer(repository: ImageAssetRepository())
     let graphicsCapabilities = TerminalGraphicsCapabilities(
       supportedProtocols: [.kitty],

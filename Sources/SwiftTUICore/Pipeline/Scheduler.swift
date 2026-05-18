@@ -244,8 +244,12 @@ public final class FrameScheduler: FrameScheduling {
     }
   }
 
-  private func waitForNextFrameRequest() async {
+  private func waitForNextFrameRequest(
+    timeout: Duration? = nil,
+    unlessFramePending framePending: () -> Bool = { false }
+  ) async {
     let waiterIDLock = OSAllocatedUnfairLock<UInt64?>(uncheckedState: nil)
+    let timeoutTaskLock = OSAllocatedUnfairLock<Task<Void, Never>?>(uncheckedState: nil)
     let pendingFrameRequestWaitersLock = pendingFrameRequestWaitersLock
     await withTaskCancellationHandler {
       await withCheckedContinuation { continuation in
@@ -261,14 +265,26 @@ public final class FrameScheduler: FrameScheduling {
           return waiterID
         }
         waiterIDLock.withLockUnchecked { $0 = waiterID }
-        if Task.isCancelled {
+        if let timeout {
+          let timeoutTask = Task {
+            try? await Task.sleep(for: timeout)
+            let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
+              state.waiters.removeValue(forKey: waiterID)
+            }
+            continuation?.resume()
+          }
+          timeoutTaskLock.withLockUnchecked { $0 = timeoutTask }
+        }
+        if framePending() || Task.isCancelled {
           let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
             state.waiters.removeValue(forKey: waiterID)
           }
+          timeoutTaskLock.withLockUnchecked { $0 }?.cancel()
           continuation?.resume()
         }
       }
     } onCancel: {
+      timeoutTaskLock.withLockUnchecked { $0 }?.cancel()
       guard let waiterID = waiterIDLock.withLockUnchecked({ $0 }),
         let continuation = pendingFrameRequestWaitersLock.withLockUnchecked({
           state in state.waiters.removeValue(forKey: waiterID)
@@ -278,6 +294,7 @@ public final class FrameScheduler: FrameScheduling {
       }
       continuation.resume()
     }
+    timeoutTaskLock.withLockUnchecked { $0 }?.cancel()
   }
 }
 
@@ -298,7 +315,9 @@ extension FrameScheduler: PendingFrameAwaiting {
       if let nextWake = nextWakeInstant(after: currentInstant) {
         let sleepDuration = currentInstant.duration(to: nextWake)
         if sleepDuration > .zero {
-          try? await Task.sleep(for: sleepDuration)
+          await waitForNextFrameRequest(timeout: sleepDuration) {
+            hasPendingFrame(at: .now())
+          }
         } else {
           return
         }
@@ -306,7 +325,9 @@ extension FrameScheduler: PendingFrameAwaiting {
         continue
       }
 
-      await waitForNextFrameRequest()
+      await waitForNextFrameRequest {
+        hasPendingFrame(at: .now())
+      }
       currentInstant = .now()
     }
   }

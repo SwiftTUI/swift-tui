@@ -26,7 +26,9 @@ struct AnimatedImageTests {
 
   @Test("Repo Nyan GIF decodes every source frame as a distinct composed frame")
   func repoNyanGIFDecodesEverySourceFrameAsDistinctComposedFrame() throws {
-    let sequence = try AnimatedGIF.decode(contentsOf: Self.repoFixturePath("nyan.gif"))
+    let sequence = try AnimatedGIF.decode(
+      contentsOf: Self.repoFixturePath("Examples/gifeditor/nyan.gif")
+    )
     let uniqueComposedFrames = Set(sequence.frames.map { $0.pixels })
 
     #expect(sequence.frames.count == 12)
