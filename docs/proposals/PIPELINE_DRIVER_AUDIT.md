@@ -21,25 +21,25 @@ touch.
 
 ## Stage 8 outcome summary
 
-| # | Finding | Outcome |
-| --- | --- | --- |
-| 1 | The formalized `Renderer<Root>` pipeline is unused outside tests | Resolved by Stage 3: the generic helper was removed and `DefaultRenderer` now runs `RuntimeRenderPipeline`. |
-| 2 | `renderView` does not execute seven ordered phases | Resolved by Stage 3 and Stage 8: docs now distinguish runtime composition from phase-product order. |
-| 3 | Sync and async render heads are ~120 duplicated lines | Resolved by Stage 1, then enforced by the Stage 3 composition. |
-| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Resolved by the Finding 4 follow-up: prepared heads now use draft/commit boundaries and the declared rollback-effect model was removed. |
-| 5 | The "strict ordered pipeline" is a bounded fixpoint loop | Resolved by Stage 2: late-preference reconciliation is named and bounded. |
-| 6 | Hand-rolled `pthread`; concurrency escape-hatch policy bypassed | Resolved by Stage 6: worker ownership and recursion safety were hardened. |
-| 7 | Off-main frame-tail rendering is a synchronous no-op on WASI | Documented by Stage 6 as a compatibility boundary. |
-| 8 | `FrameDropEligibility.Blocker` is a ~24-flag correctness surface | Resolved by Stage 5: completed-frame decisions use the shipped impact product. |
-| 9 | ~13 render entry points span the {sync,async,cancellable,reconciled} cube | Resolved by Stage 3: sync, async, and cancellable are execution strategies over one composition. |
-| 10 | `FrameDiagnostics` is a ~30-field god struct with dual code paths | Resolved by the source-breaking cleanup: diagnostics are grouped records, `collectsDiagnostics` is gone, and artifact equality ignores diagnostics sidecars. |
-| 11 | Animation is an unnamed phase that mutates the resolved tree | Resolved by Stage 2 and composed by Stage 3. |
-| 12 | Governance documentation has already diverged from the implementation | Resolved by Stage 8. |
-| 13 | Retained reuse freshness depends on hand-maintained equivalence/projection rules | Hardened by Stage 0 guardrails; future fields still need classification. |
-| 14 | Raster damage is advisory; missing invalidation can underpaint silently | Resolved by Stage 4: fresh raster and incremental repaint are split. |
-| 15 | `PresentationSurface` is terminal-shaped even for semantic/non-terminal hosts | Resolved by Stage 7: host presentation roles are split. |
-| 16 | `FrameArtifacts` is an inspection bundle, not a narrow phase contract | Resolved by Stage 0 source docs and Stage 8 architecture wording. |
-| 17 | Tests protect known incidents more than the advertised architecture | Hardened by Stage 0 contract guards. |
+| # | Finding | Outcome | Resolution mechanism |
+| --- | --- | --- | --- |
+| 1 | The formalized `Renderer<Root>` pipeline is unused outside tests | Resolved by Stage 3: the generic helper was removed and `DefaultRenderer` now runs `RuntimeRenderPipeline`. | code |
+| 2 | `renderView` does not execute seven ordered phases | Resolved by Stage 3 and Stage 8: docs now distinguish runtime composition from phase-product order. | docs |
+| 3 | Sync and async render heads are ~120 duplicated lines | Resolved by Stage 1, then enforced by the Stage 3 composition. | code |
+| 4 | Resolve mutates five subsystems; commit is not the side-effect boundary | Resolved by the Finding 4 follow-up: prepared heads now use draft/commit boundaries and the declared rollback-effect model was removed. | code |
+| 5 | The "strict ordered pipeline" is a bounded fixpoint loop | Resolved by Stage 2: late-preference reconciliation is named and bounded. | code |
+| 6 | Hand-rolled `pthread`; concurrency escape-hatch policy bypassed | Resolved by Stage 6: worker ownership and recursion safety were hardened. | code |
+| 7 | Off-main frame-tail rendering is a synchronous no-op on WASI | Documented by Stage 6 as a compatibility boundary. | docs |
+| 8 | `FrameDropEligibility.Blocker` is a ~24-flag correctness surface | Resolved by Stage 5: completed-frame decisions use the shipped impact product. | code |
+| 9 | ~13 render entry points span the {sync,async,cancellable,reconciled} cube | Resolved by Stage 3: sync, async, and cancellable are execution strategies over one composition. | code |
+| 10 | `FrameDiagnostics` is a ~30-field god struct with dual code paths | Resolved by the source-breaking cleanup: diagnostics are grouped records, `collectsDiagnostics` is gone, and artifact equality ignores diagnostics sidecars. | code |
+| 11 | Animation is an unnamed phase that mutates the resolved tree | Resolved by Stage 2 and composed by Stage 3. | code |
+| 12 | Governance documentation has already diverged from the implementation | Resolved by Stage 8. | docs |
+| 13 | Retained reuse freshness depends on hand-maintained equivalence/projection rules | Hardened by Stage 0 guardrails; future fields still need classification. | test |
+| 14 | Raster damage is advisory; missing invalidation can underpaint silently | Resolved by Stage 4: fresh raster and incremental repaint are split. | code |
+| 15 | `PresentationSurface` is terminal-shaped even for semantic/non-terminal hosts | Resolved by Stage 7: host presentation roles are split. | code |
+| 16 | `FrameArtifacts` is an inspection bundle, not a narrow phase contract | Resolved by Stage 0 source docs and Stage 8 architecture wording. | docs |
+| 17 | Tests protect known incidents more than the advertised architecture | Hardened by Stage 0 contract guards. | test |
 
 ## Why this exists
 
