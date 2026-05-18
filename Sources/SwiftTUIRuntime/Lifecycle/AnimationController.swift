@@ -222,37 +222,13 @@ package final class AnimationController: Sendable {
     previousPlacedRoot = placed
     var matchedBounds: [MatchedGeometryKey: CellRect] = [:]
     var matchedIdentities: [MatchedGeometryKey: Identity] = [:]
-    Self.collectMatchedGeometry(
+    AnimationTreeQueries.collectMatchedGeometry(
       placed,
       bounds: &matchedBounds,
       identities: &matchedIdentities
     )
     previousMatchedGeometryBounds = matchedBounds
     previousMatchedKeyIdentities = matchedIdentities
-  }
-
-  /// Walks the placed tree and records the bounds and identity of
-  /// every node tagged with a ``MatchedGeometryKey``.  Nodes whose
-  /// config is `isSource: false` never contribute their bounds —
-  /// they still receive match translations on frames where their
-  /// key is swapped to another identity, but a non-source instance
-  /// can't make another instance animate by disappearing.
-  ///
-  /// If multiple source-contributing nodes carry the same key in
-  /// one frame (undefined in SwiftUI as well) the last-walked
-  /// entry wins.
-  private static func collectMatchedGeometry(
-    _ node: PlacedNode,
-    bounds: inout [MatchedGeometryKey: CellRect],
-    identities: inout [MatchedGeometryKey: Identity]
-  ) {
-    if let config = node.matchedGeometry, config.isSource {
-      bounds[config.key] = node.bounds
-      identities[config.key] = node.identity
-    }
-    for child in node.children {
-      collectMatchedGeometry(child, bounds: &bounds, identities: &identities)
-    }
   }
 
   /// Number of matched-geometry animations currently in flight.
@@ -360,165 +336,27 @@ package final class AnimationController: Sendable {
     for tree: PlacedNode,
     at timestamp: MonotonicInstant
   ) -> PlacedAnimationOverlaySnapshot {
-    // 1. Inject removal overlays.
-    var removalOverlays: [PlacedRemovalOverlaySnapshot] = []
-    if !removingIdentities.isEmpty {
-      for (identity, entry) in removingIdentities {
-        guard let placedSnapshot = entry.placedSnapshot,
-          let parentId = entry.parentIdentity
-        else {
-          continue  // No placed capture → resolved-level path handles it.
-        }
-
-        let modifiers: TransitionModifiers
-        if let box = entry.animationBox, let anim = registeredAnimations[box] {
-          let elapsed = entry.startTime.duration(to: timestamp)
-          var state = entry.customState
-          let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-          // Write the updated custom state back so the next tick of
-          // the exit transition carries user bookkeeping forward
-          // (matches the active-animation tick loop pattern).
-          removingIdentities[identity]?.customState = state
-          if let progress = evaluated {
-            modifiers = interpolateRemovalModifiers(
-              from: entry.startOpacity,
-              to: entry.transition.removalModifiers(),
-              progress: progress
-            )
-          } else {
-            continue  // Completion handled in applyInterpolations.
-          }
-        } else {
-          continue
-        }
-
-        removalOverlays.append(
-          .init(
-            parentIdentity: parentId,
-            childIndex: entry.childIndex,
-            snapshot: placedSnapshot,
-            modifiers: modifiers
-          )
-        )
-      }
-    }
-
-    // 2. Translate placed nodes for insertion offset animations.
-    //    Filter the unified active map down to the .insertionOffset
-    //    scope; everything else (property + matchedGeometry) is
-    //    ignored on this pass.
-    var insertionOffsetsByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
-    var completedInsertionKeys: [AnimationKey] = []
-
-    for (key, entry) in activeAnimations {
-      guard key.scope == .insertionOffset else { continue }
-      guard case .insertionOffset(let from) = entry.kind else { continue }
-      guard let anim = registeredAnimations[entry.animationBox] else {
-        completedInsertionKeys.append(key)
-        continue
-      }
-      let elapsed = entry.startTime.duration(to: timestamp)
-      var state = entry.customState
-      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-      activeAnimations[key]?.customState = state
-
-      guard let progress = evaluated else {
-        // Animation complete: delta is 0 (fully at final position).
-        completedInsertionKeys.append(key)
-        continue
-      }
-      // Insertion interpolates `from` → 0.
-      // At progress p, interpolated = from * (1 - p).
-      let dx = Int(Double(from.x) * (1.0 - progress))
-      let dy = Int(Double(from.y) * (1.0 - progress))
-      insertionOffsetsByIdentity[key.identity] = (dx: dx, dy: dy)
-    }
-
-    for key in completedInsertionKeys {
-      if let entry = activeAnimations.removeValue(forKey: key) {
-        releaseBatch(entry.batchID)
-      }
-    }
-
-    // 3. Apply matched-geometry translations.  At progress 0 the
-    //    new identity renders at the PREVIOUS frame's bounds; at
-    //    progress 1 it renders at its natural new bounds.  Same
-    //    filter pattern: only .matchedGeometry-scoped keys.
-    var matchedDeltasByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
-    var completedMatchedKeys: [AnimationKey] = []
-
-    for (key, entry) in activeAnimations {
-      guard key.scope == .matchedGeometry else { continue }
-      guard case .matchedGeometry(let fromBounds) = entry.kind else { continue }
-      guard let anim = registeredAnimations[entry.animationBox] else {
-        completedMatchedKeys.append(key)
-        continue
-      }
-      let elapsed = entry.startTime.duration(to: timestamp)
-      var state = entry.customState
-      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-      activeAnimations[key]?.customState = state
-
-      guard let progress = evaluated else {
-        completedMatchedKeys.append(key)
-        continue
-      }
-
-      // Look up the new placed bounds for this identity in the
-      // current tree.  The translation delta is
-      //     (fromBounds.origin - toBounds.origin) * (1 - progress)
-      // so at progress 0 we land on fromBounds and at progress 1
-      // we land on the natural new position.
-      guard let toBounds = Self.findBounds(in: tree, identity: key.identity)
-      else { continue }
-      let deltaX =
-        Double(fromBounds.origin.x - toBounds.origin.x)
-        * (1.0 - progress)
-      let deltaY =
-        Double(fromBounds.origin.y - toBounds.origin.y)
-        * (1.0 - progress)
-      matchedDeltasByIdentity[key.identity] = (
-        dx: Int(deltaX.rounded()),
-        dy: Int(deltaY.rounded())
-      )
-    }
-
-    for key in completedMatchedKeys {
-      if let entry = activeAnimations.removeValue(forKey: key) {
-        releaseBatch(entry.batchID)
-      }
-    }
-
-    return .init(
-      removalOverlays: removalOverlays,
-      insertionOffsets: insertionOffsetsByIdentity.map { identity, offset in
-        .init(
-          identity: identity,
-          dx: offset.dx,
-          dy: offset.dy
-        )
-      },
-      matchedGeometryOffsets: matchedDeltasByIdentity.map { identity, offset in
-        .init(
-          identity: identity,
-          dx: offset.dx,
-          dy: offset.dy
-        )
-      }
+    let result = PlacedAnimationOverlaySampling.sample(
+      removingIdentities: removingIdentities,
+      activeAnimations: activeAnimations,
+      registeredAnimations: registeredAnimations,
+      tree: tree,
+      timestamp: timestamp
     )
-  }
 
-  private static func findBounds(
-    in node: PlacedNode,
-    identity: Identity
-  ) -> CellRect? {
-    if node.identity == identity { return node.bounds }
-    for child in node.children {
-      if let found = findBounds(in: child, identity: identity) {
-        return found
+    for (identity, state) in result.removalCustomStates {
+      removingIdentities[identity]?.customState = state
+    }
+    for (key, state) in result.activeAnimationCustomStates {
+      activeAnimations[key]?.customState = state
+    }
+    for key in result.completedAnimationKeys {
+      if let entry = activeAnimations.removeValue(forKey: key) {
+        releaseBatch(entry.batchID)
       }
     }
-    return nil
+
+    return result.snapshot
   }
 
   /// Number of insertion-offset animations currently in flight.
@@ -738,7 +576,10 @@ package final class AnimationController: Sendable {
       // already owns the visual transition.  Skip the removal
       // overlay so the old view just disappears.
       if let previousRoot = previousTreeRoot,
-        let previousNode = findNode(in: previousRoot, identity: identity),
+        let previousNode = AnimationTreeQueries.findResolvedNode(
+          in: previousRoot,
+          identity: identity
+        ),
         let removedConfig = previousNode.matchedGeometry,
         matchedKeysConsumedByMatch.contains(removedConfig.key)
       {
@@ -770,7 +611,10 @@ package final class AnimationController: Sendable {
       var injectionParent = previousParentByIdentity[identity]
       while let parent = injectionParent, !newIdentities.contains(parent) {
         // Stop before climbing through a multi-child container.
-        if let parentNode = findNode(in: previousRoot, identity: parent),
+        if let parentNode = AnimationTreeQueries.findResolvedNode(
+          in: previousRoot,
+          identity: parent
+        ),
           parentNode.children.count > 1
         {
           break
@@ -783,7 +627,10 @@ package final class AnimationController: Sendable {
       // If the walk-up stopped at a multi-child container (break),
       // injectionParent may still be a removed identity — skip.
       guard let injectionParent, newIdentities.contains(injectionParent),
-        let subtree = findSubtree(in: previousRoot, identity: injectionTarget)
+        let subtree = AnimationTreeQueries.findResolvedSubtree(
+          in: previousRoot,
+          identity: injectionTarget
+        )
       else { continue }
 
       // Before clearing the injected subtree's active animations, peek
@@ -791,7 +638,7 @@ package final class AnimationController: Sendable {
       // registered identity (or anywhere in the subtree) so the
       // removal can start from the displayed value instead of
       // snapping back to 1.0.  Must run before the filter below.
-      let injectedIdentities = collectIdentities(in: subtree)
+      let injectedIdentities = AnimationTreeQueries.collectIdentities(in: subtree)
       var initialOpacity: Double = 1.0
       let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
       if let existing = activeAnimations[keyOnTarget],
@@ -842,7 +689,7 @@ package final class AnimationController: Sendable {
       // injected post-layout (draw-only, no layout-shift).
       let placedSnapshot: PlacedNode?
       if let previousPlacedRoot {
-        placedSnapshot = findPlacedSubtree(
+        placedSnapshot = AnimationTreeQueries.findPlacedSubtree(
           in: previousPlacedRoot,
           identity: injectionTarget
         )
@@ -962,70 +809,6 @@ package final class AnimationController: Sendable {
 
     pendingEmptyBatchCompletions[batchID] =
       timestamp.advanced(by: drainDelay)
-  }
-
-  /// Recursively searches a resolved tree for the subtree rooted at
-  /// `identity` and returns a copy of it.
-  private func findSubtree(
-    in root: ResolvedNode,
-    identity: Identity
-  ) -> ResolvedNode? {
-    if root.identity == identity { return root }
-    for child in root.children {
-      if let match = findSubtree(in: child, identity: identity) {
-        return match
-      }
-    }
-    return nil
-  }
-
-  /// Convenience wrapper around ``findSubtree(in:identity:)`` used
-  /// by matched-geometry removal detection — same behavior, more
-  /// readable name at the call site.
-  private func findNode(
-    in root: ResolvedNode,
-    identity: Identity
-  ) -> ResolvedNode? {
-    findSubtree(in: root, identity: identity)
-  }
-
-  /// Recursively searches a placed tree for the subtree rooted at
-  /// `identity` and returns a copy of it.  Used to capture the
-  /// frozen bounds of a disappearing subtree for draw-only overlay
-  /// injection.
-  private func findPlacedSubtree(
-    in root: PlacedNode,
-    identity: Identity
-  ) -> PlacedNode? {
-    if root.identity == identity { return root }
-    for child in root.children {
-      if let match = findPlacedSubtree(in: child, identity: identity) {
-        return match
-      }
-    }
-    return nil
-  }
-
-  /// Returns the set of every identity in a subtree (inclusive).
-  private func collectIdentities(in subtree: ResolvedNode) -> Set<Identity> {
-    var result: Set<Identity> = [subtree.identity]
-    for child in subtree.children {
-      result.formUnion(collectIdentities(in: child))
-    }
-    return result
-  }
-
-  /// Marks every node in the subtree as transient so the semantic
-  /// extractor, focus tracker, and lifecycle coordinator skip the
-  /// overlay during routing even though it still flows through
-  /// layout + draw for the duration of the exit animation.
-  private func markTransient(_ node: inout ResolvedNode) {
-    node.isTransient = true
-    var children = node.children
-    for i in children.indices {
-      markTransient(&children[i])
-    }
-    node.setChildrenPreservingDerivedState(children)
   }
 
   private func enqueueInsertionAnimation(
@@ -1336,14 +1119,22 @@ package final class AnimationController: Sendable {
 
         guard let progress = evaluated else {
           // Animation complete — snap to final value and purge.
-          interpolated[key.identity, default: [:]][propertySlot(for: key)] = to
+          interpolated[key.identity, default: [:]][
+            AnimationPropertyValueApplication.propertySlot(for: key)
+          ] = to
           keysToRemove.append(key)
           if let batchID = animation.batchID { completedBatches.append(batchID) }
           redrawIdentities.insert(key.identity)
           continue
         }
-        let value = interpolate(from: from, to: to, progress: progress)
-        interpolated[key.identity, default: [:]][propertySlot(for: key)] = value
+        let value = AnimationPropertyValueApplication.interpolate(
+          from: from,
+          to: to,
+          progress: progress
+        )
+        interpolated[key.identity, default: [:]][
+          AnimationPropertyValueApplication.propertySlot(for: key)
+        ] = value
         redrawIdentities.insert(key.identity)
         latestDeadline = timestamp.advanced(by: frameInterval)
         hasPendingWork = true
@@ -1400,7 +1191,7 @@ package final class AnimationController: Sendable {
           // removal interrupted a mid-flight insertion) toward the
           // removal modifiers.  Progress 0 == starting state,
           // progress 1 == fully removed.
-          modifiers = interpolateRemovalModifiers(
+          modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
             from: entry.startOpacity,
             to: entry.transition.removalModifiers(),
             progress: progress
@@ -1434,9 +1225,10 @@ package final class AnimationController: Sendable {
         // higher up in the subtree.  Mark every node in the cloned
         // overlay as transient so the semantic extractor, focus
         // tracker, and lifecycle coordinator skip them.
-        var subtreeCopy = entry.snapshot
-        markTransient(&subtreeCopy)
-        applyTransitionModifiersRecursively(modifiers, to: &subtreeCopy)
+        let subtreeCopy = AnimationTransitionOverlay.resolvedRemovalSnapshot(
+          from: entry.snapshot,
+          applying: modifiers
+        )
         if let parentId = entry.parentIdentity {
           injectionsByParent[parentId, default: []].append(
             (childIndex: entry.childIndex, snapshot: subtreeCopy)
@@ -1453,11 +1245,17 @@ package final class AnimationController: Sendable {
     }
 
     // Apply interpolated values for in-tree animations.
-    tree = applyInterpolatedValues(tree: tree, interpolated: interpolated)
+    tree = AnimationPropertyValueApplication.applyInterpolatedValues(
+      tree: tree,
+      interpolated: interpolated
+    )
 
     // Inject removal overlays at their previous parent/index.
     if !injectionsByParent.isEmpty {
-      tree = injectRemovals(tree: tree, injectionsByParent: injectionsByParent)
+      tree = AnimationTransitionOverlay.injectResolvedRemovals(
+        into: tree,
+        injectionsByParent: injectionsByParent
+      )
     }
 
     // Drain stranded `withAnimation` completions whose target time
@@ -1499,391 +1297,6 @@ package final class AnimationController: Sendable {
     return result
   }
 
-  /// Extracts the ``AnimatableSlot`` from a property-scoped key.
-  /// Traps when called on a non-property scope — every caller filters
-  /// on ``AnimationKind.property`` first, so a non-property key
-  /// reaching this helper is a controller bug.
-  private func propertySlot(for key: AnimationKey) -> AnimatableSlot {
-    guard case .property(let slot) = key.scope else {
-      preconditionFailure(
-        "propertySlot(for:) called on non-property key scope=\(key.scope)"
-      )
-    }
-    return slot
-  }
-
-  /// Interpolates from a starting opacity (typically 1.0 = identity,
-  /// but lower if this removal interrupted a mid-flight insertion)
-  /// toward the removal modifiers based on `progress`.  Progress is
-  /// reported by the animation curve — 0 means "just starting", 1
-  /// means "fully removed".
-  private func interpolateRemovalModifiers(
-    from startOpacity: Double,
-    to target: TransitionModifiers,
-    progress: Double
-  ) -> TransitionModifiers {
-    var result = TransitionModifiers.identity
-    if let targetOpacity = target.opacity {
-      result.opacity = startOpacity + (targetOpacity - startOpacity) * progress
-    }
-    if let targetOffsetX = target.offsetX {
-      result.offsetX = Int(Double(targetOffsetX) * progress)
-    }
-    if let targetOffsetY = target.offsetY {
-      result.offsetY = Int(Double(targetOffsetY) * progress)
-    }
-    return result
-  }
-
-  /// Applies transition modifiers recursively to every node in the
-  /// subtree.  Opacity cascades (since rasterizer reads per-node
-  /// opacity and text leaves need to see it).  Offset is applied only
-  /// at the subtree root — either in place on an `.intrinsic` node,
-  /// composed into an existing `.offset` variant, or via a fresh
-  /// wrapping node when the root already carries a non-offset layout
-  /// (`.frame`, `.padding`, etc.).  The wrapping approach lets
-  /// transitions like `.move(edge:)` slide a framed or padded view.
-  private func applyTransitionModifiersRecursively(
-    _ modifiers: TransitionModifiers,
-    to node: inout ResolvedNode
-  ) {
-    // Opacity cascades down to every descendant so the text leaf
-    // (which actually renders) sees the faded value.
-    if let opacity = modifiers.opacity {
-      var drawMetadata = node.drawMetadata
-      // If the node already has an explicit opacity, multiply so the
-      // animation composes with authored opacity.
-      let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
-      drawMetadata.baseStyle.explicitOpacity = base * opacity
-      node.drawMetadata = drawMetadata
-    }
-
-    var children = node.children
-    for i in children.indices {
-      var child = children[i]
-      // Recurse with opacity only (offset stays at the root).
-      var childMods = TransitionModifiers.identity
-      childMods.opacity = modifiers.opacity
-      applyTransitionModifiersRecursively(childMods, to: &child)
-      children[i] = child
-    }
-    // Shape is unchanged (same count, just interpolated opacity on
-    // each child) so we bypass the derived-state recomputes on the
-    // normal children setter.
-    node.setChildrenPreservingDerivedState(children)
-
-    // Apply offset to the root of the subtree only.
-    let offsetX = modifiers.offsetX ?? 0
-    let offsetY = modifiers.offsetY ?? 0
-    guard offsetX != 0 || offsetY != 0 else { return }
-
-    switch node.layoutBehavior {
-    case .intrinsic:
-      // Variant is changing .intrinsic → .offset; reuse bit may
-      // change, so use the normal setter.
-      node.layoutBehavior = .offset(x: offsetX, y: offsetY)
-
-    case .offset(let existingX, let existingY):
-      // Compose with an existing offset by summation.  Variant
-      // unchanged → bypass derived-state recomputes.
-      node.setLayoutBehaviorPreservingDerivedState(
-        .offset(x: existingX + offsetX, y: existingY + offsetY)
-      )
-
-    default:
-      // Root already carries a non-offset layout (frame, padding,
-      // flexibleFrame, stack, etc.).  Wrap it in a fresh offset
-      // node so the transition offset composes with the authored
-      // layout instead of being silently dropped.
-      //
-      // The wrapper's identity is derived from the root by appending
-      // a private component so it is stable across ticks (same
-      // identity produces the same wrapping, no structural churn).
-      let wrapperIdentity = Identity(
-        components: node.identity.components + ["__transitionOffset"]
-      )
-      var wrapped = ResolvedNode(
-        identity: wrapperIdentity,
-        kind: .view("TransitionOffset"),
-        children: [node],
-        environmentSnapshot: node.environmentSnapshot,
-        transactionSnapshot: node.transactionSnapshot,
-        layoutBehavior: .offset(x: offsetX, y: offsetY)
-      )
-      // The wrapper inherits the wrapped root's transient flag so
-      // the whole overlay skips semantics / focus / lifecycle.
-      wrapped.isTransient = node.isTransient
-      node = wrapped
-    }
-  }
-
-  /// Walks the current tree and injects removal snapshots at their
-  /// previous parent identity and child index.  If the previous index
-  /// exceeds the current children count, the snapshot is appended at
-  /// the end.
-  private func injectRemovals(
-    tree: ResolvedNode,
-    injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]]
-  ) -> ResolvedNode {
-    var node = tree
-    // Recurse first so child injections happen before parent-level
-    // splicing — this preserves the visual order of nested removals.
-    var children = node.children.map { child in
-      injectRemovals(tree: child, injectionsByParent: injectionsByParent)
-    }
-    if let injections = injectionsByParent[node.identity] {
-      let sorted = injections.sorted { $0.childIndex < $1.childIndex }
-      for injection in sorted {
-        let insertIndex = min(injection.childIndex, children.count)
-        children.insert(injection.snapshot, at: insertIndex)
-      }
-    }
-    node.children = children
-    return node
-  }
-
-  private func applyInterpolatedValues(
-    tree: ResolvedNode,
-    interpolated: [Identity: [AnimatableSlot: AnyAnimatable]]
-  ) -> ResolvedNode {
-    var node = tree
-    if let values = interpolated[node.identity] {
-      for (slot, value) in values {
-        applyValue(&node, slot: slot, value: value)
-      }
-    }
-    // Recursively apply interpolated values to children; the shape
-    // is unchanged so bypass the derived-state recomputes.
-    let interpolatedChildren = node.children.map { child in
-      applyInterpolatedValues(tree: child, interpolated: interpolated)
-    }
-    node.setChildrenPreservingDerivedState(interpolatedChildren)
-    return node
-  }
-
-  private func applyValue(
-    _ node: inout ResolvedNode,
-    slot: AnimatableSlot,
-    value: AnyAnimatable
-  ) {
-    switch slot {
-    case .opacity:
-      guard let opacity = value.unwrap(as: Double.self) else { return }
-      var drawMetadata = node.drawMetadata
-      drawMetadata.baseStyle.explicitOpacity = opacity
-      node.drawMetadata = drawMetadata
-
-    case .foregroundShapeStyle:
-      guard let style = unwrapShapeStyle(value) else { return }
-      var drawMetadata = node.drawMetadata
-      drawMetadata.baseStyle.foregroundStyle = style
-      node.drawMetadata = drawMetadata
-
-    case .backgroundShapeStyle:
-      guard let style = unwrapShapeStyle(value) else { return }
-      var drawMetadata = node.drawMetadata
-      drawMetadata.baseStyle.backgroundStyle = style
-      node.drawMetadata = drawMetadata
-
-    case .borderShapeStyle:
-      guard let style = unwrapShapeStyle(value) else { return }
-      var drawMetadata = node.drawMetadata
-      drawMetadata.borderShapeStyle = style
-      node.drawMetadata = drawMetadata
-
-    case .borderBlendPhase:
-      guard let phase = value.unwrap(as: Double.self) else { return }
-      // Replace only the phase; all other border fields (set, fg, bg,
-      // blend, sides) stay identical.  Uses the
-      // preserving-derived-state helper because the shape/variant is
-      // unchanged — we just rotate the gradient start.
-      if case .border(
-        let set,
-        let placement,
-        let foreground,
-        let background,
-        let blend,
-        _,
-        let sides
-      ) = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(
-          .border(
-            set,
-            placement: placement,
-            foreground: foreground,
-            background: background,
-            blend: blend,
-            blendPhase: phase,
-            sides: sides
-          )
-        )
-      }
-
-    case .padding:
-      guard let insets = value.unwrap(as: EdgeInsets.self) else { return }
-      if case .padding = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
-      }
-
-    case .offset:
-      guard let pair = value.unwrap(as: AnimatablePair<Int, Int>.self)
-      else { return }
-      if case .offset = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(
-          .offset(x: pair.first, y: pair.second)
-        )
-      }
-
-    case .position:
-      guard let pair = value.unwrap(as: AnimatablePair<Int, Int>.self)
-      else { return }
-      if case .position = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(
-          .position(x: pair.first, y: pair.second)
-        )
-      }
-
-    case .frameWidth:
-      guard let width = value.unwrap(as: Int.self) else { return }
-      applyFrameWidth(width, to: &node)
-
-    case .frameHeight:
-      guard let height = value.unwrap(as: Int.self) else { return }
-      applyFrameHeight(height, to: &node)
-
-    case .shapeFillStyle:
-      guard let style = unwrapShapeStyle(value) else { return }
-      guard case .shape(let shapePayload) = node.drawPayload,
-        case .fill(_, let mode) = shapePayload.operation
-      else {
-        return
-      }
-      node.drawPayload = .shape(
-        ShapePayload(
-          geometry: shapePayload.geometry,
-          insetAmount: shapePayload.insetAmount,
-          operation: .fill(style: style, mode: mode)
-        )
-      )
-
-    case .shapeStrokeStyle:
-      guard let style = unwrapShapeStyle(value) else { return }
-      guard case .shape(let shapePayload) = node.drawPayload,
-        case .stroke(_, let strokeStyle, let strokeBorder, let backgroundStyle) =
-          shapePayload.operation
-      else {
-        return
-      }
-      node.drawPayload = .shape(
-        ShapePayload(
-          geometry: shapePayload.geometry,
-          insetAmount: shapePayload.insetAmount,
-          operation: .stroke(
-            style: style,
-            strokeStyle: strokeStyle,
-            strokeBorder: strokeBorder,
-            backgroundStyle: backgroundStyle
-          )
-        )
-      )
-    }
-  }
-
-  private func unwrapShapeStyle(_ value: AnyAnimatable) -> AnyShapeStyle? {
-    if let color = value.unwrap(as: Color.self) {
-      return .color(color)
-    }
-    if let linear = value.unwrap(as: LinearGradient.self) {
-      return .linearGradient(linear)
-    }
-    if let radial = value.unwrap(as: RadialGradient.self) {
-      return .radialGradient(radial)
-    }
-    if let tile = value.unwrap(as: TileStyle.self) {
-      return .tileStyle(tile)
-    }
-    return nil
-  }
-
-  private func applyFrameWidth(_ width: Int, to node: inout ResolvedNode) {
-    switch node.layoutBehavior {
-    case .frame(_, let height, let alignment):
-      node.setLayoutBehaviorPreservingDerivedState(
-        .frame(width: width, height: height, alignment: alignment)
-      )
-    case .flexibleFrame(
-      let minWidth, let idealWidth, let maxWidth,
-      let minHeight, let idealHeight, let maxHeight,
-      let alignment):
-      let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
-        width: width,
-        dimensions: (maxWidth, idealWidth, minWidth)
-      )
-      node.setLayoutBehaviorPreservingDerivedState(
-        .flexibleFrame(
-          minWidth: newMin,
-          idealWidth: newIdeal,
-          maxWidth: newMax,
-          minHeight: minHeight,
-          idealHeight: idealHeight,
-          maxHeight: maxHeight,
-          alignment: alignment
-        ))
-    default:
-      break
-    }
-  }
-
-  private func applyFrameHeight(_ height: Int, to node: inout ResolvedNode) {
-    switch node.layoutBehavior {
-    case .frame(let width, _, let alignment):
-      node.setLayoutBehaviorPreservingDerivedState(
-        .frame(width: width, height: height, alignment: alignment)
-      )
-    case .flexibleFrame(
-      let minWidth, let idealWidth, let maxWidth,
-      let minHeight, let idealHeight, let maxHeight,
-      let alignment):
-      let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
-        width: height,
-        dimensions: (maxHeight, idealHeight, minHeight)
-      )
-      node.setLayoutBehaviorPreservingDerivedState(
-        .flexibleFrame(
-          minWidth: minWidth,
-          idealWidth: idealWidth,
-          maxWidth: maxWidth,
-          minHeight: newMin,
-          idealHeight: newIdeal,
-          maxHeight: newMax,
-          alignment: alignment
-        ))
-    default:
-      break
-    }
-  }
-
-  /// Replaces the first `.finite(_)` dimension (searched in max → ideal
-  /// → min order) with the new integer value, leaving the others
-  /// untouched.  Used by ``applyValue`` to write interpolated frame
-  /// dimensions back to the same `.flexibleFrame` slot they were
-  /// extracted from.
-  private static func replaceFirstFinite(
-    width value: Int,
-    dimensions: (max: ProposedDimension?, ideal: ProposedDimension?, min: ProposedDimension?)
-  ) -> (max: ProposedDimension?, ideal: ProposedDimension?, min: ProposedDimension?) {
-    if case .finite = dimensions.max {
-      return (.finite(value), dimensions.ideal, dimensions.min)
-    }
-    if case .finite = dimensions.ideal {
-      return (dimensions.max, .finite(value), dimensions.min)
-    }
-    if case .finite = dimensions.min {
-      return (dimensions.max, dimensions.ideal, .finite(value))
-    }
-    return dimensions
-  }
-
   /// Samples the current interpolated value of a property-scoped
   /// animation at `timestamp`.  Returns `nil` for non-property kinds —
   /// the placed-level scopes (insertion offset, matched geometry)
@@ -1911,19 +1324,11 @@ package final class AnimationController: Sendable {
     guard let progress = anim.evaluate(elapsed: elapsed, state: &state) else {
       return to
     }
-    return interpolate(from: from, to: to, progress: progress)
-  }
-
-  private func interpolate(
-    from: AnyAnimatable,
-    to: AnyAnimatable,
-    progress: Double
-  ) -> AnyAnimatable {
-    // Snap to target on type mismatch — the controller should never
-    // produce a slot animation where the types differ
-    // (``diffAndEnqueue`` doesn't enqueue in that case), but
-    // belt-and-suspenders here.
-    from.interpolated(to: to, progress: progress) ?? to
+    return AnimationPropertyValueApplication.interpolate(
+      from: from,
+      to: to,
+      progress: progress
+    )
   }
 
   /// Resets all per-identity state.  Used when the renderer is disposed

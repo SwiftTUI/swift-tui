@@ -1,0 +1,733 @@
+# Production Code Humanization Progress
+
+## Current Status
+
+Started repo-wide production-code humanization on branch `humanize`.
+
+Approved constraints:
+
+- Preserve public SwiftUI-like APIs.
+- Do not change examples.
+- Keep test coverage and repo gate strength intact.
+- Begin with primary terminal rendering infrastructure.
+- Use subagents and review their work.
+
+## Completed
+
+- Loaded `positive-humanize-existing-code`.
+- Loaded batch-refactor and parallel-agent orchestration guidance.
+- Confirmed repo branch and absence of existing migration artifacts.
+- Reviewed repo guidance in `AGENTS.md`.
+- Reviewed architecture, render-pipeline, and development docs.
+- Spawned read-only subagents for terminal host, frame pipeline, runtime/CLI
+  integration, and validation mapping.
+- Created initial scope, plan, progress, and handoff artifacts.
+- Packet 1 completed: extracted terminal presentation writer/session state from
+  `TerminalHost.swift` into `TerminalPresentationState.swift`.
+- Packet 2 completed: extracted terminal presentation emission and metrics
+  bookkeeping from `TerminalHost.present(_:damage:)`.
+- Packet 3 completed: extracted frame-tail presentation-damage proof logic from
+  `FrameTailRenderer.swift` into `FrameTailPresentationDamage.swift`.
+- Packet 4 completed: split frame diagnostics and frame context out of
+  `FrameArtifacts.swift`.
+- Packet 5 completed: decomposed async runtime frame acquisition in
+  `RunLoop+Rendering.swift` into mode selection, cancellable rendering, and
+  skipped-frame bookkeeping helpers.
+- Packet 6 completed: moved committed-frame presentation dispatch, JSON and
+  accessible output, cursor-focus presentation, and output metrics into
+  `RunLoop+Presentation.swift`.
+- Packet 7 completed: extracted Kitty image payload construction, placement
+  math, and terminal command encoding from `TerminalImageRendering.swift` into
+  `TerminalImageKittyRendering.swift`, while leaving renderer cache ownership in
+  the facade.
+- Packet 8 completed: extracted Sixel output sizing, palette budgeting, payload
+  construction, and command encoding into `TerminalImageSixelRendering.swift`,
+  and moved shared image scaling and quantization helpers into
+  `TerminalImageSampling.swift`.
+- Packet 9 completed: extracted fallback overlay mode selection, cache sizing
+  helpers, ANSI/ASCII overlay generation, and raw-glyph manifest ownership into
+  `TerminalImageFallbackRendering.swift`, while keeping overlay application and
+  cache ownership in `TerminalImageRenderer`.
+- Packet 10 completed: moved terminal host graphics and pointer capability
+  probing into `TerminalHostCapabilities.swift`.
+- Packet 11 completed: extracted terminal host escape sequence construction,
+  platform I/O shims, and process-exit cleanup into dedicated terminal runtime
+  files.
+- Packet 12 completed: extracted internal terminal presentation planning,
+  row-batch strategy payloads, graphics replay planning, and dirty-row image
+  intersection checks into `TerminalPresentationPlanning.swift`.
+- Packet 13 completed: extracted pure animation resolved/placed tree query
+  helpers into `AnimationTreeQueries.swift`, leaving mutating transition and
+  lifecycle bookkeeping in `AnimationController.swift`.
+- Packet 14 completed: extracted resolved-tree removal overlay transforms into
+  `AnimationTransitionOverlay.swift`, keeping animation sampling, purge
+  decisions, deadlines, and batch bookkeeping in `AnimationController`.
+- Packet 15 completed: extracted property animation slot lookup, interpolation
+  fallback, and resolved-tree value writeback into
+  `AnimationPropertyValueApplication.swift`, keeping controller state,
+  scheduling, custom-state writeback, and batch bookkeeping in
+  `AnimationController`.
+- Packet 16 completed: extracted completed-frame artifact assembly, worker
+  timing derivation, and drop-eligibility classification into
+  `CompletedFrameArtifactBuilder.swift`, and moved `CompletedFrameCandidate`
+  out of `FrameTailRenderer.swift` into completed-frame rendering support.
+- Packet 17 completed: extracted run-loop frame diagnostic record construction
+  into `RunLoop+FrameDiagnostics.swift`.
+- Packet 18 completed: extracted terminal input support types, protocols,
+  capability models, and coalescing support out of `InputReader.swift`.
+- Packet 19 completed: extracted late-preference reconciliation policy and
+  mechanics into `LatePreferenceReconciliation.swift`.
+- Packet 20 completed: extracted frame-head transaction and draft support into
+  `FrameHeadDraftTransaction.swift`.
+- Packet 21 completed: extracted run-loop focus and scroll convergence into
+  `RunLoop+FocusSync.swift`.
+- Packet 22 completed: extracted async run-loop frame acquisition into
+  `RunLoop+FrameAcquisition.swift`.
+- Packet 23 completed: renamed completed-frame artifact support to
+  `CommittedFrameArtifactBuilder.swift`, shared one-shot and async committed
+  artifact assembly, and extracted `DefaultRenderer` commit effects and
+  committed-frame publication helpers.
+- Packet 24 completed: extracted terminal raw-mode saved state, pointer
+  reporting state, and process-exit cleanup registration into
+  `TerminalRawModeSession.swift`, leaving terminal byte ordering and POSIX
+  mutation in `TerminalHost.swift`.
+- Packet 25 completed: extracted repeated control-message filtering and
+  terminal parser feeding from `InputReader.swift` into
+  `TerminalInputEventDecoding.swift`, leaving WASI polling and DispatchSource
+  stream loops in place.
+- Packet 26 completed: moved `TerminalInputParser`, `KeyParser`, and private
+  parsing helpers from `InputReader.swift` into `TerminalInputParser.swift`,
+  leaving concrete stream ownership in `InputReader.swift`.
+- Packet 27 completed: extracted platform terminal input read classification
+  and nonblocking drain mechanics into `TerminalInputStreamReading.swift`,
+  leaving WASI polling and DispatchSource stream ownership in
+  `InputReader.swift`.
+- Packet 28 completed: extracted placed overlay sampling into
+  `PlacedAnimationOverlaySampling.swift`, leaving `AnimationController` as the
+  owner of custom-state writeback, completed-key removal, and batch release.
+- Packet 29 completed: extracted post-head/pre-commit frame-tail orchestration
+  from `DefaultRenderer` into `DefaultRendererFrameTailCoordinator.swift`,
+  leaving `DefaultRenderer` as owner of frame-head setup and commit effects.
+
+## Baseline Validation
+
+Passed before production-code edits:
+
+- `bun run test`
+- Full log: `/tmp/swift-tui-test-gate-20260518-023359-77501.log`
+- Result: PASS
+
+Packet 1 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-024018-4112.log`
+  - Result: PASS
+
+Packet 2 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-024705-20556.log`
+  - Result: PASS
+
+Packet 3 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.FrameTailWorkerFallbackTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.RetainedReuseInvariantTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-025321-47448.log`
+  - Result: PASS
+
+Packet 4 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.LayoutEngineTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-025909-68455.log`
+  - Result: PASS
+
+Packet 5 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-030508-85414.log`
+  - Result: PASS
+
+Packet 6 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.JSONFrameRendererTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.LinearAccessibilityRendererTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-031025-5025.log`
+  - Result: PASS
+
+Packet 7 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-031747-26286.log`
+  - Result: PASS
+
+Packet 8 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-032834-69653.log`
+  - Result: PASS
+
+Packet 9 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `./Scripts/check_accessibility_guardrails.sh`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-033507-95996.log`
+  - Result: PASS
+
+Packet 10 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.CellPixelMetricsRefreshTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-034357-16939.log`
+  - Result: PASS
+
+Packet 11 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalHost`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests`
+  - Result: PASS
+- `swiftly run swift test --filter WebSurfaceTransportTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITerminalTests`
+  - Result: PASS across 5 consecutive stabilization runs after removing the
+    short-lived `/bin/echo` fixture race.
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-040917-13192.log`
+  - Result: PASS
+
+Packet 12 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-041849-32895.log`
+  - Result: PASS
+
+Packet 13 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-043316-68540.log`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-042708-50577.log`
+  - Result: PASS
+
+Packet 14 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS
+
+Packet 15 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests`
+  - Result: PASS
+- `swiftly run swift test --filter AnimationController`
+  - Result: PASS, 64 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-044249-87972.log`
+  - Result: PASS
+
+Packet 16 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-045323-8675.log`
+  - Result: PASS
+
+Packet 17 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS, 22 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-050134-20208.log`
+  - Result: PASS
+
+Packet 18 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - Result: PASS, 23 tests
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-051003-41466.log`
+  - Result: PASS
+
+Packet 19 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.BoundedReconciliationTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.ToolbarTests`
+  - Result: PASS, 19 tests
+- `swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-051542-56825.log`
+  - Result: PASS
+
+Packet 20 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - Result: PASS, 4 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-052405-85109.log`
+  - Result: PASS
+
+Packet 21 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AppRuntimeTests`
+  - Result: PASS, 24 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+  - Result: PASS, 73 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `swiftly run swift test --filter SwiftTUICoreTests.FocusTrackerTests`
+  - Result: PASS, 11 tests
+- `swiftly run swift test --filter SwiftTUICoreTests.LocalScrollPositionRegistryTests`
+  - Result: PASS, 8 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-053009-4450.log`
+  - Result: PASS
+
+Packet 22 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS, 22 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-053644-24624.log`
+  - Result: PASS
+
+Packet 23 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.TimingDiagnosticsTests`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests`
+  - Result: PASS, 1305 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-054930-58630.log`
+  - Result: PASS
+
+Packet 24 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS, 11 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalCapabilityProfileApplyingTests`
+  - Result: PASS, 8 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS, 28 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+  - Result: PASS, 73 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS, 40 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-055729-85446.log`
+  - Result: PASS
+
+Packet 25 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - Result: PASS, 23 tests
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-060611-5894.log`
+  - Result: PASS
+
+Packet 26 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - Result: PASS, 23 tests
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/keyParserParsesExpectedSequences`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalInputParserDecodesMixedMouseStreams`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests/terminalPixelMouseInputReachesDragGestureAsFractionalLocation`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-061130-23411.log`
+  - Result: PASS
+
+Packet 27 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 9 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-065523-66925.log`
+  - Result: PASS
+
+Packet 28 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/matchedGeometryTriggersTranslationAnimation`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/matchedGeometryRendersAtSourceAtProgressZero`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/insertionOffsetAnimationCompletes`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/removalOverlaysDoNotAccumulateAcrossTickFrames`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/transitionRemovalIsInjectedAtPlacedLevel`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests/insertionOffsetTranslatesPlacedBounds`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/preparedFrameHeadKeepsTransitionAnimationsDraftOwnedUntilCommit`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS, 18 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS, 17 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests`
+  - Result: PASS, 7 tests
+- `swiftly run swift test --filter SwiftTUITests.MotionAndProgressPolicyTests`
+  - Result: PASS, 9 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-083720-85404.log`
+  - Result: PASS
+
+Packet 29 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests\.(RuntimeRenderPipelineTests|RenderPipelineStructureTests|PipelineContractTests|AsyncFrameTailRenderingTests|BoundedReconciliationTests|RenderDriverCharacterizationTests|RenderDriverInstrumentationCostTests)`
+  - Result: PASS, 75 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests`
+  - Result: PASS, 1309 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-093634-11184.log`
+  - Result: PASS
+
+## Next Slice
+
+Packet 30: AnimationController lifecycle bookkeeping audit. Packet 29 reduced
+`SwiftTUI.swift` from 1479 to 1169 lines by moving frame-tail orchestration into
+`DefaultRendererFrameTailCoordinator.swift`. The current production file-size
+signals put `AnimationController.swift` back at the top of the debt list, so the
+next packet should use a read-only subagent audit first and extract only a
+bounded lifecycle bookkeeping boundary that does not move mutable controller
+ownership unless the audit proves it is safe.
+
+Expected owned files pending local discovery:
+
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- a new `Sources/SwiftTUIRuntime/Lifecycle/` helper if the audit confirms a
+  safe boundary
+
+Validation:
+
+- `swiftly run swift build`
+- Animation controller and integration focused suites
+- Async frame-tail and pipeline focused suites when the extracted boundary
+  affects placed/removal overlays, completion deferral, or frame-drop blockers
+- `bun run test`
+
+## Failed Attempts
+
+- Packet 23 first full `bun run test` attempt failed in the full
+  `SwiftTUITests` runtime suite with three `AsyncLifecycleGenerationTests`
+  readiness timeouts. The failed gate log was
+  `/tmp/swift-tui-test-gate-20260518-054640-45870.log`.
+- The failed suite passed immediately in isolation, the full `SwiftTUITests`
+  target then passed, and the final full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-054930-58630.log`.
+- Packet 27 final-candidate `bun run test` attempt failed once in
+  `SwiftTUITerminalTests` on `running cat over a large file stays within the
+  byte budget` with a timeout. The failed gate log was
+  `/tmp/swift-tui-test-gate-20260518-062300-55078.log`.
+- `swiftly run swift test --filter SwiftTUITerminalTests` passed immediately
+  after, and the final full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-065523-66925.log`.
+- Packet 29 first full `bun run test` attempt failed in the full
+  `SwiftTUITests` runtime target with two timeout issues:
+  `HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents`
+  and
+  `AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead`.
+  The failed gate log was
+  `/tmp/swift-tui-test-gate-20260518-090939-98987.log`.
+- Both failed tests passed immediately in isolation, the full `SwiftTUITests`
+  target passed, and the final full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-093634-11184.log`.
+
+## Known Risks
+
+- `TerminalHost.swift`, `TerminalPresentation.swift`,
+  `TerminalImageRendering.swift`, `FrameTailRenderer.swift`, and
+  `RunLoop+Rendering.swift` are large and heavily tested shared runtime files.
+- The checkout path ends in `swift-tui.humanize`; repo docs warn that example
+  path dependencies prefer a final path component of `swift-tui`. The baseline
+  gate still passed in this checkout.
+- Swift incremental build artifacts may become stale; clean build state when
+  unexplained crashes or impossible diagnostics appear.
+- Rendering fixtures should not change unless an intentional rendering behavior
+  change is separately approved.

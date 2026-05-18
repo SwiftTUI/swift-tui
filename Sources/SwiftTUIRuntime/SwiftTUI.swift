@@ -45,29 +45,6 @@ private func withAnimationDraftSinks<Result>(
   }
 }
 
-private struct LatePreferenceReconciliationPolicy: Sendable {
-  enum BoundExceededBehavior: Sendable {
-    /// Emit a runtime warning and perform one final relayout of the latest
-    /// reconciled tree before committing.
-    case warnAndCommitLatestReconciledLayout
-  }
-
-  static let toolbarHostRuntimeBound = Self(
-    boundExceededBehavior: .warnAndCommitLatestReconciledLayout
-  )
-
-  var boundExceededBehavior: BoundExceededBehavior
-
-  /// ADR-0018 now derives the pass budget from the current resolved tree:
-  /// every relayout must be justified by at least one finite node producing a
-  /// changed late-preference consumer output, plus one pass to confirm
-  /// stability. A non-converging author cycle therefore scales with the current
-  /// tree instead of a historical toolbar constant.
-  func relayoutPassBudget(for input: FrameTailInput) -> Int {
-    max(1, input.resolved.subtreeNodeCount + 1)
-  }
-}
-
 @MainActor
 private final class CommittedPresentationDismissStack {
   private var stack = DismissStack()
@@ -119,318 +96,15 @@ package struct RuntimeSubsystemSnapshot: Equatable {
   package var animationController: AnimationController.DebugStateSnapshot
 }
 
-private struct AsyncFrameTailLayoutPass {
-  var layout: FrameTailLayoutOutput?
-  var suspensionDuration: Duration
-}
-
-private struct AsyncLatePreferenceReconciliationOutput {
-  var layout: ReconciledFrameTailLayout?
-  var suspensionDuration: Duration
-}
-
-private struct FrameTailCancellationStrategy {
-  var awaitQueuedCancellationSignal: @MainActor @Sendable () async -> Void
-  var shouldCancelQueued: @MainActor @Sendable () async -> Bool
-}
-
-private enum FrameTailLayoutStageResult {
-  case output(AsyncFrameTailLayoutStageOutput, cancellationToken: FrameTailJobCancellationToken?)
-  case cancelledBeforeStart
-}
-
 private enum CompletedFrameCandidateResolution {
   case committed(FrameArtifacts, CompletedFrameDropDecision)
   case dropped(runtimeIssues: [RuntimeIssue], dropDecision: CompletedFrameDropDecision)
 }
 
-private enum LatePreferenceReconciliationStep {
-  case finished(ReconciledFrameTailLayout)
-  case needsRelayout(FrameTailInput)
-}
-
-/// Loop-bearing stage that reconciles preferences emitted by realized
-/// layout-dependent content before semantics, draw, raster, and commit.
-private struct LatePreferenceReconciliationStage {
-  var policy: LatePreferenceReconciliationPolicy
-
-  @MainActor
-  func run(
-    initialInput: FrameTailInput,
-    renderLayout: (FrameTailInput) -> FrameTailLayoutOutput
-  ) -> ReconciledFrameTailLayout {
-    var input = initialInput
-    var layout = renderLayout(input)
-
-    let budget = policy.relayoutPassBudget(for: initialInput)
-    for _ in 0..<budget {
-      switch reconciliationStep(input: input, layout: layout) {
-      case .finished(let reconciled):
-        return reconciled
-      case .needsRelayout(let nextInput):
-        input = nextInput
-        layout = renderLayout(input)
-      }
-    }
-
-    return reconciliationLimitExceeded(
-      input: input,
-      layout: layout,
-      budget: budget,
-      renderLayout: renderLayout
-    )
-  }
-
-  @MainActor
-  func runAsync(
-    initialInput: FrameTailInput,
-    renderLayout: (FrameTailInput) async -> AsyncFrameTailLayoutPass
-  ) async -> AsyncLatePreferenceReconciliationOutput {
-    var input = initialInput
-    var totalSuspensionDuration = Duration.zero
-    var layoutPass = await renderLayout(input)
-    totalSuspensionDuration += layoutPass.suspensionDuration
-    guard var layout = layoutPass.layout else {
-      return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
-    }
-
-    let budget = policy.relayoutPassBudget(for: initialInput)
-    for _ in 0..<budget {
-      switch reconciliationStep(input: input, layout: layout) {
-      case .finished(let reconciled):
-        return .init(
-          layout: reconciled,
-          suspensionDuration: totalSuspensionDuration
-        )
-      case .needsRelayout(let nextInput):
-        input = nextInput
-        layoutPass = await renderLayout(input)
-        totalSuspensionDuration += layoutPass.suspensionDuration
-        guard let nextLayout = layoutPass.layout else {
-          return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
-        }
-        layout = nextLayout
-      }
-    }
-
-    let exceeded = await reconciliationLimitExceededAsync(
-      input: input,
-      layout: layout,
-      budget: budget,
-      renderLayout: renderLayout
-    )
-    totalSuspensionDuration += exceeded.suspensionDuration
-    return .init(layout: exceeded.layout, suspensionDuration: totalSuspensionDuration)
-  }
-
-  @MainActor
-  private func reconciliationStep(
-    input: FrameTailInput,
-    layout: FrameTailLayoutOutput
-  ) -> LatePreferenceReconciliationStep {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    let runtimeIssues = layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
-
-    guard reconciliation.requiresRelayout else {
-      var finalInput = input
-      finalInput.resolved = reconciliation.resolved
-      return .finished(
-        ReconciledFrameTailLayout(
-          input: finalInput,
-          layout: layout,
-          resolved: reconciliation.resolved,
-          runtimeIssues: runtimeIssues
-        )
-      )
-    }
-
-    return .needsRelayout(
-      relayoutInput(
-        basedOn: input,
-        resolved: reconciliation.resolved
-      )
-    )
-  }
-
-  @MainActor
-  private func reconciliationLimitExceeded(
-    input: FrameTailInput,
-    layout: FrameTailLayoutOutput,
-    budget: Int,
-    renderLayout: (FrameTailInput) -> FrameTailLayoutOutput
-  ) -> ReconciledFrameTailLayout {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    if !reconciliation.requiresRelayout {
-      var finalInput = input
-      finalInput.resolved = reconciliation.resolved
-      return ReconciledFrameTailLayout(
-        input: finalInput,
-        layout: layout,
-        resolved: reconciliation.resolved,
-        runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
-      )
-    }
-
-    switch policy.boundExceededBehavior {
-    case .warnAndCommitLatestReconciledLayout:
-      let finalInput = relayoutInput(
-        basedOn: input,
-        resolved: reconciliation.resolved
-      )
-      let finalLayout = renderLayout(finalInput)
-      return finalLayoutAfterBoundExceeded(
-        input: finalInput,
-        layout: finalLayout,
-        budget: budget
-      )
-    }
-  }
-
-  @MainActor
-  private func reconciliationLimitExceededAsync(
-    input: FrameTailInput,
-    layout: FrameTailLayoutOutput,
-    budget: Int,
-    renderLayout: (FrameTailInput) async -> AsyncFrameTailLayoutPass
-  ) async -> AsyncLatePreferenceReconciliationOutput {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    if !reconciliation.requiresRelayout {
-      var finalInput = input
-      finalInput.resolved = reconciliation.resolved
-      return .init(
-        layout: ReconciledFrameTailLayout(
-          input: finalInput,
-          layout: layout,
-          resolved: reconciliation.resolved,
-          runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
-        ),
-        suspensionDuration: .zero
-      )
-    }
-
-    let finalInput = relayoutInput(
-      basedOn: input,
-      resolved: reconciliation.resolved
-    )
-    let finalLayoutPass = await renderLayout(finalInput)
-    guard let finalLayout = finalLayoutPass.layout else {
-      return .init(layout: nil, suspensionDuration: finalLayoutPass.suspensionDuration)
-    }
-    return .init(
-      layout: finalLayoutAfterBoundExceeded(
-        input: finalInput,
-        layout: finalLayout,
-        budget: budget
-      ),
-      suspensionDuration: finalLayoutPass.suspensionDuration
-    )
-  }
-
-  @MainActor
-  private func finalLayoutAfterBoundExceeded(
-    input: FrameTailInput,
-    layout: FrameTailLayoutOutput,
-    budget: Int
-  ) -> ReconciledFrameTailLayout {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    var finalInput = input
-    finalInput.resolved = reconciliation.resolved
-    return ReconciledFrameTailLayout(
-      input: finalInput,
-      layout: layout,
-      resolved: reconciliation.resolved,
-      runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved) + [
-        latePreferenceReconciliationLimitIssue(
-          rootIdentity: input.rootIdentity,
-          relayoutPassBudget: budget
-        )
-      ]
-    )
-  }
-
-  private func relayoutInput(
-    basedOn input: FrameTailInput,
-    resolved: ResolvedNode
-  ) -> FrameTailInput {
-    FrameTailInput(
-      generation: input.generation,
-      resolved: resolved,
-      proposal: input.proposal,
-      rootIdentity: input.rootIdentity,
-      retained: input.retained,
-      layoutPassContext: LayoutPassContext(
-        retainedLayout: input.retained.retainedLayout,
-        invalidatedIdentities: input.layoutPassContext.invalidatedIdentities
-      )
-    )
-  }
-}
-
-@MainActor
-private func layoutRuntimeIssues(
-  input: FrameTailInput,
-  resolved: ResolvedNode
-) -> [RuntimeIssue] {
-  input.layoutPassContext.runtimeIssues + rootRuntimeIssues(in: resolved)
-}
-
-@MainActor
-private func rootRuntimeIssues(
-  in resolved: ResolvedNode
-) -> [RuntimeIssue] {
-  let unhostedToolbarItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
-  guard !unhostedToolbarItems.isEmpty else {
-    return []
-  }
-
-  let titles =
-    unhostedToolbarItems
-    .map(\.title)
-    .filter { !$0.isEmpty }
-  let titleSummary =
-    if titles.isEmpty {
-      ""
-    } else {
-      " Items: \(titles.joined(separator: ", "))."
-    }
-  let sourceIdentity =
-    unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
-  return [
-    RuntimeIssue(
-      severity: .warning,
-      code: "toolbar.unhostedItems",
-      message:
-        "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
-      identity: sourceIdentity,
-      source: ".toolbarItem(...)"
-    )
-  ]
-}
-
-private func latePreferenceReconciliationLimitIssue(
-  rootIdentity: Identity,
-  relayoutPassBudget: Int
-) -> RuntimeIssue {
-  RuntimeIssue(
-    severity: .warning,
-    code: "latePreference.reconciliationLimitExceeded",
-    message:
-      "Late preference reconciliation did not converge within the \(relayoutPassBudget)-pass tree-derived budget; the frame was committed after one final relayout of the latest reconciled tree.",
-    identity: rootIdentity,
-    source: "late preference reconciliation"
-  )
+private struct CommittedFrameEffects {
+  var commitPlan: CommitPlan
+  var commitDuration: Duration
+  var runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics
 }
 
 package struct CompletedFrameCandidateCommitPlanComparison {
@@ -465,6 +139,12 @@ public struct DefaultRenderer {
   private let renderGenerationSequencer: RenderGenerationSequencer
 
   private let frameTailRenderer: FrameTailRenderer
+  private var frameTailCoordinator: DefaultRendererFrameTailCoordinator {
+    .init(
+      frameTailRenderer: frameTailRenderer,
+      latePreferenceReconciliationPolicy: Self.latePreferenceReconciliationPolicy
+    )
+  }
 
   /// Creates a renderer with the supplied pipeline components.
   @MainActor
@@ -601,7 +281,7 @@ public struct DefaultRenderer {
   package func renderPreparedFrameTailForCancellationTesting(
     _ draft: FrameHeadDraft
   ) async {
-    _ = await renderFrameTailDraft(draft)
+    _ = await frameTailCoordinator.renderFrameTailDraft(draft)
   }
 
   @MainActor
@@ -613,7 +293,7 @@ public struct DefaultRenderer {
       return false
     }
 
-    let tailOutput = await renderFrameTailDraft(draft)
+    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -630,7 +310,7 @@ public struct DefaultRenderer {
   package func previewCompletedFrameCandidateForTesting(
     _ draft: FrameHeadDraft
   ) async -> CompletedFrameDropDecision {
-    let tailOutput = await renderFrameTailDraft(draft)
+    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -643,7 +323,7 @@ public struct DefaultRenderer {
   package func commitCompletedFrameCandidateForTesting(
     _ draft: FrameHeadDraft
   ) async -> CompletedFrameCandidateCommitPlanComparison {
-    let tailOutput = await renderFrameTailDraft(draft)
+    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -724,7 +404,7 @@ public struct DefaultRenderer {
           )
         },
         latePreferenceReconciliation: { draft in
-          switch await renderer.renderFrameTailLayoutStage(
+          switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(
             draft,
             cancellation: FrameTailCancellationStrategy(
               awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
@@ -746,7 +426,7 @@ public struct DefaultRenderer {
           }
         },
         fusedFrameTail: { draft, layoutStage in
-          await renderer.renderFrameTailRasterStage(
+          await renderer.frameTailCoordinator.renderFrameTailRasterStage(
             draft: draft,
             layoutStage: layoutStage.layoutStage,
             completionToken: layoutStage.cancellationToken
@@ -822,13 +502,13 @@ public struct DefaultRenderer {
           )
         },
         latePreferenceReconciliation: { input, clock in
-          renderer.renderLayoutResolvingLatePreferences(
+          renderer.frameTailCoordinator.renderLayoutResolvingLatePreferences(
             input,
             clock: clock
           )
         },
         fusedFrameTail: { draft, reconciledTailLayout in
-          renderer.renderFusedFrameTail(
+          renderer.frameTailCoordinator.renderFusedFrameTail(
             draft: draft,
             reconciledTailLayout: reconciledTailLayout
           )
@@ -844,65 +524,6 @@ public struct DefaultRenderer {
     )
   }
 
-  /// Shared fused-frame-tail head: captures the baseline placed tree for the
-  /// animation controller and snapshots any pending placed-level animation
-  /// overlays.
-  ///
-  /// Both the synchronous (`renderFusedFrameTail`) and asynchronous
-  /// (`renderFrameTailRasterStage`) tail strategies run exactly this work before
-  /// they diverge — the sync path calls `renderRaster`, the async path calls
-  /// `renderRasterAsync`. Extracting it keeps the two strategies from
-  /// duplicating the placed-tree capture / overlay-snapshot orchestration
-  /// (F11).
-  ///
-  /// Capture the BASELINE placed tree (pre-overlay) for two things:
-  /// 1. The animation controller's removal-snapshot lookup on the next frame
-  ///    (`capturePlacedTree`).
-  /// 2. The retained-layout store, so future tick frames reuse the canonical
-  ///    layout and not an animation-decorated tree.
-  ///
-  /// If we used the post-overlay placed tree, subsequent ticks would hit
-  /// retainedPlacement and return the cached tree including the stale transient
-  /// overlay — then overlay snapshot application would inject another overlay
-  /// on top, growing the tree each tick and leaving ghosted artefacts visible
-  /// after the animation completes.
-  @MainActor
-  private func prepareAnimationOverlaySnapshot(
-    draft: FrameHeadDraft,
-    layout: FrameTailLayoutOutput
-  ) -> (placed: PlacedNode, overlay: PlacedAnimationOverlaySnapshot) {
-    let placed = layout.baselinePlaced
-    let animationController = draft.animationDraft.controller
-    animationController.capturePlacedTree(layout.baselinePlaced)
-    // Snapshot any pending placed-level animation overlays. The snapshot
-    // advances controller-owned animation state on the main actor, then the
-    // frame-tail worker applies the value data before semantics/draw/raster.
-    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
-      for: placed,
-      at: draft.animationTimestamp
-    )
-    return (placed, animationOverlaySnapshot)
-  }
-
-  @MainActor
-  private func renderFusedFrameTail(
-    draft: FrameHeadDraft,
-    reconciledTailLayout: ReconciledFrameTailLayout
-  ) -> FrameTailOutput {
-    let layout = reconciledTailLayout.layout
-    let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
-      draft: draft,
-      layout: layout
-    )
-    return frameTailRenderer.renderRaster(
-      reconciledTailLayout.input,
-      layout: layout,
-      placed: placed,
-      animationOverlaySnapshot: animationOverlaySnapshot,
-      clock: draft.clock
-    )
-  }
-
   @MainActor
   private func commitOneShotFrame(
     draft: FrameHeadDraft,
@@ -911,118 +532,32 @@ public struct DefaultRenderer {
   ) -> FrameArtifacts {
     let layout = reconciledTailLayout.layout
     let resolved = reconciledTailLayout.resolved
-    var workerTimings = tail.diagnostics.workerTimings
-    if var timings = workerTimings,
-      let clock = draft.clock,
-      let workerCompletedAt = tail.workerCompletedAt
-    {
-      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
-      workerTimings = timings
-    }
-    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
-    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: draft.graphRootIdentity,
-        resolved: resolved,
-        placed: tail.placed
-      )
-      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
-      return commitPlanner.plan(
-        resolved: resolved,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        transaction: draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+    let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
+      draft: draft,
+      tail: tail
     )
-    let dropEligibilityBlockers = frameTailCommitDropBlockers(
-      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
-    )
-    let phaseTimings = FramePhaseTimings(
-      resolve: draft.resolveDuration,
-      measure: tail.diagnostics.measureDuration,
-      place: tail.diagnostics.placeDuration,
-      semantics: tail.diagnostics.semanticsDuration,
-      draw: tail.diagnostics.drawDuration,
-      raster: tail.diagnostics.rasterDuration,
-      commit: commitDuration
-    )
-    let mainActorTimings = FrameMainActorTimings(
-      blocked: phaseTimings.total,
-      suspended: .zero
-    )
-    var diagnostics = FrameDiagnostics.fromCachedPhaseProducts(
+    let effects = commitFrameEffects(
+      draft: draft,
       resolved: resolved,
-      measured: tail.measured,
       placed: tail.placed,
       semantics: tail.semantics,
-      draw: tail.draw,
-      invalidatedIdentities: draft.frameContext.invalidatedIdentities,
-      resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
-      layoutWork: tail.diagnostics.layoutWork,
-      presentationDamage: tail.presentationDamage,
-      presentationSurfaceWidth: tail.raster.size.width,
-      phaseTimings: phaseTimings,
-      renderGenerations: .init(
-        render: draft.renderGeneration,
-        layoutInput: reconciledTailLayout.input.generation,
-        layoutOutput: layout.generation,
-        rasterInput: reconciledTailLayout.input.generation,
-        rasterOutput: tail.generation
-      ),
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
+    )
+    let artifacts = CommittedFrameArtifactBuilder.makeOneShotArtifacts(
+      draft: draft,
+      reconciledTailLayout: reconciledTailLayout,
+      tail: tail,
+      commit: effects.commitPlan,
+      commitDuration: effects.commitDuration,
       workerTimings: workerTimings,
-      mainActorTimings: mainActorTimings,
-      measurementCache: tail.diagnostics.measurementCache,
-      runtimeIssues: reconciledTailLayout.runtimeIssues,
-      dropEligibilityBlockers: dropEligibilityBlockers
+      runtimeRegistrationDiagnostics: effects.runtimeRegistrationDiagnostics
     )
-    diagnostics.runtime.registrations = runtimeRegistrationDiagnostics
-    let artifacts = FrameArtifacts(
-      resolvedTree: resolved,
-      measuredTree: tail.measured,
-      placedTree: tail.placed,
-      semanticSnapshot: tail.semantics,
-      drawTree: tail.draw,
-      rasterSurface: tail.raster,
-      presentationDamage: tail.presentationDamage,
-      drawnIdentities: tail.drawnIdentities,
-      commitPlan: commit,
-      diagnostics: diagnostics
-    )
-
-    draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    draft.graphDraft.updateCommittedScrollGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    frameTailRenderer.storeCommittedFrame(
+    publishCommittedFrame(
       artifacts,
+      draft: draft,
       baselinePlacedTree: tail.baselinePlaced
     )
-    storeCommittedPresentationPortalState()
     return artifacts
-  }
-
-  @MainActor
-  private func renderLayoutResolvingLatePreferences(
-    _ initialInput: FrameTailInput,
-    clock: ContinuousClock?
-  ) -> ReconciledFrameTailLayout {
-    LatePreferenceReconciliationStage(
-      policy: Self.latePreferenceReconciliationPolicy
-    ).run(initialInput: initialInput) { input in
-      frameTailRenderer.renderLayout(
-        input,
-        clock: clock
-      )
-    }
   }
 
   @MainActor
@@ -1048,7 +583,7 @@ public struct DefaultRenderer {
           )
         },
         latePreferenceReconciliation: { draft in
-          switch await renderer.renderFrameTailLayoutStage(draft) {
+          switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(draft) {
           case .cancelledBeforeStart:
             return nil
           case .output(let layoutStage, _):
@@ -1056,7 +591,7 @@ public struct DefaultRenderer {
           }
         },
         fusedFrameTail: { draft, layoutStage in
-          await renderer.renderFrameTailRasterStage(
+          await renderer.frameTailCoordinator.renderFrameTailRasterStage(
             draft: draft,
             layoutStage: layoutStage
           )
@@ -1308,238 +843,6 @@ public struct DefaultRenderer {
   }
 
   @MainActor
-  private func renderFrameTailDraft(
-    _ draft: FrameHeadDraft
-  ) async -> AsyncFrameTailDraftOutput {
-    let layoutResult = await renderFrameTailLayoutStage(draft)
-    guard case .output(let layoutStage, _) = layoutResult else {
-      preconditionFailure("Non-cancellable frame tail unexpectedly cancelled.")
-    }
-    return await renderFrameTailRasterStage(
-      draft: draft,
-      layoutStage: layoutStage
-    )
-  }
-
-  @MainActor
-  private func renderFrameTailLayoutStage(
-    _ draft: FrameHeadDraft,
-    cancellation: FrameTailCancellationStrategy? = nil
-  ) async -> FrameTailLayoutStageResult {
-    if let cancellation {
-      let cancellationToken = FrameTailJobCancellationToken()
-      let layoutTask = Task { @MainActor in
-        await renderLayoutResolvingLatePreferencesAsync(
-          draft,
-          cancellationToken: cancellationToken
-        )
-      }
-
-      @MainActor
-      func waitForQueuedCancellationSignal() async -> FrameTailJobState {
-        await cancellation.awaitQueuedCancellationSignal()
-        if !Task.isCancelled,
-          await cancellation.shouldCancelQueued(),
-          cancellationToken.cancelBeforeStart()
-        {
-          layoutTask.cancel()
-          return .cancelledBeforeStart
-        }
-        return await cancellationToken.waitUntilLeavesQueue()
-      }
-
-      let queueExitState = await withTaskGroup(of: FrameTailJobState.self) { group in
-        group.addTask {
-          await cancellationToken.waitUntilLeavesQueue()
-        }
-        group.addTask {
-          await waitForQueuedCancellationSignal()
-        }
-        let state = await group.next() ?? cancellationToken.currentState
-        group.cancelAll()
-        return state
-      }
-
-      if queueExitState == .cancelledBeforeStart {
-        layoutTask.cancel()
-        return .cancelledBeforeStart
-      }
-
-      let layoutResult = await layoutTask.value
-      guard let reconciledLayout = layoutResult.layout else {
-        return .cancelledBeforeStart
-      }
-      return .output(
-        AsyncFrameTailLayoutStageOutput(
-          frameTailInput: reconciledLayout.input,
-          layout: reconciledLayout.layout,
-          resolved: reconciledLayout.resolved,
-          runtimeIssues: reconciledLayout.runtimeIssues,
-          suspensionDuration: layoutResult.suspensionDuration
-        ),
-        cancellationToken: cancellationToken
-      )
-    }
-
-    if frameTailRenderer.canOffloadLayout(draft.frameTailInput) {
-      let layoutPass = await renderFrameTailLayoutAsync(
-        draft.frameTailInput,
-        clock: draft.clock,
-        cancellationToken: nil
-      )
-      guard let layout = layoutPass.layout else {
-        return .cancelledBeforeStart
-      }
-      return .output(
-        AsyncFrameTailLayoutStageOutput(
-          frameTailInput: draft.frameTailInput,
-          layout: layout,
-          resolved: draft.resolved,
-          runtimeIssues: layoutRuntimeIssues(input: draft.frameTailInput, resolved: draft.resolved),
-          suspensionDuration: layoutPass.suspensionDuration
-        ),
-        cancellationToken: nil
-      )
-    }
-
-    let layoutResult = await renderLayoutResolvingLatePreferencesAsync(
-      draft,
-      cancellationToken: nil
-    )
-    guard let reconciledLayout = layoutResult.layout else {
-      return .cancelledBeforeStart
-    }
-    return .output(
-      AsyncFrameTailLayoutStageOutput(
-        frameTailInput: reconciledLayout.input,
-        layout: reconciledLayout.layout,
-        resolved: reconciledLayout.resolved,
-        runtimeIssues: reconciledLayout.runtimeIssues,
-        suspensionDuration: layoutResult.suspensionDuration
-      ),
-      cancellationToken: nil
-    )
-  }
-
-  @MainActor
-  private func renderFrameTailRasterStage(
-    draft: FrameHeadDraft,
-    layoutStage: AsyncFrameTailLayoutStageOutput,
-    completionToken: FrameTailJobCancellationToken? = nil
-  ) async -> AsyncFrameTailDraftOutput {
-    let layout = layoutStage.layout
-    let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
-      draft: draft,
-      layout: layout
-    )
-    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
-    let rasterSuspensionStart = draft.clock?.now
-    suspensionHooks?.onBegin?()
-    let tail = await frameTailRenderer.renderRasterAsync(
-      layoutStage.frameTailInput,
-      layout: layout,
-      placed: placed,
-      animationOverlaySnapshot: animationOverlaySnapshot,
-      clock: draft.clock
-    )
-    suspensionHooks?.onEnd?()
-    let rasterSuspensionDuration =
-      if let rasterSuspensionStart, let clock = draft.clock {
-        rasterSuspensionStart.duration(to: clock.now)
-      } else {
-        Duration.zero
-      }
-
-    let output = AsyncFrameTailDraftOutput(
-      frameTailInput: layoutStage.frameTailInput,
-      layout: layout,
-      tail: tail,
-      resolved: layoutStage.resolved,
-      runtimeIssues: layoutStage.runtimeIssues,
-      renderSuspensionDuration: layoutStage.suspensionDuration + rasterSuspensionDuration
-    )
-    completionToken?.markCompleted()
-    return output
-  }
-
-  @MainActor
-  private func renderLayoutResolvingLatePreferencesAsync(
-    _ draft: FrameHeadDraft,
-    cancellationToken: FrameTailJobCancellationToken?
-  ) async -> AsyncLatePreferenceReconciliationOutput {
-    guard frameTailRenderer.needsPreparedGraphDuringLayout(draft.frameTailInput) else {
-      return await renderLayoutResolvingLatePreferencesAsync(
-        draft.frameTailInput,
-        clock: draft.clock,
-        cancellationToken: cancellationToken
-      )
-    }
-
-    draft.transaction.materializePreparedState()
-    defer {
-      draft.transaction.suspendPreparedState()
-    }
-    let layoutResult = await renderLayoutResolvingLatePreferencesAsync(
-      draft.frameTailInput,
-      clock: draft.clock,
-      cancellationToken: cancellationToken
-    )
-    if layoutResult.layout != nil {
-      draft.transaction.recordPreparedGraphState()
-    }
-    return layoutResult
-  }
-
-  @MainActor
-  private func renderLayoutResolvingLatePreferencesAsync(
-    _ initialInput: FrameTailInput,
-    clock: ContinuousClock?,
-    cancellationToken: FrameTailJobCancellationToken?
-  ) async -> AsyncLatePreferenceReconciliationOutput {
-    await LatePreferenceReconciliationStage(
-      policy: Self.latePreferenceReconciliationPolicy
-    ).runAsync(initialInput: initialInput) { input in
-      await renderFrameTailLayoutAsync(
-        input,
-        clock: clock,
-        cancellationToken: cancellationToken
-      )
-    }
-  }
-
-  @MainActor
-  private func renderFrameTailLayoutAsync(
-    _ input: FrameTailInput,
-    clock: ContinuousClock?,
-    cancellationToken: FrameTailJobCancellationToken?
-  ) async -> AsyncFrameTailLayoutPass {
-    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
-    let layoutSuspends = frameTailRenderer.canOffloadLayout(input)
-    let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
-    if layoutSuspends {
-      suspensionHooks?.onBegin?()
-    }
-    let layout = await frameTailRenderer.renderLayoutAsync(
-      input,
-      clock: clock,
-      cancellationToken: cancellationToken
-    )
-    if layoutSuspends {
-      suspensionHooks?.onEnd?()
-    }
-    let layoutSuspensionDuration =
-      if let layoutSuspensionStart, let clock {
-        layoutSuspensionStart.duration(to: clock.now)
-      } else {
-        Duration.zero
-      }
-    return AsyncFrameTailLayoutPass(
-      layout: layout,
-      suspensionDuration: layoutSuspensionDuration
-    )
-  }
-
-  @MainActor
   private func makeCompletedFrameCandidate(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
@@ -1549,7 +852,7 @@ public struct DefaultRenderer {
       @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
   ) -> CompletedFrameCandidate {
     let resolved = tailOutput.resolved
-    let workerTimings = completedFrameWorkerTimings(
+    let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
       draft: draft,
       tailOutput: tailOutput
     )
@@ -1558,7 +861,7 @@ public struct DefaultRenderer {
       tailOutput: tailOutput,
       resolved: resolved
     )
-    let artifacts = makeCompletedFrameArtifacts(
+    let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
       draft: draft,
       tailOutput: tailOutput,
       resolved: resolved,
@@ -1566,7 +869,7 @@ public struct DefaultRenderer {
       commitDuration: commitDuration,
       workerTimings: workerTimings
     )
-    let eligibility = completedFrameEligibility(
+    let eligibility = CommittedFrameArtifactBuilder.eligibility(
       artifacts: artifacts,
       draft: draft,
       additionalBlockers: additionalBlockers(artifacts)
@@ -1624,50 +927,85 @@ public struct DefaultRenderer {
     let layout = candidate.tailOutput.layout
     let tail = candidate.tailOutput.tail
     candidate.draft.transaction.materializePreparedState()
-    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
-    let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: candidate.draft.graphRootIdentity,
-        resolved: candidate.resolved,
-        placed: tail.placed
-      )
-      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(candidate.draft)
-      return commitPlanner.plan(
-        resolved: candidate.resolved,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        transaction: candidate.draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+    let effects = commitFrameEffects(
+      draft: candidate.draft,
+      resolved: candidate.resolved,
+      placed: tail.placed,
+      semantics: tail.semantics,
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
-    let artifacts = makeCompletedFrameArtifacts(
+    let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
       draft: candidate.draft,
       tailOutput: candidate.tailOutput,
       resolved: candidate.resolved,
-      commit: commit,
-      commitDuration: commitDuration,
+      commit: effects.commitPlan,
+      commitDuration: effects.commitDuration,
       workerTimings: candidate.workerTimings,
-      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
+      runtimeRegistrationDiagnostics: effects.runtimeRegistrationDiagnostics
     )
 
-    candidate.draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
+    publishCommittedFrame(
+      artifacts,
+      draft: candidate.draft,
+      baselinePlacedTree: tail.baselinePlaced
+    )
+    return artifacts
+  }
+
+  @MainActor
+  private func commitFrameEffects(
+    draft: FrameHeadDraft,
+    resolved: ResolvedNode,
+    placed: PlacedNode,
+    semantics: SemanticSnapshot,
+    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
+  ) -> CommittedFrameEffects {
+    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
+    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: draft.graphRootIdentity,
+        resolved: resolved,
+        placed: placed
+      )
+      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
+      return commitPlanner.plan(
+        resolved: resolved,
+        placed: placed,
+        semantics: semantics,
+        transaction: draft.frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
+      )
+    }
+    applyWorkerCustomLayoutCacheUpdates(workerCustomLayoutCacheUpdates)
+    frameTailRenderer.pruneMeasurementCache(
+      keeping: viewGraph.liveIdentitySnapshot()
+    )
+    return CommittedFrameEffects(
+      commitPlan: commit,
+      commitDuration: commitDuration,
+      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
+    )
+  }
+
+  @MainActor
+  private func publishCommittedFrame(
+    _ artifacts: FrameArtifacts,
+    draft: FrameHeadDraft,
+    baselinePlacedTree: PlacedNode
+  ) {
+    draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
-    candidate.draft.graphDraft.updateCommittedScrollGeometry(
+    draft.graphDraft.updateCommittedScrollGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
     frameTailRenderer.storeCommittedFrame(
       artifacts,
-      baselinePlacedTree: tail.baselinePlaced
+      baselinePlacedTree: baselinePlacedTree
     )
     storeCommittedPresentationPortalState()
-    return artifacts
   }
 
   @MainActor
@@ -1709,116 +1047,6 @@ public struct DefaultRenderer {
     }
   }
 
-  private func completedFrameWorkerTimings(
-    draft: FrameHeadDraft,
-    tailOutput: AsyncFrameTailDraftOutput
-  ) -> FrameWorkerTimings? {
-    var workerTimings = tailOutput.tail.diagnostics.workerTimings
-    if var timings = workerTimings,
-      let clock = draft.clock,
-      let workerCompletedAt = tailOutput.tail.workerCompletedAt
-    {
-      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
-      workerTimings = timings
-    }
-    return workerTimings
-  }
-
-  private func makeCompletedFrameArtifacts(
-    draft: FrameHeadDraft,
-    tailOutput: AsyncFrameTailDraftOutput,
-    resolved: ResolvedNode,
-    commit: CommitPlan,
-    commitDuration: Duration,
-    workerTimings: FrameWorkerTimings?,
-    runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics = .init()
-  ) -> FrameArtifacts {
-    let layout = tailOutput.layout
-    let tail = tailOutput.tail
-    let dropEligibilityBlockers = frameTailCommitDropBlockers(
-      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
-    )
-    let phaseTimings = FramePhaseTimings(
-      resolve: draft.resolveDuration,
-      measure: tail.diagnostics.measureDuration,
-      place: tail.diagnostics.placeDuration,
-      semantics: tail.diagnostics.semanticsDuration,
-      draw: tail.diagnostics.drawDuration,
-      raster: tail.diagnostics.rasterDuration,
-      commit: commitDuration
-    )
-    let mainActorTimings = FrameMainActorTimings(
-      blocked: draft.resolveDuration
-        + (layout.ranOffMain
-          ? .zero : tail.diagnostics.measureDuration + tail.diagnostics.placeDuration)
-        + commitDuration,
-      suspended: tailOutput.renderSuspensionDuration
-    )
-    var diagnostics = FrameDiagnostics.fromCachedPhaseProducts(
-      resolved: resolved,
-      measured: tail.measured,
-      placed: tail.placed,
-      semantics: tail.semantics,
-      draw: tail.draw,
-      invalidatedIdentities: draft.frameContext.invalidatedIdentities,
-      resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
-      layoutWork: tail.diagnostics.layoutWork,
-      presentationDamage: tail.presentationDamage,
-      presentationSurfaceWidth: tail.raster.size.width,
-      phaseTimings: phaseTimings,
-      renderGenerations: .init(
-        render: draft.renderGeneration,
-        layoutInput: tailOutput.frameTailInput.generation,
-        layoutOutput: layout.generation,
-        rasterInput: tailOutput.frameTailInput.generation,
-        rasterOutput: tail.generation
-      ),
-      workerTimings: workerTimings,
-      mainActorTimings: mainActorTimings,
-      measurementCache: tail.diagnostics.measurementCache,
-      runtimeIssues: tailOutput.runtimeIssues,
-      dropEligibilityBlockers: dropEligibilityBlockers
-    )
-    diagnostics.runtime.registrations = runtimeRegistrationDiagnostics
-    let artifacts = FrameArtifacts(
-      resolvedTree: resolved,
-      measuredTree: tail.measured,
-      placedTree: tail.placed,
-      semanticSnapshot: tail.semantics,
-      drawTree: tail.draw,
-      rasterSurface: tail.raster,
-      presentationDamage: tail.presentationDamage,
-      drawnIdentities: tail.drawnIdentities,
-      commitPlan: commit,
-      diagnostics: diagnostics
-    )
-
-    return artifacts
-  }
-
-  @MainActor
-  private func completedFrameEligibility(
-    artifacts: FrameArtifacts,
-    draft: FrameHeadDraft,
-    additionalBlockers: Set<FrameDropEligibility.Blocker>
-  ) -> FrameDropEligibility {
-    return FrameDropEligibility.classify(
-      FrameDropEligibility.Candidate(
-        artifacts: artifacts,
-        additionalBlockers: additionalBlockers.union(
-          frameHeadDropBlockers(draft)
-        ),
-        hasCompleteBarrierSignals: true
-      ))
-  }
-
-  @MainActor
-  private func frameHeadDropBlockers(
-    _ draft: FrameHeadDraft
-  ) -> Set<FrameDropEligibility.Blocker> {
-    draft.transaction.draftDropEligibilityBlockers()
-  }
-
   @MainActor
   private func discardCompletedFrameCandidate(
     _ candidate: CompletedFrameCandidate,
@@ -1835,14 +1063,6 @@ public struct DefaultRenderer {
     for update in updates {
       update.apply()
     }
-  }
-
-  private func frameTailCommitDropBlockers(
-    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
-  ) -> Set<FrameDropEligibility.Blocker> {
-    FrameDropEligibility.frameTailCommitBlockers(
-      hasWorkerCustomLayoutCacheUpdates: !workerCustomLayoutCacheUpdates.isEmpty
-    )
   }
 
   @MainActor

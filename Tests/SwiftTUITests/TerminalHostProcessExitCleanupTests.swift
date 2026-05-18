@@ -74,6 +74,38 @@ struct TerminalHostProcessExitCleanupTests {
     )
   }
 
+  @Test("process-exit cleanup disables hover mouse mode when it is active")
+  func processExitCleanupDisablesActiveHoverMouseMode() throws {
+    let controller = ProcessExitCleanupController()
+    var inputPipe = try makePipe()
+    var outputPipe = try makePipe()
+    defer {
+      closePipe(&inputPipe)
+      closePipe(&outputPipe)
+      TerminalProcessExitCleanupRegistry.runForTesting()
+    }
+
+    let host = TerminalHost(
+      inputFileDescriptor: inputPipe.readEnd,
+      outputFileDescriptor: outputPipe.writeEnd,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    try host.enableRawMode()
+    try host.setPointerHoverEnabled(true)
+
+    TerminalProcessExitCleanupRegistry.runForTesting()
+    closeFileDescriptor(&outputPipe.writeEnd)
+
+    let output = try readUTF8(from: outputPipe.readEnd)
+    #expect(
+      output
+        == "\u{001B}[?1003l\u{001B}[?1002l\u{001B}[?1006l\u{001B}[?2004l\u{001B}[?25h\u{001B}[0m\u{001B}[?1049l"
+    )
+  }
+
   @Test("process-exit cleanup unregisters when raw mode is disabled normally")
   func processExitCleanupDoesNotDoubleRestoreAfterDisable() throws {
     let controller = ProcessExitCleanupController()
