@@ -204,6 +204,33 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 13: Animation Tree Queries
+
+- Objective: begin decomposing the animation lifecycle controller by moving pure
+  resolved/placed tree query helpers into a same-module helper without widening
+  package API.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationTreeQueries.swift`
+- Dependencies: Packet 12 completed the terminal presentation split; read-only
+  animation review identified this as the safest first `AnimationController`
+  slice.
+- Invariants: `AnimationController` and `AnimationFrameDraft` package-facing
+  APIs remain unchanged; matched-geometry capture order, `isSource` filtering,
+  removal lookup against previous resolved/placed trees, single-child wrapper
+  removal walk-up, child-index reinsertion, batch ref counts, completion
+  deferral, and frame-head transaction semantics remain stable.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

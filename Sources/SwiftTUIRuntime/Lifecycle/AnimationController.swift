@@ -222,37 +222,13 @@ package final class AnimationController: Sendable {
     previousPlacedRoot = placed
     var matchedBounds: [MatchedGeometryKey: CellRect] = [:]
     var matchedIdentities: [MatchedGeometryKey: Identity] = [:]
-    Self.collectMatchedGeometry(
+    AnimationTreeQueries.collectMatchedGeometry(
       placed,
       bounds: &matchedBounds,
       identities: &matchedIdentities
     )
     previousMatchedGeometryBounds = matchedBounds
     previousMatchedKeyIdentities = matchedIdentities
-  }
-
-  /// Walks the placed tree and records the bounds and identity of
-  /// every node tagged with a ``MatchedGeometryKey``.  Nodes whose
-  /// config is `isSource: false` never contribute their bounds —
-  /// they still receive match translations on frames where their
-  /// key is swapped to another identity, but a non-source instance
-  /// can't make another instance animate by disappearing.
-  ///
-  /// If multiple source-contributing nodes carry the same key in
-  /// one frame (undefined in SwiftUI as well) the last-walked
-  /// entry wins.
-  private static func collectMatchedGeometry(
-    _ node: PlacedNode,
-    bounds: inout [MatchedGeometryKey: CellRect],
-    identities: inout [MatchedGeometryKey: Identity]
-  ) {
-    if let config = node.matchedGeometry, config.isSource {
-      bounds[config.key] = node.bounds
-      identities[config.key] = node.identity
-    }
-    for child in node.children {
-      collectMatchedGeometry(child, bounds: &bounds, identities: &identities)
-    }
   }
 
   /// Number of matched-geometry animations currently in flight.
@@ -469,8 +445,14 @@ package final class AnimationController: Sendable {
       //     (fromBounds.origin - toBounds.origin) * (1 - progress)
       // so at progress 0 we land on fromBounds and at progress 1
       // we land on the natural new position.
-      guard let toBounds = Self.findBounds(in: tree, identity: key.identity)
-      else { continue }
+      guard
+        let toBounds = AnimationTreeQueries.findBounds(
+          in: tree,
+          identity: key.identity
+        )
+      else {
+        continue
+      }
       let deltaX =
         Double(fromBounds.origin.x - toBounds.origin.x)
         * (1.0 - progress)
@@ -506,19 +488,6 @@ package final class AnimationController: Sendable {
         )
       }
     )
-  }
-
-  private static func findBounds(
-    in node: PlacedNode,
-    identity: Identity
-  ) -> CellRect? {
-    if node.identity == identity { return node.bounds }
-    for child in node.children {
-      if let found = findBounds(in: child, identity: identity) {
-        return found
-      }
-    }
-    return nil
   }
 
   /// Number of insertion-offset animations currently in flight.
@@ -738,7 +707,10 @@ package final class AnimationController: Sendable {
       // already owns the visual transition.  Skip the removal
       // overlay so the old view just disappears.
       if let previousRoot = previousTreeRoot,
-        let previousNode = findNode(in: previousRoot, identity: identity),
+        let previousNode = AnimationTreeQueries.findResolvedNode(
+          in: previousRoot,
+          identity: identity
+        ),
         let removedConfig = previousNode.matchedGeometry,
         matchedKeysConsumedByMatch.contains(removedConfig.key)
       {
@@ -770,7 +742,10 @@ package final class AnimationController: Sendable {
       var injectionParent = previousParentByIdentity[identity]
       while let parent = injectionParent, !newIdentities.contains(parent) {
         // Stop before climbing through a multi-child container.
-        if let parentNode = findNode(in: previousRoot, identity: parent),
+        if let parentNode = AnimationTreeQueries.findResolvedNode(
+          in: previousRoot,
+          identity: parent
+        ),
           parentNode.children.count > 1
         {
           break
@@ -783,7 +758,10 @@ package final class AnimationController: Sendable {
       // If the walk-up stopped at a multi-child container (break),
       // injectionParent may still be a removed identity — skip.
       guard let injectionParent, newIdentities.contains(injectionParent),
-        let subtree = findSubtree(in: previousRoot, identity: injectionTarget)
+        let subtree = AnimationTreeQueries.findResolvedSubtree(
+          in: previousRoot,
+          identity: injectionTarget
+        )
       else { continue }
 
       // Before clearing the injected subtree's active animations, peek
@@ -791,7 +769,7 @@ package final class AnimationController: Sendable {
       // registered identity (or anywhere in the subtree) so the
       // removal can start from the displayed value instead of
       // snapping back to 1.0.  Must run before the filter below.
-      let injectedIdentities = collectIdentities(in: subtree)
+      let injectedIdentities = AnimationTreeQueries.collectIdentities(in: subtree)
       var initialOpacity: Double = 1.0
       let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
       if let existing = activeAnimations[keyOnTarget],
@@ -842,7 +820,7 @@ package final class AnimationController: Sendable {
       // injected post-layout (draw-only, no layout-shift).
       let placedSnapshot: PlacedNode?
       if let previousPlacedRoot {
-        placedSnapshot = findPlacedSubtree(
+        placedSnapshot = AnimationTreeQueries.findPlacedSubtree(
           in: previousPlacedRoot,
           identity: injectionTarget
         )
@@ -962,57 +940,6 @@ package final class AnimationController: Sendable {
 
     pendingEmptyBatchCompletions[batchID] =
       timestamp.advanced(by: drainDelay)
-  }
-
-  /// Recursively searches a resolved tree for the subtree rooted at
-  /// `identity` and returns a copy of it.
-  private func findSubtree(
-    in root: ResolvedNode,
-    identity: Identity
-  ) -> ResolvedNode? {
-    if root.identity == identity { return root }
-    for child in root.children {
-      if let match = findSubtree(in: child, identity: identity) {
-        return match
-      }
-    }
-    return nil
-  }
-
-  /// Convenience wrapper around ``findSubtree(in:identity:)`` used
-  /// by matched-geometry removal detection — same behavior, more
-  /// readable name at the call site.
-  private func findNode(
-    in root: ResolvedNode,
-    identity: Identity
-  ) -> ResolvedNode? {
-    findSubtree(in: root, identity: identity)
-  }
-
-  /// Recursively searches a placed tree for the subtree rooted at
-  /// `identity` and returns a copy of it.  Used to capture the
-  /// frozen bounds of a disappearing subtree for draw-only overlay
-  /// injection.
-  private func findPlacedSubtree(
-    in root: PlacedNode,
-    identity: Identity
-  ) -> PlacedNode? {
-    if root.identity == identity { return root }
-    for child in root.children {
-      if let match = findPlacedSubtree(in: child, identity: identity) {
-        return match
-      }
-    }
-    return nil
-  }
-
-  /// Returns the set of every identity in a subtree (inclusive).
-  private func collectIdentities(in subtree: ResolvedNode) -> Set<Identity> {
-    var result: Set<Identity> = [subtree.identity]
-    for child in subtree.children {
-      result.formUnion(collectIdentities(in: child))
-    }
-    return result
   }
 
   /// Marks every node in the subtree as transient so the semantic
@@ -1618,7 +1545,7 @@ package final class AnimationController: Sendable {
   }
 
   /// Walks the current tree and injects removal snapshots at their
-  /// previous parent identity and child index.  If the previous index
+  /// previous parent identity and child index. If the previous index
   /// exceeds the current children count, the snapshot is appended at
   /// the end.
   private func injectRemovals(
@@ -1627,7 +1554,7 @@ package final class AnimationController: Sendable {
   ) -> ResolvedNode {
     var node = tree
     // Recurse first so child injections happen before parent-level
-    // splicing — this preserves the visual order of nested removals.
+    // splicing; this preserves the visual order of nested removals.
     var children = node.children.map { child in
       injectRemovals(tree: child, injectionsByParent: injectionsByParent)
     }

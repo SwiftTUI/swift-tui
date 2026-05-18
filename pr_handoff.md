@@ -72,6 +72,11 @@ Packet 12 should be reviewed as terminal presentation planning extraction:
 - `Sources/SwiftTUIRuntime/Terminal/TerminalPresentation.swift`
 - `Sources/SwiftTUIRuntime/Terminal/TerminalPresentationPlanning.swift`
 
+Packet 13 should be reviewed as animation tree-query extraction:
+
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationTreeQueries.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -297,6 +302,25 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-041849-32895.log
 ```
 
+Packet 13 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests
+swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests
+swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-042708-50577.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -319,12 +343,14 @@ and shared sampling extraction. Packet 9 is fallback image overlay extraction.
 Packet 10 is terminal-host capability probing extraction. Packet 11 is
 terminal-host escape sequence, platform I/O shim, and process-exit cleanup
 extraction. Packet 12 is terminal presentation planning extraction.
+Packet 13 is animation tree-query extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
 pixel metrics refresh, input precision propagation, raw-mode cleanup,
 WebSurface full-repaint byte accounting, presentation damage planning, Kitty
-graphics replay planning, or public API regression appears.
+graphics replay planning, matched-geometry traversal, removal subtree lookup,
+or public API regression appears.
 
 ## AI Assistance Disclosure
 
