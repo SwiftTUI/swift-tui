@@ -130,6 +130,47 @@ against local source evidence.
 - Required checks: focused CLI tests first, then `bun run test`.
 - Rollback: revert the packet commit/files only.
 
+### Packet 10: Terminal Host Capability Probing
+
+- Objective: keep `TerminalHost` focused on terminal lifecycle and presentation
+  orchestration by moving graphics and pointer capability probing into a
+  same-module extension.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalHostCapabilities.swift`
+- Dependencies: Packets 1, 2, 7, 8, and 9 clarified terminal presentation and
+  image-rendering ownership.
+- Invariants: public host APIs, raw-mode ordering, image-probe drain-before-query
+  behavior, live Kitty/Sixel probing, SGR-pixels trust policy decisions, cell
+  pixel metric cache refresh behavior, and input-reader precision propagation
+  remain stable.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - `swiftly run swift test --filter SwiftTUITests.CellPixelMetricsRefreshTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
+### Packet 11: Terminal Host Sequences and Cleanup
+
+- Objective: continue reducing `TerminalHost` by isolating escape-sequence
+  construction and process-exit cleanup from presentation orchestration.
+- Likely owned files:
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+  - new terminal-host helper file selected after discovery.
+- Dependencies: Packet 10.
+- Invariants: raw-mode enter/exit bytes, mouse reporting mode bytes, bracketed
+  paste toggles, cursor visibility/focus bytes, process-exit reset bytes, and
+  synchronous cleanup ordering remain stable.
+- Required checks: terminal host presentation, raw-mode cleanup, input, and repo
+  gate tests selected from touched helpers.
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
