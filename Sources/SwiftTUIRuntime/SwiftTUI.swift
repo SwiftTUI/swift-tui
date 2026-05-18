@@ -1567,14 +1567,9 @@ public struct DefaultRenderer {
     draft: FrameHeadDraft,
     additionalBlockers: Set<FrameDropEligibility.Blocker>
   ) -> FrameDropEligibility {
-    var classificationArtifacts = artifacts
-    classificationArtifacts.diagnostics.drop.eligibilityBlockers.subtract([
-      .retainedLayoutBaseline,
-      .retainedRasterBaseline,
-    ])
     return FrameDropEligibility.classify(
       FrameDropEligibility.Candidate(
-        artifacts: classificationArtifacts,
+        artifacts: artifacts,
         additionalBlockers: additionalBlockers.union(
           frameHeadDropBlockers(draft)
         ),
@@ -1611,14 +1606,9 @@ public struct DefaultRenderer {
   private func frameTailCommitDropBlockers(
     workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
   ) -> Set<FrameDropEligibility.Blocker> {
-    var blockers: Set<FrameDropEligibility.Blocker> = [
-      .retainedLayoutBaseline,
-      .retainedRasterBaseline,
-    ]
-    if !workerCustomLayoutCacheUpdates.isEmpty {
-      blockers.insert(.workerCustomLayoutCacheUpdate)
-    }
-    return blockers
+    FrameDropEligibility.frameTailCommitBlockers(
+      hasWorkerCustomLayoutCacheUpdates: !workerCustomLayoutCacheUpdates.isEmpty
+    )
   }
 
   @MainActor
