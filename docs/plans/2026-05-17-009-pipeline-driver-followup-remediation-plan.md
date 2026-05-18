@@ -1867,7 +1867,7 @@ git add Sources/SwiftTUICore/Raster/ Tests/SwiftTUICoreTests/RasterizerTests.swi
 git commit -m "test: prove incremental repaint equals fresh raster (F13)"
 ```
 
-- [ ] **Step 5: F13 DoD** — `swift test --filter RasterizerTests.incrementalRepaintEqualsFreshRaster` PASSES. Record F13 ledger row (Mechanism `code+test`).
+- [x] **Step 5: F13 DoD** — `swift test --filter RasterizerTests.incrementalRepaintEqualsFreshRaster` PASSES. Record F13 ledger row (Mechanism `code+test`).
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
