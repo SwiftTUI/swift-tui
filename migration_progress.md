@@ -102,6 +102,9 @@ Approved constraints:
   and nonblocking drain mechanics into `TerminalInputStreamReading.swift`,
   leaving WASI polling and DispatchSource stream ownership in
   `InputReader.swift`.
+- Packet 28 completed: extracted placed overlay sampling into
+  `PlacedAnimationOverlaySampling.swift`, leaving `AnimationController` as the
+  owner of custom-state writeback, completed-key removal, and batch release.
 
 ## Baseline Validation
 
@@ -606,30 +609,69 @@ Packet 27 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-065523-66925.log`
   - Result: PASS
 
+Packet 28 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/matchedGeometryTriggersTranslationAnimation`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/matchedGeometryRendersAtSourceAtProgressZero`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/insertionOffsetAnimationCompletes`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/removalOverlaysDoNotAccumulateAcrossTickFrames`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/transitionRemovalIsInjectedAtPlacedLevel`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests/insertionOffsetTranslatesPlacedBounds`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/preparedFrameHeadKeepsTransitionAnimationsDraftOwnedUntilCommit`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS, 18 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS, 17 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests`
+  - Result: PASS, 7 tests
+- `swiftly run swift test --filter SwiftTUITests.MotionAndProgressPolicyTests`
+  - Result: PASS, 9 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-083720-85404.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 28: animation controller overlay sampling. Packet 27 finished the
-terminal input read/drain boundary, and current production file-size signals now
-point back at `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift` as
-the largest remaining `SwiftTUIRuntime` file. The next packet should use a
-read-only subagent audit first, then extract placed-overlay sampling or a
-similarly bounded animation helper without moving controller-owned mutable
-state.
+Packet 29: DefaultRenderer frame-head decomposition. Packet 28 moved placed
+overlay sampling out of `AnimationController`, and current production file-size
+signals put `Sources/SwiftTUIRuntime/SwiftTUI.swift` back above the animation
+controller. The next packet should use a read-only subagent audit first, then
+extract a bounded frame-head setup helper without changing renderer API,
+transaction, or commit behavior.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
-- a new same-folder animation helper if the audit confirms a safe boundary
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- a new same-folder rendering or runtime helper if the audit confirms a safe
+  boundary
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
-- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
-- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
-- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
-- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
-- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+- `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
 - `bun run test`
 
 ## Failed Attempts

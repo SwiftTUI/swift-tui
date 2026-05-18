@@ -154,6 +154,11 @@ Packet 27 should be reviewed as terminal input descriptor-reading extraction:
 - `Sources/SwiftTUIRuntime/Input/TerminalInputStreamReading.swift`
 - `Tests/SwiftTUITests/InputBatchingResponsivenessTests.swift`
 
+Packet 28 should be reviewed as placed animation overlay sampling extraction:
+
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/PlacedAnimationOverlaySampling.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -663,6 +668,35 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-065523-66925.log
 ```
 
+Packet 28 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/matchedGeometryTriggersTranslationAnimation
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/matchedGeometryRendersAtSourceAtProgressZero
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/insertionOffsetAnimationCompletes
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/removalOverlaysDoNotAccumulateAcrossTickFrames
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests/transitionRemovalIsInjectedAtPlacedLevel
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests/insertionOffsetTranslatesPlacedBounds
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/preparedFrameHeadKeepsTransitionAnimationsDraftOwnedUntilCommit
+swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests
+swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests
+swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests
+swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests
+swiftly run swift test --filter SwiftTUITests.MotionAndProgressPolicyTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-083720-85404.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -712,6 +746,7 @@ Packet 24 is terminal raw-mode session extraction.
 Packet 25 is input event decoding extraction.
 Packet 26 is terminal input parser file split.
 Packet 27 is terminal input descriptor-reading extraction.
+Packet 28 is placed animation overlay sampling extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -738,7 +773,9 @@ input filtering, mouse-coordinate snapshot, pending mouse flush, or
 DispatchSource/WASI stream-finish, terminal byte parser buffering, SGR mouse
 coordinate decoding, bracketed-paste envelope, key parser regression, read
 would-block/EOF classification, drained-bytes-before-EOF behavior, or
-non-would-block input failure handling
+non-would-block input failure handling, placed removal overlay sampling,
+insertion offset sampling, matched-geometry offset sampling, animation
+custom-state writeback, or animation batch release
 appears.
 
 ## AI Assistance Disclosure

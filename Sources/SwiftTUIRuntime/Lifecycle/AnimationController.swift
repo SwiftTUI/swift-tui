@@ -336,158 +336,27 @@ package final class AnimationController: Sendable {
     for tree: PlacedNode,
     at timestamp: MonotonicInstant
   ) -> PlacedAnimationOverlaySnapshot {
-    // 1. Inject removal overlays.
-    var removalOverlays: [PlacedRemovalOverlaySnapshot] = []
-    if !removingIdentities.isEmpty {
-      for (identity, entry) in removingIdentities {
-        guard let placedSnapshot = entry.placedSnapshot,
-          let parentId = entry.parentIdentity
-        else {
-          continue  // No placed capture → resolved-level path handles it.
-        }
-
-        let modifiers: TransitionModifiers
-        if let box = entry.animationBox, let anim = registeredAnimations[box] {
-          let elapsed = entry.startTime.duration(to: timestamp)
-          var state = entry.customState
-          let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-          // Write the updated custom state back so the next tick of
-          // the exit transition carries user bookkeeping forward
-          // (matches the active-animation tick loop pattern).
-          removingIdentities[identity]?.customState = state
-          if let progress = evaluated {
-            modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
-              from: entry.startOpacity,
-              to: entry.transition.removalModifiers(),
-              progress: progress
-            )
-          } else {
-            continue  // Completion handled in applyInterpolations.
-          }
-        } else {
-          continue
-        }
-
-        removalOverlays.append(
-          .init(
-            parentIdentity: parentId,
-            childIndex: entry.childIndex,
-            snapshot: placedSnapshot,
-            modifiers: modifiers
-          )
-        )
-      }
-    }
-
-    // 2. Translate placed nodes for insertion offset animations.
-    //    Filter the unified active map down to the .insertionOffset
-    //    scope; everything else (property + matchedGeometry) is
-    //    ignored on this pass.
-    var insertionOffsetsByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
-    var completedInsertionKeys: [AnimationKey] = []
-
-    for (key, entry) in activeAnimations {
-      guard key.scope == .insertionOffset else { continue }
-      guard case .insertionOffset(let from) = entry.kind else { continue }
-      guard let anim = registeredAnimations[entry.animationBox] else {
-        completedInsertionKeys.append(key)
-        continue
-      }
-      let elapsed = entry.startTime.duration(to: timestamp)
-      var state = entry.customState
-      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-      activeAnimations[key]?.customState = state
-
-      guard let progress = evaluated else {
-        // Animation complete: delta is 0 (fully at final position).
-        completedInsertionKeys.append(key)
-        continue
-      }
-      // Insertion interpolates `from` → 0.
-      // At progress p, interpolated = from * (1 - p).
-      let dx = Int(Double(from.x) * (1.0 - progress))
-      let dy = Int(Double(from.y) * (1.0 - progress))
-      insertionOffsetsByIdentity[key.identity] = (dx: dx, dy: dy)
-    }
-
-    for key in completedInsertionKeys {
-      if let entry = activeAnimations.removeValue(forKey: key) {
-        releaseBatch(entry.batchID)
-      }
-    }
-
-    // 3. Apply matched-geometry translations.  At progress 0 the
-    //    new identity renders at the PREVIOUS frame's bounds; at
-    //    progress 1 it renders at its natural new bounds.  Same
-    //    filter pattern: only .matchedGeometry-scoped keys.
-    var matchedDeltasByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
-    var completedMatchedKeys: [AnimationKey] = []
-
-    for (key, entry) in activeAnimations {
-      guard key.scope == .matchedGeometry else { continue }
-      guard case .matchedGeometry(let fromBounds) = entry.kind else { continue }
-      guard let anim = registeredAnimations[entry.animationBox] else {
-        completedMatchedKeys.append(key)
-        continue
-      }
-      let elapsed = entry.startTime.duration(to: timestamp)
-      var state = entry.customState
-      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-      activeAnimations[key]?.customState = state
-
-      guard let progress = evaluated else {
-        completedMatchedKeys.append(key)
-        continue
-      }
-
-      // Look up the new placed bounds for this identity in the
-      // current tree.  The translation delta is
-      //     (fromBounds.origin - toBounds.origin) * (1 - progress)
-      // so at progress 0 we land on fromBounds and at progress 1
-      // we land on the natural new position.
-      guard
-        let toBounds = AnimationTreeQueries.findBounds(
-          in: tree,
-          identity: key.identity
-        )
-      else {
-        continue
-      }
-      let deltaX =
-        Double(fromBounds.origin.x - toBounds.origin.x)
-        * (1.0 - progress)
-      let deltaY =
-        Double(fromBounds.origin.y - toBounds.origin.y)
-        * (1.0 - progress)
-      matchedDeltasByIdentity[key.identity] = (
-        dx: Int(deltaX.rounded()),
-        dy: Int(deltaY.rounded())
-      )
-    }
-
-    for key in completedMatchedKeys {
-      if let entry = activeAnimations.removeValue(forKey: key) {
-        releaseBatch(entry.batchID)
-      }
-    }
-
-    return .init(
-      removalOverlays: removalOverlays,
-      insertionOffsets: insertionOffsetsByIdentity.map { identity, offset in
-        .init(
-          identity: identity,
-          dx: offset.dx,
-          dy: offset.dy
-        )
-      },
-      matchedGeometryOffsets: matchedDeltasByIdentity.map { identity, offset in
-        .init(
-          identity: identity,
-          dx: offset.dx,
-          dy: offset.dy
-        )
-      }
+    let result = PlacedAnimationOverlaySampling.sample(
+      removingIdentities: removingIdentities,
+      activeAnimations: activeAnimations,
+      registeredAnimations: registeredAnimations,
+      tree: tree,
+      timestamp: timestamp
     )
+
+    for (identity, state) in result.removalCustomStates {
+      removingIdentities[identity]?.customState = state
+    }
+    for (key, state) in result.activeAnimationCustomStates {
+      activeAnimations[key]?.customState = state
+    }
+    for key in result.completedAnimationKeys {
+      if let entry = activeAnimations.removeValue(forKey: key) {
+        releaseBatch(entry.batchID)
+      }
+    }
+
+    return result.snapshot
   }
 
   /// Number of insertion-offset animations currently in flight.
