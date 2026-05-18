@@ -63,20 +63,49 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
-### Packet 3: Frame Tail / Artifacts Readability
+### Packet 3: Frame Tail Presentation Damage
 
-- Objective: make the frame-tail and artifact flow easier to trace while
-  preserving phase products and frame-drop semantics.
-- Likely owned files: pending discovery, expected to be inside
-  `Sources/SwiftTUIRuntime/Rendering/` and `Sources/SwiftTUICore/Commit/`.
-- Dependencies: Packet 2 only if shared presentation concepts are renamed or
-  extracted.
-- Invariants: phase order, retained frame reuse, damage hints, diagnostics, and
-  async/sync parity remain stable.
-- Required checks: pipeline/rendering focused tests first, then `bun run test`.
+- Objective: move the retained-frame presentation-damage proof boundary out of
+  `FrameTailRenderer` so terminal damage safety is isolated and reviewable.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/FrameTailPresentationDamage.swift`
+- Dependencies: Packet 2.
+- Invariants: retained frame reuse, damage hints, raster reuse fallback,
+  async/sync artifact parity, and frame-drop classifications remain stable.
+- Required checks:
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.FrameTailWorkerFallbackTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.RetainedReuseInvariantTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - `bun run test`
 - Rollback: revert the packet commit/files only.
 
-### Packet 4: RunLoop Presentation Path
+### Packet 4: Frame Artifact File Split
+
+- Objective: separate frame diagnostics and frame context from the artifact
+  payload so `FrameArtifacts.swift` describes the artifact bundle directly.
+- Likely owned files:
+  - `Sources/SwiftTUICore/Commit/FrameArtifacts.swift`
+  - `Sources/SwiftTUICore/Commit/FrameDiagnostics.swift`
+  - `Sources/SwiftTUICore/Commit/FrameContext.swift`
+- Dependencies: Packet 3.
+- Invariants: public API inventory, diagnostic lazy-summary behavior,
+  `FrameArtifacts` equality semantics, `drawnIdentities` visibility, and
+  `FrameDiagnostics.fromCachedPhaseProducts` field mapping remain stable.
+- Required checks:
+  - `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.LayoutEngineTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
+### Packet 5: RunLoop Presentation Path
 
 - Objective: reduce cognitive load in frame acquisition, commit, and
   presentation handoff code.
@@ -89,7 +118,7 @@ against local source evidence.
   `bun run test`.
 - Rollback: revert the packet commit/files only.
 
-### Packet 5: Platform Entrypoint Clarity
+### Packet 6: Platform Entrypoint Clarity
 
 - Objective: clarify how CLI/render-once entrypoints connect to runtime and
   terminal hosts.
