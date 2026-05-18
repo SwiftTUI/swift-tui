@@ -472,6 +472,42 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 22: RunLoop Frame Acquisition
+
+- Objective: make the runtime frame driver easier to follow by moving async
+  artifact acquisition, render-mode dispatch, queued-tail cancellation policy,
+  skipped-tail diagnostics, cancelled-intent replay, and completed-frame drop
+  blockers into a same-folder run-loop helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+  - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift`
+- Dependencies: Packet 21 isolated focus-sync convergence. Read-only runtime
+  review identified frame acquisition as the next dense runtime seam because
+  cancellation, dropped completed frames, event-pump fairness, and diagnostics
+  were interleaved with the outer frame loop.
+- Invariants: `renderPendingFramesAsync` remains the frame driver and skipped
+  tails still continue its outer frame loop; `FrameAcquisitionState` remains a
+  private rendering-file detail for the final commit body; skipped tails never
+  enter `processFocusSyncIteration` or `applyAcquiredFrame`; cancelled-before-
+  start frames still report runtime issues, carry lifecycle forward, increment
+  `cancelledRenderCount`, replay the cancelled intent, log diagnostics, record
+  `.frameSkipped`, and avoid incrementing `renderedFrames`; dropped-completed
+  frames still report issues, carry lifecycle forward, log diagnostics, record
+  `.frameSkipped`, and avoid replay/cancellation counts; `.sync` inside the
+  async entry still uses `renderer.render`, event-pump-free async still uses
+  `renderer.renderAsync`, `.asyncNoCancel` disables queued cancellation, and
+  `.asyncNoDrop` passes `.orderedCommitOnly`.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+  - `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
