@@ -387,6 +387,16 @@ public struct FrameDropEligibility: Equatable, Sendable {
     return Self(blockers: blockers, impact: impact)
   }
 
+  package static func frameTailCommitBlockers(
+    hasWorkerCustomLayoutCacheUpdates: Bool
+  ) -> Set<Blocker> {
+    var blockers: Set<Blocker> = []
+    if hasWorkerCustomLayoutCacheUpdates {
+      blockers.insert(.workerCustomLayoutCacheUpdate)
+    }
+    return blockers
+  }
+
   private static func impact(for decision: Decision) -> CompletedFrameImpact {
     switch decision {
     case .canDropVisualOnly:
