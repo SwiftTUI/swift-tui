@@ -391,29 +391,45 @@ Packet 18 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-051003-41466.log`
   - Result: PASS
 
+Packet 19 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.BoundedReconciliationTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.ToolbarTests`
+  - Result: PASS, 19 tests
+- `swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests`
+  - Result: PASS, 2 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-051542-56825.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 19: late preference reconciliation extraction. Read-only runtime review
-ranked this as the next safest high-value central rendering split after the
-input support checkpoint: move late-preference policy, sync/async reconciliation
-loop types, and runtime issue helpers out of `DefaultRenderer` into a
-same-subsystem helper without moving queued-cancellation or prepared-graph
-materialization.
+Packet 20: frame-head draft/transaction file split. Read-only runtime review
+ranked this as the next lower-risk cleanup after late-preference reconciliation:
+`FrameTailRenderer.swift` still contains frame-head transaction/draft helper
+types before the tail renderer itself. The next packet should move those helper
+types into a same-folder file without changing draft commit/discard behavior.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
-- `Sources/SwiftTUIRuntime/Rendering/LatePreferenceReconciliation.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- likely `Sources/SwiftTUIRuntime/Rendering/FrameHeadDraftTransaction.swift`
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.BoundedReconciliationTests`
-- `swiftly run swift test --filter SwiftTUITests.ToolbarTests`
-- `swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningTests`
-- `swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests`
 - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
 - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
 - `bun run test`
 
 ## Failed Attempts

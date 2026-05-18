@@ -431,6 +431,24 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-051003-41466.log
 ```
 
+Packet 19 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.BoundedReconciliationTests
+swiftly run swift test --filter SwiftTUITests.ToolbarTests
+swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningTests
+swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-051542-56825.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -459,6 +477,7 @@ Packet 15 is animation property-value application extraction.
 Packet 16 is completed-frame artifact support extraction.
 Packet 17 is run-loop frame diagnostics extraction.
 Packet 18 is input reader pure support type extraction.
+Packet 19 is late-preference reconciliation extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -470,7 +489,8 @@ reinjection ordering, property animation writeback, flexible-frame dimension
 slot preservation, shape-style destination routing, completed-frame preview
 side-effect isolation, completed-frame drop classification, diagnostics timing
 fields, skipped-frame diagnostic record, render-suspension input counting, or
-public input-event/protocol surface regression appears.
+public input-event/protocol surface, late-preference pass budget, toolbar
+runtime issue, or layout-dependent realization regression appears.
 
 ## AI Assistance Disclosure
 
