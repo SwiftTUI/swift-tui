@@ -1650,7 +1650,7 @@ git commit -m "docs: derive and justify the late-preference reconciliation bound
 
 ## Task 8.2: Justify the focus-sync bound and name both loops
 
-- [ ] **Step 1: Justify `16`**
+- [x] **Step 1: Justify `16`**
 
 In `FocusSyncRerenderBudget` (`RunLoop+Rendering.swift`), replace the bare
 `maximumRerenders: Int = 16` default with a comment deriving it (the maximum
@@ -1658,14 +1658,14 @@ number of focus/scroll/focused-value cascades a single frame can legitimately
 trigger) or, if empirical, an explicit statement that it is an empirical
 ceiling with the overflow symptom documented.
 
-- [ ] **Step 2: Update `ARCHITECTURE.md`**
+- [x] **Step 2: Update `ARCHITECTURE.md`**
 
 In the "Frame Pipeline" section, explicitly name late-preference reconciliation
 and focus-sync convergence as the two loop-bearing stages, and state that the
 "phase products flow in order" claim describes products, not a single pass.
 CB-2 downstream edit.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift docs/ARCHITECTURE.md

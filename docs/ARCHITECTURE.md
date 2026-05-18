@@ -99,8 +99,8 @@ head -> animation injection -> late-preference reconciliation -> fused frame tai
   mutate during the transaction.
 - Animation injection is a named post-head stage that rewrites the resolved
   tree for the current animation transaction.
-- Late-preference reconciliation is a bounded loop-bearing stage that may
-  rerun layout until placement-time preferences converge or the documented
+- Late-preference reconciliation is the first bounded loop-bearing stage. It
+  may rerun layout until placement-time preferences converge or the documented
   limit is reached.
 - The fused frame tail runs measure, place, semantics, draw, and raster as one
   performance node.
@@ -110,7 +110,14 @@ Sync, async, and cancellable rendering are execution strategies over that one
 composition. The async strategies may offload frame-tail work and may drop only
 completed visual-only frames under the shipped stale-frame policy.
 
-Within that composition, the typed phase products still flow in this order:
+The interactive `RunLoop` adds the second bounded loop-bearing stage:
+focus-sync convergence. After a strategy acquires candidate artifacts, the
+driver may rerender the same scheduled frame when focus regions, focus
+requests/defaults, focused values, or scroll positions change, up to the
+`FocusSyncRerenderBudget` ceiling.
+
+Within that composition and the interactive wrapper, the typed phase products
+still flow in this order:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
@@ -118,8 +125,9 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 
 This product ordering is visible in the `RuntimeRenderStageName` composition
 the executor walks, `FrameArtifacts`, diagnostics, and the regression suites.
-It is not a claim that the production runtime schedules seven independent
-closure stages for each frame.
+It describes product ownership and ordering, not a single-pass execution model
+or a claim that the production runtime schedules seven independent closure
+stages for each frame.
 
 ## Coordinate Domains
 
