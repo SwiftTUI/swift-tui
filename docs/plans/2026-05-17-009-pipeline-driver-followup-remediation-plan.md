@@ -1876,10 +1876,10 @@ git commit -m "docs: ledger F13 resolved (code+test)"
 
 ## Task 9.4: Phase 9 Gate
 
-- [ ] **Step 1:** `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F9/F10/F13 ledger rows complete; DoD commands pass.
-- [ ] **Step 4:** `git commit --allow-empty -m "chore: phase 9 gate green (F9, F10, F13)"`
+- [x] **Step 1:** `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F9/F10/F13 ledger rows complete; DoD commands pass.
+- [x] **Step 4:** `git commit --allow-empty -m "chore: phase 9 gate green (F9, F10, F13)"`
 
 ---
 
