@@ -645,6 +645,58 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 27: Terminal Input Descriptor Reading
+
+- Objective: keep `InputReader.swift` focused on stream ownership by moving
+  platform `read` classification and nonblocking descriptor draining into a
+  small helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+  - `Sources/SwiftTUIRuntime/Input/TerminalInputStreamReading.swift`
+  - `Tests/SwiftTUITests/InputBatchingResponsivenessTests.swift`
+- Dependencies: Packet 26 moved parser state out of `InputReader`. A read-only
+  stream-loop audit confirmed this slice should extract read/drain mechanics
+  only, while leaving WASI task-backed polling and DispatchSource lifecycle
+  semantics in `InputReader`.
+- Invariants: public input APIs stay unchanged; WASI keeps detached task-backed
+  polling, 512-byte reads, 1 ms would-block sleep, keyboard-only `Task.yield()`,
+  and EOF/error finish behavior; DispatchSource streams keep queue/source
+  ownership, cancellation handlers, stream termination, and 256-byte drains in
+  `InputReader`; full-input streams still flush pending mouse events before
+  control messages and before EOF/error finish; non-would-block read failures
+  still finish/cancel the stream; EOF after drained bytes still decodes/yields
+  those bytes before finishing; mouse-coordinate mode remains a
+  stream-creation snapshot.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
+### Packet 28: Animation Controller Overlay Sampling
+
+- Objective: continue the runtime decomposition by moving placed-overlay
+  sampling and completion bookkeeping out of `AnimationController.swift`
+  without changing animation state ownership.
+- Likely owned files, pending read-only subagent audit:
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+  - a new same-folder animation helper
+- Dependencies: Packets 13-15 extracted tree queries, transition overlays, and
+  property value application. Current debt metrics show `AnimationController`
+  is the largest remaining `SwiftTUIRuntime` production file.
+- Invariants: animation controller still owns mutable animation dictionaries,
+  batch ref counts, custom-state writeback, purge decisions, and completion
+  deferral; placed removal overlays, insertion offsets, and matched-geometry
+  deltas preserve existing timing, progress, completion, and deadline behavior.
+- Required checks: focused animation controller/pipeline tests first, then
+  `bun run test`.
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
