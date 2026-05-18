@@ -9,15 +9,38 @@ checkout, and the verifying commit hash is recorded.
 | --- | --- | --- | --- |
 | F1  | code+test | `grep -rn "RuntimeFrameHeadStage\|precondition(stageOrder" --include="*.swift" Sources` prints nothing — `RuntimeRenderPipeline` is a sequenced executor with no `headStage` field, no `stageOrder` initializer parameter, and no canonical-order `precondition`; dead config (`RuntimeFrameHeadStage`, frozen `stageOrder` param + precondition) deleted; stage order now executor-enforced; `RenderPipelineStructureTests.stageOrderIsStructural` pins the structural property and `composedRenderTimeBudget` pins the within-2x wall-clock time budget | 36a8b529, 1e163dbd |
 | F2  | code+test | `grep -n "rerenderedForFocusSync" Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift` shows the focus-sync rerender flag declared once (`FocusSyncConvergenceState`) and read/written only through the shared `processFocusSyncIteration` / `applyAcquiredFrame`; both `renderPendingFrames` and `renderPendingFramesAsync` are thin delegators | 6d70ca63 |
-| F3  | code+test | `swiftly run swift test --filter ResolvePurityTests` passes; `grep -c "\.discard()" Sources/SwiftTUIRuntime/SwiftTUI.swift` returns `1`, and `abortPreparedFrameHead` contains the single `draft.transaction.discard()` call instead of the former six loose rollback calls | cd91890c, fd262018 |
-| F4  | code+test | `swiftly run swift test --filter ViewGraphCheckpointTotalityTests` passes; `ViewGraphCheckpointTotalityTests.mutableFieldsAreCheckpointCovered` source-checks every mutable `ViewGraph` / `ViewNode` stored field against checkpoint coverage, `checkpointRestoreRoundTrips` proves restore identity over a mutated graph, and `AsyncFrameTailRenderingTests.previewCommitEqualsRealCommit` proves completed-frame preview commit plans match real commit plans | 80011951 |
+| F3  | _pending_ | _pending_ | _pending_ |
+| F4  | _pending_ | _pending_ | _pending_ |
 | F5  | code+test | `grep -rn "while cancellationToken.currentState\|Task.sleep(for: \\.milliseconds(1))" --include="*.swift" Sources/SwiftTUIRuntime` prints nothing for queued-tail cancellation; `FrameTailJobCancellationToken.waitUntilLeavesQueue()` and `FrameScheduler.waitForPendingFrame(at:)` provide continuation-backed queue-exit / pending-frame signals; `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/queuedFrameTailCancelsBeforeWorkerLayoutStarts` passes | 80011951 |
-| F6  | code+test | `grep -n "maximumRelayoutPasses\|maximumRerenders" Sources/SwiftTUIRuntime/SwiftTUI.swift Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift` shows the bound sites; `LatePreferenceReconciliationPolicy.toolbarHostRuntimeBound` cites ADR-0018 and `FocusSyncRerenderBudget` documents the empirical focus-sync ceiling; `swiftly run swift test --filter BoundedReconciliationTests` passes | e0c6c900, bfb50711 |
+| F6  | _pending_ | _pending_ | _pending_ |
 | F7  | code+test | `swiftly run swift test --filter FrameDropDroppabilityTests` passes; `grep -n "subtract(\[" Sources/SwiftTUIRuntime/SwiftTUI.swift` prints nothing, so completed-frame eligibility no longer subtracts retained-baseline blockers after tail classification | 61639294, 815ae644 |
-| F8  | code+test | `swiftly run swift test --filter RenderDriverInstrumentationCostTests` passes; `FrameDiagnostics.summarize` consumes cached `ResolvedNode.customLayoutFallbackSummary` scalars instead of walking resolved trees, `RenderDriverInstrumentationCostTests.diagnosticsAreLazy` proves no-consumer frames do not read diagnostic summaries, and `diagnosticsComputedOnceWhenRead` proves summary reads are memoized once per frame | 6d795094 |
-| F9  | test | `swiftly run swift test --filter FrameTailWorkerFallbackTests` passes, and `grep -rn "FrameTailLayoutWorker\|renderAsync" Platforms/WASI/Tests/SwiftTUIWASITests/` shows the WASI-lane `renderAsync` smoke test | 42f60771 |
-| F10 | test | `swiftly run swift test --filter DirtyTrackingCoherenceTests` passes; the test asserts local `@State` mutation queues scheduler invalidation and ViewGraph dirty work together, clears both after rendering, and keeps the external `previousRenderedState` signal unchanged for local-only dirtiness | 897c3bf7 |
-| F11 | code+test | `grep -n "prepareAnimationOverlaySnapshot" Sources/SwiftTUIRuntime/SwiftTUI.swift` shows the shared `@MainActor` fused-frame-tail head defined once and called by both `renderFusedFrameTail` (sync) and `renderAsyncFusedFrameTail` (async); the triplicated placed-tree capture / overlay-snapshot orchestration is gone, verified by `PipelineDriverParityTests` and `RenderDriverCharacterizationTests` | f2f1e5bb |
+| F8  | _pending_ | _pending_ | _pending_ |
+| F9  | _pending_ | _pending_ | _pending_ |
+| F10 | _pending_ | _pending_ | _pending_ |
+| F11 | _pending_ | _pending_ | _pending_ |
 | F12 | code+test | `grep -c "case .fusedFrameTail" Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift` returns ≥1 — `RuntimeRenderStageName` is the discriminant the executor switches on; each `render*` entry point dispatches every stage through an exhaustive `switch`, so the enum has a control-flow consumer rather than being unused metadata | 36a8b529 |
-| F13 | code+test | `swiftly run swift test --filter RasterizerTests.incrementalRepaintEqualsFreshRaster` passes; `Rasterizer(verifyIncrementalRepaint:)` can assert fresh-vs-incremental equivalence on the retained raster path, and `RasterizerTests.incrementalRepaintEqualsFreshRaster` proves the curated text/move/clear/image mutation matrix produces a byte-identical `RasterSurface` to fresh rasterization | 5a0b08d8 |
-| F14 | code+test | `python3 -c "from pathlib import Path; t='_'+'pending'+'_'; rows=[l for l in Path('docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md').read_text().splitlines() if l.startswith(chr(124)+' F')]; print('\n'.join(r for r in rows if t in r))"` prints nothing; `python3 -c "from pathlib import Path; rows=[l.split(chr(124)) for l in Path('docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md').read_text().splitlines() if l.startswith(chr(124)+' F')]; print('\n'.join(chr(124).join(r) for r in rows if len(r) > 3 and r[2].strip().lower() == 'docs'))"` prints nothing; `grep -n "Resolution mechanism" docs/proposals/PIPELINE_DRIVER_AUDIT.md docs/proposals/PIPELINE_DRIVER_FOLLOWUP_AUDIT.md` prints both audit table headers | 3acc52a1 |
+| F13 | _pending_ | _pending_ | _pending_ |
+| F14 | _pending_ | _pending_ | _pending_ |
+
+## Independent re-audit
+
+Independent re-audit at `a595e125` reported:
+
+| Finding | Result |
+| --- | --- |
+| F1 | RESOLVED |
+| F2 | RESOLVED |
+| F3 | STILL-OBSERVABLE |
+| F4 | STILL-OBSERVABLE |
+| F5 | RESOLVED |
+| F6 | STILL-OBSERVABLE |
+| F7 | RESOLVED |
+| F8 | STILL-OBSERVABLE |
+| F9 | STILL-OBSERVABLE |
+| F10 | STILL-OBSERVABLE |
+| F11 | STILL-OBSERVABLE |
+| F12 | RESOLVED |
+| F13 | STILL-OBSERVABLE |
+| F14 | STILL-OBSERVABLE |
+
+Reopened per Task 10.3: F3, F4, F6, F8, F9, F10, F11, F13, and F14.
