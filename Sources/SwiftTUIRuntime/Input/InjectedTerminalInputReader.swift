@@ -122,6 +122,15 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     continuation?.finish()
   }
 
+  @discardableResult
+  package func flushPendingCoalescedMouseEvents() -> [InputEvent] {
+    let (continuation, flushedMouseEvents) = flushPendingMouseEvents()
+    for event in flushedMouseEvents {
+      continuation?.yield(event)
+    }
+    return flushedMouseEvents
+  }
+
   package func inputEvents() -> AsyncStream<InputEvent> {
     makeManagedAsyncStream { continuation in
       let (generation, shouldFinish, pendingEvents) = self.state.withLock { state in

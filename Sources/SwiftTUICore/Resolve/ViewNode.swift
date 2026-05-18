@@ -802,6 +802,162 @@ extension ViewNode {
   }
 }
 
+extension ViewNode {
+  package struct DebugTotalStateSnapshot: Equatable {
+    package struct StateSlotSnapshot: Equatable {
+      package var ordinal: Int
+      package var storedTypeDescription: String
+    }
+
+    package struct HandlerSnapshot: Equatable {
+      package var actionRegistrationIdentities: [String]
+      package var keyHandlerRegistrationIdentities: [String]
+      package var keyPressHandlerRegistrationIdentities: [String]
+      package var pasteHandlerRegistrationIdentities: [String]
+      package var terminationHandlerRegistrationIdentities: [String]
+      package var pointerHandlerRouteIDs: [String]
+      package var pointerHoverHandlerRouteIDs: [String]
+      package var gestureRegistrationIdentities: [String]
+      package var gestureStateRegistrationIdentities: [String]
+      package var defaultFocusScopeIdentities: [String]
+      package var defaultFocusCandidateIdentities: [String]
+      package var focusBindingIdentities: [String]
+      package var focusedValuesIdentities: [String]
+      package var scrollPositionIdentities: [String]
+      package var lifecycleHandlerIDs: [String]
+      package var taskRegistrationIdentities: [String]
+      package var preferenceObservationHandlerIDs: [String]
+      package var commandRegistrations: [String]
+      package var dropDestinationIdentities: [String]
+    }
+
+    package var invalidatorInstalled: Bool
+    package var ownerGraphInstalled: Bool
+    package var parentIdentity: Identity?
+    package var committed: ResolvedNode
+    package var isCommittedSnapshotFresh: Bool
+    package var children: [Identity]
+    package var stateSlots: [StateSlotSnapshot]
+    package var dependencies: DependencySet
+    package var lifecycleState: NodeLifecycleState
+    package var registeredHandlers: HandlerSnapshot
+    package var isDirty: Bool
+    package var wasPresentAtFrameStart: Bool
+    package var wasVisitedThisFrame: Bool
+    package var previousChildrenIdentities: [Identity]
+    package var previousLifecycleMetadata: LifecycleMetadata
+    package var bodyStateSlotCount: Int?
+    package var currentBodyStateSlotCount: Int
+    package var pendingChangeHandlerIDs: [String]
+    package var dependencyTracker: DependencySet
+    package var registrationCaptureDepth: Int
+    package var evaluationDepth: Int
+    package var hasCommittedPresence: Bool
+    package var suppressesStructuralLifecycle: Bool
+    package var nextChangeModifierOrdinal: Int
+    package var nextNavigationDestinationModifierOrdinal: Int
+    package var preparedFrameID: UInt64
+    package var visitedFrameID: UInt64
+    package var evaluatorInstalled: Bool
+  }
+
+  package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
+    DebugTotalStateSnapshot(
+      invalidatorInstalled: invalidator != nil,
+      ownerGraphInstalled: ownerGraph != nil,
+      parentIdentity: parent?.identity,
+      committed: committed,
+      isCommittedSnapshotFresh: isCommittedSnapshotFresh,
+      children: children.map(\.identity),
+      stateSlots: stateSlots.map { ordinal, slot in
+        DebugTotalStateSnapshot.StateSlotSnapshot(
+          ordinal: ordinal,
+          storedTypeDescription: slot.storedTypeDescription
+        )
+      }.sorted { lhs, rhs in lhs.ordinal < rhs.ordinal },
+      dependencies: dependencies,
+      lifecycleState: lifecycleState,
+      registeredHandlers: registeredHandlers.debugTotalStateSnapshot(),
+      isDirty: isDirty,
+      wasPresentAtFrameStart: wasPresentAtFrameStart,
+      wasVisitedThisFrame: wasVisitedThisFrame,
+      previousChildrenIdentities: previousChildrenIdentities,
+      previousLifecycleMetadata: previousLifecycleMetadata,
+      bodyStateSlotCount: bodyStateSlotCount,
+      currentBodyStateSlotCount: currentBodyStateSlotCount,
+      pendingChangeHandlerIDs: pendingChangeHandlerIDs,
+      dependencyTracker: dependencyTracker.currentDependencies,
+      registrationCaptureDepth: registrationCaptureDepth,
+      evaluationDepth: evaluationDepth,
+      hasCommittedPresence: hasCommittedPresence,
+      suppressesStructuralLifecycle: suppressesStructuralLifecycle,
+      nextChangeModifierOrdinal: nextChangeModifierOrdinal,
+      nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
+      preparedFrameID: preparedFrameID,
+      visitedFrameID: visitedFrameID,
+      evaluatorInstalled: evaluator != nil
+    )
+  }
+}
+
+extension NodeHandlers {
+  fileprivate func debugTotalStateSnapshot() -> ViewNode.DebugTotalStateSnapshot.HandlerSnapshot {
+    ViewNode.DebugTotalStateSnapshot.HandlerSnapshot(
+      actionRegistrationIdentities: sortedIdentityStrings(actionRegistrations.keys),
+      keyHandlerRegistrationIdentities: sortedIdentityStrings(keyHandlerRegistrations.keys),
+      keyPressHandlerRegistrationIdentities: sortedIdentityStrings(
+        keyPressHandlerRegistrations.keys
+      ),
+      pasteHandlerRegistrationIdentities: sortedIdentityStrings(pasteHandlerRegistrations.keys),
+      terminationHandlerRegistrationIdentities: sortedIdentityStrings(
+        terminationHandlerRegistrations.keys
+      ),
+      pointerHandlerRouteIDs: sortedDescriptions(pointerHandlerRegistrations.keys),
+      pointerHoverHandlerRouteIDs: sortedDescriptions(pointerHoverHandlerRegistrations.keys),
+      gestureRegistrationIdentities: sortedIdentityStrings(gestureRegistrations.keys),
+      gestureStateRegistrationIdentities: sortedIdentityStrings(gestureStateRegistrations.keys),
+      defaultFocusScopeIdentities: sortedIdentityStrings(
+        defaultFocusRegistrations.scopes.map(\.identity)
+      ),
+      defaultFocusCandidateIdentities: sortedIdentityStrings(
+        defaultFocusRegistrations.candidates.map(\.identity)
+      ),
+      focusBindingIdentities: sortedIdentityStrings(focusBindingRegistrations.map(\.identity)),
+      focusedValuesIdentities: sortedIdentityStrings(focusedValuesRegistrations.map(\.identity)),
+      scrollPositionIdentities: sortedIdentityStrings(scrollPositionRegistrations.map(\.identity)),
+      lifecycleHandlerIDs: (Array(lifecycleRegistrations.appearHandlers.keys)
+        + Array(lifecycleRegistrations.disappearHandlers.keys)
+        + Array(lifecycleRegistrations.changeHandlers.keys)).sorted(),
+      taskRegistrationIdentities: sortedIdentityStrings(taskRegistrations.keys),
+      preferenceObservationHandlerIDs:
+        preferenceObservationRegistrations
+        .map(\.handlerID)
+        .sorted(),
+      commandRegistrations: commandRegistrations.keyCommandsByScope
+        .flatMap { identity, commands in
+          commands.map { binding, command in
+            "\(identity.description):\(binding):\(command.description):\(command.isEnabled)"
+          }
+        }
+        .sorted(),
+      dropDestinationIdentities: sortedIdentityStrings(
+        dropDestinationRegistrations.handlersByScope.keys)
+    )
+  }
+}
+
+private func sortedIdentityStrings<Identities: Sequence>(
+  _ identities: Identities
+) -> [String] where Identities.Element == Identity {
+  identities.map(\.description).sorted()
+}
+
+private func sortedDescriptions<Values: Sequence>(
+  _ values: Values
+) -> [String] {
+  values.map { String(describing: $0) }.sorted()
+}
+
 // MARK: - Committed-field forwarding accessors
 //
 // Prior to Item 6 of `docs/proposals/ARCHITECTURE_NOTES.md` these were ~14 stored mirror

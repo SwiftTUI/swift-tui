@@ -1,5 +1,6 @@
 @unsafe @preconcurrency import Dispatch
 import Foundation
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -2924,6 +2925,41 @@ struct AsyncFrameTailRenderingTests {
       commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == false)
   }
 
+  @Test("previewed commit plan equals the committed plan for a completed async frame")
+  func previewCommitEqualsRealCommit() async {
+    let rootIdentity = testIdentity("AsyncPreviewCommitEquivalenceRoot")
+    let proposal = ProposedSize(width: 32, height: 6)
+    let renderer = DefaultRenderer()
+    let recorder = AsyncFrameTailLifecycleRecorder()
+
+    _ = renderer.render(
+      AsyncFrameTailStressView(
+        value: 0,
+        lifecycleRecorder: recorder
+      ),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      AsyncFrameTailStressView(
+        value: 1,
+        lifecycleRecorder: recorder
+      ),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+
+    let comparison = await renderer.commitCompletedFrameCandidateForTesting(draft)
+
+    #expect(!comparison.committedCommit.lifecycle.isEmpty)
+    #expect(comparison.previewCommit == comparison.committedCommit)
+    #expect(comparison.committedArtifacts.commitPlan == comparison.committedCommit)
+  }
+
   @Test("empty visual-only reconciliation discards completed tail without commit")
   func emptyVisualOnlyReconciliationDiscardsCompletedTailWithoutCommit() async throws {
     let rootIdentity = testIdentity("AsyncSkippedVisualOnlyRoot")
@@ -4143,22 +4179,6 @@ private final class AsyncFrameTailInvalidatingTerminalHost: PresentationSurface 
   }
 }
 
-private struct AsyncFrameTailTimeout: Error {}
-
-@MainActor
-private func waitUntil(
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  _ condition: () -> Bool
-) async throws {
-  let started = ContinuousClock().now
-  while !condition() {
-    if started.duration(to: ContinuousClock().now) > .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw AsyncFrameTailTimeout()
-    }
-    try await Task.sleep(nanoseconds: 1_000_000)
-  }
-}
-
 private func diagnosticRows(_ text: String) -> [[String: String]] {
   let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
   guard let headerLine = lines.first else {
@@ -4172,24 +4192,5 @@ private func diagnosticRows(_ text: String) -> [[String: String]] {
       row[header] = fields[index]
     }
     return row
-  }
-}
-
-private func valueWithTimeout<Value: Sendable>(
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  _ operation: @escaping @Sendable () async throws -> Value
-) async throws -> Value {
-  try await withThrowingTaskGroup(of: Value.self) { group in
-    group.addTask {
-      try await operation()
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw AsyncFrameTailTimeout()
-    }
-
-    let value = try await group.next()!
-    group.cancelAll()
-    return value
   }
 }

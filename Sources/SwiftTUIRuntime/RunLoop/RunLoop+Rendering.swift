@@ -130,6 +130,12 @@ extension RunLoop {
     let hasDiagnosticsLogger = diagnosticsLogger != nil
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
+      progressProbe?.record(
+        .frameIntent,
+        frameNumber: renderedFrames + 1,
+        desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+        coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches
+      )
       drainGestureDeadlinesIfNeeded(for: scheduledFrame)
       var convergence = FocusSyncConvergenceState()
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
@@ -184,6 +190,7 @@ extension RunLoop {
         renderedFrames: &renderedFrames
       )
     }
+    progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
   }
 
   /// Drains gesture recognizer deadlines for a frame woken by a `.deadline`
@@ -399,6 +406,13 @@ extension RunLoop {
       keeping: renderer.liveIdentitySnapshot()
     )
     renderedFrames += 1
+    progressProbe?.record(
+      .frameCommitted,
+      frameNumber: renderedFrames,
+      desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+      renderGeneration: artifacts.diagnostics.timing.renderGenerations.render.rawValue,
+      tailJobState: acquisition.tailJobState
+    )
 
     if let diagnosticsLogger {
       let diag = artifacts.diagnostics
@@ -792,6 +806,12 @@ extension RunLoop {
     let hasDiagnosticsLogger = diagnosticsLogger != nil
     frameLoop: while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
+      progressProbe?.record(
+        .frameIntent,
+        frameNumber: renderedFrames + 1,
+        desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+        coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches
+      )
       drainGestureDeadlinesIfNeeded(for: scheduledFrame)
       var convergence = FocusSyncConvergenceState()
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
@@ -830,6 +850,14 @@ extension RunLoop {
         case .rendered(let renderedArtifacts, let tailJobState, let dropDecision):
           acquisition.tailJobState = tailJobState
           acquisition.completedFrameDropDecision = dropDecision
+          progressProbe?.record(
+            .frameAcquired,
+            frameNumber: renderedFrames + 1,
+            desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+            renderGeneration: renderedArtifacts.diagnostics.timing.renderGenerations.render
+              .rawValue,
+            tailJobState: tailJobState
+          )
           artifacts = renderedArtifacts
           let outcome = try processFocusSyncIteration(
             renderedArtifacts,
@@ -867,6 +895,7 @@ extension RunLoop {
         break
       }
     }
+    progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
     return nil
   }
 
@@ -924,6 +953,19 @@ extension RunLoop {
       return scheduler.hasPendingFrame(at: .now())
     }
 
+    func awaitQueuedTailCancellationSignalForMode() async {
+      guard renderMode != .asyncNoCancel else {
+        return
+      }
+      guard !scheduler.hasPendingFrame(at: .now()) else {
+        return
+      }
+      guard let pendingFrameAwaiter = scheduler as? any PendingFrameAwaiting else {
+        return
+      }
+      await pendingFrameAwaiter.waitForPendingFrame(at: .now())
+    }
+
     let renderOutcome = await renderer.renderAsyncCancellable(
       viewBuilder(
         (
@@ -946,6 +988,7 @@ extension RunLoop {
           scheduledFrame: scheduledFrame
         )
       },
+      awaitQueuedCancellationSignal: awaitQueuedTailCancellationSignalForMode,
       shouldCancelQueued: shouldCancelQueuedTailForMode
     )
     if renderOutcome.tailJobState == .cancelledBeforeStart {
@@ -970,6 +1013,13 @@ extension RunLoop {
         animationControllerHasPendingWork: renderer
           .internalAnimationController.lastTickResult.hasPendingWork
       )
+      progressProbe?.record(
+        .frameSkipped,
+        frameNumber: renderedFrames + 1,
+        desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+        renderGeneration: renderOutcome.renderGeneration.rawValue,
+        tailJobState: renderOutcome.tailJobState
+      )
       return .skipped
     }
     if renderOutcome.tailJobState == .droppedCompleted {
@@ -992,6 +1042,13 @@ extension RunLoop {
           .internalAnimationController.activeAnimationCount,
         animationControllerHasPendingWork: renderer
           .internalAnimationController.lastTickResult.hasPendingWork
+      )
+      progressProbe?.record(
+        .frameSkipped,
+        frameNumber: renderedFrames + 1,
+        desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+        renderGeneration: renderOutcome.renderGeneration.rawValue,
+        tailJobState: renderOutcome.tailJobState
       )
       return .skipped
     }

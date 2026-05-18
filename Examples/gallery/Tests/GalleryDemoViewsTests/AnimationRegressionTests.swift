@@ -282,7 +282,8 @@ struct AnimationRegressionTests {
       viewBuilder: { _, _ in viewBuilder() }
     )
     if let diagnosticsPath {
-      runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsPath)
+      let diagnosticsLogger = try #require(FrameDiagnosticsLogger(path: diagnosticsPath))
+      runLoop.diagnosticsLogger = diagnosticsLogger
     }
     return try await runLoop.run()
   }

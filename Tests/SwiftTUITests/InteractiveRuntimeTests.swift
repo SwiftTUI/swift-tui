@@ -1,9 +1,10 @@
 import EmbeddedFonts
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 #if canImport(Darwin)
@@ -1415,6 +1416,7 @@ struct InteractiveRuntimeTests {
       invalidationIdentities: [rootIdentity]
     )
     let quitGate = AsyncEventGate()
+    let progressProbe = RunLoopProgressProbe()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
@@ -1431,16 +1433,31 @@ struct InteractiveRuntimeTests {
         ToastAutoDismissHarnessView(terminalSize: terminalSize)
       }
     )
+    runLoop.progressProbe = progressProbe
     let runTask = Task {
       try await runLoop.run()
     }
 
-    let toastDismissed = try await waitUntil(timeoutNanoseconds: 10_000_000_000) {
-      guard terminal.frames.count >= 2 else {
-        return false
+    var nextProgressSequence: UInt64 = 0
+    var committedDismissalFrame: RunLoopProgressEvent?
+    while committedDismissalFrame == nil {
+      let minimumSequence = nextProgressSequence
+      let event = try await valueWithTimeout(
+        "toast auto-dismiss frame",
+        timeoutNanoseconds: 30_000_000_000
+      ) {
+        await progressProbe.frameCommitted { event in
+          event.sequence >= minimumSequence
+        }
       }
-      return !(terminal.frames.last ?? "").contains("Action performed")
+      nextProgressSequence = event.sequence &+ 1
+      if terminal.frames.count >= 2,
+        !(terminal.frames.last ?? "").contains("Action performed")
+      {
+        committedDismissalFrame = event
+      }
     }
+    let dismissalFrame = try #require(committedDismissalFrame)
     await quitGate.open()
     let result = try await runTask.value
 
@@ -1448,7 +1465,7 @@ struct InteractiveRuntimeTests {
     let lastFrame = try #require(terminal.frames.last)
 
     #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
-    #expect(toastDismissed)
+    #expect(dismissalFrame.kind == .frameCommitted)
     #expect(result.renderedFrames >= 2)
     #expect(firstFrame.contains("Action performed"))
     #expect(!lastFrame.contains("Action performed"))
@@ -2599,7 +2616,7 @@ struct InteractiveRuntimeTests {
     let clickBytes = sgrPrimaryClick(at: .init(x: 1, y: 1))
     let frameCountBeforeClick = terminal.visibleFrames.count
     try writeAllBytes(clickBytes, to: writeDescriptor)
-    _ = try await waitUntil(timeoutNanoseconds: 500_000_000) {
+    _ = try? await waitUntil(timeoutNanoseconds: 500_000_000) {
       terminal.visibleFrames.count > frameCountBeforeClick
     }
 
@@ -2692,7 +2709,7 @@ struct InteractiveRuntimeTests {
 
     let frameCountBeforeClick = terminal.visibleFrames.count
     inputReader.send(sgrPrimaryClick(at: .init(x: 1, y: 1)))
-    _ = try await waitUntil(timeoutNanoseconds: 500_000_000) {
+    _ = try? await waitUntil(timeoutNanoseconds: 500_000_000) {
       terminal.visibleFrames.count > frameCountBeforeClick
     }
 
@@ -3757,21 +3774,6 @@ private func writeAllBytes(
       totalBytesWritten += bytesWritten
     }
   }
-}
-
-private func waitUntil(
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  pollNanoseconds: UInt64 = 5_000_000,
-  condition: () -> Bool
-) async throws -> Bool {
-  let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
-  while DispatchTime.now().uptimeNanoseconds < deadline {
-    if condition() {
-      return true
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-  return condition()
 }
 
 private func sgrScrollDown(

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -26,8 +27,8 @@ struct AsyncStreamTeardownTests {
     consumer.cancel()
     _ = await consumer.result
 
-    try await waitUntil("managed stream termination") {
-      await probe.termination == .cancelled
+    try await valueWithTimeout("managed stream termination", timeoutNanoseconds: 15_000_000_000) {
+      await probe.waitForTermination()
     }
   }
 
@@ -49,15 +50,17 @@ struct AsyncStreamTeardownTests {
       _ = await iterator.next()
     }
 
-    try await waitUntil("producer yielded the first value") {
-      await probe.yieldCount == 1
+    try await valueWithTimeout(
+      "producer yielded the first value", timeoutNanoseconds: 15_000_000_000
+    ) {
+      await probe.waitForYield()
     }
 
     consumer.cancel()
     _ = await consumer.result
 
-    try await waitUntil("producer cancellation") {
-      await probe.cancelled
+    try await valueWithTimeout("producer cancellation", timeoutNanoseconds: 15_000_000_000) {
+      await probe.waitForCancellation()
     }
   }
 
@@ -79,51 +82,78 @@ struct AsyncStreamTeardownTests {
 
 private actor AsyncStreamTerminationProbe {
   private(set) var termination: AsyncStream<Int>.Continuation.Termination?
+  private var waiters: [CheckedContinuation<Void, Never>] = []
 
   func record(_ termination: AsyncStream<Int>.Continuation.Termination) {
     self.termination = termination
+    resumeWaiters()
+  }
+
+  func waitForTermination() async {
+    guard termination == nil else {
+      return
+    }
+    await withCheckedContinuation { continuation in
+      waiters.append(continuation)
+    }
+  }
+
+  private func resumeWaiters() {
+    let pendingWaiters = waiters
+    waiters.removeAll()
+    for waiter in pendingWaiters {
+      waiter.resume()
+    }
   }
 }
 
 private actor AsyncStreamProducerProbe {
   private(set) var yieldCount = 0
   private(set) var cancelled = false
+  private var yieldWaiters: [CheckedContinuation<Void, Never>] = []
+  private var cancellationWaiters: [CheckedContinuation<Void, Never>] = []
 
   func recordYield() {
     yieldCount += 1
+    resumeYieldWaiters()
   }
 
   func recordCancellation() {
     cancelled = true
+    resumeCancellationWaiters()
   }
-}
 
-@MainActor
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-
-  while !(await condition()) {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw AsyncStreamTestTimeout(label)
+  func waitForYield() async {
+    guard yieldCount == 0 else {
+      return
     }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private struct AsyncStreamTestTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
+    await withCheckedContinuation { continuation in
+      yieldWaiters.append(continuation)
+    }
   }
 
-  var description: String {
-    "Timed out waiting for \(label)"
+  func waitForCancellation() async {
+    guard !cancelled else {
+      return
+    }
+    await withCheckedContinuation { continuation in
+      cancellationWaiters.append(continuation)
+    }
+  }
+
+  private func resumeYieldWaiters() {
+    let pendingWaiters = yieldWaiters
+    yieldWaiters.removeAll()
+    for waiter in pendingWaiters {
+      waiter.resume()
+    }
+  }
+
+  private func resumeCancellationWaiters() {
+    let pendingWaiters = cancellationWaiters
+    cancellationWaiters.removeAll()
+    for waiter in pendingWaiters {
+      waiter.resume()
+    }
   }
 }

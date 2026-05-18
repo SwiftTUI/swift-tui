@@ -18,6 +18,23 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Resolved pipeline-driver follow-up F4 in code and tests: `ViewGraph` now has
+  a checkpoint-totality debug snapshot, `ViewNode` exposes node-state snapshots
+  used by the guard, source-level tests require every mutable graph/node field
+  to be checkpoint-covered, and async completed-frame tests now prove preview
+  commit plans match real commit plans.
+- Completed the second async/runtime flake remediation tranche: runtime tests
+  can now await `RunLoopProgressProbe` frame/event milestones, hosted raster
+  surfaces keep continuation-backed frame waiters, injected/hosted input can
+  flush pending coalesced mouse events in tests, and queued frame-tail
+  cancellation now races tail start against a signaled pending-frame awaiter
+  instead of a one-millisecond main-actor polling loop.
+- Added the initial async/runtime flake remediation tranche: a retained
+  repeated-run harness records current registry candidates under optional CPU
+  pressure; shared test waits support `SWIFTTUI_TEST_TIMEOUT_SCALE` and timeout
+  diagnostics; the registered runtime, SwiftUI host, and TerminalView
+  render-diff candidates now use shared waits, serialized host suites, or
+  deterministic write-shape assertions instead of local wall-clock helpers.
 - Completed the source-breaking Finding 10 diagnostics cleanup: public
   `FrameDiagnostics` is now grouped by input, counts, work, presentation,
   timing, runtime, and drop records; `DefaultRenderer` no longer exposes

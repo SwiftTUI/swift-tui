@@ -85,6 +85,7 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUIRuntime",
   "SwiftTUICore",
   "SwiftTUIViews",
+  "SwiftTUITestSupport",
   "SwiftTUIAnimatedImage",
   "SwiftTUICharts",
   .product(
@@ -295,6 +296,11 @@ let package = Package(
       path: "Platforms/WebHost/Sources/SwiftTUIWebHostCLI",
       swiftSettings: swiftSettings()
     ),
+    .target(
+      name: "SwiftTUITestSupport",
+      path: "Tests/Support",
+      swiftSettings: swiftSettings()
+    ),
     .testTarget(
       name: "SwiftTUICoreTests",
       dependencies: [
@@ -354,6 +360,7 @@ let package = Package(
       dependencies: [
         "SwiftTUI",
         "SwiftTUICore",
+        "SwiftTUITestSupport",
         "SwiftTUIPTYPrimitives",
         "SwiftTUITerminal",
       ],
@@ -426,6 +433,7 @@ let package = Package(
           name: "SwiftUIHostTests",
           dependencies: [
             "SwiftTUI",
+            "SwiftTUITestSupport",
             "SwiftUIHost",
           ],
           path: "Platforms/SwiftUI/Tests/SwiftUIHostTests",

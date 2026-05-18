@@ -140,6 +140,45 @@ struct InjectedTerminalInputReaderTests {
     )
   }
 
+  @Test("injected input reader exposes manual coalesced pointer flush")
+  func injectedReaderExposesManualCoalescedPointerFlush() async {
+    let inputReader = InjectedTerminalInputReader()
+    let eventStream = inputReader.inputEvents()
+
+    let eventsTask = Task {
+      var events: [InputEvent] = []
+      for await event in eventStream {
+        events.append(event)
+      }
+      return events
+    }
+
+    let scrollSequence: [UInt8] = [
+      0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
+    ]
+
+    inputReader.send(scrollSequence)
+    let flushedEvents = inputReader.flushPendingCoalescedMouseEvents()
+    inputReader.finish()
+
+    let events = await eventsTask.value
+
+    #expect(events == flushedEvents)
+    #expect(flushedEvents.count == 1)
+    guard case .mouse(let mouseEvent)? = flushedEvents.first else {
+      Issue.record("expected flushed coalesced mouse event, got \(flushedEvents)")
+      return
+    }
+    guard case .scrolled(let deltaX, let deltaY) = mouseEvent.kind else {
+      Issue.record("expected flushed scroll event, got \(mouseEvent.kind)")
+      return
+    }
+    #expect(deltaX == 0)
+    #expect(deltaY == 1)
+    #expect(mouseEvent.location.cell == CellPoint(x: 4, y: 6))
+    #expect(mouseEvent.location.precision == .cell)
+  }
+
   @Test("injected input reader parses terminal-pixel mouse coordinates when configured")
   func injectedReaderParsesTerminalPixelMouseCoordinatesWhenConfigured() async {
     let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)

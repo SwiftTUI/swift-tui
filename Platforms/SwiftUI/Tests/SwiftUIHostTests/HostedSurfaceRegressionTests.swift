@@ -1,187 +1,193 @@
-import Dispatch
 import SwiftTUI
+@_spi(Runners) import SwiftTUIRuntime
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftUIHost
 
 @MainActor
-@Test
-func hosted_surface_publishes_pressed_button_frame_before_mouse_up() async throws {
-  let recorder = SurfaceRecorder()
-  let surface = hostedSurface(recorder: recorder)
-  let session = try HostedSceneSession(
-    for: PressedButtonApp(),
-    sceneID: "main",
-    surface: surface
-  )
+@Suite(.serialized)
+struct HostedSurfaceRegressionTests {
+  @MainActor
+  @Test
+  func hosted_surface_publishes_pressed_button_frame_before_mouse_up() async throws {
+    let surface = hostedSurface()
+    let session = try HostedSceneSession(
+      for: PressedButtonApp(),
+      sceneID: "main",
+      surface: surface
+    )
 
-  let runTask = Task { try await session.start() }
-  defer {
-    session.stop()
+    let runTask = Task { try await session.start() }
+    defer {
+      session.stop()
+    }
+
+    let initial = try await valueWithTimeout("initial button frame") {
+      await surface.waitForSurface { surface in
+        surface.renderedText.contains("Press")
+      }
+    }
+
+    session.send(.mouse(.init(kind: .down(.primary), location: .init(x: 1, y: 0))))
+
+    let pressed = try await valueWithTimeout("pressed button frame") {
+      await surface.waitForSurface { surface in
+        surface != initial && surface.renderedText.contains("Press")
+      }
+    }
+
+    #expect(pressed.lines == initial.lines)
+    #expect(pressed != initial)
+
+    session.send(.mouse(.init(kind: .up(.primary), location: .init(x: 1, y: 0))))
+    _ = try await session.stopAndWait()
+    _ = await runTask.result
   }
 
-  let initial = try await recorder.waitForSurface(
-    "initial button frame"
-  ) { surface in
-    surface.renderedText.contains("Press")
+  @MainActor
+  @Test
+  func hosted_surface_scroll_wheel_updates_visible_scroll_view() async throws {
+    let surface = hostedSurface()
+    let session = try HostedSceneSession(
+      for: ScrollSurfaceApp(),
+      sceneID: "main",
+      surface: surface
+    )
+
+    let runTask = Task { try await session.start() }
+    defer {
+      session.stop()
+    }
+
+    let initial = try await valueWithTimeout("initial scroll frame") {
+      await surface.waitForSurface { surface in
+        surface.renderedText.contains("Row 0")
+          && surface.renderedText.contains("Row 1")
+      }
+    }
+
+    session.send(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: .init(x: 1, y: 1))))
+
+    let scrolled = try await valueWithTimeout("scrolled frame") {
+      await surface.waitForSurface { surface in
+        surface != initial
+          && !surface.renderedText.contains("Row 0")
+          && surface.renderedText.contains("Row 3")
+      }
+    }
+
+    #expect(scrolled != initial)
+
+    _ = try await session.stopAndWait()
+    _ = await runTask.result
   }
 
-  session.send(.mouse(.init(kind: .down(.primary), location: .init(x: 1, y: 0))))
+  @MainActor
+  @Test
+  func hosted_surface_animation_publishes_intermediate_frames() async throws {
+    let surface = hostedSurface()
+    let session = try HostedSceneSession(
+      for: AnimationSurfaceApp(),
+      sceneID: "main",
+      surface: surface
+    )
 
-  let pressed = try await recorder.waitForSurface(
-    "pressed button frame"
-  ) { surface in
-    surface != initial && surface.renderedText.contains("Press")
+    let runTask = Task { try await session.start() }
+    defer {
+      session.stop()
+    }
+
+    _ = try await valueWithTimeout("initial animation frame") {
+      await surface.waitForSurface { surface in
+        surface.markerColumn == 0
+      }
+    }
+
+    session.send(.mouse(.init(kind: .down(.primary), location: .init(x: 1, y: 0))))
+    session.send(.mouse(.init(kind: .up(.primary), location: .init(x: 1, y: 0))))
+
+    let frames: [SemanticHostFrame] = try await valueWithTimeout("animated marker positions") {
+      await surface.waitForFrames { frames in
+        let markerColumns = Set(frames.compactMap(\.raster.markerColumn))
+        return markerColumns.count >= 3 && Set([0, 8]).isSubset(of: markerColumns)
+      }
+    }
+    let markerColumns = Set(frames.compactMap(\.raster.markerColumn))
+
+    #expect(markerColumns.count >= 3)
+    #expect(markerColumns.contains(0))
+    #expect(markerColumns.contains(8))
+
+    _ = try await session.stopAndWait()
+    _ = await runTask.result
   }
 
-  #expect(pressed.lines == initial.lines)
-  #expect(pressed != initial)
+  @MainActor
+  @Test
+  func hosted_surface_drag_gesture_receives_fractional_location() async throws {
+    let surface = hostedSurface()
+    let session = try HostedSceneSession(
+      for: FractionalDragSurfaceApp(),
+      sceneID: "main",
+      surface: surface
+    )
 
-  session.send(.mouse(.init(kind: .up(.primary), location: .init(x: 1, y: 0))))
-  _ = try await session.stopAndWait()
-  _ = await runTask.result
-}
+    let runTask = Task { try await session.start() }
+    defer {
+      session.stop()
+    }
 
-@MainActor
-@Test
-func hosted_surface_scroll_wheel_updates_visible_scroll_view() async throws {
-  let recorder = SurfaceRecorder()
-  let surface = hostedSurface(recorder: recorder)
-  let session = try HostedSceneSession(
-    for: ScrollSurfaceApp(),
-    sceneID: "main",
-    surface: surface
-  )
+    _ = try await valueWithTimeout("initial fractional drag frame") {
+      await surface.waitForSurface { surface in
+        surface.renderedText.contains("drag idle")
+      }
+    }
 
-  let runTask = Task { try await session.start() }
-  defer {
-    session.stop()
-  }
-
-  let initial = try await recorder.waitForSurface(
-    "initial scroll frame"
-  ) { surface in
-    surface.renderedText.contains("Row 0")
-      && surface.renderedText.contains("Row 1")
-  }
-
-  session.send(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: .init(x: 1, y: 1))))
-
-  let scrolled = try await recorder.waitForSurface(
-    "scrolled frame"
-  ) { surface in
-    surface != initial
-      && !surface.renderedText.contains("Row 0")
-      && surface.renderedText.contains("Row 3")
-  }
-
-  #expect(scrolled != initial)
-
-  _ = try await session.stopAndWait()
-  _ = await runTask.result
-}
-
-@MainActor
-@Test
-func hosted_surface_animation_publishes_intermediate_frames() async throws {
-  let recorder = SurfaceRecorder()
-  let surface = hostedSurface(recorder: recorder)
-  let session = try HostedSceneSession(
-    for: AnimationSurfaceApp(),
-    sceneID: "main",
-    surface: surface
-  )
-
-  let runTask = Task { try await session.start() }
-  defer {
-    session.stop()
-  }
-
-  _ = try await recorder.waitForSurface(
-    "initial animation frame"
-  ) { surface in
-    surface.markerColumn == 0
-  }
-
-  session.send(.mouse(.init(kind: .down(.primary), location: .init(x: 1, y: 0))))
-  session.send(.mouse(.init(kind: .up(.primary), location: .init(x: 1, y: 0))))
-
-  let markerColumns = try await recorder.waitForMarkerColumns(
-    "animated marker positions",
-    minimumCount: 3,
-    requiredColumns: [0, 8]
-  )
-
-  #expect(markerColumns.count >= 3)
-  #expect(markerColumns.contains(0))
-  #expect(markerColumns.contains(8))
-
-  _ = try await session.stopAndWait()
-  _ = await runTask.result
-}
-
-@MainActor
-@Test
-func hosted_surface_drag_gesture_receives_fractional_location() async throws {
-  let recorder = SurfaceRecorder()
-  let surface = hostedSurface(recorder: recorder)
-  let session = try HostedSceneSession(
-    for: FractionalDragSurfaceApp(),
-    sceneID: "main",
-    surface: surface
-  )
-
-  let runTask = Task { try await session.start() }
-  defer {
-    session.stop()
-  }
-
-  _ = try await recorder.waitForSurface("initial fractional drag frame") { surface in
-    surface.renderedText.contains("drag idle")
-  }
-
-  let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
-  session.send(
-    .mouse(
-      .init(
-        kind: .down(.primary),
-        location: .subCell(
-          location: Point(x: 1.25, y: 0.50),
-          source: .nativePixels,
-          metrics: metrics
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    session.send(
+      .mouse(
+        .init(
+          kind: .down(.primary),
+          location: .subCell(
+            location: Point(x: 1.25, y: 0.50),
+            source: .nativePixels,
+            metrics: metrics
+          )
         )
       )
     )
-  )
-  session.send(
-    .mouse(
-      .init(
-        kind: .dragged(.primary),
-        location: .subCell(
-          location: Point(x: 1.75, y: 0.50),
-          source: .nativePixels,
-          metrics: metrics
+    session.send(
+      .mouse(
+        .init(
+          kind: .dragged(.primary),
+          location: .subCell(
+            location: Point(x: 1.75, y: 0.50),
+            source: .nativePixels,
+            metrics: metrics
+          )
         )
       )
     )
-  )
 
-  _ = try await recorder.waitForSurface("fractional drag update") { surface in
-    surface.renderedText.contains("drag 175:50")
+    _ = try await valueWithTimeout("fractional drag update") {
+      await surface.waitForSurface { surface in
+        surface.renderedText.contains("drag 175:50")
+      }
+    }
+
+    _ = try await session.stopAndWait()
+    _ = await runTask.result
   }
 
-  _ = try await session.stopAndWait()
-  _ = await runTask.result
 }
 
 @MainActor
-private func hostedSurface(recorder: SurfaceRecorder) -> HostedRasterSurface {
+private func hostedSurface() -> HostedRasterSurface {
   HostedRasterSurface(
     surfaceSize: .init(width: 32, height: 8),
     appearance: .fallback,
-    onFrame: { frame in
-      recorder.record(frame.raster)
-    }
+    onFrame: { _ in }
   )
 }
 
@@ -263,65 +269,6 @@ private struct FractionalDragSurfaceView: SwiftTUIRuntime.View {
           }
       )
   }
-}
-
-@MainActor
-private final class SurfaceRecorder {
-  private var surfaces: [RasterSurface] = []
-
-  func record(
-    _ surface: RasterSurface
-  ) {
-    surfaces.append(surface)
-  }
-
-  func waitForSurface(
-    _ label: String,
-    timeoutNanoseconds: UInt64 = 2_000_000_000,
-    matching predicate: (RasterSurface) -> Bool
-  ) async throws -> RasterSurface {
-    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
-    while DispatchTime.now().uptimeNanoseconds < deadline {
-      if let surface = surfaces.last(where: predicate) {
-        return surface
-      }
-      try await Task.sleep(nanoseconds: 5_000_000)
-    }
-
-    let rendered = surfaces.last?.renderedText ?? "<no surfaces>"
-    Issue.record("Timed out waiting for \(label). Last surface:\n\(rendered)")
-    if let surface = surfaces.last(where: predicate) {
-      return surface
-    }
-    throw SurfaceRecorderError.timedOut
-  }
-
-  func waitForMarkerColumns(
-    _ label: String,
-    timeoutNanoseconds: UInt64 = 2_000_000_000,
-    minimumCount: Int,
-    requiredColumns: Set<Int>
-  ) async throws -> Set<Int> {
-    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
-    while DispatchTime.now().uptimeNanoseconds < deadline {
-      let columns = Set(surfaces.compactMap(\.markerColumn))
-      if columns.count >= minimumCount, requiredColumns.isSubset(of: columns) {
-        return columns
-      }
-      try await Task.sleep(nanoseconds: 5_000_000)
-    }
-
-    let observedColumns = surfaces.compactMap(\.markerColumn)
-    let rendered = surfaces.last?.renderedText ?? "<no surfaces>"
-    Issue.record(
-      "Timed out waiting for \(label). Observed marker columns: \(observedColumns). Last surface:\n\(rendered)"
-    )
-    throw SurfaceRecorderError.timedOut
-  }
-}
-
-private enum SurfaceRecorderError: Error {
-  case timedOut
 }
 
 extension RasterSurface {

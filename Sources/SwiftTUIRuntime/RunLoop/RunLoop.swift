@@ -187,6 +187,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let commandRegistry = CommandRegistry()
   package let dropDestinationRegistry = DropDestinationRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
+  package var progressProbe: RunLoopProgressProbe?
   package var liveRegionAnnouncer = LiveRegionAnnouncer()
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
@@ -673,6 +674,12 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       let renderEventDrain = drainPendingRenderEvents(
         from: eventPump,
         initialEvents: pendingEvents
+      )
+      progressProbe?.record(
+        .eventDrain,
+        frameNumber: renderedFrames + 1,
+        eventCount: renderEventDrain.events.count,
+        coalescedEventBatches: renderEventDrain.coalescedEventBatches
       )
       pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
 
