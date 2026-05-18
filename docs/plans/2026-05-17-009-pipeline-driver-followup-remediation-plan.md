@@ -1926,12 +1926,12 @@ git commit -m "docs: ledger F14 resolved"
 
 ## Task 10.2: Ledger audit
 
-- [ ] **Step 1: Verify every ledger row**
+- [x] **Step 1: Verify every ledger row**
 
 For each of F1–F14, run the row's recorded DoD command on the current `HEAD`.
 Every one must produce its expected output.
 
-- [ ] **Step 2: Verify no `docs`-only mechanism**
+- [x] **Step 2: Verify no `docs`-only mechanism**
 
 ```bash
 grep -i "| docs |" docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
@@ -1939,7 +1939,7 @@ grep -i "| docs |" docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
 
 Expected: **no output**. A `docs`-only row means a finding was closed by rewording — that finding reopens.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit --allow-empty -m "chore: ledger audit — all 14 findings code/test-resolved"
