@@ -681,20 +681,57 @@ against local source evidence.
 ### Packet 28: Animation Controller Overlay Sampling
 
 - Objective: continue the runtime decomposition by moving placed-overlay
-  sampling and completion bookkeeping out of `AnimationController.swift`
-  without changing animation state ownership.
-- Likely owned files, pending read-only subagent audit:
+  sampling out of `AnimationController.swift` without changing animation state
+  ownership.
+- Owned files:
   - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
-  - a new same-folder animation helper
+  - `Sources/SwiftTUIRuntime/Lifecycle/PlacedAnimationOverlaySampling.swift`
 - Dependencies: Packets 13-15 extracted tree queries, transition overlays, and
-  property value application. Current debt metrics show `AnimationController`
-  is the largest remaining `SwiftTUIRuntime` production file.
-- Invariants: animation controller still owns mutable animation dictionaries,
-  batch ref counts, custom-state writeback, purge decisions, and completion
-  deferral; placed removal overlays, insertion offsets, and matched-geometry
-  deltas preserve existing timing, progress, completion, and deadline behavior.
-- Required checks: focused animation controller/pipeline tests first, then
-  `bun run test`.
+  property value application; Packet 27 finished the input stream read/drain
+  boundary. A read-only animation audit identified placed overlay sampling as a
+  safe value boundary and explicitly rejected moving insertion/removal detection
+  in this packet.
+- Invariants: `AnimationController` still owns mutable animation dictionaries,
+  custom-state writeback, completed-key removal, batch ref counts, purge
+  decisions, and completion deferral; placed-level animations are still
+  evaluated only in the placed overlay path, not in `applyInterpolations`;
+  removal entries with no placed snapshot or no parent identity still fall back
+  to resolved-level injection; removal sampling completion is still handled by
+  `applyInterpolations`; insertion offsets keep truncating integer math;
+  matched-geometry offsets keep rounded integer math and use current placed
+  bounds as the destination; overlay application order remains removals,
+  insertion offsets, then matched-geometry offsets.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests`
+  - `swiftly run swift test --filter SwiftTUITests.MotionAndProgressPolicyTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
+### Packet 29: DefaultRenderer Frame-Head Decomposition
+
+- Objective: return to the largest remaining runtime file and make
+  `DefaultRenderer` frame-head setup easier to follow without changing renderer
+  public API or commit behavior.
+- Likely owned files, pending read-only subagent audit:
+  - `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+  - a new same-folder rendering or runtime helper
+- Dependencies: Packet 28 completes the placed-overlay sampling extraction.
+  Current production file-size signals put `SwiftTUI.swift` back above
+  `AnimationController.swift`.
+- Invariants: renderer public APIs, frame-head transaction semantics,
+  animation draft ownership, observation/presentation portal drafts, selective
+  evaluation, safe-area wrapping, retained frame-tail inputs, and frame context
+  fields remain stable.
+- Required checks: focused renderer, async frame-tail, pipeline, and runtime
+  tests first, then `bun run test`.
 - Rollback: revert the packet commit/files only.
 
 ## Human Checkpoints
