@@ -199,7 +199,7 @@ checkout, and the verifying commit hash is recorded.
 | F10 | code+test | `swiftly run swift test --filter DirtyTrackingCoherenceTests`, `swiftly run swift test --filter InteractiveRuntimeTests/runLoopPassesScheduledInvalidationsIntoResolveContext`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; external `RunLoop` state drift is now reconciled into the scheduled invalidation signal with `ScheduledFrame.forceRootEvaluation`, carried through `ResolveContext.forceRootEvaluation` into `FrameResolveState`, and the old direct `previousRenderedState` force-root block is pinned absent by `externalStateDriftUsesScheduledInvalidationSignal`. | cfd378d4 |
 | F11 | code+test | `swiftly run swift test --filter RenderPipelineStructureTests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, `swiftly run swift test --filter PipelineDriverParityTests`, and `swiftly run swift test --filter RenderDriverCharacterizationTests` pass; branch-specific async/cancellable tail helpers (`renderFrameTailAsync`, `renderAsyncFrameTailLayoutStage`, `renderCancellableFrameTailLayoutStage`, `renderAsyncFusedFrameTail`, `renderCancellableFusedFrameTail`) are gone, and `renderTailStrategyEntrySurfaceIsShared` pins that async/cancellable paths share `renderFrameTailLayoutStage`, `renderFrameTailRasterStage`, and `resolveCompletedFrameCandidate`. | 11c9aa9f |
 | F12 | _pending_ | _pending_ | _pending_ |
-| F13 | _pending_ | _pending_ | _pending_ |
+| F13 | code+test | `swiftly run swift test --filter RasterizerTests`, `swiftly run swift test --filter PipelineContractTests/incrementalRasterReuseMatchesFreshRasterForMutationMatrix`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; default `Rasterizer()` now verifies every incremental repaint by comparing against a fresh raster and falls back to the fresh result with `presentationDamage == nil` when damage was incomplete; no `verifyIncrementalRepaint` opt-in remains. | bdabfa8d |
 | F14 | _pending_ | _pending_ | _pending_ |
 ```
 
@@ -2053,9 +2053,21 @@ Follow-up tasks added from the independent re-audit:
   and `renderTailStrategyEntrySurfaceIsShared` pins the reduced entry surface.
   `RenderPipelineStructureTests`, `AsyncFrameTailRenderingTests`,
   `PipelineDriverParityTests`, and `RenderDriverCharacterizationTests` passed.
-- [ ] **F13 reopened:** make fresh-vs-incremental raster verification active
+- [x] **F13 reopened:** make fresh-vs-incremental raster verification active
   whenever incremental damage suppresses painting, not only behind an opt-in
   test initializer.
+  Completed by `bdabfa8d`: `Rasterizer()` no longer has an opt-in
+  `verifyIncrementalRepaint` initializer; incremental rasterization now compares
+  the damage-driven surface with a fresh raster and returns the fresh result
+  with full presentation repaint when damage was incomplete. Added a regression
+  that proves an incomplete shrink-damage range falls back to the fresh surface.
+  `swiftly run swift test --filter RasterizerTests/defaultIncrementalVerificationFallsBackToFreshRasterForIncompleteDamage`,
+  `RasterizerTests`, and
+  `PipelineContractTests/incrementalRasterReuseMatchesFreshRasterForMutationMatrix`
+  passed. The full `AsyncFrameTailRenderingTests` plus
+  `PipelineDriverParityTests` gate initially hit a `swiftpm-testing-helper`
+  signal 11 during startup and then passed after deleting `.build`, matching
+  the clean-rerun rule above.
 - [ ] **F14 reopened:** make the process artifact discoverable enough that an
   independent audit constrained to the follow-up audit and repo can verify the
   process remediation without trusting prior chat context.
