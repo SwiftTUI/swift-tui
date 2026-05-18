@@ -1254,7 +1254,7 @@ now consumes cached fallback-summary scalars instead of walking resolved trees.
 
 ## Task 6.1: Remove the add-then-subtract blocker pattern
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```swift
 import Testing
@@ -1272,7 +1272,7 @@ struct FrameDropDroppabilityTests {
 }
 ```
 
-- [ ] **Step 2: Trace the pattern**
+- [x] **Step 2: Trace the pattern**
 
 Run:
 ```bash
@@ -1284,13 +1284,13 @@ grep -n "retainedLayoutBaseline\|retainedRasterBaseline\|frameTailCommitDropBloc
 both: the two blockers should never enter completed-frame classification, so
 neither the insert nor the subtract should exist.
 
-- [ ] **Step 3: Delete both halves**
+- [x] **Step 3: Delete both halves**
 
 Remove the `.retainedLayoutBaseline`/`.retainedRasterBaseline` inserts from
 `frameTailCommitDropBlockers` and the corresponding `.subtract([...])` from
 `completedFrameEligibility`. Confirm the remaining blockers are unaffected.
 
-- [ ] **Step 4: Flesh out and run the test**
+- [x] **Step 4: Flesh out and run the test**
 
 Replace the placeholder assertion in Step 1 with a real
 `FrameDropEligibility.classify` call and assert the two retained-baseline
@@ -1299,13 +1299,13 @@ blockers are absent from the classified result.
 Run: `swift test --filter FrameDropDroppabilityTests.noAddThenSubtract`
 Expected: PASS.
 
-- [ ] **Step 5: Run the drop-eligibility suites**
+- [x] **Step 5: Run the drop-eligibility suites**
 
 Run: `swift test --filter FrameDropEligibilityTests`
 Run: `swift test --filter AsyncFrameTailRenderingTests`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/SwiftTUI.swift Sources/SwiftTUICore/Pipeline/FrameDropEligibility.swift Tests/SwiftTUICoreTests/FrameDropDroppabilityTests.swift
@@ -1314,7 +1314,7 @@ git commit -m "refactor: remove add-then-subtract drop-blocker pattern (F7)"
 
 ## Task 6.2: Add the missing-blocker guard test
 
-- [ ] **Step 1: Write the guard test**
+- [x] **Step 1: Write the guard test**
 
 Add to `FrameDropDroppabilityTests.swift`:
 
@@ -1334,7 +1334,7 @@ Add to `FrameDropDroppabilityTests.swift`:
   }
 ```
 
-- [ ] **Step 2: Introduce `CommitEffectCategory`**
+- [x] **Step 2: Introduce `CommitEffectCategory`**
 
 If `CommitPlan` does not already expose a closed `CaseIterable` set of effect
 categories, add `enum CommitEffectCategory: CaseIterable` in `CommitPlan.swift`
@@ -1342,12 +1342,12 @@ enumerating exactly the observable-effect kinds `CommitPlan` can carry, and a
 `FrameDropEligibility.Blocker.blocker(for:)` mapping. This is the F7-derive
 seed: droppability now traces to a closed enum, not an open flag set.
 
-- [ ] **Step 3: Run the guard test**
+- [x] **Step 3: Run the guard test**
 
 Run: `swift test --filter FrameDropDroppabilityTests.everySideEffectCategoryHasABlocker`
 Expected: PASS. A failure names the unmapped category — add its blocker mapping.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SwiftTUICore/Commit/CommitPlan.swift Sources/SwiftTUICore/Pipeline/FrameDropEligibility.swift Tests/SwiftTUICoreTests/FrameDropDroppabilityTests.swift
@@ -1356,7 +1356,7 @@ git commit -m "test: guard drop-blocker coverage of committed effects (F7)"
 
 ## Task 6.3: F7 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
 swift test --filter FrameDropDroppabilityTests
@@ -1366,15 +1366,15 @@ grep -n "subtract(\[" Sources/SwiftTUIRuntime/SwiftTUI.swift
 Expected: tests PASS; the `grep` shows **no** retained-baseline `subtract` in
 `completedFrameEligibility`.
 
-- [ ] **Step 2:** Record the F7 ledger row (Mechanism `code+test`).
-- [ ] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F7 resolved (code+test)"`
+- [x] **Step 2:** Record the F7 ledger row (Mechanism `code+test`).
+- [x] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F7 resolved (code+test)"`
 
 ## Task 6.4: Phase 6 Gate
 
-- [ ] **Step 1:** `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F7 ledger row complete; DoD passes.
-- [ ] **Step 4:** `git commit --allow-empty -m "chore: phase 6 gate green (F7)"`
+- [x] **Step 1:** `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F7 ledger row complete; DoD passes.
+- [x] **Step 4:** `git commit --allow-empty -m "chore: phase 6 gate green (F7)"`
 
 ---
 
