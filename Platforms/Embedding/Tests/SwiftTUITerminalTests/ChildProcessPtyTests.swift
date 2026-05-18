@@ -1,5 +1,5 @@
-import SwiftTUIRuntime
 import SwiftTUIPTYPrimitives
+import SwiftTUIRuntime
 import Testing
 
 @testable import SwiftTUITerminal
@@ -12,11 +12,11 @@ import Testing
 
 @Suite("ChildProcessPty", .serialized)
 struct ChildProcessPtyTests {
-  @Test("spawn /bin/echo and read its output through the shared pair")
+  @Test("spawn a child process and read its output through the shared pair")
   func spawnEcho() async throws {
     let pty = ChildProcessPty(
-      executable: "/bin/echo",
-      arguments: ["hello"],
+      executable: "/bin/sh",
+      arguments: ["-c", "printf 'hello\\n'; sleep 0.2"],
       environment: nil,
       workingDirectory: nil,
       initialSize: CellSize(width: 80, height: 24)

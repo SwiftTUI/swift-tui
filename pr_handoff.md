@@ -243,6 +243,27 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-034357-16939.log
 ```
 
+Packet 11 validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalHost
+swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
+swiftly run swift test --filter WebSurfaceTransportTests
+swiftly run swift test --filter SwiftTUITerminalTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-040917-13192.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -262,12 +283,14 @@ Packet 4 is a core artifact file split. Packet 5 is a runtime acquisition
 control-flow extraction. Packet 6 is a runtime presentation handoff extraction.
 Packet 7 is a Kitty image command extraction. Packet 8 is a Sixel image command
 and shared sampling extraction. Packet 9 is fallback image overlay extraction.
-Packet 10 is terminal-host capability probing extraction.
+Packet 10 is terminal-host capability probing extraction. Packet 11 is
+terminal-host escape sequence, platform I/O shim, and process-exit cleanup
+extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
-pixel metrics refresh, input precision propagation, or public API regression
-appears.
+pixel metrics refresh, input precision propagation, raw-mode cleanup,
+WebSurface full-repaint byte accounting, or public API regression appears.
 
 ## AI Assistance Disclosure
 
