@@ -1,6 +1,6 @@
 # SwiftTUI
 
-SwiftTUI is a pre-1.0, single-maintainer, AI-assisted Swift package. The
+SwiftTUI is pre-1.0.  
 `0.x` line is usable for real terminal interfaces, but minor releases may still
 make source-breaking API adjustments while the public surface is being proven.
 
@@ -11,7 +11,7 @@ Depend on the current alpha release instead of `main`:
 ```swift
 // Package.swift
 .package(
-  url: "https://github.com/GoodHatsLLC/SwiftTUI",
+  url: "https://github.com/SwiftTUI/swift-tui",
   .upToNextMinor(from: "0.1.0")
 )
 ```
@@ -19,7 +19,7 @@ Depend on the current alpha release instead of `main`:
 For a terminal app executable target, add the convenience product:
 
 ```swift
-.product(name: "SwiftTUI", package: "SwiftTUI")
+.product(name: "SwiftTUI", package: "swift-tui")
 ```
 
 Use `SwiftTUIRuntime` plus explicit host/runner products when embedding or
