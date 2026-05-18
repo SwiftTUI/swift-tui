@@ -26,6 +26,8 @@ Approved constraints:
   `TerminalHost.swift` into `TerminalPresentationState.swift`.
 - Packet 2 completed: extracted terminal presentation emission and metrics
   bookkeeping from `TerminalHost.present(_:damage:)`.
+- Packet 3 completed: extracted frame-tail presentation-damage proof logic from
+  `FrameTailRenderer.swift` into `FrameTailPresentationDamage.swift`.
 
 ## Baseline Validation
 
@@ -57,19 +59,44 @@ Packet 2 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-024705-20556.log`
   - Result: PASS
 
+Packet 3 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.FrameTailWorkerFallbackTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.RetainedReuseInvariantTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-025321-47448.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 3: make frame-tail/artifact flow easier to trace while preserving phase
-products and frame-drop semantics.
+Packet 4: split frame diagnostics and frame context out of
+`FrameArtifacts.swift`.
 
-Expected owned files pending local discovery:
+Owned files:
 
-- `Sources/SwiftTUIRuntime/Rendering/`
-- `Sources/SwiftTUICore/Commit/`
+- `Sources/SwiftTUICore/Commit/FrameArtifacts.swift`
+- `Sources/SwiftTUICore/Commit/FrameDiagnostics.swift`
+- `Sources/SwiftTUICore/Commit/FrameContext.swift`
 
 Validation:
 
-- Pipeline/rendering focused tests selected from current file evidence.
+- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+- `swiftly run swift test --filter SwiftTUICoreTests.LayoutEngineTests`
 - `bun run test`
 
 ## Failed Attempts
