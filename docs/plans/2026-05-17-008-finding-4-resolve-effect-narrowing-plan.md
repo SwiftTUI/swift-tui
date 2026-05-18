@@ -1,3 +1,18 @@
+---
+title: "refactor: pipeline driver follow-up remediation"
+type: refactor
+status: shipped
+date: 2026-05-17
+depends_on:
+  - "../proposals/PIPELINE_DRIVER_AUDIT.md"
+  - "../proposals/PIPELINE_BOUNDARY_HARDENING.md"
+  - "../ARCHITECTURE.md"
+  - "../decisions/0004-frame-head-abort-reverted.md"
+  - "../decisions/0018-late-preference-reconciliation-bound.md"
+  - "../decisions/0019-composed-runtime-render-pipeline.md"
+  - "../decisions/0020-off-main-layout-worker-concurrency.md"
+---
+
 # Finding 4 Resolve-Effect Narrowing Plan
 
 ## Context
