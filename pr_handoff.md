@@ -13,6 +13,11 @@ Packet 1 should be reviewed first:
 - `Sources/SwiftTUIRuntime/Terminal/TerminalPresentationState.swift`
 - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
 
+Packet 2 should be reviewed as a same-area continuation:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalPresentationState.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -49,6 +54,21 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-024018-4112.log
 ```
 
+Packet 2 validation passed:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-024705-20556.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -62,8 +82,9 @@ about behavioral drift, output drift, concurrency changes, and fixture churn.
 
 ## Rollback
 
-Each packet should be independently revertible. No production-code packet has
-landed yet.
+Each packet should be independently revertible. Packet 1 and Packet 2 are
+same-area terminal presentation changes and should be reverted newest-first if a
+terminal output regression appears.
 
 ## AI Assistance Disclosure
 

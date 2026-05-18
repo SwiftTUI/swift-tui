@@ -42,20 +42,41 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
-### Packet 2: Frame Tail / Artifacts Readability
+### Packet 2: Terminal Presentation Emission
+
+- Objective: make `TerminalHost.present(_:damage:)` read as orchestration by
+  moving output assembly and metrics bookkeeping into named helpers.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalPresentationState.swift`
+- Scope: preserve terminal output byte-for-byte while splitting full repaint,
+  incremental row emission, Kitty graphics replay, synchronized-output wrapping,
+  writer submission, and metrics construction into named units.
+- Dependencies: Packet 1.
+- Invariants: terminal bytes, graphics replay scope/count metrics, edit-operation
+  lowering metrics, retained surface updates, synchronized-output wrapping, and
+  Kitty image-id cache behavior remain stable.
+- Required checks:
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
+### Packet 3: Frame Tail / Artifacts Readability
 
 - Objective: make the frame-tail and artifact flow easier to trace while
   preserving phase products and frame-drop semantics.
 - Likely owned files: pending discovery, expected to be inside
   `Sources/SwiftTUIRuntime/Rendering/` and `Sources/SwiftTUICore/Commit/`.
-- Dependencies: Packet 1 only if shared presentation concepts are renamed or
+- Dependencies: Packet 2 only if shared presentation concepts are renamed or
   extracted.
 - Invariants: phase order, retained frame reuse, damage hints, diagnostics, and
   async/sync parity remain stable.
 - Required checks: pipeline/rendering focused tests first, then `bun run test`.
 - Rollback: revert the packet commit/files only.
 
-### Packet 3: RunLoop Presentation Path
+### Packet 4: RunLoop Presentation Path
 
 - Objective: reduce cognitive load in frame acquisition, commit, and
   presentation handoff code.
@@ -68,7 +89,7 @@ against local source evidence.
   `bun run test`.
 - Rollback: revert the packet commit/files only.
 
-### Packet 4: Platform Entrypoint Clarity
+### Packet 5: Platform Entrypoint Clarity
 
 - Objective: clarify how CLI/render-once entrypoints connect to runtime and
   terminal hosts.
