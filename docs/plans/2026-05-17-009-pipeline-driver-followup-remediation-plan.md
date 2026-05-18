@@ -1540,7 +1540,7 @@ git commit -m "docs: record resolve staging decision, reconcile ARCHITECTURE (F3
 
 ## Task 7.4: F3 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
 swift test --filter ResolvePurityTests
@@ -1551,8 +1551,8 @@ grep -c "\.discard()" Sources/SwiftTUIRuntime/SwiftTUI.swift
 Expected: test PASSES; `abortPreparedFrameHead` body calls `transaction.discard()`
 once (confirm by inspection — the six loose `discard()` calls are gone).
 
-- [ ] **Step 2:** Record the F3 ledger row (Mechanism `code+test`).
-- [ ] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F3 resolved (code+test)"`
+- [x] **Step 2:** Record the F3 ledger row (Mechanism `code+test`).
+- [x] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F3 resolved (code+test)"`
 
 ## Task 7.5: Phase 7 Gate
 
