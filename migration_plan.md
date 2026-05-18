@@ -258,6 +258,38 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 15: Animation Property Value Application
+
+- Objective: finish the current safe `AnimationController` value-transform
+  split by moving property-slot lookup, interpolation fallback, and resolved-tree
+  property writeback into a same-subsystem helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationPropertyValueApplication.swift`
+- Dependencies: Packets 13 and 14 separated pure tree queries and removal
+  overlay transforms, leaving property animation value application as the next
+  isolated non-bookkeeping boundary.
+- Invariants: active animation iteration, custom-animation state writeback,
+  batch ref counts, completion deferral, deadlines, removal purge decisions,
+  and frame-head transaction behavior stay in `AnimationController`; property
+  writeback preserves tree shape with `setChildrenPreservingDerivedState`;
+  layout updates preserve derived state and keep `.flexibleFrame` slot priority
+  in max, ideal, then min order; shape-style slots continue writing to their
+  original draw metadata or shape payload destinations; interpolation still
+  snaps to the target value on type mismatch.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests`
+  - `swiftly run swift test --filter AnimationController`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

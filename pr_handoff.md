@@ -82,6 +82,11 @@ Packet 14 should be reviewed as animation transition-overlay extraction:
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationTransitionOverlay.swift`
 
+Packet 15 should be reviewed as animation property-value application extraction:
+
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationPropertyValueApplication.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -343,6 +348,27 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-043316-68540.log
 ```
 
+Packet 15 validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests
+swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests
+swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests
+swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests
+swiftly run swift test --filter AnimationController
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-044249-87972.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -367,6 +393,7 @@ terminal-host escape sequence, platform I/O shim, and process-exit cleanup
 extraction. Packet 12 is terminal presentation planning extraction.
 Packet 13 is animation tree-query extraction.
 Packet 14 is animation transition-overlay extraction.
+Packet 15 is animation property-value application extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -374,7 +401,9 @@ pixel metrics refresh, input precision propagation, raw-mode cleanup,
 WebSurface full-repaint byte accounting, presentation damage planning, Kitty
 graphics replay planning, matched-geometry traversal, removal subtree lookup,
 removal overlay transient marking, removal offset composition, removal
-reinjection ordering, or public API regression appears.
+reinjection ordering, property animation writeback, flexible-frame dimension
+slot preservation, shape-style destination routing, or public API regression
+appears.
 
 ## AI Assistance Disclosure
 
