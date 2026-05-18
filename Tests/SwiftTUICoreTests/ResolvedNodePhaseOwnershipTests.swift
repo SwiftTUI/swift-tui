@@ -50,6 +50,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("layoutDependentContent", .measurement),
     ("preferenceValues", .derivedCache),
     ("subtreeNodeCount", .derivedCache),
+    ("customLayoutFallbackSummary", .derivedCache),
     ("supportsRetainedReuse", .derivedCache),
     ("matchedGeometry", .placement),
     ("isTransient", .semantics),
