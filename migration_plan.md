@@ -384,6 +384,35 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 19: Late Preference Reconciliation
+
+- Objective: make `DefaultRenderer` easier to follow by moving late-preference
+  reconciliation policy, sync/async loop mechanics, and reconciliation runtime
+  issue construction into a rendering helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/LatePreferenceReconciliation.swift`
+- Dependencies: Packet 18 split low-risk terminal input support. A read-only
+  runtime review ranked late-preference reconciliation as the next central
+  rendering debt because the verbose loop is separable from frame-head
+  preparation, queued cancellation, and commit orchestration.
+- Invariants: public renderer APIs stay unchanged; pass budget remains
+  `max(1, input.resolved.subtreeNodeCount + 1)`; sync and async loops preserve
+  nil-layout cancellation behavior, suspension-duration accumulation, and
+  bound-exhaustion "warn and commit latest reconciled layout" behavior; toolbar
+  runtime issue codes, messages, identities, and sources remain stable; prepared
+  graph materialization and queued cancellation stay in `DefaultRenderer`.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.BoundedReconciliationTests`
+  - `swiftly run swift test --filter SwiftTUITests.ToolbarTests`
+  - `swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningTests`
+  - `swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
