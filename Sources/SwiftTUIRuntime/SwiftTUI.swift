@@ -1099,9 +1099,12 @@ public struct DefaultRenderer {
     case .abortable:
       // Force-unwraps are safe: every `.abortable` branch above assigned its
       // checkpoint non-nil.
+      graphDraft.recordPreparedCheckpoint(from: viewGraph)
       checkpoints = FrameHeadCheckpoints(
-        frameState: frameStateCheckpoint!,
-        frameInputs: frameInputsCheckpoint!
+        baselineFrameState: frameStateCheckpoint!,
+        baselineFrameInputs: frameInputsCheckpoint!,
+        preparedFrameState: frameState.makeCheckpoint(),
+        preparedFrameInputs: frameInputs.makeCheckpoint()
       )
     }
 
@@ -1116,6 +1119,9 @@ public struct DefaultRenderer {
       animationDraft: animationDraft,
       checkpoints: checkpoints
     )
+    if mode == .abortable {
+      transaction.suspendPreparedState()
+    }
 
     return FrameHeadDraft(
       clock: clock,
@@ -1452,6 +1458,7 @@ public struct DefaultRenderer {
   ) -> FrameArtifacts {
     let layout = candidate.tailOutput.layout
     let tail = candidate.tailOutput.tail
+    candidate.draft.transaction.materializePreparedState()
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
@@ -1517,9 +1524,11 @@ public struct DefaultRenderer {
     resolved: ResolvedNode
   ) -> (commit: CommitPlan, duration: Duration) {
     let tail = tailOutput.tail
+    draft.transaction.materializePreparedState()
     let checkpoint = viewGraph.makeCheckpoint()
     defer {
       viewGraph.restoreCheckpoint(checkpoint)
+      draft.transaction.suspendPreparedState()
     }
 
     return measurePhase(clock: draft.clock) {

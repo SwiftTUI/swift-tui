@@ -18,6 +18,10 @@ struct ResolvePurityTests {
         Text("b")
       }
     )
+
+    let afterPrepare = renderer.debugRuntimeSubsystemSnapshot()
+    #expect(baseline == afterPrepare, "prepared head mutated live subsystem state")
+
     renderer.abortPreparedFrameHeadForCancellationTesting(draft)
 
     let afterAbort = renderer.debugRuntimeSubsystemSnapshot()
