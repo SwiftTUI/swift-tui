@@ -17,22 +17,63 @@ correctness especially likely to exercise async runtime tests.
 
 ## Evidence Boundary
 
-This proposal is based on code/test-suite analysis, the follow-up plan's
+This proposal was opened from code/test-suite analysis, the follow-up plan's
 known-flake registry, and one focused isolation rerun of the registered toast
-test. It is **not** based on a fresh repeated under-load campaign at current
-HEAD. That campaign is part of the proposed work.
+test. The initial remediation tranche has now added a retained repeated-run
+harness and one repeated under-load pass at current HEAD. Broader load campaigns
+are still useful before assigning narrower root causes or expanding the
+known-flake list.
 
 Use these terms precisely:
 
 - **Confirmed in this pass:** tests in the registry and nearby suites depend on
   real async tasks, event streams, deadlines, hosted sessions, process sessions,
-  or wall-clock waits.
-- **Not confirmed in this pass:** the current flake frequency, the exact failing
-  set under load, or whether every registered timeout is caused by the async
-  renderer.
+  or wall-clock waits. The initial harness run recorded 2/2 passes for every
+  current registry candidate under light CPU pressure.
+- **Not confirmed in this pass:** the current flake frequency under heavier or
+  longer load, the exact failing set under CI load, or whether every registered
+  timeout is caused by the async renderer.
 - **Fair current category:** "load-sensitive runtime/integration tests with
   async dependencies." Calling the whole set "async renderer flake" would
   overstate the evidence.
+
+## Current Registry And Focused Reruns
+
+Each registry candidate has a focused rerun command and a remediation owner.
+The owner labels below name the responsible code area rather than an individual.
+
+| Candidate | Category | Focused rerun command | Owner | Remediation path |
+| --- | --- | --- | --- | --- |
+| `InteractiveRuntimeTests.toastAutoDismissRerendersWithoutAdditionalInput` | Async/runtime-adjacent | `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/toastAutoDismissRerendersWithoutAdditionalInput` | runtime test support | Shared scaled waits; later runtime progress probe. |
+| `AsyncFrameTailRenderingTests` | Async renderer/runtime | `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests` | runtime test support | Shared scaled waits; later runtime progress probe for exact commit/cancel milestones. |
+| `HostedSurfaceRegressionTests` | Runtime/host integration with async dependencies | `swiftly run swift test --filter SwiftUIHostTests.HostedSurfaceRegressionTests` | host test support | Shared scaled waits and serialized suite; later continuation-backed hosted-frame waiters. |
+| `SwiftUIHostAccessibilityTests` | Runtime/host integration with async dependencies | `swiftly run swift test --filter SwiftUIHostTests.SwiftUIHostAccessibilityTests` | host test support | Shared scaled waits with snapshot diagnostics and serialized suite; later continuation-backed hosted-frame waiters. |
+| `RenderDiffTests` | Process/presentation integration and wall-clock sensitivity | `swiftly run swift test --filter SwiftTUITerminalTests.RenderDiffTests` | terminal embedding test support | Replace wall-clock presentation assertion with deterministic commit/write-shape assertions. |
+
+## Initial Measurement Run
+
+Retained run:
+
+```bash
+Scripts/repeat_async_flake_registry.sh --iterations 2 --load-workers 2 --allow-failures
+```
+
+Result artifacts:
+
+- Summary: `/tmp/swift-tui-async-flake-registry-20260517-174856-49878/summary.tsv`
+- Per-candidate logs: `/tmp/swift-tui-async-flake-registry-20260517-174856-49878/`
+
+| Candidate | Pass | Fail | Skip | Total |
+| --- | ---: | ---: | ---: | ---: |
+| `AsyncFrameTailRenderingTests` | 2 | 0 | 0 | 2 |
+| `HostedSurfaceRegressionTests` | 2 | 0 | 0 | 2 |
+| `InteractiveRuntimeTests.toastAutoDismissRerendersWithoutAdditionalInput` | 2 | 0 | 0 | 2 |
+| `RenderDiffTests` | 2 | 0 | 0 | 2 |
+| `SwiftUIHostAccessibilityTests` | 2 | 0 | 0 | 2 |
+
+This run is evidence that the current candidates pass repeated focused reruns
+under light pressure after the initial test-support cleanup. It is not evidence
+that the classes are impossible to flake under heavier CI contention.
 
 ## Problem Summary
 
@@ -218,6 +259,38 @@ to change.
    more cancellation/drop/commit tests.
 6. Resume the pipeline-driver plan with F5 cancellation early, then continue
    through F4/F3/F6/F7/F8/F9/F10/F13/F14 using the probe-backed tests.
+
+Progress:
+
+- Completed: focused rerun commands and remediation owners are recorded above.
+- Completed: `Scripts/repeat_async_flake_registry.sh` records repeated registry
+  runs under optional CPU pressure with retained logs and pass/fail counts.
+- Completed: shared async wait helpers provide timeout diagnostics and
+  `SWIFTTUI_TEST_TIMEOUT_SCALE` support for the converted runtime, host, and
+  render-diff tests.
+- Completed: the registered toast, async frame-tail, host regression,
+  SwiftUI-host accessibility, and render-diff candidates use either the shared
+  helper or deterministic write-shape assertions.
+- Completed: `RunLoopProgressProbe` provides frame-intent, acquisition,
+  skipped-frame, committed-frame, event-drain, and scheduler-idle milestones;
+  the toast auto-dismiss regression now waits for committed runtime progress.
+- Completed: `HostedRasterSurface` retains recent semantic host frames and
+  exposes continuation-backed `waitForFrame`, `waitForSurface`, and
+  `waitForFrames` testing SPI; host regression tests now await those frame
+  deliveries instead of polling a recorder.
+- Completed: `InjectedTerminalInputReader` and `HostedSceneSession` expose
+  package/SPI test hooks to flush pending coalesced mouse events without
+  waiting for the production timer.
+- Completed: F5 queued-tail cancellation no longer busy-polls with a
+  one-millisecond main-actor sleep. The cancellable tail now waits on the
+  token's queue-exit continuation and a scheduler-backed pending-frame awaiter.
+- Completed: F4 checkpoint totality now has source-level guards requiring every
+  mutable `ViewGraph` and `ViewNode` field to be checkpoint-covered, a live
+  checkpoint-restore identity test, and an async preview-vs-real commit-plan
+  equivalence test.
+- Remaining: add the planned parallel-pressure mode to the registry harness,
+  then resume the F3/F6/F7/F8/F9/F10/F13/F14 pipeline-driver findings with
+  probe-backed tests.
 
 ## Acceptance Criteria
 

@@ -60,9 +60,11 @@
   IME/composition before promoting those behaviors beyond current terminal and
   browser clipboard support. See
   [proposals/TEXT_INPUT_MODEL.md](proposals/TEXT_INPUT_MODEL.md).
-- Measure and stabilize load-sensitive runtime/integration tests ahead of the
-  remaining pipeline-driver remediation: add repeated under-load evidence,
-  shared async wait helpers, and runtime/host progress await hooks. See
+- Add a parallel-pressure mode for
+  [../Scripts/repeat_async_flake_registry.sh](../Scripts/repeat_async_flake_registry.sh)
+  that runs the flake registry while representative Swift test filters or
+  package builds execute concurrently, then record whether it reproduces the
+  root-suite toast timeout shape. See
   [proposals/ASYNC_TEST_FLAKE_REMEDIATION.md](proposals/ASYNC_TEST_FLAKE_REMEDIATION.md).
 - Define the restart/reattach contract for `SwiftTUITerminalWorkspace` before
   adding persisted child-process reattachment.

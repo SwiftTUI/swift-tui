@@ -299,6 +299,12 @@ private func latePreferenceReconciliationLimitIssue(
   )
 }
 
+package struct CompletedFrameCandidateCommitPlanComparison {
+  package var previewCommit: CommitPlan
+  package var committedCommit: CommitPlan
+  package var committedArtifacts: FrameArtifacts
+}
+
 /// Renders authored terminal views through the full frame pipeline.
 ///
 /// `DefaultRenderer` is the public one-shot entry point for turning a `View`
@@ -478,6 +484,24 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  package func commitCompletedFrameCandidateForTesting(
+    _ draft: FrameHeadDraft
+  ) async -> CompletedFrameCandidateCommitPlanComparison {
+    let tailOutput = await renderFrameTailAsync(draft)
+    let candidate = makeCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration
+    )
+    let artifacts = commitCompletedFrameCandidate(candidate)
+    return CompletedFrameCandidateCommitPlanComparison(
+      previewCommit: candidate.previewArtifacts.commitPlan,
+      committedCommit: artifacts.commitPlan,
+      committedArtifacts: artifacts
+    )
+  }
+
+  @MainActor
   package func runFrameTailLayoutWorkerJobForCancellationTesting(
     _ operation: @escaping @Sendable () -> Void
   ) async {
@@ -524,6 +548,7 @@ public struct DefaultRenderer {
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
         _ in []
       },
+    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void = {},
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
     let renderer = self
@@ -545,6 +570,7 @@ public struct DefaultRenderer {
         latePreferenceReconciliation: { draft in
           await renderer.renderCancellableFrameTailLayoutStage(
             draft,
+            awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
             shouldCancelQueued: shouldCancelQueued
           )
         },
@@ -1180,6 +1206,7 @@ public struct DefaultRenderer {
   @MainActor
   private func renderCancellableFrameTailLayoutStage(
     _ draft: FrameHeadDraft,
+    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void,
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableFrameTailLayoutStageResult {
     let cancellationToken = FrameTailJobCancellationToken()
@@ -1191,12 +1218,34 @@ public struct DefaultRenderer {
       )
     }
 
-    while cancellationToken.currentState == .queued {
-      if await shouldCancelQueued(), cancellationToken.cancelBeforeStart() {
+    @MainActor
+    func waitForQueuedCancellationSignal() async -> FrameTailJobState {
+      await awaitQueuedCancellationSignal()
+      if !Task.isCancelled,
+        await shouldCancelQueued(),
+        cancellationToken.cancelBeforeStart()
+      {
         layoutTask.cancel()
         return .cancelledBeforeStart
       }
-      try? await Task.sleep(for: .milliseconds(1))
+      return await cancellationToken.waitUntilLeavesQueue()
+    }
+
+    let queueExitState = await withTaskGroup(of: FrameTailJobState.self) { group in
+      group.addTask {
+        await cancellationToken.waitUntilLeavesQueue()
+      }
+      group.addTask {
+        await waitForQueuedCancellationSignal()
+      }
+      let state = await group.next() ?? cancellationToken.currentState
+      group.cancelAll()
+      return state
+    }
+
+    if queueExitState == .cancelledBeforeStart {
+      layoutTask.cancel()
+      return .cancelledBeforeStart
     }
 
     let layoutResult = await layoutTask.value

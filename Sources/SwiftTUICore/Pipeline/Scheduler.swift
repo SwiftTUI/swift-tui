@@ -81,6 +81,10 @@ package protocol CancelledFrameIntentReplaying: AnyObject {
   func replayCancelledFrameIntent(_ frame: ScheduledFrame)
 }
 
+package protocol PendingFrameAwaiting: AnyObject {
+  func waitForPendingFrame(at now: MonotonicInstant) async
+}
+
 /// Scheduler contract used by the runtime event loop.
 public protocol FrameScheduling: Invalidating {
   func requestInput()
@@ -107,18 +111,28 @@ public final class FrameScheduler: FrameScheduling {
   /// for cancellation-pressure diagnostics; reset to 0 on consume.
   private var pendingIntentRequestCount: Int = 0
   private let wakeHandlerLock = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(uncheckedState: nil)
+  private struct PendingFrameRequestWaiters {
+    var nextID: UInt64 = 0
+    var waiters: [UInt64: CheckedContinuation<Void, Never>] = [:]
+  }
+
+  private let pendingFrameRequestWaitersLock = OSAllocatedUnfairLock<PendingFrameRequestWaiters>(
+    uncheckedState: PendingFrameRequestWaiters()
+  )
 
   public init() {}
 
   public func requestInput() {
     pendingCauses.insert(.input)
     pendingIntentRequestCount += 1
+    notifyPendingFrameRequestWaiters()
   }
 
   public func requestInvalidation(of identities: Set<Identity>) {
     pendingCauses.insert(.invalidation)
     invalidatedIdentities.formUnion(identities)
     pendingIntentRequestCount += 1
+    notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
@@ -126,12 +140,14 @@ public final class FrameScheduler: FrameScheduling {
     pendingCauses.insert(.signal)
     signalNames.insert(name)
     pendingIntentRequestCount += 1
+    notifyPendingFrameRequestWaiters()
   }
 
   public func requestExternalWake(reason: String) {
     pendingCauses.insert(.external)
     externalReasons.insert(reason)
     pendingIntentRequestCount += 1
+    notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
@@ -142,6 +158,7 @@ public final class FrameScheduler: FrameScheduling {
       nextDeadline = deadline
     }
     pendingIntentRequestCount += 1
+    notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
@@ -211,11 +228,83 @@ public final class FrameScheduler: FrameScheduling {
     pendingIntentRequestCount = 0
     nextDeadline = nil
   }
+
+  private func notifyPendingFrameRequestWaiters() {
+    let waiters = pendingFrameRequestWaitersLock.withLockUnchecked { state in
+      let waiters = Array(state.waiters.values)
+      state.waiters.removeAll(keepingCapacity: true)
+      return waiters
+    }
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
+
+  private func waitForNextFrameRequest() async {
+    let waiterIDLock = OSAllocatedUnfairLock<UInt64?>(uncheckedState: nil)
+    let pendingFrameRequestWaitersLock = pendingFrameRequestWaitersLock
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if Task.isCancelled {
+          continuation.resume()
+          return
+        }
+
+        let waiterID = pendingFrameRequestWaitersLock.withLockUnchecked { state in
+          let waiterID = state.nextID
+          state.nextID &+= 1
+          state.waiters[waiterID] = continuation
+          return waiterID
+        }
+        waiterIDLock.withLockUnchecked { $0 = waiterID }
+        if Task.isCancelled {
+          let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
+            state.waiters.removeValue(forKey: waiterID)
+          }
+          continuation?.resume()
+        }
+      }
+    } onCancel: {
+      guard let waiterID = waiterIDLock.withLockUnchecked({ $0 }),
+        let continuation = pendingFrameRequestWaitersLock.withLockUnchecked({
+          state in state.waiters.removeValue(forKey: waiterID)
+        })
+      else {
+        return
+      }
+      continuation.resume()
+    }
+  }
 }
 
 extension FrameScheduler: WakeNotifyingFrameScheduling {
   package func setWakeHandler(_ handler: (@Sendable () -> Void)?) {
     wakeHandlerLock.withLockUnchecked { $0 = handler }
+  }
+}
+
+extension FrameScheduler: PendingFrameAwaiting {
+  package func waitForPendingFrame(at now: MonotonicInstant = .now()) async {
+    var currentInstant = now
+    while !Task.isCancelled {
+      if hasPendingFrame(at: currentInstant) {
+        return
+      }
+
+      if let nextWake = nextWakeInstant(after: currentInstant) {
+        let sleepDuration = currentInstant.duration(to: nextWake)
+        if sleepDuration > .zero {
+          try? await Task.sleep(for: sleepDuration)
+        } else {
+          return
+        }
+        currentInstant = .now()
+        continue
+      }
+
+      await waitForNextFrameRequest()
+      currentInstant = .now()
+    }
   }
 }
 
@@ -238,6 +327,7 @@ extension FrameScheduler: AnimationAwareInvalidating {
     if let batchID {
       pendingAnimationBatchID = batchID
     }
+    notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 }
@@ -264,6 +354,7 @@ extension FrameScheduler: CancelledFrameIntentReplaying {
     if pendingAnimationBatchID == nil {
       pendingAnimationBatchID = frame.animationBatchID
     }
+    notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 }

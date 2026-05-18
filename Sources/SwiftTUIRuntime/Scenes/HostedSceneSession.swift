@@ -169,6 +169,12 @@ public final class HostedSceneSession {
     inputReader.send(events)
   }
 
+  @_spi(Runners) @discardableResult public func flushPendingInputEventsForTesting()
+    -> [InputEvent]
+  {
+    inputReader.flushPendingCoalescedMouseEvents()
+  }
+
   public func requestSurfaceRefresh() {
     signalReader.send("SIGWINCH")
   }

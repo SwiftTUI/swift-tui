@@ -1,12 +1,13 @@
 import Foundation
 import SwiftTUICore
 import SwiftTUITerminal
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
 @testable import SwiftTUIRuntime
 
-@Suite("TerminalView render diff")
+@Suite("TerminalView render diff", .serialized)
 struct RenderDiffTests {
   @MainActor
   @Test("running cat over a large file stays within the byte budget")
@@ -33,7 +34,7 @@ struct RenderDiffTests {
       terminalSize: terminalSize
     )
 
-    let result = try await valueWithTimeout {
+    let result = try await valueWithTimeout(timeoutNanoseconds: 10_000_000_000) {
       try await runLoop.run()
     }
 
@@ -44,8 +45,8 @@ struct RenderDiffTests {
   }
 
   @MainActor
-  @Test("50ms presentation latency keeps TerminalView commits under 100ms")
-  func latencyInjectedPresentationStaysResponsive() async throws {
+  @Test("50ms presentation latency preserves incremental TerminalView commit shape")
+  func latencyInjectedPresentationPreservesIncrementalCommitShape() async throws {
     let fixtureURL = try makeLargeTextFixture(byteCount: 64 * 1024)
     defer {
       try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent())
@@ -71,13 +72,16 @@ struct RenderDiffTests {
       terminalSize: terminalSize
     )
 
-    let result = try await valueWithTimeout {
+    let result = try await valueWithTimeout(timeoutNanoseconds: 10_000_000_000) {
       try await runLoop.run()
     }
 
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
     #expect(host.presentationMetrics.count > 1)
-    #expect(host.maxPresentationDuration < 0.100)
+    let incrementalMetrics = host.presentationMetrics.filter { $0.strategy == .incremental }
+    #expect(!incrementalMetrics.isEmpty)
+    #expect(incrementalMetrics.allSatisfy { $0.linesTouched <= terminalSize.height })
+    #expect(host.bytesEmittedToTerminal < 80_000)
   }
 
   @MainActor
@@ -117,7 +121,6 @@ private final class ByteCountingTerminalHost: PresentationSurface {
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance = .fallback
   private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
-  private(set) var presentationDurations: [Double] = []
   private(set) var outOfBandBytes = 0
   private var previousSurface: RasterSurface?
   private let artificialPresentationDelay: TimeInterval
@@ -136,10 +139,6 @@ private final class ByteCountingTerminalHost: PresentationSurface {
     outOfBandBytes + presentationMetrics.map(\.bytesWritten).reduce(0, +)
   }
 
-  var maxPresentationDuration: Double {
-    presentationDurations.max() ?? 0
-  }
-
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
@@ -147,7 +146,6 @@ private final class ByteCountingTerminalHost: PresentationSurface {
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    let started = Date()
     if artificialPresentationDelay > 0 {
       Thread.sleep(forTimeInterval: artificialPresentationDelay)
     }
@@ -160,7 +158,6 @@ private final class ByteCountingTerminalHost: PresentationSurface {
     )
     let metrics = metrics(for: plan, surface: surface)
     presentationMetrics.append(metrics)
-    presentationDurations.append(Date().timeIntervalSince(started))
     previousSurface = surface
     return metrics
   }
@@ -241,27 +238,6 @@ private final class EmptySignalReader: SignalReading {
     AsyncStream { continuation in
       continuation.finish()
     }
-  }
-}
-
-private struct RenderDiffTimeout: Error {}
-
-private func valueWithTimeout<Value: Sendable>(
-  timeoutNanoseconds: UInt64 = 10_000_000_000,
-  _ operation: @escaping @Sendable () async throws -> Value
-) async throws -> Value {
-  try await withThrowingTaskGroup(of: Value.self) { group in
-    group.addTask {
-      try await operation()
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw RenderDiffTimeout()
-    }
-
-    let value = try await group.next()!
-    group.cancelAll()
-    return value
   }
 }
 

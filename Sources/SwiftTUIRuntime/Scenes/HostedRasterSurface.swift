@@ -12,8 +12,22 @@ public final class HostedRasterSurface:
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
     var nextFrameSequence: UInt64
+    var frames: [SemanticHostFrame] = []
+    var frameWaiters: [FrameWaiter] = []
+    var frameSequenceWaiters: [FrameSequenceWaiter] = []
   }
 
+  private struct FrameWaiter: Sendable {
+    var predicate: @Sendable (SemanticHostFrame) -> Bool
+    var continuation: CheckedContinuation<SemanticHostFrame, Never>
+  }
+
+  private struct FrameSequenceWaiter: Sendable {
+    var predicate: @Sendable ([SemanticHostFrame]) -> Bool
+    var continuation: CheckedContinuation<[SemanticHostFrame], Never>
+  }
+
+  private static let frameHistoryLimit = 256
   private let state: Mutex<State>
   private let frameHandler: @Sendable (SemanticHostFrame) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
@@ -117,6 +131,69 @@ public final class HostedRasterSurface:
     clipboardWriter?(text) ?? false
   }
 
+  @_spi(Runners) public func waitForFrame(
+    matching predicate: @escaping @Sendable (SemanticHostFrame) -> Bool = { _ in true }
+  ) async -> SemanticHostFrame {
+    if let frame = state.withLock({ state in state.frames.first(where: predicate) }) {
+      return frame
+    }
+
+    return await withCheckedContinuation { continuation in
+      let immediate = state.withLock { state -> SemanticHostFrame? in
+        if let frame = state.frames.first(where: predicate) {
+          return frame
+        }
+        state.frameWaiters.append(
+          FrameWaiter(
+            predicate: predicate,
+            continuation: continuation
+          )
+        )
+        return nil
+      }
+      if let immediate {
+        continuation.resume(returning: immediate)
+      }
+    }
+  }
+
+  @_spi(Runners) public func waitForSurface(
+    matching predicate: @escaping @Sendable (RasterSurface) -> Bool = { _ in true }
+  ) async -> RasterSurface {
+    let frame = await waitForFrame { frame in
+      predicate(frame.raster)
+    }
+    return frame.raster
+  }
+
+  @_spi(Runners) public func waitForFrames(
+    matching predicate: @escaping @Sendable ([SemanticHostFrame]) -> Bool
+  ) async -> [SemanticHostFrame] {
+    if let frames = state.withLock({ state -> [SemanticHostFrame]? in
+      predicate(state.frames) ? state.frames : nil
+    }) {
+      return frames
+    }
+
+    return await withCheckedContinuation { continuation in
+      let immediate = state.withLock { state -> [SemanticHostFrame]? in
+        if predicate(state.frames) {
+          return state.frames
+        }
+        state.frameSequenceWaiters.append(
+          FrameSequenceWaiter(
+            predicate: predicate,
+            continuation: continuation
+          )
+        )
+        return nil
+      }
+      if let immediate {
+        continuation.resume(returning: immediate)
+      }
+    }
+  }
+
   @discardableResult
   public func present(
     _ surface: RasterSurface
@@ -139,10 +216,38 @@ public final class HostedRasterSurface:
   private func submit(
     _ frame: SemanticHostFrame
   ) {
-    state.withLock { state in
+    let (frameContinuations, sequenceContinuations, framesSnapshot) = state.withLock { state in
       if frame.sequence >= state.nextFrameSequence {
         state.nextFrameSequence = frame.sequence &+ 1
       }
+      state.frames.append(frame)
+      if state.frames.count > Self.frameHistoryLimit {
+        state.frames.removeFirst(state.frames.count - Self.frameHistoryLimit)
+      }
+
+      var frameContinuations: [CheckedContinuation<SemanticHostFrame, Never>] = []
+      var sequenceContinuations: [CheckedContinuation<[SemanticHostFrame], Never>] = []
+      state.frameWaiters.removeAll { waiter in
+        guard waiter.predicate(frame) else {
+          return false
+        }
+        frameContinuations.append(waiter.continuation)
+        return true
+      }
+      state.frameSequenceWaiters.removeAll { waiter in
+        guard waiter.predicate(state.frames) else {
+          return false
+        }
+        sequenceContinuations.append(waiter.continuation)
+        return true
+      }
+      return (frameContinuations, sequenceContinuations, state.frames)
+    }
+    for continuation in frameContinuations {
+      continuation.resume(returning: frame)
+    }
+    for continuation in sequenceContinuations {
+      continuation.resume(returning: framesSnapshot)
     }
     frameHandler(frame)
   }
