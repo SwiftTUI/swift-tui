@@ -304,6 +304,76 @@ package struct FrameHeadCheckpoints {
   let frameInputs: FrameResolveInputBox.Checkpoint
 }
 
+@MainActor
+package final class FrameHeadTransaction {
+  package let graphDraft: ViewGraphFrameDraft
+  package let registrationDraft: FrameHeadRegistrationDraft
+  package let presentationPortalDraft: PresentationPortalDraft
+  package let observationDraft: ObservationBridgeDraft?
+  package let animationDraft: AnimationFrameDraft
+  package let checkpoints: FrameHeadCheckpoints?
+
+  private let viewGraph: ViewGraph
+  private let frameState: FrameResolveState
+  private let frameInputs: FrameResolveInputBox
+  private var didCommit = false
+  private var didDiscard = false
+
+  package init(
+    viewGraph: ViewGraph,
+    frameState: FrameResolveState,
+    frameInputs: FrameResolveInputBox,
+    graphDraft: ViewGraphFrameDraft,
+    registrationDraft: FrameHeadRegistrationDraft,
+    presentationPortalDraft: PresentationPortalDraft,
+    observationDraft: ObservationBridgeDraft?,
+    animationDraft: AnimationFrameDraft,
+    checkpoints: FrameHeadCheckpoints?
+  ) {
+    self.viewGraph = viewGraph
+    self.frameState = frameState
+    self.frameInputs = frameInputs
+    self.graphDraft = graphDraft
+    self.registrationDraft = registrationDraft
+    self.presentationPortalDraft = presentationPortalDraft
+    self.observationDraft = observationDraft
+    self.animationDraft = animationDraft
+    self.checkpoints = checkpoints
+  }
+
+  package func commit() -> RuntimeRegistrationDiagnostics {
+    precondition(!didCommit && !didDiscard)
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)
+    observationDraft?.commit()
+    presentationPortalDraft.commit()
+    animationDraft.commit()
+    didCommit = true
+    return diagnostics
+  }
+
+  package func discard() {
+    precondition(!didCommit && !didDiscard)
+    guard let checkpoints else {
+      preconditionFailure(
+        "Cannot abort a one-shot frame head — it has no checkpoints."
+      )
+    }
+    registrationDraft.discard()
+    graphDraft.discard(from: viewGraph)
+    presentationPortalDraft.discard()
+    observationDraft?.discard()
+    animationDraft.discard()
+    frameState.restoreCheckpoint(checkpoints.frameState)
+    frameInputs.restoreCheckpoint(checkpoints.frameInputs)
+    didDiscard = true
+  }
+
+  package func draftDropEligibilityBlockers() -> Set<FrameDropEligibility.Blocker> {
+    registrationDraft.draftDropEligibilityBlockers()
+      .union(animationDraft.frameDropEligibilityBlockers)
+  }
+}
+
 /// Checkpointed main-actor frame head prepared before tail work starts.
 ///
 /// A draft owns preview resolve-side state that can be discarded only if the
@@ -312,13 +382,7 @@ package struct FrameHeadCheckpoints {
 package struct FrameHeadDraft {
   var clock: ContinuousClock?
   var renderGeneration: RenderGeneration
-  var graphDraft: ViewGraphFrameDraft
-  var registrationDraft: FrameHeadRegistrationDraft
-  var presentationPortalDraft: PresentationPortalDraft
-  var observationDraft: ObservationBridgeDraft?
-  var animationDraft: AnimationFrameDraft
-  /// The abort checkpoint bundle. `nil` for one-shot heads.
-  var checkpoints: FrameHeadCheckpoints?
+  var transaction: FrameHeadTransaction
   var resolveContext: ResolveContext
   var graphRootIdentity: Identity
   var frameContext: FrameContext
@@ -327,6 +391,16 @@ package struct FrameHeadDraft {
   var runtimeIssues: [RuntimeIssue]
   var animationTimestamp: MonotonicInstant
   var resolveDuration: Duration
+
+  var graphDraft: ViewGraphFrameDraft { transaction.graphDraft }
+  var registrationDraft: FrameHeadRegistrationDraft { transaction.registrationDraft }
+  var presentationPortalDraft: PresentationPortalDraft {
+    transaction.presentationPortalDraft
+  }
+  var observationDraft: ObservationBridgeDraft? { transaction.observationDraft }
+  var animationDraft: AnimationFrameDraft { transaction.animationDraft }
+  /// The abort checkpoint bundle. `nil` for one-shot heads.
+  var checkpoints: FrameHeadCheckpoints? { transaction.checkpoints }
 }
 
 struct AsyncFrameTailDraftOutput {

@@ -1450,7 +1450,7 @@ git commit -m "test: guard prepared-head abort totality (F3)"
 
 ## Task 7.2: Consolidate the six draft/discard mechanisms
 
-- [ ] **Step 1: Inventory the staging members**
+- [x] **Step 1: Inventory the staging members**
 
 Run:
 ```bash
@@ -1461,7 +1461,7 @@ The head stages: `graphDraft`, `registrationDraft`, `presentationPortalDraft`,
 `observationDraft`, `animationDraft`, and the `frameState` checkpoint +
 `frameInputs.clear()`.
 
-- [ ] **Step 2: Introduce `FrameHeadTransaction`**
+- [x] **Step 2: Introduce `FrameHeadTransaction`**
 
 Create a `FrameHeadTransaction` type (in `SwiftTUI.swift` or a new file
 `Sources/SwiftTUIRuntime/Rendering/FrameHeadTransaction.swift`) that owns all six
@@ -1481,7 +1481,7 @@ struct FrameHeadTransaction {
 `transaction.commit()` / `transaction.discard()`. `FrameHeadDraft` holds one
 `FrameHeadTransaction` instead of six loose members.
 
-- [ ] **Step 3: Run the purity + parity + characterization tests**
+- [x] **Step 3: Run the purity + parity + characterization tests**
 
 Run: `swift test --filter ResolvePurityTests`
 Run: `swift test --filter PipelineDriverParityTests`
@@ -1489,7 +1489,7 @@ Run: `swift test --filter RenderDriverCharacterizationTests`
 Run: `swift test --filter AsyncFrameTailRenderingTests`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/
