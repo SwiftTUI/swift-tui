@@ -29,6 +29,10 @@ Packet 4 should be reviewed as a mechanical core-artifact file split:
 - `Sources/SwiftTUICore/Commit/FrameDiagnostics.swift`
 - `Sources/SwiftTUICore/Commit/FrameContext.swift`
 
+Packet 5 should be reviewed as runtime acquisition control-flow extraction:
+
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -116,6 +120,21 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-025909-68455.log
 ```
 
+Packet 5 validation passed:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-030508-85414.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -131,8 +150,9 @@ about behavioral drift, output drift, concurrency changes, and fixture churn.
 
 Each packet should be independently revertible. Packets 1 and 2 are same-area
 terminal presentation changes. Packet 3 is a frame-tail damage-resolution split.
-Packet 4 is a core artifact file split. Revert newest-first if a terminal
-output, raster reuse, frame-tail, diagnostics, or public API regression appears.
+Packet 4 is a core artifact file split. Packet 5 is a runtime acquisition
+control-flow extraction. Revert newest-first if a terminal output, raster reuse,
+frame-tail, diagnostics, async-cancellation, or public API regression appears.
 
 ## AI Assistance Disclosure
 
