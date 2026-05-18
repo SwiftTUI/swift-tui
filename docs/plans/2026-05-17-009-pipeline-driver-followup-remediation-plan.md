@@ -1707,7 +1707,7 @@ a derivation (focus-sync). Confirm by inspection.
 
 **Anti-rationalization:** adding a sentence to ADR-0020 is not resolution. The `#else` branch of `FrameTailLayoutWorker` must be covered by a test that runs in CI.
 
-- [ ] **Step 1: Write a worker-fallback test**
+- [x] **Step 1: Write a worker-fallback test**
 
 Create `Tests/SwiftTUITests/FrameTailWorkerFallbackTests.swift`:
 
@@ -1733,19 +1733,19 @@ the `#else` branch specifically, add a CI job or local check that builds for a
 non-Dispatch target. Document in the commit that full WASI execution coverage
 requires the WASI CI lane (`SwiftTUIWASITests`).
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `swift test --filter FrameTailWorkerFallbackTests`
 Expected: PASS.
 
-- [ ] **Step 3: Verify the WASI test lane references the worker**
+- [x] **Step 3: Verify the WASI test lane references the worker**
 
 Run: `grep -rn "FrameTailLayoutWorker\|renderAsync" Tests/SwiftTUIWASITests/`
 If the WASI lane has no worker coverage, add a minimal `renderAsync` smoke test
 to `Tests/SwiftTUIWASITests/` so the synchronous fallback is exercised in the
 WASI CI lane.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Tests/SwiftTUITests/FrameTailWorkerFallbackTests.swift Tests/SwiftTUIWASITests/
