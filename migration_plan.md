@@ -160,15 +160,27 @@ against local source evidence.
 
 - Objective: continue reducing `TerminalHost` by isolating escape-sequence
   construction and process-exit cleanup from presentation orchestration.
-- Likely owned files:
+- Owned files:
   - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
-  - new terminal-host helper file selected after discovery.
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalHostEscapeSequences.swift`
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalPlatformIO.swift`
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalProcessExitCleanup.swift`
 - Dependencies: Packet 10.
 - Invariants: raw-mode enter/exit bytes, mouse reporting mode bytes, bracketed
   paste toggles, cursor visibility/focus bytes, process-exit reset bytes, and
-  synchronous cleanup ordering remain stable.
-- Required checks: terminal host presentation, raw-mode cleanup, input, and repo
-  gate tests selected from touched helpers.
+  synchronous cleanup ordering remain stable. Shared full-repaint byte accounting
+  and the WASI/web host write path continue using the same sequence catalog.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalHost`
+  - `swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests`
+  - `swiftly run swift test --filter WebSurfaceTransportTests`
+  - `swiftly run swift test --filter SwiftTUITerminalTests`
+  - `bun run test`
 - Rollback: revert the packet commit/files only.
 
 ## Human Checkpoints

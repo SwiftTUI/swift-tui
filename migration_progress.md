@@ -209,12 +209,37 @@ Packet 10 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-034357-16939.log`
   - Result: PASS
 
+Packet 11 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalHost`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests`
+  - Result: PASS
+- `swiftly run swift test --filter WebSurfaceTransportTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITerminalTests`
+  - Result: PASS across 5 consecutive stabilization runs after removing the
+    short-lived `/bin/echo` fixture race.
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-040917-13192.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 11: continue the terminal rendering pass by extracting the remaining
-terminal-host escape-sequence and raw-mode cleanup responsibilities, or stop
-early if discovery shows the next highest-value production slice is now outside
-`TerminalHost`.
+Packet 12: re-rank production code now that `TerminalHost` has been reduced
+from 1,509 lines to 1,203 lines. Continue with the highest-value production
+slice, likely the remaining terminal presentation surface or the animation
+lifecycle controller unless local discovery shows a more important debt seam.
 
 Expected owned files pending local discovery:
 

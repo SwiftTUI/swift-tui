@@ -15,183 +15,6 @@ import Synchronization
   import WASILibc
 #endif
 
-#if canImport(Darwin)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Darwin.write(fileDescriptor, buffer, count)
-  }
-
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Darwin.read(fileDescriptor, buffer, count)
-  }
-
-  private func platformPoll(
-    _ descriptors: UnsafeMutablePointer<pollfd>?,
-    _ count: nfds_t,
-    _ timeoutMilliseconds: Int32
-  ) -> Int32 {
-    unsafe Darwin.poll(descriptors, count, timeoutMilliseconds)
-  }
-#elseif canImport(Glibc)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Glibc.write(fileDescriptor, buffer, count)
-  }
-
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Glibc.read(fileDescriptor, buffer, count)
-  }
-
-  private func platformPoll(
-    _ descriptors: UnsafeMutablePointer<pollfd>?,
-    _ count: nfds_t,
-    _ timeoutMilliseconds: Int32
-  ) -> Int32 {
-    unsafe Glibc.poll(descriptors, count, timeoutMilliseconds)
-  }
-#elseif canImport(Android)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Android.write(fileDescriptor, buffer, count)
-  }
-
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Android.read(fileDescriptor, buffer, count)
-  }
-
-  private func platformPoll(
-    _ descriptors: UnsafeMutablePointer<pollfd>?,
-    _ count: nfds_t,
-    _ timeoutMilliseconds: Int32
-  ) -> Int32 {
-    unsafe Android.poll(descriptors, count, timeoutMilliseconds)
-  }
-#elseif canImport(WASILibc)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    Int(unsafe WASILibc.write(fileDescriptor, buffer, count))
-  }
-#endif
-
-#if !canImport(WASILibc)
-  package struct TerminalProcessExitResetAction: Sendable {
-    package let inputFileDescriptor: Int32
-    package let outputFileDescriptor: Int32
-    package let inputFileStatusFlags: Int32
-    package let savedAttributes: termios
-    package let resetBytes: [UInt8]
-
-    package func perform() {
-      if !resetBytes.isEmpty {
-        unsafe resetBytes.withUnsafeBytes { bytes in
-          guard let baseAddress = bytes.baseAddress else {
-            return
-          }
-
-          var offset = 0
-          while offset < bytes.count {
-            let written = unsafe platformWrite(
-              outputFileDescriptor,
-              unsafe baseAddress.advanced(by: offset),
-              bytes.count - offset
-            )
-            guard written > 0 else {
-              break
-            }
-            offset += written
-          }
-        }
-      }
-
-      _ = fcntl(inputFileDescriptor, F_SETFL, inputFileStatusFlags)
-      var attributes = savedAttributes
-      _ = unsafe tcsetattr(inputFileDescriptor, TCSAFLUSH, &attributes)
-    }
-  }
-
-  package enum TerminalProcessExitCleanupRegistry {
-    private struct State {
-      var didInstallHandler = false
-      var nextToken: UInt64 = 0
-      var actions: [(token: UInt64, action: TerminalProcessExitResetAction)] = []
-    }
-
-    private static let state = Mutex(State())
-
-    package static func register(
-      _ action: TerminalProcessExitResetAction
-    ) -> UInt64? {
-      state.withLock { state in
-        if !state.didInstallHandler {
-          guard atexit(runTerminalProcessExitCleanup) == 0 else {
-            return nil
-          }
-          state.didInstallHandler = true
-        }
-
-        let token = state.nextToken
-        state.nextToken += 1
-        state.actions.append((token: token, action: action))
-        return token
-      }
-    }
-
-    package static func unregister(
-      _ token: UInt64?
-    ) {
-      guard let token else {
-        return
-      }
-
-      state.withLock { state in
-        state.actions.removeAll { $0.token == token }
-      }
-    }
-
-    package static func runForTesting() {
-      let actions = state.withLock { state in
-        let actions = state.actions
-          .sorted { lhs, rhs in lhs.token > rhs.token }
-          .map(\.action)
-        state.actions.removeAll()
-        return actions
-      }
-
-      for action in actions {
-        action.perform()
-      }
-    }
-  }
-
-  private func runTerminalProcessExitCleanup() {
-    TerminalProcessExitCleanupRegistry.runForTesting()
-  }
-#endif
-
 /// Errors thrown while configuring or writing to a terminal-backed host.
 public enum TerminalHostError: Error {
   case notATTY(fileDescriptor: Int32)
@@ -304,7 +127,7 @@ public enum TerminalHostError: Error {
         var bytesWritten = 0
         while bytesWritten < totalBytes {
           let pointer = unsafe baseAddress.advanced(by: bytesWritten)
-          let result = unsafe platformWrite(
+          let result = unsafe terminalPlatformWrite(
             fileDescriptor,
             pointer,
             totalBytes - bytesWritten
@@ -345,7 +168,7 @@ public enum TerminalHostError: Error {
         events: Int16(POLLIN),
         revents: 0
       )
-      let ready = unsafe platformPoll(
+      let ready = unsafe terminalPlatformPoll(
         &descriptor,
         1,
         Int32(timeoutMilliseconds)
@@ -356,7 +179,7 @@ public enum TerminalHostError: Error {
       }
 
       var buffer = Array(repeating: UInt8(0), count: maxBytes)
-      let bytesRead = unsafe platformRead(fileDescriptor, &buffer, maxBytes)
+      let bytesRead = unsafe terminalPlatformRead(fileDescriptor, &buffer, maxBytes)
       guard bytesRead > 0 else {
         return []
       }
@@ -376,7 +199,7 @@ public enum TerminalHostError: Error {
       )
 
       while true {
-        let ready = unsafe platformPoll(&descriptor, 1, -1)
+        let ready = unsafe terminalPlatformPoll(&descriptor, 1, -1)
         if ready > 0 {
           return
         }
@@ -556,7 +379,7 @@ public enum TerminalHostError: Error {
             outputFileDescriptor: outputFileDescriptor,
             inputFileStatusFlags: currentFileStatusFlags,
             savedAttributes: currentAttributes,
-            resetBytes: Array(processExitResetSequence().utf8)
+            resetBytes: processExitResetBytes()
           )
         )
       #endif
@@ -585,14 +408,19 @@ public enum TerminalHostError: Error {
       }
 
       refreshAppearanceIfNeeded()
-      try write(enterAlternateScreenSequence())
-      try write(clearScreenSequence())
-      try write(cursorSequence(to: .zero))
-      try write(hideCursorSequence())
+      try write(TerminalHostEscapeSequences.enterAlternateScreen)
+      try write(TerminalHostEscapeSequences.clearScreen)
+      try write(TerminalHostEscapeSequences.cursor(to: .zero))
+      try write(TerminalHostEscapeSequences.hideCursor)
       if activeMouseCoordinateMode.reportsMouseInput {
-        try write(enableMouseReportingSequence())
+        try write(
+          TerminalHostEscapeSequences.enableMouseReporting(
+            mouseCoordinateMode: activeMouseCoordinateMode,
+            hoverEnabled: activePointerHoverEnabled
+          )
+        )
       }
-      try write("\u{001B}[?2004h")  // enable bracketed paste
+      try write(TerminalHostEscapeSequences.enableBracketedPaste)
       shouldRestoreOnFailure = false
     }
 
@@ -631,20 +459,20 @@ public enum TerminalHostError: Error {
       presentationWriter?.drain()
       try presentationWriter?.consumePendingError()
 
-      try writeSynchronously(clearScreenSequence())
-      try writeSynchronously(cursorSequence(to: .zero))
+      try writeSynchronously(TerminalHostEscapeSequences.clearScreen)
+      try writeSynchronously(TerminalHostEscapeSequences.cursor(to: .zero))
       if mouseCoordinateModeToDisable.reportsMouseInput {
         try writeSynchronously(
-          disableMouseReportingSequence(
-            for: mouseCoordinateModeToDisable,
+          TerminalHostEscapeSequences.disableMouseReporting(
+            mouseCoordinateMode: mouseCoordinateModeToDisable,
             hoverEnabled: pointerHoverToDisable
           )
         )
       }
-      try writeSynchronously("\u{001B}[?2004l")  // disable bracketed paste
-      try writeSynchronously(resetStyleSequence())
-      try writeSynchronously(showCursorSequence())
-      try writeSynchronously(exitAlternateScreenSequence())
+      try writeSynchronously(TerminalHostEscapeSequences.disableBracketedPaste)
+      try writeSynchronously(TerminalHostEscapeSequences.resetStyle)
+      try writeSynchronously(TerminalHostEscapeSequences.showCursor)
+      try writeSynchronously(TerminalHostEscapeSequences.exitAlternateScreen)
 
       if let savedInputFileStatusFlags {
         try controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
@@ -674,17 +502,19 @@ public enum TerminalHostError: Error {
     }
 
     public func clearScreen() throws {
-      try write(clearScreenSequence())
+      try write(TerminalHostEscapeSequences.clearScreen)
     }
 
     public func moveCursor(to point: CellPoint) throws {
-      try write(cursorSequence(to: point))
+      try write(TerminalHostEscapeSequences.cursor(to: point))
     }
 
     package func presentAccessibilityCursorFocus(at point: CellPoint?) throws {
       let presentationWriter = presentationWriterIfNeeded()
       try presentationWriter.consumePendingError()
-      presentationWriter.submitSupplementalOutput(cursorFocusSequence(to: point))
+      presentationWriter.submitSupplementalOutput(
+        TerminalHostEscapeSequences.cursorFocus(to: point)
+      )
     }
 
     public func setPointerHoverEnabled(_ enabled: Bool) throws {
@@ -703,9 +533,16 @@ public enum TerminalHostError: Error {
       if rawModeEnabled {
         let sequence =
           if enabled {
-            enableMouseReportingSequence(hoverEnabled: true)
+            TerminalHostEscapeSequences.enableMouseReporting(
+              mouseCoordinateMode: activeMouseCoordinateMode,
+              hoverEnabled: true
+            )
           } else {
-            "\u{001B}[?1003l" + enableMouseReportingSequence(hoverEnabled: false)
+            TerminalHostEscapeSequences.disableAllMouseMotion
+              + TerminalHostEscapeSequences.enableMouseReporting(
+                mouseCoordinateMode: activeMouseCoordinateMode,
+                hoverEnabled: false
+              )
           }
         try write(sequence)
       }
@@ -764,13 +601,15 @@ public enum TerminalHostError: Error {
         plan: plan,
         graphicsCapabilities: graphicsCapabilities
       )
-      let usedSynchronizedOutput = usesSynchronizedOutput(
+      let usedSynchronizedOutput = TerminalHostEscapeSequences.usesSynchronizedOutput(
         for: emission.output,
-        strategy: plan.strategy
+        strategy: plan.strategy,
+        capabilityProfile: capabilityProfile
       )
-      let bufferedOutput = wrappedPresentationOutput(
+      let bufferedOutput = TerminalHostEscapeSequences.wrappedSynchronizedOutput(
         emission.output,
-        strategy: plan.strategy
+        strategy: plan.strategy,
+        capabilityProfile: capabilityProfile
       )
 
       if !bufferedOutput.isEmpty {
@@ -833,8 +672,8 @@ public enum TerminalHostError: Error {
           attachmentCount: preparedSurface.imageAttachments.count
         )
       }
-      emission.append(clearScreenSequence())
-      emission.append(cursorSequence(to: .zero))
+      emission.append(TerminalHostEscapeSequences.clearScreen)
+      emission.append(TerminalHostEscapeSequences.cursor(to: .zero))
 
       let writeSteps = fullRepaintWriteSteps(
         for: preparedSurface,
@@ -867,7 +706,7 @@ public enum TerminalHostError: Error {
           emission: &emission
         )
         emission.append(
-          cursorSequence(
+          TerminalHostEscapeSequences.cursor(
             to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
           )
         )
@@ -892,7 +731,7 @@ public enum TerminalHostError: Error {
       }
 
       emission.recordEraseToEndOfLine()
-      return eraseToEndOfLineSequence()
+      return TerminalHostEscapeSequences.eraseToEndOfLine
     }
 
     private func appendKittyGraphicsReplay(
@@ -922,7 +761,7 @@ public enum TerminalHostError: Error {
           scope: .full,
           attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
         )
-        emission.append(deleteVisibleKittyPlacementsSequence())
+        emission.append(TerminalHostEscapeSequences.deleteVisibleKittyPlacements)
         appendGraphicsWriteSteps(
           for: plan.graphicsReplay.attachmentsToReplay,
           to: &emission,
@@ -1041,85 +880,13 @@ public enum TerminalHostError: Error {
       return nil
     }
 
-    private func clearScreenSequence() -> String {
-      "\u{001B}[2J"
-    }
-
-    private func eraseToEndOfLineSequence() -> String {
-      "\u{001B}[K"
-    }
-
-    private func deleteVisibleKittyPlacementsSequence() -> String {
-      "\u{001B}_Ga=d,q=2\u{001B}\\"
-    }
-
-    private func beginSynchronizedOutputSequence() -> String {
-      "\u{001B}[?2026h"
-    }
-
-    private func endSynchronizedOutputSequence() -> String {
-      "\u{001B}[?2026l"
-    }
-
-    private func enterAlternateScreenSequence() -> String {
-      "\u{001B}[?1049h"
-    }
-
-    private func exitAlternateScreenSequence() -> String {
-      "\u{001B}[?1049l"
-    }
-
-    private func hideCursorSequence() -> String {
-      "\u{001B}[?25l"
-    }
-
-    private func showCursorSequence() -> String {
-      "\u{001B}[?25h"
-    }
-
-    private func enableMouseReportingSequence() -> String {
-      enableMouseReportingSequence(hoverEnabled: activePointerHoverEnabled)
-    }
-
-    private func enableMouseReportingSequence(hoverEnabled: Bool) -> String {
-      var sequence = "\u{001B}[?1006h"
-      if activeMouseCoordinateMode.usesTerminalPixels {
-        sequence += "\u{001B}[?1016h"
-      }
-      sequence += "\u{001B}[?1002h"
-      if hoverEnabled {
-        sequence += "\u{001B}[?1003h"
-      }
-      return sequence
-    }
-
-    private func disableMouseReportingSequence(
-      for mouseCoordinateMode: MouseCoordinateMode,
-      hoverEnabled: Bool
-    ) -> String {
-      var sequence = hoverEnabled ? "\u{001B}[?1003l" : ""
-      sequence += "\u{001B}[?1002l"
-      if mouseCoordinateMode.usesTerminalPixels {
-        sequence += "\u{001B}[?1016l\u{001B}[?1006l"
-      } else {
-        sequence += "\u{001B}[?1006l"
-      }
-      return sequence
-    }
-
-    private func processExitResetSequence() -> String {
-      var reset = ""
-      if activeMouseCoordinateMode.reportsMouseInput {
-        reset += disableMouseReportingSequence(
-          for: activeMouseCoordinateMode,
+    private func processExitResetBytes() -> [UInt8] {
+      Array(
+        TerminalHostEscapeSequences.processExitReset(
+          mouseCoordinateMode: activeMouseCoordinateMode,
           hoverEnabled: activePointerHoverEnabled
-        )
-      }
-      reset += "\u{001B}[?2004l"  // disable bracketed paste
-      reset += showCursorSequence()
-      reset += resetStyleSequence()
-      reset += exitAlternateScreenSequence()
-      return reset
+        ).utf8
+      )
     }
 
     private func refreshProcessExitCleanupRegistration() {
@@ -1138,49 +905,10 @@ public enum TerminalHostError: Error {
             outputFileDescriptor: outputFileDescriptor,
             inputFileStatusFlags: savedInputFileStatusFlags,
             savedAttributes: savedAttributes,
-            resetBytes: Array(processExitResetSequence().utf8)
+            resetBytes: processExitResetBytes()
           )
         )
       #endif
-    }
-
-    private func resetStyleSequence() -> String {
-      "\u{001B}[0m"
-    }
-
-    private func cursorSequence(to point: CellPoint) -> String {
-      let row = max(1, point.y + 1)
-      let column = max(1, point.x + 1)
-      return "\u{001B}[\(row);\(column)H"
-    }
-
-    private func cursorFocusSequence(to point: CellPoint?) -> String {
-      guard let point else {
-        return hideCursorSequence()
-      }
-      return cursorSequence(to: point) + showCursorSequence()
-    }
-
-    private func wrappedPresentationOutput(
-      _ output: String,
-      strategy: TerminalPresentationPlan.Strategy
-    ) -> String {
-      guard usesSynchronizedOutput(for: output, strategy: strategy) else {
-        return output
-      }
-
-      return beginSynchronizedOutputSequence()
-        + output
-        + endSynchronizedOutputSequence()
-    }
-
-    private func usesSynchronizedOutput(
-      for output: String,
-      strategy: TerminalPresentationPlan.Strategy
-    ) -> Bool {
-      !output.isEmpty
-        && strategy == .fullRepaint
-        && capabilityProfile.supportsSynchronizedOutput
     }
 
   }
@@ -1278,24 +1006,30 @@ public enum TerminalHostError: Error {
     }
 
     public func enableRawMode() throws {
-      var setup = enterAlternateScreenSequence()
-      setup += hideCursorSequence()
+      var setup = TerminalHostEscapeSequences.enterAlternateScreen
+      setup += TerminalHostEscapeSequences.hideCursor
       if capabilityProfile.supportsMouseReporting {
-        setup += enableMouseReportingSequence()
+        setup += TerminalHostEscapeSequences.enableMouseReporting(
+          mouseCoordinateMode: .cells,
+          hoverEnabled: false
+        )
       }
-      setup += "\u{001B}[?2004h"  // enable bracketed paste
+      setup += TerminalHostEscapeSequences.enableBracketedPaste
       try write(setup)
     }
 
     public func disableRawMode() throws {
       var teardown = ""
       if capabilityProfile.supportsMouseReporting {
-        teardown += disableMouseReportingSequence()
+        teardown += TerminalHostEscapeSequences.disableMouseReporting(
+          mouseCoordinateMode: .cells,
+          hoverEnabled: false
+        )
       }
-      teardown += "\u{001B}[?2004l"  // disable bracketed paste
-      teardown += showCursorSequence()
-      teardown += resetStyleSequence()
-      teardown += exitAlternateScreenSequence()
+      teardown += TerminalHostEscapeSequences.disableBracketedPaste
+      teardown += TerminalHostEscapeSequences.showCursor
+      teardown += TerminalHostEscapeSequences.resetStyle
+      teardown += TerminalHostEscapeSequences.exitAlternateScreen
       try write(teardown)
     }
 
@@ -1316,11 +1050,11 @@ public enum TerminalHostError: Error {
     }
 
     public func clearScreen() throws {
-      try write("\u{001B}[2J")
+      try write(TerminalHostEscapeSequences.clearScreen)
     }
 
     public func moveCursor(to point: CellPoint) throws {
-      try write(cursorSequence(to: point))
+      try write(TerminalHostEscapeSequences.cursor(to: point))
     }
 
     private func writeBytes(_ bytes: [UInt8]) throws {
@@ -1333,7 +1067,7 @@ public enum TerminalHostError: Error {
         while written < bytes.count {
           let result = unsafe bytes.withUnsafeBytes { rawBuffer in
             let baseAddress = unsafe rawBuffer.baseAddress?.advanced(by: written)
-            return unsafe platformWrite(
+            return unsafe terminalPlatformWrite(
               outputFD,
               baseAddress,
               bytes.count - written
@@ -1349,39 +1083,6 @@ public enum TerminalHostError: Error {
       }
     }
 
-    private func enterAlternateScreenSequence() -> String {
-      "\u{001B}[?1049h"
-    }
-
-    private func exitAlternateScreenSequence() -> String {
-      "\u{001B}[?1049l"
-    }
-
-    private func hideCursorSequence() -> String {
-      "\u{001B}[?25l"
-    }
-
-    private func showCursorSequence() -> String {
-      "\u{001B}[?25h"
-    }
-
-    private func enableMouseReportingSequence() -> String {
-      "\u{001B}[?1006h\u{001B}[?1002h"
-    }
-
-    private func disableMouseReportingSequence() -> String {
-      "\u{001B}[?1002l\u{001B}[?1006l"
-    }
-
-    private func resetStyleSequence() -> String {
-      "\u{001B}[0m"
-    }
-
-    private func cursorSequence(to point: CellPoint) -> String {
-      let row = max(1, point.y + 1)
-      let column = max(1, point.x + 1)
-      return "\u{001B}[\(row);\(column)H"
-    }
   }
 #endif
 
@@ -1428,8 +1129,8 @@ func fullRepaintOutput(
       origin: origin
     )
   )
-  output += "\u{001B}[2J"
-  output += fullRepaintCursorSequence(to: origin)
+  output += TerminalHostEscapeSequences.clearScreen
+  output += TerminalHostEscapeSequences.cursor(to: origin)
   for writeStep in writeSteps {
     output += writeStep
   }
@@ -1440,19 +1141,12 @@ func fullRepaintBytesWritten(
   writeSteps: [String],
   origin: CellPoint
 ) -> Int {
-  let clearSequence = "\u{001B}[2J"
-  let cursorSequence = fullRepaintCursorSequence(to: origin)
-  return clearSequence.utf8.count
+  let cursorSequence = TerminalHostEscapeSequences.cursor(to: origin)
+  return TerminalHostEscapeSequences.clearScreen.utf8.count
     + cursorSequence.utf8.count
     + writeSteps.reduce(0) { partial, writeStep in
       partial + writeStep.utf8.count
     }
-}
-
-func fullRepaintCursorSequence(
-  to point: CellPoint
-) -> String {
-  "\u{001B}[\(max(1, point.y + 1));\(max(1, point.x + 1))H"
 }
 
 package func currentProcessEnvironment() -> [String: String] {
