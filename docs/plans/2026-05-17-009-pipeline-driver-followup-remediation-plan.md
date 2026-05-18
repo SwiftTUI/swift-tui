@@ -1595,7 +1595,7 @@ once (confirm by inspection — the six loose `discard()` calls are gone).
 
 ## Task 8.1: Justify the late-preference bound
 
-- [ ] **Step 1: Write a test that pins the bound's behavior**
+- [x] **Step 1: Write a test that pins the bound's behavior**
 
 Add to `Tests/SwiftTUITests/` (a new `BoundedReconciliationTests.swift` or an
 existing late-preference test file):
@@ -1619,7 +1619,7 @@ struct BoundedReconciliationTests {
 Flesh out the assertion using the toolbar reconciliation path
 (`reconcileLatePreferenceConsumers`).
 
-- [ ] **Step 2: Derive or justify `4` in ADR-0018**
+- [x] **Step 2: Derive or justify `4` in ADR-0018**
 
 Amend `docs/decisions/0018-late-preference-reconciliation-bound.md` with a
 derivation: the maximum relayout depth equals the longest chain of
@@ -1629,19 +1629,19 @@ preference-dependent layout consumers the shipped toolbar host can construct
 possible, state explicitly that `4` is an empirical ceiling and what symptom
 would justify raising it.
 
-- [ ] **Step 3: Reference the ADR from the code**
+- [x] **Step 3: Reference the ADR from the code**
 
 In `LatePreferenceReconciliationPolicy.toolbarHostRuntimeBound`, replace the
 "Keep the historical runtime bound explicit until..." comment with a comment
 that cites ADR-0018's derivation. The constant stays `4`; it is no longer magic
 because its value is now traceable.
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `swift test --filter BoundedReconciliationTests`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/SwiftTUI.swift docs/decisions/0018-late-preference-reconciliation-bound.md Tests/SwiftTUITests/BoundedReconciliationTests.swift
