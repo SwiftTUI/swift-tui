@@ -10,6 +10,11 @@ package struct FocusSyncRerenderBudget: Equatable, Sendable {
   package let maximumRerenders: Int
   package private(set) var rerenderCount: Int
 
+  /// Empirical ceiling for focus-sync convergence. One rendered tree can
+  /// cascade through focus-region repair, requested/default focus application,
+  /// focused-value propagation, and scroll-position synchronization; sixteen
+  /// rerenders gives four full cascades before the runtime reports overflow
+  /// and presents the latest available tree.
   package init(maximumRerenders: Int = 16) {
     precondition(maximumRerenders > 0)
     self.maximumRerenders = maximumRerenders
