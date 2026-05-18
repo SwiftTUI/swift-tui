@@ -435,7 +435,7 @@ extension FrameDiagnostics {
     }
   }
 
-  package static func summarize(
+  package static func fromCachedPhaseProducts(
     resolved: ResolvedNode,
     measured: MeasuredNode,
     placed: PlacedNode,
