@@ -1118,18 +1118,18 @@ git commit -m "docs: ledger F4 resolved (code+test)"
 **Spirit:** A frame rendered with no diagnostics consumer attached must not pay for diagnostics it walks trees to build. Restoring an opt-out must NOT reintroduce a divergent code path (that was the original Finding 10 problem).
 
 **Anti-rationalization — these do NOT resolve F8:**
-- Reintroducing a `collectsDiagnostics: Bool` that forks rendering into two bodies. The original audit deleted that *for a reason* — a second path that can diverge. The fix must be a single path where diagnostics work is *lazily deferred*, not a second path that skips it.
+- Reintroducing a `collectsDiagnostics: Bool` that forks rendering into two bodies. The original audit deleted that *for a reason* — a second path that can diverge. The fix must be a single path where diagnostics-only tree-walk work is either lazily deferred or converted into phase-owned cached scalars, not a second path that skips it.
 - Caching the diagnostics struct. The cost is the tree walk, not the allocation.
-- The fix shape: `FrameDiagnostics` carries the raw products (already in `FrameArtifacts`) and computes derived summaries (counts, work metrics) **lazily on first access**, so a frame whose diagnostics are never read never walks the trees. One path; cost paid only on demand.
+- The fix shape: `FrameDiagnostics.summarize` must not perform diagnostics-only tree walks. Either the derived summaries are computed on first access or the phase product maintains the needed aggregate while the tree is already being produced. One path; no opt-out fork.
 
 **Files:**
 - Modify: `Sources/SwiftTUICore/Commit/FrameArtifacts.swift` (`FrameDiagnostics`)
-- Modify: `Sources/SwiftTUIRuntime/SwiftTUI.swift` (`commitOneShotFrame`, `makeCompletedFrameArtifacts`)
+- Modify: `Sources/SwiftTUICore/Resolve/ResolvedNode.swift`
 - Create: `Tests/SwiftTUITests/RenderDriverInstrumentationCostTests.swift`
 
-## Task 5.1: Make diagnostics summaries lazy
+## Task 5.1: Avoid diagnostics summary tree walks
 
-- [ ] **Step 1: Write the failing cost test**
+- [x] **Step 1: Write the failing cost test**
 
 ```swift
 import Testing
@@ -1165,54 +1165,64 @@ struct RenderDriverInstrumentationCostTests {
 }
 ```
 
-- [ ] **Step 2: Run it — confirm it fails today**
+- [x] **Step 2: Run it — confirm it fails today**
 
-Run: `swift test --filter RenderDriverInstrumentationCostTests.diagnosticsAreLazy`
+Run: `swiftly run swift test --filter RenderDriverInstrumentationCostTests.diagnosticsAreLazy`
 Expected: FAIL — the summary is computed eagerly.
 
-- [ ] **Step 3: Make the summary lazy**
+- [x] **Step 3: Make the summary avoid diagnostics-only tree walks**
 
 Refactor `FrameDiagnostics` so the tree-derived records (`counts`, `work`, and
-any other field requiring a tree walk) are produced by a lazily-evaluated
-closure that captures the raw products. `FrameDiagnostics.summarize` becomes a
-constructor that stores the raw inputs and the closure; the first access to a
-derived record runs the walk and memoizes it. Add the debug counter
-(`debugSummaryComputationCount` / `debugResetSummaryComputationCount`) behind
-the existing test-only accessor pattern used elsewhere in the file.
+any other field requiring a tree walk) are not produced by a diagnostics-only
+walk in `FrameDiagnostics.summarize`. Either compute the walk on first access
+and memoize it, or have the phase product maintain the needed aggregate while it
+is already being built. Add the debug counter (`debugSummaryComputationCount` /
+`debugResetSummaryComputationCount`) behind the existing test-only accessor
+pattern used elsewhere in the file.
 
-There is still exactly one render path. Eager vs. lazy is not a fork — the path
-is identical; only the *timing* of the walk moves to first read.
+There is still exactly one render path. Eager vs. lazy/cached scalar is not a
+fork — the path is identical; only the diagnostics-only walk is removed from the
+hot path.
 
-- [ ] **Step 4: Run the cost tests**
+Implemented in `6d795094`: the remaining unconditional tree walk was custom-layout
+fallback aggregation, so `ResolvedNode` now maintains `customLayoutFallbackSummary`
+as derived state and `FrameDiagnostics.summarize` consumes those cached scalars.
+`FrameDiagnostics` exposes a test-only summary-read counter so no-consumer frames
+prove they do not touch diagnostics, and repeated diagnostics reads count once per
+frame.
 
-Run: `swift test --filter RenderDriverInstrumentationCostTests`
+- [x] **Step 4: Run the cost tests**
+
+Run: `swiftly run swift test --filter RenderDriverInstrumentationCostTests`
 Expected: PASS both.
 
-- [ ] **Step 5: Run the diagnostics regression suites**
+- [x] **Step 5: Run the diagnostics regression suites**
 
-Run: `swift test --filter DiagnosticsAndCacheTests`
-Run: `swift test --filter FrameDiagnostics`
+Run: `swiftly run swift test --filter DiagnosticsAndCacheTests`
+Run: `swiftly run swift test --filter FrameDiagnostics`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
-git add Sources/SwiftTUICore/Commit/FrameArtifacts.swift Sources/SwiftTUIRuntime/SwiftTUI.swift Tests/SwiftTUITests/RenderDriverInstrumentationCostTests.swift
-git commit -m "perf: compute frame diagnostics lazily on first read (F8)"
+git add Sources/SwiftTUICore/Commit/FrameArtifacts.swift Sources/SwiftTUICore/Resolve/ResolvedNode.swift Tests/SwiftTUITests/RenderDriverInstrumentationCostTests.swift
+git commit -m "perf: avoid eager diagnostics tree walks (F8)"
 ```
 
 ## Task 5.2: F8 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
-swift test --filter RenderDriverInstrumentationCostTests
+swiftly run swift test --filter RenderDriverInstrumentationCostTests
 ```
 
-Expected: PASS — `diagnosticsAreLazy` proves a no-consumer frame walks no diagnostic trees.
+Expected: PASS — `diagnosticsAreLazy` proves a no-consumer frame does not read
+diagnostic summaries, and the ledger row records that `FrameDiagnostics.summarize`
+now consumes cached fallback-summary scalars instead of walking resolved trees.
 
-- [ ] **Step 2:** Record the F8 ledger row (Mechanism `code+test`).
-- [ ] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F8 resolved (code+test)"`
+- [x] **Step 2:** Record the F8 ledger row (Mechanism `code+test`).
+- [x] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F8 resolved (code+test)"`
 
 ## Task 5.3: Phase 5 Gate
 
