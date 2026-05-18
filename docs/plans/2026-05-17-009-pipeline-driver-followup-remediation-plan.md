@@ -827,10 +827,10 @@ git commit -m "docs: ledger F1/F11/F12 resolved (code+test)"
 
 ## Task 2.6: Phase 2 Gate
 
-- [ ] **Step 1:** `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F1/F11/F12 ledger rows complete; DoD commands pass.
-- [ ] **Step 4:** `git commit --allow-empty -m "chore: phase 2 gate green (F1, F11, F12)"`
+- [x] **Step 1:** `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F1/F11/F12 ledger rows complete; DoD commands pass.
+- [x] **Step 4:** `git commit --allow-empty -m "chore: phase 2 gate green (F1, F11, F12)"`
 
 ---
 
