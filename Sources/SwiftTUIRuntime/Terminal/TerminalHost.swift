@@ -15,183 +15,6 @@ import Synchronization
   import WASILibc
 #endif
 
-#if canImport(Darwin)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Darwin.write(fileDescriptor, buffer, count)
-  }
-
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Darwin.read(fileDescriptor, buffer, count)
-  }
-
-  private func platformPoll(
-    _ descriptors: UnsafeMutablePointer<pollfd>?,
-    _ count: nfds_t,
-    _ timeoutMilliseconds: Int32
-  ) -> Int32 {
-    unsafe Darwin.poll(descriptors, count, timeoutMilliseconds)
-  }
-#elseif canImport(Glibc)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Glibc.write(fileDescriptor, buffer, count)
-  }
-
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Glibc.read(fileDescriptor, buffer, count)
-  }
-
-  private func platformPoll(
-    _ descriptors: UnsafeMutablePointer<pollfd>?,
-    _ count: nfds_t,
-    _ timeoutMilliseconds: Int32
-  ) -> Int32 {
-    unsafe Glibc.poll(descriptors, count, timeoutMilliseconds)
-  }
-#elseif canImport(Android)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Android.write(fileDescriptor, buffer, count)
-  }
-
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Android.read(fileDescriptor, buffer, count)
-  }
-
-  private func platformPoll(
-    _ descriptors: UnsafeMutablePointer<pollfd>?,
-    _ count: nfds_t,
-    _ timeoutMilliseconds: Int32
-  ) -> Int32 {
-    unsafe Android.poll(descriptors, count, timeoutMilliseconds)
-  }
-#elseif canImport(WASILibc)
-  private func platformWrite(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeRawPointer?,
-    _ count: Int
-  ) -> Int {
-    Int(unsafe WASILibc.write(fileDescriptor, buffer, count))
-  }
-#endif
-
-#if !canImport(WASILibc)
-  package struct TerminalProcessExitResetAction: Sendable {
-    package let inputFileDescriptor: Int32
-    package let outputFileDescriptor: Int32
-    package let inputFileStatusFlags: Int32
-    package let savedAttributes: termios
-    package let resetBytes: [UInt8]
-
-    package func perform() {
-      if !resetBytes.isEmpty {
-        unsafe resetBytes.withUnsafeBytes { bytes in
-          guard let baseAddress = bytes.baseAddress else {
-            return
-          }
-
-          var offset = 0
-          while offset < bytes.count {
-            let written = unsafe platformWrite(
-              outputFileDescriptor,
-              unsafe baseAddress.advanced(by: offset),
-              bytes.count - offset
-            )
-            guard written > 0 else {
-              break
-            }
-            offset += written
-          }
-        }
-      }
-
-      _ = fcntl(inputFileDescriptor, F_SETFL, inputFileStatusFlags)
-      var attributes = savedAttributes
-      _ = unsafe tcsetattr(inputFileDescriptor, TCSAFLUSH, &attributes)
-    }
-  }
-
-  package enum TerminalProcessExitCleanupRegistry {
-    private struct State {
-      var didInstallHandler = false
-      var nextToken: UInt64 = 0
-      var actions: [(token: UInt64, action: TerminalProcessExitResetAction)] = []
-    }
-
-    private static let state = Mutex(State())
-
-    package static func register(
-      _ action: TerminalProcessExitResetAction
-    ) -> UInt64? {
-      state.withLock { state in
-        if !state.didInstallHandler {
-          guard atexit(runTerminalProcessExitCleanup) == 0 else {
-            return nil
-          }
-          state.didInstallHandler = true
-        }
-
-        let token = state.nextToken
-        state.nextToken += 1
-        state.actions.append((token: token, action: action))
-        return token
-      }
-    }
-
-    package static func unregister(
-      _ token: UInt64?
-    ) {
-      guard let token else {
-        return
-      }
-
-      state.withLock { state in
-        state.actions.removeAll { $0.token == token }
-      }
-    }
-
-    package static func runForTesting() {
-      let actions = state.withLock { state in
-        let actions = state.actions
-          .sorted { lhs, rhs in lhs.token > rhs.token }
-          .map(\.action)
-        state.actions.removeAll()
-        return actions
-      }
-
-      for action in actions {
-        action.perform()
-      }
-    }
-  }
-
-  private func runTerminalProcessExitCleanup() {
-    TerminalProcessExitCleanupRegistry.runForTesting()
-  }
-#endif
-
 /// Errors thrown while configuring or writing to a terminal-backed host.
 public enum TerminalHostError: Error {
   case notATTY(fileDescriptor: Int32)
@@ -304,7 +127,7 @@ public enum TerminalHostError: Error {
         var bytesWritten = 0
         while bytesWritten < totalBytes {
           let pointer = unsafe baseAddress.advanced(by: bytesWritten)
-          let result = unsafe platformWrite(
+          let result = unsafe terminalPlatformWrite(
             fileDescriptor,
             pointer,
             totalBytes - bytesWritten
@@ -345,7 +168,7 @@ public enum TerminalHostError: Error {
         events: Int16(POLLIN),
         revents: 0
       )
-      let ready = unsafe platformPoll(
+      let ready = unsafe terminalPlatformPoll(
         &descriptor,
         1,
         Int32(timeoutMilliseconds)
@@ -356,7 +179,7 @@ public enum TerminalHostError: Error {
       }
 
       var buffer = Array(repeating: UInt8(0), count: maxBytes)
-      let bytesRead = unsafe platformRead(fileDescriptor, &buffer, maxBytes)
+      let bytesRead = unsafe terminalPlatformRead(fileDescriptor, &buffer, maxBytes)
       guard bytesRead > 0 else {
         return []
       }
@@ -376,7 +199,7 @@ public enum TerminalHostError: Error {
       )
 
       while true {
-        let ready = unsafe platformPoll(&descriptor, 1, -1)
+        let ready = unsafe terminalPlatformPoll(&descriptor, 1, -1)
         if ready > 0 {
           return
         }
@@ -388,208 +211,12 @@ public enum TerminalHostError: Error {
     }
   }
 
-  private struct PresentationFrame: Sendable {
-    var output: String
-  }
-
-  private final class PresentationWriter: Sendable {
-    private struct State: Sendable {
-      var pending: PresentationFrame?
-      var isWriting = false
-      var didDropFrame = false
-      var pendingError: TerminalHostError?
-    }
-
-    private let controller: any TerminalControlling
-    private let outputFileDescriptor: Int32
-    private let queue = DispatchQueue(label: "swift-tui.presentation-writer")
-    private let state = Mutex(State())
-
-    init(
-      controller: any TerminalControlling,
-      outputFileDescriptor: Int32
-    ) {
-      self.controller = controller
-      self.outputFileDescriptor = outputFileDescriptor
-    }
-
-    func submit(
-      _ frame: PresentationFrame
-    ) {
-      let shouldStart = state.withLock { state in
-        guard state.pendingError == nil else {
-          return false
-        }
-        if state.pending != nil {
-          state.didDropFrame = true
-        }
-        state.pending = frame
-
-        guard !state.isWriting else {
-          return false
-        }
-
-        state.isWriting = true
-        return true
-      }
-
-      guard shouldStart else {
-        return
-      }
-
-      queue.async { [self] in
-        writePendingFrames()
-      }
-    }
-
-    func submitSupplementalOutput(_ output: String) {
-      guard !output.isEmpty else {
-        return
-      }
-
-      let shouldStart = state.withLock { state in
-        guard state.pendingError == nil else {
-          return false
-        }
-        if state.pending != nil {
-          state.pending?.output.append(output)
-        } else {
-          state.pending = .init(output: output)
-        }
-
-        guard !state.isWriting else {
-          return false
-        }
-
-        state.isWriting = true
-        return true
-      }
-
-      guard shouldStart else {
-        return
-      }
-
-      queue.async { [self] in
-        writePendingFrames()
-      }
-    }
-
-    func consumeDropFlag() -> Bool {
-      state.withLock { state in
-        let didDropFrame = state.didDropFrame
-        state.didDropFrame = false
-        return didDropFrame
-      }
-    }
-
-    func hasPendingFrame() -> Bool {
-      state.withLock { state in
-        state.pending != nil
-      }
-    }
-
-    func consumePendingError() throws {
-      let pendingError = state.withLock { state in
-        let pendingError = state.pendingError
-        state.pendingError = nil
-        return pendingError
-      }
-
-      if let pendingError {
-        throw pendingError
-      }
-    }
-
-    func drain() {
-      queue.sync {}
-    }
-
-    private func writePendingFrames() {
-      while true {
-        let frame: PresentationFrame? = state.withLock { state in
-          guard let frame = state.pending else {
-            state.isWriting = false
-            return nil
-          }
-
-          state.pending = nil
-          return frame
-        }
-
-        guard let frame else {
-          return
-        }
-
-        do {
-          try controller.write(frame.output, to: outputFileDescriptor)
-        } catch let error as TerminalHostError {
-          state.withLock { state in
-            state.pending = nil
-            state.isWriting = false
-            state.pendingError = error
-          }
-          return
-        } catch {
-          state.withLock { state in
-            state.pending = nil
-            state.isWriting = false
-            state.pendingError = .failedToWrite(errno: EIO)
-          }
-          return
-        }
-      }
-    }
-  }
-
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: PresentationSurface, DamageAwarePresentationSurface,
     ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface,
     TerminalInputCapabilityProviding,
     TerminalCursorFocusPresentationSurface
   {
-    private struct CapabilityProbeState {
-      var hasProbedAppearance = false
-      var hasProbedGraphicsCapabilities = false
-      var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
-      var hasProbedSGRPixelsMode = false
-      var cachedSGRPixelsModeSupport: Bool?
-    }
-
-    private struct PresentationSession {
-      var lastSubmittedSurface: RasterSurface?
-      var transmittedKittyImages: Set<UInt32> = []
-      var forceFullRepaint = false
-      var writer: PresentationWriter?
-
-      mutating func reset() {
-        lastSubmittedSurface = nil
-        transmittedKittyImages.removeAll()
-        forceFullRepaint = false
-        writer = nil
-      }
-
-      mutating func invalidateRetainedState() {
-        lastSubmittedSurface = nil
-        transmittedKittyImages.removeAll()
-        forceFullRepaint = false
-      }
-
-      mutating func markDroppedFrame() {
-        forceFullRepaint = true
-        transmittedKittyImages.removeAll()
-      }
-
-      var previousSurface: RasterSurface? {
-        forceFullRepaint ? nil : lastSubmittedSurface
-      }
-
-      func presentationDamage(
-        requested damage: PresentationDamage?
-      ) -> PresentationDamage? {
-        forceFullRepaint ? nil : damage
-      }
-    }
-
     public var surfaceSize: CellSize {
       (try? controller.windowSize(of: outputFileDescriptor)) ?? fallbackSize
     }
@@ -609,23 +236,21 @@ public enum TerminalHostError: Error {
       )
     }
 
-    private let inputFileDescriptor: Int32
-    private let outputFileDescriptor: Int32
+    let inputFileDescriptor: Int32
+    let outputFileDescriptor: Int32
     private let fallbackSize: CellSize
-    private let controller: any TerminalControlling
-    private let environment: [String: String]
-    private let mouseInputResolution: TerminalMouseInputResolution
+    let controller: any TerminalControlling
+    let environment: [String: String]
+    let mouseInputResolution: TerminalMouseInputResolution
     private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
 
-    private var savedAttributes: termios?
-    private var savedInputFileStatusFlags: Int32?
-    private var processExitCleanupToken: UInt64?
-    private var rawModeEnabled = false
-    private var activeMouseCoordinateMode = MouseCoordinateMode.cells
-    private var activePointerHoverEnabled = false
-    private var capabilityProbe = CapabilityProbeState()
-    private var presentationSession = PresentationSession()
+    private var rawModeSession = TerminalRawModeSession()
+    var activeMouseCoordinateMode: MouseCoordinateMode {
+      rawModeSession.mouseCoordinateMode
+    }
+    var capabilityProbe = TerminalHostCapabilityProbeState()
+    private var presentationSession = TerminalPresentationSession()
 
     public convenience init(
       inputFileDescriptor: Int32 = 0,
@@ -723,7 +348,7 @@ public enum TerminalHostError: Error {
     }
 
     public func enableRawMode() throws {
-      guard !rawModeEnabled else {
+      guard !rawModeSession.isEnabled else {
         return
       }
       guard controller.isATTY(inputFileDescriptor) else {
@@ -742,79 +367,60 @@ public enum TerminalHostError: Error {
         currentFileStatusFlags | Int32(O_NONBLOCK),
         on: inputFileDescriptor
       )
-      savedAttributes = currentAttributes
-      savedInputFileStatusFlags = currentFileStatusFlags
-      activeMouseCoordinateMode = resolvedMouseCoordinateMode()
-      #if !canImport(WASILibc)
-        processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
-          .init(
-            inputFileDescriptor: inputFileDescriptor,
-            outputFileDescriptor: outputFileDescriptor,
-            inputFileStatusFlags: currentFileStatusFlags,
-            savedAttributes: currentAttributes,
-            resetBytes: Array(processExitResetSequence().utf8)
-          )
-        )
-      #endif
-      rawModeEnabled = true
+      rawModeSession.activate(
+        savedAttributes: currentAttributes,
+        inputFileStatusFlags: currentFileStatusFlags,
+        mouseCoordinateMode: resolvedMouseCoordinateMode(),
+        inputFileDescriptor: inputFileDescriptor,
+        outputFileDescriptor: outputFileDescriptor
+      )
       presentationSession.reset()
 
       var shouldRestoreOnFailure = true
       defer {
         if shouldRestoreOnFailure {
-          #if !canImport(WASILibc)
-            TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
-            processExitCleanupToken = nil
-          #endif
-          let savedInputFileStatusFlags = self.savedInputFileStatusFlags
-          savedAttributes = nil
-          self.savedInputFileStatusFlags = nil
-          rawModeEnabled = false
-          activeMouseCoordinateMode = .cells
-          activePointerHoverEnabled = false
+          let restorePlan = rawModeSession.deactivate()
           presentationSession.reset()
-          if let savedInputFileStatusFlags {
-            try? controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
+          if let savedInputFileStatusFlags = restorePlan.savedInputFileStatusFlags {
+            try? controller.setFileStatusFlags(
+              savedInputFileStatusFlags,
+              on: inputFileDescriptor
+            )
           }
-          try? controller.setAttributes(currentAttributes, on: inputFileDescriptor)
+          if let savedAttributes = restorePlan.savedAttributes {
+            try? controller.setAttributes(savedAttributes, on: inputFileDescriptor)
+          }
         }
       }
 
       refreshAppearanceIfNeeded()
-      try write(enterAlternateScreenSequence())
-      try write(clearScreenSequence())
-      try write(cursorSequence(to: .zero))
-      try write(hideCursorSequence())
-      if activeMouseCoordinateMode.reportsMouseInput {
-        try write(enableMouseReportingSequence())
+      try write(TerminalHostEscapeSequences.enterAlternateScreen)
+      try write(TerminalHostEscapeSequences.clearScreen)
+      try write(TerminalHostEscapeSequences.cursor(to: .zero))
+      try write(TerminalHostEscapeSequences.hideCursor)
+      if rawModeSession.mouseCoordinateMode.reportsMouseInput {
+        try write(
+          TerminalHostEscapeSequences.enableMouseReporting(
+            mouseCoordinateMode: rawModeSession.mouseCoordinateMode,
+            hoverEnabled: rawModeSession.pointerHoverEnabled
+          )
+        )
       }
-      try write("\u{001B}[?2004h")  // enable bracketed paste
+      try write(TerminalHostEscapeSequences.enableBracketedPaste)
       shouldRestoreOnFailure = false
     }
 
     public func disableRawMode() throws {
-      guard rawModeEnabled else {
+      guard rawModeSession.isEnabled else {
         return
       }
 
       let presentationWriter = presentationSession.writer
-      let savedAttributes = self.savedAttributes
-      let savedInputFileStatusFlags = self.savedInputFileStatusFlags
-      let mouseCoordinateModeToDisable = activeMouseCoordinateMode
-      let pointerHoverToDisable = activePointerHoverEnabled
-      #if !canImport(WASILibc)
-        TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
-        processExitCleanupToken = nil
-      #endif
-      self.savedAttributes = nil
-      self.savedInputFileStatusFlags = nil
-      rawModeEnabled = false
-      activeMouseCoordinateMode = .cells
-      activePointerHoverEnabled = false
+      let restorePlan = rawModeSession.deactivate()
       presentationSession.reset()
 
-      var attributesToRestore = savedAttributes
-      var fileStatusFlagsToRestore = savedInputFileStatusFlags
+      var attributesToRestore = restorePlan.savedAttributes
+      var fileStatusFlagsToRestore = restorePlan.savedInputFileStatusFlags
       defer {
         if let fileStatusFlagsToRestore {
           try? controller.setFileStatusFlags(fileStatusFlagsToRestore, on: inputFileDescriptor)
@@ -827,26 +433,26 @@ public enum TerminalHostError: Error {
       presentationWriter?.drain()
       try presentationWriter?.consumePendingError()
 
-      try writeSynchronously(clearScreenSequence())
-      try writeSynchronously(cursorSequence(to: .zero))
-      if mouseCoordinateModeToDisable.reportsMouseInput {
+      try writeSynchronously(TerminalHostEscapeSequences.clearScreen)
+      try writeSynchronously(TerminalHostEscapeSequences.cursor(to: .zero))
+      if restorePlan.mouseCoordinateMode.reportsMouseInput {
         try writeSynchronously(
-          disableMouseReportingSequence(
-            for: mouseCoordinateModeToDisable,
-            hoverEnabled: pointerHoverToDisable
+          TerminalHostEscapeSequences.disableMouseReporting(
+            mouseCoordinateMode: restorePlan.mouseCoordinateMode,
+            hoverEnabled: restorePlan.pointerHoverEnabled
           )
         )
       }
-      try writeSynchronously("\u{001B}[?2004l")  // disable bracketed paste
-      try writeSynchronously(resetStyleSequence())
-      try writeSynchronously(showCursorSequence())
-      try writeSynchronously(exitAlternateScreenSequence())
+      try writeSynchronously(TerminalHostEscapeSequences.disableBracketedPaste)
+      try writeSynchronously(TerminalHostEscapeSequences.resetStyle)
+      try writeSynchronously(TerminalHostEscapeSequences.showCursor)
+      try writeSynchronously(TerminalHostEscapeSequences.exitAlternateScreen)
 
-      if let savedInputFileStatusFlags {
+      if let savedInputFileStatusFlags = restorePlan.savedInputFileStatusFlags {
         try controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
         fileStatusFlagsToRestore = nil
       }
-      if let savedAttributes {
+      if let savedAttributes = restorePlan.savedAttributes {
         try controller.setAttributes(savedAttributes, on: inputFileDescriptor)
         attributesToRestore = nil
       }
@@ -870,42 +476,51 @@ public enum TerminalHostError: Error {
     }
 
     public func clearScreen() throws {
-      try write(clearScreenSequence())
+      try write(TerminalHostEscapeSequences.clearScreen)
     }
 
     public func moveCursor(to point: CellPoint) throws {
-      try write(cursorSequence(to: point))
+      try write(TerminalHostEscapeSequences.cursor(to: point))
     }
 
     package func presentAccessibilityCursorFocus(at point: CellPoint?) throws {
       let presentationWriter = presentationWriterIfNeeded()
       try presentationWriter.consumePendingError()
-      presentationWriter.submitSupplementalOutput(cursorFocusSequence(to: point))
+      presentationWriter.submitSupplementalOutput(
+        TerminalHostEscapeSequences.cursorFocus(to: point)
+      )
     }
 
     public func setPointerHoverEnabled(_ enabled: Bool) throws {
       let reportsMouseInput =
-        rawModeEnabled
-        ? activeMouseCoordinateMode.reportsMouseInput
+        rawModeSession.isEnabled
+        ? rawModeSession.mouseCoordinateMode.reportsMouseInput
         : initialConfigurationAllowsMouseReporting
       guard reportsMouseInput else {
-        activePointerHoverEnabled = false
+        rawModeSession.pointerHoverEnabled = false
         return
       }
-      guard activePointerHoverEnabled != enabled else {
+      guard rawModeSession.pointerHoverEnabled != enabled else {
         return
       }
 
-      if rawModeEnabled {
+      if rawModeSession.isEnabled {
         let sequence =
           if enabled {
-            enableMouseReportingSequence(hoverEnabled: true)
+            TerminalHostEscapeSequences.enableMouseReporting(
+              mouseCoordinateMode: rawModeSession.mouseCoordinateMode,
+              hoverEnabled: true
+            )
           } else {
-            "\u{001B}[?1003l" + enableMouseReportingSequence(hoverEnabled: false)
+            TerminalHostEscapeSequences.disableAllMouseMotion
+              + TerminalHostEscapeSequences.enableMouseReporting(
+                mouseCoordinateMode: rawModeSession.mouseCoordinateMode,
+                hoverEnabled: false
+              )
           }
         try write(sequence)
       }
-      activePointerHoverEnabled = enabled
+      rawModeSession.pointerHoverEnabled = enabled
       refreshProcessExitCleanupRegistration()
     }
 
@@ -955,112 +570,21 @@ public enum TerminalHostError: Error {
       )
       presentationSession.forceFullRepaint = false
 
-      var bytesWritten = 0
-      let origin = CellPoint.zero
-      var bufferedOutput = String()
-      var graphicsReplayScope = TerminalPresentationMetrics.GraphicsReplayScope.none
-      var graphicsAttachmentsReplayed = 0
-      var editOperationLowering = TerminalPresentationMetrics.EditOperationLowering.none
-      var editOperationCount = 0
-
-      func append(_ output: String) {
-        bufferedOutput.append(output)
-        bytesWritten += output.utf8.count
-      }
-
-      switch plan.strategy {
-      case .fullRepaint:
-        // A terminal full repaint clears the previous screen contents. Kitty
-        // image ids cannot be assumed to remain displayable after that, so
-        // force the current frame to retransmit any images before placement.
-        if graphicsCapabilities.preferredProtocol == .kitty {
-          presentationSession.transmittedKittyImages.removeAll()
-        }
-        if !preparedSurface.imageAttachments.isEmpty {
-          graphicsReplayScope = .full
-          graphicsAttachmentsReplayed = preparedSurface.imageAttachments.count
-        }
-        append(clearScreenSequence())
-        append(cursorSequence(to: origin))
-
-        let writeSteps = fullRepaintWriteSteps(
-          for: preparedSurface,
-          capabilityProfile: capabilityProfile
-        )
-        for writeStep in writeSteps {
-          append(writeStep)
-        }
-
-        for writeStep in imageRenderer.graphicsWriteSteps(
-          for: preparedSurface,
-          capabilityProfile: capabilityProfile,
-          graphicsCapabilities: graphicsCapabilities,
-          transmittedKittyImages: &presentationSession.transmittedKittyImages
-        ) {
-          append(writeStep)
-        }
-
-      case .incremental:
-        for rowBatch in plan.rowBatches {
-          let rowOutput: String
-          if usesTerminalEditOperations,
-            rowBatch.canLowerToEraseToEndOfLine(
-              surfaceWidth: preparedSurface.size.width
-            )
-          {
-            editOperationLowering = .eraseToEndOfLine
-            editOperationCount += 1
-            rowOutput = eraseToEndOfLineSequence()
-          } else {
-            rowOutput = rowBatch.renderedBatch
-          }
-          append(
-            cursorSequence(
-              to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
-            )
-          )
-          append(rowOutput)
-        }
-        if graphicsCapabilities.preferredProtocol == .kitty {
-          switch plan.graphicsReplay.scope {
-          case .none:
-            break
-          case .targeted:
-            graphicsReplayScope = .targeted
-            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
-            for writeStep in imageRenderer.graphicsWriteSteps(
-              for: plan.graphicsReplay.attachmentsToReplay,
-              capabilityProfile: capabilityProfile,
-              graphicsCapabilities: graphicsCapabilities,
-              transmittedKittyImages: &presentationSession.transmittedKittyImages
-            ) {
-              append(writeStep)
-            }
-          case .full:
-            graphicsReplayScope = .full
-            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
-            append(deleteVisibleKittyPlacementsSequence())
-            for writeStep in imageRenderer.graphicsWriteSteps(
-              for: plan.graphicsReplay.attachmentsToReplay,
-              capabilityProfile: capabilityProfile,
-              graphicsCapabilities: graphicsCapabilities,
-              transmittedKittyImages: &presentationSession.transmittedKittyImages
-            ) {
-              append(writeStep)
-            }
-          }
-        }
-      }
-
-      let usedSynchronizedOutput =
-        !bufferedOutput.isEmpty
-        && plan.strategy == .fullRepaint
-        && capabilityProfile.supportsSynchronizedOutput
-      bufferedOutput = wrappedPresentationOutput(
-        bufferedOutput,
-        strategy: plan.strategy
+      let emission = buildPresentationEmission(
+        for: preparedSurface,
+        plan: plan,
+        graphicsCapabilities: graphicsCapabilities
       )
-      bytesWritten = bufferedOutput.utf8.count
+      let usedSynchronizedOutput = TerminalHostEscapeSequences.usesSynchronizedOutput(
+        for: emission.output,
+        strategy: plan.strategy,
+        capabilityProfile: capabilityProfile
+      )
+      let bufferedOutput = TerminalHostEscapeSequences.wrappedSynchronizedOutput(
+        emission.output,
+        strategy: plan.strategy,
+        capabilityProfile: capabilityProfile
+      )
 
       if !bufferedOutput.isEmpty {
         presentationWriterIfNeeded().submit(
@@ -1072,19 +596,167 @@ public enum TerminalHostError: Error {
 
       presentationSession.lastSubmittedSurface = preparedSurface
 
-      return TerminalPresentationMetrics(
-        bytesWritten: bytesWritten,
-        linesTouched: plan.linesTouched,
-        cellsChanged: plan.cellsChanged,
-        strategy: plan.strategy == TerminalPresentationPlan.Strategy.fullRepaint
-          ? TerminalPresentationMetrics.Strategy.fullRepaint
-          : TerminalPresentationMetrics.Strategy.incremental,
-        usedSynchronizedOutput: usedSynchronizedOutput,
-        graphicsReplayScope: graphicsReplayScope,
-        graphicsAttachmentsReplayed: graphicsAttachmentsReplayed,
-        editOperationLowering: editOperationLowering,
-        editOperationCount: editOperationCount
+      return emission.metrics(
+        for: plan,
+        output: bufferedOutput,
+        usedSynchronizedOutput: usedSynchronizedOutput
       )
+    }
+
+    private func buildPresentationEmission(
+      for preparedSurface: RasterSurface,
+      plan: TerminalPresentationPlan,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) -> TerminalPresentationEmission {
+      var emission = TerminalPresentationEmission()
+      switch plan.strategy {
+      case .fullRepaint:
+        appendFullRepaint(
+          to: &emission,
+          for: preparedSurface,
+          graphicsCapabilities: graphicsCapabilities
+        )
+
+      case .incremental:
+        appendIncrementalPresentation(
+          to: &emission,
+          for: preparedSurface,
+          plan: plan,
+          graphicsCapabilities: graphicsCapabilities
+        )
+      }
+
+      return emission
+    }
+
+    private func appendFullRepaint(
+      to emission: inout TerminalPresentationEmission,
+      for preparedSurface: RasterSurface,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      // A terminal full repaint clears the previous screen contents. Kitty
+      // image ids cannot be assumed to remain displayable after that, so
+      // force the current frame to retransmit any images before placement.
+      if graphicsCapabilities.preferredProtocol == .kitty {
+        presentationSession.transmittedKittyImages.removeAll()
+      }
+      if !preparedSurface.imageAttachments.isEmpty {
+        emission.recordGraphicsReplay(
+          scope: .full,
+          attachmentCount: preparedSurface.imageAttachments.count
+        )
+      }
+      emission.append(TerminalHostEscapeSequences.clearScreen)
+      emission.append(TerminalHostEscapeSequences.cursor(to: .zero))
+
+      let writeSteps = fullRepaintWriteSteps(
+        for: preparedSurface,
+        capabilityProfile: capabilityProfile
+      )
+      for writeStep in writeSteps {
+        emission.append(writeStep)
+      }
+
+      for writeStep in imageRenderer.graphicsWriteSteps(
+        for: preparedSurface,
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities,
+        transmittedKittyImages: &presentationSession.transmittedKittyImages
+      ) {
+        emission.append(writeStep)
+      }
+    }
+
+    private func appendIncrementalPresentation(
+      to emission: inout TerminalPresentationEmission,
+      for preparedSurface: RasterSurface,
+      plan: TerminalPresentationPlan,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      for rowBatch in plan.rowBatches {
+        let rowOutput = incrementalRowOutput(
+          for: rowBatch,
+          surfaceWidth: preparedSurface.size.width,
+          emission: &emission
+        )
+        emission.append(
+          TerminalHostEscapeSequences.cursor(
+            to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
+          )
+        )
+        emission.append(rowOutput)
+      }
+      appendKittyGraphicsReplay(
+        to: &emission,
+        plan: plan,
+        graphicsCapabilities: graphicsCapabilities
+      )
+    }
+
+    private func incrementalRowOutput(
+      for rowBatch: TerminalPresentationPlan.RowBatch,
+      surfaceWidth: Int,
+      emission: inout TerminalPresentationEmission
+    ) -> String {
+      guard usesTerminalEditOperations,
+        rowBatch.canLowerToEraseToEndOfLine(surfaceWidth: surfaceWidth)
+      else {
+        return rowBatch.renderedBatch
+      }
+
+      emission.recordEraseToEndOfLine()
+      return TerminalHostEscapeSequences.eraseToEndOfLine
+    }
+
+    private func appendKittyGraphicsReplay(
+      to emission: inout TerminalPresentationEmission,
+      plan: TerminalPresentationPlan,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      guard graphicsCapabilities.preferredProtocol == .kitty else {
+        return
+      }
+
+      switch plan.graphicsReplay.scope {
+      case .none:
+        break
+      case .targeted:
+        emission.recordGraphicsReplay(
+          scope: .targeted,
+          attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
+        )
+        appendGraphicsWriteSteps(
+          for: plan.graphicsReplay.attachmentsToReplay,
+          to: &emission,
+          graphicsCapabilities: graphicsCapabilities
+        )
+      case .full:
+        emission.recordGraphicsReplay(
+          scope: .full,
+          attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
+        )
+        emission.append(TerminalHostEscapeSequences.deleteVisibleKittyPlacements)
+        appendGraphicsWriteSteps(
+          for: plan.graphicsReplay.attachmentsToReplay,
+          to: &emission,
+          graphicsCapabilities: graphicsCapabilities
+        )
+      }
+    }
+
+    private func appendGraphicsWriteSteps(
+      for attachments: [RasterImageAttachment],
+      to emission: inout TerminalPresentationEmission,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      for writeStep in imageRenderer.graphicsWriteSteps(
+        for: attachments,
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities,
+        transmittedKittyImages: &presentationSession.transmittedKittyImages
+      ) {
+        emission.append(writeStep)
+      }
     }
 
     package func drainPendingPresentation() throws {
@@ -1113,12 +785,12 @@ public enum TerminalHostError: Error {
       try presentationWriter.consumePendingError()
     }
 
-    private func presentationWriterIfNeeded() -> PresentationWriter {
+    private func presentationWriterIfNeeded() -> TerminalPresentationWriter {
       if let presentationWriter = presentationSession.writer {
         return presentationWriter
       }
 
-      let presentationWriter = PresentationWriter(
+      let presentationWriter = TerminalPresentationWriter(
         controller: controller,
         outputFileDescriptor: outputFileDescriptor
       )
@@ -1182,530 +854,11 @@ public enum TerminalHostError: Error {
       return nil
     }
 
-    private func resolvedGraphicsCapabilities(
-      probingProtocols: Bool
-    ) -> TerminalGraphicsCapabilities {
-      if probingProtocols {
-        return probeGraphicsCapabilitiesIfNeeded()
-      }
-      return baselineGraphicsCapabilities()
-    }
-
-    private func baselineGraphicsCapabilities() -> TerminalGraphicsCapabilities {
-      var capabilities = capabilityProbe.cachedGraphicsCapabilities ?? .none
-      // Always attempt a fresh ioctl read. The syscall is cheap and its
-      // result is authoritative when the kernel reports pixel dimensions.
-      // We only fall back to the cached value if the fresh read returns
-      // nil, which preserves previously-probed escape-sequence values
-      // (CSI 16 t / CSI 14 t) across frames.
-      if let fresh = try? controller.cellPixelSize(of: outputFileDescriptor) {
-        capabilities.cellPixelSize = fresh
-      }
-      capabilityProbe.cachedGraphicsCapabilities = capabilities
-      return capabilities
-    }
-
-    private func resolvedMouseCoordinateMode() -> MouseCoordinateMode {
-      guard capabilityProfile.supportsMouseReporting else {
-        return .disabled
-      }
-
-      switch mouseInputResolution {
-      case .preResolved(let mode):
-        return mouseCoordinateMode(for: mode)
-      case .automatic(let policy):
-        return automaticMouseCoordinateMode(policy: policy)
-      }
-    }
-
-    private func mouseCoordinateMode(
-      for mode: TerminalMouseInputMode
-    ) -> MouseCoordinateMode {
-      switch mode {
-      case .disabled:
-        return .disabled
-      case .cell:
-        return .cells
-      case .sgrPixels(let metrics):
-        return .pixels(metrics: metrics, source: .terminalPixels)
-      }
-    }
-
-    private func automaticMouseCoordinateMode(
-      policy: TerminalMouseInputTrustPolicy
-    ) -> MouseCoordinateMode {
-      guard let metrics = trustedCellPixelMetrics() else {
-        return .cells
-      }
-
-      if policy == .assumeWhenCellMetricsKnown {
-        return .pixels(metrics: metrics, source: .terminalPixels)
-      }
-
-      if let liveSupport = probeSGRPixelsModeSupport() {
-        return liveSupport ? .pixels(metrics: metrics, source: .terminalPixels) : .cells
-      }
-
-      switch policy {
-      case .liveProbeOnly:
-        return .cells
-      case .liveProbeOrDocumentedSupport:
-        guard documentedMatrixSupportsSGRPixels(includingKnownCompatible: false) else {
-          return .cells
-        }
-        return .pixels(metrics: metrics, source: .terminalPixels)
-      case .liveProbeOrKnownTerminalIdentity:
-        guard documentedMatrixSupportsSGRPixels(includingKnownCompatible: true) else {
-          return .cells
-        }
-        return .pixels(metrics: metrics, source: .terminalPixels)
-      case .roughTerminalIdentityHeuristics:
-        guard roughTerminalIdentitySupportsSGRPixels else {
-          return .cells
-        }
-        return .pixels(metrics: metrics, source: .terminalPixels)
-      case .assumeWhenCellMetricsKnown:
-        return .pixels(metrics: metrics, source: .terminalPixels)
-      }
-    }
-
-    private var isInsideTerminalMultiplexer: Bool {
-      if environment["TMUX"] != nil {
-        return true
-      }
-      guard let term = environment["TERM"]?.lowercased() else {
-        return false
-      }
-      return term.hasPrefix("screen") || term.hasPrefix("tmux")
-    }
-
-    private var resolvedPointerInputCapabilities: PointerInputCapabilities {
-      var capabilities = activeMouseCoordinateMode.pointerInputCapabilities
-      capabilities.supportsHover = activeMouseCoordinateMode.reportsMouseInput
-      return capabilities
-    }
-
-    private func documentedMatrixSupportsSGRPixels(
-      includingKnownCompatible: Bool
-    ) -> Bool {
-      guard !isInsideTerminalMultiplexer else {
-        return false
-      }
-      let matrix =
-        includingKnownCompatible
-        ? TerminalMouseInputCompatibilityMatrix.knownCompatible
-        : TerminalMouseInputCompatibilityMatrix.documentedSupport
-      return matrix.supportingSGRPixels(
-        environment: environment,
-        includingKnownCompatible: includingKnownCompatible
-      ) != nil
-    }
-
-    private var roughTerminalIdentitySupportsSGRPixels: Bool {
-      if documentedMatrixSupportsSGRPixels(includingKnownCompatible: true) {
-        return true
-      }
-      guard !isInsideTerminalMultiplexer else {
-        return false
-      }
-      let identityValues = [
-        environment["TERM"],
-        environment["TERM_PROGRAM"],
-        environment["LC_TERMINAL"],
-        environment["COLORTERM"],
-      ]
-      .compactMap { $0?.lowercased() }
-      let roughMarkers = [
-        "ghostty",
-        "alacritty",
-        "rio",
-        "contour",
-        "xterm.js",
-        "xtermjs",
-      ]
-      return identityValues.contains { identity in
-        roughMarkers.contains { marker in
-          identity.contains(marker)
-        }
-      }
-    }
-
-    private func trustedCellPixelMetrics() -> CellPixelMetrics? {
-      guard let cellPixelSize = baselineGraphicsCapabilities().cellPixelSize else {
-        return nil
-      }
-      return CellPixelMetrics(
-        width: max(1, cellPixelSize.width),
-        height: max(1, cellPixelSize.height),
-        source: .reported
-      )
-    }
-
-    private func probeSGRPixelsModeSupport() -> Bool? {
-      if capabilityProbe.hasProbedSGRPixelsMode {
-        return capabilityProbe.cachedSGRPixelsModeSupport
-      }
-      capabilityProbe.hasProbedSGRPixelsMode = true
-
-      guard controller.isATTY(outputFileDescriptor) else {
-        capabilityProbe.cachedSGRPixelsModeSupport = nil
-        return nil
-      }
-
-      let response =
-        (try? performInputCapabilityQuery(.decPrivateMode(mode: 1016))) ?? []
-      guard let state = parseDECPrivateModeReport(from: response, mode: 1016) else {
-        capabilityProbe.cachedSGRPixelsModeSupport = nil
-        return nil
-      }
-
-      let supported = state.canEnable
-      capabilityProbe.cachedSGRPixelsModeSupport = supported
-      return supported
-    }
-
-    private func probeGraphicsCapabilitiesIfNeeded() -> TerminalGraphicsCapabilities {
-      if capabilityProbe.hasProbedGraphicsCapabilities {
-        return baselineGraphicsCapabilities()
-      }
-      capabilityProbe.hasProbedGraphicsCapabilities = true
-
-      var capabilities = baselineGraphicsCapabilities()
-      guard controller.isATTY(outputFileDescriptor) else {
-        capabilityProbe.cachedGraphicsCapabilities = capabilities
-        return capabilities
-      }
-
-      // Single combined probe: the kitty query escape sequence already
-      // piggybacks `\e[c`, so non-kitty terminals will still respond with
-      // their device attributes. We harvest kitty support and the DA
-      // attributes from the same buffer instead of paying for a second
-      // round trip.
-      let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
-      let combinedProbeBuffer: [UInt8] =
-        (try? performGraphicsQuery(.kittySupport(id: kittyQueryID))) ?? []
-
-      if parseKittySupportResponse(in: combinedProbeBuffer, id: kittyQueryID) == true,
-        !capabilities.supportedProtocols.contains(.kitty)
-      {
-        capabilities.supportedProtocols.append(.kitty)
-      }
-
-      if let attributes = parsePrimaryDeviceAttributes(from: combinedProbeBuffer),
-        attributes.contains(4)
-      {
-        if !capabilities.supportedProtocols.contains(.sixel) {
-          capabilities.supportedProtocols.append(.sixel)
-        }
-
-        if let registersResponse = try? performGraphicsQuery(.sixelColorRegisters),
-          let registers = parseXTSMGraphicsResponse(from: registersResponse, item: 1),
-          registers.status >= 0,
-          let firstValue = registers.values.first
-        {
-          capabilities.sixelColorRegisters = firstValue
-        }
-
-        if let geometryResponse = try? performGraphicsQuery(.sixelGeometry),
-          let geometry = parseXTSMGraphicsResponse(from: geometryResponse, item: 2),
-          geometry.status >= 0,
-          geometry.values.count >= 2
-        {
-          capabilities.sixelGeometry = .init(
-            width: geometry.values[0],
-            height: geometry.values[1]
-          )
-        }
-      }
-
-      if capabilities.cellPixelSize == nil {
-        if let cellPixelResponse = try? performGraphicsQuery(.cellPixels),
-          let cellPixelSize = parseWindowSizeResponse(from: cellPixelResponse, expectedCode: 6)
-        {
-          capabilities.cellPixelSize = cellPixelSize
-        } else if let textAreaResponse = try? performGraphicsQuery(.textAreaPixels),
-          let textAreaPixels = parseWindowSizeResponse(from: textAreaResponse, expectedCode: 4)
-        {
-          let size = surfaceSize
-          if size.width > 0, size.height > 0 {
-            capabilities.cellPixelSize = .init(
-              width: max(1, textAreaPixels.width / size.width),
-              height: max(1, textAreaPixels.height / size.height)
-            )
-          }
-        }
-      }
-
-      if capabilities.supportsKitty {
-        capabilities.preferredProtocol = .kitty
-      } else if capabilities.supportsSixel {
-        capabilities.preferredProtocol = .sixel
-      }
-
-      capabilityProbe.cachedGraphicsCapabilities = capabilities
-      return capabilities
-    }
-
-    private func performInputCapabilityQuery(
-      _ query: TerminalInputCapabilityQuery
-    ) throws -> [UInt8] {
-      try writeSynchronously(query.request)
-      var buffer: [UInt8] = []
-
-      for iteration in 0..<4 {
-        let timeoutMilliseconds = iteration == 0 ? 40 : 20
-        let bytes = try controller.read(
-          from: inputFileDescriptor,
-          maxBytes: 512,
-          timeoutMilliseconds: timeoutMilliseconds
-        )
-        if bytes.isEmpty {
-          break
-        }
-        buffer.append(contentsOf: bytes)
-
-        switch query {
-        case .decPrivateMode(let mode):
-          if parseDECPrivateModeReport(from: buffer, mode: mode) != nil {
-            return buffer
-          }
-        }
-      }
-
-      return buffer
-    }
-
-    private func performGraphicsQuery(
-      _ query: TerminalGraphicsQuery
-    ) throws -> [UInt8] {
-      try writeSynchronously(query.request)
-      var buffer: [UInt8] = []
-      // The kitty/DA combined probe is the one we cannot afford to give up
-      // on early. A modern terminal usually replies in microseconds, but
-      // `swift run` cold starts, system load, and PTY scheduling can push
-      // the first byte well past 40ms. Quitting the read loop the moment
-      // a single poll returns empty made the protocol detection
-      // non-deterministic across runs of the same binary in the same
-      // terminal — sometimes kitty was detected, sometimes the renderer
-      // fell back to the dithered half-block path. Use a longer total
-      // budget for the kitty probe and never break early on it; for the
-      // narrower follow-up queries (sixel registers, cell pixels) we
-      // already know the terminal is responsive, so the original
-      // break-on-empty heuristic still applies.
-      let initialTimeoutMilliseconds: Int
-      let followUpTimeoutMilliseconds = 40
-      let breaksOnEmptyRead: Bool
-      let maxIterations: Int
-      var kittyProbeSawPrimaryDeviceAttributes = false
-      var kittyProbeEmptyReadsAfterPrimaryDeviceAttributes = 0
-      switch query {
-      case .kittySupport:
-        initialTimeoutMilliseconds = 250
-        breaksOnEmptyRead = false
-        maxIterations = 8
-      default:
-        initialTimeoutMilliseconds = 40
-        breaksOnEmptyRead = true
-        maxIterations = 6
-      }
-
-      for iteration in 0..<maxIterations {
-        let timeoutMilliseconds =
-          iteration == 0 ? initialTimeoutMilliseconds : followUpTimeoutMilliseconds
-        let bytes = try controller.read(
-          from: inputFileDescriptor,
-          maxBytes: 512,
-          timeoutMilliseconds: timeoutMilliseconds
-        )
-        if bytes.isEmpty {
-          if breaksOnEmptyRead {
-            break
-          }
-          if kittyProbeSawPrimaryDeviceAttributes {
-            kittyProbeEmptyReadsAfterPrimaryDeviceAttributes += 1
-            if kittyProbeEmptyReadsAfterPrimaryDeviceAttributes >= 2 {
-              return buffer
-            }
-          }
-          continue
-        }
-        buffer.append(contentsOf: bytes)
-
-        switch query {
-        case .kittySupport(let id):
-          // The kitty probe request piggybacks a `\e[c` (primary device
-          // attributes) query after the kitty query so non-kitty terminals
-          // still produce a response we can synchronize on. We wait for the
-          // Kitty response itself when it exists; some terminals deliver the
-          // DA reply before the Kitty OK, and returning on DA alone caches a
-          // false "no Kitty" result for the entire session.
-          if parseKittySupportResponse(in: buffer, id: id) == true {
-            return buffer
-          }
-          if parsePrimaryDeviceAttributes(from: buffer) != nil {
-            kittyProbeSawPrimaryDeviceAttributes = true
-            kittyProbeEmptyReadsAfterPrimaryDeviceAttributes = 0
-          }
-        case .primaryDeviceAttributes:
-          if parsePrimaryDeviceAttributes(from: buffer) != nil {
-            return buffer
-          }
-        case .sixelColorRegisters:
-          if parseXTSMGraphicsResponse(from: buffer, item: 1) != nil {
-            return buffer
-          }
-        case .sixelGeometry:
-          if parseXTSMGraphicsResponse(from: buffer, item: 2) != nil {
-            return buffer
-          }
-        case .textAreaPixels:
-          if parseWindowSizeResponse(from: buffer, expectedCode: 4) != nil {
-            return buffer
-          }
-        case .cellPixels:
-          if parseWindowSizeResponse(from: buffer, expectedCode: 6) != nil {
-            return buffer
-          }
-        }
-      }
-
-      return buffer
-    }
-
-    private func clearScreenSequence() -> String {
-      "\u{001B}[2J"
-    }
-
-    private func eraseToEndOfLineSequence() -> String {
-      "\u{001B}[K"
-    }
-
-    private func deleteVisibleKittyPlacementsSequence() -> String {
-      "\u{001B}_Ga=d,q=2\u{001B}\\"
-    }
-
-    private func beginSynchronizedOutputSequence() -> String {
-      "\u{001B}[?2026h"
-    }
-
-    private func endSynchronizedOutputSequence() -> String {
-      "\u{001B}[?2026l"
-    }
-
-    private func enterAlternateScreenSequence() -> String {
-      "\u{001B}[?1049h"
-    }
-
-    private func exitAlternateScreenSequence() -> String {
-      "\u{001B}[?1049l"
-    }
-
-    private func hideCursorSequence() -> String {
-      "\u{001B}[?25l"
-    }
-
-    private func showCursorSequence() -> String {
-      "\u{001B}[?25h"
-    }
-
-    private func enableMouseReportingSequence() -> String {
-      enableMouseReportingSequence(hoverEnabled: activePointerHoverEnabled)
-    }
-
-    private func enableMouseReportingSequence(hoverEnabled: Bool) -> String {
-      var sequence = "\u{001B}[?1006h"
-      if activeMouseCoordinateMode.usesTerminalPixels {
-        sequence += "\u{001B}[?1016h"
-      }
-      sequence += "\u{001B}[?1002h"
-      if hoverEnabled {
-        sequence += "\u{001B}[?1003h"
-      }
-      return sequence
-    }
-
-    private func disableMouseReportingSequence(
-      for mouseCoordinateMode: MouseCoordinateMode,
-      hoverEnabled: Bool
-    ) -> String {
-      var sequence = hoverEnabled ? "\u{001B}[?1003l" : ""
-      sequence += "\u{001B}[?1002l"
-      if mouseCoordinateMode.usesTerminalPixels {
-        sequence += "\u{001B}[?1016l\u{001B}[?1006l"
-      } else {
-        sequence += "\u{001B}[?1006l"
-      }
-      return sequence
-    }
-
-    private func processExitResetSequence() -> String {
-      var reset = ""
-      if activeMouseCoordinateMode.reportsMouseInput {
-        reset += disableMouseReportingSequence(
-          for: activeMouseCoordinateMode,
-          hoverEnabled: activePointerHoverEnabled
-        )
-      }
-      reset += "\u{001B}[?2004l"  // disable bracketed paste
-      reset += showCursorSequence()
-      reset += resetStyleSequence()
-      reset += exitAlternateScreenSequence()
-      return reset
-    }
-
     private func refreshProcessExitCleanupRegistration() {
-      guard rawModeEnabled,
-        let savedAttributes,
-        let savedInputFileStatusFlags
-      else {
-        return
-      }
-
-      #if !canImport(WASILibc)
-        TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
-        processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
-          .init(
-            inputFileDescriptor: inputFileDescriptor,
-            outputFileDescriptor: outputFileDescriptor,
-            inputFileStatusFlags: savedInputFileStatusFlags,
-            savedAttributes: savedAttributes,
-            resetBytes: Array(processExitResetSequence().utf8)
-          )
-        )
-      #endif
-    }
-
-    private func resetStyleSequence() -> String {
-      "\u{001B}[0m"
-    }
-
-    private func cursorSequence(to point: CellPoint) -> String {
-      let row = max(1, point.y + 1)
-      let column = max(1, point.x + 1)
-      return "\u{001B}[\(row);\(column)H"
-    }
-
-    private func cursorFocusSequence(to point: CellPoint?) -> String {
-      guard let point else {
-        return hideCursorSequence()
-      }
-      return cursorSequence(to: point) + showCursorSequence()
-    }
-
-    private func wrappedPresentationOutput(
-      _ output: String,
-      strategy: TerminalPresentationPlan.Strategy
-    ) -> String {
-      guard !output.isEmpty,
-        strategy == .fullRepaint,
-        capabilityProfile.supportsSynchronizedOutput
-      else {
-        return output
-      }
-
-      return beginSynchronizedOutputSequence()
-        + output
-        + endSynchronizedOutputSequence()
+      rawModeSession.refreshProcessExitCleanupRegistration(
+        inputFileDescriptor: inputFileDescriptor,
+        outputFileDescriptor: outputFileDescriptor
+      )
     }
 
   }
@@ -1803,24 +956,30 @@ public enum TerminalHostError: Error {
     }
 
     public func enableRawMode() throws {
-      var setup = enterAlternateScreenSequence()
-      setup += hideCursorSequence()
+      var setup = TerminalHostEscapeSequences.enterAlternateScreen
+      setup += TerminalHostEscapeSequences.hideCursor
       if capabilityProfile.supportsMouseReporting {
-        setup += enableMouseReportingSequence()
+        setup += TerminalHostEscapeSequences.enableMouseReporting(
+          mouseCoordinateMode: .cells,
+          hoverEnabled: false
+        )
       }
-      setup += "\u{001B}[?2004h"  // enable bracketed paste
+      setup += TerminalHostEscapeSequences.enableBracketedPaste
       try write(setup)
     }
 
     public func disableRawMode() throws {
       var teardown = ""
       if capabilityProfile.supportsMouseReporting {
-        teardown += disableMouseReportingSequence()
+        teardown += TerminalHostEscapeSequences.disableMouseReporting(
+          mouseCoordinateMode: .cells,
+          hoverEnabled: false
+        )
       }
-      teardown += "\u{001B}[?2004l"  // disable bracketed paste
-      teardown += showCursorSequence()
-      teardown += resetStyleSequence()
-      teardown += exitAlternateScreenSequence()
+      teardown += TerminalHostEscapeSequences.disableBracketedPaste
+      teardown += TerminalHostEscapeSequences.showCursor
+      teardown += TerminalHostEscapeSequences.resetStyle
+      teardown += TerminalHostEscapeSequences.exitAlternateScreen
       try write(teardown)
     }
 
@@ -1841,11 +1000,11 @@ public enum TerminalHostError: Error {
     }
 
     public func clearScreen() throws {
-      try write("\u{001B}[2J")
+      try write(TerminalHostEscapeSequences.clearScreen)
     }
 
     public func moveCursor(to point: CellPoint) throws {
-      try write(cursorSequence(to: point))
+      try write(TerminalHostEscapeSequences.cursor(to: point))
     }
 
     private func writeBytes(_ bytes: [UInt8]) throws {
@@ -1858,7 +1017,7 @@ public enum TerminalHostError: Error {
         while written < bytes.count {
           let result = unsafe bytes.withUnsafeBytes { rawBuffer in
             let baseAddress = unsafe rawBuffer.baseAddress?.advanced(by: written)
-            return unsafe platformWrite(
+            return unsafe terminalPlatformWrite(
               outputFD,
               baseAddress,
               bytes.count - written
@@ -1874,39 +1033,6 @@ public enum TerminalHostError: Error {
       }
     }
 
-    private func enterAlternateScreenSequence() -> String {
-      "\u{001B}[?1049h"
-    }
-
-    private func exitAlternateScreenSequence() -> String {
-      "\u{001B}[?1049l"
-    }
-
-    private func hideCursorSequence() -> String {
-      "\u{001B}[?25l"
-    }
-
-    private func showCursorSequence() -> String {
-      "\u{001B}[?25h"
-    }
-
-    private func enableMouseReportingSequence() -> String {
-      "\u{001B}[?1006h\u{001B}[?1002h"
-    }
-
-    private func disableMouseReportingSequence() -> String {
-      "\u{001B}[?1002l\u{001B}[?1006l"
-    }
-
-    private func resetStyleSequence() -> String {
-      "\u{001B}[0m"
-    }
-
-    private func cursorSequence(to point: CellPoint) -> String {
-      let row = max(1, point.y + 1)
-      let column = max(1, point.x + 1)
-      return "\u{001B}[\(row);\(column)H"
-    }
   }
 #endif
 
@@ -1953,8 +1079,8 @@ func fullRepaintOutput(
       origin: origin
     )
   )
-  output += "\u{001B}[2J"
-  output += fullRepaintCursorSequence(to: origin)
+  output += TerminalHostEscapeSequences.clearScreen
+  output += TerminalHostEscapeSequences.cursor(to: origin)
   for writeStep in writeSteps {
     output += writeStep
   }
@@ -1965,19 +1091,12 @@ func fullRepaintBytesWritten(
   writeSteps: [String],
   origin: CellPoint
 ) -> Int {
-  let clearSequence = "\u{001B}[2J"
-  let cursorSequence = fullRepaintCursorSequence(to: origin)
-  return clearSequence.utf8.count
+  let cursorSequence = TerminalHostEscapeSequences.cursor(to: origin)
+  return TerminalHostEscapeSequences.clearScreen.utf8.count
     + cursorSequence.utf8.count
     + writeSteps.reduce(0) { partial, writeStep in
       partial + writeStep.utf8.count
     }
-}
-
-func fullRepaintCursorSequence(
-  to point: CellPoint
-) -> String {
-  "\u{001B}[\(max(1, point.y + 1));\(max(1, point.x + 1))H"
 }
 
 package func currentProcessEnvironment() -> [String: String] {
