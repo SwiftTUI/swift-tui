@@ -170,11 +170,30 @@ extension RunLoop {
     var completedFrameDropDecision: CompletedFrameDropDecision?
   }
 
+  private func scheduledFrameByReconcilingExternalState(
+    _ scheduledFrame: ScheduledFrame,
+    currentState: State
+  ) -> ScheduledFrame {
+    guard previousRenderedState != currentState else {
+      return scheduledFrame
+    }
+    var reconciled = scheduledFrame
+    reconciled.causes.insert(.invalidation)
+    reconciled.invalidatedIdentities.insert(rootIdentity)
+    reconciled.forceRootEvaluation = true
+    return reconciled
+  }
+
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
-    while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+    while var scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      let currentState = stateContainer.state
+      scheduledFrame = scheduledFrameByReconcilingExternalState(
+        scheduledFrame,
+        currentState: currentState
+      )
       let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
       progressProbe?.record(
         .frameIntent,
@@ -186,11 +205,6 @@ extension RunLoop {
       var convergence = FocusSyncConvergenceState()
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
-      let currentState = stateContainer.state
-      if previousRenderedState != currentState {
-        renderer.forceRootEvaluation()
-        previousRenderedState = currentState
-      }
 
       var artifacts: FrameArtifacts?
       while true {
@@ -235,6 +249,7 @@ extension RunLoop {
         hasDiagnosticsLogger: hasDiagnosticsLogger,
         renderedFrames: &renderedFrames
       )
+      previousRenderedState = currentState
     }
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
   }
@@ -850,7 +865,12 @@ extension RunLoop {
     observationBridge.attachInvalidator(scheduler)
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
-    frameLoop: while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+    frameLoop: while var scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      let currentState = stateContainer.state
+      scheduledFrame = scheduledFrameByReconcilingExternalState(
+        scheduledFrame,
+        currentState: currentState
+      )
       let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
       progressProbe?.record(
         .frameIntent,
@@ -862,11 +882,6 @@ extension RunLoop {
       var convergence = FocusSyncConvergenceState()
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
-      let currentState = stateContainer.state
-      if previousRenderedState != currentState {
-        renderer.forceRootEvaluation()
-        previousRenderedState = currentState
-      }
 
       var acquisition = FrameAcquisitionState()
       var artifacts: FrameArtifacts?
@@ -933,6 +948,7 @@ extension RunLoop {
         hasDiagnosticsLogger: hasDiagnosticsLogger,
         renderedFrames: &renderedFrames
       )
+      previousRenderedState = currentState
 
       // Interactive rendering may enqueue more frames while a key or
       // pointer event is already buffered. Yield between committed frames
@@ -1214,6 +1230,7 @@ extension RunLoop {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: true
     )
+    context.forceRootEvaluation = scheduledFrame.forceRootEvaluation
     context.localPointerHandlerRegistry = localPointerHandlerRegistry
     context.localTerminationRegistry = localTerminationRegistry
     context.localGestureRegistry = localGestureRegistry

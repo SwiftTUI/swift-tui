@@ -129,6 +129,7 @@ package final class FrameResolveState {
     let newPressed = context.environmentValues.pressedIdentity
     let environmentRequiresRootEvaluation =
       forceRootEvaluation
+      || context.forceRootEvaluation
       || newFocused != previousFocusedIdentity
       || newPressed != previousPressedIdentity
       || proposal != previousProposal

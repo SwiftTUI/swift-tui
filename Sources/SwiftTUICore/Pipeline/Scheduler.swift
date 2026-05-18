@@ -15,6 +15,7 @@ public struct ScheduledFrame: Equatable, Sendable {
   public var externalReasons: [String]
   public var triggeredDeadline: MonotonicInstant?
   public var nextDeadline: MonotonicInstant?
+  package var forceRootEvaluation: Bool
   package var animationRequest: AnimationRequest
   package var animationBatchID: AnimationBatchID?
   /// Total number of `request*` calls (input, invalidation, signal,
@@ -40,6 +41,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.externalReasons = externalReasons
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
+    self.forceRootEvaluation = false
     self.animationRequest = .inherit
     self.animationBatchID = nil
     self.intentRequestCount = 0
@@ -52,6 +54,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     externalReasons: [String],
     triggeredDeadline: MonotonicInstant?,
     nextDeadline: MonotonicInstant?,
+    forceRootEvaluation: Bool = false,
     animationRequest: AnimationRequest,
     animationBatchID: AnimationBatchID? = nil,
     intentRequestCount: Int = 0
@@ -62,6 +65,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.externalReasons = externalReasons
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
+    self.forceRootEvaluation = forceRootEvaluation
     self.animationRequest = animationRequest
     self.animationBatchID = animationBatchID
     self.intentRequestCount = intentRequestCount
