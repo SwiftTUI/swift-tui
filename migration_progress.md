@@ -30,6 +30,9 @@ Approved constraints:
   `FrameTailRenderer.swift` into `FrameTailPresentationDamage.swift`.
 - Packet 4 completed: split frame diagnostics and frame context out of
   `FrameArtifacts.swift`.
+- Packet 5 completed: decomposed async runtime frame acquisition in
+  `RunLoop+Rendering.swift` into mode selection, cancellable rendering, and
+  skipped-frame bookkeeping helpers.
 
 ## Baseline Validation
 
@@ -97,19 +100,31 @@ Packet 4 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-025909-68455.log`
   - Result: PASS
 
+Packet 5 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-030508-85414.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 5: reduce cognitive load in frame acquisition, commit, and presentation
+Packet 6: continue reducing cognitive load in runtime commit and presentation
 handoff code.
 
 Expected owned files pending local discovery:
 
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
-- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
 
 Validation:
 
-- Runtime and pipeline focused tests selected from current file evidence.
+- Runtime, accessibility, JSON, terminal, and pipeline focused tests selected
+  from current file evidence.
 - `bun run test`
 
 ## Failed Attempts

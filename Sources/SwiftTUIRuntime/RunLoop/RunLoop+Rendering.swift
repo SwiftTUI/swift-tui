@@ -982,6 +982,24 @@ extension RunLoop {
     renderedFrames: Int,
     convergence: FocusSyncConvergenceState
   ) async -> FrameAcquisitionOutcome {
+    await renderFrameArtifactsForCurrentMode(
+      scheduledFrame: scheduledFrame,
+      currentState: currentState,
+      eventPump: eventPump,
+      renderIntentDiagnostics: renderIntentDiagnostics,
+      renderedFrames: renderedFrames,
+      convergence: convergence
+    )
+  }
+
+  private func renderFrameArtifactsForCurrentMode(
+    scheduledFrame: ScheduledFrame,
+    currentState: State,
+    eventPump: EventPump?,
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
+    renderedFrames: Int,
+    convergence: FocusSyncConvergenceState
+  ) async -> FrameAcquisitionOutcome {
     if renderMode == .sync {
       let renderedArtifacts = renderer.render(
         viewBuilder(
@@ -1007,28 +1025,36 @@ extension RunLoop {
       return .rendered(renderedArtifacts, .completed, nil)
     }
 
-    @MainActor
-    func shouldCancelQueuedTailForMode() async -> Bool {
-      guard renderMode != .asyncNoCancel else {
-        return false
-      }
-      return scheduler.hasPendingFrame(at: .now())
+    let renderOutcome = await acquireCancellableFrameArtifacts(
+      scheduledFrame: scheduledFrame,
+      currentState: currentState,
+      renderIntentDiagnostics: renderIntentDiagnostics
+    )
+    if let skippedFrame = recordSkippedCancellableFrame(
+      renderOutcome,
+      scheduledFrame: scheduledFrame,
+      renderIntentDiagnostics: renderIntentDiagnostics,
+      renderedFrames: renderedFrames,
+      convergence: convergence
+    ) {
+      return skippedFrame
     }
-
-    func awaitQueuedTailCancellationSignalForMode() async {
-      guard renderMode != .asyncNoCancel else {
-        return
-      }
-      guard !scheduler.hasPendingFrame(at: .now()) else {
-        return
-      }
-      guard let pendingFrameAwaiter = scheduler as? any PendingFrameAwaiting else {
-        return
-      }
-      await pendingFrameAwaiter.waitForPendingFrame(at: .now())
+    guard let outcomeArtifacts = renderOutcome.artifacts else {
+      preconditionFailure("Completed render outcome did not include frame artifacts.")
     }
+    return .rendered(
+      outcomeArtifacts,
+      renderOutcome.tailJobState,
+      renderOutcome.completedFrameDropDecision
+    )
+  }
 
-    let renderOutcome = await renderer.renderAsyncCancellable(
+  private func acquireCancellableFrameArtifacts(
+    scheduledFrame: ScheduledFrame,
+    currentState: State,
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics
+  ) async -> CancellableRenderOutcome {
+    await renderer.renderAsyncCancellable(
       viewBuilder(
         (
           state: currentState,
@@ -1053,7 +1079,38 @@ extension RunLoop {
       awaitQueuedCancellationSignal: awaitQueuedTailCancellationSignalForMode,
       shouldCancelQueued: shouldCancelQueuedTailForMode
     )
-    if renderOutcome.tailJobState == .cancelledBeforeStart {
+  }
+
+  @MainActor
+  private func shouldCancelQueuedTailForMode() async -> Bool {
+    guard renderMode != .asyncNoCancel else {
+      return false
+    }
+    return scheduler.hasPendingFrame(at: .now())
+  }
+
+  private func awaitQueuedTailCancellationSignalForMode() async {
+    guard renderMode != .asyncNoCancel else {
+      return
+    }
+    guard !scheduler.hasPendingFrame(at: .now()) else {
+      return
+    }
+    guard let pendingFrameAwaiter = scheduler as? any PendingFrameAwaiting else {
+      return
+    }
+    await pendingFrameAwaiter.waitForPendingFrame(at: .now())
+  }
+
+  private func recordSkippedCancellableFrame(
+    _ renderOutcome: CancellableRenderOutcome,
+    scheduledFrame: ScheduledFrame,
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
+    renderedFrames: Int,
+    convergence: FocusSyncConvergenceState
+  ) -> FrameAcquisitionOutcome? {
+    switch renderOutcome.tailJobState {
+    case .cancelledBeforeStart:
       reportRuntimeIssues(renderOutcome.runtimeIssues)
       appendLifecycleCarryForward(
         convergence.lifecycleCarryForward,
@@ -1083,8 +1140,7 @@ extension RunLoop {
         tailJobState: renderOutcome.tailJobState
       )
       return .skipped
-    }
-    if renderOutcome.tailJobState == .droppedCompleted {
+    case .droppedCompleted:
       reportRuntimeIssues(renderOutcome.runtimeIssues)
       appendLifecycleCarryForward(
         convergence.lifecycleCarryForward,
@@ -1113,15 +1169,9 @@ extension RunLoop {
         tailJobState: renderOutcome.tailJobState
       )
       return .skipped
+    case .queued, .started, .completed:
+      return nil
     }
-    guard let outcomeArtifacts = renderOutcome.artifacts else {
-      preconditionFailure("Completed render outcome did not include frame artifacts.")
-    }
-    return .rendered(
-      outcomeArtifacts,
-      renderOutcome.tailJobState,
-      renderOutcome.completedFrameDropDecision
-    )
   }
 
   @MainActor
