@@ -245,12 +245,10 @@ public enum TerminalHostError: Error {
     private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
 
-    private var savedAttributes: termios?
-    private var savedInputFileStatusFlags: Int32?
-    private var processExitCleanupToken: UInt64?
-    private var rawModeEnabled = false
-    var activeMouseCoordinateMode = MouseCoordinateMode.cells
-    private var activePointerHoverEnabled = false
+    private var rawModeSession = TerminalRawModeSession()
+    var activeMouseCoordinateMode: MouseCoordinateMode {
+      rawModeSession.mouseCoordinateMode
+    }
     var capabilityProbe = TerminalHostCapabilityProbeState()
     private var presentationSession = TerminalPresentationSession()
 
@@ -350,7 +348,7 @@ public enum TerminalHostError: Error {
     }
 
     public func enableRawMode() throws {
-      guard !rawModeEnabled else {
+      guard !rawModeSession.isEnabled else {
         return
       }
       guard controller.isATTY(inputFileDescriptor) else {
@@ -369,41 +367,29 @@ public enum TerminalHostError: Error {
         currentFileStatusFlags | Int32(O_NONBLOCK),
         on: inputFileDescriptor
       )
-      savedAttributes = currentAttributes
-      savedInputFileStatusFlags = currentFileStatusFlags
-      activeMouseCoordinateMode = resolvedMouseCoordinateMode()
-      #if !canImport(WASILibc)
-        processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
-          .init(
-            inputFileDescriptor: inputFileDescriptor,
-            outputFileDescriptor: outputFileDescriptor,
-            inputFileStatusFlags: currentFileStatusFlags,
-            savedAttributes: currentAttributes,
-            resetBytes: processExitResetBytes()
-          )
-        )
-      #endif
-      rawModeEnabled = true
+      rawModeSession.activate(
+        savedAttributes: currentAttributes,
+        inputFileStatusFlags: currentFileStatusFlags,
+        mouseCoordinateMode: resolvedMouseCoordinateMode(),
+        inputFileDescriptor: inputFileDescriptor,
+        outputFileDescriptor: outputFileDescriptor
+      )
       presentationSession.reset()
 
       var shouldRestoreOnFailure = true
       defer {
         if shouldRestoreOnFailure {
-          #if !canImport(WASILibc)
-            TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
-            processExitCleanupToken = nil
-          #endif
-          let savedInputFileStatusFlags = self.savedInputFileStatusFlags
-          savedAttributes = nil
-          self.savedInputFileStatusFlags = nil
-          rawModeEnabled = false
-          activeMouseCoordinateMode = .cells
-          activePointerHoverEnabled = false
+          let restorePlan = rawModeSession.deactivate()
           presentationSession.reset()
-          if let savedInputFileStatusFlags {
-            try? controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
+          if let savedInputFileStatusFlags = restorePlan.savedInputFileStatusFlags {
+            try? controller.setFileStatusFlags(
+              savedInputFileStatusFlags,
+              on: inputFileDescriptor
+            )
           }
-          try? controller.setAttributes(currentAttributes, on: inputFileDescriptor)
+          if let savedAttributes = restorePlan.savedAttributes {
+            try? controller.setAttributes(savedAttributes, on: inputFileDescriptor)
+          }
         }
       }
 
@@ -412,11 +398,11 @@ public enum TerminalHostError: Error {
       try write(TerminalHostEscapeSequences.clearScreen)
       try write(TerminalHostEscapeSequences.cursor(to: .zero))
       try write(TerminalHostEscapeSequences.hideCursor)
-      if activeMouseCoordinateMode.reportsMouseInput {
+      if rawModeSession.mouseCoordinateMode.reportsMouseInput {
         try write(
           TerminalHostEscapeSequences.enableMouseReporting(
-            mouseCoordinateMode: activeMouseCoordinateMode,
-            hoverEnabled: activePointerHoverEnabled
+            mouseCoordinateMode: rawModeSession.mouseCoordinateMode,
+            hoverEnabled: rawModeSession.pointerHoverEnabled
           )
         )
       }
@@ -425,28 +411,16 @@ public enum TerminalHostError: Error {
     }
 
     public func disableRawMode() throws {
-      guard rawModeEnabled else {
+      guard rawModeSession.isEnabled else {
         return
       }
 
       let presentationWriter = presentationSession.writer
-      let savedAttributes = self.savedAttributes
-      let savedInputFileStatusFlags = self.savedInputFileStatusFlags
-      let mouseCoordinateModeToDisable = activeMouseCoordinateMode
-      let pointerHoverToDisable = activePointerHoverEnabled
-      #if !canImport(WASILibc)
-        TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
-        processExitCleanupToken = nil
-      #endif
-      self.savedAttributes = nil
-      self.savedInputFileStatusFlags = nil
-      rawModeEnabled = false
-      activeMouseCoordinateMode = .cells
-      activePointerHoverEnabled = false
+      let restorePlan = rawModeSession.deactivate()
       presentationSession.reset()
 
-      var attributesToRestore = savedAttributes
-      var fileStatusFlagsToRestore = savedInputFileStatusFlags
+      var attributesToRestore = restorePlan.savedAttributes
+      var fileStatusFlagsToRestore = restorePlan.savedInputFileStatusFlags
       defer {
         if let fileStatusFlagsToRestore {
           try? controller.setFileStatusFlags(fileStatusFlagsToRestore, on: inputFileDescriptor)
@@ -461,11 +435,11 @@ public enum TerminalHostError: Error {
 
       try writeSynchronously(TerminalHostEscapeSequences.clearScreen)
       try writeSynchronously(TerminalHostEscapeSequences.cursor(to: .zero))
-      if mouseCoordinateModeToDisable.reportsMouseInput {
+      if restorePlan.mouseCoordinateMode.reportsMouseInput {
         try writeSynchronously(
           TerminalHostEscapeSequences.disableMouseReporting(
-            mouseCoordinateMode: mouseCoordinateModeToDisable,
-            hoverEnabled: pointerHoverToDisable
+            mouseCoordinateMode: restorePlan.mouseCoordinateMode,
+            hoverEnabled: restorePlan.pointerHoverEnabled
           )
         )
       }
@@ -474,11 +448,11 @@ public enum TerminalHostError: Error {
       try writeSynchronously(TerminalHostEscapeSequences.showCursor)
       try writeSynchronously(TerminalHostEscapeSequences.exitAlternateScreen)
 
-      if let savedInputFileStatusFlags {
+      if let savedInputFileStatusFlags = restorePlan.savedInputFileStatusFlags {
         try controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
         fileStatusFlagsToRestore = nil
       }
-      if let savedAttributes {
+      if let savedAttributes = restorePlan.savedAttributes {
         try controller.setAttributes(savedAttributes, on: inputFileDescriptor)
         attributesToRestore = nil
       }
@@ -519,34 +493,34 @@ public enum TerminalHostError: Error {
 
     public func setPointerHoverEnabled(_ enabled: Bool) throws {
       let reportsMouseInput =
-        rawModeEnabled
-        ? activeMouseCoordinateMode.reportsMouseInput
+        rawModeSession.isEnabled
+        ? rawModeSession.mouseCoordinateMode.reportsMouseInput
         : initialConfigurationAllowsMouseReporting
       guard reportsMouseInput else {
-        activePointerHoverEnabled = false
+        rawModeSession.pointerHoverEnabled = false
         return
       }
-      guard activePointerHoverEnabled != enabled else {
+      guard rawModeSession.pointerHoverEnabled != enabled else {
         return
       }
 
-      if rawModeEnabled {
+      if rawModeSession.isEnabled {
         let sequence =
           if enabled {
             TerminalHostEscapeSequences.enableMouseReporting(
-              mouseCoordinateMode: activeMouseCoordinateMode,
+              mouseCoordinateMode: rawModeSession.mouseCoordinateMode,
               hoverEnabled: true
             )
           } else {
             TerminalHostEscapeSequences.disableAllMouseMotion
               + TerminalHostEscapeSequences.enableMouseReporting(
-                mouseCoordinateMode: activeMouseCoordinateMode,
+                mouseCoordinateMode: rawModeSession.mouseCoordinateMode,
                 hoverEnabled: false
               )
           }
         try write(sequence)
       }
-      activePointerHoverEnabled = enabled
+      rawModeSession.pointerHoverEnabled = enabled
       refreshProcessExitCleanupRegistration()
     }
 
@@ -880,35 +854,11 @@ public enum TerminalHostError: Error {
       return nil
     }
 
-    private func processExitResetBytes() -> [UInt8] {
-      Array(
-        TerminalHostEscapeSequences.processExitReset(
-          mouseCoordinateMode: activeMouseCoordinateMode,
-          hoverEnabled: activePointerHoverEnabled
-        ).utf8
-      )
-    }
-
     private func refreshProcessExitCleanupRegistration() {
-      guard rawModeEnabled,
-        let savedAttributes,
-        let savedInputFileStatusFlags
-      else {
-        return
-      }
-
-      #if !canImport(WASILibc)
-        TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
-        processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
-          .init(
-            inputFileDescriptor: inputFileDescriptor,
-            outputFileDescriptor: outputFileDescriptor,
-            inputFileStatusFlags: savedInputFileStatusFlags,
-            savedAttributes: savedAttributes,
-            resetBytes: processExitResetBytes()
-          )
-        )
-      #endif
+      rawModeSession.refreshProcessExitCleanupRegistration(
+        inputFileDescriptor: inputFileDescriptor,
+        outputFileDescriptor: outputFileDescriptor
+      )
     }
 
   }

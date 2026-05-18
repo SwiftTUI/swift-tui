@@ -87,6 +87,10 @@ Approved constraints:
   `CommittedFrameArtifactBuilder.swift`, shared one-shot and async committed
   artifact assembly, and extracted `DefaultRenderer` commit effects and
   committed-frame publication helpers.
+- Packet 24 completed: extracted terminal raw-mode saved state, pointer
+  reporting state, and process-exit cleanup registration into
+  `TerminalRawModeSession.swift`, leaving terminal byte ordering and POSIX
+  mutation in `TerminalHost.swift`.
 
 ## Baseline Validation
 
@@ -505,28 +509,51 @@ Packet 23 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-054930-58630.log`
   - Result: PASS
 
+Packet 24 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS, 11 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalCapabilityProfileApplyingTests`
+  - Result: PASS, 8 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS, 28 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+  - Result: PASS, 73 tests
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS, 40 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-055729-85446.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 24: terminal-host raw-mode session boundary. Read-only runtime review
-ranked this after renderer commit consolidation because `TerminalHost` still
-owns raw-mode enable/disable sequencing, cleanup registration, terminal
-control-mode transitions, and lifecycle state around process-exit cleanup.
-The next packet should isolate that session boundary without changing emitted
-escape sequences, host lifecycle, or process-exit cleanup behavior.
+Packet 25: input reader stream/parser split. Packet 18 extracted pure input
+support types, but `InputReader` still carries stream-drain loops, parser
+feeding, coalescing, capability control-message handling, and terminal-read
+error boundaries in one production file. The next packet should isolate the
+stream-drain/parsing boundary without changing public input-event APIs,
+coalescing semantics, or terminal capability propagation.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
-- possibly a new same-folder terminal raw-mode/session helper
+- `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+- possibly a new same-folder input stream/parser helper
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
-- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
-- `swiftly run swift test --filter SwiftTUITests.TerminalCapabilityProfileApplyingTests`
-- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
 - `bun run test`
 
 ## Failed Attempts

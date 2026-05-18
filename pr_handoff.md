@@ -133,6 +133,11 @@ Packet 23 should be reviewed as renderer commit path consolidation:
 - `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
 - `Sources/SwiftTUIRuntime/Rendering/CommittedFrameArtifactBuilder.swift`
 
+Packet 24 should be reviewed as terminal raw-mode session extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalRawModeSession.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -563,6 +568,25 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-054930-58630.log
 ```
 
+Packet 24 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalCapabilityProfileApplyingTests
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-055729-85446.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -599,6 +623,7 @@ Packet 20 is frame-head draft transaction extraction.
 Packet 21 is run-loop focus-sync convergence extraction.
 Packet 22 is run-loop frame acquisition extraction.
 Packet 23 is renderer commit path consolidation.
+Packet 24 is terminal raw-mode session extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -618,7 +643,9 @@ focus-sync lifecycle carry-forward, queued-tail cancellation, dropped-completed
 frame diagnostics, cancelled-intent replay, async-no-cancel, async-no-drop,
 committed-frame artifact diagnostics, one-shot worker timing, prepared-state
 materialization, committed scroll geometry, retained baseline placement, or
-presentation dismiss-stack regression appears.
+presentation dismiss-stack, raw-mode saved state, process-exit cleanup
+registration, terminal control-mode transition, enable-failure rollback, or
+pointer-hover cleanup reset regression appears.
 
 ## AI Assistance Disclosure
 
