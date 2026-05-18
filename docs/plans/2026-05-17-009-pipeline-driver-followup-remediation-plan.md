@@ -1690,10 +1690,10 @@ a derivation (focus-sync). Confirm by inspection.
 
 ## Task 8.4: Phase 8 Gate
 
-- [ ] **Step 1:** `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F6 ledger row complete; DoD passes.
-- [ ] **Step 4:** `git commit --allow-empty -m "chore: phase 8 gate green (F6)"`
+- [x] **Step 1:** `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F6 ledger row complete; DoD passes.
+- [x] **Step 4:** `git commit --allow-empty -m "chore: phase 8 gate green (F6)"`
 
 ---
 
