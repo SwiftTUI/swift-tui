@@ -363,8 +363,17 @@ package final class FrameHeadTransaction {
       return
     }
     graphDraft.materializePreparedState(in: viewGraph)
+    observationDraft?.resumeRecording()
     frameState.restoreCheckpoint(checkpoints.preparedFrameState)
     frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
+  }
+
+  package func recordPreparedGraphState() {
+    precondition(!didCommit && !didDiscard)
+    guard checkpoints != nil else {
+      return
+    }
+    graphDraft.recordPreparedCheckpoint(from: viewGraph)
   }
 
   package func suspendPreparedState() {
@@ -605,6 +614,12 @@ final class FrameTailRenderer: Sendable {
     !containsMainActorOnlyCustomLayout(input.resolved)
       && containsMainActorOnlyIndexedChildSource(input.resolved)
       && !containsLayoutDependentContent(input.resolved)
+  }
+
+  func needsPreparedGraphDuringLayout(
+    _ input: FrameTailInput
+  ) -> Bool {
+    containsLayoutDependentContent(input.resolved)
   }
 
   func renderRaster(
