@@ -56,6 +56,52 @@ package final class FrameResolveInputBox {
   }
 }
 
+extension FrameResolveInputBox {
+  package struct Checkpoint {
+    package var inputs: FrameResolveInputs?
+  }
+
+  package struct DebugStateSnapshot: Equatable {
+    package struct InputSnapshot: Equatable {
+      package var invalidatedIdentities: Set<Identity>
+      package var invalidationSummary: InvalidationSummary
+      package var environment: EnvironmentSnapshot
+      package var focusedValues: FocusedValues
+      package var transaction: TransactionSnapshot
+      package var proposal: ProposedSize
+      package var usesSelectiveEvaluation: Bool
+      package var environmentRequiresRootEvaluation: Bool
+    }
+
+    package var inputs: InputSnapshot?
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(inputs: inputs)
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    inputs = checkpoint.inputs
+  }
+
+  package func debugStateSnapshot() -> DebugStateSnapshot {
+    DebugStateSnapshot(
+      inputs: inputs.map {
+        DebugStateSnapshot.InputSnapshot(
+          invalidatedIdentities: $0.invalidatedIdentities,
+          invalidationSummary: $0.invalidationSummary,
+          environment: $0.environment,
+          focusedValues: $0.focusedValues,
+          transaction: $0.transaction,
+          proposal: $0.proposal,
+          usesSelectiveEvaluation: $0.usesSelectiveEvaluation,
+          environmentRequiresRootEvaluation: $0.environmentRequiresRootEvaluation
+        )
+      }
+    )
+  }
+}
+
 /// Previous-frame selector memory used to prepare ``FrameResolveInputs``.
 @MainActor
 package final class FrameResolveState {
@@ -132,5 +178,22 @@ extension FrameResolveState {
     previousFocusedIdentity = checkpoint.previousFocusedIdentity
     previousPressedIdentity = checkpoint.previousPressedIdentity
     previousProposal = checkpoint.previousProposal
+  }
+
+  package struct DebugStateSnapshot: Equatable {
+    package var forceRootEvaluation: Bool
+    package var previousFocusedIdentity: Identity?
+    package var previousPressedIdentity: Identity?
+    package var previousProposal: ProposedSize?
+  }
+
+  package func debugStateSnapshot() -> DebugStateSnapshot {
+    let checkpoint = makeCheckpoint()
+    return DebugStateSnapshot(
+      forceRootEvaluation: checkpoint.forceRootEvaluation,
+      previousFocusedIdentity: checkpoint.previousFocusedIdentity,
+      previousPressedIdentity: checkpoint.previousPressedIdentity,
+      previousProposal: checkpoint.previousProposal
+    )
   }
 }

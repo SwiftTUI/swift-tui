@@ -268,6 +268,60 @@ package final class AnimationController: Sendable {
     previousMatchedGeometryBounds.count
   }
 
+  package struct DebugStateSnapshot: Equatable {
+    package var previousSnapshotIdentities: Set<Identity>
+    package var previousTreeRoot: ResolvedNode?
+    package var previousPlacedRoot: PlacedNode?
+    package var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect]
+    package var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity]
+    package var previousParentByIdentity: [Identity: Identity]
+    package var previousChildIndexByIdentity: [Identity: Int]
+    package var activeAnimationKeys: Set<AnimationKey>
+    package var registeredAnimationCount: Int
+    package var completionClosureBatchIDs: Set<AnimationBatchID>
+    package var batchRefCounts: [AnimationBatchID: Int]
+    package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
+    package var transitionIdentities: Set<Identity>
+    package var previousTransitionIdentities: Set<Identity>
+    package var pendingTransitionIdentities: Set<Identity>
+    package var removingIdentities: Set<Identity>
+    package var previousIdentities: Set<Identity>
+    package var lastTickHasPendingWork: Bool
+    package var lastTickNextDeadline: MonotonicInstant?
+    package var lastTickRedrawIdentities: Set<Identity>
+    package var isFrameHeadTransactionActive: Bool
+    package var deferredFrameHeadCompletionCount: Int
+    package var lastFrameHeadCompletionCount: Int
+  }
+
+  package func debugStateSnapshot() -> DebugStateSnapshot {
+    DebugStateSnapshot(
+      previousSnapshotIdentities: Set(previousSnapshots.keys),
+      previousTreeRoot: previousTreeRoot,
+      previousPlacedRoot: previousPlacedRoot,
+      previousMatchedGeometryBounds: previousMatchedGeometryBounds,
+      previousMatchedKeyIdentities: previousMatchedKeyIdentities,
+      previousParentByIdentity: previousParentByIdentity,
+      previousChildIndexByIdentity: previousChildIndexByIdentity,
+      activeAnimationKeys: Set(activeAnimations.keys),
+      registeredAnimationCount: registeredAnimations.count,
+      completionClosureBatchIDs: Set(completionClosures.keys),
+      batchRefCounts: batchRefCounts,
+      pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
+      transitionIdentities: Set(transitionsByIdentity.keys),
+      previousTransitionIdentities: Set(previousTransitionsByIdentity.keys),
+      pendingTransitionIdentities: Set(pendingTransitionsByIdentity.keys),
+      removingIdentities: Set(removingIdentities.keys),
+      previousIdentities: previousIdentities,
+      lastTickHasPendingWork: lastTickResult.hasPendingWork,
+      lastTickNextDeadline: lastTickResult.nextDeadline,
+      lastTickRedrawIdentities: lastTickResult.redrawIdentities,
+      isFrameHeadTransactionActive: isFrameHeadTransactionActive,
+      deferredFrameHeadCompletionCount: deferredFrameHeadCompletions.count,
+      lastFrameHeadCompletionCount: lastFrameHeadCompletionCount
+    )
+  }
+
   /// Runs the placed-level animation pass after layout: injects any
   /// pending removal overlays and translates any active insertion
   /// offsets.  Called between place and semantics in the render

@@ -1402,7 +1402,7 @@ is auditable and total, and make `ARCHITECTURE.md` tell the truth about it.
 
 ## Task 7.1: Prove the abort path is total today
 
-- [ ] **Step 1: Write the abort-totality test**
+- [x] **Step 1: Write the abort-totality test**
 
 ```swift
 import Testing
@@ -1427,7 +1427,7 @@ struct ResolvePurityTests {
 }
 ```
 
-- [ ] **Step 2: Add `debugRuntimeSubsystemSnapshot`**
+- [x] **Step 2: Add `debugRuntimeSubsystemSnapshot`**
 
 Add a package/test-only `debugRuntimeSubsystemSnapshot()` to `DefaultRenderer`
 returning an `Equatable` value composed from the observable state of all six
@@ -1435,13 +1435,13 @@ subsystems (`viewGraph`, `frameState`, `frameInputs`, `presentationPortalState`,
 `observationBridge`, `animationController`). Reuse `ViewGraph.debugTotalStateSnapshot`
 from Task 4.1.
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 Run: `swift test --filter ResolvePurityTests.abortLeavesNoResidue`
 Expected: PASS if abort is already total; FAIL if a subsystem leaks. A failure
 is finding F3 made concrete — note which subsystem leaked.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/SwiftTUI.swift Tests/SwiftTUITests/ResolvePurityTests.swift
