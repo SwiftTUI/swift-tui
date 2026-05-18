@@ -388,159 +388,6 @@ public enum TerminalHostError: Error {
     }
   }
 
-  private struct PresentationFrame: Sendable {
-    var output: String
-  }
-
-  private final class PresentationWriter: Sendable {
-    private struct State: Sendable {
-      var pending: PresentationFrame?
-      var isWriting = false
-      var didDropFrame = false
-      var pendingError: TerminalHostError?
-    }
-
-    private let controller: any TerminalControlling
-    private let outputFileDescriptor: Int32
-    private let queue = DispatchQueue(label: "swift-tui.presentation-writer")
-    private let state = Mutex(State())
-
-    init(
-      controller: any TerminalControlling,
-      outputFileDescriptor: Int32
-    ) {
-      self.controller = controller
-      self.outputFileDescriptor = outputFileDescriptor
-    }
-
-    func submit(
-      _ frame: PresentationFrame
-    ) {
-      let shouldStart = state.withLock { state in
-        guard state.pendingError == nil else {
-          return false
-        }
-        if state.pending != nil {
-          state.didDropFrame = true
-        }
-        state.pending = frame
-
-        guard !state.isWriting else {
-          return false
-        }
-
-        state.isWriting = true
-        return true
-      }
-
-      guard shouldStart else {
-        return
-      }
-
-      queue.async { [self] in
-        writePendingFrames()
-      }
-    }
-
-    func submitSupplementalOutput(_ output: String) {
-      guard !output.isEmpty else {
-        return
-      }
-
-      let shouldStart = state.withLock { state in
-        guard state.pendingError == nil else {
-          return false
-        }
-        if state.pending != nil {
-          state.pending?.output.append(output)
-        } else {
-          state.pending = .init(output: output)
-        }
-
-        guard !state.isWriting else {
-          return false
-        }
-
-        state.isWriting = true
-        return true
-      }
-
-      guard shouldStart else {
-        return
-      }
-
-      queue.async { [self] in
-        writePendingFrames()
-      }
-    }
-
-    func consumeDropFlag() -> Bool {
-      state.withLock { state in
-        let didDropFrame = state.didDropFrame
-        state.didDropFrame = false
-        return didDropFrame
-      }
-    }
-
-    func hasPendingFrame() -> Bool {
-      state.withLock { state in
-        state.pending != nil
-      }
-    }
-
-    func consumePendingError() throws {
-      let pendingError = state.withLock { state in
-        let pendingError = state.pendingError
-        state.pendingError = nil
-        return pendingError
-      }
-
-      if let pendingError {
-        throw pendingError
-      }
-    }
-
-    func drain() {
-      queue.sync {}
-    }
-
-    private func writePendingFrames() {
-      while true {
-        let frame: PresentationFrame? = state.withLock { state in
-          guard let frame = state.pending else {
-            state.isWriting = false
-            return nil
-          }
-
-          state.pending = nil
-          return frame
-        }
-
-        guard let frame else {
-          return
-        }
-
-        do {
-          try controller.write(frame.output, to: outputFileDescriptor)
-        } catch let error as TerminalHostError {
-          state.withLock { state in
-            state.pending = nil
-            state.isWriting = false
-            state.pendingError = error
-          }
-          return
-        } catch {
-          state.withLock { state in
-            state.pending = nil
-            state.isWriting = false
-            state.pendingError = .failedToWrite(errno: EIO)
-          }
-          return
-        }
-      }
-    }
-  }
-
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: PresentationSurface, DamageAwarePresentationSurface,
     ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface,
@@ -553,41 +400,6 @@ public enum TerminalHostError: Error {
       var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
       var hasProbedSGRPixelsMode = false
       var cachedSGRPixelsModeSupport: Bool?
-    }
-
-    private struct PresentationSession {
-      var lastSubmittedSurface: RasterSurface?
-      var transmittedKittyImages: Set<UInt32> = []
-      var forceFullRepaint = false
-      var writer: PresentationWriter?
-
-      mutating func reset() {
-        lastSubmittedSurface = nil
-        transmittedKittyImages.removeAll()
-        forceFullRepaint = false
-        writer = nil
-      }
-
-      mutating func invalidateRetainedState() {
-        lastSubmittedSurface = nil
-        transmittedKittyImages.removeAll()
-        forceFullRepaint = false
-      }
-
-      mutating func markDroppedFrame() {
-        forceFullRepaint = true
-        transmittedKittyImages.removeAll()
-      }
-
-      var previousSurface: RasterSurface? {
-        forceFullRepaint ? nil : lastSubmittedSurface
-      }
-
-      func presentationDamage(
-        requested damage: PresentationDamage?
-      ) -> PresentationDamage? {
-        forceFullRepaint ? nil : damage
-      }
     }
 
     public var surfaceSize: CellSize {
@@ -625,7 +437,7 @@ public enum TerminalHostError: Error {
     private var activeMouseCoordinateMode = MouseCoordinateMode.cells
     private var activePointerHoverEnabled = false
     private var capabilityProbe = CapabilityProbeState()
-    private var presentationSession = PresentationSession()
+    private var presentationSession = TerminalPresentationSession()
 
     public convenience init(
       inputFileDescriptor: Int32 = 0,
@@ -1113,12 +925,12 @@ public enum TerminalHostError: Error {
       try presentationWriter.consumePendingError()
     }
 
-    private func presentationWriterIfNeeded() -> PresentationWriter {
+    private func presentationWriterIfNeeded() -> TerminalPresentationWriter {
       if let presentationWriter = presentationSession.writer {
         return presentationWriter
       }
 
-      let presentationWriter = PresentationWriter(
+      let presentationWriter = TerminalPresentationWriter(
         controller: controller,
         outputFileDescriptor: outputFileDescriptor
       )
