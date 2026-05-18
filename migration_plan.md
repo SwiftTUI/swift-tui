@@ -413,6 +413,31 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 20: Frame-Head Draft Transaction
+
+- Objective: make frame-tail rendering easier to scan by moving the frame-head
+  mode, checkpoint, transaction, and draft support types into a same-folder
+  rendering helper.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/FrameHeadDraftTransaction.swift`
+- Dependencies: Packet 19 isolated late-preference reconciliation. Read-only
+  runtime review ranked this as the next low-risk central rendering cleanup
+  because the frame-head transaction model sat ahead of tail input/output and
+  worker execution in `FrameTailRenderer.swift`.
+- Invariants: public renderer APIs stay unchanged; frame-head commit, prepared
+  state materialization, checkpoint recording, suspension, discard preconditions,
+  draft drop blockers, observation draft commit/discard, presentation portal
+  draft commit/discard, animation draft commit/discard, and one-shot abort
+  precondition text remain stable.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

@@ -411,25 +411,44 @@ Packet 19 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-051542-56825.log`
   - Result: PASS
 
+Packet 20 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - Result: PASS, 52 tests
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS, 10 tests
+- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - Result: PASS, 4 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-052405-85109.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 20: frame-head draft/transaction file split. Read-only runtime review
-ranked this as the next lower-risk cleanup after late-preference reconciliation:
-`FrameTailRenderer.swift` still contains frame-head transaction/draft helper
-types before the tail renderer itself. The next packet should move those helper
-types into a same-folder file without changing draft commit/discard behavior.
+Packet 21: run-loop focus-sync convergence split. Read-only runtime review
+ranked this after the frame-head file split because `RunLoop+Rendering.swift`
+still mixes the frame driver with the focus/scroll convergence state and
+per-iteration synchronization body. The next packet should move the focus-sync
+budget/state/outcome and convergence iteration helpers into a same-folder
+run-loop helper without changing scheduler, acquisition, commit, or
+presentation ordering.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
-- likely `Sources/SwiftTUIRuntime/Rendering/FrameHeadDraftTransaction.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- likely `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FocusSync.swift`
 
 Validation:
 
 - `swiftly run swift build`
 - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
 - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
-- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+- `swiftly run swift test --filter SwiftTUITests.AppRuntimeTests`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
+- `swiftly run swift test --filter SwiftTUICoreTests.FocusTrackerTests`
+- `swiftly run swift test --filter SwiftTUICoreTests.LocalScrollPositionRegistryTests`
 - `bun run test`
 
 ## Failed Attempts
