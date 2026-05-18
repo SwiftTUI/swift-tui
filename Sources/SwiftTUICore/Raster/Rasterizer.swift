@@ -1,7 +1,6 @@
 /// Converts draw commands into a terminal cell surface.
 public struct Rasterizer: Sendable {
   internal static let emptyCompositingStyle = ResolvedTextStyle()
-  private let verifyIncrementalRepaint: Bool
 
   package typealias RasterizationResult = (
     surface: RasterSurface,
@@ -50,11 +49,6 @@ public struct Rasterizer: Sendable {
   }
 
   public init() {
-    self.verifyIncrementalRepaint = false
-  }
-
-  package init(verifyIncrementalRepaint: Bool) {
-    self.verifyIncrementalRepaint = verifyIncrementalRepaint
   }
 
   /// Rasterizes a draw tree into a ``RasterSurface``.
@@ -216,11 +210,16 @@ public struct Rasterizer: Sendable {
       cells: cells,
       imageAttachments: imageAttachments
     )
-    verifyIncrementalRepaintIfNeeded(
+    // F13: when damage suppresses painting, verify against a fresh raster before
+    // returning the incremental surface. A mismatch means damage was incomplete,
+    // so the fresh result must force a full presentation repaint.
+    if let freshFallback = freshRasterizationIfIncrementalMismatch(
       draw,
       surfaceSize: surfaceSize,
       incrementalSurface: surface
-    )
+    ) {
+      return freshFallback
+    }
 
     return (
       surface,
@@ -233,25 +232,19 @@ public struct Rasterizer: Sendable {
     )
   }
 
-  private func verifyIncrementalRepaintIfNeeded(
+  private func freshRasterizationIfIncrementalMismatch(
     _ draw: DrawNode,
     surfaceSize: CellSize,
     incrementalSurface: RasterSurface
-  ) {
-    guard verifyIncrementalRepaint else {
-      return
-    }
-
-    let freshSurface = rasterizeFreshCollectingVisibleIdentities(
+  ) -> RasterizationResult? {
+    let fresh = rasterizeFreshCollectingVisibleIdentities(
       draw,
       surfaceSize: surfaceSize
-    ).surface
-    guard freshSurface != incrementalSurface else {
-      return
+    )
+    guard fresh.surface != incrementalSurface else {
+      return nil
     }
 
-    assertionFailure(
-      "Incremental raster damage produced a different surface than fresh rasterization."
-    )
+    return fresh
   }
 }
