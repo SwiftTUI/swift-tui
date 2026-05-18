@@ -1314,8 +1314,7 @@ public struct DefaultRenderer {
       let cancellationToken = FrameTailJobCancellationToken()
       let layoutTask = Task { @MainActor in
         await renderLayoutResolvingLatePreferencesAsync(
-          draft.frameTailInput,
-          clock: draft.clock,
+          draft,
           cancellationToken: cancellationToken
         )
       }
@@ -1388,8 +1387,7 @@ public struct DefaultRenderer {
     }
 
     let layoutResult = await renderLayoutResolvingLatePreferencesAsync(
-      draft.frameTailInput,
-      clock: draft.clock,
+      draft,
       cancellationToken: nil
     )
     guard let reconciledLayout = layoutResult.layout else {
@@ -1446,6 +1444,34 @@ public struct DefaultRenderer {
     )
     completionToken?.markCompleted()
     return output
+  }
+
+  @MainActor
+  private func renderLayoutResolvingLatePreferencesAsync(
+    _ draft: FrameHeadDraft,
+    cancellationToken: FrameTailJobCancellationToken?
+  ) async -> AsyncLatePreferenceReconciliationOutput {
+    guard frameTailRenderer.needsPreparedGraphDuringLayout(draft.frameTailInput) else {
+      return await renderLayoutResolvingLatePreferencesAsync(
+        draft.frameTailInput,
+        clock: draft.clock,
+        cancellationToken: cancellationToken
+      )
+    }
+
+    draft.transaction.materializePreparedState()
+    defer {
+      draft.transaction.suspendPreparedState()
+    }
+    let layoutResult = await renderLayoutResolvingLatePreferencesAsync(
+      draft.frameTailInput,
+      clock: draft.clock,
+      cancellationToken: cancellationToken
+    )
+    if layoutResult.layout != nil {
+      draft.transaction.recordPreparedGraphState()
+    }
+    return layoutResult
   }
 
   @MainActor

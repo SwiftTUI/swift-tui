@@ -550,6 +550,31 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
   }
 
+  @Test("layout-dependent async commits publish realized action registrations")
+  func layoutDependentAsyncCommitsPublishRealizedActionRegistrations() async throws {
+    let actionRegistry = LocalActionRegistry()
+    var didTap = false
+
+    let artifacts = await DefaultRenderer().renderAsync(
+      GeometryReader { _ in
+        Button("Hit") {
+          didTap = true
+        }
+      },
+      context: .init(
+        identity: testIdentity("AsyncGeometryActionRoot"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: false
+      ),
+      proposal: .init(width: 24, height: 5)
+    )
+
+    let actionIdentity = try #require(artifacts.semanticSnapshot.focusRegions.first?.identity)
+    #expect(actionRegistry.hasHandler(identity: actionIdentity))
+    #expect(actionRegistry.dispatch(identity: actionIdentity))
+    #expect(didTap)
+  }
+
   @Test("late toolbar diagnostics are preserved on the async renderer")
   func lateToolbarDiagnosticsArePreservedOnAsyncRenderer() async throws {
     let artifacts = await DefaultRenderer().renderAsync(

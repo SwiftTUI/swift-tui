@@ -98,6 +98,13 @@ package final class ObservationBridge: Equatable {
     }
   }
 
+  fileprivate func resumeRecording(
+    _ draft: ObservationBridgeDraft
+  ) {
+    precondition(activeDraft == nil || activeDraft === draft)
+    activeDraft = draft
+  }
+
   fileprivate func publish(
     _ draft: ObservationBridgeDraft
   ) {
@@ -146,6 +153,11 @@ package final class ObservationBridgeDraft {
   package func suspendRecording() {
     precondition(!didCommit && !didDiscard)
     bridge.finishRecording(self)
+  }
+
+  package func resumeRecording() {
+    precondition(!didCommit && !didDiscard)
+    bridge.resumeRecording(self)
   }
 
   package func discard() {

@@ -2103,6 +2103,21 @@ git commit -m "docs: record independent re-audit of pipeline driver remediation"
 git commit --allow-empty -m "chore: pipeline driver follow-up remediation complete (F1-F14)"
 ```
 
+Current Task 10.4 status:
+
+- 2026-05-17 clean-gate rerun after deleting every repo `.build` directory:
+  `find . -name .build -type d -prune -exec rm -rf {} + && bun run test`
+  (log: `/tmp/swift-tui-test-gate-20260517-221720-73416.log`). The rerun was
+  necessary after runtime signature-shape changes so stale SwiftPM objects would
+  not be misclassified as implementation failures.
+- The clean gate no longer reports the Phase 10 action-registry blocker,
+  terminal tests, or gallery tests as failures. It still fails `Run SwiftTUI
+  runtime tests` only on
+  `InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows`,
+  the full-lazy viewport lifecycle failure already documented above as
+  stashed-clean-baseline evidence during the F10 re-audit. Because Step 1
+  requires exit 0 and zero failures, Task 10.4 remains open.
+
 ---
 
 ## Self-Review
