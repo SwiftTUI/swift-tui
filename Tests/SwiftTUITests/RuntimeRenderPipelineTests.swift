@@ -18,11 +18,4 @@ struct RuntimeRenderPipelineTests {
         .commit,
       ])
   }
-
-  @Test("runtime frame head remains abortable without declared rollback effects")
-  func runtimeFrameHeadRemainsAbortableWithoutDeclaredRollbackEffects() {
-    let pipeline = RuntimeRenderPipeline()
-
-    #expect(pipeline.headStage.isTransactionalWhenAbortable)
-  }
 }

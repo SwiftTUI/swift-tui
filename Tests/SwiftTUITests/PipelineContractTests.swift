@@ -7,8 +7,8 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PipelineContractTests {
-  @Test("runtime frame head contract has no declared rollback effects")
-  func runtimeFrameHeadContractHasNoDeclaredRollbackEffects() {
+  @Test("runtime render pipeline runs the canonical composed stage order")
+  func runtimeRenderPipelineRunsCanonicalStageOrder() {
     let pipeline = RuntimeRenderPipeline()
 
     #expect(
@@ -19,7 +19,6 @@ struct PipelineContractTests {
         .fusedFrameTail,
         .commit,
       ])
-    #expect(pipeline.headStage.isTransactionalWhenAbortable)
   }
 
   @Test("sync and async artifacts stay equivalent with committed registrations")

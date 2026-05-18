@@ -77,7 +77,19 @@ per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 SwiftTUI now has two related pipeline contracts: the runtime driver that
 schedules work, and the phase-product model that owns typed frame artifacts.
 
-`DefaultRenderer` executes one composed runtime pipeline:
+`DefaultRenderer` executes one composed runtime pipeline. `RuntimeRenderPipeline`
+is a *sequenced executor*: each `render*` entry point iterates the canonical
+`RuntimeRenderStageName` composition and dispatches every stage through an
+exhaustive `switch`, invoking the caller-supplied handler stored in a small
+per-strategy `...StageHandlers` struct. Stage order is enforced by that
+executor loop — not by prose or a `precondition` — so the ordering cannot drift
+without forcing every `switch` to be updated. The executor is not simpler or
+shorter than the code it replaced: the three strategy-specific handler structs
+(`OneShotRenderStageHandlers`, `AsyncRenderStageHandlers`,
+`CancellableRenderStageHandlers`) are a reshaping of the former closure
+parameters, retained because sync, async, and cancellable strategies differ in
+closure type and cannot share one handler. The extra code buys the compile-time
+guarantee that a mis-ordered or partial stage sequence is unrepresentable.
 
 ```text
 head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
@@ -104,10 +116,10 @@ Within that composition, the typed phase products still flow in this order:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-This product ordering is visible in `RuntimeRenderPipeline` stage metadata,
-`FrameArtifacts`, diagnostics, and the regression suites. It is not a claim
-that the production runtime schedules seven independent closure stages for each
-frame.
+This product ordering is visible in the `RuntimeRenderStageName` composition
+the executor walks, `FrameArtifacts`, diagnostics, and the regression suites.
+It is not a claim that the production runtime schedules seven independent
+closure stages for each frame.
 
 ## Coordinate Domains
 
