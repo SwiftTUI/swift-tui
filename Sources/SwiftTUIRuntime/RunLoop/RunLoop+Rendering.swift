@@ -10,15 +10,43 @@ package struct FocusSyncRerenderBudget: Equatable, Sendable {
   package let maximumRerenders: Int
   package private(set) var rerenderCount: Int
 
-  /// Empirical ceiling for focus-sync convergence. One rendered tree can
-  /// cascade through focus-region repair, requested/default focus application,
-  /// focused-value propagation, and scroll-position synchronization; sixteen
-  /// rerenders gives four full cascades before the runtime reports overflow
-  /// and presents the latest available tree.
-  package init(maximumRerenders: Int = 16) {
+  package init(maximumRerenders: Int) {
     precondition(maximumRerenders > 0)
     self.maximumRerenders = maximumRerenders
     rerenderCount = 0
+  }
+
+  /// Derives the convergence budget from the semantic graph that can
+  /// participate in focus/scroll synchronization. Each rerender must be
+  /// justified by a visible sync candidate, plus one final pass to confirm the
+  /// synchronized tree.
+  package static func derived(from semanticSnapshot: SemanticSnapshot) -> Self {
+    let syncCandidateCount =
+      semanticSnapshot.focusRegions.count
+      + semanticSnapshot.scrollRoutes.count
+      + semanticSnapshot.scrollTargets.count
+      + semanticSnapshot.accessibilityNodes.count
+    return Self(maximumRerenders: max(1, syncCandidateCount + 1))
+  }
+
+  package mutating func expandIfNeeded(for semanticSnapshot: SemanticSnapshot) {
+    let derived = Self.derived(from: semanticSnapshot)
+    guard derived.maximumRerenders > maximumRerenders else {
+      return
+    }
+    self = Self(
+      maximumRerenders: derived.maximumRerenders,
+      rerenderCount: rerenderCount
+    )
+  }
+
+  private init(
+    maximumRerenders: Int,
+    rerenderCount: Int
+  ) {
+    precondition(maximumRerenders > 0)
+    self.maximumRerenders = maximumRerenders
+    self.rerenderCount = rerenderCount
   }
 
   /// Returns `true` when another focus-sync rerender is still allowed.
@@ -103,13 +131,26 @@ extension RunLoop {
   /// focus-sync rerender loop and into the shared post-acquisition body.
   private struct FocusSyncConvergenceState {
     var rerenderedForFocusSync = false
-    var budget = FocusSyncRerenderBudget()
+    var budget: FocusSyncRerenderBudget?
     var budgetExceeded = false
     var focusGraphChanged = false
     var focusBindingChanged = false
     var focusedValuesChanged = false
     var scrollPositionChanged = false
     var lifecycleCarryForward: [LifecycleCommitEntry] = []
+
+    var rerenderCount: Int {
+      budget?.rerenderCount ?? 0
+    }
+
+    mutating func recordRerender(for semanticSnapshot: SemanticSnapshot) -> Bool {
+      if budget == nil {
+        budget = .derived(from: semanticSnapshot)
+      } else {
+        budget?.expandIfNeeded(for: semanticSnapshot)
+      }
+      return budget?.recordRerender() ?? false
+    }
   }
 
   /// Result of processing one rendered tree inside the focus-sync loop:
@@ -295,7 +336,7 @@ extension RunLoop {
         into: &convergence.lifecycleCarryForward
       )
       convergence.rerenderedForFocusSync = true
-      if !convergence.budget.recordRerender() {
+      if !convergence.recordRerender(for: renderedArtifacts.semanticSnapshot) {
         convergence.budgetExceeded = true
       }
       return .rerender
@@ -331,7 +372,7 @@ extension RunLoop {
     if convergence.budgetExceeded {
       let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
       assertionFailure(
-        "Focus synchronization did not converge after \(convergence.budget.rerenderCount) rerenders for frame causes \(causes). The runtime will present the latest available tree and continue."
+        "Focus synchronization did not converge after \(convergence.rerenderCount) rerenders for frame causes \(causes). The rerender budget was derived from the frame semantic graph."
       )
     }
 
@@ -451,7 +492,7 @@ extension RunLoop {
         FrameDiagnosticRecord(
           frameNumber: renderedFrames,
           causeSummary: causeSummary,
-          focusSyncRerenders: convergence.budget.rerenderCount,
+          focusSyncRerenders: convergence.rerenderCount,
           invalidatedIdentityCount: diag.input.invalidatedIdentities.count,
           resolvedNodeCount: diag.counts.resolvedNodes,
           resolvedNodesComputed: diag.work.resolvedNodesComputed,

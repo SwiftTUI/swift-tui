@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -42,4 +43,42 @@ struct BoundedReconciliationTests {
     #expect(rendered.contains("Settled"))
     #expect(!rendered.contains("First pass"))
   }
+
+  @Test("Fixpoint loop limits are derived and do not document stale overflow commits")
+  func fixpointLoopLimitsAreDerivedAndDoNotCommitStaleOverflow() throws {
+    let root = try repositoryRoot()
+    let rendererSource = try String(
+      contentsOf: root.appendingPathComponent("Sources/SwiftTUIRuntime/SwiftTUI.swift"),
+      encoding: .utf8
+    )
+    let runLoopSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift"
+      ),
+      encoding: .utf8
+    )
+
+    #expect(!rendererSource.contains("maximumRelayoutPasses: 4"))
+    #expect(!rendererSource.contains("warnAndCommitLastLayout"))
+    #expect(!rendererSource.contains("last fully laid-out tree without applying"))
+    #expect(!runLoopSource.contains("maximumRerenders: Int = 16"))
+    #expect(!runLoopSource.contains("latest available tree and continue"))
+  }
+}
+
+private func repositoryRoot() throws -> URL {
+  var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  while directory.path != "/" {
+    if FileManager.default.fileExists(
+      atPath: directory.appendingPathComponent("Package.swift").path
+    ) {
+      return directory
+    }
+    directory.deleteLastPathComponent()
+  }
+  throw BoundedReconciliationSourceError.missingPackageRoot
+}
+
+private enum BoundedReconciliationSourceError: Error {
+  case missingPackageRoot
 }

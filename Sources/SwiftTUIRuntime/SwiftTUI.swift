@@ -47,23 +47,25 @@ private func withAnimationDraftSinks<Result>(
 
 private struct LatePreferenceReconciliationPolicy: Sendable {
   enum BoundExceededBehavior: Sendable {
-    /// Emit a runtime warning and commit the last fully laid-out tree with the
-    /// latest realized layout-dependent content.
-    case warnAndCommitLastLayout
+    /// Emit a runtime warning and perform one final relayout of the latest
+    /// reconciled tree before committing.
+    case warnAndCommitLatestReconciledLayout
   }
 
-  /// ADR-0018 keeps this at four reconciliation checks for the shipped
-  /// toolbar-only loop: insert toolbar chrome, relayout geometry-dependent
-  /// content, absorb any changed toolbar payload, then confirm stability. The
-  /// runtime warns and commits the last complete layout if that empirical
-  /// ceiling is exceeded.
   static let toolbarHostRuntimeBound = Self(
-    maximumRelayoutPasses: 4,
-    boundExceededBehavior: .warnAndCommitLastLayout
+    boundExceededBehavior: .warnAndCommitLatestReconciledLayout
   )
 
-  var maximumRelayoutPasses: Int
   var boundExceededBehavior: BoundExceededBehavior
+
+  /// ADR-0018 now derives the pass budget from the current resolved tree:
+  /// every relayout must be justified by at least one finite node producing a
+  /// changed late-preference consumer output, plus one pass to confirm
+  /// stability. A non-converging author cycle therefore scales with the current
+  /// tree instead of a historical toolbar constant.
+  func relayoutPassBudget(for input: FrameTailInput) -> Int {
+    max(1, input.resolved.subtreeNodeCount + 1)
+  }
 }
 
 @MainActor
@@ -145,7 +147,8 @@ private struct LatePreferenceReconciliationStage {
     var input = initialInput
     var layout = renderLayout(input)
 
-    for _ in 0..<policy.maximumRelayoutPasses {
+    let budget = policy.relayoutPassBudget(for: initialInput)
+    for _ in 0..<budget {
       switch reconciliationStep(input: input, layout: layout) {
       case .finished(let reconciled):
         return reconciled
@@ -155,7 +158,12 @@ private struct LatePreferenceReconciliationStage {
       }
     }
 
-    return reconciliationLimitExceeded(input: input, layout: layout)
+    return reconciliationLimitExceeded(
+      input: input,
+      layout: layout,
+      budget: budget,
+      renderLayout: renderLayout
+    )
   }
 
   @MainActor
@@ -171,7 +179,8 @@ private struct LatePreferenceReconciliationStage {
       return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
     }
 
-    for _ in 0..<policy.maximumRelayoutPasses {
+    let budget = policy.relayoutPassBudget(for: initialInput)
+    for _ in 0..<budget {
       switch reconciliationStep(input: input, layout: layout) {
       case .finished(let reconciled):
         return .init(
@@ -189,10 +198,14 @@ private struct LatePreferenceReconciliationStage {
       }
     }
 
-    return .init(
-      layout: reconciliationLimitExceeded(input: input, layout: layout),
-      suspensionDuration: totalSuspensionDuration
+    let exceeded = await reconciliationLimitExceededAsync(
+      input: input,
+      layout: layout,
+      budget: budget,
+      renderLayout: renderLayout
     )
+    totalSuspensionDuration += exceeded.suspensionDuration
+    return .init(layout: exceeded.layout, suspensionDuration: totalSuspensionDuration)
   }
 
   @MainActor
@@ -230,7 +243,9 @@ private struct LatePreferenceReconciliationStage {
   @MainActor
   private func reconciliationLimitExceeded(
     input: FrameTailInput,
-    layout: FrameTailLayoutOutput
+    layout: FrameTailLayoutOutput,
+    budget: Int,
+    renderLayout: (FrameTailInput) -> FrameTailLayoutOutput
   ) -> ReconciledFrameTailLayout {
     let realized = input.resolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
@@ -248,21 +263,73 @@ private struct LatePreferenceReconciliationStage {
     }
 
     switch policy.boundExceededBehavior {
-    case .warnAndCommitLastLayout:
-      var finalInput = input
-      finalInput.resolved = realized
+    case .warnAndCommitLatestReconciledLayout:
+      let finalInput = relayoutInput(
+        basedOn: input,
+        resolved: reconciliation.resolved
+      )
+      let finalLayout = renderLayout(finalInput)
       return ReconciledFrameTailLayout(
         input: finalInput,
-        layout: layout,
-        resolved: realized,
-        runtimeIssues: input.layoutPassContext.runtimeIssues + [
+        layout: finalLayout,
+        resolved: finalInput.resolved,
+        runtimeIssues: layoutRuntimeIssues(input: finalInput, resolved: finalInput.resolved) + [
           latePreferenceReconciliationLimitIssue(
             rootIdentity: input.rootIdentity,
-            maximumRelayoutPasses: policy.maximumRelayoutPasses
+            relayoutPassBudget: budget
           )
         ]
       )
     }
+  }
+
+  @MainActor
+  private func reconciliationLimitExceededAsync(
+    input: FrameTailInput,
+    layout: FrameTailLayoutOutput,
+    budget: Int,
+    renderLayout: (FrameTailInput) async -> AsyncFrameTailLayoutPass
+  ) async -> AsyncLatePreferenceReconciliationOutput {
+    let realized = input.resolved.applyingLayoutDependentRealizations(
+      input.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    if !reconciliation.requiresRelayout {
+      var finalInput = input
+      finalInput.resolved = reconciliation.resolved
+      return .init(
+        layout: ReconciledFrameTailLayout(
+          input: finalInput,
+          layout: layout,
+          resolved: reconciliation.resolved,
+          runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
+        ),
+        suspensionDuration: .zero
+      )
+    }
+
+    let finalInput = relayoutInput(
+      basedOn: input,
+      resolved: reconciliation.resolved
+    )
+    let finalLayoutPass = await renderLayout(finalInput)
+    guard let finalLayout = finalLayoutPass.layout else {
+      return .init(layout: nil, suspensionDuration: finalLayoutPass.suspensionDuration)
+    }
+    return .init(
+      layout: ReconciledFrameTailLayout(
+        input: finalInput,
+        layout: finalLayout,
+        resolved: finalInput.resolved,
+        runtimeIssues: layoutRuntimeIssues(input: finalInput, resolved: finalInput.resolved) + [
+          latePreferenceReconciliationLimitIssue(
+            rootIdentity: input.rootIdentity,
+            relayoutPassBudget: budget
+          )
+        ]
+      ),
+      suspensionDuration: finalLayoutPass.suspensionDuration
+    )
   }
 
   private func relayoutInput(
@@ -326,13 +393,13 @@ private func rootRuntimeIssues(
 
 private func latePreferenceReconciliationLimitIssue(
   rootIdentity: Identity,
-  maximumRelayoutPasses: Int
+  relayoutPassBudget: Int
 ) -> RuntimeIssue {
   RuntimeIssue(
     severity: .warning,
     code: "latePreference.reconciliationLimitExceeded",
     message:
-      "Late preference reconciliation did not converge within \(maximumRelayoutPasses) passes; the frame was committed from the last fully laid-out tree without applying the final late preference changes.",
+      "Late preference reconciliation did not converge within the \(relayoutPassBudget)-pass tree-derived budget; the frame was committed after one final relayout of the latest reconciled tree.",
     identity: rootIdentity,
     source: "late preference reconciliation"
   )

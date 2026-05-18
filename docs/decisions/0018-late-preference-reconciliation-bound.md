@@ -26,20 +26,19 @@ layout-dependent `.toolbarItem(...)` values.
 ## Decision
 
 Keep late-preference reconciliation as an explicitly named loop-bearing stage
-with a documented runtime bound of four reconciliation checks.
+with a runtime pass budget derived from the current resolved tree.
 
 When the stage still has not converged after the bound, the runtime keeps the
-existing behavior: emit a `latePreference.reconciliationLimitExceeded` warning
-and commit the last fully laid-out tree with the latest realized
-layout-dependent content.
+frame non-fatal but no longer commits the stale pre-reconciliation output. It
+emits a `latePreference.reconciliationLimitExceeded` warning, applies the
+latest reconciled tree, performs one final relayout, and commits that final
+reconciled layout.
 
-Do not make bound exhaustion a hard runtime failure in this stage. Do not derive
-the bound from a preference graph yet.
+Do not make bound exhaustion a hard runtime failure in this stage.
 
 ## Rationale
 
-The bound is empirical, but it is tied to the deepest toolbar-host feedback loop
-the shipped runtime can construct today:
+The shipped toolbar-host loop still gives the smallest concrete example:
 
 1. Initial layout realizes layout-dependent toolbar items before toolbar chrome
    exists.
@@ -50,24 +49,18 @@ the shipped runtime can construct today:
 4. The next reconciliation absorbs that changed payload, and the final check
    confirms the tree is stable.
 
-That makes four reconciliation checks the current toolbar ceiling: insert
-chrome, relayout content, absorb changed payload, confirm stability. If the
-runtime emits `latePreference.reconciliationLimitExceeded`, the authored tree
-has exceeded that empirical toolbar envelope and this ADR should be revised
-with either a larger measured ceiling or a graph-derived bound.
-
-Keeping the existing value preserves compatibility while making the policy
-visible in code.
+That sequence needs four checks in the current fixture, but the runtime no
+longer bakes that value into the stage. The budget is `resolved.subtreeNodeCount
++ 1`: every relayout must be justified by a finite node in the current resolved
+tree producing changed late-preference consumer output, and the extra pass is
+the stability confirmation. If the runtime emits
+`latePreference.reconciliationLimitExceeded`, the authored tree has exceeded the
+finite per-frame tree budget or formed a late-preference cycle.
 
 A hard failure would turn authored preference depth into a frame-killing runtime
 error. That is too aggressive while the only shipped late consumer is toolbar
 hosting and while the broader arbitrary-preference dependency graph is not
 modeled.
-
-A derived bound is the better long-term shape, but it needs evidence from more
-than one late-preference consumer. Until `overlayPreferenceValue`,
-`backgroundPreferenceValue`, or another structural consumer enters this stage,
-the runtime cannot honestly claim a dependency-depth solver.
 
 ## Consequences
 
@@ -75,8 +68,8 @@ the runtime cannot honestly claim a dependency-depth solver.
   not hide it in the frame tail.
 - The warning remains author-observable through frame diagnostics and runtime
   issue sinks.
-- Deep or cyclic late-preference dependencies can still render with stale final
-  consumer output after the bound. That is an explicit degradation policy, not
-  an accidental silent path.
+- Deep or cyclic late-preference dependencies render from one final relayout of
+  the latest reconciled tree after the bound instead of the older stale
+  pre-reconciliation output.
 - A future expansion beyond toolbar hosting should revisit this ADR and decide
-  whether a graph-derived bound or a stronger diagnostic is justified.
+  whether a stronger dependency-depth solver or hard failure is justified.
