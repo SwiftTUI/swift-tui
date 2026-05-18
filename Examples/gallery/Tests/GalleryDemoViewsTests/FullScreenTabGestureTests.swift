@@ -266,6 +266,60 @@ struct PhysicsTabGestureTests {
     #expect(uniqueSurfaces.first != uniqueSurfaces.last)
   }
 
+  @Test("fullscreen demo resumes physics after drag release")
+  func draggingRectangleReleaseResumesPhysics() async throws {
+    let terminalSize = CellSize(width: 40, height: 12)
+    let rootIdentity = Identity(components: [.named("PhysicsTabReleaseResumesPhysics")])
+    let view = PhysicsTab()
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let initial = DefaultRenderer().render(
+      view,
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let shapeBounds = try #require(firstShapeBounds(in: initial.placedTree))
+    let start = centerPoint(of: shapeBounds)
+    let end = Point(x: start.x + 7, y: start.y + 3)
+
+    let capture = PhysicsReleaseCapture()
+    let host = GestureRecordingHost(size: terminalSize)
+    let result = try await runHarness(
+      host: host,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: { view },
+      terminalInputReader: AwaitedTerminalInputReader(steps: [
+        .event(.mouse(.init(kind: .down(.primary), location: start))),
+        .event(
+          .mouse(.init(kind: .dragged(.primary), location: end)),
+          delayNanoseconds: 30_000_000
+        ),
+        .event(
+          .mouse(.init(kind: .up(.primary), location: end)),
+          delayNanoseconds: 30_000_000
+        ),
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          capture.surfaceCountAtRelease = deduplicated(host.surfaces).count
+          return true
+        },
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          deduplicated(host.surfaces).count > capture.surfaceCountAtRelease
+        },
+      ])
+    )
+
+    #expect(result.exitReason == .inputEnded)
+
+    let uniqueSurfaces = deduplicated(host.surfaces)
+    #expect(
+      uniqueSurfaces.count > capture.surfaceCountAtRelease,
+      "expected at least one physics-driven frame after release, not only drag/release frames"
+    )
+  }
+
   @Test("fullscreen tab wrapped in a bottom toolbar renders the palette item")
   func fullscreenToolbarRendersPaletteItem() {
     let terminalSize = CellSize(width: 40, height: 12)
@@ -429,6 +483,11 @@ private final class GestureRecordingHost: PresentationSurface {
     surfaces.append(surface)
     return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
   }
+}
+
+@MainActor
+private final class PhysicsReleaseCapture {
+  var surfaceCountAtRelease = 0
 }
 
 @MainActor

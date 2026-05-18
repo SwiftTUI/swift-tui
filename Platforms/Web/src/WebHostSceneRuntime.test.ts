@@ -860,6 +860,54 @@ test("runtime preserves pointer movement within one cell", async () => {
   }
 });
 
+test("runtime completes captured drags when pointerup lands outside the grid", async () => {
+  const dom = installFakeDOM();
+  try {
+    const inputs: string[] = [];
+    const mount = new FakeElement("div");
+    const runtime = new WebHostSceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: { fontSize: 20 },
+      onInput: (chunk) => {
+        inputs.push(decoder.decode(chunk));
+      },
+    });
+
+    await runtime.mount();
+    runtime.resize(10, 4);
+
+    runtime.terminalMount.dispatch("pointerdown", pointerEvent({
+      button: 0,
+      buttons: 1,
+      clientX: 25,
+      clientY: 10,
+      pointerId: 7,
+    }));
+    runtime.terminalMount.dispatch("pointermove", pointerEvent({
+      buttons: 1,
+      clientX: 35,
+      clientY: 30,
+      pointerId: 7,
+    }));
+    runtime.terminalMount.dispatch("pointerup", pointerEvent({
+      button: 0,
+      buttons: 0,
+      clientX: 125,
+      clientY: 30,
+      pointerId: 7,
+    }));
+
+    expect(inputs).toEqual([
+      "\u001Emouse:down:2.5:0.37037037037037035:primary:0:0:0\n",
+      "\u001Emouse:dragged:3.5:1.1111111111111112:primary:0:0:0\n",
+      "\u001Emouse:up:12.5:1.1111111111111112:primary:0:0:0\n",
+    ]);
+  } finally {
+    dom.restore();
+  }
+});
+
 function pointerEvent(
   overrides: Record<string, unknown>
 ): Record<string, unknown> {

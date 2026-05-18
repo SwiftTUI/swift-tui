@@ -116,6 +116,32 @@ asserting. This preserves the product assertion while removing the fixed-timer
 dependency. Do not add this to the long-term registry unless it reappears after
 that remediation.
 
+### Gallery PTY Input Tests In Parallel Suite Execution
+
+Observed failure:
+
+```bash
+swiftly run swift test --package-path Examples/gallery
+```
+
+While adding terminal-host coverage for the gallery Physics tab regression, the
+full gallery package initially timed out in real-terminal/PTTY tests when
+multiple `GalleryTabSwitchTests` cases were allowed to run concurrently. Focused
+reruns of the new terminal physics cases passed, and the same package passed
+after serializing the suite.
+
+Root cause category: shared PTY/input-reader test resource contention under
+suite-level parallelism. These tests exercise real terminal hosts, raw-mode
+PTYs, and awaited input readers; running several of them concurrently made the
+test schedule sensitive to host startup, input-reader readiness, and terminal
+screen polling rather than the gallery behavior under assertion.
+
+Remediation landed in the working tree: `GalleryTabSwitchTests` is now marked
+serialized so its real-terminal coverage runs one case at a time. This keeps
+the user-facing assertions intact while removing cross-test PTY contention. Do
+not add this to the long-term registry unless a serialized run flakes with
+retained evidence.
+
 ### Async Lifecycle Generation Consumer Readiness
 
 Observed failure:
