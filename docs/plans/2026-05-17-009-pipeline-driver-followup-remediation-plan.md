@@ -85,6 +85,26 @@ If that is awkward in a given shell, the equivalent satisfiable check is:
 `--no-verify`." Fixing the repo-wide drift is explicitly out of scope for this
 plan; if it is to be fixed, it belongs in its own dedicated commit.
 
+**Pre-existing load-flaky tests.** The repository has timing-sensitive tests
+that drive a real `RunLoop` and flake under heavy parallel CPU load,
+independent of this plan's changes. A phase gate (`bun run test`) is NOT
+blocked by such a flake when **both**: (a) every failing test is in the
+known-flake registry below; **and** (b) an immediate re-run passes — either a
+fresh `bun run test`, or a focused re-run of each failing test. Rationale: a
+genuine regression fails *consistently* under its trigger condition; a
+load-timing flake does not. A test in the registry that fails a focused re-run
+is therefore NOT a flake — it is a regression and blocks the gate. Adding a
+test to the registry requires evidence to the same standard: a failure observed
+on code *without* this plan's changes (e.g. a pre-branch gate log), or a
+sustained pass rate (≥8/8) in controlled runs at the current branch HEAD.
+
+Known-flake registry (verified 2026-05-17):
+
+| Test | Evidence it is a pre-existing flake |
+| --- | --- |
+| `toast auto-dismiss rerenders without additional input` (`InteractiveRuntimeTests`) | Failed in a pre-branch gate log (`03:33`, no plan code); passes in isolation; 8/8 green in controlled parallel runs at branch HEAD after Phase 2. |
+| `HostedSurfaceRegressionTests`, `SwiftUIHostAccessibilityTests`, `RenderDiffTests` timeout cases | Reported by the Phase 1 implementer as 12 pre-existing `.timedOut` failures reproduced on a stashed-clean baseline; treat as registry candidates — still subject to the focused-re-run safeguard above. |
+
 ### CB-4 — The characterization net is sacred
 
 Phase 0 builds `Tests/SwiftTUITests/PipelineDriverParityTests.swift` and `Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift`. After Phase 0, **no task may modify, weaken, or `@disabled` those tests** to make a refactor pass. If a characterization test fails during a later refactor, the refactor changed behavior — that is the test working. Either the behavior change is intended (then update the test deliberately, in its own commit, with a commit message explaining the behavior delta and why it is correct) or it is a bug (then fix the refactor). Silently editing the expected value to match new output is an Anti-Rationalization trigger for every finding.
