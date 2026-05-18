@@ -105,6 +105,9 @@ Approved constraints:
 - Packet 28 completed: extracted placed overlay sampling into
   `PlacedAnimationOverlaySampling.swift`, leaving `AnimationController` as the
   owner of custom-state writeback, completed-key removal, and batch release.
+- Packet 29 completed: extracted post-head/pre-commit frame-tail orchestration
+  from `DefaultRenderer` into `DefaultRendererFrameTailCoordinator.swift`,
+  leaving `DefaultRenderer` as owner of frame-head setup and commit effects.
 
 ## Baseline Validation
 
@@ -649,29 +652,44 @@ Packet 28 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-083720-85404.log`
   - Result: PASS
 
+Packet 29 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests\.(RuntimeRenderPipelineTests|RenderPipelineStructureTests|PipelineContractTests|AsyncFrameTailRenderingTests|BoundedReconciliationTests|RenderDriverCharacterizationTests|RenderDriverInstrumentationCostTests)`
+  - Result: PASS, 75 tests
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests`
+  - Result: PASS, 1309 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-093634-11184.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 29: DefaultRenderer frame-head decomposition. Packet 28 moved placed
-overlay sampling out of `AnimationController`, and current production file-size
-signals put `Sources/SwiftTUIRuntime/SwiftTUI.swift` back above the animation
-controller. The next packet should use a read-only subagent audit first, then
-extract a bounded frame-head setup helper without changing renderer API,
-transaction, or commit behavior.
+Packet 30: AnimationController lifecycle bookkeeping audit. Packet 29 reduced
+`SwiftTUI.swift` from 1479 to 1169 lines by moving frame-tail orchestration into
+`DefaultRendererFrameTailCoordinator.swift`. The current production file-size
+signals put `AnimationController.swift` back at the top of the debt list, so the
+next packet should use a read-only subagent audit first and extract only a
+bounded lifecycle bookkeeping boundary that does not move mutable controller
+ownership unless the audit proves it is safe.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
-- a new same-folder rendering or runtime helper if the audit confirms a safe
-  boundary
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- a new `Sources/SwiftTUIRuntime/Lifecycle/` helper if the audit confirms a
+  safe boundary
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
-- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
-- `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
-- `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
-- `swiftly run swift test --filter SwiftTUITests.DirtyTrackingCoherenceTests`
+- Animation controller and integration focused suites
+- Async frame-tail and pipeline focused suites when the extracted boundary
+  affects placed/removal overlays, completion deferral, or frame-drop blockers
 - `bun run test`
 
 ## Failed Attempts
@@ -690,6 +708,16 @@ Validation:
 - `swiftly run swift test --filter SwiftTUITerminalTests` passed immediately
   after, and the final full repo gate passed at
   `/tmp/swift-tui-test-gate-20260518-065523-66925.log`.
+- Packet 29 first full `bun run test` attempt failed in the full
+  `SwiftTUITests` runtime target with two timeout issues:
+  `HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents`
+  and
+  `AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead`.
+  The failed gate log was
+  `/tmp/swift-tui-test-gate-20260518-090939-98987.log`.
+- Both failed tests passed immediately in isolation, the full `SwiftTUITests`
+  target passed, and the final full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-093634-11184.log`.
 
 ## Known Risks
 

@@ -715,23 +715,30 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
-### Packet 29: DefaultRenderer Frame-Head Decomposition
+### Packet 29: DefaultRenderer Frame-Tail Coordinator
 
 - Objective: return to the largest remaining runtime file and make
-  `DefaultRenderer` frame-head setup easier to follow without changing renderer
-  public API or commit behavior.
-- Likely owned files, pending read-only subagent audit:
+  `DefaultRenderer` read as frame-head and commit ownership by moving
+  post-head/pre-commit frame-tail orchestration into a named helper.
+- Owned files:
   - `Sources/SwiftTUIRuntime/SwiftTUI.swift`
-  - a new same-folder rendering or runtime helper
-- Dependencies: Packet 28 completes the placed-overlay sampling extraction.
-  Current production file-size signals put `SwiftTUI.swift` back above
-  `AnimationController.swift`.
+  - `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift`
+- Dependencies: Packet 28 completes the placed-overlay sampling extraction. A
+  read-only renderer audit rejected frame-head extraction as too stateful for
+  this packet and identified the frame-tail coordinator as the safer
+  decomposition boundary.
 - Invariants: renderer public APIs, frame-head transaction semantics,
-  animation draft ownership, observation/presentation portal drafts, selective
-  evaluation, safe-area wrapping, retained frame-tail inputs, and frame context
-  fields remain stable.
-- Required checks: focused renderer, async frame-tail, pipeline, and runtime
-  tests first, then `bun run test`.
+  animation draft ownership, observation/presentation portal drafts, one-shot
+  versus abortable tail behavior, queued-tail cancellation, prepared-state
+  materialization, late-preference reconciliation, retained baseline placement,
+  and commit behavior remain stable.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests\.(RuntimeRenderPipelineTests|RenderPipelineStructureTests|PipelineContractTests|AsyncFrameTailRenderingTests|BoundedReconciliationTests|RenderDriverCharacterizationTests|RenderDriverInstrumentationCostTests)`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedBuiltInLayoutQueuesInputWithoutCommittingAhead`
+  - `swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests/hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents`
+  - `swiftly run swift test --filter SwiftTUITests`
+  - `bun run test`
 - Rollback: revert the packet commit/files only.
 
 ## Human Checkpoints
