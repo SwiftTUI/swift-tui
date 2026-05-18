@@ -576,6 +576,42 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 25: Input Reader Event Decoding
+
+- Objective: make `InputReader` easier to follow by extracting the repeated
+  control-message filtering and terminal parser feeding into a small decoder,
+  while leaving platform-specific stream loops unchanged.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+  - `Sources/SwiftTUIRuntime/Input/TerminalInputEventDecoding.swift`
+- Dependencies: Packet 18 extracted pure input support types, and Packet 24
+  completed the latest terminal-host cleanup. A read-only input audit narrowed
+  this slice to parser/control-message feeding only so the WASI polling loop
+  and DispatchSource drain/cancel behavior stay reviewable in place.
+- Invariants: public input APIs stay unchanged; `events()` remains
+  keyboard-only while still routing control messages; `inputEvents()` preserves
+  stream-creation mouse-coordinate snapshot semantics; control messages from a
+  chunk are handled before decoded payload events; full-input streams still
+  flush pending mouse events before each control message; coalescible mouse
+  events still buffer only `.moved`, `.dragged`, and `.scrolled`; WASI still
+  reads 512-byte chunks, flushes pending mouse events on would-block, sleeps
+  1 ms on would-block, and finishes on EOF/error after flushing; DispatchSource
+  still drains 256-byte chunks until would-block/EOF/error, arms the mouse
+  flush timer once per cluster, flushes before EOF/error/cancel finish, and
+  cancels the scheduled flush on teardown.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

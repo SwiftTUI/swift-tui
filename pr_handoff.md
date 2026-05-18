@@ -138,6 +138,11 @@ Packet 24 should be reviewed as terminal raw-mode session extraction:
 - `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
 - `Sources/SwiftTUIRuntime/Terminal/TerminalRawModeSession.swift`
 
+Packet 25 should be reviewed as input event decoding extraction:
+
+- `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+- `Sources/SwiftTUIRuntime/Input/TerminalInputEventDecoding.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -587,6 +592,27 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-055729-85446.log
 ```
 
+Packet 25 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests
+swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests
+swiftly run swift test --filter SwiftTUITests.InputParserModifierTests
+swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests
+swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-060611-5894.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -624,6 +650,7 @@ Packet 21 is run-loop focus-sync convergence extraction.
 Packet 22 is run-loop frame acquisition extraction.
 Packet 23 is renderer commit path consolidation.
 Packet 24 is terminal raw-mode session extraction.
+Packet 25 is input event decoding extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -645,7 +672,9 @@ committed-frame artifact diagnostics, one-shot worker timing, prepared-state
 materialization, committed scroll geometry, retained baseline placement, or
 presentation dismiss-stack, raw-mode saved state, process-exit cleanup
 registration, terminal control-mode transition, enable-failure rollback, or
-pointer-hover cleanup reset regression appears.
+pointer-hover cleanup reset, input control-message ordering, keyboard-only
+input filtering, mouse-coordinate snapshot, pending mouse flush, or
+DispatchSource/WASI stream-finish regression appears.
 
 ## AI Assistance Disclosure
 
