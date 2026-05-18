@@ -191,7 +191,7 @@ checkout, and the verifying commit hash is recorded.
 | F6  | _pending_ | _pending_ | _pending_ |
 | F7  | _pending_ | _pending_ | _pending_ |
 | F8  | code+test | `swiftly run swift test --filter RenderDriverInstrumentationCostTests`, `swiftly run swift test --filter DiagnosticsAndCacheTests`, `swiftly run swift test --filter FrameDiagnostics`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; runtime artifact construction no longer calls `FrameDiagnostics.summarize(...)` unconditionally, and `artifactConstructionDoesNotCallFrameDiagnosticsSummarize` pins the completed-frame constructors to `FrameDiagnostics.fromCachedPhaseProducts(...)` without restoring a diagnostics opt-out fork. | 7789bdeb |
-| F9  | _pending_ | _pending_ | _pending_ |
+| F9  | code+test | `swiftly run swift test --filter FrameTailWorkerFallbackTests`, `swiftly run swift test --filter WASIRenderAsyncTests`, `swiftly run swift test --filter SwiftTUIWASITests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; the no-Dispatch frame-tail layout fallback now selects the same `ImmediateFrameTailLayoutWorker` implementation that native tests instantiate through `FrameTailLayoutWorkerBox(scheduling: .immediate)`, so the synchronous fallback semantics are exercised outside the WASI-only compile branch. | ae431c05 |
 | F10 | _pending_ | _pending_ | _pending_ |
 | F11 | _pending_ | _pending_ | _pending_ |
 | F12 | _pending_ | _pending_ | _pending_ |
@@ -2013,9 +2013,16 @@ Follow-up tasks added from the independent re-audit:
   `FrameDiagnostics.summarize(`. `RenderDriverInstrumentationCostTests`,
   `DiagnosticsAndCacheTests`, `FrameDiagnostics`,
   `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed.
-- [ ] **F9 reopened:** eliminate or truly exercise the no-Dispatch
+- [x] **F9 reopened:** eliminate or truly exercise the no-Dispatch
   `FrameTailLayoutWorker` synchronous fallback so the WASI semantics are not an
   untested branch.
+  Completed by `ae431c05`: the WASI/no-Dispatch default now selects the shared
+  `ImmediateFrameTailLayoutWorker`, and `FrameTailWorkerFallbackTests` directly
+  instantiate that immediate scheduler on the native test lane. The structural
+  guard confirms the old private `#else` worker body is gone.
+  `FrameTailWorkerFallbackTests`, `WASIRenderAsyncTests`,
+  `SwiftTUIWASITests`, `AsyncFrameTailRenderingTests`, and
+  `PipelineDriverParityTests` passed.
 - [ ] **F10 reopened:** collapse or structurally unify scheduler invalidation,
   ViewGraph dirty work, and `RunLoop.previousRenderedState` so coherence no
   longer rests on convention plus one regression test.
