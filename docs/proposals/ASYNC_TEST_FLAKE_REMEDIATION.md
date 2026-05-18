@@ -75,6 +75,102 @@ This run is evidence that the current candidates pass repeated focused reruns
 under light pressure after the initial test-support cleanup. It is not evidence
 that the classes are impossible to flake under heavier CI contention.
 
+## Additional Pipeline Follow-up Observations
+
+The pipeline-driver follow-up reruns on 2026-05-17 exposed two additional
+load-sensitive test issues. These are recorded here so the plan's known-flake
+policy does not become chat-only state.
+
+### Gallery Full-screen Physics Drag
+
+Observed failure:
+
+```bash
+find . -name .build -type d -prune -exec rm -rf {} +
+bun run test
+```
+
+The clean gate reached `Run Examples/gallery tests` and failed
+`PhysicsTabGestureTests/draggingRectangleTwiceTracksItsMovedPosition`: the
+test observed only two deduplicated rendered surfaces instead of the expected
+three.
+
+Evidence:
+
+- The exact focused filter passed immediately:
+  `swiftly run swift test --package-path Examples/gallery --filter PhysicsTabGestureTests/draggingRectangleTwiceTracksItsMovedPosition`.
+- The same focused filter then passed 8/8 repeated local runs.
+- Full `PhysicsTabGestureTests` and full `Examples/gallery` passed after the
+  test was changed.
+
+Root cause category: test scheduling race. The test sent two drag sequences on
+fixed 30 ms delays. Under full-suite load, the second drag could be queued
+before the first drag's intermediate presentation had committed, so the test
+measured scheduler timing instead of the intended "still draggable after the
+first offset change" behavior.
+
+Remediation landed in the working tree: the test now drives input through
+`AwaitedTerminalInputReader` and waits for the first visual change before
+sending the second drag, then waits for the final visual change before
+asserting. This preserves the product assertion while removing the fixed-timer
+dependency. Do not add this to the long-term registry unless it reappears after
+that remediation.
+
+### Async Lifecycle Generation Consumer Readiness
+
+Observed failure:
+
+```bash
+find . -name .build -type d -prune -exec rm -rf {} +
+bun run test
+```
+
+After the gallery race was stabilized, the next clean gate reached
+`Run SwiftTUI runtime tests` and timed out in two
+`AsyncLifecycleGenerationTests` cases:
+
+- `signal reader ignores stale stream teardown after replacement`, waiting for
+  `first signal consumer ready`
+- `injected input reader preserves pending mouse flushes across stale teardown`,
+  waiting for `first mouse input consumer ready`
+
+Evidence:
+
+- `swiftly run swift test --filter AsyncLifecycleGenerationTests` passed
+  immediately after the clean-gate failure.
+- `swiftly run swift test --filter SwiftTUITests` also passed immediately after
+  the focused rerun.
+
+Current classification: registry candidate, not yet a permanent registry
+entry. The tests create consumer tasks and poll readiness with a fixed
+five-second timeout. The failure mode means the consumer task did not reach its
+ready marker under the full gate's load window, while the same suite and the
+full runtime target passed immediately afterward. That is consistent with a
+load-sensitive scheduler-startup race, but it is not yet enough evidence to
+call the underlying stream behavior broken or to waive future failures without
+the focused-rerun safeguard.
+
+Recommended remediation:
+
+- Convert the local timeout helpers in
+  `Tests/SwiftTUITests/AsyncLifecycleGenerationTests.swift` to the shared
+  async test-support wait helpers so `SWIFTTUI_TEST_TIMEOUT_SCALE` and common
+  timeout diagnostics apply.
+- If the failure recurs, add this suite to the registry only with retained
+  repeated-run evidence and a remediation owner.
+- Prefer a deterministic consumer-start handshake over longer sleeps if the
+  stream helper can expose one without changing production semantics.
+
+### Explicit Non-flake From The Same Pass
+
+`InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows`
+failed earlier in the same follow-up work, but audit found a real async
+prepared-state bug rather than a timing flake: abortable frame-head rendering
+snapshotted main-actor-only lazy `ForEach` children after suspending prepared
+state, so placed lazy rows could request viewport lifecycle work without
+publishing the corresponding row handlers into committed runtime registries.
+That issue belongs to the pipeline-driver remediation, not this flake registry.
+
 ## Problem Summary
 
 The suspected flaky failures cluster around tests that drive a real `RunLoop`,

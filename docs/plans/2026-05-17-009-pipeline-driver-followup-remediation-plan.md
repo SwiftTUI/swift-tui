@@ -2093,11 +2093,11 @@ git commit -m "docs: record independent re-audit of pipeline driver remediation"
 
 ## Task 10.4: Final Gate
 
-- [ ] **Step 1:** Run `bun run test` — expect exit 0, zero failures.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Run `swift test --filter RenderDriverCharacterizationTests` and `swift test --filter PipelineDriverParityTests` — expect PASS (the Phase 0 net survived every refactor unmodified; confirm via `git log --oneline -- Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift` shows only the Phase 0 creation commit, or any later commit has a message explaining a deliberate behavior change per CB-4).
-- [ ] **Step 4:** Confirm all 14 ledger rows complete and the independent re-audit reports zero STILL-OBSERVABLE findings.
-- [ ] **Step 5: Commit**
+- [x] **Step 1:** Run `bun run test` — expect exit 0, zero failures.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Run `swift test --filter RenderDriverCharacterizationTests` and `swift test --filter PipelineDriverParityTests` — expect PASS (the Phase 0 net survived every refactor unmodified; confirm via `git log --oneline -- Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift` shows only the Phase 0 creation commit, or any later commit has a message explaining a deliberate behavior change per CB-4).
+- [x] **Step 4:** Confirm all 14 ledger rows complete and the independent re-audit reports zero STILL-OBSERVABLE findings.
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --allow-empty -m "chore: pipeline driver follow-up remediation complete (F1-F14)"
@@ -2117,6 +2117,67 @@ Current Task 10.4 status:
   the full-lazy viewport lifecycle failure already documented above as
   stashed-clean-baseline evidence during the F10 re-audit. Because Step 1
   requires exit 0 and zero failures, Task 10.4 remains open.
+- Follow-up audit of that remaining lifecycle failure found a real async
+  prepared-state gap: abortable frame-head rendering snapshotted
+  main-actor-only lazy `ForEach` children after suspending the prepared graph,
+  so the placed tree could request viewport lifecycle work without publishing
+  the row handlers into the committed runtime registries. The implementation now
+  materializes the prepared state while snapshotting those lazy children,
+  records the updated prepared graph, and suspends it again. Focused reruns of
+  `InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows`,
+  `SwiftUISurfaceTests/lazyForEachRowsEmitViewportLifecycleTransitions`,
+  `AsyncFrameTailRenderingTests/layoutDependentAsyncCommitsPublishRealizedActionRegistrations`,
+  and full `AsyncFrameTailRenderingTests` passed. Because this changed runtime
+  signature/commit behavior after the prior clean gate, Step 1 still must be
+  rerun from a fully deleted `.build` state before Task 10.4 can close.
+- The next clean gate rerun got past `Run SwiftTUI runtime tests` and failed
+  only `Run Examples/gallery tests` on
+  `PhysicsTabGestureTests/draggingRectangleTwiceTracksItsMovedPosition`. The
+  exact focused filter passed immediately and then passed 8/8 repeated focused
+  runs, proving the fixed-delay test was load-sensitive. The test now waits for
+  the first committed visual change before sending the second drag, preserving
+  the behavior check while removing the fixed-timer race; focused
+  `PhysicsTabGestureTests/draggingRectangleTwiceTracksItsMovedPosition`, full
+  `PhysicsTabGestureTests`, and full `Examples/gallery` passed. Because this
+  changed test code after the prior clean gate, Step 1 still remains open until
+  a full `bun run test` rerun from a fully deleted `.build` state exits 0.
+- The next clean gate rerun after the gallery stabilization failed only two
+  `AsyncLifecycleGenerationTests` cases while waiting for first consumer
+  readiness under `Run SwiftTUI runtime tests`. Immediate focused
+  `swiftly run swift test --filter AsyncLifecycleGenerationTests` and full
+  `swiftly run swift test --filter SwiftTUITests` reruns passed, so the
+  observed issue is documented as a load-sensitive registry candidate in
+  `docs/proposals/ASYNC_TEST_FLAKE_REMEDIATION.md`. Because Step 1 requires a
+  full clean `bun run test` exit 0 before completion, Task 10.4 remains open and
+  the gate must be rerun from a deleted `.build` state after this documentation
+  change.
+- Final Step 1 rerun after those implementation and documentation changes
+  passed from a fully deleted `.build` state:
+  `find . -name .build -type d -prune -exec rm -rf {} + && bun run test`
+  (tee log: `/tmp/swift-tui-test-gate-20260517-225000-clean-after-flake-doc.log`;
+  test-gate retained log:
+  `/tmp/swift-tui-test-gate-20260517-224407-32203.log`). Every repo gate stage
+  reported `PASS`, including `Run SwiftTUI runtime tests`,
+  `Run Examples/gallery tests`, and `Run Tools/TermUIPerf tests`.
+- Step 2 branch-scoped `prek` gate passed with logs
+  `/tmp/swift-tui-branch-prek-20260517-225100.log` and, after recording Steps
+  3-4 in this plan, `/tmp/swift-tui-branch-prek-20260517-225300-final.log`.
+- Step 3 Phase 0 safety-net audit passed:
+  `swiftly run swift test --filter RenderDriverCharacterizationTests` and
+  `swiftly run swift test --filter PipelineDriverParityTests` both passed.
+  `git log --oneline -- Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift`
+  shows the Phase 0 creation commit plus `1e1cab77`, which only strengthened
+  the matrix by requiring positive-width raster output for content-bearing
+  cases. `git log --oneline -- Tests/SwiftTUITests/PipelineDriverParityTests.swift`
+  shows the Phase 0 creation commit plus `6d70ca63`, which added RunLoop
+  entry-point parity for F2. Neither later commit weakens, disables, or rewrites
+  expected output to mask a regression.
+- Step 4 ledger audit passed: `Scripts/check_pipeline_driver_resolution_ledger.sh`
+  reported `[check_pipeline_driver_resolution_ledger] ok`, the current
+  independent re-audit section contains 14 `RESOLVED` rows, and that current
+  section contains no `STILL-OBSERVABLE` entries. The historical re-audit table
+  still retains its old `STILL-OBSERVABLE` rows as archived evidence and is not
+  the current status table.
 
 ---
 

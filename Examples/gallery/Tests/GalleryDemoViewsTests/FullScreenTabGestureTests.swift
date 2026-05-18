@@ -231,29 +231,32 @@ struct PhysicsTabGestureTests {
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view },
-      eventSchedule: [
-        .init(delayNanoseconds: 0, event: .mouse(.init(kind: .down(.primary), location: start))),
-        .init(
-          delayNanoseconds: 30_000_000,
-          event: .mouse(.init(kind: .dragged(.primary), location: firstEnd))
+      terminalInputReader: AwaitedTerminalInputReader(steps: [
+        .event(.mouse(.init(kind: .down(.primary), location: start))),
+        .event(
+          .mouse(.init(kind: .dragged(.primary), location: firstEnd)),
+          delayNanoseconds: 30_000_000
         ),
-        .init(
-          delayNanoseconds: 30_000_000,
-          event: .mouse(.init(kind: .up(.primary), location: firstEnd))
+        .event(
+          .mouse(.init(kind: .up(.primary), location: firstEnd)),
+          delayNanoseconds: 30_000_000
         ),
-        .init(
-          delayNanoseconds: 30_000_000,
-          event: .mouse(.init(kind: .down(.primary), location: firstEnd))
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          deduplicated(host.surfaces).count >= 2
+        },
+        .event(.mouse(.init(kind: .down(.primary), location: firstEnd))),
+        .event(
+          .mouse(.init(kind: .dragged(.primary), location: secondEnd)),
+          delayNanoseconds: 30_000_000
         ),
-        .init(
-          delayNanoseconds: 30_000_000,
-          event: .mouse(.init(kind: .dragged(.primary), location: secondEnd))
+        .event(
+          .mouse(.init(kind: .up(.primary), location: secondEnd)),
+          delayNanoseconds: 30_000_000
         ),
-        .init(
-          delayNanoseconds: 30_000_000,
-          event: .mouse(.init(kind: .up(.primary), location: secondEnd))
-        ),
-      ]
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          deduplicated(host.surfaces).count >= 3
+        },
+      ])
     )
 
     #expect(result.exitReason == .inputEnded)
