@@ -40,6 +40,4 @@ and inherit the framework's `--no-color`, `--ascii`, `--reduce-motion`,
 | `dag` | plain `Text` rows (pre-laid-out by `GraphLayout`) |
 | `dashboard` | everything above |
 
-See `docs/proposals/GITVIZ_EXAMPLE.md` and
-`docs/proposals/CALENDAR_HEATMAP_AND_LINE_CHART.md` for the full design
-discussion.
+The design is fully implemented across the widget files listed above.

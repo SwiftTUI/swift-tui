@@ -159,9 +159,8 @@ package final class ViewGraph {
   private var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
   private var taskDescriptorIdentitySlots: [Identity: TaskDescriptorIdentitySlot]
   private var nextTaskDescriptorIdentityToken: UInt64
-  /// Instrumentation added for Item 7 of
-  /// `docs/proposals/ARCHITECTURE_NOTES.md`.  Tracks
-  /// non-trivial `recordRegistrationAlias` calls so the alias layer's
+  /// Instrumentation that tracks non-trivial `recordRegistrationAlias`
+  /// calls so the alias layer's
   /// actual workload can be measured against the architecture doc's
   /// hypothesis that divergences come from a small, enumerable set of
   /// view patterns.  Always on, bounded memory — safe to leave enabled
@@ -1258,8 +1257,7 @@ package final class ViewGraph {
   ///   them, which cancels tasks, fires disappear handlers, removes
   ///   dependency edges, and drops the node from `nodesByIdentity`.
   ///
-  /// Item 3 of `docs/proposals/ARCHITECTURE_NOTES.md` discusses consolidating this
-  /// split-brain into a single reconciler (Option A).  That's a larger
+  /// Consolidating this split-brain into a single reconciler is a larger
   /// refactor and is not yet justified by a concrete pain point — this
   /// comment is the documented-fence version of the fix.
   private func applyStructuralChildDiff(

@@ -87,7 +87,7 @@ to "every Dockerfile change", which is roughly 100x less often.
 All CLI calls go through `Scripts/linux.sh`. Run it from anywhere — it
 resolves the repo root from its own location. Built-in Linux build and test
 commands invoke Swift through `swiftly run swift ...`, matching the host-side
-toolchain rule in [`docs/TOOLCHAINS.md`](../../docs/TOOLCHAINS.md).
+toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 
 ```bash
 # First time on a new machine:

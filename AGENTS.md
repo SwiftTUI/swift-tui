@@ -1,160 +1,140 @@
 # AGENTS.md
 
 Guidance for Claude Code and other agentic assistants working in this
-repository. Keep this file concise — the detailed design documents in
-[`docs/`](docs/README.md) are the source of truth. Update them there, not here.
-Use [`docs/TODO.md`](docs/TODO.md) as the live tracker for incomplete planned
-work and unresolved decisions: keep it current, keep entries concise, link to
-supporting docs, and remove items when completed rather than summarizing
-completed work there. [`docs/STATUS.md`](docs/STATUS.md) is the high-level
-state and direction overview, not the canonical work queue; any status gap that
-is planned, actively investigated, or awaiting a decision must have a
-corresponding `docs/TODO.md` item. Move completed items into
-[`docs/CHANGELOG.md`](docs/CHANGELOG.md) with concise
-self-standing entries; prefix any changelog links to repo docs with the short
-git hash that anchors the referenced material.
+repository. Keep this file concise. The architecture documentation in
+[`docs/`](docs/README.md) is the source of truth — update it there, not here.
 
 ## Build & Test Commands
 
 ```bash
-bun run test                                       # Repo gate: shared surface + gallery example
+bun run test                                       # Repo gate: shared suite + policy checks
 bun run test:all                                   # Exhaustive test surface, including all examples
 swiftly run swift build                            # Build all root-package targets
 swiftly run swift test                             # Run root-package tests
 swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests             # One test suite
 swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/testName    # One test
-swift format format -i --configuration .swift-format.json Sources/ Tests/       # Format
+swift format format -i --configuration .swift-format.json Sources/ Tests/     # Format
 ```
 
 Always run `bun run test` after changes that touch shared code, platform
-products, the gallery example, or repo tooling, and confirm it passes before
-considering work complete. Run `bun run test:all` for broad example coverage or
-when changing example packages beyond `Examples/gallery`.
-
-See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
-(`swiftly`, wasm SDK, Bun, Xcode, Android NDK).
-Do not run repo-local builds or tests with bare `swift` or `xcrun swift`; use
-`swiftly run swift ...` so development runs match the pinned Swift toolchain.
+products, examples, or repo tooling, and confirm it passes before considering
+work complete. Do not run repo-local builds or tests with bare `swift` or
+`xcrun swift` — use `swiftly run swift ...` so runs match the pinned toolchain.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full toolchain, gate, and
+release story.
 
 ## Architecture (one-page summary)
 
 ```
-SwiftTUI  ->  SwiftTUIViews  ->  SwiftTUICore
+SwiftTUICore  ->  SwiftTUIViews  ->  SwiftTUIRuntime
 ```
 
-- **SwiftTUICore** — pure, terminal-IO-free phase products
-- **SwiftTUIViews** — SwiftUI-shaped authoring surface
-- **SwiftTUI** — terminal runtime; re-exports SwiftTUIViews and SwiftTUICore via `@_exported import`
-- **SwiftTUICharts** — compact chart/metric track; separate product
-- **SwiftTUIAnimatedImage** — finite pre-composed animated image track; GIF codec owner
+- **SwiftTUICore** — the engine: geometry, the frame pipeline, and the typed
+  phase products. Terminal-IO-free.
+- **SwiftTUIViews** — the SwiftUI-shaped authoring surface (`View`, controls,
+  layout, state, focus, gestures).
+- **SwiftTUIRuntime** — the run loop, renderer, scenes, and host integration.
+- **SwiftTUI** — the terminal convenience product; re-exports `SwiftTUIRuntime`,
+  `SwiftTUICLI`, and `SwiftTUIArguments` via `@_exported import`.
+- **SwiftTUICharts**, **SwiftTUIAnimatedImage** — peer products.
 
-`DefaultRenderer` executes one composed runtime pipeline:
+`DefaultRenderer` runs one composed runtime stage pipeline:
 
 ```
 head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
 ```
 
-The fused tail still produces the seven typed phase products in order:
+The fused tail produces the seven typed phase products in order:
 
 ```
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
 Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
-[docs/RUNTIME.md](docs/RUNTIME.md). Per-file ownership map in
-[docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md).
+[docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md).
 
 ## Development Guidelines
 
-- When a new feature replaces or extends an existing constraint (e.g.
-  single-scene → multi-scene), search for and remove **all** old
-  guards/assertions that enforce the previous constraint. Don't leave stale
-  invariants behind.
-- New files should belong to one subsystem. Keep
-  [docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md) aligned with file moves.
-- Treat fixture changes as evidence, not housekeeping. See
-  [docs/TESTING_AND_FIXTURE_POLICY.md](docs/TESTING_AND_FIXTURE_POLICY.md).
+- When a new feature replaces an existing constraint, search for and remove
+  **all** old guards and assertions that enforced the previous constraint. Do
+  not leave stale invariants behind.
+- New files should belong to one subsystem; keep the source layout in
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) aligned with file moves.
+- Treat fixture changes as evidence, not housekeeping — see
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#rendered-text-fixtures).
 - For runtime state bugs, distinguish transient flicker from true state loss.
-  If state must survive lazy tab, deferred-content, or presentation churn,
-  hoist ownership above that seam. Do not over-hoist: tab-local state may be
-  intentionally ephemeral across tab switches, but palette open/close should
-  be transparent unless the palette itself changes selection. For same view
-  instance bugs, distinguish live graph isolation (`RunLoop` / invalidator-
-  backed) from no-invalidator `DefaultRenderer` snapshot behavior; do not
-  replace graph-scoped imperative state with a last-bound global fallback. See
-  [docs/RUNTIME.md](docs/RUNTIME.md) and
-  [docs/STATE_KEYING.md](docs/STATE_KEYING.md).
-- For wrapper-hosted or scene-hosted regressions, reproduce and test the
+  If state must survive lazy-tab, deferred-content, or presentation churn,
+  hoist ownership above that seam — but do not over-hoist. Distinguish live
+  graph isolation (`RunLoop` / invalidator-backed) from no-invalidator
+  `DefaultRenderer` snapshot behavior; do not replace graph-scoped imperative
+  state with a last-bound global fallback. See
+  [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md).
+- For wrapper-hosted or scene-hosted regressions, reproduce against the
   composed runtime path, not just the inner view in isolation.
-- For terminal presentation fixes, keep sanitization at the presentation
-  boundary and cover both text control scalars and OSC 8 hyperlink
-  destinations.
+- Keep terminal-output sanitization at the presentation boundary, covering both
+  text control scalars and OSC 8 hyperlink destinations.
 
 ## Code Style
 
-- 2-space indentation, 100-character line length
-- `private` (not `fileprivate`) for file-scoped declarations
-- Ordered imports, no block comments, no void return on function signatures
-- Full config in `.swift-format.json`
+- 2-space indentation, 100-character line length.
+- `private` (not `fileprivate`) for file-scoped declarations.
+- Ordered imports, no block comments, no void return on function signatures.
+- Full config in `.swift-format.json`.
 
 ## Swift Language Settings
 
-- Swift 6.3 with strict memory safety and Swift 6 language mode
-- Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`,
-  `MemberImportVisibility`, `InternalImportsByDefault`, and others
-- SwiftPM package platforms: macOS 15+, iOS 18+
-- Supported macOS development and CI floor: macOS 26 (`macos-26` on GitHub
-  Actions)
+- Swift 6.3.1, Swift 6 language mode, strict memory safety,
+  `.defaultIsolation(.none)`.
+- Upcoming features enabled include `ExistentialAny`,
+  `NonisolatedNonsendingByDefault`, `MemberImportVisibility`, and
+  `InternalImportsByDefault`.
+- SwiftPM package platforms: macOS 15+, iOS 18+. macOS CI floor: `macos-26`.
 
 ## AnyView Policy
 
-- Prefer typed `@ViewBuilder` closures and generic `Content: View` storage
-- Treat `AnyView` / `AnyScene` as escape hatches, not default container types
+- Prefer typed `@ViewBuilder` closures and generic `Content: View` storage.
+- Treat `AnyView` / `AnyScene` as escape hatches, not default container types.
 - Do not add public APIs that expose `[AnyView]`, `[AnyScene]`, builder
-  closures returning `AnyView`, or node-erasure seams
+  closures returning `AnyView`, or node-erasure seams.
 - If authored content is captured for later evaluation, use
-  `scopedAnyView(...)`, not plain `AnyView(...)`
+  `scopedAnyView(...)`, not plain `AnyView(...)`.
 - Add a nearby `AnyView policy:` comment when introducing a new stored
-  `AnyView`, `[AnyView]`, or closure-returning-`AnyView` member
+  `AnyView`, `[AnyView]`, or closure-returning-`AnyView` member.
 
-Full policy in [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md).
+Full policy in [docs/PUBLIC-API.md](docs/PUBLIC-API.md#anyview-policy).
 
 ## Pre-commit Hooks (prek)
 
-- **swift-format** — auto-formats staged `.swift` files
+- **swift-format** — auto-formats staged `.swift` files.
 - **no-foundation-in-library-products** — blocks `import Foundation` in the
-  Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` library layers
-- **public-surface-policies** — enforces the guardrails in
-  [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md)
+  Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` layers.
+- **public-surface-policies** — enforces the guardrails documented in
+  [docs/PUBLIC-API.md](docs/PUBLIC-API.md).
 - **accessibility-guardrails** — pins reviewed raw-glyph, color-state, and
-  visual-content source files and requires listening-test docs
+  visual-content source files.
 - **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and
-  `nonisolated(unsafe)`. Prefer explicit actor isolation, `Sendable` generic
-  constraints, or `Synchronization` primitives instead.
+  `nonisolated(unsafe)`; prefer explicit isolation, `Sendable` constraints, or
+  `Synchronization` primitives.
+- **main-thread-usage** — forbids bare `Thread.isMainThread` without
+  justification.
 
 ## Tests
 
 Test suites are split by layer:
 
-- `Tests/SwiftTUICoreTests/` — pipeline, layout, raster, focus infrastructure
-- `Tests/SwiftTUIViewsTests/` — authoring-surface, environment, actor-isolation
-- `Tests/SwiftTUIAnimatedImageTests/` — animated image and GIF import/export behavior
-- `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior
-- `Platforms/CLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
-  attach, scene-management behavior
-- `Platforms/WASI/Tests/SwiftTUIWASITests/` — WASI launcher and
-  manifest-mode behavior
-- `Platforms/WASI/Tests/WASISurfaceBridgeTests/` — `web-surface`
-  encoder, input parser, and transport behavior
+- `Tests/SwiftTUICoreTests/` — pipeline, layout, raster, focus infrastructure.
+- `Tests/SwiftTUIViewsTests/` — authoring surface, environment, actor isolation.
+- `Tests/SwiftTUIAnimatedImageTests/` — animated image and GIF behavior.
+- `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior.
+- `Platforms/CLI/Tests/` and `Platforms/WASI/Tests/` — runner and transport
+  behavior.
 
-Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.
-Existing XCTest suites may remain.
-
-For runtime and animation tests, prefer real `RunLoop` input-path coverage and
-bounded condition-based waits over fixed sleeps. See
-[docs/TESTING_AND_FIXTURE_POLICY.md](docs/TESTING_AND_FIXTURE_POLICY.md).
+Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests;
+existing XCTest suites may remain. For runtime and animation tests, prefer real
+`RunLoop` input-path coverage and bounded condition-based waits over fixed
+sleeps. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Documentation
 
-[docs/README.md](docs/README.md) is the canonical index — follow it for
-architecture, runtime, API governance, proposals, and background material.
+[docs/README.md](docs/README.md) is the canonical index. Per-symbol API
+reference lives in the `*.docc` catalogs under `Sources/`.

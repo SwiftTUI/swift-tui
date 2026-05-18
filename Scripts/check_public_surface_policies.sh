@@ -120,9 +120,8 @@ while IFS= read -r doc_file; do
     fail "$doc_file should document the @MainActor authoring model."
   fi
 done <<'EOF'
-docs/RUNTIME.md
-docs/STATUS.md
-docs/PUBLIC_API_INVENTORY.md
+docs/ARCHITECTURE.md
+docs/PUBLIC-API.md
 Sources/SwiftTUIViews/SwiftTUIViews.docc/Authoring-Views.md
 Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Running-Apps.md
 EOF
@@ -146,7 +145,7 @@ while IFS= read -r doc_file; do
   fi
 done <<'EOF'
 AGENTS.md
-docs/PUBLIC_SURFACE_POLICY.md
+docs/PUBLIC-API.md
 EOF
 
 if [ ! -f Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests.swift ] && [ ! -f Tests/SwiftTUITests/ActorIsolationSurfaceTests.swift ]; then
@@ -266,25 +265,23 @@ actionRole:
 focusable(role:
 EOF
 
-if ! rg -n --fixed-strings --quiet -- 'extensible style protocols rather than closed public enums' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should keep the extensible style-protocol policy."
-fi
-
-if ! rg -n --fixed-strings --quiet -- 'New public enum-backed authoring `*Style` surfaces should not be added' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should forbid new enum-backed authoring style surfaces."
-fi
-
-if ! rg -n --fixed-strings --quiet -- '### Authoring style families' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should inventory the authoring style families explicitly."
-fi
-
-if ! rg -n --fixed-strings --quiet -- 'Protocol-backed style families today' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should inventory the protocol-backed authoring style families."
-fi
-
-if ! rg -n --fixed-strings --quiet -- 'Type-erased style storage' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should inventory the type-erased style storage values."
-fi
+while IFS= read -r needle; do
+  [ -z "$needle" ] && continue
+  if ! rg -n --fixed-strings --quiet -- "$needle" docs/PUBLIC-API.md; then
+    fail "docs/PUBLIC-API.md should keep the public-surface policy text: $needle"
+  fi
+done <<'EOF'
+### Authoring style families
+extensible style protocols rather than closed public enums
+New public enum-backed authoring `*Style` surfaces should not be added
+Protocol-backed style families today
+Type-erased style storage
+## Removed From The Public Surface
+## Package-Only Transitional Seams
+### `SwiftTUI`
+### Root-package platform integration products
+Experimental or showcase targets follow the same rule
+EOF
 
 if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/SwiftTUIViews/ActionScopes/Toolbar.swift; then
   fail "ToolbarStyle should stay a public extensible style protocol."
@@ -332,16 +329,8 @@ for style_enum in $public_style_enums; do
   esac
 done
 
-if ! rg -n --fixed-strings --quiet -- 'Removed From The Public Surface' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should keep the 'Removed From The Public Surface' section."
-fi
-
-if ! rg -n --fixed-strings --quiet -- 'Package-Only Transitional Seams' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should keep the 'Package-Only Transitional Seams' section."
-fi
-
-if rg -n --fixed-strings --quiet -- 'These symbols remain public today' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md still contains outdated migration-era wording."
+if rg -n --fixed-strings --quiet -- 'These symbols remain public today' docs/PUBLIC-API.md; then
+  fail "docs/PUBLIC-API.md still contains outdated migration-era wording."
 fi
 
 while IFS= read -r doc_file; do
@@ -352,9 +341,9 @@ while IFS= read -r doc_file; do
 done <<'EOF'
 README.md
 docs/ARCHITECTURE.md
-docs/PUBLIC_API_INVENTORY.md
-docs/PUBLIC_SURFACE_POLICY.md
-docs/SOURCE_LAYOUT.md
+docs/PUBLIC-API.md
+docs/RENDER-PIPELINE.md
+docs/HOSTS-AND-PLATFORMS.md
 EOF
 
 if ! rg -n --fixed-strings --quiet -- '`SwiftTUI`' README.md; then
@@ -367,26 +356,6 @@ fi
 
 if ! rg -n --fixed-strings --quiet -- '`SwiftTUIWASI`' README.md; then
   fail "README.md should name the SwiftTUIWASI runner product explicitly."
-fi
-
-if ! rg -n --fixed-strings --quiet -- '### `SwiftTUI`' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should classify the SwiftTUI runtime explicitly."
-fi
-
-if ! rg -n --fixed-strings --quiet -- '### Root-package platform integration products' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should classify the root-package platform integration products explicitly."
-fi
-
-if ! rg -U -n -P --quiet -- 'one Swift package exposing `SwiftTUI` for the\s+default terminal app story' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should describe the root package platform product model explicitly."
-fi
-
-if ! rg -n --fixed-strings --quiet -- 'Experimental or showcase targets follow the same rule' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should keep the showcase-target policy heading."
-fi
-
-if ! rg -n --fixed-strings --quiet -- 'exported as package products' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should keep the showcase export policy."
 fi
 
 if [ "$failures" -ne 0 ]; then

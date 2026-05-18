@@ -23,10 +23,8 @@ examples or broad package behavior.
 ## Pull Request Expectations
 
 - Keep changes scoped to one behavior, subsystem, or documentation correction.
-- Update durable docs when a public contract, product boundary, or planned work
-  changes.
-- Keep `docs/TODO.md` for incomplete planned work only, and move completed
-  tracker items to `docs/CHANGELOG.md`.
+- Update the documentation in [`docs/`](docs/README.md) when a public contract,
+  product boundary, or architectural behavior changes.
 - Include tests for behavior changes unless the change is documentation-only or
   the validation path is already covered by an existing gate.
 

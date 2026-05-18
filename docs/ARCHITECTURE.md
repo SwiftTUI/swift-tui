@@ -1,365 +1,211 @@
 # Architecture
 
-## Target Boundaries
+This document describes how the SwiftTUI codebase is organized: its modules,
+its products, the dependency graph, the source layout, and the layout model.
+For the rendering internals see [RENDER-PIPELINE.md](RENDER-PIPELINE.md); for
+the execution environments see [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 
-### `SwiftTUICore`
+## The big picture
 
-- Defines the shared geometry, styling, semantic, raster, and commit data types
-- Implements layout, semantic extraction, draw extraction, rasterization, diagnostics, scheduling, and commit planning
-- Stays pure with respect to terminal I/O
+```mermaid
+flowchart LR
+    author["Authored views<br/><code>struct App: View</code>"]
+    views["SwiftTUIViews<br/>authoring surface"]
+    core["SwiftTUICore<br/>pipeline + data model"]
+    runtime["SwiftTUIRuntime<br/>run loop + hosting"]
+    host["Host<br/>terminal · browser · SwiftUI"]
 
-### `SwiftTUIViews`
-
-- Exposes the SwiftUI-shaped authoring surface
-- Resolves authored views into core nodes
-- Provides property wrappers, environment plumbing, focus APIs, layouts, and controls
-
-### `SwiftTUICharts`
-
-- Builds compact chart and metric views on top of `SwiftTUIViews`
-- Reuses the same layout, semantic, draw, and raster pipeline
-- Remains a separate track so charting does not distort the core library surface
-
-### `SwiftTUIAnimatedImage`
-
-- Builds finite pre-composed animated image views on top of `SwiftTUIViews`
-- Owns GIF encoding and decoding through the vendored `swift-gif` package
-- Keeps animated media concerns out of the core `SwiftTUI` runtime surface
-
-### `SwiftTUIRuntime`
-
-- Re-exports the public authoring and core surface that matters for shared runtime work
-- Adds terminal host integration, alternate-screen ownership, input parsing,
-  capability-aware presentation, `RunLoop`, and rendering entry points
-- Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
-
-### `SwiftTUI`
-
-- Release-facing convenience product for terminal-native apps
-- Re-exports `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so
-  terminal-native apps can write only `import SwiftTUI`
-- Does not depend on WebHost, FlyingFox, browser resources, SwiftUI hosting,
-  WASI hosting, charts, animated images, or terminal-program embedding
-
-### Platform integration products
-
-- executable runner products `SwiftTUICLI` and `SwiftTUIWASI` build top-level
-  execution layers on top of `SwiftTUIRuntime`
-- host products and packages retain authored `SwiftTUIRuntime` apps inside
-  platform-managed shells: `SwiftUIHost` for native SwiftUI, `SwiftTUIWebHost`
-  for localhost-browser launch, and `Platforms/Web` for browser deployment
-- `Platforms/WebBuild` owns browser-deployment build tooling for
-  `Platforms/Web`
-- `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
-  `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
-- terminal-program embedding lives in `SwiftTUITerminal` and
-  `SwiftTUIPTYPrimitives`; first-class terminal workspaces live in
-  `SwiftTUITerminalWorkspace`
-
-The conceptual model is:
-
-```text
-authored app surface -> SwiftTUIRuntime -> platform integration product -> platform shell
+    author --> views
+    views --> core
+    runtime --> core
+    runtime --> views
+    runtime --> host
 ```
 
-That last integration layer comes in two forms:
+An author writes `View` values. `SwiftTUIViews` defines that authoring surface.
+`SwiftTUICore` is the engine: geometry, the frame pipeline, and the data model
+each pipeline phase produces. `SwiftTUIRuntime` owns the run loop, drives the
+pipeline, and connects it to a host. A host turns a finished frame into pixels
+or terminal bytes.
 
-- executable runner products own top-level execution and default `App.main()` stories
-- host products retain `HostedSceneSession` values inside another app or runtime lifecycle
-- compound products must say which side is in scope: runner, host bridge, or
-  presentation surface
+## Modules and the dependency graph
 
-Detailed terminology lives in [TERMINOLOGY.md](TERMINOLOGY.md). Detailed
-per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
+SwiftTUI is one Swift package. Internally it has three core targets and a set
+of product targets layered on top.
 
-## Frame Pipeline
+```mermaid
+flowchart TD
+    subgraph engine["Core targets"]
+        SwiftTUICore
+        SwiftTUIViews
+        SwiftTUIRuntime
+    end
+    SwiftTUICore --> SwiftTUIViews
+    SwiftTUIViews --> SwiftTUIRuntime
 
-SwiftTUI now has two related pipeline contracts: the runtime driver that
-schedules work, and the phase-product model that owns typed frame artifacts.
+    SwiftTUIArguments
+    SwiftTUICLI --> SwiftTUIRuntime
+    SwiftTUI["SwiftTUI<br/>(convenience re-export)"]
+    SwiftTUI --> SwiftTUIRuntime
+    SwiftTUI --> SwiftTUICLI
+    SwiftTUI --> SwiftTUIArguments
 
-`DefaultRenderer` executes one composed runtime pipeline. `RuntimeRenderPipeline`
-is a *sequenced executor*: each `render*` entry point iterates the canonical
-`RuntimeRenderStageName` composition and dispatches every stage through an
-exhaustive `switch`, invoking the caller-supplied handler stored in a small
-per-strategy `...StageHandlers` struct. Stage order is enforced by that
-executor loop — not by prose or a `precondition` — so the ordering cannot drift
-without forcing every `switch` to be updated. The executor is not simpler or
-shorter than the code it replaced: the three strategy-specific handler structs
-(`OneShotRenderStageHandlers`, `AsyncRenderStageHandlers`,
-`CancellableRenderStageHandlers`) are a reshaping of the former closure
-parameters, retained because sync, async, and cancellable strategies differ in
-closure type and cannot share one handler. The extra code buys the compile-time
-guarantee that a mis-ordered or partial stage sequence is unrepresentable.
-
-```text
-head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
+    SwiftTUIWASI --> SwiftTUIRuntime
+    SwiftTUIWebHost --> SwiftTUIRuntime
+    SwiftTUIWebHostCLI --> SwiftTUIWebHost
+    SwiftUIHost["SwiftUIHost<br/>(macOS only)"] --> SwiftTUIRuntime
+    SwiftTUITerminal --> SwiftTUIRuntime
+    SwiftTUITerminalWorkspace --> SwiftTUITerminal
+    SwiftTUICharts --> SwiftTUIViews
+    SwiftTUIAnimatedImage --> SwiftTUIViews
 ```
 
-- The head evaluates the authored root into a `FrameHeadTransaction`. Abortable
-  heads suspend their prepared graph/frame-input state back to the committed
-  baseline before tail work starts.
-- Animation injection is a named post-head stage that rewrites the resolved
-  tree for the current animation transaction.
-- Late-preference reconciliation is the first bounded loop-bearing stage. It
-  may rerun layout until placement-time preferences converge or the
-  current-tree-derived pass budget is reached; exhaustion commits one final
-  relayout of the latest reconciled tree and reports a runtime issue.
-- The fused frame tail runs measure, place, semantics, draw, and raster as one
-  performance node.
-- Commit materializes the staged frame head, then packages and applies the
-  runtime-facing side-effect plan.
+### Core targets
 
-Sync, async, and cancellable rendering are execution strategies over that one
-composition. The async strategies may offload frame-tail work and may drop only
-completed visual-only frames under the shipped stale-frame policy.
+- **`SwiftTUICore`** — the engine. Geometry, the layout engine, the seven
+  pipeline phases and their typed products, the semantic and draw extractors,
+  the rasterizer, the commit planner, the scheduler, diagnostics, and the
+  shared data model. It is an internal target, **not** a published product; it
+  reaches consumers re-exported through `SwiftTUIRuntime`.
+- **`SwiftTUIViews`** — the authoring surface. The `View` protocol, view
+  builders, containers, controls, layout, state, focus, gestures, modifiers,
+  and shapes. `View` is body-only and `@MainActor`-isolated; lowering to
+  primitives is package-internal.
+- **`SwiftTUIRuntime`** — the run loop, the renderer, scenes (`App`, `Scene`,
+  `WindowGroup`), terminal hosting, and the host-frame contracts.
 
-The interactive `RunLoop` adds the second bounded loop-bearing stage:
-focus-sync convergence. After a strategy acquires candidate artifacts, the
-driver may rerender the same scheduled frame when focus regions, focus
-requests/defaults, focused values, or scroll positions change. Its rerender
-budget is derived from the acquired semantic graph rather than a fixed global
-ceiling.
+### Published library products
 
-Within that composition and the interactive wrapper, the typed phase products
-still flow in this order:
+- **`SwiftTUI`** — the terminal convenience product. It re-exports
+  `SwiftTUIRuntime`, `SwiftTUICLI`, and `SwiftTUIArguments` through
+  `@_exported import`, so an ordinary terminal app writes only `import SwiftTUI`
+  and gets the standard flags plus the default terminal `App.main()`.
+- **`SwiftTUIRuntime`**, **`SwiftTUIViews`** — usable directly by hosts and
+  custom launchers that do not want the terminal convenience product.
+- **`SwiftTUICharts`** — `LineChart`, `CalendarHeatmap`, `Sparkline`, and
+  related dashboard views.
+- **`SwiftTUIAnimatedImage`** — finite, pre-composed animated-image playback and
+  GIF import/export.
 
-```text
-resolve -> measure -> place -> semantics -> draw -> raster -> commit
+### Platform, host, and embedding products
+
+All of these live in the **root package** (`Package.swift`); the `Platforms/`
+directory holds their sources but contains no nested Swift packages.
+
+- **Runners** — `SwiftTUICLI` (`TerminalRunner`), `SwiftTUIWASI` (`WASIRunner`),
+  `SwiftTUIWebHost` (`WebHostRunner`), `SwiftTUIWebHostCLI` (`WebHostCLIRunner`),
+  and `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).
+- **Hosts** — `SwiftUIHost` retains `HostedSceneSession` values inside a SwiftUI
+  app. It depends on `SwiftTUIRuntime` directly and is **macOS-only**
+  (`#if os(Linux)` excludes it).
+- **Terminal-program embedding** — `SwiftTUITerminal` (`TerminalView`,
+  `TerminalSession`, `TerminalProcessSession`), `SwiftTUITerminalWorkspace`
+  (tabbed/split-pane workspace surfaces), and `SwiftTUIPTYPrimitives` (pty
+  creation, fd lifecycle, resize). These are macOS- and Linux-only.
+
+`SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
+permitted to link the embedded HTTP/WebSocket server (FlyingFox) and the
+bundled browser resources. A terminal-only app that imports `SwiftTUI` links
+none of that.
+
+## Source layout
+
+```
+Sources/
+  SwiftTUICore/        Geometry, Measure, Place, Resolve, Semantics, Draw,
+                       Raster, Commit, Pipeline, Animation, Styling, Pointer,
+                       Runtime, Content, Support  + SwiftTUICore.docc
+  SwiftTUIViews/       Foundation, ViewBuilder, Primitives, Controls, Stacks,
+                       Layout, State, Focus, Gestures, Collections, Modifiers,
+                       NavigationViews, Presentation, ScrollView, Shapes,
+                       Animation, Environment, GeometryReading  + .docc
+  SwiftTUIRuntime/     RunLoop, Rendering, Scenes, Terminal, Lifecycle, Input,
+                       Accessibility, Configuration, Diagnostics  + .docc
+  SwiftTUICharts/      Chart views  + SwiftTUICharts.docc
+  SwiftTUIAnimatedImage/  Animated image playback  + .docc
+  SwiftTUI/            Convenience re-export target  + SwiftTUI.docc
+Platforms/             Arguments, CLI, WASI, Web, WebBuild, WebHost,
+                       Embedding, SwiftUI  (sources for the product targets)
+Examples/              Sibling demo packages depending on the root package
+Vendor/                swift-figlet, swift-gif, swift-jpeg, swift-png,
+                       UnixSignals  (third-party code, own licenses)
+Tools/TermUIPerf/      Performance scenario harness
 ```
 
-This product ordering is visible in the `RuntimeRenderStageName` composition
-the executor walks, `FrameArtifacts`, diagnostics, and the regression suites.
-It describes product ownership and ordering, not a single-pass execution model
-or a claim that the production runtime schedules seven independent closure
-stages for each frame.
+Example apps under `Examples/` are sibling mini-packages that depend on the
+root package; they are demos and regression coverage, not published products.
 
-## Coordinate Domains
+## The frame pipeline, in one paragraph
 
-SwiftTUI keeps layout and raster placement integer-cell based while pointer,
-drawing, and interpolation APIs use continuous cell-space geometry.
+A frame is built by running an authored view tree through **seven typed
+phases** — `resolve → measure → place → semantics → draw → raster → commit` —
+each producing a distinct value type (`ResolvedNode`, `MeasuredNode`,
+`PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`, `CommitPlan`).
+The runtime drives those phases through a small **stage pipeline**
+(`head → animationInjection → latePreferenceReconciliation → fusedFrameTail →
+commit`) that decides what runs on the main actor versus a frame-tail worker.
+The full mechanics are in [RENDER-PIPELINE.md](RENDER-PIPELINE.md).
 
-- `CellPoint`, `CellSize`, and `CellRect` describe integer terminal cells.
-  They are the units for layout placement, semantic bounds, raster surfaces,
-  terminal output, and compatibility hit regions.
-- `Point`, `Size`, `Rect`, and `Vector` describe continuous positions in the
-  same terminal cell coordinate space. A `Point(x: 2.25, y: 1.5)` is inside
-  cell `(2, 1)`, not in device pixels.
-- `PixelPoint`, `PixelSize`, and `CellPixelMetrics` are provenance and host
-  metadata. They explain how a host or terminal mapped device pixels into
-  cell-space input, but they do not change layout units.
+## The layout model
 
-The semantics phase still routes through cell-denominated regions so controls
-remain stable on cell-only terminals. Pointer handlers receive the original
-continuous `PointerLocation` after routing, and authored gesture values expose
-continuous `Point` values even when the runtime had to synthesize the center of
-an integer cell as a fallback.
+Layout is SwiftUI-shaped: a recursive size negotiation, not a constraint
+solver.
 
-### Resolve
+1. A parent proposes a size to each child.
+2. Each child reports the size it wants for that proposal.
+3. The parent places each child within its own bounds.
 
-- Public `View` values are lowered into `ResolvedNode` trees through package-only lowering helpers
-- Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
-- Environment and metadata are merged here
-- Root presentations are declared during normal base resolution as portal
-  entries. The graph-owned portal root reconciles those declarations, then
-  composes active entries through `OverlayStack` so hosted content has ordinary
-  view-graph ownership under the portal destination.
-- The render pipeline exposes the authored root directly when no overlay is
-  active. When overlays are active, the composed overlay stack becomes the
-  downstream resolved root for measure, place, semantics, draw, raster, and
-  commit.
-- Reuse is conservative and keyed by identity, invalidation scope, and compatible context
+Modifier order matters, because each modifier is a node in the tree that
+re-proposes or re-places. `Layout`, `AnyLayout`, and `ViewThatFits` expose this
+to authored code; `LayoutValueKey` carries per-child layout data.
 
-### Measure
+Some content cannot be sized until its container's geometry is known —
+`GeometryReader` and anchor-based preferences. SwiftTUI handles this with
+**layout-dependent content realization**: the affected subtree is realized once
+the enclosing geometry resolves, rather than guessed and corrected.
 
-- `LayoutEngine` probes resolved nodes under proposals and produces `MeasuredNode` trees
-- Measurement is cacheable and side-effect free
-- Custom layouts, alignment, spacing, `fixedSize`, and text measurement live here
+Custom layouts run on the main actor unless they conform to `SendableLayout`
+(value and cache `Sendable`, with stable measurement/placement reuse
+signatures), which lets the renderer evaluate them on the frame-tail worker.
 
-### Place
+## The four execution modes
 
-- The same layout engine turns measured nodes into `PlacedNode` trees
-- Placement is the authoritative geometry source for interaction regions, content bounds, scrolling extents, and later composition
-- `PlacedNode` uses one grouped resolved-metadata snapshot for synchronization
-  into later-phase fields. New placement and retained-placement reuse both
-  route through the same resolved-to-placed synchronization path so
-  geometry-stable metadata changes cannot leave stale placed mirrors behind.
+The same resolved frame can be presented four ways: a **terminal**, a
+**WASI/browser** canvas, a **host-managed** raster surface inside a SwiftUI app,
+and a **localhost-browser WebHost**. Each is a different *host*; the pipeline
+above them is identical. See [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 
-### Semantics
+## Concurrency model
 
-- `SemanticExtractor` walks the placed tree to derive focus regions, interaction regions, action routes, selection routes, and scroll routes
-- Disabled state, interaction gates, and hit policy are respected here so
-  non-interactive nodes fall out of routing without being unmounted
+The package builds in Swift 6 language mode with `.defaultIsolation(.none)` —
+isolation is stated explicitly, never inferred. `View`, `Scene`, and `App` are
+`@MainActor` authoring protocols, and APIs that evaluate authored `body` trees
+(`Resolver.resolve`, `DefaultRenderer.render`) are `@MainActor`. The heavy
+middle of the pipeline runs off the main actor on a frame-tail worker; the
+boundaries are spelled out in [RENDER-PIPELINE.md](RENDER-PIPELINE.md). The repo
+forbids `@unchecked Sendable` and `nonisolated(unsafe)`; shared mutable state
+uses honest isolation or `Synchronization` primitives.
 
-### Draw
+## Glossary
 
-- `DrawExtractor` lowers placed nodes into draw commands
-- Styling, text payloads, rules, shapes, collection chrome, table chrome, and indicators are handled here
-
-### Raster
-
-- `Rasterizer` converts draw commands into a cell surface with styled runs
-- Terminal capability adaptation is not part of layout; it happens later during presentation
-- Raster cells are data, not terminal bytes. The presentation layer is
-  responsible for sanitizing control scalars and hyperlink destinations before
-  writing to a terminal stream.
-
-### Commit
-
-- `CommitPlanner` packages semantic, lifecycle, and handler-installation work into `CommitPlan`
-- `ViewGraph` owns lifecycle state and emits explicit appear, disappear, task-start, and task-cancel operations during frame finalization
-- Portal teardown flows through ordinary structural child removal, so dismissed
-  overlay subtrees cancel tasks, fire disappear handlers, and prune runtime
-  registrations through the same committed-frame path as other UI.
-- Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
-
-## Presentation Primitives
-
-Root-level UI is composed from package-internal primitives rather than a
-presentation-only host path:
-
-- `Portal` carries root-overlay declarations from arbitrary source subtrees to
-  the nearest portal root while resolving hosted content under destination-owned
-  identities.
-- `OverlayStack` draws the base and active overlays in deterministic
-  `(zIndex, activationOrdinal, stableID)` order and bridges the scene focus
-  scope onto overlay content.
-- `InteractionGate` marks a subtree as visible but unavailable for input.
-  Semantics omit gated focus, command, pointer, gesture, drop, text-input, and
-  focused-value routes while lifecycle and tasks remain mounted.
-- `DismissStack` stores topmost-dismiss actions with the same ordering model as
-  drawing, so Escape routing is not coupled to presentation family names.
-
-The built-in sheet, alert, confirmation-dialog, menu, and toast APIs are
-adapters over those primitives.
-
-## Why The Phase Split Matters
-
-Keeping the phase products explicit gives the project a few durable advantages:
-
-- tests can pin exact behavior at the right abstraction boundary
-- layout and semantics do not need terminal escape-sequence knowledge
-- runtime presentation can evolve without rewriting layout
-- diagnostics can report where work was computed versus reused
-
-The first and last bullets motivate the typed product split and the composed
-runtime driver. Fusing runtime scheduling nodes is allowed when it is the honest
-performance shape, but collapsing product ownership would force regression tests
-to overspecify combined output and would blur the diagnostic signal that
-distinguishes "we reused this" from "we recomputed this." Both costs accrue
-silently and only show up when a regression resists localization. The product
-split is the cheaper path.
-
-## Runtime Model
-
-`RunLoop` wraps the pure frame pipeline in an interactive session.
-
-It coordinates:
-
-- `TerminalHost` for raw mode, alternate-screen ownership, surface sizing, and writes
-- `HostedRasterSurface` for native hosts that consume `RasterSurface` and `SemanticSnapshot` directly
-- `HostedSceneSession` retained scene execution for embedded SwiftUI hosts
-- input readers and signal readers for event streams
-- `InjectedTerminalInputReader` for wrapper-managed byte or event delivery that still shares the terminal control-message contract
-- `FrameScheduler` for invalidations, deadlines, signals, and wakeups
-- `StateContainer` plus dynamic state storage for local state changes
-- focus, action, key, lifecycle, task, pointer, and focused-value registries
-- `LifecycleCoordinator` and `TaskRunner` for post-present lifecycle reconciliation
-- a package-private window host that makes each `WindowGroup` fill and clip to the terminal canvas
-
-The core runtime is intentionally narrow today:
-
-- one terminal host
-- one active root scene in `SwiftTUIRuntime`
-- one full-canvas `WindowGroup` per session
-- keyboard-first interaction with optional pointer input when the host or
-  terminal supports reporting
-
-Platform integration and multi-scene orchestration live in sibling products in
-the root package rather than in the `SwiftTUIRuntime` product itself.
-
-Those integration layers serve three execution modes:
-
-- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or
-  the default `App.main()` provided by the `SwiftTUI` convenience product
-- WASI executable execution and manifest generation via `WASIRunner` in
-  `SwiftTUIWASI`
-- host-managed embedding via `SceneManifest(for:)` and
-  `HostedRasterSurface` plus `HostedSceneSession(for:sceneID:surface:)`, as used by `SwiftUIHost` and
-  `Platforms/Web`
-- localhost-browser WebHost execution via `WebHostRunner` and the WebHost
-  browser bridge in `SwiftTUIWebHost`
-
-CLI scene management is executable-runner policy rather than an authored-scene
-rule. One-window and multi-window apps share the same runner story; composed
-hosts depend on `SwiftTUIRuntime` instead of the `SwiftTUI` terminal
-convenience product.
-
-## Important Data Products
-
-The runtime driver may fuse scheduling nodes, but the phase products stay
-separate. Later products intentionally carry named snapshots of earlier data
-when that is the clearest contract. Duplicated data is allowed only when it has
-an owner, projection path, and freshness proof.
-
-`FrameArtifacts` is a broad inspection bundle, not proof that runtime
-scheduling exposes every product as an independent stage. Host adapters and
-tests should prefer the product that owns the contract they need, such as
-`SemanticSnapshot`, `SemanticHostFrame`, `CommitPlan`, or
-`PresentationDamage`, and use `FrameArtifacts` when the whole current-frame
-bundle is genuinely the subject under inspection.
-
-| Product | Owns | Carries or derives | Boundary contract |
-| --- | --- | --- | --- |
-| `ResolvedNode` | Lowered structure, identity, environment, transaction, layout behavior, layout/draw/semantic/lifecycle metadata, draw payload, preferences, indexed-child hooks, layout-dependent content, transient state, matched geometry | Derived `preferenceValues`, `subtreeNodeCount`, and `supportsRetainedReuse` cache inputs | Authoritative source for resolved metadata. `NodeLayoutInfo`, `NodeSemanticInfo`, `NodeDrawInfo`, and `NodeLifecycleInfo` name grouped views of the data. |
-| `MeasuredNode` | Proposal, measured size, child measurements, container allocation snapshots | Resolve identity for cache/placement correlation | Measurement cache is keyed by `ResolvedNode.isEquivalentForMeasurement`; visual-only changes may be ignored only when measurement output is unchanged. |
-| `PlacedNode` | Bounds, content bounds, clipping, z-index, child placement, subtree counts | Current resolved-derived mirrors for semantics, draw, lifecycle, and animation | `PlacedNodeResolvedMetadata` is the resolved-to-placed projection. Retained placement must call `synchronizeRetainedPhaseMetadata` before reuse exposes a placed tree downstream. |
-| `SemanticSnapshot` | Interaction regions, focus regions, navigation/scroll/selection routes, named coordinate spaces, accessibility nodes, live announcements, warnings | Placed geometry plus refreshed semantic/environment/draw metadata | Derived route snapshot only; it is not a metadata carrier. Transient animation overlays are filtered during extraction. |
-| `DrawNode` | Draw commands, post-child draw commands, draw metadata snapshot, environment snapshot, bounds, clipping, children | Placed geometry plus refreshed draw/layout/style inputs | Placed-to-draw projection owns paint inputs for rasterization, not layout or semantic truth. |
-| `RasterSurface` | Cell grid, resolved cell styles, attachments, image attachments, raster metadata | None used as upstream truth | Presentation damage and drawn identities are hints/diagnostics beside the surface, not layout or semantic inputs. |
-| `CommitPlan` | Ordered lifecycle and handler-installation work | The already-derived `SemanticSnapshot` for runtime consumers | The frame head stages runtime subsystem effects in a `FrameHeadTransaction`. Abortable preparation suspends live state back to the committed baseline before returning; preview and commit materialize the prepared state, and commit publishes lifecycle, task, registration, focus, presentation, and animation effects. Abort discards the same transaction. |
-| `FrameArtifacts` | Full current-frame bundle and diagnostics | Presentation damage, drawn identities, render generations, runtime diagnostics | Field authority is documented on `FrameArtifacts` itself: phase products are canonical, `placedTree` is decorated/baseline-sensitive, presentation damage and drawn identities are advisory, `commitPlan` is the side-effect plan, and `diagnostics` is diagnostic-only. Retained layout indexes canonical baseline layout products; animation-decorated placed trees may be committed for the current frame but must not become retained layout baselines. |
-
-The focused boundary tests live near the seams they protect:
-
-- `Tests/SwiftTUICoreTests/LayoutEngineTests.swift` covers retained placement
-  metadata synchronization.
-- `Tests/SwiftTUITests/DiagnosticsAndCacheTests.swift` covers retained
-  measurement/placement freshness through the default renderer.
-- `Tests/SwiftTUITests/AnimationControllerTests.swift` covers baseline placed
-  tree storage versus transient animation overlays.
-- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` covers sync/async
-  artifact parity and completed-frame drop boundaries.
-
-## Styling And Presentation
-
-- The public styling story is semantic-token-first: TUI views author against
-  `.foreground`, `.background`, `.warning`, `.tint`, and related roles
-- The active host integration chooses the active theme; the inner TUI app does
-  not branch on host style variants or inspect theme choice directly
-- Terminal appearance can be inferred heuristically or queried actively from the
-  host and can synthesize the default semantic theme when no explicit host theme
-  is provided
-- Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
-- Presentation sanitizes authored text and OSC 8 hyperlink destinations before
-  emitting terminal bytes; layout, semantics, and raster artifacts never need to
-  encode terminal-control safety rules themselves
-- Terminal capability affects presentation, not layout semantics
-
-## Transitional Seams
-
-The repository still carries a few package-only seams:
-
-- lowerer protocols such as `ViewNode` and `ResolvableView`
-- internal resolver and lifecycle seams used by tests and runtime plumbing
-
-Those seams should remain adapters. They are not part of the public authoring story and should not leak back into the supported surface.
-
-## Related Docs
-
-- [STATUS.md](STATUS.md): current implementation status and remaining constraints
-- [RUNTIME.md](RUNTIME.md): runtime behavior, lifecycle semantics, and incremental cost model
-- [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md): source ownership map
-- [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md): canonical public and package-only surface areas
-- [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md): review policy for future public API additions
-- [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md): fixture, performance, and architecture regression policy
-- [VISION.md](VISION.md): philosophy, scope, and deferred items
+- **Phase product** — the typed value a pipeline phase emits (`ResolvedNode`,
+  `MeasuredNode`, `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`,
+  `CommitPlan`). All seven are gathered on `FrameArtifacts`.
+- **Resolve** — turning an authored `View` tree into a `ResolvedNode` graph
+  with identity and state attached.
+- **Frame tail** — the off-main portion of a frame: measure through raster.
+- **Frame head** — the on-main portion that resolves the tree and stages
+  side effects before the tail runs.
+- **Commit** — applying a finished frame's `CommitPlan` to a host surface.
+- **Cell space** — the integer terminal grid (`CellPoint`, `CellSize`,
+  `CellRect`).
+- **Continuous cell space** — fractional coordinates over that grid (`Point`,
+  `Size`, `Rect`, `Vector`), used for gestures, hover, drawing, and animation.
+- **Pixel space** — device pixels (`PixelPoint`, `PixelSize`), used only for
+  host/graphics interop.
+- **Semantic snapshot** — the per-frame `SemanticSnapshot`, including the flat
+  `accessibilityNodes` array, consumed by accessibility and focus.
+- **Host** — the component that presents a committed frame: a terminal, a
+  browser canvas, or a SwiftUI raster surface.
+- **Action scope** — a node in the focus chain that can own key commands,
+  palette commands, and toolbar items (`ActionScope`).

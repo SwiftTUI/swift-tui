@@ -24,10 +24,8 @@ struct VStackLeadingGuideShiftBehaviourTests {
   ///
   /// This matches faithful SwiftUI semantics: increasing an
   /// alignment-guide value shifts the view in the OPPOSITE
-  /// direction along the alignment axis. The plan originally
-  /// predicted a rightward shift; see
-  /// `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #1 — this
-  /// test pins the observed (SwiftUI-faithful) behaviour.
+  /// direction along the alignment axis. This test pins the
+  /// observed (SwiftUI-faithful) behaviour.
   ///
   /// Markers (`"plain above"`, `"shifted"`, `"plain below"`) are
   /// unique words so substring matching is unambiguous — renaming a
@@ -69,8 +67,7 @@ struct VStackLeadingGuideShiftBehaviourTests {
 
     #expect(aboveCol == belowCol, "plain rows share the same leading col")
     // Positive alignment-guide value shifts the view in the opposite
-    // direction (SwiftUI-faithful). See
-    // docs/proposals/layout/BEHAVIOUR_FINDINGS.md Finding #1.
+    // direction (SwiftUI-faithful).
     #expect(
       shiftedCol == aboveCol - 4,
       "shifted col (\(shiftedCol)) should be 4 less than plain col (\(aboveCol))"

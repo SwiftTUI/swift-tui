@@ -1,4 +1,4 @@
-# ``Core/CellPixelMetrics``
+# ``CellPixelMetrics``
 
 Read-only display metrics describing how terminal cells map to device pixels.
 
@@ -32,5 +32,3 @@ require pixel accuracy.
 - ``estimated``
 
 ## See Also
-
-- [Cell Pixel Geometry Research](https://github.com/adamz/swift-tui/blob/main/docs/CELL_PIXEL_GEOMETRY_RESEARCH.md)

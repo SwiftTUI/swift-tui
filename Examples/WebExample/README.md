@@ -67,7 +67,7 @@ The minimum a host needs:
   The build script captures the canonical command.
 - **Bun** for the web app, the bundler, and the test runner.
 
-See the repo-level [`docs/TOOLCHAINS.md`](../../docs/TOOLCHAINS.md) for
+See the repo-level [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md) for
 the canonical environment story.
 
 ## Setup
@@ -138,8 +138,7 @@ Examples/WebExample/
   product that provides the WASI runner this example builds against
 - [`WASISurfaceBridge`](../../Platforms/WASI/Sources/WASISurfaceBridge) — the
   package-only transport target shared by the WASI runner and native WebHost
-- [`docs/HOST_PACKAGES.md`](../../docs/HOST_PACKAGES.md) — the root package
+- [`docs/HOSTS-AND-PLATFORMS.md`](../../docs/HOSTS-AND-PLATFORMS.md) — the root package
   platform product model
-- [`docs/decisions/0016-platform-products-live-in-root-package.md`](../../docs/decisions/0016-platform-products-live-in-root-package.md) — the ADR for that model
 - [Top-level `Website/`](../../Website) — Astro stub that iframes
   this example as the live demo

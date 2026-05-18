@@ -1,7 +1,7 @@
 # Aspect-correct shapes in terminals
 
 SwiftTUI's Braille-subpixel shape rasterizer consumes
-``/Core/CellPixelMetrics`` from the resolve environment so that
+``SwiftTUICore/CellPixelMetrics`` from the resolve environment so that
 ``Circle``, ``Ellipse``, and ``Capsule`` render honestly regardless of
 the terminal's cell aspect ratio.
 
@@ -27,6 +27,4 @@ whose cell dimensions it can read.
 
 ## See Also
 
-The rasterizer-equivalence guarantee at `.estimated` metrics, fixture regeneration policy, and the integer-division quantization caveat that determines which metrics actually exercise the aspect-correction path:
-
-- [Cell Pixel Metrics proposal](https://github.com/adamz/swift-tui/blob/main/docs/proposals/CELL_PIXEL_METRICS.md)
+The rasterizer-equivalence guarantee at `.estimated` metrics, fixture regeneration policy, and the integer-division quantization caveat that determines which metrics actually exercise the aspect-correction path are covered in the `SwiftTUICore` regression suites alongside the shape rasterizer. See ``SwiftTUICore/CellPixelMetrics`` for the full metrics type documentation.

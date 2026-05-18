@@ -331,9 +331,8 @@ extension Gesture {
   /// > not yet plumb this through; mutations to the transaction
   /// > inside the closure are silently discarded.
   ///
-  /// Full transaction threading is tracked in
-  /// `docs/proposals/GESTURES_IMPLEMENTATION.md` as a deferred
-  /// enhancement.
+  /// Full transaction threading is a deferred enhancement; mutations to
+  /// the transaction inside the closure are currently silently discarded.
   public func updating<State>(
     _ state: GestureStateBinding<State>,
     body: @escaping @MainActor (Value, inout State, inout Transaction) -> Void
