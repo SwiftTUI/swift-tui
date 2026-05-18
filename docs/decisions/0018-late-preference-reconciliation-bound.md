@@ -26,7 +26,7 @@ layout-dependent `.toolbarItem(...)` values.
 ## Decision
 
 Keep late-preference reconciliation as an explicitly named loop-bearing stage
-with a documented runtime bound of four relayout passes.
+with a documented runtime bound of four reconciliation checks.
 
 When the stage still has not converged after the bound, the runtime keeps the
 existing behavior: emit a `latePreference.reconciliationLimitExceeded` warning
@@ -38,9 +38,26 @@ the bound from a preference graph yet.
 
 ## Rationale
 
-Four relayout passes are the existing shipped behavior from the toolbar
-reconciliation tranche. Keeping that value preserves compatibility while making
-the policy visible in code.
+The bound is empirical, but it is tied to the deepest toolbar-host feedback loop
+the shipped runtime can construct today:
+
+1. Initial layout realizes layout-dependent toolbar items before toolbar chrome
+   exists.
+2. The first reconciliation absorbs those items and inserts toolbar chrome,
+   which changes the available geometry for the hosted content.
+3. The relayout realizes geometry-dependent content again under the reserved
+   toolbar row; those realized toolbar payloads can differ from the first pass.
+4. The next reconciliation absorbs that changed payload, and the final check
+   confirms the tree is stable.
+
+That makes four reconciliation checks the current toolbar ceiling: insert
+chrome, relayout content, absorb changed payload, confirm stability. If the
+runtime emits `latePreference.reconciliationLimitExceeded`, the authored tree
+has exceeded that empirical toolbar envelope and this ADR should be revised
+with either a larger measured ceiling or a graph-derived bound.
+
+Keeping the existing value preserves compatibility while making the policy
+visible in code.
 
 A hard failure would turn authored preference depth into a frame-killing runtime
 error. That is too aggressive while the only shipped late consumer is toolbar

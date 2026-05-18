@@ -52,10 +52,11 @@ private struct LatePreferenceReconciliationPolicy: Sendable {
     case warnAndCommitLastLayout
   }
 
-  /// The toolbar-only shipped reconciler can need a first layout plus bounded
-  /// relayouts when toolbar chrome changes available geometry. Keep the
-  /// historical runtime bound explicit until more late-preference consumers
-  /// justify a derived dependency-depth bound.
+  /// ADR-0018 keeps this at four reconciliation checks for the shipped
+  /// toolbar-only loop: insert toolbar chrome, relayout geometry-dependent
+  /// content, absorb any changed toolbar payload, then confirm stability. The
+  /// runtime warns and commits the last complete layout if that empirical
+  /// ceiling is exceeded.
   static let toolbarHostRuntimeBound = Self(
     maximumRelayoutPasses: 4,
     boundExceededBehavior: .warnAndCommitLastLayout
