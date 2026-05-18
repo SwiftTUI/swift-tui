@@ -11,7 +11,7 @@ import Testing
 #endif
 
 @MainActor
-@Suite
+@Suite(.serialized)
 struct GalleryTabSwitchTests {
   @Test("gallery tabs collapse into the overflow trigger instead of ellipsizing")
   func galleryTabsCollapseIntoOverflowTrigger() {
@@ -290,6 +290,327 @@ struct GalleryTabSwitchTests {
     )
   }
 
+  @Test("selecting the gallery physics tab starts its gravity loop")
+  func selectingPhysicsTabStartsGravityLoop() async throws {
+    let terminalSize = CellSize(width: 160, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryPhysicsSelectionStartsLoop")])
+    let view = GallerySelectionSeedHarness(initialSelection: .counter)
+    let tabClickCenter = try Self.centerOfText(
+      "Full Screen",
+      in: view,
+      terminalSize: terminalSize,
+      rootIdentity: Identity(components: [
+        .named("GalleryPhysicsSelectionStartsLoop.BoundsProbe")
+      ])
+    )
+    let host = GalleryTabSwitchRecordingHost(size: terminalSize)
+    let capture = GalleryPhysicsSelectionCapture()
+
+    let result = try await Self.runHarness(
+      presentationSurface: host,
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
+        .event(.mouse(.init(kind: .down(.primary), location: tabClickCenter))),
+        .event(.mouse(.init(kind: .up(.primary), location: tabClickCenter))),
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          guard let surface = host.lastPresentedSurface,
+            Self.containsBrailleDrawing(surface)
+          else {
+            return false
+          }
+          capture.surfaceCountAtFirstPhysicsFrame = deduplicated(host.surfaces).count
+          return true
+        },
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          deduplicated(host.surfaces).count >= capture.surfaceCountAtFirstPhysicsFrame + 2
+        },
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+      ]),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+
+    let uniqueSurfaces = deduplicated(host.surfaces)
+    #expect(
+      uniqueSurfaces.count >= capture.surfaceCountAtFirstPhysicsFrame + 2,
+      "expected selecting the gallery Physics tab to start gravity-driven frames"
+    )
+  }
+
+  @Test("selecting the overflowed gallery physics tab starts its gravity loop")
+  func selectingOverflowedPhysicsTabStartsGravityLoop() async throws {
+    let terminalSize = CellSize(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryOverflowPhysicsSelectionStartsLoop")])
+    let view = GallerySelectionSeedHarness(initialSelection: .counter)
+    let overflowTriggerCenter = try Self.centerOfText(
+      "▾",
+      in: view,
+      terminalSize: terminalSize,
+      rootIdentity: Identity(components: [
+        .named("GalleryOverflowPhysicsSelectionStartsLoop.BoundsProbe")
+      ])
+    )
+    let host = GalleryTabSwitchRecordingHost(size: terminalSize)
+    let capture = GalleryPhysicsSelectionCapture()
+
+    let result = try await Self.runHarness(
+      presentationSurface: host,
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
+        .event(.mouse(.init(kind: .down(.primary), location: overflowTriggerCenter))),
+        .event(.mouse(.init(kind: .up(.primary), location: overflowTriggerCenter))),
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          guard let surface = host.lastPresentedSurface,
+            let itemBounds = Self.boundsOfText("Full Screen", in: surface)
+          else {
+            return false
+          }
+          capture.overflowItemCenter = Self.centerPoint(of: itemBounds)
+          return true
+        },
+        .eventFrom {
+          .mouse(.init(kind: .down(.primary), location: capture.overflowItemCenter))
+        },
+        .eventFrom {
+          .mouse(.init(kind: .up(.primary), location: capture.overflowItemCenter))
+        },
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          guard let surface = host.lastPresentedSurface,
+            Self.containsBrailleDrawing(surface)
+          else {
+            return false
+          }
+          capture.surfaceCountAtFirstPhysicsFrame = deduplicated(host.surfaces).count
+          return true
+        },
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          deduplicated(host.surfaces).count >= capture.surfaceCountAtFirstPhysicsFrame + 2
+        },
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+      ]),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+
+    let uniqueSurfaces = deduplicated(host.surfaces)
+    #expect(
+      uniqueSurfaces.count >= capture.surfaceCountAtFirstPhysicsFrame + 2,
+      "expected selecting overflowed Physics to start gravity-driven frames"
+    )
+  }
+
+  @Test("gallery physics tab keeps advancing after a drag release")
+  func physicsTabKeepsAdvancingAfterDragRelease() async throws {
+    let terminalSize = CellSize(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryPhysicsReleaseContinuity")])
+    let view = GallerySelectionSeedHarness(initialSelection: .physics)
+    let host = GalleryTabSwitchRecordingHost(size: terminalSize)
+    let capture = GalleryPhysicsReleaseCapture()
+
+    let result = try await Self.runHarness(
+      presentationSurface: host,
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          let surfaces = deduplicated(host.surfaces)
+          guard surfaces.count >= 4,
+            let bounds = surfaces.last.flatMap(Self.brailleBounds(in:))
+          else {
+            return false
+          }
+          let start = Self.centerPoint(of: bounds)
+          capture.dragStart = start
+          capture.dragEnd = Point(x: start.x + 12, y: start.y - 5)
+          return true
+        },
+        .eventFrom {
+          .mouse(.init(kind: .down(.primary), location: capture.dragStart))
+        },
+        .eventFrom(
+          delayNanoseconds: 30_000_000
+        ) {
+          .mouse(.init(kind: .dragged(.primary), location: capture.dragEnd))
+        },
+        .eventFrom(
+          delayNanoseconds: 30_000_000
+        ) {
+          .mouse(.init(kind: .up(.primary), location: capture.dragEnd))
+        },
+        .waitUntil(timeoutNanoseconds: 1_000_000_000) {
+          capture.surfaceCountAtRelease = deduplicated(host.surfaces).count
+          return true
+        },
+        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
+          deduplicated(host.surfaces).count >= capture.surfaceCountAtRelease + 3
+        },
+        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+      ]),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(
+      capture.surfaceCountAtRelease >= 4,
+      "expected gravity-driven frames before dragging the gallery Physics tab"
+    )
+
+    let uniqueSurfaces = deduplicated(host.surfaces)
+    #expect(
+      uniqueSurfaces.count >= capture.surfaceCountAtRelease + 3,
+      "expected multiple physics-driven frames after release, not only drag/release frames"
+    )
+    let postReleaseCenters =
+      uniqueSurfaces
+      .dropFirst(max(0, capture.surfaceCountAtRelease - 1))
+      .compactMap { Self.brailleBounds(in: $0).map(Self.centerPoint(of:)) }
+    let xPositions = Set(postReleaseCenters.map { $0.containingCell.x })
+    let yPositions = Set(postReleaseCenters.map { $0.containingCell.y })
+
+    #expect(
+      xPositions.count >= 2,
+      "expected the released Physics ball to keep horizontal momentum; centers: \(postReleaseCenters)"
+    )
+    #expect(
+      yPositions.count >= 2,
+      "expected the released Physics ball to keep responding to gravity; centers: \(postReleaseCenters)"
+    )
+  }
+
+  @Test("real terminal host keeps gallery physics moving after drag release")
+  func realTerminalHostPhysicsDragReleaseKeepsMoving() async throws {
+    try await Self.realTerminalHostPhysicsDragReleaseKeepsMoving(
+      mouseInputResolution: .preResolved(.cell),
+      inputEncoding: .cells
+    )
+  }
+
+  @Test("real terminal pixel mouse input keeps gallery physics moving after drag release")
+  func realTerminalPixelMousePhysicsDragReleaseKeepsMoving() async throws {
+    try await Self.realTerminalHostPhysicsDragReleaseKeepsMoving(
+      mouseInputResolution: .preResolved(
+        .sgrPixels(metrics: .init(width: 9, height: 18, source: .reported))
+      ),
+      inputEncoding: .pixels(width: 9, height: 18)
+    )
+  }
+
+  @Test("scene-hosted real terminal keeps gallery physics moving")
+  func sceneHostedRealTerminalPhysicsKeepsMoving() async throws {
+    let terminalSize = CellSize(width: 80, height: 24)
+    let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
+    defer {
+      _ = close(pty.master)
+      _ = close(pty.slave)
+    }
+
+    let host = TerminalHost(
+      inputFileDescriptor: pty.slave,
+      outputFileDescriptor: pty.slave,
+      fallbackSize: terminalSize,
+      capabilityProfile: .ansi16,
+      mouseInputResolution: .preResolved(.cell)
+    )
+    let inputReader = InputReader(fileDescriptor: pty.slave)
+    let runTask = Task {
+      try await Self.runSceneHarness(
+        scene: WindowGroup("Gallery Window") {
+          GallerySelectionSeedHarness(initialSelection: .physics)
+        },
+        presentationSurface: host,
+        terminalInputReader: inputReader,
+        sessionName: "GalleryTabSwitchTests.SceneHostedPhysics"
+      )
+    }
+
+    var screen = PTYVisibleScreen(size: terminalSize)
+    let bounds = try await Self.collectDistinctBrailleBounds(
+      on: pty.master,
+      screen: &screen,
+      minimumCount: 4
+    )
+    _ = close(pty.master)
+    _ = try await runTask.value
+
+    let centers = bounds.map(Self.centerPoint(of:))
+    let yPositions = Set(centers.map { $0.containingCell.y })
+    #expect(
+      yPositions.count >= 2,
+      "expected scene-hosted Physics to advance under gravity; centers: \(centers)"
+    )
+  }
+
+  private static func realTerminalHostPhysicsDragReleaseKeepsMoving(
+    mouseInputResolution: TerminalMouseInputResolution,
+    inputEncoding: SGRMouseInputEncoding
+  ) async throws {
+    let terminalSize = CellSize(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryPhysicsRealTerminalRelease")])
+    let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
+    defer {
+      _ = close(pty.master)
+      _ = close(pty.slave)
+    }
+
+    let host = TerminalHost(
+      inputFileDescriptor: pty.slave,
+      outputFileDescriptor: pty.slave,
+      fallbackSize: terminalSize,
+      capabilityProfile: .ansi16,
+      mouseInputResolution: mouseInputResolution
+    )
+    let inputReader = InputReader(fileDescriptor: pty.slave)
+    let runTask = Task {
+      try await Self.runHarness(
+        presentationSurface: host,
+        terminalInputReader: inputReader,
+        terminalSize: terminalSize,
+        rootIdentity: rootIdentity,
+        viewBuilder: { GallerySelectionSeedHarness(initialSelection: .physics) }
+      )
+    }
+
+    var screen = PTYVisibleScreen(size: terminalSize)
+    let preDragBounds = try await Self.collectDistinctBrailleBounds(
+      on: pty.master,
+      screen: &screen,
+      minimumCount: 4
+    )
+    let start = Self.centerPoint(of: try #require(preDragBounds.last))
+    let end = Point(x: start.x + 12, y: start.y - 5)
+
+    try Self.writeAllBytes(Self.sgrPrimaryDown(at: start, encoding: inputEncoding), to: pty.master)
+    try await Task.sleep(nanoseconds: 60_000_000)
+    try Self.writeAllBytes(Self.sgrPrimaryDrag(at: end, encoding: inputEncoding), to: pty.master)
+    try await Task.sleep(nanoseconds: 60_000_000)
+    try Self.writeAllBytes(Self.sgrPrimaryUp(at: end, encoding: inputEncoding), to: pty.master)
+
+    let postReleaseBounds = try await Self.collectDistinctBrailleBounds(
+      on: pty.master,
+      screen: &screen,
+      minimumCount: 4
+    )
+    _ = close(pty.master)
+    _ = try await runTask.value
+
+    let centers = postReleaseBounds.map(Self.centerPoint(of:))
+    let xPositions = Set(centers.map { $0.containingCell.x })
+    let yPositions = Set(centers.map { $0.containingCell.y })
+
+    #expect(
+      xPositions.count >= 2,
+      "expected real-terminal drag release to preserve horizontal momentum; centers: \(centers)"
+    )
+    #expect(
+      yPositions.count >= 2,
+      "expected real-terminal drag release to resume gravity; centers: \(centers)"
+    )
+  }
+
   @Test("gallery command palette lists tab commands")
   func galleryCommandPaletteListsTabCommands() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
@@ -477,6 +798,24 @@ struct GalleryTabSwitchTests {
     return matches.first
   }
 
+  private static func boundsOfText(
+    _ target: String,
+    in surface: RasterSurface
+  ) -> CellRect? {
+    for (row, line) in surface.lines.enumerated() {
+      guard let range = line.range(of: target) else {
+        continue
+      }
+
+      let column = line.distance(from: line.startIndex, to: range.lowerBound)
+      return CellRect(
+        origin: CellPoint(x: column, y: row),
+        size: CellSize(width: target.count, height: 1)
+      )
+    }
+    return nil
+  }
+
   private static func centerOfText(
     _ target: String,
     in view: some View,
@@ -516,6 +855,84 @@ struct GalleryTabSwitchTests {
         x: rect.origin.x + rect.size.width / 2,
         y: rect.origin.y + rect.size.height / 2
       )
+    )
+  }
+
+  private static func firstShapeBounds(in node: PlacedNode) -> CellRect? {
+    if case .shape = node.drawPayload {
+      return node.bounds
+    }
+    for child in node.children {
+      if let match = firstShapeBounds(in: child) {
+        return match
+      }
+    }
+    return nil
+  }
+
+  private static func containsBrailleDrawing(_ surface: RasterSurface) -> Bool {
+    surface.lines.contains { line in
+      line.unicodeScalars.contains { scalar in
+        (0x2800...0x28FF).contains(Int(scalar.value))
+      }
+    }
+  }
+
+  private static func brailleBounds(in surface: RasterSurface) -> CellRect? {
+    var minX = Int.max
+    var minY = Int.max
+    var maxX = Int.min
+    var maxY = Int.min
+
+    for (y, line) in surface.lines.enumerated() {
+      var x = 0
+      for scalar in line.unicodeScalars {
+        if (0x2800...0x28FF).contains(Int(scalar.value)) {
+          minX = min(minX, x)
+          minY = min(minY, y)
+          maxX = max(maxX, x)
+          maxY = max(maxY, y)
+        }
+        x += 1
+      }
+    }
+
+    guard minX <= maxX, minY <= maxY else {
+      return nil
+    }
+    return CellRect(
+      origin: CellPoint(x: minX, y: minY),
+      size: CellSize(width: maxX - minX + 1, height: maxY - minY + 1)
+    )
+  }
+
+  private static func brailleBounds(in rendered: String) -> CellRect? {
+    var minX = Int.max
+    var minY = Int.max
+    var maxX = Int.min
+    var maxY = Int.min
+
+    for (y, line) in rendered.split(separator: "\n", omittingEmptySubsequences: false)
+      .enumerated()
+    {
+      var x = 0
+      for scalar in line.unicodeScalars {
+        if (0x2800...0x28FF).contains(Int(scalar.value)) {
+          minX = min(minX, x)
+          minY = min(minY, y)
+          maxX = max(maxX, x)
+          maxY = max(maxY, y)
+        }
+        x += 1
+      }
+    }
+
+    guard minX <= maxX, minY <= maxY else {
+      return nil
+    }
+    return CellRect(
+      origin: CellPoint(x: minX, y: minY),
+      size: CellSize(width: maxX - minX + 1, height: maxY - minY + 1)
     )
   }
 
@@ -664,9 +1081,40 @@ struct GalleryTabSwitchTests {
   private static func sgrPrimaryClick(
     at point: Point
   ) -> [UInt8] {
-    let cell = point.containingCell
+    sgrMouse(encodedButton: 0, terminator: "M", at: point)
+      + sgrMouse(encodedButton: 0, terminator: "m", at: point)
+  }
+
+  private static func sgrPrimaryDown(
+    at point: Point,
+    encoding: SGRMouseInputEncoding = .cells
+  ) -> [UInt8] {
+    sgrMouse(encodedButton: 0, terminator: "M", at: point, encoding: encoding)
+  }
+
+  private static func sgrPrimaryDrag(
+    at point: Point,
+    encoding: SGRMouseInputEncoding = .cells
+  ) -> [UInt8] {
+    sgrMouse(encodedButton: 32, terminator: "M", at: point, encoding: encoding)
+  }
+
+  private static func sgrPrimaryUp(
+    at point: Point,
+    encoding: SGRMouseInputEncoding = .cells
+  ) -> [UInt8] {
+    sgrMouse(encodedButton: 0, terminator: "m", at: point, encoding: encoding)
+  }
+
+  private static func sgrMouse(
+    encodedButton: Int,
+    terminator: String,
+    at point: Point,
+    encoding: SGRMouseInputEncoding = .cells
+  ) -> [UInt8] {
+    let encoded = encoding.encodedCoordinates(for: point)
     return Array(
-      "\u{001B}[<0;\(cell.x + 1);\(cell.y + 1)M\u{001B}[<0;\(cell.x + 1);\(cell.y + 1)m"
+      "\u{001B}[<\(encodedButton);\(encoded.x);\(encoded.y)\(terminator)"
         .utf8
     )
   }
@@ -688,7 +1136,7 @@ struct GalleryTabSwitchTests {
   private static func waitForScreen(
     on fileDescriptor: Int32,
     screen: inout PTYVisibleScreen,
-    timeoutNanoseconds: UInt64 = 2_000_000_000,
+    timeoutNanoseconds: UInt64 = 5_000_000_000,
     pollNanoseconds: UInt64 = 5_000_000,
     condition: (String) -> Bool
   ) async throws -> String {
@@ -752,6 +1200,39 @@ struct GalleryTabSwitchTests {
       throw ScreenWaitError.forbiddenStateObserved(rendered: rendered)
     }
     return rendered
+  }
+
+  private static func collectDistinctBrailleBounds(
+    on fileDescriptor: Int32,
+    screen: inout PTYVisibleScreen,
+    minimumCount: Int,
+    timeoutNanoseconds: UInt64 = 8_000_000_000,
+    pollNanoseconds: UInt64 = 5_000_000
+  ) async throws -> [CellRect] {
+    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+    var bounds: [CellRect] = []
+
+    while DispatchTime.now().uptimeNanoseconds < deadline {
+      let bytes = try readAvailableBytes(from: fileDescriptor)
+      if !bytes.isEmpty {
+        screen.feed(bytes)
+      }
+      if let next = brailleBounds(in: screen.renderedText),
+        bounds.last != next
+      {
+        bounds.append(next)
+        if bounds.count >= minimumCount {
+          return bounds
+        }
+      }
+      try await Task.sleep(nanoseconds: pollNanoseconds)
+    }
+
+    let finalBytes = try readAvailableBytes(from: fileDescriptor)
+    if !finalBytes.isEmpty {
+      screen.feed(finalBytes)
+    }
+    throw ScreenWaitError.timedOut(rendered: screen.renderedText)
   }
 
   private static func readAvailableBytes(
@@ -926,8 +1407,30 @@ private final class GalleryTabSwitchScriptedInput: TerminalInputReading {
   }
 }
 
+private enum SGRMouseInputEncoding {
+  case cells
+  case pixels(width: Int, height: Int)
+
+  func encodedCoordinates(for point: Point) -> (x: Int, y: Int) {
+    switch self {
+    case .cells:
+      let cell = point.containingCell
+      return (cell.x + 1, cell.y + 1)
+    case .pixels(let width, let height):
+      return (
+        Int(((point.x + 0.5) * Double(width)).rounded()) + 1,
+        Int(((point.y + 0.5) * Double(height)).rounded()) + 1
+      )
+    }
+  }
+}
+
 private enum GalleryTabSwitchAwaitedInputStep {
   case event(InputEvent, delayNanoseconds: UInt64 = 0)
+  case eventFrom(
+    delayNanoseconds: UInt64 = 0,
+    provider: @MainActor () -> InputEvent
+  )
   case waitUntil(
     timeoutNanoseconds: UInt64 = 1_000_000_000,
     predicate: @MainActor () -> Bool
@@ -958,6 +1461,11 @@ private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
               try? await Task.sleep(nanoseconds: delayNanoseconds)
             }
             continuation.yield(event)
+          case .eventFrom(let delayNanoseconds, let provider):
+            if delayNanoseconds > 0 {
+              try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            continuation.yield(provider())
           case .waitUntil(let timeoutNanoseconds, let predicate):
             var elapsedNanoseconds: UInt64 = 0
             while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
@@ -1014,6 +1522,19 @@ private final class GallerySurfaceCapture {
   var initialPhysicsSurface: RasterSurface?
   var prePaletteSurface: RasterSurface?
   var postDismissSurface: RasterSurface?
+}
+
+@MainActor
+private final class GalleryPhysicsReleaseCapture {
+  var surfaceCountAtRelease = 0
+  var dragStart = Point.zero
+  var dragEnd = Point.zero
+}
+
+@MainActor
+private final class GalleryPhysicsSelectionCapture {
+  var surfaceCountAtFirstPhysicsFrame = 0
+  var overflowItemCenter = Point.zero
 }
 
 @MainActor
@@ -1121,7 +1642,12 @@ private struct PTYVisibleScreen {
       guard index + sequenceLength <= pendingBytes.count else {
         break
       }
-      write("•")
+      let character =
+        String(
+          decoding: pendingBytes[index..<(index + sequenceLength)],
+          as: UTF8.self
+        ).first ?? "•"
+      write(character)
       index += sequenceLength
     }
 

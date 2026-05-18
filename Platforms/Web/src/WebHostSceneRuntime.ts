@@ -77,6 +77,7 @@ export class WebHostSceneRuntime {
   private cellWidth = 8;
   private cellHeight = 18;
   private activePointerButton: "primary" | "middle" | "secondary" = "primary";
+  private hasCapturedPointer = false;
   private lastSentResize?: {
     columns: number;
     rows: number;
@@ -315,6 +316,7 @@ export class WebHostSceneRuntime {
 
       const button = pointerButton(event.button);
       this.activePointerButton = button;
+      this.hasCapturedPointer = true;
       this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
       this.onInput(encodeMouseInputMessage({
@@ -328,8 +330,11 @@ export class WebHostSceneRuntime {
     };
 
     const handlePointerUp = (event: PointerEvent) => {
-      const location = this.cellLocation(event);
+      const location = this.hasCapturedPointer
+        ? this.rawCellLocation(event)
+        : this.cellLocation(event);
       this.terminalMount.releasePointerCapture?.(event.pointerId);
+      this.hasCapturedPointer = false;
       if (!location) {
         return;
       }
@@ -345,7 +350,9 @@ export class WebHostSceneRuntime {
     };
 
     const handlePointerMove = (event: PointerEvent) => {
-      const location = this.cellLocation(event);
+      const location = event.buttons && this.hasCapturedPointer
+        ? this.rawCellLocation(event)
+        : this.cellLocation(event);
       if (!location) {
         return;
       }
@@ -754,6 +761,22 @@ export class WebHostSceneRuntime {
   private cellLocation(
     event: MouseEvent
   ): { x: number; y: number } | undefined {
+    const location = this.rawCellLocation(event);
+    if (!location) {
+      return undefined;
+    }
+
+    const cellX = Math.floor(location.x);
+    const cellY = Math.floor(location.y);
+    if (cellX < 0 || cellY < 0 || cellX >= this.columns || cellY >= this.rows) {
+      return undefined;
+    }
+    return location;
+  }
+
+  private rawCellLocation(
+    event: MouseEvent
+  ): { x: number; y: number } | undefined {
     const rect = this.canvas?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.();
     if (!rect) {
       return undefined;
@@ -761,11 +784,6 @@ export class WebHostSceneRuntime {
 
     const x = (event.clientX - rect.left) / this.cellWidth;
     const y = (event.clientY - rect.top) / this.cellHeight;
-    const cellX = Math.floor(x);
-    const cellY = Math.floor(y);
-    if (cellX < 0 || cellY < 0 || cellX >= this.columns || cellY >= this.rows) {
-      return undefined;
-    }
     return { x, y };
   }
 }

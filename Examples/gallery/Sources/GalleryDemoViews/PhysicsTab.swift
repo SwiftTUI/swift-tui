@@ -3,8 +3,8 @@ import SwiftTUIRuntime
 struct PhysicsTab: View {
   @State private var toyState = FullScreenToyPhysics.State()
   @State private var didSeedInitialPosition = false
+  @State private var isDragging = false
   @GestureState private var dragOffset = Vector.zero
-  @GestureState private var gestureIsActive = false
 
   var body: some View {
     GeometryReader { proxy in
@@ -57,11 +57,11 @@ struct PhysicsTab: View {
     metrics: CellPixelMetrics
   ) -> some Gesture {
     DragGesture()
-      .updating($gestureIsActive) { _, state, _ in
-        state = true
-      }
       .updating($dragOffset) { value, state, _ in
         state = value.translation
+      }
+      .onChanged { _ in
+        isDragging = true
       }
       .onEnded { value in
         FullScreenToyPhysics.applyRelease(
@@ -71,6 +71,7 @@ struct PhysicsTab: View {
           in: bounds,
           metrics: metrics
         )
+        isDragging = false
       }
   }
 
@@ -88,7 +89,7 @@ struct PhysicsTab: View {
 
     while !Task.isCancelled {
       try? await Task.sleep(nanoseconds: FullScreenToyPhysics.tickNanoseconds)
-      guard !gestureIsActive else {
+      guard !isDragging else {
         continue
       }
 
