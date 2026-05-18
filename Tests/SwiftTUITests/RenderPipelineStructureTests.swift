@@ -82,6 +82,39 @@ struct RenderPipelineStructureTests {
     #expect(!body.contains("finalizeFrame("))
   }
 
+  @Test("render-tail strategy entry surface is shared")
+  func renderTailStrategyEntrySurfaceIsShared() throws {
+    let source = try String(
+      contentsOf: Self.runtimeRendererSourceURL(),
+      encoding: .utf8
+    )
+
+    #expect(source.contains("renderFrameTailLayoutStage("))
+    #expect(source.contains("renderFrameTailRasterStage("))
+    #expect(source.contains("resolveCompletedFrameCandidate("))
+    #expect(!source.contains("renderFrameTailAsync("))
+    #expect(!source.contains("renderAsyncFrameTailLayoutStage("))
+    #expect(!source.contains("renderCancellableFrameTailLayoutStage("))
+    #expect(!source.contains("renderAsyncFusedFrameTail("))
+    #expect(!source.contains("renderCancellableFusedFrameTail("))
+
+    let cancellableBody = try Self.functionBody(
+      named: "renderAsyncCancellable",
+      in: source
+    )
+    #expect(!cancellableBody.contains("makeCompletedFrameCandidate("))
+    #expect(!cancellableBody.contains("commitCompletedFrameCandidate("))
+    #expect(cancellableBody.contains("resolveCompletedFrameCandidate("))
+
+    let asyncBody = try Self.functionBody(
+      named: "renderViewAsync",
+      in: source
+    )
+    #expect(!asyncBody.contains("makeCompletedFrameCandidate("))
+    #expect(!asyncBody.contains("commitCompletedFrameCandidate("))
+    #expect(asyncBody.contains("resolveCompletedFrameCandidate("))
+  }
+
   @Test("composed render path stays within 2x the pre-refactor time budget")
   func composedRenderTimeBudget() {
     let proposal = ProposedSize(width: .finite(80), height: .finite(40))
@@ -130,7 +163,24 @@ struct RenderPipelineStructureTests {
     guard let declaration = source.range(of: "func \(name)") else {
       throw RenderPipelineStructureSourceError.missingFunction(name)
     }
-    guard let openingBrace = source[declaration.upperBound...].firstIndex(of: "{") else {
+    var signatureIndex = declaration.upperBound
+    var parameterDepth = 0
+    var sawParameterList = false
+    var openingBrace: String.Index?
+    while signatureIndex < source.endIndex {
+      let character = source[signatureIndex]
+      if character == "(" {
+        parameterDepth += 1
+        sawParameterList = true
+      } else if character == ")" {
+        parameterDepth -= 1
+      } else if character == "{", sawParameterList, parameterDepth == 0 {
+        openingBrace = signatureIndex
+        break
+      }
+      signatureIndex = source.index(after: signatureIndex)
+    }
+    guard let openingBrace else {
       throw RenderPipelineStructureSourceError.missingOpeningBrace(name)
     }
 

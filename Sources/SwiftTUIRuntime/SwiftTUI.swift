@@ -129,6 +129,21 @@ private struct AsyncLatePreferenceReconciliationOutput {
   var suspensionDuration: Duration
 }
 
+private struct FrameTailCancellationStrategy {
+  var awaitQueuedCancellationSignal: @MainActor @Sendable () async -> Void
+  var shouldCancelQueued: @MainActor @Sendable () async -> Bool
+}
+
+private enum FrameTailLayoutStageResult {
+  case output(AsyncFrameTailLayoutStageOutput, cancellationToken: FrameTailJobCancellationToken?)
+  case cancelledBeforeStart
+}
+
+private enum CompletedFrameCandidateResolution {
+  case committed(FrameArtifacts, CompletedFrameDropDecision)
+  case dropped(runtimeIssues: [RuntimeIssue], dropDecision: CompletedFrameDropDecision)
+}
+
 private enum LatePreferenceReconciliationStep {
   case finished(ReconciledFrameTailLayout)
   case needsRelayout(FrameTailInput)
@@ -573,7 +588,7 @@ public struct DefaultRenderer {
   package func renderPreparedFrameTailForCancellationTesting(
     _ draft: FrameHeadDraft
   ) async {
-    _ = await renderFrameTailAsync(draft)
+    _ = await renderFrameTailDraft(draft)
   }
 
   @MainActor
@@ -585,7 +600,7 @@ public struct DefaultRenderer {
       return false
     }
 
-    let tailOutput = await renderFrameTailAsync(draft)
+    let tailOutput = await renderFrameTailDraft(draft)
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -602,7 +617,7 @@ public struct DefaultRenderer {
   package func previewCompletedFrameCandidateForTesting(
     _ draft: FrameHeadDraft
   ) async -> CompletedFrameDropDecision {
-    let tailOutput = await renderFrameTailAsync(draft)
+    let tailOutput = await renderFrameTailDraft(draft)
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -615,7 +630,7 @@ public struct DefaultRenderer {
   package func commitCompletedFrameCandidateForTesting(
     _ draft: FrameHeadDraft
   ) async -> CompletedFrameCandidateCommitPlanComparison {
-    let tailOutput = await renderFrameTailAsync(draft)
+    let tailOutput = await renderFrameTailDraft(draft)
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -696,16 +711,32 @@ public struct DefaultRenderer {
           )
         },
         latePreferenceReconciliation: { draft in
-          await renderer.renderCancellableFrameTailLayoutStage(
+          switch await renderer.renderFrameTailLayoutStage(
             draft,
-            awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
-            shouldCancelQueued: shouldCancelQueued
-          )
+            cancellation: FrameTailCancellationStrategy(
+              awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
+              shouldCancelQueued: shouldCancelQueued
+            )
+          ) {
+          case .cancelledBeforeStart:
+            return .cancelledBeforeStart
+          case .output(let layoutStage, let cancellationToken):
+            guard let cancellationToken else {
+              preconditionFailure("Cancellable layout stage completed without a token.")
+            }
+            return .output(
+              CancellableFrameTailLayoutStageOutput(
+                layoutStage: layoutStage,
+                cancellationToken: cancellationToken
+              )
+            )
+          }
         },
         fusedFrameTail: { draft, layoutStage in
-          await renderer.renderCancellableFusedFrameTail(
+          await renderer.renderFrameTailRasterStage(
             draft: draft,
-            layoutStage: layoutStage
+            layoutStage: layoutStage.layoutStage,
+            completionToken: layoutStage.cancellationToken
           )
         },
         cancelledBeforeStart: { draft in
@@ -722,38 +753,34 @@ public struct DefaultRenderer {
         },
         commitOrDrop: { draft, tailOutput in
           let newestGeneration = newestDesiredGeneration() ?? draft.renderGeneration
-          let candidate = renderer.makeCompletedFrameCandidate(
+          switch renderer.resolveCompletedFrameCandidate(
             draft: draft,
             tailOutput: tailOutput,
             newestDesiredGeneration: newestGeneration,
             completedFramePolicy: completedFramePolicy,
             additionalBlockers: completedFrameAdditionalBlockers
-          )
-          if candidate.dropDecision.canSkipCompletedFrame {
-            renderer.discardCompletedFrameCandidate(
-              candidate,
-              reconciliation: candidate.dropDecision.reconciliation
-            )
+          ) {
+          case .dropped(let runtimeIssues, let dropDecision):
             return CancellableRenderOutcome(
               artifacts: nil,
-              runtimeIssues: candidate.previewArtifacts.diagnostics.runtime.issues,
+              runtimeIssues: runtimeIssues,
               renderGeneration: draft.renderGeneration,
               newestDesiredGeneration: newestGeneration,
               tailJobState: .droppedCompleted,
               tailCancelReason: nil,
-              completedFrameDropDecision: candidate.dropDecision
+              completedFrameDropDecision: dropDecision
+            )
+          case .committed(let artifacts, let dropDecision):
+            return CancellableRenderOutcome(
+              artifacts: artifacts,
+              runtimeIssues: artifacts.diagnostics.runtime.issues,
+              renderGeneration: draft.renderGeneration,
+              newestDesiredGeneration: newestGeneration,
+              tailJobState: .completed,
+              tailCancelReason: nil,
+              completedFrameDropDecision: dropDecision
             )
           }
-          let artifacts = renderer.commitCompletedFrameCandidate(candidate)
-          return CancellableRenderOutcome(
-            artifacts: artifacts,
-            runtimeIssues: artifacts.diagnostics.runtime.issues,
-            renderGeneration: draft.renderGeneration,
-            newestDesiredGeneration: newestGeneration,
-            tailJobState: .completed,
-            tailCancelReason: nil,
-            completedFrameDropDecision: candidate.dropDecision
-          )
         }
       )
     )
@@ -809,7 +836,7 @@ public struct DefaultRenderer {
   /// overlays.
   ///
   /// Both the synchronous (`renderFusedFrameTail`) and asynchronous
-  /// (`renderAsyncFusedFrameTail`) tail strategies run exactly this work before
+  /// (`renderFrameTailRasterStage`) tail strategies run exactly this work before
   /// they diverge — the sync path calls `renderRaster`, the async path calls
   /// `renderRasterAsync`. Extracting it keeps the two strategies from
   /// duplicating the placed-tree capture / overlay-snapshot orchestration
@@ -1008,21 +1035,30 @@ public struct DefaultRenderer {
           )
         },
         latePreferenceReconciliation: { draft in
-          await renderer.renderAsyncFrameTailLayoutStage(draft)
+          switch await renderer.renderFrameTailLayoutStage(draft) {
+          case .cancelledBeforeStart:
+            return nil
+          case .output(let layoutStage, _):
+            return layoutStage
+          }
         },
         fusedFrameTail: { draft, layoutStage in
-          await renderer.renderAsyncFusedFrameTail(
+          await renderer.renderFrameTailRasterStage(
             draft: draft,
             layoutStage: layoutStage
           )
         },
         commit: { draft, tailOutput in
-          let candidate = renderer.makeCompletedFrameCandidate(
+          switch renderer.resolveCompletedFrameCandidate(
             draft: draft,
             tailOutput: tailOutput,
             newestDesiredGeneration: draft.renderGeneration
-          )
-          return renderer.commitCompletedFrameCandidate(candidate)
+          ) {
+          case .committed(let artifacts, _):
+            return artifacts
+          case .dropped:
+            preconditionFailure("Non-cancellable frame unexpectedly dropped.")
+          }
         }
       )
     )
@@ -1256,22 +1292,80 @@ public struct DefaultRenderer {
   }
 
   @MainActor
-  private func renderFrameTailAsync(
+  private func renderFrameTailDraft(
     _ draft: FrameHeadDraft
   ) async -> AsyncFrameTailDraftOutput {
-    guard let layoutStage = await renderAsyncFrameTailLayoutStage(draft) else {
+    let layoutResult = await renderFrameTailLayoutStage(draft)
+    guard case .output(let layoutStage, _) = layoutResult else {
       preconditionFailure("Non-cancellable frame tail unexpectedly cancelled.")
     }
-    return await renderAsyncFusedFrameTail(
+    return await renderFrameTailRasterStage(
       draft: draft,
       layoutStage: layoutStage
     )
   }
 
   @MainActor
-  private func renderAsyncFrameTailLayoutStage(
-    _ draft: FrameHeadDraft
-  ) async -> AsyncFrameTailLayoutStageOutput? {
+  private func renderFrameTailLayoutStage(
+    _ draft: FrameHeadDraft,
+    cancellation: FrameTailCancellationStrategy? = nil
+  ) async -> FrameTailLayoutStageResult {
+    if let cancellation {
+      let cancellationToken = FrameTailJobCancellationToken()
+      let layoutTask = Task { @MainActor in
+        await renderLayoutResolvingLatePreferencesAsync(
+          draft.frameTailInput,
+          clock: draft.clock,
+          cancellationToken: cancellationToken
+        )
+      }
+
+      @MainActor
+      func waitForQueuedCancellationSignal() async -> FrameTailJobState {
+        await cancellation.awaitQueuedCancellationSignal()
+        if !Task.isCancelled,
+          await cancellation.shouldCancelQueued(),
+          cancellationToken.cancelBeforeStart()
+        {
+          layoutTask.cancel()
+          return .cancelledBeforeStart
+        }
+        return await cancellationToken.waitUntilLeavesQueue()
+      }
+
+      let queueExitState = await withTaskGroup(of: FrameTailJobState.self) { group in
+        group.addTask {
+          await cancellationToken.waitUntilLeavesQueue()
+        }
+        group.addTask {
+          await waitForQueuedCancellationSignal()
+        }
+        let state = await group.next() ?? cancellationToken.currentState
+        group.cancelAll()
+        return state
+      }
+
+      if queueExitState == .cancelledBeforeStart {
+        layoutTask.cancel()
+        return .cancelledBeforeStart
+      }
+
+      let layoutResult = await layoutTask.value
+      guard let reconciledLayout = layoutResult.layout else {
+        return .cancelledBeforeStart
+      }
+      return .output(
+        AsyncFrameTailLayoutStageOutput(
+          frameTailInput: reconciledLayout.input,
+          layout: reconciledLayout.layout,
+          resolved: reconciledLayout.resolved,
+          runtimeIssues: reconciledLayout.runtimeIssues,
+          suspensionDuration: layoutResult.suspensionDuration
+        ),
+        cancellationToken: cancellationToken
+      )
+    }
+
     if frameTailRenderer.canOffloadLayout(draft.frameTailInput) {
       let layoutPass = await renderFrameTailLayoutAsync(
         draft.frameTailInput,
@@ -1279,14 +1373,17 @@ public struct DefaultRenderer {
         cancellationToken: nil
       )
       guard let layout = layoutPass.layout else {
-        return nil
+        return .cancelledBeforeStart
       }
-      return AsyncFrameTailLayoutStageOutput(
-        frameTailInput: draft.frameTailInput,
-        layout: layout,
-        resolved: draft.resolved,
-        runtimeIssues: layoutRuntimeIssues(input: draft.frameTailInput, resolved: draft.resolved),
-        suspensionDuration: layoutPass.suspensionDuration
+      return .output(
+        AsyncFrameTailLayoutStageOutput(
+          frameTailInput: draft.frameTailInput,
+          layout: layout,
+          resolved: draft.resolved,
+          runtimeIssues: layoutRuntimeIssues(input: draft.frameTailInput, resolved: draft.resolved),
+          suspensionDuration: layoutPass.suspensionDuration
+        ),
+        cancellationToken: nil
       )
     }
 
@@ -1296,21 +1393,25 @@ public struct DefaultRenderer {
       cancellationToken: nil
     )
     guard let reconciledLayout = layoutResult.layout else {
-      return nil
+      return .cancelledBeforeStart
     }
-    return AsyncFrameTailLayoutStageOutput(
-      frameTailInput: reconciledLayout.input,
-      layout: reconciledLayout.layout,
-      resolved: reconciledLayout.resolved,
-      runtimeIssues: reconciledLayout.runtimeIssues,
-      suspensionDuration: layoutResult.suspensionDuration
+    return .output(
+      AsyncFrameTailLayoutStageOutput(
+        frameTailInput: reconciledLayout.input,
+        layout: reconciledLayout.layout,
+        resolved: reconciledLayout.resolved,
+        runtimeIssues: reconciledLayout.runtimeIssues,
+        suspensionDuration: layoutResult.suspensionDuration
+      ),
+      cancellationToken: nil
     )
   }
 
   @MainActor
-  private func renderAsyncFusedFrameTail(
+  private func renderFrameTailRasterStage(
     draft: FrameHeadDraft,
-    layoutStage: AsyncFrameTailLayoutStageOutput
+    layoutStage: AsyncFrameTailLayoutStageOutput,
+    completionToken: FrameTailJobCancellationToken? = nil
   ) async -> AsyncFrameTailDraftOutput {
     let layout = layoutStage.layout
     let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
@@ -1335,7 +1436,7 @@ public struct DefaultRenderer {
         Duration.zero
       }
 
-    return AsyncFrameTailDraftOutput(
+    let output = AsyncFrameTailDraftOutput(
       frameTailInput: layoutStage.frameTailInput,
       layout: layout,
       tail: tail,
@@ -1343,83 +1444,8 @@ public struct DefaultRenderer {
       runtimeIssues: layoutStage.runtimeIssues,
       renderSuspensionDuration: layoutStage.suspensionDuration + rasterSuspensionDuration
     )
-  }
-
-  @MainActor
-  private func renderCancellableFrameTailLayoutStage(
-    _ draft: FrameHeadDraft,
-    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void,
-    shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
-  ) async -> CancellableFrameTailLayoutStageResult {
-    let cancellationToken = FrameTailJobCancellationToken()
-    let layoutTask = Task { @MainActor in
-      await renderLayoutResolvingLatePreferencesAsync(
-        draft.frameTailInput,
-        clock: draft.clock,
-        cancellationToken: cancellationToken
-      )
-    }
-
-    @MainActor
-    func waitForQueuedCancellationSignal() async -> FrameTailJobState {
-      await awaitQueuedCancellationSignal()
-      if !Task.isCancelled,
-        await shouldCancelQueued(),
-        cancellationToken.cancelBeforeStart()
-      {
-        layoutTask.cancel()
-        return .cancelledBeforeStart
-      }
-      return await cancellationToken.waitUntilLeavesQueue()
-    }
-
-    let queueExitState = await withTaskGroup(of: FrameTailJobState.self) { group in
-      group.addTask {
-        await cancellationToken.waitUntilLeavesQueue()
-      }
-      group.addTask {
-        await waitForQueuedCancellationSignal()
-      }
-      let state = await group.next() ?? cancellationToken.currentState
-      group.cancelAll()
-      return state
-    }
-
-    if queueExitState == .cancelledBeforeStart {
-      layoutTask.cancel()
-      return .cancelledBeforeStart
-    }
-
-    let layoutResult = await layoutTask.value
-    guard let reconciledLayout = layoutResult.layout else {
-      return .cancelledBeforeStart
-    }
-    let layoutStage = AsyncFrameTailLayoutStageOutput(
-      frameTailInput: reconciledLayout.input,
-      layout: reconciledLayout.layout,
-      resolved: reconciledLayout.resolved,
-      runtimeIssues: reconciledLayout.runtimeIssues,
-      suspensionDuration: layoutResult.suspensionDuration
-    )
-    return .output(
-      CancellableFrameTailLayoutStageOutput(
-        layoutStage: layoutStage,
-        cancellationToken: cancellationToken
-      )
-    )
-  }
-
-  @MainActor
-  private func renderCancellableFusedFrameTail(
-    draft: FrameHeadDraft,
-    layoutStage: CancellableFrameTailLayoutStageOutput
-  ) async -> AsyncFrameTailDraftOutput {
-    let tailOutput = await renderAsyncFusedFrameTail(
-      draft: draft,
-      layoutStage: layoutStage.layoutStage
-    )
-    layoutStage.cancellationToken.markCompleted()
-    return tailOutput
+    completionToken?.markCompleted()
+    return output
   }
 
   @MainActor
@@ -1517,6 +1543,36 @@ public struct DefaultRenderer {
         eligibility: eligibility
       )
     )
+  }
+
+  @MainActor
+  private func resolveCompletedFrameCandidate(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput,
+    newestDesiredGeneration: RenderGeneration,
+    completedFramePolicy: CompletedFramePolicy? = nil,
+    additionalBlockers:
+      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
+  ) -> CompletedFrameCandidateResolution {
+    let candidate = makeCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      newestDesiredGeneration: newestDesiredGeneration,
+      completedFramePolicy: completedFramePolicy,
+      additionalBlockers: additionalBlockers
+    )
+    if candidate.dropDecision.canSkipCompletedFrame {
+      discardCompletedFrameCandidate(
+        candidate,
+        reconciliation: candidate.dropDecision.reconciliation
+      )
+      return .dropped(
+        runtimeIssues: candidate.previewArtifacts.diagnostics.runtime.issues,
+        dropDecision: candidate.dropDecision
+      )
+    }
+    let artifacts = commitCompletedFrameCandidate(candidate)
+    return .committed(artifacts, candidate.dropDecision)
   }
 
   @MainActor
