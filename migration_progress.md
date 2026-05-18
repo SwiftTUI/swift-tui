@@ -33,6 +33,9 @@ Approved constraints:
 - Packet 5 completed: decomposed async runtime frame acquisition in
   `RunLoop+Rendering.swift` into mode selection, cancellable rendering, and
   skipped-frame bookkeeping helpers.
+- Packet 6 completed: moved committed-frame presentation dispatch, JSON and
+  accessible output, cursor-focus presentation, and output metrics into
+  `RunLoop+Presentation.swift`.
 
 ## Baseline Validation
 
@@ -112,19 +115,40 @@ Packet 5 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-030508-85414.log`
   - Result: PASS
 
+Packet 6 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.JSONFrameRendererTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.LinearAccessibilityRendererTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-031025-5025.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 6: continue reducing cognitive load in runtime commit and presentation
-handoff code.
+Packet 7: continue from the next highest-debt production subsystem after the
+primary runtime presentation path.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- To be selected from production-code size/coupling evidence.
 
 Validation:
 
-- Runtime, accessibility, JSON, terminal, and pipeline focused tests selected
-  from current file evidence.
+- Focused tests selected from touched subsystem evidence.
 - `bun run test`
 
 ## Failed Attempts
