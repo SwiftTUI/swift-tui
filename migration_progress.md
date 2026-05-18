@@ -369,22 +369,51 @@ Packet 17 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-050134-20208.log`
   - Result: PASS
 
+Packet 18 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - Result: PASS, 23 tests
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-051003-41466.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 18: re-rank remaining production debt after the run-loop diagnostics
-gate. Current candidates from prior reviews are `InputReader` parser/type
-separation and additional `RunLoop` control-flow decomposition. The next packet
-should start from the highest-centrality code still mixing policy, parsing, and
-side effects after Packet 17 is committed.
+Packet 19: late preference reconciliation extraction. Read-only runtime review
+ranked this as the next safest high-value central rendering split after the
+input support checkpoint: move late-preference policy, sync/async reconciliation
+loop types, and runtime issue helpers out of `DefaultRenderer` into a
+same-subsystem helper without moving queued-cancellation or prepared-graph
+materialization.
 
 Expected owned files pending local discovery:
 
-- likely `Sources/SwiftTUIRuntime/Input/InputReader.swift` plus a same-folder
-  parser/model helper, or another narrow `RunLoop` helper.
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/LatePreferenceReconciliation.swift`
 
 Validation:
 
-- Focused tests selected from touched subsystem evidence.
+- `swiftly run swift build`
+- `swiftly run swift test --filter SwiftTUITests.BoundedReconciliationTests`
+- `swiftly run swift test --filter SwiftTUITests.ToolbarTests`
+- `swiftly run swift test --filter SwiftTUITests.LayoutDependentContainerHardeningTests`
+- `swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
 - `bun run test`
 
 ## Failed Attempts

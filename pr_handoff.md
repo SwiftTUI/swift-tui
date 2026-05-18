@@ -412,6 +412,25 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-050134-20208.log
 ```
 
+Packet 18 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests
+swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests
+swiftly run swift test --filter SwiftTUITests.InputParserModifierTests
+swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-051003-41466.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -439,6 +458,7 @@ Packet 14 is animation transition-overlay extraction.
 Packet 15 is animation property-value application extraction.
 Packet 16 is completed-frame artifact support extraction.
 Packet 17 is run-loop frame diagnostics extraction.
+Packet 18 is input reader pure support type extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -450,7 +470,7 @@ reinjection ordering, property animation writeback, flexible-frame dimension
 slot preservation, shape-style destination routing, completed-frame preview
 side-effect isolation, completed-frame drop classification, diagnostics timing
 fields, skipped-frame diagnostic record, render-suspension input counting, or
-public API regression appears.
+public input-event/protocol surface regression appears.
 
 ## AI Assistance Disclosure
 
