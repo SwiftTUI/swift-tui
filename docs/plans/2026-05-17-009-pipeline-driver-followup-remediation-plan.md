@@ -197,7 +197,7 @@ checkout, and the verifying commit hash is recorded.
 | F8  | code+test | `swiftly run swift test --filter RenderDriverInstrumentationCostTests`, `swiftly run swift test --filter DiagnosticsAndCacheTests`, `swiftly run swift test --filter FrameDiagnostics`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; runtime artifact construction no longer calls `FrameDiagnostics.summarize(...)` unconditionally, and `artifactConstructionDoesNotCallFrameDiagnosticsSummarize` pins the completed-frame constructors to `FrameDiagnostics.fromCachedPhaseProducts(...)` without restoring a diagnostics opt-out fork. | 7789bdeb |
 | F9  | code+test | `swiftly run swift test --filter FrameTailWorkerFallbackTests`, `swiftly run swift test --filter WASIRenderAsyncTests`, `swiftly run swift test --filter SwiftTUIWASITests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; the no-Dispatch frame-tail layout fallback now selects the same `ImmediateFrameTailLayoutWorker` implementation that native tests instantiate through `FrameTailLayoutWorkerBox(scheduling: .immediate)`, so the synchronous fallback semantics are exercised outside the WASI-only compile branch. | ae431c05 |
 | F10 | code+test | `swiftly run swift test --filter DirtyTrackingCoherenceTests`, `swiftly run swift test --filter InteractiveRuntimeTests/runLoopPassesScheduledInvalidationsIntoResolveContext`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; external `RunLoop` state drift is now reconciled into the scheduled invalidation signal with `ScheduledFrame.forceRootEvaluation`, carried through `ResolveContext.forceRootEvaluation` into `FrameResolveState`, and the old direct `previousRenderedState` force-root block is pinned absent by `externalStateDriftUsesScheduledInvalidationSignal`. | cfd378d4 |
-| F11 | _pending_ | _pending_ | _pending_ |
+| F11 | code+test | `swiftly run swift test --filter RenderPipelineStructureTests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, `swiftly run swift test --filter PipelineDriverParityTests`, and `swiftly run swift test --filter RenderDriverCharacterizationTests` pass; branch-specific async/cancellable tail helpers (`renderFrameTailAsync`, `renderAsyncFrameTailLayoutStage`, `renderCancellableFrameTailLayoutStage`, `renderAsyncFusedFrameTail`, `renderCancellableFusedFrameTail`) are gone, and `renderTailStrategyEntrySurfaceIsShared` pins that async/cancellable paths share `renderFrameTailLayoutStage`, `renderFrameTailRasterStage`, and `resolveCompletedFrameCandidate`. | 11c9aa9f |
 | F12 | _pending_ | _pending_ | _pending_ |
 | F13 | _pending_ | _pending_ | _pending_ |
 | F14 | _pending_ | _pending_ | _pending_ |
@@ -2042,9 +2042,17 @@ Follow-up tasks added from the independent re-audit:
   `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed; the
   F10 focused suite required deleting `.build` before rerun after an
   incremental stale-link failure.
-- [ ] **F11 reopened:** reduce the observable render-tail entry surface; sync,
+- [x] **F11 reopened:** reduce the observable render-tail entry surface; sync,
   async, cancellable, late-preference, layout, and completed-frame candidate
   helpers must route through a smaller shared control-flow surface.
+  Completed by `11c9aa9f`: async and cancellable render-tail paths now share
+  `renderFrameTailLayoutStage` for layout/late-preference/cancellation,
+  `renderFrameTailRasterStage` for async raster plus completion-token marking,
+  and `resolveCompletedFrameCandidate` for completed-frame commit/drop
+  handling. The old branch-specific helpers named in the re-audit are absent,
+  and `renderTailStrategyEntrySurfaceIsShared` pins the reduced entry surface.
+  `RenderPipelineStructureTests`, `AsyncFrameTailRenderingTests`,
+  `PipelineDriverParityTests`, and `RenderDriverCharacterizationTests` passed.
 - [ ] **F13 reopened:** make fresh-vs-incremental raster verification active
   whenever incremental damage suppresses painting, not only behind an opt-in
   test initializer.
