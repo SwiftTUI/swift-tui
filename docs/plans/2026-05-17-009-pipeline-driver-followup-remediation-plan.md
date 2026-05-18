@@ -187,20 +187,20 @@ checkout, and the verifying commit hash is recorded.
 
 | Finding | Mechanism | DoD command | Verified-by commit |
 | --- | --- | --- | --- |
-| F1  | _pending_ | _pending_ | _pending_ |
-| F2  | _pending_ | _pending_ | _pending_ |
-| F3  | _pending_ | _pending_ | _pending_ |
-| F4  | _pending_ | _pending_ | _pending_ |
-| F5  | _pending_ | _pending_ | _pending_ |
-| F6  | _pending_ | _pending_ | _pending_ |
-| F7  | _pending_ | _pending_ | _pending_ |
+| F1  | code+test | `grep -rn "RuntimeFrameHeadStage\|precondition(stageOrder" --include="*.swift" Sources` prints nothing — `RuntimeRenderPipeline` is a sequenced executor with no `headStage` field, no `stageOrder` initializer parameter, and no canonical-order `precondition`; dead config (`RuntimeFrameHeadStage`, frozen `stageOrder` param + precondition) deleted; stage order now executor-enforced; `RenderPipelineStructureTests.stageOrderIsStructural` pins the structural property and `composedRenderTimeBudget` pins the within-2x wall-clock time budget | 36a8b529, 1e163dbd |
+| F2  | code+test | `grep -n "rerenderedForFocusSync" Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift` shows the focus-sync rerender flag declared once (`FocusSyncConvergenceState`) and read/written only through the shared `processFocusSyncIteration` / `applyAcquiredFrame`; both `renderPendingFrames` and `renderPendingFramesAsync` are thin delegators | 6d70ca63 |
+| F3  | code+test | `swiftly run swift test --filter ResolvePurityTests` passes; the guard now asserts the runtime subsystem snapshot is unchanged immediately after `prepareFrameHeadForCancellationTesting(...)` and again after abort. Abortable heads record prepared graph/frame-input checkpoints, suspend live state back to the committed baseline before returning, and materialize the prepared state only for preview/commit. | c04d5ac1 |
+| F4  | code+test | `swiftly run swift test --filter ViewGraphCheckpointTotalityTests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests/previewCommitEqualsRealCommit`, and `swiftly run swift test --filter RenderPipelineStructureTests/completedFramePreviewDoesNotFinalizeLiveGraph` pass; completed-frame preview now uses non-mutating `ViewGraph.previewLifecycleEvents(...)` and the structural guard pins that `previewCompletedFrameCommit` does not call `finalizeFrame`. | 5856eda2 |
+| F5  | code+test | `grep -rn "while cancellationToken.currentState\|Task.sleep(for: \\.milliseconds(1))" --include="*.swift" Sources/SwiftTUIRuntime` prints nothing for queued-tail cancellation; `FrameTailJobCancellationToken.waitUntilLeavesQueue()` and `FrameScheduler.waitForPendingFrame(at:)` provide continuation-backed queue-exit / pending-frame signals; `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/queuedFrameTailCancelsBeforeWorkerLayoutStarts` passes | 80011951 |
+| F6  | code+test | `swiftly run swift test --filter BoundedReconciliationTests`, `swiftly run swift test --filter AppRuntimeTests/focusSynchronizationRerenderBudgetTripsAtTheConfiguredLimit`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; late-preference relayout uses a current-tree-derived budget and final reconciled relayout on exhaustion, and focus-sync derives its rerender budget from the acquired semantic graph instead of a fixed default. | be0e54c4 |
+| F7  | code+test | `swiftly run swift test --filter FrameDropDroppabilityTests` passes; `grep -n "subtract(\[" Sources/SwiftTUIRuntime/SwiftTUI.swift` prints nothing, so completed-frame eligibility no longer subtracts retained-baseline blockers after tail classification | 61639294, 815ae644 |
 | F8  | code+test | `swiftly run swift test --filter RenderDriverInstrumentationCostTests`, `swiftly run swift test --filter DiagnosticsAndCacheTests`, `swiftly run swift test --filter FrameDiagnostics`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; runtime artifact construction no longer calls `FrameDiagnostics.summarize(...)` unconditionally, and `artifactConstructionDoesNotCallFrameDiagnosticsSummarize` pins the completed-frame constructors to `FrameDiagnostics.fromCachedPhaseProducts(...)` without restoring a diagnostics opt-out fork. | 7789bdeb |
 | F9  | code+test | `swiftly run swift test --filter FrameTailWorkerFallbackTests`, `swiftly run swift test --filter WASIRenderAsyncTests`, `swiftly run swift test --filter SwiftTUIWASITests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; the no-Dispatch frame-tail layout fallback now selects the same `ImmediateFrameTailLayoutWorker` implementation that native tests instantiate through `FrameTailLayoutWorkerBox(scheduling: .immediate)`, so the synchronous fallback semantics are exercised outside the WASI-only compile branch. | ae431c05 |
 | F10 | code+test | `swiftly run swift test --filter DirtyTrackingCoherenceTests`, `swiftly run swift test --filter InteractiveRuntimeTests/runLoopPassesScheduledInvalidationsIntoResolveContext`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; external `RunLoop` state drift is now reconciled into the scheduled invalidation signal with `ScheduledFrame.forceRootEvaluation`, carried through `ResolveContext.forceRootEvaluation` into `FrameResolveState`, and the old direct `previousRenderedState` force-root block is pinned absent by `externalStateDriftUsesScheduledInvalidationSignal`. | cfd378d4 |
 | F11 | code+test | `swiftly run swift test --filter RenderPipelineStructureTests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, `swiftly run swift test --filter PipelineDriverParityTests`, and `swiftly run swift test --filter RenderDriverCharacterizationTests` pass; branch-specific async/cancellable tail helpers (`renderFrameTailAsync`, `renderAsyncFrameTailLayoutStage`, `renderCancellableFrameTailLayoutStage`, `renderAsyncFusedFrameTail`, `renderCancellableFusedFrameTail`) are gone, and `renderTailStrategyEntrySurfaceIsShared` pins that async/cancellable paths share `renderFrameTailLayoutStage`, `renderFrameTailRasterStage`, and `resolveCompletedFrameCandidate`. | 11c9aa9f |
-| F12 | _pending_ | _pending_ | _pending_ |
+| F12 | code+test | `grep -c "case .fusedFrameTail" Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift` returns ≥1 — `RuntimeRenderStageName` is the discriminant the executor switches on; each `render*` entry point dispatches every stage through an exhaustive `switch`, so the enum has a control-flow consumer rather than being unused metadata | 36a8b529 |
 | F13 | code+test | `swiftly run swift test --filter RasterizerTests`, `swiftly run swift test --filter PipelineContractTests/incrementalRasterReuseMatchesFreshRasterForMutationMatrix`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; default `Rasterizer()` now verifies every incremental repaint by comparing against a fresh raster and falls back to the fresh result with `presentationDamage == nil` when damage was incomplete; no `verifyIncrementalRepaint` opt-in remains. | bdabfa8d |
-| F14 | _pending_ | _pending_ | _pending_ |
+| F14 | code+test | `Scripts/check_pipeline_driver_resolution_ledger.sh` passes and is invoked by `bun run test` through `Scripts/lib/repo_policy_checks.sh`; the checker requires all 14 ledger rows to be populated with non-`docs` mechanisms, requires both audit summaries to carry a resolution-mechanism column, requires the follow-up audit to link this ledger and name the checker, and requires the current independent re-audit status to report every finding as `RESOLVED`. | 6e76aa46 |
 ```
 
 - [x] **Step 2: Commit**
@@ -2068,9 +2068,16 @@ Follow-up tasks added from the independent re-audit:
   `PipelineDriverParityTests` gate initially hit a `swiftpm-testing-helper`
   signal 11 during startup and then passed after deleting `.build`, matching
   the clean-rerun rule above.
-- [ ] **F14 reopened:** make the process artifact discoverable enough that an
+- [x] **F14 reopened:** make the process artifact discoverable enough that an
   independent audit constrained to the follow-up audit and repo can verify the
   process remediation without trusting prior chat context.
+  Completed by `6e76aa46`: added
+  `Scripts/check_pipeline_driver_resolution_ledger.sh` and wired it into
+  `Scripts/lib/repo_policy_checks.sh` so `bun run test` mechanically checks the
+  ledger. Completed by this ledger update: the follow-up audit now names the
+  checker, the ledger has independent audit entrypoints, and a current
+  independent re-audit status table records all F1-F14 rows as resolved while
+  preserving the historical `a595e125` still-observable report as history.
 
 - [x] **Step 3: Record the re-audit outcome**
 
