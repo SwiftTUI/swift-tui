@@ -73,7 +73,11 @@ codes while test suites are starting, even when no assertion failure is
 reported. If a phase gate fails with `swiftpm-testing-helper` signal exits or
 similar build-product corruption symptoms, fully delete repo `.build`
 directories and rerun `bun run test` from the clean build state before
-classifying the phase as failed. The Phase 7 clean rerun passed after:
+classifying the phase as failed. Phase 10 follow-up work also observed that
+signature-shape changes can leave stale SwiftPM test objects linked against an
+old package initializer; after such changes, rerun the relevant gate from a
+clean `.build` before classifying the phase. The Phase 7 clean rerun passed
+after:
 
 ```bash
 find . -name .build -type d -prune -exec rm -rf {} +
@@ -192,7 +196,7 @@ checkout, and the verifying commit hash is recorded.
 | F7  | _pending_ | _pending_ | _pending_ |
 | F8  | code+test | `swiftly run swift test --filter RenderDriverInstrumentationCostTests`, `swiftly run swift test --filter DiagnosticsAndCacheTests`, `swiftly run swift test --filter FrameDiagnostics`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; runtime artifact construction no longer calls `FrameDiagnostics.summarize(...)` unconditionally, and `artifactConstructionDoesNotCallFrameDiagnosticsSummarize` pins the completed-frame constructors to `FrameDiagnostics.fromCachedPhaseProducts(...)` without restoring a diagnostics opt-out fork. | 7789bdeb |
 | F9  | code+test | `swiftly run swift test --filter FrameTailWorkerFallbackTests`, `swiftly run swift test --filter WASIRenderAsyncTests`, `swiftly run swift test --filter SwiftTUIWASITests`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; the no-Dispatch frame-tail layout fallback now selects the same `ImmediateFrameTailLayoutWorker` implementation that native tests instantiate through `FrameTailLayoutWorkerBox(scheduling: .immediate)`, so the synchronous fallback semantics are exercised outside the WASI-only compile branch. | ae431c05 |
-| F10 | _pending_ | _pending_ | _pending_ |
+| F10 | code+test | `swiftly run swift test --filter DirtyTrackingCoherenceTests`, `swiftly run swift test --filter InteractiveRuntimeTests/runLoopPassesScheduledInvalidationsIntoResolveContext`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; external `RunLoop` state drift is now reconciled into the scheduled invalidation signal with `ScheduledFrame.forceRootEvaluation`, carried through `ResolveContext.forceRootEvaluation` into `FrameResolveState`, and the old direct `previousRenderedState` force-root block is pinned absent by `externalStateDriftUsesScheduledInvalidationSignal`. | cfd378d4 |
 | F11 | _pending_ | _pending_ | _pending_ |
 | F12 | _pending_ | _pending_ | _pending_ |
 | F13 | _pending_ | _pending_ | _pending_ |
@@ -2023,9 +2027,21 @@ Follow-up tasks added from the independent re-audit:
   `FrameTailWorkerFallbackTests`, `WASIRenderAsyncTests`,
   `SwiftTUIWASITests`, `AsyncFrameTailRenderingTests`, and
   `PipelineDriverParityTests` passed.
-- [ ] **F10 reopened:** collapse or structurally unify scheduler invalidation,
+- [x] **F10 reopened:** collapse or structurally unify scheduler invalidation,
   ViewGraph dirty work, and `RunLoop.previousRenderedState` so coherence no
   longer rests on convention plus one regression test.
+  Completed by `cfd378d4`: external state drift is now folded into the
+  scheduled invalidation path by marking the root identity invalidated and
+  carrying `ScheduledFrame.forceRootEvaluation` through `ResolveContext` into
+  `FrameResolveState`; `previousRenderedState` advances only after a committed
+  frame. The audit also confirmed
+  `InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows`
+  fails on a stashed-clean baseline, so that isolated lifecycle failure is
+  pre-existing rather than F10-induced. `DirtyTrackingCoherenceTests`,
+  `InteractiveRuntimeTests/runLoopPassesScheduledInvalidationsIntoResolveContext`,
+  `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed; the
+  F10 focused suite required deleting `.build` before rerun after an
+  incremental stale-link failure.
 - [ ] **F11 reopened:** reduce the observable render-tail entry surface; sync,
   async, cancellable, late-preference, layout, and completed-frame candidate
   helpers must route through a smaller shared control-flow surface.
