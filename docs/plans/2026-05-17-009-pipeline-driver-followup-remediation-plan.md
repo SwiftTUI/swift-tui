@@ -1767,7 +1767,7 @@ git commit -m "docs: ledger F9 resolved (test)"
 
 **Anti-rationalization:** documenting the three mechanisms does not resolve F10. The fix is a test asserting they agree, plus — where feasible — collapsing the `RunLoop` state-diff into the scheduler/graph signal so there are fewer independent sources.
 
-- [ ] **Step 1: Write the coherence test**
+- [x] **Step 1: Write the coherence test**
 
 Create `Tests/SwiftTUITests/DirtyTrackingCoherenceTests.swift`:
 
@@ -1792,13 +1792,13 @@ struct DirtyTrackingCoherenceTests {
 Flesh out using the `RunLoop` + `StateContainer` test pattern from
 `InteractiveRuntimeTests.swift`.
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `swift test --filter DirtyTrackingCoherenceTests`
 Expected: PASS. A failure is F10 made concrete — the mechanisms disagree; fix
 the disagreement.
 
-- [ ] **Step 3: Evaluate collapsing the `RunLoop` state diff**
+- [x] **Step 3: Evaluate collapsing the `RunLoop` state diff**
 
 Inspect whether `previousRenderedState` + `forceRootEvaluation` can be replaced
 by routing state changes through `scheduler.requestInvalidation`. If feasible
@@ -1806,7 +1806,7 @@ within this phase, do it (fewer independent signals = the real fix). If not,
 record in the commit why the third signal must stay, so the next maintainer
 knows it is a considered choice, not an oversight.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Tests/SwiftTUITests/DirtyTrackingCoherenceTests.swift Sources/SwiftTUIRuntime/
