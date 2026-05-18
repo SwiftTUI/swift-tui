@@ -28,6 +28,8 @@ Approved constraints:
   bookkeeping from `TerminalHost.present(_:damage:)`.
 - Packet 3 completed: extracted frame-tail presentation-damage proof logic from
   `FrameTailRenderer.swift` into `FrameTailPresentationDamage.swift`.
+- Packet 4 completed: split frame diagnostics and frame context out of
+  `FrameArtifacts.swift`.
 
 ## Baseline Validation
 
@@ -79,24 +81,35 @@ Packet 3 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-025321-47448.log`
   - Result: PASS
 
+Packet 4 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUICoreTests.LayoutEngineTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-025909-68455.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 4: split frame diagnostics and frame context out of
-`FrameArtifacts.swift`.
+Packet 5: reduce cognitive load in frame acquisition, commit, and presentation
+handoff code.
 
-Owned files:
+Expected owned files pending local discovery:
 
-- `Sources/SwiftTUICore/Commit/FrameArtifacts.swift`
-- `Sources/SwiftTUICore/Commit/FrameDiagnostics.swift`
-- `Sources/SwiftTUICore/Commit/FrameContext.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
 
 Validation:
 
-- `swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests`
-- `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
-- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
-- `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
-- `swiftly run swift test --filter SwiftTUICoreTests.LayoutEngineTests`
+- Runtime and pipeline focused tests selected from current file evidence.
 - `bun run test`
 
 ## Failed Attempts
