@@ -612,6 +612,39 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 26: Terminal Input Parser File Split
+
+- Objective: keep `InputReader.swift` focused on stream ownership by moving the
+  public terminal byte parser and keyboard parser into a dedicated input parser
+  file.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+  - `Sources/SwiftTUIRuntime/Input/TerminalInputParser.swift`
+- Dependencies: Packet 25 isolated the feed pipeline. A read-only parser audit
+  confirmed this is a pure declaration move: parser types, bracketed-paste
+  marker matching, CSI modifier parsing, SGR mouse parsing, and private numeric
+  helpers move together, while platform stream loops stay in `InputReader`.
+- Invariants: public `TerminalInputParser` and `KeyParser` symbols stay
+  unchanged; `TerminalInputParser.init(mouseCoordinateMode:)` remains package
+  only; private parser helpers stay private; partial CSI, SGR, and
+  bracketed-paste buffers keep waiting for completion; lone `ESC` still emits a
+  key event immediately; bracketed paste still emits one `.paste` event and
+  preserves unterminated bytes across feeds; SGR cell coordinates remain
+  1-based input to 0-based cell fallback; SGR pixel mode keeps zero/negative raw
+  pixel behavior; the `asciiSignedInteger` implementation shape remains
+  unchanged to avoid the documented Swift 6.3.1 wasm optimizer issue.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/keyParserParsesExpectedSequences`
+  - `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalInputParserDecodesMixedMouseStreams`
+  - `swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests/terminalPixelMouseInputReachesDragGestureAsFractionalLocation`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

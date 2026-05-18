@@ -143,6 +143,11 @@ Packet 25 should be reviewed as input event decoding extraction:
 - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
 - `Sources/SwiftTUIRuntime/Input/TerminalInputEventDecoding.swift`
 
+Packet 26 should be reviewed as terminal input parser file split:
+
+- `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+- `Sources/SwiftTUIRuntime/Input/TerminalInputParser.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -613,6 +618,26 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-060611-5894.log
 ```
 
+Packet 26 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.InputParserModifierTests
+swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests
+swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests
+swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/keyParserParsesExpectedSequences
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalInputParserDecodesMixedMouseStreams
+swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests/terminalPixelMouseInputReachesDragGestureAsFractionalLocation
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-061130-23411.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -651,6 +676,7 @@ Packet 22 is run-loop frame acquisition extraction.
 Packet 23 is renderer commit path consolidation.
 Packet 24 is terminal raw-mode session extraction.
 Packet 25 is input event decoding extraction.
+Packet 26 is terminal input parser file split.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -674,7 +700,9 @@ presentation dismiss-stack, raw-mode saved state, process-exit cleanup
 registration, terminal control-mode transition, enable-failure rollback, or
 pointer-hover cleanup reset, input control-message ordering, keyboard-only
 input filtering, mouse-coordinate snapshot, pending mouse flush, or
-DispatchSource/WASI stream-finish regression appears.
+DispatchSource/WASI stream-finish, terminal byte parser buffering, SGR mouse
+coordinate decoding, bracketed-paste envelope, or key parser regression
+appears.
 
 ## AI Assistance Disclosure
 

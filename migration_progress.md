@@ -95,6 +95,9 @@ Approved constraints:
   terminal parser feeding from `InputReader.swift` into
   `TerminalInputEventDecoding.swift`, leaving WASI polling and DispatchSource
   stream loops in place.
+- Packet 26 completed: moved `TerminalInputParser`, `KeyParser`, and private
+  parsing helpers from `InputReader.swift` into `TerminalInputParser.swift`,
+  leaving concrete stream ownership in `InputReader.swift`.
 
 ## Baseline Validation
 
@@ -557,28 +560,50 @@ Packet 25 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-060611-5894.log`
   - Result: PASS
 
+Packet 26 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+  - Result: PASS, 23 tests
+- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+  - Result: PASS, 4 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/keyParserParsesExpectedSequences`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/terminalInputParserDecodesMixedMouseStreams`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests/terminalPixelMouseInputReachesDragGestureAsFractionalLocation`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-061130-23411.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 26: terminal input parser file split. Packet 25 isolated the feed
-pipeline, but `InputReader.swift` still contains the public
-`TerminalInputParser`, keyboard parser, bracketed-paste helpers, CSI modifier
-parsing, SGR mouse parsing, and the concrete stream reader in one file. The
-next packet should move parser types and pure parsing helpers into a dedicated
-input parser file without changing public parser behavior or stream-reader
-behavior.
+Packet 27: input stream loop extraction. Packet 26 completed the parser file
+split, leaving `InputReader.swift` focused but still carrying two platform
+stream implementations. The next packet should isolate the repeated terminal
+read result/drain mechanics carefully, without unifying WASI task-backed
+polling and DispatchSource event-driven cancellation semantics.
 
 Expected owned files pending local discovery:
 
 - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
-- `Sources/SwiftTUIRuntime/Input/TerminalInputParser.swift`
+- possibly a new same-folder input stream reading helper
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
-- `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
 - `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
 - `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
 - `bun run test`
 
 ## Failed Attempts
