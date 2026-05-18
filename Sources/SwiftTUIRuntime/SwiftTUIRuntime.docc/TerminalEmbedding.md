@@ -104,7 +104,7 @@ initializer when the terminal pane owns the response locally.
 
 ## Capabilities
 
-The v1 package supports local spawned child processes, pty creation and resize,
+The current package supports local spawned child processes, pty creation and resize,
 SwiftTerm-backed VT emulation, focus-gated keyboard forwarding, X10 / 1000 /
 1002 / SGR mouse mode translation, bracketed paste, OSC 52 clipboard
 forwarding, OSC 0/2 title changes, OSC 7 working-directory changes, and OSC 8
@@ -116,7 +116,7 @@ filesystem navigation and an embedded preview command in the rightmost column.
 ## Deferred Work
 
 Sixel and Kitty graphics inside an embedded pane, Kitty keyboard protocol, OSC
-99 notification namespacing, iOS, and WASI are deferred beyond v1.
+99 notification namespacing, iOS, and WASI are not yet implemented.
 
 For the broader runtime model and deferred surface rationale, see <doc:Runtime>
 and <doc:Vision>.

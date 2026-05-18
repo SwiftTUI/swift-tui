@@ -16,7 +16,8 @@ import SwiftTUIRuntime
 /// d in d.width }` (anchor leading guide at the right edge of the
 /// first child) would express the colon column directly, but the
 /// resulting child-shift direction is opposite the naive intuition
-/// — see `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` Finding #1.
+/// — increasing an alignment-guide value shifts the view in the
+/// OPPOSITE direction along the alignment axis.
 /// The right-aligned-frame approach is faithful to SwiftUI's
 /// "Aligning views across stacks" form-layout idiom and is easier
 /// to read at a glance, so this layout uses that shape and the

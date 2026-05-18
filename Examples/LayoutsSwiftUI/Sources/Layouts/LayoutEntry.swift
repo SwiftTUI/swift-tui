@@ -12,7 +12,7 @@ import SwiftUI
 /// catalog is a heterogeneous `[LayoutEntry]`. The concrete view per
 /// layout is still a strongly-typed `struct`; the erasure happens
 /// at the catalog literal only (`AnyView(ConcreteLayout())`).
-/// See `docs/PUBLIC_SURFACE_POLICY.md` for the AnyView policy.
+/// See `docs/PUBLIC-API.md` for the AnyView policy.
 public struct LayoutEntry: Identifiable, Hashable, Sendable {
   public let id: String
   public let category: Category

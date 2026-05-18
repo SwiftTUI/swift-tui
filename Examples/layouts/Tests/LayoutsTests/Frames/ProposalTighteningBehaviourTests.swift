@@ -11,7 +11,6 @@ struct ProposalTighteningBehaviourTests {
   /// implementation would tighten the proposal that reaches the
   /// reader so `proxy.size.width` reports `30`.
   ///
-  /// See `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #4 —
   /// `GeometryReader` previously read `terminalSize` from the
   /// environment and missed fixed-frame tightening. The fix tightens
   /// the terminal-size environment on explicit-axis frames and lowers

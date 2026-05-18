@@ -5,9 +5,6 @@ and the matching SwiftTUI implementation embedded through `SwiftUIHost` on the
 right. The matching SwiftTUI package owns the raster smoke and behaviour tests
 for the shared catalog IDs.
 
-Design and taxonomy live in
-[../../docs/plans/2026-04-24-001-layouts-example-plan.md](../../docs/plans/2026-04-24-001-layouts-example-plan.md).
-
 ## Run
 
 ```bash
@@ -30,9 +27,7 @@ package owns the raster behaviour tests.
 
 ## Findings
 
-Library divergences and design questions surfaced while
-implementing the behaviour tests are tracked in
-[../../docs/proposals/layout/BEHAVIOUR_FINDINGS.md](../../docs/proposals/layout/BEHAVIOUR_FINDINGS.md).
-Behaviour tests pin the *observed* behaviour today; the findings
-doc is the place to escalate "what should this actually do?"
-before changing the library.
+Library divergences and design questions surfaced while implementing the
+behaviour tests are documented inline in the behaviour test files.
+Behaviour tests pin the *observed* behaviour today; update a test's
+comment and open a discussion before changing the library.

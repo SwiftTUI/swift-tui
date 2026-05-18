@@ -23,8 +23,8 @@ For a terminal app executable target, add the convenience product:
 ```
 
 Use `SwiftTUIRuntime` plus explicit host/runner products when embedding or
-building non-terminal launch paths. See [docs/RELEASES.md](docs/RELEASES.md)
-for release policy and support details.
+building non-terminal launch paths. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+for the release policy and support details.
 
 ## Support Matrix
 
@@ -163,15 +163,11 @@ struct MyApp: App, SwiftTUICommand {
 > runner. `--debug` enables the existing frame diagnostics logger. `--json`
 > emits machine-readable frame JSON, and standalone `--linear` selects the
 > accessible linear output path. `--scene` selects which declared `WindowGroup`
-> identifier the single-scene WebHost launch should run. See
-> [docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md)
-> for the full roadmap.
+> identifier the single-scene WebHost launch should run.
 
 Bare-mode apps (no `SwiftTUICommand` conformance) still honor `NO_COLOR`,
-`LANG=C`, and the `SWIFTTUI_*` environment variables automatically. The
-full design is in
-[docs/proposals/ARGUMENT_PARSING.md](docs/proposals/ARGUMENT_PARSING.md);
-see [Examples/argparse](Examples/argparse) for a working consumer-flags +
+`LANG=C`, and the `SWIFTTUI_*` environment variables automatically. See
+[Examples/argparse](Examples/argparse) for a working consumer-flags +
 framework-flags demo.
 
 The same authored `App` and `Scene` declarations can then flow into these
@@ -195,7 +191,7 @@ root package products:
 
 In repo terminology, a runner owns process startup or launch routing, while a
 host owns an external presentation environment or embedding lifecycle. See
-[docs/TERMINOLOGY.md](docs/TERMINOLOGY.md) for the precise boundary.
+[docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) for that boundary.
 
 `SwiftTUIRuntime` is the platform-neutral runtime product. It provides the
 shared runtime, `SceneManifest`, and `HostedSceneSession`; runner and host
@@ -284,8 +280,8 @@ environment.
 
 Use the repo-local perf tool when changing async rendering, frame scheduling,
 presentation, layout fallback behavior, or other runtime paths where input
-latency and CPU cost need to be compared. The full operator guide is
-[docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md).
+latency and CPU cost need to be compared. See
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for how the harness fits the gate.
 
 List the checked-in scenarios:
 
@@ -339,30 +335,23 @@ archive as part of the web build and copies it into `Website/dist/docs/`.
 
 ## Documentation
 
-Start with [docs/README.md](docs/README.md) — it is the canonical index for every
-design doc, active proposal, and background note in this repository. Per-module
-API reference lives in the `*.docc` catalogs under `Sources/` and `Platforms/`,
-generated with the DocC command above.
-
-For the current incomplete work queue, use [docs/TODO.md](docs/TODO.md). It is
-additive to the durable docs: keep it concise, link to supporting documents,
-and remove items when they are completed. [docs/STATUS.md](docs/STATUS.md)
-remains the high-level overview of shipped surface, constraints, goals, and
-explicit deferrals; any planned or decision-bound status gap belongs in
-`docs/TODO.md`. Completed TODO entries move to
-[docs/CHANGELOG.md](docs/CHANGELOG.md), where
-descriptions stay self-standing and any links to repo docs are prefixed with
-the short git hash that anchors the referenced material.
+[docs/README.md](docs/README.md) is the canonical index for the architecture
+and project documentation. Per-module API reference lives in the `*.docc`
+catalogs under `Sources/`, generated with the DocC command above.
 
 Common entry points:
 
-- [docs/STATUS.md](docs/STATUS.md): shipped surface and current constraints
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): target boundaries and frame pipeline
-- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md): accessibility semantics,
-  runtime policy, target bridges, and guardrails
-- [docs/RUNTIME.md](docs/RUNTIME.md): lifecycle, graph-scoped state,
-  terminal presentation safety, and incremental rendering behavior
-- [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work
-- [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md): CPU and input-latency evaluation workflow
-- [Examples/README.md](Examples/README.md): maintained example apps
-- [docs/CHANGELOG.md](docs/CHANGELOG.md): concise completed-work history
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): modules, products, source
+  layout, and the layout model.
+- [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md): the frame pipeline,
+  off-main rendering, and frame-drop policy.
+- [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md): the four execution
+  modes and the platform support matrix.
+- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md): the semantic substrate and its
+  consumers.
+- [docs/PUBLIC-API.md](docs/PUBLIC-API.md): the public surface policy.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): toolchains, the test gate, and the
+  release process.
+- [docs/VISION.md](docs/VISION.md) and [docs/VISION-GAP.md](docs/VISION-GAP.md):
+  what SwiftTUI is for, and where the code currently differs from that intent.
+- [Examples/README.md](Examples/README.md): maintained example apps.

@@ -14,9 +14,8 @@ import SwiftTUIRuntime
 ///   4. Curved shapes — ``Circle``, ``Ellipse``, and ``Capsule`` across
 ///      fill / strokeBorder / ``TileStyle`` variants, including a
 ///      ``PhaseAnimator``-driven gradient that smoothly rotates
-///      through the four corner orientations (the payoff for the
-///      Animatable-protocol migration in
-///      ``docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md``).
+///      through the four corner orientations (enabled by the
+///      `Animatable` protocol migration).
 ///   5. A hand-drawn ``Canvas`` sparkline, the arbitrary-drawing
 ///      escape hatch alongside the shape fill/stroke algebra.
 ///   6. A direct ``withAnimation`` gradient rotation demo: tap a

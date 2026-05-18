@@ -53,13 +53,6 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
-    "Check pipeline driver resolution ledger" \
-    "./Scripts/check_pipeline_driver_resolution_ledger.sh" \
-    ./Scripts/check_pipeline_driver_resolution_ledger.sh
-
-  run_repo_policy_check \
-    "$mode" \
-    "$repo_root" \
     "Check DocC coverage policy" \
     "./Scripts/check_docc_coverage.sh" \
     ./Scripts/check_docc_coverage.sh

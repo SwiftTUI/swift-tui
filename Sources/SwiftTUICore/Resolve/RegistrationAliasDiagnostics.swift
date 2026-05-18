@@ -1,6 +1,5 @@
-/// Instrumentation for Item 7 of `docs/proposals/ARCHITECTURE_NOTES.md` — a bounded,
-/// low-overhead record of every non-trivial call to
-/// `ViewGraph.recordRegistrationAlias`.
+/// Instrumentation providing a bounded, low-overhead record of every
+/// non-trivial call to `ViewGraph.recordRegistrationAlias`.
 ///
 /// The registration alias layer exists to let runtime registrations
 /// (onAppear / task / env observation) recorded against a context's

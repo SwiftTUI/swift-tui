@@ -10,8 +10,7 @@
 /// _this scope's identity is on the current focus chain_ (i.e. present
 /// in the currently focused region's `scopePath`).
 ///
-/// See `docs/proposals/ACTION_SCOPES_AND_COMMANDS.md` for the full
-/// design.
+/// See `docs/PUBLIC-API.md` for the public surface of action scopes.
 public protocol ActionScope: Identifiable {
 }
 

@@ -120,9 +120,8 @@ struct CanvasHonorsClippedBehaviourTests {
   /// past col 11") would be vacuously true regardless of `.clipped()`.
   ///
   /// Note: this layout is also where the "removing `.clipped()`" hand-
-  /// wave from the plan does not give a useful vacuity check — see the
-  /// "Canvas auto-clips at subpixel level" finding in
-  /// `docs/proposals/layout/BEHAVIOUR_FINDINGS.md`. Instead, growing
+  /// wave from the plan does not give a useful vacuity check — canvas
+  /// auto-clips at the subpixel level regardless. Instead, growing
   /// the frame widens the cyan region — that's the genuine A/B that
   /// the assertion is observing the frame edge.
   @Test("widening the frame to 30 paints cyan past the original 10-cell edge")

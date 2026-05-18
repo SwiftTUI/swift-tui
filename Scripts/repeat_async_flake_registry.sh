@@ -187,35 +187,35 @@ run_candidate \
   "InteractiveRuntimeTests.toastAutoDismissRerendersWithoutAdditionalInput" \
   "async/runtime-adjacent" \
   "runtime test support" \
-  "docs/proposals/ASYNC_TEST_FLAKE_REMEDIATION.md#recommended-immediate-tranche" \
+  "Scripts/repeat_async_flake_registry.sh" \
   "swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/toastAutoDismissRerendersWithoutAdditionalInput"
 
 run_candidate \
   "AsyncFrameTailRenderingTests" \
   "async renderer/runtime" \
   "runtime test support" \
-  "docs/proposals/ASYNC_TEST_FLAKE_REMEDIATION.md#recommended-immediate-tranche" \
+  "Scripts/repeat_async_flake_registry.sh" \
   "swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests"
 
 run_candidate \
   "HostedSurfaceRegressionTests" \
   "runtime/host integration with async dependencies" \
   "host test support" \
-  "docs/proposals/ASYNC_TEST_FLAKE_REMEDIATION.md#recommended-immediate-tranche" \
+  "Scripts/repeat_async_flake_registry.sh" \
   "swiftly run swift test --filter SwiftUIHostTests.HostedSurfaceRegressionTests"
 
 run_candidate \
   "SwiftUIHostAccessibilityTests" \
   "runtime/host integration with async dependencies" \
   "host test support" \
-  "docs/proposals/ASYNC_TEST_FLAKE_REMEDIATION.md#recommended-immediate-tranche" \
+  "Scripts/repeat_async_flake_registry.sh" \
   "swiftly run swift test --filter SwiftUIHostTests.SwiftUIHostAccessibilityTests"
 
 run_candidate \
   "RenderDiffTests" \
   "process/presentation integration and wall-clock sensitivity" \
   "terminal embedding test support" \
-  "docs/proposals/ASYNC_TEST_FLAKE_REMEDIATION.md#recommended-immediate-tranche" \
+  "Scripts/repeat_async_flake_registry.sh" \
   "swiftly run swift test --filter SwiftTUITerminalTests.RenderDiffTests"
 
 unsorted_summary_file="$run_root/summary.unsorted.tsv"

@@ -51,4 +51,3 @@ Practical consequences:
 - <doc:State-Environment-And-Focus>
 - <doc:Focus>
 - <doc:Authoring-Views>
-- [State Keying: Ordinal vs Source-Location](https://github.com/adamz/swift-tui/blob/main/docs/STATE_KEYING.md)

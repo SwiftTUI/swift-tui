@@ -27,7 +27,7 @@ hooks = [
     name = "enforce public surface and documentation guardrails",
     entry = "./Scripts/check_public_surface_policies.sh",
     language = "system",
-    files = '^(Package\.swift|README\.md|docs/(RUNTIME|STATUS|PUBLIC_(API_INVENTORY|SURFACE_POLICY))\.md|Sources/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUI/SwiftTUI\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
+    files = '^(Package\.swift|README\.md|AGENTS\.md|docs/(ARCHITECTURE|PUBLIC-API)\.md|Sources/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUIRuntime/SwiftTUIRuntime\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
   },
   {
@@ -52,14 +52,6 @@ hooks = [
     entry = "./Scripts/check_main_thread_usage.sh",
     language = "system",
     files = '^((Sources|Tests|Runners|Examples|GUI)/.*\.swift|Scripts/check_main_thread_usage\.sh)$',
-    pass_filenames = false
-  },
-  {
-    id = "doc-frontmatter",
-    name = "validate docs/decisions and docs/plans frontmatter",
-    entry = "bun Scripts/check_doc_frontmatter.ts",
-    language = "system",
-    files = '^(docs/(decisions/[0-9].*\.md|plans/.*\.md)|Scripts/check_doc_frontmatter\.ts)$',
     pass_filenames = false
   },
 ]

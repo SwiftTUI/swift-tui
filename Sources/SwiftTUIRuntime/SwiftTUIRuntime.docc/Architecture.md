@@ -174,7 +174,7 @@ The core runtime is intentionally narrow today:
 Platform integration and multi-scene orchestration live in sibling products in
 the root package rather than in the `SwiftTUIRuntime` product itself.
 
-Those integration layers serve three execution modes:
+Those integration layers serve four execution modes:
 
 - terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or
   the default `App.main()` provided by the `SwiftTUI` convenience product
@@ -221,4 +221,4 @@ convenience product.
 - <doc:Runtime>
 - <doc:Vision>
 - <doc:Host-Integration>
-- [Architecture details](https://github.com/adamz/swift-tui/blob/main/docs/ARCHITECTURE.md)
+- [Architecture details](https://github.com/GoodHatsLLC/SwiftTUI/blob/main/docs/ARCHITECTURE.md)

@@ -1,149 +1,82 @@
 # Vision
 
-## What This Project Is
+## What SwiftTUI is
 
-SwiftTUI is a Swift package for building terminal user interfaces with an authoring model, layout model, and runtime contract that are deliberately shaped after SwiftUI.
+SwiftTUI is a UI framework for the terminal that an iOS or macOS engineer can
+pick up without relearning UI. You write `View` values with a declarative,
+body-only, state-driven API; SwiftTUI resolves them through a typed rendering
+pipeline and presents the result as terminal text, a browser canvas, or a
+raster surface inside a host application.
 
-The project implements the SwiftUI subset needed to build strong terminal applications without shortcuts in the layout algorithm, state model, or render pipeline. The goal is not to mimic SwiftUI cosmetically. The goal is to preserve the parts of SwiftUI that make large UI codebases predictable.
+The framework is a pre-1.0, single-maintainer, AI-assisted package. The `0.x`
+line is usable for real terminal interfaces, but minor releases may still make
+source-breaking adjustments while the public surface is being proven.
 
-## Core Principles
+## The guiding principle: SwiftUI faithfulness
 
-### SwiftUI Faithfulness
+SwiftTUI mirrors SwiftUI's *shape*, not just its names. The goal is that
+knowledge transfers: layout negotiation, modifier ordering, state identity,
+focus, and animation behave the way a SwiftUI developer expects.
 
-The package aims to match SwiftUI semantics as closely as the terminal domain allows:
+Concretely, faithfulness means:
 
-- Layout is recursive parent-child negotiation, not global constraint solving
-- A parent proposes a size, a child chooses, and the parent places the child
-- Modifier order matters because modifiers participate in layout and semantics
-- Graph-scoped state drives rendering, not the reverse
-- `Layout` is the public surface of custom layout participation
-- Focus should belong to authored controls rather than incidental containers, and explicit focus modifiers should remain authoritative
+- **Recursive layout negotiation.** A parent proposes a size, a child reports
+  what it wants, the parent places it. Modifier order changes the result.
+- **Graph-scoped state.** `@State`, `@Binding`, `@Environment`, `@FocusState`,
+  and the repo-owned `@Bindable` keep their SwiftUI semantics, including state
+  identity tied to a view's position in the resolved graph.
+- **A body-only `View` protocol.** Authoring views never see the rendering
+  pipeline. Lowering to primitives is internal.
+- **Declarative composition.** `@ViewBuilder`, `ViewModifier`, presentation
+  modifiers, and scenes compose the same way they do in SwiftUI.
 
-Terminal-specific differences are restricted to the edges of the system: integer-cell geometry, glyph-width-aware text layout, and ANSI or capability-aware presentation. Those constraints do not justify collapsing phases or inventing a fundamentally different authoring story.
+Faithfulness is a *constraint*, not a veneer. When a literal translation of a
+desktop behavior would degrade the terminal experience, SwiftTUI reinterprets
+it toward a terminal-native default — but the API shape stays SwiftUI-shaped so
+the reinterpretation is the only thing a developer has to learn.
 
-See [SWIFTUI_LAYOUT.md](SWIFTUI_LAYOUT.md) for the upstream layout model that serves as the reference target.
+## Deliberate terminal-native deviations
 
-### Implementing A Useful Subset
+A SwiftUI-faithful surface still has to be a *good terminal framework*. SwiftTUI
+makes a small number of intentional departures:
 
-SwiftTUI is intentionally not implementing every SwiftUI concept.
+- **Tree-forward collections.** `List`, `OutlineGroup`, and `Table` lean toward
+  structural, keyboard-first navigation rather than touch-scrolling ergonomics.
+- **A continuous coordinate space over a cell grid.** Geometry, gestures, and
+  drawing work in continuous cell coordinates (`Point`), distinct from the
+  integer cell grid (`CellPoint`) the terminal actually addresses.
+- **Terminal-program embedding as authored content.** A real child terminal
+  program can be embedded in the view tree through `TerminalView`.
+- **Restrained chrome.** Defaults favor calm, low-noise output appropriate to a
+  terminal rather than maximal decoration.
 
-What that means in practice:
+## In scope today
 
-- Layout primitives come first: stacks, frames, padding, overlays, scrolling, and custom layouts
-- State and environment come next: graph-scoped `@State`, `@Binding`,
-  `@Observable`, focused values, and focus bindings
-- Runtime correctness comes next: lifecycle ownership, task staging, and incremental terminal presentation
-- Broader orchestration APIs such as stack navigation, sheets, and popovers
-  arrive only after the foundation is firm. The current shipped subset includes
-  binding-driven navigation destinations and terminal-native presentations.
-- Terminal-only chrome that would bend the public authoring story away from SwiftUI does not belong in the core library
+- The SwiftUI-shaped authoring surface: containers, controls, layout, state,
+  focus, gestures, animation, navigation, and presentation surfaces.
+- A typed seven-phase render pipeline with off-main execution of the heavy
+  stages.
+- Four execution modes: terminal-native, WASI/browser, host-managed embedding,
+  and a localhost-browser WebHost.
+- A semantic accessibility substrate feeding terminal, web, and SwiftUI-host
+  consumers.
+- Charts, animated-image playback, and terminal-program embedding as peer
+  products.
 
-### Deviations From SwiftUI
+## Out of scope today
 
-Deviations are permitted only when all of the following are true:
+- Pixel-precise, media-heavy layout. SwiftTUI targets the cell grid, with
+  Braille and half-block subpixel tricks, not arbitrary pixel composition.
+- Host-native input methods (IME / composition) inside SwiftTUI's own text
+  inputs.
+- A general retained navigation controller. Navigation is binding-driven.
 
-1. The deviation is well-considered and explicitly justified
-2. The deviation solves a real terminal problem rather than copying another TUI framework by habit
-3. The deviation is documented here and reflected in the public API inventory
+## Where this leads
 
-When SwiftUI precedent and terminal-native practice disagree, SwiftTUI should
-keep the SwiftUI-shaped authoring story only if it still produces a good
-terminal experience. If a direct translation would create page-like,
-mouse-centric, overdecorated, or otherwise non-native terminal behavior, the
-framework should reinterpret the behavior toward terminal-native defaults.
+The near-term direction is stabilizing the public surface toward a `0.9.0`
+public beta and then `1.0.0`. The project does not document speculative
+roadmaps here.
 
-Confirmed deviations today:
-
-- **Tree-forward collection presentation.** Hierarchical list and outline presentation is more central in TUI software than it is in common SwiftUI app design. SwiftTUI supports tree-style collection display as a first-class authoring pattern while still staying close to SwiftUI’s `OutlineGroup` and `children` vocabulary.
-- **Repo-owned `@Bindable`.** The package ships its own bindable wrapper to keep observable editing on the same invalidation path as `@State` and the rest of the runtime.
-- **Terminal-program embedding as authored content.** SwiftUI has no direct
-  equivalent for hosting a running terminal program inside a `View`, but the
-  terminal workspace model needs that verb. SwiftTUI supports it through the
-  `SwiftTUITerminal` product and `TerminalView`; the design is captured in
-  [proposals/TERMINAL_EMBEDDING.md](proposals/TERMINAL_EMBEDDING.md).
-- **Terminal-native reinterpretation of defaults.** Automatic chrome, app shell
-  composition, and navigation-oriented surfaces may intentionally diverge from
-  desktop SwiftUI precedent when modern terminal UX has a clearly better answer.
-
-### Input Philosophy
-
-SwiftTUI is keyboard-first, but not keyboard-only.
-
-- Keyboard and focus traversal remain the primary design center
-- Mouse reporting and pointer-style interaction are supported when the terminal exposes them
-- Pointer interaction should augment authored controls and collections, not replace the keyboard or focus model
-
-That means pointer support is in scope, but touch-first, pointer-first, or pixel-precise interaction models are not the architectural center of the project.
-
-### SwiftUI Concepts That Need A Stronger Hypothesis First
-
-Some SwiftUI concepts likely belong in SwiftTUI eventually, but the package does not yet have a strong enough model to ship them confidently.
-
-Deferred items:
-
-- `NavigationLink`, public `NavigationPath`, and automatic Back chrome
-- host-native text value/selection transport and IME/composition
-- process reattachment for terminal workspaces after app restart
-
-These should not be implemented just because terminal frameworks often have
-analogous surfaces. They should land only once the terminal-specific interaction
-model is clear and the API still reads like the same product.
-
-Commands, keybindings, and scopes — `ActionScope`, `Panel`,
-`FocusContainment`, `.keyCommand`, `.paletteCommand`, `.toolbar`, and
-`.toolbarItem` — already follow this pattern: commands belong to **scopes**, a
-superset abstraction over navigation, sub-hierarchies, and modal modes, with
-focus-chain membership as the activation predicate. See
-[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
-for the full design.
-
-Navigation-oriented surfaces that are especially central to terminal UX, such as
-`TabView` and split-pane workspace layouts composed from stacks, may land
-earlier than their desktop-GUI counterparts if they are expressed as a
-SwiftUI-shaped but terminal-native subset.
-
-Current implementation status and short-term constraints live in [STATUS.md](STATUS.md). Deferred items should not jump ahead of foundation work without an explicit tradeoff.
-
-### What Is Not In Scope Today
-
-- media-heavy surfaces beyond PNG, baseline JPEG, and the peer
-  `SwiftTUIAnimatedImage` product (video, remote fetching, asset bundles)
-- host-native assistive-technology control beyond the shipped semantic
-  accessibility substrate, terminal accessible output, Web/WASI ARIA mounting,
-  and SwiftUI host accessibility overlay
-- pixel-precise layout or a second, non-terminal presentation model
-
-### Image Rendering
-
-SwiftTUI ships a narrow image surface covering common still-image formats:
-
-- SwiftUI-shaped `Image` authoring for explicit named resources, local `file://` URLs, and embedded `[UInt8]` bytes
-- format detection by leading magic bytes via `Image(data:)`; the decoder picks
-  PNG or baseline-sequential JPEG on its own
-- pure-Swift decoders vendored alongside the project (`Vendor/swift-png`,
-  `Vendor/swift-jpeg`) — no system imaging frameworks, so the surface works
-  identically across macOS, Linux, Android, and WASI
-- runtime-hosted terminal presentation through Kitty graphics or Sixel when the terminal advertises support
-- capability-aware fallback rendering into terminal cells when graphics protocols are unavailable
-
-That scope is intentionally tight. Still images in PNG / JPEG are in the core
-runtime. GIF decoding, GIF encoding, and finite pre-composed animation playback
-belong to the peer `AnimatedImage` product. Progressive JPEG, broader media
-playback, remote fetching, and bundle-driven asset systems are still outside
-the core story.
-
-## Aesthetic And Component Guidance
-
-[Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) are useful reference points for what terminal applications often need visually and structurally. They are evidence, not templates.
-
-See [LIPGLOSS_SWIFTUI_EQUIVALENTS.md](LIPGLOSS_SWIFTUI_EQUIVALENTS.md) for the mapping between Lip Gloss concepts and the SwiftUI-shaped surfaces SwiftTUI prefers.
-
-## SwiftTUICharts
-
-`SwiftTUICharts` is intentionally a separate track. It demonstrates how compact dashboard and metrics components can be built on the same view and runtime foundation without allowing charting needs to distort the core API story.
-
-## AnimatedImage
-
-`AnimatedImage` is intentionally a separate media track. It demonstrates how GIF
-import/export and finite pre-composed image animation can reuse the same view
-surface without making the `SwiftTUI` runtime responsible for animated media.
+The honest, current distance between this vision and the shipped code is
+tracked — concretely and without aspiration creeping back into the rest of the
+documentation — in [VISION-GAP.md](VISION-GAP.md).

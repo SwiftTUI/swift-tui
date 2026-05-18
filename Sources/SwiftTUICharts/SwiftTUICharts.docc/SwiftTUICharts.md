@@ -20,7 +20,6 @@ The module is intentionally separate from the core roadmap so charting needs do 
 
 ### Metric Views
 
-- ``ProgressView``
 - ``Meter``
 - ``ThresholdGauge``
 
