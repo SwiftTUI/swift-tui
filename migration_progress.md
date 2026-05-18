@@ -40,6 +40,10 @@ Approved constraints:
   math, and terminal command encoding from `TerminalImageRendering.swift` into
   `TerminalImageKittyRendering.swift`, while leaving renderer cache ownership in
   the facade.
+- Packet 8 completed: extracted Sixel output sizing, palette budgeting, payload
+  construction, and command encoding into `TerminalImageSixelRendering.swift`,
+  and moved shared image scaling and quantization helpers into
+  `TerminalImageSampling.swift`.
 
 ## Baseline Validation
 
@@ -153,15 +157,27 @@ Packet 7 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-031747-26286.log`
   - Result: PASS
 
+Packet 8 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-032834-69653.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 8: continue the terminal image rendering split by isolating Sixel
-encoding helpers from `TerminalImageRendering.swift`.
+Packet 9: continue the terminal image rendering split by isolating ANSI/ASCII
+fallback overlay construction from `TerminalImageRendering.swift`.
 
 Expected owned files pending local discovery:
 
 - `Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift`
-- A new terminal Sixel helper file under `Sources/SwiftTUIRuntime/Terminal/`
+- A new terminal fallback helper file under `Sources/SwiftTUIRuntime/Terminal/`
 
 Validation:
 
