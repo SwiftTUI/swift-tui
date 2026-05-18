@@ -302,6 +302,123 @@ struct RasterizerTests {
       ])
   }
 
+  @Test("Incremental repaint equals fresh raster across a mutation matrix")
+  func incrementalRepaintEqualsFreshRaster() {
+    let rasterizer = Rasterizer(verifyIncrementalRepaint: true)
+    let mutations: [CoreRasterRepaintMutation] = [
+      .init(
+        name: "single row text edit",
+        previous: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "value", row: 0, text: "Value 1", width: 10)
+          ]),
+        current: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "value", row: 0, text: "Value 2", width: 10)
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [0..<10])])
+      ),
+      .init(
+        name: "text shrink clears trailing cells",
+        previous: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+          ]),
+        current: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "shrinking", row: 0, text: "ABX", width: 4)
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [2..<4])])
+      ),
+      .init(
+        name: "moved row clears old bounds and paints new bounds",
+        previous: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "moving", row: 0, text: "MOVE", width: 6)
+          ]),
+        current: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "moving", row: 2, text: "MOVE", width: 6)
+          ]),
+        damage: .init(
+          textRows: [
+            .init(row: 0, columnRanges: [0..<6]),
+            .init(row: 2, columnRanges: [0..<6]),
+          ])
+      ),
+      .init(
+        name: "clean sibling outside dirty rows is retained",
+        previous: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "dirty", row: 0, text: "old", width: 6),
+            coreRasterTextNode(id: "clean", row: 2, text: "keep", width: 6),
+          ]),
+        current: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "dirty", row: 0, text: "new", width: 6),
+            coreRasterTextNode(id: "clean", row: 2, text: "keep", width: 6),
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [0..<6])])
+      ),
+      .init(
+        name: "image attachment outside dirty rows is retained",
+        previous: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "dirtyImageSibling", row: 0, text: "old", width: 6),
+            coreRasterImageNode(id: "image", row: 2, source: "demo.png"),
+          ]),
+        current: coreRasterRoot(
+          width: 12,
+          height: 4,
+          children: [
+            coreRasterTextNode(id: "dirtyImageSibling", row: 0, text: "new", width: 6),
+            coreRasterImageNode(id: "image", row: 2, source: "demo.png"),
+          ]),
+        damage: .init(textRows: [.init(row: 0, columnRanges: [0..<6])])
+      ),
+    ]
+
+    for mutation in mutations {
+      let previousSurface = rasterizer.rasterize(
+        mutation.previous,
+        minimumSize: mutation.minimumSize
+      )
+      let fresh = rasterizer.rasterize(
+        mutation.current,
+        minimumSize: mutation.minimumSize
+      )
+      let incremental = rasterizer.rasterize(
+        mutation.current,
+        minimumSize: mutation.minimumSize,
+        previousSurface: previousSurface,
+        damage: mutation.damage
+      )
+
+      #expect(
+        incremental == fresh,
+        "incremental repaint differed from fresh raster for \(mutation.name)"
+      )
+    }
+  }
+
   @Test("incremental raster reuse falls back to fresh raster for incompatible surface size")
   func incrementalRasterReuseFallsBackForIncompatibleSurfaceSize() {
     let rasterizer = Rasterizer()
@@ -554,6 +671,14 @@ struct RasterizerTests {
     )
     #expect(frame2.visibleIdentities.contains(movingIdentity))
   }
+}
+
+private struct CoreRasterRepaintMutation {
+  var name: String
+  var previous: DrawNode
+  var current: DrawNode
+  var damage: PresentationDamage
+  var minimumSize = CellSize(width: 12, height: 4)
 }
 
 private func coreRasterRoot(

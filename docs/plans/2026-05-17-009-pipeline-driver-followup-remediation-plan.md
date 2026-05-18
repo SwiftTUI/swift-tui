@@ -1828,7 +1828,7 @@ git commit -m "docs: ledger F10 resolved"
 
 **Anti-rationalization:** documenting that "damage must be sound" does not resolve F13. The fix is either a verification mode that diffs incremental vs. fresh raster, or a test proving equivalence across a mutation matrix.
 
-- [ ] **Step 1: Write the incremental-vs-fresh equivalence test**
+- [x] **Step 1: Write the incremental-vs-fresh equivalence test**
 
 Add to `Tests/SwiftTUICoreTests/RasterizerTests.swift`:
 
@@ -1847,20 +1847,20 @@ Flesh out: for each mutation pair, rasterize fresh (no previous surface, no
 damage) and rasterize incrementally (with previous surface + damage), assert
 `==`.
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `swift test --filter RasterizerTests.incrementalRepaintEqualsFreshRaster`
 Expected: PASS. A failure is a real missed-invalidation soundness bug — fix the
 damage computation in `Rasterizer+Damage.swift`.
 
-- [ ] **Step 3: Add a debug verification mode (optional but preferred)**
+- [x] **Step 3: Add a debug verification mode (optional but preferred)**
 
 Add a debug flag to `Rasterizer` that, when set, always computes both the
 incremental and fresh surfaces and `assertionFailure`s on mismatch. This makes
 missed invalidation crash loudly in debug builds and tests instead of silently
 underpainting.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SwiftTUICore/Raster/ Tests/SwiftTUICoreTests/RasterizerTests.swift
