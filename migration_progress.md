@@ -98,6 +98,10 @@ Approved constraints:
 - Packet 26 completed: moved `TerminalInputParser`, `KeyParser`, and private
   parsing helpers from `InputReader.swift` into `TerminalInputParser.swift`,
   leaving concrete stream ownership in `InputReader.swift`.
+- Packet 27 completed: extracted platform terminal input read classification
+  and nonblocking drain mechanics into `TerminalInputStreamReading.swift`,
+  leaving WASI polling and DispatchSource stream ownership in
+  `InputReader.swift`.
 
 ## Baseline Validation
 
@@ -582,28 +586,50 @@ Packet 26 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-061130-23411.log`
   - Result: PASS
 
+Packet 27 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
+  - Result: PASS, 9 tests
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
+  - Result: PASS, 3 tests
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+  - Result: PASS, 5 tests
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
+  - Result: PASS, 1 test
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+  - Result: PASS, 1 test
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-065523-66925.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 27: input stream loop extraction. Packet 26 completed the parser file
-split, leaving `InputReader.swift` focused but still carrying two platform
-stream implementations. The next packet should isolate the repeated terminal
-read result/drain mechanics carefully, without unifying WASI task-backed
-polling and DispatchSource event-driven cancellation semantics.
+Packet 28: animation controller overlay sampling. Packet 27 finished the
+terminal input read/drain boundary, and current production file-size signals now
+point back at `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift` as
+the largest remaining `SwiftTUIRuntime` file. The next packet should use a
+read-only subagent audit first, then extract placed-overlay sampling or a
+similarly bounded animation helper without moving controller-owned mutable
+state.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/Input/InputReader.swift`
-- possibly a new same-folder input stream reading helper
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- a new same-folder animation helper if the audit confirms a safe boundary
 
 Validation:
 
 - `swiftly run swift build`
-- `swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests`
-- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
-- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts`
-- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick`
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
 - `bun run test`
 
 ## Failed Attempts
@@ -615,6 +641,13 @@ Validation:
 - The failed suite passed immediately in isolation, the full `SwiftTUITests`
   target then passed, and the final full repo gate passed at
   `/tmp/swift-tui-test-gate-20260518-054930-58630.log`.
+- Packet 27 final-candidate `bun run test` attempt failed once in
+  `SwiftTUITerminalTests` on `running cat over a large file stays within the
+  byte budget` with a timeout. The failed gate log was
+  `/tmp/swift-tui-test-gate-20260518-062300-55078.log`.
+- `swiftly run swift test --filter SwiftTUITerminalTests` passed immediately
+  after, and the final full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-065523-66925.log`.
 
 ## Known Risks
 

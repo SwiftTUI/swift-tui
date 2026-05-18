@@ -5,50 +5,6 @@ import Synchronization
   @unsafe @preconcurrency import Dispatch
 #endif
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
-#if canImport(Darwin)
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Darwin.read(fileDescriptor, buffer, count)
-  }
-#elseif canImport(Glibc)
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Glibc.read(fileDescriptor, buffer, count)
-  }
-#elseif canImport(Android)
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    unsafe Android.read(fileDescriptor, buffer, count)
-  }
-#elseif canImport(WASILibc)
-  private func platformRead(
-    _ fileDescriptor: Int32,
-    _ buffer: UnsafeMutableRawPointer?,
-    _ count: Int
-  ) -> Int {
-    Int(unsafe WASILibc.read(fileDescriptor, buffer, count))
-  }
-#endif
-
 /// Reads terminal input from a file descriptor.
 public final class InputReader: InputReading, TerminalInputReading,
   TerminalInputCapabilityConfiguring
@@ -134,11 +90,8 @@ extension InputReader {
         }
 
         while !Task.isCancelled {
-          var buffer = Array(repeating: UInt8(0), count: 512)
-          let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
-
-          if bytesRead > 0 {
-            let chunk = Array(buffer.prefix(Int(bytesRead)))
+          switch readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) {
+          case .bytes(let chunk):
             let decoded = decoder.decode(chunk)
 
             for message in decoded.controlMessages {
@@ -156,19 +109,17 @@ extension InputReader {
               }
             }
             continue
-          }
-
-          if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+          case .wouldBlock:
             if !pendingMouseEvents.isEmpty {
               flushPendingMouseEvents()
             }
             try? await Task.sleep(nanoseconds: 1_000_000)
             continue
+          case .endOfFile, .failure:
+            flushPendingMouseEvents()
+            continuation.finish()
+            return
           }
-
-          flushPendingMouseEvents()
-          continuation.finish()
-          return
         }
       }
     }
@@ -193,11 +144,8 @@ extension InputReader {
         )
 
         while !Task.isCancelled {
-          var buffer = Array(repeating: UInt8(0), count: 512)
-          let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
-
-          if bytesRead > 0 {
-            let chunk = Array(buffer.prefix(Int(bytesRead)))
+          switch readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) {
+          case .bytes(let chunk):
             let decoded = decoder.decode(chunk)
 
             for message in decoded.controlMessages {
@@ -209,15 +157,13 @@ extension InputReader {
             }
             await Task.yield()
             continue
-          }
-
-          if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+          case .wouldBlock:
             try? await Task.sleep(nanoseconds: 1_000_000)
             continue
+          case .endOfFile, .failure:
+            continuation.finish()
+            return
           }
-
-          continuation.finish()
-          return
         }
       }
     }
@@ -273,35 +219,19 @@ extension InputReader {
         }
 
         source.setEventHandler {
-          var input: [UInt8] = []
-          var shouldFinish = false
-
-          while true {
-            var buffer = Array(repeating: UInt8(0), count: 256)
-            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
-
-            if bytesRead > 0 {
-              input.append(contentsOf: buffer.prefix(Int(bytesRead)))
-              continue
-            }
-
-            if bytesRead == 0 {
-              shouldFinish = true
-              break
-            }
-
-            if errno == EAGAIN || errno == EWOULDBLOCK {
-              break
-            }
-
+          let drainResult = drainAvailableTerminalInput(
+            from: fileDescriptor,
+            maxBytesPerRead: 256
+          )
+          if drainResult.failureErrno != nil {
             flushPendingMouseEvents()
             continuation.finish()
             source.cancel()
             return
           }
 
-          if !input.isEmpty {
-            let decoded = decoder.decode(input)
+          if !drainResult.bytes.isEmpty {
+            let decoded = decoder.decode(drainResult.bytes)
             for message in decoded.controlMessages {
               flushPendingMouseEvents()
               controlHandler(message)
@@ -318,7 +248,7 @@ extension InputReader {
             }
           }
 
-          if shouldFinish {
+          if drainResult.shouldFinish {
             flushPendingMouseEvents()
             continuation.finish()
             source.cancel()
@@ -354,34 +284,18 @@ extension InputReader {
         )
 
         source.setEventHandler {
-          var input: [UInt8] = []
-          var shouldFinish = false
-
-          while true {
-            var buffer = Array(repeating: UInt8(0), count: 256)
-            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
-
-            if bytesRead > 0 {
-              input.append(contentsOf: buffer.prefix(Int(bytesRead)))
-              continue
-            }
-
-            if bytesRead == 0 {
-              shouldFinish = true
-              break
-            }
-
-            if errno == EAGAIN || errno == EWOULDBLOCK {
-              break
-            }
-
+          let drainResult = drainAvailableTerminalInput(
+            from: fileDescriptor,
+            maxBytesPerRead: 256
+          )
+          if drainResult.failureErrno != nil {
             continuation.finish()
             source.cancel()
             return
           }
 
-          if !input.isEmpty {
-            let decoded = decoder.decode(input)
+          if !drainResult.bytes.isEmpty {
+            let decoded = decoder.decode(drainResult.bytes)
             for message in decoded.controlMessages {
               controlHandler(message)
             }
@@ -391,7 +305,7 @@ extension InputReader {
             }
           }
 
-          if shouldFinish {
+          if drainResult.shouldFinish {
             continuation.finish()
             source.cancel()
           }

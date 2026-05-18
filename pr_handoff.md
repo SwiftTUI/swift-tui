@@ -148,6 +148,12 @@ Packet 26 should be reviewed as terminal input parser file split:
 - `Sources/SwiftTUIRuntime/Input/InputReader.swift`
 - `Sources/SwiftTUIRuntime/Input/TerminalInputParser.swift`
 
+Packet 27 should be reviewed as terminal input descriptor-reading extraction:
+
+- `Sources/SwiftTUIRuntime/Input/InputReader.swift`
+- `Sources/SwiftTUIRuntime/Input/TerminalInputStreamReading.swift`
+- `Tests/SwiftTUITests/InputBatchingResponsivenessTests.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -638,6 +644,25 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-061130-23411.log
 ```
 
+Packet 27 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.InputBatchingResponsivenessTests
+swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests
+swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderDrainsPointerBurstsAcrossMultipleReads
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/inputReaderCoalescesStaggeredPointerBursts
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-065523-66925.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -645,6 +670,15 @@ full repo gate passed on rerun. Failed gate log:
 
 ```text
 /tmp/swift-tui-test-gate-20260518-054640-45870.log
+```
+
+One Packet 27 final-candidate full-gate attempt failed in
+`SwiftTUITerminalTests` on `running cat over a large file stays within the byte
+budget` with a timeout. The target passed immediately in isolation, and the
+full repo gate passed on rerun. Failed gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-062300-55078.log
 ```
 
 ## Risks
@@ -677,6 +711,7 @@ Packet 23 is renderer commit path consolidation.
 Packet 24 is terminal raw-mode session extraction.
 Packet 25 is input event decoding extraction.
 Packet 26 is terminal input parser file split.
+Packet 27 is terminal input descriptor-reading extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -701,7 +736,9 @@ registration, terminal control-mode transition, enable-failure rollback, or
 pointer-hover cleanup reset, input control-message ordering, keyboard-only
 input filtering, mouse-coordinate snapshot, pending mouse flush, or
 DispatchSource/WASI stream-finish, terminal byte parser buffering, SGR mouse
-coordinate decoding, bracketed-paste envelope, or key parser regression
+coordinate decoding, bracketed-paste envelope, key parser regression, read
+would-block/EOF classification, drained-bytes-before-EOF behavior, or
+non-would-block input failure handling
 appears.
 
 ## AI Assistance Disclosure

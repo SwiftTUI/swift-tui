@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 import SwiftTUIViews
+import Testing
 
 @testable import SwiftTUIRuntime
 
@@ -79,6 +79,64 @@ struct InputBatchingResponsivenessTests {
     #expect(
       state.append(nextScroll) == true,
       "after drain, the next event must arm a fresh cluster"
+    )
+  }
+
+  @Test("readTerminalInputChunk returns bytes then wouldBlock for a nonblocking pipe")
+  func terminalInputChunkReadClassifiesBytesAndWouldBlock() throws {
+    let pipe = try makeNonblockingPipe()
+    defer {
+      close(pipe.readEnd)
+      close(pipe.writeEnd)
+    }
+
+    try writeAll(Array("abc".utf8), to: pipe.writeEnd)
+
+    #expect(readTerminalInputChunk(from: pipe.readEnd, maxBytes: 8) == .bytes(Array("abc".utf8)))
+    #expect(readTerminalInputChunk(from: pipe.readEnd, maxBytes: 8) == .wouldBlock)
+  }
+
+  @Test("readTerminalInputChunk returns endOfFile after the writer closes")
+  func terminalInputChunkReadClassifiesEndOfFile() throws {
+    let pipe = try makeNonblockingPipe()
+    defer {
+      close(pipe.readEnd)
+    }
+
+    close(pipe.writeEnd)
+
+    #expect(readTerminalInputChunk(from: pipe.readEnd, maxBytes: 8) == .endOfFile)
+  }
+
+  @Test("drainAvailableTerminalInput accumulates chunks until wouldBlock")
+  func terminalInputDrainAccumulatesUntilWouldBlock() throws {
+    let pipe = try makeNonblockingPipe()
+    defer {
+      close(pipe.readEnd)
+      close(pipe.writeEnd)
+    }
+
+    try writeAll(Array("abcdef".utf8), to: pipe.writeEnd)
+
+    #expect(
+      drainAvailableTerminalInput(from: pipe.readEnd, maxBytesPerRead: 2)
+        == TerminalInputDrainResult(bytes: Array("abcdef".utf8), shouldFinish: false)
+    )
+  }
+
+  @Test("drainAvailableTerminalInput preserves drained bytes when EOF follows")
+  func terminalInputDrainPreservesBytesBeforeEndOfFile() throws {
+    let pipe = try makeNonblockingPipe()
+    defer {
+      close(pipe.readEnd)
+    }
+
+    try writeAll(Array("abcdef".utf8), to: pipe.writeEnd)
+    close(pipe.writeEnd)
+
+    #expect(
+      drainAvailableTerminalInput(from: pipe.readEnd, maxBytesPerRead: 2)
+        == TerminalInputDrainResult(bytes: Array("abcdef".utf8), shouldFinish: true)
     )
   }
 
@@ -219,3 +277,36 @@ struct InputBatchingResponsivenessTests {
 }
 
 private struct EventBatchProbeState: Equatable, Sendable {}
+
+private func makeNonblockingPipe() throws -> (readEnd: Int32, writeEnd: Int32) {
+  var pipeFDs: [Int32] = [0, 0]
+  let pipeResult = unsafe pipeFDs.withUnsafeMutableBufferPointer { buffer in
+    unsafe pipe(buffer.baseAddress!)
+  }
+  try #require(pipeResult == 0)
+
+  let readEnd = pipeFDs[0]
+  let flags = fcntl(readEnd, F_GETFL)
+  try #require(flags >= 0)
+  try #require(fcntl(readEnd, F_SETFL, flags | O_NONBLOCK) >= 0)
+
+  return (readEnd: readEnd, writeEnd: pipeFDs[1])
+}
+
+private func writeAll(
+  _ bytes: [UInt8],
+  to fileDescriptor: Int32
+) throws {
+  try bytes.withUnsafeBufferPointer { buffer in
+    var written = 0
+    while written < bytes.count {
+      let result = unsafe write(
+        fileDescriptor,
+        buffer.baseAddress!.advanced(by: written),
+        bytes.count - written
+      )
+      try #require(result > 0)
+      written += result
+    }
+  }
+}
