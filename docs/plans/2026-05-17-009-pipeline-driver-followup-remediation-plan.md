@@ -1104,10 +1104,10 @@ git commit -m "docs: ledger F4 resolved (code+test)"
 
 ## Task 4.4: Phase 4 Gate
 
-- [ ] **Step 1:** `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F4 ledger row complete; DoD passes.
-- [ ] **Step 4:** `git commit --allow-empty -m "chore: phase 4 gate green (F4)"`
+- [x] **Step 1:** `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F4 ledger row complete; DoD passes.
+- [x] **Step 4:** `git commit --allow-empty -m "chore: phase 4 gate green (F4)"`
 
 ---
 
