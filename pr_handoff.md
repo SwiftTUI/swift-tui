@@ -77,6 +77,11 @@ Packet 13 should be reviewed as animation tree-query extraction:
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
 - `Sources/SwiftTUIRuntime/Lifecycle/AnimationTreeQueries.swift`
 
+Packet 14 should be reviewed as animation transition-overlay extraction:
+
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationTransitionOverlay.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -321,6 +326,23 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-042708-50577.log
 ```
 
+Packet 14 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-043316-68540.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -344,13 +366,15 @@ Packet 10 is terminal-host capability probing extraction. Packet 11 is
 terminal-host escape sequence, platform I/O shim, and process-exit cleanup
 extraction. Packet 12 is terminal presentation planning extraction.
 Packet 13 is animation tree-query extraction.
+Packet 14 is animation transition-overlay extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
 pixel metrics refresh, input precision propagation, raw-mode cleanup,
 WebSurface full-repaint byte accounting, presentation damage planning, Kitty
 graphics replay planning, matched-geometry traversal, removal subtree lookup,
-or public API regression appears.
+removal overlay transient marking, removal offset composition, removal
+reinjection ordering, or public API regression appears.
 
 ## AI Assistance Disclosure
 

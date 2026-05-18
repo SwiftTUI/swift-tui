@@ -231,6 +231,33 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 14: Animation Transition Overlays
+
+- Objective: continue decomposing `AnimationController` by moving resolved-tree
+  removal overlay value transforms behind an internal facade while keeping
+  controller-owned state and batch bookkeeping in place.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+  - `Sources/SwiftTUIRuntime/Lifecycle/AnimationTransitionOverlay.swift`
+- Dependencies: Packet 13 extracted pure tree queries. Read-only review
+  confirmed this next slice is safe only if the extraction remains a
+  value-transform boundary.
+- Invariants: resolved-level injection still only happens when no placed
+  snapshot is available; removal clones are transient before reinjection;
+  opacity cascades to descendants; offsets apply only at the removal subtree
+  root; existing offsets compose by addition; non-offset roots get the same
+  stable `__transitionOffset` wrapper identity; injection remains child-first
+  and sorted by previous child index; animation state, purge decisions, batch
+  ref counts, deadlines, and completion deferral stay in `AnimationController`.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:

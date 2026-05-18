@@ -59,6 +59,9 @@ Approved constraints:
 - Packet 13 completed: extracted pure animation resolved/placed tree query
   helpers into `AnimationTreeQueries.swift`, leaving mutating transition and
   lifecycle bookkeeping in `AnimationController.swift`.
+- Packet 14 completed: extracted resolved-tree removal overlay transforms into
+  `AnimationTransitionOverlay.swift`, keeping animation sampling, purge
+  decisions, deadlines, and batch bookkeeping in `AnimationController`.
 
 ## Baseline Validation
 
@@ -267,6 +270,9 @@ Packet 13 validation:
   - Result: PASS
 - `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
   - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-043316-68540.log`
+  - Result: PASS
 - `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
   - Result: PASS
 - `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
@@ -279,13 +285,25 @@ Packet 13 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-042708-50577.log`
   - Result: PASS
 
+Packet 14 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 14: continue `AnimationController` decomposition with a mutating helper
-boundary only after Packet 13's full gate passes. The likely next candidate is
-the transition/removal overlay mutation group (`markTransient`,
-`applyTransitionModifiersRecursively`, and `injectRemovals`), but it should be
-verified against local source evidence before editing.
+Packet 15: re-rank the remaining `AnimationController` internals after Packet
+14's full gate passes. Candidate areas are property writeback/sample helpers or
+frame-draft/checkpoint scaffolding, but avoid any extraction that requires
+package API widening.
 
 Expected owned files pending local discovery:
 

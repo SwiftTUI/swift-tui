@@ -356,7 +356,7 @@ package final class AnimationController: Sendable {
           // (matches the active-animation tick loop pattern).
           removingIdentities[identity]?.customState = state
           if let progress = evaluated {
-            modifiers = interpolateRemovalModifiers(
+            modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
               from: entry.startOpacity,
               to: entry.transition.removalModifiers(),
               progress: progress
@@ -942,19 +942,6 @@ package final class AnimationController: Sendable {
       timestamp.advanced(by: drainDelay)
   }
 
-  /// Marks every node in the subtree as transient so the semantic
-  /// extractor, focus tracker, and lifecycle coordinator skip the
-  /// overlay during routing even though it still flows through
-  /// layout + draw for the duration of the exit animation.
-  private func markTransient(_ node: inout ResolvedNode) {
-    node.isTransient = true
-    var children = node.children
-    for i in children.indices {
-      markTransient(&children[i])
-    }
-    node.setChildrenPreservingDerivedState(children)
-  }
-
   private func enqueueInsertionAnimation(
     identity: Identity,
     transition: AnyTransition,
@@ -1327,7 +1314,7 @@ package final class AnimationController: Sendable {
           // removal interrupted a mid-flight insertion) toward the
           // removal modifiers.  Progress 0 == starting state,
           // progress 1 == fully removed.
-          modifiers = interpolateRemovalModifiers(
+          modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
             from: entry.startOpacity,
             to: entry.transition.removalModifiers(),
             progress: progress
@@ -1361,9 +1348,10 @@ package final class AnimationController: Sendable {
         // higher up in the subtree.  Mark every node in the cloned
         // overlay as transient so the semantic extractor, focus
         // tracker, and lifecycle coordinator skip them.
-        var subtreeCopy = entry.snapshot
-        markTransient(&subtreeCopy)
-        applyTransitionModifiersRecursively(modifiers, to: &subtreeCopy)
+        let subtreeCopy = AnimationTransitionOverlay.resolvedRemovalSnapshot(
+          from: entry.snapshot,
+          applying: modifiers
+        )
         if let parentId = entry.parentIdentity {
           injectionsByParent[parentId, default: []].append(
             (childIndex: entry.childIndex, snapshot: subtreeCopy)
@@ -1384,7 +1372,10 @@ package final class AnimationController: Sendable {
 
     // Inject removal overlays at their previous parent/index.
     if !injectionsByParent.isEmpty {
-      tree = injectRemovals(tree: tree, injectionsByParent: injectionsByParent)
+      tree = AnimationTransitionOverlay.injectResolvedRemovals(
+        into: tree,
+        injectionsByParent: injectionsByParent
+      )
     }
 
     // Drain stranded `withAnimation` completions whose target time
@@ -1437,136 +1428,6 @@ package final class AnimationController: Sendable {
       )
     }
     return slot
-  }
-
-  /// Interpolates from a starting opacity (typically 1.0 = identity,
-  /// but lower if this removal interrupted a mid-flight insertion)
-  /// toward the removal modifiers based on `progress`.  Progress is
-  /// reported by the animation curve — 0 means "just starting", 1
-  /// means "fully removed".
-  private func interpolateRemovalModifiers(
-    from startOpacity: Double,
-    to target: TransitionModifiers,
-    progress: Double
-  ) -> TransitionModifiers {
-    var result = TransitionModifiers.identity
-    if let targetOpacity = target.opacity {
-      result.opacity = startOpacity + (targetOpacity - startOpacity) * progress
-    }
-    if let targetOffsetX = target.offsetX {
-      result.offsetX = Int(Double(targetOffsetX) * progress)
-    }
-    if let targetOffsetY = target.offsetY {
-      result.offsetY = Int(Double(targetOffsetY) * progress)
-    }
-    return result
-  }
-
-  /// Applies transition modifiers recursively to every node in the
-  /// subtree.  Opacity cascades (since rasterizer reads per-node
-  /// opacity and text leaves need to see it).  Offset is applied only
-  /// at the subtree root — either in place on an `.intrinsic` node,
-  /// composed into an existing `.offset` variant, or via a fresh
-  /// wrapping node when the root already carries a non-offset layout
-  /// (`.frame`, `.padding`, etc.).  The wrapping approach lets
-  /// transitions like `.move(edge:)` slide a framed or padded view.
-  private func applyTransitionModifiersRecursively(
-    _ modifiers: TransitionModifiers,
-    to node: inout ResolvedNode
-  ) {
-    // Opacity cascades down to every descendant so the text leaf
-    // (which actually renders) sees the faded value.
-    if let opacity = modifiers.opacity {
-      var drawMetadata = node.drawMetadata
-      // If the node already has an explicit opacity, multiply so the
-      // animation composes with authored opacity.
-      let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
-      drawMetadata.baseStyle.explicitOpacity = base * opacity
-      node.drawMetadata = drawMetadata
-    }
-
-    var children = node.children
-    for i in children.indices {
-      var child = children[i]
-      // Recurse with opacity only (offset stays at the root).
-      var childMods = TransitionModifiers.identity
-      childMods.opacity = modifiers.opacity
-      applyTransitionModifiersRecursively(childMods, to: &child)
-      children[i] = child
-    }
-    // Shape is unchanged (same count, just interpolated opacity on
-    // each child) so we bypass the derived-state recomputes on the
-    // normal children setter.
-    node.setChildrenPreservingDerivedState(children)
-
-    // Apply offset to the root of the subtree only.
-    let offsetX = modifiers.offsetX ?? 0
-    let offsetY = modifiers.offsetY ?? 0
-    guard offsetX != 0 || offsetY != 0 else { return }
-
-    switch node.layoutBehavior {
-    case .intrinsic:
-      // Variant is changing .intrinsic → .offset; reuse bit may
-      // change, so use the normal setter.
-      node.layoutBehavior = .offset(x: offsetX, y: offsetY)
-
-    case .offset(let existingX, let existingY):
-      // Compose with an existing offset by summation.  Variant
-      // unchanged → bypass derived-state recomputes.
-      node.setLayoutBehaviorPreservingDerivedState(
-        .offset(x: existingX + offsetX, y: existingY + offsetY)
-      )
-
-    default:
-      // Root already carries a non-offset layout (frame, padding,
-      // flexibleFrame, stack, etc.).  Wrap it in a fresh offset
-      // node so the transition offset composes with the authored
-      // layout instead of being silently dropped.
-      //
-      // The wrapper's identity is derived from the root by appending
-      // a private component so it is stable across ticks (same
-      // identity produces the same wrapping, no structural churn).
-      let wrapperIdentity = Identity(
-        components: node.identity.components + ["__transitionOffset"]
-      )
-      var wrapped = ResolvedNode(
-        identity: wrapperIdentity,
-        kind: .view("TransitionOffset"),
-        children: [node],
-        environmentSnapshot: node.environmentSnapshot,
-        transactionSnapshot: node.transactionSnapshot,
-        layoutBehavior: .offset(x: offsetX, y: offsetY)
-      )
-      // The wrapper inherits the wrapped root's transient flag so
-      // the whole overlay skips semantics / focus / lifecycle.
-      wrapped.isTransient = node.isTransient
-      node = wrapped
-    }
-  }
-
-  /// Walks the current tree and injects removal snapshots at their
-  /// previous parent identity and child index. If the previous index
-  /// exceeds the current children count, the snapshot is appended at
-  /// the end.
-  private func injectRemovals(
-    tree: ResolvedNode,
-    injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]]
-  ) -> ResolvedNode {
-    var node = tree
-    // Recurse first so child injections happen before parent-level
-    // splicing; this preserves the visual order of nested removals.
-    var children = node.children.map { child in
-      injectRemovals(tree: child, injectionsByParent: injectionsByParent)
-    }
-    if let injections = injectionsByParent[node.identity] {
-      let sorted = injections.sorted { $0.childIndex < $1.childIndex }
-      for injection in sorted {
-        let insertIndex = min(injection.childIndex, children.count)
-        children.insert(injection.snapshot, at: insertIndex)
-      }
-    }
-    node.children = children
-    return node
   }
 
   private func applyInterpolatedValues(
