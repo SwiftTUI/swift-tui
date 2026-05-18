@@ -55,6 +55,23 @@ Packet 9 should be reviewed as fallback image overlay extraction:
 - `Sources/SwiftTUIRuntime/Terminal/TerminalImageFallbackRendering.swift`
 - `Scripts/lib/accessibility_raw_glyph_sources.txt`
 
+Packet 10 should be reviewed as terminal-host capability probing extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHostCapabilities.swift`
+
+Packet 11 should be reviewed as terminal-host sequence and cleanup extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHostEscapeSequences.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalPlatformIO.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalProcessExitCleanup.swift`
+
+Packet 12 should be reviewed as terminal presentation planning extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalPresentation.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalPresentationPlanning.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -264,6 +281,22 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-040917-13192.log
 ```
 
+Packet 12 validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-041849-32895.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -285,12 +318,13 @@ Packet 7 is a Kitty image command extraction. Packet 8 is a Sixel image command
 and shared sampling extraction. Packet 9 is fallback image overlay extraction.
 Packet 10 is terminal-host capability probing extraction. Packet 11 is
 terminal-host escape sequence, platform I/O shim, and process-exit cleanup
-extraction.
+extraction. Packet 12 is terminal presentation planning extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
 pixel metrics refresh, input precision propagation, raw-mode cleanup,
-WebSurface full-repaint byte accounting, or public API regression appears.
+WebSurface full-repaint byte accounting, presentation damage planning, Kitty
+graphics replay planning, or public API regression appears.
 
 ## AI Assistance Disclosure
 

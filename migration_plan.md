@@ -183,6 +183,27 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 12: Terminal Presentation Planning
+
+- Objective: keep `TerminalPresentation.swift` focused on rendering terminal
+  surfaces by moving incremental/full repaint planning into a dedicated
+  internal file.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalPresentation.swift`
+  - `Sources/SwiftTUIRuntime/Terminal/TerminalPresentationPlanning.swift`
+- Dependencies: Packets 1, 2, and 7-11 clarified terminal presentation and image
+  replay ownership.
+- Invariants: public capability APIs, renderer output, damage hint
+  normalization, row-batch construction, edit-operation lowering, full-repaint
+  fallbacks, and Kitty image replay planning remain stable.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
