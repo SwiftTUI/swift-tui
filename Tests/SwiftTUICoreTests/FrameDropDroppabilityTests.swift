@@ -19,6 +19,15 @@ struct FrameDropDroppabilityTests {
     #expect(!eligibility.blockers.contains(.retainedRasterBaseline))
     #expect(eligibility.blockers == [.workerCustomLayoutCacheUpdate])
   }
+
+  @Test("Every committed side-effect category maps to a drop blocker")
+  func everySideEffectCategoryHasABlocker() {
+    for category in CommitEffectCategory.allCases {
+      #expect(
+        FrameDropEligibility.Blocker.blocker(for: category) != nil,
+        "committed effect category \(category) has no drop blocker")
+    }
+  }
 }
 
 private func makeFrameDropArtifacts(
