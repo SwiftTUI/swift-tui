@@ -290,6 +290,40 @@ against local source evidence.
   - `bun run test`
 - Rollback: revert the packet commit/files only.
 
+### Packet 16: DefaultRenderer Completed Frame Artifacts
+
+- Objective: reduce `DefaultRenderer` completed-frame commit/candidate noise by
+  moving artifact assembly, worker timing derivation, and drop-eligibility
+  classification into a same-subsystem helper, and move the completed-frame
+  candidate model out of `FrameTailRenderer`.
+- Owned files:
+  - `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/CompletedFrameArtifactBuilder.swift`
+  - `Sources/SwiftTUIRuntime/Rendering/CompletedFrameCandidate.swift`
+- Dependencies: Packet 15 completed the animation-controller value split.
+  Read-only runtime review ranked this `DefaultRenderer` seam as the most
+  central remaining rendering debt; run-loop diagnostics and input parsing are
+  next candidates after this checkpoint.
+- Invariants: public renderer APIs stay unchanged; candidate preview still uses
+  `previewLifecycleEvents` and never finalizes the live graph; actual commit
+  still runs through `commitCompletedFrameCandidate`; runtime registration
+  diagnostics are attached only after the commit path; scroll geometry,
+  retained frame storage, presentation dismiss-stack commit, measurement-cache
+  pruning, worker timings, main-actor timings, render-generation diagnostics,
+  frame-tail drop blockers, and completed-frame policy decisions remain stable.
+- Required checks:
+  - `swiftly run swift build`
+  - `swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineContractTests`
+  - `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+  - `swiftly run swift test --filter SwiftTUITests.PipelineDriverParityTests`
+  - `swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests`
+  - `swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests`
+  - `bun run test`
+- Rollback: revert the packet commit/files only.
+
 ## Human Checkpoints
 
 Stop for approval before:
