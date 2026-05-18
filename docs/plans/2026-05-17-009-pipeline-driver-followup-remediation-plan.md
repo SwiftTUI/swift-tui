@@ -1913,7 +1913,7 @@ git add docs/proposals/PIPELINE_DRIVER_AUDIT.md docs/proposals/PIPELINE_DRIVER_F
 git commit -m "docs: track resolution mechanism in audit tables (F14)"
 ```
 
-- [ ] **Step 4: F14 DoD** — `PIPELINE_DRIVER_RESOLUTION_LEDGER.md` has all 14 rows
+- [x] **Step 4: F14 DoD** — `PIPELINE_DRIVER_RESOLUTION_LEDGER.md` has all 14 rows
 populated with no `docs`-only mechanism, and both audit tables carry the
 mechanism column. Record F14 ledger row (Mechanism `code+test` — the ledger and
 its governing rule are the artifact; the guard is that every other row is
