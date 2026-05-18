@@ -36,6 +36,10 @@ Approved constraints:
 - Packet 6 completed: moved committed-frame presentation dispatch, JSON and
   accessible output, cursor-focus presentation, and output metrics into
   `RunLoop+Presentation.swift`.
+- Packet 7 completed: extracted Kitty image payload construction, placement
+  math, and terminal command encoding from `TerminalImageRendering.swift` into
+  `TerminalImageKittyRendering.swift`, while leaving renderer cache ownership in
+  the facade.
 
 ## Baseline Validation
 
@@ -137,14 +141,27 @@ Packet 6 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-031025-5025.log`
   - Result: PASS
 
+Packet 7 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-031747-26286.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 7: continue from the next highest-debt production subsystem after the
-primary runtime presentation path.
+Packet 8: continue the terminal image rendering split by isolating Sixel
+encoding helpers from `TerminalImageRendering.swift`.
 
 Expected owned files pending local discovery:
 
-- To be selected from production-code size/coupling evidence.
+- `Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift`
+- A new terminal Sixel helper file under `Sources/SwiftTUIRuntime/Terminal/`
 
 Validation:
 

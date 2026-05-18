@@ -38,6 +38,11 @@ Packet 6 should be reviewed as runtime presentation handoff extraction:
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
 - `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift`
 
+Packet 7 should be reviewed as Kitty image command extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalImageRendering.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalImageKittyRendering.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -160,6 +165,21 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-031025-5025.log
 ```
 
+Packet 7 validation passed:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+swiftly run swift test --filter SwiftTUITests.ImageSurfaceTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-031747-26286.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -177,9 +197,9 @@ Each packet should be independently revertible. Packets 1 and 2 are same-area
 terminal presentation changes. Packet 3 is a frame-tail damage-resolution split.
 Packet 4 is a core artifact file split. Packet 5 is a runtime acquisition
 control-flow extraction. Packet 6 is a runtime presentation handoff extraction.
-Revert newest-first if a terminal output, raster reuse, frame-tail, diagnostics,
-async-cancellation, cursor-focus, JSON/accessibility output, or public API
-regression appears.
+Packet 7 is a Kitty image command extraction. Revert newest-first if a terminal
+output, raster reuse, frame-tail, diagnostics, async-cancellation, cursor-focus,
+JSON/accessibility output, image-protocol, or public API regression appears.
 
 ## AI Assistance Disclosure
 
