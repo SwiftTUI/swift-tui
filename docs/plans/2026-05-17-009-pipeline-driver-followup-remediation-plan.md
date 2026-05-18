@@ -158,7 +158,7 @@ Line numbers drift as the plan executes. Every task locates code by symbol name 
 **Files:**
 - Create: `docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md`
 
-- [ ] **Step 1: Write the ledger file**
+- [x] **Step 1: Write the ledger file**
 
 ```markdown
 # Pipeline Driver Resolution Ledger
@@ -186,7 +186,7 @@ checkout, and the verifying commit hash is recorded.
 | F14 | _pending_ | _pending_ | _pending_ |
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
@@ -200,7 +200,7 @@ git commit -m "docs: open pipeline driver resolution ledger"
 **Files:**
 - Create: `Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift`
 
-- [ ] **Step 1: Write the characterization test**
+- [x] **Step 1: Write the characterization test**
 
 This test renders a curated matrix of views through `DefaultRenderer.render`
 (sync) and asserts stable structural properties of `FrameArtifacts`. It does not
@@ -261,13 +261,13 @@ struct RenderDriverCharacterizationTests {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it passes against current behavior**
+- [x] **Step 2: Run the test to verify it passes against current behavior**
 
 Run: `swift test --filter RenderDriverCharacterizationTests`
 Expected: PASS. If a matrix case fails to compile (a view API differs), fix the
 matrix case to a compiling equivalent — do not delete the case.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift
@@ -281,7 +281,7 @@ git commit -m "test: characterize render driver across a view matrix"
 **Files:**
 - Create: `Tests/SwiftTUITests/PipelineDriverParityTests.swift`
 
-- [ ] **Step 1: Write the parity test**
+- [x] **Step 1: Write the parity test**
 
 ```swift
 import Testing
@@ -314,13 +314,13 @@ struct PipelineDriverParityTests {
 }
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `swift test --filter PipelineDriverParityTests`
 Expected: PASS. If a case fails, the strategies already diverge — record it as a
 pre-existing defect in the commit message; do not weaken the assertion.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Tests/SwiftTUITests/PipelineDriverParityTests.swift
@@ -329,17 +329,17 @@ git commit -m "test: pin sync/async render artifact parity"
 
 ## Task 0.4: Phase 0 Gate
 
-- [ ] **Step 1: Run the full gate**
+- [x] **Step 1: Run the full gate**
 
 Run: `bun run test`
 Expected: exit 0, zero test failures.
 
-- [ ] **Step 2: Run pre-commit hooks**
+- [x] **Step 2: Run pre-commit hooks**
 
 Run the branch prek gate (CB-3).
 Expected: all hooks pass on branch-changed files.
 
-- [ ] **Step 3: Commit the gate confirmation**
+- [x] **Step 3: Commit the gate confirmation**
 
 ```bash
 git commit --allow-empty -m "chore: phase 0 gate green (characterization net in place)"
@@ -365,7 +365,7 @@ git commit --allow-empty -m "chore: phase 0 gate green (characterization net in 
 
 ## Task 1.1: Diff the two driver bodies and classify every difference
 
-- [ ] **Step 1: Produce the structural diff**
+- [x] **Step 1: Produce the structural diff**
 
 Run:
 ```bash
@@ -375,7 +375,7 @@ awk '/package func renderPendingFramesAsync\($/,/^  }$/' RunLoop+Rendering.swift
 diff /tmp/sync_driver.txt /tmp/async_driver.txt
 ```
 
-- [ ] **Step 2: Write the difference classification into the ADR**
+- [x] **Step 2: Write the difference classification into the ADR**
 
 Create `docs/decisions/0021-unified-frame-driver.md`:
 
@@ -418,7 +418,7 @@ A focus-sync or diagnostics change now lands in one place.
 Fill the table with **every** line the Step 1 diff reported. A difference left
 unclassified is an Anti-Rationalization trigger.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/decisions/0021-unified-frame-driver.md
@@ -430,7 +430,7 @@ git commit -m "docs: inventory frame driver body differences (ADR-0021)"
 **Files:**
 - Modify: `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
 
-- [ ] **Step 1: Write the failing parity test for the unified body**
+- [x] **Step 1: Write the failing parity test for the unified body**
 
 Add to `Tests/SwiftTUITests/PipelineDriverParityTests.swift`:
 
@@ -460,12 +460,12 @@ If no `RunLoopTestHarness` exists, use the construction pattern from
 `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` directly inline; do not
 invent an API that does not exist.
 
-- [ ] **Step 2: Run it to confirm it passes today (both forks currently work)**
+- [x] **Step 2: Run it to confirm it passes today (both forks currently work)**
 
 Run: `swift test --filter PipelineDriverParityTests.syncAsyncDriverParity`
 Expected: PASS (both forks are currently correct; this test pins that they stay equal).
 
-- [ ] **Step 3: Extract the shared body**
+- [x] **Step 3: Extract the shared body**
 
 In `RunLoop+Rendering.swift`, create one private method that contains the
 per-frame processing (focus-sync convergence loop, pointer-capture release,
@@ -500,7 +500,7 @@ The cancelled/dropped branches the async fork has become `.skipped` cases
 handled once inside `processReadyFrame`. Move the entire shared body — every
 line classified "structural" in ADR-0021 — into this method verbatim.
 
-- [ ] **Step 4: Rewrite both entry points as thin delegators**
+- [x] **Step 4: Rewrite both entry points as thin delegators**
 
 `renderPendingFrames` (sync) keeps its signature and body becomes a loop that
 calls `processReadyFrame` with an `acquireArtifacts` closure that calls
@@ -517,20 +517,20 @@ the diff supports; record the choice in ADR-0021.
 `renderPendingFramesAsync` keeps its signature and passes an `acquireArtifacts`
 closure that branches on `renderMode` (the existing sync/asyncNoCancel/cancellable logic).
 
-- [ ] **Step 5: Run the parity tests and characterization tests**
+- [x] **Step 5: Run the parity tests and characterization tests**
 
 Run: `swift test --filter PipelineDriverParityTests`
 Run: `swift test --filter RenderDriverCharacterizationTests`
 Expected: PASS. If `syncAsyncDriverParity` fails, the extraction changed behavior — fix the extraction (CB-4).
 
-- [ ] **Step 6: Run the full RunLoop-adjacent suites**
+- [x] **Step 6: Run the full RunLoop-adjacent suites**
 
 Run: `swift test --filter InteractiveRuntimeTests`
 Run: `swift test --filter AsyncFrameTailRenderingTests`
 Run: `swift test --filter FocusTransitionTests`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift Tests/SwiftTUITests/PipelineDriverParityTests.swift
@@ -539,7 +539,7 @@ git commit -m "refactor: unify sync and async frame driver bodies (F2)"
 
 ## Task 1.3: F2 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
 # No two functions in the file may each exceed 120 lines AND both contain a
@@ -552,14 +552,14 @@ function body. Confirm by inspection that `renderPendingFrames` and
 `renderPendingFramesAsync` are each now thin (< 60 lines) and delegate to
 `processReadyFrame` / `applyAcquiredFrame`.
 
-- [ ] **Step 2: Record the ledger row**
+- [x] **Step 2: Record the ledger row**
 
 Edit `docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md`, F2 row:
 - Mechanism: `code+test`
 - DoD command: `grep -c "rerenderedForFocusSync" Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift` returns the shared-body count and both entry points are thin delegators
 - Verified-by commit: the short hash from Task 1.2 Step 7
 
-- [ ] **Step 3: Commit the ledger update**
+- [x] **Step 3: Commit the ledger update**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
@@ -568,10 +568,10 @@ git commit -m "docs: ledger F2 resolved (code+test)"
 
 ## Task 1.4: Phase 1 Gate
 
-- [ ] **Step 1:** Run `bun run test` — expect exit 0.
-- [ ] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
-- [ ] **Step 3:** Confirm F2 ledger row complete and DoD passes.
-- [ ] **Step 4:** Commit: `git commit --allow-empty -m "chore: phase 1 gate green (F2)"`
+- [x] **Step 1:** Run `bun run test` — expect exit 0.
+- [x] **Step 2:** Run the branch prek gate (CB-3) — expect pass.
+- [x] **Step 3:** Confirm F2 ledger row complete and DoD passes.
+- [x] **Step 4:** Commit: `git commit --allow-empty -m "chore: phase 1 gate green (F2)"`
 
 ---
 
@@ -601,7 +601,7 @@ This plan implements **Option B** because the repository's own documents (`ARCHI
 
 ## Task 2.1: Spike-measure Option B allocation cost
 
-- [ ] **Step 1: Write a micro-benchmark**
+- [x] **Step 1: Write a micro-benchmark**
 
 Add to `Tests/SwiftTUITests/RenderPipelineStructureTests.swift`:
 
@@ -637,7 +637,7 @@ struct RenderPipelineStructureTests {
 }
 ```
 
-- [ ] **Step 2: Capture the pre-refactor baseline**
+- [x] **Step 2: Capture the pre-refactor baseline**
 
 Run: `swift test --filter RenderPipelineStructureTests.composedRenderAllocationBudget`
 It will fail (baseline 0). Read the printed `elapsed`, set `baselineMillis` to
@@ -653,7 +653,7 @@ git commit -m "test: capture pre-refactor render allocation baseline (F1)"
 **Files:**
 - Modify: `Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift`
 
-- [ ] **Step 1: Write the failing structure guard test**
+- [x] **Step 1: Write the failing structure guard test**
 
 Add to `RenderPipelineStructureTests.swift`:
 
@@ -677,12 +677,12 @@ Add to `RenderPipelineStructureTests.swift`:
   }
 ```
 
-- [ ] **Step 2: Run it — confirm current state**
+- [x] **Step 2: Run it — confirm current state**
 
 Run: `swift test --filter RenderPipelineStructureTests.stageOrderIsStructural`
 Expected: PASS today (the property exists) — this test pins it stays true with the parameter gone.
 
-- [ ] **Step 3: Rewrite `RuntimeRenderPipeline` as an executor**
+- [x] **Step 3: Rewrite `RuntimeRenderPipeline` as an executor**
 
 Replace `RuntimeRenderPipeline` with a struct that:
 - Has **no** `init` parameters. `stageOrder` is a computed constant only.
@@ -720,25 +720,25 @@ func renderOneShot(
 Order is now enforced by the loop over `orderedComposition`. A stage cannot run
 out of order because the loop is the only driver.
 
-- [ ] **Step 4: Update the three callers in `SwiftTUI.swift`**
+- [x] **Step 4: Update the three callers in `SwiftTUI.swift`**
 
 `renderView`, `renderViewAsync`, `renderAsyncCancellable` build a
 `...StageHandlers` value instead of passing loose closures. The closure bodies
 are unchanged — only their packaging changes.
 
-- [ ] **Step 5: Run structure + parity + characterization tests**
+- [x] **Step 5: Run structure + parity + characterization tests**
 
 Run: `swift test --filter RenderPipelineStructureTests`
 Run: `swift test --filter PipelineDriverParityTests`
 Run: `swift test --filter RenderDriverCharacterizationTests`
 Expected: PASS, including the allocation-budget test.
 
-- [ ] **Step 6: Confirm dead config is gone**
+- [x] **Step 6: Confirm dead config is gone**
 
 Run: `grep -rn "RuntimeFrameHeadStage\|isTransactionalWhenAbortable" --include="*.swift" Sources`
 Expected: **no output** (the type is deleted).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift Sources/SwiftTUIRuntime/SwiftTUI.swift Tests/SwiftTUITests/RenderPipelineStructureTests.swift
@@ -749,7 +749,7 @@ git commit -m "refactor: make RuntimeRenderPipeline a sequenced executor (F1, F1
 
 **Spirit:** sync, async, and cancellable must share their tail orchestration; they may differ only where suspension or cancellation genuinely requires it.
 
-- [ ] **Step 1: Inventory the tail-path functions**
+- [x] **Step 1: Inventory the tail-path functions**
 
 Run:
 ```bash
@@ -758,7 +758,7 @@ grep -n "private func render\|package func render" Sources/SwiftTUIRuntime/Swift
 
 List `renderFusedFrameTail`, `renderAsyncFusedFrameTail`, `renderCancellableFusedFrameTail`, and the `renderAsyncFrameTailLayoutStage`/`renderCancellableFrameTailLayoutStage` pair.
 
-- [ ] **Step 2: Diff `renderAsyncFusedFrameTail` against `renderFusedFrameTail`**
+- [x] **Step 2: Diff `renderAsyncFusedFrameTail` against `renderFusedFrameTail`**
 
 `renderCancellableFusedFrameTail` already delegates to `renderAsyncFusedFrameTail`
 (verified) — that one is fine. The remaining duplication is `renderFusedFrameTail`
@@ -777,13 +777,13 @@ private func prepareAnimationOverlaySnapshot(
 Both sync and async call it; they differ only in `renderRaster` vs.
 `renderRasterAsync`.
 
-- [ ] **Step 3: Run parity + characterization tests**
+- [x] **Step 3: Run parity + characterization tests**
 
 Run: `swift test --filter PipelineDriverParityTests`
 Run: `swift test --filter RenderDriverCharacterizationTests`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/SwiftTUI.swift
@@ -792,11 +792,11 @@ git commit -m "refactor: share fused-frame-tail orchestration across strategies 
 
 ## Task 2.4: Reconcile ADR-0019 and ARCHITECTURE.md (downstream doc step)
 
-- [ ] **Step 1: Amend ADR-0019** to record that stage order is now enforced by the executor loop, not by prose or a `precondition`. State whether Option A or B was chosen and (if B) cite the allocation-budget test result.
+- [x] **Step 1: Amend ADR-0019** to record that stage order is now enforced by the executor loop, not by prose or a `precondition`. State whether Option A or B was chosen and (if B) cite the allocation-budget test result.
 
-- [ ] **Step 2: Update `ARCHITECTURE.md`** "Frame Pipeline" section so the composed-runtime description matches the executor. This is a CB-2 downstream edit — it describes the code; it is not the resolution.
+- [x] **Step 2: Update `ARCHITECTURE.md`** "Frame Pipeline" section so the composed-runtime description matches the executor. This is a CB-2 downstream edit — it describes the code; it is not the resolution.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/decisions/0019-composed-runtime-render-pipeline.md docs/ARCHITECTURE.md
@@ -805,7 +805,7 @@ git commit -m "docs: reconcile pipeline composition docs with the executor (F1)"
 
 ## Task 2.5: F1/F11/F12 Definition of Done
 
-- [ ] **Step 1: Run the DoD commands**
+- [x] **Step 1: Run the DoD commands**
 
 ```bash
 # F1: no dead config, no frozen-parameter precondition
@@ -816,9 +816,9 @@ grep -c "case .fusedFrameTail" Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPi
 
 Expected: first command — **no output**. Second command — returns ≥ 1 (the enum is a switch discriminant).
 
-- [ ] **Step 2: Record ledger rows** for F1, F11, F12 (Mechanism `code+test`; DoD commands above; verifying commit hashes).
+- [x] **Step 2: Record ledger rows** for F1, F11, F12 (Mechanism `code+test`; DoD commands above; verifying commit hashes).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
@@ -851,7 +851,7 @@ git commit -m "docs: ledger F1/F11/F12 resolved (code+test)"
 
 ## Task 3.1: Make the cancellation token signal instead of being polled
 
-- [ ] **Step 1: Write the failing latency test**
+- [x] **Step 1: Write the failing latency test**
 
 Add to `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` (or a new file
 `Tests/SwiftTUITests/CancellationLatencyTests.swift`):
@@ -875,12 +875,12 @@ struct CancellationLatencyTests {
 }
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `swift test --filter CancellationLatencyTests`
 Expected: PASS (smoke test).
 
-- [ ] **Step 3: Add a wait API to the cancellation token**
+- [x] **Step 3: Add a wait API to the cancellation token**
 
 In `FrameTailRenderer.swift`, `FrameTailJobCancellationToken` currently wraps a
 `Mutex<FrameTailJobState>`. Add a method that suspends until the state leaves
@@ -905,7 +905,7 @@ func awaitLeftQueue() async -> FrameTailJobState {
 `state.withLock`, capture and clear `pendingContinuation` and resume it with the
 new state. Store `pendingContinuation` as a field guarded by the same `Mutex`.
 
-- [ ] **Step 4: Replace the busy-poll**
+- [x] **Step 4: Replace the busy-poll**
 
 In `renderCancellableFrameTailLayoutStage` (`SwiftTUI.swift`), delete the
 `while cancellationToken.currentState == .queued { ... Task.sleep ... }` loop.
@@ -914,14 +914,14 @@ becoming true and calls `cancelBeforeStart()`; the main path awaits
 `cancellationToken.awaitLeftQueue()`. Whichever resolves first decides the
 outcome. Use `withTaskGroup` or `async let` — no loop, no sleep.
 
-- [ ] **Step 5: Run cancellation + parity tests**
+- [x] **Step 5: Run cancellation + parity tests**
 
 Run: `swift test --filter CancellationLatencyTests`
 Run: `swift test --filter AsyncFrameTailRenderingTests`
 Run: `swift test --filter PipelineDriverParityTests`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SwiftTUIRuntime/SwiftTUI.swift Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift Tests/SwiftTUITests/CancellationLatencyTests.swift
@@ -930,7 +930,7 @@ git commit -m "refactor: event-driven frame-tail cancellation, no busy-poll (F5)
 
 ## Task 3.2: F5 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
 # No Task.sleep anywhere on the cancellable render path.
@@ -941,9 +941,9 @@ Expected: **no output** within `renderCancellableFrameTailLayoutStage`. (If
 `Task.sleep` appears elsewhere in the file for an unrelated reason, confirm by
 inspection it is not on the cancellation path and note it in the commit.)
 
-- [ ] **Step 2: Record the F5 ledger row** (Mechanism `code+test`).
+- [x] **Step 2: Record the F5 ledger row** (Mechanism `code+test`).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
@@ -976,7 +976,7 @@ git commit -m "docs: ledger F5 resolved (code+test)"
 
 ## Task 4.1: Add a checkpoint round-trip identity guard
 
-- [ ] **Step 1: Write the failing guard test**
+- [x] **Step 1: Write the failing guard test**
 
 ```swift
 import Testing
@@ -1008,7 +1008,7 @@ struct ViewGraphCheckpointTotalityTests {
 }
 ```
 
-- [ ] **Step 2: Add `debugTotalStateSnapshot` to `ViewGraph`**
+- [x] **Step 2: Add `debugTotalStateSnapshot` to `ViewGraph`**
 
 `debugTotalStateSnapshot()` returns an `Equatable` value built from **every
 stored property of `ViewGraph`**. Implement it adjacent to the stored-property
@@ -1025,7 +1025,7 @@ The snapshot must be derived from the same property list `makeCheckpoint`
 captures — so if a future field is added to one and not the other, the
 round-trip test fails.
 
-- [ ] **Step 3: Run the guard test**
+- [x] **Step 3: Run the guard test**
 
 Run: `swift test --filter ViewGraphCheckpointTotalityTests`
 Expected: it either PASSES (checkpoint is already total — good) or FAILS
@@ -1033,7 +1033,7 @@ Expected: it either PASSES (checkpoint is already total — good) or FAILS
 extend `makeCheckpoint`/`restoreCheckpoint` to cover the missed field, then
 re-run to PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SwiftTUICore/Resolve/ViewGraph.swift Tests/SwiftTUICoreTests/ViewGraphCheckpointTotalityTests.swift
@@ -1044,7 +1044,7 @@ git commit -m "test: guard ViewGraph checkpoint totality (F4)"
 
 **Spirit:** the previewed commit and the real commit of the same frame must produce identical `CommitPlan`s — that equivalence is what makes the double-commit safe.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Add to `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`:
 
@@ -1069,12 +1069,12 @@ Add to `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`:
   }
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `swift test --filter AsyncFrameTailRenderingTests.previewCommitEqualsRealCommit`
 Expected: PASS. A failure means the preview's checkpoint-restore corrupts the graph — fix `makeCheckpoint`/`restoreCheckpoint` (Task 4.1 Step 3).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift
@@ -1083,7 +1083,7 @@ git commit -m "test: preview commit equals real commit for async frames (F4)"
 
 ## Task 4.3: F4 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
 swift test --filter ViewGraphCheckpointTotalityTests
@@ -1093,9 +1093,9 @@ Expected: PASS. Confirm by inspection that `debugTotalStateSnapshot` references
 every stored property of `ViewGraph` and carries the CHECKPOINT TOTALITY
 CONTRACT comment.
 
-- [ ] **Step 2: Record the F4 ledger row** (Mechanism `code+test`).
+- [x] **Step 2: Record the F4 ledger row** (Mechanism `code+test`).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
