@@ -498,18 +498,7 @@ public struct DefaultRenderer {
   package func abortPreparedFrameHead(
     _ draft: FrameHeadDraft
   ) {
-    guard let checkpoints = draft.checkpoints else {
-      preconditionFailure(
-        "Cannot abort a one-shot frame head — it has no checkpoints."
-      )
-    }
-    draft.registrationDraft.discard()
-    draft.graphDraft.discard(from: viewGraph)
-    draft.presentationPortalDraft.discard()
-    draft.observationDraft?.discard()
-    draft.animationDraft.discard()
-    frameState.restoreCheckpoint(checkpoints.frameState)
-    frameInputs.restoreCheckpoint(checkpoints.frameInputs)
+    draft.transaction.discard()
   }
 
   @MainActor
@@ -829,10 +818,7 @@ public struct DefaultRenderer {
         resolved: resolved,
         placed: tail.placed
       )
-      runtimeRegistrationDiagnostics = draft.graphDraft.commitRuntimeRegistrations(
-        from: viewGraph
-      )
-      commitFrameHeadDraftEffects(draft)
+      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
       return commitPlanner.plan(
         resolved: resolved,
         placed: tail.placed,
@@ -841,7 +827,6 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    draft.animationDraft.commit()
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
@@ -1119,15 +1104,22 @@ public struct DefaultRenderer {
       )
     }
 
-    return FrameHeadDraft(
-      clock: clock,
-      renderGeneration: renderGeneration,
+    let transaction = FrameHeadTransaction(
+      viewGraph: viewGraph,
+      frameState: frameState,
+      frameInputs: frameInputs,
       graphDraft: graphDraft,
       registrationDraft: registrationDraft,
       presentationPortalDraft: presentationPortalDraft,
       observationDraft: observationDraft,
       animationDraft: animationDraft,
-      checkpoints: checkpoints,
+      checkpoints: checkpoints
+    )
+
+    return FrameHeadDraft(
+      clock: clock,
+      renderGeneration: renderGeneration,
+      transaction: transaction,
       resolveContext: resolveContext,
       graphRootIdentity: presentationPortalContext.identity,
       frameContext: frameContext,
@@ -1466,10 +1458,7 @@ public struct DefaultRenderer {
         resolved: candidate.resolved,
         placed: tail.placed
       )
-      runtimeRegistrationDiagnostics = candidate.draft.graphDraft.commitRuntimeRegistrations(
-        from: viewGraph
-      )
-      commitFrameHeadDraftEffects(candidate.draft)
+      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(candidate.draft)
       return commitPlanner.plan(
         resolved: candidate.resolved,
         placed: tail.placed,
@@ -1478,7 +1467,6 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    candidate.draft.animationDraft.commit()
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
@@ -1517,9 +1505,8 @@ public struct DefaultRenderer {
   @MainActor
   private func commitFrameHeadDraftEffects(
     _ draft: FrameHeadDraft
-  ) {
-    draft.observationDraft?.commit()
-    draft.presentationPortalDraft.commit()
+  ) -> RuntimeRegistrationDiagnostics {
+    draft.transaction.commit()
   }
 
   @MainActor
@@ -1657,8 +1644,7 @@ public struct DefaultRenderer {
   private func frameHeadDropBlockers(
     _ draft: FrameHeadDraft
   ) -> Set<FrameDropEligibility.Blocker> {
-    draft.registrationDraft.draftDropEligibilityBlockers()
-      .union(draft.animationDraft.frameDropEligibilityBlockers)
+    draft.transaction.draftDropEligibilityBlockers()
   }
 
   @MainActor
