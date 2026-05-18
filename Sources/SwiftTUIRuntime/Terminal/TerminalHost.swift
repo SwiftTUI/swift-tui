@@ -767,112 +767,19 @@ public enum TerminalHostError: Error {
       )
       presentationSession.forceFullRepaint = false
 
-      var bytesWritten = 0
-      let origin = CellPoint.zero
-      var bufferedOutput = String()
-      var graphicsReplayScope = TerminalPresentationMetrics.GraphicsReplayScope.none
-      var graphicsAttachmentsReplayed = 0
-      var editOperationLowering = TerminalPresentationMetrics.EditOperationLowering.none
-      var editOperationCount = 0
-
-      func append(_ output: String) {
-        bufferedOutput.append(output)
-        bytesWritten += output.utf8.count
-      }
-
-      switch plan.strategy {
-      case .fullRepaint:
-        // A terminal full repaint clears the previous screen contents. Kitty
-        // image ids cannot be assumed to remain displayable after that, so
-        // force the current frame to retransmit any images before placement.
-        if graphicsCapabilities.preferredProtocol == .kitty {
-          presentationSession.transmittedKittyImages.removeAll()
-        }
-        if !preparedSurface.imageAttachments.isEmpty {
-          graphicsReplayScope = .full
-          graphicsAttachmentsReplayed = preparedSurface.imageAttachments.count
-        }
-        append(clearScreenSequence())
-        append(cursorSequence(to: origin))
-
-        let writeSteps = fullRepaintWriteSteps(
-          for: preparedSurface,
-          capabilityProfile: capabilityProfile
-        )
-        for writeStep in writeSteps {
-          append(writeStep)
-        }
-
-        for writeStep in imageRenderer.graphicsWriteSteps(
-          for: preparedSurface,
-          capabilityProfile: capabilityProfile,
-          graphicsCapabilities: graphicsCapabilities,
-          transmittedKittyImages: &presentationSession.transmittedKittyImages
-        ) {
-          append(writeStep)
-        }
-
-      case .incremental:
-        for rowBatch in plan.rowBatches {
-          let rowOutput: String
-          if usesTerminalEditOperations,
-            rowBatch.canLowerToEraseToEndOfLine(
-              surfaceWidth: preparedSurface.size.width
-            )
-          {
-            editOperationLowering = .eraseToEndOfLine
-            editOperationCount += 1
-            rowOutput = eraseToEndOfLineSequence()
-          } else {
-            rowOutput = rowBatch.renderedBatch
-          }
-          append(
-            cursorSequence(
-              to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
-            )
-          )
-          append(rowOutput)
-        }
-        if graphicsCapabilities.preferredProtocol == .kitty {
-          switch plan.graphicsReplay.scope {
-          case .none:
-            break
-          case .targeted:
-            graphicsReplayScope = .targeted
-            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
-            for writeStep in imageRenderer.graphicsWriteSteps(
-              for: plan.graphicsReplay.attachmentsToReplay,
-              capabilityProfile: capabilityProfile,
-              graphicsCapabilities: graphicsCapabilities,
-              transmittedKittyImages: &presentationSession.transmittedKittyImages
-            ) {
-              append(writeStep)
-            }
-          case .full:
-            graphicsReplayScope = .full
-            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
-            append(deleteVisibleKittyPlacementsSequence())
-            for writeStep in imageRenderer.graphicsWriteSteps(
-              for: plan.graphicsReplay.attachmentsToReplay,
-              capabilityProfile: capabilityProfile,
-              graphicsCapabilities: graphicsCapabilities,
-              transmittedKittyImages: &presentationSession.transmittedKittyImages
-            ) {
-              append(writeStep)
-            }
-          }
-        }
-      }
-
-      let usedSynchronizedOutput =
-        !bufferedOutput.isEmpty
-        && plan.strategy == .fullRepaint
-        && capabilityProfile.supportsSynchronizedOutput
-      bufferedOutput = wrappedPresentationOutput(
-        bufferedOutput,
+      let emission = buildPresentationEmission(
+        for: preparedSurface,
+        plan: plan,
+        graphicsCapabilities: graphicsCapabilities
+      )
+      let usedSynchronizedOutput = usesSynchronizedOutput(
+        for: emission.output,
         strategy: plan.strategy
       )
-      bytesWritten = bufferedOutput.utf8.count
+      let bufferedOutput = wrappedPresentationOutput(
+        emission.output,
+        strategy: plan.strategy
+      )
 
       if !bufferedOutput.isEmpty {
         presentationWriterIfNeeded().submit(
@@ -884,19 +791,167 @@ public enum TerminalHostError: Error {
 
       presentationSession.lastSubmittedSurface = preparedSurface
 
-      return TerminalPresentationMetrics(
-        bytesWritten: bytesWritten,
-        linesTouched: plan.linesTouched,
-        cellsChanged: plan.cellsChanged,
-        strategy: plan.strategy == TerminalPresentationPlan.Strategy.fullRepaint
-          ? TerminalPresentationMetrics.Strategy.fullRepaint
-          : TerminalPresentationMetrics.Strategy.incremental,
-        usedSynchronizedOutput: usedSynchronizedOutput,
-        graphicsReplayScope: graphicsReplayScope,
-        graphicsAttachmentsReplayed: graphicsAttachmentsReplayed,
-        editOperationLowering: editOperationLowering,
-        editOperationCount: editOperationCount
+      return emission.metrics(
+        for: plan,
+        output: bufferedOutput,
+        usedSynchronizedOutput: usedSynchronizedOutput
       )
+    }
+
+    private func buildPresentationEmission(
+      for preparedSurface: RasterSurface,
+      plan: TerminalPresentationPlan,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) -> TerminalPresentationEmission {
+      var emission = TerminalPresentationEmission()
+      switch plan.strategy {
+      case .fullRepaint:
+        appendFullRepaint(
+          to: &emission,
+          for: preparedSurface,
+          graphicsCapabilities: graphicsCapabilities
+        )
+
+      case .incremental:
+        appendIncrementalPresentation(
+          to: &emission,
+          for: preparedSurface,
+          plan: plan,
+          graphicsCapabilities: graphicsCapabilities
+        )
+      }
+
+      return emission
+    }
+
+    private func appendFullRepaint(
+      to emission: inout TerminalPresentationEmission,
+      for preparedSurface: RasterSurface,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      // A terminal full repaint clears the previous screen contents. Kitty
+      // image ids cannot be assumed to remain displayable after that, so
+      // force the current frame to retransmit any images before placement.
+      if graphicsCapabilities.preferredProtocol == .kitty {
+        presentationSession.transmittedKittyImages.removeAll()
+      }
+      if !preparedSurface.imageAttachments.isEmpty {
+        emission.recordGraphicsReplay(
+          scope: .full,
+          attachmentCount: preparedSurface.imageAttachments.count
+        )
+      }
+      emission.append(clearScreenSequence())
+      emission.append(cursorSequence(to: .zero))
+
+      let writeSteps = fullRepaintWriteSteps(
+        for: preparedSurface,
+        capabilityProfile: capabilityProfile
+      )
+      for writeStep in writeSteps {
+        emission.append(writeStep)
+      }
+
+      for writeStep in imageRenderer.graphicsWriteSteps(
+        for: preparedSurface,
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities,
+        transmittedKittyImages: &presentationSession.transmittedKittyImages
+      ) {
+        emission.append(writeStep)
+      }
+    }
+
+    private func appendIncrementalPresentation(
+      to emission: inout TerminalPresentationEmission,
+      for preparedSurface: RasterSurface,
+      plan: TerminalPresentationPlan,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      for rowBatch in plan.rowBatches {
+        let rowOutput = incrementalRowOutput(
+          for: rowBatch,
+          surfaceWidth: preparedSurface.size.width,
+          emission: &emission
+        )
+        emission.append(
+          cursorSequence(
+            to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
+          )
+        )
+        emission.append(rowOutput)
+      }
+      appendKittyGraphicsReplay(
+        to: &emission,
+        plan: plan,
+        graphicsCapabilities: graphicsCapabilities
+      )
+    }
+
+    private func incrementalRowOutput(
+      for rowBatch: TerminalPresentationPlan.RowBatch,
+      surfaceWidth: Int,
+      emission: inout TerminalPresentationEmission
+    ) -> String {
+      guard usesTerminalEditOperations,
+        rowBatch.canLowerToEraseToEndOfLine(surfaceWidth: surfaceWidth)
+      else {
+        return rowBatch.renderedBatch
+      }
+
+      emission.recordEraseToEndOfLine()
+      return eraseToEndOfLineSequence()
+    }
+
+    private func appendKittyGraphicsReplay(
+      to emission: inout TerminalPresentationEmission,
+      plan: TerminalPresentationPlan,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      guard graphicsCapabilities.preferredProtocol == .kitty else {
+        return
+      }
+
+      switch plan.graphicsReplay.scope {
+      case .none:
+        break
+      case .targeted:
+        emission.recordGraphicsReplay(
+          scope: .targeted,
+          attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
+        )
+        appendGraphicsWriteSteps(
+          for: plan.graphicsReplay.attachmentsToReplay,
+          to: &emission,
+          graphicsCapabilities: graphicsCapabilities
+        )
+      case .full:
+        emission.recordGraphicsReplay(
+          scope: .full,
+          attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
+        )
+        emission.append(deleteVisibleKittyPlacementsSequence())
+        appendGraphicsWriteSteps(
+          for: plan.graphicsReplay.attachmentsToReplay,
+          to: &emission,
+          graphicsCapabilities: graphicsCapabilities
+        )
+      }
+    }
+
+    private func appendGraphicsWriteSteps(
+      for attachments: [RasterImageAttachment],
+      to emission: inout TerminalPresentationEmission,
+      graphicsCapabilities: TerminalGraphicsCapabilities
+    ) {
+      for writeStep in imageRenderer.graphicsWriteSteps(
+        for: attachments,
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities,
+        transmittedKittyImages: &presentationSession.transmittedKittyImages
+      ) {
+        emission.append(writeStep)
+      }
     }
 
     package func drainPendingPresentation() throws {
@@ -1508,16 +1563,22 @@ public enum TerminalHostError: Error {
       _ output: String,
       strategy: TerminalPresentationPlan.Strategy
     ) -> String {
-      guard !output.isEmpty,
-        strategy == .fullRepaint,
-        capabilityProfile.supportsSynchronizedOutput
-      else {
+      guard usesSynchronizedOutput(for: output, strategy: strategy) else {
         return output
       }
 
       return beginSynchronizedOutputSequence()
         + output
         + endSynchronizedOutputSequence()
+    }
+
+    private func usesSynchronizedOutput(
+      for output: String,
+      strategy: TerminalPresentationPlan.Strategy
+    ) -> Bool {
+      !output.isEmpty
+        && strategy == .fullRepaint
+        && capabilityProfile.supportsSynchronizedOutput
     }
 
   }

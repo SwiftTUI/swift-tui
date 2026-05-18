@@ -10,6 +10,51 @@ import Synchronization
     var output: String
   }
 
+  struct TerminalPresentationEmission {
+    var output = ""
+    var graphicsReplayScope = TerminalPresentationMetrics.GraphicsReplayScope.none
+    var graphicsAttachmentsReplayed = 0
+    var editOperationLowering = TerminalPresentationMetrics.EditOperationLowering.none
+    var editOperationCount = 0
+
+    mutating func append(_ output: String) {
+      self.output.append(output)
+    }
+
+    mutating func recordGraphicsReplay(
+      scope: TerminalPresentationMetrics.GraphicsReplayScope,
+      attachmentCount: Int
+    ) {
+      graphicsReplayScope = scope
+      graphicsAttachmentsReplayed = attachmentCount
+    }
+
+    mutating func recordEraseToEndOfLine() {
+      editOperationLowering = .eraseToEndOfLine
+      editOperationCount += 1
+    }
+
+    func metrics(
+      for plan: TerminalPresentationPlan,
+      output: String,
+      usedSynchronizedOutput: Bool
+    ) -> TerminalPresentationMetrics {
+      TerminalPresentationMetrics(
+        bytesWritten: output.utf8.count,
+        linesTouched: plan.linesTouched,
+        cellsChanged: plan.cellsChanged,
+        strategy: plan.strategy == TerminalPresentationPlan.Strategy.fullRepaint
+          ? TerminalPresentationMetrics.Strategy.fullRepaint
+          : TerminalPresentationMetrics.Strategy.incremental,
+        usedSynchronizedOutput: usedSynchronizedOutput,
+        graphicsReplayScope: graphicsReplayScope,
+        graphicsAttachmentsReplayed: graphicsAttachmentsReplayed,
+        editOperationLowering: editOperationLowering,
+        editOperationCount: editOperationCount
+      )
+    }
+  }
+
   /// Serializes terminal writes without making the render loop wait for
   /// blocking file-descriptor output.
   ///

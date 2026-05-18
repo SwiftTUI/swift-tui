@@ -24,6 +24,8 @@ Approved constraints:
 - Created initial scope, plan, progress, and handoff artifacts.
 - Packet 1 completed: extracted terminal presentation writer/session state from
   `TerminalHost.swift` into `TerminalPresentationState.swift`.
+- Packet 2 completed: extracted terminal presentation emission and metrics
+  bookkeeping from `TerminalHost.present(_:damage:)`.
 
 ## Baseline Validation
 
@@ -43,12 +45,32 @@ Packet 1 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-024018-4112.log`
   - Result: PASS
 
+Packet 2 validation:
+
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-024705-20556.log`
+  - Result: PASS
+
 ## Next Slice
 
-Checkpoint Packet 1, then select Packet 2 from the remaining evidence. The
-next best candidates are extracting terminal frame emission from
-`TerminalHost.present(_:damage:)` or splitting frame-tail support types from
-`FrameTailRenderer.swift`.
+Packet 3: make frame-tail/artifact flow easier to trace while preserving phase
+products and frame-drop semantics.
+
+Expected owned files pending local discovery:
+
+- `Sources/SwiftTUIRuntime/Rendering/`
+- `Sources/SwiftTUICore/Commit/`
+
+Validation:
+
+- Pipeline/rendering focused tests selected from current file evidence.
+- `bun run test`
 
 ## Failed Attempts
 
