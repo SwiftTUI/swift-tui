@@ -1674,7 +1674,7 @@ git commit -m "docs: justify focus-sync bound, name loop-bearing stages (F6)"
 
 ## Task 8.3: F6 Definition of Done
 
-- [ ] **Step 1: Run the DoD command**
+- [x] **Step 1: Run the DoD command**
 
 ```bash
 # Both bounds must cite a justification. Neither file may carry the word
@@ -1685,8 +1685,8 @@ grep -n "maximumRelayoutPasses\|maximumRerenders" Sources/SwiftTUIRuntime/SwiftT
 Expected: each site has an adjacent comment citing ADR-0018 (late-preference) or
 a derivation (focus-sync). Confirm by inspection.
 
-- [ ] **Step 2:** Record the F6 ledger row (Mechanism `code+test` — the bound is justified in code comments + ADR, behavior pinned by `BoundedReconciliationTests`).
-- [ ] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F6 resolved (code+test)"`
+- [x] **Step 2:** Record the F6 ledger row (Mechanism `code+test` — the bound is justified in code comments + ADR, behavior pinned by `BoundedReconciliationTests`).
+- [x] **Step 3:** Commit: `git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md && git commit -m "docs: ledger F6 resolved (code+test)"`
 
 ## Task 8.4: Phase 8 Gate
 
