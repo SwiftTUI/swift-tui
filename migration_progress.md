@@ -56,6 +56,9 @@ Approved constraints:
 - Packet 12 completed: extracted internal terminal presentation planning,
   row-batch strategy payloads, graphics replay planning, and dirty-row image
   intersection checks into `TerminalPresentationPlanning.swift`.
+- Packet 13 completed: extracted pure animation resolved/placed tree query
+  helpers into `AnimationTreeQueries.swift`, leaving mutating transition and
+  lifecycle bookkeeping in `AnimationController.swift`.
 
 ## Baseline Validation
 
@@ -256,18 +259,39 @@ Packet 12 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-041849-32895.log`
   - Result: PASS
 
+Packet 13 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-042708-50577.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 13: move to the animation lifecycle controller. Subagent review and file
-size/coupling evidence point to `AnimationController.swift` as the next
-highest-value production seam now that terminal presentation and host
-orchestration have been split into smaller files.
+Packet 14: continue `AnimationController` decomposition with a mutating helper
+boundary only after Packet 13's full gate passes. The likely next candidate is
+the transition/removal overlay mutation group (`markTransient`,
+`applyTransitionModifiersRecursively`, and `injectRemovals`), but it should be
+verified against local source evidence before editing.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUICore/Animation/AnimationController.swift`
-- New same-subsystem helper files for resolved-tree walking and removal
-  planning if local source review confirms those boundaries.
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- New same-subsystem helper file only if it does not require package API
+  widening.
 
 Validation:
 
