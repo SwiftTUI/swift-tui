@@ -132,6 +132,23 @@ public struct FrameDropEligibility: Equatable, Sendable {
     /// current classifier.  Future stages will refine this away as the
     /// runtime learns to detect each missing barrier.
     case unobservable
+
+    package static func blocker(for category: CommitEffectCategory) -> Self? {
+      switch category {
+      case .lifecycleAppear:
+        .lifecycleAppear
+      case .lifecycleDisappear:
+        .lifecycleDisappear
+      case .lifecycleChange:
+        .lifecycleChange
+      case .taskStart:
+        .taskStart
+      case .taskCancel:
+        .taskCancel
+      case .handlerInstallations:
+        .handlerInstallations
+      }
+    }
   }
 
   /// Closed non-visual impact categories used for completed-frame drop
@@ -344,22 +361,8 @@ public struct FrameDropEligibility: Equatable, Sendable {
       impact.formUnion(CompletedFrameImpact(blocker: blocker))
     }
 
-    for entry in artifacts.commitPlan.lifecycle {
-      switch entry.operation {
-      case .appear:
-        record(.lifecycleAppear)
-      case .disappear:
-        record(.lifecycleDisappear)
-      case .change:
-        record(.lifecycleChange)
-      case .taskStart:
-        record(.taskStart)
-      case .taskCancel:
-        record(.taskCancel)
-      }
-    }
-    if !artifacts.commitPlan.handlerInstallations.isEmpty {
-      record(.handlerInstallations)
+    for category in artifacts.commitPlan.effectCategories {
+      record(Blocker.blocker(for: category) ?? .unobservable)
     }
     if artifacts.diagnostics.work.customLayoutFallbackCount > 0 {
       record(.customLayoutFallback)

@@ -26,6 +26,21 @@ public enum LifecycleCommitOperation: Equatable, Sendable {
   case change(handlerIDs: [String])
   case taskStart(TaskDescriptor)
   case taskCancel(TaskDescriptor)
+
+  package var commitEffectCategory: CommitEffectCategory {
+    switch self {
+    case .appear:
+      .lifecycleAppear
+    case .disappear:
+      .lifecycleDisappear
+    case .change:
+      .lifecycleChange
+    case .taskStart:
+      .taskStart
+    case .taskCancel:
+      .taskCancel
+    }
+  }
 }
 
 /// A single lifecycle operation emitted for one identity.
@@ -51,6 +66,16 @@ public struct HandlerInstallation: Equatable, Sendable {
   }
 }
 
+/// Closed categories of observable side effects carried by ``CommitPlan``.
+package enum CommitEffectCategory: CaseIterable, Sendable {
+  case lifecycleAppear
+  case lifecycleDisappear
+  case lifecycleChange
+  case taskStart
+  case taskCancel
+  case handlerInstallations
+}
+
 /// The runtime-facing result of the commit phase.
 ///
 /// Commit packages the already-derived semantic snapshot with lifecycle and
@@ -73,5 +98,13 @@ public struct CommitPlan: Equatable, Sendable {
     self.semanticSnapshot = semanticSnapshot
     self.lifecycle = lifecycle
     self.handlerInstallations = handlerInstallations
+  }
+
+  package var effectCategories: Set<CommitEffectCategory> {
+    var categories = Set(lifecycle.map(\.operation.commitEffectCategory))
+    if !handlerInstallations.isEmpty {
+      categories.insert(.handlerInstallations)
+    }
+    return categories
   }
 }
