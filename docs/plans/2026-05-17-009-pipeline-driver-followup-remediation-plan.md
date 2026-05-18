@@ -1813,7 +1813,7 @@ git add Tests/SwiftTUITests/DirtyTrackingCoherenceTests.swift Sources/SwiftTUIRu
 git commit -m "test: guard dirty-tracking coherence across the three signals (F10)"
 ```
 
-- [ ] **Step 5: F10 DoD** — `swift test --filter DirtyTrackingCoherenceTests` PASSES. Record F10 ledger row (Mechanism `code+test` if the diff was collapsed, else `test`).
+- [x] **Step 5: F10 DoD** — `swift test --filter DirtyTrackingCoherenceTests` PASSES. Record F10 ledger row (Mechanism `code+test` if the diff was collapsed, else `test`).
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_RESOLUTION_LEDGER.md
