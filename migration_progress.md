@@ -48,6 +48,14 @@ Approved constraints:
   helpers, ANSI/ASCII overlay generation, and raw-glyph manifest ownership into
   `TerminalImageFallbackRendering.swift`, while keeping overlay application and
   cache ownership in `TerminalImageRenderer`.
+- Packet 10 completed: moved terminal host graphics and pointer capability
+  probing into `TerminalHostCapabilities.swift`.
+- Packet 11 completed: extracted terminal host escape sequence construction,
+  platform I/O shims, and process-exit cleanup into dedicated terminal runtime
+  files.
+- Packet 12 completed: extracted internal terminal presentation planning,
+  row-batch strategy payloads, graphics replay planning, and dirty-row image
+  intersection checks into `TerminalPresentationPlanning.swift`.
 
 ## Baseline Validation
 
@@ -234,20 +242,37 @@ Packet 11 validation:
   - Full log: `/tmp/swift-tui-test-gate-20260518-040917-13192.log`
   - Result: PASS
 
+Packet 12 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests`
+  - Result: PASS
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-041849-32895.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 12: re-rank production code now that `TerminalHost` has been reduced
-from 1,509 lines to 1,203 lines. Continue with the highest-value production
-slice, likely the remaining terminal presentation surface or the animation
-lifecycle controller unless local discovery shows a more important debt seam.
+Packet 13: move to the animation lifecycle controller. Subagent review and file
+size/coupling evidence point to `AnimationController.swift` as the next
+highest-value production seam now that terminal presentation and host
+orchestration have been split into smaller files.
 
 Expected owned files pending local discovery:
 
-- To be selected from production-code size/coupling evidence.
+- `Sources/SwiftTUICore/Animation/AnimationController.swift`
+- New same-subsystem helper files for resolved-tree walking and removal
+  planning if local source review confirms those boundaries.
 
 Validation:
 
-- Focused tests selected from touched subsystem evidence.
+- Focused animation and frame-pipeline tests selected from touched subsystem
+  evidence.
 - `bun run test`
 
 ## Failed Attempts
