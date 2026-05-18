@@ -190,7 +190,7 @@ checkout, and the verifying commit hash is recorded.
 | F5  | _pending_ | _pending_ | _pending_ |
 | F6  | _pending_ | _pending_ | _pending_ |
 | F7  | _pending_ | _pending_ | _pending_ |
-| F8  | _pending_ | _pending_ | _pending_ |
+| F8  | code+test | `swiftly run swift test --filter RenderDriverInstrumentationCostTests`, `swiftly run swift test --filter DiagnosticsAndCacheTests`, `swiftly run swift test --filter FrameDiagnostics`, `swiftly run swift test --filter AsyncFrameTailRenderingTests`, and `swiftly run swift test --filter PipelineDriverParityTests` pass; runtime artifact construction no longer calls `FrameDiagnostics.summarize(...)` unconditionally, and `artifactConstructionDoesNotCallFrameDiagnosticsSummarize` pins the completed-frame constructors to `FrameDiagnostics.fromCachedPhaseProducts(...)` without restoring a diagnostics opt-out fork. | 7789bdeb |
 | F9  | _pending_ | _pending_ | _pending_ |
 | F10 | _pending_ | _pending_ | _pending_ |
 | F11 | _pending_ | _pending_ | _pending_ |
@@ -2004,9 +2004,15 @@ Follow-up tasks added from the independent re-audit:
   graph. `BoundedReconciliationTests`,
   `AppRuntimeTests/focusSynchronizationRerenderBudgetTripsAtTheConfiguredLimit`,
   `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed.
-- [ ] **F8 reopened:** stop calling `FrameDiagnostics.summarize(...)`
+- [x] **F8 reopened:** stop calling `FrameDiagnostics.summarize(...)`
   unconditionally during artifact construction when no diagnostics consumer has
   read diagnostics.
+  Completed by `7789bdeb`: both sync and async artifact constructors now call
+  `FrameDiagnostics.fromCachedPhaseProducts(...)`; the F8 audit guard confirms
+  `Sources/SwiftTUIRuntime/SwiftTUI.swift` no longer contains
+  `FrameDiagnostics.summarize(`. `RenderDriverInstrumentationCostTests`,
+  `DiagnosticsAndCacheTests`, `FrameDiagnostics`,
+  `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed.
 - [ ] **F9 reopened:** eliminate or truly exercise the no-Dispatch
   `FrameTailLayoutWorker` synchronous fallback so the WASI semantics are not an
   untested branch.
