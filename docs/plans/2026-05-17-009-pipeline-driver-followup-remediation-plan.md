@@ -1983,9 +1983,16 @@ Follow-up tasks added from the independent re-audit:
   commit. `swiftly run swift test --filter ResolvePurityTests`,
   `PipelineDriverParityTests`, `RenderDriverCharacterizationTests`, and
   `AsyncFrameTailRenderingTests` passed.
-- [ ] **F4 reopened:** remove the observable double-finalize path for completed
+- [x] **F4 reopened:** remove the observable double-finalize path for completed
   async frames; completed-frame preview must not call `viewGraph.finalizeFrame`
   before the real commit.
+  Completed by `5856eda2`: completed-frame preview now computes lifecycle
+  events through non-mutating `ViewGraph.previewLifecycleEvents(...)` and a
+  source-level guard pins that `previewCompletedFrameCommit` does not call
+  `finalizeFrame`. `ViewGraphCheckpointTotalityTests`,
+  `AsyncFrameTailRenderingTests/previewCommitEqualsRealCommit`,
+  `RenderPipelineStructureTests/completedFramePreviewDoesNotFinalizeLiveGraph`,
+  full `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed.
 - [ ] **F6 reopened:** remove the observable underived fixed iteration limits
   from late-preference reconciliation and focus synchronization, or replace
   them with a mechanically derived convergence contract that no longer commits
