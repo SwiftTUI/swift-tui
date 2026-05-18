@@ -24,22 +24,22 @@ defect worse than any of the original 17 shipped during the same period.
 
 ## Summary of findings
 
-| # | Finding | Severity | Class |
-| --- | --- | --- | --- |
-| F1 | `RuntimeRenderPipeline` is ceremony: phase order is asserted by prose and a `precondition`, not composition | Critical | Architecture / dead code |
-| F2 | `renderPendingFrames` and `renderPendingFramesAsync` are a ~355/~470-line copy-paste fork — the original audit never looked at `RunLoop+Rendering.swift` | Critical | Duplication / drift |
-| F3 | Resolve still mutates six subsystems; "commit is the side-effect boundary" is still false; draft/discard is renamed checkpoint/restore | Critical | Architecture |
-| F4 | Every async frame runs `commit` / `finalizeFrame` twice; correctness rests on total `ViewGraph` checkpoint fidelity with no mechanical guard | Critical | Correctness |
-| F5 | Cancellation is a 1 ms `Task.sleep` busy-poll on the main actor | High | Concurrency |
-| F6 | The "formalized pipeline" contains two nested bounded-fixpoint loops with underived magic constants, each rendering stale on overflow | High | Contract gap |
-| F7 | `FrameDropEligibility.Blocker` is still a ~24-flag enumerated correctness surface, with an add-then-subtract blocker pattern | High | Correctness surface |
-| F8 | Diagnostics cost is now mandatory: the `collectsDiagnostics` opt-out was deleted, so a full-tree `summarize` walk runs every frame | High | Performance |
-| F9 | `renderAsync` is one API with three concurrency semantics; the WASI synchronous path is untested on CI | High | Portability |
-| F10 | Three dirty-tracking signals (scheduler / `ViewGraph` / `RunLoop` state diff) must stay coherent by convention | Medium | Architecture |
-| F11 | The render-tail entry surface is still ~11 functions; sync/async/cancellable tail orchestration is triplicated | Medium | Duplication |
-| F12 | `RuntimeRenderStageName` is a `CaseIterable` enum used only as metadata, switched on by no control flow | Medium | Dead structure |
-| F13 | Raster damage gates painting internally but has no global diff to catch missed invalidation | Medium | Soundness |
-| F14 | The original audit closes findings via documentation rewording; the doc corpus grows faster than load-bearing API | High | Governance |
+| # | Finding | Severity | Class | Resolution mechanism |
+| --- | --- | --- | --- | --- |
+| F1 | `RuntimeRenderPipeline` is ceremony: phase order is asserted by prose and a `precondition`, not composition | Critical | Architecture / dead code | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F2 | `renderPendingFrames` and `renderPendingFramesAsync` are a ~355/~470-line copy-paste fork — the original audit never looked at `RunLoop+Rendering.swift` | Critical | Duplication / drift | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F3 | Resolve still mutates six subsystems; "commit is the side-effect boundary" is still false; draft/discard is renamed checkpoint/restore | Critical | Architecture | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F4 | Every async frame runs `commit` / `finalizeFrame` twice; correctness rests on total `ViewGraph` checkpoint fidelity with no mechanical guard | Critical | Correctness | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F5 | Cancellation is a 1 ms `Task.sleep` busy-poll on the main actor | High | Concurrency | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F6 | The "formalized pipeline" contains two nested bounded-fixpoint loops with underived magic constants, each rendering stale on overflow | High | Contract gap | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F7 | `FrameDropEligibility.Blocker` is still a ~24-flag enumerated correctness surface, with an add-then-subtract blocker pattern | High | Correctness surface | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F8 | Diagnostics cost is now mandatory: the `collectsDiagnostics` opt-out was deleted, so a full-tree `summarize` walk runs every frame | High | Performance | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F9 | `renderAsync` is one API with three concurrency semantics; the WASI synchronous path is untested on CI | High | Portability | [test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F10 | Three dirty-tracking signals (scheduler / `ViewGraph` / `RunLoop` state diff) must stay coherent by convention | Medium | Architecture | [test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F11 | The render-tail entry surface is still ~11 functions; sync/async/cancellable tail orchestration is triplicated | Medium | Duplication | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F12 | `RuntimeRenderStageName` is a `CaseIterable` enum used only as metadata, switched on by no control flow | Medium | Dead structure | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F13 | Raster damage gates painting internally but has no global diff to catch missed invalidation | Medium | Soundness | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F14 | The original audit closes findings via documentation rewording; the doc corpus grows faster than load-bearing API | High | Governance | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 
 ---
 

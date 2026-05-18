@@ -1893,20 +1893,20 @@ git commit -m "docs: ledger F13 resolved (code+test)"
 
 **Anti-rationalization:** F14 is the one finding whose deliverable is partly documentation — but its *spirit* is a process guard. Resolving F14 means the ledger (CB-1) exists, is complete, and the audit tables reference it. The ledger being a real, populated artifact is the resolution; the table edits are how it becomes discoverable.
 
-- [ ] **Step 1: Add a "Resolution mechanism" column to `PIPELINE_DRIVER_FOLLOWUP_AUDIT.md`**
+- [x] **Step 1: Add a "Resolution mechanism" column to `PIPELINE_DRIVER_FOLLOWUP_AUDIT.md`**
 
 Add a column to the "Summary of findings" table whose value for each finding is
 copied from the now-complete ledger (`code`, `code+test`, or `test`), with a
 link to `PIPELINE_DRIVER_RESOLUTION_LEDGER.md`.
 
-- [ ] **Step 2: Add the same column to `PIPELINE_DRIVER_AUDIT.md`'s "Stage 8 outcome summary"**
+- [x] **Step 2: Add the same column to `PIPELINE_DRIVER_AUDIT.md`'s "Stage 8 outcome summary"**
 
 For each original finding, mark whether its historical resolution was `code`,
 `test`, or `docs`. Do not rewrite history — where the original resolution was
 documentation-only (Findings 2, 7, 12, 16), mark it `docs` honestly. This makes
 the original audit's true resolution profile visible.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/proposals/PIPELINE_DRIVER_AUDIT.md docs/proposals/PIPELINE_DRIVER_FOLLOWUP_AUDIT.md
