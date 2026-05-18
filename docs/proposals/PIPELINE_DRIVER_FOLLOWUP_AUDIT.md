@@ -34,12 +34,19 @@ defect worse than any of the original 17 shipped during the same period.
 | F6 | The "formalized pipeline" contains two nested bounded-fixpoint loops with underived magic constants, each rendering stale on overflow | High | Contract gap | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 | F7 | `FrameDropEligibility.Blocker` is still a ~24-flag enumerated correctness surface, with an add-then-subtract blocker pattern | High | Correctness surface | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 | F8 | Diagnostics cost is now mandatory: the `collectsDiagnostics` opt-out was deleted, so a full-tree `summarize` walk runs every frame | High | Performance | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
-| F9 | `renderAsync` is one API with three concurrency semantics; the WASI synchronous path is untested on CI | High | Portability | [test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
-| F10 | Three dirty-tracking signals (scheduler / `ViewGraph` / `RunLoop` state diff) must stay coherent by convention | Medium | Architecture | [test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F9 | `renderAsync` is one API with three concurrency semantics; the WASI synchronous path is untested on CI | High | Portability | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+| F10 | Three dirty-tracking signals (scheduler / `ViewGraph` / `RunLoop` state diff) must stay coherent by convention | Medium | Architecture | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 | F11 | The render-tail entry surface is still ~11 functions; sync/async/cancellable tail orchestration is triplicated | Medium | Duplication | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 | F12 | `RuntimeRenderStageName` is a `CaseIterable` enum used only as metadata, switched on by no control flow | Medium | Dead structure | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 | F13 | Raster damage gates painting internally but has no global diff to catch missed invalidation | Medium | Soundness | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
 | F14 | The original audit closes findings via documentation rewording; the doc corpus grows faster than load-bearing API | High | Governance | [code+test](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md) |
+
+The linked
+[`PIPELINE_DRIVER_RESOLUTION_LEDGER.md`](./PIPELINE_DRIVER_RESOLUTION_LEDGER.md)
+is the current source of truth for remediation status and DoD commands.
+`Scripts/check_pipeline_driver_resolution_ledger.sh` mechanically verifies that
+the ledger is complete, non-`docs` for all current rows, connected to both audit
+summary tables, and part of the `bun run test` policy phase.
 
 ---
 
@@ -383,6 +390,15 @@ re-investigation.
 **Recommendation:** the audit table should record resolution *mechanism* as a
 distinct column — `code`, `test`, or `docs` — so a green row means the driver
 changed, not that the prose did.
+
+**Current verification:** the remediation ledger linked from the summary table
+is the canonical repository artifact for this process guard. It records the
+current mechanism, executable DoD, and verifying commit for each finding, and it
+keeps the historical independent re-audit separate from the current re-audit
+status. `Scripts/check_pipeline_driver_resolution_ledger.sh` validates those
+requirements and is wired into the repo policy phase so `bun run test` fails if
+the ledger becomes incomplete, drifts away from the audit tables, or reports an
+unresolved current re-audit row.
 
 ---
 
