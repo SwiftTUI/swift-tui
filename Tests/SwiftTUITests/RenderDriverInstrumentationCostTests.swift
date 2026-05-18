@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUIViews
 import Testing
 
@@ -41,4 +42,32 @@ struct RenderDriverInstrumentationCostTests {
 
     #expect(FrameDiagnostics.debugSummaryComputationCount() == 1)
   }
+
+  @Test("Artifact construction does not call FrameDiagnostics.summarize eagerly")
+  func artifactConstructionDoesNotCallFrameDiagnosticsSummarize() throws {
+    let root = try repositoryRoot()
+    let rendererSource = try String(
+      contentsOf: root.appendingPathComponent("Sources/SwiftTUIRuntime/SwiftTUI.swift"),
+      encoding: .utf8
+    )
+
+    #expect(!rendererSource.contains("FrameDiagnostics.summarize("))
+  }
+}
+
+private func repositoryRoot() throws -> URL {
+  var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  while directory.path != "/" {
+    if FileManager.default.fileExists(
+      atPath: directory.appendingPathComponent("Package.swift").path
+    ) {
+      return directory
+    }
+    directory.deleteLastPathComponent()
+  }
+  throw RenderDriverInstrumentationSourceError.missingPackageRoot
+}
+
+private enum RenderDriverInstrumentationSourceError: Error {
+  case missingPackageRoot
 }

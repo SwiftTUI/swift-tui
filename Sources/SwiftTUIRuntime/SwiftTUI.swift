@@ -915,7 +915,7 @@ public struct DefaultRenderer {
       blocked: phaseTimings.total,
       suspended: .zero
     )
-    var diagnostics = FrameDiagnostics.summarize(
+    var diagnostics = FrameDiagnostics.fromCachedPhaseProducts(
       resolved: resolved,
       measured: tail.measured,
       placed: tail.placed,
@@ -1656,7 +1656,7 @@ public struct DefaultRenderer {
         + commitDuration,
       suspended: tailOutput.renderSuspensionDuration
     )
-    var diagnostics = FrameDiagnostics.summarize(
+    var diagnostics = FrameDiagnostics.fromCachedPhaseProducts(
       resolved: resolved,
       measured: tail.measured,
       placed: tail.placed,
