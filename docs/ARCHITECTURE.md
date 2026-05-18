@@ -95,8 +95,9 @@ guarantee that a mis-ordered or partial stage sequence is unrepresentable.
 head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
 ```
 
-- The head evaluates the authored root and declares the live subsystems it may
-  mutate during the transaction.
+- The head evaluates the authored root into a `FrameHeadTransaction`. Abortable
+  heads suspend their prepared graph/frame-input state back to the committed
+  baseline before tail work starts.
 - Animation injection is a named post-head stage that rewrites the resolved
   tree for the current animation transaction.
 - Late-preference reconciliation is the first bounded loop-bearing stage. It
@@ -104,7 +105,8 @@ head -> animation injection -> late-preference reconciliation -> fused frame tai
   limit is reached.
 - The fused frame tail runs measure, place, semantics, draw, and raster as one
   performance node.
-- Commit packages and applies the runtime-facing side-effect plan.
+- Commit materializes the staged frame head, then packages and applies the
+  runtime-facing side-effect plan.
 
 Sync, async, and cancellable rendering are execution strategies over that one
 composition. The async strategies may offload frame-tail work and may drop only
@@ -312,7 +314,7 @@ bundle is genuinely the subject under inspection.
 | `SemanticSnapshot` | Interaction regions, focus regions, navigation/scroll/selection routes, named coordinate spaces, accessibility nodes, live announcements, warnings | Placed geometry plus refreshed semantic/environment/draw metadata | Derived route snapshot only; it is not a metadata carrier. Transient animation overlays are filtered during extraction. |
 | `DrawNode` | Draw commands, post-child draw commands, draw metadata snapshot, environment snapshot, bounds, clipping, children | Placed geometry plus refreshed draw/layout/style inputs | Placed-to-draw projection owns paint inputs for rasterization, not layout or semantic truth. |
 | `RasterSurface` | Cell grid, resolved cell styles, attachments, image attachments, raster metadata | None used as upstream truth | Presentation damage and drawn identities are hints/diagnostics beside the surface, not layout or semantic inputs. |
-| `CommitPlan` | Ordered lifecycle and handler-installation work | The already-derived `SemanticSnapshot` for runtime consumers | The frame head stages runtime subsystem effects in a `FrameHeadTransaction`; commit closes that transaction and publishes lifecycle, task, registration, focus, presentation, and animation effects. Abort discards the same transaction, and preview commit is checkpoint-restored. |
+| `CommitPlan` | Ordered lifecycle and handler-installation work | The already-derived `SemanticSnapshot` for runtime consumers | The frame head stages runtime subsystem effects in a `FrameHeadTransaction`. Abortable preparation suspends live state back to the committed baseline before returning; preview and commit materialize the prepared state, and commit publishes lifecycle, task, registration, focus, presentation, and animation effects. Abort discards the same transaction. |
 | `FrameArtifacts` | Full current-frame bundle and diagnostics | Presentation damage, drawn identities, render generations, runtime diagnostics | Field authority is documented on `FrameArtifacts` itself: phase products are canonical, `placedTree` is decorated/baseline-sensitive, presentation damage and drawn identities are advisory, `commitPlan` is the side-effect plan, and `diagnostics` is diagnostic-only. Retained layout indexes canonical baseline layout products; animation-decorated placed trees may be committed for the current frame but must not become retained layout baselines. |
 
 The focused boundary tests live near the seams they protect:
