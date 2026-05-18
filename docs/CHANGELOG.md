@@ -18,6 +18,11 @@ in the durable docs, plans, source, or tests linked from an entry.
 
 ## 2026-05-17
 
+- Resolved pipeline-driver follow-up F8 in code and tests:
+  `FrameDiagnostics.summarize` now consumes cached tree-derived summary scalars
+  instead of walking resolved trees for custom-layout fallback diagnostics,
+  no-consumer frames avoid diagnostic summary reads, and instrumentation-cost
+  tests prove diagnostics reads are counted only once per frame.
 - Resolved pipeline-driver follow-up F4 in code and tests: `ViewGraph` now has
   a checkpoint-totality debug snapshot, `ViewNode` exposes node-state snapshots
   used by the guard, source-level tests require every mutable graph/node field
