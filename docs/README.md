@@ -89,6 +89,7 @@ Active design proposals that are still shaping decisions:
 - [proposals/TERMINAL_WORKSPACE.md](proposals/TERMINAL_WORKSPACE.md) — scoped design work for a first-class Zellij-style terminal workspace surface above `TerminalView`
 - [proposals/POPOVER_PRESENTATION_API.md](proposals/POPOVER_PRESENTATION_API.md) — draft anchored popover and TipKit-inspired `popoverTip` API proposal
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — completed-frame stale policy
+- [proposals/ASYNC_TEST_FLAKE_REMEDIATION.md](proposals/ASYNC_TEST_FLAKE_REMEDIATION.md) — proposal to measure and stabilize load-sensitive runtime/integration tests ahead of the remaining pipeline-driver remediation while preserving the longer-term deterministic-runtime goal
 - [proposals/CPU_LATENCY_EVALUATION_PIPELINE.md](proposals/CPU_LATENCY_EVALUATION_PIPELINE.md) — CPU-versus-latency measurement system for async rendering and future runtime optimizations
 - [proposals/PIPELINE_BOUNDARY_HARDENING.md](proposals/PIPELINE_BOUNDARY_HARDENING.md) — proposed vision and staged approach for hardening phase-product ownership, mirrored metadata, retained reuse, and async frame-tail boundaries
 - [proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md](proposals/EXPLICIT_LAYOUT_WORK_STACK_MIGRATION.md) — accepted Stage 6 destination for migrating built-in layout measurement and placement from recursive walks to explicit work stacks
