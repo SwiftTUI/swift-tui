@@ -1263,8 +1263,11 @@ public struct DefaultRenderer {
     if mode == .abortable,
       frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput)
     {
+      draft.transaction.materializePreparedState()
       resolved = indexedChildSourceWorkerSnapshot(of: resolved)
       frameTailInput.resolved = resolved
+      draft.transaction.recordPreparedGraphState()
+      draft.transaction.suspendPreparedState()
     }
 
     draft.resolved = resolved
