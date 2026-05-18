@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUICore
 import SwiftTUIViews
 import Testing
@@ -67,6 +68,20 @@ struct RenderPipelineStructureTests {
     #expect(type(of: pipeline) == RuntimeRenderPipeline.self)
   }
 
+  @Test("completed-frame preview does not finalize the live graph")
+  func completedFramePreviewDoesNotFinalizeLiveGraph() throws {
+    let source = try String(
+      contentsOf: Self.runtimeRendererSourceURL(),
+      encoding: .utf8
+    )
+    let body = try Self.functionBody(
+      named: "previewCompletedFrameCommit",
+      in: source
+    )
+
+    #expect(!body.contains("finalizeFrame("))
+  }
+
   @Test("composed render path stays within 2x the pre-refactor time budget")
   func composedRenderTimeBudget() {
     let proposal = ProposedSize(width: .finite(80), height: .finite(40))
@@ -93,4 +108,54 @@ struct RenderPipelineStructureTests {
       elapsed <= budget,
       "composed render path took \(elapsed); budget is \(budget) (2x baseline)")
   }
+
+  private static func runtimeRendererSourceURL() throws -> URL {
+    var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    while directory.path != "/" {
+      let sourceURL = directory.appendingPathComponent(
+        "Sources/SwiftTUIRuntime/SwiftTUI.swift"
+      )
+      if FileManager.default.fileExists(atPath: sourceURL.path) {
+        return sourceURL
+      }
+      directory.deleteLastPathComponent()
+    }
+    throw RenderPipelineStructureSourceError.missingRendererSource
+  }
+
+  private static func functionBody(
+    named name: String,
+    in source: String
+  ) throws -> String {
+    guard let declaration = source.range(of: "func \(name)") else {
+      throw RenderPipelineStructureSourceError.missingFunction(name)
+    }
+    guard let openingBrace = source[declaration.upperBound...].firstIndex(of: "{") else {
+      throw RenderPipelineStructureSourceError.missingOpeningBrace(name)
+    }
+
+    var depth = 0
+    var index = openingBrace
+    while index < source.endIndex {
+      let character = source[index]
+      if character == "{" {
+        depth += 1
+      } else if character == "}" {
+        depth -= 1
+        if depth == 0 {
+          let bodyStart = source.index(after: openingBrace)
+          return String(source[bodyStart..<index])
+        }
+      }
+      index = source.index(after: index)
+    }
+    throw RenderPipelineStructureSourceError.missingClosingBrace(name)
+  }
+}
+
+private enum RenderPipelineStructureSourceError: Error {
+  case missingRendererSource
+  case missingFunction(String)
+  case missingOpeningBrace(String)
+  case missingClosingBrace(String)
 }
