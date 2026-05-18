@@ -449,6 +449,22 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-051542-56825.log
 ```
 
+Packet 20 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+swiftly run swift test --filter SwiftTUITests.RenderPipelineStructureTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-052405-85109.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -478,6 +494,7 @@ Packet 16 is completed-frame artifact support extraction.
 Packet 17 is run-loop frame diagnostics extraction.
 Packet 18 is input reader pure support type extraction.
 Packet 19 is late-preference reconciliation extraction.
+Packet 20 is frame-head draft transaction extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -490,7 +507,8 @@ slot preservation, shape-style destination routing, completed-frame preview
 side-effect isolation, completed-frame drop classification, diagnostics timing
 fields, skipped-frame diagnostic record, render-suspension input counting, or
 public input-event/protocol surface, late-preference pass budget, toolbar
-runtime issue, or layout-dependent realization regression appears.
+runtime issue, layout-dependent realization, frame-head checkpoint restore,
+draft commit/discard, or one-shot abort precondition regression appears.
 
 ## AI Assistance Disclosure
 
