@@ -300,6 +300,8 @@ package struct FrameHeadCheckpoints {
   /// Previous-frame selector memory only. Current-frame resolve inputs are
   /// carried by the prepared head and overwritten by the next frame.
   let frameState: FrameResolveState.Checkpoint
+  /// Current-frame input box contents visible to retained evaluator closures.
+  let frameInputs: FrameResolveInputBox.Checkpoint
 }
 
 /// Checkpointed main-actor frame head prepared before tail work starts.

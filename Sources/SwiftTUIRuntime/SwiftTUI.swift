@@ -78,6 +78,44 @@ private final class CommittedPresentationDismissStack {
   }
 }
 
+@MainActor
+private final class DebugObservationBridgeTracker {
+  weak var bridge: ObservationBridge?
+
+  func store(_ bridge: ObservationBridge?) {
+    self.bridge = bridge
+  }
+}
+
+package struct RuntimeSubsystemSnapshot: Equatable {
+  package struct PresentationPortalSnapshot: Equatable {
+    package struct EntrySnapshot: Equatable {
+      package var id: String
+      package var ordering: PortalOrdering
+      package var kindName: String
+      package var modalPolicy: PortalModalPolicy
+      package var acceptsEscape: Bool
+      package var hasDismissAction: Bool
+    }
+
+    package var overlayEntries: [EntrySnapshot]
+  }
+
+  package struct ObservationBridgeSnapshot: Equatable {
+    package var currentPass: UInt64
+    package var observedPasses: [Identity: UInt64]
+    package var invalidatorID: ObjectIdentifier?
+    package var viewGraphID: ObjectIdentifier?
+  }
+
+  package var viewGraph: ViewGraph.DebugTotalStateSnapshot
+  package var frameState: FrameResolveState.DebugStateSnapshot
+  package var frameInputs: FrameResolveInputBox.DebugStateSnapshot
+  package var presentationPortalState: PresentationPortalSnapshot
+  package var observationBridge: ObservationBridgeSnapshot?
+  package var animationController: AnimationController.DebugStateSnapshot
+}
+
 private struct AsyncFrameTailLayoutPass {
   var layout: FrameTailLayoutOutput?
   var suspensionDuration: Duration
@@ -326,6 +364,7 @@ public struct DefaultRenderer {
   private let frameInputs: FrameResolveInputBox
   private let presentationPortalState: PresentationPortalState
   private let committedPresentationDismissStack: CommittedPresentationDismissStack
+  private let debugObservationBridgeTracker: DebugObservationBridgeTracker
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
 
@@ -353,6 +392,7 @@ public struct DefaultRenderer {
     frameInputs = .init()
     presentationPortalState = .init()
     committedPresentationDismissStack = .init()
+    debugObservationBridgeTracker = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
     frameTailRenderer = .init(
@@ -404,6 +444,37 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  package func debugRuntimeSubsystemSnapshot() -> RuntimeSubsystemSnapshot {
+    let presentationEntries = presentationPortalState.overlayEntries().map {
+      RuntimeSubsystemSnapshot.PresentationPortalSnapshot.EntrySnapshot(
+        id: $0.id,
+        ordering: $0.ordering,
+        kindName: $0.kindName,
+        modalPolicy: $0.modalPolicy,
+        acceptsEscape: $0.acceptsEscape,
+        hasDismissAction: $0.dismiss != nil
+      )
+    }
+    let observationBridgeSnapshot = debugObservationBridgeTracker.bridge.map { bridge in
+      let checkpoint = bridge.makeCheckpoint()
+      return RuntimeSubsystemSnapshot.ObservationBridgeSnapshot(
+        currentPass: checkpoint.currentPass,
+        observedPasses: checkpoint.observedPasses,
+        invalidatorID: checkpoint.invalidator.map(ObjectIdentifier.init),
+        viewGraphID: checkpoint.viewGraph.map(ObjectIdentifier.init)
+      )
+    }
+    return RuntimeSubsystemSnapshot(
+      viewGraph: viewGraph.debugTotalStateSnapshot(),
+      frameState: frameState.debugStateSnapshot(),
+      frameInputs: frameInputs.debugStateSnapshot(),
+      presentationPortalState: .init(overlayEntries: presentationEntries),
+      observationBridge: observationBridgeSnapshot,
+      animationController: animationController.debugStateSnapshot()
+    )
+  }
+
+  @MainActor
   package func prepareFrameHeadForCancellationTesting<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
@@ -438,7 +509,7 @@ public struct DefaultRenderer {
     draft.observationDraft?.discard()
     draft.animationDraft.discard()
     frameState.restoreCheckpoint(checkpoints.frameState)
-    frameInputs.clear()
+    frameInputs.restoreCheckpoint(checkpoints.frameInputs)
   }
 
   @MainActor
@@ -922,6 +993,7 @@ public struct DefaultRenderer {
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
+    debugObservationBridgeTracker.store(resolveContext.observationBridge)
     let registrationDraft = FrameHeadRegistrationDraft()
     let graphDraft = ViewGraphFrameDraft(
       liveRegistrations: resolveContext.runtimeRegistrations,
@@ -936,11 +1008,14 @@ public struct DefaultRenderer {
     // Abortable heads checkpoint previous-frame selector state before preparing
     // current-frame resolve inputs. One-shot heads never abort, so skip.
     let frameStateCheckpoint: FrameResolveState.Checkpoint?
+    let frameInputsCheckpoint: FrameResolveInputBox.Checkpoint?
     switch mode {
     case .oneShot:
       frameStateCheckpoint = nil
+      frameInputsCheckpoint = nil
     case .abortable:
       frameStateCheckpoint = frameState.makeCheckpoint()
+      frameInputsCheckpoint = frameInputs.makeCheckpoint()
     }
     let resolveInputs = frameState.prepareInputs(
       from: resolveContext,
@@ -1039,7 +1114,8 @@ public struct DefaultRenderer {
       // Force-unwraps are safe: every `.abortable` branch above assigned its
       // checkpoint non-nil.
       checkpoints = FrameHeadCheckpoints(
-        frameState: frameStateCheckpoint!
+        frameState: frameStateCheckpoint!,
+        frameInputs: frameInputsCheckpoint!
       )
     }
 
