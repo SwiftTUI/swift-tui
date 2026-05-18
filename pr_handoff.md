@@ -23,6 +23,12 @@ Packet 3 should be reviewed as the first frame-tail continuation:
 - `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
 - `Sources/SwiftTUIRuntime/Rendering/FrameTailPresentationDamage.swift`
 
+Packet 4 should be reviewed as a mechanical core-artifact file split:
+
+- `Sources/SwiftTUICore/Commit/FrameArtifacts.swift`
+- `Sources/SwiftTUICore/Commit/FrameDiagnostics.swift`
+- `Sources/SwiftTUICore/Commit/FrameContext.swift`
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -93,6 +99,23 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-025321-47448.log
 ```
 
+Packet 4 validation passed:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.RenderDriverInstrumentationCostTests
+swiftly run swift test --filter SwiftTUITests.PipelineContractTests
+swiftly run swift test --filter SwiftTUICoreTests.FrameDropEligibilityTests
+swiftly run swift test --filter SwiftTUICoreTests.FrameDropDroppabilityTests
+swiftly run swift test --filter SwiftTUICoreTests.LayoutEngineTests
+bun run test
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-025909-68455.log
+```
+
 Required repo gate before completion:
 
 ```bash
@@ -108,8 +131,8 @@ about behavioral drift, output drift, concurrency changes, and fixture churn.
 
 Each packet should be independently revertible. Packets 1 and 2 are same-area
 terminal presentation changes. Packet 3 is a frame-tail damage-resolution split.
-Revert newest-first if a terminal output, raster reuse, or frame-tail regression
-appears.
+Packet 4 is a core artifact file split. Revert newest-first if a terminal
+output, raster reuse, frame-tail, diagnostics, or public API regression appears.
 
 ## AI Assistance Disclosure
 
