@@ -62,6 +62,11 @@ Approved constraints:
 - Packet 14 completed: extracted resolved-tree removal overlay transforms into
   `AnimationTransitionOverlay.swift`, keeping animation sampling, purge
   decisions, deadlines, and batch bookkeeping in `AnimationController`.
+- Packet 15 completed: extracted property animation slot lookup, interpolation
+  fallback, and resolved-tree value writeback into
+  `AnimationPropertyValueApplication.swift`, keeping controller state,
+  scheduling, custom-state writeback, and batch bookkeeping in
+  `AnimationController`.
 
 ## Baseline Validation
 
@@ -298,23 +303,50 @@ Packet 14 validation:
 - `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
   - Result: PASS
 
+Packet 15 validation:
+
+- `swiftly run swift build`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerRemovalTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationControllerSnapshotTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.GradientAnimationIntegrationTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests`
+  - Result: PASS
+- `swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests`
+  - Result: PASS
+- `swiftly run swift test --filter AnimationController`
+  - Result: PASS, 64 tests
+- `bun run test`
+  - Full log: `/tmp/swift-tui-test-gate-20260518-044249-87972.log`
+  - Result: PASS
+
 ## Next Slice
 
-Packet 15: re-rank the remaining `AnimationController` internals after Packet
-14's full gate passes. Candidate areas are property writeback/sample helpers or
-frame-draft/checkpoint scaffolding, but avoid any extraction that requires
-package API widening.
+Packet 16: re-rank the remaining shared runtime debt after Packet 15. Current
+candidate areas are the `DefaultRenderer` completed-frame/candidate commit flow
+in `SwiftTUI.swift`, the remaining run-loop focus-sync/frame-acquisition
+orchestration, and input parsing/stream ownership. Prefer the next slice that
+preserves public API and can be verified with focused runtime tests plus the
+repo gate.
 
 Expected owned files pending local discovery:
 
-- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
-- New same-subsystem helper file only if it does not require package API
-  widening.
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift` or
+  `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`, pending local
+  evidence and subagent review.
+- New same-subsystem helper file only if it keeps behavior and API stable.
 
 Validation:
 
-- Focused animation and frame-pipeline tests selected from touched subsystem
-  evidence.
+- Focused runtime, frame-pipeline, and host/session tests selected from touched
+  subsystem evidence.
 - `bun run test`
 
 ## Failed Attempts
