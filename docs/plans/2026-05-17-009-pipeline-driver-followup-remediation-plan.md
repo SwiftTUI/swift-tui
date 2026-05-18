@@ -1993,10 +1993,17 @@ Follow-up tasks added from the independent re-audit:
   `AsyncFrameTailRenderingTests/previewCommitEqualsRealCommit`,
   `RenderPipelineStructureTests/completedFramePreviewDoesNotFinalizeLiveGraph`,
   full `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed.
-- [ ] **F6 reopened:** remove the observable underived fixed iteration limits
+- [x] **F6 reopened:** remove the observable underived fixed iteration limits
   from late-preference reconciliation and focus synchronization, or replace
   them with a mechanically derived convergence contract that no longer commits
   stale overflow frames.
+  Completed by `be0e54c4`: late-preference reconciliation now derives its pass
+  budget from the current resolved tree and, on exhaustion, commits one final
+  relayout of the latest reconciled tree instead of stale pre-reconciliation
+  output. Focus-sync derives its rerender budget from the acquired semantic
+  graph. `BoundedReconciliationTests`,
+  `AppRuntimeTests/focusSynchronizationRerenderBudgetTripsAtTheConfiguredLimit`,
+  `AsyncFrameTailRenderingTests`, and `PipelineDriverParityTests` passed.
 - [ ] **F8 reopened:** stop calling `FrameDiagnostics.summarize(...)`
   unconditionally during artifact construction when no diagnostics consumer has
   read diagnostics.
