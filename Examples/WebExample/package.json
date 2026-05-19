@@ -2,7 +2,7 @@
   "name": "web-example",
   "version": "0.1.0",
   "private": true,
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build:terminal": "bun run src/build-terminal.ts",
