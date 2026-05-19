@@ -14,8 +14,31 @@ CONTAINER_TOOL=""
 # Default to the prebuilt image published by .github/workflows/build-linux-image.yml.
 # Override with LINUX_IMAGE=swift:6.3.1 (or any other base) to fall back to lazy
 # provisioning of swiftly, bun, and the Wasm SDK at runtime.
-IMAGE="${LINUX_IMAGE:-ghcr.io/swifttui/swift-tui-linux:latest}"
+DEFAULT_IMAGE="ghcr.io/swifttui/swift-tui-linux:latest"
+IMAGE="${LINUX_IMAGE:-$DEFAULT_IMAGE}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
+
+# The published dev image is built linux/amd64 only — multi-arch is a
+# deliberate non-goal (see Scripts/linux/README.md). On an Apple Silicon
+# host a bare `docker pull` of it fails with "no matching manifest for
+# linux/arm64", so we pin the platform: Docker then pulls the amd64 image
+# and runs it under emulation. A user-supplied LINUX_IMAGE is assumed to
+# resolve natively, so the platform is left unset there. Override with
+# LINUX_PLATFORM (set it empty to force-unset even for the default image).
+if [[ -n "${LINUX_PLATFORM+set}" ]]; then
+  PLATFORM="$LINUX_PLATFORM"
+elif [[ "$IMAGE" == "$DEFAULT_IMAGE" ]]; then
+  PLATFORM="linux/amd64"
+else
+  PLATFORM=""
+fi
+# docker/podman pull/create/build flags for the pinned platform, if any.
+# `${arr[@]+"${arr[@]}"}` is the bash 3.2-safe expansion: it yields nothing
+# for an empty array instead of tripping `set -u` on an unbound variable.
+PLATFORM_FLAGS=()
+if [[ -n "$PLATFORM" ]]; then
+  PLATFORM_FLAGS=(--platform "$PLATFORM")
+fi
 CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}}"
 CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/workspace}"
 # SwiftPM dependency + build cache. This is the one volume that genuinely
@@ -65,6 +88,11 @@ Environment:
                        Set to e.g. swift:6.3.1 to fall back to the upstream
                        Swift base image; swiftly, bun, and the Wasm SDK will be
                        installed lazily on first use.
+  LINUX_PLATFORM        Platform passed to docker/podman pull/create/build
+                       (default: ${PLATFORM:-<unset>})
+                       Defaults to linux/amd64 for the amd64-only published
+                       image so it pulls on Apple Silicon; unset for a
+                       custom LINUX_IMAGE. Set it empty to force-unset.
   LINUX_CONTAINER_NAME  Override the container name
   LINUX_CONTAINER_DIR   Override the in-container workspace mount
                        (default: $CONTAINER_DIR)
@@ -147,8 +175,8 @@ ensure_volume() {
 
 pull_image() {
   ensure_container_tool
-  log "Pulling $IMAGE"
-  "$CONTAINER_TOOL" pull "$IMAGE"
+  log "Pulling $IMAGE${PLATFORM:+ (platform $PLATFORM)}"
+  "$CONTAINER_TOOL" pull ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} "$IMAGE"
 }
 
 ensure_container() {
@@ -174,6 +202,7 @@ ensure_container() {
     # roughly 10x faster after a `nuke`.
     "$CONTAINER_TOOL" create \
       --name "$CONTAINER_NAME" \
+      ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
       --mount "type=bind,src=$REPO_DIR,dst=$CONTAINER_DIR" \
       --mount "type=volume,src=$SWIFTPM_CACHE_VOLUME,dst=/root/.cache/org.swift.swiftpm" \
       --workdir "$CONTAINER_DIR" \
@@ -194,6 +223,7 @@ build_image() {
   fi
   log "Building $LINUX_IMAGE_BUILD_TAG from $LINUX_IMAGE_DOCKERFILE"
   "$CONTAINER_TOOL" build \
+    ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
     --file "$LINUX_IMAGE_DOCKERFILE" \
     --tag "$LINUX_IMAGE_BUILD_TAG" \
     --build-arg "SWIFT_VERSION=$LINUX_SWIFT_VERSION" \

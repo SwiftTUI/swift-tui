@@ -395,10 +395,11 @@ Useful when iterating on `Dockerfile` syntax errors that fail before
 ## What this setup deliberately does NOT do
 
 - **Multi-arch builds.** The CI workflow only builds `linux/amd64`.
-  Apple Silicon developers run it under Rosetta-emulated Linux containers
-  (Docker Desktop handles this transparently). Adding `linux/arm64` is
-  ~10 minutes of work in the workflow if it ever becomes painful — for
-  now, the cost (doubled build time, doubled cache) outweighs the win.
+  On Apple Silicon, `linux.sh` pins `--platform linux/amd64` automatically
+  for the default image, so the container pulls and runs under emulation
+  (override via `LINUX_PLATFORM`). Adding a native `linux/arm64` image is
+  ~10 minutes of work in the workflow if emulation ever becomes painful —
+  for now, the cost (doubled build time, doubled cache) outweighs the win.
 - **A Compose stack.** There's only one service, with no networking
   between containers. A `docker-compose.yml` would add ceremony without
   removing anything.
