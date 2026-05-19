@@ -2517,7 +2517,16 @@ Revisited-phase batches:
   widenings, all namespaced under the enum). Also corrected a latent
   over-broad `public import` in `ToolbarStyle.swift`. No public API (669),
   fixture, or test changed.
-- Batch 189+ (planned): `NativeTerminalSurfaceView.swift`.
+- **Batch 189-191** (done): `NativeTerminalSurfaceView.swift` (1128 lines) →
+  `NativeTerminalPlatformAdapters.swift`, `NativeRasterSurfaceRenderer.swift`,
+  `NativeTerminalMetrics.swift` + the residual view-class file. 8
+  `private`/`fileprivate`→`internal` widenings. No public API (669), fixture,
+  or test changed.
+
+The revisited phase is complete: six of the seven previously-skipped files are
+now decomposed; `BuiltinTabViewStyles.swift` stays skipped with a detailed
+rationale. The production-code humanization migration is finished — 191
+behavior-preserving packets, public API held at 669 symbols throughout.
 
 ## Risks
 
