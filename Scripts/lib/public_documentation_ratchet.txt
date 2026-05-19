@@ -6,9 +6,9 @@
 
 ShapeStyle protocol|Sources/SwiftTUICore/Styling/ShapeStyles.swift|^public protocol ShapeStyle\b
 AnyShapeStyle eraser|Sources/SwiftTUICore/Styling/ShapeStyles.swift|^public enum AnyShapeStyle\b
-ToolbarStyle protocol|Sources/SwiftTUIViews/ActionScopes/Toolbar.swift|^public protocol ToolbarStyle\b
-DefaultTopToolbarStyle built-in|Sources/SwiftTUIViews/ActionScopes/Toolbar.swift|^public struct DefaultTopToolbarStyle\b
-DefaultBottomToolbarStyle built-in|Sources/SwiftTUIViews/ActionScopes/Toolbar.swift|^public struct DefaultBottomToolbarStyle\b
+ToolbarStyle protocol|Sources/SwiftTUIViews/ActionScopes/ToolbarStyle.swift|^public protocol ToolbarStyle\b
+DefaultTopToolbarStyle built-in|Sources/SwiftTUIViews/ActionScopes/ToolbarStyle.swift|^public struct DefaultTopToolbarStyle\b
+DefaultBottomToolbarStyle built-in|Sources/SwiftTUIViews/ActionScopes/ToolbarStyle.swift|^public struct DefaultBottomToolbarStyle\b
 ButtonStyle protocol|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public protocol ButtonStyle\b
 AnyButtonStyle eraser|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct AnyButtonStyle\b
 AutomaticButtonStyle built-in|Sources/SwiftTUIViews/Controls/ButtonStyles.swift|^public struct AutomaticButtonStyle\b

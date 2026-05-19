@@ -2319,6 +2319,57 @@ Runner log: /tmp/swift-tui-test-gate-20260518-195632-54551.log
 Result: PASS
 ```
 
+## Latest Review Packets: 157-161 (SwiftTUIViews)
+
+Second batch of the other-production-code phase. All behavior-preserving moves
+in `Sources/SwiftTUIViews`; public API inventory unchanged (669 symbols).
+
+Production scope:
+
+- Packet 157 — authoring-context types, identity helpers, and imperative
+  snapshot → `State/AuthoringContext.swift` (leaves `State.swift` focused on
+  the `@State` property wrapper and its backing storage).
+- Packet 158 — layout modifier implementation types (`PaddingModifier`,
+  `FrameModifier`, `OverlayModifier`, …) + their two private resolution
+  helpers → `Modifiers/ViewLayoutModifierTypes.swift` (leaves
+  `ViewLayoutModifiers.swift` as the public `extension View` modifier API).
+- Packet 159 — navigation-destination preference/declaration types →
+  `NavigationViews/NavigationDestinationPreferences.swift`
+  (`navigationDestinationPopAction` stays — it needs the file-scoped
+  `private` `scopeDepth`).
+- Packet 160 — `ScrollViewLayout` + its reuse-signature extension →
+  `ScrollView/ScrollViewLayout.swift`. One documented access widening:
+  `private struct` → file-internal `struct`, so `ScrollView.resolve` can
+  still construct it across files.
+- Packet 161 — toolbar style vocabulary (`ToolbarStyle`, `ToolbarPlacement`,
+  `Default{Top,Bottom}ToolbarStyle`) → `ActionScopes/ToolbarStyle.swift`.
+
+Review note: moving `public protocol ToolbarStyle` required updating two
+path-pinned guardrails in the same packet — `check_public_surface_policies.sh`
+(the `ToolbarStyle` invariant) and `Scripts/lib/public_documentation_ratchet.txt`
+(the `ToolbarStyle` / `DefaultTopToolbarStyle` / `DefaultBottomToolbarStyle`
+doc-summary entries). Both guardrails are unchanged in substance and still
+fail-closed; only the file paths follow the moved declarations.
+
+Behavior intentionally preserved:
+
+- `@State` storage and binding resolution, layout modifier lowering,
+  navigation-destination preference plumbing, scroll-view layout/clamping, and
+  toolbar styling are unchanged.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+First attempt FAILED: doc ratchet flagged the three moved ToolbarStyle
+entries (stale paths in public_documentation_ratchet.txt).
+Fixed the ratchet paths, re-ran.
+User tee log: /tmp/swift-tui-test-gate-20260518-210648-packet157-161-rerun.log
+Runner log: /tmp/swift-tui-test-gate-20260518-210648-12881.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict

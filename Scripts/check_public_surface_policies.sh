@@ -284,7 +284,7 @@ Type-erased style storage
 Experimental or showcase targets follow the same rule
 EOF
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/SwiftTUIViews/ActionScopes/Toolbar.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/SwiftTUIViews/ActionScopes/ToolbarStyle.swift; then
   fail "ToolbarStyle should stay a public extensible style protocol."
 fi
 

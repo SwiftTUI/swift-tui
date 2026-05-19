@@ -3265,7 +3265,112 @@ public-API invariants. Any packet that *moves* a guarded declaration
 matching path in that script in the same packet. The script is fail-closed, so
 a missed update fails the batch gate rather than silently passing.
 
+A *second* path-pinned guardrail exists: `Scripts/lib/public_documentation_ratchet.txt`
+records a `name|file|regex` row for every public declaration that must keep a
+`///` summary. Moving a public declaration breaks the ratchet because the
+regex still anchors to the old file. Packet 161 hit this — the moved
+`ToolbarStyle` / `Default{Top,Bottom}ToolbarStyle` rows had to follow the
+declaration to `ToolbarStyle.swift`. **Any public-type move must check both
+`check_public_surface_policies.sh` and the doc ratchet.**
+
+## Packet 157-161 Batch: SwiftTUIViews Decomposition (Other Production Code, Phase 2)
+
+Second batch of the other-production-code phase. Scope: `Sources/SwiftTUIViews`.
+All behavior-preserving file extractions; public API unchanged (verified — 669
+top-level public symbols).
+
+- Packet 157: split the authoring-context infrastructure — `ViewGraphScopeID`,
+  `AuthoringContext`, its task-local storage and factory functions, the
+  graph-scoped state-identity helpers, and `ImperativeAuthoringContextSnapshot`
+  — out of `State.swift` into `State/AuthoringContext.swift`, leaving the
+  `@State` property wrapper, `StateBox`, `AuthoringOrdinalTracker`, and
+  `StateSlotOrdinals` in `State.swift`.
+- Packet 158: split the layout modifier implementation types (`PaddingModifier`,
+  `SafeAreaPaddingModifier`, `IgnoreSafeAreaModifier`, `SafeAreaInsetModifier`,
+  `BorderModifier`, `FrameModifier`, `OffsetModifier`, `PositionModifier`,
+  `MatchedGeometryModifier`, `FlexibleFrameModifier`, `OverlayModifier`,
+  `BackgroundModifier`) plus the two `private` resolution helpers out of
+  `ViewLayoutModifiers.swift` into `Modifiers/ViewLayoutModifierTypes.swift`,
+  leaving `ViewLayoutModifiers.swift` as the public `extension View` modifier
+  API. The private helpers travel with their caller structs, preserving
+  file-scoped `private` access.
+- Packet 159: split the navigation-destination preference plumbing
+  (`NavigationDestinationDeclaration`, `NavigationDestinationInstance`,
+  `NavigationDestinationPopEntry`, the two preference-value structs, the two
+  `PreferenceKey` enums) out of `NavigationStack.swift` into
+  `NavigationViews/NavigationDestinationPreferences.swift`.
+  `navigationDestinationPopAction` stays in `NavigationStack.swift` — it
+  depends on the file-scoped `private` `scopeDepth` helper.
+- Packet 160: split `ScrollViewLayout` and its reuse-signature extension out
+  of `ScrollView.swift` into `ScrollView/ScrollViewLayout.swift`. One
+  documented access widening: `private struct ScrollViewLayout` →
+  file-internal `struct` so `ScrollView.resolve` can still construct it from
+  `ScrollView.swift`. The nested `private struct IndicatorInsets` stays
+  `private`.
+- Packet 161: split the toolbar style vocabulary (`ToolbarPlacement`,
+  `ToolbarStyle`, `DefaultTopToolbarStyle`, `DefaultBottomToolbarStyle`, and
+  the two `where Self ==` static-accessor extensions) out of `Toolbar.swift`
+  into `ActionScopes/ToolbarStyle.swift`.
+
+Validation-artifact update (Packet 161):
+
+- `Scripts/check_public_surface_policies.sh` hard-codes the file path it greps
+  for `public protocol ToolbarStyle`; the path was updated to
+  `ToolbarStyle.swift`.
+- `Scripts/lib/public_documentation_ratchet.txt` has three rows pinning
+  `ToolbarStyle`, `DefaultTopToolbarStyle`, and `DefaultBottomToolbarStyle` to
+  a source file; all three paths were updated to `ToolbarStyle.swift`. The
+  first `bun run test` attempt failed because this ratchet update was missed;
+  it was applied and the gate re-ran green (see Failed Attempts).
+
+Behavior preserved:
+
+- `@State` storage/binding resolution, layout modifier lowering,
+  navigation-destination preference plumbing, scroll-view measurement/offset
+  clamping, and toolbar styling all remained unchanged. No public API,
+  fixture, or test changed.
+
+Packet 157-161 focused validation:
+
+- `swiftly run swift build --target SwiftTUIViews` — PASS (all packets)
+- `swiftly run swift test --filter ImperativeAuthoringContextDispatchTests`
+  (21) — PASS
+- `swiftly run swift test --filter ViewModifierAlgebraTests` (5) — PASS
+- `swiftly run swift test --filter NavigationDestinationTests` (7) — PASS
+- `swiftly run swift test --filter ScrollIndicatorDraggingTests`,
+  `LayoutDependentContainerHardeningTests` (3) — PASS
+- `swiftly run swift test --filter ToolbarTests` (19) — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS (after the path update)
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols (no public API drift)
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+- `./Scripts/check_public_documentation_ratchet.sh` — PASS, 70 entries (after
+  the ratchet path update)
+
+Packet 157-161 batch validation:
+
+- `bun run test`
+  - First attempt FAIL: doc ratchet flagged three stale `ToolbarStyle` entry
+    paths. Failed gate log:
+    `/tmp/swift-tui-test-gate-20260518-210349-packet157-161.log`
+  - After fixing `public_documentation_ratchet.txt`:
+    - User tee log:
+      `/tmp/swift-tui-test-gate-20260518-210648-packet157-161-rerun.log`
+    - Runner log: `/tmp/swift-tui-test-gate-20260518-210648-12881.log`
+    - Result: PASS
+
 ## Failed Attempts
+
+- Packet 157-161 first full `bun run test` attempt failed the "Check public
+  documentation ratchet" step: moving `public protocol ToolbarStyle` and the
+  two `Default*ToolbarStyle` structs to `ToolbarStyle.swift` left three stale
+  `Sources/.../Toolbar.swift` rows in `Scripts/lib/public_documentation_ratchet.txt`.
+  Failed gate log: `/tmp/swift-tui-test-gate-20260518-210349-packet157-161.log`.
+- Updating the three ratchet rows to `ToolbarStyle.swift` fixed it;
+  `./Scripts/check_public_documentation_ratchet.sh` then passed (70 entries)
+  and the full repo gate passed at
+  `/tmp/swift-tui-test-gate-20260518-210648-12881.log`.
 
 - Packet 51-53 first full `bun run test` attempt failed in the full
   `SwiftTUITests` runtime target with three
