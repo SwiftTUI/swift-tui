@@ -1207,7 +1207,7 @@ struct InteractiveRuntimeTests {
       recorder: recorder,
       focusable: true,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("d"), modifiers: .ctrl))
+        .init(value: KeyPress(.character("d"), modifiers: .ctrl))
       ]
     )
 
@@ -1228,8 +1228,8 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       recorder: recorder,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("t"))),
-        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("d"), modifiers: .ctrl)),
+        .init(value: KeyPress(.character("t"))),
+        .init(value: KeyPress(.character("d"), modifiers: .ctrl)),
       ]
     )
 
@@ -1253,7 +1253,7 @@ struct InteractiveRuntimeTests {
       terminal: RecordingTerminalHost(),
       recorder: recorder,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("d"), modifiers: .ctrl))
+        .init(value: KeyPress(.character("d"), modifiers: .ctrl))
       ]
     )
 
@@ -1270,7 +1270,7 @@ struct InteractiveRuntimeTests {
       terminal: RecordingTerminalHost(),
       recorder: recorder,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("d"), modifiers: .ctrl))
+        .init(value: KeyPress(.character("d"), modifiers: .ctrl))
       ]
     )
 
@@ -1303,7 +1303,7 @@ struct InteractiveRuntimeTests {
       recorder: recorder,
       events: [] as [TimedRuntimeEvent<KeyPress>],
       signals: [
-        .init(delayNanoseconds: 50_000_000, value: "SIGTERM")
+        .init(value: "SIGTERM")
       ]
     )
 
@@ -1346,8 +1346,10 @@ struct InteractiveRuntimeTests {
         gate: quitGate, event: KeyPress(.character("d"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
-          .init(delayNanoseconds: 50_000_000, value: "SIGWINCH")
-        ]
+          .init(value: "SIGWINCH")
+        ],
+        frameSignal: terminal.frameSignal,
+        frameCount: { terminal.frames.count }
       )
     )
 
@@ -1391,8 +1393,10 @@ struct InteractiveRuntimeTests {
         gate: quitGate, event: KeyPress(.character("d"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
-          .init(delayNanoseconds: 50_000_000, value: "SIGWINCH")
-        ]
+          .init(value: "SIGWINCH")
+        ],
+        frameSignal: terminal.frameSignal,
+        frameCount: { terminal.frames.count }
       )
     )
 
@@ -1487,8 +1491,10 @@ struct InteractiveRuntimeTests {
         gate: AsyncEventGate(), event: KeyPress(.character("d"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
-          .init(delayNanoseconds: 1_000_000_000, value: "SIGTERM")
-        ]
+          .init(value: "SIGTERM")
+        ],
+        frameSignal: terminal.frameSignal,
+        frameCount: { terminal.frames.count }
       ),
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -3505,6 +3511,10 @@ private final class RecordingTerminalHost: PresentationSurface {
   private let surfaceSizeProvider: () -> CellSize
   private let presentObserver: (() -> Void)?
 
+  /// Notified after every appended frame, so a frame-gated input/signal
+  /// reader can deliver its next scripted event the instant a frame commits.
+  let frameSignal = MainActorConditionSignal()
+
   init(
     surfaceSizeProvider: @escaping () -> CellSize = { InteractiveDemoLayout.frameSize },
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
@@ -3559,11 +3569,23 @@ private final class RecordingTerminalHost: PresentationSurface {
     presentedSurfaceSizes.append(surface.size)
     frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
     lastPresentedSurface = surface
+    notifyFrameObservers()
     return metrics
   }
 
   func write(_ output: String) throws {
     frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
+    notifyFrameObservers()
+  }
+
+  /// The run loop only ever presents on the MainActor; `assumeIsolated`
+  /// bridges these nonisolated protocol witnesses to the MainActor-isolated
+  /// signal.
+  private func notifyFrameObservers() {
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
   }
 
   private func cursorSequence(row: Int, column: Int) -> String {
@@ -4044,8 +4066,10 @@ private final class EmptySignalReader: SignalReading {
   }
 }
 
+/// A scripted runtime event delivered one host-frame commit after the
+/// previous one — a deterministic, frame-gated stand-in for the wall-clock
+/// delays the lifecycle tests used to space input/signals.
 private struct TimedRuntimeEvent<Value: Sendable>: Sendable {
-  let delayNanoseconds: UInt64
   let value: Value
 }
 
@@ -4117,37 +4141,66 @@ private final class GateInputReader: InputReading {
   }
 }
 
+/// Drives a scripted sequence so each event lands one host-frame commit after
+/// the previous one — re-checked on the host's `frameSignal`, never a clock.
+private func runFrameGatedScript<Value: Sendable>(
+  _ events: [TimedRuntimeEvent<Value>],
+  frameSignal: MainActorConditionSignal,
+  frameCount: @escaping @MainActor () -> Int,
+  yield: @escaping @Sendable (Value) -> Void,
+  finish: @escaping @Sendable () -> Void
+) -> Task<Void, Never> {
+  Task { @MainActor in
+    for (index, event) in events.enumerated() {
+      // Event `i` is delivered once the host has committed at least `i + 1`
+      // frames. An *absolute* target (rather than "one more than last time")
+      // is unaffected by how many frames already landed before this reader's
+      // task was first scheduled, so it can never gate on a frame the run
+      // loop will not produce.
+      let target = index + 1
+      await frameSignal.wait(until: { frameCount() >= target })
+      yield(event.value)
+    }
+    finish()
+  }
+}
+
 private final class TimedInputReader: InputReading {
   private let scriptedEvents: [TimedRuntimeEvent<KeyPress>]
+  private let frameSignal: MainActorConditionSignal
+  private let frameCount: @MainActor () -> Int
 
-  init(events: [TimedRuntimeEvent<KeyPress>]) {
+  init(
+    events: [TimedRuntimeEvent<KeyPress>],
+    frameSignal: MainActorConditionSignal,
+    frameCount: @escaping @MainActor () -> Int
+  ) {
     scriptedEvents = events
+    self.frameSignal = frameSignal
+    self.frameCount = frameCount
   }
 
-  convenience init(events: [TimedRuntimeEvent<KeyEvent>]) {
+  convenience init(
+    events: [TimedRuntimeEvent<KeyEvent>],
+    frameSignal: MainActorConditionSignal,
+    frameCount: @escaping @MainActor () -> Int
+  ) {
     self.init(
-      events: events.map { event in
-        .init(
-          delayNanoseconds: event.delayNanoseconds,
-          value: KeyPress(event.value)
-        )
-      }
+      events: events.map { .init(value: KeyPress($0.value)) },
+      frameSignal: frameSignal,
+      frameCount: frameCount
     )
   }
 
   func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
-      let scriptedEvents = scriptedEvents
-      let task = Task {
-        for event in scriptedEvents {
-          if event.delayNanoseconds > 0 {
-            try? await Task.sleep(nanoseconds: event.delayNanoseconds)
-          }
-          continuation.yield(event.value)
-        }
-        continuation.finish()
-      }
-
+      let task = runFrameGatedScript(
+        scriptedEvents,
+        frameSignal: frameSignal,
+        frameCount: frameCount,
+        yield: { continuation.yield($0) },
+        finish: { continuation.finish() }
+      )
       continuation.onTermination = { _ in
         task.cancel()
       }
@@ -4157,24 +4210,28 @@ private final class TimedInputReader: InputReading {
 
 private final class TimedSignalReader: SignalReading {
   private let scriptedSignals: [TimedRuntimeEvent<String>]
+  private let frameSignal: MainActorConditionSignal
+  private let frameCount: @MainActor () -> Int
 
-  init(signals: [TimedRuntimeEvent<String>]) {
+  init(
+    signals: [TimedRuntimeEvent<String>],
+    frameSignal: MainActorConditionSignal,
+    frameCount: @escaping @MainActor () -> Int
+  ) {
     scriptedSignals = signals
+    self.frameSignal = frameSignal
+    self.frameCount = frameCount
   }
 
   func events() -> AsyncStream<String> {
     AsyncStream { continuation in
-      let scriptedSignals = scriptedSignals
-      let task = Task {
-        for signal in scriptedSignals {
-          if signal.delayNanoseconds > 0 {
-            try? await Task.sleep(nanoseconds: signal.delayNanoseconds)
-          }
-          continuation.yield(signal.value)
-        }
-        continuation.finish()
-      }
-
+      let task = runFrameGatedScript(
+        scriptedSignals,
+        frameSignal: frameSignal,
+        frameCount: frameCount,
+        yield: { continuation.yield($0) },
+        finish: { continuation.finish() }
+      )
       continuation.onTermination = { _ in
         task.cancel()
       }
@@ -4477,8 +4534,16 @@ private func makeLifecycleRuntimeHarness(
   let runLoop = RunLoop(
     rootIdentity: testIdentity("LifecycleRuntimeRoot"),
     presentationSurface: terminal,
-    inputReader: TimedInputReader(events: events),
-    signalReader: TimedSignalReader(signals: signals),
+    inputReader: TimedInputReader(
+      events: events,
+      frameSignal: terminal.frameSignal,
+      frameCount: { terminal.frames.count }
+    ),
+    signalReader: TimedSignalReader(
+      signals: signals,
+      frameSignal: terminal.frameSignal,
+      frameCount: { terminal.frames.count }
+    ),
     scheduler: FrameScheduler(),
     stateContainer: StateContainer(
       initialState: LifecycleRuntimeState(),
@@ -4521,10 +4586,7 @@ private func makeLifecycleRuntimeHarness(
     recorder: recorder,
     focusable: focusable,
     events: events.map { event in
-      .init(
-        delayNanoseconds: event.delayNanoseconds,
-        value: KeyPress(event.value)
-      )
+      .init(value: KeyPress(event.value))
     },
     signals: signals
   )
