@@ -12,16 +12,23 @@
 @MainActor
 package final class MainActorConditionSignal {
   private final class Waiter {
+    let id: UInt64
     let predicate: () -> Bool
     let continuation: CheckedContinuation<Void, Never>
 
-    init(predicate: @escaping () -> Bool, continuation: CheckedContinuation<Void, Never>) {
+    init(
+      id: UInt64,
+      predicate: @escaping () -> Bool,
+      continuation: CheckedContinuation<Void, Never>
+    ) {
+      self.id = id
       self.predicate = predicate
       self.continuation = continuation
     }
   }
 
   private var waiters: [Waiter] = []
+  private var nextID: UInt64 = 0
 
   package init() {}
 
@@ -52,13 +59,35 @@ package final class MainActorConditionSignal {
   /// Suspends until `predicate` holds.
   ///
   /// Returns immediately if the predicate already holds; otherwise resumes on
-  /// the first `notify()` that makes it true.
+  /// the first `notify()` that makes it true. Also resumes promptly if the
+  /// calling task is cancelled, so a cancelled waiter never strands a task
+  /// group it is racing inside — `withStageBudget` relies on this.
   package func wait(until predicate: @escaping () -> Bool) async {
     if predicate() {
       return
     }
-    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-      waiters.append(Waiter(predicate: predicate, continuation: continuation))
+    let id = nextID
+    nextID &+= 1
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        if Task.isCancelled {
+          continuation.resume()
+          return
+        }
+        waiters.append(
+          Waiter(id: id, predicate: predicate, continuation: continuation)
+        )
+      }
+    } onCancel: {
+      // `onCancel` runs synchronously on an arbitrary executor; hop back to
+      // the MainActor to unregister the waiter and resume it. The hop task is
+      // unstructured, so it still runs even though the parent task is cancelled.
+      Task { @MainActor in
+        guard let index = self.waiters.firstIndex(where: { $0.id == id }) else {
+          return
+        }
+        self.waiters.remove(at: index).continuation.resume()
+      }
     }
   }
 }
