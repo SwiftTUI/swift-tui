@@ -413,11 +413,15 @@ private final class ScheduledTerminalInputReader: TerminalInputReading {
     AsyncStream { continuation in
       let schedule = self.schedule
       let task = Task {
+        // Virtual clock: each scheduled delay advances the timestamp stamped
+        // onto the event rather than being slept through, so drag-release
+        // velocity is deterministic and independent of wall-clock pacing.
+        var virtualClock = MonotonicInstant.now()
         for item in schedule {
-          if item.delayNanoseconds > 0 {
-            try? await Task.sleep(nanoseconds: item.delayNanoseconds)
-          }
-          continuation.yield(item.event)
+          virtualClock = virtualClock.advanced(
+            by: .nanoseconds(Int64(item.delayNanoseconds))
+          )
+          continuation.yield(restampedInputEvent(item.event, at: virtualClock))
         }
         continuation.finish()
       }
@@ -427,6 +431,20 @@ private final class ScheduledTerminalInputReader: TerminalInputReading {
       }
     }
   }
+}
+
+/// Re-stamps a scripted mouse event with a virtual timestamp so the runtime's
+/// gesture velocity tracker sees a deterministic inter-event interval. Non-mouse
+/// events are returned unchanged.
+private func restampedInputEvent(
+  _ event: InputEvent,
+  at timestamp: MonotonicInstant
+) -> InputEvent {
+  guard case .mouse(var mouseEvent) = event else {
+    return event
+  }
+  mouseEvent.timestamp = timestamp
+  return .mouse(mouseEvent)
 }
 
 private final class AwaitedTerminalInputReader: TerminalInputReading {
@@ -446,13 +464,16 @@ private final class AwaitedTerminalInputReader: TerminalInputReading {
       let steps = self.steps
       let frameSignal = self.frameSignal
       let task = Task { @MainActor in
+        // Virtual clock: a step's delay advances the timestamp stamped onto
+        // the event rather than being slept through (see restampedInputEvent).
+        var virtualClock = MonotonicInstant.now()
         for step in steps {
           switch step {
           case .event(let event, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
-            continuation.yield(event)
+            virtualClock = virtualClock.advanced(
+              by: .nanoseconds(Int64(delayNanoseconds))
+            )
+            continuation.yield(restampedInputEvent(event, at: virtualClock))
           case .awaitCondition(let predicate):
             await frameSignal.wait(until: predicate)
           }
