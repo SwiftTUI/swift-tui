@@ -592,15 +592,22 @@ struct GalleryTabSwitchTests {
     let start = Self.centerPoint(of: try #require(preDragBounds.last))
     let end = Point(x: start.x + 12, y: start.y - 5)
 
-    // Wait for the runtime to actually present a frame in response to each
-    // drag byte before writing the next, rather than sleeping a fixed
-    // interval: the down/drag/up sequences are then parsed in separate read
-    // cycles (so the gesture sees a non-degenerate inter-event interval)
-    // without any wall-clock dependency.
+    // The press must land in an earlier read cycle than the drag/release, so
+    // the velocity tracker sees a non-zero interval between its first and
+    // last samples: wait for the runtime to present a frame in response to
+    // the press before continuing.
     try Self.writeAllBytes(Self.sgrPrimaryDown(at: start, encoding: inputEncoding), to: pty.master)
     try await Self.waitForNextFrame(on: pty.master, screen: &screen)
+
+    // The drag and release are written back to back with no suspension point
+    // between them. `DragGestureRecognizer.computeVelocity` derives release
+    // velocity from samples inside a trailing ~100ms window; the drag and the
+    // release share a location, so if a slow read cycle let more than 100ms
+    // elapse between parsing them the tracker would fall back to the
+    // stationary drag sample and report zero horizontal momentum. Keeping
+    // them in the same parser pass bounds that interval to the read loop,
+    // well under the window, with no wall-clock dependency.
     try Self.writeAllBytes(Self.sgrPrimaryDrag(at: end, encoding: inputEncoding), to: pty.master)
-    try await Self.waitForNextFrame(on: pty.master, screen: &screen)
     try Self.writeAllBytes(Self.sgrPrimaryUp(at: end, encoding: inputEncoding), to: pty.master)
 
     let postReleaseBounds = try await Self.collectDistinctBrailleBounds(
