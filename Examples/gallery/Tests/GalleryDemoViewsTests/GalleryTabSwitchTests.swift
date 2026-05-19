@@ -1147,34 +1147,49 @@ struct GalleryTabSwitchTests {
   private static func waitForScreen(
     on fileDescriptor: Int32,
     screen: inout PTYVisibleScreen,
-    timeoutNanoseconds: UInt64 = 5_000_000_000,
-    pollNanoseconds: UInt64 = 5_000_000,
     condition: (String) -> Bool
   ) async throws -> String {
-    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
     var rendered = screen.renderedText
-
-    while DispatchTime.now().uptimeNanoseconds < deadline {
-      let bytes = try readAvailableBytes(from: fileDescriptor)
-      if !bytes.isEmpty {
-        screen.feed(bytes)
-        rendered = screen.renderedText
-      }
-      if condition(rendered) {
-        return rendered
-      }
-      try await Task.sleep(nanoseconds: pollNanoseconds)
+    let initial = try readAvailableBytes(from: fileDescriptor)
+    if !initial.bytes.isEmpty {
+      screen.feed(initial.bytes)
+      rendered = screen.renderedText
     }
-
-    let finalBytes = try readAvailableBytes(from: fileDescriptor)
-    if !finalBytes.isEmpty {
-      screen.feed(finalBytes)
-    }
-    rendered = screen.renderedText
     if condition(rendered) {
       return rendered
     }
-    throw ScreenWaitError.timedOut(rendered: rendered)
+
+    let readable = PTYReadableSource(fileDescriptor: fileDescriptor)
+    var outcome: Result<String, any Error> = .failure(
+      ScreenWaitError.timedOut(rendered: rendered)
+    )
+    for await _ in readable.events {
+      let next: (bytes: [UInt8], reachedEOF: Bool)
+      do {
+        next = try readAvailableBytes(from: fileDescriptor)
+      } catch {
+        outcome = .failure(error)
+        break
+      }
+      if !next.bytes.isEmpty {
+        screen.feed(next.bytes)
+        rendered = screen.renderedText
+      }
+      if condition(rendered) {
+        outcome = .success(rendered)
+        break
+      }
+      if next.reachedEOF {
+        // The PTY closed before the screen reached the awaited state — the
+        // condition can never hold now, so fail rather than await forever.
+        outcome = .failure(ScreenWaitError.timedOut(rendered: rendered))
+        break
+      }
+    }
+    // Tear the read source fully down *before* returning, so the caller may
+    // safely close the file descriptor.
+    await readable.cancel()
+    return try outcome.get()
   }
 
   private static func observeScreenWhileAbsent(
@@ -1184,6 +1199,10 @@ struct GalleryTabSwitchTests {
     pollNanoseconds: UInt64 = 5_000_000,
     forbidden: (String) -> Bool
   ) async throws -> String {
+    // A bounded *negative* assertion: confirm `forbidden` stays false for a
+    // fixed observation window. There is no event that signals "nothing
+    // happened", so this deliberately keeps a wall-clock loop — a documented
+    // test-sync ratchet exception.
     let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
     var rendered = screen.renderedText
     if forbidden(rendered) {
@@ -1191,9 +1210,9 @@ struct GalleryTabSwitchTests {
     }
 
     while DispatchTime.now().uptimeNanoseconds < deadline {
-      let bytes = try readAvailableBytes(from: fileDescriptor)
-      if !bytes.isEmpty {
-        screen.feed(bytes)
+      let chunk = try readAvailableBytes(from: fileDescriptor)
+      if !chunk.bytes.isEmpty {
+        screen.feed(chunk.bytes)
         rendered = screen.renderedText
       }
       if forbidden(rendered) {
@@ -1202,9 +1221,9 @@ struct GalleryTabSwitchTests {
       try await Task.sleep(nanoseconds: pollNanoseconds)
     }
 
-    let finalBytes = try readAvailableBytes(from: fileDescriptor)
-    if !finalBytes.isEmpty {
-      screen.feed(finalBytes)
+    let finalChunk = try readAvailableBytes(from: fileDescriptor)
+    if !finalChunk.bytes.isEmpty {
+      screen.feed(finalChunk.bytes)
     }
     rendered = screen.renderedText
     if forbidden(rendered) {
@@ -1216,39 +1235,55 @@ struct GalleryTabSwitchTests {
   private static func collectDistinctBrailleBounds(
     on fileDescriptor: Int32,
     screen: inout PTYVisibleScreen,
-    minimumCount: Int,
-    timeoutNanoseconds: UInt64 = 8_000_000_000,
-    pollNanoseconds: UInt64 = 5_000_000
+    minimumCount: Int
   ) async throws -> [CellRect] {
-    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
     var bounds: [CellRect] = []
 
-    while DispatchTime.now().uptimeNanoseconds < deadline {
-      let bytes = try readAvailableBytes(from: fileDescriptor)
-      if !bytes.isEmpty {
-        screen.feed(bytes)
+    func absorb(_ chunk: (bytes: [UInt8], reachedEOF: Bool)) -> [CellRect]? {
+      if !chunk.bytes.isEmpty {
+        screen.feed(chunk.bytes)
       }
-      if let next = brailleBounds(in: screen.renderedText),
-        bounds.last != next
-      {
+      if let next = brailleBounds(in: screen.renderedText), bounds.last != next {
         bounds.append(next)
         if bounds.count >= minimumCount {
           return bounds
         }
       }
-      try await Task.sleep(nanoseconds: pollNanoseconds)
+      return nil
     }
 
-    let finalBytes = try readAvailableBytes(from: fileDescriptor)
-    if !finalBytes.isEmpty {
-      screen.feed(finalBytes)
+    if let collected = absorb(try readAvailableBytes(from: fileDescriptor)) {
+      return collected
     }
-    throw ScreenWaitError.timedOut(rendered: screen.renderedText)
+
+    let readable = PTYReadableSource(fileDescriptor: fileDescriptor)
+    var outcome: Result<[CellRect], any Error> = .failure(
+      ScreenWaitError.timedOut(rendered: screen.renderedText)
+    )
+    for await _ in readable.events {
+      let chunk: (bytes: [UInt8], reachedEOF: Bool)
+      do {
+        chunk = try readAvailableBytes(from: fileDescriptor)
+      } catch {
+        outcome = .failure(error)
+        break
+      }
+      if let collected = absorb(chunk) {
+        outcome = .success(collected)
+        break
+      }
+      if chunk.reachedEOF {
+        outcome = .failure(ScreenWaitError.timedOut(rendered: screen.renderedText))
+        break
+      }
+    }
+    await readable.cancel()
+    return try outcome.get()
   }
 
   private static func readAvailableBytes(
     from fileDescriptor: Int32
-  ) throws -> [UInt8] {
+  ) throws -> (bytes: [UInt8], reachedEOF: Bool) {
     var collected: [UInt8] = []
 
     while true {
@@ -1261,17 +1296,57 @@ struct GalleryTabSwitchTests {
       }
 
       if bytesRead == 0 {
-        break
+        return (collected, true)
       }
 
       if errno == EAGAIN || errno == EWOULDBLOCK {
-        break
+        return (collected, false)
       }
 
       throw TerminalHostError.failedToReadWindowSize(errno: errno)
     }
+  }
+}
 
-    return collected
+/// A `DispatchSource`-backed "the PTY has bytes" signal.
+///
+/// Replaces fixed-interval polling of a PTY master fd: `events` yields once
+/// per readable edge (data available, or EOF). The caller MUST `await
+/// cancel()` before closing the file descriptor — `cancel()` tears the source
+/// down and waits until libdispatch has released its hold on the fd, which
+/// avoids the trap that closing the fd under a live source would cause.
+private final class PTYReadableSource {
+  let events: AsyncStream<Void>
+  private let source: any DispatchSourceRead
+  private let cancelled = AsyncEvent()
+
+  init(fileDescriptor: Int32) {
+    let source = DispatchSource.makeReadSource(
+      fileDescriptor: fileDescriptor,
+      queue: DispatchQueue(label: "GalleryTabSwitchTests.ptyReadable")
+    )
+    self.source = source
+
+    var streamContinuation: AsyncStream<Void>.Continuation!
+    events = AsyncStream<Void> { streamContinuation = $0 }
+    let continuation = streamContinuation!
+    let cancelledEvent = cancelled
+
+    source.setEventHandler {
+      continuation.yield(())
+    }
+    source.setCancelHandler {
+      continuation.finish()
+      cancelledEvent.fire()
+    }
+    source.resume()
+  }
+
+  /// Cancels the source and suspends until its cancel handler has run — i.e.
+  /// until libdispatch has released the file descriptor.
+  func cancel() async {
+    source.cancel()
+    await cancelled.wait()
   }
 }
 
