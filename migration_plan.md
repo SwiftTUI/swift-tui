@@ -3489,11 +3489,21 @@ Rollback: revert each new file into its source; reverse the rename and the
 three `WebSurfaceFrameEncoder` widenings; rerun
 `check_accessibility_guardrails.sh --update`.
 
-### Batches 180+ — planned
+### Batch 180-184 — COMPLETED
 
-`PickerRendering.swift`, `BoxDrawingRenderer.swift`,
-`NativeTerminalSurfaceView.swift`, and `CustomLayout.swift` remain; each has a
-reviewed packet plan.
+- Packets 180-183: `PickerRendering.swift` → `PickerSharedRendering.swift`,
+  `PickerMenuStyle.swift`, `PickerInlineStyle.swift`; residual renamed
+  `PickerSegmentedAndRadioStyles.swift`. 2 `private`→`internal` widenings.
+- Packet 184: `CustomLayout.swift` part 1 → `CustomLayoutPlacementGeometry.swift`
+  (placement geometry); 4 `private`→`internal` widenings.
+
+Rollback: revert each new file into its source; reverse the renames and
+widenings; rerun `check_accessibility_guardrails.sh --update`.
+
+### Batches 185+ — planned
+
+`CustomLayout.swift` part 2 (the type-erasure engine), `BoxDrawingRenderer.swift`,
+and `NativeTerminalSurfaceView.swift` remain; each has a reviewed packet plan.
 
 ## Human Checkpoints
 

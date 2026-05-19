@@ -7,24 +7,9 @@ public protocol LayoutValueKey {
   static var defaultValue: Value { get }
 }
 
-private struct LayoutSubviewPlacementRecord {
-  var position: LayoutPoint
-  var anchor: Alignment
-  var proposal: ProposedViewSize
-  var viewportContext: ScrollViewportContext?
-}
-
-private final class LayoutSubviewPlacementRecorder {
-  private var placements: [Identity: LayoutSubviewPlacementRecord] = [:]
-
-  func record(identity: Identity, placement: LayoutSubviewPlacementRecord) {
-    placements[identity] = placement
-  }
-
-  func placement(for identity: Identity) -> LayoutSubviewPlacementRecord? {
-    placements[identity]
-  }
-}
+// `LayoutSubviewPlacementRecord`, `LayoutSubviewPlacementRecorder`,
+// `defaultPlacement`, and `placedOrigin` live in
+// `CustomLayoutPlacementGeometry.swift`.
 
 /// A layout-facing handle for a resolved child view.
 public struct LayoutSubview {
@@ -849,43 +834,4 @@ private final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
       }
     }
   }
-}
-
-private func defaultPlacement(
-  in bounds: LayoutRect,
-  proposal: ProposedViewSize
-) -> LayoutSubviewPlacementRecord {
-  LayoutSubviewPlacementRecord(
-    position: LayoutPoint(
-      x: bounds.origin.x + (bounds.size.width / 2),
-      y: bounds.origin.y + (bounds.size.height / 2)
-    ),
-    anchor: .center,
-    proposal: proposal
-  )
-}
-
-private func placedOrigin(
-  for childSize: LayoutSize,
-  at position: LayoutPoint,
-  anchor: Alignment
-) -> LayoutPoint {
-  let dimensions = ViewDimensions(width: childSize.width, height: childSize.height)
-  let xOffset =
-    if anchor.horizontal == .center {
-      (childSize.width + 1) / 2
-    } else {
-      dimensions[anchor.horizontal]
-    }
-  let yOffset =
-    if anchor.vertical == .center {
-      (childSize.height + 1) / 2
-    } else {
-      dimensions[anchor.vertical]
-    }
-
-  return LayoutPoint(
-    x: position.x - xOffset,
-    y: position.y - yOffset
-  )
 }

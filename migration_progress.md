@@ -3652,6 +3652,59 @@ Packet 175-179 validation:
   - User tee log: `/tmp/swift-tui-test-gate-20260518-224044-packet175-179.log`
   - Runner log: `/tmp/swift-tui-test-gate-20260518-224044-50892.log`
 
+## Packet 180-184 Batch: PickerRendering + CustomLayout (part 1)
+
+Second batch of the revisited phase.
+
+- Packet 180: the two genuinely-shared picker helpers
+  (`inlineRowIntrinsicLineWidth`, `pickerRow`) out of `PickerRendering.swift`
+  into `PickerSharedRendering.swift`. Widened `private` → file-internal —
+  `internal`, not `package`, because `pickerRow` takes an `internal`
+  `StyleEnvironmentSnapshot` parameter (a `package` function cannot expose an
+  `internal` type).
+- Packet 181: the menu picker style → `PickerMenuStyle.swift`. Zero widening.
+- Packet 182: the inline picker style and its row machinery →
+  `PickerInlineStyle.swift`. Zero widening — `InlinePickerRow` and the three
+  row helpers travel with their only caller and stay `private`.
+- Packet 183: the residual `PickerRendering.swift` (segmented + radio styles)
+  renamed `PickerSegmentedAndRadioStyles.swift`.
+- Packet 184: `CustomLayout.swift` part 1 — placement geometry
+  (`LayoutSubviewPlacementRecord`, `LayoutSubviewPlacementRecorder`,
+  `defaultPlacement`, `placedOrigin`) → `CustomLayoutPlacementGeometry.swift`.
+  Widened `private` → file-internal `internal`. No explicit initializer was
+  needed: an `internal` struct's synthesized memberwise initializer is itself
+  `internal` and preserves the implicit `nil` default for the optional
+  `viewportContext`.
+
+### Lesson: `internal`, not `package`, when a signature already names an `internal` type
+
+A `package` function/type cannot expose an `internal` type in its signature
+(Swift rejects it: "cannot be declared package because its parameter uses an
+internal type"). Packet 180 hit this — `pickerRow` was first written `package`
+but takes an `internal` `StyleEnvironmentSnapshot`. The fix is `internal`,
+which is the correct minimal level anyway: `internal` is module-wide
+cross-file visible, so it fully enables a same-module file split. Reserve
+`package` for symbols that genuinely must cross a module boundary; default
+file-split widenings to `internal`.
+
+Behavior preserved: every moved declaration is byte-identical; only file
+location and access level changed. No public API, fixture, or test changed.
+
+Packet 180-184 validation:
+
+- Per-packet `swiftly run swift build --target SwiftTUIViews` — PASS
+- `swiftly run swift test --filter NonAggregatingViewFixtureTests` (27),
+  `SwiftUISurfaceTests` (188) — PASS
+- `./Scripts/check_public_surface_policies.sh`,
+  `generate_public_api_inventory.sh --check` (669),
+  `check_public_documentation_ratchet.sh` (70), `check_stable_doc_source_paths.sh`
+  — PASS
+- `./Scripts/check_accessibility_guardrails.sh --update` — color-state manifest
+  relabel only (`PickerRendering.swift` → the two new picker files).
+- `bun run test` — PASS.
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-225321-packet180-184.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-225321-89257.log`
+
 ## Failed Attempts
 
 - Packet 173 first attempt tried to extract `NativeTerminalMetrics` from
