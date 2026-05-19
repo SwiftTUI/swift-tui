@@ -2511,8 +2511,13 @@ Revisited-phase batches:
   `CustomLayout.swift` part 1 → `CustomLayoutPlacementGeometry.swift` (4
   `private`→`internal` widenings). No public API (669), fixture, or test
   changed.
-- Batches 185+ (planned): `CustomLayout.swift` part 2, `BoxDrawingRenderer.swift`,
-  `NativeTerminalSurfaceView.swift`.
+- **Batch 185-188** (done): `CustomLayout.swift` part 2 →
+  `CustomLayoutErasure.swift` (type-erasure engine, 7 widenings);
+  `BoxDrawingRenderer.swift` → 3 `+Lines`/`+Blocks`/`+Braille` files (9
+  widenings, all namespaced under the enum). Also corrected a latent
+  over-broad `public import` in `ToolbarStyle.swift`. No public API (669),
+  fixture, or test changed.
+- Batch 189+ (planned): `NativeTerminalSurfaceView.swift`.
 
 ## Risks
 

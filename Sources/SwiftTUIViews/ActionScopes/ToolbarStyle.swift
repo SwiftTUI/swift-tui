@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 // The toolbar style vocabulary.
 //
