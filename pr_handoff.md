@@ -2143,6 +2143,43 @@ Runner log: /tmp/swift-tui-test-gate-20260518-175110-42380.log
 Result: PASS
 ```
 
+## Latest Review Packets: 132-136
+
+This five-packet batch continues the constrained central runtime/core pass.
+Every packet is a behavior-preserving move; no logic was rewritten.
+
+Production scope:
+
+- Packet 132 — test-only pipeline-stage hooks moved out of `SwiftTUI.swift`
+  into `DefaultRenderer+TestingHooks.swift`. Review note: `frameTailCoordinator`
+  and `prepareFrameHead` widened `private` → file-internal.
+- Packet 133 — RunLoop runtime environment-action factories consolidated into
+  `RunLoop+EnvironmentActions.swift` from `RunLoop+ResolveContext.swift` and
+  `Support/ClipboardWriting.swift`; `ClipboardWriting.swift` deleted.
+- Packet 134 — `AnimatableSnapshot` split out of `AnimationModels.swift` into
+  `AnimatableSnapshot.swift`.
+- Packet 135 — `SnapshotRenderer` tree `describe(_:)` formatters split out of
+  `Snapshots.swift` into `SnapshotRenderer+TreeDescriptions.swift` (dropped
+  `private`, matching the existing `+StyleDescriptions` convention).
+- Packet 136 — `Commit/RetainedResolveFrame.swift` renamed to
+  `Commit/LayoutPassContext.swift` to match its contents.
+
+Behavior intentionally preserved:
+
+- Test-hook semantics, environment-action wiring, animatable-slot extraction,
+  snapshot text-fixture output, and layout-pass context behavior are unchanged
+  and covered by focused checks.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-182040-packet132-136.log
+Runner log: /tmp/swift-tui-test-gate-20260518-182040-24464.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict

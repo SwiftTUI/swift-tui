@@ -3282,13 +3282,20 @@ validation logs):
 Rollback: each new file's contents inline back into its source file; delete the
 new file. No call sites changed.
 
-### Batch 132-136
+### Batch 132-136 — COMPLETED
 
-- DefaultRenderer subsystem snapshot and testing hook cleanup.
-- RunLoop reset/focus/clipboard context helper cleanup.
-- Animation completion scheduling call-site refinement.
-- Core resolved-tree debug support review.
-- Final central runtime/core consolidation pass before re-ranking.
+Delivered as five behavior-preserving moves (see `migration_progress.md`):
+
+- Packet 132: DefaultRenderer test-only hooks → `DefaultRenderer+TestingHooks.swift`.
+- Packet 133: RunLoop runtime environment-action factories →
+  `RunLoop+EnvironmentActions.swift` (deleted `ClipboardWriting.swift`).
+- Packet 134: `AnimatableSnapshot` → `AnimatableSnapshot.swift`.
+- Packet 135: SnapshotRenderer tree `describe(_:)` formatters →
+  `SnapshotRenderer+TreeDescriptions.swift`.
+- Packet 136: renamed `RetainedResolveFrame.swift` → `LayoutPassContext.swift`
+  to match its post-Packet-130 contents.
+
+Rollback: revert each new file back into its source; reverse the rename.
 
 ### Batch 137-141
 

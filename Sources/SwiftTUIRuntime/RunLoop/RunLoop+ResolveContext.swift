@@ -1,19 +1,9 @@
 import SwiftTUICore
 import SwiftTUIViews
 
+// Runtime environment-action factories (focus reset, clipboard read/write)
+// live in `RunLoop+EnvironmentActions.swift`.
 extension RunLoop {
-  package func runtimeResetFocusAction() -> ResetFocusAction {
-    ResetFocusAction(
-      snapshotLabel: "ResetFocusAction.runtime",
-      isPlaceholder: false,
-      handler: { [weak scheduler, localDefaultFocusRegistry, rootIdentity] namespace in
-        localDefaultFocusRegistry.requestReset(in: namespace)
-        scheduler?.requestInvalidation(of: [rootIdentity])
-        return true
-      }
-    )
-  }
-
   package func resolveContext(
     for scheduledFrame: ScheduledFrame
   ) -> ResolveContext {
