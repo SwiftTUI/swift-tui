@@ -3189,6 +3189,82 @@ production code outside the central runtime/core — `Sources/SwiftTUIViews`,
 `Platforms/*/Sources` — using the same five-packet-batch SOP and the full repo
 gate. Example apps remain out of scope.
 
+## Packet 152-156 Batch: SwiftTUIViews Decomposition (Other Production Code, Phase 2)
+
+First batch of the other-production-code phase. Scope: `Sources/SwiftTUIViews`.
+All behavior-preserving file extractions; public API unchanged (verified — 669
+top-level public symbols).
+
+- Packet 152: split the four semantic environment actions (`OpenLinkAction`,
+  `ResetFocusAction`, `ClipboardWriteAction`, `ClipboardReadAction`), their
+  `EnvironmentKey`s, and their `EnvironmentValues` accessors out of
+  `Environment.swift` into `EnvironmentActions.swift`.
+- Packet 153: split the resolve-tracking reference types (`ResolveWorkTracker`,
+  `ResolveInvalidationProxy`) out of `Environment.swift` into
+  `ResolveWorkTracking.swift`.
+- Packet 154: split picker selection-tag matching (`OptionalSelectionValue`,
+  `OptionalSelectionMatchable`, the `Optional` conformances,
+  `pickerSelectionMatches`, `pickerSelectionValue`) out of
+  `SelectionAndValueSupport.swift` into `PickerSelectionSupport.swift`.
+- Packet 155: split the popover tip vocabulary (`PopoverTipAction`,
+  `PopoverTip`, `extension PopoverTip`) out of `PopoverPresentation.swift` into
+  `PopoverTip.swift`.
+- Packet 156: split the foundational view protocols (`View`, `ViewNode`,
+  `PrimitiveView`, `ResolvableView`, `DeclaredChildrenView`, and
+  `extension Never: View` / `extension PrimitiveView`) out of
+  `ViewFoundation.swift` into `ViewProtocols.swift`, leaving `Resolver` in
+  place.
+
+Validation-artifact update (Packets 152 & 156):
+
+- `Scripts/check_public_surface_policies.sh` hard-codes the file paths it greps
+  for the `View` protocol and `OpenLinkAction` `@MainActor` guarantees. Moving
+  those declarations required updating the script's paths to
+  `ViewProtocols.swift` and `EnvironmentActions.swift`. The guardrail checks
+  themselves are unchanged — the same invariants are enforced at the new
+  locations, so the guardrail remains fully effective (it is fail-closed).
+
+Behavior preserved:
+
+- Environment action wiring, resolve work/invalidation tracking, picker
+  optional-selection matching, popover tip rendering, and view-protocol
+  conformance dispatch all remained unchanged. No public API, fixture, or test
+  changed.
+
+Packet 152-156 focused validation:
+
+- `swiftly run swift build --target SwiftTUIViews` — PASS (all packets)
+- `swiftly run swift test --filter Phase4ObservationAndEnvironmentTests`,
+  `ImperativeAuthoringContextDispatchTests` (55) — PASS
+- `swiftly run swift test --filter DiagnosticsAndCacheTests`,
+  `LifecycleSelectiveEvaluationTests` (27) — PASS
+- `swiftly run swift test --filter CollectionSupportTests` — PASS
+- `swiftly run swift test --filter PopoverPresentationTests` (8) — PASS
+- `swiftly run swift test --filter ResolvePurityTests`,
+  `AnyViewResilienceTests` (9) — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS (after the path update
+  above)
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols (no public API drift)
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 152-156 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-195632-packet152-156.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-195632-54551.log`
+  - Result: PASS
+
+### Lesson: guardrail scripts hard-code source paths
+
+`Scripts/check_public_surface_policies.sh` greps specific source files for
+public-API invariants. Any packet that *moves* a guarded declaration
+(`View`, `OpenLinkAction`, `Resolver.resolve`, `Scene`, `App`, `Binding.init`,
+`View.task`, `Button` actions, the various `*Style` protocols) must update the
+matching path in that script in the same packet. The script is fail-closed, so
+a missed update fails the batch gate rather than silently passing.
+
 ## Failed Attempts
 
 - Packet 51-53 first full `bun run test` attempt failed in the full
