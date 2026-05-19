@@ -1,4 +1,5 @@
 import Dispatch
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -129,7 +130,7 @@ struct TerminalHostPresentationBatchingTests {
   }
 
   @Test("terminal host queues accessibility cursor focus behind pending presentation")
-  func accessibilityCursorFocusQueuesBehindPendingPresentation() throws {
+  func accessibilityCursorFocusQueuesBehindPendingPresentation() async throws {
     let controller = BlockingPresentationWriteController(isTTY: true)
     let host = TerminalHost(
       inputFileDescriptor: 0,
@@ -145,7 +146,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["ABCD"]
       )
     )
-    controller.waitForBlockedWriteToStart()
+    await controller.waitForBlockedWriteToStart()
 
     try host.presentAccessibilityCursorFocus(at: .init(x: 2, y: 0))
 
@@ -260,7 +261,7 @@ struct TerminalHostPresentationBatchingTests {
   }
 
   @Test("terminal host drops stale pending frames and forces a full repaint on recovery")
-  func droppedPendingFramesForceFullRepaintRecovery() throws {
+  func droppedPendingFramesForceFullRepaintRecovery() async throws {
     let controller = BlockingPresentationWriteController(isTTY: true)
     let host = TerminalHost(
       inputFileDescriptor: 0,
@@ -276,7 +277,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["AAAA"]
       )
     )
-    controller.waitForBlockedWriteToStart()
+    await controller.waitForBlockedWriteToStart()
 
     _ = try host.present(
       RasterSurface(
@@ -318,7 +319,7 @@ struct TerminalHostPresentationBatchingTests {
   @Test(
     "terminal host forces a full repaint immediately when the current submit replaces a queued frame"
   )
-  func replacingQueuedFrameUsesImmediateFullRepaint() throws {
+  func replacingQueuedFrameUsesImmediateFullRepaint() async throws {
     let controller = BlockingPresentationWriteController(
       isTTY: true,
       blocksFirstWrite: false
@@ -346,7 +347,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["BBBB"]
       )
     )
-    controller.waitForBlockedWriteToStart()
+    await controller.waitForBlockedWriteToStart()
 
     _ = try host.present(
       RasterSurface(
@@ -375,7 +376,7 @@ struct TerminalHostPresentationBatchingTests {
   }
 
   @Test("drop recovery full repaints stay synchronized when the terminal supports it")
-  func dropRecoveryFullRepaintsStaySynchronized() throws {
+  func dropRecoveryFullRepaintsStaySynchronized() async throws {
     let controller = BlockingPresentationWriteController(isTTY: true)
     let host = TerminalHost(
       inputFileDescriptor: 0,
@@ -396,7 +397,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["AAAA"]
       )
     )
-    controller.waitForBlockedWriteToStart()
+    await controller.waitForBlockedWriteToStart()
 
     _ = try host.present(
       RasterSurface(
@@ -481,7 +482,13 @@ private final class PresentationWriteCountingController: TerminalControlling {
 
 private final class BlockingPresentationWriteController: TerminalControlling {
   private let isTTYValue: Bool
-  private let blockedWriteStarted = DispatchSemaphore(value: 0)
+  /// Fired (synchronously, from the blocking sync `write`) once the gate has
+  /// entered its blocked state, so the test can await it directly instead of
+  /// blocking a cooperative-pool thread on a semaphore.
+  private let blockedWriteStartedEvent = AsyncEvent()
+  // A genuine *synchronous* thread block: `write` is a sync method that must
+  // stall its own thread until `unblockWrite()`. A semaphore is the correct
+  // primitive — not the async-bridge anti-pattern.
   private let releaseBlockedWrite = DispatchSemaphore(value: 0)
   private let shouldBlockNextWriteStorage: LockedBox<Bool>
   private let writesStorage = LockedBox<[String]>([])
@@ -533,7 +540,7 @@ private final class BlockingPresentationWriteController: TerminalControlling {
     }
 
     if shouldBlockFirstWrite {
-      blockedWriteStarted.signal()
+      blockedWriteStartedEvent.fire()
       // No timeout: the test thread releases this deterministically. A blocking
       // wait without a clock cannot flake under CI load.
       releaseBlockedWrite.wait()
@@ -550,8 +557,8 @@ private final class BlockingPresentationWriteController: TerminalControlling {
     []
   }
 
-  func waitForBlockedWriteToStart() {
-    blockedWriteStarted.wait()
+  func waitForBlockedWriteToStart() async {
+    await blockedWriteStartedEvent.wait()
   }
 
   func armBlockNextWrite() {
