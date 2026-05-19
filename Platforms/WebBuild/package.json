@@ -1,7 +1,7 @@
 {
   "name": "@swifttui/build",
   "version": "0.1.0",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "module": "index.ts",
   "bin": {
     "swifttui-web": "./cli.ts"

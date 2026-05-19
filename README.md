@@ -5,7 +5,7 @@
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI-1E90FF)
 ![Status](https://img.shields.io/badge/status-0.1.0%20alpha-DAA520)
-![License](https://img.shields.io/badge/license-AGPL--3.0--only-3DA639)
+![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
 You author `View`, `Scene`, and `App` values exactly the way you would for
@@ -292,6 +292,6 @@ and the performance-evaluation harness.
 
 ## License
 
-SwiftTUI first-party code is licensed under the GNU Affero General Public
-License v3.0 only (`AGPL-3.0-only`). Vendored third-party code under `Vendor/`
-keeps its own license and provenance notices. See [LICENSE](LICENSE).
+SwiftTUI first-party code is licensed under the MIT License (`MIT`).
+Vendored third-party code under `Vendor/` keeps its own license and
+provenance notices. See [LICENSE](LICENSE).

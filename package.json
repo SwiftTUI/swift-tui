@@ -2,7 +2,7 @@
   "name": "swift-tui-workspace",
   "private": true,
   "version": "0.1.0",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "scripts": {
     "build:wasm": "bun run --cwd Website build:wasm",
     "build:wasm:dev": "bun run --cwd Website build:wasm:dev",
