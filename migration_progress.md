@@ -3504,8 +3504,80 @@ that moves color/glyph/visual-content-bearing code must rerun
 `./Scripts/check_accessibility_guardrails.sh --update` and confirm the diff is
 only relabeled file paths — never a new accessibility risk.**
 
+## Packet 172-174 Batch: Platforms Decomposition (Other Production Code, Phase 2)
+
+Fifth batch of the other-production-code phase. Scope: `Platforms/*/Sources`.
+A three-packet batch — clean, safely-extractable slices in the platform host
+code are scarcer than in the libraries (many platform files are single-file
+units built on `private`/`fileprivate` cohesion), so the batch closed at three
+rather than five.
+
+- Packet 172: split `WebSurfaceInputParser` (the incremental byte/command
+  parser, a `package struct` with purely `private` internals) out of
+  `WebSurfaceInput.swift` into `WebSurfaceInputParser.swift`. Zero widening —
+  the file-level `private` funcs it leaves behind are used only by
+  `WebSurfaceInputReader`.
+- Packet 173: split `TerminalWorkspaceSplitLayout` out of
+  `TerminalWorkspaceView.swift` into `TerminalWorkspaceSplitLayout.swift`. One
+  documented widening: `private struct` → file-internal `struct` so
+  `TerminalWorkspaceNodeView` can still construct it (the `ScrollViewLayout`
+  pattern).
+- Packet 174: split the `App.main()` terminal launch entry points (both
+  `extension App` blocks) and their `exitLaunch` failure path out of
+  `TerminalRunner.swift` into `App+TerminalLaunch.swift`. `exitLaunch` is
+  `private` and travels with its sole caller. The doc ratchet row for
+  `public static func main() async` was repathed to `App+TerminalLaunch.swift`
+  in the same packet.
+
+Behavior preserved:
+
+- Web-surface input parsing, workspace split layout, and terminal app launch
+  are unchanged. No public API, fixture, or test changed.
+
+Packet 172-174 focused validation:
+
+- `swiftly run swift build --target {WASISurfaceBridge,SwiftTUITerminalWorkspace,SwiftTUICLI}`
+  — PASS (per packet)
+- `swiftly run swift test --filter WASISurfaceBridgeTests` (19) — PASS
+- `swiftly run swift test --filter SwiftTUITerminalWorkspaceTests` (8) — PASS
+- `swiftly run swift test --filter SwiftTUICLITests` (50) — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols (no public API drift)
+- `./Scripts/check_public_documentation_ratchet.sh` — PASS, 70 entries (after
+  repathing the `App.main` row)
+- `./Scripts/check_accessibility_guardrails.sh` — PASS
+
+Packet 172-174 batch validation:
+
+- `bun run test`
+  - First attempt FAIL: doc ratchet flagged the moved
+    `public static func main() async` (stale `TerminalRunner.swift` path).
+  - After repathing the ratchet row to `App+TerminalLaunch.swift`:
+    - User tee log: `/tmp/swift-tui-test-gate-20260518-220532-packet172-174.log`
+    - Runner log: `/tmp/swift-tui-test-gate-20260518-220532-9354.log`
+    - Result: PASS
+
+### Lesson: platform host code resists decomposition
+
+The platform host files (`NativeTerminalSurfaceView.swift`,
+`BoxDrawingRenderer.swift`, `WebSurfaceFrameEncoder.swift`) are largely
+single-file units built on `private`/`fileprivate` cohesion — file-private
+platform typealiases (`NativePlatformFont`), `fileprivate` drawing primitives,
+or large `private`-method namespace enums. Extracting from them would require
+widening many declarations at once, which is not behavior-preserving in
+spirit. Per the SOP these are assessed-and-skipped (see Migration Status).
+
 ## Failed Attempts
 
+- Packet 173 first attempt tried to extract `NativeTerminalMetrics` from
+  `NativeTerminalSurfaceView.swift`. The build failed: `NativeTerminalMetrics`
+  stores `NativePlatformFont`, which is a file-private platform-conditional
+  `typealias` (`NSFont`/`UIFont`). Extracting the struct would require widening
+  that typealias (and its macOS/iOS variants). The attempt was reverted —
+  `NativeTerminalSurfaceView.swift` is too entangled for a safe slice — and
+  Packet 173 was redone as the `TerminalWorkspaceSplitLayout` extraction.
 - Packet 157-161 first full `bun run test` attempt failed the "Check public
   documentation ratchet" step: moving `public protocol ToolbarStyle` and the
   two `Default*ToolbarStyle` structs to `ToolbarStyle.swift` left three stale

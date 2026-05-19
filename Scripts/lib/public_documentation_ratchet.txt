@@ -68,7 +68,7 @@ App protocol|Sources/SwiftTUIRuntime/Scenes/App.swift|^public protocol App\b
 Scene protocol|Sources/SwiftTUIRuntime/Scenes/App.swift|^public protocol Scene\b
 WindowGroup scene|Sources/SwiftTUIRuntime/Scenes/App.swift|^public struct WindowGroup\b
 TerminalRunner entrypoint|Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift|^public enum TerminalRunner\b
-TerminalRunner App main|Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift|^\s*public static func main\(\) async\b
+TerminalRunner App main|Platforms/CLI/Sources/SwiftTUICLI/App+TerminalLaunch.swift|^\s*public static func main\(\) async\b
 WASIRunner entrypoint|Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift|^public enum WASIRunner\b
 WASIRunner App main|Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift|^\s*public static func main\(\) async throws\b
 WebHostRunner entrypoint|Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift|^public enum WebHostRunner\b
