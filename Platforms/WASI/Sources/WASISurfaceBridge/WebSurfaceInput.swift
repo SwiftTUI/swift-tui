@@ -18,12 +18,14 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
       let controlHandler = self.controlHandler
       let task = Task.detached {
         var parser = WebSurfaceInputParser()
+        var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
           var buffer = Array(repeating: UInt8(0), count: 512)
           let bytesRead = unsafe webSurfaceRead(fileDescriptor, &buffer, buffer.count)
 
           if bytesRead > 0 {
+            backoff.recordInput()
             let chunk = Array(buffer.prefix(Int(bytesRead)))
             let parsed = parser.feed(chunk)
             for controlMessage in parsed.controlMessages {
@@ -37,7 +39,8 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
           }
 
           if bytesRead < 0, webSurfaceErrnoIsWouldBlock(webSurfaceErrno) {
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
+            backoff.recordIdlePoll()
             continue
           }
 
