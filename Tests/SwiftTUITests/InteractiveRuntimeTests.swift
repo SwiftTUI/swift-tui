@@ -1444,13 +1444,10 @@ struct InteractiveRuntimeTests {
     var committedDismissalFrame: RunLoopProgressEvent?
     while committedDismissalFrame == nil {
       let minimumSequence = nextProgressSequence
-      let event = try await valueWithTimeout(
-        "toast auto-dismiss frame",
-        timeoutNanoseconds: 30_000_000_000
-      ) {
-        await progressProbe.frameCommitted { event in
-          event.sequence >= minimumSequence
-        }
+      // `frameCommitted` is itself the awaitable signal — it suspends until a
+      // committed frame matches the predicate, so no timeout wrapper is needed.
+      let event = await progressProbe.frameCommitted { event in
+        event.sequence >= minimumSequence
       }
       nextProgressSequence = event.sequence &+ 1
       if terminal.frames.count >= 2,
@@ -2597,17 +2594,14 @@ struct InteractiveRuntimeTests {
       )
     }
 
-    let didRenderInitialFrame = try await waitUntil(timeoutNanoseconds: 15_000_000_000) {
-      !terminal.visibleFrames.isEmpty
-    }
-    #expect(didRenderInitialFrame)
+    await terminal.frameSignal.wait { !terminal.visibleFrames.isEmpty }
 
     let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
     for _ in 0..<12 {
       try writeAllBytes(scrollBytes, to: writeDescriptor)
     }
 
-    let scrollBurstBecameVisible = try await waitUntil {
+    await terminal.frameSignal.wait {
       positionBox.value.y >= 10
         && (terminal.visibleFrames.last ?? "").contains("Gallery row 5")
     }
@@ -2615,14 +2609,7 @@ struct InteractiveRuntimeTests {
     let frameAfterScrollBurst = terminal.visibleFrames.last ?? ""
     let positionAfterScrollBurst = positionBox.value
 
-    let clickBytes = sgrPrimaryClick(at: .init(x: 1, y: 1))
-    let frameCountBeforeClick = terminal.visibleFrames.count
-    try writeAllBytes(clickBytes, to: writeDescriptor)
-    _ = try? await waitUntil(timeoutNanoseconds: 500_000_000) {
-      terminal.visibleFrames.count > frameCountBeforeClick
-    }
-
-    let frameAfterClick = terminal.visibleFrames.last ?? ""
+    try writeAllBytes(sgrPrimaryClick(at: .init(x: 1, y: 1)), to: writeDescriptor)
 
     _ = close(writeDescriptor)
     didCloseWriteDescriptor = true
@@ -2632,11 +2619,11 @@ struct InteractiveRuntimeTests {
     _ = close(readDescriptor)
     didCloseReadDescriptor = true
 
+    // The session has drained every byte, including the click, so the final
+    // recorded frame reflects the post-click state deterministically.
+    let frameAfterClick = terminal.visibleFrames.last ?? ""
+
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
-    #expect(
-      scrollBurstBecameVisible,
-      "the scroll burst should be observable before the follow-up click"
-    )
     #expect(positionAfterScrollBurst.y >= 10)
     #expect(
       frameAfterScrollBurst.contains("Gallery row 5"),
@@ -2691,17 +2678,14 @@ struct InteractiveRuntimeTests {
       )
     }
 
-    let didRenderInitialFrame = try await waitUntil(timeoutNanoseconds: 15_000_000_000) {
-      !terminal.visibleFrames.isEmpty
-    }
-    #expect(didRenderInitialFrame)
+    await terminal.frameSignal.wait { !terminal.visibleFrames.isEmpty }
 
     let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
     for _ in 0..<12 {
       inputReader.send(scrollBytes)
     }
 
-    let scrollBurstBecameVisible = try await waitUntil {
+    await terminal.frameSignal.wait {
       positionBox.value.y >= 10
         && (terminal.visibleFrames.last ?? "").contains("Gallery row 5")
     }
@@ -2709,22 +2693,16 @@ struct InteractiveRuntimeTests {
     let frameAfterScrollBurst = terminal.visibleFrames.last ?? ""
     let positionAfterScrollBurst = positionBox.value
 
-    let frameCountBeforeClick = terminal.visibleFrames.count
     inputReader.send(sgrPrimaryClick(at: .init(x: 1, y: 1)))
-    _ = try? await waitUntil(timeoutNanoseconds: 500_000_000) {
-      terminal.visibleFrames.count > frameCountBeforeClick
-    }
-
-    let frameAfterClick = terminal.visibleFrames.last ?? ""
 
     inputReader.finish()
     let result = try await runTask.value
 
+    // The session has drained every byte, including the click, so the final
+    // recorded frame reflects the post-click state deterministically.
+    let frameAfterClick = terminal.visibleFrames.last ?? ""
+
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
-    #expect(
-      scrollBurstBecameVisible,
-      "the injected-input scroll burst should be observable before the follow-up click"
-    )
     #expect(positionAfterScrollBurst.y >= 10)
     #expect(
       frameAfterScrollBurst.contains("Gallery row 5"),
@@ -3593,7 +3571,9 @@ private final class RecordingTerminalHost: PresentationSurface {
   }
 }
 
-private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwarePresentationSurface
+private final class DamageRecordingTerminalHost: PresentationSurface,
+  DamageAwarePresentationSurface,
+  Sendable
 {
   var surfaceSize: CellSize {
     surfaceSizeProvider()
@@ -3607,10 +3587,14 @@ private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwar
     state.value.presentationMetrics
   }
   private let state = LockedBox(DamageRecordingTerminalHostState())
-  private let surfaceSizeProvider: () -> CellSize
+  private let surfaceSizeProvider: @Sendable () -> CellSize
+
+  /// Fires after every `present`, so tests can `await` a frame condition
+  /// directly instead of polling `visibleFrames` under a timeout.
+  let frameSignal = ConditionSignal()
 
   init(
-    surfaceSizeProvider: @escaping () -> CellSize = { InteractiveDemoLayout.frameSize },
+    surfaceSizeProvider: @escaping @Sendable () -> CellSize = { InteractiveDemoLayout.frameSize },
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -3634,7 +3618,7 @@ private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwar
     _ surface: RasterSurface,
     damage: PresentationDamage?
   ) throws -> TerminalPresentationMetrics {
-    state.withLock { state in
+    let presentedMetrics = state.withLock { state in
       let renderer = TerminalSurfaceRenderer(
         capabilityProfile: capabilityProfile
       )
@@ -3743,6 +3727,8 @@ private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwar
       state.presentationMetrics.append(metrics)
       return metrics
     }
+    frameSignal.notify()
+    return presentedMetrics
   }
 
   func write(_: String) throws {}
