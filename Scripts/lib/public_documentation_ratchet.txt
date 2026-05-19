@@ -39,12 +39,12 @@ AutomaticOutlineStyle built-in|Sources/SwiftTUIViews/Collections/OutlineStyles.s
 RoundedOutlineStyle built-in|Sources/SwiftTUIViews/Collections/OutlineStyles.swift|^public struct RoundedOutlineStyle\b
 PlainOutlineStyle built-in|Sources/SwiftTUIViews/Collections/OutlineStyles.swift|^public struct PlainOutlineStyle\b
 ASCIIOutlineStyle built-in|Sources/SwiftTUIViews/Collections/OutlineStyles.swift|^public struct ASCIIOutlineStyle\b
-TabViewStyle protocol|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public protocol TabViewStyle\b
-AnyTabViewStyle eraser|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct AnyTabViewStyle\b
-AutomaticTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct AutomaticTabViewStyle\b
-UnderlineTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct UnderlineTabViewStyle\b
-LiteralTabsTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct LiteralTabsTabViewStyle\b
-PowerlineTabViewStyle built-in|Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift|^public struct PowerlineTabViewStyle\b
+TabViewStyle protocol|Sources/SwiftTUIViews/TabViews/TabViewStyles.swift|^public protocol TabViewStyle\b
+AnyTabViewStyle eraser|Sources/SwiftTUIViews/TabViews/TabViewStyles.swift|^public struct AnyTabViewStyle\b
+AutomaticTabViewStyle built-in|Sources/SwiftTUIViews/TabViews/TabViewStyles.swift|^public struct AutomaticTabViewStyle\b
+UnderlineTabViewStyle built-in|Sources/SwiftTUIViews/TabViews/TabViewStyles.swift|^public struct UnderlineTabViewStyle\b
+LiteralTabsTabViewStyle built-in|Sources/SwiftTUIViews/TabViews/TabViewStyles.swift|^public struct LiteralTabsTabViewStyle\b
+PowerlineTabViewStyle built-in|Sources/SwiftTUIViews/TabViews/TabViewStyles.swift|^public struct PowerlineTabViewStyle\b
 ToastStyle protocol|Sources/SwiftTUIViews/Presentation/ToastPresentation.swift|^public protocol ToastStyle\b
 AnyToastStyle eraser|Sources/SwiftTUIViews/Presentation/ToastPresentation.swift|^public struct AnyToastStyle\b
 InfoToastStyle built-in|Sources/SwiftTUIViews/Presentation/ToastPresentation.swift|^public struct InfoToastStyle\b
@@ -54,8 +54,8 @@ DangerToastStyle built-in|Sources/SwiftTUIViews/Presentation/ToastPresentation.s
 TextField control|Sources/SwiftTUIViews/Controls/ValueControls.swift|^public struct TextField\b
 TextEditor control|Sources/SwiftTUIViews/Input/TextEditor.swift|^public struct TextEditor\b
 SecureField control|Sources/SwiftTUIViews/Input/SecureField.swift|^public struct SecureField\b
-Tab declaration view|Sources/SwiftTUIViews/NavigationViews/Tab.swift|^public struct Tab\b
-TabView control|Sources/SwiftTUIViews/NavigationViews/TabView.swift|^public struct TabView\b
+Tab declaration view|Sources/SwiftTUIViews/TabViews/Tab.swift|^public struct Tab\b
+TabView control|Sources/SwiftTUIViews/TabViews/TabView.swift|^public struct TabView\b
 NavigationStack control|Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift|^public struct NavigationStack\b
 alert modifier|Sources/SwiftTUIViews/Presentation/PromptPresentationEntrypoints.swift|^\s*public func alert\b
 confirmationDialog modifier|Sources/SwiftTUIViews/Presentation/PromptPresentationEntrypoints.swift|^\s*public func confirmationDialog\b

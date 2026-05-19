@@ -117,7 +117,7 @@ Sources/
                        Runtime, Content, Support  + SwiftTUICore.docc
   SwiftTUIViews/       Foundation, ViewBuilder, Primitives, Controls, Stacks,
                        Layout, State, Focus, Gestures, Collections, Modifiers,
-                       NavigationViews, Presentation, ScrollView, Shapes,
+                       NavigationViews, TabViews, Presentation, ScrollView, Shapes,
                        Animation, Environment, GeometryReading  + .docc
   SwiftTUIRuntime/     RunLoop, Rendering, Scenes, Terminal, Lifecycle, Input,
                        Accessibility, Configuration, Diagnostics  + .docc
