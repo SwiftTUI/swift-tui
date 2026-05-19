@@ -3369,6 +3369,29 @@ moved `View` protocol and `OpenLinkAction` declarations.
 Rollback: revert each new file back into its source file; restore the two
 guardrail-script paths.
 
+### Batch 157-161 — COMPLETED (SwiftTUIViews)
+
+Five behavior-preserving moves (see `migration_progress.md` for validation
+logs):
+
+- Packet 157: authoring-context infrastructure →
+  `State/AuthoringContext.swift`.
+- Packet 158: layout modifier implementation types →
+  `Modifiers/ViewLayoutModifierTypes.swift`.
+- Packet 159: navigation-destination preference plumbing →
+  `NavigationViews/NavigationDestinationPreferences.swift`.
+- Packet 160: `ScrollViewLayout` → `ScrollView/ScrollViewLayout.swift`
+  (one documented `private` → file-internal widening on `ScrollViewLayout`).
+- Packet 161: toolbar style vocabulary → `ActionScopes/ToolbarStyle.swift`.
+
+Packet 161 also updated two path-pinned guardrails to follow the moved
+`ToolbarStyle` declaration: `Scripts/check_public_surface_policies.sh` and the
+three `ToolbarStyle`-related rows in `Scripts/lib/public_documentation_ratchet.txt`.
+
+Rollback: revert each new file back into its source file; reverse the
+`ScrollViewLayout` access widening; restore the guardrail-script and
+doc-ratchet paths.
+
 Future `SwiftTUIViews`/`SwiftTUICharts`/platform batches will be planned as
 they are reached.
 
