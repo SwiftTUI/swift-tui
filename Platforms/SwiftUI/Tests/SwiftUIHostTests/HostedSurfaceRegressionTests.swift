@@ -1,6 +1,5 @@
 import SwiftTUI
 @_spi(Runners) import SwiftTUIRuntime
-@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftUIHost
@@ -23,18 +22,14 @@ struct HostedSurfaceRegressionTests {
       session.stop()
     }
 
-    let initial = try await valueWithTimeout("initial button frame") {
-      await surface.waitForSurface { surface in
-        surface.renderedText.contains("Press")
-      }
+    let initial = await surface.waitForSurface { surface in
+      surface.renderedText.contains("Press")
     }
 
     session.send(.mouse(.init(kind: .down(.primary), location: .init(x: 1, y: 0))))
 
-    let pressed = try await valueWithTimeout("pressed button frame") {
-      await surface.waitForSurface { surface in
-        surface != initial && surface.renderedText.contains("Press")
-      }
+    let pressed = await surface.waitForSurface { surface in
+      surface != initial && surface.renderedText.contains("Press")
     }
 
     #expect(pressed.lines == initial.lines)
@@ -60,21 +55,17 @@ struct HostedSurfaceRegressionTests {
       session.stop()
     }
 
-    let initial = try await valueWithTimeout("initial scroll frame") {
-      await surface.waitForSurface { surface in
-        surface.renderedText.contains("Row 0")
-          && surface.renderedText.contains("Row 1")
-      }
+    let initial = await surface.waitForSurface { surface in
+      surface.renderedText.contains("Row 0")
+        && surface.renderedText.contains("Row 1")
     }
 
     session.send(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: .init(x: 1, y: 1))))
 
-    let scrolled = try await valueWithTimeout("scrolled frame") {
-      await surface.waitForSurface { surface in
-        surface != initial
-          && !surface.renderedText.contains("Row 0")
-          && surface.renderedText.contains("Row 3")
-      }
+    let scrolled = await surface.waitForSurface { surface in
+      surface != initial
+        && !surface.renderedText.contains("Row 0")
+        && surface.renderedText.contains("Row 3")
     }
 
     #expect(scrolled != initial)
@@ -98,20 +89,16 @@ struct HostedSurfaceRegressionTests {
       session.stop()
     }
 
-    _ = try await valueWithTimeout("initial animation frame") {
-      await surface.waitForSurface { surface in
-        surface.markerColumn == 0
-      }
+    _ = await surface.waitForSurface { surface in
+      surface.markerColumn == 0
     }
 
     session.send(.mouse(.init(kind: .down(.primary), location: .init(x: 1, y: 0))))
     session.send(.mouse(.init(kind: .up(.primary), location: .init(x: 1, y: 0))))
 
-    let frames: [SemanticHostFrame] = try await valueWithTimeout("animated marker positions") {
-      await surface.waitForFrames { frames in
-        let markerColumns = Set(frames.compactMap(\.raster.markerColumn))
-        return markerColumns.count >= 3 && Set([0, 8]).isSubset(of: markerColumns)
-      }
+    let frames: [SemanticHostFrame] = await surface.waitForFrames { frames in
+      let markerColumns = Set(frames.compactMap(\.raster.markerColumn))
+      return markerColumns.count >= 3 && Set([0, 8]).isSubset(of: markerColumns)
     }
     let markerColumns = Set(frames.compactMap(\.raster.markerColumn))
 
@@ -138,10 +125,8 @@ struct HostedSurfaceRegressionTests {
       session.stop()
     }
 
-    _ = try await valueWithTimeout("initial fractional drag frame") {
-      await surface.waitForSurface { surface in
-        surface.renderedText.contains("drag idle")
-      }
+    _ = await surface.waitForSurface { surface in
+      surface.renderedText.contains("drag idle")
     }
 
     let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
@@ -170,10 +155,8 @@ struct HostedSurfaceRegressionTests {
       )
     )
 
-    _ = try await valueWithTimeout("fractional drag update") {
-      await surface.waitForSurface { surface in
-        surface.renderedText.contains("drag 175:50")
-      }
+    _ = await surface.waitForSurface { surface in
+      surface.renderedText.contains("drag 175:50")
     }
 
     _ = try await session.stopAndWait()
