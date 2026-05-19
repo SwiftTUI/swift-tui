@@ -511,8 +511,8 @@ struct InteractiveRuntimeTests {
       for _ in 0..<20 {
         try writeAllBytes(scrollSequence, to: writeDescriptor)
         // Keep writes staggered but still well inside the 1 ms flush window.
-        // Task.sleep() was coarse enough on some runners to miss coalescing
-        // entirely and turn this into a scheduler test instead.
+        // A cooperative async sleep was coarse enough on some runners to miss
+        // coalescing entirely and turn this into a scheduler test instead.
         usleep(50)
       }
     }
@@ -4194,6 +4194,10 @@ private final class RuntimeLifecycleRecorder: Sendable {
 
   private let state = LockedBox(State())
 
+  /// Notified after every recorded event, so `waitForEvent` resumes the
+  /// instant its event lands instead of polling under a timeout.
+  private let eventSignal = ConditionSignal()
+
   private(set) var appearCountsAtPresent: [Int] {
     get { state.value.appearCountsAtPresent }
     set { state.withLock { $0.appearCountsAtPresent = newValue } }
@@ -4206,6 +4210,7 @@ private final class RuntimeLifecycleRecorder: Sendable {
 
   func record(_ event: String) {
     state.withLock { $0.orderedEvents.append(event) }
+    eventSignal.notify()
   }
 
   func recordAppearCountAtPresent() {
@@ -4219,27 +4224,20 @@ private final class RuntimeLifecycleRecorder: Sendable {
     state.withLock { $0.orderedEvents.filter { $0.hasPrefix(prefix) } }
   }
 
-  func waitForEvent(
-    _ event: String,
-    timeoutNanoseconds: UInt64 = 1_000_000_000
-  ) async -> Bool {
-    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
-    while DispatchTime.now().uptimeNanoseconds < deadline {
-      if contains(event) {
-        return true
-      }
-      try? await Task.sleep(nanoseconds: 10_000_000)
-    }
-    return false
+  /// Suspends until `event` has been recorded, re-evaluated only on each
+  /// `record` (`eventSignal.notify()`) rather than on a clock. Always returns
+  /// `true`: a never-recorded event leaves the caller suspended (a hang the
+  /// CI job timeout surfaces) rather than failing on a wall-clock budget.
+  func waitForEvent(_ event: String) async -> Bool {
+    await eventSignal.wait(until: { self.contains(event) })
+    return true
   }
 
   func runUntilCancelled(
     identity: Identity
   ) async {
     record("taskStart:\(identity)")
-    while !Task.isCancelled {
-      try? await Task.sleep(nanoseconds: 10_000_000)
-    }
+    await parkUntilCancelled()
     record("taskCancel:\(identity)")
   }
 
@@ -4247,10 +4245,15 @@ private final class RuntimeLifecycleRecorder: Sendable {
     label: String
   ) async {
     record("taskStart:\(label)")
-    while !Task.isCancelled {
-      try? await Task.sleep(nanoseconds: 10_000_000)
-    }
+    await parkUntilCancelled()
     record("taskCancel:\(label)")
+  }
+
+  /// Suspends until the surrounding task is cancelled. `AsyncEvent.wait()` is
+  /// cancellation-aware, so a never-fired event parks the task with no poll
+  /// loop and resumes the instant cancellation arrives.
+  private func parkUntilCancelled() async {
+    await AsyncEvent().wait()
   }
 
   private func contains(_ event: String) -> Bool {
