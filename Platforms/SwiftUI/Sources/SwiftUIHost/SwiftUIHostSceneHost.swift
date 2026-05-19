@@ -29,6 +29,11 @@ public final class SwiftUIHostSceneHost {
   @ObservationIgnored
   private var latestSemanticHostFrameSequence: UInt64?
 
+  /// Test-only hook fired after every applied frame, so a test can await a
+  /// frame condition on a poll-free signal instead of polling under a timeout.
+  @ObservationIgnored
+  var onFrameForTesting: (@MainActor () -> Void)?
+
   public init<A: SwiftTUIRuntime.App>(
     app: A,
     descriptor: SwiftUIHostSceneDescriptor,
@@ -158,6 +163,7 @@ public final class SwiftUIHostSceneHost {
     NativeAccessibilityAnnouncementPoster.post(
       accessibilityAnnouncer.announcements(for: frame.semantics)
     )
+    onFrameForTesting?()
   }
 
   private func updateFocusPresentation(

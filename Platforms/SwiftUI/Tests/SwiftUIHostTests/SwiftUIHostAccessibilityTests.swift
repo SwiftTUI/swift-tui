@@ -17,17 +17,14 @@ struct SwiftUIHostAccessibilityTests {
       style: .default
     )
 
+    let frameSignal = MainActorConditionSignal()
+    host.onFrameForTesting = { frameSignal.notify() }
     host.start()
     defer {
       host.stop()
     }
 
-    try await waitUntil(
-      "semantic snapshot",
-      lastObservation: {
-        host.latestSurface?.renderedText ?? "<no surface>"
-      }
-    ) {
+    await frameSignal.wait {
       host.latestSurface?.renderedText.contains("Host") == true
         && host.latestSemanticSnapshot?.accessibilityNodes.contains {
           $0.label == "Host action"
@@ -63,18 +60,14 @@ struct SwiftUIHostAccessibilityTests {
       style: .default
     )
 
+    let frameSignal = MainActorConditionSignal()
+    host.onFrameForTesting = { frameSignal.notify() }
     host.start()
     defer {
       host.stop()
     }
 
-    try await waitUntil(
-      "visible semantic snapshot",
-      lastObservation: {
-        let labels = host.latestSemanticSnapshot?.accessibilityNodes.compactMap(\.label) ?? []
-        return "labels=\(labels)"
-      }
-    ) {
+    await frameSignal.wait {
       host.latestSemanticSnapshot?.accessibilityNodes.contains {
         $0.label == "Visible action"
       } == true
