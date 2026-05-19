@@ -3453,31 +3453,47 @@ platform typealiases.
 Rollback: revert each new file back into its source file; reverse the
 `TerminalWorkspaceSplitLayout` widening; restore the doc-ratchet path.
 
-## Migration Status — Substantially Complete
+## Revisited Phase — Splitting Previously-Skipped Files
 
-The cleanly-decomposable production code has been decomposed across 174
-behavior-preserving packets (1-151 central runtime/core; 152-174 other
-production code). The remaining large files were assessed and are
-**deliberately skipped** as too entangled for a safe behavior-preserving
-slice (single-file `private`/`fileprivate` cohesion):
+After packet 174 the migration was paused with seven large files skipped as
+"too entangled". The task owner then authorized visibility adjustments where
+they improve maintainability. Each file was re-analyzed (one read-only
+analysis agent per file, reviewed against a widening-cost rubric). Verdicts:
 
-- `Sources/SwiftTUIViews/Layout/CustomLayout.swift` — `fileprivate` init and
-  members across the `AnyLayout` box machinery.
-- `Sources/SwiftTUIViews/NavigationViews/BuiltinTabViewStyles.swift` —
-  dense web of cross-calling `private` style item views and chrome functions.
-- `Sources/SwiftTUIViews/Controls/SelectionAndValueSupport.swift` — the
-  `private` value-formatting cluster is called from many file-internal sites.
-- `Sources/SwiftTUIViews/Controls/PickerRendering.swift` — interleaved
-  `private` picker-style bodies and rendering helpers.
-- `Platforms/SwiftUI/Sources/SwiftUIHost/NativeTerminalSurfaceView.swift` —
-  file-private platform-conditional typealiases (`NativePlatformFont`).
-- `Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer.swift` —
-  `fileprivate` drawing primitives shared across the enum and its extensions.
-- `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceFrameEncoder.swift` —
-  a large `private`-method namespace enum with dense internal cross-calls.
+- **Split** — `SelectionAndValueSupport.swift` (packets 175-178),
+  `WebSurfaceFrameEncoder.swift` (179), `PickerRendering.swift`,
+  `BoxDrawingRenderer.swift`, `NativeTerminalSurfaceView.swift`,
+  `CustomLayout.swift`. Each split uses only documented low-cost widening:
+  typealiases (an alias leaks no abstraction), or members that stay
+  namespaced under their type/enum, widened to `package` (hidden from API
+  consumers) or — in `Platforms` host modules — `internal`.
+- **Keep skipped** — `BuiltinTabViewStyles.swift`. The only viable split
+  (public `TabViewStyle` conformances vs. the private rendering engine)
+  leaves a ~540-line still-entangled engine file and requires HIGH-cost
+  free-symbol widenings (bare glyph constants, loose layout helpers). It does
+  not yield two conceptually-focused comparable files — the rubric's
+  net-negative case. The dense `private` web is also a verified correctness
+  guarantee (no external caller exists). This skip is now backed by a
+  detailed analysis rather than a quick judgment.
 
-Splitting any of these would require widening many declarations at once,
-which the migration treats as outside the behavior-preserving bar.
+### Batch 175-179 — COMPLETED
+
+- Packets 175-178: `SelectionAndValueSupport.swift` → `ControlValueMath.swift`,
+  `BoundSelectionSupport.swift`, `ControlFocusRowSupport.swift`; residual
+  renamed `PointerRouteView.swift`. Zero widening.
+- Packet 179: `WebSurfaceFrameEncoder.swift` → `WebSurfaceImageEncoder.swift`
+  (image-encoding cluster); 3 `private`→`package` widenings on namespace-enum
+  `static` members.
+
+Rollback: revert each new file into its source; reverse the rename and the
+three `WebSurfaceFrameEncoder` widenings; rerun
+`check_accessibility_guardrails.sh --update`.
+
+### Batches 180+ — planned
+
+`PickerRendering.swift`, `BoxDrawingRenderer.swift`,
+`NativeTerminalSurfaceView.swift`, and `CustomLayout.swift` remain; each has a
+reviewed packet plan.
 
 ## Human Checkpoints
 

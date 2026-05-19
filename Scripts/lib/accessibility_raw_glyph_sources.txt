@@ -47,9 +47,10 @@ Sources/SwiftTUICore/Styling/CollectionStylePresentations.swift
 Sources/SwiftTUICore/Styling/TileStyle.swift
 Sources/SwiftTUIRuntime/Terminal/TerminalCellTextRenderer.swift
 Sources/SwiftTUIRuntime/Terminal/TerminalImageFallbackRendering.swift
+Sources/SwiftTUIViews/Controls/ControlFocusRowSupport.swift
+Sources/SwiftTUIViews/Controls/ControlValueMath.swift
 Sources/SwiftTUIViews/Controls/MetricTrackSupport.swift
 Sources/SwiftTUIViews/Controls/ProgressView.swift
-Sources/SwiftTUIViews/Controls/SelectionAndValueSupport.swift
 Sources/SwiftTUIViews/Controls/Spinner.swift
 Sources/SwiftTUIViews/Controls/Stepper.swift
 Sources/SwiftTUIViews/Controls/ValueControls.swift

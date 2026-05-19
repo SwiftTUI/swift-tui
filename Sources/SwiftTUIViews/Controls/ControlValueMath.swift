@@ -1,4 +1,18 @@
-package import SwiftTUICore
+import SwiftTUICore
+
+// Control value math: the `AdjustableControlValue` abstraction and its helpers.
+//
+// `AdjustableControlValue` is the numeric abstraction behind `Stepper`,
+// `Slider`, and other value controls — `Int` and `Double` conform. The free
+// functions clamp, step, and snap values, derive a slider value from a pointer
+// location, and render a compact slider track. The `private` block at the end
+// is the `Double`-only display-string machinery: it rounds a value to the
+// fewest decimal places that still round-trips within tolerance, then trims
+// trailing zeros.
+//
+// Split out of `SelectionAndValueSupport.swift`. The `private` formatting
+// cluster travels here with its only callers (the `Double` conformance and the
+// slider helpers) — so it stays `private` with zero access widening.
 
 protocol AdjustableControlValue: Comparable, SignedNumeric, Sendable {
   init(_ value: Int)
@@ -435,174 +449,4 @@ private func fixedControlString(
     ? String(repeating: "0", count: precision - fractionText.count) + fractionText
     : fractionText
   return "\(isNegative ? "-" : "")\(whole).\(paddedFraction)"
-}
-
-@MainActor
-func setBoundSelection<SelectionValue: Hashable>(
-  _ binding: Binding<SelectionValue>,
-  to tag: SelectionTag
-) -> Bool {
-  guard let nextSelection = pickerSelectionValue(from: tag, as: SelectionValue.self) else {
-    return false
-  }
-  if binding.wrappedValue != nextSelection {
-    binding.wrappedValue = nextSelection
-  }
-  return true
-}
-
-@MainActor
-func stepBoundSelection<SelectionValue: Hashable>(
-  _ binding: Binding<SelectionValue>,
-  orderedTags: [SelectionTag],
-  delta: Int
-) -> Bool {
-  guard let direction = delta == 0 ? nil : delta.signum(),
-    !orderedTags.isEmpty
-  else {
-    return false
-  }
-
-  let currentIndex =
-    orderedTags.firstIndex { tag in
-      pickerSelectionMatches(tag, selection: binding.wrappedValue)
-    }
-    ?? (direction > 0 ? -1 : orderedTags.count)
-  let nextIndex = min(
-    max(currentIndex + delta, 0),
-    orderedTags.count - 1
-  )
-  guard nextIndex != currentIndex else {
-    return false
-  }
-
-  return setBoundSelection(
-    binding,
-    to: orderedTags[nextIndex]
-  )
-}
-
-package let controlFocusRailGlyph = "▌"
-
-@MainActor
-@ViewBuilder
-package func controlFocusRail(
-  isVisible: Bool,
-  style: AnyShapeStyle,
-  inactiveStyle: AnyShapeStyle = AnyShapeStyle(.background),
-  reservesSpaceWhenHidden: Bool = false
-) -> some View {
-  if isVisible {
-    Text(controlFocusRailGlyph)
-      .foregroundStyle(style)
-  } else if reservesSpaceWhenHidden {
-    Text(String(repeating: " ", count: controlFocusRailGlyph.count))
-      .foregroundStyle(inactiveStyle)
-  }
-}
-
-@MainActor
-@ViewBuilder
-package func highlightedControlRow<Row: View>(
-  _ row: Row,
-  isHighlighted: Bool,
-  backgroundStyle: AnyShapeStyle
-) -> some View {
-  if isHighlighted {
-    row.background {
-      Rectangle().fill(backgroundStyle)
-    }
-  } else {
-    row
-  }
-}
-
-@MainActor
-package func controlFocusRow<Content: View>(
-  showsRail: Bool,
-  railStyle: AnyShapeStyle,
-  isHighlighted: Bool,
-  backgroundStyle: AnyShapeStyle,
-  inactiveRailStyle: AnyShapeStyle = AnyShapeStyle(.background),
-  reservesRailSpaceWhenHidden: Bool = false,
-  spacing: Int = 1,
-  @ViewBuilder content: () -> Content
-) -> some View {
-  highlightedControlRow(
-    HStack(alignment: .center, spacing: spacing) {
-      if showsRail || reservesRailSpaceWhenHidden {
-        controlFocusRail(
-          isVisible: showsRail,
-          style: railStyle,
-          inactiveStyle: inactiveRailStyle,
-          reservesSpaceWhenHidden: reservesRailSpaceWhenHidden
-        )
-      }
-      content()
-    },
-    isHighlighted: isHighlighted,
-    backgroundStyle: backgroundStyle
-  )
-}
-
-@MainActor
-package func textEditorBody(
-  displayText: String,
-  displayRuns: [TextInputDisplayRun]? = nil,
-  ownerIdentity: Identity? = nil,
-  caretAnchor: CellPoint? = nil,
-  chrome: ControlChrome,
-  scrollPosition: Binding<ScrollPosition>,
-  focusActive: Bool = false
-) -> some View {
-  ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
-    VStack(alignment: .leading, spacing: 0) {
-      TextInputContent(
-        displayText: displayText,
-        displayRuns: displayRuns,
-        ownerIdentity: ownerIdentity,
-        caretAnchor: caretAnchor
-      )
-      .fixedSize(horizontal: false, vertical: true)
-      .foregroundStyle(chrome.foregroundStyle)
-      .drawMetadata(.init(opacity: chrome.opacity))
-    }
-    .padding(.init(horizontal: 1, vertical: 1))
-  }
-  .focusable(false)
-  .background {
-    RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
-  }
-  .overlay {
-    RoundedRectangle(cornerRadius: 1).strokeBorder(
-      chrome.borderStyle,
-      style: focusActive ? .heavy : .init(),
-      background: chrome.borderBackgroundStyle
-    )
-  }
-  .layoutMetadata(.init(minimumHeight: 3))
-}
-
-struct PointerRouteView<Content: View>: PrimitiveView, ResolvableView {
-  var identity: Identity
-  var content: Content
-
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let wrapperContext = context.replacingIdentity(with: identity)
-    let child = content.resolve(
-      in: wrapperContext.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: identity,
-        kind: .view("PointerRoute"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        semanticMetadata: .init(participatesInPointerHitTesting: true)
-      )
-    ]
-  }
 }

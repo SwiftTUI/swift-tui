@@ -2490,13 +2490,24 @@ Result: PASS
 
 ## Migration Status
 
-The production-code humanization is substantially complete: 174
-behavior-preserving packets (1-151 central runtime/core; 152-174 other
-production code under `SwiftTUIViews`, `SwiftTUICharts`, and `Platforms`).
-The remaining large files are documented in `migration_plan.md` as
-deliberately skipped — they are single-file units built on `private` /
-`fileprivate` cohesion, and a safe behavior-preserving slice is not available
-without widening many declarations at once.
+The production-code humanization ran through 174 behavior-preserving packets
+(1-151 central runtime/core; 152-174 other production code). A **revisited
+phase** then followed: the task owner authorized visibility adjustments where
+they improve maintainability, and the seven previously-skipped large files
+were re-analyzed (one read-only analysis agent each). Six are being split with
+documented low-cost widening; one (`BuiltinTabViewStyles.swift`) stays skipped
+with a detailed rationale. See `migration_plan.md` → "Revisited Phase".
+
+Revisited-phase batches:
+
+- **Batch 175-179** (done): `SelectionAndValueSupport.swift` → 3 focused files
+  + `PointerRouteView.swift` rename (zero widening);
+  `WebSurfaceFrameEncoder.swift` → `WebSurfaceImageEncoder.swift` (3
+  `private`→`package` widenings, all namespaced under the enum). No public API
+  (669 symbols), fixture, or test changed; accessibility manifests regenerated
+  for the relocated glyphs.
+- Batches 180+ (planned): `PickerRendering.swift`, `BoxDrawingRenderer.swift`,
+  `NativeTerminalSurfaceView.swift`, `CustomLayout.swift`.
 
 ## Risks
 

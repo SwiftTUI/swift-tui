@@ -3579,9 +3579,78 @@ The platform host files (`NativeTerminalSurfaceView.swift`,
 `BoxDrawingRenderer.swift`, `WebSurfaceFrameEncoder.swift`) are largely
 single-file units built on `private`/`fileprivate` cohesion — file-private
 platform typealiases (`NativePlatformFont`), `fileprivate` drawing primitives,
-or large `private`-method namespace enums. Extracting from them would require
-widening many declarations at once, which is not behavior-preserving in
-spirit. Per the SOP these are assessed-and-skipped (see Migration Status).
+or large `private`-method namespace enums.
+
+**Update (revisited):** the task owner subsequently authorized visibility
+adjustments where they improve maintainability. Seven previously-skipped files
+were re-analyzed (one read-only analysis agent each, reviewed). Six were
+re-classified as splittable with documented, low-cost widening (typealiases,
+or `package` members that stay namespaced under their type/enum); only
+`BuiltinTabViewStyles.swift` remains skipped — see below.
+
+## Revisited Phase: Splitting Previously-Skipped Files
+
+The task owner authorized visibility adjustments. The seven skipped files were
+analyzed; the verdicts:
+
+- **Split** (low-cost widening): `SelectionAndValueSupport.swift`,
+  `WebSurfaceFrameEncoder.swift`, `PickerRendering.swift`,
+  `BoxDrawingRenderer.swift`, `NativeTerminalSurfaceView.swift`,
+  `CustomLayout.swift`.
+- **Keep skipped**: `BuiltinTabViewStyles.swift` — the only viable split
+  (public conformances vs. private rendering engine) leaves a ~540-line
+  still-entangled engine file *and* requires HIGH-cost free-symbol widenings
+  (bare glyph constants, loose layout helpers). The split would not produce
+  two conceptually-focused comparable files; it is the rubric's net-negative
+  case. The `private` web is also a verified correctness guarantee (no
+  external caller exists). This skip is now backed by a detailed analysis.
+
+## Packet 175-179 Batch: SelectionAndValueSupport + WebSurfaceFrameEncoder
+
+First batch of the revisited phase.
+
+- Packet 175: control value math — `AdjustableControlValue`, the `Int`/`Double`
+  conformances, the control-value free functions, and the `private` numeric
+  formatting cluster — out of `SelectionAndValueSupport.swift` into
+  `ControlValueMath.swift`. **Zero widening**: the `private` formatting cluster
+  travels with its only callers, so it stays `private`.
+- Packet 176: bound-selection helpers → `BoundSelectionSupport.swift`. Zero
+  widening.
+- Packet 177: shared focus-row chrome (`controlFocusRail`,
+  `highlightedControlRow`, `controlFocusRow`, `textEditorBody`) →
+  `ControlFocusRowSupport.swift`. Zero widening (already `package`).
+- Packet 178: renamed the residual `SelectionAndValueSupport.swift` (now only
+  `PointerRouteView`) to `PointerRouteView.swift`.
+- Packet 179: the image-attachment encoding cluster out of
+  `WebSurfaceFrameEncoder.swift` into `WebSurfaceImageEncoder.swift`. Three
+  widenings — `encodeImages`, `encodeRect`, `jsonString` — all `private` →
+  `package`, all `static` members of the `WebSurfaceFrameEncoder` namespace
+  enum so they stay namespaced (`WebSurfaceFrameEncoder.jsonString` etc.), no
+  top-level namespace pollution. The encoder's fused core (orchestrator,
+  damage, row, accessibility, style) was deliberately not sub-split.
+
+Behavior preserved: every moved declaration is byte-identical; only file
+location and (for the three `WebSurfaceFrameEncoder` leaves) access level
+changed. No public API, fixture, or test changed.
+
+Packet 175-179 validation:
+
+- `swiftly run swift build --target {SwiftTUIViews,WASISurfaceBridge}` — PASS
+  (per packet)
+- `swiftly run swift test --filter CollectionSupportTests`,
+  `SwiftUISurfaceTests` (196) — PASS
+- `swiftly run swift test --filter WASISurfaceBridgeTests` (19) — PASS
+- `./Scripts/check_public_surface_policies.sh`,
+  `generate_public_api_inventory.sh --check` (669 symbols),
+  `check_public_documentation_ratchet.sh` (70), `check_stable_doc_source_paths.sh`
+  — PASS
+- `./Scripts/check_accessibility_guardrails.sh --update` — the raw-glyph and
+  color-state manifests were regenerated (the `▌` focus-rail glyph and slider
+  track glyphs moved to new files; `SelectionAndValueSupport.swift` was
+  renamed). Diff is pure path relabels.
+- `bun run test` — PASS.
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-224044-packet175-179.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-224044-50892.log`
 
 ## Failed Attempts
 
