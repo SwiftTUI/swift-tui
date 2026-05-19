@@ -2411,6 +2411,46 @@ Runner log: /tmp/swift-tui-test-gate-20260518-213611-44263.log
 Result: PASS
 ```
 
+## Latest Review Packets: 167-171 (SwiftTUICharts)
+
+Fourth batch of the other-production-code phase. `ChartSupport.swift` (618
+lines of `internal` per-chart-family free functions) split cleanly by family;
+public API inventory unchanged (669 symbols).
+
+Production scope:
+
+- Packet 167 — shared/timeline/legend helpers → `ChartCommonSupport.swift`.
+- Packet 168 — comparison-chart helpers → `ComparisonChartSupport.swift`.
+- Packet 169 — stacked-bar-chart helpers → `StackedBarChartSupport.swift`.
+- Packet 170 — threshold-gauge helpers → `ThresholdGaugeSupport.swift`.
+- Packet 171 — bullet-chart helpers → `BulletChartSupport.swift`.
+
+Review note: every extracted function is byte-identical and `internal`, so
+there is no access widening. The batch did require regenerating the
+accessibility source manifests (`accessibility_color_state_sources.txt`,
+`accessibility_raw_glyph_sources.txt`) via
+`check_accessibility_guardrails.sh --update`, because color/glyph-bearing
+chart code moved to new files. The manifests only relabel file paths — no new
+accessibility risk; the code was already accepted in `ChartSupport.swift`.
+
+Behavior intentionally preserved:
+
+- All chart-support functions are byte-identical to their previous form; only
+  their file location changed. No public SwiftUI-shaped API, fixture, or test
+  was changed.
+
+Batch gate:
+
+```text
+bun run test
+First attempt FAILED: accessibility manifests changed (color/glyph chart code
+moved to new files). Regenerated with check_accessibility_guardrails.sh
+--update, re-ran.
+User tee log: /tmp/swift-tui-test-gate-20260518-214925-packet167-171-rerun.log
+Runner log: /tmp/swift-tui-test-gate-20260518-214925-77602.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict
