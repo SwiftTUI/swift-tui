@@ -2,87 +2,6 @@
 public struct SnapshotRenderer {
   public init() {}
 
-  public func frameDiagnostics(_ diagnostics: FrameDiagnostics) -> String {
-    var lines: [String] = []
-    lines.append("proposal=\(describe(diagnostics.input.proposal))")
-    lines.append(
-      "invalidatedIdentities=\(describe(diagnostics.input.invalidatedIdentities))"
-    )
-    lines.append("resolvedNodes=\(diagnostics.counts.resolvedNodes)")
-    lines.append("measuredNodes=\(diagnostics.counts.measuredNodes)")
-    lines.append("placedNodes=\(diagnostics.counts.placedNodes)")
-    lines.append(
-      "resolvedWork=computed:\(diagnostics.work.resolvedNodesComputed) reused:\(diagnostics.work.resolvedNodesReused)"
-    )
-    lines.append(
-      "measuredWork=computed:\(diagnostics.work.measuredNodesComputed) reused:\(diagnostics.work.measuredNodesReused)"
-    )
-    lines.append(
-      "placedWork=computed:\(diagnostics.work.placedNodesComputed) reused:\(diagnostics.work.placedNodesReused)"
-    )
-    lines.append(
-      "layoutDependent=realized:\(diagnostics.work.layoutDependentRealizations) cacheHits:\(diagnostics.work.layoutDependentRealizationCacheHits) mainActorFallbacks:\(diagnostics.work.layoutDependentMainActorFallbacks)"
-    )
-    lines.append("drawNodes=\(diagnostics.counts.drawNodes)")
-    lines.append("interactionRegions=\(diagnostics.counts.interactionRegions)")
-    lines.append("focusRegions=\(diagnostics.counts.focusRegions)")
-    lines.append("scrollRoutes=\(diagnostics.counts.scrollRoutes)")
-    lines.append("selectionRoutes=\(diagnostics.counts.selectionRoutes)")
-    if let phaseTimings = diagnostics.timing.phaseTimings {
-      lines.append(
-        "phaseTimings=resolve:\(describe(phaseTimings.resolve)) measure:\(describe(phaseTimings.measure)) place:\(describe(phaseTimings.place)) semantics:\(describe(phaseTimings.semantics)) draw:\(describe(phaseTimings.draw)) raster:\(describe(phaseTimings.raster)) commit:\(describe(phaseTimings.commit)) total:\(describe(phaseTimings.total))"
-      )
-    } else {
-      lines.append("phaseTimings=nil")
-    }
-
-    let generations = diagnostics.timing.renderGenerations
-    lines.append(
-      "renderGenerations=render:\(describe(generations.render)) layoutInput:\(describe(generations.layoutInput)) layoutOutput:\(describe(generations.layoutOutput)) rasterInput:\(describe(generations.rasterInput)) rasterOutput:\(describe(generations.rasterOutput))"
-    )
-
-    if let workerTimings = diagnostics.timing.workerTimings {
-      lines.append(
-        "workerTimings=layoutEnqueue:\(describe(workerTimings.layoutEnqueueToStart)) layoutCompute:\(describe(workerTimings.layoutCompute)) rasterEnqueue:\(describe(workerTimings.rasterEnqueueToStart)) rasterCompute:\(describe(workerTimings.rasterCompute)) completionToCommit:\(describe(workerTimings.completionToMainCommit))"
-      )
-    } else {
-      lines.append("workerTimings=nil")
-    }
-
-    if let mainActorTimings = diagnostics.timing.mainActorTimings {
-      lines.append(
-        "mainActorTimings=blocked:\(describe(mainActorTimings.blocked)) suspended:\(describe(mainActorTimings.suspended))"
-      )
-    } else {
-      lines.append("mainActorTimings=nil")
-    }
-
-    if let cache = diagnostics.work.measurementCache {
-      lines.append(
-        "measurementCache=generation:\(cache.generation) entries:\(cache.entries) lookups:\(cache.lookups) hits:\(cache.hits) misses:\(cache.misses) invalidations:\(cache.invalidations) stores:\(cache.stores)"
-      )
-    } else {
-      lines.append("measurementCache=nil")
-    }
-    lines.append("customLayoutFallbacks=\(diagnostics.work.customLayoutFallbackCount)")
-    lines.append(
-      "firstCustomLayoutFallback=\(diagnostics.work.firstCustomLayoutFallbackIdentity?.path ?? "nil")"
-    )
-    let geometry = diagnostics.geometryResolutionDiagnostics
-    lines.append(
-      "geometryResolution=anchorMisses:\(geometry.anchorResolutionMissCount) missingNamed:\(geometry.missingNamedCoordinateSpaceCount) duplicateNamed:\(geometry.duplicateNamedCoordinateSpaceCount)"
-    )
-    lines.append(
-      "firstGeometryResolutionMiss=anchor:\(geometry.firstAnchorResolutionMissIdentity?.path ?? "nil") missingNamed:\(geometry.firstMissingNamedCoordinateSpaceName ?? "nil") duplicateNamed:\(geometry.firstDuplicateNamedCoordinateSpaceName ?? "nil")"
-    )
-    lines.append("runtimeIssues=\(diagnostics.runtime.issues.count)")
-    for issue in diagnostics.runtime.issues {
-      lines.append("  \(issue.description)")
-    }
-
-    return lines.joined(separator: "\n")
-  }
-
   public func resolvedTree(_ node: ResolvedNode) -> String {
     renderResolved(node, depth: 0).joined(separator: "\n")
   }
@@ -146,17 +65,6 @@ public struct SnapshotRenderer {
     return (lines + surface.lines.map { "  \($0)" }).joined(separator: "\n")
   }
 
-  public func scheduledFrame(_ frame: ScheduledFrame) -> String {
-    [
-      "causes=\(frame.causes.map(\.rawValue).sorted().joined(separator: ","))",
-      "invalidatedIdentities=\(frame.invalidatedIdentities.map(\.path).sorted().joined(separator: ","))",
-      "signalNames=\(frame.signalNames.joined(separator: ","))",
-      "externalReasons=\(frame.externalReasons.joined(separator: ","))",
-      "triggeredDeadline=\(describe(frame.triggeredDeadline))",
-      "nextDeadline=\(describe(frame.nextDeadline))",
-    ].joined(separator: "\n")
-  }
-
   public func frameArtifacts(_ artifacts: FrameArtifacts) -> String {
     [
       "[Resolved]",
@@ -178,36 +86,6 @@ public struct SnapshotRenderer {
 }
 
 extension SnapshotRenderer {
-  private func describe(
-    _ identities: Set<Identity>
-  ) -> String {
-    let paths = identities.map(\.path).sorted()
-    return paths.isEmpty ? "none" : paths.joined(separator: ",")
-  }
-
-  private func describe(
-    _ duration: Duration
-  ) -> String {
-    let components = duration.components
-    let milliseconds =
-      Double(components.seconds) * 1_000
-      + Double(components.attoseconds) / 1_000_000_000_000_000
-    let rounded = (milliseconds * 100).rounded() / 100
-    return "\(rounded)ms"
-  }
-
-  private func describe(
-    _ generation: RenderGeneration
-  ) -> String {
-    String(generation.rawValue)
-  }
-
-  private func describe(
-    _ generation: RenderGeneration?
-  ) -> String {
-    generation.map(describe) ?? "-"
-  }
-
   private func renderResolved(
     _ node: ResolvedNode,
     depth: Int
@@ -389,7 +267,7 @@ extension SnapshotRenderer {
     "@(\(rect.origin.x),\(rect.origin.y)) \(rect.size.width)x\(rect.size.height)"
   }
 
-  private func describe(_ proposal: ProposedSize) -> String {
+  func describe(_ proposal: ProposedSize) -> String {
     "(\(describe(proposal.width)),\(describe(proposal.height)))"
   }
 
@@ -402,25 +280,6 @@ extension SnapshotRenderer {
     case .finite(let value):
       return String(value)
     }
-  }
-
-  private func describe(
-    _ instant: MonotonicInstant?
-  ) -> String {
-    guard let instant else {
-      return "nil"
-    }
-    let totalSeconds =
-      Double(instant.offset.components.seconds)
-      + (Double(instant.offset.components.attoseconds) / 1_000_000_000_000_000_000)
-    let roundedMilliseconds = Int((totalSeconds * 1000).rounded())
-    let wholeSeconds = roundedMilliseconds / 1000
-    let fractionalMilliseconds = abs(roundedMilliseconds % 1000)
-    let fractionalString = String(fractionalMilliseconds)
-    let paddedFractional =
-      String(repeating: "0", count: max(0, 3 - fractionalString.count))
-      + fractionalString
-    return "\(wholeSeconds).\(paddedFractional)"
   }
 
   private func describe(_ command: DrawCommand) -> String {
@@ -534,29 +393,6 @@ extension SnapshotRenderer {
     }
   }
 
-  private func describe(_ style: TextStyle) -> String {
-    var parts: [String] = []
-    if let foregroundStyle = style.foregroundStyle {
-      parts.append("fg=\(describe(foregroundStyle))")
-    }
-    if let backgroundStyle = style.backgroundStyle {
-      parts.append("bg=\(describe(backgroundStyle))")
-    }
-    if !style.emphasis.isEmpty {
-      parts.append("emphasis=\(style.emphasis.debugNames.joined(separator: "+"))")
-    }
-    if let underlineStyle = style.underlineStyle {
-      parts.append("underline=\(describe(underlineStyle))")
-    }
-    if let strikethroughStyle = style.strikethroughStyle {
-      parts.append("strikethrough=\(describe(strikethroughStyle))")
-    }
-    if style.opacity != 1 {
-      parts.append("opacity=\(style.opacity)")
-    }
-    return parts.joined(separator: ",")
-  }
-
   private func describe(_ source: ImageSource) -> String {
     switch source {
     case .path(let name):
@@ -595,191 +431,4 @@ extension SnapshotRenderer {
     "@(\(styleRun.x),\(styleRun.y))+\(styleRun.length){\(describe(styleRun.style))}"
   }
 
-  private func describe(_ style: ResolvedTextStyle) -> String {
-    var parts: [String] = []
-    if let foregroundColor = style.foregroundColor {
-      parts.append("fg=\(foregroundColor.hexString(format: .rrggbbaa))")
-    }
-    if let backgroundColor = style.backgroundColor {
-      parts.append("bg=\(backgroundColor.hexString(format: .rrggbbaa))")
-    }
-    if !style.emphasis.isEmpty {
-      parts.append("emphasis=\(style.emphasis.debugNames.joined(separator: "+"))")
-    }
-    if let underlineStyle = style.underlineStyle {
-      parts.append("underline=\(describe(underlineStyle))")
-    }
-    if let strikethroughStyle = style.strikethroughStyle {
-      parts.append("strikethrough=\(describe(strikethroughStyle))")
-    }
-    if style.opacity != 1 {
-      parts.append("opacity=\(style.opacity)")
-    }
-    return parts.joined(separator: ",")
-  }
-
-  private func describe(_ style: AnyShapeStyle) -> String {
-    switch style {
-    case .semantic(let role):
-      return role.rawValue
-    case .color(let color):
-      return color.hexString(format: .rrggbbaa)
-    case .linearGradient(let gradient):
-      return "linearGradient(\(describe(gradient)))"
-    case .radialGradient(let gradient):
-      return "radialGradient(\(describe(gradient)))"
-    case .tileStyle(let tile):
-      return "tileStyle(\(describe(tile)))"
-    case .terminalChrome(let chromeStyle):
-      return describe(chromeStyle)
-    case .opacity(let inner, let amount):
-      return "\(describe(inner)).opacity(\(amount))"
-    }
-  }
-
-  private func describe(_ tile: TileStyle) -> String {
-    let rows = tile.pattern.rows.map { row in
-      String(row)
-    }.joined(separator: "/")
-    let fg = describe(tile.foreground.style)
-    if let background = tile.background {
-      return "rows=\(rows),fg=\(fg),bg=\(describe(background.style))"
-    }
-    return "rows=\(rows),fg=\(fg)"
-  }
-
-  private func describe(_ style: TerminalChromeStyle) -> String {
-    switch style.kind {
-    case .accent(let tone):
-      return "terminalAccent(\(tone.rawValue))"
-    case .surface(let tone):
-      return "terminalSurface(\(tone.rawValue))"
-    case .surfaceBackground:
-      return "terminalSurfaceBackground"
-    case .border(let tone):
-      return "terminalBorder(\(tone.rawValue))"
-    case .tile(let tone):
-      return "terminalTile(\(tone.rawValue))"
-    case .row(let tone, let isSelected, let isOdd):
-      return "terminalRow(\(tone.rawValue),selected:\(isSelected),odd:\(isOdd))"
-    case .badge(let tone, let emphasized):
-      return "terminalBadge(\(tone.rawValue),emphasized:\(emphasized))"
-    case .keycap(let tone):
-      return "terminalKeycap(\(tone.rawValue))"
-    case .tab(let tone, let isSelected):
-      return "terminalTab(\(tone.rawValue),selected:\(isSelected))"
-    }
-  }
-  private func describe(_ gradient: LinearGradient) -> String {
-    let stops = gradient.gradient.stops.map { stop in
-      "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
-    }.joined(separator: ",")
-    return
-      "start=(\(gradient.startPoint.x),\(gradient.startPoint.y))"
-      + "->end=(\(gradient.endPoint.x),\(gradient.endPoint.y)):[\(stops)]"
-  }
-
-  private func describe(_ gradient: RadialGradient) -> String {
-    let stops = gradient.gradient.stops.map { stop in
-      "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
-    }.joined(separator: ",")
-    return
-      "center=(\(gradient.center.x),\(gradient.center.y)),"
-      + "startRadius=\(gradient.startRadius),endRadius=\(gradient.endRadius):[\(stops)]"
-  }
-
-  private func describe(_ lineStyle: TextLineStyle) -> String {
-    if let color = lineStyle.color {
-      return "\(lineStyle.pattern.rawValue):\(color.hexString(format: .rrggbbaa))"
-    }
-    return lineStyle.pattern.rawValue
-  }
-
-  private func describe(
-    _ geometry: ShapeGeometry,
-    insetAmount: Int = 0
-  ) -> String {
-    let base =
-      switch geometry {
-      case .rectangle:
-        "rectangle"
-      case .roundedRectangle(let cornerRadius):
-        "roundedRectangle(\(cornerRadius))"
-      case .circle:
-        "circle"
-      case .ellipse:
-        "ellipse"
-      case .capsule:
-        "capsule"
-      }
-    if insetAmount > 0 {
-      return "\(base).inset(\(insetAmount))"
-    }
-    return base
-  }
-
-  private func describe(_ payload: ShapePayload) -> String {
-    "\(describe(payload.geometry, insetAmount: payload.insetAmount)),\(describe(payload.operation))"
-  }
-
-  private func describe(_ operation: ShapeOperation) -> String {
-    switch operation {
-    case .fill(let style, let mode):
-      return "fill(\(style.map(describe) ?? "foreground"),mode=\(describe(mode)))"
-    case .stroke(let style, let strokeStyle, let strokeBorder, let backgroundStyle):
-      return
-        "stroke(\(style.map(describe) ?? "foreground"),\(describe(strokeStyle)),border=\(strokeBorder),bg=\(backgroundStyle.map(describe) ?? "nil"))"
-    }
-  }
-
-  private func describe(_ mode: ShapeFillMode) -> String {
-    switch mode {
-    case .full:
-      return "full"
-    case .interior(let strokeWidth):
-      return "interior(\(strokeWidth))"
-    }
-  }
-
-  private func describe(_ style: BorderBackgroundStyle) -> String {
-    [
-      "top=\(style.top.map(describe) ?? "nil")",
-      "right=\(style.right.map(describe) ?? "nil")",
-      "bottom=\(style.bottom.map(describe) ?? "nil")",
-      "left=\(style.left.map(describe) ?? "nil")",
-    ].joined(separator: ",")
-  }
-
-  private func describe(_ strokeStyle: StrokeStyle) -> String {
-    "width:\(strokeStyle.lineWidth),set:\(describeBorderSetName(strokeStyle.borderSet))"
-  }
-
-  private func describeBorderSetName(_ set: BorderSet) -> String {
-    switch set {
-    case .single: return "single"
-    case .rounded: return "rounded"
-    case .double: return "double"
-    case .heavy: return "heavy"
-    case .block: return "block"
-    case .outerHalfBlock: return "outerHalfBlock"
-    case .innerHalfBlock: return "innerHalfBlock"
-    case .singleDouble: return "singleDouble"
-    case .doubleSingle: return "doubleSingle"
-    case .ascii: return "ascii"
-    case .hidden: return "hidden"
-    case .none: return "none"
-    case .dashed: return "dashed"
-    case .dashedHeavy: return "dashedHeavy"
-    case .markdown: return "markdown"
-    default:
-      return
-        "custom(top:\(set.top),bottom:\(set.bottom),left:\(set.left),right:\(set.right))"
-    }
-  }
-
-  private func hexadecimal(_ component: Int) -> String {
-    let digits = Array("0123456789ABCDEF")
-    let value = min(255, max(0, component))
-    return String([digits[value / 16], digits[value % 16]])
-  }
 }

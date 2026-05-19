@@ -26,6 +26,26 @@ struct TextLayoutTests {
     #expect(layout.lines.map(\.text) == ["  alpha", "beta"])
   }
 
+  @Test("empty and unbounded text keep their single-line layout shape")
+  func guardPathLayoutsKeepSingleLineShape() {
+    let unbounded = layoutText(
+      for: "alpha beta",
+      width: nil
+    )
+    let zeroWidth = layoutText(
+      for: "alpha beta",
+      width: 0
+    )
+    let empty = layoutText(
+      for: "",
+      width: 5
+    )
+
+    #expect(unbounded.lines.map(\.text) == ["alpha beta"])
+    #expect(zeroWidth.lines.map(\.text) == [""])
+    #expect(empty.lines.map(\.text) == [""])
+  }
+
   @Test("word-boundary wrapping adds continuation markers for oversized word-like tokens")
   func wordBoundaryWrappingAddsContinuationMarkers() {
     let twoLine = layoutText(

@@ -1,16 +1,12 @@
 import SwiftTUICore
 import Synchronization
 
-#if canImport(Dispatch)
-  @unsafe @preconcurrency import Dispatch
-#endif
-
 #if canImport(Darwin)
-  package import Darwin
+  import Darwin
 #elseif canImport(Glibc)
-  package import Glibc
+  import Glibc
 #elseif canImport(Android)
-  package import Android
+  import Android
 #elseif canImport(WASILibc)
   import WASILibc
 #endif
@@ -27,190 +23,6 @@ public enum TerminalHostError: Error {
 }
 
 #if !canImport(WASILibc)
-  package protocol TerminalControlling: Sendable {
-    func isATTY(_ fileDescriptor: Int32) -> Bool
-    func getAttributes(from fileDescriptor: Int32) throws -> termios
-    func setAttributes(_ attributes: termios, on fileDescriptor: Int32) throws
-    func windowSize(of fileDescriptor: Int32) throws -> CellSize
-    func cellPixelSize(of fileDescriptor: Int32) throws -> PixelSize?
-    func getFileStatusFlags(of fileDescriptor: Int32) throws -> Int32
-    func setFileStatusFlags(_ flags: Int32, on fileDescriptor: Int32) throws
-    func write(_ output: String, to fileDescriptor: Int32) throws
-    func read(
-      from fileDescriptor: Int32,
-      maxBytes: Int,
-      timeoutMilliseconds: Int
-    ) throws -> [UInt8]
-  }
-
-  extension TerminalControlling {
-    func cellPixelSize(of _: Int32) throws -> PixelSize? {
-      nil
-    }
-  }
-
-  struct POSIXTerminalController: TerminalControlling {
-    func isATTY(_ fileDescriptor: Int32) -> Bool {
-      isatty(fileDescriptor) == 1
-    }
-
-    func getAttributes(from fileDescriptor: Int32) throws -> termios {
-      var attributes = termios()
-      guard unsafe tcgetattr(fileDescriptor, &attributes) == 0 else {
-        throw TerminalHostError.failedToReadAttributes(errno: errno)
-      }
-      return attributes
-    }
-
-    func setAttributes(_ attributes: termios, on fileDescriptor: Int32) throws {
-      var attributes = attributes
-      guard unsafe tcsetattr(fileDescriptor, TCSAFLUSH, &attributes) == 0 else {
-        throw TerminalHostError.failedToSetAttributes(errno: errno)
-      }
-    }
-
-    func windowSize(of fileDescriptor: Int32) throws -> CellSize {
-      var windowSize = winsize()
-      guard unsafe ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
-        throw TerminalHostError.failedToReadWindowSize(errno: errno)
-      }
-
-      return CellSize(
-        width: max(1, Int(windowSize.ws_col)),
-        height: max(1, Int(windowSize.ws_row))
-      )
-    }
-
-    func cellPixelSize(of fileDescriptor: Int32) throws -> PixelSize? {
-      var windowSize = winsize()
-      guard unsafe ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
-        throw TerminalHostError.failedToReadWindowSize(errno: errno)
-      }
-      guard
-        windowSize.ws_col > 0,
-        windowSize.ws_row > 0,
-        windowSize.ws_xpixel > 0,
-        windowSize.ws_ypixel > 0
-      else {
-        return nil
-      }
-
-      return .init(
-        width: max(1, Int(windowSize.ws_xpixel) / Int(windowSize.ws_col)),
-        height: max(1, Int(windowSize.ws_ypixel) / Int(windowSize.ws_row))
-      )
-    }
-
-    func getFileStatusFlags(of fileDescriptor: Int32) throws -> Int32 {
-      let flags = fcntl(fileDescriptor, F_GETFL)
-      guard flags >= 0 else {
-        throw TerminalHostError.failedToReadFileStatusFlags(errno: errno)
-      }
-      return flags
-    }
-
-    func setFileStatusFlags(_ flags: Int32, on fileDescriptor: Int32) throws {
-      guard fcntl(fileDescriptor, F_SETFL, flags) >= 0 else {
-        throw TerminalHostError.failedToSetFileStatusFlags(errno: errno)
-      }
-    }
-
-    func write(_ output: String, to fileDescriptor: Int32) throws {
-      let bytes = Array(output.utf8)
-      let totalBytes = bytes.count
-
-      try unsafe bytes.withUnsafeBytes { rawBuffer in
-        guard let baseAddress = rawBuffer.baseAddress else {
-          return
-        }
-
-        var bytesWritten = 0
-        while bytesWritten < totalBytes {
-          let pointer = unsafe baseAddress.advanced(by: bytesWritten)
-          let result = unsafe terminalPlatformWrite(
-            fileDescriptor,
-            pointer,
-            totalBytes - bytesWritten
-          )
-
-          if result > 0 {
-            bytesWritten += result
-            continue
-          }
-
-          if result == 0 {
-            continue
-          }
-
-          switch errno {
-          case EINTR:
-            continue
-          case EAGAIN, EWOULDBLOCK:
-            try waitUntilWritable(fileDescriptor)
-          default:
-            throw TerminalHostError.failedToWrite(errno: errno)
-          }
-        }
-      }
-    }
-
-    func read(
-      from fileDescriptor: Int32,
-      maxBytes: Int,
-      timeoutMilliseconds: Int
-    ) throws -> [UInt8] {
-      guard maxBytes > 0 else {
-        return []
-      }
-
-      var descriptor = pollfd(
-        fd: fileDescriptor,
-        events: Int16(POLLIN),
-        revents: 0
-      )
-      let ready = unsafe terminalPlatformPoll(
-        &descriptor,
-        1,
-        Int32(timeoutMilliseconds)
-      )
-
-      guard ready > 0 else {
-        return []
-      }
-
-      var buffer = Array(repeating: UInt8(0), count: maxBytes)
-      let bytesRead = unsafe terminalPlatformRead(fileDescriptor, &buffer, maxBytes)
-      guard bytesRead > 0 else {
-        return []
-      }
-
-      return Array(buffer.prefix(Int(bytesRead)))
-    }
-  }
-
-  extension POSIXTerminalController {
-    private func waitUntilWritable(
-      _ fileDescriptor: Int32
-    ) throws {
-      var descriptor = pollfd(
-        fd: fileDescriptor,
-        events: Int16(POLLOUT),
-        revents: 0
-      )
-
-      while true {
-        let ready = unsafe terminalPlatformPoll(&descriptor, 1, -1)
-        if ready > 0 {
-          return
-        }
-        if ready == 0 || errno == EINTR {
-          continue
-        }
-        throw TerminalHostError.failedToWrite(errno: errno)
-      }
-    }
-  }
-
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: PresentationSurface, DamageAwarePresentationSurface,
     ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface,
@@ -570,10 +382,15 @@ public enum TerminalHostError: Error {
       )
       presentationSession.forceFullRepaint = false
 
-      let emission = buildPresentationEmission(
+      let emission = TerminalHostPresentationEmissionBuilder(
+        capabilityProfile: capabilityProfile,
+        usesTerminalEditOperations: usesTerminalEditOperations,
+        imageRenderer: imageRenderer
+      ).build(
         for: preparedSurface,
         plan: plan,
-        graphicsCapabilities: graphicsCapabilities
+        graphicsCapabilities: graphicsCapabilities,
+        transmittedKittyImages: &presentationSession.transmittedKittyImages
       )
       let usedSynchronizedOutput = TerminalHostEscapeSequences.usesSynchronizedOutput(
         for: emission.output,
@@ -601,162 +418,6 @@ public enum TerminalHostError: Error {
         output: bufferedOutput,
         usedSynchronizedOutput: usedSynchronizedOutput
       )
-    }
-
-    private func buildPresentationEmission(
-      for preparedSurface: RasterSurface,
-      plan: TerminalPresentationPlan,
-      graphicsCapabilities: TerminalGraphicsCapabilities
-    ) -> TerminalPresentationEmission {
-      var emission = TerminalPresentationEmission()
-      switch plan.strategy {
-      case .fullRepaint:
-        appendFullRepaint(
-          to: &emission,
-          for: preparedSurface,
-          graphicsCapabilities: graphicsCapabilities
-        )
-
-      case .incremental:
-        appendIncrementalPresentation(
-          to: &emission,
-          for: preparedSurface,
-          plan: plan,
-          graphicsCapabilities: graphicsCapabilities
-        )
-      }
-
-      return emission
-    }
-
-    private func appendFullRepaint(
-      to emission: inout TerminalPresentationEmission,
-      for preparedSurface: RasterSurface,
-      graphicsCapabilities: TerminalGraphicsCapabilities
-    ) {
-      // A terminal full repaint clears the previous screen contents. Kitty
-      // image ids cannot be assumed to remain displayable after that, so
-      // force the current frame to retransmit any images before placement.
-      if graphicsCapabilities.preferredProtocol == .kitty {
-        presentationSession.transmittedKittyImages.removeAll()
-      }
-      if !preparedSurface.imageAttachments.isEmpty {
-        emission.recordGraphicsReplay(
-          scope: .full,
-          attachmentCount: preparedSurface.imageAttachments.count
-        )
-      }
-      emission.append(TerminalHostEscapeSequences.clearScreen)
-      emission.append(TerminalHostEscapeSequences.cursor(to: .zero))
-
-      let writeSteps = fullRepaintWriteSteps(
-        for: preparedSurface,
-        capabilityProfile: capabilityProfile
-      )
-      for writeStep in writeSteps {
-        emission.append(writeStep)
-      }
-
-      for writeStep in imageRenderer.graphicsWriteSteps(
-        for: preparedSurface,
-        capabilityProfile: capabilityProfile,
-        graphicsCapabilities: graphicsCapabilities,
-        transmittedKittyImages: &presentationSession.transmittedKittyImages
-      ) {
-        emission.append(writeStep)
-      }
-    }
-
-    private func appendIncrementalPresentation(
-      to emission: inout TerminalPresentationEmission,
-      for preparedSurface: RasterSurface,
-      plan: TerminalPresentationPlan,
-      graphicsCapabilities: TerminalGraphicsCapabilities
-    ) {
-      for rowBatch in plan.rowBatches {
-        let rowOutput = incrementalRowOutput(
-          for: rowBatch,
-          surfaceWidth: preparedSurface.size.width,
-          emission: &emission
-        )
-        emission.append(
-          TerminalHostEscapeSequences.cursor(
-            to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
-          )
-        )
-        emission.append(rowOutput)
-      }
-      appendKittyGraphicsReplay(
-        to: &emission,
-        plan: plan,
-        graphicsCapabilities: graphicsCapabilities
-      )
-    }
-
-    private func incrementalRowOutput(
-      for rowBatch: TerminalPresentationPlan.RowBatch,
-      surfaceWidth: Int,
-      emission: inout TerminalPresentationEmission
-    ) -> String {
-      guard usesTerminalEditOperations,
-        rowBatch.canLowerToEraseToEndOfLine(surfaceWidth: surfaceWidth)
-      else {
-        return rowBatch.renderedBatch
-      }
-
-      emission.recordEraseToEndOfLine()
-      return TerminalHostEscapeSequences.eraseToEndOfLine
-    }
-
-    private func appendKittyGraphicsReplay(
-      to emission: inout TerminalPresentationEmission,
-      plan: TerminalPresentationPlan,
-      graphicsCapabilities: TerminalGraphicsCapabilities
-    ) {
-      guard graphicsCapabilities.preferredProtocol == .kitty else {
-        return
-      }
-
-      switch plan.graphicsReplay.scope {
-      case .none:
-        break
-      case .targeted:
-        emission.recordGraphicsReplay(
-          scope: .targeted,
-          attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
-        )
-        appendGraphicsWriteSteps(
-          for: plan.graphicsReplay.attachmentsToReplay,
-          to: &emission,
-          graphicsCapabilities: graphicsCapabilities
-        )
-      case .full:
-        emission.recordGraphicsReplay(
-          scope: .full,
-          attachmentCount: plan.graphicsReplay.attachmentsToReplay.count
-        )
-        emission.append(TerminalHostEscapeSequences.deleteVisibleKittyPlacements)
-        appendGraphicsWriteSteps(
-          for: plan.graphicsReplay.attachmentsToReplay,
-          to: &emission,
-          graphicsCapabilities: graphicsCapabilities
-        )
-      }
-    }
-
-    private func appendGraphicsWriteSteps(
-      for attachments: [RasterImageAttachment],
-      to emission: inout TerminalPresentationEmission,
-      graphicsCapabilities: TerminalGraphicsCapabilities
-    ) {
-      for writeStep in imageRenderer.graphicsWriteSteps(
-        for: attachments,
-        capabilityProfile: capabilityProfile,
-        graphicsCapabilities: graphicsCapabilities,
-        transmittedKittyImages: &presentationSession.transmittedKittyImages
-      ) {
-        emission.append(writeStep)
-      }
     }
 
     package func drainPendingPresentation() throws {

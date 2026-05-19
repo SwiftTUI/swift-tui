@@ -20,6 +20,22 @@ Begin with the primary SwiftTUI infrastructure supporting terminal rendering:
 The initial slice should target production code on the terminal presentation
 path before moving outward to less central production areas.
 
+## Current Constrained Focus
+
+As of packet 126, remaining migration work is constrained to the central runtime
+and primary core:
+
+- `Sources/SwiftTUICore/`
+- `Sources/SwiftTUIRuntime/`
+- repo policy, migration, and validation artifacts needed to support those
+  production changes
+
+Previously completed view, chart, platform, tooling, and example-adjacent work
+remains part of the historical migration record, but new packets should not
+expand into `SwiftTUIViews`, `SwiftTUICharts`, `SwiftTUIAnimatedImage`,
+`Platforms`, `Tools`, or examples unless needed to preserve validation or policy
+artifacts for a central runtime/core move.
+
 ## Repo-Wide Scope
 
 The broader migration may touch production code under:
@@ -76,7 +92,7 @@ is shared infrastructure and should be treated as high-risk production code.
 
 ## Branch and Tickets
 
-- Branch: `humanize`
+- Branch: `main`
 - Ticket/issue: none provided
 
 ## Risk Register

@@ -71,7 +71,9 @@ struct RenderPipelineStructureTests {
   @Test("completed-frame preview does not finalize the live graph")
   func completedFramePreviewDoesNotFinalizeLiveGraph() throws {
     let source = try String(
-      contentsOf: Self.runtimeRendererSourceURL(),
+      contentsOf: Self.sourceURL(
+        "Sources/SwiftTUIRuntime/Rendering/DefaultRenderer+CompletedFrameCandidates.swift"
+      ),
       encoding: .utf8
     )
     let body = try Self.functionBody(
@@ -85,18 +87,35 @@ struct RenderPipelineStructureTests {
   @Test("render-tail strategy entry surface is shared")
   func renderTailStrategyEntrySurfaceIsShared() throws {
     let source = try String(
-      contentsOf: Self.runtimeRendererSourceURL(),
+      contentsOf: Self.sourceURL("Sources/SwiftTUIRuntime/SwiftTUI.swift"),
       encoding: .utf8
     )
+    let completedFrameSource = try String(
+      contentsOf: Self.sourceURL(
+        "Sources/SwiftTUIRuntime/Rendering/DefaultRenderer+CompletedFrameCandidates.swift"
+      ),
+      encoding: .utf8
+    )
+    let tailCoordinatorSource = try String(
+      contentsOf: Self.sourceURL(
+        "Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift"
+      ),
+      encoding: .utf8
+    )
+    let combinedSource = [
+      source,
+      completedFrameSource,
+      tailCoordinatorSource,
+    ].joined(separator: "\n")
 
-    #expect(source.contains("renderFrameTailLayoutStage("))
-    #expect(source.contains("renderFrameTailRasterStage("))
-    #expect(source.contains("resolveCompletedFrameCandidate("))
-    #expect(!source.contains("renderFrameTailAsync("))
-    #expect(!source.contains("renderAsyncFrameTailLayoutStage("))
-    #expect(!source.contains("renderCancellableFrameTailLayoutStage("))
-    #expect(!source.contains("renderAsyncFusedFrameTail("))
-    #expect(!source.contains("renderCancellableFusedFrameTail("))
+    #expect(combinedSource.contains("renderFrameTailLayoutStage("))
+    #expect(combinedSource.contains("renderFrameTailRasterStage("))
+    #expect(combinedSource.contains("resolveCompletedFrameCandidate("))
+    #expect(!combinedSource.contains("renderFrameTailAsync("))
+    #expect(!combinedSource.contains("renderAsyncFrameTailLayoutStage("))
+    #expect(!combinedSource.contains("renderCancellableFrameTailLayoutStage("))
+    #expect(!combinedSource.contains("renderAsyncFusedFrameTail("))
+    #expect(!combinedSource.contains("renderCancellableFusedFrameTail("))
 
     let cancellableBody = try Self.functionBody(
       named: "renderAsyncCancellable",
@@ -142,12 +161,10 @@ struct RenderPipelineStructureTests {
       "composed render path took \(elapsed); budget is \(budget) (2x baseline)")
   }
 
-  private static func runtimeRendererSourceURL() throws -> URL {
+  private static func sourceURL(_ relativePath: String) throws -> URL {
     var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     while directory.path != "/" {
-      let sourceURL = directory.appendingPathComponent(
-        "Sources/SwiftTUIRuntime/SwiftTUI.swift"
-      )
+      let sourceURL = directory.appendingPathComponent(relativePath)
       if FileManager.default.fileExists(atPath: sourceURL.path) {
         return sourceURL
       }

@@ -95,12 +95,13 @@ if ! rg -U -n -P --quiet -- 'public init\s*\(\s*get: @escaping @MainActor @Senda
   fail "Binding.init(get:set:) must keep honest @MainActor get/set closures."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift; then
-  fail "ViewModifiers.task must keep actor-inheriting task closures."
+if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' \
+  Sources/SwiftTUIViews/Modifiers/ViewLifecycleModifiers.swift; then
+  fail "View.task must keep actor-inheriting task closures."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'public func task<ID: Equatable>(' \
-  Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift; then
+  Sources/SwiftTUIViews/Modifiers/ViewLifecycleModifiers.swift; then
   fail "The public task(id:) overload must stay available."
 fi
 
@@ -287,7 +288,7 @@ if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/Swi
   fail "ToolbarStyle should stay a public extensible style protocol."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/SwiftTUICore/Styling/Styling.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/SwiftTUICore/Styling/ShapeStyles.swift; then
   fail "ShapeStyle should stay a public extensible style protocol."
 fi
 

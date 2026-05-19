@@ -80,4 +80,29 @@ struct TextLayoutCacheTests {
     #expect(metrics.stores == 5)
     #expect(metrics.evictions == 0)
   }
+
+  @Test("cache eviction keeps the most recently used entry")
+  func evictionKeepsMostRecentlyUsedEntry() {
+    let cache = TextLayoutCache(capacity: 2)
+    let options = TextLayoutOptions(width: nil)
+
+    let firstAlpha = cache.layout(for: "alpha", options: options)
+    let firstBeta = cache.layout(for: "beta", options: options)
+    let refreshedAlpha = cache.layout(for: "alpha", options: options)
+    _ = cache.layout(for: "gamma", options: options)
+    let retainedAlpha = cache.layout(for: "alpha", options: options)
+    let reloadedBeta = cache.layout(for: "beta", options: options)
+
+    #expect(refreshedAlpha == firstAlpha)
+    #expect(retainedAlpha == firstAlpha)
+    #expect(reloadedBeta == firstBeta)
+
+    let metrics = cache.metrics
+    #expect(metrics.entries == 2)
+    #expect(metrics.lookups == 6)
+    #expect(metrics.hits == 2)
+    #expect(metrics.misses == 4)
+    #expect(metrics.stores == 4)
+    #expect(metrics.evictions == 2)
+  }
 }

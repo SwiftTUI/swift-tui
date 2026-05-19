@@ -2,80 +2,7 @@ import SwiftTUICore
 import SwiftTUIViews
 
 extension RunLoop {
-  package struct RenderIntentCoalescingDiagnostics: Equatable, Sendable {
-    package var desiredGeneration: UInt64
-    package var coalescedEventBatches: Int
-    package var coalescedWakeCauses: Set<WakeCause>
-    /// Number of `request*` calls (input, invalidation, signal,
-    /// external, deadline) the scheduler coalesced into the active
-    /// frame.  When > 1, multiple intents merged — a Stage 3D
-    /// pre-start cancellation could have superseded the older
-    /// in-flight tail job.
-    package var intentRequestCount: Int
-  }
-
-  private enum AnimationWakeTiming {
-    // When a frame overruns its nominal 33 ms budget, the controller's
-    // requested deadline can already be in the past by the time the
-    // run loop reaches the scheduling site below. Re-queuing an already
-    // due deadline would make `renderPendingFrames` spin inside the same
-    // call; failing to schedule anything would stall the animation until
-    // unrelated input arrives. Clamp overdue deadlines slightly into the
-    // future so the next tick runs "as soon as possible" on the next
-    // event-loop turn without busy-looping in-place.
-    static var minimumLeadTime: Duration { .milliseconds(1) }
-  }
-
-  package func nextRenderIntentDiagnostics(
-    for scheduledFrame: ScheduledFrame
-  ) -> RenderIntentCoalescingDiagnostics {
-    defer {
-      nextRenderIntentGeneration &+= 1
-      pendingCoalescedEventBatches = 0
-      pendingCoalescedWakeCauses.removeAll(keepingCapacity: true)
-    }
-
-    return RenderIntentCoalescingDiagnostics(
-      desiredGeneration: nextRenderIntentGeneration,
-      coalescedEventBatches: pendingCoalescedEventBatches,
-      coalescedWakeCauses: pendingCoalescedWakeCauses.union(scheduledFrame.causes),
-      intentRequestCount: scheduledFrame.intentRequestCount
-    )
-  }
-
-  private func mergeLifecycleCarryForward(
-    _ carryForward: [LifecycleCommitEntry],
-    into lifecycle: inout [LifecycleCommitEntry]
-  ) {
-    guard !carryForward.isEmpty else {
-      return
-    }
-    let retainedCurrent = lifecycle.filter { !carryForward.contains($0) }
-    lifecycle = carryForward + retainedCurrent
-  }
-
   // MARK: - Frame driver (F2: unified sync/async per-frame body, ADR-0021)
-
-  /// Strategy state describing how the async path acquired a frame; the
-  /// synchronous path always supplies `.completed` / `nil`.
-  private struct FrameAcquisitionState {
-    var tailJobState: FrameTailJobState = .completed
-    var completedFrameDropDecision: CompletedFrameDropDecision?
-  }
-
-  private func scheduledFrameByReconcilingExternalState(
-    _ scheduledFrame: ScheduledFrame,
-    currentState: State
-  ) -> ScheduledFrame {
-    guard previousRenderedState != currentState else {
-      return scheduledFrame
-    }
-    var reconciled = scheduledFrame
-    reconciled.causes.insert(.invalidation)
-    reconciled.invalidatedIdentities.insert(rootIdentity)
-    reconciled.forceRootEvaluation = true
-    return reconciled
-  }
 
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
@@ -147,23 +74,6 @@ extension RunLoop {
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
   }
 
-  /// Drains gesture recognizer deadlines for a frame woken by a `.deadline`
-  /// cause so recognizers that transition on this wake see their new phase
-  /// reflected in the upcoming render pass.
-  private func drainGestureDeadlinesIfNeeded(for scheduledFrame: ScheduledFrame) {
-    guard scheduledFrame.causes.contains(.deadline) else {
-      return
-    }
-    if let triggeredDeadline = scheduledFrame.triggeredDeadline {
-      drainGestureDeadlines(at: triggeredDeadline)
-    } else {
-      assertionFailure(
-        "FrameScheduler produced .deadline cause without a triggeredDeadline; "
-          + "gesture deadlines will not drain this frame."
-      )
-    }
-  }
-
   /// Shared post-acquisition per-frame body. Both `renderPendingFrames` and
   /// `renderPendingFramesAsync` delegate to this once their (differing)
   /// artifact-acquisition strategy has produced a converged frame. Every
@@ -199,32 +109,11 @@ extension RunLoop {
     let focusPresentation = artifacts.semanticSnapshot.focusPresentation(
       for: focusTracker.currentFocusIdentity
     )
-    let presentationDamage: PresentationDamage? =
-      if convergence.rerenderedForFocusSync {
-        nil
-      } else {
-        artifacts.presentationDamage
-      }
-    let presentStart: ContinuousClock.Instant?
-    let presentClock: ContinuousClock?
-    if hasDiagnosticsLogger {
-      let clock = ContinuousClock()
-      presentClock = clock
-      presentStart = clock.now
-    } else {
-      presentClock = nil
-      presentStart = nil
-    }
-    let presentationMetrics = try presentCommittedFrame(
+    let presentationResult = try presentCommittedFrameWithDiagnosticsTiming(
       artifacts,
-      damage: presentationDamage
+      damage: presentationDamage(for: artifacts, convergence: convergence),
+      hasDiagnosticsLogger: hasDiagnosticsLogger
     )
-    let presentationDuration: Duration =
-      if let presentStart, let presentClock {
-        presentStart.duration(to: presentClock.now)
-      } else {
-        .zero
-      }
     lifecycleCoordinator.applyCommittedFrame(
       plan: artifacts.commitPlan,
       currentLifecycleRegistry: localLifecycleRegistry,
@@ -235,10 +124,7 @@ extension RunLoop {
       since: previousPreferenceObservations
     )
     previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
-    if !postActionInvalidationIdentities.isEmpty {
-      scheduler.requestInvalidation(of: postActionInvalidationIdentities)
-      postActionInvalidationIdentities.removeAll(keepingCapacity: true)
-    }
+    flushPostActionInvalidations()
     // After rendering, request the next animation frame deadline
     // whenever the tick reported pending work.  Phase 4 split the
     // tick result so ``hasPendingWork`` is the unambiguous "schedule
@@ -255,19 +141,7 @@ extension RunLoop {
     // dirty-region calculation; only the wake-up decision is
     // unconditional now.
     let animationTick = renderer.internalAnimationController.lastTickResult
-    if runtimeConfiguration.motion == .normal,
-      animationTick.hasPendingWork,
-      let nextDeadline = animationTick.nextDeadline
-    {
-      let now = MonotonicInstant.now()
-      let scheduledDeadline =
-        if nextDeadline > now {
-          nextDeadline
-        } else {
-          now.advanced(by: AnimationWakeTiming.minimumLeadTime)
-        }
-      scheduler.requestDeadline(scheduledDeadline)
-    }
+    requestNextAnimationFrameIfNeeded(animationTick)
     observationBridge.prune(
       keeping: renderer.liveIdentitySnapshot()
     )
@@ -294,8 +168,8 @@ extension RunLoop {
       tailJobState: acquisition.tailJobState,
       completedFrameDropDecision: acquisition.completedFrameDropDecision,
       animationControllerHasPendingWork: animationTick.hasPendingWork,
-      presentationMetrics: presentationMetrics,
-      presentationDuration: presentationDuration,
+      presentationMetrics: presentationResult.metrics,
+      presentationDuration: presentationResult.duration,
       renderedFrames: renderedFrames
     )
 
@@ -428,120 +302,6 @@ extension RunLoop {
     }
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
     return nil
-  }
-
-  package func runtimeResetFocusAction() -> ResetFocusAction {
-    ResetFocusAction(
-      snapshotLabel: "ResetFocusAction.runtime",
-      isPlaceholder: false,
-      handler: { [weak scheduler, localDefaultFocusRegistry, rootIdentity] namespace in
-        localDefaultFocusRegistry.requestReset(in: namespace)
-        scheduler?.requestInvalidation(of: [rootIdentity])
-        return true
-      }
-    )
-  }
-
-  package func resolveContext(
-    for scheduledFrame: ScheduledFrame
-  ) -> ResolveContext {
-    let causeSummary = scheduledFrame.causes
-      .map(\.rawValue)
-      .sorted()
-      .joined(separator: "+")
-    var effectiveEnvironmentValues = environmentValues
-    effectiveEnvironmentValues.terminalAppearance = presentationSurface.appearance
-    effectiveEnvironmentValues.theme = presentationSurface.theme
-    effectiveEnvironmentValues.terminalSize = presentationSurface.surfaceSize
-    if let cellPixelSize = presentationSurface.graphicsCapabilities.cellPixelSize {
-      effectiveEnvironmentValues.cellPixelMetrics = CellPixelMetrics(
-        width: cellPixelSize.width,
-        height: cellPixelSize.height,
-        source: .reported
-      )
-    } else {
-      effectiveEnvironmentValues.cellPixelMetrics = .estimated
-    }
-    effectiveEnvironmentValues.pointerInputCapabilities =
-      presentationSurface.pointerInputCapabilities
-    effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
-    effectiveEnvironmentValues.focusedValues = currentFocusedValues
-    effectiveEnvironmentValues.pressedIdentity = pressedIdentity
-    effectiveEnvironmentValues.accessibilityReduceMotion = runtimeConfiguration.motion == .reduced
-    effectiveEnvironmentValues.suppressesProgress = runtimeConfiguration.noProgress
-    effectiveEnvironmentValues.cursorFollowsFocus =
-      runtimeConfiguration.cursorFollowsFocus
-      || usesTerminalCursorForTextInput
-    if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
-      effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
-    }
-    if effectiveEnvironmentValues.resetFocus.isPlaceholder {
-      effectiveEnvironmentValues.resetFocus = runtimeResetFocusAction()
-    }
-    if effectiveEnvironmentValues.clipboardWriteAction.isPlaceholder {
-      effectiveEnvironmentValues.clipboardWriteAction = runtimeClipboardWriteAction()
-    }
-    if effectiveEnvironmentValues.clipboardReadAction.isPlaceholder {
-      effectiveEnvironmentValues.clipboardReadAction = runtimeClipboardReadAction()
-    }
-    var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
-    if runtimeConfiguration.motion == .reduced {
-      transactionSnapshot.animationRequest = .disabled
-      transactionSnapshot.animationBatchID = nil
-    } else {
-      transactionSnapshot.animationRequest = scheduledFrame.animationRequest
-      transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
-    }
-    // Phase 3's ``diffAndEnqueue`` retargets in-flight animations
-    // correctly via ``sample(existing, at:)`` + ``effectiveFrom``, so
-    // the previous re-injection of the controller's "dominant active
-    // request" on tick frames is no longer required.  A `.inherit`
-    // tick frame whose resolve diffs an unchanged property won't
-    // touch the running animation (the diff bails on ``previous ==
-    // current``); a tick frame whose resolve diffs a CHANGED property
-    // under `.inherit` correctly purges the obsolete animation, which
-    // matches SwiftUI's "untracked write snaps" semantics.  The
-    // scheduler stays animation-unaware; all retarget state lives on
-    // the controller.
-    var context = ResolveContext(
-      identity: rootIdentity,
-      environment: environment,
-      environmentValues: effectiveEnvironmentValues,
-      transaction: transactionSnapshot,
-      invalidatedIdentities: scheduledFrame.invalidatedIdentities,
-      localActionRegistry: localActionRegistry,
-      localKeyHandlerRegistry: localKeyHandlerRegistry,
-      localLifecycleRegistry: localLifecycleRegistry,
-      localTaskRegistry: localTaskRegistry,
-      applyEnvironmentValues: true
-    )
-    context.forceRootEvaluation = scheduledFrame.forceRootEvaluation
-    context.localPointerHandlerRegistry = localPointerHandlerRegistry
-    context.localTerminationRegistry = localTerminationRegistry
-    context.localGestureRegistry = localGestureRegistry
-    context.localGestureStateRegistry = localGestureStateRegistry
-    context.localDefaultFocusRegistry = localDefaultFocusRegistry
-    context.localFocusBindingRegistry = localFocusBindingRegistry
-    context.localFocusedValuesRegistry = localFocusedValuesRegistry
-    context.localScrollPositionRegistry = localScrollPositionRegistry
-    context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
-    context.commandRegistry = commandRegistry
-    context.dropDestinationRegistry = dropDestinationRegistry
-    context.invalidationProxy = .init(invalidator: scheduler)
-    context.observationBridge = observationBridge
-    context.requestDeadline = { [weak scheduler] instant in
-      scheduler?.requestDeadline(instant)
-    }
-    return context
-  }
-
-  package func proposal() -> ProposedSize {
-    if let proposalOverride {
-      return proposalOverride
-    }
-
-    let size = presentationSurface.surfaceSize
-    return .init(width: size.width, height: size.height)
   }
 
   private func appendPendingAccessibilityAnnouncements(

@@ -8,30 +8,6 @@ package import SwiftTUIViews
 /// and registered animation/completion closures used by frame ticks.
 @MainActor
 package final class AnimationController: Sendable {
-  package struct Checkpoint {
-    fileprivate var previousSnapshots: [Identity: AnimatableSnapshot]
-    fileprivate var previousTreeRoot: ResolvedNode?
-    fileprivate var previousPlacedRoot: PlacedNode?
-    fileprivate var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect]
-    fileprivate var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity]
-    fileprivate var previousParentByIdentity: [Identity: Identity]
-    fileprivate var previousChildIndexByIdentity: [Identity: Int]
-    fileprivate var activeAnimations: [AnimationKey: ActiveAnimation]
-    fileprivate var registeredAnimations: [AnimationBox: Animation]
-    fileprivate var completionClosures: [AnimationBatchID: @Sendable () -> Void]
-    fileprivate var batchRefCounts: [AnimationBatchID: Int]
-    fileprivate var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
-    fileprivate var transitionsByIdentity: [Identity: AnyTransition]
-    fileprivate var previousTransitionsByIdentity: [Identity: AnyTransition]
-    fileprivate var pendingTransitionsByIdentity: [Identity: AnyTransition]
-    fileprivate var removingIdentities: [Identity: RemovalEntry]
-    fileprivate var previousIdentities: Set<Identity>
-    fileprivate var lastTickResult: AnimationTickResult
-    fileprivate var isFrameHeadTransactionActive: Bool
-    fileprivate var deferredFrameHeadCompletions: [@Sendable () -> Void]
-    fileprivate var lastFrameHeadCompletionCount: Int
-  }
-
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
   /// Full tree from the previous frame, retained so removals can capture
   /// their subtrees.
@@ -219,16 +195,10 @@ package final class AnimationController: Sendable {
   /// Called by the render pipeline after ``place`` runs.  When no
   /// removal overlays are pending this is a cheap reference copy.
   package func capturePlacedTree(_ placed: PlacedNode) {
-    previousPlacedRoot = placed
-    var matchedBounds: [MatchedGeometryKey: CellRect] = [:]
-    var matchedIdentities: [MatchedGeometryKey: Identity] = [:]
-    AnimationTreeQueries.collectMatchedGeometry(
-      placed,
-      bounds: &matchedBounds,
-      identities: &matchedIdentities
-    )
-    previousMatchedGeometryBounds = matchedBounds
-    previousMatchedKeyIdentities = matchedIdentities
+    let capture = AnimationPlacedTreeCapture.capture(placed)
+    previousPlacedRoot = capture.root
+    previousMatchedGeometryBounds = capture.matchedBounds
+    previousMatchedKeyIdentities = capture.matchedIdentities
   }
 
   /// Number of matched-geometry animations currently in flight.
@@ -242,32 +212,6 @@ package final class AnimationController: Sendable {
   /// capturePlacedTree is observing the matched-geometry field.
   package var previousMatchedGeometryKeyCount: Int {
     previousMatchedGeometryBounds.count
-  }
-
-  package struct DebugStateSnapshot: Equatable {
-    package var previousSnapshotIdentities: Set<Identity>
-    package var previousTreeRoot: ResolvedNode?
-    package var previousPlacedRoot: PlacedNode?
-    package var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect]
-    package var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity]
-    package var previousParentByIdentity: [Identity: Identity]
-    package var previousChildIndexByIdentity: [Identity: Int]
-    package var activeAnimationKeys: Set<AnimationKey>
-    package var registeredAnimationCount: Int
-    package var completionClosureBatchIDs: Set<AnimationBatchID>
-    package var batchRefCounts: [AnimationBatchID: Int]
-    package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
-    package var transitionIdentities: Set<Identity>
-    package var previousTransitionIdentities: Set<Identity>
-    package var pendingTransitionIdentities: Set<Identity>
-    package var removingIdentities: Set<Identity>
-    package var previousIdentities: Set<Identity>
-    package var lastTickHasPendingWork: Bool
-    package var lastTickNextDeadline: MonotonicInstant?
-    package var lastTickRedrawIdentities: Set<Identity>
-    package var isFrameHeadTransactionActive: Bool
-    package var deferredFrameHeadCompletionCount: Int
-    package var lastFrameHeadCompletionCount: Int
   }
 
   package func debugStateSnapshot() -> DebugStateSnapshot {
@@ -475,10 +419,14 @@ package final class AnimationController: Sendable {
     // identities that are already mid-removal: they exist in the
     // injected overlay but not in the live tree, so they should not be
     // re-inserted as "new".
-    let newIdentities = Set(newSnapshots.keys)
-    let liveIdentities = previousIdentities.subtracting(removingIdentities.keys)
-    let insertedIdentities = newIdentities.subtracting(previousIdentities)
-    let removedIdentities = liveIdentities.subtracting(newIdentities)
+    let resolvedDiff = AnimationResolvedIdentityDiff.make(
+      newSnapshots: newSnapshots,
+      previousIdentities: previousIdentities,
+      removingIdentities: Set(removingIdentities.keys)
+    )
+    let newIdentities = resolvedDiff.newIdentities
+    let insertedIdentities = resolvedDiff.insertedIdentities
+    let removedIdentities = resolvedDiff.removedIdentities
 
     // Matched-geometry detection.  A match fires when the current
     // frame's (identity, key) mapping differs from the previous
@@ -487,36 +435,27 @@ package final class AnimationController: Sendable {
     // cases are handled by comparing previous vs new key→identity
     // maps.  Collect the set of keys that matched so the
     // counterpart removal/transition can be skipped.
-    var matchedKeysConsumedByMatch: Set<MatchedGeometryKey> = []
-    for (identity, key) in newMatchedKeysByIdentity {
-      // Skip if the same identity held this key last frame — no
-      // swap, no translation.
-      if let previousIdentity = previousMatchedKeyIdentities[key],
-        previousIdentity == identity
-      {
-        continue
-      }
-      guard let fromBounds = previousMatchedGeometryBounds[key] else { continue }
-      guard case .animate(let box) = transaction.animationRequest else {
-        // Without withAnimation intent the match snaps to the new
-        // location immediately.
-        continue
-      }
-      let batchID = transaction.animationBatchID
+    let matchedGeometryPlans = AnimationResolvedTreeDiffing.matchedGeometryPlans(
+      newMatchedKeysByIdentity: newMatchedKeysByIdentity,
+      previousMatchedKeyIdentities: previousMatchedKeyIdentities,
+      previousMatchedGeometryBounds: previousMatchedGeometryBounds,
+      transaction: transaction
+    )
+    let matchedKeysConsumedByMatch = matchedGeometryPlans.consumedKeys
+    for plan in matchedGeometryPlans.animations {
       let matchedKey = AnimationKey(
-        identity: identity, scope: .matchedGeometry
+        identity: plan.identity, scope: .matchedGeometry
       )
       if let existing = activeAnimations[matchedKey] {
         releaseBatch(existing.batchID)
       }
-      retainBatch(batchID)
+      retainBatch(plan.batchID)
       activeAnimations[matchedKey] = ActiveAnimation(
-        kind: .matchedGeometry(fromBounds: fromBounds),
-        animationBox: box,
+        kind: .matchedGeometry(fromBounds: plan.fromBounds),
+        animationBox: plan.animationBox,
         startTime: timestamp,
-        batchID: batchID
+        batchID: plan.batchID
       )
-      matchedKeysConsumedByMatch.insert(key)
     }
 
     // Process insertions: kick off willAppear -> identity animations.
@@ -760,55 +699,23 @@ package final class AnimationController: Sendable {
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant
   ) {
-    // Find the one batch this resolve pass was opened for.  A single
-    // ``withAnimation`` scope opens exactly one batch per top-level
-    // call; nested `.animation(_:value:)` modifiers don't register
-    // completions, so we only ever have at most one stranded batch
-    // to consider per pass.
-    guard let batchID = transaction.animationBatchID else { return }
-    // A batch already tracked by ``batchRefCounts`` has at least
-    // one retained animation that will release it via the normal
-    // path — leave it alone.
-    guard batchRefCounts[batchID] == nil else { return }
-    // Only act on batches that registered a completion closure.  A
-    // plain `withAnimation(anim) { ... }` (no completion overload)
-    // never calls ``registerCompletion``, so there's nothing to
-    // drain even when the body changes nothing tracked.
-    guard completionClosures[batchID] != nil else { return }
-    // Don't reschedule a drain that's already pending from a
-    // previous resolve pass.
-    guard pendingEmptyBatchCompletions[batchID] == nil else { return }
+    let decision = AnimationCompletionScheduling.strandedBatchDecision(
+      for: transaction,
+      timestamp: timestamp,
+      registeredAnimations: registeredAnimations,
+      batchRefCounts: batchRefCounts,
+      completionClosures: completionClosures,
+      pendingEmptyBatchCompletions: pendingEmptyBatchCompletions
+    )
 
-    let drainDelay: Duration?
-    switch transaction.animationRequest {
-    case .animate(let box):
-      if let animation = registeredAnimations[box] {
-        // ``totalDuration`` is `nil` for `.repeatForever`.
-        drainDelay = animation.totalDuration
-      } else {
-        // Box without registration — fire immediately.  The
-        // registration usually happens at withAnimation-time, so
-        // a missing entry means the caller wanted a snap or
-        // constructed the transaction manually.
-        drainDelay = .zero
-      }
-    case .disabled, .inherit:
-      // `withAnimation(nil, body, completion)` routes through here:
-      // no animation was requested, so the completion is logically
-      // complete as soon as the body returns.
-      drainDelay = .zero
-    }
-
-    guard let drainDelay else {
-      // Infinite animation — don't fire the completion, matching
-      // SwiftUI.  Drop the closure so it doesn't leak indefinitely
-      // as every subsequent frame would revisit it.
-      completionClosures.removeValue(forKey: batchID)
+    switch decision {
+    case .ignore:
       return
+    case .schedule(let batchID, let deadline):
+      pendingEmptyBatchCompletions[batchID] = deadline
+    case .dropCompletion(let batchID):
+      completionClosures.removeValue(forKey: batchID)
     }
-
-    pendingEmptyBatchCompletions[batchID] =
-      timestamp.advanced(by: drainDelay)
   }
 
   private func enqueueInsertionAnimation(
@@ -1266,21 +1173,17 @@ package final class AnimationController: Sendable {
     // duration.  The closure is removed in a single pass so the same
     // drain can't double-fire across subsequent ticks.
     if !pendingEmptyBatchCompletions.isEmpty {
-      var drainedBatchIDs: [AnimationBatchID] = []
-      for (batchID, deadline) in pendingEmptyBatchCompletions {
-        if deadline <= timestamp {
-          drainedBatchIDs.append(batchID)
-          continue
-        }
-        // Still in flight — keep the run loop ticking until its
-        // deadline arrives.  Adopt the earliest still-pending drain
-        // deadline so the scheduler wakes exactly when needed.
+      let pendingDrain = AnimationCompletionScheduling.partitionPendingDrains(
+        pendingEmptyBatchCompletions,
+        at: timestamp
+      )
+      if let deadline = pendingDrain.nextDeadline {
         hasPendingWork = true
         if latestDeadline == timestamp || deadline < latestDeadline {
           latestDeadline = deadline
         }
       }
-      for batchID in drainedBatchIDs {
+      for batchID in pendingDrain.drainedBatchIDs {
         pendingEmptyBatchCompletions.removeValue(forKey: batchID)
         if let closure = completionClosures.removeValue(forKey: batchID) {
           fireOrDeferCompletion(closure)
