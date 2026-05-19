@@ -89,9 +89,12 @@ extension InputReader {
           }
         }
 
+        var backoff = InputPollBackoff()
+
         while !Task.isCancelled {
           switch readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) {
           case .bytes(let chunk):
+            backoff.recordInput()
             let decoded = decoder.decode(chunk)
 
             for message in decoded.controlMessages {
@@ -113,7 +116,8 @@ extension InputReader {
             if !pendingMouseEvents.isEmpty {
               flushPendingMouseEvents()
             }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
+            backoff.recordIdlePoll()
             continue
           case .endOfFile, .failure:
             flushPendingMouseEvents()
@@ -142,10 +146,12 @@ extension InputReader {
           mouseCoordinateMode: mouseCoordinateMode,
           transform: transform
         )
+        var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
           switch readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) {
           case .bytes(let chunk):
+            backoff.recordInput()
             let decoded = decoder.decode(chunk)
 
             for message in decoded.controlMessages {
@@ -158,7 +164,8 @@ extension InputReader {
             await Task.yield()
             continue
           case .wouldBlock:
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
+            backoff.recordIdlePoll()
             continue
           case .endOfFile, .failure:
             continuation.finish()
