@@ -1,5 +1,6 @@
 import Dispatch
 @_spi(Runners) import SwiftTUI
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -57,7 +58,14 @@ struct SceneRuntimeTests {
 
     let invocationCount = Mutex<Int>(0)
     let attachmentEvents = Mutex<[Bool]>([])
-    let firstSessionShouldEnd = Mutex<Bool>(false)
+    // Fired by the test to release the first mock session; AsyncEvent.wait()
+    // is cancellation-aware, so the second session parks on a never-fired
+    // event until the runtime's run task is cancelled.
+    let firstSessionShouldEnd = AsyncEvent()
+    // Notified on every lifecycle-relevant change — attachment transitions
+    // (after SceneRuntime has already updated lifecycle.state) and each mock
+    // session invocation — so the test awaits state poll-free.
+    let lifecycleSignal = MainActorConditionSignal()
     var firstClientFD: Int32 = -1
     var secondClientFD: Int32 = -1
 
@@ -69,24 +77,13 @@ struct SceneRuntimeTests {
           count += 1
           return count
         }
+        lifecycleSignal.notify()
 
         if invocation == 1 {
-          while !Task.isCancelled {
-            if firstSessionShouldEnd.withLock({ $0 }) {
-              break
-            }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-          }
-
-          return RunLoopResult(
-            finalState: SceneSessionState(),
-            renderedFrames: 1,
-            exitReason: .inputEnded
-          )
-        }
-
-        while !Task.isCancelled {
-          try? await Task.sleep(nanoseconds: 10_000_000)
+          await firstSessionShouldEnd.wait()
+        } else {
+          // Park until the runtime's run task is cancelled.
+          await AsyncEvent().wait()
         }
 
         return RunLoopResult(
@@ -104,13 +101,16 @@ struct SceneRuntimeTests {
           attachmentEvents.withLock {
             $0.append(isAttached)
           }
+          // `onAttachmentChanged` is invoked by the MainActor-isolated
+          // SceneRuntime after the lifecycle state has already transitioned.
+          MainActor.assumeIsolated {
+            lifecycleSignal.notify()
+          }
         }
       )
     }
     defer {
-      firstSessionShouldEnd.withLock {
-        $0 = true
-      }
+      firstSessionShouldEnd.fire()
       task.cancel()
       if firstClientFD >= 0 {
         sceneClose(firstClientFD)
@@ -129,27 +129,23 @@ struct SceneRuntimeTests {
     firstClientFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
     #expect(firstClientFD >= 0)
 
-    try await waitUntil("first attach") {
-      let invocation = invocationCount.withLock { $0 }
-      return invocation == 1 && runtime.lifecycle.state == .rendering
+    await lifecycleSignal.wait {
+      invocationCount.withLock { $0 } == 1 && runtime.lifecycle.state == .rendering
     }
 
-    firstSessionShouldEnd.withLock {
-      $0 = true
-    }
+    firstSessionShouldEnd.fire()
     sceneClose(firstClientFD)
     firstClientFD = -1
 
-    try await waitUntil("detach to suspended") {
+    await lifecycleSignal.wait {
       runtime.lifecycle.state == .suspended
     }
 
     secondClientFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
     #expect(secondClientFD >= 0)
 
-    try await waitUntil("second attach") {
-      let invocation = invocationCount.withLock { $0 }
-      return invocation == 2 && runtime.lifecycle.state == .rendering
+    await lifecycleSignal.wait {
+      invocationCount.withLock { $0 } == 2 && runtime.lifecycle.state == .rendering
     }
 
     task.cancel()
@@ -165,33 +161,4 @@ struct SceneRuntimeTests {
 
 private enum RuntimeTestError: Error {
   case missingSlavePath
-}
-
-@MainActor
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 10_000_000_000,
-  pollNanoseconds: UInt64 = 20_000_000,
-  condition: @escaping @MainActor () -> Bool
-) async throws {
-  let start = DispatchTime.now().uptimeNanoseconds
-  while !condition() {
-    let elapsed = DispatchTime.now().uptimeNanoseconds - start
-    if elapsed >= timeoutNanoseconds {
-      throw RuntimeTestErrorTimedOut(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private struct RuntimeTestErrorTimedOut: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
-  }
 }
