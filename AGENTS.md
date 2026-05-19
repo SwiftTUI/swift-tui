@@ -129,10 +129,10 @@ Test suites are split by layer:
 - `Platforms/CLI/Tests/` and `Platforms/WASI/Tests/` — runner and transport
   behavior.
 
-Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests;
-existing XCTest suites may remain. For runtime and animation tests, prefer real
-`RunLoop` input-path coverage and bounded condition-based waits over fixed
-sleeps. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Use Swift Testing (`import Testing`, `@Test`, `#expect`) for tests. For runtime
+and animation tests, prefer real `RunLoop` input-path coverage and bounded
+condition-based waits over fixed sleeps. See
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Documentation
 

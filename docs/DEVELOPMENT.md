@@ -43,8 +43,8 @@ flowchart TD
     wasi["SwiftTUIWASITests"] --> wasiT["Platforms/WASI"]
 ```
 
-New tests should be written with **Swift Testing** (`import Testing`, `@Test`,
-`#expect`). Existing XCTest suites may remain.
+Tests are written with **Swift Testing** (`import Testing`, `@Test`,
+`#expect`).
 
 ## The repo gate
 
