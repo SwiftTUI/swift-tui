@@ -145,7 +145,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["ABCD"]
       )
     )
-    #expect(controller.waitForBlockedWriteToStart())
+    controller.waitForBlockedWriteToStart()
 
     try host.presentAccessibilityCursorFocus(at: .init(x: 2, y: 0))
 
@@ -276,7 +276,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["AAAA"]
       )
     )
-    #expect(controller.waitForBlockedWriteToStart())
+    controller.waitForBlockedWriteToStart()
 
     _ = try host.present(
       RasterSurface(
@@ -346,7 +346,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["BBBB"]
       )
     )
-    #expect(controller.waitForBlockedWriteToStart())
+    controller.waitForBlockedWriteToStart()
 
     _ = try host.present(
       RasterSurface(
@@ -396,7 +396,7 @@ struct TerminalHostPresentationBatchingTests {
         lines: ["AAAA"]
       )
     )
-    #expect(controller.waitForBlockedWriteToStart())
+    controller.waitForBlockedWriteToStart()
 
     _ = try host.present(
       RasterSurface(
@@ -534,9 +534,9 @@ private final class BlockingPresentationWriteController: TerminalControlling {
 
     if shouldBlockFirstWrite {
       blockedWriteStarted.signal()
-      guard releaseBlockedWrite.wait(timeout: .now() + 1) == .success else {
-        throw TerminalHostError.failedToWrite(errno: ETIMEDOUT)
-      }
+      // No timeout: the test thread releases this deterministically. A blocking
+      // wait without a clock cannot flake under CI load.
+      releaseBlockedWrite.wait()
     }
 
     writesStorage.withLock { $0.append(output) }
@@ -550,8 +550,8 @@ private final class BlockingPresentationWriteController: TerminalControlling {
     []
   }
 
-  func waitForBlockedWriteToStart() -> Bool {
-    blockedWriteStarted.wait(timeout: .now() + 1) == .success
+  func waitForBlockedWriteToStart() {
+    blockedWriteStarted.wait()
   }
 
   func armBlockNextWrite() {

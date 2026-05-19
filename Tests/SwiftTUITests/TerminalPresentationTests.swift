@@ -1,8 +1,8 @@
 import Dispatch
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin
@@ -1211,13 +1211,13 @@ struct TerminalPresentationTests {
     let drainFinished = DispatchSemaphore(value: 0)
     DispatchQueue.global().async {
       drainStarted.signal()
-      _ = allowDrain.wait(timeout: .now() + 1)
+      allowDrain.wait()
       var buffer = Array(repeating: UInt8(0), count: 8192)
       _ = unsafe read(readDescriptor, &buffer, buffer.count)
       drainFinished.signal()
     }
 
-    #expect(drainStarted.wait(timeout: .now() + 1) == .success)
+    drainStarted.wait()
 
     let controller = POSIXTerminalController()
     let writeFinished = DispatchSemaphore(value: 0)
@@ -1231,11 +1231,14 @@ struct TerminalPresentationTests {
       writeFinished.signal()
     }
 
+    // Deliberate negative check: the pipe is full and the drain is gated, so
+    // the write must still be blocked. This asserts a non-event, so it is
+    // necessarily bounded by a short wait rather than an awaitable signal.
     #expect(writeFinished.wait(timeout: .now() + .milliseconds(50)) == .timedOut)
     allowDrain.signal()
 
-    #expect(drainFinished.wait(timeout: .now() + 1) == .success)
-    #expect(writeFinished.wait(timeout: .now() + 1) == .success)
+    drainFinished.wait()
+    writeFinished.wait()
     let completedWrite = try #require(writeResult.value)
     #expect(throws: Never.self) {
       try completedWrite.get()

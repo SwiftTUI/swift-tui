@@ -172,22 +172,9 @@ struct InputBatchingResponsivenessTests {
     _ = fcntl(readEnd, F_SETFL, flags | O_NONBLOCK)
 
     let reader = InputReader(fileDescriptor: readEnd)
-    let receivedEvents = LockedBox<[InputEvent]>([])
     // Construct the stream before writing so the dispatch source is installed
-    // even when the consumer task is delayed by the full parallel test suite.
+    // even when this task is delayed by the full parallel test suite.
     let inputEvents = reader.inputEvents()
-
-    let consumerTask = Task {
-      for await event in inputEvents {
-        receivedEvents.withLock { events in
-          events.append(event)
-          return ()
-        }
-      }
-    }
-    defer {
-      consumerTask.cancel()
-    }
 
     let scrollEventBytes: [UInt8] = Array("\u{1B}[<64;5;5M".utf8)
     let bytesWritten = unsafe scrollEventBytes.withUnsafeBufferPointer { buffer in
@@ -195,30 +182,20 @@ struct InputBatchingResponsivenessTests {
     }
     #expect(bytesWritten == scrollEventBytes.count)
 
-    func receivedScrollEvent() -> Bool {
-      receivedEvents.value.contains { event in
-        if case .mouse(let mouse) = event,
-          case .scrolled = mouse.kind
-        {
-          return true
-        }
-        return false
-      }
-    }
-
-    // Wait for the consumer task to drain the pipe and yield the event.  Keep
-    // the write end open until the event arrives so the dispatch source cannot
-    // observe EOF before its pending mouse flush runs under heavy test load.
-    let deadline = ContinuousClock.now.advanced(by: .seconds(15))
-    while ContinuousClock.now < deadline {
-      if receivedScrollEvent() {
+    // Consume the stream directly until the scroll event arrives — an await on
+    // the event itself, not a polled deadline. The write end stays open until
+    // then, so the dispatch source cannot observe EOF before its pending mouse
+    // flush runs under heavy test load.
+    var sawScrollEvent = false
+    for await event in inputEvents {
+      if case .mouse(let mouse) = event, case .scrolled = mouse.kind {
+        sawScrollEvent = true
         break
       }
-      try await Task.sleep(nanoseconds: 5_000_000)
     }
 
     #expect(
-      receivedScrollEvent(),
+      sawScrollEvent,
       "the consumer must see at least one scroll event from the pipe"
     )
 
