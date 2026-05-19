@@ -4,9 +4,9 @@ name: Build Linux dev image
 # and .devcontainer/devcontainer.json both consume the resulting image, so
 # this workflow is the only producer.
 #
-# Triggers are intentionally narrow: this image rebuilds only when its
-# inputs change (the Dockerfile itself, the Swift toolchain pin, or this
-# workflow). Use `workflow_dispatch` to force a rebuild on demand.
+# Triggers: this image rebuilds when its inputs change (the Dockerfile,
+# the Swift toolchain pin, or this workflow), weekly so it picks up
+# base-image security patches, and on demand via `workflow_dispatch`.
 #
 # Security note: every user-controllable input ($SWIFT_VERSION, $REF_NAME,
 # $EVENT_NAME, $OVERRIDE) is funneled through `env:` and shell-quoted, never
@@ -25,12 +25,20 @@ on:
       - "Scripts/linux/Dockerfile"
       - ".swift-version"
       - ".github/workflows/build-linux-image.yml"
+  # Weekly rebuild so the image picks up base-image security patches:
+  # `FROM swift:<version>` is a floating tag the Swift team rebuilds with
+  # OS CVE fixes, which this image only sees when it rebuilds itself.
+  schedule:
+    - cron: "17 7 * * 1"
   workflow_dispatch:
     inputs:
       push:
-        description: "Push the built image to GHCR (default true on main, false on PRs)"
+        description: "Push the built image to GHCR"
         type: boolean
         required: false
+        # default: true so an un-set boolean input resolves to "true"
+        # rather than "false" — see the "Decide whether to push" step.
+        default: true
 
 permissions:
   contents: read
@@ -81,15 +89,20 @@ jobs:
           OVERRIDE: ${{ inputs.push }}
         run: |
           set -euo pipefail
-          # Default: push on main and on workflow_dispatch; build-only on PRs.
-          # All inputs are read from env: vars (never inlined as Actions
-          # expressions in the script body) so a malicious branch name
-          # can't break out.
-          if [ -n "${OVERRIDE:-}" ]; then
+          # Push on main pushes, weekly scheduled rebuilds, and manual
+          # dispatches; build-only on PRs. For workflow_dispatch the `push`
+          # input decides — it carries `default: true`, so OVERRIDE is always
+          # a concrete "true"/"false" and the dispatch default is honored.
+          # (A prior `[ -n "$OVERRIDE" ]` guard was wrong: an un-set boolean
+          # input resolves to the string "false", not "", so a plain dispatch
+          # silently built without pushing.) All inputs are read from env:
+          # vars, never inlined as Actions expressions, so a malicious branch
+          # name can't break out.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             push="$OVERRIDE"
           elif [ "$EVENT_NAME" = "push" ] && [ "$REF_NAME" = "main" ]; then
             push=true
-          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          elif [ "$EVENT_NAME" = "schedule" ]; then
             push=true
           else
             push=false
