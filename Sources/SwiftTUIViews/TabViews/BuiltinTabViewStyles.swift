@@ -384,6 +384,9 @@ private enum TabStripChromeStyle {
   case powerline
 }
 
+/// FIXME: this view is an indication that TabViewStyle is not powerful enough to do its job.
+/// The implementations of each of the styles should be fully independent and there should be
+/// no introspection required to lay them out. This construct should go.
 private struct TabStripItemView: View {
   let label: String
   let isSelected: Bool
