@@ -3326,14 +3326,30 @@ Delivered as five behavior-preserving moves (see `migration_progress.md`):
 
 Rollback: revert each new file back into its source file.
 
-### Batch 147-151
+### Batch 147-151 — COMPLETED
 
-- Frame-tail retained state and worker-timing readability review.
-- RunLoop event pump, acquisition, and diagnostics naming follow-up.
-- Animation overlay planning boundary re-rank and lowest-risk extraction.
-- ViewGraph lifecycle/dependency support review after packet 126.
-- Central runtime/core documentation and handoff cleanup before the next
-  checkpoint.
+Delivered as four behavior-preserving moves plus the planned handoff packet
+(see `migration_progress.md`):
+
+- Packet 147: frame-drop blocker derivation →
+  `RunLoop+FrameDropBlockerDerivation.swift`.
+- Packet 148: completed-frame candidate support types →
+  `CompletedFrameCandidateTypes.swift`.
+- Packet 149: `PlacedAnimationOverlaySamplingResult` →
+  `PlacedAnimationOverlaySamplingResult.swift`.
+- Packet 150: zero-artifact diagnostic record builder →
+  `RunLoop+ZeroArtifactDiagnosticRecord.swift`.
+- Packet 151: documentation and handoff cleanup (migration artifacts).
+
+Rollback: revert each new file back into its source file.
+
+## Central Runtime/Core Migration — Complete
+
+All scheduled central runtime/core batches (packets 1-151) are done. Continued
+humanization moves to other production code per the repo-wide scope —
+`SwiftTUIViews`, `SwiftTUICharts`, `SwiftTUIAnimatedImage`, and
+`Platforms/*/Sources` — under the same SOP. Future batches there will be
+planned as they are reached.
 
 ## Human Checkpoints
 

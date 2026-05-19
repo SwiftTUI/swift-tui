@@ -3126,8 +3126,68 @@ Packet 142-146 batch validation:
   - Runner log: `/tmp/swift-tui-test-gate-20260518-184640-86536.log`
   - Result: PASS
 
-Next scheduled focus: continue with Batch 147-151 per the migration plan,
-remaining inside `SwiftTUICore` and `SwiftTUIRuntime`.
+## Packet 147-151 Batch: Diagnostic Support, Candidate Types, Overlay Result, Zero-Artifact Record, Handoff
+
+Scope completed (all within `SwiftTUICore` and `SwiftTUIRuntime`):
+
+- Packet 147: split frame-drop blocker derivation (`causeSummary`,
+  `frameDropEligibilityBlockers`, `droppedFrameBlockers`) out of
+  `RunLoop+FrameDiagnosticRecordAssembly.swift` into
+  `RunLoop+FrameDropBlockerDerivation.swift`.
+- Packet 148: split the completed-frame candidate support types
+  (`CompletedFrameCandidateResolution`, `CommittedFrameEffects`,
+  `CompletedFrameCandidateCommitPlanComparison`) out of
+  `DefaultRenderer+CompletedFrameCandidates.swift` into
+  `CompletedFrameCandidateTypes.swift`.
+- Packet 149: split the `PlacedAnimationOverlaySamplingResult` value type out of
+  `PlacedAnimationOverlaySampling.swift` into
+  `PlacedAnimationOverlaySamplingResult.swift`.
+- Packet 150: split the zero-artifact diagnostic record builder and its shared
+  value formatters out of `RunLoop+FrameDiagnosticRecordAssembly.swift` into
+  `RunLoop+ZeroArtifactDiagnosticRecord.swift`.
+- Packet 151: documentation and handoff cleanup — migration artifacts updated
+  to record the completed central runtime/core phase (packets 1-151) and to
+  hand off to the next phase (other production code outside the core).
+
+Behavior preserved:
+
+- Drop-blocker derivation, completed-frame candidate resolution, placed-overlay
+  sampling, and zero-artifact diagnostic record assembly all remained
+  unchanged. No public API, fixture, or test changed.
+
+Packet 147-151 focused validation:
+
+- `swiftly run swift build --target SwiftTUIRuntime` — PASS (packets 147-150)
+- `swiftly run swift test --filter TimingDiagnosticsTests`,
+  `FrameDropEligibilityTests` (20) — PASS
+- `swiftly run swift test --filter AsyncFrameTailRenderingTests` (52) — PASS
+- `swiftly run swift test --filter AnimationControllerTests` (64) — PASS
+- `swiftly run swift test --filter RenderDriverInstrumentationCostTests` — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 147-151 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-185750-packet147-151.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-185750-12943.log`
+  - Result: PASS
+
+## Central Runtime/Core Phase Complete
+
+Packets 1-151 are complete. The framework core (`SwiftTUICore` and
+`SwiftTUIRuntime`) has been incrementally decomposed into focused, documented
+files through 151 behavior-preserving packets across 30+ batches. Every batch
+passed the full repo gate; no public API, fixture, or test was changed.
+
+Next phase: per the repo-wide scope, humanization continues into other
+production code outside the central runtime/core — `Sources/SwiftTUIViews`,
+`Sources/SwiftTUICharts`, `Sources/SwiftTUIAnimatedImage`, and
+`Platforms/*/Sources` — using the same five-packet-batch SOP and the full repo
+gate. Example apps remain out of scope.
 
 ## Failed Attempts
 

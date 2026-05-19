@@ -2249,6 +2249,42 @@ Runner log: /tmp/swift-tui-test-gate-20260518-184640-86536.log
 Result: PASS
 ```
 
+## Latest Review Packets: 147-151
+
+This batch closes the central runtime/core phase. Packets 147-150 are
+behavior-preserving moves; packet 151 is documentation/handoff only.
+
+Production scope:
+
+- Packet 147 — frame-drop blocker derivation →
+  `RunLoop+FrameDropBlockerDerivation.swift`.
+- Packet 148 — completed-frame candidate support types →
+  `CompletedFrameCandidateTypes.swift`.
+- Packet 149 — `PlacedAnimationOverlaySamplingResult` →
+  `PlacedAnimationOverlaySamplingResult.swift`.
+- Packet 150 — zero-artifact diagnostic record builder + shared value
+  formatters → `RunLoop+ZeroArtifactDiagnosticRecord.swift`.
+- Packet 151 — migration artifact updates only; no source change.
+
+Behavior intentionally preserved:
+
+- Drop-blocker derivation, completed-frame candidate resolution, placed-overlay
+  sampling, and zero-artifact diagnostic record assembly are unchanged and
+  covered by focused checks.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-185750-packet147-151.log
+Runner log: /tmp/swift-tui-test-gate-20260518-185750-12943.log
+Result: PASS
+```
+
+This completes the central runtime/core phase (packets 1-151). Continued
+humanization moves to other production code per the repo-wide scope.
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict

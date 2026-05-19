@@ -1,25 +1,6 @@
 @_spi(Testing) package import SwiftTUICore
 package import SwiftTUIViews
 
-package struct PlacedAnimationOverlaySamplingResult: Sendable {
-  package var snapshot: PlacedAnimationOverlaySnapshot
-  package var removalCustomStates: [Identity: AnimationState]
-  package var activeAnimationCustomStates: [AnimationKey: AnimationState]
-  package var completedAnimationKeys: [AnimationKey]
-
-  package init(
-    snapshot: PlacedAnimationOverlaySnapshot,
-    removalCustomStates: [Identity: AnimationState] = [:],
-    activeAnimationCustomStates: [AnimationKey: AnimationState] = [:],
-    completedAnimationKeys: [AnimationKey] = []
-  ) {
-    self.snapshot = snapshot
-    self.removalCustomStates = removalCustomStates
-    self.activeAnimationCustomStates = activeAnimationCustomStates
-    self.completedAnimationKeys = completedAnimationKeys
-  }
-}
-
 package enum PlacedAnimationOverlaySampling {
   package static func sample(
     removingIdentities: [Identity: RemovalEntry],
