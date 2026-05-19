@@ -3345,11 +3345,32 @@ Rollback: revert each new file back into its source file.
 
 ## Central Runtime/Core Migration — Complete
 
-All scheduled central runtime/core batches (packets 1-151) are done. Continued
-humanization moves to other production code per the repo-wide scope —
+All scheduled central runtime/core batches (packets 1-151) are done.
+
+## Other Production Code — In Progress
+
+Humanization continues into other production code per the repo-wide scope —
 `SwiftTUIViews`, `SwiftTUICharts`, `SwiftTUIAnimatedImage`, and
-`Platforms/*/Sources` — under the same SOP. Future batches there will be
-planned as they are reached.
+`Platforms/*/Sources` — under the same five-packet-batch SOP.
+
+### Batch 152-156 — COMPLETED (SwiftTUIViews)
+
+Five behavior-preserving moves (see `migration_progress.md`):
+
+- Packet 152: environment action types → `EnvironmentActions.swift`.
+- Packet 153: resolve-tracking reference types → `ResolveWorkTracking.swift`.
+- Packet 154: picker selection-tag matching → `PickerSelectionSupport.swift`.
+- Packet 155: popover tip vocabulary → `PopoverTip.swift`.
+- Packet 156: foundational view protocols → `ViewProtocols.swift`.
+
+Also updated `Scripts/check_public_surface_policies.sh` paths to follow the
+moved `View` protocol and `OpenLinkAction` declarations.
+
+Rollback: revert each new file back into its source file; restore the two
+guardrail-script paths.
+
+Future `SwiftTUIViews`/`SwiftTUICharts`/platform batches will be planned as
+they are reached.
 
 ## Human Checkpoints
 

@@ -16,10 +16,10 @@ view_protocol_block=$(awk '
   /public protocol View \{/ { collecting = 1 }
   /extension Never: View \{/ { collecting = 0 }
   collecting { print }
-' Sources/SwiftTUIViews/Foundation/ViewFoundation.swift)
+' Sources/SwiftTUIViews/Foundation/ViewProtocols.swift)
 
 if [ -z "$view_protocol_block" ]; then
-  fail "Could not isolate the public View protocol block in Sources/SwiftTUIViews/Foundation/ViewFoundation.swift."
+  fail "Could not isolate the public View protocol block in Sources/SwiftTUIViews/Foundation/ViewProtocols.swift."
 else
   case "$view_protocol_block" in
   *"associatedtype Body: View = Never"*)
@@ -41,12 +41,12 @@ else
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
-  Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
+  Sources/SwiftTUIViews/Foundation/ViewProtocols.swift; then
   fail "The public View protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@ViewBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
+  Sources/SwiftTUIViews/Foundation/ViewProtocols.swift; then
   fail "View.body must stay @ViewBuilder and @MainActor-annotated."
 fi
 
@@ -111,7 +111,7 @@ if ! rg -n --fixed-strings --quiet -- 'action: @escaping @MainActor @Sendable ()
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (LinkDestination) -> Bool' \
-  Sources/SwiftTUIViews/Environment/Environment.swift; then
+  Sources/SwiftTUIViews/Environment/EnvironmentActions.swift; then
   fail "OpenLinkAction must stay main-actor-aware."
 fi
 

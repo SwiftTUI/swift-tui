@@ -2285,6 +2285,40 @@ Result: PASS
 This completes the central runtime/core phase (packets 1-151). Continued
 humanization moves to other production code per the repo-wide scope.
 
+## Latest Review Packets: 152-156 (SwiftTUIViews)
+
+First batch of the other-production-code phase. All behavior-preserving moves
+in `Sources/SwiftTUIViews`; public API inventory unchanged (669 symbols).
+
+Production scope:
+
+- Packet 152 — environment action types + keys + accessors →
+  `EnvironmentActions.swift`.
+- Packet 153 — resolve-tracking reference types → `ResolveWorkTracking.swift`.
+- Packet 154 — picker selection-tag matching → `PickerSelectionSupport.swift`.
+- Packet 155 — popover tip vocabulary → `PopoverTip.swift`.
+- Packet 156 — foundational view protocols → `ViewProtocols.swift`.
+
+Review note: `Scripts/check_public_surface_policies.sh` greps fixed source
+paths for the `View` protocol and `OpenLinkAction` `@MainActor` invariants.
+Packets 152 and 156 updated those two paths to the new files. The guardrail
+checks are unchanged and still fail-closed.
+
+Behavior intentionally preserved:
+
+- Environment action wiring, resolve tracking, picker optional-selection
+  matching, popover tips, and view-protocol dispatch are unchanged.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-195632-packet152-156.log
+Runner log: /tmp/swift-tui-test-gate-20260518-195632-54551.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict
