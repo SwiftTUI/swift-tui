@@ -1,5 +1,6 @@
 import SwiftTUICore
 import SwiftTUIRuntime
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -88,14 +89,10 @@ struct TerminalViewLayoutTests {
       try await runLoop.run()
     }
 
-    try await waitUntil("session started") {
-      session.isStarted
-    }
+    await session.startedSignal.wait { session.isStarted }
     session.publish(.clipboardWriteRequested(Array("child text".utf8)))
 
-    try await waitUntil("clipboard write") {
-      host.clipboardWrites == ["child text"]
-    }
+    await host.clipboardSignal.wait { host.clipboardWrites == ["child text"] }
 
     inputReader.finish()
     let result = try await task.value
@@ -160,6 +157,10 @@ private final class EventingTerminalSession: TerminalSession, Sendable {
 
   private let state: Mutex<State>
 
+  /// Notified when the session transitions to started, so a test can await
+  /// that transition poll-free instead of polling `isStarted`.
+  let startedSignal = ConditionSignal()
+
   init(grid: ForeignGrid) {
     state = Mutex(State(snapshot: grid))
   }
@@ -176,6 +177,7 @@ private final class EventingTerminalSession: TerminalSession, Sendable {
     state.withLock { state in
       state.isStarted = true
     }
+    startedSignal.notify()
   }
 
   func snapshot() async -> ForeignGrid {
@@ -221,12 +223,17 @@ private final class EventingTerminalSession: TerminalSession, Sendable {
   }
 }
 
-private final class ClipboardTerminalHost: PresentationSurface, ClipboardWritingPresentationSurface
+private final class ClipboardTerminalHost: PresentationSurface, ClipboardWritingPresentationSurface,
+  Sendable
 {
   var surfaceSize: CellSize { .init(width: 8, height: 2) }
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private let clipboardWritesStorage = Mutex<[String]>([])
+
+  /// Notified after every clipboard write, so a test can await a clipboard
+  /// condition poll-free instead of polling `clipboardWrites`.
+  let clipboardSignal = ConditionSignal()
 
   var clipboardWrites: [String] {
     clipboardWritesStorage.withLock { $0 }
@@ -242,6 +249,7 @@ private final class ClipboardTerminalHost: PresentationSurface, ClipboardWriting
   @MainActor
   func writeClipboard(_ text: String) throws -> Bool {
     clipboardWritesStorage.withLock { $0.append(text) }
+    clipboardSignal.notify()
     return true
   }
 }
@@ -293,33 +301,4 @@ private func allCommands(in node: DrawNode) -> [DrawCommand] {
   node.commands
     + node.children.flatMap(allCommands(in:))
     + node.postCommands
-}
-
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 15_000_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-
-  while !(await condition()) {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw TerminalViewLayoutTestTimeout(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private struct TerminalViewLayoutTestTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
-  }
 }
