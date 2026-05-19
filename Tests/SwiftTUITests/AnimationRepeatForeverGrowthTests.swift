@@ -1,4 +1,5 @@
 import Foundation
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -616,9 +617,9 @@ struct AnimationRepeatForeverGrowthTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
-      terminalInputReader: DelayedQuitTerminalInputReader(
-        delayNanoseconds: 200_000_000
-      ),
+      terminalInputReader: FrameCountQuitTerminalInputReader(
+        frameSignal: terminal.frameSignal
+      ) { terminal.presentCount >= 4 },
       signalReader: nil,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -778,20 +779,27 @@ private final class EmptyTerminalInputReader: TerminalInputReading {
   }
 }
 
-private final class DelayedQuitTerminalInputReader: TerminalInputReading {
-  let delayNanoseconds: UInt64
+private final class FrameCountQuitTerminalInputReader: TerminalInputReading {
+  private let frameSignal: MainActorConditionSignal
+  private let quitWhen: @MainActor () -> Bool
 
-  init(delayNanoseconds: UInt64) {
-    self.delayNanoseconds = delayNanoseconds
+  init(
+    frameSignal: MainActorConditionSignal,
+    quitWhen: @escaping @MainActor () -> Bool
+  ) {
+    self.frameSignal = frameSignal
+    self.quitWhen = quitWhen
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
-      let delayNanoseconds = self.delayNanoseconds
-      let task = Task {
-        if delayNanoseconds > 0 {
-          try? await Task.sleep(nanoseconds: delayNanoseconds)
-        }
+      let frameSignal = self.frameSignal
+      let quitWhen = self.quitWhen
+      let task = Task { @MainActor in
+        // Quit once the host has presented enough frames, re-checked on each
+        // present() rather than after a fixed wall-clock delay — the
+        // repeat-forever animation gets a deterministic number of ticks.
+        await frameSignal.wait(until: quitWhen)
         continuation.yield(.key(KeyPress(.character("d"), modifiers: .ctrl)))
         continuation.finish()
       }
@@ -808,6 +816,11 @@ private final class SlowPresentTerminalHost: PresentationSurface {
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   let presentDelayMicroseconds: useconds_t
+  private(set) var presentCount = 0
+
+  /// Notified after every present, so the input reader can quit on a frame
+  /// count instead of a wall-clock delay.
+  let frameSignal = MainActorConditionSignal()
 
   init(surfaceSize: CellSize, presentDelayMicroseconds: useconds_t) {
     self.surfaceSize = surfaceSize
@@ -823,6 +836,13 @@ private final class SlowPresentTerminalHost: PresentationSurface {
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     if presentDelayMicroseconds > 0 {
       usleep(presentDelayMicroseconds)
+    }
+    presentCount += 1
+    // The run loop only ever presents on the MainActor; `assumeIsolated`
+    // bridges this nonisolated witness to the MainActor-isolated signal.
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
     }
     return .init(
       bytesWritten: 0,
