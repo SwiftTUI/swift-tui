@@ -1,7 +1,6 @@
 import Foundation
 import SwiftTUICore
 import SwiftTUITerminal
-@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -34,9 +33,7 @@ struct RenderDiffTests {
       terminalSize: terminalSize
     )
 
-    let result = try await valueWithTimeout(timeoutNanoseconds: 10_000_000_000) {
-      try await runLoop.run()
-    }
+    let result = try await runLoop.run()
 
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
     #expect(host.presentationMetrics.count > 1)
@@ -72,9 +69,7 @@ struct RenderDiffTests {
       terminalSize: terminalSize
     )
 
-    let result = try await valueWithTimeout(timeoutNanoseconds: 10_000_000_000) {
-      try await runLoop.run()
-    }
+    let result = try await runLoop.run()
 
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
     #expect(host.presentationMetrics.count > 1)
