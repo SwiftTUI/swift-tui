@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUI
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -111,7 +112,7 @@ struct WebHostRunnerTests {
     }
 
     let session = await server.startedSession()
-    try await waitUntil("banner write") {
+    await banner.wrote.wait {
       banner.messages.contains(
         WebHostBanner.message(for: session, configuration: .init(port: 0))
       )
@@ -138,9 +139,7 @@ struct WebHostRunnerTests {
     }
 
     let session = await server.startedSession()
-    try await waitUntil("browser open") {
-      opener.openedURLs.count == 1
-    }
+    await opener.opened.wait { opener.openedURLs.count == 1 }
 
     #expect(opener.openedURLs == [session.url(path: "/")])
     await cancelAndDrain(task)
@@ -169,9 +168,7 @@ struct WebHostRunnerTests {
       }
     }
 
-    try await waitUntil("initial web-surface frame") {
-      await recorder.containsSurfaceFrame()
-    }
+    await recorder.waitForSurfaceFrame()
 
     outputTask.cancel()
     await cancelAndDrain(task)
@@ -265,6 +262,9 @@ private actor FakeWebHostServer: WebHostServer {
 private final class RecordingBrowserOpener: BrowserOpening, Sendable {
   private let storage = Mutex<[URL]>([])
 
+  /// Fires after each `open`, so tests await a browser open directly.
+  let opened = ConditionSignal()
+
   var openedURLs: [URL] {
     storage.withLock { $0 }
   }
@@ -275,11 +275,15 @@ private final class RecordingBrowserOpener: BrowserOpening, Sendable {
     storage.withLock {
       $0.append(url)
     }
+    opened.notify()
   }
 }
 
 private final class RecordingBannerWriter: WebHostBannerWriting, Sendable {
   private let storage = Mutex<[String]>([])
+
+  /// Fires after each `write`, so tests await a banner message directly.
+  let wrote = ConditionSignal()
 
   var messages: [String] {
     storage.withLock { $0 }
@@ -291,16 +295,25 @@ private final class RecordingBannerWriter: WebHostBannerWriting, Sendable {
     storage.withLock {
       $0.append(message)
     }
+    wrote.notify()
   }
 }
 
 private actor WebSocketOutputRecorder {
   private var messages: [WebHostSocketMessage] = []
+  private var surfaceFrameWaiters: [CheckedContinuation<Void, Never>] = []
 
   func record(
     _ message: WebHostSocketMessage
   ) {
     messages.append(message)
+    if containsSurfaceFrame() {
+      let waiters = surfaceFrameWaiters
+      surfaceFrameWaiters = []
+      for waiter in waiters {
+        waiter.resume()
+      }
+    }
   }
 
   func containsSurfaceFrame() -> Bool {
@@ -312,37 +325,15 @@ private actor WebSocketOutputRecorder {
       return output.contains("\u{1E}surface:")
     }
   }
-}
 
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 2_000_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
-  predicate: () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !(await predicate()) {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw WebHostRunnerTestError.timeout(label)
+  /// Suspends until a recorded message carries a web-surface frame.
+  func waitForSurfaceFrame() async {
+    if containsSurfaceFrame() {
+      return
     }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 2_000_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
-  predicate: () -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !predicate() {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw WebHostRunnerTestError.timeout(label)
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      surfaceFrameWaiters.append(continuation)
     }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
   }
 }
 
@@ -350,27 +341,7 @@ private func cancelAndDrain(
   _ task: Task<Void, any Error>
 ) async {
   task.cancel()
-  _ = try? await value(of: task, timeoutNanoseconds: 1_000_000_000)
-}
-
-private func value<T>(
-  of task: Task<T, any Error>,
-  timeoutNanoseconds: UInt64
-) async throws -> T {
-  try await withThrowingTaskGroup(of: T.self) { group in
-    group.addTask {
-      try await task.value
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw WebHostRunnerTestError.timeout("task")
-    }
-    let value = try await group.next()!
-    group.cancelAll()
-    return value
-  }
-}
-
-private enum WebHostRunnerTestError: Error, Equatable {
-  case timeout(String)
+  // The runner honours cancellation, so awaiting its completion is bounded
+  // without a timeout.
+  _ = try? await task.value
 }
