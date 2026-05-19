@@ -16,8 +16,8 @@
 
 #if !os(Windows)
 
+  import Testing
   import UnixSignals
-  import XCTest
   #if canImport(Darwin)
     import Darwin
   #elseif canImport(Glibc)
@@ -28,8 +28,11 @@
     import Android
   #endif
 
-  final class UnixSignalTests: XCTestCase {
-    func testSingleSignal() async {
+  // These tests trap and raise process-global UNIX signals, so they must run
+  // serially — parallel cases would steal each other's signal deliveries.
+  @Suite(.serialized)
+  struct UnixSignalTests {
+    @Test func singleSignal() async {
       let signal = UnixSignal.sigalrm
       let signals = await UnixSignalsSequence(trapping: signal)
       let pid = getpid()
@@ -37,10 +40,10 @@
       var signalIterator = signals.makeAsyncIterator()
       kill(pid, signal.rawValue)  // ignore-unacceptable-language
       let caught = await signalIterator.next()
-      XCTAssertEqual(caught, signal)
+      #expect(caught == signal)
     }
 
-    func testCatchingMultipleSignals() async {
+    @Test func catchingMultipleSignals() async {
       let signal = UnixSignal.sigalrm
       let signals = await UnixSignalsSequence(trapping: signal)
       let pid = getpid()
@@ -50,11 +53,11 @@
         kill(pid, signal.rawValue)  // ignore-unacceptable-language
 
         let caught = await signalIterator.next()
-        XCTAssertEqual(caught, signal)
+        #expect(caught == signal)
       }
     }
 
-    func testCancelOnSignal() async throws {
+    @Test func cancelOnSignal() async throws {
       enum GroupResult {
         case timedOut
         case cancelled
@@ -67,7 +70,7 @@
             try await Task.sleep(nanoseconds: 5_000_000_000)
             return .timedOut
           } catch {
-            XCTAssert(error is CancellationError)
+            #expect(error is CancellationError)
             return .cancelled
           }
         }
@@ -85,23 +88,23 @@
         kill(pid, UnixSignal.sigalrm.rawValue)  // ignore-unacceptable-language
 
         let first = try await group.next()
-        XCTAssertEqual(first, .caughtSignal)
+        #expect(first == .caughtSignal)
 
         // Caught the signal; cancel the remaining task.
         group.cancelAll()
         let second = try await group.next()
-        XCTAssertEqual(second, .cancelled)
+        #expect(second == .cancelled)
       }
     }
 
-    func testEmptySequence() async {
+    @Test func emptySequence() async {
       let signals = await UnixSignalsSequence(trapping: [])
       for await _ in signals {
-        XCTFail("Unexpected siganl")
+        Issue.record("Unexpected signal")
       }
     }
 
-    func testCorrectSignalIsGiven() async {
+    @Test func correctSignalIsGiven() async {
       let signals = await UnixSignalsSequence(
         trapping: .sigterm, .sigusr1, .sigusr2, .sighup, .sigint, .sigalrm)
       var signalIterator = signals.makeAsyncIterator()
@@ -112,13 +115,13 @@
       for _ in 0..<10 {
         kill(pid, signal.rawValue)  // ignore-unacceptable-language
         let trapped = await signalIterator.next()
-        XCTAssertEqual(trapped, signal)
+        #expect(trapped == signal)
       }
     }
 
-    func testSignalRawValue() {
+    @Test func signalRawValue() {
       func assert(_ signal: UnixSignal, rawValue: Int32) {
-        XCTAssertEqual(signal.rawValue, rawValue)
+        #expect(signal.rawValue == rawValue)
       }
 
       assert(.sigalrm, rawValue: SIGALRM)
@@ -130,9 +133,9 @@
       assert(.sigterm, rawValue: SIGTERM)
     }
 
-    func testSignalCustomStringConvertible() {
+    @Test func signalCustomStringConvertible() {
       func assert(_ signal: UnixSignal, description: String) {
-        XCTAssertEqual(String(describing: signal), description)
+        #expect(String(describing: signal) == description)
       }
 
       assert(.sigalrm, description: "SIGALRM")
@@ -145,7 +148,7 @@
       assert(.sigwinch, description: "SIGWINCH")
     }
 
-    func testCancelledTask() async {
+    @Test func cancelledTask() async {
       let task = Task {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
 
