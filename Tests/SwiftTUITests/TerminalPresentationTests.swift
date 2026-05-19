@@ -1206,6 +1206,11 @@ struct TerminalPresentationTests {
       chunk: Array(repeating: fillerByte, count: 1024)
     )
 
+    // This is a synchronous test that drives genuine *blocking* POSIX read/
+    // write syscalls on real `DispatchQueue.global()` threads. DispatchSemaphore
+    // is the correct primitive to coordinate them — the async test-sync signals
+    // cannot bridge blocking syscall threads — so these four semaphores are a
+    // deliberate, permanent exception to the test-sync ratchet.
     let drainStarted = DispatchSemaphore(value: 0)
     let allowDrain = DispatchSemaphore(value: 0)
     let drainFinished = DispatchSemaphore(value: 0)
