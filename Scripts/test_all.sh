@@ -122,6 +122,7 @@ if [ "${STUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
 fi
 
 skip_bun_install=0
+clean_builds=0
 host_os=$(uname -s)
 is_linux=0
 step_index=0
@@ -161,7 +162,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_all.sh [--skip-bun-install]
+Usage: Scripts/test_all.sh [--clean] [--skip-bun-install]
 
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
@@ -207,6 +208,13 @@ On Linux, the script also:
   - skips focused SwiftUIHost tests because the target is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
+
+Pass --clean to delete every SwiftPM `.build` directory before any step
+runs. The satellite packages reached via `--package-path` rebuild the repo's
+module graph inside their own `.build`, and SwiftPM's incremental tracking
+across that package boundary can leave a stale object linked against a
+since-changed symbol. --clean trades a from-scratch rebuild for a run that
+cannot be tripped by that staleness.
 
 For the curated repo gate, use Scripts/test_gate.sh. That runner keeps the same
 non-example surface but only includes Examples/gallery from the examples set.
@@ -324,6 +332,9 @@ for argument in "$@"; do
   case "$argument" in
   --skip-bun-install)
     skip_bun_install=1
+    ;;
+  --clean)
+    clean_builds=1
     ;;
   --example-scope=*)
     example_scope=${argument#--example-scope=}
@@ -468,6 +479,21 @@ check_fixture_recording_environment_disabled() {
   done
 }
 
+clean_swift_build_directories() {
+  build_dirs=$(find "$repo_root" -type d -name .build -prune 2>/dev/null)
+
+  if [ -z "$build_dirs" ]; then
+    echo "No SwiftPM .build directories found; nothing to clean."
+    return 0
+  fi
+
+  echo "$build_dirs" | while IFS= read -r build_dir; do
+    [ -n "$build_dir" ] || continue
+    echo "Removing $build_dir"
+    rm -rf "$build_dir"
+  done
+}
+
 print_failure_logs() {
   while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
     [ "$status" = "FAIL" ] || continue
@@ -542,6 +568,13 @@ run_function_step \
   "Check rendered fixture recording is disabled" \
   "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|STUI_RECORD_RENDERED_TEXT_FIXTURES|STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
   check_fixture_recording_environment_disabled
+
+if [ "$clean_builds" -eq 1 ]; then
+  run_function_step \
+    "Clean SwiftPM build directories" \
+    "find . -type d -name .build -prune -exec rm -rf {} +" \
+    clean_swift_build_directories
+fi
 
 if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
   run_step \

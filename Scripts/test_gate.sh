@@ -6,12 +6,16 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_gate.sh [--skip-bun-install]
+Usage: Scripts/test_gate.sh [--clean] [--skip-bun-install]
 
 Runs the curated repo gate:
   - the same policy, root-package, platform-package, and tooling checks as
     Scripts/test_all.sh
   - only Examples/gallery from the examples test set
+
+Pass --clean to delete every SwiftPM `.build` directory before any step runs,
+trading a from-scratch rebuild for a run that cannot be tripped by stale
+cross-package incremental artifacts.
 
 Use Scripts/test_all.sh for exhaustive example coverage.
 EOF
@@ -20,6 +24,8 @@ EOF
 for argument in "$@"; do
   case "$argument" in
   --skip-bun-install)
+    ;;
+  --clean)
     ;;
   -h | --help)
     usage
