@@ -417,6 +417,7 @@ let package = Package(
       dependencies: [
         "SwiftTUIAnimatedImage",
         "SwiftTUI",
+        "SwiftTUITestSupport",
       ],
       swiftSettings: swiftSettings()
     ),
