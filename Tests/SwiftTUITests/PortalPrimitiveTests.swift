@@ -1,8 +1,9 @@
 import Foundation
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -20,12 +21,14 @@ struct PortalPrimitiveTests {
       try? FileManager.default.removeItem(at: diagnosticsURL)
     }
 
-    let inputReader = PortalPrimitiveAwaitedInputReader(steps: [
-      .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-        terminal.frames.contains { $0.contains("Tick 1") }
-      },
-      .press(KeyPress(.character("d"), modifiers: .ctrl)),
-    ])
+    let inputReader = PortalPrimitiveAwaitedInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("Tick 1") }
+        },
+        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+      ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
@@ -72,16 +75,18 @@ struct PortalPrimitiveTests {
     let rootIdentity = testIdentity("PortalSpinnerRuntimeRoot")
     let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
-    let inputReader = PortalPrimitiveAwaitedInputReader(steps: [
-      .press(KeyPress(.return)),
-      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
-        terminal.frames.contains { $0.contains("Inspector") && $0.contains("⠋") }
-          && terminal.frames.contains { frame in
-            advancedGlyphs.contains { frame.contains($0) }
-          }
-      },
-      .press(KeyPress(.character("d"), modifiers: .ctrl)),
-    ])
+    let inputReader = PortalPrimitiveAwaitedInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .press(KeyPress(.return)),
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("Inspector") && $0.contains("⠋") }
+            && terminal.frames.contains { frame in
+              advancedGlyphs.contains { frame.contains($0) }
+            }
+        },
+        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+      ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
@@ -117,16 +122,18 @@ struct PortalPrimitiveTests {
     let rootIdentity = testIdentity("PortalSingleSpinnerRuntimeRoot")
     let expectedGlyphs = Set(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
-    let inputReader = PortalPrimitiveAwaitedInputReader(steps: [
-      .press(KeyPress(.return)),
-      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
-        observedSpinnerGlyphs(
-          in: terminal.frames,
-          expectedGlyphs: expectedGlyphs
-        ).count >= 7
-      },
-      .press(KeyPress(.character("d"), modifiers: .ctrl)),
-    ])
+    let inputReader = PortalPrimitiveAwaitedInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .press(KeyPress(.return)),
+        .awaitCondition {
+          observedSpinnerGlyphs(
+            in: terminal.frames,
+            expectedGlyphs: expectedGlyphs
+          ).count >= 7
+        },
+        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+      ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
@@ -173,7 +180,10 @@ private struct PortalTaskContent: View {
   var body: some View {
     Text("Tick \(tick)")
       .task(id: "advance") {
-        try? await Task.sleep(for: .milliseconds(20))
+        // Yield once so the update lands on a later runtime turn (the test
+        // asserts both the "Tick 0" and "Tick 1" frames) without pinning the
+        // hand-off to a wall-clock sleep.
+        await Task.yield()
         tick = 1
       }
   }
@@ -214,6 +224,10 @@ private final class PortalPrimitiveRecordingTerminalHost: PresentationSurface {
   let appearance: TerminalAppearance
   private(set) var frames: [String] = []
   private var lastPresentedSurface: RasterSurface?
+
+  /// Notified after every appended frame, so an awaited input step can
+  /// re-check its predicate the instant a frame lands instead of polling.
+  let frameSignal = MainActorConditionSignal()
 
   init(
     surfaceSize: CellSize,
@@ -264,11 +278,23 @@ private final class PortalPrimitiveRecordingTerminalHost: PresentationSurface {
     )
     frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
     lastPresentedSurface = surface
+    notifyFrameObservers()
     return metrics
   }
 
   func write(_ output: String) throws {
     frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
+    notifyFrameObservers()
+  }
+
+  /// The run loop only ever presents on the MainActor; `assumeIsolated`
+  /// bridges these nonisolated protocol witnesses to the MainActor-isolated
+  /// signal, trapping loudly rather than racing if that ever stops holding.
+  private func notifyFrameObservers() {
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
   }
 
   private func cursorSequence(row: Int, column: Int) -> String {
@@ -277,43 +303,35 @@ private final class PortalPrimitiveRecordingTerminalHost: PresentationSurface {
 }
 
 private enum PortalPrimitiveInputStep {
-  case press(KeyPress, delayNanoseconds: UInt64 = 0)
-  case waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
-    predicate: @MainActor () -> Bool
-  )
+  case press(KeyPress)
+  /// Suspends the input script until `predicate` holds, re-evaluated only when
+  /// the host appends a frame (`frameSignal.notify()`) rather than on a clock.
+  case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
 private final class PortalPrimitiveAwaitedInputReader: InputReading {
   private let steps: [PortalPrimitiveInputStep]
-  private let pollNanoseconds: UInt64
+  private let frameSignal: MainActorConditionSignal
 
   init(
-    steps: [PortalPrimitiveInputStep],
-    pollNanoseconds: UInt64 = 10_000_000
+    frameSignal: MainActorConditionSignal,
+    steps: [PortalPrimitiveInputStep]
   ) {
+    self.frameSignal = frameSignal
     self.steps = steps
-    self.pollNanoseconds = pollNanoseconds
   }
 
   func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       let steps = self.steps
-      let pollNanoseconds = self.pollNanoseconds
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         for step in steps {
           switch step {
-          case .press(let event, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
+          case .press(let event):
             continuation.yield(event)
-          case .waitUntil(let timeoutNanoseconds, let predicate):
-            var elapsedNanoseconds: UInt64 = 0
-            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
-              try? await Task.sleep(nanoseconds: pollNanoseconds)
-              elapsedNanoseconds += pollNanoseconds
-            }
+          case .awaitCondition(let predicate):
+            await frameSignal.wait(until: predicate)
           }
         }
         continuation.finish()
