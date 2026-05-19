@@ -46,4 +46,36 @@ struct AsyncEventTests {
     event.fire()
     await event.wait()
   }
+
+  @Test("a cancelled waiter resumes promptly instead of hanging")
+  func cancelledWaiterResumes() async {
+    let event = AsyncEvent()
+    let waiter = Task { await event.wait() }
+    waiter.cancel()
+    await waiter.value
+  }
+
+  @Test("a budgeted wait returns when the event fires inside its budget")
+  func budgetedWaitObservesFire() async throws {
+    let event = AsyncEvent()
+    let clock = ManualStageClock()
+    event.fire()
+    try await event.wait(
+      for: "pre-fired event",
+      within: ProgressBudget(stages: 3),
+      on: clock
+    )
+  }
+
+  @Test("a budgeted wait throws once the budget is exhausted")
+  func budgetedWaitThrowsWhenExhausted() async {
+    let event = AsyncEvent()
+    await #expect(throws: StageBudgetExceeded.self) {
+      try await event.wait(
+        for: "event that never fires",
+        within: ProgressBudget(stages: 1),
+        on: ExhaustedStageClock()
+      )
+    }
+  }
 }
