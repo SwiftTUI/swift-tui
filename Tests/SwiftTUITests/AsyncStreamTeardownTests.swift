@@ -1,5 +1,4 @@
 import Foundation
-@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -27,9 +26,7 @@ struct AsyncStreamTeardownTests {
     consumer.cancel()
     _ = await consumer.result
 
-    try await valueWithTimeout("managed stream termination", timeoutNanoseconds: 15_000_000_000) {
-      await probe.waitForTermination()
-    }
+    await probe.waitForTermination()
   }
 
   @Test("task-backed async stream cancels its producer task when the consumer terminates")
@@ -50,18 +47,12 @@ struct AsyncStreamTeardownTests {
       _ = await iterator.next()
     }
 
-    try await valueWithTimeout(
-      "producer yielded the first value", timeoutNanoseconds: 15_000_000_000
-    ) {
-      await probe.waitForYield()
-    }
+    await probe.waitForYield()
 
     consumer.cancel()
     _ = await consumer.result
 
-    try await valueWithTimeout("producer cancellation", timeoutNanoseconds: 15_000_000_000) {
-      await probe.waitForCancellation()
-    }
+    await probe.waitForCancellation()
   }
 
   @Test("task-backed async stream preserves normal finish semantics")
