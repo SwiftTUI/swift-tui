@@ -2506,8 +2506,13 @@ Revisited-phase batches:
   `private`→`package` widenings, all namespaced under the enum). No public API
   (669 symbols), fixture, or test changed; accessibility manifests regenerated
   for the relocated glyphs.
-- Batches 180+ (planned): `PickerRendering.swift`, `BoxDrawingRenderer.swift`,
-  `NativeTerminalSurfaceView.swift`, `CustomLayout.swift`.
+- **Batch 180-184** (done): `PickerRendering.swift` → 3 picker-style files +
+  `PickerSharedRendering.swift` (2 `private`→`internal` widenings);
+  `CustomLayout.swift` part 1 → `CustomLayoutPlacementGeometry.swift` (4
+  `private`→`internal` widenings). No public API (669), fixture, or test
+  changed.
+- Batches 185+ (planned): `CustomLayout.swift` part 2, `BoxDrawingRenderer.swift`,
+  `NativeTerminalSurfaceView.swift`.
 
 ## Risks
 

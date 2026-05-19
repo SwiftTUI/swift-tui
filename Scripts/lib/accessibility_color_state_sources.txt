@@ -24,7 +24,8 @@ Sources/SwiftTUICore/Styling/CollectionStylePresentations.swift
 Sources/SwiftTUIViews/Collections/Table.swift
 Sources/SwiftTUIViews/Controls/ButtonStyleChrome.swift
 Sources/SwiftTUIViews/Controls/ControlFocusRowSupport.swift
-Sources/SwiftTUIViews/Controls/PickerRendering.swift
+Sources/SwiftTUIViews/Controls/PickerSegmentedAndRadioStyles.swift
+Sources/SwiftTUIViews/Controls/PickerSharedRendering.swift
 Sources/SwiftTUIViews/Controls/Stepper.swift
 Sources/SwiftTUIViews/NavigationViews/BuiltinTabViewStyles.swift
 Sources/SwiftTUIViews/Presentation/PromptPresentationSurface.swift
