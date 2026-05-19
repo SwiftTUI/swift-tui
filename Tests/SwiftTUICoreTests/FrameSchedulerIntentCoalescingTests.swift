@@ -97,9 +97,14 @@ struct FrameSchedulerIntentCoalescingTests {
 
   @Test("pending frame waiter wakes for a new request before a future deadline")
   @MainActor
-  func pendingFrameWaiterWakesForRequestBeforeFutureDeadline() async throws {
+  func pendingFrameWaiterWakesForRequestBeforeFutureDeadline() async {
     let scheduler = FrameScheduler()
-    scheduler.requestDeadline(.now().advanced(by: .seconds(1)))
+    // A far-future deadline: if the waiter completes at all it can only be
+    // because the invalidation below woke it, never the deadline. So a plain
+    // `await waiter.value` is the whole assertion — a regression hangs and is
+    // caught by the CI job timeout, with no wall-clock budget that could
+    // flake on a loaded runner.
+    scheduler.requestDeadline(.now().advanced(by: .seconds(3600)))
 
     let waiter = Task { @MainActor in
       await (scheduler as any PendingFrameAwaiting).waitForPendingFrame(at: .now())
@@ -108,39 +113,13 @@ struct FrameSchedulerIntentCoalescingTests {
       waiter.cancel()
     }
 
-    try await Task.sleep(nanoseconds: 25_000_000)
+    // Give the waiter a turn to reach its suspension point before the
+    // invalidation, so this exercises the wake-a-suspended-waiter path.
+    // Correctness does not depend on it: a waiter that has not suspended yet
+    // simply observes the pending frame immediately instead.
+    await Task.yield()
     scheduler.requestInvalidation(of: [testIdentity("EarlyInvalidation")])
 
-    try await valueWithTimeout("pending frame waiter", timeoutNanoseconds: 250_000_000) {
-      await waiter.value
-    }
-  }
-}
-
-private func valueWithTimeout<Value: Sendable>(
-  _ label: String,
-  timeoutNanoseconds: UInt64,
-  _ operation: @escaping @Sendable () async throws -> Value
-) async throws -> Value {
-  try await withThrowingTaskGroup(of: Value.self) { group in
-    group.addTask {
-      try await operation()
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw FrameSchedulerIntentCoalescingTimeout(label: label)
-    }
-
-    let value = try await group.next()!
-    group.cancelAll()
-    return value
-  }
-}
-
-private struct FrameSchedulerIntentCoalescingTimeout: Error, CustomStringConvertible {
-  var label: String
-
-  var description: String {
-    "Timed out waiting for \(label)"
+    await waiter.value
   }
 }
