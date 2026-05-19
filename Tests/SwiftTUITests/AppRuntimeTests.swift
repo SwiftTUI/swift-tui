@@ -1,8 +1,9 @@
 import Foundation
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
-@_spi(Runners) @testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -150,19 +151,21 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.StatefulTextEditorWindow",
       presentationSurface: terminal,
-      inputReader: AwaitedScriptedInputReader(steps: [
-        .press(KeyPress(.character("H"))),
-        .press(KeyPress(.character("i"))),
-        .press(KeyPress(.return)),
-        .press(KeyPress(.character("!"))),
-        .waitUntil {
-          guard let lastFrame = terminal.frames.last else {
-            return false
-          }
-          return lastFrame.contains("Lines: 2") && lastFrame.contains("Preview: Hi | !")
-        },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
-      ]),
+      inputReader: AwaitedScriptedInputReader(
+        frameSignal: terminal.frameSignal,
+        steps: [
+          .press(KeyPress(.character("H"))),
+          .press(KeyPress(.character("i"))),
+          .press(KeyPress(.return)),
+          .press(KeyPress(.character("!"))),
+          .awaitCondition {
+            guard let lastFrame = terminal.frames.last else {
+              return false
+            }
+            return lastFrame.contains("Lines: 2") && lastFrame.contains("Preview: Hi | !")
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]),
       signalReader: EmptySignalReader()
     )
 
@@ -245,20 +248,22 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetPresentationWindow.Escape",
       presentationSurface: terminal,
-      inputReader: AwaitedScriptedInputReader(steps: [
-        .press(KeyPress(.return)),
-        .waitUntil {
-          terminal.frames.contains { $0.contains("Sheet body") }
-        },
-        .press(KeyPress(.escape)),
-        .waitUntil {
-          guard let lastFrame = terminal.frames.last else {
-            return false
-          }
-          return !lastFrame.contains("Sheet body") && lastFrame.contains("Count 1")
-        },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
-      ]),
+      inputReader: AwaitedScriptedInputReader(
+        frameSignal: terminal.frameSignal,
+        steps: [
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Sheet body") }
+          },
+          .press(KeyPress(.escape)),
+          .awaitCondition {
+            guard let lastFrame = terminal.frames.last else {
+              return false
+            }
+            return !lastFrame.contains("Sheet body") && lastFrame.contains("Count 1")
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]),
       signalReader: EmptySignalReader()
     )
 
@@ -287,21 +292,23 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetFocusRestorationWindow",
       presentationSurface: terminal,
-      inputReader: AwaitedScriptedInputReader(steps: [
-        .press(KeyPress(.return)),
-        .waitUntil {
-          terminal.frames.contains { $0.contains("Sheet focus active: true") }
-        },
-        .press(KeyPress(.escape)),
-        .waitUntil {
-          guard let lastFrame = terminal.frames.last else {
-            return false
-          }
-          return !lastFrame.contains("Sheet focus active: true")
-            && lastFrame.contains("Base focused: true")
-        },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
-      ]),
+      inputReader: AwaitedScriptedInputReader(
+        frameSignal: terminal.frameSignal,
+        steps: [
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Sheet focus active: true") }
+          },
+          .press(KeyPress(.escape)),
+          .awaitCondition {
+            guard let lastFrame = terminal.frames.last else {
+              return false
+            }
+            return !lastFrame.contains("Sheet focus active: true")
+              && lastFrame.contains("Base focused: true")
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]),
       signalReader: EmptySignalReader()
     )
 
@@ -1121,6 +1128,10 @@ private final class RecordingTerminalHost: PresentationSurface {
   private(set) var presentedSurfaceSizes: [CellSize] = []
   private var lastPresentedSurface: RasterSurface?
 
+  /// Notified after every appended frame, so an awaited input step can
+  /// re-check its predicate the instant a frame lands instead of polling.
+  let frameSignal = MainActorConditionSignal()
+
   init(
     surfaceSize: CellSize = .init(width: 60, height: 18),
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
@@ -1172,11 +1183,23 @@ private final class RecordingTerminalHost: PresentationSurface {
     presentedSurfaceSizes.append(surface.size)
     frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
     lastPresentedSurface = surface
+    notifyFrameObservers()
     return metrics
   }
 
   func write(_ output: String) throws {
     frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
+    notifyFrameObservers()
+  }
+
+  /// The run loop only ever presents on the MainActor; `assumeIsolated`
+  /// bridges these nonisolated protocol witnesses to the MainActor-isolated
+  /// signal.
+  private func notifyFrameObservers() {
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
   }
 
   private func cursorSequence(row: Int, column: Int) -> String {
@@ -1206,43 +1229,35 @@ private final class ScriptedInputReader: InputReading {
 }
 
 private enum AwaitedInputStep {
-  case press(KeyPress, delayNanoseconds: UInt64 = 0)
-  case waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
-    predicate: @MainActor () -> Bool
-  )
+  case press(KeyPress)
+  /// Suspends the input script until `predicate` holds, re-evaluated only when
+  /// the host appends a frame (`frameSignal.notify()`) rather than on a clock.
+  case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
 private final class AwaitedScriptedInputReader: InputReading {
   private let steps: [AwaitedInputStep]
-  private let pollNanoseconds: UInt64
+  private let frameSignal: MainActorConditionSignal
 
   init(
-    steps: [AwaitedInputStep],
-    pollNanoseconds: UInt64 = 10_000_000
+    frameSignal: MainActorConditionSignal,
+    steps: [AwaitedInputStep]
   ) {
+    self.frameSignal = frameSignal
     self.steps = steps
-    self.pollNanoseconds = pollNanoseconds
   }
 
   func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       let steps = self.steps
-      let pollNanoseconds = self.pollNanoseconds
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         for step in steps {
           switch step {
-          case .press(let event, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
+          case .press(let event):
             continuation.yield(event)
-          case .waitUntil(let timeoutNanoseconds, let predicate):
-            var elapsedNanoseconds: UInt64 = 0
-            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
-              try? await Task.sleep(nanoseconds: pollNanoseconds)
-              elapsedNanoseconds += pollNanoseconds
-            }
+          case .awaitCondition(let predicate):
+            await frameSignal.wait(until: predicate)
           }
         }
         continuation.finish()
