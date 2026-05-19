@@ -2370,6 +2370,47 @@ Runner log: /tmp/swift-tui-test-gate-20260518-210648-12881.log
 Result: PASS
 ```
 
+## Latest Review Packets: 162-166 (SwiftTUIViews)
+
+Third batch of the other-production-code phase. All behavior-preserving moves
+in `Sources/SwiftTUIViews`; public API inventory unchanged (669 symbols).
+
+Production scope:
+
+- Packet 162 — `ResolveContext` + extensions → `Environment/ResolveContext.swift`.
+  One documented access widening: `EnvironmentValues.applying(to:reuseStyle:)`
+  `fileprivate` → `package`, so the moved file can fold environment edits back
+  into a snapshot.
+- Packet 163 — gesture-recognizer decorator classes →
+  `Gestures/GestureModifierDecorators.swift`.
+- Packet 164 — `PopoverAttachmentAnchor` + `attachmentRect` →
+  `Presentation/PopoverAttachmentAnchor.swift`.
+- Packet 165 — tab metadata-peeking protocols/conformances →
+  `NavigationViews/TabMetadataPeeking.swift`.
+- Packet 166 — `Section` view → `Collections/Section.swift`.
+
+Review note: no path-pinned guardrail needed updating this batch — none of
+the moved declarations are pinned by `check_public_surface_policies.sh` or the
+doc ratchet. The one access change (`EnvironmentValues.applying`,
+`fileprivate` → `package`) does not affect the public surface; the inventory
+held at 669 symbols.
+
+Behavior intentionally preserved:
+
+- Resolve-context construction/derivation, gesture-recognizer decoration,
+  popover anchor resolution, tab metadata peeking, and section resolution are
+  unchanged.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-213611-packet162-166.log
+Runner log: /tmp/swift-tui-test-gate-20260518-213611-44263.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict
