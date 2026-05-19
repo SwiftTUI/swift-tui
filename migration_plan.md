@@ -3433,8 +3433,51 @@ code moved to new files.
 Rollback: revert each new file back into `ChartSupport.swift`; rerun
 `check_accessibility_guardrails.sh --update`.
 
-Future `SwiftTUIViews`/`SwiftTUICharts`/platform batches will be planned as
-they are reached.
+### Batch 172-174 — COMPLETED (Platforms)
+
+Three behavior-preserving moves in `Platforms/*/Sources` (see
+`migration_progress.md` for validation logs):
+
+- Packet 172: `WebSurfaceInputParser` → `WebSurfaceInputParser.swift`
+  (zero widening).
+- Packet 173: `TerminalWorkspaceSplitLayout` → `TerminalWorkspaceSplitLayout.swift`
+  (one documented `private` → file-internal widening).
+- Packet 174: `App.main()` launch entry points + `exitLaunch` →
+  `App+TerminalLaunch.swift` (doc-ratchet row repathed).
+
+Closed at three packets: clean, safely-extractable slices in platform host
+code are scarce. A first attempt at a fourth packet (`NativeTerminalMetrics`)
+was reverted — `NativeTerminalSurfaceView.swift` is entangled via file-private
+platform typealiases.
+
+Rollback: revert each new file back into its source file; reverse the
+`TerminalWorkspaceSplitLayout` widening; restore the doc-ratchet path.
+
+## Migration Status — Substantially Complete
+
+The cleanly-decomposable production code has been decomposed across 174
+behavior-preserving packets (1-151 central runtime/core; 152-174 other
+production code). The remaining large files were assessed and are
+**deliberately skipped** as too entangled for a safe behavior-preserving
+slice (single-file `private`/`fileprivate` cohesion):
+
+- `Sources/SwiftTUIViews/Layout/CustomLayout.swift` — `fileprivate` init and
+  members across the `AnyLayout` box machinery.
+- `Sources/SwiftTUIViews/NavigationViews/BuiltinTabViewStyles.swift` —
+  dense web of cross-calling `private` style item views and chrome functions.
+- `Sources/SwiftTUIViews/Controls/SelectionAndValueSupport.swift` — the
+  `private` value-formatting cluster is called from many file-internal sites.
+- `Sources/SwiftTUIViews/Controls/PickerRendering.swift` — interleaved
+  `private` picker-style bodies and rendering helpers.
+- `Platforms/SwiftUI/Sources/SwiftUIHost/NativeTerminalSurfaceView.swift` —
+  file-private platform-conditional typealiases (`NativePlatformFont`).
+- `Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer.swift` —
+  `fileprivate` drawing primitives shared across the enum and its extensions.
+- `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceFrameEncoder.swift` —
+  a large `private`-method namespace enum with dense internal cross-calls.
+
+Splitting any of these would require widening many declarations at once,
+which the migration treats as outside the behavior-preserving bar.
 
 ## Human Checkpoints
 

@@ -2451,6 +2451,53 @@ Runner log: /tmp/swift-tui-test-gate-20260518-214925-77602.log
 Result: PASS
 ```
 
+## Latest Review Packets: 172-174 (Platforms)
+
+Fifth batch of the other-production-code phase — a three-packet batch in
+`Platforms/*/Sources`. Public API inventory unchanged (669 symbols).
+
+Production scope:
+
+- Packet 172 — `WebSurfaceInputParser` → `WebSurfaceInputParser.swift`
+  (zero widening).
+- Packet 173 — `TerminalWorkspaceSplitLayout` →
+  `TerminalWorkspaceSplitLayout.swift` (one documented `private` →
+  file-internal widening).
+- Packet 174 — `App.main()` launch entry points + `exitLaunch` →
+  `App+TerminalLaunch.swift`.
+
+Review note: Packet 174 repathed the `public static func main() async` row in
+`public_documentation_ratchet.txt` to follow the moved declaration. A first
+attempt at a fourth packet (`NativeTerminalMetrics`) was reverted —
+`NativeTerminalSurfaceView.swift` is entangled via file-private platform
+typealiases — so the batch closed at three.
+
+Behavior intentionally preserved:
+
+- Web-surface input parsing, workspace split layout, and terminal app launch
+  are unchanged. No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+First attempt FAILED: doc ratchet flagged the moved App.main() (stale
+TerminalRunner.swift path). Repathed the ratchet row, re-ran.
+User tee log: /tmp/swift-tui-test-gate-20260518-220532-packet172-174.log
+Runner log: /tmp/swift-tui-test-gate-20260518-220532-9354.log
+Result: PASS
+```
+
+## Migration Status
+
+The production-code humanization is substantially complete: 174
+behavior-preserving packets (1-151 central runtime/core; 152-174 other
+production code under `SwiftTUIViews`, `SwiftTUICharts`, and `Platforms`).
+The remaining large files are documented in `migration_plan.md` as
+deliberately skipped — they are single-file units built on `private` /
+`fileprivate` cohesion, and a safe behavior-preserving slice is not available
+without widening many declarations at once.
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict
