@@ -1468,18 +1468,22 @@ private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
       let steps = self.steps
       let frameSignal = self.frameSignal
       let task = Task { @MainActor in
+        // Virtual clock: a step's delay advances the timestamp stamped onto
+        // the event rather than being slept through, so drag-release velocity
+        // is deterministic and independent of wall-clock pacing.
+        var virtualClock = MonotonicInstant.now()
         for step in steps {
           switch step {
           case .event(let event, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
-            continuation.yield(event)
+            virtualClock = virtualClock.advanced(
+              by: .nanoseconds(Int64(delayNanoseconds))
+            )
+            continuation.yield(restampedInputEvent(event, at: virtualClock))
           case .eventFrom(let delayNanoseconds, let provider):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
-            continuation.yield(provider())
+            virtualClock = virtualClock.advanced(
+              by: .nanoseconds(Int64(delayNanoseconds))
+            )
+            continuation.yield(restampedInputEvent(provider(), at: virtualClock))
           case .awaitCondition(let predicate):
             await frameSignal.wait(until: predicate)
           }
@@ -1492,6 +1496,20 @@ private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
       }
     }
   }
+}
+
+/// Re-stamps a scripted mouse event with a virtual timestamp so the runtime's
+/// gesture velocity tracker sees a deterministic inter-event interval. Non-mouse
+/// events are returned unchanged.
+private func restampedInputEvent(
+  _ event: InputEvent,
+  at timestamp: MonotonicInstant
+) -> InputEvent {
+  guard case .mouse(var mouseEvent) = event else {
+    return event
+  }
+  mouseEvent.timestamp = timestamp
+  return .mouse(mouseEvent)
 }
 
 private final class GalleryTabSwitchEmptySignals: SignalReading {
