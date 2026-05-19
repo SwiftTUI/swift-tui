@@ -297,7 +297,7 @@ private func writeAll(
   _ bytes: [UInt8],
   to fileDescriptor: Int32
 ) throws {
-  try bytes.withUnsafeBufferPointer { buffer in
+  try unsafe bytes.withUnsafeBufferPointer { buffer in
     var written = 0
     while written < bytes.count {
       let result = unsafe write(

@@ -1,5 +1,5 @@
 @_spi(Testing) package import SwiftTUICore
-package import SwiftTUIViews
+import SwiftTUIViews
 
 /// Snapshot of every tracked animatable slot's value for one view
 /// ``Identity`` after a resolve pass.  Stored per-identity in
