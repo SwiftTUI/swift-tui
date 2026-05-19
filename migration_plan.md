@@ -3313,13 +3313,18 @@ Delivered as five behavior-preserving moves (see `migration_progress.md`):
 
 Rollback: revert each new file back into its source file.
 
-### Batch 142-146
+### Batch 142-146 — COMPLETED
 
-- Core frame artifact and diagnostics helper review.
-- RunLoop presentation/focus convergence follow-up cleanup.
-- Animation removal overlay planning support review.
-- ViewGraph dependency/debug snapshot final consolidation pass.
-- Central runtime/core re-rank and handoff cleanup.
+Delivered as five behavior-preserving moves (see `migration_progress.md`):
+
+- Packet 142: frame diagnostic component structs → `FrameDiagnosticComponents.swift`.
+- Packet 143: `FocusSyncRerenderBudget` → `FocusSyncRerenderBudget.swift`.
+- Packet 144: frame-head phase helpers → `FrameHeadCoordinatorPhaseSupport.swift`.
+- Packet 145: `ViewNode.DebugTotalStateSnapshot` type → `ViewNodeDebugSnapshots.swift`.
+- Packet 146: lifecycle planning contract types →
+  `ViewGraphLifecyclePlanningTypes.swift`.
+
+Rollback: revert each new file back into its source file.
 
 ### Batch 147-151
 

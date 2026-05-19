@@ -2217,6 +2217,38 @@ Runner log: /tmp/swift-tui-test-gate-20260518-183437-57793.log
 Result: PASS
 ```
 
+## Latest Review Packets: 142-146
+
+This five-packet batch continues the constrained central runtime/core pass.
+Every packet is a behavior-preserving move; no logic was rewritten.
+
+Production scope:
+
+- Packet 142 — `FrameDiagnostic*` component structs → `FrameDiagnosticComponents.swift`.
+- Packet 143 — `FocusSyncRerenderBudget` → `FocusSyncRerenderBudget.swift`.
+- Packet 144 — frame-head phase helpers → `FrameHeadCoordinatorPhaseSupport.swift`
+  (`withAnimationDraftSinks`/`measurePhase` widened `private` → file-internal).
+- Packet 145 — `ViewNode.DebugTotalStateSnapshot` type declaration →
+  `ViewNodeDebugSnapshots.swift` (the building method stays in `ViewNode.swift`).
+- Packet 146 — lifecycle planning contract types →
+  `ViewGraphLifecyclePlanningTypes.swift`.
+
+Behavior intentionally preserved:
+
+- Frame diagnostics field shape, focus-sync convergence budgeting, frame-head
+  phase timing, ViewNode debug snapshot contents, and lifecycle event planning
+  are unchanged and covered by focused checks.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-184640-packet142-146.log
+Runner log: /tmp/swift-tui-test-gate-20260518-184640-86536.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict

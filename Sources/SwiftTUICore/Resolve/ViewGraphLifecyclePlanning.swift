@@ -1,20 +1,3 @@
-struct ViewGraphFrameLifecycleEventPlan {
-  var events: [LifecycleEvent]
-  var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
-  var viewportLifecycleOrder: [Identity]
-}
-
-struct ViewGraphLifecyclePlanningInput {
-  var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
-  var viewportLifecycleOrder: [Identity]
-  var changeHandlerIDsByIdentity: [(identity: Identity, handlerIDs: [String])]
-  var stableTaskCancelEvents: [LifecycleEvent]
-  var stableTaskStartEvents: [LifecycleEvent]
-  var structuralAppearEvents: [LifecycleEvent]
-  var structuralTaskCancelEvents: [LifecycleEvent]
-  var structuralDisappearEvents: [LifecycleEvent]
-}
-
 private struct ViewGraphViewportLifecycleEventPlan {
   var events: [LifecycleEvent]
   var nodesByIdentity: [Identity: LifecycleStateNode]
