@@ -20,21 +20,24 @@ Begin with the primary SwiftTUI infrastructure supporting terminal rendering:
 The initial slice should target production code on the terminal presentation
 path before moving outward to less central production areas.
 
-## Current Constrained Focus
+## Current Focus
 
-As of packet 126, remaining migration work is constrained to the central runtime
-and primary core:
+As of packet 151, the central runtime/core phase is complete: `SwiftTUICore`
+and `SwiftTUIRuntime` have been incrementally decomposed through 151
+behavior-preserving packets.
 
-- `Sources/SwiftTUICore/`
-- `Sources/SwiftTUIRuntime/`
+Remaining migration work continues into other production code under the
+repo-wide scope (below), starting outside the central runtime/core:
+
+- `Sources/SwiftTUIViews/`
+- `Sources/SwiftTUICharts/`
+- `Sources/SwiftTUIAnimatedImage/`
+- `Platforms/*/Sources/`
 - repo policy, migration, and validation artifacts needed to support those
   production changes
 
-Previously completed view, chart, platform, tooling, and example-adjacent work
-remains part of the historical migration record, but new packets should not
-expand into `SwiftTUIViews`, `SwiftTUICharts`, `SwiftTUIAnimatedImage`,
-`Platforms`, `Tools`, or examples unless needed to preserve validation or policy
-artifacts for a central runtime/core move.
+Example apps under `Examples/` remain out of scope. Public APIs remain stable
+unless a later human checkpoint approves a change.
 
 ## Repo-Wide Scope
 

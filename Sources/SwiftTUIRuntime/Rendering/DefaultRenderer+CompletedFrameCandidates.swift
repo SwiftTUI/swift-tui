@@ -1,22 +1,5 @@
 import SwiftTUICore
 
-enum CompletedFrameCandidateResolution {
-  case committed(FrameArtifacts, CompletedFrameDropDecision)
-  case dropped(runtimeIssues: [RuntimeIssue], dropDecision: CompletedFrameDropDecision)
-}
-
-struct CommittedFrameEffects {
-  var commitPlan: CommitPlan
-  var commitDuration: Duration
-  var runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics
-}
-
-package struct CompletedFrameCandidateCommitPlanComparison {
-  package var previewCommit: CommitPlan
-  package var committedCommit: CommitPlan
-  package var committedArtifacts: FrameArtifacts
-}
-
 extension DefaultRenderer {
   @MainActor
   func makeCompletedFrameCandidate(
