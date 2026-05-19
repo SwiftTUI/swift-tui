@@ -3297,13 +3297,21 @@ Delivered as five behavior-preserving moves (see `migration_progress.md`):
 
 Rollback: revert each new file back into its source; reverse the rename.
 
-### Batch 137-141
+### Batch 137-141 — COMPLETED
 
-- Core layout measurement/placement support readability review.
-- Runtime render-driver cancellation and issue-reporting support review.
-- Animation overlay insertion/removal sampling call-site cleanup.
-- ViewGraph runtime registration restoration support review.
-- Core pipeline snapshot/testing support final pass before the next re-rank.
+Delivered as five behavior-preserving moves (see `migration_progress.md`):
+
+- Packet 137: special-case placement-request builders →
+  `LayoutEngine+SpecialPlacementRequests.swift`.
+- Packet 138: ANSI color-code resolution →
+  `TerminalCellTextRenderer+ColorCodes.swift`.
+- Packet 139: animation runtime-state types → `AnimationRuntimeState.swift`.
+- Packet 140: bulk registration operations →
+  `RuntimeRegistrationSet+Operations.swift`.
+- Packet 141: `CompletedFrameImpact` →
+  `FrameDropEligibility+CompletedFrameImpact.swift`.
+
+Rollback: revert each new file back into its source file.
 
 ### Batch 142-146
 
