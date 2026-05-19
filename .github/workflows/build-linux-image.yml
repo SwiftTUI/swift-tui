@@ -13,23 +13,19 @@ name: Build Linux dev image
 # inlined into a `run:` script. See the GitHub blog post on workflow
 # injection prevention.
 
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - "Scripts/linux/Dockerfile"
+#       - ".swift-version"
+#       - ".github/workflows/build-linux-image.yml"
+#   pull_request:
+#     paths:
+#       - "Scripts/linux/Dockerfile"
+#       - ".swift-version"
+#       - ".github/workflows/build-linux-image.yml"
 on:
-  push:
-    branches: [main]
-    paths:
-      - "Scripts/linux/Dockerfile"
-      - ".swift-version"
-      - ".github/workflows/build-linux-image.yml"
-  pull_request:
-    paths:
-      - "Scripts/linux/Dockerfile"
-      - ".swift-version"
-      - ".github/workflows/build-linux-image.yml"
-  # Weekly rebuild so the image picks up base-image security patches:
-  # `FROM swift:<version>` is a floating tag the Swift team rebuilds with
-  # OS CVE fixes, which this image only sees when it rebuilds itself.
-  schedule:
-    - cron: "17 7 * * 1"
   workflow_dispatch:
     inputs:
       push:
