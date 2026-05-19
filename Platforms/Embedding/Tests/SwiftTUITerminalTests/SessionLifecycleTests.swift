@@ -12,14 +12,12 @@ struct SessionLifecycleTests {
       arguments: ["-c", "echo hi; exit 0"],
       initialSize: CellSize(width: 40, height: 10)
     )
+    // Register the event stream before `start()`: the pump task finishes it
+    // immediately after `markExited`, so draining it is a direct, poll-free
+    // await for the child's exit — no wall-clock timeout.
+    let sessionEvents = session.events()
     try await session.start()
-
-    try await waitUntil("session exit") {
-      if case .exited = await session.currentLifecycle() {
-        return true
-      }
-      return false
-    }
+    for await _ in sessionEvents {}
 
     if case .exited(let reason) = await session.currentLifecycle() {
       #expect(reason == .normal(code: 0))
@@ -35,49 +33,16 @@ struct SessionLifecycleTests {
       arguments: ["-c", "printf hi; sleep 0.5"],
       initialSize: CellSize(width: 10, height: 1)
     )
+    let sessionEvents = session.events()
     try await session.start()
+    for await _ in sessionEvents {}
 
-    try await waitUntil("child output") {
-      let snap = await session.snapshot()
-      guard let firstRow = snap.cells.first else {
-        return false
-      }
-      let firstTwo = firstRow.prefix(2).map(\.character)
-      return firstTwo == ["h", "i"]
-    }
-
-    try await waitUntil("session exit") {
-      if case .exited = await session.currentLifecycle() {
-        return true
-      }
-      return false
-    }
-  }
-}
-
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 2_000_000_000,
-  pollNanoseconds: UInt64 = 50_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let start = ContinuousClock.now
-  while !(await condition()) {
-    if start.duration(to: ContinuousClock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw SessionLifecycleTimeout(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private struct SessionLifecycleTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
+    // After the session has exited the final emulator snapshot retains the
+    // child's output, so asserting it here tests the same thing the
+    // mid-run poll did, deterministically.
+    let snap = await session.snapshot()
+    let firstRow = try #require(snap.cells.first)
+    let firstTwo = firstRow.prefix(2).map(\.character)
+    #expect(firstTwo == ["h", "i"])
   }
 }
