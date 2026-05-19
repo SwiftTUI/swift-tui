@@ -3500,10 +3500,20 @@ three `WebSurfaceFrameEncoder` widenings; rerun
 Rollback: revert each new file into its source; reverse the renames and
 widenings; rerun `check_accessibility_guardrails.sh --update`.
 
-### Batches 185+ — planned
+### Batch 185-188 — COMPLETED
 
-`CustomLayout.swift` part 2 (the type-erasure engine), `BoxDrawingRenderer.swift`,
-and `NativeTerminalSurfaceView.swift` remain; each has a reviewed packet plan.
+- Packet 185: `CustomLayout.swift` part 2 → `CustomLayoutErasure.swift`
+  (type-erasure engine; 7 `private`/`fileprivate`→`internal` widenings).
+- Packets 186-188: `BoxDrawingRenderer.swift` → `BoxDrawingRenderer+Lines.swift`,
+  `+Blocks.swift`, `+Braille.swift` (9 `private`/`fileprivate`→`internal`
+  widenings, all namespaced under the enum).
+
+Rollback: revert each new file into its source; reverse the widenings; restore
+`ToolbarStyle.swift`'s import; rerun `check_accessibility_guardrails.sh --update`.
+
+### Batch 189+ — planned
+
+`NativeTerminalSurfaceView.swift` remains (4 packets, reviewed plan).
 
 ## Human Checkpoints
 

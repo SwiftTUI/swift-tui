@@ -26,6 +26,9 @@ Examples/layouts/Sources/Layouts/BordersOverlays/OverlayAlignmentBadge.swift
 Examples/layouts/Sources/Layouts/BordersOverlays/PerSideBorderColors.swift
 Examples/layouts/Sources/Layouts/Spacers/DividerOrientationFlip.swift
 Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift
+Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer+Blocks.swift
+Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer+Braille.swift
+Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer+Lines.swift
 Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer.swift
 Sources/SwiftTUICharts/BulletChartSupport.swift
 Sources/SwiftTUICharts/CalendarHeatmap.swift

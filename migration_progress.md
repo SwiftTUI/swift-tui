@@ -3705,6 +3705,54 @@ Packet 180-184 validation:
   - User tee log: `/tmp/swift-tui-test-gate-20260518-225321-packet180-184.log`
   - Runner log: `/tmp/swift-tui-test-gate-20260518-225321-89257.log`
 
+## Packet 185-188 Batch: CustomLayout (part 2) + BoxDrawingRenderer
+
+Third batch of the revisited phase.
+
+- Packet 185: `CustomLayout.swift` part 2 — the type-erasure engine
+  (`AnyLayoutBox`, `ConcreteAnyLayoutBox`, `SendableLayoutWorkerProxy`,
+  `LayoutProxyBox`, `LayoutContainer`) → `CustomLayoutErasure.swift`. Five
+  `private`→`internal` widenings plus `LayoutSubview.init` and
+  `AnyLayout.debugName` `fileprivate`→`internal`. `import Synchronization`
+  moved with `SendableLayoutWorkerProxy` (its only `Mutex` user), so
+  `CustomLayout.swift` no longer carries an unused import. Also corrected a
+  latent over-broad `public import SwiftTUICore` in `ToolbarStyle.swift` (a
+  packet-161 oversight Swift flagged once the file recompiled).
+- Packet 186: box-drawing line primitives (`drawBoxDrawing`, the `lineSpecs`
+  table, the line renderers) → `BoxDrawingRenderer+Lines.swift`. The 6 shared
+  geometry types (`LineWeight`, `Spec`, `StrokeMetrics`, `strokeMetrics`,
+  `Direction`, `Corner`) and `drawBoxDrawing` widened `fileprivate`/`private`
+  → file-internal; the Lines-internal helpers travel with `drawBoxDrawing` and
+  stay `fileprivate`.
+- Packet 187: block-element rendering → `BoxDrawingRenderer+Blocks.swift`
+  (`drawBlockElement` widened to file-internal; helpers stay `fileprivate`).
+- Packet 188: braille-pattern rendering → `BoxDrawingRenderer+Braille.swift`
+  (`drawBraille` widened to file-internal; `brailleSubpixels` stays
+  `fileprivate`).
+
+`BoxDrawingRenderer` is a namespace `enum`, so every widened member stays
+namespaced (`BoxDrawingRenderer.drawBoxDrawing` etc.) — no top-level
+namespace pollution.
+
+Behavior preserved: every moved declaration is byte-identical; only file
+location and access level changed. No public API, fixture, or test changed.
+
+Packet 185-188 validation:
+
+- Per-packet `swiftly run swift build --target {SwiftTUIViews,SwiftUIHost}` —
+  PASS
+- `swiftly run swift test --filter SwiftUISurfaceTests` (188) — PASS;
+  `SwiftUIHostTests` builds clean
+- `./Scripts/check_public_surface_policies.sh`,
+  `generate_public_api_inventory.sh --check` (669),
+  `check_public_documentation_ratchet.sh` (70), `check_stable_doc_source_paths.sh`
+  — PASS
+- `./Scripts/check_accessibility_guardrails.sh --update` — raw-glyph manifest
+  registered the 3 new `BoxDrawingRenderer+*` files (additions only).
+- `bun run test` — PASS.
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-230910-packet185-188.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-230910-22212.log`
+
 ## Failed Attempts
 
 - Packet 173 first attempt tried to extract `NativeTerminalMetrics` from
