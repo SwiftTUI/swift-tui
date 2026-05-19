@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Testing) import SwiftTUI
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import GalleryDemoViews
@@ -144,12 +145,14 @@ struct PhysicsTabGestureTests {
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { PhysicsTab() },
-      terminalInputReader: AwaitedTerminalInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          deduplicated(host.surfaces).count >= 2
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ])
+      terminalInputReader: AwaitedTerminalInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= 2
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ])
     )
 
     #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
@@ -231,32 +234,34 @@ struct PhysicsTabGestureTests {
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view },
-      terminalInputReader: AwaitedTerminalInputReader(steps: [
-        .event(.mouse(.init(kind: .down(.primary), location: start))),
-        .event(
-          .mouse(.init(kind: .dragged(.primary), location: firstEnd)),
-          delayNanoseconds: 30_000_000
-        ),
-        .event(
-          .mouse(.init(kind: .up(.primary), location: firstEnd)),
-          delayNanoseconds: 30_000_000
-        ),
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          deduplicated(host.surfaces).count >= 2
-        },
-        .event(.mouse(.init(kind: .down(.primary), location: firstEnd))),
-        .event(
-          .mouse(.init(kind: .dragged(.primary), location: secondEnd)),
-          delayNanoseconds: 30_000_000
-        ),
-        .event(
-          .mouse(.init(kind: .up(.primary), location: secondEnd)),
-          delayNanoseconds: 30_000_000
-        ),
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          deduplicated(host.surfaces).count >= 3
-        },
-      ])
+      terminalInputReader: AwaitedTerminalInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .event(.mouse(.init(kind: .down(.primary), location: start))),
+          .event(
+            .mouse(.init(kind: .dragged(.primary), location: firstEnd)),
+            delayNanoseconds: 30_000_000
+          ),
+          .event(
+            .mouse(.init(kind: .up(.primary), location: firstEnd)),
+            delayNanoseconds: 30_000_000
+          ),
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= 2
+          },
+          .event(.mouse(.init(kind: .down(.primary), location: firstEnd))),
+          .event(
+            .mouse(.init(kind: .dragged(.primary), location: secondEnd)),
+            delayNanoseconds: 30_000_000
+          ),
+          .event(
+            .mouse(.init(kind: .up(.primary), location: secondEnd)),
+            delayNanoseconds: 30_000_000
+          ),
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= 3
+          },
+        ])
     )
 
     #expect(result.exitReason == .inputEnded)
@@ -291,24 +296,26 @@ struct PhysicsTabGestureTests {
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view },
-      terminalInputReader: AwaitedTerminalInputReader(steps: [
-        .event(.mouse(.init(kind: .down(.primary), location: start))),
-        .event(
-          .mouse(.init(kind: .dragged(.primary), location: end)),
-          delayNanoseconds: 30_000_000
-        ),
-        .event(
-          .mouse(.init(kind: .up(.primary), location: end)),
-          delayNanoseconds: 30_000_000
-        ),
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          capture.surfaceCountAtRelease = deduplicated(host.surfaces).count
-          return true
-        },
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          deduplicated(host.surfaces).count > capture.surfaceCountAtRelease
-        },
-      ])
+      terminalInputReader: AwaitedTerminalInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .event(.mouse(.init(kind: .down(.primary), location: start))),
+          .event(
+            .mouse(.init(kind: .dragged(.primary), location: end)),
+            delayNanoseconds: 30_000_000
+          ),
+          .event(
+            .mouse(.init(kind: .up(.primary), location: end)),
+            delayNanoseconds: 30_000_000
+          ),
+          .awaitCondition {
+            capture.surfaceCountAtRelease = deduplicated(host.surfaces).count
+            return true
+          },
+          .awaitCondition {
+            deduplicated(host.surfaces).count > capture.surfaceCountAtRelease
+          },
+        ])
     )
 
     #expect(result.exitReason == .inputEnded)
@@ -360,12 +367,14 @@ struct PhysicsTabGestureTests {
           .panel(id: "gallery")
           .toolbar(style: DefaultBottomToolbarStyle())
       },
-      terminalInputReader: AwaitedTerminalInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          deduplicated(host.surfaces).count >= 2
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ])
+      terminalInputReader: AwaitedTerminalInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= 2
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ])
     )
 
     #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
@@ -387,10 +396,10 @@ private struct ScheduledInputEvent {
 
 private enum AwaitedTerminalInputStep {
   case event(InputEvent, delayNanoseconds: UInt64 = 0)
-  case waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
-    predicate: @MainActor () -> Bool
-  )
+  /// Suspends the input script until `predicate` holds, re-evaluated only when
+  /// the host presents a new frame (`frameSignal.notify()`) rather than on a
+  /// clock — a starved run loop slows the test instead of timing it out.
+  case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
 private final class ScheduledTerminalInputReader: TerminalInputReading {
@@ -422,20 +431,20 @@ private final class ScheduledTerminalInputReader: TerminalInputReading {
 
 private final class AwaitedTerminalInputReader: TerminalInputReading {
   private let steps: [AwaitedTerminalInputStep]
-  private let pollNanoseconds: UInt64
+  private let frameSignal: MainActorConditionSignal
 
   init(
-    steps: [AwaitedTerminalInputStep],
-    pollNanoseconds: UInt64 = 10_000_000
+    frameSignal: MainActorConditionSignal,
+    steps: [AwaitedTerminalInputStep]
   ) {
+    self.frameSignal = frameSignal
     self.steps = steps
-    self.pollNanoseconds = pollNanoseconds
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let steps = self.steps
-      let pollNanoseconds = self.pollNanoseconds
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         for step in steps {
           switch step {
@@ -444,12 +453,8 @@ private final class AwaitedTerminalInputReader: TerminalInputReading {
               try? await Task.sleep(nanoseconds: delayNanoseconds)
             }
             continuation.yield(event)
-          case .waitUntil(let timeoutNanoseconds, let predicate):
-            var elapsedNanoseconds: UInt64 = 0
-            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
-              try? await Task.sleep(nanoseconds: pollNanoseconds)
-              elapsedNanoseconds += pollNanoseconds
-            }
+          case .awaitCondition(let predicate):
+            await frameSignal.wait(until: predicate)
           }
         }
         continuation.finish()
@@ -468,6 +473,10 @@ private final class GestureRecordingHost: PresentationSurface {
   let appearance: TerminalAppearance = .fallback
   private(set) var surfaces: [RasterSurface] = []
 
+  /// Notified after every present, so an awaited input step can re-check its
+  /// predicate the instant a frame lands instead of polling under a timeout.
+  let frameSignal = MainActorConditionSignal()
+
   init(size: CellSize) {
     self.surfaceSize = size
   }
@@ -481,6 +490,12 @@ private final class GestureRecordingHost: PresentationSurface {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     surfaces.append(surface)
+    // The run loop only ever presents on the MainActor; `assumeIsolated`
+    // bridges this nonisolated witness to the MainActor-isolated signal.
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
     return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
   }
 }

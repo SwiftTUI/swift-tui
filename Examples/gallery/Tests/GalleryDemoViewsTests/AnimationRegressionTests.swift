@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Testing) import SwiftTUI
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import GalleryDemoViews
@@ -29,30 +30,32 @@ struct AnimationRegressionTests {
       host: host,
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
-      inputReader: AnimationRegressionAwaitedInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          let markerColumns = Self.slideMarkerColumns(in: host.surfaces)
-          guard let latestColumn = markerColumns.last else {
-            return false
-          }
-          initialColumn = latestColumn
-          framesBeforeToggle = host.surfaces.count
-          return true
-        },
-        .event(.mouse(.init(kind: .down(.primary), location: buttonLocation))),
-        .event(.mouse(.init(kind: .up(.primary), location: buttonLocation))),
-        .waitUntil(timeoutNanoseconds: 2_500_000_000) {
-          guard let initialColumn else {
-            return false
-          }
-          markerColumnsAfterToggle = Array(
-            Self.slideMarkerColumns(in: host.surfaces)
-              .dropFirst(framesBeforeToggle)
-          )
-          return markerColumnsAfterToggle.contains(initialColumn + 30)
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      inputReader: AnimationRegressionAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            let markerColumns = Self.slideMarkerColumns(in: host.surfaces)
+            guard let latestColumn = markerColumns.last else {
+              return false
+            }
+            initialColumn = latestColumn
+            framesBeforeToggle = host.surfaces.count
+            return true
+          },
+          .event(.mouse(.init(kind: .down(.primary), location: buttonLocation))),
+          .event(.mouse(.init(kind: .up(.primary), location: buttonLocation))),
+          .awaitCondition {
+            guard let initialColumn else {
+              return false
+            }
+            markerColumnsAfterToggle = Array(
+              Self.slideMarkerColumns(in: host.surfaces)
+                .dropFirst(framesBeforeToggle)
+            )
+            return markerColumnsAfterToggle.contains(initialColumn + 30)
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       viewBuilder: { AnimationsTab() }
     )
 
@@ -111,30 +114,32 @@ struct AnimationRegressionTests {
       host: host,
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
-      inputReader: AnimationRegressionAwaitedInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          let markerColumns = Self.slideMarkerColumns(in: host.surfaces)
-          guard let latestColumn = markerColumns.last else {
-            return false
-          }
-          initialColumn = latestColumn
-          framesBeforeToggle = host.surfaces.count
-          return true
-        },
-        .event(.mouse(.init(kind: .down(.primary), location: buttonLocation))),
-        .event(.mouse(.init(kind: .up(.primary), location: buttonLocation))),
-        .waitUntil(timeoutNanoseconds: 2_500_000_000) {
-          guard let initialColumn else {
-            return false
-          }
-          markerColumnsAfterToggle = Array(
-            Self.slideMarkerColumns(in: host.surfaces)
-              .dropFirst(framesBeforeToggle)
-          )
-          return markerColumnsAfterToggle.contains(initialColumn + 30)
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      inputReader: AnimationRegressionAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            let markerColumns = Self.slideMarkerColumns(in: host.surfaces)
+            guard let latestColumn = markerColumns.last else {
+              return false
+            }
+            initialColumn = latestColumn
+            framesBeforeToggle = host.surfaces.count
+            return true
+          },
+          .event(.mouse(.init(kind: .down(.primary), location: buttonLocation))),
+          .event(.mouse(.init(kind: .up(.primary), location: buttonLocation))),
+          .awaitCondition {
+            guard let initialColumn else {
+              return false
+            }
+            markerColumnsAfterToggle = Array(
+              Self.slideMarkerColumns(in: host.surfaces)
+                .dropFirst(framesBeforeToggle)
+            )
+            return markerColumnsAfterToggle.contains(initialColumn + 30)
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       diagnosticsPath: diagnosticsURL.path,
       viewBuilder: { AnimationsTab() }
     )
@@ -306,43 +311,36 @@ struct AnimationRegressionTests {
 }
 
 private enum AnimationRegressionAwaitedInputStep {
-  case event(InputEvent, delayNanoseconds: UInt64 = 0)
-  case waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
-    predicate: @MainActor () -> Bool
-  )
+  case event(InputEvent)
+  /// Suspends the input script until `predicate` holds, re-evaluated only when
+  /// the host presents a new frame (`frameSignal.notify()`) rather than on a
+  /// clock — a starved run loop slows the test instead of timing it out.
+  case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
 private final class AnimationRegressionAwaitedInputReader: TerminalInputReading {
   private let steps: [AnimationRegressionAwaitedInputStep]
-  private let pollNanoseconds: UInt64
+  private let frameSignal: MainActorConditionSignal
 
   init(
-    steps: [AnimationRegressionAwaitedInputStep],
-    pollNanoseconds: UInt64 = 10_000_000
+    frameSignal: MainActorConditionSignal,
+    steps: [AnimationRegressionAwaitedInputStep]
   ) {
+    self.frameSignal = frameSignal
     self.steps = steps
-    self.pollNanoseconds = pollNanoseconds
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let steps = self.steps
-      let pollNanoseconds = self.pollNanoseconds
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         for step in steps {
           switch step {
-          case .event(let event, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
+          case .event(let event):
             continuation.yield(event)
-          case .waitUntil(let timeoutNanoseconds, let predicate):
-            var elapsedNanoseconds: UInt64 = 0
-            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
-              try? await Task.sleep(nanoseconds: pollNanoseconds)
-              elapsedNanoseconds += pollNanoseconds
-            }
+          case .awaitCondition(let predicate):
+            await frameSignal.wait(until: predicate)
           }
         }
         continuation.finish()
@@ -369,6 +367,10 @@ private final class AnimationRegressionRecordingHost: PresentationSurface {
   let appearance: TerminalAppearance = .fallback
   private(set) var surfaces: [RasterSurface] = []
 
+  /// Notified after every present, so an awaited input step can re-check its
+  /// predicate the instant a frame lands instead of polling under a timeout.
+  let frameSignal = MainActorConditionSignal()
+
   init(size: CellSize) {
     surfaceSize = size
   }
@@ -382,6 +384,12 @@ private final class AnimationRegressionRecordingHost: PresentationSurface {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     surfaces.append(surface)
+    // The run loop only ever presents on the MainActor; `assumeIsolated`
+    // bridges this nonisolated witness to the MainActor-isolated signal.
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
     return .init(
       bytesWritten: 0,
       linesTouched: surface.size.height,
