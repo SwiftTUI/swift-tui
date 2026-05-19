@@ -404,6 +404,7 @@ let package = Package(
         "SwiftTUICLI",
         "SwiftTUIWebHost",
         "SwiftTUIWebHostCLI",
+        "SwiftTUITestSupport",
       ],
       path: "Platforms/WebHost/Tests/SwiftTUIWebHostTests",
       swiftSettings: swiftSettings()
