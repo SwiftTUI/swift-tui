@@ -28,7 +28,10 @@ public struct DefaultRenderer {
   private let renderGenerationSequencer: RenderGenerationSequencer
 
   let frameTailRenderer: FrameTailRenderer
-  private var frameTailCoordinator: DefaultRendererFrameTailCoordinator {
+  // Visibility note: `frameTailCoordinator` and `prepareFrameHead` are
+  // file-internal rather than `private` so the test-only hooks in
+  // `DefaultRenderer+TestingHooks.swift` can reach them.
+  var frameTailCoordinator: DefaultRendererFrameTailCoordinator {
     .init(
       frameTailRenderer: frameTailRenderer,
       latePreferenceReconciliationPolicy: Self.latePreferenceReconciliationPolicy
@@ -158,99 +161,8 @@ public struct DefaultRenderer {
     )
   }
 
-  @MainActor
-  package func prepareFrameHeadForCancellationTesting<V: View>(
-    _ root: V,
-    context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified
-  ) -> FrameHeadDraft {
-    prepareFrameHead(
-      root,
-      context: context,
-      proposal: proposal
-    )
-  }
-
-  @MainActor
-  package func abortPreparedFrameHeadForCancellationTesting(
-    _ draft: FrameHeadDraft
-  ) {
-    abortPreparedFrameHead(draft)
-  }
-
-  @MainActor
-  package func abortPreparedFrameHead(
-    _ draft: FrameHeadDraft
-  ) {
-    draft.transaction.discard()
-  }
-
-  @MainActor
-  package func renderPreparedFrameTailForCancellationTesting(
-    _ draft: FrameHeadDraft
-  ) async {
-    _ = await frameTailCoordinator.renderFrameTailDraft(draft)
-  }
-
-  @MainActor
-  package func discardPreparedFrameTailForReconciliationTesting(
-    _ draft: FrameHeadDraft,
-    decision: CompletedFrameDropDecision
-  ) async -> Bool {
-    guard decision.canSkipCompletedFrame else {
-      return false
-    }
-
-    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
-    let candidate = makeCompletedFrameCandidate(
-      draft: draft,
-      tailOutput: tailOutput,
-      newestDesiredGeneration: draft.renderGeneration
-    )
-    discardCompletedFrameCandidate(
-      candidate,
-      reconciliation: decision.reconciliation
-    )
-    return true
-  }
-
-  @MainActor
-  package func previewCompletedFrameCandidateForTesting(
-    _ draft: FrameHeadDraft
-  ) async -> CompletedFrameDropDecision {
-    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
-    let candidate = makeCompletedFrameCandidate(
-      draft: draft,
-      tailOutput: tailOutput,
-      newestDesiredGeneration: draft.renderGeneration
-    )
-    return candidate.dropDecision
-  }
-
-  @MainActor
-  package func commitCompletedFrameCandidateForTesting(
-    _ draft: FrameHeadDraft
-  ) async -> CompletedFrameCandidateCommitPlanComparison {
-    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
-    let candidate = makeCompletedFrameCandidate(
-      draft: draft,
-      tailOutput: tailOutput,
-      newestDesiredGeneration: draft.renderGeneration
-    )
-    let artifacts = commitCompletedFrameCandidate(candidate)
-    return CompletedFrameCandidateCommitPlanComparison(
-      previewCommit: candidate.previewArtifacts.commitPlan,
-      committedCommit: artifacts.commitPlan,
-      committedArtifacts: artifacts
-    )
-  }
-
-  @MainActor
-  package func runFrameTailLayoutWorkerJobForCancellationTesting(
-    _ operation: @escaping @Sendable () -> Void
-  ) async {
-    await frameTailRenderer.runLayoutWorkerJobForCancellationTesting(operation)
-  }
+  // Test-only pipeline-stage hooks live in
+  // `DefaultRenderer+TestingHooks.swift`.
 
   /// Renders `root` into complete frame artifacts.
   @MainActor
@@ -553,8 +465,10 @@ public struct DefaultRenderer {
     )
   }
 
+  // Visibility: file-internal (see note on `frameTailCoordinator`) so the
+  // test-only hooks can prepare a frame head directly.
   @MainActor
-  private func prepareFrameHead<V: View>(
+  func prepareFrameHead<V: View>(
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize

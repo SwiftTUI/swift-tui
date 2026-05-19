@@ -1,5 +1,16 @@
 import Synchronization
 
+// Layout-pass context and its supporting value types.
+//
+// `LayoutPassContext` carries the mutable per-frame state the layout engine
+// threads through a measure/place pass: scroll viewport context, work metrics,
+// worker custom-layout cache updates, and the custom-layout compatibility
+// boundary stack. `ScrollViewportContext`, `CustomLayoutCompatibilityPhase`,
+// and `WorkerCustomLayoutCacheUpdate` are its companions.
+//
+// The read-only retained-frame query types this file was once named for now
+// live in `RetainedFrameQueries.swift`.
+
 package struct ScrollViewportContext: Equatable, Sendable {
   package var axes: AxisSet
   package var viewportRect: CellRect
@@ -15,9 +26,6 @@ package struct ScrollViewportContext: Equatable, Sendable {
     self.contentOffset = contentOffset
   }
 }
-
-// Retained-frame query types (`RetainedFrameIndex`, `RetainedInvalidationSummary`,
-// `RetainedLayoutSession`) live in `RetainedFrameQueries.swift`.
 
 package final class LayoutPassContext: Sendable {
   private struct MutableState: Sendable {

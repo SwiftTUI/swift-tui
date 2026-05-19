@@ -2962,7 +2962,63 @@ Packet 127-131 batch validation:
   - Runner log: `/tmp/swift-tui-test-gate-20260518-175110-42380.log`
   - Result: PASS
 
-Next scheduled focus: continue with Batch 132-136 per the migration plan,
+## Packet 132-136 Batch: Testing Hooks, Env Actions, Snapshot Models, And File Consolidation
+
+Scope completed (all within `SwiftTUICore` and `SwiftTUIRuntime`):
+
+- Packet 132: moved the eight test-only `*ForTesting`/`*ForCancellationTesting`
+  pipeline-stage hooks out of `SwiftTUI.swift` into
+  `DefaultRenderer+TestingHooks.swift`. `frameTailCoordinator` and
+  `prepareFrameHead` were widened from `private` to file-internal.
+- Packet 133: consolidated the scattered RunLoop runtime environment-action
+  factories — `runtimeResetFocusAction` (from `RunLoop+ResolveContext.swift`)
+  and `runtimeClipboardWriteAction`/`runtimeClipboardReadAction` (from
+  `Support/ClipboardWriting.swift`) — into `RunLoop+EnvironmentActions.swift`;
+  deleted the now-empty `ClipboardWriting.swift`.
+- Packet 134: split the `AnimatableSnapshot` struct and its slot-extraction
+  logic out of the `AnimationModels.swift` grab-bag into
+  `AnimatableSnapshot.swift`.
+- Packet 135: split `SnapshotRenderer`'s tree-structural `describe(_:)` value
+  formatters out of `Snapshots.swift` into
+  `SnapshotRenderer+TreeDescriptions.swift`, dropping `private` to file-internal
+  to match the existing `SnapshotRenderer+StyleDescriptions.swift` convention.
+- Packet 136: renamed `Commit/RetainedResolveFrame.swift` to
+  `Commit/LayoutPassContext.swift` to match its actual contents — its
+  retained-frame query types left for `RetainedFrameQueries.swift` in Packet
+  130, leaving only `LayoutPassContext` and companions.
+
+Behavior preserved:
+
+- Test-hook semantics, runtime environment-action wiring, animatable-slot
+  extraction, snapshot text-fixture output, and layout-pass context behavior
+  all remained unchanged. No public API, fixture, or test changed.
+
+Packet 132-136 focused validation:
+
+- `swiftly run swift build --target SwiftTUIRuntime` — PASS (packets 132-134)
+- `swiftly run swift build --target SwiftTUICore` — PASS (packets 135-136)
+- `swiftly run swift test --filter AsyncFrameTailRenderingTests`,
+  `ResolvePurityTests`, `Phase4ObservationAndEnvironmentTests` (79) — PASS
+- `swiftly run swift test --filter TextInputRuntimeIntegrationTests`,
+  `TerminalPresentationTests` (54) — PASS
+- `swiftly run swift test --filter AnimationControllerTests`,
+  `AnimationSolverTests` (90) — PASS
+- `swiftly run swift test --filter DrawExtractorTests`, `RasterizerTests`,
+  `LayoutAndRenderingPipelineTests`, `LayoutEngineTests` — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 132-136 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-182040-packet132-136.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-182040-24464.log`
+  - Result: PASS
+
+Next scheduled focus: continue with Batch 137-141 per the migration plan,
 remaining inside `SwiftTUICore` and `SwiftTUIRuntime`.
 
 ## Failed Attempts
