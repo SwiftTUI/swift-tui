@@ -13,7 +13,9 @@
     "perf:run": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf run",
     "test": "sh ./Scripts/test_gate.sh",
     "test:gate": "sh ./Scripts/test_gate.sh",
+    "test:clean": "sh ./Scripts/test_gate.sh --clean",
     "test:all": "sh ./Scripts/test_all.sh",
+    "test:all:clean": "sh ./Scripts/test_all.sh --clean",
     "test:coverage": "sh ./Scripts/report_test_coverage.sh"
   },
   "workspaces": [
