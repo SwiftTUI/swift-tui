@@ -3360,6 +3360,67 @@ Packet 157-161 batch validation:
     - Runner log: `/tmp/swift-tui-test-gate-20260518-210648-12881.log`
     - Result: PASS
 
+## Packet 162-166 Batch: SwiftTUIViews Decomposition (Other Production Code, Phase 2)
+
+Third batch of the other-production-code phase. Scope: `Sources/SwiftTUIViews`.
+All behavior-preserving file extractions; public API unchanged (verified — 669
+top-level public symbols).
+
+- Packet 162: split `ResolveContext` and its two extensions out of
+  `Environment.swift` into `Environment/ResolveContext.swift`, leaving
+  `Environment.swift` focused on the environment value types
+  (`EnvironmentKey`, `EnvironmentValues`, `Environment`, `EnvironmentReader`).
+  `ResolveContext`'s own `private static` helpers travel with it; one
+  documented widening: `EnvironmentValues.applying(to:reuseStyle:)` from
+  `fileprivate` to `package` so the moved file can reach it.
+- Packet 163: split the four `GestureRecognizer` decorator classes
+  (`OnEndedDecorator`, `OnChangedDecorator`, `MapDecorator`,
+  `UpdatingDecorator`) out of `GestureModifiers.swift` into
+  `Gestures/GestureModifierDecorators.swift`, leaving `GestureModifiers.swift`
+  focused on the public `_XGesture` combinator types.
+- Packet 164: split `PopoverAttachmentAnchor` and its `attachmentRect(in:)`
+  resolution out of `PopoverPresentation.swift` into
+  `Presentation/PopoverAttachmentAnchor.swift`. The two `private` unit→cell
+  scaling helpers travel with `attachmentRect` (their only caller).
+- Packet 165: split the tab metadata-peeking system (`PeekedTabChildMetadata`,
+  the `TabItemMetadataProvidingModifier` / `TabMetadataPeekingView` /
+  `TabDeclarationView` protocols, the two `ModifiedContent` conformances, and
+  `peekTabChildMetadata`) out of `TabView.swift` into
+  `NavigationViews/TabMetadataPeeking.swift`. `tabViewAvailableWidth` stayed
+  behind — it sits inside the same MARK region but is a layout helper.
+- Packet 166: split the `Section` view (and its `private` `extension Section`
+  resolution methods) out of `List.swift` into `Collections/Section.swift`.
+
+Behavior preserved:
+
+- Resolve-context construction/derivation, gesture-recognizer decoration,
+  popover anchor resolution, tab metadata peeking, and section resolution all
+  remained unchanged. No public API, fixture, or test changed.
+
+Packet 162-166 focused validation:
+
+- `swiftly run swift build --target SwiftTUIViews` — PASS (all packets)
+- `swiftly run swift test --filter Phase4ObservationAndEnvironmentTests`,
+  `ResolvePurityTests` (27) — PASS
+- `swiftly run swift test --filter GestureModifiersTests` (5) — PASS
+- `swiftly run swift test --filter PopoverPresentationTests` (8) — PASS
+- `swiftly run swift test --filter TabViewSurfaceTests` (17) — PASS
+- `swiftly run swift test --filter OutlineSurfaceTests`,
+  `CollectionSupportTests` (11) — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols (no public API drift)
+- `./Scripts/check_public_documentation_ratchet.sh` — PASS, 70 entries
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 162-166 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-213611-packet162-166.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-213611-44263.log`
+  - Result: PASS
+
 ## Failed Attempts
 
 - Packet 157-161 first full `bun run test` attempt failed the "Check public

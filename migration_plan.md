@@ -3392,6 +3392,28 @@ Rollback: revert each new file back into its source file; reverse the
 `ScrollViewLayout` access widening; restore the guardrail-script and
 doc-ratchet paths.
 
+### Batch 162-166 — COMPLETED (SwiftTUIViews)
+
+Five behavior-preserving moves (see `migration_progress.md` for validation
+logs):
+
+- Packet 162: `ResolveContext` + extensions → `Environment/ResolveContext.swift`
+  (one documented widening: `EnvironmentValues.applying` `fileprivate` →
+  `package`).
+- Packet 163: gesture-recognizer decorator classes →
+  `Gestures/GestureModifierDecorators.swift`.
+- Packet 164: `PopoverAttachmentAnchor` + `attachmentRect` →
+  `Presentation/PopoverAttachmentAnchor.swift`.
+- Packet 165: tab metadata-peeking protocols/conformances →
+  `NavigationViews/TabMetadataPeeking.swift`.
+- Packet 166: `Section` view → `Collections/Section.swift`.
+
+No guardrail-path updates were needed (no path-pinned public declaration
+moved).
+
+Rollback: revert each new file back into its source file; reverse the
+`EnvironmentValues.applying` access widening.
+
 Future `SwiftTUIViews`/`SwiftTUICharts`/platform batches will be planned as
 they are reached.
 
