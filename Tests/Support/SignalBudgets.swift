@@ -10,7 +10,7 @@
 extension AsyncEvent {
   /// Waits for the event to fire, throwing `StageBudgetExceeded` if `budget`
   /// stages of `clock` elapse first.
-  package func wait(
+  @_spi(Testing) public func wait(
     for label: String,
     within budget: ProgressBudget,
     on clock: some StageClock
@@ -24,7 +24,7 @@ extension AsyncEvent {
 extension MainActorConditionSignal {
   /// Waits until `predicate` holds, throwing `StageBudgetExceeded` if `budget`
   /// stages of `clock` elapse first.
-  package func wait(
+  @_spi(Testing) public func wait(
     until predicate: @escaping @Sendable () -> Bool,
     for label: String,
     within budget: ProgressBudget,

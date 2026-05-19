@@ -1,6 +1,6 @@
 import CoreGraphics
 import SwiftTUI
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftUIHost

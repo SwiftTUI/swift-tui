@@ -1,4 +1,4 @@
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @Suite("AsyncEvent one-shot signal")

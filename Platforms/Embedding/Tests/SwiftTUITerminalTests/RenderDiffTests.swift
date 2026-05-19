@@ -1,7 +1,7 @@
 import Foundation
 import SwiftTUICore
 import SwiftTUITerminal
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 

@@ -1,6 +1,6 @@
 import SwiftTUI
 @_spi(Runners) import SwiftTUIRuntime
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftUIHost

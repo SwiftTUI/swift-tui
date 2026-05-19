@@ -10,15 +10,15 @@
 /// the waiter simply stays suspended until the producer runs. The test
 /// synchronises on the state change, not on the wall clock.
 @MainActor
-package final class MainActorConditionSignal {
+@_spi(Testing) public final class MainActorConditionSignal {
   private final class Waiter {
     let id: UInt64
-    let predicate: () -> Bool
+    let predicate: @MainActor () -> Bool
     let continuation: CheckedContinuation<Void, Never>
 
     init(
       id: UInt64,
-      predicate: @escaping () -> Bool,
+      predicate: @escaping @MainActor () -> Bool,
       continuation: CheckedContinuation<Void, Never>
     ) {
       self.id = id
@@ -30,12 +30,15 @@ package final class MainActorConditionSignal {
   private var waiters: [Waiter] = []
   private var nextID: UInt64 = 0
 
-  package init() {}
+  /// `nonisolated` so a non-`MainActor` owner (such as a test presentation
+  /// surface created off the actor) can construct the signal; every *use* of
+  /// the signal still happens on the `MainActor`.
+  @_spi(Testing) public nonisolated init() {}
 
   /// Re-evaluates every pending waiter, resuming those whose predicate now holds.
   ///
   /// Call this after every change to the state the waiters observe.
-  package func notify() {
+  @_spi(Testing) public func notify() {
     guard !waiters.isEmpty else {
       return
     }
@@ -62,7 +65,7 @@ package final class MainActorConditionSignal {
   /// the first `notify()` that makes it true. Also resumes promptly if the
   /// calling task is cancelled, so a cancelled waiter never strands a task
   /// group it is racing inside — `withStageBudget` relies on this.
-  package func wait(until predicate: @escaping () -> Bool) async {
+  @_spi(Testing) public func wait(until predicate: @escaping @MainActor () -> Bool) async {
     if predicate() {
       return
     }

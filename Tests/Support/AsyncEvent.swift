@@ -10,7 +10,7 @@ import Synchronization
 /// Unlike a polling loop, a starved producer never makes a waiter fail — the
 /// waiter simply stays suspended until the producer is scheduled. That is the
 /// whole point: the test synchronises on the *event*, not on the wall clock.
-package final class AsyncEvent: Sendable {
+@_spi(Testing) public final class AsyncEvent: Sendable {
   private struct Waiter {
     let id: UInt64
     let continuation: CheckedContinuation<Void, Never>
@@ -24,12 +24,12 @@ package final class AsyncEvent: Sendable {
 
   private let state = Mutex(State())
 
-  package init() {}
+  @_spi(Testing) public init() {}
 
   /// Signals the event, resuming every pending waiter.
   ///
   /// Idempotent: firing more than once has no additional effect.
-  package func fire() {
+  @_spi(Testing) public func fire() {
     let pending: [CheckedContinuation<Void, Never>] = state.withLock { state in
       guard !state.isFired else { return [] }
       state.isFired = true
@@ -46,7 +46,7 @@ package final class AsyncEvent: Sendable {
   /// Returns immediately if the event has already fired. Resumes promptly if
   /// the calling task is cancelled, so a cancelled waiter never strands a
   /// task group it is racing inside.
-  package func wait() async {
+  @_spi(Testing) public func wait() async {
     let id = state.withLock { state -> UInt64 in
       let id = state.nextID
       state.nextID &+= 1

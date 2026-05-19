@@ -10,7 +10,7 @@ import Synchronization
 ///
 /// Call `notify()` *outside* any lock the predicate itself acquires, so the two
 /// always lock in the order `ConditionSignal` → observed-state.
-package final class ConditionSignal: Sendable {
+@_spi(Testing) public final class ConditionSignal: Sendable {
   private struct Waiter {
     let predicate: @Sendable () -> Bool
     let continuation: CheckedContinuation<Void, Never>
@@ -22,10 +22,10 @@ package final class ConditionSignal: Sendable {
 
   private let state = Mutex(State())
 
-  package init() {}
+  @_spi(Testing) public init() {}
 
   /// Re-evaluates every pending waiter, resuming those whose predicate now holds.
-  package func notify() {
+  @_spi(Testing) public func notify() {
     let ready = state.withLock { state -> [CheckedContinuation<Void, Never>] in
       var remaining: [Waiter] = []
       var resumed: [CheckedContinuation<Void, Never>] = []
@@ -48,7 +48,7 @@ package final class ConditionSignal: Sendable {
   ///
   /// Returns immediately if the predicate already holds; otherwise resumes on
   /// the first `notify()` that makes it true.
-  package func wait(until predicate: @escaping @Sendable () -> Bool) async {
+  @_spi(Testing) public func wait(until predicate: @escaping @Sendable () -> Bool) async {
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
       let alreadyHolds = state.withLock { state -> Bool in
         if predicate() {
