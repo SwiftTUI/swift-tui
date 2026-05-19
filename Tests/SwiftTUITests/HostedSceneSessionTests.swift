@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import SwiftTUIViews
 import Testing
 
@@ -70,14 +71,12 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("first surface") {
-      recorder.surfaceCount >= 1
-    }
+    await recorder.updates.wait { recorder.surfaceCount >= 1 }
 
     surface.updateSurfaceSize(.init(width: 32, height: 8))
     session.requestSurfaceRefresh()
 
-    try await waitUntil("second surface") {
+    await recorder.updates.wait {
       recorder.surfaceCount >= 2 && recorder.latestSurface?.size == .init(width: 32, height: 8)
     }
 
@@ -100,9 +99,7 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("first surface") {
-      recorder.surfaceCount >= 1
-    }
+    await recorder.updates.wait { recorder.surfaceCount >= 1 }
 
     #expect(recorder.latestSurface?.lines.first?.contains("Primary") == true)
 
@@ -129,16 +126,12 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("first surface") {
-      surfaceRecorder.surfaceCount >= 1
-    }
+    await surfaceRecorder.updates.wait { surfaceRecorder.surfaceCount >= 1 }
 
     session.send(.key(.init(.character("a"), modifiers: .ctrl)))
     session.send(.key(.init(.character("c"), modifiers: .ctrl)))
 
-    try await waitUntil("clipboard write") {
-      clipboardRecorder.writes == ["hello"]
-    }
+    await clipboardRecorder.updates.wait { clipboardRecorder.writes == ["hello"] }
 
     session.send(.key(.init(.character("d"), modifiers: .ctrl)))
     let exitReason = try await task.value
@@ -162,7 +155,7 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("semantic frame") {
+    await semanticRecorder.updates.wait {
       surfaceRecorder.surfaceCount >= 1
         && semanticRecorder.frameCount >= 1
         && semanticRecorder.latestSnapshot?.accessibilityNodes.contains {
@@ -210,9 +203,7 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("first surface") {
-      recorder.surfaceCount >= 1
-    }
+    await recorder.updates.wait { recorder.surfaceCount >= 1 }
 
     surface.updateStyle(
       .init(
@@ -242,9 +233,7 @@ struct HostedSceneSessionTests {
     )
     session.requestSurfaceRefresh()
 
-    try await waitUntil("second surface") {
-      recorder.surfaceCount >= 2
-    }
+    await recorder.updates.wait { recorder.surfaceCount >= 2 }
 
     session.sendInput([0x04])  // Ctrl+D
     let exitReason = try await task.value
@@ -268,16 +257,12 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("activate focus presentation") {
-      session.currentFocusPresentation.semantics == .activate
-    }
+    await recorder.updates.wait { recorder.presentations.last?.semantics == .activate }
     #expect(session.currentFocusPresentation.prefersTextInput == false)
 
     session.sendInput([0x09])
 
-    try await waitUntil("edit focus presentation") {
-      session.currentFocusPresentation.semantics == .edit
-    }
+    await recorder.updates.wait { recorder.presentations.last?.semantics == .edit }
     #expect(session.currentFocusPresentation.prefersTextInput)
 
     let stopExitReason = try await session.stopAndWait()
@@ -318,9 +303,7 @@ struct HostedSceneSessionTests {
       try await session.start()
     }
 
-    try await waitUntil("first surface") {
-      recorder.surfaceCount >= 1
-    }
+    await recorder.updates.wait { recorder.surfaceCount >= 1 }
 
     task.cancel()
 
@@ -356,6 +339,7 @@ struct HostedSceneSessionTests {
 @MainActor
 private final class SurfaceRecorder {
   private(set) var surfaces: [RasterSurface] = []
+  let updates = MainActorConditionSignal()
 
   var surfaceCount: Int {
     surfaces.count
@@ -369,6 +353,7 @@ private final class SurfaceRecorder {
     _ surface: RasterSurface
   ) {
     surfaces.append(surface)
+    updates.notify()
   }
 }
 
@@ -383,6 +368,8 @@ private final class SemanticFrameRecorder {
       damage: PresentationDamage?
     )] =
       []
+
+  let updates = MainActorConditionSignal()
 
   var frameCount: Int {
     frames.count
@@ -408,57 +395,32 @@ private final class SemanticFrameRecorder {
         damage: frame.rasterDamage
       )
     )
+    updates.notify()
   }
 }
 
 @MainActor
 private final class FocusPresentationRecorder {
   private(set) var presentations: [FocusPresentation] = []
+  let updates = MainActorConditionSignal()
 
   func record(
     _ presentation: FocusPresentation
   ) {
     presentations.append(presentation)
+    updates.notify()
   }
 }
 
 @MainActor
 private final class ClipboardRecorder {
   private(set) var writes: [String] = []
+  let updates = MainActorConditionSignal()
 
   func record(
     _ text: String
   ) {
     writes.append(text)
-  }
-}
-
-@MainActor
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 15_000_000_000,
-  pollNanoseconds: UInt64 = 20_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-
-  while !(await condition()) {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw HostedSceneTestTimeout(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private struct HostedSceneTestTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
+    updates.notify()
   }
 }

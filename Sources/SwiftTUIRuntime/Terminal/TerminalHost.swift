@@ -686,7 +686,14 @@ public enum TerminalHostError: Error {
           }
 
           if result < 0 {
-            throw TerminalHostError.failedToWrite(errno: errno)
+            let writeErrno = errno
+            // EIO (PTY master closed) and EPIPE (socket-backed terminal
+            // closed) both mean the far end is gone — a clean disconnect,
+            // not a failure. Stop writing; the input EOF drives shutdown.
+            if writeErrno == EIO || writeErrno == EPIPE {
+              return
+            }
+            throw TerminalHostError.failedToWrite(errno: writeErrno)
           }
 
           written += result

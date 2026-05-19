@@ -342,6 +342,7 @@ let package = Package(
         "SwiftTUIArguments",
         "SwiftTUICLI",
         "SwiftTUIPTYPrimitives",
+        "SwiftTUITestSupport",
       ],
       path: "Platforms/CLI/Tests/SwiftTUICLITests",
       swiftSettings: swiftSettings()

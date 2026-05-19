@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -162,7 +163,10 @@ struct GestureRunLoopDispatchTests {
   @Test("LongPressGesture fires through the full RunLoop deadline path")
   func longPressGestureFiresThroughRunLoop() async throws {
     @MainActor final class Box {
-      var count = 0
+      let updates = MainActorConditionSignal()
+      var count = 0 {
+        didSet { updates.notify() }
+      }
     }
 
     let box = Box()
@@ -217,20 +221,10 @@ struct GestureRunLoopDispatchTests {
       try await runLoop.run()
     }
 
-    do {
-      try await waitUntilGesture("initial frame") {
-        host.presentCount > 0
-      }
-      inputReader.send(.mouse(.init(kind: .down(.primary), location: point)))
-      try await waitUntilGesture("long press callback") {
-        box.count == 1
-      }
-      inputReader.finish()
-    } catch {
-      inputReader.finish()
-      _ = try? await task.value
-      throw error
-    }
+    await host.firstPresent.wait()
+    inputReader.send(.mouse(.init(kind: .down(.primary), location: point)))
+    await box.updates.wait { box.count == 1 }
+    inputReader.finish()
 
     let result = try await task.value
     #expect(result.exitReason == .inputEnded)
@@ -380,6 +374,10 @@ private final class RecordingGestureTerminalHost: PresentationSurface {
   let appearance: TerminalAppearance = .fallback
   private let presentCountStorage = Mutex(0)
 
+  /// Fires the first time the runtime presents a frame, so tests can `await`
+  /// the initial render directly instead of polling `presentCount`.
+  let firstPresent = AsyncEvent()
+
   var presentCount: Int {
     presentCountStorage.withLock { $0 }
   }
@@ -397,35 +395,7 @@ private final class RecordingGestureTerminalHost: PresentationSurface {
   @discardableResult
   func present(_: RasterSurface) throws -> TerminalPresentationMetrics {
     presentCountStorage.withLock { $0 += 1 }
+    firstPresent.fire()
     return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
-  }
-}
-
-private func waitUntilGesture(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 20_000_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-
-  while !(await condition()) {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw GestureRunLoopDispatchTestTimeout(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private struct GestureRunLoopDispatchTestTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
   }
 }

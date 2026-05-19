@@ -81,6 +81,13 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check test synchronisation policies" \
+    "./Scripts/check_test_sync_policies.sh" \
+    ./Scripts/check_test_sync_policies.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check public-API baseline" \
     "./Scripts/generate_public_api_inventory.sh --check" \
     ./Scripts/generate_public_api_inventory.sh --check
