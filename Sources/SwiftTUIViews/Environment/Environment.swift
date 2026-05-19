@@ -1,5 +1,5 @@
 import Observation
-public import SwiftTUICore
+package import SwiftTUICore
 import Synchronization
 
 /// Declares a typed environment value.

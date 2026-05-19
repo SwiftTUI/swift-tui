@@ -51,8 +51,8 @@ enum BundledFonts {
         continue
       }
       var error: Unmanaged<CFError>?
-      _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
-      error?.release()
+      _ = unsafe CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
+      unsafe error?.release()
     }
   }()
 }

@@ -1,5 +1,5 @@
 @_spi(Testing) package import SwiftTUICore
-package import SwiftTUIViews
+import SwiftTUIViews
 
 /// Identifies a logical animatable slot on a ``ResolvedNode``.  Each
 /// slot maps to a specific writeback destination in ``applyValue``.

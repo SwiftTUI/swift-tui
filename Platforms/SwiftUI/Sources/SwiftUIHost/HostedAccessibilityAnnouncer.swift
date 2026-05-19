@@ -176,7 +176,7 @@ enum NativeAccessibilityAnnouncementPoster {
     #if canImport(AppKit) && !targetEnvironment(macCatalyst)
       let priority: NSAccessibilityPriorityLevel =
         announcement.politeness == .assertive ? .high : .medium
-      NSAccessibility.post(
+      unsafe NSAccessibility.post(
         element: NSApplication.shared,
         notification: .announcementRequested,
         userInfo: [

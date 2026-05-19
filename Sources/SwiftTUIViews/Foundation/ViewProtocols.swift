@@ -1,4 +1,4 @@
-public import SwiftTUICore
+package import SwiftTUICore
 
 // The foundational view protocols.
 //

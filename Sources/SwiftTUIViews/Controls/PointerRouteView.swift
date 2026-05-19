@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // A wrapper view that marks its subtree as participating in pointer hit
 // testing under a caller-supplied identity.

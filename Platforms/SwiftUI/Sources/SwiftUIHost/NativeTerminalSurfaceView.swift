@@ -85,7 +85,7 @@ import SwiftTUIRuntime
     }
 
     override func mouseDown(with event: NSEvent) {
-      window?.makeFirstResponder(self)
+      unsafe window?.makeFirstResponder(self)
       onInputEvent?(
         .mouse(
           .init(
@@ -151,7 +151,7 @@ import SwiftTUIRuntime
     }
 
     private var backingScale: CGFloat {
-      window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
+      unsafe window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
     }
 
     private func updateMetrics() {
