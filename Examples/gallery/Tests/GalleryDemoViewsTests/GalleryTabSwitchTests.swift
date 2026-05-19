@@ -592,10 +592,15 @@ struct GalleryTabSwitchTests {
     let start = Self.centerPoint(of: try #require(preDragBounds.last))
     let end = Point(x: start.x + 12, y: start.y - 5)
 
+    // Wait for the runtime to actually present a frame in response to each
+    // drag byte before writing the next, rather than sleeping a fixed
+    // interval: the down/drag/up sequences are then parsed in separate read
+    // cycles (so the gesture sees a non-degenerate inter-event interval)
+    // without any wall-clock dependency.
     try Self.writeAllBytes(Self.sgrPrimaryDown(at: start, encoding: inputEncoding), to: pty.master)
-    try await Task.sleep(nanoseconds: 60_000_000)
+    try await Self.waitForNextFrame(on: pty.master, screen: &screen)
     try Self.writeAllBytes(Self.sgrPrimaryDrag(at: end, encoding: inputEncoding), to: pty.master)
-    try await Task.sleep(nanoseconds: 60_000_000)
+    try await Self.waitForNextFrame(on: pty.master, screen: &screen)
     try Self.writeAllBytes(Self.sgrPrimaryUp(at: end, encoding: inputEncoding), to: pty.master)
 
     let postReleaseBounds = try await Self.collectDistinctBrailleBounds(
@@ -1279,6 +1284,39 @@ struct GalleryTabSwitchTests {
     }
     await readable.cancel()
     return try outcome.get()
+  }
+
+  /// Awaits one frame's worth of PTY output, draining it into `screen`.
+  ///
+  /// Used to pace scripted drag input: the next byte sequence is written only
+  /// once the runtime has actually responded to the previous one, so the
+  /// input parser stamps the down/drag/up events at genuinely separated
+  /// times — with no fixed wall-clock sleep between them.
+  private static func waitForNextFrame(
+    on fileDescriptor: Int32,
+    screen: inout PTYVisibleScreen
+  ) async throws {
+    let readable = PTYReadableSource(fileDescriptor: fileDescriptor)
+    var readError: (any Error)?
+    for await _ in readable.events {
+      do {
+        let chunk = try readAvailableBytes(from: fileDescriptor)
+        if !chunk.bytes.isEmpty {
+          screen.feed(chunk.bytes)
+          break
+        }
+        if chunk.reachedEOF {
+          break
+        }
+      } catch {
+        readError = error
+        break
+      }
+    }
+    await readable.cancel()
+    if let readError {
+      throw readError
+    }
   }
 
   private static func readAvailableBytes(
