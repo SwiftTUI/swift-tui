@@ -27,12 +27,17 @@ Examples/layouts/Sources/Layouts/BordersOverlays/PerSideBorderColors.swift
 Examples/layouts/Sources/Layouts/Spacers/DividerOrientationFlip.swift
 Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIOptions.swift
 Platforms/SwiftUI/Sources/SwiftUIHost/BoxDrawingRenderer.swift
+Sources/SwiftTUICharts/BulletChartSupport.swift
 Sources/SwiftTUICharts/CalendarHeatmap.swift
 Sources/SwiftTUICharts/CalendarHeatmapSupport.swift
 Sources/SwiftTUICharts/ChartChromeSupport.swift
+Sources/SwiftTUICharts/ChartCommonSupport.swift
 Sources/SwiftTUICharts/ChartSupport.swift
-Sources/SwiftTUICharts/LineChartSupport.swift
+Sources/SwiftTUICharts/ComparisonChartSupport.swift
 Sources/SwiftTUICharts/LineChartRasterization.swift
+Sources/SwiftTUICharts/LineChartSupport.swift
+Sources/SwiftTUICharts/StackedBarChartSupport.swift
+Sources/SwiftTUICharts/ThresholdGaugeSupport.swift
 Sources/SwiftTUICore/Draw/BrailleCanvas.swift
 Sources/SwiftTUICore/Draw/CanvasGrid.swift
 Sources/SwiftTUICore/Draw/CanvasPixelGridDrawing.swift
@@ -46,7 +51,7 @@ Sources/SwiftTUIViews/Controls/MetricTrackSupport.swift
 Sources/SwiftTUIViews/Controls/ProgressView.swift
 Sources/SwiftTUIViews/Controls/SelectionAndValueSupport.swift
 Sources/SwiftTUIViews/Controls/Spinner.swift
-Sources/SwiftTUIViews/Controls/ValueControls.swift
 Sources/SwiftTUIViews/Controls/Stepper.swift
+Sources/SwiftTUIViews/Controls/ValueControls.swift
 Sources/SwiftTUIViews/NavigationViews/BuiltinTabViewStyles.swift
 Sources/SwiftTUIViews/Presentation/ToastPresentation.swift

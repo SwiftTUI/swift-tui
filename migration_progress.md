@@ -3421,6 +3421,89 @@ Packet 162-166 batch validation:
   - Runner log: `/tmp/swift-tui-test-gate-20260518-213611-44263.log`
   - Result: PASS
 
+## Packet 167-171 Batch: ChartSupport Decomposition (Other Production Code, Phase 2)
+
+Fourth batch of the other-production-code phase. Scope: `Sources/SwiftTUICharts`.
+`ChartSupport.swift` (618 lines) was a flat catalogue of per-chart-family free
+functions — all `internal`, no types, no `private` — so it split cleanly by
+chart family with zero access widening.
+
+- Packet 167: shared chart helpers and the timeline/legend renderers
+  (`isEmptyView`, `chartHeader`, `chartAccessibilityMetadata`,
+  `chartAccessibilityLabel`, `timelineEntryView`, `legendItemView`) →
+  `ChartCommonSupport.swift`.
+- Packet 168: comparison-chart helpers (`comparisonChartMaximumValue`,
+  `comparisonChartSummaryText`, `comparisonEntryTone`, `comparisonTrackView`,
+  `comparisonChartRow`) → `ComparisonChartSupport.swift`.
+- Packet 169: stacked-bar-chart helpers (`stackedBarEffectiveTotal`,
+  `stackedBarSummaryText`, `stackedBarWidths`, `stackedBarTrackView`) →
+  `StackedBarChartSupport.swift`.
+- Packet 170: threshold-gauge helpers (`thresholdBandsSorted`,
+  `thresholdBandTone`, `thresholdGaugeTrackView`) →
+  `ThresholdGaugeSupport.swift`.
+- Packet 171: bullet-chart helpers (`bulletChartSummaryText`,
+  `bulletChartTrackView`) → `BulletChartSupport.swift`.
+
+`ChartSupport.swift` retains the bar, column, and heat-strip helpers (~230
+lines).
+
+Validation-artifact update (Packet 171, batch gate):
+
+- The accessibility guardrail (`Scripts/check_accessibility_guardrails.sh`)
+  maintains scanned source manifests under `Scripts/lib/` —
+  `accessibility_color_state_sources.txt` and
+  `accessibility_raw_glyph_sources.txt` — listing every file that contains
+  color-state or raw-glyph code. Moving color/glyph-bearing chart helpers to
+  new files changed which files those scans match, so the manifests had to be
+  regenerated with `./Scripts/check_accessibility_guardrails.sh --update`.
+  The color/glyph code itself is unchanged and was already accepted in
+  `ChartSupport.swift`; the regeneration only relabels file paths and
+  normalizes the (previously slightly mis-sorted) manifest order. The gate
+  sort-normalizes both sides, so the reorder is cosmetic.
+
+Behavior preserved:
+
+- Every chart-support function is byte-identical to its previous form; only
+  its file location changed. No public API, fixture, or test changed.
+
+Packet 167-171 focused validation:
+
+- `swiftly run swift build --target SwiftTUICharts` — PASS (all packets)
+- `swiftly run swift test --filter NonAggregatingViewFixtureTests` (27 chart
+  fixture cases) — PASS
+- `swiftly run swift test --filter LinearAccessibilityRendererTests` (9) — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols (no public API drift)
+- `./Scripts/check_public_documentation_ratchet.sh` — PASS, 70 entries
+- `./Scripts/check_accessibility_guardrails.sh` — PASS (after `--update`)
+
+Packet 167-171 batch validation:
+
+- `bun run test`
+  - First attempt FAIL: accessibility color-state/raw-glyph manifests changed
+    because color/glyph-bearing chart helpers moved to new files. Failed gate
+    log: `/tmp/swift-tui-test-gate-20260518-214536-packet167-171.log`
+  - After `./Scripts/check_accessibility_guardrails.sh --update`:
+    - User tee log:
+      `/tmp/swift-tui-test-gate-20260518-214925-packet167-171-rerun.log`
+    - Runner log: `/tmp/swift-tui-test-gate-20260518-214925-77602.log`
+    - Result: PASS
+
+### Lesson: a third path-pinned guardrail — the accessibility manifests
+
+Beyond `check_public_surface_policies.sh` and the doc ratchet, a third
+guardrail tracks source paths: `Scripts/check_accessibility_guardrails.sh`
+keeps scanned manifests (`accessibility_color_state_sources.txt`,
+`accessibility_raw_glyph_sources.txt`,
+`accessibility_visual_content_sources.txt`) of every file containing
+color-state, raw-glyph, or visual-content code. Moving such code to a new file
+fails the gate until the manifest is regenerated with `--update`. **Any packet
+that moves color/glyph/visual-content-bearing code must rerun
+`./Scripts/check_accessibility_guardrails.sh --update` and confirm the diff is
+only relabeled file paths — never a new accessibility risk.**
+
 ## Failed Attempts
 
 - Packet 157-161 first full `bun run test` attempt failed the "Check public

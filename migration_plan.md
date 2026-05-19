@@ -3414,6 +3414,25 @@ moved).
 Rollback: revert each new file back into its source file; reverse the
 `EnvironmentValues.applying` access widening.
 
+### Batch 167-171 — COMPLETED (SwiftTUICharts)
+
+Five behavior-preserving moves splitting `ChartSupport.swift` by chart family
+(see `migration_progress.md` for validation logs):
+
+- Packet 167: shared/timeline/legend helpers → `ChartCommonSupport.swift`.
+- Packet 168: comparison-chart helpers → `ComparisonChartSupport.swift`.
+- Packet 169: stacked-bar-chart helpers → `StackedBarChartSupport.swift`.
+- Packet 170: threshold-gauge helpers → `ThresholdGaugeSupport.swift`.
+- Packet 171: bullet-chart helpers → `BulletChartSupport.swift`.
+
+All extracted functions are `internal` free functions — zero access widening.
+The batch gate required regenerating the accessibility source manifests
+(`./Scripts/check_accessibility_guardrails.sh --update`) because color/glyph
+code moved to new files.
+
+Rollback: revert each new file back into `ChartSupport.swift`; rerun
+`check_accessibility_guardrails.sh --update`.
+
 Future `SwiftTUIViews`/`SwiftTUICharts`/platform batches will be planned as
 they are reached.
 
