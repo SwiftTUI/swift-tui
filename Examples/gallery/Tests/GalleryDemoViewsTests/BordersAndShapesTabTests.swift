@@ -54,13 +54,10 @@ struct BordersAndShapesTabTests {
         }
       }
     )
-    let timeoutTask = Task {
-      try? await Task.sleep(nanoseconds: 1_000_000_000)
-      await quitGate.open()
-    }
-    defer {
-      timeoutTask.cancel()
-    }
+    // No wall-clock fallback: the gate opens only once the chasing-light
+    // animation has actually presented three frames. A broken animation
+    // hangs (surfaced by the CI job timeout) rather than racing a 1s timer
+    // that could open the gate early under a loaded runner and fail the test.
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: host,
