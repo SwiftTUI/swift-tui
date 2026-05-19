@@ -156,7 +156,7 @@ struct ImperativeAuthoringContextDispatchTests {
 
     _ = primary.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
 
-    try await waitUntil("appear lifecycle mutation") {
+    try await renderUntil("appear lifecycle mutation") {
       do {
         try renderPending(primary.runLoop)
         try renderPending(secondary.runLoop)
@@ -184,7 +184,7 @@ struct ImperativeAuthoringContextDispatchTests {
 
     _ = primary.runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
 
-    try await waitUntil("disappear lifecycle mutation") {
+    try await renderUntil("disappear lifecycle mutation") {
       do {
         try renderPending(primary.runLoop)
         try renderPending(secondary.runLoop)
@@ -212,7 +212,7 @@ struct ImperativeAuthoringContextDispatchTests {
 
     _ = primary.runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
 
-    try await waitUntil("change lifecycle mutation") {
+    try await renderUntil("change lifecycle mutation") {
       do {
         try renderPending(primary.runLoop)
         try renderPending(secondary.runLoop)
@@ -242,7 +242,7 @@ struct ImperativeAuthoringContextDispatchTests {
 
     _ = primary.runLoop.handleKeyPress(KeyPress(.character("t"), modifiers: .ctrl))
 
-    try await waitUntil("task lifecycle mutation", timeoutNanoseconds: 1_000_000_000) {
+    try await renderUntil("task lifecycle mutation") {
       do {
         try renderPending(primary.runLoop)
         try renderPending(secondary.runLoop)
@@ -919,28 +919,29 @@ private struct ImperativeDispatchTimeout: Error, CustomStringConvertible {
   let label: String
 
   var description: String {
-    "Timed out waiting for \(label)"
+    "Ran out of render attempts waiting for \(label)"
   }
 }
 
+/// Pumps `condition` — which itself drives a render cycle — until it holds.
+///
+/// The bound is a count of *render attempts*, not a wall-clock interval, so
+/// it is identical on a fast laptop and a starved CI core and never times out
+/// spuriously. `Task.yield()` between attempts lets an asynchronous lifecycle
+/// effect (a `.task`) make progress before the next render.
 @MainActor
-private func waitUntil(
+private func renderUntil(
   _ label: String,
-  timeoutNanoseconds: UInt64 = 500_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
+  maxRenderAttempts: Int = 1000,
   condition: @escaping @MainActor () -> Bool
 ) async throws {
-  let clock = ContinuousClock()
-  let deadline = clock.now.advanced(by: .nanoseconds(Int64(timeoutNanoseconds)))
-  while true {
+  for _ in 0..<maxRenderAttempts {
     if condition() {
       return
     }
-    if clock.now >= deadline {
-      throw ImperativeDispatchTimeout(label: label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
+    await Task.yield()
   }
+  throw ImperativeDispatchTimeout(label: label)
 }
 
 @MainActor
