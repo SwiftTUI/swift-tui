@@ -161,6 +161,9 @@ jobs:
 
   coverage-report:
     name: Coverage report
+    # Manual-only for now: run via the Actions "Run workflow" button, not on
+    # every push/PR. Coverage is informational and not a merge gate.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
