@@ -1,6 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUI
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 

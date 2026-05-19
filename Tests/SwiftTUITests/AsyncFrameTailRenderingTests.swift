@@ -1,6 +1,6 @@
 @unsafe @preconcurrency import Dispatch
 import Foundation
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 

@@ -1,4 +1,4 @@
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 /// A *stage* is one unit of runtime progress (for the run loop, one completed

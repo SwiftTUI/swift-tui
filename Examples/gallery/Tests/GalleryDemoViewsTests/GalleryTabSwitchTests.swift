@@ -1,5 +1,6 @@
 import Dispatch
 @_spi(Runners) @_spi(Testing) import SwiftTUI
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import GalleryDemoViews
@@ -236,35 +237,37 @@ struct GalleryTabSwitchTests {
 
     let result = try await Self.runHarness(
       presentationSurface: host,
-      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          let surfaces = deduplicated(host.surfaces)
-          guard surfaces.count >= 2 else {
-            return false
-          }
-          capture.initialPhysicsSurface = capture.initialPhysicsSurface ?? surfaces.first
-          capture.prePaletteSurface = surfaces.last
-          return capture.prePaletteSurface != capture.initialPhysicsSurface
-        },
-        .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          let text = host.lastPresentedSurface?.lines.joined(separator: "\n") ?? ""
-          return text.contains("Command palette")
-        },
-        .event(.key(KeyPress(.escape, modifiers: []))),
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          guard let surface = host.lastPresentedSurface else {
-            return false
-          }
-          let text = surface.lines.joined(separator: "\n")
-          guard !text.contains("Command palette"), !text.contains("palette sheet") else {
-            return false
-          }
-          capture.postDismissSurface = surface
-          return true
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            let surfaces = deduplicated(host.surfaces)
+            guard surfaces.count >= 2 else {
+              return false
+            }
+            capture.initialPhysicsSurface = capture.initialPhysicsSurface ?? surfaces.first
+            capture.prePaletteSurface = surfaces.last
+            return capture.prePaletteSurface != capture.initialPhysicsSurface
+          },
+          .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
+          .awaitCondition {
+            let text = host.lastPresentedSurface?.lines.joined(separator: "\n") ?? ""
+            return text.contains("Command palette")
+          },
+          .event(.key(KeyPress(.escape, modifiers: []))),
+          .awaitCondition {
+            guard let surface = host.lastPresentedSurface else {
+              return false
+            }
+            let text = surface.lines.joined(separator: "\n")
+            guard !text.contains("Command palette"), !text.contains("palette sheet") else {
+              return false
+            }
+            capture.postDismissSurface = surface
+            return true
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view }
@@ -308,23 +311,25 @@ struct GalleryTabSwitchTests {
 
     let result = try await Self.runHarness(
       presentationSurface: host,
-      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
-        .event(.mouse(.init(kind: .down(.primary), location: tabClickCenter))),
-        .event(.mouse(.init(kind: .up(.primary), location: tabClickCenter))),
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          guard let surface = host.lastPresentedSurface,
-            Self.containsBrailleDrawing(surface)
-          else {
-            return false
-          }
-          capture.surfaceCountAtFirstPhysicsFrame = deduplicated(host.surfaces).count
-          return true
-        },
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          deduplicated(host.surfaces).count >= capture.surfaceCountAtFirstPhysicsFrame + 2
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .event(.mouse(.init(kind: .down(.primary), location: tabClickCenter))),
+          .event(.mouse(.init(kind: .up(.primary), location: tabClickCenter))),
+          .awaitCondition {
+            guard let surface = host.lastPresentedSurface,
+              Self.containsBrailleDrawing(surface)
+            else {
+              return false
+            }
+            capture.surfaceCountAtFirstPhysicsFrame = deduplicated(host.surfaces).count
+            return true
+          },
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= capture.surfaceCountAtFirstPhysicsFrame + 2
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view }
@@ -357,38 +362,40 @@ struct GalleryTabSwitchTests {
 
     let result = try await Self.runHarness(
       presentationSurface: host,
-      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
-        .event(.mouse(.init(kind: .down(.primary), location: overflowTriggerCenter))),
-        .event(.mouse(.init(kind: .up(.primary), location: overflowTriggerCenter))),
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          guard let surface = host.lastPresentedSurface,
-            let itemBounds = Self.boundsOfText("Full Screen", in: surface)
-          else {
-            return false
-          }
-          capture.overflowItemCenter = Self.centerPoint(of: itemBounds)
-          return true
-        },
-        .eventFrom {
-          .mouse(.init(kind: .down(.primary), location: capture.overflowItemCenter))
-        },
-        .eventFrom {
-          .mouse(.init(kind: .up(.primary), location: capture.overflowItemCenter))
-        },
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          guard let surface = host.lastPresentedSurface,
-            Self.containsBrailleDrawing(surface)
-          else {
-            return false
-          }
-          capture.surfaceCountAtFirstPhysicsFrame = deduplicated(host.surfaces).count
-          return true
-        },
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          deduplicated(host.surfaces).count >= capture.surfaceCountAtFirstPhysicsFrame + 2
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .event(.mouse(.init(kind: .down(.primary), location: overflowTriggerCenter))),
+          .event(.mouse(.init(kind: .up(.primary), location: overflowTriggerCenter))),
+          .awaitCondition {
+            guard let surface = host.lastPresentedSurface,
+              let itemBounds = Self.boundsOfText("Full Screen", in: surface)
+            else {
+              return false
+            }
+            capture.overflowItemCenter = Self.centerPoint(of: itemBounds)
+            return true
+          },
+          .eventFrom {
+            .mouse(.init(kind: .down(.primary), location: capture.overflowItemCenter))
+          },
+          .eventFrom {
+            .mouse(.init(kind: .up(.primary), location: capture.overflowItemCenter))
+          },
+          .awaitCondition {
+            guard let surface = host.lastPresentedSurface,
+              Self.containsBrailleDrawing(surface)
+            else {
+              return false
+            }
+            capture.surfaceCountAtFirstPhysicsFrame = deduplicated(host.surfaces).count
+            return true
+          },
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= capture.surfaceCountAtFirstPhysicsFrame + 2
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view }
@@ -413,41 +420,43 @@ struct GalleryTabSwitchTests {
 
     let result = try await Self.runHarness(
       presentationSurface: host,
-      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          let surfaces = deduplicated(host.surfaces)
-          guard surfaces.count >= 4,
-            let bounds = surfaces.last.flatMap(Self.brailleBounds(in:))
-          else {
-            return false
-          }
-          let start = Self.centerPoint(of: bounds)
-          capture.dragStart = start
-          capture.dragEnd = Point(x: start.x + 12, y: start.y - 5)
-          return true
-        },
-        .eventFrom {
-          .mouse(.init(kind: .down(.primary), location: capture.dragStart))
-        },
-        .eventFrom(
-          delayNanoseconds: 30_000_000
-        ) {
-          .mouse(.init(kind: .dragged(.primary), location: capture.dragEnd))
-        },
-        .eventFrom(
-          delayNanoseconds: 30_000_000
-        ) {
-          .mouse(.init(kind: .up(.primary), location: capture.dragEnd))
-        },
-        .waitUntil(timeoutNanoseconds: 1_000_000_000) {
-          capture.surfaceCountAtRelease = deduplicated(host.surfaces).count
-          return true
-        },
-        .waitUntil(timeoutNanoseconds: 8_000_000_000) {
-          deduplicated(host.surfaces).count >= capture.surfaceCountAtRelease + 3
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            let surfaces = deduplicated(host.surfaces)
+            guard surfaces.count >= 4,
+              let bounds = surfaces.last.flatMap(Self.brailleBounds(in:))
+            else {
+              return false
+            }
+            let start = Self.centerPoint(of: bounds)
+            capture.dragStart = start
+            capture.dragEnd = Point(x: start.x + 12, y: start.y - 5)
+            return true
+          },
+          .eventFrom {
+            .mouse(.init(kind: .down(.primary), location: capture.dragStart))
+          },
+          .eventFrom(
+            delayNanoseconds: 30_000_000
+          ) {
+            .mouse(.init(kind: .dragged(.primary), location: capture.dragEnd))
+          },
+          .eventFrom(
+            delayNanoseconds: 30_000_000
+          ) {
+            .mouse(.init(kind: .up(.primary), location: capture.dragEnd))
+          },
+          .awaitCondition {
+            capture.surfaceCountAtRelease = deduplicated(host.surfaces).count
+            return true
+          },
+          .awaitCondition {
+            deduplicated(host.surfaces).count >= capture.surfaceCountAtRelease + 3
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { view }
@@ -620,24 +629,26 @@ struct GalleryTabSwitchTests {
 
     let result = try await Self.runHarness(
       presentationSurface: host,
-      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          host.lastPresentedSurface != nil
-        },
-        .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
-        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
-          guard let surface = host.lastPresentedSurface else {
-            return false
-          }
-          let text = surface.lines.joined(separator: "\n")
-          guard text.contains("Command palette") else {
-            return false
-          }
-          capture.paletteSurface = surface
-          return true
-        },
-        .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
-      ]),
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(
+        frameSignal: host.frameSignal,
+        steps: [
+          .awaitCondition {
+            host.lastPresentedSurface != nil
+          },
+          .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
+          .awaitCondition {
+            guard let surface = host.lastPresentedSurface else {
+              return false
+            }
+            let text = surface.lines.joined(separator: "\n")
+            guard text.contains("Command palette") else {
+              return false
+            }
+            capture.paletteSurface = surface
+            return true
+          },
+          .event(.key(KeyPress(.character("d"), modifiers: .ctrl))),
+        ]),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { GalleryView() }
@@ -1431,28 +1442,31 @@ private enum GalleryTabSwitchAwaitedInputStep {
     delayNanoseconds: UInt64 = 0,
     provider: @MainActor () -> InputEvent
   )
-  case waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
-    predicate: @MainActor () -> Bool
-  )
+  /// Suspends the input script until `predicate` holds.
+  ///
+  /// Unlike a timeout poll, the predicate is re-evaluated only when the host
+  /// presents a new frame (the host's `frameSignal.notify()`), never on a
+  /// clock. A starved run loop therefore slows the test down instead of
+  /// timing the wait out and continuing prematurely.
+  case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
 private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
   private let steps: [GalleryTabSwitchAwaitedInputStep]
-  private let pollNanoseconds: UInt64
+  private let frameSignal: MainActorConditionSignal
 
   init(
-    steps: [GalleryTabSwitchAwaitedInputStep],
-    pollNanoseconds: UInt64 = 10_000_000
+    frameSignal: MainActorConditionSignal,
+    steps: [GalleryTabSwitchAwaitedInputStep]
   ) {
+    self.frameSignal = frameSignal
     self.steps = steps
-    self.pollNanoseconds = pollNanoseconds
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let steps = self.steps
-      let pollNanoseconds = self.pollNanoseconds
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         for step in steps {
           switch step {
@@ -1466,12 +1480,8 @@ private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
               try? await Task.sleep(nanoseconds: delayNanoseconds)
             }
             continuation.yield(provider())
-          case .waitUntil(let timeoutNanoseconds, let predicate):
-            var elapsedNanoseconds: UInt64 = 0
-            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
-              try? await Task.sleep(nanoseconds: pollNanoseconds)
-              elapsedNanoseconds += pollNanoseconds
-            }
+          case .awaitCondition(let predicate):
+            await frameSignal.wait(until: predicate)
           }
         }
         continuation.finish()
@@ -1499,6 +1509,10 @@ private final class GalleryTabSwitchRecordingHost: PresentationSurface {
   private(set) var surfaces: [RasterSurface] = []
   private(set) var lastPresentedSurface: RasterSurface?
 
+  /// Notified after every `present`, so an awaited input step can re-check its
+  /// predicate the instant a new frame lands instead of polling under a timeout.
+  let frameSignal = MainActorConditionSignal()
+
   init(size: CellSize) {
     surfaceSize = size
   }
@@ -1513,6 +1527,15 @@ private final class GalleryTabSwitchRecordingHost: PresentationSurface {
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     surfaces.append(surface)
     lastPresentedSurface = surface
+    // The run loop only ever presents on the MainActor; `assumeIsolated`
+    // bridges this nonisolated protocol witness to the MainActor-isolated
+    // signal, and traps loudly rather than corrupting state if that ever
+    // stops being true. Bind the (Sendable) signal to a local first so the
+    // closure never has to capture the non-Sendable host itself.
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
     return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
   }
 }

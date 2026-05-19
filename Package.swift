@@ -134,6 +134,9 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
     .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
     .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
+    // Exported so example packages (Examples/*) can synchronise their tests on
+    // the shared poll-free signals instead of timeout-based waiting.
+    .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
   ]
   + (includeSwiftUIHost
     ? [

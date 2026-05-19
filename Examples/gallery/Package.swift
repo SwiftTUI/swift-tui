@@ -19,7 +19,7 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-tui", path: "../.."),
+    .package(name: "swift-tui", path: "../..")
   ],
   targets: [
     .executableTarget(
@@ -44,6 +44,7 @@ let package = Package(
         "GalleryDemoViews",
         .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "SwiftTUIAnimatedImage", package: "swift-tui"),
+        .product(name: "SwiftTUITestSupport", package: "swift-tui"),
       ]
     ),
   ]
