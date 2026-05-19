@@ -7,15 +7,20 @@ extension RunLoop {
   ) {
     switch mouseEvent.kind {
     case .down(let button):
-      handleMouseDown(button, location: mouseEvent.location)
+      handleMouseDown(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
     case .up(let button):
-      handleMouseUp(button, location: mouseEvent.location)
+      handleMouseUp(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
     case .moved:
-      handleMouseMove(location: mouseEvent.location)
+      handleMouseMove(location: mouseEvent.location, timestamp: mouseEvent.timestamp)
     case .dragged(let button):
-      handleMouseDrag(button, location: mouseEvent.location)
+      handleMouseDrag(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
     case .scrolled(let deltaX, let deltaY):
-      handleMouseScroll(deltaX: deltaX, deltaY: deltaY, location: mouseEvent.location)
+      handleMouseScroll(
+        deltaX: deltaX,
+        deltaY: deltaY,
+        location: mouseEvent.location,
+        timestamp: mouseEvent.timestamp
+      )
     }
   }
 
@@ -35,7 +40,8 @@ extension RunLoop {
 
   package func handleMouseDown(
     _ button: MouseButton,
-    location: PointerLocation
+    location: PointerLocation,
+    timestamp: MonotonicInstant = .now()
   ) {
     guard button == .primary else {
       return
@@ -56,7 +62,8 @@ extension RunLoop {
       location: location,
       targetRect: hitTarget.region.rect,
       scrollContext: scrollContext(for: hitTarget.region.identity),
-      namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+      namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+      timestamp: timestamp
     )
 
     let customHandled = dispatchPointerEvent(
@@ -104,7 +111,8 @@ extension RunLoop {
 
   package func handleMouseUp(
     _ button: MouseButton,
-    location: PointerLocation
+    location: PointerLocation,
+    timestamp: MonotonicInstant = .now()
   ) {
     guard button == .primary else {
       return
@@ -128,7 +136,8 @@ extension RunLoop {
           location: location,
           targetRect: region.rect,
           scrollContext: scrollContext(for: region.identity),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+          timestamp: timestamp
         )
       )
       return
@@ -151,7 +160,8 @@ extension RunLoop {
         location: location,
         targetRect: region.rect,
         scrollContext: scrollContext(for: region.identity),
-        namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+        namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+        timestamp: timestamp
       )
     )
     if pointerHandled {
@@ -180,7 +190,8 @@ extension RunLoop {
   }
 
   package func handleMouseMove(
-    location: PointerLocation
+    location: PointerLocation,
+    timestamp: MonotonicInstant = .now()
   ) {
     updatePointerHover(at: location)
 
@@ -199,7 +210,8 @@ extension RunLoop {
           location: location,
           targetRect: region.rect,
           scrollContext: scrollContext(for: region.identity),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+          timestamp: timestamp
         )
       )
       if handled {
@@ -212,7 +224,8 @@ extension RunLoop {
 
   package func handleMouseDrag(
     _ button: MouseButton,
-    location: PointerLocation
+    location: PointerLocation,
+    timestamp: MonotonicInstant = .now()
   ) {
     guard button == .primary else {
       return
@@ -229,7 +242,8 @@ extension RunLoop {
           location: location,
           targetRect: region.rect,
           scrollContext: scrollContext(for: region.identity),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+          timestamp: timestamp
         )
       )
       return
@@ -241,7 +255,8 @@ extension RunLoop {
   package func handleMouseScroll(
     deltaX: Int,
     deltaY: Int,
-    location: PointerLocation
+    location: PointerLocation,
+    timestamp: MonotonicInstant = .now()
   ) {
     // Scroll events should not move keyboard focus — the scroll target
     // is resolved independently via scrollTarget(at:).
@@ -258,7 +273,8 @@ extension RunLoop {
             viewportRect: scrollRoute.viewportRect,
             contentBounds: scrollRoute.contentBounds
           ),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+          timestamp: timestamp
         )
       )
       if handled {

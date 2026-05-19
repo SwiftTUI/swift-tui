@@ -2641,6 +2641,7 @@ SwiftTUIRuntime.MouseButton.middle
 SwiftTUIRuntime.MouseButton.primary
 SwiftTUIRuntime.MouseButton.secondary
 SwiftTUIRuntime.MouseEvent
+SwiftTUIRuntime.MouseEvent.==(_:_:)
 SwiftTUIRuntime.MouseEvent.Kind
 SwiftTUIRuntime.MouseEvent.Kind.down(_:)
 SwiftTUIRuntime.MouseEvent.Kind.dragged(_:)
@@ -2648,11 +2649,12 @@ SwiftTUIRuntime.MouseEvent.Kind.moved
 SwiftTUIRuntime.MouseEvent.Kind.scrolled(deltaX:deltaY:)
 SwiftTUIRuntime.MouseEvent.Kind.up(_:)
 SwiftTUIRuntime.MouseEvent.Modifiers
-SwiftTUIRuntime.MouseEvent.init(kind:location:modifiers:)
-SwiftTUIRuntime.MouseEvent.init(kind:location:modifiers:)
+SwiftTUIRuntime.MouseEvent.init(kind:location:modifiers:timestamp:)
+SwiftTUIRuntime.MouseEvent.init(kind:location:modifiers:timestamp:)
 SwiftTUIRuntime.MouseEvent.kind
 SwiftTUIRuntime.MouseEvent.location
 SwiftTUIRuntime.MouseEvent.modifiers
+SwiftTUIRuntime.MouseEvent.timestamp
 SwiftTUIRuntime.PasteEvent
 SwiftTUIRuntime.PasteEvent.content
 SwiftTUIRuntime.PasteEvent.init(content:)

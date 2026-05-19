@@ -24,15 +24,24 @@ public struct MouseEvent: Equatable, Sendable {
   public var kind: Kind
   public var location: PointerLocation
   public var modifiers: Modifiers
+  /// When the event occurred, on the runtime's monotonic clock.
+  ///
+  /// Threaded into the `LocalPointerEvent` the run loop dispatches, where
+  /// gestures derive drag velocity from the interval between events. Tests
+  /// stamp deterministic values so velocity does not depend on wall-clock
+  /// spacing between scripted events.
+  public var timestamp: MonotonicInstant
 
   public init(
     kind: Kind,
     location: PointerLocation,
-    modifiers: Modifiers = []
+    modifiers: Modifiers = [],
+    timestamp: MonotonicInstant = .now()
   ) {
     self.kind = kind
     self.location = location
     self.modifiers = modifiers
+    self.timestamp = timestamp
   }
 
   /// Builds a cell-only fallback event for the cell containing `location`.
@@ -41,13 +50,25 @@ public struct MouseEvent: Equatable, Sendable {
   public init(
     kind: Kind,
     location: Point,
-    modifiers: Modifiers = []
+    modifiers: Modifiers = [],
+    timestamp: MonotonicInstant = .now()
   ) {
     self.init(
       kind: kind,
       location: .cellFallback(location.containingCell),
-      modifiers: modifiers
+      modifiers: modifiers,
+      timestamp: timestamp
     )
+  }
+
+  /// Equality deliberately ignores `timestamp`: it records *when* an event
+  /// occurred, not *what* it is. Two events with the same kind, location, and
+  /// modifiers are the same event — so a parser/coalescer test can assert the
+  /// decoded events without pinning their wall-clock arrival times.
+  public static func == (lhs: MouseEvent, rhs: MouseEvent) -> Bool {
+    lhs.kind == rhs.kind
+      && lhs.location == rhs.location
+      && lhs.modifiers == rhs.modifiers
   }
 }
 
