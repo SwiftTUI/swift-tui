@@ -27,6 +27,6 @@ Sources/SwiftTUIViews/Controls/ControlFocusRowSupport.swift
 Sources/SwiftTUIViews/Controls/PickerSegmentedAndRadioStyles.swift
 Sources/SwiftTUIViews/Controls/PickerSharedRendering.swift
 Sources/SwiftTUIViews/Controls/Stepper.swift
-Sources/SwiftTUIViews/NavigationViews/BuiltinTabViewStyles.swift
 Sources/SwiftTUIViews/Presentation/PromptPresentationSurface.swift
 Sources/SwiftTUIViews/Presentation/ToastPresentation.swift
+Sources/SwiftTUIViews/TabViews/BuiltinTabViewStyles.swift

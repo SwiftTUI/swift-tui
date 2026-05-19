@@ -57,5 +57,5 @@ Sources/SwiftTUIViews/Controls/ProgressView.swift
 Sources/SwiftTUIViews/Controls/Spinner.swift
 Sources/SwiftTUIViews/Controls/Stepper.swift
 Sources/SwiftTUIViews/Controls/ValueControls.swift
-Sources/SwiftTUIViews/NavigationViews/BuiltinTabViewStyles.swift
 Sources/SwiftTUIViews/Presentation/ToastPresentation.swift
+Sources/SwiftTUIViews/TabViews/BuiltinTabViewStyles.swift

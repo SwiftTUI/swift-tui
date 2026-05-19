@@ -298,19 +298,19 @@ for style_protocol in ButtonStyle TextFieldStyle PickerStyle ListStyle OutlineSt
   fi
 done
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol TabViewStyle' Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol TabViewStyle' Sources/SwiftTUIViews/TabViews/TabViewStyles.swift; then
   fail "TabViewStyle should be a public extensible style protocol."
 fi
 
-if rg -n -P --quiet -- '(public|package)\s+enum\s+TabViewStyle\b' Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift; then
+if rg -n -P --quiet -- '(public|package)\s+enum\s+TabViewStyle\b' Sources/SwiftTUIViews/TabViews/TabViewStyles.swift; then
   fail "TabViewStyle must not regress to an enum-owned style surface."
 fi
 
-if rg -n -P --quiet -- 'AnyTabViewStyle|AutomaticTabViewStyle|UnderlineTabViewStyle|LiteralTabsTabViewStyle|PowerlineTabViewStyle' Sources/SwiftTUIViews/NavigationViews/TabView.swift; then
+if rg -n -P --quiet -- 'AnyTabViewStyle|AutomaticTabViewStyle|UnderlineTabViewStyle|LiteralTabsTabViewStyle|PowerlineTabViewStyle' Sources/SwiftTUIViews/TabViews/TabView.swift; then
   fail "TabView.swift should not branch directly on built-in tab style types; keep style ownership in TabViewStyles.swift."
 fi
 
-if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/SwiftTUIViews/NavigationViews/TabView.swift; then
+if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/SwiftTUIViews/TabViews/TabView.swift; then
   fail "TabView.swift should not switch directly on tab styles."
 fi
 
