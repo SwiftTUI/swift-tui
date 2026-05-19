@@ -2180,6 +2180,43 @@ Runner log: /tmp/swift-tui-test-gate-20260518-182040-24464.log
 Result: PASS
 ```
 
+## Latest Review Packets: 137-141
+
+This five-packet batch continues the constrained central runtime/core pass.
+Every packet is a behavior-preserving move; no logic was rewritten.
+
+Production scope:
+
+- Packet 137 — special-case placement-request builders →
+  `LayoutEngine+SpecialPlacementRequests.swift` (three helpers widened
+  `private` → file-internal).
+- Packet 138 — ANSI color-code resolution →
+  `TerminalCellTextRenderer+ColorCodes.swift` (three lookups widened
+  `private` → file-internal; cache/palette stay `private`).
+- Packet 139 — animation runtime-state types (`AnimationKind`,
+  `ActiveAnimation`, `AnimationTickResult`, `RemovalEntry`) →
+  `AnimationRuntimeState.swift`.
+- Packet 140 — bulk registration operations →
+  `RuntimeRegistrationSet+Operations.swift`.
+- Packet 141 — `CompletedFrameImpact` nested type →
+  `FrameDropEligibility+CompletedFrameImpact.swift`.
+
+Behavior intentionally preserved:
+
+- Placement geometry, ANSI color resolution, animation runtime state,
+  registration reset/restore semantics, and frame-drop impact classification
+  are unchanged and covered by focused checks.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-183437-packet137-141.log
+Runner log: /tmp/swift-tui-test-gate-20260518-183437-57793.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict

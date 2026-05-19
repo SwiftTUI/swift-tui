@@ -3018,7 +3018,65 @@ Packet 132-136 batch validation:
   - Runner log: `/tmp/swift-tui-test-gate-20260518-182040-24464.log`
   - Result: PASS
 
-Next scheduled focus: continue with Batch 137-141 per the migration plan,
+## Packet 137-141 Batch: Placement, Color Codes, Animation State, Registration Ops, Drop Impact
+
+Scope completed (all within `SwiftTUICore` and `SwiftTUIRuntime`, all
+behavior-preserving moves):
+
+- Packet 137: split the three special-case placement-request builders
+  (`safeAreaInset`, `decoration`, layout-dependent content) out of
+  `LayoutEngine+PlacementRequests.swift` into
+  `LayoutEngine+SpecialPlacementRequests.swift`; widened the three from
+  `private` to file-internal.
+- Packet 138: split ANSI color-code resolution
+  (`closestANSI16ForegroundCode`, `ansi256Code`, `backgroundCode`, and the
+  delta-E cache/palette) out of `TerminalCellTextRenderer.swift` into
+  `TerminalCellTextRenderer+ColorCodes.swift`; widened the three lookup
+  functions from `private` to file-internal.
+- Packet 139: split the in-flight animation runtime-state types
+  (`AnimationKind`, `ActiveAnimation`, `AnimationTickResult`, `RemovalEntry`)
+  out of `AnimationModels.swift` into `AnimationRuntimeState.swift`.
+- Packet 140: split the bulk registration operations (`resetAll`,
+  `removeSubtrees`, `pruneOrphanedGestures`, `restore`, `diagnostics`,
+  `frameDropEligibilityBlockers`) out of `RuntimeRegistrationSet.swift` into
+  `RuntimeRegistrationSet+Operations.swift`.
+- Packet 141: split the `CompletedFrameImpact` nested type out of
+  `FrameDropEligibility.swift` into
+  `FrameDropEligibility+CompletedFrameImpact.swift`.
+
+Behavior preserved:
+
+- Placement geometry, ANSI color resolution, animation runtime state,
+  registration reset/restore semantics, and frame-drop impact classification
+  all remained unchanged. No public API, fixture, or test changed.
+
+Packet 137-141 focused validation:
+
+- `swiftly run swift build --target SwiftTUICore` — PASS (packets 137, 139-141)
+- `swiftly run swift build --target SwiftTUIRuntime` — PASS (packets 138-139)
+- `swiftly run swift test --filter SafeAreaSurfaceTests`,
+  `AnchorPreferenceSurfaceTests`, `LayoutEngineTests`,
+  `BoundedReconciliationTests` — PASS
+- `swiftly run swift test --filter TerminalPresentationTests`,
+  `TerminalGraphicsProtocolTests` (68) — PASS
+- `swiftly run swift test --filter AnimationControllerTests`,
+  `AnimationTickVisibilityTests` (66) — PASS
+- `swiftly run swift test --filter FrameDropEligibilityTests`,
+  `FrameDropDroppabilityTests`, `GestureResetAndReplayTests` — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 137-141 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-183437-packet137-141.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-183437-57793.log`
+  - Result: PASS
+
+Next scheduled focus: continue with Batch 142-146 per the migration plan,
 remaining inside `SwiftTUICore` and `SwiftTUIRuntime`.
 
 ## Failed Attempts
