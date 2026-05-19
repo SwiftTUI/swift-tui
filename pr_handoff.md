@@ -2100,6 +2100,49 @@ Runner log: /tmp/swift-tui-test-gate-20260518-170129-78413.log
 Result: PASS
 ```
 
+## Latest Review Packets: 127-131
+
+This five-packet batch continues the constrained central runtime/core pass.
+Every packet is a behavior-preserving move; no logic was rewritten.
+
+Production scope:
+
+- Packet 127 — terminal mouse coordinate-mode resolution split out of
+  `TerminalHostCapabilities.swift` into `TerminalMouseCoordinateResolution.swift`
+  (`TerminalHostCapabilities.swift`, `TerminalMouseCoordinateResolution.swift`).
+  Review note: `baselineGraphicsCapabilities()` was widened `private` →
+  file-internal — the only visibility change in the batch.
+- Packet 128 — layout-offload eligibility split out of `FrameTailRenderer.swift`
+  into `FrameTailLayoutOffloadEligibility.swift` (`FrameTailRenderer.swift`,
+  `FrameTailLayoutOffloadEligibility.swift`). The three `contains*` scans became
+  file-internal so `renderLayoutAsync` keeps reusing them.
+- Packet 129 — pure transition removal injection-point walk-up extracted from
+  `AnimationController.swift` into `AnimationTransitionRemovalPlanning.swift`
+  (`AnimationController.swift`, `AnimationTransitionRemovalPlanning.swift`).
+- Packet 130 — read-only retained-frame query types split out of
+  `RetainedResolveFrame.swift` into `RetainedFrameQueries.swift`
+  (`RetainedResolveFrame.swift`, `RetainedFrameQueries.swift`).
+- Packet 131 — `FrameTailRetainedState` extracted from the `FrameTailModels.swift`
+  value-type grab-bag into `FrameTailRetainedState.swift`
+  (`FrameTailModels.swift`, `FrameTailRetainedState.swift`).
+
+Behavior intentionally preserved:
+
+- SGR-pixels trust resolution, graphics-protocol probing, layout-worker offload
+  decisions, transition overlay injection points, retained-frame
+  indexing/invalidation queries, and frame-tail retained-state storage are all
+  unchanged and covered by focused checks.
+- No public SwiftUI-shaped API, fixture, or test was changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-175110-packet127-131.log
+Runner log: /tmp/swift-tui-test-gate-20260518-175110-42380.log
+Result: PASS
+```
+
 ## Risks
 
 The first focus area is central runtime infrastructure. Review should be strict

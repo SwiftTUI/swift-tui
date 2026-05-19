@@ -533,39 +533,22 @@ package final class AnimationController: Sendable {
         let previousRoot = previousTreeRoot
       else { continue }
 
-      // Walk up: injectionTarget is the deepest ancestor that is ALSO
-      // gone from the new tree.  injectionParent is the first surviving
-      // ancestor (or nil if none exists, in which case we can't inject).
-      //
-      // The walk ONLY passes through single-child wrapper nodes
-      // (.padding, .frame, .offset, etc.).  When a removed ancestor
-      // has multiple children in the previous tree it is a structural
-      // container (VStack, HStack, ScrollView, …) — climbing past it
-      // would capture an entire unrelated subtree as the removal
-      // overlay, which is what happens during a tab switch where the
-      // PhaseAnimator’s frame-level .animate leaks to the transition.
-      // Stopping here means injectionParent might still be a removed
-      // identity, which the guard below converts into a skip.
-      var injectionTarget = identity
-      var injectionParent = previousParentByIdentity[identity]
-      while let parent = injectionParent, !newIdentities.contains(parent) {
-        // Stop before climbing through a multi-child container.
-        if let parentNode = AnimationTreeQueries.findResolvedNode(
-          in: previousRoot,
-          identity: parent
-        ),
-          parentNode.children.count > 1
-        {
-          break
-        }
-        injectionTarget = parent
-        injectionParent = previousParentByIdentity[parent]
-      }
+      // Resolve the injection point: the deepest disappearing ancestor (the
+      // subtree to inject) and the first surviving ancestor it attaches to.
+      // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
+      let injectionPoint = AnimationTransitionRemovalPlanning.injectionPoint(
+        for: identity,
+        previousRoot: previousRoot,
+        previousParentByIdentity: previousParentByIdentity,
+        newIdentities: newIdentities
+      )
+      let injectionTarget = injectionPoint.target
 
       // injectionParent must be a surviving identity in the new tree.
-      // If the walk-up stopped at a multi-child container (break),
-      // injectionParent may still be a removed identity — skip.
-      guard let injectionParent, newIdentities.contains(injectionParent),
+      // If the walk-up stopped at a multi-child container, it may still be a
+      // removed identity — skip.
+      guard let injectionParent = injectionPoint.parent,
+        newIdentities.contains(injectionParent),
         let subtree = AnimationTreeQueries.findResolvedSubtree(
           in: previousRoot,
           identity: injectionTarget
