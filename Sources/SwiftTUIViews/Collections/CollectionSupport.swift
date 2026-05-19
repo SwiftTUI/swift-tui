@@ -1,4 +1,3 @@
-import SwiftTUICore
 @_spi(Testing) import SwiftTUICore
 
 func resolvedNodeLabelText(
