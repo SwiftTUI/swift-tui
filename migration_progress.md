@@ -2,19 +2,25 @@
 
 ## Current Status
 
-**Substantially complete.** Repo-wide production-code humanization on `main`
-(after the `humanize` branch merged at `847ece21`) has run through 174
-behavior-preserving packets:
+**Complete.** Repo-wide production-code humanization on `main` (after the
+`humanize` branch merged at `847ece21`) has run through 191 behavior-preserving
+packets:
 
 - Packets 1-151 — central runtime/core (`SwiftTUICore`, `SwiftTUIRuntime`).
 - Packets 152-174 — other production code (`SwiftTUIViews`, `SwiftTUICharts`,
   `Platforms/*/Sources`).
+- Packets 175-191 — the **revisited phase**: after the task owner authorized
+  visibility adjustments where they improve maintainability, the seven files
+  previously skipped as "too entangled" were re-analyzed. Six were split with
+  documented low-cost widening (`SelectionAndValueSupport`,
+  `WebSurfaceFrameEncoder`, `PickerRendering`, `CustomLayout`,
+  `BoxDrawingRenderer`, `NativeTerminalSurfaceView`).
 
 Every cleanly-decomposable production file has been decomposed into focused,
-documented files. The remaining large files were assessed and are deliberately
-skipped — they are single-file units built on `private`/`fileprivate` cohesion
-where no safe behavior-preserving slice exists without widening many
-declarations at once (see `migration_plan.md` → "Migration Status").
+documented files. One file — `BuiltinTabViewStyles.swift` — remains
+deliberately skipped: its only viable split leaves a ~540-line still-entangled
+engine and needs HIGH-cost free-symbol widenings, a net-negative tradeoff (a
+detailed analysis is on record).
 
 Every batch passed the full repo gate (`bun run test`); no public API (held at
 669 top-level public symbols), fixture, or test was changed.
@@ -3752,6 +3758,64 @@ Packet 185-188 validation:
 - `bun run test` — PASS.
   - User tee log: `/tmp/swift-tui-test-gate-20260518-230910-packet185-188.log`
   - Runner log: `/tmp/swift-tui-test-gate-20260518-230910-22212.log`
+
+## Packet 189-191 Batch: NativeTerminalSurfaceView
+
+Fourth and final batch of the revisited phase. `NativeTerminalSurfaceView.swift`
+(1128 lines) split into four focused files.
+
+- Packet 189: the per-platform adapters — `NativePlatformFont`/`Color`/`Image`
+  typealiases, their `terminalFont`/`terminalColor`/`terminalImage` extensions,
+  and `NativeInputMapper` — out into `NativeTerminalPlatformAdapters.swift`.
+  The new file replicates the `#if canImport(AppKit) && !targetEnvironment(macCatalyst)`
+  / `#elseif canImport(UIKit)` guards and carries its own platform `import`.
+  Typealiases and adapter entry points widened `private`/`fileprivate` →
+  file-internal; `withTerminalTraits` / the UIKit `modifiers` helper stay
+  `fileprivate`.
+- Packet 190: `NativeRasterSurfaceRenderer` → `NativeRasterSurfaceRenderer.swift`
+  (`private enum` → file-internal). Also widened `NativeTerminalMetrics.font(for:)`
+  `fileprivate` → file-internal, since the renderer (now in its own file) calls
+  it.
+- Packet 191: `NativeTerminalMetrics` → `NativeTerminalMetrics.swift`. No
+  widening beyond the `font(for:)` change already applied in packet 190.
+- The residual `NativeTerminalSurfaceView.swift` is now just the two platform
+  view classes (~443 lines).
+
+### Lesson: a file-scoped `import` inside `#if` covers the whole file
+
+`NativeRasterSurfaceRenderer` and `NativeTerminalMetrics` use AppKit/UIKit
+symbols (`NSString.draw`, attributed-string keys, `NSFont.ascender`). In the
+original 1128-line file this compiled because the view classes' `import AppKit`
+/ `import UIKit` (inside their `#if` blocks) are file-scoped — they import for
+the *entire* file, including the unconditional types below. Once those types
+move to their own files, each new file must add its own
+`#if canImport(AppKit) … #elseif canImport(UIKit) … #endif` import block. The
+build caught the omission immediately.
+
+Behavior preserved: every moved declaration is byte-identical; only file
+location, access level, and (for the new files) the conditional import block
+changed. No public API, fixture, or test changed.
+
+Packet 189-191 validation:
+
+- Per-packet `swiftly run swift build --target SwiftUIHost` — PASS
+- `swiftly run swift test --filter NativeTerminalSurfaceViewEventTests` (3) —
+  PASS
+- `./Scripts/check_public_surface_policies.sh`,
+  `generate_public_api_inventory.sh --check` (669),
+  `check_public_documentation_ratchet.sh` (70), `check_stable_doc_source_paths.sh`,
+  `check_accessibility_guardrails.sh` — PASS (no manifest change)
+- `bun run test` — PASS.
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-231817-packet189-191.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-231817-44672.log`
+
+## Revisited Phase — Complete
+
+All six splittable previously-skipped files are now decomposed (packets
+175-191, 17 packets). `BuiltinTabViewStyles.swift` remains the single
+deliberately-skipped file, with a detailed analysis on record. The production
+codebase has no remaining file that can be split with a net-positive
+maintainability tradeoff.
 
 ## Failed Attempts
 

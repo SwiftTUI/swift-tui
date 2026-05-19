@@ -3511,9 +3511,25 @@ widenings; rerun `check_accessibility_guardrails.sh --update`.
 Rollback: revert each new file into its source; reverse the widenings; restore
 `ToolbarStyle.swift`'s import; rerun `check_accessibility_guardrails.sh --update`.
 
-### Batch 189+ — planned
+### Batch 189-191 — COMPLETED
 
-`NativeTerminalSurfaceView.swift` remains (4 packets, reviewed plan).
+`NativeTerminalSurfaceView.swift` (1128 lines) → four files:
+`NativeTerminalPlatformAdapters.swift`, `NativeRasterSurfaceRenderer.swift`,
+`NativeTerminalMetrics.swift`, and the residual two-view-class file. 8
+`private`/`fileprivate`→`internal` widenings (typealiases + namespaced
+members). New non-view files carry their own `#if canImport(AppKit)/UIKit`
+import blocks.
+
+Rollback: revert each new file into `NativeTerminalSurfaceView.swift`; reverse
+the widenings.
+
+## Revisited Phase — Complete
+
+All six splittable previously-skipped files are decomposed (packets 175-191).
+`BuiltinTabViewStyles.swift` is the single deliberately-skipped file — see the
+"Revisited Phase" section above for the rationale. The production codebase has
+no remaining file that can be split with a net-positive maintainability
+tradeoff.
 
 ## Human Checkpoints
 
