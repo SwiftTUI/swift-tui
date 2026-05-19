@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUI
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIWebHost
@@ -181,9 +182,10 @@ private actor RecordingByteSink: WebHostByteSink {
 
 private struct StalledByteSink: WebHostByteSink {
   func send(_: [UInt8]) async throws {
-    while !Task.isCancelled {
-      try await Task.sleep(for: .milliseconds(100))
-    }
+    // Park until the caller cancels: AsyncEvent.wait() is cancellation-aware,
+    // so a never-fired event suspends with no poll loop and resumes the
+    // instant cancellation arrives.
+    await AsyncEvent().wait()
     throw CancellationError()
   }
 }
