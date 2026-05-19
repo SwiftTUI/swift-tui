@@ -3,12 +3,6 @@
 This directory documents the manual listening surface that complements the
 checked-in semantic, Web/WASI, SwiftUI host, and accessible-output tests.
 
-Run `./Scripts/check_accessibility_guardrails.sh` before broad accessibility
-changes. The script pins current source files that contain raw glyphs,
-color-state styling, and visual-only surfaces so new entries require review.
-Use `./Scripts/check_accessibility_guardrails.sh --update` only after the new
-source has an accessible label, summary, hidden policy, or explicit acceptance.
-
 ## VoiceOver
 
 Use VoiceOver on macOS for both terminal accessible output and the SwiftUI host.

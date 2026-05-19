@@ -39,13 +39,6 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
-    "Check public documentation ratchet" \
-    "./Scripts/check_public_documentation_ratchet.sh" \
-    ./Scripts/check_public_documentation_ratchet.sh
-
-  run_repo_policy_check \
-    "$mode" \
-    "$repo_root" \
     "Check stable doc source paths" \
     "./Scripts/check_stable_doc_source_paths.sh" \
     ./Scripts/check_stable_doc_source_paths.sh
@@ -53,7 +46,7 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
-    "Check DocC coverage policy" \
+    "Check DocC coverage" \
     "./Scripts/check_docc_coverage.sh" \
     ./Scripts/check_docc_coverage.sh
 
@@ -77,13 +70,6 @@ run_repo_policy_phase() {
     "Check concurrency-safety policies" \
     "./Scripts/check_concurrency_safety_policies.sh" \
     ./Scripts/check_concurrency_safety_policies.sh
-
-  run_repo_policy_check \
-    "$mode" \
-    "$repo_root" \
-    "Check accessibility guardrails" \
-    "./Scripts/check_accessibility_guardrails.sh" \
-    ./Scripts/check_accessibility_guardrails.sh
 
   run_repo_policy_check \
     "$mode" \

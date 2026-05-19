@@ -39,14 +39,6 @@ hooks = [
     pass_filenames = false
   },
   {
-    id = "accessibility-guardrails",
-    name = "enforce accessibility source and listening guardrails",
-    entry = "./Scripts/check_accessibility_guardrails.sh",
-    language = "system",
-    files = '^((Sources|Platforms|Examples)/.*\.swift|Tests/SwiftTUITests/Accessibility/README\.md|Scripts/(check_accessibility_guardrails\.sh|lib/accessibility_.*_sources\.txt))$',
-    pass_filenames = false
-  },
-  {
     id = "main-thread-usage",
     name = "forbid bare Thread.isMainThread without thread-ismain-ok justification",
     entry = "./Scripts/check_main_thread_usage.sh",

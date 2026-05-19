@@ -124,10 +124,11 @@ its runs are comparative measurements, not a gate.
   contributors and stabilizing the surface toward `1.0.0` — has not been
   reached. The project is a single-maintainer `0.1.0` alpha.
 - **Global documentation linting.** `AllPublicDeclarationsHaveDocumentation` is
-  deliberately off. A curated ratchet
-  (`Scripts/lib/public_documentation_ratchet.txt`) covers the consumer-facing
-  surface until package-only seams are audited enough that the global rule
-  would help rather than force low-value comments onto internals.
+  deliberately off. In its place, `generate_public_api_inventory.sh --check`
+  runs a report-only ratchet that counts `canonical` public symbols with no
+  `///` summary. It does not fail the gate yet; once the count reaches zero,
+  flipping `ENFORCE_DOC_COMMENTS` makes it a hard gate. The global rule stays
+  off because it would also force low-value comments onto package-only seams.
 - **The name.** "SwiftTUI" collides with other terminal-UI projects in the
   Swift ecosystem. Whether to rename the package is unresolved.
 - **The `0.0.1` tag.** It predates the release policy and is kept only as a

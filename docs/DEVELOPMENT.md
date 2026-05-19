@@ -56,19 +56,18 @@ phase (`Scripts/lib/repo_policy_checks.sh`) runs, in order:
    absence of retired AnyView and registry seams, and the style-protocol
    policy; also checks that the policy is documented in
    [PUBLIC-API.md](PUBLIC-API.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
-2. **Public documentation ratchet** (`check_public_documentation_ratchet.sh`) —
-   the curated consumer-facing declarations in
-   `Scripts/lib/public_documentation_ratchet.txt` must keep a `///` summary.
-3. **Stable doc source paths** (`check_stable_doc_source_paths.sh`).
-4. **DocC coverage** (`check_docc_coverage.sh`).
-5. **Root test-target coverage** (`check_root_test_target_coverage.sh`).
-6. **Rendered text fixture matrix** (`check_rendered_text_fixture_matrix.sh`).
-7. **Concurrency-safety policies** (`check_concurrency_safety_policies.sh`) —
+2. **Stable doc source paths** (`check_stable_doc_source_paths.sh`).
+3. **DocC coverage** (`check_docc_coverage.sh`) — every `.library` product in
+   `Package.swift` ships a DocC catalog. Derived by convention (a directory
+   named `<target>.docc`); no manifest.
+4. **Root test-target coverage** (`check_root_test_target_coverage.sh`).
+5. **Rendered text fixture matrix** (`check_rendered_text_fixture_matrix.sh`).
+6. **Concurrency-safety policies** (`check_concurrency_safety_policies.sh`) —
    forbids `@unchecked Sendable`, `nonisolated(unsafe)`, and unchecked escape
    hatches.
-8. **Accessibility guardrails** (`check_accessibility_guardrails.sh`).
-9. **WebHost package boundary** (`check_webhost_package_boundary.sh`).
-10. **Public-API baseline** (`generate_public_api_inventory.sh --check`).
+7. **WebHost package boundary** (`check_webhost_package_boundary.sh`).
+8. **Public-API baseline** (`generate_public_api_inventory.sh --check`) — also
+   runs a report-only doc-comment ratchet over the `canonical` surface.
 
 ### Pre-commit hooks
 
@@ -78,7 +77,7 @@ Hooks run through `prek` (`prek.toml`):
 - `no-foundation-in-library-products` — `Foundation` imports are forbidden in
   `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI`.
 - `public-surface-policies`, `structured-concurrency-escape-hatches`,
-  `accessibility-guardrails`, `main-thread-usage` — the source-policy checks.
+  `main-thread-usage` — the source-policy checks.
 
 ## Rendered text fixtures
 
