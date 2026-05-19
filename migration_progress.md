@@ -2,8 +2,22 @@
 
 ## Current Status
 
-Continuing repo-wide production-code humanization on `main` after the
-`humanize` branch was merged at `847ece21`.
+**Substantially complete.** Repo-wide production-code humanization on `main`
+(after the `humanize` branch merged at `847ece21`) has run through 174
+behavior-preserving packets:
+
+- Packets 1-151 — central runtime/core (`SwiftTUICore`, `SwiftTUIRuntime`).
+- Packets 152-174 — other production code (`SwiftTUIViews`, `SwiftTUICharts`,
+  `Platforms/*/Sources`).
+
+Every cleanly-decomposable production file has been decomposed into focused,
+documented files. The remaining large files were assessed and are deliberately
+skipped — they are single-file units built on `private`/`fileprivate` cohesion
+where no safe behavior-preserving slice exists without widening many
+declarations at once (see `migration_plan.md` → "Migration Status").
+
+Every batch passed the full repo gate (`bun run test`); no public API (held at
+669 top-level public symbols), fixture, or test was changed.
 
 Approved constraints:
 
