@@ -317,11 +317,9 @@ private func runHarness<V: View>(
 }
 
 private struct ScheduledGestureInputEvent {
-  let delayNanoseconds: UInt64
   let event: InputEvent
 
-  init(delayNanoseconds: UInt64 = 0, event: InputEvent) {
-    self.delayNanoseconds = delayNanoseconds
+  init(event: InputEvent) {
     self.event = event
   }
 }
@@ -345,9 +343,6 @@ private final class ScriptedGestureInput: TerminalInputReading {
       let schedule = self.schedule
       let task = Task {
         for item in schedule {
-          if item.delayNanoseconds > 0 {
-            try? await Task.sleep(nanoseconds: item.delayNanoseconds)
-          }
           continuation.yield(item.event)
         }
         continuation.finish()
