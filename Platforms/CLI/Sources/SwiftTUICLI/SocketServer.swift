@@ -163,7 +163,12 @@ struct SceneInfo: Sendable {
 
     /// Starts the server: creates the socket directory, binds, listens, and accepts in a loop.
     /// Returns when cancelled or throws on unrecoverable startup error.
-    func run() async throws {
+    ///
+    /// - Parameter onReady: invoked exactly once, on the calling task, after the
+    ///   listening socket is bound and accepting — i.e. the precise instant a
+    ///   client connect would succeed. Lets callers (and tests) `await` server
+    ///   readiness directly instead of polling for it.
+    func run(onReady: (@Sendable () -> Void)? = nil) async throws {
       // Create directory structure recursively (pure stdlib — no Foundation)
       let parts = socketPath.split(separator: "/" as Character, omittingEmptySubsequences: true)
       let dirParts = parts.dropLast()
@@ -208,6 +213,10 @@ struct SceneInfo: Sendable {
       // Set server socket to non-blocking so accept() doesn't block the cooperative thread pool.
       let flags = fcntl(serverFD, F_GETFL)
       _ = fcntl(serverFD, F_SETFL, flags | O_NONBLOCK)
+
+      // The socket is now bound and listening: a client connect will succeed
+      // from here on. Signal readiness before entering the accept loop.
+      onReady?()
 
       // Accept loop — poll with a timeout so we check for cancellation periodically.
       while !Task.isCancelled {

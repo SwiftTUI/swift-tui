@@ -134,7 +134,14 @@ struct RenderPipelineStructureTests {
     #expect(asyncBody.contains("resolveCompletedFrameCandidate("))
   }
 
-  @Test("composed render path stays within 2x the pre-refactor time budget")
+  /// Wall-clock budget assertions are inherently flaky on shared CI runners:
+  /// a starved core inflates the measured time with no real regression. This
+  /// blunder-detector is therefore opt-in — set `STUI_RUN_WALLCLOCK_PERF` to
+  /// run it locally or in a dedicated perf job; the repo gate skips it.
+  @Test(
+    "composed render path stays within 2x the pre-refactor time budget",
+    .enabled(if: ProcessInfo.processInfo.environment["STUI_RUN_WALLCLOCK_PERF"] != nil)
+  )
   func composedRenderTimeBudget() {
     let proposal = ProposedSize(width: .finite(80), height: .finite(40))
     let iterations = 1000

@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Runners) @testable import SwiftTUIRuntime
@@ -7,33 +8,26 @@ struct AsyncLifecycleGenerationTests {
   @Test("signal reader ignores stale stream teardown after replacement")
   func signalReaderIgnoresStaleStreamTeardownAfterReplacement() async throws {
     let reader = InProcessSignalReader()
-    let firstReady = AwaitingNextProbe()
-    let secondReady = AwaitingNextProbe()
+    let firstReady = AsyncEvent()
+    let secondReady = AsyncEvent()
     let firstConsumer = awaitNextValue(
       from: reader.events(),
-      readyProbe: firstReady
+      readySignal: firstReady
     )
     let secondConsumer = awaitNextValue(
       from: reader.events(),
-      readyProbe: secondReady
+      readySignal: secondReady
     )
 
-    try await waitUntil("first signal consumer ready") {
-      await firstReady.isReady
-    }
-    try await waitUntil("second signal consumer ready") {
-      await secondReady.isReady
-    }
+    await firstReady.wait()
+    await secondReady.wait()
 
     firstConsumer.cancel()
     _ = await firstConsumer.result
 
     reader.send("SIGWINCH")
 
-    let signal = try await awaitTaskValue(
-      secondConsumer,
-      label: "replacement signal delivery"
-    )
+    let signal = try #require(await secondConsumer.value)
 
     #expect(signal == "SIGWINCH")
     reader.finish()
@@ -42,33 +36,26 @@ struct AsyncLifecycleGenerationTests {
   @Test("injected input reader ignores stale stream teardown after replacement")
   func injectedInputReaderIgnoresStaleStreamTeardownAfterReplacement() async throws {
     let inputReader = InjectedTerminalInputReader()
-    let firstReady = AwaitingNextProbe()
-    let secondReady = AwaitingNextProbe()
+    let firstReady = AsyncEvent()
+    let secondReady = AsyncEvent()
     let firstConsumer = awaitNextValue(
       from: inputReader.inputEvents(),
-      readyProbe: firstReady
+      readySignal: firstReady
     )
     let secondConsumer = awaitNextValue(
       from: inputReader.inputEvents(),
-      readyProbe: secondReady
+      readySignal: secondReady
     )
 
-    try await waitUntil("first input consumer ready") {
-      await firstReady.isReady
-    }
-    try await waitUntil("second input consumer ready") {
-      await secondReady.isReady
-    }
+    await firstReady.wait()
+    await secondReady.wait()
 
     firstConsumer.cancel()
     _ = await firstConsumer.result
 
     inputReader.send(Array("q".utf8))
 
-    let event = try await awaitTaskValue(
-      secondConsumer,
-      label: "replacement input delivery"
-    )
+    let event = try #require(await secondConsumer.value)
 
     #expect(event == .key(.character("q")))
     inputReader.finish()
@@ -77,21 +64,23 @@ struct AsyncLifecycleGenerationTests {
   @Test("injected input reader preserves pending mouse flushes across stale teardown")
   func injectedInputReaderPreservesPendingMouseFlushesAcrossStaleTeardown() async throws {
     let inputReader = InjectedTerminalInputReader()
-    let firstReady = AwaitingNextProbe()
-    let secondReady = AwaitingNextProbe()
-    let deliveredEvents = EventProbe<InputEvent>()
+    let firstReady = AsyncEvent()
+    let secondReady = AsyncEvent()
+    let firstEventDelivered = AsyncEvent()
     let firstConsumer = awaitNextValue(
       from: inputReader.inputEvents(),
-      readyProbe: firstReady
+      readySignal: firstReady
     )
-    let secondConsumer = Task {
+    let secondConsumer = Task { () -> [InputEvent] in
       var iterator = inputReader.inputEvents().makeAsyncIterator()
-      await secondReady.markReady()
+      secondReady.fire()
 
       var events: [InputEvent] = []
       while let event = await iterator.next() {
         events.append(event)
-        await deliveredEvents.replace(events)
+        if events.count == 1 {
+          firstEventDelivered.fire()
+        }
       }
       return events
     }
@@ -99,27 +88,18 @@ struct AsyncLifecycleGenerationTests {
       0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
     ]
 
-    try await waitUntil("first mouse input consumer ready") {
-      await firstReady.isReady
-    }
-    try await waitUntil("second mouse input consumer ready") {
-      await secondReady.isReady
-    }
+    await firstReady.wait()
+    await secondReady.wait()
 
     inputReader.send(scrollSequence)
     firstConsumer.cancel()
     _ = await firstConsumer.result
     inputReader.send(scrollSequence)
 
-    try await waitUntil("replacement mouse flush delivery") {
-      await deliveredEvents.count == 1
-    }
+    await firstEventDelivered.wait()
     inputReader.finish()
 
-    let events = try await awaitTaskValue(
-      secondConsumer,
-      label: "replacement mouse flush delivery"
-    )
+    let events = await secondConsumer.value
 
     #expect(
       events == [
@@ -134,99 +114,17 @@ struct AsyncLifecycleGenerationTests {
   }
 }
 
-private actor AwaitingNextProbe {
-  private(set) var isReady = false
-
-  func markReady() {
-    isReady = true
-  }
-}
-
-private actor EventProbe<Element: Sendable> {
-  private var events: [Element] = []
-
-  var count: Int {
-    events.count
-  }
-
-  func replace(_ events: [Element]) {
-    self.events = events
-  }
-}
-
+/// Spawns a consumer that subscribes to `stream` and resolves to its first
+/// element. `readySignal` fires once the iterator exists, so the caller can
+/// `await` exactly when the consumer has claimed its stream generation —
+/// no polling, no timeout.
 private func awaitNextValue<Element: Sendable>(
   from stream: AsyncStream<Element>,
-  readyProbe: AwaitingNextProbe
+  readySignal: AsyncEvent
 ) -> Task<Element?, Never> {
   Task {
     var iterator = stream.makeAsyncIterator()
-    await readyProbe.markReady()
+    readySignal.fire()
     return await iterator.next()
-  }
-}
-
-private func collectEvents<Element: Sendable>(
-  from stream: AsyncStream<Element>,
-  readyProbe: AwaitingNextProbe
-) -> Task<[Element], Never> {
-  Task {
-    var iterator = stream.makeAsyncIterator()
-    await readyProbe.markReady()
-
-    var events: [Element] = []
-    while let event = await iterator.next() {
-      events.append(event)
-    }
-    return events
-  }
-}
-
-@MainActor
-private func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  pollNanoseconds: UInt64 = 10_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-
-  while !(await condition()) {
-    if start.duration(to: clock.now) >= .nanoseconds(Int64(timeoutNanoseconds)) {
-      throw AsyncLifecycleGenerationTimeout(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private func awaitTaskValue<Value: Sendable>(
-  _ task: Task<Value, Never>,
-  label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000
-) async throws -> Value {
-  try await withThrowingTaskGroup(of: Value.self) { group in
-    group.addTask {
-      await task.value
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw AsyncLifecycleGenerationTimeout(label)
-    }
-
-    let value = try await group.next()
-    group.cancelAll()
-    return try #require(value)
-  }
-}
-
-private struct AsyncLifecycleGenerationTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
   }
 }

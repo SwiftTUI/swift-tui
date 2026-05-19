@@ -1,4 +1,3 @@
-@unsafe @preconcurrency import Dispatch
 @_spi(Runners) import SwiftTUIRuntime
 import Synchronization
 import WASISurfaceBridge
@@ -38,9 +37,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
   }
 
   private let state: Mutex<State>
-  private let sink: any WebHostByteSink
-  private let sendTimeoutNanoseconds: UInt64
-  private let sendLock = Mutex(())
+  private let pump: ByteSinkPump
 
   package let capabilityProfile = TerminalCapabilityProfile(
     glyphLevel: .unicode,
@@ -57,8 +54,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     renderStyle: TerminalRenderStyle = .init(appearance: .fallback),
     sendTimeoutNanoseconds: UInt64 = 10_000_000_000
   ) {
-    self.sink = sink
-    self.sendTimeoutNanoseconds = sendTimeoutNanoseconds
+    self.pump = ByteSinkPump(sink: sink, sendTimeoutNanoseconds: sendTimeoutNanoseconds)
     state = Mutex(
       State(
         surfaceSize: surfaceSize,
@@ -159,6 +155,17 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     )
   }
 
+  /// Suspends until every byte batch handed to the transport has been sent.
+  ///
+  /// Throws the first send failure observed, if any. This is the awaitable
+  /// completion signal callers use instead of blocking inside `present`.
+  package func drain() async throws {
+    await pump.waitUntilIdle()
+    if let error = pump.currentError() {
+      throw error
+    }
+  }
+
   private static func pointerInputCapabilities(
     for cellPixelSize: PixelSize?
   ) -> PointerInputCapabilities {
@@ -184,37 +191,135 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     guard !bytes.isEmpty else {
       return
     }
+    // Surface a prior send failure synchronously so a stuck transport stops
+    // accepting frames, then hand the batch off without blocking. The actual
+    // send happens on the pump's drain task; callers await `drain()` to learn
+    // when it finished.
+    if let error = pump.currentError() {
+      throw error
+    }
+    pump.enqueue(bytes)
+  }
+}
 
-    try sendLock.withLock { _ in
-      let semaphore = DispatchSemaphore(value: 0)
-      let result = Mutex<Result<Void, WebHostByteSinkError>?>(nil)
-      let sink = self.sink
+/// Buffers byte batches and drains them to the sink on a dedicated task.
+///
+/// `enqueue` is synchronous, ordered, and never blocks the caller. It replaces
+/// a `DispatchSemaphore` bridge that blocked a cooperative-pool thread while a
+/// child task did the async send — a pattern that deadlocked the pool under
+/// parallel load and surfaced as spurious "byte sink timed out" failures.
+///
+/// Send failures are observed either on a later `enqueue` (via `currentError`)
+/// or by awaiting `waitUntilIdle()`. The per-send timeout still applies, but it
+/// races *inside* the drain task and so never blocks a presenting caller.
+private final class ByteSinkPump: Sendable {
+  private enum DrainStep {
+    case batch([UInt8])
+    case finished([CheckedContinuation<Void, Never>])
+  }
 
-      let task = Task {
-        do {
-          try await sink.send(bytes)
-          result.withLock { result in
-            result = .success(())
-          }
-        } catch {
-          result.withLock { result in
-            result = .failure(.sendFailed(String(describing: error)))
-          }
-        }
-        semaphore.signal()
-      }
+  private struct State {
+    var pending: [[UInt8]] = []
+    var isDraining = false
+    var firstError: WebHostByteSinkError?
+    var idleWaiters: [CheckedContinuation<Void, Never>] = []
+  }
 
-      let timeout = DispatchTimeInterval.nanoseconds(
-        Int(min(sendTimeoutNanoseconds, UInt64(Int.max)))
-      )
-      if semaphore.wait(timeout: .now() + timeout) == .timedOut {
-        task.cancel()
-        throw WebHostByteSinkError.sendTimedOut
-      }
-      try result.withLock { result in
-        result ?? .failure(.sendDidNotComplete)
-      }.get()
+  private let sink: any WebHostByteSink
+  private let sendTimeoutNanoseconds: UInt64
+  private let state = Mutex(State())
+
+  init(sink: any WebHostByteSink, sendTimeoutNanoseconds: UInt64) {
+    self.sink = sink
+    self.sendTimeoutNanoseconds = sendTimeoutNanoseconds
+  }
+
+  /// The first send failure observed so far, if any.
+  func currentError() -> WebHostByteSinkError? {
+    state.withLock(\.firstError)
+  }
+
+  /// Appends `bytes` to the FIFO send queue, starting a drain task if idle.
+  func enqueue(_ bytes: [UInt8]) {
+    let shouldStartDrain = state.withLock { state -> Bool in
+      state.pending.append(bytes)
+      guard !state.isDraining else { return false }
+      state.isDraining = true
+      return true
+    }
+    if shouldStartDrain {
+      Task { await self.drain() }
     }
   }
 
+  /// Suspends until the send queue is fully drained.
+  func waitUntilIdle() async {
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      let isIdle = state.withLock { state -> Bool in
+        if !state.isDraining, state.pending.isEmpty {
+          return true
+        }
+        state.idleWaiters.append(continuation)
+        return false
+      }
+      if isIdle {
+        continuation.resume()
+      }
+    }
+  }
+
+  private func drain() async {
+    while true {
+      let step = state.withLock { state -> DrainStep in
+        guard !state.pending.isEmpty else {
+          state.isDraining = false
+          defer { state.idleWaiters = [] }
+          return .finished(state.idleWaiters)
+        }
+        return .batch(state.pending.removeFirst())
+      }
+
+      switch step {
+      case .batch(let batch):
+        if currentError() == nil {
+          do {
+            try await sendWithTimeout(batch)
+          } catch let error as WebHostByteSinkError {
+            recordError(error)
+          } catch {
+            recordError(.sendFailed(String(describing: error)))
+          }
+        }
+      case .finished(let waiters):
+        for waiter in waiters {
+          waiter.resume()
+        }
+        return
+      }
+    }
+  }
+
+  private func recordError(_ error: WebHostByteSinkError) {
+    state.withLock { state in
+      if state.firstError == nil {
+        state.firstError = error
+      }
+    }
+  }
+
+  private func sendWithTimeout(_ bytes: [UInt8]) async throws {
+    let sink = self.sink
+    let timeoutNanoseconds = sendTimeoutNanoseconds
+    try await withThrowingTaskGroup(of: Void.self) { group in
+      group.addTask {
+        try await sink.send(bytes)
+      }
+      group.addTask {
+        try await Task.sleep(nanoseconds: timeoutNanoseconds)
+        throw WebHostByteSinkError.sendTimedOut
+      }
+      defer { group.cancelAll() }
+      try await group.next()
+    }
+  }
 }

@@ -129,6 +129,12 @@ import SwiftTUICore
             continue
           case EAGAIN, EWOULDBLOCK:
             try waitUntilWritable(fileDescriptor)
+          case EIO, EPIPE:
+            // The far end of the terminal has closed: EIO when a PTY master
+            // is gone, EPIPE for a socket-backed terminal. That is a clean
+            // disconnect, not a failure — stop writing and let the input
+            // side (EOF) drive the session's orderly shutdown.
+            return
           default:
             throw TerminalHostError.failedToWrite(errno: errno)
           }

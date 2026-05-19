@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICLI
@@ -16,14 +17,10 @@ struct SocketDiscoveryTests {
     let identifier = "shared"
 
     let firstServer = makeServer(appName: appName, identifier: identifier)
-    let firstTask = Task {
-      try await firstServer.run()
-    }
+    let firstTask = await startServer(firstServer)
     defer {
       firstTask.cancel()
     }
-
-    try await waitForServer(at: firstServer.socketPath)
 
     let secondServer = makeServer(appName: appName, identifier: identifier)
     let secondTask = Task {
@@ -31,7 +28,7 @@ struct SocketDiscoveryTests {
     }
 
     do {
-      try await value(of: secondTask, timeoutNanoseconds: 2_000_000_000)
+      try await secondTask.value
       Issue.record("Expected duplicate instance startup to fail")
     } catch let error as SceneDiscoveryServerError {
       switch error {
@@ -49,7 +46,7 @@ struct SocketDiscoveryTests {
     #expect(response.hasPrefix("OK "))
 
     firstTask.cancel()
-    _ = try? await value(of: firstTask, timeoutNanoseconds: 2_000_000_000)
+    _ = try? await firstTask.value
   }
 
   @Test("Stale socket paths are replaced on startup")
@@ -71,14 +68,11 @@ struct SocketDiscoveryTests {
     #expect(bindResult == 0)
     sceneClose(staleFD)
 
-    let task = Task {
-      try await server.run()
-    }
+    let task = await startServer(server)
     defer {
       task.cancel()
     }
 
-    try await waitForServer(at: server.socketPath)
     let response = try SocketClient.sendRequest(
       socketPath: server.socketPath,
       request: "LIST\n"
@@ -86,7 +80,7 @@ struct SocketDiscoveryTests {
     #expect(response.hasPrefix("OK "))
 
     task.cancel()
-    _ = try? await value(of: task, timeoutNanoseconds: 2_000_000_000)
+    _ = try? await task.value
   }
 
   @Test("Most recent instance selection uses socket timestamps")
@@ -94,20 +88,25 @@ struct SocketDiscoveryTests {
     let appName = uniqueAppName()
 
     let firstServer = makeServer(appName: appName, identifier: "first")
-    let firstTask = Task {
-      try await firstServer.run()
-    }
+    let firstTask = await startServer(firstServer)
     defer { firstTask.cancel() }
-    try await waitForServer(at: firstServer.socketPath)
-
-    try await Task.sleep(nanoseconds: 200_000_000)
 
     let secondServer = makeServer(appName: appName, identifier: "second")
-    let secondTask = Task {
-      try await secondServer.run()
-    }
+    let secondTask = await startServer(secondServer)
     defer { secondTask.cancel() }
-    try await waitForServer(at: secondServer.socketPath)
+
+    // Make "most recent" deterministic by stamping the socket modification
+    // times explicitly, instead of relying on a wall-clock sleep between the
+    // two server starts to produce distinct timestamps.
+    let now = Date()
+    try FileManager.default.setAttributes(
+      [.modificationDate: now.addingTimeInterval(-2)],
+      ofItemAtPath: firstServer.socketPath
+    )
+    try FileManager.default.setAttributes(
+      [.modificationDate: now],
+      ofItemAtPath: secondServer.socketPath
+    )
 
     let instances = SocketClient.discoverInstances(appName: appName)
     #expect(instances.map(\.identifier) == ["first", "second"])
@@ -120,25 +119,22 @@ struct SocketDiscoveryTests {
 
     firstTask.cancel()
     secondTask.cancel()
-    _ = try? await value(of: firstTask, timeoutNanoseconds: 2_000_000_000)
-    _ = try? await value(of: secondTask, timeoutNanoseconds: 2_000_000_000)
+    _ = try? await firstTask.value
+    _ = try? await secondTask.value
   }
 
   @Test("Server shutdown removes its socket path")
   func shutdownRemovesSocketPath() async throws {
     let appName = uniqueAppName()
     let server = makeServer(appName: appName, identifier: "cleanup")
-    let task = Task {
-      try await server.run()
-    }
+    let task = await startServer(server)
 
-    try await waitForServer(at: server.socketPath)
     #expect(FileManager.default.fileExists(atPath: server.socketPath))
 
     task.cancel()
-    _ = try? await value(of: task, timeoutNanoseconds: 2_000_000_000)
-
-    try await waitUntilSocketRemoved(server.socketPath)
+    // `run()` unlinks the socket path in its `defer` before returning, so once
+    // the task completes the path is already gone — no polling needed.
+    _ = try? await task.value
     #expect(!FileManager.default.fileExists(atPath: server.socketPath))
   }
 
@@ -191,6 +187,20 @@ private func makeServer(appName: String, identifier: String) -> SceneDiscoverySe
   )
 }
 
+/// Starts `server` and returns once it is bound and listening.
+///
+/// `run(onReady:)` fires the readiness callback at the exact instant a client
+/// connect would succeed, so the test `await`s that signal directly instead of
+/// polling the socket under a timeout.
+private func startServer(_ server: SceneDiscoveryServer) async -> Task<Void, any Error> {
+  let ready = AsyncEvent()
+  let task = Task {
+    try await server.run(onReady: { ready.fire() })
+  }
+  await ready.wait()
+  return task
+}
+
 private func uniqueAppName() -> String {
   "swifttuiscenes-tests-\(UUID().uuidString)"
 }
@@ -201,75 +211,4 @@ private func streamSocketType() -> Int32 {
   #elseif canImport(Glibc)
     Int32(SOCK_STREAM.rawValue)
   #endif
-}
-
-private func waitForServer(at socketPath: String) async throws {
-  try await waitUntilSocketCondition("server readiness") {
-    do {
-      let response = try SocketClient.sendRequest(
-        socketPath: socketPath,
-        request: "LIST\n",
-        timeoutMilliseconds: 100
-      )
-      return response.hasPrefix("OK ")
-    } catch {
-      return false
-    }
-  }
-}
-
-private func waitUntilSocketRemoved(_ socketPath: String) async throws {
-  try await waitUntilSocketCondition("server shutdown cleanup") {
-    !FileManager.default.fileExists(atPath: socketPath)
-  }
-}
-
-private func waitUntilSocketCondition(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 2_000_000_000,
-  pollNanoseconds: UInt64 = 20_000_000,
-  condition: @escaping () async -> Bool
-) async throws {
-  let start = DispatchTime.now().uptimeNanoseconds
-  while !(await condition()) {
-    let elapsed = DispatchTime.now().uptimeNanoseconds - start
-    if elapsed >= timeoutNanoseconds {
-      throw SocketDiscoveryTimeout(label)
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-}
-
-private func value<Success>(
-  of task: Task<Success, any Error>,
-  timeoutNanoseconds: UInt64
-) async throws -> Success {
-  try await withThrowingTaskGroup(of: Success.self) { group in
-    group.addTask {
-      try await task.value
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw SocketDiscoveryTimeout("task completion")
-    }
-
-    let value = try await group.next()
-    group.cancelAll()
-    guard let value else {
-      throw SocketDiscoveryTimeout("task completion")
-    }
-    return value
-  }
-}
-
-private struct SocketDiscoveryTimeout: Error, CustomStringConvertible {
-  let label: String
-
-  init(_ label: String) {
-    self.label = label
-  }
-
-  var description: String {
-    "Timed out waiting for \(label)"
-  }
 }

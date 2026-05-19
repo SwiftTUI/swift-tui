@@ -34,6 +34,7 @@ struct WebSocketSurfaceTransportTests {
       ),
     )
 
+    try await transport.drain()
     let record = try #require(await sink.strings().first)
     let frame = try decodedSurfaceFrame(record)
     #expect(frame["version"] as? Int == 2)
@@ -68,6 +69,7 @@ struct WebSocketSurfaceTransportTests {
       )
     )
 
+    try await transport.drain()
     let record = try #require(await sink.strings().first)
     let frame = try decodedSurfaceFrame(record)
     #expect(frame["version"] as? Int == 2)
@@ -94,6 +96,7 @@ struct WebSocketSurfaceTransportTests {
     try transport.present(Self.basicSurface("AA"))
     try transport.present(Self.basicSurface("BB"))
 
+    try await transport.drain()
     let records = await sink.strings()
     #expect(records.count == 2)
     #expect(records[0].contains("\"A\""))
@@ -108,8 +111,9 @@ struct WebSocketSurfaceTransportTests {
       sendTimeoutNanoseconds: 10_000_000
     )
 
-    #expect(throws: WebHostByteSinkError.self) {
-      try transport.present(Self.basicSurface("AA"))
+    try transport.present(Self.basicSurface("AA"))
+    await #expect(throws: WebHostByteSinkError.self) {
+      try await transport.drain()
     }
   }
 
@@ -124,6 +128,7 @@ struct WebSocketSurfaceTransportTests {
 
     try transport.writeClipboard("copy \"this\"")
 
+    try await transport.drain()
     #expect(await sink.strings() == ["\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n"])
   }
 
@@ -145,6 +150,7 @@ struct WebSocketSurfaceTransportTests {
       )
     )
 
+    try await transport.drain()
     let record = try #require(await sink.strings().first)
     #expect(record.hasPrefix("\u{001E}runtimeIssue:"))
     #expect(record.contains("\"code\":\"toolbar.unhostedItems\""))
