@@ -110,8 +110,6 @@ Full policy in [docs/PUBLIC-API.md](docs/PUBLIC-API.md#anyview-policy).
   Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` layers.
 - **public-surface-policies** — enforces the guardrails documented in
   [docs/PUBLIC-API.md](docs/PUBLIC-API.md).
-- **accessibility-guardrails** — pins reviewed raw-glyph, color-state, and
-  visual-content source files.
 - **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and
   `nonisolated(unsafe)`; prefer explicit isolation, `Sendable` constraints, or
   `Synchronization` primitives.

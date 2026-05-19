@@ -1,6 +1,14 @@
 import SwiftTUICore
 import Synchronization
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#elseif canImport(Android)
+  import Android
+#endif
+
 #if canImport(Dispatch)
   @unsafe @preconcurrency import Dispatch
 #endif

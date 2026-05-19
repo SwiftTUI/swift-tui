@@ -12,6 +12,10 @@
 # applied from `docs/public_api_overrides.yml`. Symbols not in that file
 # are reported as `pending-review`.
 #
+# `--check` also runs a report-only doc-comment ratchet: it counts the
+# `canonical` symbols with no `///` summary. See ENFORCE_DOC_COMMENTS in
+# Scripts/lib/generate_public_api_inventory.ts.
+#
 # Usage:
 #   Scripts/generate_public_api_inventory.sh            # regenerate baseline
 #   Scripts/generate_public_api_inventory.sh --check    # fail if the committed

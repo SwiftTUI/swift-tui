@@ -170,7 +170,6 @@ Runs the exhaustive checked-in repo verification surface:
   - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
   - rendered-text fixture matrix guardrails
-  - accessibility guardrails for raw glyphs, color-state styling, and visual content
   - public-API baseline freshness check
   - focused root SwiftPM framework tests
   - focused SwiftTUIArguments tests

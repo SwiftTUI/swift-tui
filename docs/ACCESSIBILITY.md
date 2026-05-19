@@ -105,9 +105,3 @@ flowchart TD
   glyphs, reduced motion, no progress animation, and linear rendering.
 - `CI=true` implies both reduced motion and no progress animation.
 - A non-TTY stdout implies reduced motion but not accessible output.
-
-## Guardrails
-
-`Scripts/check_accessibility_guardrails.sh` runs in the repo policy phase to
-keep accessibility source paths and listening behavior within their expected
-boundaries. See [DEVELOPMENT.md](DEVELOPMENT.md).

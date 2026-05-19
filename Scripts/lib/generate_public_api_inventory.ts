@@ -15,6 +15,9 @@
 // Classifications come from docs/public_api_overrides.yml. Symbols not in
 // that file fall into the `pending-review` bucket.
 //
+// `--check` also runs a report-only doc-comment ratchet over `canonical`
+// symbols (see ENFORCE_DOC_COMMENTS).
+//
 // Run via `Scripts/generate_public_api_inventory.sh`. The shell wrapper
 // handles the swift toolchain invocation; this file is pure parse + emit.
 
@@ -81,6 +84,8 @@ interface SymbolGraphSymbol {
   accessLevel: string;
   names: { title: string };
   declarationFragments?: ReadonlyArray<{ kind: string; spelling: string }>;
+  /** Present when the declaration carries a `///` documentation comment. */
+  docComment?: { lines: ReadonlyArray<{ text: string }> };
 }
 
 interface SymbolGraph {
@@ -146,6 +151,15 @@ const CLASSIFICATION_HEADINGS: Record<Classification, string> = {
   "pending-review": "Pending review ⚠",
 };
 
+// Doc-comment coverage gate.
+//
+// `--check` reports how many `canonical`-classified top-level symbols carry no
+// `///` summary. The consumer-facing surface is not yet fully documented, so
+// this is a report-only ratchet: the count is printed but does not fail the
+// gate. Flip ENFORCE_DOC_COMMENTS to `true` once the count reaches zero — that
+// turns it into a hard gate that locks the canonical surface documented.
+const ENFORCE_DOC_COMMENTS = false;
+
 interface OverrideFile {
   classifications?: Partial<Record<Classification, string[]>>;
   /** Module-level fallback. Applied before the global `default`. */
@@ -201,6 +215,8 @@ interface TopLevelEntry {
   /** members nested inside this top-level type */
   members: MemberEntry[];
   classification: Classification;
+  /** whether the declaration carries a `///` documentation comment */
+  hasDoc: boolean;
 }
 
 interface MemberEntry {
@@ -295,6 +311,7 @@ function buildModuleReport(
         kindId: sym.kind.identifier,
         members: [],
         classification: classifications.get(qualifiedName) ?? moduleDefault,
+        hasDoc: hasDocComment(sym),
       });
       continue;
     }
@@ -306,6 +323,7 @@ function buildModuleReport(
       kindId: sym.kind.identifier,
       members: [],
       classification: classifications.get(qualifiedName) ?? moduleDefault,
+      hasDoc: hasDocComment(sym),
     });
   }
 
@@ -340,6 +358,12 @@ function buildModuleReport(
 
 function isSynthesizedSymbol(sym: SymbolGraphSymbol): boolean {
   return sym.identifier.precise.includes("::SYNTHESIZED::");
+}
+
+function hasDocComment(sym: SymbolGraphSymbol): boolean {
+  return (sym.docComment?.lines ?? []).some(
+    (line) => line.text.trim().length > 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -463,6 +487,11 @@ function renderFlatBaseline(reports: ReadonlyArray<ModuleReport>): string {
 interface DriftReport {
   pendingReview: ReadonlyArray<{ module: ModuleName; qualifiedName: string }>;
   removedButPresent: ReadonlyArray<{ module: ModuleName; qualifiedName: string }>;
+  /** `canonical`-classified top-level symbols with no `///` doc comment. */
+  undocumentedCanonical: ReadonlyArray<{
+    module: ModuleName;
+    qualifiedName: string;
+  }>;
   baselineStale: boolean;
   partialBaseline: boolean;
 }
@@ -475,6 +504,10 @@ async function checkDrift(
 ): Promise<DriftReport> {
   const pendingReview: { module: ModuleName; qualifiedName: string }[] = [];
   const removedButPresent: { module: ModuleName; qualifiedName: string }[] = [];
+  const undocumentedCanonical: {
+    module: ModuleName;
+    qualifiedName: string;
+  }[] = [];
 
   for (const report of reports) {
     for (const entry of report.topLevel) {
@@ -485,6 +518,11 @@ async function checkDrift(
         });
       } else if (entry.classification === "removed") {
         removedButPresent.push({
+          module: report.module,
+          qualifiedName: entry.qualifiedName,
+        });
+      } else if (entry.classification === "canonical" && !entry.hasDoc) {
+        undocumentedCanonical.push({
           module: report.module,
           qualifiedName: entry.qualifiedName,
         });
@@ -501,6 +539,7 @@ async function checkDrift(
   return {
     pendingReview,
     removedButPresent,
+    undocumentedCanonical,
     baselineStale,
     partialBaseline: options.partialBaseline,
   };
@@ -639,6 +678,32 @@ async function main(): Promise<void> {
         failures.push(`  - ${p.qualifiedName}`);
       }
     }
+    if (drift.undocumentedCanonical.length > 0) {
+      const summary =
+        `${drift.undocumentedCanonical.length} canonical public ` +
+        "symbol(s) have no doc comment";
+      if (ENFORCE_DOC_COMMENTS) {
+        failures.push(`${summary}:`);
+        for (const p of drift.undocumentedCanonical.slice(0, 10)) {
+          failures.push(`  - ${p.qualifiedName}`);
+        }
+        if (drift.undocumentedCanonical.length > 10) {
+          failures.push(
+            `  - ...and ${drift.undocumentedCanonical.length - 10} more.`,
+          );
+        }
+        failures.push(
+          "Add a /// summary to each, or reclassify it in " +
+            "docs/public_api_overrides.yml if it is not consumer-facing.",
+        );
+      } else {
+        console.error(
+          `[generate_public_api_inventory] NOTE: ${summary} — ` +
+            "report-only ratchet, not failing the gate. Add `///` summaries " +
+            "to drive this to zero, then set ENFORCE_DOC_COMMENTS = true.",
+        );
+      }
+    }
     if (failures.length > 0) {
       for (const f of failures) console.error(f);
       process.exit(1);
@@ -662,6 +727,11 @@ async function main(): Promise<void> {
   if (drift.removedButPresent.length > 0) {
     console.error(
       `[generate_public_api_inventory] WARN: ${drift.removedButPresent.length} "removed" symbol(s) are still present in the source.`,
+    );
+  }
+  if (drift.undocumentedCanonical.length > 0) {
+    console.log(
+      `[generate_public_api_inventory] NOTE: ${drift.undocumentedCanonical.length} canonical symbol(s) have no doc comment. See --check output.`,
     );
   }
 }
