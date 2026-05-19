@@ -7,9 +7,11 @@
 #
 # This check is convention-based and keeps no hand-maintained manifest. The
 # DocC catalog for a target is, by repo convention, a directory named
-# `<target>.docc` somewhere under Sources/ or Platforms/. The check derives the
-# expected set of products straight from Package.swift and confirms each one's
-# catalog exists.
+# `<target>.docc` somewhere under Sources/, Platforms/, or Tests/ (the last for
+# test-support library products such as SwiftTUITestSupport, whose catalog
+# lives inside the target's own source path). The check derives the expected
+# set of products straight from Package.swift and confirms each one's catalog
+# exists.
 #
 # Scripts/lib/public_docc_targets.txt still drives Scripts/build_docc_archive.sh
 # (it also lists package-only support targets such as SwiftTUICore); it is a
@@ -33,12 +35,12 @@ fi
 failures=0
 for product in $products; do
   catalog=$(
-    find Sources Platforms -type d -name "$product.docc" -print 2>/dev/null \
+    find Sources Platforms Tests -type d -name "$product.docc" -print 2>/dev/null \
       | head -n 1
   )
   if [ -z "$catalog" ]; then
     >&2 echo "[check_docc_coverage] library product '$product' has no DocC catalog" \
-      "(expected a directory named '$product.docc' under Sources/ or Platforms/)."
+      "(expected a directory named '$product.docc' under Sources/, Platforms/, or Tests/)."
     failures=$((failures + 1))
   fi
 done
