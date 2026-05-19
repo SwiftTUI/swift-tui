@@ -407,30 +407,3 @@ private struct AnimationInjectionStage {
     )
   }
 }
-
-@MainActor
-private func withAnimationDraftSinks<Result>(
-  _ animationDraft: AnimationFrameDraft,
-  operation: () -> Result
-) -> Result {
-  let controller = animationDraft.controller
-  return AnimationRegistrationStorage.$currentTaskSink.withValue(controller) {
-    TransitionRegistrationStorage.$currentTaskSink.withValue(controller) {
-      AnimationCompletionStorage.$currentTaskSink.withValue(controller) {
-        operation()
-      }
-    }
-  }
-}
-
-private func measurePhase<Value>(
-  clock: ContinuousClock?,
-  _ operation: () -> Value
-) -> (Value, Duration) {
-  guard let clock else {
-    return (operation(), .zero)
-  }
-  let start = clock.now
-  let value = operation()
-  return (value, start.duration(to: clock.now))
-}

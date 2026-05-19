@@ -3076,7 +3076,57 @@ Packet 137-141 batch validation:
   - Runner log: `/tmp/swift-tui-test-gate-20260518-183437-57793.log`
   - Result: PASS
 
-Next scheduled focus: continue with Batch 142-146 per the migration plan,
+## Packet 142-146 Batch: Diagnostic Components, Focus Budget, Phase Support, Debug/Lifecycle Types
+
+Scope completed (all within `SwiftTUICore` and `SwiftTUIRuntime`, all
+behavior-preserving moves):
+
+- Packet 142: split the seven `FrameDiagnostic*` component structs out of
+  `FrameDiagnostics.swift` into `FrameDiagnosticComponents.swift`.
+- Packet 143: split the `FocusSyncRerenderBudget` value type out of
+  `RunLoop+FocusSync.swift` into `FocusSyncRerenderBudget.swift`.
+- Packet 144: split the `withAnimationDraftSinks` / `measurePhase` phase
+  helpers out of `DefaultRendererFrameHeadCoordinator.swift` into
+  `FrameHeadCoordinatorPhaseSupport.swift`; widened both from `private` to
+  file-internal.
+- Packet 145: split the `ViewNode.DebugTotalStateSnapshot` type declaration out
+  of `ViewNode.swift` into `ViewNodeDebugSnapshots.swift`; the snapshot-building
+  method stays in `ViewNode.swift` where the live private state is reachable.
+- Packet 146: split the `ViewGraphLifecyclePlanner` contract types
+  (`ViewGraphFrameLifecycleEventPlan`, `ViewGraphLifecyclePlanningInput`) out of
+  `ViewGraphLifecyclePlanning.swift` into `ViewGraphLifecyclePlanningTypes.swift`.
+
+Behavior preserved:
+
+- Frame diagnostics field shape, focus-sync convergence budgeting, frame-head
+  phase timing/sink installation, ViewNode debug snapshot contents, and
+  lifecycle event planning all remained unchanged. No public API, fixture, or
+  test changed.
+
+Packet 142-146 focused validation:
+
+- `swiftly run swift build --target SwiftTUICore` — PASS (packets 142, 145-146)
+- `swiftly run swift build --target SwiftTUIRuntime` — PASS (packets 143-144)
+- `swiftly run swift test --filter TimingDiagnosticsTests`,
+  `DiagnosticsAndCacheTests` (23) — PASS
+- `swiftly run swift test --filter FocusTransitionTests` (13) — PASS
+- `swiftly run swift test --filter AsyncFrameTailRenderingTests` (52) — PASS
+- `swiftly run swift test --filter ViewGraphCheckpointTotalityTests`,
+  `ViewGraphTests`, `LifecycleSelectiveEvaluationTests` — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 142-146 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-184640-packet142-146.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-184640-86536.log`
+  - Result: PASS
+
+Next scheduled focus: continue with Batch 147-151 per the migration plan,
 remaining inside `SwiftTUICore` and `SwiftTUIRuntime`.
 
 ## Failed Attempts
