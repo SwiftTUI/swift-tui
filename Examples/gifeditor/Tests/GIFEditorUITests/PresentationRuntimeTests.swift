@@ -1,5 +1,6 @@
 import GIFEditorCore
 import SwiftTUI
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import GIFEditorUI
@@ -15,23 +16,25 @@ struct PresentationRuntimeTests {
     let rootIdentity = Identity(components: ["gifeditor.presentation-runtime"])
     let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
-    let inputReader = GIFEditorPresentationInputReader(steps: [
-      .press(KeyPress(.character("?"), modifiers: [])),
-      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
-        terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
-          && terminal.frames.contains { frame in
-            advancedGlyphs.contains { frame.contains($0) }
-          }
-      },
-      .press(KeyPress(.escape, modifiers: [])),
-      .waitUntil(timeoutNanoseconds: 1_000_000_000) {
-        terminal.latestFrame?.contains("Keyboard help") == false
-      },
-      .press(KeyPress(.character("]"), modifiers: [])),
-      .waitUntil(timeoutNanoseconds: 1_000_000_000) {
-        terminal.frames.contains { $0.contains("B2") }
-      },
-    ])
+    let inputReader = GIFEditorPresentationInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .press(KeyPress(.character("?"), modifiers: [])),
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
+            && terminal.frames.contains { frame in
+              advancedGlyphs.contains { frame.contains($0) }
+            }
+        },
+        .press(KeyPress(.escape, modifiers: [])),
+        .awaitCondition {
+          terminal.latestFrame?.contains("Keyboard help") == false
+        },
+        .press(KeyPress(.character("]"), modifiers: [])),
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("B2") }
+        },
+      ])
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
@@ -66,23 +69,25 @@ struct PresentationRuntimeTests {
     let rootIdentity = Identity(components: ["gifeditor.presentation-runtime.close-button"])
     let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
-    let inputReader = GIFEditorPresentationInputReader(steps: [
-      .press(KeyPress(.character("?"), modifiers: [])),
-      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
-        terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
-          && terminal.frames.contains { frame in
-            advancedGlyphs.contains { frame.contains($0) }
-          }
-      },
-      .click(.init(x: 76, y: 2)),
-      .waitUntil(timeoutNanoseconds: 1_000_000_000) {
-        terminal.latestFrame?.contains("Keyboard help") == false
-      },
-      .press(KeyPress(.character("]"), modifiers: [])),
-      .waitUntil(timeoutNanoseconds: 1_000_000_000) {
-        terminal.frames.contains { $0.contains("B2") }
-      },
-    ])
+    let inputReader = GIFEditorPresentationInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .press(KeyPress(.character("?"), modifiers: [])),
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
+            && terminal.frames.contains { frame in
+              advancedGlyphs.contains { frame.contains($0) }
+            }
+        },
+        .click(.init(x: 76, y: 2)),
+        .awaitCondition {
+          terminal.latestFrame?.contains("Keyboard help") == false
+        },
+        .press(KeyPress(.character("]"), modifiers: [])),
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("B2") }
+        },
+      ])
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
@@ -119,16 +124,18 @@ struct PresentationRuntimeTests {
     let exitKey = KeyPress(.character("q"), modifiers: .ctrl)
     let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
-    let inputReader = GIFEditorPresentationInputReader(steps: [
-      .press(KeyPress(.character("?"), modifiers: [])),
-      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
-        terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
-          && terminal.frames.contains { frame in
-            advancedGlyphs.contains { frame.contains($0) }
-          }
-      },
-      .press(exitKey),
-    ])
+    let inputReader = GIFEditorPresentationInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .press(KeyPress(.character("?"), modifiers: [])),
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
+            && terminal.frames.contains { frame in
+              advancedGlyphs.contains { frame.contains($0) }
+            }
+        },
+        .press(exitKey),
+      ])
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
@@ -167,6 +174,10 @@ private final class GIFEditorPresentationRecordingTerminalHost: PresentationSurf
     frames.last
   }
 
+  /// Notified after every appended frame, so an awaited input step can
+  /// re-check its predicate the instant a frame lands instead of polling.
+  let frameSignal = MainActorConditionSignal()
+
   init(
     surfaceSize: CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
@@ -188,6 +199,7 @@ private final class GIFEditorPresentationRecordingTerminalHost: PresentationSurf
       capabilityProfile: capabilityProfile
     ).render(surface)
     frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
+    notifyFrameObservers()
     return TerminalPresentationMetrics(
       bytesWritten: rendered.utf8.count,
       linesTouched: surface.size.height,
@@ -198,58 +210,58 @@ private final class GIFEditorPresentationRecordingTerminalHost: PresentationSurf
 
   func write(_ output: String) throws {
     frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
+    notifyFrameObservers()
+  }
+
+  /// The run loop only ever presents on the MainActor; `assumeIsolated`
+  /// bridges these nonisolated protocol witnesses to the MainActor-isolated
+  /// signal.
+  private func notifyFrameObservers() {
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
   }
 }
 
 private enum GIFEditorPresentationInputStep {
-  case press(KeyPress, delayNanoseconds: UInt64 = 0)
-  case click(CellPoint, delayNanoseconds: UInt64 = 0)
-  case waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
-    predicate: @MainActor () -> Bool
-  )
+  case press(KeyPress)
+  case click(CellPoint)
+  /// Suspends the input script until `predicate` holds, re-evaluated only when
+  /// the host appends a frame (`frameSignal.notify()`) rather than on a clock.
+  case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
 private final class GIFEditorPresentationInputReader: TerminalInputReading {
   private let steps: [GIFEditorPresentationInputStep]
-  private let pollNanoseconds: UInt64
+  private let frameSignal: MainActorConditionSignal
 
   init(
-    steps: [GIFEditorPresentationInputStep],
-    pollNanoseconds: UInt64 = 10_000_000
+    frameSignal: MainActorConditionSignal,
+    steps: [GIFEditorPresentationInputStep]
   ) {
+    self.frameSignal = frameSignal
     self.steps = steps
-    self.pollNanoseconds = pollNanoseconds
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let steps = self.steps
-      let pollNanoseconds = self.pollNanoseconds
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         for step in steps {
           switch step {
-          case .press(let event, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
+          case .press(let event):
             continuation.yield(.key(event))
-          case .click(let cell, let delayNanoseconds):
-            if delayNanoseconds > 0 {
-              try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
+          case .click(let cell):
             continuation.yield(
               .mouse(.init(kind: .down(.primary), location: .cellFallback(cell)))
             )
             continuation.yield(
               .mouse(.init(kind: .up(.primary), location: .cellFallback(cell)))
             )
-          case .waitUntil(let timeoutNanoseconds, let predicate):
-            var elapsedNanoseconds: UInt64 = 0
-            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
-              try? await Task.sleep(nanoseconds: pollNanoseconds)
-              elapsedNanoseconds += pollNanoseconds
-            }
+          case .awaitCondition(let predicate):
+            await frameSignal.wait(until: predicate)
           }
         }
         continuation.finish()

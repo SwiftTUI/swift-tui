@@ -83,6 +83,7 @@ let package = Package(
       dependencies: [
         "GIFEditorUI",
         .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUITestSupport", package: "swift-tui"),
       ]
     ),
   ]
