@@ -1,6 +1,8 @@
 import SwiftTUICore
 
 package struct LinearAccessibilityRenderer: Equatable, Sendable {
+  private let textSanitizer = AccessibilityTextSanitizer()
+
   package init() {}
 
   package func render(_ snapshot: SemanticSnapshot) -> String {
@@ -34,7 +36,7 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
     }
 
     for warning in warnings {
-      if let message = sanitized(warning.message) {
+      if let message = textSanitizer.sanitized(warning.message) {
         lines.append("warning: \(message)")
       }
     }
@@ -48,14 +50,14 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
   private func line(
     for node: AccessibilityNode
   ) -> String? {
-    let label = sanitized(node.label)
-    let hint = sanitized(node.hint)
+    let label = textSanitizer.sanitized(node.label)
+    let hint = textSanitizer.sanitized(node.hint)
 
     if node.role == .group, label == nil, hint == nil {
       return nil
     }
 
-    let role = sanitized(node.role.description) ?? "unknown"
+    let role = textSanitizer.sanitized(node.role.description) ?? "unknown"
     var line =
       if let label {
         "\(role): \(label)"
@@ -87,67 +89,6 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
     }
 
     return depth
-  }
-
-  private func sanitized(
-    _ value: String?
-  ) -> String? {
-    guard let value else {
-      return nil
-    }
-
-    var scalars: [Unicode.Scalar] = []
-    scalars.reserveCapacity(value.unicodeScalars.count)
-    var previousWasSpace = false
-
-    func appendSpaceIfNeeded() {
-      guard !previousWasSpace else {
-        return
-      }
-      scalars.append(Unicode.Scalar(0x20)!)
-      previousWasSpace = true
-    }
-
-    for scalar in value.unicodeScalars {
-      switch scalar.value {
-      case 0x20:
-        appendSpaceIfNeeded()
-      case 0x21...0x7E:
-        scalars.append(scalar)
-        previousWasSpace = false
-      case 0x09, 0x0A, 0x0B, 0x0C, 0x0D:
-        appendSpaceIfNeeded()
-      default:
-        scalars.append(Unicode.Scalar(0x3F)!)
-        previousWasSpace = false
-      }
-    }
-
-    let trimmed = trimmingAsciiSpaces(scalars)
-    guard !trimmed.isEmpty else {
-      return nil
-    }
-    return String(String.UnicodeScalarView(trimmed))
-  }
-
-  private func trimmingAsciiSpaces(
-    _ scalars: [Unicode.Scalar]
-  ) -> [Unicode.Scalar] {
-    var start = scalars.startIndex
-    var end = scalars.endIndex
-
-    while start < end, scalars[start].value == 0x20 {
-      start = scalars.index(after: start)
-    }
-    while start < end {
-      let previous = scalars.index(before: end)
-      guard scalars[previous].value == 0x20 else {
-        break
-      }
-      end = previous
-    }
-
-    return Array(scalars[start..<end])
   }
 }
 

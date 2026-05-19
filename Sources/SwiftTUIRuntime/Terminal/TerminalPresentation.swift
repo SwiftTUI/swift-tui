@@ -1,226 +1,5 @@
 import SwiftTUICore
 
-/// The terminal capabilities assumed when presenting a raster surface.
-public struct TerminalCapabilityProfile: Equatable, Sendable {
-  /// The glyph repertoire the presentation layer may emit.
-  public enum GlyphLevel: String, Equatable, Sendable {
-    case ascii
-    case unicode
-  }
-
-  /// The color repertoire the presentation layer may emit.
-  public enum ColorLevel: String, Equatable, Sendable {
-    case none
-    case ansi16
-    case ansi256
-    case trueColor
-  }
-
-  public var glyphLevel: GlyphLevel
-  public var colorLevel: ColorLevel
-  public var emitsStyleEscapeSequences: Bool
-  public var supportsHyperlinks: Bool
-  public var supportsMouseReporting: Bool
-  public var supportsSynchronizedOutput: Bool
-
-  /// Creates a terminal capability profile explicitly.
-  public init(
-    glyphLevel: GlyphLevel,
-    colorLevel: ColorLevel,
-    emitsStyleEscapeSequences: Bool,
-    supportsHyperlinks: Bool = false,
-    supportsMouseReporting: Bool = false,
-    supportsSynchronizedOutput: Bool = false
-  ) {
-    self.glyphLevel = glyphLevel
-    self.colorLevel = colorLevel
-    self.emitsStyleEscapeSequences = emitsStyleEscapeSequences
-    self.supportsHyperlinks = supportsHyperlinks
-    self.supportsMouseReporting = supportsMouseReporting
-    self.supportsSynchronizedOutput = supportsSynchronizedOutput
-  }
-
-  public static let previewUnicode = Self(
-    glyphLevel: .unicode,
-    colorLevel: .none,
-    emitsStyleEscapeSequences: false,
-    supportsHyperlinks: false,
-    supportsMouseReporting: false
-  )
-
-  public static let previewASCII = Self(
-    glyphLevel: .ascii,
-    colorLevel: .none,
-    emitsStyleEscapeSequences: false,
-    supportsHyperlinks: false,
-    supportsMouseReporting: false
-  )
-
-  public static let ansi16 = Self(
-    glyphLevel: .unicode,
-    colorLevel: .ansi16,
-    emitsStyleEscapeSequences: true,
-    supportsHyperlinks: true,
-    supportsMouseReporting: true
-  )
-
-  public static let ansi256 = Self(
-    glyphLevel: .unicode,
-    colorLevel: .ansi256,
-    emitsStyleEscapeSequences: true,
-    supportsHyperlinks: true,
-    supportsMouseReporting: true
-  )
-
-  public static let trueColor = Self(
-    glyphLevel: .unicode,
-    colorLevel: .trueColor,
-    emitsStyleEscapeSequences: true,
-    supportsHyperlinks: true,
-    supportsMouseReporting: true
-  )
-
-  /// Detects a capability profile from environment variables and TTY status.
-  public static func detect(
-    environment: [String: String],
-    isTTY: Bool
-  ) -> Self {
-
-    let term = environment["TERM"]?.lowercased() ?? ""
-    let colorTerm = environment["COLORTERM"]?.lowercased() ?? ""
-    let localeValues = [
-      environment["LC_ALL"],
-      environment["LC_CTYPE"],
-      environment["LANG"],
-    ]
-
-    let supportsUnicode =
-      localeValues
-      .compactMap { $0?.lowercased() }
-      .contains { value in
-        value.contains("utf-8") || value.contains("utf8")
-      }
-
-    let glyphLevel: GlyphLevel = supportsUnicode ? .unicode : .ascii
-
-    guard isTTY, term != "dumb" else {
-      return Self(
-        glyphLevel: glyphLevel,
-        colorLevel: .none,
-        emitsStyleEscapeSequences: false,
-        supportsHyperlinks: false,
-        supportsMouseReporting: false
-      )
-    }
-
-    let colorLevel: ColorLevel
-    if environment["NO_COLOR"] != nil {
-      colorLevel = .none
-    } else if colorTerm.contains("truecolor") || colorTerm.contains("24bit") {
-      colorLevel = .trueColor
-    } else if term.contains("256color") {
-      colorLevel = .ansi256
-    } else {
-      colorLevel = .ansi16
-    }
-
-    return Self(
-      glyphLevel: glyphLevel,
-      colorLevel: colorLevel,
-      emitsStyleEscapeSequences: colorLevel != .none,
-      supportsHyperlinks: supportsHyperlinks(term: term),
-      supportsMouseReporting: supportsMouseReporting(term: term),
-      supportsSynchronizedOutput: supportsSynchronizedOutput(term: term)
-    )
-  }
-
-  private static func supportsHyperlinks(
-    term: String
-  ) -> Bool {
-    supportsRichTerminalFeatures(term: term)
-  }
-
-  private static func supportsMouseReporting(
-    term: String
-  ) -> Bool {
-    supportsRichTerminalFeatures(term: term)
-  }
-
-  private static func supportsSynchronizedOutput(
-    term: String
-  ) -> Bool {
-    supportsRichTerminalFeatures(term: term)
-  }
-
-  private static func supportsRichTerminalFeatures(
-    term: String
-  ) -> Bool {
-    guard !term.isEmpty, term != "dumb" else {
-      return false
-    }
-
-    let sgrCapableTerms = [
-      "xterm",
-      "screen",
-      "tmux",
-      "wezterm",
-      "kitty",
-      "ghostty",
-      "rxvt",
-      "alacritty",
-      "foot",
-      "st",
-    ]
-
-    return sgrCapableTerms.contains { candidate in
-      term.contains(candidate)
-    }
-  }
-}
-
-extension TerminalCapabilityProfile {
-  /// Returns a new profile with the user's explicit `RuntimeConfiguration`
-  /// preferences applied on top of the detected profile.
-  ///
-  /// - `RuntimeConfiguration.color`:
-  ///   - `.never`: forces `colorLevel = .none` and disables style escape
-  ///     sequences. Wins regardless of TTY status.
-  ///   - `.always`: forces `colorLevel` to at least `.ansi16` even when
-  ///     the detected profile would have disabled color (non-TTY, etc.).
-  ///   - `.auto`: no override; the detected level stands.
-  /// - `RuntimeConfiguration.glyphs`:
-  ///   - `.ascii`: forces `glyphLevel = .ascii`.
-  ///   - `.unicode`: no override (unicode is the strict superset; if
-  ///     detection picked ascii because of locale, the user's `.unicode`
-  ///     preference is treated as a "don't restrict me" hint rather than
-  ///     a "force unicode glyphs" override).
-  ///
-  /// Other `RuntimeConfiguration` fields (motion, output, web, debug) are not
-  /// terminal capability inputs; this method ignores them.
-  public func applying(_ configuration: RuntimeConfiguration) -> Self {
-    var result = self
-    switch configuration.color {
-    case .never:
-      result.colorLevel = .none
-      result.emitsStyleEscapeSequences = false
-    case .always:
-      if result.colorLevel == .none {
-        result.colorLevel = .ansi16
-        result.emitsStyleEscapeSequences = true
-      }
-    case .auto:
-      break
-    }
-    switch configuration.glyphs {
-    case .ascii:
-      result.glyphLevel = .ascii
-    case .unicode:
-      break
-    }
-    return result
-  }
-}
-
 /// Renders a raster surface into terminal text for a specific capability
 /// profile.
 ///
@@ -304,9 +83,8 @@ public struct TerminalSurfaceRenderer {
 }
 
 extension TerminalSurfaceRenderer {
-  private struct RenderState {
-    var activeStyle: ResolvedTextStyle?
-    var activeHyperlink: String?
+  private var damageRenderer: TerminalSurfaceDamageRenderer {
+    TerminalSurfaceDamageRenderer(capabilityProfile: capabilityProfile)
   }
 
   private func renderCells(
@@ -319,7 +97,7 @@ extension TerminalSurfaceRenderer {
     if !preservingTrailingWhitespace {
       var trimmedEnd = max(start, min(end, row.count))
       while trimmedEnd > start {
-        let cell = cell(at: trimmedEnd - 1, in: row)
+        let cell = TerminalSurfaceDamageRenderer.cell(at: trimmedEnd - 1, in: row)
         if cell.isContinuation {
           trimmedEnd -= 1
           continue
@@ -345,15 +123,16 @@ extension TerminalSurfaceRenderer {
     let cellCount = max(0, end - start)
     var result = ""
     result.reserveCapacity(cellCount * 3)
-    var state = RenderState()
-    let renderedWidth = appendRenderedCells(
+    let textRenderer = TerminalCellTextRenderer(capabilityProfile: capabilityProfile)
+    var state = TerminalCellTextRenderer.RenderState()
+    let renderedWidth = textRenderer.appendRenderedCells(
       in: row,
       from: start,
       to: max(start, end),
       into: &result,
       state: &state
     )
-    closeRenderState(&state, into: &result)
+    textRenderer.closeRenderState(&state, into: &result)
 
     if let width {
       result += String(repeating: " ", count: max(0, width - renderedWidth))
@@ -367,65 +146,10 @@ extension TerminalSurfaceRenderer {
     currentRow: [RasterCell],
     spans: [Range<Int>]
   ) -> TerminalPresentationPlan.RowBatch? {
-    let orderedSpans =
-      spans
-      .filter { !$0.isEmpty }
-      .sorted { lhs, rhs in
-        lhs.lowerBound < rhs.lowerBound
-      }
-    guard let firstSpan = orderedSpans.first else {
-      return nil
-    }
-
-    var renderedBatch = ""
-    renderedBatch.reserveCapacity(
-      orderedSpans.reduce(0) { partial, span in
-        partial + max(0, span.upperBound - span.lowerBound) * 3
-      }
-    )
-    var state = RenderState()
-    var cursorColumn = firstSpan.lowerBound
-    var spanUpdates: [TerminalPresentationPlan.SpanUpdate] = []
-
-    for span in orderedSpans {
-      if span.lowerBound > cursorColumn {
-        renderedBatch += cursorForwardSequence(span.lowerBound - cursorColumn)
-        cursorColumn = span.lowerBound
-      }
-
-      var renderedSpan = ""
-      renderedSpan.reserveCapacity(max(0, span.upperBound - span.lowerBound) * 3)
-      _ = appendRenderedCells(
-        in: currentRow,
-        from: span.lowerBound,
-        to: span.upperBound,
-        into: &renderedSpan,
-        state: &state
-      )
-      renderedBatch += renderedSpan
-
-      spanUpdates.append(
-        .init(
-          row: row,
-          column: span.lowerBound,
-          renderedSpan: renderedSpan,
-          cellsChanged: cellsChanged(
-            in: currentRow,
-            from: span.lowerBound,
-            to: span.upperBound
-          )
-        )
-      )
-      cursorColumn = span.upperBound
-    }
-
-    closeRenderState(&state, into: &renderedBatch)
-
-    return .init(
+    damageRenderer.renderRowBatch(
       row: row,
-      anchorColumn: firstSpan.lowerBound,
-      renderedBatch: renderedBatch,
-      spanUpdates: spanUpdates
+      currentRow: currentRow,
+      spans: spans
     )
   }
 
@@ -435,78 +159,12 @@ extension TerminalSurfaceRenderer {
     width: Int,
     limitingTo candidateRanges: [Range<Int>]? = nil
   ) -> [Range<Int>] {
-    guard width > 0 else {
-      return []
-    }
-
-    if let candidateRanges, !candidateRanges.isEmpty {
-      var spans: [Range<Int>] = []
-      for candidateRange in candidateRanges {
-        appendDiffSpans(
-          in: candidateRange,
-          previousRow: previousRow,
-          currentRow: currentRow,
-          width: width,
-          to: &spans
-        )
-      }
-      return spans
-    }
-
-    var spans: [Range<Int>] = []
-    appendDiffSpans(
-      in: 0..<width,
+    damageRenderer.diffSpans(
       previousRow: previousRow,
       currentRow: currentRow,
       width: width,
-      to: &spans
+      limitingTo: candidateRanges
     )
-    return spans
-  }
-
-  private func appendDiffSpans(
-    in candidateRange: Range<Int>,
-    previousRow: [RasterCell],
-    currentRow: [RasterCell],
-    width: Int,
-    to spans: inout [Range<Int>]
-  ) {
-    let lowerBound = max(0, min(width, candidateRange.lowerBound))
-    let upperBound = max(lowerBound, min(width, candidateRange.upperBound))
-    guard lowerBound < upperBound else {
-      return
-    }
-
-    var index = lowerBound
-    while index < upperBound {
-      guard cell(at: index, in: previousRow) != cell(at: index, in: currentRow) else {
-        index += 1
-        continue
-      }
-
-      let rawStart = index
-      index += 1
-      while index < upperBound,
-        cell(at: index, in: previousRow) != cell(at: index, in: currentRow)
-      {
-        index += 1
-      }
-
-      let normalized = normalizeSpan(
-        rawStart..<index,
-        previousRow: previousRow,
-        currentRow: currentRow,
-        width: width
-      )
-
-      if let last = spans.last,
-        last.upperBound >= normalized.lowerBound
-      {
-        spans[spans.count - 1] = last.lowerBound..<max(last.upperBound, normalized.upperBound)
-      } else {
-        spans.append(normalized)
-      }
-    }
   }
 
   func normalizeSpan(
@@ -515,52 +173,26 @@ extension TerminalSurfaceRenderer {
     currentRow: [RasterCell],
     width: Int
   ) -> Range<Int> {
-    guard !span.isEmpty else {
-      return span
-    }
-
-    var start = max(0, min(span.lowerBound, width))
-    var end = max(start, min(span.upperBound, width))
-
-    while start > 0 {
-      let candidate = min(
-        leadIndexIfContinuation(at: start, in: currentRow),
-        leadIndexIfContinuation(at: start, in: previousRow)
-      )
-      guard candidate < start else {
-        break
-      }
-      start = candidate
-    }
-
-    while end < width {
-      if cell(at: end, in: currentRow).isContinuation
-        || cell(at: end, in: previousRow).isContinuation
-      {
-        end += 1
-        continue
-      }
-      break
-    }
-
-    return start..<end
+    damageRenderer.normalizeSpan(
+      span,
+      previousRow: previousRow,
+      currentRow: currentRow,
+      width: width
+    )
   }
 
   func leadIndexIfContinuation(
     at index: Int,
     in row: [RasterCell]
   ) -> Int {
-    guard cell(at: index, in: row).isContinuation else {
-      return index
-    }
-    return max(0, min(index, cell(at: index, in: row).continuationLeadX ?? index))
+    damageRenderer.leadIndexIfContinuation(at: index, in: row)
   }
 
   func cell(
     at index: Int,
     in row: [RasterCell]
   ) -> RasterCell {
-    row.indices.contains(index) ? row[index] : .empty
+    damageRenderer.cell(at: index, in: row)
   }
 
   func cellsChanged(
@@ -568,470 +200,6 @@ extension TerminalSurfaceRenderer {
     from start: Int,
     to end: Int
   ) -> Int {
-    guard start < end else {
-      return 0
-    }
-
-    var total = 0
-    for index in start..<end {
-      let cell = cell(at: index, in: row)
-      guard !cell.isContinuation else {
-        continue
-      }
-      total += max(1, cell.spanWidth)
-    }
-    return total
-  }
-
-  @discardableResult
-  private func appendRenderedCells(
-    in row: [RasterCell],
-    from start: Int,
-    to end: Int,
-    into result: inout String,
-    state: inout RenderState
-  ) -> Int {
-    var renderedWidth = 0
-
-    for index in start..<max(start, end) {
-      let cell = cell(at: index, in: row)
-      guard !cell.isContinuation else {
-        continue
-      }
-
-      transitionRenderState(
-        style: cell.style,
-        hyperlink: cell.hyperlink,
-        state: &state,
-        into: &result
-      )
-      result += renderedCharacter(for: cell)
-      renderedWidth += max(1, cell.spanWidth)
-    }
-
-    return renderedWidth
-  }
-
-  private func transitionRenderState(
-    style: ResolvedTextStyle?,
-    hyperlink: String?,
-    state: inout RenderState,
-    into result: inout String
-  ) {
-    if hyperlink != state.activeHyperlink {
-      if state.activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
-        result += closeHyperlinkSequence()
-      }
-      if let hyperlink, capabilityProfile.supportsHyperlinks {
-        result += openHyperlinkSequence(for: .init(hyperlink))
-      }
-      state.activeHyperlink = hyperlink
-    }
-
-    if style != state.activeStyle {
-      if state.activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
-        result += "\u{001B}[0m"
-      }
-      if let style,
-        capabilityProfile.emitsStyleEscapeSequences,
-        let sequence = styleSequence(for: style)
-      {
-        result += sequence
-      }
-      state.activeStyle = style
-    }
-  }
-
-  private func closeRenderState(
-    _ state: inout RenderState,
-    into result: inout String
-  ) {
-    if state.activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
-      result += closeHyperlinkSequence()
-      state.activeHyperlink = nil
-    }
-    if state.activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
-      result += "\u{001B}[0m"
-      state.activeStyle = nil
-    }
-  }
-
-  private func cursorForwardSequence(
-    _ count: Int
-  ) -> String {
-    guard count > 0 else {
-      return ""
-    }
-    return "\u{001B}[\(count)C"
-  }
-
-  private func renderedCharacter(
-    for cell: RasterCell
-  ) -> String {
-    let sanitizedCharacter = sanitizedTerminalCharacter(cell.character)
-    if capabilityProfile.glyphLevel == .ascii {
-      return degradedASCIIText(
-        character: sanitizedCharacter,
-        spanWidth: max(1, cell.spanWidth)
-      )
-    }
-    return String(sanitizedCharacter)
-  }
-
-  private func sanitizedTerminalCharacter(
-    _ character: Character
-  ) -> Character {
-    let scalars = character.unicodeScalars
-    if scalars.allSatisfy(isUnsafeTerminalControlScalar) {
-      return "�"
-    }
-    return character
-  }
-
-  private func isUnsafeTerminalControlScalar(
-    _ scalar: UnicodeScalar
-  ) -> Bool {
-    switch scalar.value {
-    case 0x00...0x1F, 0x7F...0x9F:
-      return true
-    default:
-      return false
-    }
-  }
-
-  /// Builds the SGR escape sequence for `style` directly into a String,
-  /// avoiding intermediate `[String]` / `[Int]` arrays.
-  private func styleSequence(
-    for style: ResolvedTextStyle
-  ) -> String? {
-    // Build the sequence by appending SGR codes directly into a String.
-    // The escape prefix and `m` suffix are added once at the edges.
-    var seq = "\u{001B}["
-    var hasCodes = false
-
-    @inline(__always)
-    func appendCode(_ code: String) {
-      if hasCodes { seq += ";" }
-      seq += code
-      hasCodes = true
-    }
-
-    @inline(__always)
-    func appendIntCode(_ code: Int) {
-      if hasCodes { seq += ";" }
-      seq += String(code)
-      hasCodes = true
-    }
-
-    // Emphasis codes (inlined from former emphasisCodes(for:)).
-    if style.emphasis.contains(.bold) { appendCode("1") }
-    if style.emphasis.contains(.faint) || style.opacity < 1 { appendCode("2") }
-    if style.emphasis.contains(.italic) { appendCode("3") }
-    if let underlineStyle = style.underlineStyle {
-      switch underlineStyle.pattern {
-      case .solid: appendCode("4")
-      case .double: appendCode("4:2")
-      case .curly: appendCode("4:3")
-      case .dot: appendCode("4:4")
-      case .dash, .dashDot, .dashDotDot: appendCode("4:5")
-      }
-    }
-    if style.emphasis.contains(.blink) { appendCode("5") }
-    if style.emphasis.contains(.reverse) { appendCode("7") }
-    if style.strikethroughStyle != nil { appendCode("9") }
-
-    // Foreground color codes (inlined from former colorCodes).
-    if let fg = style.foregroundColor {
-      appendColorCodes(for: fg, isBackground: false, into: &seq, hasCodes: &hasCodes)
-    }
-
-    // Background color codes.
-    if let bg = style.backgroundColor {
-      appendColorCodes(for: bg, isBackground: true, into: &seq, hasCodes: &hasCodes)
-    }
-
-    // Underline color.
-    if let underlineColor = style.underlineStyle?.color {
-      appendUnderlineColorCodes(for: underlineColor, into: &seq, hasCodes: &hasCodes)
-    }
-
-    guard hasCodes else {
-      return nil
-    }
-
-    seq += "m"
-    return seq
-  }
-
-  /// Appends SGR color codes for `color` directly into `seq`.
-  private func appendColorCodes(
-    for color: Color,
-    isBackground: Bool,
-    into seq: inout String,
-    hasCodes: inout Bool
-  ) {
-    @inline(__always)
-    func appendCode(_ code: Int) {
-      if hasCodes { seq += ";" }
-      seq += String(code)
-      hasCodes = true
-    }
-
-    switch capabilityProfile.colorLevel {
-    case .none:
-      break
-    case .ansi16:
-      let code = closestANSI16ForegroundCode(for: color)
-      appendCode(isBackground ? backgroundCode(forForegroundCode: code) : code)
-    case .ansi256:
-      appendCode(isBackground ? 48 : 38)
-      appendCode(5)
-      appendCode(ansi256Code(for: color))
-    case .trueColor:
-      appendCode(isBackground ? 48 : 38)
-      appendCode(2)
-      appendCode(Int(color.red * 255))
-      appendCode(Int(color.green * 255))
-      appendCode(Int(color.blue * 255))
-    }
-  }
-
-  /// Appends underline color SGR codes directly into `seq`.
-  private func appendUnderlineColorCodes(
-    for color: Color,
-    into seq: inout String,
-    hasCodes: inout Bool
-  ) {
-    @inline(__always)
-    func appendCode(_ code: String) {
-      if hasCodes { seq += ";" }
-      seq += code
-      hasCodes = true
-    }
-
-    switch capabilityProfile.colorLevel {
-    case .none, .ansi16:
-      break
-    case .ansi256:
-      appendCode("58")
-      appendCode("5")
-      appendCode(String(ansi256Code(for: color)))
-    case .trueColor:
-      appendCode("58")
-      appendCode("2")
-      appendCode(String(Int(color.red * 255)))
-      appendCode(String(Int(color.green * 255)))
-      appendCode(String(Int(color.blue * 255)))
-    }
-  }
-
-  private func degradedASCIIText(
-    character: Character,
-    spanWidth: Int
-  ) -> String {
-    switch character {
-    case "│", "┃", "║":
-      return "|"
-    case "─", "━", "═":
-      return "-"
-    case "▌", "▐":
-      return "|"
-    case "▀", "▄":
-      return "-"
-    case "┌", "┐", "└", "┘",
-      "╭", "╮", "╰", "╯",
-      "╔", "╗", "╚", "╝",
-      "┏", "┓", "┗", "┛",
-      "▛", "▜", "▙", "▟",
-      "▗", "▖", "▝", "▘",
-      "├", "┤", "┬", "┴", "┼",
-      "╠", "╣", "╦", "╩", "╬":
-      return "+"
-    case "█":
-      return "#"
-    case "•":
-      return "*"
-    case "◀", "◁":
-      return "<"
-    case "▶", "▷":
-      return ">"
-    case "▼", "▽":
-      return "v"
-    case "▲", "△":
-      return "^"
-    case "×":
-      return "x"
-    case "●", "○":
-      return "o"
-    case "←":
-      return "<"
-    case "→":
-      return ">"
-    case "↑":
-      return "^"
-    case "↓":
-      return "v"
-    case "…":
-      return "~"
-    default:
-      let scalarView = String(character).unicodeScalars
-      guard scalarView.allSatisfy(\.isASCII) else {
-        return String(repeating: "?", count: max(1, spanWidth))
-      }
-      return String(character)
-    }
-  }
-
-  private func escapeSequence(
-    forCodes codes: [Int]
-  ) -> String {
-    escapeSequence(forCodeStrings: codes.map(String.init))
-  }
-
-  private func escapeSequence(
-    forCodeStrings codes: [String]
-  ) -> String {
-    "\u{001B}[\(codes.joined(separator: ";"))m"
-  }
-
-  private func openHyperlinkSequence(
-    for destination: LinkDestination
-  ) -> String {
-    "\u{001B}]8;;\(sanitizedHyperlinkDestination(destination.rawValue))\u{001B}\\"
-  }
-
-  private func sanitizedHyperlinkDestination(
-    _ destination: String
-  ) -> String {
-    var sanitized = String()
-    sanitized.reserveCapacity(destination.count)
-
-    var shouldDropStringTerminator = false
-    for scalar in destination.unicodeScalars {
-      if scalar.value == 0x1B {
-        shouldDropStringTerminator = true
-        continue
-      }
-      if scalar.isTerminalControlScalar {
-        continue
-      }
-      if shouldDropStringTerminator && scalar.value == 0x5C {
-        shouldDropStringTerminator = false
-        continue
-      }
-
-      shouldDropStringTerminator = false
-      sanitized.unicodeScalars.append(scalar)
-    }
-    return sanitized
-  }
-
-  private func closeHyperlinkSequence() -> String {
-    "\u{001B}]8;;\u{001B}\\"
-  }
-
-  private func backgroundCode(
-    forForegroundCode code: Int
-  ) -> Int {
-    code + 10
-  }
-
-  /// Cache for recent ANSI16 color lookups.  The deltaE computation is
-  /// expensive; apps typically use a small set of colors so a tiny cache
-  /// eliminates almost all redundant work across a frame.
-  private static let ansi16Cache = ANSI16Cache()
-
-  private final class ANSI16Cache: Sendable {
-    private struct Storage {
-      // Fixed-size ring of the last 8 mappings.
-      var entries: [(color: Color, code: Int)] = []
-      var cursor: Int = 0
-    }
-
-    private let storage = OSAllocatedUnfairLock<Storage>(uncheckedState: .init())
-
-    func lookup(for color: Color) -> Int? {
-      storage.withLock { storage in
-        storage.entries.first(where: { $0.color == color })?.code
-      }
-    }
-
-    func store(color: Color, code: Int) {
-      storage.withLock { storage in
-        if storage.entries.count < 8 {
-          storage.entries.append((color, code))
-        } else {
-          storage.entries[storage.cursor] = (color, code)
-          storage.cursor = (storage.cursor + 1) % 8
-        }
-      }
-    }
-  }
-
-  private static let ansi16Palette: [(Int, Color)] = [
-    (30, .init(hexRGB: 0x000000)),
-    (91, .init(hexRGB: 0xFF5555)),
-    (92, .init(hexRGB: 0x50C878)),
-    (93, .init(hexRGB: 0xFFD700)),
-    (94, .init(hexRGB: 0x6495ED)),
-    (95, .init(hexRGB: 0xDA70D6)),
-    (96, .init(hexRGB: 0x40E0D0)),
-    (97, .init(hexRGB: 0xF5F5F5)),
-    (90, .init(hexRGB: 0x808080)),
-  ]
-
-  private func closestANSI16ForegroundCode(
-    for color: Color
-  ) -> Int {
-    if let cached = Self.ansi16Cache.lookup(for: color) {
-      return cached
-    }
-
-    let code =
-      Self.ansi16Palette.min {
-        color.deltaE(to: $0.1) < color.deltaE(to: $1.1)
-      }?.0 ?? 97
-
-    Self.ansi16Cache.store(color: color, code: code)
-    return code
-  }
-
-  private func ansi256Code(
-    for color: Color
-  ) -> Int {
-    switch color {
-    case .black:
-      return 16
-    case .red:
-      return 203
-    case .green:
-      return 114
-    case .yellow:
-      return 179
-    case .blue:
-      return 111
-    case .magenta:
-      return 176
-    case .cyan:
-      return 117
-    case .white:
-      return 255
-    case .gray:
-      return 145
-    default:
-      break
-    }
-
-    let red = Int((color.red * 5).rounded())
-    let green = Int((color.green * 5).rounded())
-    let blue = Int((color.blue * 5).rounded())
-    return 16 + (36 * red) + (6 * green) + blue
-  }
-
-}
-
-extension Unicode.Scalar {
-  fileprivate var isTerminalControlScalar: Bool {
-    value < 0x20 || (value >= 0x7F && value <= 0x9F)
+    damageRenderer.cellsChanged(in: row, from: start, to: end)
   }
 }

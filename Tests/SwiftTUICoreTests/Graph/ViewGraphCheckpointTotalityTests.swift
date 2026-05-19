@@ -21,7 +21,7 @@ struct ViewGraphCheckpointTotalityTests {
     let viewGraphDebugFields = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "DebugTotalStateSnapshot",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraph.swift"
+      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphDebugSnapshots.swift"
     )
 
     #expect(Set(viewGraphFields).count == viewGraphFields.count)

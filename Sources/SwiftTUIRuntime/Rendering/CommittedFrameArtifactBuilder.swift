@@ -105,14 +105,6 @@ enum CommittedFrameArtifactBuilder {
       ))
   }
 
-  static func frameTailCommitDropBlockers(
-    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
-  ) -> Set<FrameDropEligibility.Blocker> {
-    FrameDropEligibility.frameTailCommitBlockers(
-      hasWorkerCustomLayoutCacheUpdates: !workerCustomLayoutCacheUpdates.isEmpty
-    )
-  }
-
   private static func workerTimings(
     _ workerTimings: FrameWorkerTimings?,
     workerCompletedAt: ContinuousClock.Instant?,
@@ -142,35 +134,20 @@ enum CommittedFrameArtifactBuilder {
     runtimeIssues: [RuntimeIssue],
     runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics
   ) -> FrameArtifacts {
-    let dropEligibilityBlockers = frameTailCommitDropBlockers(
-      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
+    let diagnostics = makeDiagnostics(
+      CommittedFrameDiagnosticInput(
+        draft: draft,
+        tailInputGeneration: tailInputGeneration,
+        layout: layout,
+        resolved: resolved,
+        tail: tail,
+        phaseTimings: phaseTimings,
+        workerTimings: workerTimings,
+        mainActorTimings: mainActorTimings,
+        runtimeIssues: runtimeIssues,
+        runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
+      )
     )
-    var diagnostics = FrameDiagnostics.fromCachedPhaseProducts(
-      resolved: resolved,
-      measured: tail.measured,
-      placed: tail.placed,
-      semantics: tail.semantics,
-      draw: tail.draw,
-      invalidatedIdentities: draft.frameContext.invalidatedIdentities,
-      resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
-      layoutWork: tail.diagnostics.layoutWork,
-      presentationDamage: tail.presentationDamage,
-      presentationSurfaceWidth: tail.raster.size.width,
-      phaseTimings: phaseTimings,
-      renderGenerations: .init(
-        render: draft.renderGeneration,
-        layoutInput: tailInputGeneration,
-        layoutOutput: layout.generation,
-        rasterInput: tailInputGeneration,
-        rasterOutput: tail.generation
-      ),
-      workerTimings: workerTimings,
-      mainActorTimings: mainActorTimings,
-      measurementCache: tail.diagnostics.measurementCache,
-      runtimeIssues: runtimeIssues,
-      dropEligibilityBlockers: dropEligibilityBlockers
-    )
-    diagnostics.runtime.registrations = runtimeRegistrationDiagnostics
     return FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,
@@ -182,38 +159,6 @@ enum CommittedFrameArtifactBuilder {
       drawnIdentities: tail.drawnIdentities,
       commitPlan: commit,
       diagnostics: diagnostics
-    )
-  }
-
-  private static func completedFrameMainActorTimings(
-    draft: FrameHeadDraft,
-    tailOutput: AsyncFrameTailDraftOutput,
-    commitDuration: Duration
-  ) -> FrameMainActorTimings {
-    let layout = tailOutput.layout
-    let tail = tailOutput.tail
-    return FrameMainActorTimings(
-      blocked: draft.resolveDuration
-        + (layout.ranOffMain
-          ? .zero : tail.diagnostics.measureDuration + tail.diagnostics.placeDuration)
-        + commitDuration,
-      suspended: tailOutput.renderSuspensionDuration
-    )
-  }
-
-  private static func phaseTimings(
-    draft: FrameHeadDraft,
-    tail: FrameTailOutput,
-    commitDuration: Duration
-  ) -> FramePhaseTimings {
-    FramePhaseTimings(
-      resolve: draft.resolveDuration,
-      measure: tail.diagnostics.measureDuration,
-      place: tail.diagnostics.placeDuration,
-      semantics: tail.diagnostics.semanticsDuration,
-      draw: tail.diagnostics.drawDuration,
-      raster: tail.diagnostics.rasterDuration,
-      commit: commitDuration
     )
   }
 

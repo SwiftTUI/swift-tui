@@ -2,117 +2,6 @@
 @_exported import SwiftTUICore
 @_exported import SwiftTUIViews
 
-/// Mutates the resolved tree with in-flight animation values after resolve and
-/// before measure.
-///
-/// This is the runtime's explicit animation-injection stage. It is not a new
-/// public phase product; it is the single insertion point where resolved
-/// animatable values are rewritten before the measure/place tail observes them.
-private struct AnimationInjectionStage {
-  var animationDraft: AnimationFrameDraft
-
-  @MainActor
-  func apply(
-    to resolved: inout ResolvedNode,
-    transaction: TransactionSnapshot,
-    timestamp: MonotonicInstant
-  ) {
-    let controller = animationDraft.controller
-    controller.processResolvedTree(
-      resolved,
-      transaction: transaction,
-      timestamp: timestamp
-    )
-    _ = controller.applyInterpolations(
-      to: &resolved,
-      at: timestamp
-    )
-  }
-}
-
-@MainActor
-private func withAnimationDraftSinks<Result>(
-  _ animationDraft: AnimationFrameDraft,
-  operation: () -> Result
-) -> Result {
-  let controller = animationDraft.controller
-  return AnimationRegistrationStorage.$currentTaskSink.withValue(controller) {
-    TransitionRegistrationStorage.$currentTaskSink.withValue(controller) {
-      AnimationCompletionStorage.$currentTaskSink.withValue(controller) {
-        operation()
-      }
-    }
-  }
-}
-
-@MainActor
-private final class CommittedPresentationDismissStack {
-  private var stack = DismissStack()
-
-  func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
-    stack.topmostEscapeDismissAction()
-  }
-
-  func store(_ stack: DismissStack) {
-    self.stack = stack
-  }
-}
-
-@MainActor
-private final class DebugObservationBridgeTracker {
-  weak var bridge: ObservationBridge?
-
-  func store(_ bridge: ObservationBridge?) {
-    self.bridge = bridge
-  }
-}
-
-package struct RuntimeSubsystemSnapshot: Equatable {
-  package struct PresentationPortalSnapshot: Equatable {
-    package struct EntrySnapshot: Equatable {
-      package var id: String
-      package var ordering: PortalOrdering
-      package var kindName: String
-      package var modalPolicy: PortalModalPolicy
-      package var acceptsEscape: Bool
-      package var hasDismissAction: Bool
-    }
-
-    package var overlayEntries: [EntrySnapshot]
-  }
-
-  package struct ObservationBridgeSnapshot: Equatable {
-    package var currentPass: UInt64
-    package var observedPasses: [Identity: UInt64]
-    package var invalidatorID: ObjectIdentifier?
-    package var viewGraphID: ObjectIdentifier?
-  }
-
-  package var viewGraph: ViewGraph.DebugTotalStateSnapshot
-  package var frameState: FrameResolveState.DebugStateSnapshot
-  package var frameInputs: FrameResolveInputBox.DebugStateSnapshot
-  package var presentationPortalState: PresentationPortalSnapshot
-  package var observationBridge: ObservationBridgeSnapshot?
-  package var animationController: AnimationController.DebugStateSnapshot
-}
-
-private enum CompletedFrameCandidateResolution {
-  case committed(FrameArtifacts, CompletedFrameDropDecision)
-  case dropped(runtimeIssues: [RuntimeIssue], dropDecision: CompletedFrameDropDecision)
-}
-
-private struct CommittedFrameEffects {
-  var commitPlan: CommitPlan
-  var commitDuration: Duration
-  var runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics
-}
-
-package struct CompletedFrameCandidateCommitPlanComparison {
-  package var previewCommit: CommitPlan
-  package var committedCommit: CommitPlan
-  package var committedArtifacts: FrameArtifacts
-}
-
 /// Renders authored terminal views through the full frame pipeline.
 ///
 /// `DefaultRenderer` is the public one-shot entry point for turning a `View`
@@ -129,7 +18,7 @@ public struct DefaultRenderer {
   public let rasterizer: Rasterizer
   public let commitPlanner: CommitPlanner
   private let imageRepository: ImageAssetRepository
-  private let viewGraph: ViewGraph
+  let viewGraph: ViewGraph
   private let frameState: FrameResolveState
   private let frameInputs: FrameResolveInputBox
   private let presentationPortalState: PresentationPortalState
@@ -138,11 +27,30 @@ public struct DefaultRenderer {
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
 
-  private let frameTailRenderer: FrameTailRenderer
+  let frameTailRenderer: FrameTailRenderer
   private var frameTailCoordinator: DefaultRendererFrameTailCoordinator {
     .init(
       frameTailRenderer: frameTailRenderer,
       latePreferenceReconciliationPolicy: Self.latePreferenceReconciliationPolicy
+    )
+  }
+  @MainActor
+  private var frameHeadCoordinator: DefaultRendererFrameHeadCoordinator {
+    let observationBridgeTracker = debugObservationBridgeTracker
+    return .init(
+      resolver: resolver,
+      imageRepository: imageRepository,
+      viewGraph: viewGraph,
+      frameState: frameState,
+      frameInputs: frameInputs,
+      presentationPortalState: presentationPortalState,
+      animationController: animationController,
+      renderGenerationSequencer: renderGenerationSequencer,
+      frameTailRenderer: frameTailRenderer,
+      storeObservationBridge: { bridge in
+        observationBridgeTracker.store(bridge)
+      },
+      renderPipelineContentTree: renderPipelineTree(from:)
     )
   }
 
@@ -626,166 +534,11 @@ public struct DefaultRenderer {
     proposal: ProposedSize,
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
-    let clock = ContinuousClock()
-    let renderGeneration = renderGenerationSequencer.next()
-
-    var resolveContext = context
-    debugObservationBridgeTracker.store(resolveContext.observationBridge)
-    let registrationDraft = FrameHeadRegistrationDraft()
-    let graphDraft = ViewGraphFrameDraft(
-      liveRegistrations: resolveContext.runtimeRegistrations,
-      checkpoint: mode == .abortable ? viewGraph.makeCheckpoint() : nil
-    )
-    let animationDraft = animationController.makeFrameDraft()
-    resolveContext = resolveContext.replacingRuntimeRegistrations(
-      registrationDraft.draftRegistrations
-    )
-    resolveContext.imageAssetResolver = imageRepository.resolver()
-
-    // Abortable heads checkpoint previous-frame selector state before preparing
-    // current-frame resolve inputs. One-shot heads never abort, so skip.
-    let frameStateCheckpoint: FrameResolveState.Checkpoint?
-    let frameInputsCheckpoint: FrameResolveInputBox.Checkpoint?
-    switch mode {
-    case .oneShot:
-      frameStateCheckpoint = nil
-      frameInputsCheckpoint = nil
-    case .abortable:
-      frameStateCheckpoint = frameState.makeCheckpoint()
-      frameInputsCheckpoint = frameInputs.makeCheckpoint()
-    }
-    let resolveInputs = frameState.prepareInputs(
-      from: resolveContext,
-      proposal: proposal
-    )
-    frameInputs.store(resolveInputs)
-    resolveContext.frameInputs = frameInputs
-
-    // The graph draft owns the viewGraph checkpoint captured before
-    // `beginFrame`, for the same abort reason.
-    viewGraph.beginFrame()
-    let canUseSelectiveEvaluation = resolveInputs.usesSelectiveEvaluation
-    if canUseSelectiveEvaluation {
-      viewGraph.invalidateAndQueueDirty(resolveInputs.invalidatedIdentities)
-    } else {
-      viewGraph.invalidate(resolveInputs.invalidatedIdentities)
-    }
-    resolveContext.viewGraph = viewGraph
-    let observationDraft = resolveContext.observationBridge?.makeDraft(
-      attaching: viewGraph
-    )
-    let presentationPortalContext = resolveContext.replacingIdentity(
-      with: presentationPortalIdentity(for: resolveContext.identity)
-    )
-    let hasExistingPresentationPortalRoot = viewGraph.containsNode(
-      for: presentationPortalContext.identity
-    )
-    let presentationPortalDraft = presentationPortalState.makeDraft()
-    let wrappedRoot = PresentationPortalRoot(
-      content: root,
-      portalState: presentationPortalDraft,
-      contentRootIdentity: resolveContext.identity
-    )
-    viewGraph.setRootEvaluator(rootIdentity: presentationPortalContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
-    }
-    viewGraph.setEvaluator(for: presentationPortalContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
-    }
-    if !hasExistingPresentationPortalRoot
-      || !canUseSelectiveEvaluation
-      || !resolveInputs.invalidatedIdentities.isEmpty
-    {
-      viewGraph.queueDirty([presentationPortalContext.identity])
-    }
-    let (_, resolveDuration): (Void, Duration)
-    animationDraft.controller.beginTransitionCollection()
-    if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
-      // Nothing is dirty — skip evaluation entirely and reuse the existing
-      // tree snapshot. The root evaluator and registrations are untouched.
-      resolveDuration = .zero
-    } else {
-      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
-      graphDraft.recordDirtyEvaluationPlan(dirtyEvaluationPlan)
-
-      (_, resolveDuration) = measurePhase(clock: clock) {
-        withAnimationDraftSinks(animationDraft) {
-          viewGraph.evaluateDirtyNodes(
-            using: dirtyEvaluationPlan
-          )
-        }
-      }
-    }
-    animationDraft.controller.finishTransitionCollection()
-    let resolved = wrapInContainerSafeArea(
-      renderPipelineTree(from: viewGraph.snapshot()),
-      context: resolveContext
-    )
-
-    let frameTailRetainedInput = frameTailRenderer.retainedInput(
-      invalidatedIdentities: resolveInputs.invalidatedIdentities
-    )
-    let layoutPassContext = LayoutPassContext(
-      retainedLayout: frameTailRetainedInput.retainedLayout,
-      invalidatedIdentities: resolveInputs.invalidatedIdentities
-    )
-    let frameContext = FrameContext(
-      environment: resolveInputs.environment,
-      transaction: resolveInputs.transaction,
-      invalidatedIdentities: resolveInputs.invalidatedIdentities
-    )
-    let frameTailInput = FrameTailInput(
-      generation: renderGeneration,
-      resolved: resolved,
-      proposal: resolveInputs.proposal,
-      rootIdentity: resolveContext.identity,
-      retained: frameTailRetainedInput,
-      layoutPassContext: layoutPassContext
-    )
-
-    let checkpoints: FrameHeadCheckpoints?
-    switch mode {
-    case .oneShot:
-      checkpoints = nil
-    case .abortable:
-      // Force-unwraps are safe: every `.abortable` branch above assigned its
-      // checkpoint non-nil.
-      graphDraft.recordPreparedCheckpoint(from: viewGraph)
-      checkpoints = FrameHeadCheckpoints(
-        baselineFrameState: frameStateCheckpoint!,
-        baselineFrameInputs: frameInputsCheckpoint!,
-        preparedFrameState: frameState.makeCheckpoint(),
-        preparedFrameInputs: frameInputs.makeCheckpoint()
-      )
-    }
-
-    let transaction = FrameHeadTransaction(
-      viewGraph: viewGraph,
-      frameState: frameState,
-      frameInputs: frameInputs,
-      graphDraft: graphDraft,
-      registrationDraft: registrationDraft,
-      presentationPortalDraft: presentationPortalDraft,
-      observationDraft: observationDraft,
-      animationDraft: animationDraft,
-      checkpoints: checkpoints
-    )
-    if mode == .abortable {
-      transaction.suspendPreparedState()
-    }
-
-    return FrameHeadDraft(
-      clock: clock,
-      renderGeneration: renderGeneration,
-      transaction: transaction,
-      resolveContext: resolveContext,
-      graphRootIdentity: presentationPortalContext.identity,
-      frameContext: frameContext,
-      resolved: resolved,
-      frameTailInput: frameTailInput,
-      runtimeIssues: [],
-      animationTimestamp: MonotonicInstant.now(),
-      resolveDuration: resolveDuration
+    frameHeadCoordinator.computeFrameHead(
+      root,
+      context: context,
+      proposal: proposal,
+      mode: mode
     )
   }
 
@@ -794,34 +547,10 @@ public struct DefaultRenderer {
     into draft: FrameHeadDraft,
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
-    var draft = draft
-    var resolved = draft.resolved
-    let animationTimestamp = MonotonicInstant.now()
-    AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
-      to: &resolved,
-      transaction: draft.frameContext.transaction,
-      timestamp: animationTimestamp
+    frameHeadCoordinator.injectAnimations(
+      into: draft,
+      mode: mode
     )
-
-    var frameTailInput = draft.frameTailInput
-    frameTailInput.resolved = resolved
-    // Worker-safe snapshotting of lazy indexed child sources is only needed
-    // when the frame tail runs off-main. One-shot renders run the tail
-    // synchronously on the main actor, so they skip it.
-    if mode == .abortable,
-      frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput)
-    {
-      draft.transaction.materializePreparedState()
-      resolved = indexedChildSourceWorkerSnapshot(of: resolved)
-      frameTailInput.resolved = resolved
-      draft.transaction.recordPreparedGraphState()
-      draft.transaction.suspendPreparedState()
-    }
-
-    draft.resolved = resolved
-    draft.frameTailInput = frameTailInput
-    draft.animationTimestamp = animationTimestamp
-    return draft
   }
 
   @MainActor
@@ -830,307 +559,16 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize
   ) -> FrameHeadDraft {
-    let draft = computeFrameHead(
+    frameHeadCoordinator.prepareFrameHead(
       root,
       context: context,
-      proposal: proposal,
-      mode: .abortable
-    )
-    return injectAnimations(
-      into: draft,
-      mode: .abortable
+      proposal: proposal
     )
   }
 
   @MainActor
-  private func makeCompletedFrameCandidate(
-    draft: FrameHeadDraft,
-    tailOutput: AsyncFrameTailDraftOutput,
-    newestDesiredGeneration: RenderGeneration,
-    completedFramePolicy: CompletedFramePolicy? = nil,
-    additionalBlockers:
-      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
-  ) -> CompletedFrameCandidate {
-    let resolved = tailOutput.resolved
-    let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
-      draft: draft,
-      tailOutput: tailOutput
-    )
-    let (commit, commitDuration) = previewCompletedFrameCommit(
-      draft: draft,
-      tailOutput: tailOutput,
-      resolved: resolved
-    )
-    let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
-      draft: draft,
-      tailOutput: tailOutput,
-      resolved: resolved,
-      commit: commit,
-      commitDuration: commitDuration,
-      workerTimings: workerTimings
-    )
-    let eligibility = CommittedFrameArtifactBuilder.eligibility(
-      artifacts: artifacts,
-      draft: draft,
-      additionalBlockers: additionalBlockers(artifacts)
-    )
-    return CompletedFrameCandidate(
-      draft: draft,
-      tailOutput: tailOutput,
-      resolved: resolved,
-      workerTimings: workerTimings,
-      previewArtifacts: artifacts,
-      eligibility: eligibility,
-      newestDesiredGeneration: newestDesiredGeneration,
-      dropDecision: (completedFramePolicy ?? .dropCompletedVisualOnly).decide(
-        candidateGeneration: draft.renderGeneration,
-        newestDesiredGeneration: newestDesiredGeneration,
-        eligibility: eligibility
-      )
-    )
-  }
-
-  @MainActor
-  private func resolveCompletedFrameCandidate(
-    draft: FrameHeadDraft,
-    tailOutput: AsyncFrameTailDraftOutput,
-    newestDesiredGeneration: RenderGeneration,
-    completedFramePolicy: CompletedFramePolicy? = nil,
-    additionalBlockers:
-      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
-  ) -> CompletedFrameCandidateResolution {
-    let candidate = makeCompletedFrameCandidate(
-      draft: draft,
-      tailOutput: tailOutput,
-      newestDesiredGeneration: newestDesiredGeneration,
-      completedFramePolicy: completedFramePolicy,
-      additionalBlockers: additionalBlockers
-    )
-    if candidate.dropDecision.canSkipCompletedFrame {
-      discardCompletedFrameCandidate(
-        candidate,
-        reconciliation: candidate.dropDecision.reconciliation
-      )
-      return .dropped(
-        runtimeIssues: candidate.previewArtifacts.diagnostics.runtime.issues,
-        dropDecision: candidate.dropDecision
-      )
-    }
-    let artifacts = commitCompletedFrameCandidate(candidate)
-    return .committed(artifacts, candidate.dropDecision)
-  }
-
-  @MainActor
-  private func commitCompletedFrameCandidate(
-    _ candidate: CompletedFrameCandidate
-  ) -> FrameArtifacts {
-    let layout = candidate.tailOutput.layout
-    let tail = candidate.tailOutput.tail
-    candidate.draft.transaction.materializePreparedState()
-    let effects = commitFrameEffects(
-      draft: candidate.draft,
-      resolved: candidate.resolved,
-      placed: tail.placed,
-      semantics: tail.semantics,
-      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
-    )
-    let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
-      draft: candidate.draft,
-      tailOutput: candidate.tailOutput,
-      resolved: candidate.resolved,
-      commit: effects.commitPlan,
-      commitDuration: effects.commitDuration,
-      workerTimings: candidate.workerTimings,
-      runtimeRegistrationDiagnostics: effects.runtimeRegistrationDiagnostics
-    )
-
-    publishCommittedFrame(
-      artifacts,
-      draft: candidate.draft,
-      baselinePlacedTree: tail.baselinePlaced
-    )
-    return artifacts
-  }
-
-  @MainActor
-  private func commitFrameEffects(
-    draft: FrameHeadDraft,
-    resolved: ResolvedNode,
-    placed: PlacedNode,
-    semantics: SemanticSnapshot,
-    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
-  ) -> CommittedFrameEffects {
-    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
-    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: draft.graphRootIdentity,
-        resolved: resolved,
-        placed: placed
-      )
-      runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
-      return commitPlanner.plan(
-        resolved: resolved,
-        placed: placed,
-        semantics: semantics,
-        transaction: draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    applyWorkerCustomLayoutCacheUpdates(workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
-    )
-    return CommittedFrameEffects(
-      commitPlan: commit,
-      commitDuration: commitDuration,
-      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
-    )
-  }
-
-  @MainActor
-  private func publishCommittedFrame(
-    _ artifacts: FrameArtifacts,
-    draft: FrameHeadDraft,
-    baselinePlacedTree: PlacedNode
-  ) {
-    draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    draft.graphDraft.updateCommittedScrollGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    frameTailRenderer.storeCommittedFrame(
-      artifacts,
-      baselinePlacedTree: baselinePlacedTree
-    )
-    storeCommittedPresentationPortalState()
-  }
-
-  @MainActor
-  private func storeCommittedPresentationPortalState() {
+  func storeCommittedPresentationPortalState() {
     committedPresentationDismissStack.store(presentationPortalState.dismissStack())
-  }
-
-  @MainActor
-  private func commitFrameHeadDraftEffects(
-    _ draft: FrameHeadDraft
-  ) -> RuntimeRegistrationDiagnostics {
-    draft.transaction.commit()
-  }
-
-  @MainActor
-  private func previewCompletedFrameCommit(
-    draft: FrameHeadDraft,
-    tailOutput: AsyncFrameTailDraftOutput,
-    resolved: ResolvedNode
-  ) -> (commit: CommitPlan, duration: Duration) {
-    let tail = tailOutput.tail
-    draft.transaction.materializePreparedState()
-    defer {
-      draft.transaction.suspendPreparedState()
-    }
-
-    return measurePhase(clock: draft.clock) {
-      let lifecycleEvents = viewGraph.previewLifecycleEvents(
-        resolved: resolved,
-        placed: tail.placed
-      )
-      return commitPlanner.plan(
-        resolved: resolved,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        transaction: draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-  }
-
-  @MainActor
-  private func discardCompletedFrameCandidate(
-    _ candidate: CompletedFrameCandidate,
-    reconciliation: SkippedFrameReconciliation
-  ) {
-    precondition(reconciliation.isAvailableToRuntimePolicy)
-    abortPreparedFrameHead(candidate.draft)
-  }
-
-  @MainActor
-  private func applyWorkerCustomLayoutCacheUpdates(
-    _ updates: [WorkerCustomLayoutCacheUpdate]
-  ) {
-    for update in updates {
-      update.apply()
-    }
-  }
-
-  @MainActor
-  private func indexedChildSourceWorkerSnapshot(
-    of node: ResolvedNode
-  ) -> ResolvedNode {
-    var node = node
-    node.children = node.children.map(indexedChildSourceWorkerSnapshot(of:))
-
-    guard let source = node.indexedChildSource,
-      !source.canRunOnWorker
-    else {
-      return node
-    }
-
-    let children = (0..<source.count).map { index in
-      indexedChildSourceWorkerSnapshot(of: source.child(at: index))
-    }
-    node.indexedChildSource = IndexedChildSourceSnapshot(
-      identityRoot: source.identityRoot,
-      measurementSignature: source.measurementSignature,
-      children: children
-    )
-    return node
-  }
-
-  private func measurePhase<Value>(
-    clock: ContinuousClock?,
-    _ operation: () -> Value
-  ) -> (Value, Duration) {
-    guard let clock else {
-      return (operation(), .zero)
-    }
-    let start = clock.now
-    let value = operation()
-    return (value, start.duration(to: clock.now))
-  }
-
-  private func wrapInContainerSafeArea(
-    _ resolved: ResolvedNode,
-    context: ResolveContext
-  ) -> ResolvedNode {
-    let safeAreaInsets = context.environmentValues.safeAreaInsets
-    guard !safeAreaInsets.isZero else {
-      return resolved
-    }
-
-    return ResolvedNode(
-      identity: resolved.identity.child(.named("ContainerSafeArea")),
-      kind: .view("ContainerSafeArea"),
-      children: [resolved],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      layoutBehavior: .padding(safeAreaInsets)
-    )
-  }
-
-  private func renderPipelineTree(
-    from graphRoot: ResolvedNode
-  ) -> ResolvedNode {
-    guard graphRoot.kind == .view("PresentationPortalRoot"),
-      graphRoot.children.count == 1,
-      let contentRoot = graphRoot.children.first
-    else {
-      return graphRoot
-    }
-
-    return contentRoot
   }
 
   /// Enables selective dirty-frontier evaluation for subsequent frames.

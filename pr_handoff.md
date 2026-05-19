@@ -165,6 +165,251 @@ extraction:
 - `Sources/SwiftTUIRuntime/SwiftTUI.swift`
 - `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift`
 
+Packet 30 should be reviewed as animation completion scheduling extraction:
+
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationCompletionScheduling.swift`
+
+Packet 31 should be reviewed as DefaultRenderer frame-head coordination
+extraction:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameHeadCoordinator.swift`
+
+Previous Packet 67-71 should be reviewed as the Core layout/raster and Charts
+support decomposition:
+
+- `Sources/SwiftTUICore/Measure/LayoutEngine+MeasurementWorkStack.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+MeasurementWorkItems.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+MeasurementResultStack.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+MeasuredNodeBuilding.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+StackMeasurementScheduling.swift`
+- `Sources/SwiftTUICore/Place/LayoutEngine+PlacementWorkStack.swift`
+- `Sources/SwiftTUICore/Place/LayoutEngine+PlacementWorkItems.swift`
+- `Sources/SwiftTUICore/Place/LayoutEngine+PlacementResultStack.swift`
+- `Sources/SwiftTUICore/Place/LayoutEngine+PlacementRequests.swift`
+- `Sources/SwiftTUICore/Place/LayoutEngine+StackPlacementRequests.swift`
+- `Sources/SwiftTUICore/Resolve/ViewNode.swift`
+- `Sources/SwiftTUICore/Resolve/ViewNodeHandlerDebugSnapshots.swift`
+- `Sources/SwiftTUICore/Resolve/ViewNodeCommittedAccessors.swift`
+- `Sources/SwiftTUICore/Raster/Rasterizer+Borders.swift`
+- `Sources/SwiftTUICore/Raster/Rasterizer+LayoutBorders.swift`
+- `Sources/SwiftTUICharts/LineChartSupport.swift`
+- `Sources/SwiftTUICharts/LineChartDomainSupport.swift`
+- `Sources/SwiftTUICharts/LineChartRasterization.swift`
+- `Sources/SwiftTUICharts/LineChartAxisTickSupport.swift`
+- `Sources/SwiftTUICharts/LineChartSeriesComposition.swift`
+
+Previous Packet 72-81 should be reviewed as the constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUICore/Semantics/Semantics.swift`
+- `Sources/SwiftTUICore/Semantics/SemanticPayloadRouting.swift`
+- `Sources/SwiftTUICore/Pipeline/Snapshots.swift`
+- `Sources/SwiftTUICore/Pipeline/SnapshotRenderer+StyleDescriptions.swift`
+- `Sources/SwiftTUICore/Draw/CanvasDrawing.swift`
+- `Sources/SwiftTUICore/Draw/CanvasPixelGridDrawing.swift`
+- `Sources/SwiftTUICore/Draw/CanvasPayload.swift`
+- `Sources/SwiftTUICore/Styling/Styling.swift`
+- `Sources/SwiftTUICore/Styling/GradientStyles.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoopSessionTypes.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+PointerHandling.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+PointerHitTesting.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+PointerHover.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+RuntimeSupport.swift`
+- `Sources/SwiftTUIRuntime/Diagnostics/FrameDiagnosticsLogger.swift`
+- `Sources/SwiftTUIRuntime/Diagnostics/FrameDiagnosticRecord.swift`
+- `Sources/SwiftTUIRuntime/Terminal/ImageAssetRepository.swift`
+- `Sources/SwiftTUIRuntime/Terminal/ImageAssetModels.swift`
+- `Scripts/lib/accessibility_raw_glyph_sources.txt`
+
+Previous Packet 82-91 should be reviewed as the next constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUICore/Measure/LayoutEngine+Stack.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+StackAxisSupport.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+StackLazyAllocation.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+StackMetrics.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+StackSpaceAllocation.swift`
+- `Sources/SwiftTUICore/Measure/LayoutEngine+StackMinimums.swift`
+- `Sources/SwiftTUIRuntime/Diagnostics/FrameDiagnosticsLogger.swift`
+- `Sources/SwiftTUIRuntime/Diagnostics/FrameDiagnosticsTSVFormatting.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalRenderStyleCodec.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalStyleTransportJSON.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalStyleTransportBase64.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailModels.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalPOSIXController.swift`
+
+Review notes for previous packets:
+
+- No SwiftUI-like public API was intentionally changed; public API inventory
+  stayed at 669 top-level public symbols.
+- Subagent scouts ranked stack axis/lazy helpers, stack flexibility/minimum
+  sizing, diagnostics TSV formatting, render-style transport, frame-tail models,
+  and terminal POSIX control as safe high-value central runtime/core packets.
+- `LayoutEngine+Stack.swift` is deleted because it became an empty placeholder;
+  the stack implementation now lives in the five focused `LayoutEngine+Stack*`
+  files listed above.
+- The frame-tail model extraction widened helper declarations only to
+  module-internal visibility so cross-file runtime code could keep using them;
+  no public API surface was added.
+- Terminal host presentation lifecycle movement was intentionally deferred
+  because it would require broader private-state movement than this batch
+  needed.
+
+Latest Packet 122-126 should be reviewed as the newest constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer+InlineStages.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+EventPump.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+EventPumpSupport.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+RuntimeSupport.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+RuntimeIssueReporting.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CommittedFrameArtifactBuilder.swift`
+- `Sources/SwiftTUIRuntime/Rendering/CommittedFrameDiagnosticsBuilder.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphLifecycleEventCollection.swift`
+
+Review notes for latest packets:
+
+- No SwiftUI-like public API was intentionally changed; public API inventory
+  stayed at 669 top-level public symbols.
+- Frame-tail inline stages, event-pump support, runtime issue reporting,
+  committed-frame diagnostics assembly, and ViewGraph lifecycle event
+  collection moved into focused files while preserving behavior.
+- The packet intentionally avoided async cancellation policy, completed-frame
+  drop eligibility, lifecycle ordering, and retained-layout baseline changes.
+- A read-only review subagent found no material runtime/core issues and
+  independently ran focused checks for the batch.
+- The next five scheduled five-packet batches now run through packet 151 for a
+  later continuation.
+
+Previous Packet 117-121 should be reviewed as the prior constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+PostCommitSupport.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnostics.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnosticRecordAssembly.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationResolvedTreeDiffing.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphInvalidationPlanning.swift`
+- `Sources/SwiftTUICore/Pipeline/Snapshots.swift`
+- `Sources/SwiftTUICore/Pipeline/SnapshotRenderer+Diagnostics.swift`
+
+Review notes for previous packets:
+
+- No SwiftUI-like public API was intentionally changed; public API inventory
+  stayed at 669 top-level public symbols.
+- Post-commit presentation support, frame diagnostic record assembly,
+  animation identity/matched-geometry diff planning, ViewGraph invalidation
+  planning, and snapshot diagnostics formatting moved into focused files while
+  preserving behavior.
+- The full removal-overlay animation loop was intentionally deferred because it
+  combines tree lookup, opacity sampling, batch release, and placed snapshot
+  lookup in one behavior-heavy path.
+- A read-only review subagent found no material runtime/core issues.
+
+Previous Packet 112-116 should be reviewed as the prior constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/DefaultRendererRuntimeSubsystems.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+ResolveContext.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisitionOutcome.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationControllerStateSnapshots.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphCheckpointing.swift`
+
+Review notes for previous packets:
+
+- No SwiftUI-like public API was intentionally changed; public API inventory
+  stayed at 669 top-level public symbols.
+- Renderer subsystem/debug declarations, run-loop resolve-context assembly,
+  frame-acquisition outcome reporting, animation snapshot type declarations,
+  and ViewGraph node checkpoint map construction/restoration moved into
+  focused files while preserving behavior.
+- A read-only scout agreed the packet split boundaries were low-risk and called
+  out only that the newly added files must be included with the batch.
+- The next five scheduled five-packet batches now run through packet 141 before
+  the next re-rank.
+
+Previous Packet 107-111 should be reviewed as the prior constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUIRuntime/SwiftTUI.swift`
+- `Sources/SwiftTUIRuntime/Rendering/DefaultRenderer+CompletedFrameCandidates.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`
+- `Sources/SwiftTUIRuntime/RunLoop/RunLoop+RenderDriverSupport.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationController.swift`
+- `Sources/SwiftTUIRuntime/Lifecycle/AnimationPlacedTreeCapture.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphDebugSnapshots.swift`
+- `Tests/SwiftTUICoreTests/Graph/ViewGraphCheckpointTotalityTests.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailWorkerExecutor.swift`
+- `Tests/SwiftTUITests/RenderPipelineStructureTests.swift`
+
+Review notes for previous packets:
+
+- No SwiftUI-like public API was intentionally changed; public API inventory
+  stayed at 669 top-level public symbols.
+- Completed-frame candidate preview/drop/commit coordination moved out of the
+  public renderer entry file into a focused extension. The existing
+  source-structure guard was updated to inspect the moved helper body instead
+  of weakening the assertion.
+- Run-loop render-driver support, animation placed-tree capture, ViewGraph
+  debug snapshot declarations, and frame-tail worker execution/timing moved into
+  focused files while preserving behavior.
+- A read-only review subagent found no material issues in packets 107-111.
+
+Previous Packet 92-106 should be reviewed as the prior constrained central
+runtime/core decomposition:
+
+- `Sources/SwiftTUICore/Styling/Styling.swift`
+- `Sources/SwiftTUICore/Styling/ShapeStyles.swift`
+- `Sources/SwiftTUICore/Styling/Theme.swift`
+- `Sources/SwiftTUICore/Styling/StrokeStyles.swift`
+- `Sources/SwiftTUICore/Styling/ShapePayload.swift`
+- `Sources/SwiftTUICore/Styling/ResolvedTextStyle.swift`
+- `Sources/SwiftTUICore/Draw/RenderMetadataTypes.swift`
+- `Sources/SwiftTUICore/Draw/DrawPayload.swift`
+- `Sources/SwiftTUICore/Draw/TextStyle.swift`
+- `Sources/SwiftTUICore/Draw/DrawMetadata.swift`
+- `Sources/SwiftTUICore/Draw/SelectionTag.swift`
+- `Sources/SwiftTUICore/Draw/ListPayload.swift`
+- `Sources/SwiftTUIRuntime/Scenes/App.swift`
+- `Sources/SwiftTUIRuntime/Scenes/SceneBuilder.swift`
+- `Sources/SwiftTUIRuntime/Scenes/WindowSceneConfiguration.swift`
+- `Sources/SwiftTUIRuntime/Scenes/WindowSceneSelection.swift`
+- `Sources/SwiftTUIRuntime/Scenes/HostedRasterSurface.swift`
+- `Sources/SwiftTUIRuntime/Scenes/HostedRasterSurfaceState.swift`
+- `Sources/SwiftTUIRuntime/Accessibility/LinearAccessibilityRenderer.swift`
+- `Sources/SwiftTUIRuntime/Accessibility/AccessibilityTextSanitizer.swift`
+- `Scripts/lib/accessibility_color_state_sources.txt`
+
+Review notes for previous packets:
+
+- No SwiftUI-like public API was intentionally changed; public API inventory
+  stayed at 669 top-level public symbols across all three batch gates.
+- `Styling.swift` and `RenderMetadataTypes.swift` were deleted after becoming
+  empty broad buckets; their declarations now live in focused files named for
+  style, payload, metadata, selection, and list responsibilities.
+- Scene builder artifacts, window scene configuration, selected-scene runner
+  plumbing, hosted raster state, and accessibility text sanitization moved out
+  of larger runtime files without changing scene collection or hosted-frame
+  behavior.
+- A read-only review subagent found no code regressions in packets 92-101 and
+  flagged only that the migration artifacts needed this update.
+
 ## What Must Stay Stable
 
 - Public SwiftUI-like APIs.
@@ -185,6 +430,45 @@ Full log:
 
 ```text
 /tmp/swift-tui-test-gate-20260518-023359-77501.log
+```
+
+Latest constrained batches passed:
+
+```bash
+bun run test
+bun run test
+bun run test
+bun run test
+bun run test
+bun run test
+bun run test
+```
+
+Latest batch logs:
+
+```text
+/tmp/swift-tui-test-gate-20260518-145417-packet72-76.log
+/tmp/swift-tui-test-gate-20260518-145417-59626.log
+/tmp/swift-tui-test-gate-20260518-150340-packet77-81.log
+/tmp/swift-tui-test-gate-20260518-150340-86962.log
+/tmp/swift-tui-test-gate-20260518-153444-packet82-86.log
+/tmp/swift-tui-test-gate-20260518-153444-16744.log
+/tmp/swift-tui-test-gate-20260518-154406-packet87-91.log
+/tmp/swift-tui-test-gate-20260518-154406-32556.log
+/tmp/swift-tui-test-gate-20260518-155625-packet92-96.log
+/tmp/swift-tui-test-gate-20260518-155625-58962.log
+/tmp/swift-tui-test-gate-20260518-160339-packet97-101.log
+/tmp/swift-tui-test-gate-20260518-160339-76975.log
+/tmp/swift-tui-test-gate-20260518-161124-packet102-106.log
+/tmp/swift-tui-test-gate-20260518-161124-95992.log
+/tmp/swift-tui-test-gate-20260518-162436-packet107-111.log
+/tmp/swift-tui-test-gate-20260518-162436-14895.log
+/tmp/swift-tui-test-gate-20260518-163254-packet112-116.log
+/tmp/swift-tui-test-gate-20260518-163254-34322.log
+/tmp/swift-tui-test-gate-20260518-164649-packet117-121.log
+/tmp/swift-tui-test-gate-20260518-164649-55780.log
+/tmp/swift-tui-test-gate-20260518-170129-packet122-126.log
+/tmp/swift-tui-test-gate-20260518-170129-78413.log
 ```
 
 Packet 1 validation passed:
@@ -720,6 +1004,705 @@ Slice gate log:
 /tmp/swift-tui-test-gate-20260518-093634-11184.log
 ```
 
+Packet 30 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests
+swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/preparedFrameHeadAbortKeepsAnimationCompletionsUncommitted
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadDefersAnimationCompletionUntilCommit
+swiftly run swift test --filter AnimationController
+bun run test
+git diff --check
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-100620-73481.log
+```
+
+Packet 30 patch review:
+
+```text
+Read-only subagent review found no behavior or API issues. It flagged that the
+new helper file was not visible in plain git diff while untracked; that was
+resolved with git add -N so review diffs include the file.
+```
+
+Packet 31 focused validation passed:
+
+```bash
+swiftly run swift build
+swift format lint --configuration .swift-format.json Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameHeadCoordinator.swift Sources/SwiftTUIRuntime/SwiftTUI.swift
+swiftly run swift test --filter 'SwiftTUITests\.(RuntimeRenderPipelineTests|RenderPipelineStructureTests|PipelineContractTests|AsyncFrameTailRenderingTests|BoundedReconciliationTests|RenderDriverCharacterizationTests|RenderDriverInstrumentationCostTests)'
+swiftly run swift test --filter 'SwiftTUITests\.(ResolvePurityTests|Phase4ObservationAndEnvironmentTests)'
+swiftly run swift test --filter SwiftTUITests.AnimationControllerPropertyTests/frameHeadTransactionDefersBatchCompletionUntilCommit
+swiftly run swift test --filter SwiftTUITests.AppRuntimeTests/optionalFocusStateTracksRuntimeFocusChanges
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-102231-97496.log
+```
+
+The first Packet 31 full `SwiftTUITests` attempt failed once in
+`AppRuntimeTests/optional FocusState equals bindings track runtime focus changes across controls`.
+That specific test passed immediately in isolation, and the full
+`SwiftTUITests` target passed on rerun with 1309 tests.
+
+Packet 31 patch review:
+
+```text
+Read-only subagent review found no behavior or API issues. It flagged one
+low-severity surface issue where a renderer-only helper had become
+module-internal; that was resolved by keeping renderPipelineTree(from:) private
+in SwiftTUI.swift and passing it into the coordinator as a closure.
+```
+
+Packet 32 is planned as frame-tail job cancellation and outcome type
+extraction:
+
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`
+- `Sources/SwiftTUIRuntime/Rendering/FrameTailJobCancellation.swift`
+
+Packet 32 focused validation passed:
+
+```bash
+swift format lint --configuration .swift-format.json Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift Sources/SwiftTUIRuntime/Rendering/FrameTailJobCancellation.swift
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter 'SwiftTUITests\.(RuntimeRenderPipelineTests|RenderPipelineStructureTests|RenderDriverInstrumentationCostTests)'
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-103156-25687.log
+```
+
+Packet 32 patch review:
+
+```text
+Read-only subagent review found no behavior, access-control, concurrency, or
+API issue in the moved cancellation code. It noted that the broader worktree
+also includes previous Packet 30 and 31 changes, so Packet 32 review should
+stay scoped to FrameTailRenderer.swift and FrameTailJobCancellation.swift.
+```
+
+Packet 33 is ViewGraph lifecycle planning extraction:
+
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphLifecyclePlanning.swift`
+
+Packet 33 focused validation passed:
+
+```bash
+swift format format -i --configuration .swift-format.json Sources/SwiftTUICore/Resolve/ViewGraph.swift Sources/SwiftTUICore/Resolve/ViewGraphLifecyclePlanning.swift
+swift format lint --configuration .swift-format.json Sources/SwiftTUICore/Resolve/ViewGraph.swift Sources/SwiftTUICore/Resolve/ViewGraphLifecyclePlanning.swift
+swiftly run swift build
+swiftly run swift test --filter SwiftTUICoreTests.ViewGraphCheckpointTotalityTests
+swiftly run swift test --filter SwiftTUICoreTests.ViewGraphTests
+swiftly run swift test --filter SwiftTUITests.LifecycleSelectiveEvaluationTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/preparedFrameHeadAbortRestoresBroadResetState
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/lazyForEachRowsEmitViewportLifecycleTransitions
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+Packet 33 patch review:
+
+```text
+Read-only subagent review found one medium-severity state-boundary issue: the
+first helper shape accepted the live ViewNode map. This was resolved by keeping
+ViewNode access in ViewGraph and passing changeHandlerIDsByIdentity as ordered
+value data into the planner.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-104315-68488.log
+```
+
+Packet 34 is presentation item and storage model extraction:
+
+- `Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift`
+- `Sources/SwiftTUIViews/Presentation/PresentationCoordinatorStorage.swift`
+- `Sources/SwiftTUIViews/Presentation/PresentationItems.swift`
+
+Packet 34 focused validation passed:
+
+```bash
+swift format format -i --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/PresentationCoordinatorStorage.swift Sources/SwiftTUIViews/Presentation/PresentationItems.swift
+swift format lint --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/PresentationCoordinatorStorage.swift Sources/SwiftTUIViews/Presentation/PresentationItems.swift
+swiftly run swift build
+swiftly run swift test --filter SwiftTUIViewsTests
+swiftly run swift test --filter 'SwiftTUITests\.(PresentationSurfaceTests|PresentationEscapeDismissTests|PopoverPresentationTests|OverlayStackTests|DismissStackTests)'
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftSheetOutOfEscapeDismissal
+./Scripts/generate_public_api_inventory.sh --check
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+The public API inventory check passed with 669 top-level public symbols. The
+script emitted and ignored its existing SwiftPM synthetic package-test symbol
+graph warning.
+
+Packet 34 patch review:
+
+```text
+Read-only subagent review found no behavior drift, access-control broadening,
+Sendable or actor-isolation drift, public API change, or move-scope issue. It
+confirmed the diff is mechanical and keeps fileprivate checkpoint fields
+colocated with storage users.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-105218-92507.log
+```
+
+Packet 35 is being audited as built-in presentation coordinator extraction:
+
+- `Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift`
+- `Sources/SwiftTUIViews/Presentation/BuiltinPresentationCoordinators.swift`
+
+Packet 35 focused validation passed:
+
+```bash
+swift format format -i --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/BuiltinPresentationCoordinators.swift
+swift format lint --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/BuiltinPresentationCoordinators.swift
+swiftly run swift build
+swiftly run swift test --filter 'SwiftTUITests\.(PresentationSurfaceTests|PopoverPresentationTests|MenuSurfaceTests|PaletteSheetAbsorptionTests|PresentationActionScopeTests)'
+./Scripts/generate_public_api_inventory.sh --check
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+The public API inventory check passed with 669 top-level public symbols. The
+script emitted and ignored its existing SwiftPM synthetic package-test symbol
+graph warning.
+
+Packet 35 patch review:
+
+```text
+Read-only subagent review found no behavior drift, z-index or modal-policy
+drift, mutation-message drift, access-control broadening, Sendable or
+actor-isolation issue, public API issue, or move-scope creep. It confirmed the
+registry still uses the same concrete coordinator types.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-105849-10257.log
+```
+
+Packet 36 is planned as presentation registry support extraction:
+
+- `Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift`
+- `Sources/SwiftTUIViews/Presentation/PresentationCoordinatorRegistry.swift`
+
+The read-only audit selected this as the next safe state-boundary move. Move
+`PresentationCoordinatorBox`, `AnyPresentationCoordinatorBox`, and
+`PresentationCoordinatorRegistry` together. Keep portal state/draft
+publication, declaration preferences, and portal-root composition in
+`PresentationCoordinator.swift`.
+
+Packet 36 focused validation passed:
+
+```bash
+swift format format -i --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/PresentationCoordinatorRegistry.swift
+swift format lint --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/PresentationCoordinatorRegistry.swift
+swiftly run swift build
+swiftly run swift test --filter 'SwiftTUITests\.(PresentationEscapeDismissTests|PopoverPresentationTests|OverlayStackTests|DismissStackTests|PresentationSurfaceTests)'
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftSheetOutOfEscapeDismissal
+./Scripts/generate_public_api_inventory.sh --check
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+The public API inventory check passed with 669 top-level public symbols. The
+script emitted and ignored its existing SwiftPM synthetic package-test symbol
+graph warning.
+
+Packet 36 patch review:
+
+```text
+Read-only subagent review found no behavior drift, registry order drift,
+checkpoint construction or restore-order drift, reconciliation or overlay
+sorting drift, dismiss-stack derivation drift, handle-injection drift,
+access-control broadening, actor-isolation issue, public API issue, or
+move-scope creep.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-110638-29651.log
+```
+
+Packet 37 is presentation portal state transaction extraction:
+
+- `Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift`
+- `Sources/SwiftTUIViews/Presentation/PresentationPortalState.swift`
+
+The read-only audit selected moving only `PresentationPortalState` and
+`PresentationPortalDraft` together. Keep declaration preferences,
+`PresentationPortalRoot`, `reconcilePresentationDeclarations`, and
+`composePresentationPortalTree` in `PresentationCoordinator.swift`.
+
+Packet 37 focused validation passed:
+
+```bash
+swift format lint --configuration .swift-format.json Sources/SwiftTUIViews/Presentation/PresentationCoordinator.swift Sources/SwiftTUIViews/Presentation/PresentationPortalState.swift
+swiftly run swift build
+swiftly run swift test --filter 'SwiftTUITests\.(PresentationSurfaceTests|PresentationContinuityTests|PresentationEscapeDismissTests|PopoverPresentationTests|PortalPrimitiveTests)'
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftSheetOutOfEscapeDismissal
+./Scripts/generate_public_api_inventory.sh --check
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+The public API inventory check passed with 669 top-level public symbols. The
+script emitted and ignored its existing SwiftPM synthetic package-test symbol
+graph warning.
+
+Packet 37 patch review:
+
+```text
+Read-only subagent review found no behavior drift, package-access broadening,
+actor-isolation issue, public API issue, or draft commit/discard lifetime issue.
+It confirmed the moved types preserve the prior checkpoint and publication
+behavior.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-111454-47956.log
+```
+
+Packet 38 is ViewGraph structural removal planning extraction:
+
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphStructuralReconciliation.swift`
+
+The fresh production debt scan selected `ViewGraph` over adjacent presentation
+cleanup because it remains a central infrastructure file with dirty
+evaluation, structural reconciliation, dependency indexing, alias cleanup, and
+lifecycle side effects. Packet 38 keeps the slice narrow: only value-only
+removed-child planning moved out of `ViewGraph`; live node mutation and subtree
+teardown stayed in `ViewGraph`.
+
+Packet 38 focused validation passed:
+
+```bash
+swift format format -i --configuration .swift-format.json Sources/SwiftTUICore/Resolve/ViewGraph.swift Sources/SwiftTUICore/Resolve/ViewGraphStructuralReconciliation.swift
+swift format lint --configuration .swift-format.json Sources/SwiftTUICore/Resolve/ViewGraph.swift Sources/SwiftTUICore/Resolve/ViewGraphStructuralReconciliation.swift
+swiftly run swift build
+swiftly run swift test --filter SwiftTUICoreTests.ViewGraphTests
+swiftly run swift test --filter SwiftTUICoreTests.ViewGraphCheckpointTotalityTests
+swiftly run swift test --filter SwiftTUICoreTests.StructuralDiffTests
+swiftly run swift test --filter SwiftTUICoreTests
+swiftly run swift test --filter SwiftTUITests.LifecycleSelectiveEvaluationTests
+swiftly run swift test --filter SwiftTUITests.Phase2CommitPlannerTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+./Scripts/generate_public_api_inventory.sh --check
+swiftly run swift test --filter SwiftTUITests
+git diff --check
+```
+
+The public API inventory check passed with 669 top-level public symbols. The
+script emitted and ignored its existing SwiftPM synthetic package-test symbol
+graph warning.
+
+Packet 38 patch review:
+
+```text
+Read-only subagent review found no behavior drift in removal planning, index
+guards, or committed-snapshot selection. It found one misleading helper comment
+about non-removal operations; the comment was tightened to state that matched,
+moved, and inserted children are owned by later commit/reuse/install
+materialization paths.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-112550-packet38.log
+```
+
+Packet 39 is ViewGraph dirty-evaluation planning extraction:
+
+- `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+- `Sources/SwiftTUICore/Resolve/ViewGraphDirtyEvaluationPlanning.swift`
+
+The fresh production scan kept focus on `ViewGraph` because selective dirty
+evaluation was still central, high-risk infrastructure: graph-known
+invalidation checks, dirty-frontier discovery, lifecycle-owner promotion,
+evaluator fallback, target de-duplication, and graph mutation lived together in
+one method. Packet 39 extracts the value-selection work and leaves live graph
+mutation in `ViewGraph`.
+
+Packet 39 focused validation passed:
+
+```bash
+swiftly run swift build
+swift format lint --configuration .swift-format.json Sources/SwiftTUICore/Resolve/ViewGraph.swift Sources/SwiftTUICore/Resolve/ViewGraphDirtyEvaluationPlanning.swift
+./Scripts/generate_public_api_inventory.sh --check
+git diff --check
+swiftly run swift test --filter SwiftTUICoreTests.ViewGraphTests
+swiftly run swift test --filter SwiftTUICoreTests.ViewGraphCheckpointTotalityTests
+swiftly run swift test --filter SwiftTUITests.LifecycleSelectiveEvaluationTests
+swiftly run swift test --filter SwiftTUITests.Phase2CommitPlannerTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUICoreTests
+swiftly run swift test --filter SwiftTUITests
+```
+
+The public API inventory check passed with 669 top-level public symbols. The
+script emitted and ignored its existing SwiftPM synthetic package-test symbol
+graph warning.
+
+Packet 39 patch review:
+
+```text
+Read-only subagent review found no behavior drift in graph-known invalidation
+filtering, dirty-frontier ancestor suppression and ordering, lifecycle-owner
+promotion, duplicate evaluator collapse, or evaluator fallback. It also
+confirmed target `markDirty()` and `DirtyEvaluationPlan` construction remained
+in `ViewGraph`.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-113708-packet39.log
+```
+
+Packet 40 is TerminalHost presentation emission builder extraction:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalHost+PresentationEmission.swift`
+
+The terminal-runtime audit selected this over adjacent platform-host and style
+codec cleanup because it stays in the core terminal rendering path:
+`TerminalHost` still mixed raw-mode/session sequencing with frame emission,
+edit-operation lowering, incremental row output, and Kitty replay. Packet 40
+moves emission assembly behind `TerminalHostPresentationEmissionBuilder` while
+passing the transmitted Kitty image-id cache by `inout`; `TerminalHost` still
+owns probing, writer drain/drop recovery, synchronized-output wrapping, and
+retained-surface publication.
+
+Packet 40 focused validation passed:
+
+```bash
+swiftly run swift build
+swift format lint --configuration .swift-format.json Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift Sources/SwiftTUIRuntime/Terminal/TerminalHost+PresentationEmission.swift
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
+./Scripts/generate_public_api_inventory.sh --check
+git diff --check
+swiftly run swift test --filter SwiftTUITests
+```
+
+The build emitted existing strict-memory-safety warnings in unrelated SwiftUI
+host files. The public API inventory check passed with 669 top-level public
+symbols and ignored the existing SwiftPM synthetic package-test symbol graph
+warning.
+
+Packet 40 patch review:
+
+```text
+Read-only subagent review found no behavior drift in full repaint ordering,
+incremental row ordering, Kitty transmitted-image cache mutation, graphics
+replay metrics, erase-to-end lowering, or synchronized-output boundaries. It
+found no new concurrency risk.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-114635-packet40.log
+```
+
+Packet 41 is Terminal render-style codec file split:
+
+- `Sources/SwiftTUIRuntime/Terminal/TerminalControlMessages.swift`
+- `Sources/SwiftTUIRuntime/Terminal/TerminalRenderStyleCodec.swift`
+
+The Packet 41 audit compared the remaining `TerminalSurfaceRenderer`
+style/sanitization and row-diff seams with the control-message style transport
+codec. The codec split was selected first because it is lower risk: it keeps
+the Web/runner style transport behavior byte-stable while making
+`TerminalControlMessages.swift` about command framing and dispatch again.
+
+Packet 41 focused validation passed:
+
+```bash
+swiftly run swift build
+swift format lint --configuration .swift-format.json Sources/SwiftTUIRuntime/Terminal/TerminalControlMessages.swift Sources/SwiftTUIRuntime/Terminal/TerminalRenderStyleCodec.swift
+swiftly run swift test --filter SwiftTUITests.TerminalRenderStyleCodecTests
+swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests
+swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests
+swiftly run swift test --filter WASISurfaceBridgeTests
+swiftly run swift test --filter SwiftTUIWebHostTests
+./Scripts/generate_public_api_inventory.sh --check
+git diff --check
+swiftly run swift test --filter SwiftTUITests
+```
+
+The build emitted existing strict-memory-safety warnings in unrelated SwiftUI
+host files. The public API inventory check passed with 669 top-level public
+symbols and ignored the existing SwiftPM synthetic package-test symbol graph
+warning.
+
+Packet 41 patch review:
+
+```text
+Read-only subagent review found no behavior drift: the codec body stayed
+byte-for-byte identical, SPI/public surface and schema comment were preserved,
+ControlMessageParser still calls decodeBase64, no Foundation import was added,
+and invalid input behavior stayed intact.
+```
+
+Slice gate log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-115536-packet41.log
+```
+
+Packets 42-47 continue the same production-humanization track:
+
+- Packet 42: `TerminalCellTextRenderer` split from `TerminalPresentation`
+  for terminal cell text rendering, SGR lowering, OSC 8 sanitization, ASCII
+  glyph degradation, and ANSI16 palette matching.
+- Packet 43: `TerminalSurfaceDamageRendering` split for row-damage span
+  detection, wide-glyph continuation normalization, row-batch rendering, and
+  changed-cell accounting.
+- Packet 44: `TerminalCapabilityProfile` split from terminal presentation
+  rendering, preserving public capability profile API and environment/runtime
+  overlay behavior.
+- Packet 45: `TabViewStyleHosting` split for TabView type-erasure, hosted
+  strip/overflow views, layout slot metadata, and package identity helpers.
+- Packet 46: `SemanticAccessibilityExtraction` split for accessibility node
+  extraction and warning emission, with shared `semanticBounds` retained as
+  the single offset-aware bounds helper.
+- Packet 47: `TextLayoutCache` split for layout cache storage, metrics,
+  generation refresh, and LRU eviction bookkeeping.
+
+Packet 45-47 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.TabViewSurfaceTests
+swiftly run swift test --filter SwiftTUITests.TabViewLifecycleTests
+swiftly run swift test --filter SwiftTUICoreTests.AccessibilityNodeExtractionTests
+swiftly run swift test --filter SwiftTUICoreTests.AccessibilityRoleTests
+swiftly run swift test --filter SwiftTUICoreTests.FocusPresentationTests
+swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
+swiftly run swift test --filter SwiftTUITests.LinearAccessibilityRendererTests
+swiftly run swift test --filter SwiftTUITests.ContentShapeTests
+swiftly run swift test --filter SwiftTUITests.LayoutAndRenderingPipelineTests
+swiftly run swift test --filter SwiftTUITests.TextLayoutTests
+swiftly run swift test --filter SwiftTUITests.TextLayoutCacheTests
+swiftly run swift test --filter SwiftTUITests.TextFigureSurfaceTests
+swiftly run swift test --filter SwiftTUITests.RenderedTextFixtureSupportTests
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests
+./Scripts/generate_public_api_inventory.sh --check
+./Scripts/check_accessibility_guardrails.sh
+git diff --check
+```
+
+Packet 45, 46, and 47 each received read-only subagent review. Reviews found no
+material behavior drift. Packet 46 was tightened after review to share the
+existing semantic bounds helper instead of duplicating offset geometry; Packet
+47 added one focused cache-eviction test to pin refreshed-entry retention.
+
+Packet 45-47 batch gate:
+
+```text
+/tmp/swift-tui-test-gate-20260518-123452-43677.log
+```
+
+Result: PASS.
+
+Packets 48-50 continue the core text-layout decomposition:
+
+- Packet 48: `TextLayoutWrapping` split for word-boundary wrapping,
+  whitespace/token classification, oversized word-like continuation markers,
+  cluster fallback wrapping, and the existing wrapping test hook.
+- Packet 49: `TextLayoutTruncation` split for line-limit truncation and
+  head/middle/tail fitting helpers.
+- Packet 50: `TextCellWidth` split for package terminal cell-width policy
+  shared by text layout, text input, borders, tile style, and terminal
+  presentation support.
+
+Packet 48-50 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift test --filter SwiftTUITests.TextLayoutTests
+swiftly run swift test --filter SwiftTUITests.TextLayoutCacheTests
+swiftly run swift test --filter SwiftTUITests.TextFigureSurfaceTests
+swiftly run swift test --filter SwiftTUITests.LayoutAndRenderingPipelineTests
+swiftly run swift test --filter SwiftTUIViewsTests.TextInputLayoutMapTests
+swiftly run swift test --filter TileStyle
+swiftly run swift test --filter BorderSet
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests
+./Scripts/generate_public_api_inventory.sh --check
+./Scripts/check_accessibility_guardrails.sh
+git diff --check
+```
+
+Packet 48, 49, and 50 each received read-only subagent review. Reviews found
+no material behavior drift. Packet 48 added guard-path text layout coverage for
+nil width, zero width, and empty text after review. Packet 50 corrected a
+comment to cover multi-scalar ASCII clusters as well as non-ASCII clusters.
+The review noted the module-internal `uncachedTextLayout(for:options:)`
+visibility introduced by the cache split; it remains non-public and
+non-package API.
+
+Packet 48-50 batch gate:
+
+```text
+/tmp/swift-tui-test-gate-20260518-124933-79782.log
+```
+
+Result: PASS.
+
+Packet 51-53 completed the next three-packet presentation split:
+
+- Packet 51 moved prompt presentation specs and public `.alert(...)`,
+  `.confirmationDialog(...)`, and `.sheet(...)` entrypoints into
+  `PromptPresentationEntrypoints.swift`.
+- Packet 52 moved `HostedPromptPresentation` and `PromptPresentationSurface`
+  into `PromptPresentationSurface.swift`.
+- Packet 53 moved toast styles, public `.toast(...)` entrypoints,
+  `ToastModifier`, `ToastCoordinatorBodyView`, and `ToastPresentationView`
+  into `ToastPresentation.swift`.
+
+Public API shape was preserved. `Scripts/lib/public_documentation_ratchet.txt`
+now follows the moved prompt/toast declarations. Accessibility guardrails now
+track prompt-surface color-state styling in `PromptPresentationSurface.swift`
+and toast raw glyph/color-state usage in `ToastPresentation.swift`.
+
+Packet 51-53 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift build --target SwiftTUIViews
+swiftly run swift build --target SwiftTUIRuntime
+swiftly run swift test --filter SwiftTUITests.PresentationSurfaceTests
+swiftly run swift test --filter SwiftTUITests.PresentationActionScopeTests
+swiftly run swift test --filter SwiftTUITests.PopoverPresentationTests
+swiftly run swift test --filter SwiftTUITests.PresentationContinuityTests
+swiftly run swift test --filter SwiftTUITests.PresentationEscapeDismissTests
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/toastAutoDismissRegistersLifecycleTask
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/toastAutoDismissRerendersWithoutAdditionalInput
+./Scripts/check_public_documentation_ratchet.sh
+./Scripts/check_accessibility_guardrails.sh
+./Scripts/check_public_surface_policies.sh
+git diff --check
+```
+
+Packet 51 and Packet 53 read-only reviews found no material findings. Packet 52
+review found the prompt-surface move behavior-preserving but recommended
+`package import SwiftTUICore`; direct `SwiftTUIViews` and `SwiftTUIRuntime`
+target builds passed with the warning-free plain import, while `package import`
+produced an unused package-import warning, so the plain import was retained.
+
+Packet 51-53 batch gate:
+
+```text
+/tmp/swift-tui-test-gate-20260518-131048-20030.log
+```
+
+Result: PASS.
+
+The first Packet 51-53 full-gate attempt failed only in `SwiftTUITests` with
+three `AsyncLifecycleGenerationTests` readiness timeouts:
+
+```text
+/tmp/swift-tui-test-gate-20260518-130832-8813.log
+```
+
+The failed suite passed immediately in isolation with:
+
+```bash
+swiftly run swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests
+```
+
+Packet 54-56 completed a three-packet `ResolvedNode.swift` decomposition:
+
+- Packet 54 moved `TabItemLabel`, `AccessibilityVisualContent`,
+  `SemanticMetadata`, and `TextInputAccessibilityCursorAnchor` into
+  `ResolvedSemanticMetadata.swift`.
+- Packet 55 moved lifecycle metadata, matched-geometry value types, indexed
+  child support, custom-layout fallback summaries, and
+  `usesIndexedChildSource` into dedicated resolve support files.
+- Packet 56 moved traversal/lifecycle collection helpers and
+  measurement/placement/equality logic into `ResolvedNodeTraversal.swift` and
+  `ResolvedNodeEquivalence.swift`.
+
+Public API shape was preserved. `ResolvedNode.swift` now keeps the resolved
+node stored phase data, initializers, and private derived-state maintenance in
+one 302-line file; helper declarations live in named files.
+
+Packet 54-56 focused validation passed:
+
+```bash
+swiftly run swift build
+swiftly run swift build --target SwiftTUICore
+swiftly run swift test --filter SwiftTUICoreTests.AccessibilityNodeExtractionTests
+swiftly run swift test --filter SwiftTUIViewsTests.AccessibilityMetadataModifierTests
+swiftly run swift test --filter SwiftTUITests.AccessibilityRuntimePolicyTests
+swiftly run swift test --filter SwiftTUICoreTests.ResolvedNodePhaseOwnershipTests
+swiftly run swift test --filter SwiftTUICoreTests.ChildDescriptorTests
+swiftly run swift test --filter matchedGeometry
+swiftly run swift test --filter LayoutEngineTests
+swiftly run swift test --filter SwiftTUITests.FrameTailWorkerFallbackTests
+swiftly run swift test --filter SwiftTUITests.ResolveReuseIndexingTests
+swiftly run swift test --filter SwiftTUICoreTests.StackSafetyRegressionTests
+swiftly run swift test --filter SwiftTUICoreTests.RetainedReuseInvariantTests
+swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests
+git diff --check
+./Scripts/check_public_documentation_ratchet.sh
+./Scripts/check_accessibility_guardrails.sh
+./Scripts/check_public_surface_policies.sh
+./Scripts/generate_public_api_inventory.sh --check
+```
+
+Read-only scout subagents reviewed the candidate split and found the semantic,
+support-value, traversal, and equivalence moves appropriate as mechanical
+extractions. They warned not to move `ResolvedNode` stored fields because
+`ResolvedNodePhaseOwnershipTests` parses the exact source path; that invariant
+was preserved.
+
+Packet 54-56 batch gate:
+
+```text
+/tmp/swift-tui-test-gate-20260518-132341-40611.log
+```
+
+Result: PASS. Tee log:
+
+```text
+/tmp/swift-tui-test-gate-20260518-132300-packet54-56.log
+```
+
 One earlier Packet 23 full-gate attempt failed in `SwiftTUITests` with three
 `AsyncLifecycleGenerationTests` readiness timeouts. The suite passed in
 isolation immediately after, the full `SwiftTUITests` target passed, and the
@@ -748,6 +1731,373 @@ passed, and the full repo gate passed on rerun. Failed gate log:
 
 ```text
 /tmp/swift-tui-test-gate-20260518-090939-98987.log
+```
+
+## Earlier Review Packet: 57-61
+
+The latest batch follows the updated five-packet cadence and focuses on the
+remaining central SwiftTUIViews modifier/layout infrastructure.
+
+Production scope:
+
+- `ViewModifiers.swift` is now a small resolver/`AnyView` utility file.
+- Metadata/identity/accessibility/focus/environment modifiers moved to
+  `ViewMetadataModifiers.swift`.
+- Lifecycle modifiers moved to `ViewLifecycleModifiers.swift`, and the
+  public-surface guard now checks `.task` actor inheritance in that file.
+- Layout/decorative modifiers moved to `ViewLayoutModifiers.swift`.
+- The previous `Layout.swift` custom-layout bridge was renamed to
+  `CustomLayout.swift`.
+- Built-in stack layouts and stack/overlay helper math moved to
+  `StackLayouts.swift`.
+
+Behavior intentionally preserved:
+
+- No SwiftUI-shaped public consumer API signatures changed.
+- Public API inventory remained at 669 top-level public symbols.
+- `.task` keeps `@_inheritActorContext` and the `task(id:)` overload guard.
+- Layout values, alignment guides, safe areas, borders, overlays,
+  backgrounds, matched geometry, stack placement, `AnyLayout` cache scoping,
+  and `SendableLayout` worker execution were covered by focused tests.
+
+Focused validation highlights:
+
+- `swiftly run swift build --target SwiftTUIViews` passed after each packet.
+- Metadata checks passed:
+  `SwiftTUIViewsTests.AccessibilityMetadataModifierTests`,
+  `SwiftTUIViewsTests.ViewModifierAlgebraTests`,
+  `SwiftTUIViewsTests.DependencyTrackingTests`,
+  `SwiftTUIViewsTests.EnvironmentTests`,
+  `SwiftTUITests.SwiftUISurfaceTests/customLayoutReadsLayoutValuesAndPlacesSubviews`,
+  and
+  `SwiftTUITests.SwiftUISurfaceTests/alignmentGuideOverridesFeedStackPlacement`.
+- Lifecycle checks passed:
+  `SwiftTUITests.Phase2LifecycleFixtureTests`,
+  `SwiftTUITests.AsyncLifecycleGenerationTests`,
+  `SwiftTUITests.LifecycleSelectiveEvaluationTests`,
+  `SwiftTUITests.SwiftUISurfaceTests/onChangeDefersExecutionUntilCommitAndTracksOldAndNewValues`,
+  and `SwiftTUITests.ImperativeAuthoringContextDispatchTests`.
+- Layout/decorative checks passed:
+  `SwiftTUITests.SafeAreaSurfaceTests`,
+  `SwiftTUITests.BorderModifierLayoutTests`,
+  `SwiftTUITests.BorderRenderingTests`,
+  `SwiftTUITests.GeometryReaderSurfaceTests`, `matchedGeometry`,
+  `SwiftTUITests.MotionAndProgressPolicyTests/reducedMotionSuppressesMatchedGeometryTranslation`,
+  and
+  `SwiftTUITests.SwiftUISurfaceTests/overlayAlignmentUsesPrimaryGuides`.
+- Stack/custom-layout checks passed:
+  `SwiftTUITests.SwiftUISurfaceTests/zStackLayoutMirrorsZStackPlacement`,
+  `SwiftTUITests.SwiftUISurfaceTests/anyLayoutPreservesIdentityAcrossSwitches`,
+  `SwiftTUITests.SwiftUISurfaceTests/anyLayoutFlattensForEachChildren`,
+  `SwiftTUITests.SwiftUISurfaceTests/customLayoutReusesCacheBetweenMeasurementAndPlacement`,
+  `SwiftTUITests.SwiftUISurfaceTests/sharedAnyLayoutInstancesKeepCacheScopedPerContainer`,
+  and
+  `SwiftTUITests.AsyncFrameTailRenderingTests/publicSendableLayoutOptInRunsLayoutOnFrameTailWorker`.
+
+Shared pre-gates:
+
+- `git diff --check`: PASS
+- `./Scripts/check_public_documentation_ratchet.sh`: PASS, 70 entries
+- `./Scripts/check_accessibility_guardrails.sh`: PASS
+- `./Scripts/check_public_surface_policies.sh`: PASS
+- `./Scripts/generate_public_api_inventory.sh --check`: PASS, 669 top-level
+  public symbols, with the known ignored SwiftPM synthetic package-test
+  symbolgraph warning
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-134540-packet57-61.log
+Runner log: /tmp/swift-tui-test-gate-20260518-134540-77000.log
+Result: PASS
+```
+
+## Previous Review Packet: 62-66
+
+This batch follows the five-packet cadence and focuses on remaining central
+Core graph helpers plus SwiftTUIViews style/control files.
+
+Production scope:
+
+- `ViewGraph.swift` now delegates dependency indexing and runtime-registration
+  restoration to `ViewGraphDependencyIndexing.swift` and
+  `ViewGraphRuntimeRegistrationRestoration.swift`.
+- Public TabView style declarations remain in `TabViewStyles.swift`; built-in
+  conformances and terminal chrome moved to `BuiltinTabViewStyles.swift`.
+- `CollectionStyles.swift` was split into `ListStyles.swift` and
+  `OutlineStyles.swift`.
+- Public button style declarations remain in `ButtonStyles.swift`; built-in
+  chrome resolution and style-body views moved to `ButtonStyleChrome.swift`.
+- `AdjustableValueControls.swift` was split into `Stepper.swift`,
+  `Slider.swift`, and `AdjustableControlValueSupport.swift`.
+
+Behavior intentionally preserved:
+
+- No SwiftUI-shaped public consumer API signatures changed.
+- Public API inventory remained at 669 top-level public symbols.
+- `ViewGraph` private stored state remains private; helpers receive explicit
+  dictionary/set inputs.
+- Tab overflow/chrome, list/outline style presentations, button focus/pressed
+  chrome, stepper actions, slider pointer math, and accessibility guardrails
+  are covered by focused checks.
+
+Focused validation highlights:
+
+- `swiftly run swift build --target SwiftTUICore` passed for Packet 62.
+- `swiftly run swift build --target SwiftTUIViews` passed for Packets 63-66.
+- ViewGraph checks passed:
+  `SwiftTUICoreTests.ViewGraphCheckpointTotalityTests` and
+  `SwiftTUICoreTests.ViewGraphTests`.
+- TabView checks passed:
+  `SwiftTUITests.TabViewSurfaceTests`,
+  `SwiftTUITests.TabViewLifecycleTests`, and
+  `SwiftTUITests.InteractiveRuntimeTests/literalTabOverflowUpdatesOnSIGWINCHWithoutAdditionalInput`.
+- Collection checks passed:
+  `SwiftTUITests.CollectionSupportTests`,
+  `SwiftTUITests.OutlineSurfaceTests`,
+  `SwiftTUITests.SwiftUISurfaceTests/listUsesTagsAndArrowKeys`, and
+  `SwiftTUITests.SwiftUISurfaceTests/listAndTableRenderEditingChromeDirectlyFromFocus`.
+- Button checks passed:
+  `SwiftTUITests.ButtonFocusStabilityTests` and
+  `SwiftTUITests.ButtonSystemHintTests`.
+- Adjustable-control checks passed:
+  `SwiftTUITests.SwiftUISurfaceTests/stepperDispatchesAndClamps`,
+  `SwiftTUITests.SwiftUISurfaceTests/sliderHandlesArrowKeysAndRendersTrack`,
+  `SwiftTUITests.SwiftUISurfaceTests/doubleAdjustableControlsRenderCleanFractionalValues`,
+  and
+  `SwiftTUITests.SwiftUISurfaceTests/sliderTrackUsesFractionalPointerLocations`.
+
+Shared pre-gates:
+
+- `git diff --check`: PASS
+- `./Scripts/check_public_documentation_ratchet.sh`: PASS, 70 entries
+- `./Scripts/check_accessibility_guardrails.sh`: PASS
+- `./Scripts/check_public_surface_policies.sh`: PASS
+- `./Scripts/generate_public_api_inventory.sh --check`: PASS, 669 top-level
+  public symbols, with the known ignored SwiftPM synthetic package-test
+  symbolgraph warning
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-140917-packet62-66.log
+Runner log: /tmp/swift-tui-test-gate-20260518-140917-98579.log
+Result: PASS
+```
+
+## Previous Review Packet: 67-71
+
+This batch follows the five-packet cadence and focuses on remaining central
+Core layout/raster files plus SwiftTUICharts support.
+
+Production scope:
+
+- Measurement work-stack support moved into work-item, result-stack,
+  measured-node building, and stack scheduling files.
+- Placement work-stack support moved into work-item, result-stack, placement
+  request, and stack placement request files.
+- `ViewNode.swift` now delegates debug snapshot helpers and committed-field
+  forwarding accessors to focused files, without widening mutable node storage.
+- Layout-border rasterization moved to `Rasterizer+LayoutBorders.swift`,
+  leaving shape stroke and rule drawing in `Rasterizer+Borders.swift`.
+- `LineChartSupport.swift` now keeps view-body and legend/x-axis formatting
+  support; domain, rasterization, tick, and series helpers moved to focused
+  files.
+
+Behavior intentionally preserved:
+
+- No SwiftUI-shaped public consumer API signatures changed.
+- Public API inventory remained at 669 top-level public symbols.
+- Measurement and placement stack order, retained placement, custom-layout
+  placement, `ViewNode` debug output, border raster output, line-chart domain
+  math, chart glyphs, axis labels, and series composition are covered by
+  focused checks.
+
+Focused validation highlights:
+
+- `swiftly run swift build --target SwiftTUICore` passed for Packets 67-70.
+- `swiftly run swift build --target SwiftTUICharts` passed for Packet 71.
+- Layout work-stack checks passed:
+  `SwiftTUICoreTests.LayoutEngineTests` and
+  `SwiftTUICoreTests.StackSafetyRegressionTests`.
+- ViewNode checks passed:
+  `SwiftTUICoreTests.ViewGraphCheckpointTotalityTests` and
+  `SwiftTUICoreTests.ViewGraphTests`.
+- Border checks passed:
+  `SwiftTUITests.BorderRenderingTests` and
+  `SwiftTUITests.BorderGradientTests`.
+- LineChart checks passed:
+  `SwiftTUITests.LineChartDomainTests` and `LineChart`.
+  A mistyped `SwiftTUITests.LineChartRasterTests` filter matched 0 tests and
+  was replaced by the broader `LineChart` filter.
+
+Shared pre-gates:
+
+- `git diff --check`: PASS
+- `./Scripts/check_accessibility_guardrails.sh`: PASS
+- `./Scripts/check_public_documentation_ratchet.sh`: PASS, 70 entries
+- `./Scripts/check_public_surface_policies.sh`: PASS
+- `./Scripts/generate_public_api_inventory.sh --check`: PASS, 669 top-level
+  public symbols, with the known ignored SwiftPM synthetic package-test
+  symbolgraph warning
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-142822-packet67-71.log
+Runner log: /tmp/swift-tui-test-gate-20260518-142822-14676.log
+Result: PASS
+```
+
+## Recent Review Packet: 72-81
+
+This pair of five-packet batches begins the current constrained central
+runtime/core pass.
+
+Production scope:
+
+- Semantic payload routing moved out of `Semantics.swift`.
+- Pointer hit-testing and hover routing moved out of pointer dispatch.
+- Run-loop session/support types moved out of `RunLoop.swift`.
+- Snapshot style descriptions, image asset models, canvas pixel-grid drawing,
+  canvas payloads, diagnostics records, gradient styles, and run-loop runtime
+  support moved to focused files.
+
+Behavior intentionally preserved:
+
+- Semantic snapshots, pointer dispatch, hover delivery, run-loop exit behavior,
+  snapshot diagnostics, image rendering, canvas rendering, diagnostic logging,
+  gradient styling, and runtime issue/wake/focus support are covered by focused
+  checks.
+- Public API inventory remained at 669 top-level public symbols.
+
+Batch gates:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-145417-packet72-76.log
+Runner log: /tmp/swift-tui-test-gate-20260518-145417-59626.log
+Result: PASS
+
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-150340-packet77-81.log
+Runner log: /tmp/swift-tui-test-gate-20260518-150340-86962.log
+Result: PASS
+```
+
+## Latest Review Packets: 82-91
+
+This pair of five-packet batches continues the constrained central
+runtime/core pass.
+
+Production scope:
+
+- Built-in stack support was decomposed into axis support, lazy allocation,
+  metrics, space allocation, and minimum-size files.
+- Diagnostics TSV formatting moved out of the file logger.
+- Terminal render-style JSON and Base64 transport helpers moved out of the
+  style codec.
+- Frame-tail retained state, typed tail products, worker result, generation
+  sequencer, and hooks moved out of `FrameTailRenderer.swift`.
+- POSIX terminal descriptor control moved out of `TerminalHost.swift`.
+
+Behavior intentionally preserved:
+
+- Stack sizing/allocation/minimums, diagnostics TSV output, style transport
+  payloads, frame-tail retained input and diagnostics, terminal descriptor I/O,
+  raw-mode mutation, and cell-pixel metrics are covered by focused checks.
+- No public SwiftUI-shaped API was intentionally changed.
+
+Batch gates:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-153444-packet82-86.log
+Runner log: /tmp/swift-tui-test-gate-20260518-153444-16744.log
+Result: PASS
+
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-154406-packet87-91.log
+Runner log: /tmp/swift-tui-test-gate-20260518-154406-32556.log
+Result: PASS
+```
+
+## Latest Review Packets: 92-106
+
+These three five-packet batches continue the constrained central runtime/core
+pass.
+
+Production scope:
+
+- Core styling was split into shape styles, theme/render style, stroke helpers,
+  shape payloads, and resolved text style files.
+- Core draw metadata was split into draw payload, text style, draw metadata,
+  selection tag, and list payload files.
+- Runtime scene builder artifacts, window scene configuration, selected-scene
+  runner plumbing, hosted raster surface state, and accessibility text
+  sanitization were extracted into focused files.
+
+Behavior intentionally preserved:
+
+- Shape/style resolution, terminal render-style payloads, draw metadata
+  propagation, list/table selection behavior, scene builder ordering, hosted
+  scene lookup, hosted frame waiter behavior, damage metrics, and linear
+  accessibility output are covered by focused checks.
+- No public SwiftUI-shaped API was intentionally changed.
+
+Batch gates:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-155625-packet92-96.log
+Runner log: /tmp/swift-tui-test-gate-20260518-155625-58962.log
+Result: PASS
+
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-160339-packet97-101.log
+Runner log: /tmp/swift-tui-test-gate-20260518-160339-76975.log
+Result: PASS
+
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-161124-packet102-106.log
+Runner log: /tmp/swift-tui-test-gate-20260518-161124-95992.log
+Result: PASS
+```
+
+## Latest Review Packets: 122-126
+
+This five-packet batch continues the constrained central runtime/core pass.
+
+Production scope:
+
+- Frame-tail inline layout/raster stage mechanics moved into
+  `FrameTailRenderer+InlineStages.swift`.
+- Event-pump timing, buffering, drain, completion, and deadline helper types
+  moved into `RunLoop+EventPumpSupport.swift`.
+- Runtime issue reporting moved into `RunLoop+RuntimeIssueReporting.swift`.
+- Committed-frame diagnostic input and assembly moved into
+  `CommittedFrameDiagnosticsBuilder.swift`.
+- ViewGraph lifecycle event collection and frame-plan input construction moved
+  into `ViewGraphLifecycleEventCollection.swift`.
+
+Behavior intentionally preserved:
+
+- Retained baseline placement, decorated placed-tree consumers,
+  deadline/acquisition event-pump semantics, runtime issue de-duping,
+  diagnostics timing values, and lifecycle ordering/checkpoint storage are
+  covered by focused checks.
+- No public SwiftUI-shaped API was intentionally changed.
+
+Batch gate:
+
+```text
+bun run test
+User tee log: /tmp/swift-tui-test-gate-20260518-170129-packet122-126.log
+Runner log: /tmp/swift-tui-test-gate-20260518-170129-78413.log
+Result: PASS
 ```
 
 ## Risks
@@ -783,6 +2133,107 @@ Packet 26 is terminal input parser file split.
 Packet 27 is terminal input descriptor-reading extraction.
 Packet 28 is placed animation overlay sampling extraction.
 Packet 29 is DefaultRenderer frame-tail coordination extraction.
+Packet 30 is animation completion scheduling extraction.
+Packet 31 is DefaultRenderer frame-head coordination extraction.
+Packet 32 is frame-tail job cancellation and outcome type extraction.
+Packet 33 is ViewGraph lifecycle planning extraction.
+Packet 34 is presentation item and storage model extraction.
+Packet 35 is built-in presentation coordinator extraction.
+Packet 36 is presentation registry support extraction.
+Packet 37 is presentation portal state transaction extraction.
+Packet 38 is ViewGraph structural removal planning extraction.
+Packet 39 is ViewGraph dirty-evaluation planning extraction.
+Packet 40 is TerminalHost presentation emission builder extraction.
+Packet 41 is Terminal render-style codec file split.
+Packet 42 is Terminal cell text rendering and sanitization extraction.
+Packet 43 is Terminal surface damage/span rendering extraction.
+Packet 44 is Terminal capability-profile file split.
+Packet 45 is TabView style host split.
+Packet 46 is semantic accessibility extraction.
+Packet 47 is text layout cache extraction.
+Packet 48 is text layout wrapping extraction.
+Packet 49 is text layout truncation extraction.
+Packet 50 is text cell-width policy extraction.
+Packet 51 is prompt presentation entrypoint extraction.
+Packet 52 is prompt presentation surface extraction.
+Packet 53 is toast presentation extraction.
+Packet 54 is resolved semantic metadata extraction.
+Packet 55 is resolved lifecycle, matched-geometry, and indexed-child support
+type extraction.
+Packet 56 is resolved-node traversal and equivalence extraction.
+Packet 57 is metadata, identity, accessibility, focus, environment, layout-value,
+and alignment-guide modifier extraction.
+Packet 58 is lifecycle modifier extraction and the `.task` policy guard path
+update.
+Packet 59 is layout/decorative modifier extraction.
+Packet 60 is built-in stack layout extraction.
+Packet 61 is custom-layout bridge rename to `CustomLayout.swift`.
+Packet 62 is ViewGraph dependency-index and runtime-registration helper
+extraction.
+Packet 63 is built-in TabView style chrome extraction.
+Packet 64 is list/outline style family splitting.
+Packet 65 is button style chrome extraction.
+Packet 66 is Stepper/Slider adjustable-control splitting.
+Packet 67 is measurement work-stack support decomposition.
+Packet 68 is placement work-stack support decomposition.
+Packet 69 is ViewNode debug and committed-accessor splitting.
+Packet 70 is layout-border raster extraction.
+Packet 71 is LineChart support decomposition.
+Packet 72 is semantic payload routing extraction.
+Packet 73 is pointer hit-testing and hover splitting.
+Packet 74 is run-loop session type extraction.
+Packet 75 is snapshot style-description extraction.
+Packet 76 is image asset model extraction.
+Packet 77 is canvas pixel-grid drawing extraction.
+Packet 78 is canvas payload extraction.
+Packet 79 is frame diagnostic record extraction.
+Packet 80 is gradient style family extraction.
+Packet 81 is run-loop runtime support extraction.
+Packet 82 is stack axis support extraction.
+Packet 83 is stack lazy allocation extraction.
+Packet 84 is stack metrics extraction.
+Packet 85 is stack space allocation extraction.
+Packet 86 is stack minimum-size extraction.
+Packet 87 is frame diagnostics TSV formatting extraction.
+Packet 88 is terminal style JSON transport extraction.
+Packet 89 is terminal style Base64 transport extraction.
+Packet 90 is frame-tail model extraction.
+Packet 91 is terminal POSIX controller extraction.
+Packet 92 is shape style family extraction.
+Packet 93 is theme and terminal render-style extraction.
+Packet 94 is stroke style and shape payload extraction.
+Packet 95 is resolved text style extraction.
+Packet 96 is styling policy path cleanup.
+Packet 97 is draw payload extraction.
+Packet 98 is text style metadata extraction.
+Packet 99 is draw metadata extraction.
+Packet 100 is selection tag extraction.
+Packet 101 is list payload extraction.
+Packet 102 is scene builder artifact extraction.
+Packet 103 is window scene configuration extraction.
+Packet 104 is window scene selection extraction.
+Packet 105 is hosted raster surface state extraction.
+Packet 106 is accessibility text sanitizer extraction.
+Packet 107 is completed-frame candidate coordination extraction.
+Packet 108 is run-loop render-driver support extraction.
+Packet 109 is animation placed-tree capture extraction.
+Packet 110 is ViewGraph debug snapshot extraction.
+Packet 111 is frame-tail worker executor extraction.
+Packet 112 is DefaultRenderer runtime subsystem support extraction.
+Packet 113 is run-loop resolve-context support extraction.
+Packet 114 is frame-acquisition outcome support extraction.
+Packet 115 is animation controller snapshot type extraction.
+Packet 116 is ViewGraph node checkpointing support extraction.
+Packet 117 is run-loop post-commit support extraction.
+Packet 118 is frame diagnostic record assembly extraction.
+Packet 119 is animation resolved-tree diffing support extraction.
+Packet 120 is ViewGraph invalidation planning extraction.
+Packet 121 is snapshot renderer diagnostics extraction.
+Packet 122 is frame-tail inline stage renderer extraction.
+Packet 123 is event pump support extraction.
+Packet 124 is runtime issue reporting extraction.
+Packet 125 is committed-frame diagnostics builder extraction.
+Packet 126 is ViewGraph lifecycle event collection extraction.
 Revert newest-first if a terminal output, raster reuse, frame-tail,
 diagnostics, async-cancellation, cursor-focus, JSON/accessibility output,
 image-protocol, fallback image, raw-glyph manifest, SGR-pixels policy, cell
@@ -811,9 +2262,65 @@ coordinate decoding, bracketed-paste envelope, key parser regression, read
 would-block/EOF classification, drained-bytes-before-EOF behavior, or
 non-would-block input failure handling, placed removal overlay sampling,
 insertion offset sampling, matched-geometry offset sampling, animation
-custom-state writeback, animation batch release, late-preference
-reconciliation, prepared-state materialization, queued-tail cancellation, or
-frame-tail raster handoff
+custom-state writeback, animation batch release, stranded completion deadline,
+repeat-forever completion suppression, frame-head completion deferral,
+late-preference reconciliation, prepared-state materialization, queued-tail
+cancellation, or frame-tail raster handoff
+or frame-head preparation ordering, resolve input handoff, observation draft
+visibility, presentation portal identity, animation-injection stage separation,
+worker indexed-child snapshotting, frame-tail job-state raw values, pre-start
+cancellation transition, queued waiter resumption, or cancellable render outcome
+diagnostics, lifecycle event ordering, viewport lifecycle visibility, lazy
+indexed viewport transitions, lifecycle preview purity, dirty-state clearing,
+structural child-removal planning, subtree teardown order, committed removal
+snapshots, dependency cleanup, row-span render-state carry, terminal text
+control-scalar replacement, ASCII glyph degradation, SGR style lowering, OSC 8
+destination sanitization, hyperlink close ordering, row-damage span sorting,
+cursor-forward gap emission, candidate range clamping, wide-glyph continuation
+normalization, changed-cell span-width accounting, UTF-8 capability detection,
+NO_COLOR handling, non-TTY/dumb fallback, rich-terminal capability flags, or
+RuntimeConfiguration terminal capability overlays, TabView hosted strip or
+overflow placement, tab/overflow identity stability, accessibility node
+parent/hidden/cursor-anchor output, visual-content warning output, text-layout
+cache hit/miss/eviction counters, text-layout cache retention order,
+word-boundary wrapping, continuation-marker output, truncation ellipsis
+placement, terminal cell-width classification, public text layout API behavior,
+prompt public overload, presentation attachment token, default dismiss title,
+prompt authoring-context capture, prompt surface chrome, prompt focus-scope
+metadata, menu intrinsic sizing, close-button behavior, toast public overload,
+toast semantic icon, toast auto-dismiss lifecycle task, toast overlay
+placement, toast hit-testing behavior, or presentation accessibility guardrail
+coverage, resolved semantic metadata merge/focus/accessibility behavior,
+lifecycle metadata public behavior, matched-geometry key/config behavior,
+indexed-child worker snapshotting, custom-layout fallback summaries,
+resolved-node traversal order, lifecycle collection order, measurement or
+placement equivalence, type-discriminator compatibility, or `ResolvedNode`
+equality, view metadata/identity/environment/accessibility/focus modifier
+behavior, layout-value or alignment-guide propagation, lifecycle event/task
+registration, task actor-inheritance, safe-area propagation, border layout or
+raster behavior, frame/padding/overlay/background behavior, offset or
+matched-geometry transition contribution, stack layout spacing/alignment, built-in
+layout-behavior detection, `AnyLayout` cache scoping, custom-layout placement
+fallbacks, `SendableLayout` worker execution, or custom-layout stack-minimum
+behavior, ViewGraph dependency indexing, runtime-registration alias replay,
+TabView style overflow/chrome, List/Outline style presentation, Button
+focus/pressed/role chrome, Stepper key or pointer handling, Slider key or
+fractional pointer handling, adjustable-control accessibility-role behavior,
+measurement or placement work-stack ordering, retained/custom placement,
+`ViewNode` debug snapshots or committed accessors, layout-border raster output,
+line-chart domain calculation, line-chart raw glyph output, axis tick labels,
+line-chart series composition, semantic payload routing, pointer hit-testing,
+hover transitions, run-loop session semantics, snapshot style descriptions,
+image asset model behavior, canvas pixel-grid output, canvas payload equality,
+frame diagnostic record schema, gradient shape-style behavior, run-loop runtime
+support, stack axis conversion, lazy stack visible ranges, stack spacing,
+stack surplus allocation, stack minimum sizing, diagnostics TSV output,
+terminal style JSON/Base64 transport, frame-tail retained state/model wiring,
+POSIX terminal descriptor control, completed-frame candidate construction,
+ordered candidate commit effects, render-intent coalescing diagnostics,
+animation wake clamping, gesture deadline draining, matched-geometry placed
+tree capture, ViewGraph debug snapshot totality, frame-tail worker timing, or
+layout-worker cancellation start behavior
 appears.
 
 ## AI Assistance Disclosure

@@ -6,29 +6,8 @@ public final class HostedRasterSurface:
   PresentationSurfaceMetricsProvider, RasterPresentationSurface,
   ClipboardWritingPresentationSurface, Sendable
 {
-  private struct State: Sendable {
-    var surfaceSize: CellSize
-    var renderStyle: TerminalRenderStyle
-    var graphicsCapabilities: TerminalGraphicsCapabilities
-    var pointerInputCapabilities: PointerInputCapabilities
-    var nextFrameSequence: UInt64
-    var frames: [SemanticHostFrame] = []
-    var frameWaiters: [FrameWaiter] = []
-    var frameSequenceWaiters: [FrameSequenceWaiter] = []
-  }
-
-  private struct FrameWaiter: Sendable {
-    var predicate: @Sendable (SemanticHostFrame) -> Bool
-    var continuation: CheckedContinuation<SemanticHostFrame, Never>
-  }
-
-  private struct FrameSequenceWaiter: Sendable {
-    var predicate: @Sendable ([SemanticHostFrame]) -> Bool
-    var continuation: CheckedContinuation<[SemanticHostFrame], Never>
-  }
-
   private static let frameHistoryLimit = 256
-  private let state: Mutex<State>
+  private let state: Mutex<HostedRasterSurfaceState>
   private let frameHandler: @Sendable (SemanticHostFrame) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
 
@@ -70,7 +49,7 @@ public final class HostedRasterSurface:
     }
     clipboardWriter = onClipboardWrite
     state = Mutex(
-      State(
+      HostedRasterSurfaceState(
         surfaceSize: surfaceSize,
         renderStyle: .init(
           appearance: appearance,
@@ -144,7 +123,7 @@ public final class HostedRasterSurface:
           return frame
         }
         state.frameWaiters.append(
-          FrameWaiter(
+          HostedFrameWaiter(
             predicate: predicate,
             continuation: continuation
           )
@@ -181,7 +160,7 @@ public final class HostedRasterSurface:
           return state.frames
         }
         state.frameSequenceWaiters.append(
-          FrameSequenceWaiter(
+          HostedFrameSequenceWaiter(
             predicate: predicate,
             continuation: continuation
           )
