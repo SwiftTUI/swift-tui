@@ -1,6 +1,7 @@
 import Foundation
 import SwiftTUI
 import SwiftTUIAnimatedImage
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @MainActor
@@ -71,7 +72,9 @@ struct AnimatedImageTests {
       ImageAssetReference.embeddedImage($0.imageData)
     }
     let host = AnimatedImageRecordingHost(size: CellSize(width: 4, height: 2))
-    let inputReader = AnimatedImageConditionalInputReader {
+    let inputReader = AnimatedImageConditionalInputReader(
+      frameSignal: host.frameSignal
+    ) {
       expectedFrameReferences.allSatisfy { host.observedReferences.contains($0) }
     }
     let rootIdentity = Identity(components: ["animated-image.tests"])
@@ -171,6 +174,10 @@ private final class AnimatedImageRecordingHost: PresentationSurface {
   let appearance: TerminalAppearance = .fallback
   private(set) var observedReferences: [ImageAssetReference] = []
 
+  /// Notified after every present, so an awaited input reader can re-check its
+  /// exit predicate the instant a frame lands instead of polling.
+  let frameSignal = MainActorConditionSignal()
+
   init(size: CellSize) {
     surfaceSize = size
   }
@@ -186,6 +193,12 @@ private final class AnimatedImageRecordingHost: PresentationSurface {
     observedReferences.append(
       contentsOf: surface.imageAttachments.compactMap(\.resolvedReference)
     )
+    // The run loop only ever presents on the MainActor; `assumeIsolated`
+    // bridges this nonisolated witness to the MainActor-isolated signal.
+    let frameSignal = self.frameSignal
+    MainActor.assumeIsolated {
+      frameSignal.notify()
+    }
     return TerminalPresentationMetrics(
       bytesWritten: 0,
       linesTouched: surface.size.height,
@@ -197,24 +210,22 @@ private final class AnimatedImageRecordingHost: PresentationSurface {
 
 private final class AnimatedImageConditionalInputReader: InputReading {
   private let shouldExit: @MainActor () -> Bool
+  private let frameSignal: MainActorConditionSignal
 
-  init(shouldExit: @escaping @MainActor () -> Bool) {
+  init(
+    frameSignal: MainActorConditionSignal,
+    shouldExit: @escaping @MainActor () -> Bool
+  ) {
+    self.frameSignal = frameSignal
     self.shouldExit = shouldExit
   }
 
   func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       let shouldExit = self.shouldExit
+      let frameSignal = self.frameSignal
       let task = Task { @MainActor in
-        let timeoutNanoseconds: UInt64 = 1_000_000_000
-        let pollNanoseconds: UInt64 = 10_000_000
-        var elapsedNanoseconds: UInt64 = 0
-
-        while !shouldExit() && elapsedNanoseconds < timeoutNanoseconds {
-          try? await Task.sleep(nanoseconds: pollNanoseconds)
-          elapsedNanoseconds += pollNanoseconds
-        }
-
+        await frameSignal.wait(until: shouldExit)
         continuation.yield(KeyPress(.character("d"), modifiers: .ctrl))
         continuation.finish()
       }
