@@ -3262,13 +3262,25 @@ Five additional central runtime/core batches are scheduled after packet
 122-126, preserving the current aggressive five-packet cadence while keeping
 the scope inside `SwiftTUICore` and `SwiftTUIRuntime`.
 
-### Batch 127-131
+### Batch 127-131 — COMPLETED
 
-- Terminal/runtime capability plumbing review within the constrained scope.
-- Runtime render-pipeline test/source guard cleanup.
-- Animation transition insertion/removal helper extraction.
-- Core dependency snapshot and dirty-frontier readability pass.
-- Frame-tail retained state and presentation-damage support review.
+Delivered as five behavior-preserving moves (see `migration_progress.md` for
+validation logs):
+
+- Packet 127: terminal mouse coordinate-mode resolution →
+  `TerminalMouseCoordinateResolution.swift`.
+- Packet 128: frame-tail layout-offload eligibility →
+  `FrameTailLayoutOffloadEligibility.swift`.
+- Packet 129: pure transition removal injection-point walk-up →
+  `AnimationTransitionRemovalPlanning.swift`.
+- Packet 130: read-only retained-frame query types →
+  `RetainedFrameQueries.swift` (replaced the originally planned
+  dependency-snapshot move, which was infeasible without widening ~25 `private`
+  `ViewGraph` properties).
+- Packet 131: `FrameTailRetainedState` → `FrameTailRetainedState.swift`.
+
+Rollback: each new file's contents inline back into its source file; delete the
+new file. No call sites changed.
 
 ### Batch 132-136
 

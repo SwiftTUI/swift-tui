@@ -1,56 +1,8 @@
 import SwiftTUICore
 import Synchronization
 
-final class FrameTailRetainedState: Sendable {
-  private struct State: Sendable {
-    var previousFrameIndex: RetainedFrameIndex?
-    var previousRasterSurface: RasterSurface?
-  }
-
-  private let state = Mutex(State())
-
-  func input(
-    invalidatedIdentities: Set<Identity>
-  ) -> FrameTailRetainedInput {
-    // Retained input is previous committed-frame state only: baseline layout
-    // products for retained measurement/placement, plus the previous committed
-    // raster surface for presentation damage. It never previews a candidate.
-    state.withLock { state in
-      .init(
-        retainedLayout: RetainedLayoutSession(
-          previousFrameIndex: state.previousFrameIndex,
-          invalidatedIdentities: invalidatedIdentities
-        ),
-        previousRasterSurface: state.previousRasterSurface
-      )
-    }
-  }
-
-  /// Stores the frame's artifacts so the next frame's pipeline can
-  /// reuse cached layout.
-  ///
-  /// `baselinePlacedTree` is the **pre-overlay** placed tree — the
-  /// canonical layout result from `LayoutEngine.place`, before the
-  /// animation controller injected any transient removal overlays.
-  /// The retained-layout cache indexes this baseline so future tick
-  /// frames reuse stable bounds/identities rather than the
-  /// animation-decorated tree; overlays are re-injected from the
-  /// controller's own removal-entry state on each tick.
-  ///
-  /// When no overlays were injected this frame, pass the same
-  /// `placedTree` as baseline — the two are identical.
-  func storeCommittedFrame(
-    _ artifacts: FrameArtifacts,
-    baselinePlacedTree: PlacedNode
-  ) {
-    var indexable = artifacts
-    indexable.placedTree = baselinePlacedTree
-    state.withLock { state in
-      state.previousFrameIndex = .init(frame: indexable)
-      state.previousRasterSurface = artifacts.rasterSurface
-    }
-  }
-}
+// `FrameTailRetainedState` — the frame tail's cross-frame mutable state — lives
+// in `FrameTailRetainedState.swift`. This file holds the value-type models.
 
 struct FrameTailRetainedInput {
   /// Previous committed baseline layout products for retained measure/place.

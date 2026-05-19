@@ -94,28 +94,6 @@ final class FrameTailRenderer: Sendable {
     return output
   }
 
-  func canOffloadLayout(
-    _ input: FrameTailInput
-  ) -> Bool {
-    !containsMainActorOnlyCustomLayout(input.resolved)
-      && !containsMainActorOnlyIndexedChildSource(input.resolved)
-      && !containsLayoutDependentContent(input.resolved)
-  }
-
-  func needsIndexedChildSourceWorkerSnapshot(
-    _ input: FrameTailInput
-  ) -> Bool {
-    !containsMainActorOnlyCustomLayout(input.resolved)
-      && containsMainActorOnlyIndexedChildSource(input.resolved)
-      && !containsLayoutDependentContent(input.resolved)
-  }
-
-  func needsPreparedGraphDuringLayout(
-    _ input: FrameTailInput
-  ) -> Bool {
-    containsLayoutDependentContent(input.resolved)
-  }
-
   func renderRaster(
     _ input: FrameTailInput,
     layout: FrameTailLayoutOutput,
@@ -216,51 +194,5 @@ final class FrameTailRenderer: Sendable {
     _ operation: @escaping @Sendable () -> Void
   ) async {
     await workerExecutor.runLayoutWorkerJob(operation)
-  }
-
-  private func containsMainActorOnlyCustomLayout(
-    _ node: ResolvedNode
-  ) -> Bool {
-    if case .custom(let handle) = node.layoutBehavior,
-      !handle.canRunOnWorker
-    {
-      return true
-    }
-    if let workerChildren = node.indexedChildSource?.workerResolvedChildren,
-      workerChildren.contains(where: containsMainActorOnlyCustomLayout)
-    {
-      return true
-    }
-    return node.children.contains { containsMainActorOnlyCustomLayout($0) }
-  }
-
-  private func containsMainActorOnlyIndexedChildSource(
-    _ node: ResolvedNode
-  ) -> Bool {
-    if let source = node.indexedChildSource {
-      if !source.canRunOnWorker {
-        return true
-      }
-      if let workerChildren = source.workerResolvedChildren,
-        workerChildren.contains(where: containsMainActorOnlyIndexedChildSource)
-      {
-        return true
-      }
-    }
-    return node.children.contains { containsMainActorOnlyIndexedChildSource($0) }
-  }
-
-  private func containsLayoutDependentContent(
-    _ node: ResolvedNode
-  ) -> Bool {
-    if node.layoutDependentContent != nil {
-      return true
-    }
-    if let workerChildren = node.indexedChildSource?.workerResolvedChildren,
-      workerChildren.contains(where: containsLayoutDependentContent)
-    {
-      return true
-    }
-    return node.children.contains { containsLayoutDependentContent($0) }
   }
 }

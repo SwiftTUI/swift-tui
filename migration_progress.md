@@ -2892,9 +2892,78 @@ Review:
   and core files. It independently ran build, format lint, diff check, and the
   highest-risk focused tests for this batch.
 
-Next scheduled focus: stop after this batch as requested. The migration plan
-now schedules five future five-packet central runtime/core batches from
-127-151 for a later continuation.
+## Packet 127-131 Batch: Capability, Offload, Transition, Retained-Frame, And Frame-Tail-State Splits
+
+Scope completed (all within `SwiftTUICore` and `SwiftTUIRuntime`, all
+behavior-preserving moves):
+
+- Packet 127: extracted terminal mouse coordinate-mode resolution (the SGR-
+  pixels trust-policy ladder, multiplexer/identity heuristics, live DEC-1016
+  probe, and `performInputCapabilityQuery`) from `TerminalHostCapabilities.swift`
+  into `TerminalMouseCoordinateResolution.swift`. `baselineGraphicsCapabilities()`
+  was widened from `private` to file-internal so the new file can reuse it.
+- Packet 128: extracted layout-offload eligibility (`canOffloadLayout`,
+  `needsIndexedChildSourceWorkerSnapshot`, `needsPreparedGraphDuringLayout`, and
+  the three recursive `contains*` tree scans) from `FrameTailRenderer.swift`
+  into `FrameTailLayoutOffloadEligibility.swift`. The `contains*` scans are
+  file-internal so `renderLayoutAsync` can still reuse
+  `containsLayoutDependentContent`.
+- Packet 129: extracted the pure transition removal injection-point walk-up
+  from `AnimationController.swift` into `AnimationTransitionRemovalPlanning.swift`
+  (an `InjectionPoint` value plus a static resolver), following the existing
+  `AnimationTreeQueries`/`AnimationCompletionScheduling` pure-helper pattern.
+- Packet 130: split the read-only retained-frame query types
+  (`RetainedFrameIndex`, `RetainedInvalidationSummary`, `RetainedLayoutSession`)
+  out of `RetainedResolveFrame.swift` into `RetainedFrameQueries.swift`, leaving
+  `ScrollViewportContext`, `LayoutPassContext`, and the custom-layout
+  compatibility types in place.
+- Packet 131: extracted the stateful `FrameTailRetainedState` class out of the
+  `FrameTailModels.swift` value-type grab-bag into `FrameTailRetainedState.swift`.
+
+Behavior preserved:
+
+- SGR-pixels resolution, graphics-protocol probing, layout-worker offload
+  decisions, transition insertion/removal overlay injection, retained-frame
+  indexing/invalidation queries, and frame-tail retained-state storage all
+  remained unchanged. No public API, fixture, or test changed.
+
+Failed attempt during Packet 130:
+
+- The first Packet 130 candidate moved `ViewGraph.debugTotalStateSnapshot()`
+  into `ViewGraphDebugSnapshots.swift`. It reads ~25 `private` `ViewGraph`
+  stored properties; because `private` is file-scoped in Swift, an extension in
+  another file cannot see them, and widening all of them would broaden the
+  mutable-state surface. The attempt was reverted and Packet 130 was redefined
+  as the `RetainedFrameQueries.swift` split above.
+
+Packet 127-131 focused validation:
+
+- `swiftly run swift build --target SwiftTUIRuntime` — PASS (packets 127-129, 131)
+- `swiftly run swift build --target SwiftTUICore` — PASS (packet 130)
+- `swiftly run swift test --filter TerminalGraphicsProtocolTests` (28),
+  `CellPixelMetricsRefreshTests`, `PointerHoverTests` — PASS
+- `swiftly run swift test --filter AsyncFrameTailRenderingTests` (52) — PASS
+- `swiftly run swift test --filter AnimationControllerTests`,
+  `MotionAndProgressPolicyTests` (73) — PASS, incl. removal-injection suite
+- `swiftly run swift test --filter LayoutEngineTests`,
+  `BoundedReconciliationTests` (35) — PASS
+- `swiftly run swift test --filter TerminalPresentationTests`,
+  `PipelineContractTests` (50) — PASS
+- `git diff --check` — PASS
+- `./Scripts/check_public_surface_policies.sh` — PASS
+- `./Scripts/generate_public_api_inventory.sh --check` — PASS; 669 top-level
+  public symbols
+- `./Scripts/check_stable_doc_source_paths.sh` — PASS
+
+Packet 127-131 batch validation:
+
+- `bun run test`
+  - User tee log: `/tmp/swift-tui-test-gate-20260518-175110-packet127-131.log`
+  - Runner log: `/tmp/swift-tui-test-gate-20260518-175110-42380.log`
+  - Result: PASS
+
+Next scheduled focus: continue with Batch 132-136 per the migration plan,
+remaining inside `SwiftTUICore` and `SwiftTUIRuntime`.
 
 ## Failed Attempts
 
