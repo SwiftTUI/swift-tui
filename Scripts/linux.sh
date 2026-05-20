@@ -18,17 +18,11 @@ DEFAULT_IMAGE="ghcr.io/swifttui/swift-tui-linux:latest"
 IMAGE="${LINUX_IMAGE:-$DEFAULT_IMAGE}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
 
-# The published dev image is built linux/amd64 only — multi-arch is a
-# deliberate non-goal (see Scripts/linux/README.md). On an Apple Silicon
-# host a bare `docker pull` of it fails with "no matching manifest for
-# linux/arm64", so we pin the platform: Docker then pulls the amd64 image
-# and runs it under emulation. A user-supplied LINUX_IMAGE is assumed to
-# resolve natively, so the platform is left unset there. Override with
-# LINUX_PLATFORM (set it empty to force-unset even for the default image).
+# The published dev image is multi-arch. Leave the platform unset by default
+# so Docker resolves the host-native manifest; set LINUX_PLATFORM explicitly
+# only for cross-architecture diagnosis.
 if [[ -n "${LINUX_PLATFORM+set}" ]]; then
   PLATFORM="$LINUX_PLATFORM"
-elif [[ "$IMAGE" == "$DEFAULT_IMAGE" ]]; then
-  PLATFORM="linux/amd64"
 else
   PLATFORM=""
 fi
@@ -39,7 +33,8 @@ PLATFORM_FLAGS=()
 if [[ -n "$PLATFORM" ]]; then
   PLATFORM_FLAGS=(--platform "$PLATFORM")
 fi
-CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}}"
+PLATFORM_SLUG="$(printf '%s' "${PLATFORM:-native}" | tr '/:' '--')"
+CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}-${PLATFORM_SLUG}}"
 CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/workspace}"
 # SwiftPM dependency + build cache. This is the one volume that genuinely
 # needs to survive container resets — it keeps `swift build` fast across
@@ -74,13 +69,14 @@ Interactive:
   info              Print container configuration and tool versions
 
 Repo-aware:
-  test              Run \`swiftly run swift test\`
+  test              Run the Linux repo gate used by CI
+  root-test         Run raw \`swiftly run swift test\` for root-package diagnosis
   cli-test          Run focused SwiftTUICLI tests from the root package
   cli-build-tests   Build root package tests without running them
   examples          Build the Linux example packages
   web               Build the browser examples
   workflow          Mirror the Examples Linux workflow: examples + web
-  full              Run \`swiftly run swift test\`, then \`workflow\`
+  full              Run the Linux repo gate, then \`workflow\`
 
 Environment:
   LINUX_CONTAINER_TOOL  Force docker or podman
@@ -90,9 +86,9 @@ Environment:
                        installed lazily on first use.
   LINUX_PLATFORM        Platform passed to docker/podman pull/create/build
                        (default: ${PLATFORM:-<unset>})
-                       Defaults to linux/amd64 for the amd64-only published
-                       image so it pulls on Apple Silicon; unset for a
-                       custom LINUX_IMAGE. Set it empty to force-unset.
+                       Unset by default so Docker uses the host-native
+                       multi-arch image. Set to linux/amd64 or linux/arm64
+                       for cross-architecture diagnosis.
   LINUX_CONTAINER_NAME  Override the container name
   LINUX_CONTAINER_DIR   Override the in-container workspace mount
                        (default: $CONTAINER_DIR)
@@ -173,15 +169,71 @@ ensure_volume() {
   fi
 }
 
+container_engine_architecture() {
+  local architecture
+  architecture="$("$CONTAINER_TOOL" info --format '{{.Architecture}}' 2>/dev/null || true)"
+  case "$architecture" in
+    x86_64)
+      printf 'amd64'
+      ;;
+    aarch64)
+      printf 'arm64'
+      ;;
+    *)
+      printf '%s' "$architecture"
+      ;;
+  esac
+}
+
+requested_image_architecture() {
+  if [[ -n "$PLATFORM" ]]; then
+    case "$PLATFORM" in
+      linux/amd64)
+        printf 'amd64'
+        ;;
+      linux/arm64 | linux/arm64/v8)
+        printf 'arm64'
+        ;;
+      *)
+        printf ''
+        ;;
+    esac
+    return
+  fi
+
+  container_engine_architecture
+}
+
+image_matches_requested_architecture() {
+  ensure_container_tool
+  if ! "$CONTAINER_TOOL" image inspect "$IMAGE" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local requested_architecture
+  requested_architecture="$(requested_image_architecture)"
+  if [[ -z "$requested_architecture" ]]; then
+    return 0
+  fi
+
+  local image_architecture
+  image_architecture="$("$CONTAINER_TOOL" image inspect -f '{{.Architecture}}' "$IMAGE")"
+  [[ "$image_architecture" == "$requested_architecture" ]]
+}
+
 pull_image() {
   ensure_container_tool
-  log "Pulling $IMAGE${PLATFORM:+ (platform $PLATFORM)}"
+  local platform_label="host-native platform"
+  if [[ -n "$PLATFORM" ]]; then
+    platform_label="platform $PLATFORM"
+  fi
+  log "Pulling $IMAGE ($platform_label)"
   "$CONTAINER_TOOL" pull ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} "$IMAGE"
 }
 
 ensure_container() {
   ensure_container_tool
-  if ! "$CONTAINER_TOOL" image inspect "$IMAGE" >/dev/null 2>&1; then
+  if ! image_matches_requested_architecture; then
     pull_image
   fi
 
@@ -329,6 +381,7 @@ cmd_info() {
 
     echo "container_tool='"$CONTAINER_TOOL"'"
     echo "image='"$IMAGE"'"
+    echo "platform='"${PLATFORM:-host-native}"'"
     echo "container='"$CONTAINER_NAME"'"
     echo "workspace='"$CONTAINER_DIR"'"
     echo "disable_explicit_platforms='"$LINUX_DISABLE_EXPLICIT_PLATFORMS"'"
@@ -361,6 +414,16 @@ cmd_examples() {
 }
 
 cmd_test() {
+  ensure_swiftly
+  ensure_bun
+  run_shell_script "
+    export BUN_INSTALL=/root/.bun
+    export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
+    sh ./Scripts/test_gate.sh --skip-bun-install
+  "
+}
+
+cmd_root_test() {
   ensure_swiftly
   run_shell_script "
     swiftly run swift test --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/root")
@@ -470,6 +533,9 @@ main() {
       ;;
     test)
       cmd_test
+      ;;
+    root-test)
+      cmd_root_test
       ;;
     cli-test)
       cmd_cli_test

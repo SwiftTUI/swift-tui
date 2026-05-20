@@ -172,7 +172,8 @@ Runs the exhaustive checked-in repo verification surface:
   - root Package.swift test-target coverage guardrails
   - rendered-text fixture matrix guardrails
   - public-API baseline freshness check
-  - focused root SwiftPM framework tests
+  - focused root SwiftPM framework tests, with high-contention async runtime
+    suites isolated from the broad SwiftTUI runtime step
   - focused SwiftTUIArguments tests
   - focused SwiftTUICLI tests
   - focused SwiftTUITerminal / PTY primitive tests
@@ -368,6 +369,12 @@ run_swift() {
   fi
 
   swiftly run swift "$@"
+}
+
+run_swift_runtime_tests_without_isolated_async_suites() {
+  run_swift test "$@" \
+    --skip AsyncLifecycleGenerationTests \
+    --skip AsyncFrameTailRenderingTests
 }
 
 require_command() {
@@ -603,9 +610,19 @@ run_function_step \
   run_swift test --filter SwiftTUIViewsTests
 
 run_function_step \
+  "Run SwiftTUI async lifecycle tests" \
+  "$(swift_command_text test --filter SwiftTUITests.AsyncLifecycleGenerationTests)" \
+  run_swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests
+
+run_function_step \
+  "Run SwiftTUI async frame-tail tests" \
+  "$(swift_command_text test --filter SwiftTUITests.AsyncFrameTailRenderingTests)" \
+  run_swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+
+run_function_step \
   "Run SwiftTUI runtime tests" \
-  "$(swift_command_text test --filter SwiftTUITests)" \
-  run_swift test --filter SwiftTUITests
+  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests)" \
+  run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
 
 run_function_step \
   "Run SwiftTUIAnimatedImage tests" \

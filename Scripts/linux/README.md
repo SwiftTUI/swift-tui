@@ -2,9 +2,9 @@
 
 This directory owns the Linux build/test environment for SwiftTUI. It exists
 because most contributors develop on macOS, but the project ships on Linux
-(via `swift:6.3` on `ubuntu-latest`) and to the browser (via the Wasm Swift
-SDK). Reproducing a Linux failure on a Mac means running it inside Linux —
-which is what this setup gives you, with one command.
+(via `swift:6.3` on native amd64 and arm64 Ubuntu runners) and to the browser
+(via the Wasm Swift SDK). Reproducing a Linux failure on a Mac means running
+it inside Linux — which is what this setup gives you, with one command.
 
 If you've never touched the Docker side of the project before, read all of
 [What's in here](#whats-in-here) and [Daily workflow](#daily-workflow). The
@@ -25,7 +25,7 @@ Scripts/
 └── devcontainer.json        # VS Code / Cursor / Codespaces entrypoint
 
 .github/workflows/
-└── build-linux-image.yml    # Builds & pushes the image to GHCR
+└── build-linux-image.yml    # Builds & pushes the multi-arch image to GHCR
 ```
 
 These four files cooperate as follows:
@@ -35,8 +35,8 @@ These four files cooperate as follows:
                         │   .github/workflows/                  │
                         │   build-linux-image.yml               │
                         │                                       │
-                        │   docker buildx build                 │
-                        │   docker push ghcr.io/.../swift-tui-… │
+                        │   native amd64 + arm64 builds         │
+                        │   docker manifest push                │
                         └────────────────┬──────────────────────┘
                                          │ (publishes)
                                          ▼
@@ -52,9 +52,10 @@ These four files cooperate as follows:
    └────────────────────────┘                       └───────────────────────────┘
 ```
 
-The image is built **once** in CI and consumed by both the script and the
-devcontainer. Nothing in the image references the repo source — the repo is
-bind-mounted at runtime.
+The image is built **once per Linux architecture** in CI, published as one
+multi-arch manifest, and consumed by both the script and the devcontainer.
+Nothing in the image references the repo source — the repo is bind-mounted at
+runtime.
 
 ---
 
@@ -95,12 +96,13 @@ toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 ./Scripts/linux.sh start          # Create + start the long-lived container
 ./Scripts/linux.sh info           # Sanity check: prints toolchain versions
 
-# Run the same things CI runs:
-./Scripts/linux.sh test           # swiftly run swift test (root package)
+# Run CI-shaped validation plus optional Linux-only build checks:
+./Scripts/linux.sh test           # Linux repo gate (Scripts/test_gate.sh)
+./Scripts/linux.sh root-test      # raw root-package swiftly run swift test
 ./Scripts/linux.sh cli-test       # focused SwiftTUICLI tests from the root package
 ./Scripts/linux.sh examples       # Build Linux example packages
 ./Scripts/linux.sh web            # Build WebExample + Platforms/Web host bundle
-./Scripts/linux.sh workflow       # examples + web (mirrors CI)
+./Scripts/linux.sh workflow       # examples + web build checks
 ./Scripts/linux.sh full           # test + workflow
 
 # Drop into the container for ad-hoc work:
@@ -125,7 +127,8 @@ When you run `./Scripts/linux.sh test`, the script:
 
 1. Checks for `docker` (or falls back to `podman`).
 2. Pulls `ghcr.io/swifttui/swift-tui-linux:latest` if you don't have it
-   locally.
+   locally. Docker selects the host-native image from the multi-arch manifest
+   unless you set `LINUX_PLATFORM` explicitly.
 3. Creates a named volume `swift-tui-…-swiftpm-cache` for SwiftPM's
    dependency + build artifact cache.
 4. Creates a long-lived container with two mounts:
@@ -134,9 +137,16 @@ When you run `./Scripts/linux.sh test`, the script:
    - The SwiftPM cache **volume**, mounted at `/root/.cache/org.swift.swiftpm`.
 5. Sets `WORKDIR=/workspace`, then runs `sleep infinity` as PID 1 so the
    container stays alive between commands.
-6. `docker exec`s `swiftly run swift test` inside it, with
+6. `docker exec`s `sh ./Scripts/test_gate.sh --skip-bun-install` inside it, with
    `DISABLE_EXPLICIT_PLATFORMS=1` so `Package.swift` skips the macOS/iOS
    platform pins.
+
+Use `./Scripts/linux.sh root-test` when you specifically need a raw
+root-package `swiftly run swift test` run. The CI-shaped gate intentionally
+splits root tests by target through `Scripts/test_gate.sh`, and the broad
+SwiftTUI runtime step isolates the high-contention async lifecycle and
+frame-tail suites. CI also runs the Linux repo gate on native amd64 and arm64
+runners, so architecture coverage does not depend on x86 emulation.
 
 **Bind mounts vs named volumes** is the key distinction:
 
@@ -161,12 +171,14 @@ When you run `./Scripts/linux.sh test`, the script:
 - the workflow file itself
 
 Other commits don't rebuild — the image is a build *input*, not an output of
-each commit. PRs that modify these paths build the image but don't push;
-only `main` pushes (and manual `workflow_dispatch` runs) publish to GHCR.
+each commit. PRs that modify these paths build both native architectures but
+don't push; only `main` pushes (and manual `workflow_dispatch` runs) publish
+the multi-arch manifest to GHCR.
 
 ### Tags published to GHCR
 
-Each successful push job emits:
+Each successful publish emits a manifest containing both `linux/amd64` and
+`linux/arm64` images:
 
 | Tag                | When                              | Purpose                       |
 |--------------------|-----------------------------------|-------------------------------|
@@ -210,17 +222,20 @@ When iterating on the Dockerfile itself, you don't want to push for every
 attempt. Do it locally:
 
 ```bash
-./Scripts/linux.sh build              # docker build with current ARGs
+./Scripts/linux.sh build              # native docker build with current ARGs
 ./Scripts/linux.sh reset              # drop the existing container
 ./Scripts/linux.sh start              # create a new one against the new image
 ./Scripts/linux.sh full               # validate
 ./Scripts/linux.sh push               # push only when you're satisfied
 ```
 
-`build` defaults to tagging the image with whatever `LINUX_IMAGE` is — so by
-default you'll overwrite the `:latest` tag on your local machine. Override
-with `LINUX_IMAGE_BUILD_TAG=ghcr.io/swifttui/swift-tui-linux:experiment`
-to keep the published image around.
+`build` defaults to the host-native platform and tags the image with whatever
+`LINUX_IMAGE` is — so by default you'll overwrite the `:latest` tag on your
+local machine. Override with
+`LINUX_IMAGE_BUILD_TAG=ghcr.io/swifttui/swift-tui-linux:experiment` to keep
+the published image around. Set `LINUX_PLATFORM=linux/amd64` or
+`LINUX_PLATFORM=linux/arm64` only when you intentionally want a cross-platform
+diagnostic build.
 
 ---
 
@@ -345,7 +360,8 @@ the container was created against an older script version — `reset` and
 Means the container failed to start. Look at recent logs:
 
 ```bash
-docker logs swift-tui-ghcr.io-swifttui-swift-tui-linux--latest
+docker ps --format '{{.Names}}' | grep swift-tui
+docker logs <container-name>
 ```
 
 Most common cause: image manifest changed and the named container is bound
@@ -353,13 +369,17 @@ to an older config. `./Scripts/linux.sh reset` recreates it.
 
 ### Switching between the prebuilt image and a vanilla one mid-session
 
-The container name encodes the image, so switching `LINUX_IMAGE` creates a
-*second* container alongside the first rather than reconfiguring. To free
-disk space when you're done with one:
+The container name encodes the image and requested platform, so switching
+`LINUX_IMAGE` or `LINUX_PLATFORM` creates a *second* container alongside the
+first rather than reconfiguring. To free disk space when you're done with one:
 
 ```bash
 LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh nuke
 ```
+
+If you pulled the old amd64-only `:latest` image on Apple Silicon before the
+multi-arch image existed, `linux.sh` will detect the architecture mismatch and
+pull the host-native manifest before creating the new default container.
 
 ### `permission denied` on bind-mounted files inside the container
 
@@ -394,12 +414,11 @@ Useful when iterating on `Dockerfile` syntax errors that fail before
 
 ## What this setup deliberately does NOT do
 
-- **Multi-arch builds.** The CI workflow only builds `linux/amd64`.
-  On Apple Silicon, `linux.sh` pins `--platform linux/amd64` automatically
-  for the default image, so the container pulls and runs under emulation
-  (override via `LINUX_PLATFORM`). Adding a native `linux/arm64` image is
-  ~10 minutes of work in the workflow if emulation ever becomes painful —
-  for now, the cost (doubled build time, doubled cache) outweighs the win.
+- **Emulated default validation.** The published image is multi-arch and
+  `linux.sh` leaves Docker's platform unset by default so local runs use the
+  host-native image. `LINUX_PLATFORM` remains available for explicit
+  cross-architecture diagnostics, but that path may use emulation depending on
+  your host.
 - **A Compose stack.** There's only one service, with no networking
   between containers. A `docker-compose.yml` would add ceremony without
   removing anything.
