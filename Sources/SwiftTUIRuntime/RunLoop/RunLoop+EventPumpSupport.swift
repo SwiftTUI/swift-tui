@@ -22,7 +22,7 @@ package final class DeadlineWakeState: Sendable {
     state.withLock { state in
       state.task?.cancel()
       let continuation = state.continuation
-      state.task = Task {
+      state.task = Task.detached {
         try? await Task.sleep(for: sleepDuration)
         guard !Task.isCancelled else { return }
         continuation?.yield()

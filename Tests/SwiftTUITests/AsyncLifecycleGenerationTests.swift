@@ -63,10 +63,9 @@ struct AsyncLifecycleGenerationTests {
 
   @Test("injected input reader preserves pending mouse flushes across stale teardown")
   func injectedInputReaderPreservesPendingMouseFlushesAcrossStaleTeardown() async throws {
-    let inputReader = InjectedTerminalInputReader()
+    let inputReader = InjectedTerminalInputReader(mouseFlushScheduling: .manual)
     let firstReady = AsyncEvent()
     let secondReady = AsyncEvent()
-    let firstEventDelivered = AsyncEvent()
     let firstConsumer = awaitNextValue(
       from: inputReader.inputEvents(),
       readySignal: firstReady
@@ -78,9 +77,6 @@ struct AsyncLifecycleGenerationTests {
       var events: [InputEvent] = []
       while let event = await iterator.next() {
         events.append(event)
-        if events.count == 1 {
-          firstEventDelivered.fire()
-        }
       }
       return events
     }
@@ -96,21 +92,21 @@ struct AsyncLifecycleGenerationTests {
     _ = await firstConsumer.result
     inputReader.send(scrollSequence)
 
-    await firstEventDelivered.wait()
+    let flushedEvents = inputReader.flushPendingCoalescedMouseEvents()
     inputReader.finish()
 
     let events = await secondConsumer.value
-
-    #expect(
-      events == [
-        .mouse(
-          MouseEvent(
-            kind: .scrolled(deltaX: 0, deltaY: 2),
-            location: .cellFallback(CellPoint(x: 4, y: 6))
-          )
+    let expectedEvents: [InputEvent] = [
+      .mouse(
+        MouseEvent(
+          kind: .scrolled(deltaX: 0, deltaY: 2),
+          location: .cellFallback(CellPoint(x: 4, y: 6))
         )
-      ]
-    )
+      )
+    ]
+
+    #expect(flushedEvents == expectedEvents)
+    #expect(events == expectedEvents)
   }
 }
 

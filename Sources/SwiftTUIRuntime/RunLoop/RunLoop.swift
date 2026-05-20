@@ -434,8 +434,13 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       }
     }
 
-    scheduler.requestInvalidation(of: [rootIdentity])
+    let eventPump = makeEventPump()
+    defer {
+      eventPump.cancel()
+    }
+    var iterator = eventPump.stream.makeAsyncIterator()
 
+    scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
     try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
 
@@ -443,12 +448,6 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     // closures, enable selective dirty evaluation for subsequent frames.
     // This avoids full root re-evaluation when only small subtrees change.
     renderer.enableSelectiveEvaluation()
-
-    let eventPump = makeEventPump()
-    defer {
-      eventPump.cancel()
-    }
-    var iterator = eventPump.stream.makeAsyncIterator()
 
     scheduleNextWakeIfNeeded(using: eventPump)
 

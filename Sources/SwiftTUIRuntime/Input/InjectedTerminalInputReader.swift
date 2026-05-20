@@ -1,6 +1,11 @@
 import Synchronization
 
 package final class InjectedTerminalInputReader: TerminalInputReading, Sendable {
+  package enum MouseFlushScheduling: Sendable {
+    case automatic
+    case manual
+  }
+
   private struct State: Sendable {
     var parser: TerminalInputParser
     var controlParser = ControlMessageParser()
@@ -15,12 +20,15 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
 
   private let state: Mutex<State>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
+  private let mouseFlushScheduling: MouseFlushScheduling
 
   package init(
     mouseCoordinateMode: MouseCoordinateMode = .cells,
+    mouseFlushScheduling: MouseFlushScheduling = .automatic,
     controlHandler: @escaping @Sendable (TerminalControlMessage) -> Void = { _ in }
   ) {
     state = Mutex(State(parser: TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)))
+    self.mouseFlushScheduling = mouseFlushScheduling
     self.controlHandler = controlHandler
   }
 
@@ -198,6 +206,9 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     }
 
     guard let token else {
+      return
+    }
+    guard mouseFlushScheduling == .automatic else {
       return
     }
 

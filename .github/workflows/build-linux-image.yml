@@ -5,27 +5,26 @@ name: Build Linux dev image
 # this workflow is the only producer.
 #
 # Triggers: this image rebuilds when its inputs change (the Dockerfile,
-# the Swift toolchain pin, or this workflow), weekly so it picks up
-# base-image security patches, and on demand via `workflow_dispatch`.
+# the Swift toolchain pin, or this workflow), and on demand via
+# `workflow_dispatch`.
 #
 # Security note: every user-controllable input ($SWIFT_VERSION, $REF_NAME,
 # $EVENT_NAME, $OVERRIDE) is funneled through `env:` and shell-quoted, never
 # inlined into a `run:` script. See the GitHub blog post on workflow
 # injection prevention.
 
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-#       - "Scripts/linux/Dockerfile"
-#       - ".swift-version"
-#       - ".github/workflows/build-linux-image.yml"
-#   pull_request:
-#     paths:
-#       - "Scripts/linux/Dockerfile"
-#       - ".swift-version"
-#       - ".github/workflows/build-linux-image.yml"
 on:
+  push:
+    branches: [main]
+    paths:
+      - "Scripts/linux/Dockerfile"
+      - ".swift-version"
+      - ".github/workflows/build-linux-image.yml"
+  pull_request:
+    paths:
+      - "Scripts/linux/Dockerfile"
+      - ".swift-version"
+      - ".github/workflows/build-linux-image.yml"
   workflow_dispatch:
     inputs:
       push:
@@ -55,7 +54,18 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.arch }} image
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
 
     steps:
       - name: Checkout
@@ -85,8 +95,8 @@ jobs:
           OVERRIDE: ${{ inputs.push }}
         run: |
           set -euo pipefail
-          # Push on main pushes, weekly scheduled rebuilds, and manual
-          # dispatches; build-only on PRs. For workflow_dispatch the `push`
+          # Push on main pushes and manual dispatches; build-only on PRs.
+          # For workflow_dispatch the `push`
           # input decides — it carries `default: true`, so OVERRIDE is always
           # a concrete "true"/"false" and the dispatch default is honored.
           # (A prior `[ -n "$OVERRIDE" ]` guard was wrong: an un-set boolean
@@ -97,8 +107,6 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             push="$OVERRIDE"
           elif [ "$EVENT_NAME" = "push" ] && [ "$REF_NAME" = "main" ]; then
-            push=true
-          elif [ "$EVENT_NAME" = "schedule" ]; then
             push=true
           else
             push=false
@@ -113,49 +121,123 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image tags
-        id: tags
-        shell: bash
-        env:
-          SWIFT_VERSION: ${{ steps.swift.outputs.version }}
-          REF_NAME: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
-          COMMIT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          short_sha="${COMMIT_SHA:0:7}"
-          # Always emit a SHA tag so deployments can pin if `:latest` regresses.
-          tags=("$IMAGE_NAME:sha-$short_sha")
-          # Toolchain-pinned tag for visibility when bumping Swift.
-          tags+=("$IMAGE_NAME:swift-$SWIFT_VERSION")
-          # `:latest` only on main pushes / manual dispatches against main.
-          if [ "$EVENT_NAME" != "pull_request" ] && [ "$REF_NAME" = "main" ]; then
-            tags+=("$IMAGE_NAME:latest")
-          fi
-          # Newline-separated for build-push-action's `tags:` input.
-          {
-            printf 'tags<<EOF\n'
-            printf '%s\n' "${tags[@]}"
-            printf 'EOF\n'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build (and optionally push) image
+      - name: Build image
+        if: steps.push_decision.outputs.push != 'true'
         uses: docker/build-push-action@v6
         with:
           # Tiny build context — the Dockerfile doesn't COPY anything from
           # the repo, so we limit the context to its own directory.
           context: Scripts/linux
           file: Scripts/linux/Dockerfile
-          push: ${{ steps.push_decision.outputs.push == 'true' }}
-          tags: ${{ steps.tags.outputs.tags }}
-          # Registry-backed BuildKit cache. Stored as a separate `:buildcache`
-          # tag in the same repo, so cache state survives across branches and
-          # isn't bound by the GitHub Actions cache 10GB / 7-day limits.
-          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+          platforms: ${{ matrix.platform }}
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:build-${{ matrix.arch }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }}
           build-args: |
             SWIFT_VERSION=${{ steps.swift.outputs.version }}
             SWIFTLY_VERSION=${{ env.SWIFTLY_VERSION }}
           # Add provenance/SBOM for supply-chain hygiene. Cheap to enable.
           provenance: true
           sbom: true
+
+      - name: Build and push image by digest
+        if: steps.push_decision.outputs.push == 'true'
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: Scripts/linux
+          file: Scripts/linux/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ env.IMAGE_NAME }}
+          # Registry-backed BuildKit cache. Stored per architecture so native
+          # builders never overwrite each other's layers.
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }},mode=max
+          build-args: |
+            SWIFT_VERSION=${{ steps.swift.outputs.version }}
+            SWIFTLY_VERSION=${{ env.SWIFTLY_VERSION }}
+          # Add provenance/SBOM for supply-chain hygiene. Cheap to enable.
+          provenance: true
+          sbom: true
+
+      - name: Export image digest
+        if: steps.push_decision.outputs.push == 'true'
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          digest="${DIGEST#sha256:}"
+          touch "/tmp/digests/$digest"
+
+      - name: Upload image digest
+        if: steps.push_decision.outputs.push == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Publish multi-arch manifest
+    needs: build
+    runs-on: ubuntu-24.04
+    if: >-
+      needs.build.result == 'success' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.push) ||
+        (github.event_name == 'push' && github.ref_name == 'main')
+      )
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download image digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Create and inspect manifest
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          short_sha="${COMMIT_SHA:0:7}"
+
+          tag_args=(-t "$IMAGE_NAME:sha-$short_sha" -t "$IMAGE_NAME:swift-$swift_version")
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$REF_NAME" = "main" ]; then
+            tag_args+=(-t "$IMAGE_NAME:latest")
+          fi
+
+          digest_refs=()
+          while IFS= read -r digest_file; do
+            digest_refs+=("$IMAGE_NAME@sha256:$(basename "$digest_file")")
+          done < <(find /tmp/digests -type f | sort)
+
+          if [ "${#digest_refs[@]}" -ne 2 ]; then
+            printf 'Expected 2 image digests, found %s\n' "${#digest_refs[@]}" >&2
+            exit 1
+          fi
+
+          docker buildx imagetools create "${tag_args[@]}" "${digest_refs[@]}"
+          docker buildx imagetools inspect "$IMAGE_NAME:sha-$short_sha"
