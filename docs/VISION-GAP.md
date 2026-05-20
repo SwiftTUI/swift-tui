@@ -9,17 +9,8 @@ Each entry states what is **shipped today** and what is **not yet built**. None
 of the unbuilt work is scheduled or promised here — this is a gap register, not
 a roadmap.
 
-## Navigation
-
-**Shipped.** `NavigationStack` with binding-driven destinations:
-`.navigationDestination(isPresented:)` and `.navigationDestination(item:)`.
-
-**Not yet built.** The value-routed half of SwiftUI's navigation model:
-`NavigationLink`, a public `NavigationPath`, `navigationDestination(for:)`
-value-type routing, a retained navigation controller via
-`@Environment(\.dismiss)`, automatic Back-button chrome, and navigation
-titles/breadcrumbs. Navigation today is entirely binding-driven by design; the
-gap is whether the value-routed surface is ever added.
+Items that [VISION.md](VISION.md) declares out of scope are intentionally
+omitted even when SwiftUI exposes a corresponding API.
 
 ## Accessibility
 
@@ -50,16 +41,6 @@ pushes runtime focus to VoiceOver.
   after the host app restarts — and a daemon-backed session lifecycle.
 - iOS and WASI builds of the embedding products.
 
-## Text input
-
-**Shipped.** The `TextInputReducer` model with V2 selection ranges and shortcut
-bindings; caret anchoring flows into the accessibility substrate.
-
-**Not yet built.** A bridge to host-native text systems — value/selection
-transport to the platform text system, IME/composition input for native and
-web hosts — and rope/piece-tree storage for large documents. SwiftTUI's own
-text inputs handle their own editing today.
-
 ## Layout and pipeline internals
 
 **Shipped.** The seven-phase pipeline, off-main frame-tail execution, and
@@ -84,9 +65,7 @@ drawing surface with Braille subpixel rendering.
 
 **Not yet built.** `Canvas`'s internal drawing coordinate model is still the
 legacy integer-cell interface; it has not been migrated to the fractional
-cell-coordinate model the rest of the geometry system uses. Pixel-exact
-`Canvas` grids are intentionally kept non-public until a buffer-backed
-graphics-protocol renderer exists to exercise them.
+cell-coordinate model the rest of the geometry system uses.
 
 ## Web packaging
 
