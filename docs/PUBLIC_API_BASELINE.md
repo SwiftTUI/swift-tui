@@ -19,7 +19,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 |---|---:|---:|
 | `SwiftTUI` | 0 | 0 |
 | `SwiftTUIRuntime` | 55 | 491 |
-| `SwiftTUIViews` | 262 | 1398 |
+| `SwiftTUIViews` | 263 | 1405 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
 | `SwiftTUIArguments` | 4 | 46 |
@@ -98,7 +98,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (262)
+### Canonical surface (263)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActivePaletteCommand` — struct — 4 members
@@ -227,7 +227,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `LinkButtonStyle` — struct — 3 members
 - `List` — struct — 10 members
 - `ListStyle` — protocol — 1 member
-- `LiteralTabsTabViewStyle` — struct — 7 members
+- `LiteralTabsTabViewStyle` — struct — 4 members
 - `LongPressGesture` — struct — 6 members
 - `MatchedGeometryModifier` — struct
 - `Menu` — struct — 2 members
@@ -306,10 +306,11 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TableRow` — struct — 1 member
 - `TabView` — struct — 2 members
 - `TabViewOverflowMenuPresentation` — struct — 15 members
-- `TabViewOverflowTriggerConfiguration` — struct — 7 members
-- `TabViewStyle` — protocol — 14 members
+- `TabViewOverflowTriggerConfiguration` — struct — 8 members
+- `TabViewStyle` — protocol — 5 members
+- `TabViewStyleBodyConfiguration` — struct — 15 members
 - `TabViewStyleConfiguration` — struct — 9 members
-- `TabViewStyleItemConfiguration` — struct — 5 members
+- `TabViewStyleItemConfiguration` — struct — 7 members
 - `TabViewStyleOption` — struct — 2 members
 - `TabViewStylePresentation` — struct — 4 members
 - `TagValueModifier` — struct

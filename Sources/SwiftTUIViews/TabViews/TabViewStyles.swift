@@ -43,19 +43,11 @@ public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStr
 
   @MainActor
   package func resolveBody(
-    configuration: TabViewStyleConfiguration,
-    presentation: TabViewStylePresentation,
-    controlIdentity: Identity,
-    activeContentIndex: Int?,
-    activeContent: DeferredViewPayload?,
+    configuration: TabViewStyleBodyConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
     box.resolveBody(
       configuration: configuration,
-      presentation: presentation,
-      controlIdentity: controlIdentity,
-      activeContentIndex: activeContentIndex,
-      activeContent: activeContent,
       in: context
     )
   }
@@ -83,10 +75,7 @@ public struct PowerlineTabViewStyle: Sendable {
 
 /// Defines tab strip, overflow, and active tab rendering.
 public protocol TabViewStyle: Sendable {
-  associatedtype TabBody: View
-  associatedtype OverflowTriggerBody: View
-  associatedtype OverflowItemBody: View
-  associatedtype StripBackgroundBody: View
+  associatedtype Body: View
 
   var snapshotLabel: String { get }
 
@@ -96,59 +85,14 @@ public protocol TabViewStyle: Sendable {
   ) -> TabViewStylePresentation
 
   @ViewBuilder @MainActor
-  func makeTabBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
-  ) -> TabBody
-
-  @ViewBuilder @MainActor
-  func makeOverflowTriggerBody(
-    configuration: TabViewStyleConfiguration,
-    trigger: TabViewOverflowTriggerConfiguration
-  ) -> OverflowTriggerBody
-
-  @ViewBuilder @MainActor
-  func makeOverflowItemBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration,
-    overflow: TabViewOverflowMenuPresentation
-  ) -> OverflowItemBody
-
-  @ViewBuilder @MainActor
-  func makeStripBackground(
-    configuration: TabViewStyleConfiguration,
-    presentation: TabViewStylePresentation
-  ) -> StripBackgroundBody
+  func makeBody(
+    configuration: TabViewStyleBodyConfiguration
+  ) -> Body
 }
 
 extension TabViewStyle {
   public var snapshotLabel: String {
     String(reflecting: Self.self)
-  }
-
-  @MainActor
-  public func makeOverflowTriggerBody(
-    configuration _: TabViewStyleConfiguration,
-    trigger _: TabViewOverflowTriggerConfiguration
-  ) -> EmptyView {
-    EmptyView()
-  }
-
-  @MainActor
-  public func makeOverflowItemBody(
-    configuration _: TabViewStyleConfiguration,
-    item _: TabViewStyleItemConfiguration,
-    overflow _: TabViewOverflowMenuPresentation
-  ) -> EmptyView {
-    EmptyView()
-  }
-
-  @MainActor
-  public func makeStripBackground(
-    configuration _: TabViewStyleConfiguration,
-    presentation _: TabViewStylePresentation
-  ) -> EmptyView {
-    EmptyView()
   }
 }
 
@@ -167,6 +111,7 @@ public struct TabViewStyleItemConfiguration: Sendable {
   public var label: TabItemLabel
   public var isSelected: Bool
   public var isFocused: Bool
+  package var controlIdentity: Identity?
 
   public init(
     index: Int,
@@ -178,6 +123,49 @@ public struct TabViewStyleItemConfiguration: Sendable {
     self.label = label
     self.isSelected = isSelected
     self.isFocused = isFocused
+    controlIdentity = nil
+  }
+
+  package init(
+    index: Int,
+    label: TabItemLabel,
+    isSelected: Bool,
+    isFocused: Bool,
+    controlIdentity: Identity
+  ) {
+    self.index = index
+    self.label = label
+    self.isSelected = isSelected
+    self.isFocused = isFocused
+    self.controlIdentity = controlIdentity
+  }
+
+  @ViewBuilder @MainActor
+  public func route<Content: View>(
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    if let controlIdentity {
+      PointerRouteView(
+        identity: tabItemIdentity(for: controlIdentity, index: index),
+        content: content()
+      )
+    } else {
+      content()
+    }
+  }
+
+  @ViewBuilder @MainActor
+  public func overflowRoute<Content: View>(
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    if let controlIdentity {
+      PointerRouteView(
+        identity: tabOverflowItemIdentity(for: controlIdentity, index: index),
+        content: content()
+      )
+    } else {
+      content()
+    }
   }
 }
 
@@ -188,6 +176,7 @@ public struct TabViewOverflowTriggerConfiguration: Sendable {
   public var isExpanded: Bool
   public var overflowIndices: [Int]
   public var leadingWidth: Int
+  package var controlIdentity: Identity?
 
   public init(
     label: String,
@@ -203,6 +192,39 @@ public struct TabViewOverflowTriggerConfiguration: Sendable {
     self.isExpanded = isExpanded
     self.overflowIndices = overflowIndices
     self.leadingWidth = leadingWidth
+    controlIdentity = nil
+  }
+
+  package init(
+    label: String,
+    isSelected: Bool,
+    isFocused: Bool,
+    isExpanded: Bool,
+    overflowIndices: [Int],
+    leadingWidth: Int,
+    controlIdentity: Identity
+  ) {
+    self.label = label
+    self.isSelected = isSelected
+    self.isFocused = isFocused
+    self.isExpanded = isExpanded
+    self.overflowIndices = overflowIndices
+    self.leadingWidth = leadingWidth
+    self.controlIdentity = controlIdentity
+  }
+
+  @ViewBuilder @MainActor
+  public func route<Content: View>(
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    if let controlIdentity {
+      PointerRouteView(
+        identity: tabOverflowTriggerIdentity(for: controlIdentity),
+        content: content()
+      )
+    } else {
+      content()
+    }
   }
 }
 
@@ -302,5 +324,91 @@ public struct TabViewStyleConfiguration: Sendable {
     self.styleEnvironment = styleEnvironment
     self.availableWidth = availableWidth
     self.isOverflowMenuExpanded = isOverflowMenuExpanded
+  }
+}
+
+public struct TabViewStyleBodyConfiguration: Sendable {
+  public struct Content: PrimitiveView, ResolvableView, Sendable {
+    package var activeContentIndex: Int?
+    package var payload: DeferredViewPayload?
+
+    package init(
+      activeContentIndex: Int?,
+      payload: DeferredViewPayload?
+    ) {
+      self.activeContentIndex = activeContentIndex
+      self.payload = payload
+    }
+
+    package func resolveElements(
+      in context: ResolveContext
+    ) -> [ResolvedNode] {
+      guard let payload else {
+        return []
+      }
+
+      // Keep the style-owned content slot transparent while preserving the
+      // deferred payload boundary that owns active-tab lifecycle and state.
+      let child = resolveView(
+        DeferredPayloadView(payload: payload),
+        in: context.indexedChild(
+          kind: .init(rawValue: "TabContentPayload"),
+          index: activeContentIndex ?? 0
+        )
+      )
+
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Group"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+    }
+  }
+
+  public var options: [TabViewStyleOption]
+  public var items: [TabViewStyleItemConfiguration]
+  public var visibleItems: [TabViewStyleItemConfiguration]
+  public var overflowItems: [TabViewStyleItemConfiguration]
+  public var selectedIndex: Int?
+  public var focusedIndex: Int?
+  public var isFocused: Bool
+  public var showsFocusEffect: Bool
+  public var styleEnvironment: StyleEnvironmentSnapshot
+  public var availableWidth: Int
+  public var isOverflowMenuExpanded: Bool
+  public var presentation: TabViewStylePresentation
+  public var overflowTrigger: TabViewOverflowTriggerConfiguration?
+  public var content: Content
+
+  package init(
+    styleConfiguration: TabViewStyleConfiguration,
+    presentation: TabViewStylePresentation,
+    items: [TabViewStyleItemConfiguration],
+    overflowTrigger: TabViewOverflowTriggerConfiguration?,
+    content: Content
+  ) {
+    options = styleConfiguration.options
+    self.items = items
+    visibleItems = presentation.visibleOptionIndices.compactMap { index in
+      items.indices.contains(index) ? items[index] : nil
+    }
+    overflowItems =
+      presentation.overflowMenu?.overflowIndices.compactMap { index in
+        items.indices.contains(index) ? items[index] : nil
+      } ?? []
+    selectedIndex = styleConfiguration.selectedIndex
+    focusedIndex = styleConfiguration.focusedIndex
+    isFocused = styleConfiguration.isFocused
+    showsFocusEffect = styleConfiguration.showsFocusEffect
+    styleEnvironment = styleConfiguration.styleEnvironment
+    availableWidth = styleConfiguration.availableWidth
+    isOverflowMenuExpanded = styleConfiguration.isOverflowMenuExpanded
+    self.presentation = presentation
+    self.overflowTrigger = overflowTrigger
+    self.content = content
   }
 }
