@@ -190,7 +190,8 @@ extension Rasterizer {
     atX x: Int,
     y: Int,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     let glyphWidth = max(1, width)
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
@@ -214,10 +215,16 @@ extension Rasterizer {
     case (let overlayStyle?, nil):
       finalStyle = overlayStyle.isDefault ? nil : overlayStyle
     case (nil, let underlayStyle?):
-      let compositedStyle = Self.emptyCompositingStyle.composited(over: underlayStyle)
+      let compositedStyle = Self.emptyCompositingStyle.composited(
+        over: underlayStyle,
+        blendMode: blendMode
+      )
       finalStyle = compositedStyle.isDefault ? nil : compositedStyle
     case (let overlayStyle?, let underlayStyle?):
-      let compositedStyle = overlayStyle.composited(over: underlayStyle)
+      let compositedStyle = overlayStyle.composited(
+        over: underlayStyle,
+        blendMode: blendMode
+      )
       finalStyle = compositedStyle.isDefault ? nil : compositedStyle
     }
 

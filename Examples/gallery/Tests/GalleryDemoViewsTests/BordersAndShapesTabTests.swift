@@ -35,6 +35,10 @@ struct BordersAndShapesTabTests {
       artifacts.rasterSurface.lines.joined(separator: "\n").contains("chasing light"),
       "expected the animated border card to be visible in the initial viewport"
     )
+    #expect(
+      artifacts.rasterSurface.lines.joined(separator: "\n").contains("Blend Modes"),
+      "expected the blend-mode cards to be visible in the initial viewport"
+    )
   }
 
   @Test(

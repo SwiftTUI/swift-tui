@@ -62,27 +62,30 @@ extension Rasterizer {
     // inset-placement borders need to correctly overdraw the outermost
     // cells of their subtree.
     enum Frame {
-      case visit(node: DrawNode, clip: CellRect?)
+      case visit(node: DrawNode, clip: CellRect?, blendMode: BlendMode?)
       case post(
         commands: [DrawCommand],
         environment: StyleEnvironmentSnapshot,
-        clip: CellRect?)
+        clip: CellRect?,
+        blendMode: BlendMode?)
     }
 
-    var stack: [Frame] = [.visit(node: node, clip: clip)]
+    var stack: [Frame] = [.visit(node: node, clip: clip, blendMode: nil)]
 
     while let frame = stack.popLast() {
       switch frame {
-      case .post(let commands, let environment, let clip):
+      case .post(let commands, let environment, let clip, let blendMode):
         paint(
           commands: commands,
           environment: environment,
           cells: &cells,
           imageAttachments: &imageAttachments,
           clip: clip,
+          blendMode: blendMode,
           dirtyRows: dirtyRows
         )
-      case .visit(let node, let frameClip):
+      case .visit(let node, let frameClip, let inheritedBlendMode):
+        let activeBlendMode = node.metadata.blendMode ?? inheritedBlendMode
         let effectiveClip = intersect(frameClip, node.clipBounds)
         let visibleBounds: CellRect
         if let effectiveClip {
@@ -128,6 +131,7 @@ extension Rasterizer {
           cells: &cells,
           imageAttachments: &imageAttachments,
           clip: effectiveClip,
+          blendMode: activeBlendMode,
           dirtyRows: dirtyRows
         )
 
@@ -141,12 +145,13 @@ extension Rasterizer {
             .post(
               commands: node.postCommands,
               environment: node.environmentSnapshot.style,
-              clip: effectiveClip
+              clip: effectiveClip,
+              blendMode: activeBlendMode
             )
           )
         }
         for child in node.children.reversed() {
-          stack.append(.visit(node: child, clip: effectiveClip))
+          stack.append(.visit(node: child, clip: effectiveClip, blendMode: activeBlendMode))
         }
       }
     }
@@ -158,6 +163,7 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
     clip: CellRect?,
+    blendMode: BlendMode? = nil,
     dirtyRows: Set<Int>? = nil
   ) {
     struct Frame {
@@ -227,7 +233,8 @@ extension Rasterizer {
               atX: x,
               y: bounds.origin.y + lineIndex,
               cells: &cells,
-              clip: frame.clip
+              clip: frame.clip,
+              blendMode: blendMode
             )
             x += cluster.cellWidth
             if x >= bounds.origin.x + bounds.size.width {
@@ -273,7 +280,8 @@ extension Rasterizer {
               atX: x,
               y: bounds.origin.y + lineIndex,
               cells: &cells,
-              clip: frame.clip
+              clip: frame.clip,
+              blendMode: blendMode
             )
             x += cluster.cellWidth
           }
@@ -320,7 +328,8 @@ extension Rasterizer {
                 atX: x,
                 y: bounds.origin.y + lineIndex,
                 cells: &cells,
-                clip: frame.clip
+                clip: frame.clip,
+                blendMode: blendMode
               )
               x += cluster.cellWidth
             }
@@ -383,7 +392,8 @@ extension Rasterizer {
               atX: x,
               y: bounds.origin.y + lineIndex,
               cells: &cells,
-              clip: frame.clip
+              clip: frame.clip,
+              blendMode: blendMode
             )
             x += cluster.cellWidth
             if x >= bounds.origin.x + bounds.size.width {
@@ -422,7 +432,8 @@ extension Rasterizer {
           mode: mode,
           environment: environment,
           cells: &cells,
-          clip: frame.clip
+          clip: frame.clip,
+          blendMode: blendMode
         )
       case .stroke(
         let bounds, let geometry, let insetAmount, let style, let strokeStyle, let strokeBorder,
@@ -437,7 +448,8 @@ extension Rasterizer {
           backgroundStyle: backgroundStyle,
           environment: environment,
           cells: &cells,
-          clip: frame.clip
+          clip: frame.clip,
+          blendMode: blendMode
         )
       case .rule(let bounds, let style, let strokeStyle, let stackAxis):
         paintRule(
@@ -447,7 +459,8 @@ extension Rasterizer {
           stackAxis: stackAxis,
           environment: environment,
           cells: &cells,
-          clip: frame.clip
+          clip: frame.clip,
+          blendMode: blendMode
         )
       case .border(
         let bounds,
@@ -468,7 +481,8 @@ extension Rasterizer {
           sides: sides,
           environment: environment,
           cells: &cells,
-          clip: frame.clip
+          clip: frame.clip,
+          blendMode: blendMode
         )
       case .canvas(let bounds, let payload, let foregroundStyle):
         paintCanvasDrawing(
@@ -477,7 +491,8 @@ extension Rasterizer {
           foregroundStyle: foregroundStyle,
           environment: environment,
           cells: &cells,
-          clip: frame.clip
+          clip: frame.clip,
+          blendMode: blendMode
         )
       case .foreignSurface(let bounds, let payload):
         guard bounds.size.width > 0, bounds.size.height > 0 else {
@@ -507,7 +522,25 @@ extension Rasterizer {
             guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
               continue
             }
-            cells[y][x] = sourceRow[col]
+            let sourceCell = sourceRow[col]
+            if let blendMode {
+              guard sourceCell.spanWidth != 0 else {
+                continue
+              }
+              write(
+                sourceCell.character,
+                width: sourceCell.spanWidth,
+                style: sourceCell.style,
+                hyperlink: sourceCell.hyperlink,
+                atX: x,
+                y: y,
+                cells: &cells,
+                clip: frame.clip,
+                blendMode: blendMode
+              )
+            } else {
+              cells[y][x] = sourceCell
+            }
           }
         }
       }

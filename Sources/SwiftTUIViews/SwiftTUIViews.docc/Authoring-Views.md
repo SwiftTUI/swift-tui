@@ -53,7 +53,7 @@ passed down through bindings or model references.
 Most familiar modifier categories are available:
 
 - layout modifiers such as padding, frame, spacing, fixed-size, and clipping
-- style modifiers such as foreground style, tint, and disabled state
+- style modifiers such as foreground style, tint, blend mode, and disabled state
 - identity modifiers such as `.id(_:)`, which accepts any `Hashable` value and
   scopes it under the view's current tree position
 - focus modifiers such as `.focused(...)`, `.defaultFocus(...)`, and `.focusEffectDisabled()`
