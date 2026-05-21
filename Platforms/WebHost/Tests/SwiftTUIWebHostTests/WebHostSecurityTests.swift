@@ -11,7 +11,7 @@ struct WebHostSecurityTests {
   @Test("valid token sets a cookie that authorizes subsequent resources and WebSockets")
   func validTokenSetsCookieThatAuthorizesSubsequentResourcesAndWebSockets() async throws {
     try await withServer { session in
-      let (_, firstResponse) = try await URLSession.shared.data(from: session.url(path: "/"))
+      let (_, firstResponse) = try await serverData(from: session.url(path: "/"))
       let cookie = try #require(
         (firstResponse as? HTTPURLResponse)?.value(forHTTPHeaderField: "Set-Cookie")
       )
@@ -20,7 +20,7 @@ struct WebHostSecurityTests {
       var scriptRequest = URLRequest(
         url: session.url(path: "/static/webhost.js", includeToken: false))
       scriptRequest.setValue(cookie, forHTTPHeaderField: "Cookie")
-      let (_, scriptResponse) = try await URLSession.shared.data(for: scriptRequest)
+      let (_, scriptResponse) = try await serverData(for: scriptRequest)
       #expect(try statusCode(from: scriptResponse) == 200)
 
       var components = URLComponents(url: session.webSocketURL, resolvingAgainstBaseURL: false)!
@@ -41,7 +41,7 @@ struct WebHostSecurityTests {
   @Test("token-protected endpoints reject missing and wrong tokens")
   func tokenProtectedEndpointsRejectMissingAndWrongTokens() async throws {
     try await withServer { session in
-      let (_, missingResponse) = try await URLSession.shared.data(
+      let (_, missingResponse) = try await serverData(
         from: session.url(path: "/", includeToken: false)
       )
       #expect(try statusCode(from: missingResponse) == 403)
@@ -51,7 +51,7 @@ struct WebHostSecurityTests {
       components.queryItems = [URLQueryItem(name: "token", value: "wrong-token")]
       wrongTokenURL = components.url!
 
-      let (_, wrongResponse) = try await URLSession.shared.data(from: wrongTokenURL)
+      let (_, wrongResponse) = try await serverData(from: wrongTokenURL)
       #expect(try statusCode(from: wrongResponse) == 403)
     }
   }

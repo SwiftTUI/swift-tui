@@ -6,10 +6,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: perf-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   perf-smoke:
     name: Archive non-failing perf smoke artifacts
     runs-on: macos-26
+    timeout-minutes: 20
 
     steps:
 

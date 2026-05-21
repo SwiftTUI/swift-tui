@@ -7,6 +7,8 @@ cd "$repo_root"
 
 runner_name=${STUI_TEST_RUNNER_NAME:-test-all}
 example_scope=${STUI_TEST_EXAMPLE_SCOPE:-all}
+step_timeout_seconds=${STUI_TEST_STEP_TIMEOUT_SECONDS:-1200}
+step_timeout_kill_grace_seconds=${STUI_TEST_TIMEOUT_KILL_GRACE_SECONDS:-10}
 
 write_full_log_report() {
   body_log=$1
@@ -29,7 +31,7 @@ write_full_log_report() {
   ' "$body_log" >"$marker_file"
 
   result_count=$(awk 'END { print NR + 0 }' "$results_report" 2>/dev/null || echo 0)
-  failure_count=$(awk -F '|' '$2 == "FAIL" { count += 1 } END { print count + 0 }' \
+  failure_count=$(awk -F '|' '$2 == "FAIL" || $2 == "TIMEOUT" { count += 1 } END { print count + 0 }' \
     "$results_report" 2>/dev/null || echo 0)
   line_offset=$((6 + result_count + failure_count + 2))
 
@@ -54,9 +56,12 @@ write_full_log_report() {
       if [ "$status" = "SKIP" ] && [ -n "$detail" ]; then
         printf ' (%s)' "$detail"
       fi
+      if [ "$status" = "TIMEOUT" ] && [ -n "$detail" ]; then
+        printf ' (%s)' "$detail"
+      fi
       printf '\n'
 
-      if [ "$status" = "FAIL" ]; then
+      if [ "$status" = "FAIL" ] || [ "$status" = "TIMEOUT" ]; then
         printf '        rerun: %s\n' "$rerun_command"
       fi
     done <"$results_report"
@@ -217,6 +222,12 @@ across that package boundary can leave a stale object linked against a
 since-changed symbol. --clean trades a from-scratch rebuild for a run that
 cannot be tripped by that staleness.
 
+Each step is bounded by STUI_TEST_STEP_TIMEOUT_SECONDS, defaulting to 1200
+seconds. Set it to 0 to disable the per-step watchdog for local diagnosis.
+After a timeout, the runner sends SIGTERM to the step's process tree, waits
+STUI_TEST_TIMEOUT_KILL_GRACE_SECONDS seconds, then sends SIGKILL before
+printing the captured log and failing the gate.
+
 For the curated repo gate, use Scripts/test_gate.sh. That runner keeps the same
 non-example surface but only includes Examples/gallery from the examples set.
 EOF
@@ -246,18 +257,131 @@ read_step_exit_code() {
   fi
 }
 
+is_non_negative_integer() {
+  case "$1" in
+  "" | *[!0-9]*)
+    return 1
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+}
+
+validate_timeout_configuration() {
+  if ! is_non_negative_integer "$step_timeout_seconds"; then
+    >&2 echo "STUI_TEST_STEP_TIMEOUT_SECONDS must be a non-negative integer."
+    exit 1
+  fi
+
+  if ! is_non_negative_integer "$step_timeout_kill_grace_seconds"; then
+    >&2 echo "STUI_TEST_TIMEOUT_KILL_GRACE_SECONDS must be a non-negative integer."
+    exit 1
+  fi
+}
+
+process_children() {
+  pid=$1
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -P "$pid" 2>/dev/null || true
+    return
+  fi
+
+  ps -e -o pid= -o ppid= 2>/dev/null | awk -v parent="$pid" '$2 == parent { print $1 }'
+}
+
+send_signal() {
+  signal=$1
+  pid=$2
+
+  case "$signal" in
+  TERM)
+    kill -TERM "$pid" 2>/dev/null || true
+    ;;
+  KILL)
+    kill -KILL "$pid" 2>/dev/null || true
+    ;;
+  esac
+}
+
+kill_process_tree() {
+  pid=$1
+  signal=$2
+
+  for child in $(process_children "$pid"); do
+    kill_process_tree "$child" "$signal"
+  done
+
+  send_signal "$signal" "$pid"
+}
+
 run_logged_command() {
   log_file=$1
   status_file=$2
-  shift 2
+  timeout_file=$3
+  watchdog_cancel_file=$timeout_file.cancel
+  shift 3
 
-  rm -f "$status_file"
+  rm -f "$status_file" "$timeout_file" "$watchdog_cancel_file"
 
   (
     set +e
-    "$@"
+
+    if [ "$step_timeout_seconds" -eq 0 ]; then
+      "$@"
+      command_status=$?
+      printf '%s\n' "$command_status" >"$status_file"
+      exit 0
+    fi
+
+    "$@" &
+    command_pid=$!
+
+    (
+      elapsed_ticks=0
+      timeout_ticks=$((step_timeout_seconds * 5))
+      while [ "$elapsed_ticks" -lt "$timeout_ticks" ]; do
+        if [ -f "$watchdog_cancel_file" ]; then
+          exit 0
+        fi
+        sleep 0.2
+        elapsed_ticks=$((elapsed_ticks + 1))
+      done
+
+      if [ -f "$watchdog_cancel_file" ]; then
+        exit 0
+      fi
+
+      if kill -0 "$command_pid" 2>/dev/null; then
+        detail="timed out after ${step_timeout_seconds}s"
+        printf '%s\n' "$detail" >"$timeout_file"
+        printf '%s\n' 124 >"$status_file"
+        >&2 echo "TIMEOUT: command $detail; terminating process tree rooted at pid $command_pid."
+        kill_process_tree "$command_pid" TERM
+        sleep "$step_timeout_kill_grace_seconds"
+        if kill -0 "$command_pid" 2>/dev/null; then
+          >&2 echo "TIMEOUT: command still running after ${step_timeout_kill_grace_seconds}s; sending SIGKILL."
+          kill_process_tree "$command_pid" KILL
+        fi
+      fi
+    ) &
+    watchdog_pid=$!
+
+    wait "$command_pid"
     command_status=$?
-    printf '%s\n' "$command_status" >"$status_file"
+    if [ -f "$timeout_file" ]; then
+      wait "$watchdog_pid" 2>/dev/null || true
+    else
+      printf '%s\n' cancel >"$watchdog_cancel_file"
+      wait "$watchdog_pid" 2>/dev/null || true
+    fi
+    rm -f "$watchdog_cancel_file"
+
+    if [ ! -f "$status_file" ]; then
+      printf '%s\n' "$command_status" >"$status_file"
+    fi
+
     exit 0
   ) 2>&1 | tee "$log_file"
 
@@ -393,24 +517,41 @@ run_step() {
   step_index=$((step_index + 1))
   log_file=$log_root/step-$step_index.log
   status_file=$log_root/step-$step_index.status
+  timeout_file=$log_root/step-$step_index.timeout
 
   echo ""
   echo "==> $title"
 
   if (
     cd "$workdir" &&
-      run_logged_command "$log_file" "$status_file" "$@"
+      run_logged_command "$log_file" "$status_file" "$timeout_file" "$@"
   ); then
-    rm -f "$status_file"
+    rm -f "$status_file" "$timeout_file"
     echo "PASS: $title"
     record_result "$title" "PASS" "0" "-" "$rerun_command" "$log_file" ""
   else
     exit_code=$(read_step_exit_code "$status_file")
-    rm -f "$status_file"
-    failure_count=$(derive_failure_count "$log_file")
-    >&2 echo "FAIL: $title"
+    if [ -f "$timeout_file" ]; then
+      detail=$(cat "$timeout_file")
+      failure_count="-"
+      status=TIMEOUT
+      >&2 echo "TIMEOUT: $title ($detail)"
+    else
+      detail=""
+      failure_count=$(derive_failure_count "$log_file")
+      status=FAIL
+      >&2 echo "FAIL: $title"
+    fi
+    rm -f "$status_file" "$timeout_file"
     any_failed=1
-    record_result "$title" "FAIL" "$exit_code" "$failure_count" "$rerun_command" "$log_file" ""
+    record_result "$title" "$status" "$exit_code" "$failure_count" "$rerun_command" "$log_file" "$detail"
+    if [ "$status" = "TIMEOUT" ]; then
+      >&2 echo ""
+      >&2 echo "Aborting after timeout to avoid spending more CI minutes on a stuck gate."
+      print_failure_logs
+      print_summary >&2
+      exit 1
+    fi
   fi
 }
 
@@ -421,21 +562,38 @@ run_function_step() {
   step_index=$((step_index + 1))
   log_file=$log_root/step-$step_index.log
   status_file=$log_root/step-$step_index.status
+  timeout_file=$log_root/step-$step_index.timeout
 
   echo ""
   echo "==> $title"
 
-  if run_logged_command "$log_file" "$status_file" "$@"; then
-    rm -f "$status_file"
+  if run_logged_command "$log_file" "$status_file" "$timeout_file" "$@"; then
+    rm -f "$status_file" "$timeout_file"
     echo "PASS: $title"
     record_result "$title" "PASS" "0" "-" "$rerun_command" "$log_file" ""
   else
     exit_code=$(read_step_exit_code "$status_file")
-    rm -f "$status_file"
-    failure_count=$(derive_failure_count "$log_file")
-    >&2 echo "FAIL: $title"
+    if [ -f "$timeout_file" ]; then
+      detail=$(cat "$timeout_file")
+      failure_count="-"
+      status=TIMEOUT
+      >&2 echo "TIMEOUT: $title ($detail)"
+    else
+      detail=""
+      failure_count=$(derive_failure_count "$log_file")
+      status=FAIL
+      >&2 echo "FAIL: $title"
+    fi
+    rm -f "$status_file" "$timeout_file"
     any_failed=1
-    record_result "$title" "FAIL" "$exit_code" "$failure_count" "$rerun_command" "$log_file" ""
+    record_result "$title" "$status" "$exit_code" "$failure_count" "$rerun_command" "$log_file" "$detail"
+    if [ "$status" = "TIMEOUT" ]; then
+      >&2 echo ""
+      >&2 echo "Aborting after timeout to avoid spending more CI minutes on a stuck gate."
+      print_failure_logs
+      print_summary >&2
+      exit 1
+    fi
   fi
 }
 
@@ -503,7 +661,7 @@ clean_swift_build_directories() {
 
 print_failure_logs() {
   while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
-    [ "$status" = "FAIL" ] || continue
+    [ "$status" = "FAIL" ] || [ "$status" = "TIMEOUT" ] || continue
 
     >&2 echo ""
     >&2 echo "===== $title (exit $exit_code) ====="
@@ -530,6 +688,15 @@ print_summary() {
         "$status" "$exit_code" "$failure_count" "$title"
       printf '        rerun: %s\n' "$rerun_command"
       ;;
+    TIMEOUT)
+      printf '  %-4s  exit=%-3s  failures=%-3s  %s' \
+        "$status" "$exit_code" "$failure_count" "$title"
+      if [ -n "$detail" ]; then
+        printf ' (%s)' "$detail"
+      fi
+      printf '\n'
+      printf '        rerun: %s\n' "$rerun_command"
+      ;;
     SKIP)
       printf '  %-4s  exit=%-3s  failures=%-3s  %s' \
         "$status" "$exit_code" "$failure_count" "$title"
@@ -554,6 +721,7 @@ print_summary() {
 
 require_command swiftly
 require_command bun
+validate_timeout_configuration
 
 if [ "$is_linux" -eq 1 ]; then
   echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."

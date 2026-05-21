@@ -31,6 +31,12 @@ process.
 Set `SWIFTTUI_TEST_TIMEOUT_SCALE` to widen async test timeouts on a slow or
 loaded machine.
 
+The repo gate also has a command-level watchdog around every sub-suite. By
+default, `STUI_TEST_STEP_TIMEOUT_SECONDS=1200`; set it to `0` only for local
+diagnosis when you intentionally want an unbounded run. On timeout, the runner
+prints the captured sub-suite log and exits immediately so later suites do not
+keep spending CI minutes.
+
 ### Test targets
 
 ```mermaid
@@ -132,7 +138,11 @@ land through reviewed pull requests.
 ## Continuous integration
 
 CI runs on GitHub Actions. The macOS jobs use the `macos-26` runner, which is
-the macOS support floor; Linux jobs run on `ubuntu-latest` with a
-`swiftly`-managed toolchain. An iOS job builds (but does not run) the
-host-compatible products. The browser deployment workflow publishes the
-combined DocC archive.
+the macOS support floor; Linux jobs run on native amd64 and arm64 Ubuntu
+runners with a `swiftly`-managed toolchain. An iOS job builds (but does not
+run) the host-compatible products. The browser deployment workflow publishes
+the combined DocC archive. CI jobs also carry workflow-level caps: the Linux
+repo gate is capped at 45 minutes, the macOS repo gate at 30 minutes, the iOS
+build at 15 minutes, the Linux image build at 45 minutes, the Linux image
+manifest publish at 10 minutes, the perf smoke at 20 minutes, and Cloudflare
+Pages deployment at 30 minutes.
