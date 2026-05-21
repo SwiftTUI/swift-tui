@@ -239,6 +239,7 @@ struct GalleryTabSwitchTests {
       presentationSurface: host,
       terminalInputReader: GalleryTabSwitchAwaitedInputReader(
         frameSignal: host.frameSignal,
+        stageClock: host.stageClock,
         steps: [
           .awaitCondition {
             let surfaces = deduplicated(host.surfaces)
@@ -313,6 +314,7 @@ struct GalleryTabSwitchTests {
       presentationSurface: host,
       terminalInputReader: GalleryTabSwitchAwaitedInputReader(
         frameSignal: host.frameSignal,
+        stageClock: host.stageClock,
         steps: [
           .event(.mouse(.init(kind: .down(.primary), location: tabClickCenter))),
           .event(.mouse(.init(kind: .up(.primary), location: tabClickCenter))),
@@ -364,6 +366,7 @@ struct GalleryTabSwitchTests {
       presentationSurface: host,
       terminalInputReader: GalleryTabSwitchAwaitedInputReader(
         frameSignal: host.frameSignal,
+        stageClock: host.stageClock,
         steps: [
           .event(.mouse(.init(kind: .down(.primary), location: overflowTriggerCenter))),
           .event(.mouse(.init(kind: .up(.primary), location: overflowTriggerCenter))),
@@ -422,6 +425,7 @@ struct GalleryTabSwitchTests {
       presentationSurface: host,
       terminalInputReader: GalleryTabSwitchAwaitedInputReader(
         frameSignal: host.frameSignal,
+        stageClock: host.stageClock,
         steps: [
           .awaitCondition {
             let surfaces = deduplicated(host.surfaces)
@@ -643,6 +647,7 @@ struct GalleryTabSwitchTests {
       presentationSurface: host,
       terminalInputReader: GalleryTabSwitchAwaitedInputReader(
         frameSignal: host.frameSignal,
+        stageClock: host.stageClock,
         steps: [
           .awaitCondition {
             host.lastPresentedSurface != nil
@@ -979,6 +984,25 @@ struct GalleryTabSwitchTests {
   @MainActor
   private static func runHarness<V: View>(
     presentationSurface: any PresentationSurface,
+    terminalInputReader: GalleryTabSwitchAwaitedInputReader,
+    terminalSize: CellSize,
+    rootIdentity: Identity,
+    viewBuilder: @escaping () -> V
+  ) async throws -> RunLoopResult<Int> {
+    let result = try await runHarness(
+      presentationSurface: presentationSurface,
+      terminalInputReader: terminalInputReader as any TerminalInputReading,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: viewBuilder
+    )
+    try await terminalInputReader.requireNoWaitFailure()
+    return result
+  }
+
+  @MainActor
+  private static func runHarness<V: View>(
+    presentationSurface: any PresentationSurface,
     terminalInputReader: any TerminalInputReading,
     terminalSize: CellSize,
     rootIdentity: Identity,
@@ -1003,6 +1027,10 @@ struct GalleryTabSwitchTests {
       proposal: .init(width: terminalSize.width, height: terminalSize.height),
       viewBuilder: { _, _ in viewBuilder() }
     )
+    // These gallery tests exercise tab, gesture, and scene composition. The
+    // async frame-tail contract is covered separately, so keep this harness on
+    // the deterministic sync path under Linux load.
+    runLoop.renderMode = .sync
     return try await runLoop.run()
   }
 
@@ -1027,7 +1055,8 @@ struct GalleryTabSwitchTests {
         presentationSurface: presentationSurface,
         terminalInputReader: terminalInputReader,
         signalReader: GalleryTabSwitchEmptySignals(),
-        scheduler: FrameScheduler()
+        scheduler: FrameScheduler(),
+        renderMode: .sync
       ),
       stateContainer: StateContainer(
         initialState: SceneSessionState(),
@@ -1571,41 +1600,86 @@ private enum GalleryTabSwitchAwaitedInputStep {
   case awaitCondition(predicate: @MainActor () -> Bool)
 }
 
+private actor GalleryTabSwitchWaitFailureRecorder {
+  private var failure: StageBudgetExceeded?
+
+  func record(_ failure: StageBudgetExceeded) {
+    self.failure = failure
+  }
+
+  func requireNoFailure() throws {
+    if let failure {
+      throw failure
+    }
+  }
+}
+
 private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
   private let steps: [GalleryTabSwitchAwaitedInputStep]
   private let frameSignal: MainActorConditionSignal
+  private let stageClock: ManualStageClock
+  private let waitBudget: ProgressBudget
+  private let waitFailure = GalleryTabSwitchWaitFailureRecorder()
 
   init(
     frameSignal: MainActorConditionSignal,
+    stageClock: ManualStageClock,
+    waitBudget: ProgressBudget = ProgressBudget(stages: 480),
     steps: [GalleryTabSwitchAwaitedInputStep]
   ) {
     self.frameSignal = frameSignal
+    self.stageClock = stageClock
+    self.waitBudget = waitBudget
     self.steps = steps
+  }
+
+  @MainActor
+  func requireNoWaitFailure() async throws {
+    try await waitFailure.requireNoFailure()
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let steps = self.steps
       let frameSignal = self.frameSignal
+      let stageClock = self.stageClock
+      let waitBudget = self.waitBudget
+      let waitFailure = self.waitFailure
       let task = Task { @MainActor in
         // Virtual clock: a step's delay advances the timestamp stamped onto
         // the event rather than being slept through, so drag-release velocity
         // is deterministic and independent of wall-clock pacing.
         var virtualClock = MonotonicInstant.now()
-        for step in steps {
+        for (index, step) in steps.enumerated() {
           switch step {
           case .event(let event, let delayNanoseconds):
             virtualClock = virtualClock.advanced(
               by: .nanoseconds(Int64(delayNanoseconds))
             )
+            stageClock.advance()
             continuation.yield(restampedInputEvent(event, at: virtualClock))
           case .eventFrom(let delayNanoseconds, let provider):
             virtualClock = virtualClock.advanced(
               by: .nanoseconds(Int64(delayNanoseconds))
             )
+            stageClock.advance()
             continuation.yield(restampedInputEvent(provider(), at: virtualClock))
           case .awaitCondition(let predicate):
-            await frameSignal.wait(until: predicate)
+            do {
+              try await frameSignal.wait(
+                until: predicate,
+                for: "gallery tab-switch awaited input step \(index)",
+                within: waitBudget,
+                on: stageClock
+              )
+            } catch let failure as StageBudgetExceeded {
+              await waitFailure.record(failure)
+              continuation.finish()
+              return
+            } catch {
+              continuation.finish()
+              return
+            }
           }
         }
         continuation.finish()
@@ -1644,6 +1718,7 @@ private final class GalleryTabSwitchRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
+  let stageClock = ManualStageClock()
   private(set) var surfaces: [RasterSurface] = []
   private(set) var lastPresentedSurface: RasterSurface?
 
@@ -1665,6 +1740,7 @@ private final class GalleryTabSwitchRecordingHost: PresentationSurface {
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     surfaces.append(surface)
     lastPresentedSurface = surface
+    stageClock.advance()
     // The run loop only ever presents on the MainActor; `assumeIsolated`
     // bridges this nonisolated protocol witness to the MainActor-isolated
     // signal, and traps loudly rather than corrupting state if that ever

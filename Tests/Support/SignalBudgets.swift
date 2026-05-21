@@ -25,7 +25,7 @@ extension MainActorConditionSignal {
   /// Waits until `predicate` holds, throwing `StageBudgetExceeded` if `budget`
   /// stages of `clock` elapse first.
   @_spi(Testing) public func wait(
-    until predicate: @escaping @Sendable () -> Bool,
+    until predicate: @escaping @MainActor @Sendable () -> Bool,
     for label: String,
     within budget: ProgressBudget,
     on clock: some StageClock
