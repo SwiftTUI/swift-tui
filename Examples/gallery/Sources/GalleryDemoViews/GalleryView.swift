@@ -63,6 +63,10 @@ public struct GalleryView: View {
       Tab("Physics", value: GalleryView.GalleryTab.physics) {
         PhysicsTab()
       }
+
+      Tab("Claude", value: GalleryView.GalleryTab.claudeWorking) {
+        ClaudeWorkingTab()
+      }
     }
     .tabViewStyle(.literalTabs)
     .toolbarItem(
@@ -130,6 +134,10 @@ public struct GalleryView: View {
       name: "Physics",
       action: { selection = .physics }
     )
+    .paletteCommand(
+      name: "Claude",
+      action: { selection = .claudeWorking }
+    )
     .toolbar(style: .defaultBottom)
     .paletteSheet("Command palette", isPresented: $showPalette) { commands in
       CommandPaletteList(
@@ -155,6 +163,7 @@ extension GalleryView {
     case fileDrop
     case popovers
     case physics
+    case claudeWorking
 
     init?(environmentName: String) {
       switch environmentName.lowercased() {
@@ -175,6 +184,8 @@ extension GalleryView {
       case "filedrop", "file-drop", "files": self = .fileDrop
       case "popover", "popovers", "tips": self = .popovers
       case "physics": self = .physics
+      case "claude", "working", "claudeworking", "claude-working", "todolist", "todo-list":
+        self = .claudeWorking
       default: return nil
       }
     }

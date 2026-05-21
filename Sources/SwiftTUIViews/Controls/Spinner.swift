@@ -2,12 +2,22 @@ import SwiftTUICore
 
 public struct Spinner: View {
 
-  public init(_ set: SpinnerSet = .brailleLoop, stage: Stage = .active) {
+  public init(
+    _ set: SpinnerSet = .brailleLoop,
+    stage: Stage = .active,
+    interval: Duration = .milliseconds(64)
+  ) {
+    precondition(
+      interval > .zero,
+      "Spinner interval must be > 0 milliseconds"
+    )
     self.set = set
     self.stage = stage
+    self.interval = interval
   }
   let set: SpinnerSet
   let stage: Stage
+  let interval: Duration
   @State var iteration: Int = 0
 
   public var body: some View {
@@ -22,11 +32,11 @@ public struct Spinner: View {
       spinnerText(accessibilityReduceMotion: true)
     } else {
       spinnerText(accessibilityReduceMotion: false)
-        .task(id: Pair(a: set, b: stage)) {
+        .task(id: SpinnerTaskKey(set: set, stage: stage, interval: interval)) {
           switch stage {
           case .active:
             while !Task.isCancelled {
-              try? await Task.sleep(for: .milliseconds(64))
+              try? await Task.sleep(for: interval)
               let max = set.body.count
               var newIteration = iteration + 1
               newIteration %= max
@@ -122,6 +132,11 @@ public struct Spinner: View {
     public static let heavyArrowCompass = Self("⇑", "⇗", "⇒", "⇘", "⇓", "⇙", "⇐", "⇖")
     public static let lineCompass = Self("│", "╱", "─", "╲", tail: "┼")
     public static let asciiLineCompass = Self("|", "/", "-", "\\", tail: "X")
+    /// Compact 4-glyph cycle used by Claude Code's terminal "working"
+    /// header: asterisk, middle dot, plus, division sign.  All four
+    /// glyphs are single-cell-wide ASCII so the spinner stays at a
+    /// constant width as it rotates.
+    public static let asteriskCycle = Self("*", "·", "+", "÷")
     public static let oghamPulse = Self(
       " ", "ᚁ", "ᚂ", "ᚃ", "ᚄ", "ᚅ", "ᚄ", "ᚃ", "ᚂ", "ᚁ", " ", "ᚆ", "ᚇ", "ᚈ", "ᚉ", "ᚊ", "ᚉ", "ᚈ", "ᚇ",
       "ᚆ", tail: "ᚔ")
@@ -138,6 +153,15 @@ struct Pair<A, B> {
 extension Pair: Equatable where A: Equatable, B: Equatable {}
 extension Pair: Hashable where A: Hashable, B: Hashable {}
 extension Pair: Sendable where A: Sendable, B: Sendable {}
+
+/// Composite key used to drive the spinner's `.task(id:)` cancellation.
+/// Changing any of the three observed fields cleanly cancels the
+/// previous tick loop so a fresh one starts at the new rate.
+private struct SpinnerTaskKey: Hashable, Sendable {
+  let set: Spinner.SpinnerSet
+  let stage: Spinner.Stage
+  let interval: Duration
+}
 
 extension Array {
   subscript(safe safe: Int) -> Element? {

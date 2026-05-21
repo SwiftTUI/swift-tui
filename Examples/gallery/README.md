@@ -42,6 +42,7 @@ checks, for example `GALLERY_INITIAL_TAB=images`.
 | File Drop | File-drop authoring surface |
 | Popovers | Anchored popover presentation and palette composition |
 | Physics | Gesture-driven full-screen toy surface |
+| Claude | Reproduction of Claude Code's animated "working" pane (spinner, shimmering title, subtask list) |
 
 `Ctrl+K` opens the command palette. The gallery intentionally exercises the
 same command and presentation surfaces that app authors use.

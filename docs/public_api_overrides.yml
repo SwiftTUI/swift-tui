@@ -311,6 +311,17 @@ classifications:
     - SwiftTUIViews.PointerPath
     - SwiftTUIViews.TapGesture
 
+    # ─── Timeline-driven views ────────────────────────────────────────────
+    # TimelineView re-evaluates content at dates supplied by a schedule.
+    # Used for clocks, shimmer/marquee effects, and other "current time"
+    # surfaces.  See Sources/SwiftTUIViews/Animation/TimelineView.swift.
+    - SwiftTUIViews.AnimationTimelineSchedule
+    - SwiftTUIViews.PeriodicTimelineSchedule
+    - SwiftTUIViews.TimelineSchedule
+    - SwiftTUIViews.TimelineScheduleMode
+    - SwiftTUIViews.TimelineView
+    - SwiftTUIViews.TimelineViewContext
+
     # ─── View layout primitives ───────────────────────────────────────────
     - SwiftTUIViews.CoordinateSpace
     - SwiftTUIViews.GeometryProxy
