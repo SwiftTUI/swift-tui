@@ -5725,6 +5725,76 @@ struct SwiftUISurfaceTests {
         != artifacts.rasterSurface.styleRuns[1].style.foregroundColor)
   }
 
+  @Test("bold text samples linear gradient foreground per cell")
+  func boldTextSamplesLinearGradientForegroundPerCell() {
+    let gradient = LinearGradient(
+      colors: [.red, .blue],
+      startPoint: .leading,
+      endPoint: .trailing
+    )
+    let artifacts = DefaultRenderer().render(
+      Text("AB")
+        .bold()
+        .foregroundStyle(gradient),
+      context: .init(identity: testIdentity("BoldGradientText"))
+    )
+
+    #expect(artifacts.rasterSurface.styleRuns.count == 2)
+    #expect(artifacts.rasterSurface.styleRuns.allSatisfy { $0.style.emphasis == .bold })
+    #expect(
+      artifacts.rasterSurface.styleRuns[0].style.foregroundColor
+        != artifacts.rasterSurface.styleRuns[1].style.foregroundColor)
+  }
+
+  @Test("linear gradient foreground handles shine stops clamped to both edges")
+  func linearGradientForegroundHandlesClampedShineStops() {
+    let gradient = LinearGradient(
+      stops: [
+        .init(color: .white, location: 0),
+        .init(color: .yellow, location: 0),
+        .init(color: .yellow, location: 1),
+        .init(color: .white, location: 1),
+      ],
+      startPoint: .leading,
+      endPoint: .trailing
+    )
+    let artifacts = DefaultRenderer().render(
+      Text("SHINE")
+        .foregroundStyle(gradient),
+      context: .init(identity: testIdentity("ClampedShineGradient"))
+    )
+
+    #expect(artifacts.rasterSurface.styleRuns.count == 1)
+    let color = artifacts.rasterSurface.styleRuns[0].style.foregroundColor
+    #expect(color != nil)
+    #expect(abs((color?.red ?? 0) - Color.yellow.red) < 0.0001)
+    #expect(abs((color?.green ?? 0) - Color.yellow.green) < 0.0001)
+    #expect(abs((color?.blue ?? 0) - Color.yellow.blue) < 0.0001)
+  }
+
+  @Test("inherited text gradients are bounded per sibling text leaf")
+  func inheritedTextGradientsAreBoundedPerSiblingTextLeaf() {
+    let gradient = LinearGradient(
+      colors: [.red, .blue],
+      startPoint: .leading,
+      endPoint: .trailing
+    )
+    let artifacts = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("AB")
+        Text("CD")
+      }
+      .foregroundStyle(gradient),
+      context: .init(identity: testIdentity("SiblingGradientText"))
+    )
+
+    let firstSiblingStart = artifacts.rasterSurface.cells[0][0].style?.foregroundColor
+    let secondSiblingStart = artifacts.rasterSurface.cells[0][2].style?.foregroundColor
+
+    #expect(firstSiblingStart != nil)
+    #expect(firstSiblingStart == secondSiblingStart)
+  }
+
   @Test("tile style renders tiled content with framework styles")
   func tileStyleRendersTiledContent() {
     let artifacts = DefaultRenderer().render(
