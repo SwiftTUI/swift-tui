@@ -126,6 +126,10 @@ extension View {
     environment(\.tintStyle, style.map(AnyShapeStyle.init))
   }
 
+  public func blendMode(_ blendMode: BlendMode) -> some View {
+    drawMetadata(.init(blendMode: blendMode))
+  }
+
   public func disabled(_ isDisabled: Bool) -> some View {
     transformEnvironment(\.isEnabled) { isEnabled in
       isEnabled = isEnabled && !isDisabled

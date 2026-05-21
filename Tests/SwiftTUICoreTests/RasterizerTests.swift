@@ -63,6 +63,111 @@ struct RasterizerTests {
     #expect(surface.cells[0][0].style?.backgroundColor == .red)
   }
 
+  @Test(
+    "blend mode composites fill backgrounds against the current raster backdrop",
+    arguments: [
+      BlendMode.normal,
+      BlendMode.multiply,
+      BlendMode.screen,
+      BlendMode.overlay,
+      BlendMode.darken,
+      BlendMode.lighten,
+    ]
+  )
+  func blendModeCompositesFillBackground(mode: BlendMode) throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let backdrop = Color(red: 0.20, green: 0.60, blue: 0.70, profile: .linearSRGB)
+    let source = Color(red: 0.80, green: 0.40, blue: 0.20, profile: .linearSRGB)
+    let expected = source.composited(over: backdrop, mode: mode, workingSpace: .linearSRGB)
+    let draw = DrawNode(
+      identity: testIdentity("blend-root"),
+      bounds: bounds,
+      commands: [
+        .fill(
+          bounds: bounds,
+          geometry: .rectangle,
+          insetAmount: 0,
+          style: .color(backdrop),
+          mode: .full
+        )
+      ],
+      children: [
+        DrawNode(
+          identity: testIdentity("blend-child"),
+          bounds: bounds,
+          metadata: .init(blendMode: mode),
+          commands: [
+            .fill(
+              bounds: bounds,
+              geometry: .rectangle,
+              insetAmount: 0,
+              style: .color(source),
+              mode: .full
+            )
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let style = try #require(surface.cells[0][0].style)
+
+    expectColor(style.backgroundColor, equals: expected)
+  }
+
+  @Test("blend mode composites text foreground against the current raster foreground")
+  func blendModeCompositesTextForeground() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let backdropForeground = Color(red: 0.20, green: 0.60, blue: 0.70, profile: .linearSRGB)
+    let sourceForeground = Color(red: 0.80, green: 0.40, blue: 0.20, profile: .linearSRGB)
+    let expectedForeground = sourceForeground.composited(
+      over: backdropForeground,
+      mode: .screen,
+      workingSpace: .linearSRGB
+    )
+    let draw = DrawNode(
+      identity: testIdentity("blend-text-root"),
+      bounds: bounds,
+      commands: [
+        .text(
+          bounds: bounds,
+          content: "B",
+          style: .init(
+            foregroundStyle: .color(backdropForeground), backgroundStyle: .color(.black)),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ],
+      children: [
+        DrawNode(
+          identity: testIdentity("blend-text-child"),
+          bounds: bounds,
+          metadata: .init(blendMode: .screen),
+          commands: [
+            .text(
+              bounds: bounds,
+              content: "S",
+              style: .init(foregroundStyle: .color(sourceForeground)),
+              lineLimit: nil,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let style = try #require(surface.cells[0][0].style)
+
+    #expect(surface.cells[0][0].character == "S")
+    expectColor(style.foregroundColor, equals: expectedForeground)
+    #expect(style.backgroundColor == Color.black)
+  }
+
   @Test("fully clipped descendants do not expand the raster surface extent")
   func clippedDescendantsDoNotExpandSurfaceExtent() {
     let rasterizer = Rasterizer()
@@ -775,4 +880,19 @@ private func coreRasterImageNode(
       )
     ]
   )
+}
+
+private func expectColor(
+  _ actual: Color?,
+  equals expected: Color,
+  tolerance: Double = 0.0001
+) {
+  guard let actual else {
+    Issue.record("expected color \(expected), got nil")
+    return
+  }
+  #expect(abs(actual.red - expected.red) < tolerance)
+  #expect(abs(actual.green - expected.green) < tolerance)
+  #expect(abs(actual.blue - expected.blue) < tolerance)
+  #expect(abs(actual.alpha - expected.alpha) < tolerance)
 }

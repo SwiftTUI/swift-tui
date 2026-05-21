@@ -54,6 +54,18 @@ Semantics is computed from the placed tree alongside draw, and the
 array — flows through to commit so every host can present it. See
 [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
+## Raster Compositing
+
+`View.blendMode(_:)` lowers into draw metadata and is inherited by the raster
+paint walk until a descendant supplies its own blend mode. At each cell write,
+the rasterizer resolves the source and backdrop foreground/background colors
+first, then composites each channel independently with `Color.composited` in
+linear sRGB. This keeps semantic styles and gradients resolved before blending.
+
+SwiftTUI does not currently implement SwiftUI's `compositingGroup()` off-screen
+flattening. Nested blend modes therefore operate at the leaf cell-write level;
+there is no intermediate subtree buffer that blends as one layer.
+
 ## The runtime stage pipeline
 
 `RuntimeRenderPipeline` runs `RuntimeRenderStageName.orderedComposition` with an

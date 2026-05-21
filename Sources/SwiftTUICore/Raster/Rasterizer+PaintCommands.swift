@@ -7,7 +7,8 @@ extension Rasterizer {
     mode: ShapeFillMode,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -44,7 +45,8 @@ extension Rasterizer {
         stroke: false,
         environment: environment,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
       return
     case .rectangle, .roundedRectangle:
@@ -106,16 +108,30 @@ extension Rasterizer {
             atX: x,
             y: y,
             cells: &cells,
-            clip: clip
+            clip: clip,
+            blendMode: blendMode
           )
           x += 1
           continue
         }
 
         if isTranslucent {
-          // Translucent constant fill: tint existing cell in-place.
           if let color = constantColor, color.alpha > 0 {
-            tintCell(atX: x, y: y, with: color, cells: &cells, clip: clip)
+            if let blendMode {
+              let resolvedStyle = ResolvedTextStyle(backgroundColor: color)
+              write(
+                " ",
+                style: resolvedStyle.isDefault ? nil : resolvedStyle,
+                atX: x,
+                y: y,
+                cells: &cells,
+                clip: clip,
+                blendMode: blendMode
+              )
+            } else {
+              // Translucent constant fill: tint existing cell in-place.
+              tintCell(atX: x, y: y, with: color, cells: &cells, clip: clip)
+            }
           }
         } else if let constantColor {
           // Opaque constant fill: overwrite cell.
@@ -126,7 +142,8 @@ extension Rasterizer {
             atX: x,
             y: y,
             cells: &cells,
-            clip: clip
+            clip: clip,
+            blendMode: blendMode
           )
         } else {
           // Sampled (gradient) fill: resolve per-cell.
@@ -138,7 +155,20 @@ extension Rasterizer {
           )
           if let fillColor, fillColor.alpha < 1 {
             if fillColor.alpha > 0 {
-              tintCell(atX: x, y: y, with: fillColor, cells: &cells, clip: clip)
+              if let blendMode {
+                let resolvedStyle = ResolvedTextStyle(backgroundColor: fillColor)
+                write(
+                  " ",
+                  style: resolvedStyle.isDefault ? nil : resolvedStyle,
+                  atX: x,
+                  y: y,
+                  cells: &cells,
+                  clip: clip,
+                  blendMode: blendMode
+                )
+              } else {
+                tintCell(atX: x, y: y, with: fillColor, cells: &cells, clip: clip)
+              }
             }
           } else {
             write(
@@ -152,7 +182,8 @@ extension Rasterizer {
               atX: x,
               y: y,
               cells: &cells,
-              clip: clip
+              clip: clip,
+              blendMode: blendMode
             )
           }
         }
@@ -174,7 +205,8 @@ extension Rasterizer {
     foregroundStyle: AnyShapeStyle,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     let cellW = bounds.size.width
     let cellH = bounds.size.height
@@ -225,7 +257,8 @@ extension Rasterizer {
           atX: originX + cellX,
           y: originY + cellY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
     }
@@ -255,7 +288,8 @@ extension Rasterizer {
           atX: originX + cellX,
           y: originY + cellY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
     }
@@ -275,7 +309,8 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    backgroundStyle: BorderBackgroundStyle? = nil
+    backgroundStyle: BorderBackgroundStyle? = nil,
+    blendMode: BlendMode? = nil
   ) {
     let cellW = shapeBounds.size.width
     let cellH = shapeBounds.size.height
@@ -378,7 +413,8 @@ extension Rasterizer {
           atX: targetX,
           y: targetY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
     }

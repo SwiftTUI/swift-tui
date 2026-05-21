@@ -7,18 +7,19 @@ import SwiftTUIRuntime
 ///
 ///   1. A chasing-light perimeter gradient driven by an animated
 ///      ``BorderBlend`` phase via `withAnimation(.repeatForever)`.
-///   2. The built-in ``BorderSet`` catalog — a grid of small bordered
+///   2. View-level ``BlendMode`` compositing over varied backdrop cells.
+///   3. The built-in ``BorderSet`` catalog — a grid of small bordered
 ///      cards, one per built-in set, so every glyph family is visible.
-///   3. Per-side ``BorderEdgeStyle`` foregrounds — a traffic-light card
+///   4. Per-side ``BorderEdgeStyle`` foregrounds — a traffic-light card
 ///      and a CSS-shorthand two-color card.
-///   4. Curved shapes — ``Circle``, ``Ellipse``, and ``Capsule`` across
+///   5. Curved shapes — ``Circle``, ``Ellipse``, and ``Capsule`` across
 ///      fill / strokeBorder / ``TileStyle`` variants, including a
 ///      ``PhaseAnimator``-driven gradient that smoothly rotates
 ///      through the four corner orientations (enabled by the
 ///      `Animatable` protocol migration).
-///   5. A hand-drawn ``Canvas`` sparkline, the arbitrary-drawing
+///   6. A hand-drawn ``Canvas`` sparkline, the arbitrary-drawing
 ///      escape hatch alongside the shape fill/stroke algebra.
-///   6. A direct ``withAnimation`` gradient rotation demo: tap a
+///   7. A direct ``withAnimation`` gradient rotation demo: tap a
 ///      button and the linear gradient interpolates its start and
 ///      end points to a new orientation, exercising
 ///      ``LinearGradient`` 's `Animatable` conformance through a real
@@ -32,6 +33,8 @@ struct BordersAndShapesTab: View {
         BordersAndShapesHeader()
         Divider()
         chasingLightSection
+        Divider()
+        BordersAndShapesBlendModesSection()
         Divider()
         BordersAndShapesCatalogSection()
         Divider()
@@ -77,8 +80,52 @@ private struct BordersAndShapesHeader: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Borders & Shapes").foregroundStyle(.foreground)
-      Text("BorderSet catalog, per-side colors, animated gradient, curved shapes, Canvas.")
+      Text("Blend modes, BorderSet catalog, per-side colors, curved shapes, Canvas.")
         .foregroundStyle(.separator)
+    }
+  }
+}
+
+private struct BordersAndShapesBlendModesSection: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("2. Blend Modes — cell compositing over gradient backdrops")
+        .foregroundStyle(.muted)
+      HStack(spacing: 2) {
+        blendCard("normal", mode: .normal, tint: .yellow)
+        blendCard("multiply", mode: .multiply, tint: .yellow)
+        blendCard("screen", mode: .screen, tint: .cyan)
+      }
+      HStack(spacing: 2) {
+        blendCard("overlay", mode: .overlay, tint: .magenta)
+        blendCard("darken", mode: .darken, tint: .green)
+        blendCard("lighten", mode: .lighten, tint: .blue)
+      }
+    }
+  }
+
+  private func blendCard(
+    _ label: String,
+    mode: BlendMode,
+    tint: Color
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ZStack {
+        Rectangle()
+          .fill(
+            LinearGradient(
+              colors: [.blue, .red],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+        Rectangle()
+          .fill(tint.opacity(0.75))
+          .blendMode(mode)
+      }
+      .frame(width: 10, height: 2)
+      .border(set: .single)
+      Text(label).foregroundStyle(.separator)
     }
   }
 }
@@ -92,7 +139,7 @@ private struct BordersAndShapesCatalogSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("2. Built-in BorderSet catalog").foregroundStyle(.muted)
+      Text("3. Built-in BorderSet catalog").foregroundStyle(.muted)
       VStack(alignment: .leading, spacing: 1) {
         HStack(spacing: 2) {
           borderCard("single", set: .single)
@@ -120,7 +167,7 @@ private struct BordersAndShapesCatalogSection: View {
 private struct BordersAndShapesEdgeStyleSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("3. Per-side colors via BorderEdgeStyle").foregroundStyle(.muted)
+      Text("4. Per-side colors via BorderEdgeStyle").foregroundStyle(.muted)
       HStack(spacing: 3) {
         Text("traffic light")
           .padding(1)
@@ -142,7 +189,7 @@ private struct BordersAndShapesEdgeStyleSection: View {
 private struct BordersAndShapesCurvedShapesSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("4. Curved shapes — Circle, Ellipse, Capsule")
+      Text("5. Curved shapes — Circle, Ellipse, Capsule")
         .foregroundStyle(.muted)
       Text("fill").foregroundStyle(.separator)
       HStack(spacing: 2) {
@@ -221,7 +268,7 @@ private struct BordersAndShapesCurvedShapesSection: View {
 private struct BordersAndShapesCanvasSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("5. Canvas sparkline — 20 data points in a 30×4 frame")
+      Text("6. Canvas sparkline — 20 data points in a 30×4 frame")
         .foregroundStyle(.muted)
       Canvas(
         Sparkline(
@@ -249,7 +296,7 @@ private struct BordersAndShapesAnimatedGradientsSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("6. Direct withAnimation — tap to rotate gradient")
+      Text("7. Direct withAnimation — tap to rotate gradient")
         .foregroundStyle(.muted)
       Button("rotate") {
         withAnimation(.easeInOut(duration: .milliseconds(800))) {

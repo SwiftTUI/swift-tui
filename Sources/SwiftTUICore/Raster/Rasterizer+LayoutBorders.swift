@@ -19,7 +19,8 @@ extension Rasterizer {
     sides: Edge.Set,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     guard outer.size.width > 0, outer.size.height > 0 else {
       return
@@ -128,7 +129,8 @@ extension Rasterizer {
           atX: x,
           y: y,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
         x += glyphWidth
         glyphIndex += 1
@@ -165,7 +167,8 @@ extension Rasterizer {
           atX: x,
           y: y,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
         x += glyphWidth
         glyphIndex += 1
@@ -201,7 +204,8 @@ extension Rasterizer {
           atX: x,
           y: y,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
         y += 1
         glyphIndex += 1
@@ -237,7 +241,8 @@ extension Rasterizer {
           atX: x,
           y: y,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
         y += 1
         glyphIndex += 1
@@ -258,7 +263,8 @@ extension Rasterizer {
       perimeterColors: perimeterColors,
       environment: environment,
       cells: &cells,
-      clip: clip
+      clip: clip,
+      blendMode: blendMode
     )
   }
 
@@ -276,7 +282,8 @@ extension Rasterizer {
     perimeterColors: [Color]?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode?
   ) {
     if topWidth > 0 && leftWidth > 0 {
       let cornerX = outer.origin.x
@@ -296,7 +303,8 @@ extension Rasterizer {
         foreground: cornerForeground,
         background: topBackground,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
     }
     if topWidth > 0 && rightWidth > 0 {
@@ -317,7 +325,8 @@ extension Rasterizer {
         foreground: cornerForeground,
         background: topBackground,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
     }
     if bottomWidth > 0 && leftWidth > 0 {
@@ -338,7 +347,8 @@ extension Rasterizer {
         foreground: cornerForeground,
         background: bottomBackground,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
     }
     if bottomWidth > 0 && rightWidth > 0 {
@@ -359,7 +369,8 @@ extension Rasterizer {
         foreground: cornerForeground,
         background: bottomBackground,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
     }
   }
@@ -440,7 +451,8 @@ extension Rasterizer {
     atX x: Int,
     y: Int,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     var resolved = ResolvedTextStyle()
     resolved.foregroundColor = foreground
@@ -452,7 +464,8 @@ extension Rasterizer {
       atX: x,
       y: y,
       cells: &cells,
-      clip: clip
+      clip: clip,
+      blendMode: blendMode
     )
   }
 
@@ -463,7 +476,8 @@ extension Rasterizer {
     foreground: Color?,
     background: Color?,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     guard !text.isEmpty else {
       return
@@ -479,7 +493,8 @@ extension Rasterizer {
         atX: cursor,
         y: y,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
       cursor += glyphWidth
     }
