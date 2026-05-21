@@ -6,22 +6,42 @@ import Testing
 @MainActor
 @Suite
 struct BlendModeModifierTests {
-  @Test("blendMode modifier writes draw metadata")
-  func blendModeModifierWritesDrawMetadata() {
+  @Test("blendMode modifier appends an ordered draw effect")
+  func blendModeModifierAppendsOrderedDrawEffect() {
     let resolved = Text("Glow")
       .blendMode(.multiply)
       .resolve(in: .init(identity: testIdentity("BlendMode", "Root")))
 
-    #expect(resolved.drawMetadata.blendMode == .multiply)
+    #expect(resolved.drawEffects.ordered == [.blendMode(.multiply)])
   }
 
-  @Test("later blendMode modifier overrides earlier blend metadata")
-  func laterBlendModeModifierOverridesEarlierBlendMetadata() {
+  @Test("multiple blendMode modifiers preserve authored order")
+  func multipleBlendModeModifiersPreserveAuthoredOrder() {
     let resolved = Text("Glow")
       .blendMode(.multiply)
       .blendMode(.screen)
       .resolve(in: .init(identity: testIdentity("BlendMode", "Root")))
 
-    #expect(resolved.drawMetadata.blendMode == .screen)
+    #expect(resolved.drawEffects.ordered == [.blendMode(.multiply), .blendMode(.screen)])
+  }
+
+  @Test("blendMode before compositingGroup preserves order")
+  func blendModeBeforeCompositingGroupPreservesOrder() {
+    let resolved = Text("Glow")
+      .blendMode(.multiply)
+      .compositingGroup()
+      .resolve(in: .init(identity: testIdentity("BlendMode", "Root")))
+
+    #expect(resolved.drawEffects.ordered == [.blendMode(.multiply), .compositingGroup])
+  }
+
+  @Test("compositingGroup before blendMode preserves order")
+  func compositingGroupBeforeBlendModePreservesOrder() {
+    let resolved = Text("Glow")
+      .compositingGroup()
+      .blendMode(.multiply)
+      .resolve(in: .init(identity: testIdentity("BlendMode", "Root")))
+
+    #expect(resolved.drawEffects.ordered == [.compositingGroup, .blendMode(.multiply)])
   }
 }

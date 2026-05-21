@@ -291,6 +291,19 @@ public struct DrawMetadataModifier: PrimitiveViewModifier {
   }
 }
 
+package struct DrawEffectModifier: PrimitiveViewModifier {
+  package var effect: DrawEffect
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    node.drawEffects.append(effect)
+    return [node]
+  }
+}
+
 extension DrawMetadataModifier: TransitionEffectProvidingModifier {
   package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
     if let opacity = metadata.baseStyle.explicitOpacity {

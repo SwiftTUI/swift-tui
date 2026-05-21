@@ -27,6 +27,7 @@ private struct DrawPhaseProjection {
   var bounds: CellRect
   var layoutMetadata: LayoutMetadata
   var drawMetadata: DrawMetadata
+  var drawEffects: DrawEffects
   var drawPayload: DrawPayload
   var layoutBehavior: LayoutBehavior
 }
@@ -142,6 +143,7 @@ extension DrawExtractor {
     let bounds = projection.bounds
     let layoutMetadata = projection.layoutMetadata
     let drawMetadata = projection.drawMetadata
+    let drawEffects = projection.drawEffects
     let drawPayload = projection.drawPayload
     var commands: [DrawCommand] = []
     let drawsRule: Bool
@@ -348,6 +350,7 @@ extension DrawExtractor {
       bounds: bounds,
       clipBounds: drawMetadata.clipsToBounds ? bounds : nil,
       metadata: drawMetadata,
+      drawEffects: drawEffects,
       commands: maskedBackgroundCommands(
         commands,
         in: bounds,
@@ -368,6 +371,7 @@ extension DrawExtractor {
       bounds: placed.bounds,
       layoutMetadata: placed.layoutMetadata,
       drawMetadata: placed.drawMetadata,
+      drawEffects: placed.drawEffects,
       drawPayload: placed.drawPayload,
       layoutBehavior: placed.layoutBehavior
     )

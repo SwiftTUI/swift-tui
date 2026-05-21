@@ -53,7 +53,8 @@ passed down through bindings or model references.
 Most familiar modifier categories are available:
 
 - layout modifiers such as padding, frame, spacing, fixed-size, and clipping
-- style modifiers such as foreground style, tint, blend mode, and disabled state
+- style modifiers such as foreground style, tint, blend mode, compositing
+  groups, and disabled state
 - identity modifiers such as `.id(_:)`, which accepts any `Hashable` value and
   scopes it under the view's current tree position
 - focus modifiers such as `.focused(...)`, `.defaultFocus(...)`, and `.focusEffectDisabled()`
@@ -65,6 +66,12 @@ Most familiar modifier categories are available:
 Modifiers are first-class public API through `ViewModifier`,
 `View.modifier(_:)`, and `ModifiedContent`. Direct lowering hooks remain
 package-only; ordinary call sites should stay on the modifier surface.
+
+Blend modifiers follow SwiftUI ordering. Use `.blendMode(_:)` when a subtree's
+cell writes should blend with the current backdrop as they stream through the
+rasterizer. Add `.compositingGroup()` when the subtree should first flatten into
+one terminal-cell layer before later effects, such as an outer blend mode, are
+applied.
 
 ## Preview And Inspection
 

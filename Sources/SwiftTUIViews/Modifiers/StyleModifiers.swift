@@ -127,7 +127,11 @@ extension View {
   }
 
   public func blendMode(_ blendMode: BlendMode) -> some View {
-    drawMetadata(.init(blendMode: blendMode))
+    modifier(DrawEffectModifier(effect: .blendMode(blendMode)))
+  }
+
+  public func compositingGroup() -> some View {
+    modifier(DrawEffectModifier(effect: .compositingGroup))
   }
 
   public func disabled(_ isDisabled: Bool) -> some View {

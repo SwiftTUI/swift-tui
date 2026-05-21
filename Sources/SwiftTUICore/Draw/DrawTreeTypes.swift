@@ -284,6 +284,7 @@ public struct DrawNode: Equatable, Sendable {
   public var bounds: CellRect
   public var clipBounds: CellRect?
   package var metadata: DrawMetadata
+  package var drawEffects: DrawEffects
   public var commands: [DrawCommand]
   /// Commands that must paint **after** this node's children have been
   /// fully painted.  Used by features that overdraw their children, such
@@ -304,6 +305,7 @@ public struct DrawNode: Equatable, Sendable {
     bounds: CellRect,
     clipBounds: CellRect? = nil,
     metadata: DrawMetadata = .init(),
+    drawEffects: DrawEffects = .init(),
     commands: [DrawCommand] = [],
     postCommands: [DrawCommand] = [],
     children: [DrawNode] = []
@@ -313,6 +315,7 @@ public struct DrawNode: Equatable, Sendable {
     self.bounds = bounds
     self.clipBounds = clipBounds
     self.metadata = metadata
+    self.drawEffects = drawEffects
     self.commands = commands
     self.postCommands = postCommands
     self.children = children

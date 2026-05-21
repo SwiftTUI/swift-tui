@@ -451,6 +451,7 @@ struct StackSafetyRegressionTests {
 
   @Test("post-layout render node metadata stays within stack-safety budgets")
   func renderNodeLayoutsStayWithinBudget() {
+    #expect(MemoryLayout<DrawEffects>.size <= 16)
     #expect(MemoryLayout<DrawMetadata>.size <= 128)
     #expect(MemoryLayout<PlacedNode>.size <= 768)
     #expect(MemoryLayout<DrawNode>.size <= 256)
