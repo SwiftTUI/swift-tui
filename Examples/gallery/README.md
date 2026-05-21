@@ -36,8 +36,7 @@ checks, for example `GALLERY_INITIAL_TAB=images`.
 | Scroll Control | Programmatic scroll movement and bound scroll position |
 | Calculator | Click targets and compact control layout |
 | Borders & Shapes | Shape drawing, borders, and panel chrome |
-| Images | Image attachments and rendered image placement |
-| Animated GIF | `SwiftTUIAnimatedImage` playback inside the gallery shell |
+| Images | Image attachments, rendered image placement, and `SwiftTUIAnimatedImage` playback |
 | Animations | Runtime invalidation and animated presentation |
 | File Drop | File-drop authoring surface |
 | Popovers | Anchored popover presentation and palette composition |
