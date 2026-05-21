@@ -107,6 +107,10 @@ extensible style protocols rather than closed public enums.
   `AnyToastStyle`, and `AnyTabViewStyle` — provides the concrete values used
   where environment or modifier plumbing needs a non-generic stored style.
 - Built-in styles are concrete values conforming to those protocols.
+- `TabViewStyle` is a full-body container style. Styles receive routeable tab
+  item configurations, a routeable overflow trigger, routeable overflow item
+  configurations, presentation metadata, and an active-content placeholder.
+  Built-in tab styles are implemented through those same public hooks.
 - New public enum-backed authoring `*Style` surfaces should not be added, and
   previously removed enum-backed style families should not return as shims.
 

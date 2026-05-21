@@ -73,6 +73,26 @@ extension TabView {
       selectedIndex.flatMap { index in
         options.indices.contains(index) ? options[index].contentPayload : nil
       }
+    let styleItems = options.indices.map { index in
+      TabViewStyleItemConfiguration(
+        index: index,
+        label: options[index].label,
+        isSelected: selectedIndex == index,
+        isFocused: (isFocused && showsFocusEffect) && focusedIndex == index,
+        controlIdentity: context.identity
+      )
+    }
+    let overflowTrigger = stylePresentation.overflowMenu.map { overflow in
+      TabViewOverflowTriggerConfiguration(
+        label: overflow.triggerLabel,
+        isSelected: overflow.isTriggerSelected,
+        isFocused: overflow.isTriggerFocused,
+        isExpanded: overflow.isExpanded,
+        overflowIndices: overflow.overflowIndices,
+        leadingWidth: overflow.triggerLeadingWidth,
+        controlIdentity: context.identity
+      )
+    }
 
     if isEnabled {
       let binding = selection
@@ -145,7 +165,7 @@ extension TabView {
         followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
       )
 
-      for index in stylePresentation.visibleOptionIndices {
+      for index in options.indices {
         let routeID = primaryRouteID(
           for: tabItemIdentity(
             for: context.identity,
@@ -184,7 +204,7 @@ extension TabView {
           }
         }
 
-        for index in overflowPresentation.overflowIndices {
+        for index in options.indices {
           let routeID = primaryRouteID(
             for: tabOverflowItemIdentity(
               for: context.identity,
@@ -206,12 +226,18 @@ extension TabView {
       }
     }
 
-    let child = tabStyle.resolveBody(
-      configuration: styleConfiguration,
+    let bodyConfiguration = TabViewStyleBodyConfiguration(
+      styleConfiguration: styleConfiguration,
       presentation: stylePresentation,
-      controlIdentity: context.identity,
-      activeContentIndex: selectedIndex,
-      activeContent: activeContentPayload,
+      items: styleItems,
+      overflowTrigger: overflowTrigger,
+      content: .init(
+        activeContentIndex: selectedIndex,
+        payload: activeContentPayload
+      )
+    )
+    let child = tabStyle.resolveBody(
+      configuration: bodyConfiguration,
       in: context.child(component: .named("TabBody"))
     )
 
