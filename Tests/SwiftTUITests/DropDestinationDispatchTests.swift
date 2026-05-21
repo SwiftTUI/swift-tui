@@ -1,7 +1,7 @@
 import Testing
 
-@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// End-to-end drop-dispatch tests. Unlike `DropDestinationTests` (which

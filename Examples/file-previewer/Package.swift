@@ -14,7 +14,7 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(name: "swift-tui", path: "../.."),
+    .package(name: "swift-tui", path: "../..")
   ],
   targets: [
     .target(

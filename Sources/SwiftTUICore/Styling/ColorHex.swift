@@ -8,7 +8,6 @@
   internal import ucrt  // Windows
 #endif
 
-
 // MARK: - Hex formatting
 
 extension Color {

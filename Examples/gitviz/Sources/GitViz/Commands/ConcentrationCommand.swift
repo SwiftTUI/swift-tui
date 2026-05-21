@@ -21,7 +21,8 @@ struct ConcentrationCommand: AsyncParsableCommand {
     let total = tallies.reduce(0) { $0 + $1.commits }
     let busFactor = computeBusFactor(tallies, total: total)
     let topEntries = tallies.prefix(opts.top).map { tally in
-      BarChartEntry(tally.name, value: Double(tally.commits), tone: AuthorPaletteAdapter.tone(for: tally.name))
+      BarChartEntry(
+        tally.name, value: Double(tally.commits), tone: AuthorPaletteAdapter.tone(for: tally.name))
     }
 
     GitVizRunOnce.print(
@@ -35,7 +36,8 @@ struct ConcentrationCommand: AsyncParsableCommand {
           tone: .warning
         )
         Divider()
-        StackedBarChart("Commit share — top \(opts.top)", entries: topEntries, total: Double(total), barWidth: 28)
+        StackedBarChart(
+          "Commit share — top \(opts.top)", entries: topEntries, total: Double(total), barWidth: 28)
       },
       opts: opts
     )

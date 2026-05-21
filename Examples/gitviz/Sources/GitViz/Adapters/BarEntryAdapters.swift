@@ -53,7 +53,8 @@ enum BarEntryAdapters {
         recent[key, default: 0] += 1
       }
     }
-    let topAuthors = allTime
+    let topAuthors =
+      allTime
       .sorted { lhs, rhs in lhs.value > rhs.value }
       .prefix(n)
       .map(\.key)

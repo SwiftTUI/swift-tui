@@ -85,7 +85,8 @@ enum DateValueAdapters {
       totals[key, default: 0] += 1
     }
 
-    let top = totals
+    let top =
+      totals
       .sorted { lhs, rhs in lhs.value > rhs.value }
       .prefix(topN)
       .map(\.key)

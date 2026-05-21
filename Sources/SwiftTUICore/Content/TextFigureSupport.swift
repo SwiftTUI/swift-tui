@@ -1,5 +1,5 @@
-@_exported import EmbeddedFonts
 import DequeModule
+@_exported import EmbeddedFonts
 import SwiftFiglet
 import Synchronization
 
@@ -238,7 +238,6 @@ package enum TextFigureSupport {
     }
     return resolvedFont
   }
-
 
   private static func nextMetricsCacheGeneration(
     in storage: inout MetricsCacheStorage
