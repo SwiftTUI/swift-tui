@@ -29,6 +29,40 @@ run_repo_policy_phase() {
   repo_root=$1
   mode=$2
 
+  # Run prek hooks first.  prek owns hooks that have no standalone
+  # script (notably swift-format and `no-foundation-in-library-products`)
+  # and also re-invokes the script-based hooks below.  Putting it at
+  # the top of the phase lets the gate fail fast on policy violations
+  # that would otherwise only surface at `git commit` time.
+  #
+  # Scope is the branch's diff against `origin/main` rather than
+  # `--all-files`.  Two reasons:
+  #
+  #   1. The pre-commit hook on the developer's machine is also scoped
+  #      to staged files, so the gate matches its scope — no surprise
+  #      reformats of files this branch didn't touch.
+  #   2. `swift-format` rewrites files in-place; running it across the
+  #      whole repo would silently reformat code unrelated to this
+  #      branch, producing a noisy diff and obscuring the actual
+  #      changes under review.
+  #
+  # If `prek` is not installed locally the step is skipped — the
+  # commit-time hooks still catch the same issues, and CI installs
+  # prek explicitly.  This keeps the gate runnable on machines that
+  # have not finished onboarding.
+  if command -v prek >/dev/null 2>&1; then
+    run_repo_policy_check \
+      "$mode" \
+      "$repo_root" \
+      "Run prek hooks (branch diff vs origin/main)" \
+      "prek run --from-ref origin/main --to-ref HEAD" \
+      prek run --from-ref origin/main --to-ref HEAD
+  else
+    echo "[check_repo_policy_phase] prek not on PATH — skipping prek run"
+    echo "  install it from https://prek.j178.dev to catch policy"
+    echo "  violations during the gate rather than at commit time."
+  fi
+
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
