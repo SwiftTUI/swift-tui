@@ -15,6 +15,7 @@ import SwiftTUIViews
   @_spi(Runners) public let progressProbe: RunLoopProgressProbe?
   @_spi(Runners) public var runtimeIssueSink: RuntimeIssueSink?
   @_spi(Runners) public let runtimeConfiguration: RuntimeConfiguration
+  @_spi(Runners) public let renderMode: RuntimeRenderMode?
   @_spi(Runners) public let focusPresentationHandler:
     (@MainActor @Sendable (FocusPresentation) -> Void)?
 
@@ -28,6 +29,7 @@ import SwiftTUIViews
     diagnosticsLogger: FrameDiagnosticsLogger? = nil,
     progressProbe: RunLoopProgressProbe?,
     runtimeConfiguration: RuntimeConfiguration = .default,
+    renderMode: RuntimeRenderMode?,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
     self.presentationSurface = presentationSurface
@@ -40,7 +42,62 @@ import SwiftTUIViews
     self.progressProbe = progressProbe
     self.runtimeIssueSink = nil
     self.runtimeConfiguration = runtimeConfiguration
+    self.renderMode = renderMode
     self.focusPresentationHandler = focusPresentationHandler
+  }
+
+  @_spi(Runners) public convenience init(
+    presentationSurface: any PresentationSurfaceMetricsProvider,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    surfaceName: String = "terminal",
+    environmentValues: [String: String] = [:],
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    progressProbe: RunLoopProgressProbe?,
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
+  ) {
+    self.init(
+      presentationSurface: presentationSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      surfaceName: surfaceName,
+      environmentValues: environmentValues,
+      diagnosticsLogger: diagnosticsLogger,
+      progressProbe: progressProbe,
+      runtimeConfiguration: runtimeConfiguration,
+      renderMode: nil,
+      focusPresentationHandler: focusPresentationHandler
+    )
+  }
+
+  @_spi(Runners) public convenience init(
+    presentationSurface: any PresentationSurfaceMetricsProvider,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    surfaceName: String = "terminal",
+    environmentValues: [String: String] = [:],
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    renderMode: RuntimeRenderMode?,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
+  ) {
+    self.init(
+      presentationSurface: presentationSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      surfaceName: surfaceName,
+      environmentValues: environmentValues,
+      diagnosticsLogger: diagnosticsLogger,
+      progressProbe: nil,
+      runtimeConfiguration: runtimeConfiguration,
+      renderMode: renderMode,
+      focusPresentationHandler: focusPresentationHandler
+    )
   }
 
   @_spi(Runners) public convenience init(
@@ -64,6 +121,36 @@ import SwiftTUIViews
       diagnosticsLogger: diagnosticsLogger,
       progressProbe: nil,
       runtimeConfiguration: runtimeConfiguration,
+      renderMode: nil,
+      focusPresentationHandler: focusPresentationHandler
+    )
+  }
+
+  @_spi(Runners) public convenience init(
+    presentationSurface: any PresentationSurface,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    surfaceName: String = "terminal",
+    environmentValues: [String: String] = [:],
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    progressProbe: RunLoopProgressProbe?,
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    renderMode: RuntimeRenderMode?,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
+  ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
+    self.init(
+      presentationSurface: metricsSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      surfaceName: surfaceName,
+      environmentValues: environmentValues,
+      diagnosticsLogger: diagnosticsLogger,
+      progressProbe: progressProbe,
+      runtimeConfiguration: runtimeConfiguration,
+      renderMode: renderMode,
       focusPresentationHandler: focusPresentationHandler
     )
   }
@@ -91,6 +178,35 @@ import SwiftTUIViews
       diagnosticsLogger: diagnosticsLogger,
       progressProbe: progressProbe,
       runtimeConfiguration: runtimeConfiguration,
+      renderMode: nil,
+      focusPresentationHandler: focusPresentationHandler
+    )
+  }
+
+  @_spi(Runners) public convenience init(
+    presentationSurface: any PresentationSurface,
+    terminalInputReader: any TerminalInputReading,
+    signalReader: (any SignalReading)? = nil,
+    scheduler: any FrameScheduling = FrameScheduler(),
+    surfaceName: String = "terminal",
+    environmentValues: [String: String] = [:],
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    runtimeConfiguration: RuntimeConfiguration = .default,
+    renderMode: RuntimeRenderMode?,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
+  ) {
+    let metricsSurface: any PresentationSurfaceMetricsProvider = presentationSurface
+    self.init(
+      presentationSurface: metricsSurface,
+      terminalInputReader: terminalInputReader,
+      signalReader: signalReader,
+      scheduler: scheduler,
+      surfaceName: surfaceName,
+      environmentValues: environmentValues,
+      diagnosticsLogger: diagnosticsLogger,
+      progressProbe: nil,
+      runtimeConfiguration: runtimeConfiguration,
+      renderMode: renderMode,
       focusPresentationHandler: focusPresentationHandler
     )
   }
@@ -117,6 +233,7 @@ import SwiftTUIViews
       diagnosticsLogger: diagnosticsLogger,
       progressProbe: nil,
       runtimeConfiguration: runtimeConfiguration,
+      renderMode: nil,
       focusPresentationHandler: focusPresentationHandler
     )
   }
@@ -166,6 +283,9 @@ import SwiftTUIViews
     runLoop.diagnosticsLogger = resources.diagnosticsLogger
     runLoop.runtimeIssueSink = resources.runtimeIssueSink
     runLoop.progressProbe = resources.progressProbe
+    if let renderMode = resources.renderMode {
+      runLoop.renderMode = renderMode
+    }
 
     return try await runLoop.run()
   }
