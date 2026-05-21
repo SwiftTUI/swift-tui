@@ -17,14 +17,10 @@ extension AutomaticTabViewStyle: TabViewStyle {
   }
 
   @MainActor
-  public func makeTabBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
+  public func makeBody(
+    configuration: TabViewStyleBodyConfiguration
   ) -> some View {
-    UnderlineTabStyleItemView(
-      configuration: configuration,
-      item: item
-    )
+    UnderlineTabStyleBody(configuration: configuration)
   }
 }
 
@@ -45,14 +41,10 @@ extension UnderlineTabViewStyle: TabViewStyle {
   }
 
   @MainActor
-  public func makeTabBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
+  public func makeBody(
+    configuration: TabViewStyleBodyConfiguration
   ) -> some View {
-    UnderlineTabStyleItemView(
-      configuration: configuration,
-      item: item
-    )
+    UnderlineTabStyleBody(configuration: configuration)
   }
 }
 
@@ -156,46 +148,10 @@ extension LiteralTabsTabViewStyle: TabViewStyle {
   }
 
   @MainActor
-  public func makeTabBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
+  public func makeBody(
+    configuration: TabViewStyleBodyConfiguration
   ) -> some View {
-    LiteralTabsTabStyleItemView(
-      configuration: configuration,
-      item: item
-    )
-  }
-
-  @MainActor
-  public func makeOverflowTriggerBody(
-    configuration: TabViewStyleConfiguration,
-    trigger: TabViewOverflowTriggerConfiguration
-  ) -> some View {
-    LiteralTabsOverflowTriggerView(
-      configuration: configuration,
-      trigger: trigger
-    )
-  }
-
-  @MainActor
-  public func makeOverflowItemBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration,
-    overflow: TabViewOverflowMenuPresentation
-  ) -> some View {
-    LiteralTabsOverflowMenuRowView(
-      configuration: configuration,
-      item: item,
-      overflowIndices: overflow.overflowIndices
-    )
-  }
-
-  @MainActor
-  public func makeStripBackground(
-    configuration _: TabViewStyleConfiguration,
-    presentation: TabViewStylePresentation
-  ) -> some View {
-    LiteralTabsStripBackgroundView(presentation: presentation)
+    LiteralTabsTabStyleBody(configuration: configuration)
   }
 }
 
@@ -216,93 +172,221 @@ extension PowerlineTabViewStyle: TabViewStyle {
   }
 
   @MainActor
-  public func makeTabBody(
-    configuration: TabViewStyleConfiguration,
-    item: TabViewStyleItemConfiguration
+  public func makeBody(
+    configuration: TabViewStyleBodyConfiguration
   ) -> some View {
-    PowerlineTabStyleItemView(
-      configuration: configuration,
-      item: item
-    )
+    PowerlineTabStyleBody(configuration: configuration)
+  }
+}
+
+private struct UnderlineTabStyleBody: View {
+  let configuration: TabViewStyleBodyConfiguration
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 0) {
+        ForEach(Array(configuration.visibleItems.indices), id: \.self) { index in
+          let item = configuration.visibleItems[index]
+          item.route {
+            UnderlineTabStyleItemView(
+              configuration: configuration,
+              item: item
+            )
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .frame(height: configuration.presentation.stripHeight, alignment: .leading)
+
+      configuration.content
+    }
+  }
+}
+
+private struct PowerlineTabStyleBody: View {
+  let configuration: TabViewStyleBodyConfiguration
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 0) {
+        ForEach(Array(configuration.visibleItems.indices), id: \.self) { index in
+          let item = configuration.visibleItems[index]
+          item.route {
+            PowerlineTabStyleItemView(
+              configuration: configuration,
+              item: item
+            )
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .frame(height: configuration.presentation.stripHeight, alignment: .leading)
+
+      configuration.content
+    }
+  }
+}
+
+private struct LiteralTabsTabStyleBody: View {
+  let configuration: TabViewStyleBodyConfiguration
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
+          ForEach(Array(configuration.visibleItems.indices), id: \.self) { index in
+            let item = configuration.visibleItems[index]
+            item.route {
+              LiteralTabsTabStyleItemView(
+                configuration: configuration,
+                item: item
+              )
+            }
+          }
+
+          if let trigger = configuration.overflowTrigger {
+            trigger.route {
+              LiteralTabsOverflowTriggerView(
+                configuration: configuration,
+                trigger: trigger
+              )
+            }
+          }
+
+          Spacer(minLength: 0)
+        }
+        .frame(height: configuration.presentation.stripHeight, alignment: .leading)
+        .background {
+          LiteralTabsStripBackgroundView(presentation: configuration.presentation)
+        }
+
+        configuration.content
+      }
+
+      if configuration.overflowTrigger?.isExpanded == true {
+        HStack(alignment: .top, spacing: 0) {
+          Spacer(minLength: 0)
+            .frame(width: configuration.overflowTrigger?.leadingWidth ?? 0)
+          LiteralTabsOverflowMenuView(configuration: configuration)
+          Spacer(minLength: 0)
+        }
+        .padding(
+          .init(
+            top: configuration.presentation.stripHeight,
+            leading: 0,
+            bottom: 0,
+            trailing: 0
+          )
+        )
+      }
+    }
   }
 }
 
 private struct UnderlineTabStyleItemView: View {
-  let configuration: TabViewStyleConfiguration
+  let configuration: TabViewStyleBodyConfiguration
   let item: TabViewStyleItemConfiguration
 
   var body: some View {
-    TabStripItemView(
-      label: item.label.displayText,
-      isSelected: item.isSelected,
-      isFocused: item.isFocused,
-      showsTrailingSeparator: item.index < configuration.options.count - 1,
-      trailingSeparatorStyle: powerlineSeparatorStyle(
-        index: item.index,
-        activeIndex: configuration.selectedIndex ?? 0
-      ),
-      tone: .accent,
-      chrome: .underline,
-      styleEnvironment: configuration.styleEnvironment
-    )
+    VStack(alignment: .leading, spacing: 0) {
+      underlineTabItem(
+        label: item.label.displayText,
+        isSelected: item.isSelected,
+        tone: .accent
+      )
+      underlineRuleSegment(
+        label: item.label.displayText,
+        isSelected: item.isSelected,
+        isFocused: item.isFocused,
+        tone: .accent
+      )
+    }
+    .background {
+      if item.isFocused {
+        Rectangle()
+          .fill(AnyShapeStyle(.terminalSurface(.accent)))
+      }
+    }
   }
 }
 
 private struct PowerlineTabStyleItemView: View {
-  let configuration: TabViewStyleConfiguration
+  let configuration: TabViewStyleBodyConfiguration
   let item: TabViewStyleItemConfiguration
 
   var body: some View {
-    TabStripItemView(
+    powerlineTabItem(
       label: item.label.displayText,
       isSelected: item.isSelected,
-      isFocused: item.isFocused,
-      showsTrailingSeparator: item.index < configuration.options.count - 1,
+      showsTrailingSeparator: item.index < configuration.items.count - 1,
       trailingSeparatorStyle: powerlineSeparatorStyle(
         index: item.index,
         activeIndex: configuration.selectedIndex ?? 0
       ),
       tone: .accent,
-      chrome: .powerline,
       styleEnvironment: configuration.styleEnvironment
     )
+    .background {
+      if item.isFocused {
+        Rectangle()
+          .fill(AnyShapeStyle(.terminalSurface(.accent)))
+      }
+    }
   }
 }
 
 private struct LiteralTabsTabStyleItemView: View {
-  let configuration: TabViewStyleConfiguration
+  let configuration: TabViewStyleBodyConfiguration
   let item: TabViewStyleItemConfiguration
 
   var body: some View {
-    TabStripItemView(
-      label: item.label.displayText,
-      isSelected: item.isSelected,
-      isFocused: item.isFocused,
-      showsTrailingSeparator: false,
-      trailingSeparatorStyle: .plain,
-      tone: .accent,
-      chrome: .literalTabs,
-      styleEnvironment: configuration.styleEnvironment
-    )
+    VStack(alignment: .leading, spacing: 0) {
+      literalTabItem(label: item.label.displayText)
+      literalTabRuleSegment(
+        label: item.label.displayText,
+        isSelected: item.isSelected,
+        tone: .accent
+      )
+      literalTabBottomChrome(
+        label: item.label.displayText,
+        isSelected: item.isSelected,
+        tone: .accent
+      )
+    }
+    .background {
+      if item.isFocused {
+        Rectangle()
+          .fill(AnyShapeStyle(.terminalSurface(.accent)))
+      }
+    }
     .fixedSize(horizontal: true, vertical: true)
   }
 }
 
 private struct LiteralTabsOverflowTriggerView: View {
-  let configuration: TabViewStyleConfiguration
+  let configuration: TabViewStyleBodyConfiguration
   let trigger: TabViewOverflowTriggerConfiguration
 
   var body: some View {
-    TabStripItemView(
-      label: trigger.label,
-      isSelected: trigger.isSelected,
-      isFocused: trigger.isFocused,
-      showsTrailingSeparator: false,
-      trailingSeparatorStyle: .plain,
-      tone: .accent,
-      chrome: .literalTabs,
-      styleEnvironment: configuration.styleEnvironment
-    )
+    VStack(alignment: .leading, spacing: 0) {
+      literalTabItem(label: trigger.label)
+      literalTabRuleSegment(
+        label: trigger.label,
+        isSelected: trigger.isSelected,
+        tone: .accent
+      )
+      literalTabBottomChrome(
+        label: trigger.label,
+        isSelected: trigger.isSelected,
+        tone: .accent
+      )
+    }
+    .background {
+      if trigger.isFocused {
+        Rectangle()
+          .fill(AnyShapeStyle(.terminalSurface(.accent)))
+      }
+    }
     .fixedSize(horizontal: true, vertical: true)
   }
 }
@@ -343,7 +427,7 @@ private struct LiteralTabsStripBaseRule: PrimitiveView, ResolvableView {
 }
 
 private struct LiteralTabsOverflowMenuRowView: View {
-  let configuration: TabViewStyleConfiguration
+  let configuration: TabViewStyleBodyConfiguration
   let item: TabViewStyleItemConfiguration
   let overflowIndices: [Int]
 
@@ -378,123 +462,41 @@ private struct LiteralTabsOverflowMenuRowView: View {
   }
 }
 
-private enum TabStripChromeStyle {
-  case underline
-  case literalTabs
-  case powerline
-}
-
-/// FIXME: this view is an indication that TabViewStyle is not powerful enough to do its job.
-/// The implementations of each of the styles should be fully independent and there should be
-/// no introspection required to lay them out. This construct should go.
-private struct TabStripItemView: View {
-  let label: String
-  let isSelected: Bool
-  let isFocused: Bool
-  let showsTrailingSeparator: Bool
-  let trailingSeparatorStyle: PowerlineSeparatorStyle
-  let tone: TerminalTone
-  let chrome: TabStripChromeStyle
-  let styleEnvironment: StyleEnvironmentSnapshot
+private struct LiteralTabsOverflowMenuView: View {
+  let configuration: TabViewStyleBodyConfiguration
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      tabItemPrimaryChrome(
-        label: label,
-        isSelected: isSelected,
-        isFocused: isFocused,
-        showsTrailingSeparator: showsTrailingSeparator,
-        trailingSeparatorStyle: trailingSeparatorStyle,
-        tone: tone,
-        chrome: chrome,
-        styleEnvironment: styleEnvironment
-      )
-      if chrome != .powerline {
-        tabItemRuleChrome(
-          label: label,
-          isSelected: isSelected,
-          isFocused: isFocused,
-          tone: tone,
-          chrome: chrome,
-          styleEnvironment: styleEnvironment
-        )
-      }
-      if chrome == .literalTabs {
-        literalTabBottomChrome(
-          label: label,
-          isSelected: isSelected,
-          tone: tone
-        )
+      ForEach(Array(configuration.overflowItems.indices), id: \.self) { index in
+        let item = configuration.overflowItems[index]
+        item.overflowRoute {
+          LiteralTabsOverflowMenuRowView(
+            configuration: configuration,
+            item: item,
+            overflowIndices: configuration.presentation.overflowMenu?.overflowIndices ?? []
+          )
+        }
       }
     }
+    .padding(configuration.presentation.overflowMenu?.contentPadding ?? .zero)
     .background {
-      if isFocused {
-        Rectangle()
-          .fill(AnyShapeStyle(.terminalSurface(tone)))
+      if let overflow = configuration.presentation.overflowMenu,
+        let backgroundStyle = overflow.backgroundStyle
+      {
+        RoundedRectangle(cornerRadius: overflow.cornerRadius)
+          .inset(by: overflow.borderInset)
+          .fill(backgroundStyle)
       }
     }
-  }
-}
-
-@MainActor
-@ViewBuilder
-private func tabItemPrimaryChrome(
-  label: String,
-  isSelected: Bool,
-  isFocused _: Bool,
-  showsTrailingSeparator: Bool,
-  trailingSeparatorStyle: PowerlineSeparatorStyle,
-  tone: TerminalTone,
-  chrome: TabStripChromeStyle,
-  styleEnvironment: StyleEnvironmentSnapshot
-) -> some View {
-  switch chrome {
-  case .underline:
-    underlineTabItem(
-      label: label,
-      isSelected: isSelected,
-      tone: tone
-    )
-  case .literalTabs:
-    literalTabItem(label: label)
-  case .powerline:
-    powerlineTabItem(
-      label: label,
-      isSelected: isSelected,
-      showsTrailingSeparator: showsTrailingSeparator,
-      trailingSeparatorStyle: trailingSeparatorStyle,
-      tone: tone,
-      styleEnvironment: styleEnvironment
-    )
-  }
-}
-
-@MainActor
-@ViewBuilder
-private func tabItemRuleChrome(
-  label: String,
-  isSelected: Bool,
-  isFocused: Bool,
-  tone: TerminalTone,
-  chrome: TabStripChromeStyle,
-  styleEnvironment _: StyleEnvironmentSnapshot
-) -> some View {
-  switch chrome {
-  case .underline:
-    underlineRuleSegment(
-      label: label,
-      isSelected: isSelected,
-      isFocused: isFocused,
-      tone: tone
-    )
-  case .literalTabs:
-    literalTabRuleSegment(
-      label: label,
-      isSelected: isSelected,
-      tone: tone
-    )
-  case .powerline:
-    EmptyView()
+    .overlay {
+      if let overflow = configuration.presentation.overflowMenu,
+        let borderStyle = overflow.borderStyle
+      {
+        RoundedRectangle(cornerRadius: overflow.cornerRadius)
+          .strokeBorder(borderStyle)
+      }
+    }
+    .fixedSize(horizontal: true, vertical: true)
   }
 }
 
