@@ -23,6 +23,7 @@ import "./index.css";
 import {
   defaultStyle,
   fallbackManifest,
+  marketingStyle,
   terminalAppManifestPath,
   terminalAppWasmPath,
 } from "./app-data.ts";
@@ -37,6 +38,7 @@ const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
 const backtabSequence = new TextEncoder().encode("[Z");
 const isPassiveMarketingEmbed = new URLSearchParams(window.location.search).get("embed")
   === "marketing";
+const activeStyle = isPassiveMarketingEmbed ? marketingStyle : defaultStyle;
 
 try {
   await bootstrap();
@@ -220,7 +222,7 @@ async function createController(
     return await createWebHostApp({
       mount,
       manifestUrl: terminalAppManifestUrl,
-      style: defaultStyle,
+      style: activeStyle,
       initialSceneId: "main",
       environment: {
         TUIGUI_APP_NAME: "Examples/WebExample",
@@ -233,7 +235,7 @@ async function createController(
     return await createWebHostApp({
       mount,
       manifest: fallbackManifest,
-      style: defaultStyle,
+      style: activeStyle,
       initialSceneId: fallbackManifest.defaultSceneId,
       sceneRuntimeFactory: (options) => new WebHostSceneRuntime(passiveEmbedOptions(options)),
     });
