@@ -1,9 +1,9 @@
 # Vision Gap
 
-This document is the **only** place in the documentation that describes
-intended-but-unbuilt work. Every other document describes the code as it is at
-`HEAD`. This one records, concretely, where the code falls short of the
-project's intent ([VISION.md](VISION.md)).
+This document is the **only gap register** in the documentation. Every other
+document describes the code as it is at `HEAD`, unless a gap entry links to a
+focused proposal that scopes one unbuilt item. This one records, concretely,
+where the code falls short of the project's intent ([VISION.md](VISION.md)).
 
 Each entry states what is **shipped today** and what is **not yet built**. None
 of the unbuilt work is scheduled or promised here — this is a gap register, not
@@ -66,6 +66,18 @@ drawing surface with Braille subpixel rendering.
 **Not yet built.** `Canvas`'s internal drawing coordinate model is still the
 legacy integer-cell interface; it has not been migrated to the fractional
 cell-coordinate model the rest of the geometry system uses.
+
+## Image rendering and compositing
+
+**Shipped.** PNG and JPEG images render as host presentation attachments, and
+`SwiftTUIAnimatedImage` displays pre-composed frames by feeding PNG bytes
+through the same image surface. `View.blendMode(_:)` works for terminal-cell
+content such as text, fills, strokes, and borders.
+
+**Not yet built.** Image pixels are not part of the blend-mode compositor.
+`Image(...).blendMode(...)` and `AnimatedImage(...).blendMode(...)` still emit
+unblended image attachments. The implementation scope is captured in
+[Image Blend Mode Proposal](proposals/IMAGE_BLEND_MODE.md).
 
 ## Web packaging
 

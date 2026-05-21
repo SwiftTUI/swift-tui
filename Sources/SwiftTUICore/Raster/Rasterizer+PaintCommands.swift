@@ -462,9 +462,24 @@ extension Rasterizer {
       let leftCx = rx
       let rightCx = subW - 1 - rx
       if stroke {
-        // Two half-ellipses plus the two horizontal body edges.
-        canvas.strokeEllipse(centerX: leftCx, centerY: cy, radiusX: rx, radiusY: ry)
-        canvas.strokeEllipse(centerX: rightCx, centerY: cy, radiusX: rx, radiusY: ry)
+        strokeEllipseSegment(
+          into: &canvas,
+          centerX: leftCx,
+          centerY: cy,
+          radiusX: rx,
+          radiusY: ry
+        ) { x, _ in
+          x <= leftCx
+        }
+        strokeEllipseSegment(
+          into: &canvas,
+          centerX: rightCx,
+          centerY: cy,
+          radiusX: rx,
+          radiusY: ry
+        ) { x, _ in
+          x >= rightCx
+        }
         // Top and bottom body edges between the two centers.
         if rightCx > leftCx {
           for x in leftCx...rightCx {
@@ -491,8 +506,24 @@ extension Rasterizer {
       let topCy = ry
       let bottomCy = subH - 1 - ry
       if stroke {
-        canvas.strokeEllipse(centerX: cx, centerY: topCy, radiusX: rx, radiusY: ry)
-        canvas.strokeEllipse(centerX: cx, centerY: bottomCy, radiusX: rx, radiusY: ry)
+        strokeEllipseSegment(
+          into: &canvas,
+          centerX: cx,
+          centerY: topCy,
+          radiusX: rx,
+          radiusY: ry
+        ) { _, y in
+          y <= topCy
+        }
+        strokeEllipseSegment(
+          into: &canvas,
+          centerX: cx,
+          centerY: bottomCy,
+          radiusX: rx,
+          radiusY: ry
+        ) { _, y in
+          y >= bottomCy
+        }
         if bottomCy > topCy {
           for y in topCy...bottomCy {
             canvas.setPixel(x: cx - rx, y: y)
@@ -513,6 +544,31 @@ extension Rasterizer {
         }
       }
     }
+  }
+
+  private func strokeEllipseSegment(
+    into canvas: inout BrailleCanvas,
+    centerX: Int,
+    centerY: Int,
+    radiusX: Int,
+    radiusY: Int,
+    include: (Int, Int) -> Bool
+  ) {
+    var ellipse = BrailleCanvas(width: canvas.width, height: canvas.height)
+    ellipse.strokeEllipse(centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY)
+
+    for y in 0..<ellipse.subpixelHeight {
+      for x in 0..<ellipse.subpixelWidth where include(x, y) {
+        guard brailleCanvasPixelIsLit(ellipse, x: x, y: y) else {
+          continue
+        }
+        canvas.setPixel(x: x, y: y)
+      }
+    }
+  }
+
+  private func brailleCanvasPixelIsLit(_ canvas: BrailleCanvas, x: Int, y: Int) -> Bool {
+    canvas.cell(x: x / 2, y: y / 4).contains(x: x % 2, y: y % 4)
   }
 
   internal func tintCell(

@@ -17,6 +17,17 @@ private func brailleDotCount(_ cell: RasterCell) -> Int {
   return Int(scalar - 0x2800).nonzeroBitCount
 }
 
+private func brailleDotIsLit(_ cell: RasterCell, x: Int, y: Int) -> Bool {
+  guard let scalar = cell.character.unicodeScalars.first?.value,
+    scalar >= 0x2800,
+    scalar <= 0x28FF,
+    let mask = BrailleCell.bitMask(x: x, y: y)
+  else {
+    return false
+  }
+  return UInt8(scalar - 0x2800) & mask != 0
+}
+
 /// Counts the number of cells in a single row that hold a non-blank
 /// Braille glyph (i.e. at least one subpixel dot lit).
 private func litBrailleCellsInRow(
@@ -170,5 +181,22 @@ struct CircleEllipseCapsuleTests {
     let fillDots = brailleDotCount(fillArt.rasterSurface.cells[1][10])
     let strokeDots = brailleDotCount(strokeArt.rasterSurface.cells[1][10])
     #expect(fillDots > strokeDots)
+  }
+
+  @Test("Capsule().strokeBorder does not draw internal cap seams")
+  func capsuleStrokeBorderOmitsInternalCapSeams() {
+    let wideArt = DefaultRenderer().render(
+      Capsule().strokeBorder(Color.white).frame(width: 16, height: 3),
+      context: .init(identity: testIdentity("CapsuleWideStrokeSeams"))
+    )
+    #expect(!brailleDotIsLit(wideArt.rasterSurface.cells[1][5], x: 0, y: 1))
+    #expect(!brailleDotIsLit(wideArt.rasterSurface.cells[1][10], x: 1, y: 1))
+
+    let tallArt = DefaultRenderer().render(
+      Capsule().strokeBorder(Color.white).frame(width: 3, height: 8),
+      context: .init(identity: testIdentity("CapsuleTallStrokeSeams"))
+    )
+    #expect(!brailleDotIsLit(tallArt.rasterSurface.cells[1][1], x: 0, y: 0))
+    #expect(!brailleDotIsLit(tallArt.rasterSurface.cells[6][1], x: 0, y: 3))
   }
 }
