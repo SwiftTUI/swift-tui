@@ -6,15 +6,15 @@ struct CommitKindTests {
   @Test(
     "Conventional-Commits prefixes classify directly",
     arguments: [
-      ("feat: add foo",                CommitKind.feat),
-      ("fix(api): handle nulls",       CommitKind.fix),
-      ("refactor(parser)!: rewrite",   CommitKind.refactor),
-      ("revert: revert previous",      CommitKind.revert),
-      ("docs(readme): typo",           CommitKind.docs),
-      ("test: cover edge cases",       CommitKind.test),
-      ("chore: bump deps",             CommitKind.chore),
-      ("perf: faster hashing",         CommitKind.perf),
-      ("ci: gha matrix",               CommitKind.ci),
+      ("feat: add foo", CommitKind.feat),
+      ("fix(api): handle nulls", CommitKind.fix),
+      ("refactor(parser)!: rewrite", CommitKind.refactor),
+      ("revert: revert previous", CommitKind.revert),
+      ("docs(readme): typo", CommitKind.docs),
+      ("test: cover edge cases", CommitKind.test),
+      ("chore: bump deps", CommitKind.chore),
+      ("perf: faster hashing", CommitKind.perf),
+      ("ci: gha matrix", CommitKind.ci),
     ]
   )
   func conventionalCommitsPrefix(subject: String, expected: CommitKind) {

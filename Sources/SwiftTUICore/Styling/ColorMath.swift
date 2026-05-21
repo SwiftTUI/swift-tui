@@ -217,4 +217,3 @@ public struct Matrix3x3: Hashable, Sendable, Codable {
     )
   }
 }
-

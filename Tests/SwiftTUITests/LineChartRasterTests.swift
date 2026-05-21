@@ -19,7 +19,7 @@ struct LineChartCellMappingTests {
   @Test("yCell inverts Y axis (top row = max)")
   func yInverts() {
     #expect(yCell(value: 10, domain: 0...10, plotHeight: 10) == 0)
-    #expect(yCell(value: 0,  domain: 0...10, plotHeight: 10) == 9)
+    #expect(yCell(value: 0, domain: 0...10, plotHeight: 10) == 9)
   }
 
   @Test("yCell clamps out-of-range to nearest edge")

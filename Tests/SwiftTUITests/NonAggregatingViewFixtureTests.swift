@@ -268,10 +268,11 @@ struct NonAggregatingViewFixtureTests {
           LineChart(
             "Net LOC",
             series: [
-              LineChartSeries("net loc",
-                              points: locSeries(),
-                              style: .area,
-                              tone: .info)
+              LineChartSeries(
+                "net loc",
+                points: locSeries(),
+                style: .area,
+                tone: .info)
             ],
             height: 6
           )
@@ -289,10 +290,11 @@ struct NonAggregatingViewFixtureTests {
           LineChart(
             "Release cadence",
             series: [
-              LineChartSeries("releases",
-                              points: stepSeries(),
-                              style: .step,
-                              tone: .success)
+              LineChartSeries(
+                "releases",
+                points: stepSeries(),
+                style: .step,
+                tone: .success)
             ],
             height: 6
           )
@@ -448,24 +450,30 @@ private func tokenSeries() -> [LineChartSeries] {
   formatter.timeZone = TimeZone(identifier: "UTC")
   func d(_ s: String) -> Date { formatter.date(from: s)! }
   return [
-    LineChartSeries("Opus 4.7", points: [
-      .init(date: d("2024-09-01"), value: 1_200_000),
-      .init(date: d("2024-09-08"), value: 3_400_000),
-      .init(date: d("2024-09-15"), value: 5_100_000),
-      .init(date: d("2024-09-22"), value: 4_200_000),
-    ], tone: .info),
-    LineChartSeries("Opus 4.6", points: [
-      .init(date: d("2024-09-01"), value: 800_000),
-      .init(date: d("2024-09-08"), value: 2_100_000),
-      .init(date: d("2024-09-15"), value: 1_900_000),
-      .init(date: d("2024-09-22"), value: 2_500_000),
-    ], tone: .success),
-    LineChartSeries("Haiku 4.5", points: [
-      .init(date: d("2024-09-01"), value: 400_000),
-      .init(date: d("2024-09-08"), value: 700_000),
-      .init(date: d("2024-09-15"), value: 1_100_000),
-      .init(date: d("2024-09-22"), value: 900_000),
-    ], tone: .warning),
+    LineChartSeries(
+      "Opus 4.7",
+      points: [
+        .init(date: d("2024-09-01"), value: 1_200_000),
+        .init(date: d("2024-09-08"), value: 3_400_000),
+        .init(date: d("2024-09-15"), value: 5_100_000),
+        .init(date: d("2024-09-22"), value: 4_200_000),
+      ], tone: .info),
+    LineChartSeries(
+      "Opus 4.6",
+      points: [
+        .init(date: d("2024-09-01"), value: 800_000),
+        .init(date: d("2024-09-08"), value: 2_100_000),
+        .init(date: d("2024-09-15"), value: 1_900_000),
+        .init(date: d("2024-09-22"), value: 2_500_000),
+      ], tone: .success),
+    LineChartSeries(
+      "Haiku 4.5",
+      points: [
+        .init(date: d("2024-09-01"), value: 400_000),
+        .init(date: d("2024-09-08"), value: 700_000),
+        .init(date: d("2024-09-15"), value: 1_100_000),
+        .init(date: d("2024-09-22"), value: 900_000),
+      ], tone: .warning),
   ]
 }
 

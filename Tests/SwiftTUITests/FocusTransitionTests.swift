@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// Tests that focus transitions between controls (Tab/Shift-Tab) produce

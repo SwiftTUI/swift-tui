@@ -114,4 +114,3 @@ public struct FrameMainActorTimings: Equatable, Sendable {
     self.suspended = suspended
   }
 }
-
