@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Suite
-struct AnimatedImageTabTests {
+struct ImagesTabAnimatedGIFTests {
   @Test("embedded gallery GIF decodes into a multi-frame animated image sequence")
   func embeddedGIFDecodes() throws {
     let sequence = try AnimatedGIF.decode(data: ImagesTab.gifBytes)
@@ -15,16 +15,16 @@ struct AnimatedImageTabTests {
     #expect(sequence.frameDelays.count == sequence.frames.count)
   }
 
-  @Test("AnimatedImageTab resolves and rasterises its GIF preview surface")
+  @Test("ImagesTab resolves and rasterises the animated GIF preview surface")
   func rendersAnimatedImageShowcase() {
     let terminalSize = CellSize(width: 80, height: 28)
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
 
     let artifacts = DefaultRenderer().render(
-      AnimatedImageTab(),
+      ImagesTab(),
       context: .init(
-        identity: Identity(components: [.named("AnimatedImageTabSmoke")]),
+        identity: Identity(components: [.named("ImagesTabAnimatedGIFSmoke")]),
         environmentValues: env
       ),
       proposal: .init(width: terminalSize.width, height: terminalSize.height)
@@ -32,14 +32,16 @@ struct AnimatedImageTabTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(artifacts.rasterSurface.cells.count > 0)
+    #expect(surface.contains("Images"))
     #expect(surface.contains("Animated GIF"))
     #expect(surface.contains("Nyan fixture"))
+    #expect(!surface.contains("GIF (frame 0)"))
   }
 
-  @Test("Gallery initial-tab aliases select the animated GIF tab")
-  func galleryInitialTabAliasesIncludeAnimatedGIF() throws {
-    #expect(GalleryView.GalleryTab(environmentName: "gif") == .animatedGIF)
-    #expect(GalleryView.GalleryTab(environmentName: "animated-gif") == .animatedGIF)
-    #expect(GalleryView.GalleryTab(environmentName: "animated-image") == .animatedGIF)
+  @Test("Gallery initial-tab aliases select Images for animated GIF coverage")
+  func galleryInitialTabAliasesSelectImagesForAnimatedGIFCoverage() throws {
+    #expect(GalleryView.GalleryTab(environmentName: "gif") == .images)
+    #expect(GalleryView.GalleryTab(environmentName: "animated-gif") == .images)
+    #expect(GalleryView.GalleryTab(environmentName: "animated-image") == .images)
   }
 }

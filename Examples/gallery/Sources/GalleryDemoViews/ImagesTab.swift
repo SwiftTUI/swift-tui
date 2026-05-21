@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUIAnimatedImage
 import SwiftTUIRuntime
 
 /// Showcases the ``Image`` primitive across its four rendering modes —
@@ -12,6 +13,8 @@ import SwiftTUIRuntime
 /// the `.data` path of ``ImageSource`` — the same path the renderer takes
 /// for attachments that need to survive without filesystem access.
 struct ImagesTab: View {
+  private static let animatedGIFSequence = try? AnimatedGIF.decode(data: ImagesTab.gifBytes)
+
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 1) {
@@ -32,19 +35,17 @@ struct ImagesTab: View {
     }
   }
 
-  // 0. Format dispatch — three Image(data:) instances side by side,
-  //    one per supported container. The renderer's magic-byte sniff
-  //    picks the right decoder, and the kitty path either ships PNG
-  //    bytes verbatim (f=100) or serializes the decoded RGBA pixels
-  //    (f=32). Visually identical output across formats is the proof.
+  // 0. Format dispatch — the static PNG/JPEG cards exercise Image(data:)
+  //    decoder sniffing, while the animated GIF card routes the embedded GIF
+  //    through SwiftTUIAnimatedImage so playback is covered in the same tab.
   private var formatRow: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("0. Format dispatch — PNG, JPEG, GIF")
+      Text("0. Format dispatch — PNG, JPEG, animated GIF")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         formatCard(name: "PNG", bytes: Self.pngBytes)
         formatCard(name: "JPEG", bytes: Self.jpegBytes)
-        formatCard(name: "GIF (frame 0)", bytes: Self.gifBytes)
+        animatedGIFCard
       }
     }
   }
@@ -55,6 +56,24 @@ struct ImagesTab: View {
         .border(.separator)
       Text(name)
         .foregroundStyle(.separator)
+    }
+  }
+
+  @ViewBuilder
+  private var animatedGIFCard: some View {
+    if let sequence = Self.animatedGIFSequence {
+      VStack(alignment: .leading, spacing: 0) {
+        AnimatedImage(sequence)
+          .accessibilityLabel("Animated GIF preview of the embedded Nyan fixture")
+          .border(.separator)
+        Text("Animated GIF")
+          .foregroundStyle(.separator)
+        Text("Nyan fixture")
+          .foregroundStyle(.separator)
+      }
+    } else {
+      Text("Embedded GIF failed to decode.")
+        .foregroundStyle(.red)
     }
   }
 
@@ -135,7 +154,7 @@ private struct ImagesHeader: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Images").foregroundStyle(.foreground)
-      Text("Intrinsic, resizable, scaledToFit, scaledToFill — embedded PNG bytes.")
+      Text("Static image modes and embedded animated GIF playback.")
         .foregroundStyle(.separator)
     }
   }
