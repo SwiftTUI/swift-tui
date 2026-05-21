@@ -20,13 +20,14 @@ struct TabViewStyleParityTests {
     )
     let renderer = DefaultRenderer()
     let pointerRegistry = LocalPointerHandlerRegistry()
+    let tabsIdentity = testIdentity("Tabs")
     var context = ResolveContext(identity: testIdentity("Root"))
     context.localPointerHandlerRegistry = pointerRegistry
 
     let surface = renderer.render(
       parityTabView(selection: selection)
         .tabViewStyle(ContentFirstConsumerTabViewStyle())
-        .id(testIdentity("Tabs")),
+        .id(tabsIdentity),
       context: context,
       proposal: .init(width: 40, height: 6)
     )
@@ -43,14 +44,12 @@ struct TabViewStyleParityTests {
         ]
     )
 
-    let routeID = primaryRouteID(
-      for: testIdentity("Tabs").child(.indexed("TabItem", index: 1))
-    )
+    let routeID = tabItemRouteID(for: tabsIdentity, index: 1)
     #expect(pointerRegistry.hasHandler(routeID: routeID))
     #expect(
       pointerRegistry.dispatch(
         routeID: routeID,
-        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+        event: primaryPointerDownEvent()
       )
     )
     #expect(selectionBox.value == "settings")
@@ -69,32 +68,31 @@ struct TabViewStyleParityTests {
     )
     let renderer = DefaultRenderer()
     let pointerRegistry = LocalPointerHandlerRegistry()
+    let tabsIdentity = testIdentity("Tabs")
     var context = ResolveContext(identity: testIdentity("Root"))
     context.localPointerHandlerRegistry = pointerRegistry
 
     _ = renderer.render(
       overflowParityTabView(selection: selection)
         .tabViewStyle(OverflowConsumerTabViewStyle())
-        .id(testIdentity("Tabs")),
+        .id(tabsIdentity),
       context: context,
       proposal: .init(width: 30, height: 8)
     )
 
-    let triggerRouteID = primaryRouteID(
-      for: testIdentity("Tabs").child(.named("TabOverflowTrigger"))
-    )
+    let triggerRouteID = tabOverflowTriggerRouteID(for: tabsIdentity)
     #expect(pointerRegistry.hasHandler(routeID: triggerRouteID))
     #expect(
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
-        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+        event: primaryPointerDownEvent()
       )
     )
 
     let expanded = renderer.render(
       overflowParityTabView(selection: selection)
         .tabViewStyle(OverflowConsumerTabViewStyle())
-        .id(testIdentity("Tabs")),
+        .id(tabsIdentity),
       context: context,
       proposal: .init(width: 30, height: 8)
     )
@@ -113,14 +111,12 @@ struct TabViewStyleParityTests {
         ]
     )
 
-    let overflowItemRouteID = primaryRouteID(
-      for: testIdentity("Tabs").child(.indexed("TabOverflowItem", index: 2))
-    )
+    let overflowItemRouteID = tabOverflowItemRouteID(for: tabsIdentity, index: 2)
     #expect(pointerRegistry.hasHandler(routeID: overflowItemRouteID))
     #expect(
       pointerRegistry.dispatch(
         routeID: overflowItemRouteID,
-        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+        event: primaryPointerDownEvent()
       )
     )
     #expect(selectionBox.value == "three")
@@ -267,4 +263,38 @@ private func trimTrailingSpaces(
   _ line: String
 ) -> String {
   String(line.reversed().drop(while: { $0 == " " }).reversed())
+}
+
+private func tabItemRouteID(
+  for tabsIdentity: Identity,
+  index: Int
+) -> RouteID {
+  primaryRouteID(
+    for: tabsIdentity.child(.indexed("TabItem", index: index))
+  )
+}
+
+private func tabOverflowTriggerRouteID(
+  for tabsIdentity: Identity
+) -> RouteID {
+  primaryRouteID(
+    for: tabsIdentity.child(.named("TabOverflowTrigger"))
+  )
+}
+
+private func tabOverflowItemRouteID(
+  for tabsIdentity: Identity,
+  index: Int
+) -> RouteID {
+  primaryRouteID(
+    for: tabsIdentity.child(.indexed("TabOverflowItem", index: index))
+  )
+}
+
+private func primaryPointerDownEvent() -> LocalPointerEvent {
+  .init(
+    kind: .down(.primary),
+    location: .zero,
+    targetRect: .zero
+  )
 }

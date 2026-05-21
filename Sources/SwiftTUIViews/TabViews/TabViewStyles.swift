@@ -347,6 +347,8 @@ public struct TabViewStyleBodyConfiguration: Sendable {
         return []
       }
 
+      // Keep the style-owned content slot transparent while preserving the
+      // deferred payload boundary that owns active-tab lifecycle and state.
       let child = resolveView(
         DeferredPayloadView(payload: payload),
         in: context.indexedChild(
