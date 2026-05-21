@@ -180,6 +180,11 @@ final class WebSocketTestClient {
 
   private func readBytes(count: Int) throws -> [UInt8] {
     while bufferedBytes.count < count {
+      try waitUntilReady(
+        Int16(POLLIN),
+        timeoutError: .readTimedOut(webSocketIOTimeoutMilliseconds)
+      )
+
       var buffer = [UInt8](repeating: 0, count: 4096)
       let readCount = unsafe buffer.withUnsafeMutableBufferPointer { storage in
         unsafe recv(fileDescriptor, storage.baseAddress, storage.count, 0)
@@ -205,6 +210,11 @@ final class WebSocketTestClient {
   private func writeAll(_ bytes: [UInt8]) throws {
     var offset = 0
     while offset < bytes.count {
+      try waitUntilReady(
+        Int16(POLLOUT),
+        timeoutError: .writeTimedOut(webSocketIOTimeoutMilliseconds)
+      )
+
       let written = unsafe bytes.withUnsafeBufferPointer { storage in
         unsafe send(
           fileDescriptor,
@@ -216,6 +226,29 @@ final class WebSocketTestClient {
       if written > 0 {
         offset += written
         continue
+      }
+      if written == 0 {
+        throw WebSocketTestClientError.connectionClosed
+      }
+      if errno == EINTR {
+        continue
+      }
+      throw WebSocketTestClientError.posix(errno)
+    }
+  }
+
+  private func waitUntilReady(
+    _ event: Int16,
+    timeoutError: WebSocketTestClientError
+  ) throws {
+    while true {
+      var descriptor = pollfd(fd: fileDescriptor, events: event, revents: 0)
+      let ready = unsafe poll(&descriptor, 1, webSocketIOTimeoutMilliseconds)
+      if ready > 0 {
+        return
+      }
+      if ready == 0 {
+        throw timeoutError
       }
       if errno == EINTR {
         continue
@@ -234,9 +267,11 @@ private enum WebSocketTestClientError: Error, CustomStringConvertible {
   case invalidHTTPResponse
   case invalidURL
   case posix(Int32)
+  case readTimedOut(Int32)
   case unexpectedStatus(Int)
   case unsupportedLength
   case unsupportedOpcode(UInt8)
+  case writeTimedOut(Int32)
 
   var description: String {
     switch self {
@@ -248,15 +283,21 @@ private enum WebSocketTestClientError: Error, CustomStringConvertible {
       "Invalid WebSocket URL"
     case .posix(let code):
       "POSIX error \(code)"
+    case .readTimedOut(let timeoutMilliseconds):
+      "WebSocket read timed out after \(timeoutMilliseconds) ms"
     case .unexpectedStatus(let status):
       "Unexpected HTTP status \(status)"
     case .unsupportedLength:
       "Unsupported WebSocket frame length"
     case .unsupportedOpcode(let opcode):
       "Unsupported WebSocket opcode \(opcode)"
+    case .writeTimedOut(let timeoutMilliseconds):
+      "WebSocket write timed out after \(timeoutMilliseconds) ms"
     }
   }
 }
+
+private let webSocketIOTimeoutMilliseconds: Int32 = 5_000
 
 private func webSocketRequestPath(for url: URL) -> String {
   var path = url.path.isEmpty ? "/" : url.path

@@ -39,7 +39,7 @@ struct SocketDiscoveryTests {
       }
     }
 
-    let response = try SocketClient.sendRequest(
+    let response = try sendListRequest(
       socketPath: firstServer.socketPath,
       request: "LIST\n"
     )
@@ -73,7 +73,7 @@ struct SocketDiscoveryTests {
       task.cancel()
     }
 
-    let response = try SocketClient.sendRequest(
+    let response = try sendListRequest(
       socketPath: server.socketPath,
       request: "LIST\n"
     )
@@ -184,6 +184,17 @@ private func makeServer(appName: String, identifier: String) -> SceneDiscoverySe
     attachHandler: { _ in
       .error("unsupported")
     }
+  )
+}
+
+private func sendListRequest(
+  socketPath: String,
+  request: String
+) throws(SocketClientError) -> String {
+  try SocketClient.sendRequest(
+    socketPath: socketPath,
+    request: request,
+    timeoutMilliseconds: 5_000
   )
 }
 

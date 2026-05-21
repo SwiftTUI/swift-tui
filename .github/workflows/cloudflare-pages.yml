@@ -37,6 +37,7 @@ jobs:
   deploy:
     name: Build and deploy to Cloudflare Pages
     runs-on: macos-26
+    timeout-minutes: 30
 
     env:
       CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'swift-tui' }}

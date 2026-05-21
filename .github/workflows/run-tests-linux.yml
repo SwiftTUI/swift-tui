@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: repo-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   BUN_VERSION: "1.3.13"
   SWIFTLY_VERSION: "1.1.1"
@@ -18,6 +22,7 @@ jobs:
   linux-gate:
     name: Linux repo gate (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -122,6 +127,8 @@ jobs:
 
       - name: Run repo gate
         shell: bash
+        env:
+          STUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
         run: |
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
@@ -131,6 +138,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: linux-gate
     if: always()
+    timeout-minutes: 5
 
     steps:
       - name: Require native Linux matrix
@@ -147,6 +155,7 @@ jobs:
   macos-gate:
     name: macOS repo gate
     runs-on: macos-26
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -212,6 +221,8 @@ jobs:
 
       - name: Run repo gate
         shell: bash
+        env:
+          STUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
         run: |
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
@@ -219,6 +230,7 @@ jobs:
   ios-build:
     name: iOS package build
     runs-on: macos-26
+    timeout-minutes: 15
 
     steps:
       - name: Checkout

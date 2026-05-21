@@ -21,7 +21,7 @@ struct WebHostServerTests {
       #expect(session.baseURL.host == "127.0.0.1")
       #expect(session.baseURL.port != nil)
 
-      let (data, response) = try await URLSession.shared.data(from: session.url(path: "/"))
+      let (data, response) = try await serverData(from: session.url(path: "/"))
       #expect(try statusCode(from: response) == 200)
       let html = String(decoding: data, as: UTF8.self)
       #expect(html.contains("<main id=\"webhost-root\"></main>"))
@@ -32,11 +32,11 @@ struct WebHostServerTests {
   @Test("static resource content types are stable")
   func staticResourceContentTypesAreStable() async throws {
     try await withServer { session in
-      let (_, htmlResponse) = try await URLSession.shared.data(from: session.url(path: "/"))
-      let (_, scriptResponse) = try await URLSession.shared.data(
+      let (_, htmlResponse) = try await serverData(from: session.url(path: "/"))
+      let (_, scriptResponse) = try await serverData(
         from: session.url(path: "/static/webhost.js")
       )
-      let (manifestData, manifestResponse) = try await URLSession.shared.data(
+      let (manifestData, manifestResponse) = try await serverData(
         from: session.url(path: "/scene-manifest.json")
       )
 
@@ -97,6 +97,30 @@ func withServer(
     await session.stop()
     throw error
   }
+}
+
+func serverData(
+  from url: URL
+) async throws -> (Data, URLResponse) {
+  let session = webHostTestURLSession()
+  defer { session.finishTasksAndInvalidate() }
+  return try await session.data(from: url)
+}
+
+func serverData(
+  for request: URLRequest
+) async throws -> (Data, URLResponse) {
+  let session = webHostTestURLSession()
+  defer { session.finishTasksAndInvalidate() }
+  return try await session.data(for: request)
+}
+
+private func webHostTestURLSession() -> URLSession {
+  let configuration = URLSessionConfiguration.ephemeral
+  configuration.timeoutIntervalForRequest = 5
+  configuration.timeoutIntervalForResource = 10
+  configuration.httpShouldSetCookies = false
+  return URLSession(configuration: configuration)
 }
 
 func statusCode(
