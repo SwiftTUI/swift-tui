@@ -9,13 +9,13 @@ let package = Package(
     .executable(name: "argparse-demo", targets: ["ArgParseDemo"])
   ],
   dependencies: [
-    .package(name: "swift-tui", path: "../.."),
+    .package(name: "swift-tui", path: "../..")
   ],
   targets: [
     .executableTarget(
       name: "ArgParseDemo",
       dependencies: [
-        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUI", package: "swift-tui")
       ]
     )
   ]

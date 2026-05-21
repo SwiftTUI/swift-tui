@@ -42,7 +42,7 @@ struct AdaptersTests {
     let day = isoDate("2026-04-01T00:00:00Z")
     let deltas = [
       CommitDelta(sha: "a", date: day, insertions: 10, deletions: 2, filesChanged: 1),
-      CommitDelta(sha: "b", date: day, insertions: 5,  deletions: 0, filesChanged: 1),
+      CommitDelta(sha: "b", date: day, insertions: 5, deletions: 0, filesChanged: 1),
     ]
     let (insertions, deletions) = LineSeriesAdapters.dailyDeltas(deltas, calendar: calendar)
     #expect(insertions.label == "Insertions")
@@ -57,12 +57,12 @@ struct AdaptersTests {
     let day2 = isoDate("2026-04-02T00:00:00Z")
     let deltas = [
       CommitDelta(sha: "a", date: day1, insertions: 10, deletions: 5, filesChanged: 1),
-      CommitDelta(sha: "b", date: day2, insertions: 4,  deletions: 1, filesChanged: 1),
+      CommitDelta(sha: "b", date: day2, insertions: 4, deletions: 1, filesChanged: 1),
     ]
     let series = LineSeriesAdapters.cumulativeLOC(deltas, calendar: calendar)
     #expect(series.points.count == 2)
-    #expect(series.points[0].y == 5)   // 10 - 5
-    #expect(series.points[1].y == 8)   // running 5 + (4 - 1)
+    #expect(series.points[0].y == 5)  // 10 - 5
+    #expect(series.points[1].y == 8)  // running 5 + (4 - 1)
   }
 
   @Test("commitKindCounts uses CommitKind.allCases ordering")

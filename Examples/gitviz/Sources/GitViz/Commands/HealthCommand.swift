@@ -23,7 +23,8 @@ struct HealthCommand: AsyncParsableCommand {
     let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: now) ?? now
 
     let totalTouched = deltas.reduce(0) { $0 + $1.insertions + $1.deletions }
-    let recentTouched = deltas
+    let recentTouched =
+      deltas
       .filter { $0.date >= oneYearAgo }
       .reduce(0) { $0 + $1.insertions + $1.deletions }
     let share = totalTouched == 0 ? 0.0 : Double(recentTouched) / Double(totalTouched)

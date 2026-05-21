@@ -1,6 +1,6 @@
-import SwiftTUIAnimatedImage
 import Foundation
 import SwiftTUI
+import SwiftTUIAnimatedImage
 
 public struct GifCatItem: Equatable, Hashable, Identifiable, Sendable {
   public var id: Int

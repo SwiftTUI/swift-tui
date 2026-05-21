@@ -8,7 +8,7 @@ struct GraphLayoutTests {
     let rows = [
       (sha: "c3", parents: ["c2"], subject: "third"),
       (sha: "c2", parents: ["c1"], subject: "second"),
-      (sha: "c1", parents: [],     subject: "first"),
+      (sha: "c1", parents: [], subject: "first"),
     ]
     let result = GraphLayout.layout(rows: rows)
     #expect(!result.bailed)
@@ -23,9 +23,9 @@ struct GraphLayoutTests {
     // f a
     let rows = [
       (sha: "m", parents: ["f", "a"], subject: "merge"),
-      (sha: "f", parents: ["root"],   subject: "first parent"),
-      (sha: "a", parents: ["root"],   subject: "side branch"),
-      (sha: "root", parents: [],      subject: "root"),
+      (sha: "f", parents: ["root"], subject: "first parent"),
+      (sha: "a", parents: ["root"], subject: "side branch"),
+      (sha: "root", parents: [], subject: "root"),
     ]
     let result = GraphLayout.layout(rows: rows)
     #expect(!result.bailed)
@@ -56,8 +56,8 @@ struct GraphLayoutTests {
   func glyphRowShape() {
     let rows = [
       (sha: "m", parents: ["a", "b"], subject: "merge"),
-      (sha: "a", parents: [],         subject: "left"),
-      (sha: "b", parents: [],         subject: "right"),
+      (sha: "a", parents: [], subject: "left"),
+      (sha: "b", parents: [], subject: "right"),
     ]
     let result = GraphLayout.layout(rows: rows)
     // First row: only one lane, just `●`.
@@ -71,9 +71,9 @@ struct GraphLayoutTests {
   func mergeEmitsFanOutConnector() {
     let rows = [
       (sha: "m", parents: ["f", "a"], subject: "merge"),
-      (sha: "f", parents: ["root"],   subject: "first parent"),
-      (sha: "a", parents: ["root"],   subject: "side branch"),
-      (sha: "root", parents: [],      subject: "root"),
+      (sha: "f", parents: ["root"], subject: "first parent"),
+      (sha: "a", parents: ["root"], subject: "side branch"),
+      (sha: "root", parents: [], subject: "root"),
     ]
     let result = GraphLayout.layout(rows: rows)
     let merge = result.commits[0]
@@ -84,9 +84,9 @@ struct GraphLayoutTests {
   func glyphsCarryLaneIndices() {
     let rows = [
       (sha: "m", parents: ["f", "a"], subject: "merge"),
-      (sha: "f", parents: ["root"],   subject: "first parent"),
-      (sha: "a", parents: ["root"],   subject: "side branch"),
-      (sha: "root", parents: [],      subject: "root"),
+      (sha: "f", parents: ["root"], subject: "first parent"),
+      (sha: "a", parents: ["root"], subject: "side branch"),
+      (sha: "root", parents: [], subject: "root"),
     ]
     let result = GraphLayout.layout(rows: rows)
     let merge = result.commits[0]
@@ -113,9 +113,9 @@ struct GraphLayoutTests {
     // `a` rejoining lane 0.
     let rows = [
       (sha: "m", parents: ["f", "a"], subject: "merge"),
-      (sha: "f", parents: ["root"],   subject: "first parent"),
-      (sha: "a", parents: ["root"],   subject: "side branch"),
-      (sha: "root", parents: [],      subject: "root"),
+      (sha: "f", parents: ["root"], subject: "first parent"),
+      (sha: "a", parents: ["root"], subject: "side branch"),
+      (sha: "root", parents: [], subject: "root"),
     ]
     let result = GraphLayout.layout(rows: rows)
     let sideBranch = result.commits[2]
@@ -126,7 +126,7 @@ struct GraphLayoutTests {
   func linearCommitsHaveNoConnector() {
     let rows = [
       (sha: "c2", parents: ["c1"], subject: "second"),
-      (sha: "c1", parents: [],     subject: "first"),
+      (sha: "c1", parents: [], subject: "first"),
     ]
     let result = GraphLayout.layout(rows: rows)
     #expect(result.commits.allSatisfy { $0.connectorBelow == nil })
@@ -143,9 +143,9 @@ struct GraphLayoutTests {
     //       leftmost free lane — which is lane 0 — so the fan-out
     //       opens to the LEFT.
     let rows = [
-      (sha: "m0", parents: ["p1", "m"],   subject: "first merge"),
-      (sha: "p1", parents: ["m"],         subject: "converges into lane 1"),
-      (sha: "m",  parents: ["q1", "q2"],  subject: "merge with left-side fan-out"),
+      (sha: "m0", parents: ["p1", "m"], subject: "first merge"),
+      (sha: "p1", parents: ["m"], subject: "converges into lane 1"),
+      (sha: "m", parents: ["q1", "q2"], subject: "merge with left-side fan-out"),
     ]
     let result = GraphLayout.layout(rows: rows)
     #expect(result.commits[2].lane == 1)
@@ -160,8 +160,8 @@ struct GraphLayoutTests {
     // rather than getting a duplicate "root" assignment.
     let rows = [
       (sha: "m", parents: ["f", "a"], subject: "merge"),
-      (sha: "f", parents: ["root"],   subject: "first parent"),
-      (sha: "a", parents: ["root"],   subject: "side branch"),
+      (sha: "f", parents: ["root"], subject: "first parent"),
+      (sha: "a", parents: ["root"], subject: "side branch"),
     ]
     let result = GraphLayout.layout(rows: rows)
     // Side-branch commit's connector should converge into lane 0,

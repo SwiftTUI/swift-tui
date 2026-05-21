@@ -9,10 +9,13 @@ struct LineChartAxisConfigTests {
   func xAxisValuesBuildsNumeric() {
     let axis = LineChartXAxis.values(count: 6)
     #expect(axis.isHidden == false)
-    if case .count(let n) = axis.ticks { #expect(n == 6) } else {
+    if case .count(let n) = axis.ticks {
+      #expect(n == 6)
+    } else {
       Issue.record("expected .count tick strategy")
     }
-    if case .number = axis.format { } else {
+    if case .number = axis.format {
+    } else {
       Issue.record("expected .number format")
     }
   }
@@ -20,10 +23,13 @@ struct LineChartAxisConfigTests {
   @Test("X axis .dates builds DateAxisStride / Date.FormatStyle")
   func xAxisDatesBuildsDateStride() {
     let axis = LineChartXAxis.dates(every: .month)
-    if case .dates(let stride) = axis.ticks { #expect(stride == .month) } else {
+    if case .dates(let stride) = axis.ticks {
+      #expect(stride == .month)
+    } else {
       Issue.record("expected .dates tick strategy")
     }
-    if case .date = axis.format { } else {
+    if case .date = axis.format {
+    } else {
       Issue.record("expected .date format")
     }
   }
@@ -36,7 +42,9 @@ struct LineChartAxisConfigTests {
   @Test("Y axis .values defaults to compact-name notation")
   func yAxisValuesDefaultsToCompact() {
     let axis = LineChartYAxis.values()
-    if case .count(let n) = axis.ticks { #expect(n == 5) } else {
+    if case .count(let n) = axis.ticks {
+      #expect(n == 5)
+    } else {
       Issue.record("expected .count tick strategy")
     }
     #expect(axis.isHidden == false)
@@ -120,7 +128,7 @@ struct LineChartXAxisTickTests {
     formatter.formatOptions = [.withFullDate]
     formatter.timeZone = TimeZone(identifier: "UTC")
     let start = formatter.date(from: "2024-01-15")!
-    let end   = formatter.date(from: "2024-04-15")!
+    let end = formatter.date(from: "2024-04-15")!
     let labels = xAxisTickLabels(
       domain: start.timeIntervalSinceReferenceDate...end.timeIntervalSinceReferenceDate,
       ticks: .dates(every: .month),

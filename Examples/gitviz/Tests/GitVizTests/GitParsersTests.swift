@@ -75,7 +75,8 @@ struct GitParsersTests {
 
   private func loadFixture(named name: String) throws -> String {
     let bundle = Bundle.module
-    guard let url = bundle.url(forResource: name, withExtension: nil, subdirectory: "Fixtures") else {
+    guard let url = bundle.url(forResource: name, withExtension: nil, subdirectory: "Fixtures")
+    else {
       throw FixtureError.notFound(name)
     }
     return try String(contentsOf: url, encoding: .utf8)

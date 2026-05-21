@@ -17,8 +17,8 @@ func inferDateRange(_ days: [DateValue]) -> ClosedRange<Date>? {
 
 /// First day of the week for a `CalendarHeatmap` row layout.
 public enum CalendarHeatmapWeekStart: Hashable, Sendable {
-  case sunday   // Sun, Mon, ..., Sat (rows 0..6)
-  case monday   // Mon, Tue, ..., Sun (rows 0..6)
+  case sunday  // Sun, Mon, ..., Sat (rows 0..6)
+  case monday  // Mon, Tue, ..., Sun (rows 0..6)
 }
 
 struct CalendarHeatmapBucket: Equatable, Sendable {
@@ -57,9 +57,10 @@ func bucketDays(
   for entry in days {
     let day = startOfDay(entry.date, in: calendar)
     guard day >= lower && day <= upper else { continue }
-    let (row, col) = position(of: day,
-                              from: firstColumnDate,
-                              calendar: calendar)
+    let (row, col) = position(
+      of: day,
+      from: firstColumnDate,
+      calendar: calendar)
     guard col >= 0 && col < columnCount else { continue }
     grid[row][col] = (grid[row][col] ?? 0) + entry.value
   }
@@ -89,7 +90,7 @@ private func startOfWeek(
   let offsetFromStart: Int
   switch weekStart {
   case .sunday: offsetFromStart = (weekdayUnit - 1) % 7
-  case .monday: offsetFromStart = (weekdayUnit + 5) % 7   // shift so Monday = 0
+  case .monday: offsetFromStart = (weekdayUnit + 5) % 7  // shift so Monday = 0
   }
   return calendar.date(byAdding: .day, value: -offsetFromStart, to: date) ?? date
 }
@@ -187,9 +188,12 @@ func calendarHeatmapBody(
         }
         ForEach(bucket.grid[row].indices, id: \.self) { column in
           let cell = bucket.grid[row][column]
-          Text(String(repeating: calendarHeatmapGlyph(value: cell, maximumValue: maximumValue),
-                      count: effectiveWidth))
-            .foregroundStyle(accentStyle)
+          Text(
+            String(
+              repeating: calendarHeatmapGlyph(value: cell, maximumValue: maximumValue),
+              count: effectiveWidth)
+          )
+          .foregroundStyle(accentStyle)
         }
       }
     }
@@ -202,8 +206,8 @@ func calendarHeatmapBody(
 private let dayLabelColumnWidth = 4
 
 private func calendarHeatmapGlyph(value: Double?, maximumValue: Double) -> String {
-  guard let value else { return " " }      // out of range → space
-  if value == 0 { return "·" }              // in range, no activity → dot
+  guard let value else { return " " }  // out of range → space
+  if value == 0 { return "·" }  // in range, no activity → dot
   let fraction = min(max(abs(value) / maximumValue, 0), 1)
   return intensityRampGlyph(fraction: fraction)
 }
@@ -221,7 +225,8 @@ private func calendarHeatmapMonthHeaderRow(
     }
     ForEach(labels.indices, id: \.self) { column in
       let label = labels[column]
-      let padded = label.isEmpty
+      let padded =
+        label.isEmpty
         ? String(repeating: " ", count: cellWidth)
         : String((label + String(repeating: " ", count: cellWidth)).prefix(cellWidth))
       Text(padded)

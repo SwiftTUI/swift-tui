@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 private struct DiagonalLine: CanvasDrawing, Equatable {

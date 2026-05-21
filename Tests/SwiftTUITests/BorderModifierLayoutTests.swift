@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// Layout-only assertions for the rewritten `.border(...)` view modifier.

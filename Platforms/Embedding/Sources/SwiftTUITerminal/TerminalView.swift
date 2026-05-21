@@ -1,5 +1,5 @@
-import SwiftTUIRuntime
 import SwiftTUICore
+import SwiftTUIRuntime
 
 public struct TerminalView<Session: TerminalSession>: View {
   @State private var updateGeneration: UInt64 = 0

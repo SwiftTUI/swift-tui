@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 extension ResolvedNode {

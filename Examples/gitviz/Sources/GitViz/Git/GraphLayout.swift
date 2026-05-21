@@ -163,14 +163,12 @@ enum GraphLayout {
     lanes: [String?]
   ) -> [GraphGlyph] {
     let newLanesSet = Set(newLanes)
-    let allLeft  = newLanes.allSatisfy { $0 < commitLane }
+    let allLeft = newLanes.allSatisfy { $0 < commitLane }
     let allRight = newLanes.allSatisfy { $0 > commitLane }
     let commitGlyph: Character =
-      allLeft  ? "┤" :
-      allRight ? "├" :
-      "┼"
+      allLeft ? "┤" : allRight ? "├" : "┼"
 
-    let leftBound  = min(commitLane, newLanes.min() ?? commitLane)
+    let leftBound = min(commitLane, newLanes.min() ?? commitLane)
     let rightBound = max(commitLane, newLanes.max() ?? commitLane)
     let maxIndex = max(rightBound, lanes.count - 1)
     let movingLane = newLanes.first ?? commitLane

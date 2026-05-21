@@ -159,4 +159,3 @@ public func interpolateHue(
     return _PrismNumeric.wrapDegrees(start + delta * t)
   }
 }
-
