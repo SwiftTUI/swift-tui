@@ -56,15 +56,27 @@ array — flows through to commit so every host can present it. See
 
 ## Raster Compositing
 
-`View.blendMode(_:)` lowers into draw metadata and is inherited by the raster
-paint walk until a descendant supplies its own blend mode. At each cell write,
-the rasterizer resolves the source and backdrop foreground/background colors
-first, then composites each channel independently with `Color.composited` in
-linear sRGB. This keeps semantic styles and gradients resolved before blending.
+`View.blendMode(_:)` and `View.compositingGroup()` lower into an ordered draw
+effect list that survives resolve, place, draw extraction, and rasterization.
+The order is significant: `.blendMode(.multiply).compositingGroup()` applies the
+blend while building the isolated group layer, while
+`.compositingGroup().blendMode(.multiply)` first flattens the subtree and then
+multiplies the resulting layer against its parent backdrop.
 
-SwiftTUI does not currently implement SwiftUI's `compositingGroup()` off-screen
-flattening. Nested blend modes therefore operate at the leaf cell-write level;
-there is no intermediate subtree buffer that blends as one layer.
+Without a compositing group, blend modes remain streaming cell effects. The
+rasterizer inherits the current blend mode through the draw tree until a
+descendant supplies another one, resolves source and backdrop
+foreground/background colors at each cell write, and composites each channel
+independently with `Color.composited` in linear sRGB.
+
+`compositingGroup()` paints the node's commands, descendants, and post-child
+commands into a temporary terminal-cell layer clipped to the visible subtree.
+The flattened lead cells are then written back through the normal cell writer,
+so wide-glyph continuation cells, hyperlinks, clipping, dirty-row culling, and
+layout-border ordering stay on the same terminal-cell path. Terminal image
+attachments are carried out unblended because they are presentation attachments,
+not raster cells; terminal hosts still receive the attachment, but SwiftTUI
+does not pretend to blend image pixels into the cell layer.
 
 ## The runtime stage pipeline
 

@@ -101,6 +101,10 @@ private struct BordersAndShapesBlendModesSection: View {
         blendCard("darken", mode: .darken, tint: .green)
         blendCard("lighten", mode: .lighten, tint: .blue)
       }
+      HStack(spacing: 2) {
+        effectOrderCard("blend then group", groupBeforeBlend: false)
+        effectOrderCard("group then blend", groupBeforeBlend: true)
+      }
     }
   }
 
@@ -126,6 +130,45 @@ private struct BordersAndShapesBlendModesSection: View {
       .frame(width: 10, height: 2)
       .border(set: .single)
       Text(label).foregroundStyle(.separator)
+    }
+  }
+
+  private func effectOrderCard(
+    _ label: String,
+    groupBeforeBlend: Bool
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ZStack {
+        Rectangle()
+          .fill(.blue)
+        orderedEffectPair(groupBeforeBlend: groupBeforeBlend)
+      }
+      .frame(width: 16, height: 2)
+      .border(set: .single)
+      Text(label).foregroundStyle(.separator)
+    }
+  }
+
+  @ViewBuilder
+  private func orderedEffectPair(groupBeforeBlend: Bool) -> some View {
+    if groupBeforeBlend {
+      ZStack {
+        Rectangle()
+          .fill(.red)
+        Rectangle()
+          .fill(.green)
+      }
+      .compositingGroup()
+      .blendMode(.multiply)
+    } else {
+      ZStack {
+        Rectangle()
+          .fill(.red)
+        Rectangle()
+          .fill(.green)
+      }
+      .blendMode(.multiply)
+      .compositingGroup()
     }
   }
 }

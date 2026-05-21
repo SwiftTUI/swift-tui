@@ -42,6 +42,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("_storedLayoutBehavior", .measurement),
     ("layoutMetadata", .measurement),
     ("_boxedDrawMetadata", .draw),
+    ("drawEffects", .draw),
     ("semanticMetadata", .semantics),
     ("lifecycleMetadata", .lifecycle),
     ("drawPayload", .draw),

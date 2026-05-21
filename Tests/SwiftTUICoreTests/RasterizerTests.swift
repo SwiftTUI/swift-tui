@@ -96,7 +96,7 @@ struct RasterizerTests {
         DrawNode(
           identity: testIdentity("blend-child"),
           bounds: bounds,
-          metadata: .init(blendMode: mode),
+          drawEffects: .init([.blendMode(mode)]),
           commands: [
             .fill(
               bounds: bounds,
@@ -145,7 +145,7 @@ struct RasterizerTests {
         DrawNode(
           identity: testIdentity("blend-text-child"),
           bounds: bounds,
-          metadata: .init(blendMode: .screen),
+          drawEffects: .init([.blendMode(.screen)]),
           commands: [
             .text(
               bounds: bounds,
@@ -166,6 +166,238 @@ struct RasterizerTests {
     #expect(surface.cells[0][0].character == "S")
     expectColor(style.foregroundColor, equals: expectedForeground)
     #expect(style.backgroundColor == Color.black)
+  }
+
+  @Test("blend mode without a group streams each leaf against the current backdrop")
+  func blendModeWithoutGroupStreamsPerLeafAgainstBackdrop() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let backdrop = Color(red: 0.20, green: 0.30, blue: 0.80, profile: .linearSRGB)
+    let first = Color(red: 0.80, green: 0.20, blue: 0.20, profile: .linearSRGB)
+    let second = Color(red: 0.20, green: 0.80, blue: 0.40, profile: .linearSRGB)
+    let firstComposite = first.composited(over: backdrop, mode: .screen, workingSpace: .linearSRGB)
+    let expected = second.composited(
+      over: firstComposite,
+      mode: .screen,
+      workingSpace: .linearSRGB
+    )
+    let draw = DrawNode(
+      identity: testIdentity("streaming-root"),
+      bounds: bounds,
+      commands: [fillCommand(bounds: bounds, color: backdrop)],
+      children: [
+        DrawNode(
+          identity: testIdentity("streaming-container"),
+          bounds: bounds,
+          drawEffects: .init([.blendMode(.screen)]),
+          children: [
+            fillNode("streaming-first", bounds: bounds, color: first),
+            fillNode("streaming-second", bounds: bounds, color: second),
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let style = try #require(surface.cells[0][0].style)
+
+    expectColor(style.backgroundColor, equals: expected)
+  }
+
+  @Test("blend mode before compositingGroup does not blend the flattened group with backdrop")
+  func blendModeBeforeCompositingGroupDoesNotBlendTheFlattenedGroupWithBackdrop() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let backdrop = Color(red: 0.15, green: 0.35, blue: 0.85, profile: .linearSRGB)
+    let first = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
+    let second = Color(red: 0.20, green: 0.80, blue: 0.45, profile: .linearSRGB)
+    let expected = second.composited(over: first, mode: .multiply, workingSpace: .linearSRGB)
+    let draw = DrawNode(
+      identity: testIdentity("blend-before-group-root"),
+      bounds: bounds,
+      commands: [fillCommand(bounds: bounds, color: backdrop)],
+      children: [
+        DrawNode(
+          identity: testIdentity("blend-before-group"),
+          bounds: bounds,
+          drawEffects: .init([.blendMode(.multiply), .compositingGroup]),
+          children: [
+            fillNode("blend-before-group-first", bounds: bounds, color: first),
+            fillNode("blend-before-group-second", bounds: bounds, color: second),
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let style = try #require(surface.cells[0][0].style)
+
+    expectColor(style.backgroundColor, equals: expected)
+  }
+
+  @Test("blend mode after compositingGroup blends the flattened group with backdrop")
+  func blendModeAfterCompositingGroupBlendsFlattenedGroupWithBackdrop() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let backdrop = Color(red: 0.15, green: 0.35, blue: 0.85, profile: .linearSRGB)
+    let first = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
+    let second = Color(red: 0.20, green: 0.80, blue: 0.45, profile: .linearSRGB)
+    let expected = second.composited(over: backdrop, mode: .multiply, workingSpace: .linearSRGB)
+    let draw = DrawNode(
+      identity: testIdentity("group-before-blend-root"),
+      bounds: bounds,
+      commands: [fillCommand(bounds: bounds, color: backdrop)],
+      children: [
+        DrawNode(
+          identity: testIdentity("group-before-blend"),
+          bounds: bounds,
+          drawEffects: .init([.compositingGroup, .blendMode(.multiply)]),
+          children: [
+            fillNode("group-before-blend-first", bounds: bounds, color: first),
+            fillNode("group-before-blend-second", bounds: bounds, color: second),
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let style = try #require(surface.cells[0][0].style)
+
+    expectColor(style.backgroundColor, equals: expected)
+  }
+
+  @Test("nested compositing groups apply inner and outer blend modes in order")
+  func nestedCompositingGroupsApplyInnerAndOuterBlendModesInOrder() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let rootBackdrop = Color(red: 0.20, green: 0.30, blue: 0.80, profile: .linearSRGB)
+    let outerBackdrop = Color(red: 0.15, green: 0.65, blue: 0.25, profile: .linearSRGB)
+    let innerSource = Color(red: 0.85, green: 0.20, blue: 0.35, profile: .linearSRGB)
+    let innerComposite = innerSource.composited(
+      over: outerBackdrop,
+      mode: .screen,
+      workingSpace: .linearSRGB
+    )
+    let expected = innerComposite.composited(
+      over: rootBackdrop,
+      mode: .multiply,
+      workingSpace: .linearSRGB
+    )
+    let draw = DrawNode(
+      identity: testIdentity("nested-group-root"),
+      bounds: bounds,
+      commands: [fillCommand(bounds: bounds, color: rootBackdrop)],
+      children: [
+        DrawNode(
+          identity: testIdentity("nested-group-outer"),
+          bounds: bounds,
+          drawEffects: .init([.compositingGroup, .blendMode(.multiply)]),
+          children: [
+            fillNode("nested-group-outer-backdrop", bounds: bounds, color: outerBackdrop),
+            DrawNode(
+              identity: testIdentity("nested-group-inner"),
+              bounds: bounds,
+              drawEffects: .init([.compositingGroup, .blendMode(.screen)]),
+              commands: [fillCommand(bounds: bounds, color: innerSource)]
+            ),
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let style = try #require(surface.cells[0][0].style)
+
+    expectColor(style.backgroundColor, equals: expected)
+  }
+
+  @Test("compositingGroup respects clip bounds")
+  func compositingGroupRespectsClipBounds() throws {
+    let rasterizer = Rasterizer()
+    let rootBounds = CellRect(origin: .zero, size: CellSize(width: 2, height: 1))
+    let clip = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    let backdrop = Color(red: 0.10, green: 0.20, blue: 0.70, profile: .linearSRGB)
+    let source = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
+    let draw = DrawNode(
+      identity: testIdentity("group-clip-root"),
+      bounds: rootBounds,
+      commands: [fillCommand(bounds: rootBounds, color: backdrop)],
+      children: [
+        DrawNode(
+          identity: testIdentity("group-clip"),
+          bounds: rootBounds,
+          clipBounds: clip,
+          drawEffects: .init([.compositingGroup]),
+          commands: [fillCommand(bounds: rootBounds, color: source)]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let clippedStyle = try #require(surface.cells[0][0].style)
+    let retainedStyle = try #require(surface.cells[0][1].style)
+
+    expectColor(clippedStyle.backgroundColor, equals: source)
+    expectColor(retainedStyle.backgroundColor, equals: backdrop)
+  }
+
+  @Test("compositingGroup preserves wide glyph continuation cells")
+  func compositingGroupPreservesWideGlyphContinuationCells() {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 2, height: 1))
+    let draw = DrawNode(
+      identity: testIdentity("group-wide-root"),
+      bounds: bounds,
+      drawEffects: .init([.compositingGroup]),
+      commands: [
+        .text(
+          bounds: bounds,
+          content: "界",
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+
+    #expect(surface.cells[0][0].character == "界")
+    #expect(surface.cells[0][0].spanWidth == 2)
+    #expect(surface.cells[0][1].continuationLeadX == 0)
+  }
+
+  @Test("compositingGroup preserves post-child inset border ordering")
+  func compositingGroupPreservesPostChildInsetBorderOrdering() {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 3, height: 3))
+    let draw = DrawNode(
+      identity: testIdentity("group-post-border-root"),
+      bounds: bounds,
+      drawEffects: .init([.compositingGroup]),
+      commands: [fillCommand(bounds: bounds, color: .blue)],
+      postCommands: [
+        .border(
+          bounds: bounds,
+          set: .single,
+          foreground: .init(.red),
+          background: nil,
+          blend: nil,
+          blendPhase: 0,
+          sides: .all
+        )
+      ],
+      children: [
+        fillNode("group-post-border-child", bounds: bounds, color: .green)
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+
+    #expect(surface.lines == ["┌─┐", "│ │", "└─┘"])
+    #expect(surface.cells[0][0].style?.foregroundColor == .red)
+    #expect(surface.cells[1][1].style?.backgroundColor == .green)
   }
 
   @Test("fully clipped descendants do not expand the raster surface extent")
@@ -879,6 +1111,33 @@ private func coreRasterImageNode(
         payload: .init(source: .path(source))
       )
     ]
+  )
+}
+
+private func fillNode(
+  _ id: String,
+  bounds: CellRect,
+  color: Color,
+  drawEffects: DrawEffects = .init()
+) -> DrawNode {
+  DrawNode(
+    identity: testIdentity("RasterizerFill", id),
+    bounds: bounds,
+    drawEffects: drawEffects,
+    commands: [fillCommand(bounds: bounds, color: color)]
+  )
+}
+
+private func fillCommand(
+  bounds: CellRect,
+  color: Color
+) -> DrawCommand {
+  .fill(
+    bounds: bounds,
+    geometry: .rectangle,
+    insetAmount: 0,
+    style: .color(color),
+    mode: .full
   )
 }
 

@@ -89,6 +89,7 @@ struct RetainedReuseInvariantTests {
         "semanticRole",
         "layoutMetadata",
         "drawMetadata",
+        "drawEffects",
         "semanticMetadata",
         "lifecycleMetadata",
         "drawPayload",
@@ -131,6 +132,7 @@ private func makeMetadata(
       compositingHint: "composite-\(token)",
       imagePreference: "image-\(token)"
     ),
+    drawEffects: .init([.blendMode(token == "second" ? .screen : .multiply)]),
     semanticMetadata: .init(
       isFocusable: true,
       participatesInPointerHitTesting: true,
@@ -165,6 +167,7 @@ private func makeResolvedNode(
     layoutBehavior: metadata.layoutBehavior,
     layoutMetadata: metadata.layoutMetadata,
     drawMetadata: metadata.drawMetadata,
+    drawEffects: metadata.drawEffects,
     semanticMetadata: metadata.semanticMetadata,
     lifecycleMetadata: metadata.lifecycleMetadata,
     drawPayload: metadata.drawPayload

@@ -1252,6 +1252,104 @@ struct SwiftUISurfaceTests {
         ))
   }
 
+  @Test("compositingGroup order changes public blendMode raster output")
+  @MainActor
+  func compositingGroupOrderChangesPublicBlendModeRasterOutput() throws {
+    let backdrop = Color(red: 0.15, green: 0.35, blue: 0.85, profile: .linearSRGB)
+    let first = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
+    let second = Color(red: 0.20, green: 0.80, blue: 0.45, profile: .linearSRGB)
+
+    let blendThenGroup = DefaultRenderer().render(
+      ZStack(alignment: .topLeading) {
+        Rectangle().fill(backdrop).frame(width: 1, height: 1)
+        ZStack(alignment: .topLeading) {
+          Rectangle().fill(first).frame(width: 1, height: 1)
+          Rectangle().fill(second).frame(width: 1, height: 1)
+        }
+        .blendMode(.multiply)
+        .compositingGroup()
+      },
+      context: .init(identity: testIdentity("BlendThenGroup"))
+    )
+    let groupThenBlend = DefaultRenderer().render(
+      ZStack(alignment: .topLeading) {
+        Rectangle().fill(backdrop).frame(width: 1, height: 1)
+        ZStack(alignment: .topLeading) {
+          Rectangle().fill(first).frame(width: 1, height: 1)
+          Rectangle().fill(second).frame(width: 1, height: 1)
+        }
+        .compositingGroup()
+        .blendMode(.multiply)
+      },
+      context: .init(identity: testIdentity("GroupThenBlend"))
+    )
+
+    let blendThenGroupCell = try #require(blendThenGroup.rasterSurface.cells.first?.first)
+    let groupThenBlendCell = try #require(groupThenBlend.rasterSurface.cells.first?.first)
+    let blendThenGroupStyle = try #require(blendThenGroupCell.style)
+    let groupThenBlendStyle = try #require(groupThenBlendCell.style)
+    let expectedBlendThenGroup = second.composited(
+      over: first,
+      mode: .multiply,
+      workingSpace: .linearSRGB
+    )
+    let expectedGroupThenBlend = second.composited(
+      over: backdrop,
+      mode: .multiply,
+      workingSpace: .linearSRGB
+    )
+
+    expectSurfaceColor(blendThenGroupStyle.backgroundColor, equals: expectedBlendThenGroup)
+    expectSurfaceColor(groupThenBlendStyle.backgroundColor, equals: expectedGroupThenBlend)
+    #expect(blendThenGroupStyle.backgroundColor != groupThenBlendStyle.backgroundColor)
+  }
+
+  @Test("background before blendMode differs from blendMode before background")
+  @MainActor
+  func backgroundAndBlendModeOrderAffectRasterOutput() throws {
+    let backdrop = Color(red: 0.15, green: 0.35, blue: 0.85, profile: .linearSRGB)
+    let childBackground = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
+
+    let backgroundThenBlend = DefaultRenderer().render(
+      ZStack(alignment: .topLeading) {
+        Rectangle().fill(backdrop).frame(width: 1, height: 1)
+        Text("A")
+          .frame(width: 1, height: 1)
+          .background(childBackground)
+          .blendMode(.multiply)
+      },
+      context: .init(identity: testIdentity("BackgroundThenBlend"))
+    )
+    let blendThenBackground = DefaultRenderer().render(
+      ZStack(alignment: .topLeading) {
+        Rectangle().fill(backdrop).frame(width: 1, height: 1)
+        Text("A")
+          .frame(width: 1, height: 1)
+          .blendMode(.multiply)
+          .background(childBackground)
+      },
+      context: .init(identity: testIdentity("BlendThenBackground"))
+    )
+
+    let backgroundThenBlendCell = try #require(
+      backgroundThenBlend.rasterSurface.cells.first?.first
+    )
+    let blendThenBackgroundCell = try #require(
+      blendThenBackground.rasterSurface.cells.first?.first
+    )
+    let backgroundThenBlendStyle = try #require(backgroundThenBlendCell.style)
+    let blendThenBackgroundStyle = try #require(blendThenBackgroundCell.style)
+    let expectedBlendedBackground = childBackground.composited(
+      over: backdrop,
+      mode: .multiply,
+      workingSpace: .linearSRGB
+    )
+
+    expectSurfaceColor(backgroundThenBlendStyle.backgroundColor, equals: expectedBlendedBackground)
+    expectSurfaceColor(blendThenBackgroundStyle.backgroundColor, equals: childBackground)
+    #expect(backgroundThenBlendStyle.backgroundColor != blendThenBackgroundStyle.backgroundColor)
+  }
+
   @Test("stroked borders keep underlay backgrounds out of the border ring")
   @MainActor
   func strokedBordersKeepUnderlayBackgroundOutOfBorderRing() {
@@ -6492,6 +6590,21 @@ private func isTaskCancel(_ operation: LifecycleCommitOperation) -> Bool {
     return true
   }
   return false
+}
+
+private func expectSurfaceColor(
+  _ actual: Color?,
+  equals expected: Color,
+  tolerance: Double = 0.0001
+) {
+  guard let actual else {
+    Issue.record("expected color \(expected), got nil")
+    return
+  }
+  #expect(abs(actual.red - expected.red) < tolerance)
+  #expect(abs(actual.green - expected.green) < tolerance)
+  #expect(abs(actual.blue - expected.blue) < tolerance)
+  #expect(abs(actual.alpha - expected.alpha) < tolerance)
 }
 
 extension ResolvedNode {

@@ -1,4 +1,23 @@
 extension Rasterizer {
+  private struct PaintContext {
+    var clip: CellRect?
+    var activeBlendMode: BlendMode?
+    var dirtyRows: Set<Int>?
+    var dirtyRowRange: (min: Int, max: Int)?
+  }
+
+  private struct RasterLayer {
+    var bounds: CellRect
+    var cells: [[RasterCell]]
+    var imageAttachments: [RasterImageAttachment]
+  }
+
+  private struct EffectSplit {
+    var inner: DrawEffects
+    var outer: DrawEffects
+    var hasGroup: Bool
+  }
+
   internal func maximumExtent(
     for node: DrawNode,
     clip: CellRect?
@@ -62,34 +81,39 @@ extension Rasterizer {
     // inset-placement borders need to correctly overdraw the outermost
     // cells of their subtree.
     enum Frame {
-      case visit(node: DrawNode, clip: CellRect?, blendMode: BlendMode?)
+      case visit(node: DrawNode, context: PaintContext)
       case post(
         commands: [DrawCommand],
         environment: StyleEnvironmentSnapshot,
-        clip: CellRect?,
-        blendMode: BlendMode?)
+        context: PaintContext)
     }
 
-    var stack: [Frame] = [.visit(node: node, clip: clip, blendMode: nil)]
+    let initialContext = PaintContext(
+      clip: clip,
+      activeBlendMode: nil,
+      dirtyRows: dirtyRows,
+      dirtyRowRange: dirtyRowRange
+    )
+    var stack: [Frame] = [.visit(node: node, context: initialContext)]
 
     while let frame = stack.popLast() {
       switch frame {
-      case .post(let commands, let environment, let clip, let blendMode):
+      case .post(let commands, let environment, let context):
         paint(
           commands: commands,
           environment: environment,
           cells: &cells,
           imageAttachments: &imageAttachments,
-          clip: clip,
-          blendMode: blendMode,
-          dirtyRows: dirtyRows
+          clip: context.clip,
+          blendMode: context.activeBlendMode,
+          dirtyRows: context.dirtyRows
         )
-      case .visit(let node, let frameClip, let inheritedBlendMode):
-        let activeBlendMode = node.metadata.blendMode ?? inheritedBlendMode
-        let effectiveClip = intersect(frameClip, node.clipBounds)
+      case .visit(let node, let context):
+        var nodeContext = context
+        nodeContext.clip = intersect(context.clip, node.clipBounds)
         let visibleBounds: CellRect
-        if let effectiveClip {
-          guard let clipped = intersect(node.bounds, effectiveClip) else {
+        if let clip = nodeContext.clip {
+          guard let clipped = intersect(node.bounds, clip) else {
             continue
           }
           visibleBounds = clipped
@@ -113,7 +137,7 @@ extension Rasterizer {
           visibleIdentities.insert(node.identity)
         }
 
-        if let dirtyRowRange {
+        if let dirtyRowRange = nodeContext.dirtyRowRange {
           let nodeTop = max(0, visibleBounds.origin.y)
           let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
           // O(1) range-overlap check: skip subtree when its row span
@@ -125,14 +149,30 @@ extension Rasterizer {
           }
         }
 
+        let effectSplit = splitEffects(node.drawEffects)
+        if effectSplit.hasGroup {
+          paintCompositingGroup(
+            node,
+            split: effectSplit,
+            visibleBounds: visibleBounds,
+            context: nodeContext,
+            cells: &cells,
+            imageAttachments: &imageAttachments,
+            visibleIdentities: &visibleIdentities
+          )
+          continue
+        }
+
+        nodeContext = applyingStreamingEffects(node.drawEffects, to: nodeContext)
+
         paint(
           commands: node.commands,
           environment: node.environmentSnapshot.style,
           cells: &cells,
           imageAttachments: &imageAttachments,
-          clip: effectiveClip,
-          blendMode: activeBlendMode,
-          dirtyRows: dirtyRows
+          clip: nodeContext.clip,
+          blendMode: nodeContext.activeBlendMode,
+          dirtyRows: nodeContext.dirtyRows
         )
 
         // Schedule post-children commands first so they pop LAST
@@ -145,16 +185,187 @@ extension Rasterizer {
             .post(
               commands: node.postCommands,
               environment: node.environmentSnapshot.style,
-              clip: effectiveClip,
-              blendMode: activeBlendMode
+              context: nodeContext
             )
           )
         }
         for child in node.children.reversed() {
-          stack.append(.visit(node: child, clip: effectiveClip, blendMode: activeBlendMode))
+          stack.append(.visit(node: child, context: nodeContext))
         }
       }
     }
+  }
+
+  private func applyingStreamingEffects(
+    _ effects: DrawEffects,
+    to context: PaintContext
+  ) -> PaintContext {
+    var updated = context
+    for effect in effects.ordered {
+      switch effect {
+      case .blendMode(let blendMode):
+        updated.activeBlendMode = blendMode
+      case .compositingGroup:
+        updated.activeBlendMode = context.activeBlendMode
+      }
+    }
+    return updated
+  }
+
+  private func splitEffects(_ effects: DrawEffects) -> EffectSplit {
+    var inner: [DrawEffect] = []
+    var outer: [DrawEffect] = []
+    var foundGroup = false
+
+    for effect in effects.ordered {
+      if foundGroup {
+        outer.append(effect)
+      } else if effect == .compositingGroup {
+        foundGroup = true
+      } else {
+        inner.append(effect)
+      }
+    }
+
+    return EffectSplit(
+      inner: DrawEffects(inner),
+      outer: DrawEffects(outer),
+      hasGroup: foundGroup
+    )
+  }
+
+  private func paintCompositingGroup(
+    _ node: DrawNode,
+    split: EffectSplit,
+    visibleBounds: CellRect,
+    context: PaintContext,
+    cells: inout [[RasterCell]],
+    imageAttachments: inout [RasterImageAttachment],
+    visibleIdentities: inout Set<Identity>
+  ) {
+    guard visibleBounds.size.width > 0, visibleBounds.size.height > 0 else {
+      return
+    }
+
+    var isolatedNode = node
+    isolatedNode.drawEffects = split.inner
+    var layer = RasterLayer(
+      bounds: visibleBounds,
+      cells: emptyCells(matching: cells),
+      imageAttachments: []
+    )
+
+    paint(
+      node: isolatedNode,
+      cells: &layer.cells,
+      imageAttachments: &layer.imageAttachments,
+      clip: visibleBounds,
+      dirtyRows: context.dirtyRows,
+      dirtyRowRange: context.dirtyRowRange,
+      visibleIdentities: &visibleIdentities
+    )
+    compositeLayer(
+      layer,
+      effects: split.outer,
+      context: context,
+      cells: &cells,
+      imageAttachments: &imageAttachments
+    )
+  }
+
+  private func compositeLayer(
+    _ layer: RasterLayer,
+    effects: DrawEffects,
+    context: PaintContext,
+    cells: inout [[RasterCell]],
+    imageAttachments: inout [RasterImageAttachment]
+  ) {
+    let split = splitEffects(effects)
+    if split.hasGroup {
+      var intermediate = RasterLayer(
+        bounds: layer.bounds,
+        cells: emptyCells(matching: cells),
+        imageAttachments: layer.imageAttachments
+      )
+      let innerContext = applyingStreamingEffects(
+        split.inner,
+        to: PaintContext(
+          clip: layer.bounds,
+          activeBlendMode: nil,
+          dirtyRows: context.dirtyRows,
+          dirtyRowRange: context.dirtyRowRange
+        )
+      )
+      compositeLayerCells(
+        from: layer,
+        into: &intermediate.cells,
+        context: innerContext
+      )
+      compositeLayer(
+        intermediate,
+        effects: split.outer,
+        context: context,
+        cells: &cells,
+        imageAttachments: &imageAttachments
+      )
+      return
+    }
+
+    var outputContext = applyingStreamingEffects(effects, to: context)
+    outputContext.clip = intersect(context.clip, layer.bounds)
+    compositeLayerCells(
+      from: layer,
+      into: &cells,
+      context: outputContext
+    )
+    imageAttachments.append(contentsOf: layer.imageAttachments)
+  }
+
+  private func compositeLayerCells(
+    from layer: RasterLayer,
+    into cells: inout [[RasterCell]],
+    context: PaintContext
+  ) {
+    let startY = layer.bounds.origin.y
+    let endY = startY + layer.bounds.size.height
+    let startX = layer.bounds.origin.x
+    let endX = startX + layer.bounds.size.width
+
+    for y in startY..<endY {
+      guard y >= 0, y < layer.cells.count else {
+        continue
+      }
+      for x in startX..<endX {
+        guard x >= 0, x < layer.cells[y].count else {
+          continue
+        }
+        let source = layer.cells[y][x]
+        guard source.spanWidth > 0, source != .empty else {
+          continue
+        }
+        write(
+          source.character,
+          width: source.spanWidth,
+          style: source.style,
+          hyperlink: source.hyperlink,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: context.clip,
+          blendMode: context.activeBlendMode
+        )
+      }
+    }
+  }
+
+  private func emptyCells(matching cells: [[RasterCell]]) -> [[RasterCell]] {
+    guard let width = cells.first?.count else {
+      return []
+    }
+    return Array(
+      repeating: Array(repeating: RasterCell.empty, count: width),
+      count: cells.count
+    )
   }
 
   internal func paint(

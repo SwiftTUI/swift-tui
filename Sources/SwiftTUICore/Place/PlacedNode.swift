@@ -21,6 +21,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var semanticRole: SemanticRole
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
+  package var drawEffects: DrawEffects
   package var semanticMetadata: SemanticMetadata
   package var lifecycleMetadata: LifecycleMetadata
   package var drawPayload: DrawPayload
@@ -34,6 +35,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     semanticRole: SemanticRole = .generic,
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
+    drawEffects: DrawEffects = .init(),
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
@@ -46,6 +48,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     self.semanticRole = semanticRole
     self.layoutMetadata = layoutMetadata
     self.drawMetadata = drawMetadata
+    self.drawEffects = drawEffects
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
@@ -64,6 +67,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
       semanticRole: semanticRole,
       layoutMetadata: resolved.layoutMetadata,
       drawMetadata: resolved.drawMetadata,
+      drawEffects: resolved.drawEffects,
       semanticMetadata: resolved.semanticMetadata,
       lifecycleMetadata: resolved.lifecycleMetadata,
       drawPayload: resolved.drawPayload,
@@ -96,6 +100,7 @@ public struct PlacedNode: Equatable, Sendable {
   public var semanticRole: SemanticRole
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
+  package var drawEffects: DrawEffects
   private var _semanticMetadata: Boxed<SemanticMetadata>?
   public var semanticMetadata: SemanticMetadata {
     get { _semanticMetadata?.value ?? SemanticMetadata() }
@@ -161,6 +166,7 @@ public struct PlacedNode: Equatable, Sendable {
         semanticRole: semanticRole,
         layoutMetadata: layoutMetadata,
         drawMetadata: drawMetadata,
+        drawEffects: drawEffects,
         semanticMetadata: semanticMetadata,
         lifecycleMetadata: lifecycleMetadata,
         drawPayload: drawPayload,
@@ -195,6 +201,7 @@ public struct PlacedNode: Equatable, Sendable {
       semanticRole: resolvedMetadata.semanticRole,
       layoutMetadata: resolvedMetadata.layoutMetadata,
       drawMetadata: resolvedMetadata.drawMetadata,
+      drawEffects: resolvedMetadata.drawEffects,
       semanticMetadata: resolvedMetadata.semanticMetadata,
       lifecycleMetadata: resolvedMetadata.lifecycleMetadata,
       drawPayload: resolvedMetadata.drawPayload,
@@ -216,6 +223,7 @@ public struct PlacedNode: Equatable, Sendable {
     semanticRole: SemanticRole = .generic,
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
+    drawEffects: DrawEffects = .init(),
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
@@ -234,6 +242,7 @@ public struct PlacedNode: Equatable, Sendable {
     self.semanticRole = semanticRole
     self.layoutMetadata = layoutMetadata
     self.drawMetadata = drawMetadata
+    self.drawEffects = drawEffects
     if semanticMetadata == SemanticMetadata() {
       _semanticMetadata = nil
     } else {
@@ -258,6 +267,7 @@ public struct PlacedNode: Equatable, Sendable {
     semanticRole = metadata.semanticRole
     layoutMetadata = metadata.layoutMetadata
     drawMetadata = metadata.drawMetadata
+    drawEffects = metadata.drawEffects
     semanticMetadata = metadata.semanticMetadata
     lifecycleMetadata = metadata.lifecycleMetadata
     drawPayload = metadata.drawPayload
