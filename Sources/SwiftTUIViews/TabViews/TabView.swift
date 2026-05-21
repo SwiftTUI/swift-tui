@@ -73,6 +73,26 @@ extension TabView {
       selectedIndex.flatMap { index in
         options.indices.contains(index) ? options[index].contentPayload : nil
       }
+    let styleItems = options.indices.map { index in
+      TabViewStyleItemConfiguration(
+        index: index,
+        label: options[index].label,
+        isSelected: selectedIndex == index,
+        isFocused: (isFocused && showsFocusEffect) && focusedIndex == index,
+        controlIdentity: context.identity
+      )
+    }
+    let overflowTrigger = stylePresentation.overflowMenu.map { overflow in
+      TabViewOverflowTriggerConfiguration(
+        label: overflow.triggerLabel,
+        isSelected: overflow.isTriggerSelected,
+        isFocused: overflow.isTriggerFocused,
+        isExpanded: overflow.isExpanded,
+        overflowIndices: overflow.overflowIndices,
+        leadingWidth: overflow.triggerLeadingWidth,
+        controlIdentity: context.identity
+      )
+    }
 
     if isEnabled {
       let binding = selection
@@ -145,73 +165,27 @@ extension TabView {
         followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
       )
 
-      for index in stylePresentation.visibleOptionIndices {
-        let routeID = primaryRouteID(
-          for: tabItemIdentity(
-            for: context.identity,
-            index: index
-          )
-        )
-        context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
-          guard case .down(.primary) = event.kind else {
-            return false
-          }
-
-          return withAuthoringContext(dynamicPropertyScope) {
-            setStoredTabOverflowMenuExpanded(false, in: ownerNode)
-            setStoredFocusedTabIndex(index, in: ownerNode)
-            return setBoundSelection(binding, to: options[index].tag)
-          }
-        }
-      }
-
-      if let overflowPresentation = stylePresentation.overflowMenu {
-        let triggerRouteID = primaryRouteID(
-          for: tabOverflowTriggerIdentity(for: context.identity)
-        )
-        context.localPointerHandlerRegistry?.register(routeID: triggerRouteID) { event in
-          guard case .down(.primary) = event.kind else {
-            return false
-          }
-
-          return withAuthoringContext(dynamicPropertyScope) {
-            let nextExpanded = !storedTabOverflowMenuExpanded(in: ownerNode)
-            setStoredTabOverflowMenuExpanded(nextExpanded, in: ownerNode)
-            if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
-              setStoredFocusedTabIndex(focusIndex, in: ownerNode)
-            }
-            return true
-          }
-        }
-
-        for index in overflowPresentation.overflowIndices {
-          let routeID = primaryRouteID(
-            for: tabOverflowItemIdentity(
-              for: context.identity,
-              index: index
-            )
-          )
-          context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
-            guard case .down(.primary) = event.kind else {
-              return false
-            }
-
-            return withAuthoringContext(dynamicPropertyScope) {
-              setStoredFocusedTabIndex(index, in: ownerNode)
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
-              return setBoundSelection(binding, to: options[index].tag)
-            }
-          }
-        }
-      }
+      registerPointerRoutes(
+        in: context,
+        presentation: stylePresentation,
+        ownerNode: ownerNode,
+        options: options,
+        dynamicPropertyScope: dynamicPropertyScope
+      )
     }
 
-    let child = tabStyle.resolveBody(
-      configuration: styleConfiguration,
+    let bodyConfiguration = TabViewStyleBodyConfiguration(
+      styleConfiguration: styleConfiguration,
       presentation: stylePresentation,
-      controlIdentity: context.identity,
-      activeContentIndex: selectedIndex,
-      activeContent: activeContentPayload,
+      items: styleItems,
+      overflowTrigger: overflowTrigger,
+      content: .init(
+        activeContentIndex: selectedIndex,
+        payload: activeContentPayload
+      )
+    )
+    let child = tabStyle.resolveBody(
+      configuration: bodyConfiguration,
       in: context.child(component: .named("TabBody"))
     )
 
@@ -227,6 +201,86 @@ extension TabView {
         accessibilityRole: .tabView
       )
     )
+  }
+
+  @MainActor
+  private func registerPointerRoutes(
+    in context: ResolveContext,
+    presentation: TabViewStylePresentation,
+    ownerNode: SwiftTUICore.ViewNode?,
+    options: [TabOption],
+    dynamicPropertyScope: AuthoringContext?
+  ) {
+    guard let pointerRegistry = context.localPointerHandlerRegistry else {
+      return
+    }
+
+    let binding = selection
+
+    // Custom styles receive every item and can place any item in either the
+    // primary strip or an overflow surface. Keep the registered route family
+    // complete and let the style choose which wrappers it renders.
+    for index in options.indices {
+      let routeID = primaryRouteID(
+        for: tabItemIdentity(
+          for: context.identity,
+          index: index
+        )
+      )
+      pointerRegistry.register(routeID: routeID) { event in
+        guard case .down(.primary) = event.kind else {
+          return false
+        }
+
+        return withAuthoringContext(dynamicPropertyScope) {
+          setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+          setStoredFocusedTabIndex(index, in: ownerNode)
+          return setBoundSelection(binding, to: options[index].tag)
+        }
+      }
+    }
+
+    guard let overflowPresentation = presentation.overflowMenu else {
+      return
+    }
+
+    let triggerRouteID = primaryRouteID(
+      for: tabOverflowTriggerIdentity(for: context.identity)
+    )
+    pointerRegistry.register(routeID: triggerRouteID) { event in
+      guard case .down(.primary) = event.kind else {
+        return false
+      }
+
+      return withAuthoringContext(dynamicPropertyScope) {
+        let nextExpanded = !storedTabOverflowMenuExpanded(in: ownerNode)
+        setStoredTabOverflowMenuExpanded(nextExpanded, in: ownerNode)
+        if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
+          setStoredFocusedTabIndex(focusIndex, in: ownerNode)
+        }
+        return true
+      }
+    }
+
+    for index in options.indices {
+      let routeID = primaryRouteID(
+        for: tabOverflowItemIdentity(
+          for: context.identity,
+          index: index
+        )
+      )
+      pointerRegistry.register(routeID: routeID) { event in
+        guard case .down(.primary) = event.kind else {
+          return false
+        }
+
+        return withAuthoringContext(dynamicPropertyScope) {
+          setStoredFocusedTabIndex(index, in: ownerNode)
+          setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+          return setBoundSelection(binding, to: options[index].tag)
+        }
+      }
+    }
   }
 
   private func resolvedOptions(

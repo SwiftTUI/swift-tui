@@ -314,6 +314,18 @@ if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/Swi
   fail "TabView.swift should not switch directly on tab styles."
 fi
 
+if rg -n -P --quiet -- 'TabStripItemView|TabStripChromeStyle' Sources/SwiftTUIViews/TabViews/BuiltinTabViewStyles.swift; then
+  fail "Built-in TabView styles should not share a private chrome-switching TabStripItemView."
+fi
+
+if rg -n -P --quiet -- 'FrameworkHostedTabStripView|FrameworkHostedTabOverflowSlotView|FrameworkHostedTabOverflowMenuView|TabViewStyleBodyHost' Sources/SwiftTUIViews/TabViews/TabViewStyleHosting.swift; then
+  fail "TabViewStyleHosting should not own private strip or overflow layout; TabViewStyle must own full body composition."
+fi
+
+if rg -n -P --quiet -- 'makeTabBody|makeOverflowTriggerBody|makeOverflowItemBody|makeStripBackground' Sources/SwiftTUIViews/TabViews/TabViewStyles.swift; then
+  fail "TabViewStyle should expose full-body composition rather than fragment-only hooks."
+fi
+
 public_style_enums=$(
   rg -n -P --glob '*.swift' -- 'public enum ([A-Za-z_][A-Za-z0-9_]*Style)\b' Sources |
     sed -E 's/.*public enum ([A-Za-z_][A-Za-z0-9_]*Style).*/\1/' |

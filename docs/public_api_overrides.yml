@@ -245,6 +245,7 @@ classifications:
     - SwiftTUIViews.SegmentedPickerStyle
     - SwiftTUIViews.SuccessToastStyle
     - SwiftTUIViews.TabViewStyle
+    - SwiftTUIViews.TabViewStyleBodyConfiguration
     - SwiftTUIViews.TabViewStyleConfiguration
     - SwiftTUIViews.TabViewStyleItemConfiguration
     - SwiftTUIViews.TabViewStyleOption
