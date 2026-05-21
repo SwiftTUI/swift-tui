@@ -200,7 +200,7 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
   .surface {
     position: relative;
     height: var(--demo-h);
-    background: #000;
+    background: var(--bg);
   }
   iframe {
     position: absolute;
@@ -209,7 +209,7 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
     height: 100%;
     border: 0;
     display: block;
-    background: #000;
+    background: var(--bg);
   }
 
   /* dev fallback (only renders during `astro dev`) */
