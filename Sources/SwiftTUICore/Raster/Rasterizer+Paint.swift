@@ -6,16 +6,25 @@ extension Rasterizer {
     var dirtyRowRange: (min: Int, max: Int)?
   }
 
+  private struct PaintVisibility {
+    var clip: CellRect?
+    var bounds: CellRect
+  }
+
+  /// Temporary surface for an isolated compositing group.
+  ///
+  /// `cells` mirrors the destination surface dimensions so existing absolute
+  /// draw commands can paint without translation. `bounds` records the visible
+  /// rectangle that should be flattened back into the destination.
   private struct RasterLayer {
     var bounds: CellRect
     var cells: [[RasterCell]]
     var imageAttachments: [RasterImageAttachment]
   }
 
-  private struct EffectSplit {
-    var inner: DrawEffects
-    var outer: DrawEffects
-    var hasGroup: Bool
+  private struct CompositingGroupSplit {
+    var effectsInsideGroup: DrawEffects
+    var effectsAfterGroup: DrawEffects
   }
 
   internal func maximumExtent(
@@ -33,19 +42,12 @@ extension Rasterizer {
     var stack: [Frame] = [Frame(node: node, clip: clip)]
 
     while let frame = stack.popLast() {
-      let effectiveClip = intersect(frame.clip, frame.node.clipBounds)
-      let visibleBounds: CellRect
-      if let effectiveClip {
-        guard let clippedBounds = intersect(frame.node.bounds, effectiveClip) else {
-          continue
-        }
-        visibleBounds = clippedBounds
-      } else {
-        visibleBounds = frame.node.bounds
+      guard let visibility = paintVisibility(for: frame.node, inheritedClip: frame.clip) else {
+        continue
       }
 
-      let nodeMaxX = visibleBounds.origin.x + visibleBounds.size.width
-      let nodeMaxY = visibleBounds.origin.y + visibleBounds.size.height
+      let nodeMaxX = visibility.bounds.origin.x + visibility.bounds.size.width
+      let nodeMaxY = visibility.bounds.origin.y + visibility.bounds.size.height
       if hasVisibleExtent {
         maxX = max(maxX, nodeMaxX)
         maxY = max(maxY, nodeMaxY)
@@ -56,7 +58,7 @@ extension Rasterizer {
       }
 
       for child in frame.node.children.reversed() {
-        stack.append(Frame(node: child, clip: effectiveClip))
+        stack.append(Frame(node: child, clip: visibility.clip))
       }
     }
 
@@ -110,16 +112,10 @@ extension Rasterizer {
         )
       case .visit(let node, let context):
         var nodeContext = context
-        nodeContext.clip = intersect(context.clip, node.clipBounds)
-        let visibleBounds: CellRect
-        if let clip = nodeContext.clip {
-          guard let clipped = intersect(node.bounds, clip) else {
-            continue
-          }
-          visibleBounds = clipped
-        } else {
-          visibleBounds = node.bounds
+        guard let visibility = paintVisibility(for: node, inheritedClip: context.clip) else {
+          continue
         }
+        nodeContext.clip = visibility.clip
 
         // Record visibility BEFORE the dirty-rows cull.  The animation
         // tick-gating check treats this set as a geometric predicate
@@ -133,13 +129,13 @@ extension Rasterizer {
         // an animation ticks invalidates the animated identity which
         // forces that subtree's bounds into dirtyRows, so the paint
         // walk will still descend into it.
-        if visibleBounds.size.width > 0, visibleBounds.size.height > 0 {
+        if visibility.bounds.size.width > 0, visibility.bounds.size.height > 0 {
           visibleIdentities.insert(node.identity)
         }
 
         if let dirtyRowRange = nodeContext.dirtyRowRange {
-          let nodeTop = max(0, visibleBounds.origin.y)
-          let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
+          let nodeTop = max(0, visibility.bounds.origin.y)
+          let nodeBottom = nodeTop + max(0, visibility.bounds.size.height)
           // O(1) range-overlap check: skip subtree when its row span
           // is entirely outside the dirty-row range.
           if nodeBottom > nodeTop,
@@ -149,12 +145,11 @@ extension Rasterizer {
           }
         }
 
-        let effectSplit = splitEffects(node.drawEffects)
-        if effectSplit.hasGroup {
+        if let groupSplit = splitAtFirstCompositingGroup(node.drawEffects) {
           paintCompositingGroup(
             node,
-            split: effectSplit,
-            visibleBounds: visibleBounds,
+            split: groupSplit,
+            visibleBounds: visibility.bounds,
             context: nodeContext,
             cells: &cells,
             imageAttachments: &imageAttachments,
@@ -163,7 +158,7 @@ extension Rasterizer {
           continue
         }
 
-        nodeContext = applyingStreamingEffects(node.drawEffects, to: nodeContext)
+        nodeContext = applyingUngroupedEffects(node.drawEffects, to: nodeContext)
 
         paint(
           commands: node.commands,
@@ -196,7 +191,25 @@ extension Rasterizer {
     }
   }
 
-  private func applyingStreamingEffects(
+  private func paintVisibility(
+    for node: DrawNode,
+    inheritedClip: CellRect?
+  ) -> PaintVisibility? {
+    let clip = intersect(inheritedClip, node.clipBounds)
+    let bounds: CellRect
+    if let clip {
+      guard let clippedBounds = intersect(node.bounds, clip) else {
+        return nil
+      }
+      bounds = clippedBounds
+    } else {
+      bounds = node.bounds
+    }
+
+    return PaintVisibility(clip: clip, bounds: bounds)
+  }
+
+  private func applyingUngroupedEffects(
     _ effects: DrawEffects,
     to context: PaintContext
   ) -> PaintContext {
@@ -206,37 +219,45 @@ extension Rasterizer {
       case .blendMode(let blendMode):
         updated.activeBlendMode = blendMode
       case .compositingGroup:
-        updated.activeBlendMode = context.activeBlendMode
+        // Callers normally split groups before this helper. If a future
+        // segment still contains a group marker, it has no streaming effect
+        // by itself; only the split/flatten step changes painting behavior.
+        continue
       }
     }
     return updated
   }
 
-  private func splitEffects(_ effects: DrawEffects) -> EffectSplit {
-    var inner: [DrawEffect] = []
-    var outer: [DrawEffect] = []
+  private func splitAtFirstCompositingGroup(
+    _ effects: DrawEffects
+  ) -> CompositingGroupSplit? {
+    var effectsBeforeGroup: [DrawEffect] = []
+    var effectsAfterGroup: [DrawEffect] = []
     var foundGroup = false
 
     for effect in effects.ordered {
       if foundGroup {
-        outer.append(effect)
+        effectsAfterGroup.append(effect)
       } else if effect == .compositingGroup {
         foundGroup = true
       } else {
-        inner.append(effect)
+        effectsBeforeGroup.append(effect)
       }
     }
 
-    return EffectSplit(
-      inner: DrawEffects(inner),
-      outer: DrawEffects(outer),
-      hasGroup: foundGroup
+    guard foundGroup else {
+      return nil
+    }
+
+    return CompositingGroupSplit(
+      effectsInsideGroup: DrawEffects(effectsBeforeGroup),
+      effectsAfterGroup: DrawEffects(effectsAfterGroup)
     )
   }
 
   private func paintCompositingGroup(
     _ node: DrawNode,
-    split: EffectSplit,
+    split: CompositingGroupSplit,
     visibleBounds: CellRect,
     context: PaintContext,
     cells: inout [[RasterCell]],
@@ -248,7 +269,7 @@ extension Rasterizer {
     }
 
     var isolatedNode = node
-    isolatedNode.drawEffects = split.inner
+    isolatedNode.drawEffects = split.effectsInsideGroup
     var layer = RasterLayer(
       bounds: visibleBounds,
       cells: emptyCells(matching: cells),
@@ -266,7 +287,7 @@ extension Rasterizer {
     )
     compositeLayer(
       layer,
-      effects: split.outer,
+      effects: split.effectsAfterGroup,
       context: context,
       cells: &cells,
       imageAttachments: &imageAttachments
@@ -280,15 +301,14 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment]
   ) {
-    let split = splitEffects(effects)
-    if split.hasGroup {
+    if let nestedGroup = splitAtFirstCompositingGroup(effects) {
       var intermediate = RasterLayer(
         bounds: layer.bounds,
         cells: emptyCells(matching: cells),
         imageAttachments: layer.imageAttachments
       )
-      let innerContext = applyingStreamingEffects(
-        split.inner,
+      let innerContext = applyingUngroupedEffects(
+        nestedGroup.effectsInsideGroup,
         to: PaintContext(
           clip: layer.bounds,
           activeBlendMode: nil,
@@ -303,7 +323,7 @@ extension Rasterizer {
       )
       compositeLayer(
         intermediate,
-        effects: split.outer,
+        effects: nestedGroup.effectsAfterGroup,
         context: context,
         cells: &cells,
         imageAttachments: &imageAttachments
@@ -311,7 +331,7 @@ extension Rasterizer {
       return
     }
 
-    var outputContext = applyingStreamingEffects(effects, to: context)
+    var outputContext = applyingUngroupedEffects(effects, to: context)
     outputContext.clip = intersect(context.clip, layer.bounds)
     compositeLayerCells(
       from: layer,
