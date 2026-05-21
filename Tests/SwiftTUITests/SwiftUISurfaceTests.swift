@@ -1259,7 +1259,7 @@ struct SwiftUISurfaceTests {
     let first = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
     let second = Color(red: 0.20, green: 0.80, blue: 0.45, profile: .linearSRGB)
 
-    let blendThenGroup = DefaultRenderer().render(
+    let blendThenGroupStyle = try renderedFirstCellStyle(identity: "BlendThenGroup") {
       ZStack(alignment: .topLeading) {
         Rectangle().fill(backdrop).frame(width: 1, height: 1)
         ZStack(alignment: .topLeading) {
@@ -1268,10 +1268,9 @@ struct SwiftUISurfaceTests {
         }
         .blendMode(.multiply)
         .compositingGroup()
-      },
-      context: .init(identity: testIdentity("BlendThenGroup"))
-    )
-    let groupThenBlend = DefaultRenderer().render(
+      }
+    }
+    let groupThenBlendStyle = try renderedFirstCellStyle(identity: "GroupThenBlend") {
       ZStack(alignment: .topLeading) {
         Rectangle().fill(backdrop).frame(width: 1, height: 1)
         ZStack(alignment: .topLeading) {
@@ -1280,14 +1279,8 @@ struct SwiftUISurfaceTests {
         }
         .compositingGroup()
         .blendMode(.multiply)
-      },
-      context: .init(identity: testIdentity("GroupThenBlend"))
-    )
-
-    let blendThenGroupCell = try #require(blendThenGroup.rasterSurface.cells.first?.first)
-    let groupThenBlendCell = try #require(groupThenBlend.rasterSurface.cells.first?.first)
-    let blendThenGroupStyle = try #require(blendThenGroupCell.style)
-    let groupThenBlendStyle = try #require(groupThenBlendCell.style)
+      }
+    }
     let expectedBlendThenGroup = second.composited(
       over: first,
       mode: .multiply,
@@ -1310,35 +1303,24 @@ struct SwiftUISurfaceTests {
     let backdrop = Color(red: 0.15, green: 0.35, blue: 0.85, profile: .linearSRGB)
     let childBackground = Color(red: 0.90, green: 0.30, blue: 0.20, profile: .linearSRGB)
 
-    let backgroundThenBlend = DefaultRenderer().render(
+    let backgroundThenBlendStyle = try renderedFirstCellStyle(identity: "BackgroundThenBlend") {
       ZStack(alignment: .topLeading) {
         Rectangle().fill(backdrop).frame(width: 1, height: 1)
         Text("A")
           .frame(width: 1, height: 1)
           .background(childBackground)
           .blendMode(.multiply)
-      },
-      context: .init(identity: testIdentity("BackgroundThenBlend"))
-    )
-    let blendThenBackground = DefaultRenderer().render(
+      }
+    }
+    let blendThenBackgroundStyle = try renderedFirstCellStyle(identity: "BlendThenBackground") {
       ZStack(alignment: .topLeading) {
         Rectangle().fill(backdrop).frame(width: 1, height: 1)
         Text("A")
           .frame(width: 1, height: 1)
           .blendMode(.multiply)
           .background(childBackground)
-      },
-      context: .init(identity: testIdentity("BlendThenBackground"))
-    )
-
-    let backgroundThenBlendCell = try #require(
-      backgroundThenBlend.rasterSurface.cells.first?.first
-    )
-    let blendThenBackgroundCell = try #require(
-      blendThenBackground.rasterSurface.cells.first?.first
-    )
-    let backgroundThenBlendStyle = try #require(backgroundThenBlendCell.style)
-    let blendThenBackgroundStyle = try #require(blendThenBackgroundCell.style)
+      }
+    }
     let expectedBlendedBackground = childBackground.composited(
       over: backdrop,
       mode: .multiply,
@@ -6605,6 +6587,19 @@ private func expectSurfaceColor(
   #expect(abs(actual.green - expected.green) < tolerance)
   #expect(abs(actual.blue - expected.blue) < tolerance)
   #expect(abs(actual.alpha - expected.alpha) < tolerance)
+}
+
+@MainActor
+private func renderedFirstCellStyle<Content: View>(
+  identity: String,
+  @ViewBuilder content: () -> Content
+) throws -> ResolvedTextStyle {
+  let artifacts = DefaultRenderer().render(
+    content(),
+    context: .init(identity: testIdentity(identity))
+  )
+  let cell = try #require(artifacts.rasterSurface.cells.first?.first)
+  return try #require(cell.style)
 }
 
 extension ResolvedNode {
