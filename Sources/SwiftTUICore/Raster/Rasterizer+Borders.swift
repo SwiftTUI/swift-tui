@@ -9,7 +9,8 @@ extension Rasterizer {
     backgroundStyle: BorderBackgroundStyle?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -36,7 +37,8 @@ extension Rasterizer {
         environment: environment,
         cells: &cells,
         clip: clip,
-        backgroundStyle: backgroundStyle
+        backgroundStyle: backgroundStyle,
+        blendMode: blendMode
       )
       return
     case .rectangle, .roundedRectangle:
@@ -70,7 +72,8 @@ extension Rasterizer {
           x: x,
           y: minY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
         if maxY != minY {
           writeStrokeGlyph(
@@ -84,7 +87,8 @@ extension Rasterizer {
             x: x,
             y: maxY,
             cells: &cells,
-            clip: clip
+            clip: clip,
+            blendMode: blendMode
           )
         }
       }
@@ -102,7 +106,8 @@ extension Rasterizer {
             x: minX,
             y: y,
             cells: &cells,
-            clip: clip
+            clip: clip,
+            blendMode: blendMode
           )
           if maxX != minX {
             writeStrokeGlyph(
@@ -116,7 +121,8 @@ extension Rasterizer {
               x: maxX,
               y: y,
               cells: &cells,
-              clip: clip
+              clip: clip,
+              blendMode: blendMode
             )
           }
         }
@@ -133,7 +139,8 @@ extension Rasterizer {
         x: minX,
         y: minY,
         cells: &cells,
-        clip: clip
+        clip: clip,
+        blendMode: blendMode
       )
       if maxX != minX {
         writeStrokeGlyph(
@@ -147,7 +154,8 @@ extension Rasterizer {
           x: maxX,
           y: minY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
       if maxY != minY {
@@ -162,7 +170,8 @@ extension Rasterizer {
           x: minX,
           y: maxY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
       if maxX != minX, maxY != minY {
@@ -177,7 +186,8 @@ extension Rasterizer {
           x: maxX,
           y: maxY,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
     }
@@ -190,7 +200,8 @@ extension Rasterizer {
     stackAxis: Axis?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -225,7 +236,8 @@ extension Rasterizer {
           x: x,
           y: y,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
     } else {
@@ -242,7 +254,8 @@ extension Rasterizer {
           x: x,
           y: y,
           cells: &cells,
-          clip: clip
+          clip: clip,
+          blendMode: blendMode
         )
       }
     }
@@ -259,7 +272,8 @@ extension Rasterizer {
     x: Int,
     y: Int,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    blendMode: BlendMode? = nil
   ) {
     let resolvedStyle = ResolvedTextStyle(
       foregroundColor: resolveColor(
@@ -285,7 +299,8 @@ extension Rasterizer {
       atX: x,
       y: y,
       cells: &cells,
-      clip: clip
+      clip: clip,
+      blendMode: blendMode
     )
   }
 

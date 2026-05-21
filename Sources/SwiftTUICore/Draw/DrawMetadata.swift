@@ -119,6 +119,7 @@ package struct DrawMetadata: Equatable, Sendable {
   package var compositingHint: String?
   package var imagePreference: String?
   package var ruleStackAxis: Axis?
+  package var blendMode: BlendMode?
 
   package init(
     foregroundStyle: AnyShapeStyle? = nil,
@@ -142,7 +143,8 @@ package struct DrawMetadata: Equatable, Sendable {
     clipsToBounds: Bool = false,
     clipIdentifier: String? = nil,
     compositingHint: String? = nil,
-    imagePreference: String? = nil
+    imagePreference: String? = nil,
+    blendMode: BlendMode? = nil
   ) {
     let resolvedListStyle =
       listStyle?.merging(
@@ -183,6 +185,7 @@ package struct DrawMetadata: Equatable, Sendable {
     self.clipIdentifier = clipIdentifier
     self.compositingHint = compositingHint
     self.imagePreference = imagePreference
+    self.blendMode = blendMode
     ruleStackAxis = nil
   }
 
@@ -288,6 +291,7 @@ package struct DrawMetadata: Equatable, Sendable {
     merged.compositingHint = other.compositingHint ?? compositingHint
     merged.imagePreference = other.imagePreference ?? imagePreference
     merged.ruleStackAxis = other.ruleStackAxis ?? ruleStackAxis
+    merged.blendMode = other.blendMode ?? blendMode
     return merged
   }
 

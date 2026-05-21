@@ -66,32 +66,65 @@ extension ResolvedTextStyle {
   public func composited(
     over underlay: ResolvedTextStyle?
   ) -> ResolvedTextStyle {
+    composited(over: underlay, blendMode: nil)
+  }
+
+  internal func composited(
+    over underlay: ResolvedTextStyle?,
+    blendMode: BlendMode?
+  ) -> ResolvedTextStyle {
     guard let underlay else {
       return self
     }
 
     let blendedBackground: Color? =
-      switch (backgroundColor, underlay.backgroundColor) {
-      case (let overlay?, let under?) where overlay.alpha < 1:
-        under.mixed(
-          with: Color(red: overlay.red, green: overlay.green, blue: overlay.blue),
-          amount: overlay.alpha)
-      case (let overlay?, _):
-        overlay
-      case (nil, let under?):
-        under
-      case (nil, nil):
-        Color?.none
+      if let blendMode {
+        compositedColor(
+          source: backgroundColor,
+          over: underlay.backgroundColor,
+          blendMode: blendMode
+        )
+      } else {
+        switch (backgroundColor, underlay.backgroundColor) {
+        case (let overlay?, let under?) where overlay.alpha < 1:
+          under.mixed(
+            with: Color(red: overlay.red, green: overlay.green, blue: overlay.blue),
+            amount: overlay.alpha)
+        case (let overlay?, _):
+          overlay
+        case (nil, let under?):
+          under
+        case (nil, nil):
+          Color?.none
+        }
       }
 
     return .init(
-      foregroundColor: foregroundColor ?? underlay.foregroundColor,
+      foregroundColor: compositedColor(
+        source: foregroundColor,
+        over: underlay.foregroundColor,
+        blendMode: blendMode
+      ),
       backgroundColor: blendedBackground,
       emphasis: emphasis,
       underlineStyle: underlineStyle,
       strikethroughStyle: strikethroughStyle,
       opacity: opacity
     )
+  }
+
+  private func compositedColor(
+    source: Color?,
+    over backdrop: Color?,
+    blendMode: BlendMode?
+  ) -> Color? {
+    guard let source else {
+      return backdrop
+    }
+    guard let blendMode, let backdrop else {
+      return source
+    }
+    return source.composited(over: backdrop, mode: blendMode)
   }
 
   public func tinted(with overlay: Color) -> ResolvedTextStyle {

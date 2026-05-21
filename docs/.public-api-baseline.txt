@@ -4393,6 +4393,7 @@ SwiftTUIViews.View.animation(_:value:)
 SwiftTUIViews.View.background(_:)
 SwiftTUIViews.View.background(alignment:content:)
 SwiftTUIViews.View.backgroundPreferenceValue(_:alignment:_:)
+SwiftTUIViews.View.blendMode(_:)
 SwiftTUIViews.View.body
 SwiftTUIViews.View.border(_:set:placement:sides:)
 SwiftTUIViews.View.border(_:set:placement:sides:)
