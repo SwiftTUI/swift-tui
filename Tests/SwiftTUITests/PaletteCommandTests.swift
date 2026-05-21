@@ -71,7 +71,8 @@ struct PaletteCommandTests {
       in: ResolveContext(identity: testIdentity("palette-root"))
     )
 
-    let names = resolved
+    let names =
+      resolved
       .preferenceValues[PaletteCommandsPreferenceKey.self]
       .map(\.name)
     #expect(names == ["Command A", "Command B"])

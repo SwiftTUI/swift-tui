@@ -107,12 +107,12 @@ struct LifeGrid {
 
         var n = 0
         if cells[rowUp + xLt] { n += 1 }
-        if cells[rowUp + x]   { n += 1 }
+        if cells[rowUp + x] { n += 1 }
         if cells[rowUp + xRt] { n += 1 }
         if cells[rowMid + xLt] { n += 1 }
         if cells[rowMid + xRt] { n += 1 }
         if cells[rowDn + xLt] { n += 1 }
-        if cells[rowDn + x]   { n += 1 }
+        if cells[rowDn + x] { n += 1 }
         if cells[rowDn + xRt] { n += 1 }
 
         let alive = cells[rowMid + x]

@@ -1,7 +1,7 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUICharts
+@testable import SwiftTUICore
 
 @Suite("Chart coordinate conversion")
 struct ChartCoordinateConversionTests {

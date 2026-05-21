@@ -68,7 +68,7 @@ public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableVi
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let effectiveWidth = max(20, width ?? 60)   // assume an 80-col terminal minus padding
+    let effectiveWidth = max(20, width ?? 60)  // assume an 80-col terminal minus padding
     return [
       resolveView(
         VStack(alignment: .leading, spacing: 0) {
@@ -99,16 +99,24 @@ public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableVi
 
 extension LineChart {
   public func chartXAxis(_ axis: LineChartXAxis) -> Self {
-    var copy = self; copy.xAxis = axis; return copy
+    var copy = self
+    copy.xAxis = axis
+    return copy
   }
   public func chartYAxis(_ axis: LineChartYAxis) -> Self {
-    var copy = self; copy.yAxis = axis; return copy
+    var copy = self
+    copy.yAxis = axis
+    return copy
   }
   public func chartLegend(_ config: LineChartLegendConfig) -> Self {
-    var copy = self; copy.legend = config; return copy
+    var copy = self
+    copy.legend = config
+    return copy
   }
   public func chartBaseline(_ baseline: LineChartBaseline) -> Self {
-    var copy = self; copy.baseline = baseline; return copy
+    var copy = self
+    copy.baseline = baseline
+    return copy
   }
 }
 

@@ -522,4 +522,3 @@ extension RGBColorProfile {
       transferFunction: .linear)
   }
 }
-

@@ -15,7 +15,8 @@ struct TempoCommand: AsyncParsableCommand {
     let repo = try GitRepo(workingDirectory: opts.resolvedPath)
     let calendar = Calendar.current
     let now = Date()
-    let start = opts.sinceDate
+    let start =
+      opts.sinceDate
       ?? calendar.date(byAdding: .month, value: -6, to: now)
       ?? now
     let end = opts.untilDate ?? now

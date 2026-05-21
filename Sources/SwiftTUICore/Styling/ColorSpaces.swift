@@ -193,4 +193,3 @@ public func adapt(
     "Chromatic adaptation must preserve finiteness")
   return XYZColor(x: adapted.x, y: adapted.y, z: adapted.z, whitePoint: targetWhite)
 }
-

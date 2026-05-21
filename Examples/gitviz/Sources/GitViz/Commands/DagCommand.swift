@@ -16,7 +16,8 @@ struct DagCommand: AsyncParsableCommand {
     let repo = try GitRepo(workingDirectory: opts.resolvedPath)
     let layout = try repo.revList(max: max)
 
-    let bailFooter = layout.bailed
+    let bailFooter =
+      layout.bailed
       ? "(stopped — exceeded maximum lane count)" : nil
 
     GitVizRunOnce.print(
