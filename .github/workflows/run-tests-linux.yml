@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Linux test dependencies
         shell: bash
@@ -55,7 +55,7 @@ jobs:
             unzip
 
       - name: Cache Swiftly toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/share/swiftly
@@ -98,7 +98,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache SwiftPM
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/org.swift.swiftpm
@@ -109,7 +109,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.arch }}-swiftpm-
 
       - name: Cache Bun deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.bun/install/cache
@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload lane result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-test-result-linux-${{ matrix.arch }}
           path: .ci-results/linux-${{ matrix.arch }}.result
@@ -181,7 +181,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install swiftly and Swift toolchain
         shell: bash
@@ -212,7 +212,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache SwiftPM
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/org.swift.swiftpm
@@ -223,7 +223,7 @@ jobs:
             ${{ runner.os }}-swiftpm-
 
       - name: Cache Bun deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.bun/install/cache
@@ -262,7 +262,7 @@ jobs:
 
       - name: Upload lane result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-test-result-macos
           path: .ci-results/macos.result
@@ -276,7 +276,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode with Swift 6.3 support
         shell: bash
@@ -325,7 +325,7 @@ jobs:
 
       - name: Upload lane result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-test-result-ios
           path: .ci-results/ios.result
@@ -345,13 +345,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download lane results
         id: download-results
         if: always()
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: .ci-results
           pattern: ci-test-result-*
