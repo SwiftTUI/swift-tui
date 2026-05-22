@@ -5,7 +5,7 @@ import SiteFooter from "../components/SiteFooter.astro";
 import SiteIcons from "../components/SiteIcons.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const site = (import.meta.env.SITE ?? "https://swifttui.io").replace(/\/$/, "");
+const site = (import.meta.env.SITE ?? "https://swifttui.sh").replace(/\/$/, "");
 const canonical = `${site}${base || ""}/pipeline/`;
 const ogImage = `${site}${base || ""}/og.png`;
 const title = "SwiftTUI Rendering Pipeline";
