@@ -19,7 +19,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install swiftly and Swift toolchain
         shell: bash
@@ -37,7 +37,7 @@ jobs:
           echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
 
       - name: Cache SwiftPM
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/org.swift.swiftpm
@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload perf artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: termui-perf-runs
           path: .perf/runs
