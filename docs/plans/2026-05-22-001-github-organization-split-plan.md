@@ -31,11 +31,16 @@ and `@swifttui/build`.
 | `SwiftTUI/swift-tui-examples` | Runnable examples, demo package tests, WebExample static deployment source, example screenshots/assets | Public Swift framework products, required DocC coverage |
 | `SwiftTUI/swift-tui-site` | Astro website, Cloudflare Pages deployment, docs composition, release landing pages | Framework implementation and package releases |
 
-Leave `SwiftTUICharts`, `SwiftTUIAnimatedImage`, `SwiftTUITerminal`,
-`SwiftTUITerminalWorkspace`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and
-`SwiftTUIWebHostCLI` in `swift-tui` for this split. Several of those targets
-use `package` access or runner SPI today; extracting them now would force
-implementation seams into public API before they are stable.
+No Swift target leaves `swift-tui` in this split. Every target currently in
+`Package.swift` (and listed in `Scripts/lib/public_docc_targets.txt`) stays —
+including `SwiftTUICharts`, `SwiftTUIAnimatedImage`, `SwiftTUITerminal`,
+`SwiftTUITerminalWorkspace`, `SwiftTUIWASI`, `SwiftTUIWebHost`,
+`SwiftTUIWebHostCLI`, `SwiftTUIArguments`, `SwiftTUIPTYPrimitives`, and
+`SwiftUIHost`. Several of these use `package` access or runner SPI today;
+extracting any of them now would force implementation seams into public API
+before they are stable. Only TypeScript browser source, examples, and the
+website move out. (Stating it as "all Swift targets stay" avoids an enumerated
+list that silently goes stale when a target is added.)
 
 ## Invariants
 
@@ -126,10 +131,11 @@ implementation seams into public API before they are stable.
 
   ## Extraction Boundary
 
-  `SwiftTUICore`, `SwiftTUIViews`, `SwiftTUIRuntime`, `SwiftTUICLI`,
-  `SwiftTUIWASI`, `SwiftTUIWebHost`, `SwiftTUIWebHostCLI`,
-  `SwiftTUIAnimatedImage`, `SwiftTUICharts`, `SwiftTUITerminal`, and
-  `SwiftTUITerminalWorkspace` stay in `swift-tui` for this split.
+  No Swift target leaves `swift-tui` in this split: every target in
+  `Package.swift` stays. Only TypeScript browser source (`@swifttui/web`,
+  `@swifttui/build`), the runnable examples, and the website move to sibling
+  repos. A Swift target is extracted only when a later, explicit decision
+  promotes its package-private seams into stable public API.
 
   ## Documentation Contract
 
@@ -138,18 +144,23 @@ implementation seams into public API before they are stable.
   example becomes a published library product.
   ```
 
-- [ ] **Step 2: Link the decision and plan from `docs/README.md`**
+- [ ] **Step 2: Link the decision from `docs/README.md`**
 
-  Add a `Planning documents` section after `Proposal documents`:
+  `docs/README.md` already has a `## Planning documents` section that links this
+  plan. Do not add a second heading — add one bullet for the new decision record
+  at the top of that section:
 
   ```markdown
-  ## Planning documents
-
   - [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) - repository ownership,
     release boundaries, and public documentation invariants.
-  - [plans/2026-05-22-001-github-organization-split-plan.md](plans/2026-05-22-001-github-organization-split-plan.md)
-    - execution plan for moving browser source, examples, and the website into
-      separate GitHub repositories.
+  ```
+
+  `REPOSITORY-SPLIT.md` is a stable decision record, so also consider adding it
+  to the main `## Contents` table alongside `ARCHITECTURE.md`. Verify the section
+  before editing:
+
+  ```bash
+  rg -n "## Planning documents" docs/README.md
   ```
 
 - [ ] **Step 3: Update architecture wording**
@@ -195,10 +206,16 @@ implementation seams into public API before they are stable.
   ```bash
   rg -n "Repository Split|swift-tui-web|update_webhost_bundle|Planning documents" docs
   git diff --check
+  ./Scripts/check_stable_doc_source_paths.sh
   ```
 
   Expected: `rg` prints the new links and release-flow text; `git diff --check`
-  exits with status 0.
+  exits with status 0; the doc-path guard prints
+  `[check_stable_doc_source_paths] ok`. That guard greps `README.md` and
+  `docs/*.md` for moved `Sources/SwiftTUI/...` implementation paths, so run it
+  whenever this plan edits docs — the new prose above intentionally references
+  only product names and `Platforms/...` resource paths, neither of which the
+  guard rejects.
 
 - [ ] **Step 6: Commit the decision**
 
@@ -212,11 +229,15 @@ implementation seams into public API before they are stable.
 ### Task 2: Freeze The Main Swift Package Boundary
 
 **Files:**
-- Modify: `Package.swift`
-- Modify: `Scripts/check_webhost_package_boundary.sh`
 - Create: `Scripts/check_repository_split_boundary.sh`
 - Modify: `Scripts/lib/repo_policy_checks.sh`
-- Modify: `docs/DEVELOPMENT.md`
+- Reference (not edited): `Package.swift`,
+  `Scripts/check_webhost_package_boundary.sh` — the boundary is frozen by adding
+  a *new* guard, not by editing the manifest or the existing WebHost check.
+
+The `run_repo_policy_check` call signature this task appends to matches the
+existing helper exactly: `mode`, `repo_root`, `title`, `rerun_command`, then the
+command and its argv.
 
 - [ ] **Step 1: Add a repository split boundary check**
 
@@ -296,7 +317,7 @@ implementation seams into public API before they are stable.
 - [ ] **Step 5: Commit the boundary guard**
 
   ```bash
-  git add Scripts/check_repository_split_boundary.sh Scripts/lib/repo_policy_checks.sh docs/DEVELOPMENT.md
+  git add Scripts/check_repository_split_boundary.sh Scripts/lib/repo_policy_checks.sh
   git commit -m "chore: guard repository split boundaries"
   ```
 
@@ -521,10 +542,14 @@ implementation seams into public API before they are stable.
   cd /Users/adamz/Developer/repos
   gh repo create SwiftTUI/swift-tui-examples --public --clone
   cd swift-tui-examples
+  mkdir -p Scripts
   rsync -a --delete ../swift-tui/Examples/ Examples/
   cp ../swift-tui/Scripts/check_demo_builds.sh Scripts/check_examples.sh
   cp ../swift-tui/Scripts/stack_safety_harness.py Scripts/stack_safety_harness.py
   ```
+
+  `gh repo create --clone` leaves an empty checkout, so `Scripts/` must be
+  created before the `cp` lines or they fail with "No such file or directory".
 
 - [ ] **Step 2: Update local package paths**
 
@@ -548,9 +573,15 @@ implementation seams into public API before they are stable.
   rg -n 'package\\(name: "swift-tui"|github.com/SwiftTUI/swift-tui|path: "../.."' Examples
   ```
 
-  Expected: every example resolves either to `../../../swift-tui` or
-  `../../../../swift-tui`; no example points back to an in-repo root package
+  Expected: every dependency *on the framework* resolves to `../../../swift-tui`
+  or `../../../../swift-tui`; no example points back to an in-repo root package
   path.
+
+  Note the grep also surfaces intra-examples dependencies that must stay
+  unchanged — `Examples/WebExample/TerminalApp/Package.swift` declares
+  `.package(path: "../../gallery")`, and that relative path is still correct
+  because `gallery` and `WebExample` move together. Only rewrite dependencies
+  that point at the framework root, not sibling-example dependencies.
 
 - [ ] **Step 3: Rewrite `Scripts/check_examples.sh`**
 
@@ -645,9 +676,14 @@ implementation seams into public API before they are stable.
   In `swift-tui`:
 
   ```bash
-  git add Scripts/test_all.sh Scripts/test_gate.sh Scripts/check_demo_builds.sh docs/DEVELOPMENT.md
+  git add Scripts/test_all.sh Scripts/test_gate.sh docs/DEVELOPMENT.md
   git commit -m "chore: move example matrix to examples repo"
   ```
+
+  Task 4 only copies `Scripts/check_demo_builds.sh` (and `stack_safety_harness.py`)
+  into the examples repo and edits the gate scripts; the originals in `swift-tui`
+  are not modified here. They are deleted in Task 6, after the gate no longer
+  drives examples.
 
 ---
 
@@ -655,11 +691,26 @@ implementation seams into public API before they are stable.
 
 **Files:**
 - Create in `SwiftTUI/swift-tui-site`: `Website/`
+- Modify in `SwiftTUI/swift-tui-site`: `Website/package.json` (rebase the
+  `build:wasm` / `build:wasm:dev` `../Examples/WebExample` paths to the
+  multi-repo checkout)
 - Create in `SwiftTUI/swift-tui-site`: `.github/workflows/cloudflare-pages.yml`
 - Create in `SwiftTUI/swift-tui-site`: `docs/docc-repos.yml`
 - Create in `SwiftTUI/swift-tui-site`: `Scripts/build_docc_site.sh`
 - Modify in `swift-tui`: `.github/workflows/cloudflare-pages.yml`
 - Modify in `swift-tui`: `package.json`
+
+> **Cross-repo wasm chain (read first).** The WebExample WASI demo is built by a
+> chain that currently lives entirely inside `swift-tui`:
+> `package.json:build:wasm` → `Website/package.json:build:wasm` →
+> `bun run --cwd ../Examples/WebExample build` → `compress:wasm`. After the
+> split this chain spans three repos: the `SwiftTUIWASI` target stays in
+> `swift-tui`, `WebExample` (which emits `app.wasm`) moves to
+> `swift-tui-examples`, and the Astro site that compresses/serves it moves to
+> `swift-tui-site`. The relative path `../Examples/WebExample` is only valid in
+> the old monorepo; it must be rebased, and the wasm SDK install, Binaryen,
+> Brotli, and Cloudflare size/file-count validation that the current workflow
+> performs must be carried into the new site workflow. See Step 4.
 
 - [ ] **Step 1: Create the site repository and copy the current site**
 
@@ -742,6 +793,52 @@ implementation seams into public API before they are stable.
   Build DocC from `swift-tui`, build WebExample from `swift-tui-examples`, and
   compose the artifact under `swift-tui-site/_cf-pages-artifact`.
 
+  The current `swift-tui/.github/workflows/cloudflare-pages.yml` is not a simple
+  Astro build — porting it is the bulk of this task. Carry over every step it
+  performs, rebasing each hardcoded path to the multi-repo layout:
+
+  - Install `swiftly` + the Swift toolchain from `swift-tui/.swift-version`.
+  - Install the wasm Swift SDK (`swift-6.3.1-RELEASE_wasm`, with checksum) used
+    by WebExample.
+  - `brew install binaryen brotli` (the wasm is Binaryen-optimized and
+    Brotli-compressed).
+  - Build the demo: today this is `bun run build:wasm`, which calls
+    `Website/package.json:build:wasm` → `bun run --cwd ../Examples/WebExample`.
+    After the split, WebExample lives in the `swift-tui-examples` checkout, so
+    rebase that relative path (see the `Website/package.json` edit below).
+  - Validate the emitted `app.wasm`: `brotli --test` plus the in-browser
+    `WebAssembly.compile` smoke check the current workflow runs.
+  - Build the Astro site with `ASTRO_BASE=/` and the resolved `ASTRO_SITE`.
+  - Build DocC at `--hosting-base-path docs` and drop the duplicated
+    `documentation/` shell tree (Cloudflare Pages Free caps deployments at
+    20,000 files; the site routes all DocC paths through one SPA shell via
+    `Website/public/_redirects` and advertises the Brotli encoding via
+    `Website/public/_headers`).
+  - Compose `_cf-pages-artifact` (`/` Astro, `/docs` DocC, `/webexample`
+    WebExample) and re-run the 25 MiB single-asset and 20,000-file guards before
+    `wrangler pages deploy`.
+
+  Then rebase the demo path in `swift-tui-site/Website/package.json`. With the
+  workflow checking examples out at `path: swift-tui-examples` (a sibling of the
+  `swift-tui-site` checkout), the path from `Website/` becomes
+  `../../swift-tui-examples/Examples/WebExample`. Prefer making it overridable so
+  local runs and CI can differ:
+
+  ```jsonc
+  // Website/package.json — accept an env override, default to the CI layout
+  "build:wasm": "bun run --cwd \"${WEBEXAMPLE_DIR:-../../swift-tui-examples/Examples/WebExample}\" build && bun run compress:wasm",
+  "build:wasm:dev": "bun run --cwd \"${WEBEXAMPLE_DIR:-../../swift-tui-examples/Examples/WebExample}\" build:dev && bun run compress:wasm:dev"
+  ```
+
+  Confirm no stale monorepo paths remain:
+
+  ```bash
+  rg -n "\.\./Examples/WebExample|--cwd Website" swift-tui-site
+  ```
+
+  Expected: no matches (every demo path now resolves through the examples
+  checkout or `WEBEXAMPLE_DIR`).
+
 - [ ] **Step 5: Validate the site repo locally**
 
   ```bash
@@ -758,15 +855,29 @@ implementation seams into public API before they are stable.
 - [ ] **Step 6: Remove site workspace ownership from `swift-tui`**
 
   In `swift-tui/package.json`, remove `Website` from `workspaces` and remove
-  scripts whose only purpose is site deployment:
+  every script that targets `Website` — including the wasm wrappers, which only
+  exist to drive the site's demo build and would dangle once Step 7 deletes
+  `Website`:
 
   ```json
+  "build:wasm": "bun run --cwd Website build:wasm",
+  "build:wasm:dev": "bun run --cwd Website build:wasm:dev",
   "build:website": "bun run --cwd Website build:full",
   "build:website:dev": "bun run --cwd Website build:dev",
   "dev:website": "bun run --cwd Website dev"
   ```
 
-  Keep framework, WebHost bundle, and repo-gate scripts in `swift-tui`.
+  Keep framework, WebHost bundle, and repo-gate scripts in `swift-tui`. After
+  removal, confirm nothing in `swift-tui` still references the deleted scripts or
+  directory:
+
+  ```bash
+  rg -n "build:wasm|build:website|dev:website|--cwd Website" package.json .github
+  ```
+
+  Expected: no matches. (The wasm artifact is now produced only in
+  `swift-tui-site` from the `swift-tui-examples` WebExample; the `SwiftTUIWASI`
+  Swift target stays in `swift-tui` and is exercised by its own target tests.)
 
 - [ ] **Step 7: Commit both repositories**
 
@@ -796,7 +907,10 @@ implementation seams into public API before they are stable.
 - Delete from `swift-tui`: `Platforms/Web/`
 - Delete from `swift-tui`: `Platforms/WebBuild/`
 - Delete from `swift-tui`: `Examples/`
-- Modify in `swift-tui`: `Scripts/check_demo_builds.sh`
+- Delete from `swift-tui`: `Scripts/check_demo_builds.sh` (its example
+  build/test matrix now lives in `swift-tui-examples/Scripts/check_examples.sh`)
+- Delete from `swift-tui`: `Scripts/stack_safety_harness.py` (referenced only by
+  `check_demo_builds.sh`; it moved to the examples repo in Task 4)
 - Modify in `swift-tui`: `Scripts/build-webhost-bundle.sh`
 - Modify in `swift-tui`: `docs/HOSTS-AND-PLATFORMS.md`
 - Modify in `swift-tui`: `docs/DEVELOPMENT.md`
@@ -805,7 +919,19 @@ implementation seams into public API before they are stable.
 
   ```bash
   git rm -r Platforms/Web Platforms/WebBuild Examples
+  git rm Scripts/check_demo_builds.sh Scripts/stack_safety_harness.py
   ```
+
+  `check_demo_builds.sh` is standalone (no other script invokes it) and only
+  builds `Examples/`, so it is dead once `Examples/` is gone;
+  `stack_safety_harness.py` is referenced only by it. Both now live in
+  `swift-tui-examples`. Before deleting, confirm nothing else references them:
+
+  ```bash
+  rg -n "check_demo_builds|stack_safety_harness" Scripts .github package.json
+  ```
+
+  Expected: no matches outside the two files themselves.
 
 - [ ] **Step 2: Shrink the Bun workspace**
 
@@ -886,10 +1012,14 @@ implementation seams into public API before they are stable.
 **Files:**
 - Create in `swift-tui-site`: `docs/releases.yml`
 - Modify in `swift-tui-site`: `docs/docc-repos.yml`
-- Modify in `swift-tui-site`: `.github/workflows/cloudflare-pages.yml`
-- Modify in `swift-tui`: `docs/DEVELOPMENT.md`
+- Modify in `swift-tui-site`: `Scripts/build_docc_site.sh` (honor the manifest
+  `ref` — see the note in Step 4)
 - Modify in `swift-tui-web`: `package.json`
-- Modify in `swift-tui-examples`: `README.md`
+
+Optional polish (not covered by the steps below): add a `README.md` to
+`swift-tui-examples` documenting the required sibling `../swift-tui` checkout, and
+a `Repository split release flow` note already lands in `swift-tui/docs/DEVELOPMENT.md`
+via Task 1 Step 4.
 
 - [ ] **Step 1: Add release manifest**
 
@@ -941,19 +1071,30 @@ implementation seams into public API before they are stable.
   }
   ```
 
-- [ ] **Step 4: Run release validation in order**
+- [ ] **Step 4: Commit, validate, and tag in order**
 
-  In `swift-tui`:
+  Commit the Step 1–3 changes in each repo *before* tagging — a tag names a
+  commit, so an uncommitted `releases.yml`, `docc-repos.yml` ref bump, or web
+  release script would be absent from the tagged tree.
+
+  `swift-tui` is the release anchor and must be tagged **and pushed first**: the
+  site builds DocC against `ref: v0.1.0` of `swift-tui` (Step 2), so that tag has
+  to exist on the remote before the site can compose against it.
+
+  In `swift-tui` (already committed via Task 6; tag the release commit):
 
   ```bash
   bun run test
   Scripts/build_docc_archive.sh --hosting-base-path docs --output-path .build-docs
   git tag v0.1.0
+  git push origin v0.1.0
   ```
 
   In `swift-tui-web`:
 
   ```bash
+  git add package.json
+  git commit -m "chore: add web package release scripts"
   bun run ci
   bun run pack:web
   bun run pack:build
@@ -967,22 +1108,32 @@ implementation seams into public API before they are stable.
   git tag v0.1.0
   ```
 
-  In `swift-tui-site`:
+  In `swift-tui-site` (run only after `swift-tui` `v0.1.0` is pushed, so
+  `build_docc_site.sh` can fetch the tagged framework):
 
   ```bash
+  git add docs/releases.yml docs/docc-repos.yml
+  git commit -m "chore: pin docs composition to v0.1.0 releases"
   bun run --cwd Website check
   bun run --cwd Website build
   Scripts/build_docc_site.sh
   git tag v0.1.0
   ```
 
-- [ ] **Step 5: Push tags after all validation passes**
+  > `Scripts/build_docc_site.sh` as written in Task 5 clones `swift-tui`'s
+  > default branch and ignores `docc-repos.yml`'s `ref`. For the `v0.1.0` pin to
+  > take effect, update the script to read `ref` from the manifest and
+  > `git clone --branch "$ref"` (or `git -C … checkout "$ref"`). Otherwise the
+  > ref bump in Step 2 is decorative and the site keeps building `main`.
+
+- [ ] **Step 5: Push the remaining tags after all validation passes**
 
   ```bash
   git push origin v0.1.0
   ```
 
-  Run that command separately in each repo only after every repo has passed its
+  `swift-tui`'s tag was pushed above. Run this in `swift-tui-web`,
+  `swift-tui-examples`, and `swift-tui-site` only after every repo has passed its
   validation command.
 
 ---
@@ -1022,6 +1173,21 @@ implementation seams into public API before they are stable.
     }
   }
   ```
+
+  Notes for the executor:
+
+  - The file currently imports only `SwiftTUI` and `Testing`. The `@OptionGroup`
+    property wrapper is an `ArgumentParser` type, so add `import ArgumentParser`
+    at the top of the file — every in-repo `@OptionGroup` user imports it
+    explicitly (e.g. `Examples/gitviz/.../Options.swift`); do not rely on it
+    leaking through the `SwiftTUI` re-export.
+  - This fixture is the same `App, SwiftTUICommand` shape proven in
+    `Platforms/Arguments/Tests/SwiftTUIArgumentsTests/SwiftTUICommandTests.swift`
+    (`TestSwiftTUICommand`), so no `run()` is required.
+  - `#expect(ImportSmokeCommand.configuration.subcommands.count == 1)` is correct
+    because the default `SwiftTUICommand.configuration` injects exactly one
+    subcommand (`CompletionsCommand`). The assertion intentionally locks that
+    default in place — leave it as-is.
 
 - [ ] **Step 2: Validate the consumer contract**
 
@@ -1093,3 +1259,26 @@ implementation seams into public API before they are stable.
   bundle before TypeScript source leaves `swift-tui`.
 - Examples are moved after their own CI exists, so the main repo does not lose
   regression coverage before the replacement gate is available.
+
+## Risks And Open Items
+
+- **The cross-repo wasm chain is the highest-risk part of this split.** The
+  WebExample WASI demo is currently built by `build:wasm` →
+  `--cwd ../Examples/WebExample` → `compress:wasm`, a chain that, after the
+  split, spans `swift-tui` (the `SwiftTUIWASI` target), `swift-tui-examples`
+  (WebExample, which emits `app.wasm`), and `swift-tui-site` (Astro
+  compression/serving). Task 5 must rebase the relative demo path and carry the
+  wasm SDK install, Binaryen, Brotli, and Cloudflare 25 MiB / 20,000-file
+  validation into the site workflow. Validate the full `build:full` deploy path
+  in the site repo's CI, not just `astro build`, before retiring the monorepo
+  workflow.
+- **Docs edits run through grep ratchets.** `check_stable_doc_source_paths.sh`
+  scans `README.md` and `docs/*.md`; run it (or the full `bun run test`) after
+  every doc change in this plan.
+- **`build_docc_site.sh` must honor the manifest `ref`** for the `v0.1.0` pin in
+  Task 7 to mean anything; as drafted it clones `main`.
+- This plan was reviewed against the working tree on 2026-05-22: the repo
+  targets, scripts, `@swifttui/web`/`@swifttui/build` package names, the
+  checked-in WebHost browser bundle, the policy-check helper signature, and the
+  `App, SwiftTUICommand` test-fixture shape were all confirmed to exist as the
+  tasks assume.
