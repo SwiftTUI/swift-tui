@@ -34,9 +34,9 @@ SwiftTUICore  ->  SwiftTUIViews  ->  SwiftTUIRuntime
 - **SwiftTUIViews** — the SwiftUI-shaped authoring surface (`View`, controls,
   layout, state, focus, gestures).
 - **SwiftTUIRuntime** — the run loop, renderer, scenes, and host integration.
-- **SwiftTUI** — the terminal convenience product; re-exports `SwiftTUIRuntime`,
-  `SwiftTUICLI`, and `SwiftTUIArguments` via `@_exported import`.
-- **SwiftTUICharts**, **SwiftTUIAnimatedImage** — peer products.
+- **SwiftTUI** — the batteries-included convenience product; re-exports the
+  combined terminal/WebHost runner and `SwiftTUIAnimatedImage`.
+- **SwiftTUICharts** — peer product for charting/graph views.
 
 `DefaultRenderer` runs one composed runtime stage pipeline:
 

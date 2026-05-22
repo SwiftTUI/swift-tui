@@ -56,8 +56,8 @@ phase timings, worker queue/compute timings, `main_actor_blocked_ms`,
 
 The public scene declarations live in `SwiftTUIRuntime`, while platform
 integration lives in sibling root package products. The `SwiftTUI` convenience
-product re-exports this module plus terminal launch support for ordinary
-terminal apps.
+product re-exports this module plus the combined terminal/WebHost launch
+surface and animated GIF/image support for ordinary app binaries.
 
 The same authored `App` and `Scene` declarations can feed these execution
 modes:
@@ -73,8 +73,9 @@ It does not pull in runner products on its own.
 
 ### Executable runners
 
-For ordinary terminal-native apps, import `SwiftTUI` and mark your app type
-with `@main` to use the default terminal `App.main()`. When you need an
+For ordinary apps, import `SwiftTUI` and mark your app type with `@main` to use
+the default launcher. It runs in the terminal by default and switches to the
+localhost WebHost when `--web` is present. When you need a terminal-only
 explicit launcher, compose `SwiftTUIRuntime` with `SwiftTUICLI` and call:
 
 ```swift
@@ -99,5 +100,6 @@ browser hosting on top of a `SwiftTUIWASI` build.
 
 `SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
 `WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`
-provides `WebHostCLIRunner` for binaries that intentionally support both
-terminal-native and `--web` launch.
+provides `WebHostCLIRunner` for binaries that support both terminal-native and
+`--web` launch. `SwiftTUI` includes that combined runner by default; import
+`SwiftTUIWebHostCLI` directly only for a narrower graph.

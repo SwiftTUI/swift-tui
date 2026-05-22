@@ -2,18 +2,18 @@ import Foundation
 import Testing
 
 struct PackageGraphIsolationTests {
-  @Test("SwiftTUI is the terminal convenience product")
-  func swiftTUIIsTerminalConvenienceProduct() throws {
+  @Test("SwiftTUI is the batteries-included convenience product")
+  func swiftTUIIsBatteriesIncludedConvenienceProduct() throws {
     let rootManifest = try String(
       contentsOf: repoRoot().appendingPathComponent("Package.swift"),
       encoding: .utf8
     )
     let swiftTUITargetBlock = try #require(targetBlock(named: "SwiftTUI", in: rootManifest))
 
-    #expect(swiftTUITargetBlock.contains("\"SwiftTUIRuntime\""))
-    #expect(swiftTUITargetBlock.contains("\"SwiftTUIArguments\""))
-    #expect(swiftTUITargetBlock.contains("\"SwiftTUICLI\""))
-    #expect(!swiftTUITargetBlock.contains("SwiftTUI" + "WebHost"))
+    #expect(swiftTUITargetBlock.contains("\"SwiftTUIWebHostCLI\""))
+    #expect(swiftTUITargetBlock.contains("\"SwiftTUIAnimatedImage\""))
+    #expect(!swiftTUITargetBlock.contains("\"SwiftTUICLI\""))
+    #expect(!swiftTUITargetBlock.contains("\"SwiftTUICharts\""))
     #expect(!swiftTUITargetBlock.contains("Flying" + "Fox"))
   }
 
@@ -32,8 +32,8 @@ struct PackageGraphIsolationTests {
     #expect(!runtimeTargetBlock.contains("Swift" + "Term"))
   }
 
-  @Test("argument parser depends below the terminal convenience product")
-  func argumentParserDependsBelowTerminalConvenienceProduct() throws {
+  @Test("argument parser depends below the convenience product")
+  func argumentParserDependsBelowConvenienceProduct() throws {
     let rootManifest = try String(
       contentsOf: repoRoot().appendingPathComponent("Package.swift"),
       encoding: .utf8

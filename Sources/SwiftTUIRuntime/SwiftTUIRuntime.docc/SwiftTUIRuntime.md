@@ -17,7 +17,7 @@ Use it when you want to:
 
 `SwiftTUIRuntime` re-exports `SwiftTUIViews` and `SwiftTUICore`. Import it for
 shared view packages, explicit host composition, or custom launchers that should
-not inherit the terminal app convenience product.
+not inherit the batteries-included convenience product.
 
 ## Runtime Story
 
@@ -30,11 +30,12 @@ It also owns the shared scene-hosting APIs that root package platform products
 build on.
 
 Scene declarations such as ``App`` and ``WindowGroup`` also live here. The
-release-facing `SwiftTUI` product re-exports this module plus `SwiftTUIArguments`
-and `SwiftTUICLI` for one-import terminal apps. Other platform integrations
-compose with this module directly: `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`,
-`SwiftTUIWebHost`, and `SwiftTUIWebHostCLI`. Browser deployment through
-`Platforms/Web` remains the Bun package that consumes a `SwiftTUIWASI` build.
+release-facing `SwiftTUI` product re-exports this module through
+`SwiftTUIWebHostCLI` and includes animated GIF/image support for one-import
+apps. Other platform integrations compose with this module directly:
+`SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`, `SwiftTUIWebHost`, and
+`SwiftTUIWebHostCLI`. Browser deployment through `Platforms/Web` remains the
+Bun package that consumes a `SwiftTUIWASI` build.
 
 Pointer input policy types such as `TerminalMouseInputResolution`,
 `TerminalMouseInputTrustPolicy`, and `TerminalMouseInputCompatibilityMatrix`

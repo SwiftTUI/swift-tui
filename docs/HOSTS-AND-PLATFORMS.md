@@ -25,14 +25,15 @@ flowchart TD
 
 | Mode | Product | Presents to | Notes |
 | --- | --- | --- | --- |
-| Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | The default `App.main()` story re-exported by `SwiftTUI`. |
+| Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI; raster output drawn onto a canvas via the `web-surface` transport. |
 | Host-managed | `SwiftUIHost` | A `SwiftUI` view inside an app | Retains `HostedSceneSession` values and draws a `HostedRasterSurface`. macOS-only. |
 | Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` v2 protocol. |
 
 A binary can support more than one mode. `SwiftTUIWebHostCLI` (`WebHostCLIRunner`)
 combines terminal-native and localhost-browser launch in one executable;
-`--web` selects the WebHost path.
+`--web` selects the WebHost path. The `SwiftTUI` convenience product includes
+that combined runner by default.
 
 ## The host-frame contract
 

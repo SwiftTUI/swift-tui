@@ -23,22 +23,22 @@ README says otherwise.
 | [gifcat](gifcat) | Terminal app | `SwiftTUIAnimatedImage` playback, source GIF delays, regular-size image attachments, and row-major tiling of multiple GIFs | `swiftly run swift run --package-path Examples/gifcat gifcat nyan.gif` |
 | [gifeditor](gifeditor) | Terminal app plus optional WebHost | Full GIF editor: half-cell canvas, palette, tools, layers, timeline, pointer input, undo/redo, and GIF import/export | `swiftly run swift run --package-path Examples/gifeditor gifeditor` |
 | [SwiftUIExample](SwiftUIExample) | Native Apple app | SwiftUI host app embedding reusable SwiftTUI scenes through `SwiftUIHost` | `open Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
-| [WebHostExample](WebHostExample) | Localhost browser host | Smallest `SwiftTUIWebHostCLI` opt-in app; terminal by default, browser host with `--web` | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
+| [WebHostExample](WebHostExample) | Localhost browser host | Smallest `SwiftTUI` convenience app showing terminal by default and browser host with `--web` | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
 | [WebExample](WebExample) | Static browser/WASI app | Browser deployment using `SwiftTUIWASI`, `@swifttui/web`, `@swifttui/build`, and a Bun-served host shell | `bun --cwd Examples/WebExample dev` |
 
 ## By Product
 
 | Product or package | Examples |
 | --- | --- |
-| `SwiftTUI` app/runtime surface | [argparse](argparse), [gallery](gallery), [layouts](layouts), [file-previewer](file-previewer), [terminal-workspace](terminal-workspace), [gifcat](gifcat), [gifeditor](gifeditor), [WebHostExample](WebHostExample) |
+| `SwiftTUI` convenience surface | [argparse](argparse), [gallery](gallery), [layouts](layouts), [file-previewer](file-previewer), [terminal-workspace](terminal-workspace), [gifcat](gifcat), [gifeditor](gifeditor), [WebHostExample](WebHostExample) |
 | `SwiftTUIRuntime` / low-level rendering | [minimal](minimal), [gallery](gallery), [WebExample](WebExample) |
 | `SwiftTUIArguments` / `SwiftTUICommand` | [argparse](argparse), [gallery](gallery), [gifeditor](gifeditor), [gitviz](gitviz) |
 | `SwiftTUICharts` | [gitviz](gitviz), [gallery](gallery), [layouts](layouts) |
-| `SwiftTUIAnimatedImage` | [gifcat](gifcat), [gallery](gallery) |
+| `SwiftTUIAnimatedImage` | Included by `SwiftTUI`; used directly by [gifcat](gifcat), [gallery](gallery) |
 | `SwiftTUITerminal` | [file-previewer](file-previewer) |
 | `SwiftTUITerminalWorkspace` | [terminal-workspace](terminal-workspace) |
 | `SwiftUIHost` | [SwiftUIExample](SwiftUIExample) |
-| `SwiftTUIWebHostCLI` | [WebHostExample](WebHostExample), [gallery](gallery), [gifeditor](gifeditor) |
+| `SwiftTUIWebHostCLI` | Included by `SwiftTUI`; used directly by [gallery](gallery), [gifeditor](gifeditor) |
 | `SwiftTUIWASI`, `@swifttui/web`, `@swifttui/build` | [WebExample](WebExample) |
 
 ## Focused Tests

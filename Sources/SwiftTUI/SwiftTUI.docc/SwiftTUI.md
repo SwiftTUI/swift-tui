@@ -1,12 +1,12 @@
 # ``SwiftTUI``
 
-Build terminal-native SwiftTUI apps with one import.
+Build batteries-included SwiftTUI apps with one import.
 
 ## Overview
 
-`SwiftTUI` is the release-facing terminal app convenience module. It re-exports
-`SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so terminal-native
-apps can write:
+`SwiftTUI` is the release-facing convenience module. It re-exports the
+platform-neutral runtime, standard argument parsing, the combined
+terminal/WebHost runner, and animated GIF/image support so apps can write:
 
 ```swift
 import SwiftTUI
@@ -21,15 +21,12 @@ struct DemoApp: App {
 }
 ```
 
-Use `SwiftTUIRuntime` directly when building shared view packages, host
-products, or custom launchers that should not inherit terminal runner
-convenience behavior. Add peer products such as `SwiftTUICharts`,
-`SwiftTUIAnimatedImage`, `SwiftTUITerminal`, or `SwiftTUITerminalWorkspace`
-only when that surface is part of your app.
-
-WebHost support remains compile-time opt-in. Apps that intentionally support
-both terminal and `--web` launch should depend on and import
-`SwiftTUIWebHostCLI` instead.
+The default `App.main()` uses the terminal runner unless the parsed
+configuration requests `--web`, in which case it launches the localhost
+WebHost bridge. Use `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWebHost`, or
+`SwiftTUIWebHostCLI` directly when building a narrower custom graph. Add peer
+products such as `SwiftTUICharts`, `SwiftTUITerminal`, or
+`SwiftTUITerminalWorkspace` only when that surface is part of your app.
 
 ## Topics
 

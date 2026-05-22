@@ -60,8 +60,8 @@ makes a small number of intentional departures:
   and a localhost-browser WebHost.
 - A semantic accessibility substrate feeding terminal, web, and SwiftUI-host
   consumers.
-- Charts, animated-image playback, and terminal-program embedding as peer
-  products.
+- Animated-image playback in the default `SwiftTUI` convenience product, with
+  charts and terminal-program embedding as peer products.
 
 ## Out of scope today
 

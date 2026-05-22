@@ -35,10 +35,11 @@ surface — without rewriting view code.
   driving a linear accessible output path, `--no-color` / `--ascii` fallbacks,
   and reduce-motion behavior — see [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - **Portable.** Terminal, browser, and embedded hosts are sibling products of
-  one package; opting into a heavier surface (a web server, a terminal
-  emulator) is explicit and never linked unless you ask for it.
-- **Batteries included.** Argument parsing, charts, animated images, embedded
-  terminal panes, and split-pane workspaces ship as peer products.
+  one package; use the default `SwiftTUI` import for terminal plus local
+  WebHost launch, or compose narrower products directly.
+- **Batteries included.** The default `SwiftTUI` import includes argument
+  parsing, terminal launch, localhost WebHost launch, and animated GIF/image
+  playback. Charts and terminal embedding remain opt-in peer products.
 
 ## Requirements
 
@@ -65,14 +66,17 @@ current alpha with `.upToNextMinor` so a minor release cannot break your build:
 )
 ```
 
-For a terminal-native executable, depend on the `SwiftTUI` convenience product:
+For a batteries-included executable, depend on the `SwiftTUI` convenience
+product:
 
 ```swift
 .product(name: "SwiftTUI", package: "swift-tui")
 ```
 
 That single import re-exports the platform-neutral runtime, the standard
-argument-parsing surface, and the terminal runner.
+argument-parsing surface, the combined terminal/WebHost runner, and animated
+GIF/image support. Charts are still explicit: add `SwiftTUICharts` only when
+your app uses chart views.
 
 ## Building a terminal app
 
@@ -106,11 +110,12 @@ struct DemoApp: App {
 ```
 
 `swift run` builds and launches it; the app takes the alternate screen until
-you exit, then restores your shell. When you want an explicit launcher instead
-of `@main`, call the terminal runner directly:
+you exit, then restores your shell. Passing `--web` launches the same app
+through the localhost WebHost bridge. When you want an explicit launcher
+instead of `@main`, call the combined runner directly:
 
 ```swift
-try await TerminalRunner.run(DemoApp.self)
+try await WebHostCLIRunner.run(DemoApp.self)
 ```
 
 ### Standard CLI flags
@@ -199,10 +204,10 @@ stdin works; everything around the mount element is your own page chrome.
 complete Bun-served browser app whose load-bearing embedding code is roughly 60
 lines. Copy that pattern to adopt SwiftTUI in a web project.
 
-If you only want a native process that can *also* open a browser window on
-`--web`, skip the build pipeline and import `SwiftTUIWebHostCLI` instead; it
-routes normal launches to the terminal runner and `--web` launches through the
-localhost WebHost bridge.
+If you only want a native process that can open a browser window on `--web`,
+use the normal `SwiftTUI` dependency. For a narrower custom launcher, compose
+`SwiftTUIRuntime` with `SwiftTUICLI`, `SwiftTUIWebHost`, or
+`SwiftTUIWebHostCLI` directly.
 
 ## Execution modes & products
 
@@ -210,13 +215,14 @@ Author once; pick the product that matches how you ship.
 
 | Product | Use when |
 | --- | --- |
-| `SwiftTUI` | Building a terminal-native executable with the default `App.main()` runner |
+| `SwiftTUI` | Building a batteries-included executable with terminal launch, `--web` local hosting, and animated GIF/image support |
 | `SwiftTUIRuntime` | Composing a custom runner or host on the platform-neutral runtime |
 | `SwiftTUICLI` / `SwiftTUIWASI` | You need an explicit terminal or WASI runner product |
-| `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` | Opting a native process into localhost browser hosting |
+| `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` | Composing localhost browser hosting without the full `SwiftTUI` convenience product |
 | `SwiftUIHost` | Embedding SwiftTUI scenes inside a host-managed SwiftUI surface (Apple platforms) |
 | `SwiftTUITerminal` / `SwiftTUITerminalWorkspace` | Embedding terminal child processes or building split-pane workspaces |
-| `SwiftTUIAnimatedImage` / `SwiftTUICharts` | You need the peer animated-image or charting surfaces |
+| `SwiftTUIAnimatedImage` | Composing animated-image support without the full `SwiftTUI` convenience product |
+| `SwiftTUICharts` | You need charting/graph views |
 | `@swifttui/web` / `@swifttui/build` | Packaging a browser/WASI deployment |
 
 A *runner* owns process startup or launch routing; a *host* owns an external
@@ -242,7 +248,7 @@ a given product surface or run mode.
 | [gifcat](Examples/gifcat) | Terminal-native animated GIF playback | `swiftly run swift run --package-path Examples/gifcat gifcat nyan.gif` |
 | [gifeditor](Examples/gifeditor) | Full terminal GIF editor: canvas, layers, timeline, import/export | `swiftly run swift run --package-path Examples/gifeditor gifeditor` |
 | [SwiftUIExample](Examples/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via `SwiftUIHost` | Open `Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
-| [WebHostExample](Examples/WebHostExample) | Smallest app that opts into the localhost browser runner | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
+| [WebHostExample](Examples/WebHostExample) | Smallest `SwiftTUI` convenience app with terminal and `--web` launch | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
 | [WebExample](Examples/WebExample) | Static browser/WASI deployment with `@swifttui/web` + `@swifttui/build` | `bun --cwd Examples/WebExample dev` |
 
 ## Documentation

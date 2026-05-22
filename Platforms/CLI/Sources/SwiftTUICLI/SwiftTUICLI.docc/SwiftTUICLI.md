@@ -8,8 +8,9 @@ Launch SwiftTUI apps in a terminal process.
 scene discovery, attach flows, pty-backed secondary scenes, and one-shot
 rendering helpers.
 
-Most terminal apps import `SwiftTUI`, which re-exports this runner. Import
-`SwiftTUICLI` directly when building a custom launch path around
+The `SwiftTUI` convenience product reaches terminal launch through
+`SwiftTUIWebHostCLI`, so `--web` works by default. Import `SwiftTUICLI`
+directly when building a terminal-only custom launch path around
 `SwiftTUIRuntime`.
 
 ## Topics

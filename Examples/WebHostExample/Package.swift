@@ -20,7 +20,7 @@ let package = Package(
     .executableTarget(
       name: "WebHostExample",
       dependencies: [
-        .product(name: "SwiftTUIWebHostCLI", package: "swift-tui")
+        .product(name: "SwiftTUI", package: "swift-tui")
       ]
     ),
     .testTarget(

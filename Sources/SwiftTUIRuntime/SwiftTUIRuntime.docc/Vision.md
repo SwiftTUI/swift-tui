@@ -22,7 +22,8 @@ SwiftTUI provides:
 - ``RunLoop``-driven interactive sessions with alternate-screen ownership and ANSI rendering
 - Tree-forward collection presentation as a first-class authoring pattern
 - PNG and baseline JPEG image presentation
-- GIF import/export and finite animation through the peer `SwiftTUIAnimatedImage` product
+- GIF import/export and finite animation through `SwiftTUIAnimatedImage`, which
+  is included by the `SwiftTUI` convenience product
 - Compact charts and metric components through the peer `SwiftTUICharts` product
 - Terminal-native presentation through alerts, confirmation dialogs, sheets,
   popovers, popover tips, menus, and toasts
