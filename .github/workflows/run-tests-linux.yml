@@ -135,6 +135,26 @@ jobs:
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
 
+      - name: Record lane result
+        if: always()
+        shell: bash
+        env:
+          LANE_ID: linux-${{ matrix.arch }}
+          LANE_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          printf '%s|%s\n' "$LANE_ID" "$LANE_RESULT" > ".ci-results/$LANE_ID.result"
+
+      - name: Upload lane result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-result-linux-${{ matrix.arch }}
+          path: .ci-results/linux-${{ matrix.arch }}.result
+          if-no-files-found: error
+          retention-days: 1
+
   linux-gate-required:
     name: Linux repo gate
     runs-on: ubuntu-24.04
@@ -229,6 +249,26 @@ jobs:
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
 
+      - name: Record lane result
+        if: always()
+        shell: bash
+        env:
+          LANE_ID: macos
+          LANE_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          printf '%s|%s\n' "$LANE_ID" "$LANE_RESULT" > ".ci-results/$LANE_ID.result"
+
+      - name: Upload lane result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-result-macos
+          path: .ci-results/macos.result
+          if-no-files-found: error
+          retention-days: 1
+
   ios-build:
     name: iOS package build
     runs-on: macos-26
@@ -271,3 +311,74 @@ jobs:
             -destination 'generic/platform=iOS' \
             -skipPackagePluginValidation \
             build
+
+      - name: Record lane result
+        if: always()
+        shell: bash
+        env:
+          LANE_ID: ios
+          LANE_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          printf '%s|%s\n' "$LANE_ID" "$LANE_RESULT" > ".ci-results/$LANE_ID.result"
+
+      - name: Upload lane result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-result-ios
+          path: .ci-results/ios.result
+          if-no-files-found: error
+          retention-days: 1
+
+  ci-summary:
+    name: CI test matrix summary
+    runs-on: ubuntu-24.04
+    needs:
+      - linux-gate
+      - linux-gate-required
+      - macos-gate
+      - ios-build
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download lane results
+        id: download-results
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: .ci-results
+          pattern: ci-test-result-*
+          merge-multiple: true
+
+      - name: Publish matrix summary
+        if: always()
+        shell: bash
+        env:
+          RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' && inputs.run_arm64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          expected_file=.ci-results/expected.txt
+          cat > "$expected_file" <<'EOF'
+          linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|sh ./Scripts/test_gate.sh --skip-bun-install
+          EOF
+          if [ "$RUN_ARM64" = "true" ]; then
+            cat >> "$expected_file" <<'EOF'
+          linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|sh ./Scripts/test_gate.sh --skip-bun-install
+          EOF
+          fi
+          cat >> "$expected_file" <<'EOF'
+          macos|macOS repo gate|macOS|-|macos-26|sh ./Scripts/test_gate.sh --skip-bun-install
+          ios|iOS package build|iOS|generic|macos-26|xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build
+          EOF
+          Scripts/render_ci_test_matrix_summary.sh \
+            "$expected_file" \
+            .ci-results \
+            "$GITHUB_STEP_SUMMARY"
