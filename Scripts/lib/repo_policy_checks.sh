@@ -101,6 +101,13 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check CI test matrix summary" \
+    "./Scripts/check_ci_test_matrix_summary.sh" \
+    ./Scripts/check_ci_test_matrix_summary.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check concurrency-safety policies" \
     "./Scripts/check_concurrency_safety_policies.sh" \
     ./Scripts/check_concurrency_safety_policies.sh
