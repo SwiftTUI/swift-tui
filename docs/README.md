@@ -57,6 +57,13 @@ not create an independent roadmap.
 - [proposals/IMAGE_BLEND_MODE.md](proposals/IMAGE_BLEND_MODE.md) - scope for
   making `blendMode(_:)` affect image pixels.
 
+## Planning documents
+
+- [plans/2026-05-22-001-github-organization-split-plan.md](plans/2026-05-22-001-github-organization-split-plan.md) -
+  execution plan for splitting SwiftTUI across GitHub organization repositories
+  while preserving the one-package terminal/WebHost consumer path and coherent
+  DocC generation.
+
 ## API reference
 
 Per-symbol API documentation is authored as DocC catalogs alongside the source:
