@@ -20,6 +20,7 @@ extension ViewGraph {
     package var invalidatedIdentities: Set<Identity>
     package var graphLocalDirtyIdentities: Set<Identity>
     package var latestLifecycleEvents: [LifecycleEvent]
+    package var stateMutationKeys: Set<StateSlotKey>
     package var registrationAliasesByIdentity: [Identity: Set<Identity>]
     package var registrationAliasTargets: [Identity: Identity]
     package var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]

@@ -46,6 +46,9 @@ package final class FrameHeadTransaction {
   private let frameInputs: FrameResolveInputBox
   private var didCommit = false
   private var didDiscard = false
+  // After the first rollback to baseline, live @State writes may happen while
+  // the async tail is still running. Later restores must keep those writes.
+  private var hasSuspendedPreparedState = false
 
   package init(
     viewGraph: ViewGraph,
@@ -84,7 +87,10 @@ package final class FrameHeadTransaction {
     guard let checkpoints else {
       return
     }
-    graphDraft.materializePreparedState(in: viewGraph)
+    graphDraft.materializePreparedState(
+      in: viewGraph,
+      preservingCurrentStateMutations: hasSuspendedPreparedState
+    )
     observationDraft?.resumeRecording()
     frameState.restoreCheckpoint(checkpoints.preparedFrameState)
     frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
@@ -103,10 +109,14 @@ package final class FrameHeadTransaction {
     guard let checkpoints else {
       return
     }
-    graphDraft.restoreBaselineState(in: viewGraph)
+    graphDraft.restoreBaselineState(
+      in: viewGraph,
+      preservingCurrentStateMutations: hasSuspendedPreparedState
+    )
     observationDraft?.suspendRecording()
     frameState.restoreCheckpoint(checkpoints.baselineFrameState)
     frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+    hasSuspendedPreparedState = true
   }
 
   package func discard() {
@@ -117,7 +127,10 @@ package final class FrameHeadTransaction {
       )
     }
     registrationDraft.discard()
-    graphDraft.discard(from: viewGraph)
+    graphDraft.discard(
+      from: viewGraph,
+      preservingCurrentStateMutations: hasSuspendedPreparedState
+    )
     presentationPortalDraft.discard()
     observationDraft?.discard()
     animationDraft.discard()

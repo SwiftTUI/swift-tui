@@ -16,6 +16,7 @@ extension ViewGraph {
       invalidatedIdentities: invalidatedIdentities,
       graphLocalDirtyIdentities: graphLocalDirtyIdentities,
       latestLifecycleEvents: latestLifecycleEvents,
+      stateMutationKeys: stateMutationKeys,
       registrationAliasesByIdentity: registrationAliasesByIdentity,
       registrationAliasTargets: registrationAliasTargets,
       registrationAliasDiagnostics: registrationAliasDiagnostics,
@@ -51,6 +52,7 @@ extension ViewGraph {
     invalidatedIdentities = checkpoint.invalidatedIdentities
     graphLocalDirtyIdentities = checkpoint.graphLocalDirtyIdentities
     latestLifecycleEvents = checkpoint.latestLifecycleEvents
+    stateMutationKeys = checkpoint.stateMutationKeys
     registrationAliasesByIdentity = checkpoint.registrationAliasesByIdentity
     registrationAliasTargets = checkpoint.registrationAliasTargets
     registrationAliasDiagnostics = checkpoint.registrationAliasDiagnostics
@@ -95,6 +97,7 @@ package final class ViewGraph {
   private var invalidatedIdentities: Set<Identity>
   private var graphLocalDirtyIdentities: Set<Identity>
   private var latestLifecycleEvents: [LifecycleEvent]
+  private var stateMutationKeys: Set<StateSlotKey>
   private var registrationAliasesByIdentity: [Identity: Set<Identity>]
   private var registrationAliasTargets: [Identity: Identity]
   private var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
@@ -130,6 +133,7 @@ package final class ViewGraph {
     invalidatedIdentities = []
     graphLocalDirtyIdentities = []
     latestLifecycleEvents = []
+    stateMutationKeys = []
     registrationAliasesByIdentity = [:]
     registrationAliasTargets = [:]
     lifecycleEvaluationOwnersByIdentity = [:]
@@ -164,6 +168,7 @@ package final class ViewGraph {
       invalidatedIdentities: invalidatedIdentities,
       graphLocalDirtyIdentities: graphLocalDirtyIdentities,
       latestLifecycleEvents: latestLifecycleEvents,
+      stateMutationKeys: stateMutationKeys,
       registrationAliasesByIdentity: registrationAliasesByIdentity,
       registrationAliasTargets: registrationAliasTargets,
       lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity,
@@ -229,12 +234,48 @@ package final class ViewGraph {
   package func queueDirtyForStateChange(
     _ key: StateSlotKey
   ) {
+    stateMutationKeys.insert(key)
     queueDirty(
       ViewGraphInvalidationPlanner.stateChangeDirtyIdentities(
         for: key,
         stateSlotDependents: stateSlotDependents
       )
     )
+  }
+
+  package func stateMutationOverlay() -> StateMutationOverlay {
+    var stateSlots: [StateSlotKey: AnyStateSlot] = [:]
+    for key in stateMutationKeys {
+      guard
+        let slot = nodesByIdentity[key.identity]?.stateSlotStorage(
+          ordinal: key.ordinal
+        )
+      else {
+        continue
+      }
+      stateSlots[key] = slot
+    }
+    return StateMutationOverlay(
+      stateSlots: stateSlots,
+      invalidatedIdentities: invalidatedIdentities,
+      graphLocalDirtyIdentities: graphLocalDirtyIdentities,
+      stateMutationKeys: stateMutationKeys
+    )
+  }
+
+  package func applyStateMutationOverlay(
+    _ overlay: StateMutationOverlay
+  ) {
+    for (key, slot) in overlay.stateSlots {
+      guard let node = nodesByIdentity[key.identity] else {
+        continue
+      }
+      node.restoreStateSlot(ordinal: key.ordinal, slot: slot)
+      node.markDirty()
+    }
+    invalidatedIdentities.formUnion(overlay.invalidatedIdentities)
+    graphLocalDirtyIdentities.formUnion(overlay.graphLocalDirtyIdentities)
+    stateMutationKeys.formUnion(overlay.stateMutationKeys)
   }
 
   package func queueDirtyForObservationChange(
@@ -866,6 +907,7 @@ package final class ViewGraph {
     liveIdentities.formUnion(frameOrder)
     invalidatedIdentities.removeAll(keepingCapacity: true)
     graphLocalDirtyIdentities.removeAll(keepingCapacity: true)
+    stateMutationKeys.removeAll(keepingCapacity: true)
     return latestLifecycleEvents
   }
 

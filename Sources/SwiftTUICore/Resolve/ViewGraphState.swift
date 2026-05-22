@@ -22,6 +22,7 @@ extension ViewGraph {
     package var invalidatedIdentities: Set<Identity>
     package var graphLocalDirtyIdentities: Set<Identity>
     package var latestLifecycleEvents: [LifecycleEvent]
+    package var stateMutationKeys: Set<StateSlotKey>
     package var registrationAliasesByIdentity: [Identity: Set<Identity>]
     package var registrationAliasTargets: [Identity: Identity]
     package var registrationAliasDiagnostics: RegistrationAliasDiagnostics
@@ -36,6 +37,13 @@ extension ViewGraph {
     package var currentFrameID: UInt64
     package var liveIdentities: Set<Identity>
     package var nodeCheckpoints: [Identity: ViewNode.Checkpoint]
+  }
+
+  package struct StateMutationOverlay {
+    package var stateSlots: [StateSlotKey: AnyStateSlot]
+    package var invalidatedIdentities: Set<Identity>
+    package var graphLocalDirtyIdentities: Set<Identity>
+    package var stateMutationKeys: Set<StateSlotKey>
   }
 }
 

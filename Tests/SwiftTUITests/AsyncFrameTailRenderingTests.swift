@@ -100,6 +100,83 @@ struct AsyncFrameTailRenderingTests {
     #expect(lifecycleRecorder.events == ["appear 0", "disappear 0", "appear 1"])
   }
 
+  @Test("internal @State mutations during suspended async frame tail survive commit")
+  func internalStateMutationDuringSuspendedAsyncTailSurvivesCommit() async throws {
+    let rootIdentity = testIdentity("AsyncFrameTailInternalStateRoot")
+    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let terminal = AsyncFrameTailTerminalHost()
+    let trigger = AsyncFrameTailInternalStateTrigger()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { phase, _ in
+        AsyncFrameTailInternalStateMutationView(
+          phase: phase,
+          trigger: trigger
+        )
+      }
+    )
+    let eventPump = runLoop.makeEventPump()
+    defer {
+      eventPump.cancel()
+    }
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    _ = try await runLoop.renderPendingFramesAsync(
+      renderedFrames: &initialFrames,
+      eventPump: eventPump
+    )
+    #expect(terminal.frames.last?.contains("phase 0 count 0") == true)
+
+    runLoop.stateContainer.mutate { phase in
+      phase = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: eventPump
+      )
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+    trigger.fire()
+    gate.release()
+
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(
+      terminal.frames.last?.contains("phase 1 count 1") == true,
+      "frames: \(terminal.frames)"
+    )
+  }
+
   @Test("blocked built-in layout queues input without committing ahead")
   func blockedBuiltInLayoutQueuesInputWithoutCommittingAhead() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailLayoutRoot")
@@ -3168,6 +3245,33 @@ private struct AsyncFrameTailStressView: View {
       }
     }
     .defaultFocus($focusedField, .button)
+  }
+}
+
+private final class AsyncFrameTailInternalStateTrigger {
+  private let event = AsyncEvent()
+
+  func fire() {
+    event.fire()
+  }
+
+  func wait() async {
+    await event.wait()
+  }
+}
+
+private struct AsyncFrameTailInternalStateMutationView: View {
+  var phase: Int
+  var trigger: AsyncFrameTailInternalStateTrigger
+
+  @State private var count = 0
+
+  var body: some View {
+    Text("phase \(phase) count \(count)")
+      .task {
+        await trigger.wait()
+        count = 1
+      }
   }
 }
 
