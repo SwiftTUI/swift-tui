@@ -2,14 +2,12 @@
 import "../styles/site.css";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
-import favicon from "../../logo/sm.gif";
-import touchIcon from "../../logo/lg.gif";
+import SiteIcons from "../components/SiteIcons.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const site = (import.meta.env.SITE ?? "https://swifttui.io").replace(/\/$/, "");
 const canonical = `${site}${base || ""}/pipeline/`;
-const faviconUrl = typeof favicon === "string" ? favicon : favicon.src;
-const touchIconUrl = typeof touchIcon === "string" ? touchIcon : touchIcon.src;
+const ogImage = `${site}${base || ""}/og.png`;
 const title = "SwiftTUI Rendering Pipeline";
 const description =
   "A user-facing guide to SwiftTUI's resolve, measure, place, semantics, draw, raster, and commit frame pipeline.";
@@ -99,9 +97,11 @@ const phases = [
     <meta property="og:description" content={description} />
     <meta property="og:type" content="article" />
     <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:alt" content="SwiftTUI logo over a dark marketing card" />
     <meta name="twitter:card" content="summary" />
-    <link rel="icon" type="image/gif" href={faviconUrl} />
-    <link rel="apple-touch-icon" href={touchIconUrl} />
+    <meta name="twitter:image" content={ogImage} />
+    <SiteIcons />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
