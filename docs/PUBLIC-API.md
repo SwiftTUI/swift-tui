@@ -16,14 +16,16 @@ this way?".
 The package presents a single primary authoring story:
 
 - Write views with the SwiftUI-shaped surface on `View`.
-- Use `SwiftTUI` for one-import terminal apps, or `SwiftTUIRuntime` for
-  platform-neutral runtime composition with explicit host products.
+- Use `SwiftTUI` for one-import apps that should include terminal launch,
+  localhost WebHost launch, and animated GIF/image support, or `SwiftTUIRuntime`
+  for platform-neutral runtime composition with explicit host products.
 - Treat `SwiftTUICore` as pipeline and data-model infrastructure.
 
 Anything outside that shape has to justify being public. The supported package
-model is one Swift package exposing `SwiftTUI` for the default terminal app
-story, `SwiftTUIRuntime` for shared runtime integration, and sibling platform
-integration products for execution, hosting, and terminal-program embedding.
+model is one Swift package exposing `SwiftTUI` for the default batteries-included
+app story, `SwiftTUIRuntime` for shared runtime integration, and sibling
+platform integration products for narrow execution, hosting, charting, and
+terminal-program embedding.
 
 ## The canonical surface
 
@@ -42,7 +44,8 @@ The canonical public surface is the API ordinary app code uses first:
   `RuntimeConfiguration`, `App`, `Scene`, `WindowGroup`, the scene builder
   artifacts, `HostedSceneSession`, `HostedRasterSurface`, `SemanticHostFrame`,
   and the `PresentationSurface` roles.
-- The peer products `SwiftTUICharts` and `SwiftTUIAnimatedImage`.
+- The default animated-image surface from `SwiftTUIAnimatedImage`, plus the
+  explicit `SwiftTUICharts` charting product.
 
 If a feature can be expressed on this surface, it should be documented there
 first.
@@ -147,13 +150,14 @@ The full ActionScope/commands surface is public:
 
 ### `SwiftTUI`
 
-`SwiftTUI` is the terminal app convenience product. It re-exports
-`SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI`, so an ordinary
-terminal app writes only `import SwiftTUI` and gets the standard flags and the
-default terminal `App.main()`.
+`SwiftTUI` is the batteries-included app convenience product. It re-exports the
+combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`, so an
+ordinary app writes only `import SwiftTUI` and gets standard flags, the default
+terminal `App.main()`, `--web` localhost launch, and animated GIF/image support.
+It does not include `SwiftTUICharts`; charting/graph views remain explicit.
 
 `SwiftTUIRuntime` is the platform-neutral runtime import for host products and
-custom launchers that do not want the terminal convenience product.
+custom launchers that do not want the convenience product.
 `SwiftTUICore` is target-level pipeline infrastructure, re-exported through
 `SwiftTUIRuntime` rather than published as its own product.
 
@@ -168,9 +172,10 @@ Platform-specific execution and embedding are root-package products:
 - **Embedding** — `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`, and
   `SwiftTUIPTYPrimitives`.
 
-`SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
-that may link the embedded HTTP/WebSocket server and the bundled browser
-resources.
+`SwiftTUIWebHost` owns the embedded HTTP/WebSocket server and bundled browser
+resources. `SwiftTUIWebHostCLI` composes that local server with terminal launch,
+and `SwiftTUI` includes the combined runner by default. Use `SwiftTUICLI`
+directly for a terminal-only graph.
 
 ## Removed From The Public Surface
 

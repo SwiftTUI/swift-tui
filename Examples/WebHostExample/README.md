@@ -2,16 +2,15 @@
 
 Smallest localhost-browser host example.
 
-This package imports `SwiftTUIWebHostCLI`, not bare `SwiftTUI`, so the same app
-can run as a normal terminal program or launch through the opt-in WebHost
-browser runner when `--web` is present.
+This package imports `SwiftTUI`, so the same app can run as a normal terminal
+program or launch through the included WebHost browser runner when `--web` is
+present.
 
 ## Demonstrates
 
-- The combined terminal/WebHost CLI product.
+- The `SwiftTUI` convenience product's combined terminal/WebHost launcher.
 - A single `WindowGroup` with an explicit scene identifier.
-- Keeping WebHost support as an app-level opt-in instead of a default dependency
-  for every SwiftTUI executable.
+- The default `--web` path without importing lower-level WebHost products.
 
 ## Run
 
@@ -36,5 +35,5 @@ The normal WebHost flags are available here, including `--port`, `--bind`,
 swiftly run swift test --package-path Examples/WebHostExample
 ```
 
-The test pins the intended package boundary: the example imports
-`SwiftTUIWebHostCLI` and does not directly wire the lower-level WebHost runner.
+The test pins the intended package boundary: the example imports `SwiftTUI` and
+does not directly wire the lower-level WebHost runner.

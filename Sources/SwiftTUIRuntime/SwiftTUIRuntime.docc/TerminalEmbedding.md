@@ -7,7 +7,7 @@ Host external terminal programs inside SwiftTUI layout with the
 
 Terminal embedding is implemented outside the `SwiftTUIRuntime` product in the
 root package's `SwiftTUITerminal` product. Apps import `SwiftTUI` for the
-terminal convenience surface or `SwiftTUIRuntime` for explicit composition, and
+convenience surface or `SwiftTUIRuntime` for explicit composition, and
 import `SwiftTUITerminal` for `TerminalView<Session>`, `TerminalSession`, and
 `TerminalProcessSession`.
 

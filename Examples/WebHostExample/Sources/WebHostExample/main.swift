@@ -1,4 +1,4 @@
-import SwiftTUIWebHostCLI
+import SwiftTUI
 
 @main
 struct WebHostExampleApp: App {

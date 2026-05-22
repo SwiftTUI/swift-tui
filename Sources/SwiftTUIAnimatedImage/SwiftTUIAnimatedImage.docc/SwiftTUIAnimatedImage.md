@@ -4,9 +4,10 @@ Animate finite pre-composed image sequences and import or export GIFs.
 
 ## Overview
 
-`SwiftTUIAnimatedImage` is a peer product to `SwiftTUICharts`. It keeps animated-image
-concerns out of the core `SwiftTUI` runtime while reusing the same `SwiftTUIViews`
-surface.
+`SwiftTUIAnimatedImage` is included by the default `SwiftTUI` convenience
+product and is also available as a standalone product for narrower
+compositions. It keeps animated-image concerns out of the core runtime while
+reusing the same `SwiftTUIViews` surface.
 
 Create an animation from frames plus either a display frame rate or explicit
 frame delays:

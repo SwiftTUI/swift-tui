@@ -4,8 +4,8 @@ Pick the SwiftTUI product that matches where your app runs.
 
 ## Overview
 
-Most terminal apps should start with one dependency on the root `swift-tui`
-package and one import:
+Most apps should start with one dependency on the root `swift-tui` package and
+one import:
 
 ```swift
 import SwiftTUI
@@ -20,18 +20,19 @@ struct DemoApp: App {
 }
 ```
 
-`SwiftTUI` is the convenience product for terminal-native executables. It
-re-exports the view/runtime surface, shared argument parsing, and the terminal
-runner that provides the default `App.main()` behavior.
+`SwiftTUI` is the convenience product for batteries-included executables. It
+re-exports the view/runtime surface, shared argument parsing, the combined
+terminal/WebHost runner that provides the default `App.main()` behavior, and
+animated GIF/image support.
 
-When your app needs a different launch or hosting story, choose one of the
-sibling root-package products instead of adding everything by default.
+When your app needs a narrower launch or hosting story, choose one of the
+sibling root-package products directly.
 
 ## Import Matrix
 
 | App shape | Depend on | Import |
 | --- | --- | --- |
-| Terminal-native executable | `SwiftTUI` | `import SwiftTUI` |
+| Batteries-included executable: terminal by default, `--web` when requested, animated GIF/images available | `SwiftTUI` | `import SwiftTUI` |
 | Shared view package or custom host/launcher | `SwiftTUIRuntime` | `import SwiftTUIRuntime` |
 | Explicit terminal runner control | `SwiftTUIRuntime` + `SwiftTUICLI` | `import SwiftTUIRuntime` and `import SwiftTUICLI` |
 | WASI executable or manifest-mode app | `SwiftTUIWASI` | `import SwiftTUIWASI` |
@@ -42,21 +43,21 @@ sibling root-package products instead of adding everything by default.
 | Embedded terminal program panes | `SwiftTUITerminal` | `import SwiftTUITerminal` |
 | Tabbed/split terminal workspaces | `SwiftTUITerminalWorkspace` | `import SwiftTUITerminalWorkspace` |
 | Charts and compact metrics | `SwiftTUICharts` | `import SwiftTUICharts` |
-| Finite animated images or GIF import/export | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
+| Finite animated images or GIF import/export without the full convenience product | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
 
 `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and
 `SwiftTUIWebHostCLI` all re-export the authoring surface, so an executable
-usually imports one launch product. Peer content products such as
-`SwiftTUICharts`, `SwiftTUIAnimatedImage`, `SwiftTUITerminal`, and
-`SwiftTUITerminalWorkspace` are added alongside that launch product when you
-use those views.
+usually imports one launch product. `SwiftTUI` additionally includes
+`SwiftTUIAnimatedImage` by default. Add peer products such as `SwiftTUICharts`,
+`SwiftTUITerminal`, and `SwiftTUITerminalWorkspace` alongside your launch
+product only when you use those views.
 
 ## Common Compositions
 
 ### Terminal App
 
 Use this for a normal command-line application that owns the terminal while it
-runs:
+runs and can switch to localhost browser hosting when launched with `--web`:
 
 ```swift
 import SwiftTUI
@@ -71,9 +72,9 @@ struct DemoApp: App {
 }
 ```
 
-Terminal-only apps do not link the embedded WebHost server or browser bundle.
-If the user passes `--web`, the terminal runner rejects that mode before
-entering raw terminal setup.
+The default `SwiftTUI` graph links the embedded WebHost server and browser
+bundle so `--web` is available without changing imports. Use `SwiftTUICLI`
+directly when you want a terminal-only graph that rejects `--web`.
 
 ### Terminal App With Charts
 
@@ -91,10 +92,11 @@ struct MetricsView: View {
 }
 ```
 
-### Terminal Plus Local Browser Mode
+### Narrow Terminal Plus Local Browser Mode
 
 Use `SwiftTUIWebHostCLI` as the launch import when one executable should run in
-the terminal by default and switch to a localhost browser host for `--web`.
+the terminal by default and switch to a localhost browser host for `--web`
+without pulling in the rest of the `SwiftTUI` convenience surface.
 
 ```swift
 import SwiftTUIWebHostCLI
@@ -109,15 +111,15 @@ struct DemoApp: App {
 }
 ```
 
-This is a compile-time choice. A terminal-only `SwiftTUI` binary does not
-dynamically discover WebHost support.
+This is the lower-level product that `SwiftTUI` uses for its default launch
+behavior.
 
 ### Host-Managed App
 
 Use `SwiftTUIRuntime` for shared app declarations when another product owns the
 outer shell. Host products build `SceneManifest` values and retain
 `HostedSceneSession` values with explicit presentation surfaces such as
-`HostedRasterSurface` instead of relying on the terminal convenience `App.main()`.
+`HostedRasterSurface` instead of relying on the convenience `App.main()`.
 
 ```swift
 import SwiftTUIRuntime

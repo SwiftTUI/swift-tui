@@ -46,13 +46,14 @@ flowchart TD
     SwiftTUIArguments
     SwiftTUICLI --> SwiftTUIRuntime
     SwiftTUI["SwiftTUI<br/>(convenience re-export)"]
-    SwiftTUI --> SwiftTUIRuntime
-    SwiftTUI --> SwiftTUICLI
-    SwiftTUI --> SwiftTUIArguments
+    SwiftTUI --> SwiftTUIWebHostCLI
+    SwiftTUI --> SwiftTUIAnimatedImage
 
     SwiftTUIWASI --> SwiftTUIRuntime
     SwiftTUIWebHost --> SwiftTUIRuntime
     SwiftTUIWebHostCLI --> SwiftTUIWebHost
+    SwiftTUIWebHostCLI --> SwiftTUICLI
+    SwiftTUIWebHostCLI --> SwiftTUIArguments
     SwiftUIHost["SwiftUIHost<br/>(macOS only)"] --> SwiftTUIRuntime
     SwiftTUITerminal --> SwiftTUIRuntime
     SwiftTUITerminalWorkspace --> SwiftTUITerminal
@@ -76,16 +77,19 @@ flowchart TD
 
 ### Published library products
 
-- **`SwiftTUI`** — the terminal convenience product. It re-exports
-  `SwiftTUIRuntime`, `SwiftTUICLI`, and `SwiftTUIArguments` through
-  `@_exported import`, so an ordinary terminal app writes only `import SwiftTUI`
-  and gets the standard flags plus the default terminal `App.main()`.
+- **`SwiftTUI`** — the batteries-included convenience product. It re-exports
+  the combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`, so an
+  ordinary app writes only `import SwiftTUI` and gets standard flags, default
+  terminal `App.main()`, `--web` localhost launch, and animated GIF/image
+  support.
 - **`SwiftTUIRuntime`**, **`SwiftTUIViews`** — usable directly by hosts and
-  custom launchers that do not want the terminal convenience product.
+  custom launchers that do not want the convenience product.
 - **`SwiftTUICharts`** — `LineChart`, `CalendarHeatmap`, `Sparkline`, and
-  related dashboard views.
+  related dashboard views. Charting is not included in the default `SwiftTUI`
+  import.
 - **`SwiftTUIAnimatedImage`** — finite, pre-composed animated-image playback and
-  GIF import/export.
+  GIF import/export. It is available as a standalone product for narrow
+  compositions and is included by the `SwiftTUI` convenience product.
 
 ### Platform, host, and embedding products
 
@@ -103,10 +107,10 @@ directory holds their sources but contains no nested Swift packages.
   (tabbed/split-pane workspace surfaces), and `SwiftTUIPTYPrimitives` (pty
   creation, fd lifecycle, resize). These are macOS- and Linux-only.
 
-`SwiftTUIWebHost` and `SwiftTUIWebHostCLI` are the only first-party products
-permitted to link the embedded HTTP/WebSocket server (FlyingFox) and the
-bundled browser resources. A terminal-only app that imports `SwiftTUI` links
-none of that.
+`SwiftTUIWebHost` owns the embedded HTTP/WebSocket server (FlyingFox) and the
+bundled browser resources. `SwiftTUIWebHostCLI` composes that host with the
+terminal runner, and the `SwiftTUI` convenience product includes it by default.
+Use `SwiftTUICLI` directly for a terminal-only graph.
 
 ## Source layout
 

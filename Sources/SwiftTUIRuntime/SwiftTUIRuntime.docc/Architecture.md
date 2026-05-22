@@ -44,11 +44,13 @@ boundaries, the runtime pipeline, and the phase products that connect them.
 
 ### `SwiftTUI`
 
-- Release-facing convenience product for terminal-native apps
-- Re-exports `SwiftTUIRuntime`, `SwiftTUIArguments`, and `SwiftTUICLI` so
-  terminal-native apps can write only `import SwiftTUI`
-- Does not depend on WebHost, browser resources, SwiftUI hosting, WASI hosting,
-  charts, animated images, or terminal-program embedding
+- Release-facing convenience product for batteries-included apps
+- Re-exports the combined terminal/WebHost CLI surface and
+  `SwiftTUIAnimatedImage` so apps can write only `import SwiftTUI`
+- Includes terminal launch, standard arguments, `--web` localhost launch, and
+  animated GIF/image support by default
+- Does not depend on SwiftUI hosting, WASI hosting, charts, or
+  terminal-program embedding
 
 ### Platform integration products
 

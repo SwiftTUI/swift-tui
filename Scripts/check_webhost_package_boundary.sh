@@ -20,9 +20,10 @@ target_block() {
 }
 
 if rg -n --fixed-strings 'SwiftTUIWebHost' Platforms/CLI/Sources Sources \
-  --glob '*.swift'
+  --glob '*.swift' \
+  | rg -v '^Sources/SwiftTUI/SwiftTUI\.swift:.*SwiftTUIWebHostCLI$'
 then
-  fail 'SwiftTUIWebHost must not be referenced by root SwiftTUI sources or Platforms/CLI sources.'
+  fail 'Only the SwiftTUI convenience re-export may reference SwiftTUIWebHostCLI outside Platforms/WebHost.'
 fi
 
 if rg -n --fixed-strings 'FlyingFox' Platforms/CLI/Sources Sources \
@@ -41,23 +42,30 @@ case "$swift_tui_runtime_target_block" in
 esac
 
 case "$swift_tui_target_block" in
-  *SwiftTUIRuntime*) ;;
-  *) fail 'The SwiftTUI target should depend on SwiftTUIRuntime.' ;;
+  *SwiftTUIWebHostCLI*) ;;
+  *) fail 'The SwiftTUI target should depend on SwiftTUIWebHostCLI.' ;;
 esac
 
 case "$swift_tui_target_block" in
-  *SwiftTUIArguments*) ;;
-  *) fail 'The SwiftTUI target should depend on SwiftTUIArguments.' ;;
+  *SwiftTUIAnimatedImage*) ;;
+  *) fail 'The SwiftTUI target should depend on SwiftTUIAnimatedImage.' ;;
 esac
 
 case "$swift_tui_target_block" in
-  *SwiftTUICLI*) ;;
-  *) fail 'The SwiftTUI target should depend on SwiftTUICLI.' ;;
+  *'"SwiftTUICLI"'*)
+    fail 'The SwiftTUI convenience target should inherit terminal launch through SwiftTUIWebHostCLI.'
+    ;;
 esac
 
 case "$swift_tui_target_block" in
-  *SwiftTUIWebHost*|*FlyingFox*)
-    fail 'The SwiftTUI convenience target must not depend on SwiftTUIWebHost or FlyingFox.'
+  *'"SwiftTUIWebHost"'*|*FlyingFox*)
+    fail 'The SwiftTUI convenience target must not depend directly on SwiftTUIWebHost or FlyingFox.'
+    ;;
+esac
+
+case "$swift_tui_target_block" in
+  *SwiftTUICharts*)
+    fail 'The SwiftTUI convenience target must not depend on SwiftTUICharts.'
     ;;
 esac
 
