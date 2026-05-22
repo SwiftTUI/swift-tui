@@ -230,6 +230,19 @@ package final class ViewNode {
     stateSlots[ordinal] = slot
   }
 
+  package func stateSlotStorage(
+    ordinal: Int
+  ) -> AnyStateSlot? {
+    stateSlots[ordinal]
+  }
+
+  package func restoreStateSlot(
+    ordinal: Int,
+    slot: AnyStateSlot
+  ) {
+    stateSlots[ordinal] = slot
+  }
+
   package func markDirty() {
     let wasDirty = isDirty
     isDirty = true

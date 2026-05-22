@@ -45,20 +45,36 @@ package final class ViewGraphFrameDraft {
     preparedCheckpoint = viewGraph.makeCheckpoint()
   }
 
-  package func materializePreparedState(in viewGraph: ViewGraph) {
+  package func materializePreparedState(
+    in viewGraph: ViewGraph,
+    preservingCurrentStateMutations: Bool = false
+  ) {
     precondition(!didCommit && !didDiscard)
     guard let preparedCheckpoint else {
       return
     }
+    let stateMutations =
+      preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
     viewGraph.restoreCheckpoint(preparedCheckpoint)
+    if let stateMutations {
+      viewGraph.applyStateMutationOverlay(stateMutations)
+    }
   }
 
-  package func restoreBaselineState(in viewGraph: ViewGraph) {
+  package func restoreBaselineState(
+    in viewGraph: ViewGraph,
+    preservingCurrentStateMutations: Bool = false
+  ) {
     precondition(!didCommit && !didDiscard)
     guard let checkpoint else {
       return
     }
+    let stateMutations =
+      preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
     viewGraph.restoreCheckpoint(checkpoint)
+    if let stateMutations {
+      viewGraph.applyStateMutationOverlay(stateMutations)
+    }
   }
 
   @discardableResult
@@ -89,9 +105,15 @@ package final class ViewGraphFrameDraft {
     )
   }
 
-  package func discard(from viewGraph: ViewGraph) {
+  package func discard(
+    from viewGraph: ViewGraph,
+    preservingCurrentStateMutations: Bool = false
+  ) {
     precondition(!didCommit && !didDiscard)
-    restoreBaselineState(in: viewGraph)
+    restoreBaselineState(
+      in: viewGraph,
+      preservingCurrentStateMutations: preservingCurrentStateMutations
+    )
     didDiscard = true
   }
 
