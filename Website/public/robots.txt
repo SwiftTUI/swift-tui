@@ -7,4 +7,4 @@ Allow: /docs/
 # WASI demo artifact (large, no useful content for indexing — but no harm).
 Disallow: /webexample/
 
-Sitemap: https://swifttui.io/sitemap.xml
+Sitemap: https://swifttui.sh/sitemap.xml

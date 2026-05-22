@@ -2,7 +2,7 @@
 
 Stub Astro site that frames the
 [`Examples/WebExample`](../Examples/WebExample) WASI demo in an iframe.
-Deployed at <https://swifttui.io>.
+Deployed at <https://swifttui.sh>.
 
 The site copy is the public marketing layer for the framework. Keep state,
 runtime, capability negotiation, and terminal-presentation safety claims

@@ -253,7 +253,7 @@ a given product surface or run mode.
 
 ## Documentation
 
-Live API reference: <https://swifttui.io/docs/documentation/>
+Live API reference: <https://swifttui.sh/docs/documentation/>
 
 [docs/README.md](docs/README.md) is the canonical index for architecture and
 project documentation. Common entry points:
