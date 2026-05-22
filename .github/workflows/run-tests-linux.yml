@@ -6,6 +6,12 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_arm64:
+        description: Run the Linux arm64 gate in addition to amd64
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -26,11 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
 
     steps:
       - name: Checkout

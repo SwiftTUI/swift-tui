@@ -83,19 +83,53 @@ struct WebHostServerTests {
 func withServer(
   _ body: (WebHostServerSession) async throws -> Void
 ) async throws {
-  let server = WebHostFlyingFoxServer()
-  let session = try await server.start(
-    configuration: .init(bind: "127.0.0.1", port: 0),
-    token: WebHostToken(rawValue: "test-token"),
-    scene: .init(id: "main", title: "Main")
-  )
-
+  await webHostNetworkTestGate.enter()
   do {
-    try await body(session)
-    await session.stop()
+    let server = WebHostFlyingFoxServer()
+    let session = try await server.start(
+      configuration: .init(bind: "127.0.0.1", port: 0),
+      token: WebHostToken(rawValue: "test-token"),
+      scene: .init(id: "main", title: "Main")
+    )
+
+    do {
+      try await body(session)
+      await session.stop()
+    } catch {
+      await session.stop()
+      throw error
+    }
+    await webHostNetworkTestGate.leave()
   } catch {
-    await session.stop()
+    await webHostNetworkTestGate.leave()
     throw error
+  }
+}
+
+private let webHostNetworkTestGate = WebHostNetworkTestGate()
+
+private actor WebHostNetworkTestGate {
+  private var isLocked = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func enter() async {
+    guard isLocked else {
+      isLocked = true
+      return
+    }
+
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      waiters.append(continuation)
+    }
+  }
+
+  func leave() {
+    guard !waiters.isEmpty else {
+      isLocked = false
+      return
+    }
+
+    waiters.removeFirst().resume()
   }
 }
 
