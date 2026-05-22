@@ -247,7 +247,7 @@ a given product surface or run mode.
 
 ## Documentation
 
-Live API reference: <https://swifttui.io/docs/documentation/swifttui/>
+Live API reference: <https://swifttui.io/docs/documentation/>
 
 [docs/README.md](docs/README.md) is the canonical index for architecture and
 project documentation. Common entry points:
@@ -260,10 +260,10 @@ project documentation. Common entry points:
 - [docs/PUBLIC-API.md](docs/PUBLIC-API.md) — the public surface policy.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — toolchains, the test gate, the release process.
 
-Build per-module DocC archives locally with:
+Build the combined DocC archive locally with:
 
 ```bash
-swiftly run swift package generate-documentation --target SwiftTUI
+Scripts/build_docc_archive.sh
 ```
 
 ## Project status
