@@ -10,6 +10,7 @@ import Testing
   import Glibc
 #endif
 
+@Suite(.serialized)
 struct SocketDiscoveryTests {
   @Test("Duplicate live instance identifiers are rejected")
   func duplicateIdentifiersRejected() async throws {
