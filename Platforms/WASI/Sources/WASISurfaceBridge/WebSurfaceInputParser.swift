@@ -196,10 +196,14 @@ package struct WebSurfaceInputParser {
     x: Double,
     y: Double
   ) -> PointerLocation {
-    guard let cellPixelSize else {
-      return .cellFallback(Point(x: x, y: y).containingCell)
-    }
     let location = Point(x: x, y: y)
+    guard let cellPixelSize else {
+      return .subCell(
+        location: location,
+        source: .webPixels,
+        metrics: .estimated
+      )
+    }
     return .subCell(
       location: location,
       source: .webPixels,
