@@ -17,6 +17,7 @@ flowchart TD
     VISION["VISION.md<br/>what SwiftTUI is for"]
     GAP["VISION-GAP.md<br/>code vs. intent"]
     ARCH["ARCHITECTURE.md<br/>modules, products, layout"]
+    SPLIT["REPOSITORY-SPLIT.md<br/>repository ownership"]
     PIPE["RENDER-PIPELINE.md<br/>frame pipeline internals"]
     HOSTS["HOSTS-AND-PLATFORMS.md<br/>execution modes, platforms"]
     A11Y["ACCESSIBILITY.md<br/>semantic substrate"]
@@ -26,6 +27,7 @@ flowchart TD
 
     README --> VISION
     README --> ARCH
+    README --> SPLIT
     README --> DEV
     VISION --> GAP
     GAP --> PROP
@@ -42,6 +44,7 @@ flowchart TD
 | [VISION.md](VISION.md) | What SwiftTUI is for, its design principles, and what is deliberately in and out of scope. |
 | [VISION-GAP.md](VISION-GAP.md) | The concrete differences between the code at `HEAD` and the project's stated intent. The gap register and entrypoint for linked proposals. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, products, the dependency graph, source layout, layout model, and a glossary. The starting point for understanding the codebase. |
+| [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) | Repository ownership, release boundaries, and public documentation invariants. |
 | [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | The seven phase products, the runtime stage pipeline, off-main rendering, and frame-drop policy. |
 | [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) | The four execution modes, the platform support matrix, and terminal-program embedding. |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds four accessibility consumers. |
@@ -59,6 +62,8 @@ not create an independent roadmap.
 
 ## Planning documents
 
+- [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) - repository ownership, release
+  boundaries, and public documentation invariants.
 - [plans/2026-05-22-001-github-organization-split-plan.md](plans/2026-05-22-001-github-organization-split-plan.md) -
   execution plan for splitting SwiftTUI across GitHub organization repositories
   while preserving the one-package terminal/WebHost consumer path and coherent
