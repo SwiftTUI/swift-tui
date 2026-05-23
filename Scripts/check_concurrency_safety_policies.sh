@@ -14,7 +14,7 @@ matches=$(
     --regexp '@unchecked Sendable' \
     --regexp 'nonisolated\(unsafe\)' \
     --regexp '@safe\b' \
-    Sources Tests Platforms Examples Package.swift || true
+    Sources Tests Platforms Package.swift || true
 )
 
 if [ -n "$matches" ]; then

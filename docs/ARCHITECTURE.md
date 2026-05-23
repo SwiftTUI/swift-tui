@@ -132,16 +132,15 @@ Sources/
   SwiftTUICharts/      Chart views  + SwiftTUICharts.docc
   SwiftTUIAnimatedImage/  Animated image playback  + .docc
   SwiftTUI/            Convenience re-export target  + SwiftTUI.docc
-Platforms/             Arguments, CLI, WASI, Web, WebBuild, WebHost,
+Platforms/             Arguments, CLI, WASI, WebHost,
                        Embedding, SwiftUI  (sources for the product targets)
-Examples/              Sibling demo packages depending on the root package
 Vendor/                swift-figlet, swift-gif, swift-jpeg, swift-png,
                        UnixSignals  (third-party code, own licenses)
 Tools/TermUIPerf/      Performance scenario harness
 ```
 
-Example apps under `Examples/` are sibling mini-packages that depend on the
-root package; they are demos and regression coverage, not published products.
+Runnable example apps live in the sibling `SwiftTUI/swift-tui-examples`
+repository; they are demos and regression coverage, not published products.
 
 ## The frame pipeline, in one paragraph
 

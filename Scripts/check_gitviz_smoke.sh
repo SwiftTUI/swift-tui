@@ -1,13 +1,14 @@
 #!/usr/bin/env sh
 #
-# Visual smoke check for Examples/gitviz against the host repository itself.
+# Visual smoke check for swift-tui-examples/Examples/gitviz against this repository.
 # Not a CI gate — failures are visual, not asserted. Use this before commits
 # to confirm the README screenshots still look like what `gitviz` produces.
 
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-example_root="$repo_root/Examples/gitviz"
+examples_root="${SWIFTTUI_EXAMPLES_CHECKOUT:-"$repo_root/../swift-tui-examples"}"
+example_root="$examples_root/Examples/gitviz"
 binary="$example_root/.build/debug/gitviz"
 
 cd "$example_root"

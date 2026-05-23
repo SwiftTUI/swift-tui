@@ -45,7 +45,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 #   - libcurl dev:   Swiftly's downloaded Swift toolchains require it
 #   - ca-certificates+git: SwiftPM dependency resolution over HTTPS
 #   - ripgrep:       used by repo tests + matches the GH Actions runner setup
-#   - binaryen:      provides wasm-opt for Examples/WebExample
+#   - binaryen:      provides wasm-opt for sibling WebExample diagnostics
 #   - brotli:        WebExample wasm is shipped Brotli-compressed
 #   - jq:            convenient for inspecting JSON in the container
 #

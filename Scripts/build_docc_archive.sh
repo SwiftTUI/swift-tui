@@ -14,8 +14,8 @@ Usage: Scripts/build_docc_archive.sh [--output-path PATH] [--hosting-base-path P
 Builds the combined DocC archive for every DocC target listed in
 Scripts/lib/public_docc_targets.txt. That manifest must include every externally
 linkable root package product, and may include support targets whose symbols are
-part of the published reference. Example packages under Examples/ are
-intentionally excluded from DocC coverage.
+part of the published reference. Example packages in SwiftTUI/swift-tui-examples
+are intentionally excluded from DocC coverage.
 EOF
 }
 

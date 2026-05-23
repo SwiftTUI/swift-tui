@@ -114,10 +114,6 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-            Examples/WebExample/node_modules
-            Platforms/Web/node_modules
-            Platforms/WebBuild/node_modules
-            Website/node_modules
           key: ${{ runner.os }}-${{ matrix.arch }}-bun-gate-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.arch }}-bun-gate-
@@ -228,10 +224,6 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-            Examples/WebExample/node_modules
-            Platforms/Web/node_modules
-            Platforms/WebBuild/node_modules
-            Website/node_modules
           key: ${{ runner.os }}-bun-gate-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-gate-

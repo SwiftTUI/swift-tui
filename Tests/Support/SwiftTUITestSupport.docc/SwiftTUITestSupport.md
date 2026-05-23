@@ -6,8 +6,9 @@ Poll-free synchronisation primitives for deterministic, flake-resistant tests.
 
 `SwiftTUITestSupport` is the shared toolkit the SwiftTUI test suites use to
 *wait for things to happen* without polling a predicate on a timer. It is
-exported as a library product so example packages under `Examples/` can
-synchronise their own tests on the same primitives.
+exported as a library product so packages in the sibling
+`SwiftTUI/swift-tui-examples` repository can synchronise their own tests on the
+same primitives.
 
 The classic test wait — set a flag, then loop on a clock until either the flag
 flips or a timeout elapses — fails for a structural reason: the timeout is a

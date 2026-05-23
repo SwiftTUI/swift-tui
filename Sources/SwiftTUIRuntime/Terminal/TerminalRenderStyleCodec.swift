@@ -1,5 +1,5 @@
 @_spi(Runners) public enum TerminalRenderStyleCodec {
-  // Keep this transport schema aligned with Platforms/Web/src/WebHostTerminalStyle.ts.
+  // Keep this transport schema aligned with swift-tui-web/packages/web/src/WebHostTerminalStyle.ts.
   @_spi(Runners) public static func decodeBase64(
     _ encoded: String
   ) -> TerminalRenderStyle? {

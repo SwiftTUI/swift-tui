@@ -68,10 +68,10 @@ runtime.
 |---------------|-------------------------------------------------------------|
 | Swiftly       | Selects the repo-pinned Swift toolchain                     |
 | Swift 6.3.1   | Installed and selected through Swiftly                      |
-| bun           | Builds `Examples/WebExample` and the Astro website          |
+| bun           | Runs the repo gate scripts                                  |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
-| binaryen      | Provides `wasm-opt` for the WebExample wasm pipeline        |
-| brotli        | WebExample wasm is shipped Brotli-compressed                |
+| binaryen      | Present for sibling WebExample diagnostics                  |
+| brotli        | Present for sibling WebExample diagnostics                  |
 | ripgrep       | Used by repo tests; matches the GH Actions runner setup     |
 | git, curl, unzip, ca-certificates, jq | General build prerequisites           |
 
@@ -101,13 +101,13 @@ toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 ./Scripts/linux.sh root-test      # raw root-package swiftly run swift test
 ./Scripts/linux.sh cli-test       # focused SwiftTUICLI tests from the root package
 ./Scripts/linux.sh examples       # Build Linux example packages
-./Scripts/linux.sh web            # Build WebExample + Platforms/Web host bundle
-./Scripts/linux.sh workflow       # examples + web build checks
-./Scripts/linux.sh full           # test + workflow
+./Scripts/linux.sh examples       # Print the extracted examples workflow location
+./Scripts/linux.sh web            # Print the extracted browser workflow location
+./Scripts/linux.sh full           # repo gate
 
 # Drop into the container for ad-hoc work:
 ./Scripts/linux.sh shell
-./Scripts/linux.sh run swiftly run swift build --package-path Examples/gallery
+./Scripts/linux.sh run swiftly run swift build
 
 # Lifecycle:
 ./Scripts/linux.sh stop           # Stop the container (state preserved)

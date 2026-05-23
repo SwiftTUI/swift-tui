@@ -36,7 +36,7 @@ sibling root-package products directly.
 | Shared view package or custom host/launcher | `SwiftTUIRuntime` | `import SwiftTUIRuntime` |
 | Explicit terminal runner control | `SwiftTUIRuntime` + `SwiftTUICLI` | `import SwiftTUIRuntime` and `import SwiftTUICLI` |
 | WASI executable or manifest-mode app | `SwiftTUIWASI` | `import SwiftTUIWASI` |
-| Browser deployment from a WASI build | `SwiftTUIWASI` app plus `Platforms/Web` tooling | `import SwiftTUIWASI` in the app |
+| Browser deployment from a WASI build | `SwiftTUIWASI` app plus `@swifttui/web` tooling | `import SwiftTUIWASI` in the app |
 | Localhost browser app from a native binary | `SwiftTUIWebHost` | `import SwiftTUIWebHost` |
 | One binary that supports terminal launch and `--web` | `SwiftTUIWebHostCLI` | `import SwiftTUIWebHostCLI` |
 | Native SwiftUI host on Apple platforms | `SwiftUIHost` | `import SwiftUIHost` |
@@ -133,7 +133,7 @@ struct HostedApp: App {
 }
 ```
 
-`SwiftUIHost` uses this shape for native SwiftUI embedding. `Platforms/Web`
+`SwiftUIHost` uses this shape for native SwiftUI embedding. `@swifttui/web`
 uses the same authored scene model with a `SwiftTUIWASI` build and the
 browser-side `web-surface` runtime.
 

@@ -95,7 +95,7 @@ values so host shells receive producer sequence, raster output, semantics,
 focus, and raster damage as one committed frame.
 
 `SwiftUIHost` uses that path to embed SwiftTUI scenes inside a SwiftUI
-app on Apple platforms. `Platforms/Web` uses the same authored scene model for
+app on Apple platforms. `@swifttui/web` uses the same authored scene model for
 browser hosting on top of a `SwiftTUIWASI` build.
 
 `SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
