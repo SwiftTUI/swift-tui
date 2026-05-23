@@ -9,6 +9,7 @@ import Testing
   import Glibc
 #endif
 
+@Suite(.serialized)
 struct ScenePtyTests {
   @Test("Allocates a pty pair with valid file descriptors")
   func allocatesScenePty() async throws {
