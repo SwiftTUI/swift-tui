@@ -38,7 +38,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
         surfaceSize: surfaceSize,
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
-        pointerInputCapabilities: .cellOnly,
+        pointerInputCapabilities: Self.pointerInputCapabilities(for: nil),
         transmittedImageIDs: []
       )
     )
@@ -80,18 +80,18 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
   private static func pointerInputCapabilities(
     for cellPixelSize: PixelSize?
   ) -> PointerInputCapabilities {
-    guard let cellPixelSize else {
-      return .cellOnly
-    }
-    return PointerInputCapabilities(
-      precision: .subCell(
-        source: .webPixels,
-        metrics: CellPixelMetrics(
+    let metrics =
+      if let cellPixelSize {
+        CellPixelMetrics(
           width: cellPixelSize.width,
           height: cellPixelSize.height,
           source: .reported
         )
-      ),
+      } else {
+        CellPixelMetrics.estimated
+      }
+    return PointerInputCapabilities(
+      precision: .subCell(source: .webPixels, metrics: metrics),
       supportsHover: true
     )
   }
