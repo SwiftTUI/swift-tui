@@ -1,3 +1,4 @@
+import ArgumentParser
 import SwiftTUI
 import Testing
 
@@ -23,5 +24,27 @@ struct SwiftTUIConvenienceImportTests {
     #expect(configuration.web?.port == 4567)
     #expect(configuration.web?.bind == "127.0.0.1")
     #expect(configuration.web?.openBrowser == true)
+  }
+
+  @MainActor
+  @Test("SwiftTUI import exposes command conformance surface")
+  func swiftTUIImportExposesCommandConformanceSurface() throws {
+    let app = try ImportSmokeCommand.parse(["--web"])
+    let configuration = app.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+
+    #expect(configuration.web != nil)
+    #expect(ImportSmokeCommand.configuration.subcommands.count == 1)
+  }
+}
+
+private struct ImportSmokeCommand: App, SwiftTUICommand {
+  @OptionGroup(title: "SwiftTUI Options") public var swiftTUIOptions: SwiftTUIOptions
+
+  init() {}
+
+  var body: some Scene {
+    WindowGroup {
+      Text("Smoke")
+    }
   }
 }

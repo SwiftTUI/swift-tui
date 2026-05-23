@@ -15,13 +15,13 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(name: "swift-tui", path: "../.."),
+    .package(name: "swift-tui", path: "../..")
   ],
   targets: [
     .executableTarget(
       name: "TermUIPerf",
       dependencies: [
-        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUI", package: "swift-tui")
       ]
     ),
     .testTarget(

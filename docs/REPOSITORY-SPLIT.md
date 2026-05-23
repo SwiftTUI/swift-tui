@@ -9,6 +9,12 @@ A terminal or localhost-browser app depends on `SwiftTUI/swift-tui` and imports
 `SwiftTUI`. The package continues to include terminal launch and WebHost launch
 through `SwiftTUIWebHostCLI`, so `--web` remains a runtime mode selection.
 
+`Tests/SwiftTUITests/SwiftTUIConvenienceImportTests.swift` locks this contract
+with a consumer-shaped `App, SwiftTUICommand` fixture. The split can move
+browser TypeScript, examples, and site deployment out of this repository without
+requiring downstream apps to add extra SwiftPM dependencies or import lower-level
+SwiftTUI products directly.
+
 ## Repository Ownership
 
 | Repository | Owns | Does not own |
