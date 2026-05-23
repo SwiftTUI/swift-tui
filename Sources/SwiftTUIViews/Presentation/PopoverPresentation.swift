@@ -410,6 +410,7 @@ private func popoverPromptPresentationDescriptor(
     scrollMaxHeight: 32,
     bodyMode: .contentOnly,
     chrome: .menu,
+    borderStyle: StrokeStyle(),
     contentSizing: .intrinsic,
     createsFocusScope: createsFocusScope
   )
