@@ -4,11 +4,6 @@
   "version": "0.1.0",
   "license": "MIT",
   "scripts": {
-    "build:wasm": "bun run --cwd Website build:wasm",
-    "build:wasm:dev": "bun run --cwd Website build:wasm:dev",
-    "build:website": "bun run --cwd Website build:full",
-    "build:website:dev": "bun run --cwd Website build:dev",
-    "dev:website": "bun run --cwd Website dev",
     "perf:compare": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf compare",
     "perf:list": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf list-scenarios",
     "perf:run": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf run",
@@ -22,8 +17,7 @@
   "workspaces": [
     "Platforms/Web",
     "Platforms/WebBuild",
-    "Examples/WebExample",
-    "Website"
+    "Examples/WebExample"
   ],
   "devDependencies": {
     "yaml": "^2.8.3"
