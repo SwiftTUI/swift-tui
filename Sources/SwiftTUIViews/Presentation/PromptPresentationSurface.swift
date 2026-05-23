@@ -117,7 +117,7 @@ package struct PromptPresentationSurface: View, ActionScope {
           // glyph-identity check, not a placement check.
           RoundedRectangle(cornerRadius: 1).strokeBorder(
             .terminalBorder(.accent),
-            style: StrokeStyle(borderSet: .innerHalfBlock, placement: .outset)
+            style: item.descriptor.borderStyle
           )
         }
         .frame(
@@ -141,7 +141,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         .overlay {
           Rectangle().strokeBorder(
             .terminalBorder(.accent),
-            style: StrokeStyle(borderSet: .innerHalfBlock, placement: .outset)
+            style: item.descriptor.borderStyle
           )
         }
         .semanticMetadata(

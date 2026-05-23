@@ -61,6 +61,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   package var scrollMaxHeight: Int
   package var bodyMode: BodyMode
   package var chrome: PresentationChrome
+  package var borderStyle: StrokeStyle
   package var contentSizing: PromptPresentationContentSizing
   package var createsFocusScope: Bool
 
@@ -77,6 +78,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     scrollMaxHeight: Int,
     bodyMode: BodyMode,
     chrome: PresentationChrome = .surface,
+    borderStyle: StrokeStyle = StrokeStyle(borderSet: .innerHalfBlock, placement: .outset),
     contentSizing: PromptPresentationContentSizing = .fillAvailable,
     createsFocusScope: Bool = true
   ) {
@@ -92,6 +94,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     self.scrollMaxHeight = scrollMaxHeight
     self.bodyMode = bodyMode
     self.chrome = chrome
+    self.borderStyle = borderStyle
     self.contentSizing = contentSizing
     self.createsFocusScope = createsFocusScope
   }

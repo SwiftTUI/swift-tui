@@ -63,6 +63,36 @@ struct PopoverPresentationTests {
     #expect(popover.x < source.x)
   }
 
+  @Test("popover chrome uses the standard rounded border")
+  func popoverChromeUsesStandardRoundedBorder() {
+    let artifacts = DefaultRenderer().render(
+      Text("Anchor")
+        .popover(
+          isPresented: .constant(true),
+          arrowEdge: .trailing
+        ) {
+          Text("Details")
+        }
+        .frame(width: 36, height: 8, alignment: .topLeading),
+      context: .init(
+        identity: testIdentity("Root"),
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 36, height: 8)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(surface.contains("╭"))
+    #expect(surface.contains("╮"))
+    #expect(surface.contains("╰"))
+    #expect(surface.contains("╯"))
+    #expect(!surface.contains("▗"))
+    #expect(!surface.contains("▖"))
+    #expect(!surface.contains("▝"))
+    #expect(!surface.contains("▘"))
+  }
+
   @Test("interactive popover gates base focus while keeping popover focusable")
   func interactivePopoverGatesBaseFocus() {
     let baseIdentity = testIdentity("BaseButton")
