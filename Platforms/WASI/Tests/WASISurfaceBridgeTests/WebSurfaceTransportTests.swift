@@ -40,6 +40,30 @@ struct WebSurfaceTransportTests {
     #expect(metrics.strategy == .fullRepaint)
   }
 
+  @Test("host exposes web sub-cell pointer capabilities before reported metrics arrive")
+  func hostExposesWebSubCellPointerCapabilitiesBeforeMetrics() {
+    let host = WebSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 2),
+      renderStyle: .init(appearance: .fallback)
+    )
+
+    #expect(
+      host.pointerInputCapabilities
+        == PointerInputCapabilities(
+          precision: .subCell(source: .webPixels, metrics: .estimated),
+          supportsHover: true
+        ))
+
+    host.updateSurfaceSize(.init(width: 4, height: 2), cellPixelSize: nil)
+
+    #expect(
+      host.pointerInputCapabilities
+        == PointerInputCapabilities(
+          precision: .subCell(source: .webPixels, metrics: .estimated),
+          supportsHover: true
+        ))
+  }
+
   @MainActor
   @Test("host writes typed clipboard records")
   func hostWritesTypedClipboardRecords() throws {
@@ -338,7 +362,11 @@ struct WebSurfaceTransportTests {
         .mouse(
           .init(
             kind: .scrolled(deltaX: 0, deltaY: -1),
-            location: .cellFallback(CellPoint(x: 2, y: 3)),
+            location: .subCell(
+              location: Point(x: 2, y: 3),
+              source: .webPixels,
+              metrics: .estimated
+            ),
             modifiers: [.alt]
           )
         ),
@@ -396,6 +424,26 @@ struct WebSurfaceTransportTests {
     #expect(mouse.location.location == Point(x: -0.25, y: 3.10))
     #expect(mouse.location.cell == CellPoint(x: -1, y: 3))
     #expect(mouse.location.precision.isSubCell)
+  }
+
+  @Test("parser preserves fractional web coordinates before cell metrics are reported")
+  func parserPreservesFractionalWebCoordinatesBeforeMetrics() throws {
+    var parser = WebSurfaceInputParser()
+    let parsed = parser.feed(
+      bytes("\u{001E}mouse:moved:2.75:1.25:none:0:0:0\n")
+    )
+
+    guard case .mouse(let mouse) = try #require(parsed.events.first) else {
+      Issue.record("expected mouse event")
+      return
+    }
+
+    #expect(mouse.location.location == Point(x: 2.75, y: 1.25))
+    #expect(mouse.location.cell == CellPoint(x: 2, y: 1))
+    #expect(mouse.location.rawPixel == nil)
+    #expect(
+      mouse.location.precision
+        == .subCell(source: .webPixels, metrics: .estimated))
   }
 
   @Test("parser ignores malformed web-surface commands")
