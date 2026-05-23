@@ -14,9 +14,9 @@ process.
   supported** — the pinned toolchain is the source of truth.
 - **Bun `1.3.13`** orchestrates the test and policy scripts.
 - **WASI** builds use the `swift-6.3.1-RELEASE_wasm` SDK.
-- When working in a git worktree, keep the final path component `swift-tui` so
-  example packages that use `.package(name: "swift-tui", path: "../..")`
-  resolve correctly.
+- When working on extracted examples, keep `swift-tui`,
+  `swift-tui-web`, and `swift-tui-examples` as sibling checkouts so local
+  package paths resolve correctly.
 
 ## Building and testing
 
@@ -27,6 +27,11 @@ process.
 | `bun run test:all` | The exhaustive suite, including slower platform and integration coverage. |
 | `bun run test:coverage` | Produce coverage data. Informational — there is no enforced coverage threshold. |
 | `bun run perf:list` / `perf:run` / `perf:compare` | Drive the `Tools/TermUIPerf` scenario harness. |
+
+The runnable example matrix lives in `SwiftTUI/swift-tui-examples`. From that
+sibling checkout, run `Scripts/check_examples.sh --skip-clean` to validate
+example packages, WebExample, and native host shells against this framework
+checkout.
 
 Set `SWIFTTUI_TEST_TIMEOUT_SCALE` to widen async test timeouts on a slow or
 loaded machine.
@@ -72,7 +77,9 @@ phase (`Scripts/lib/repo_policy_checks.sh`) runs, in order:
    forbids `@unchecked Sendable`, `nonisolated(unsafe)`, and unchecked escape
    hatches.
 7. **WebHost package boundary** (`check_webhost_package_boundary.sh`).
-8. **Public-API baseline** (`generate_public_api_inventory.sh --check`) — also
+8. **Repository split boundary** (`check_repository_split_boundary.sh`) — keeps
+   the main Swift package release anchor and checked-in WebHost bundle intact.
+9. **Public-API baseline** (`generate_public_api_inventory.sh --check`) — also
    runs a report-only doc-comment ratchet over the `canonical` surface.
 
 ### Pre-commit hooks
@@ -135,6 +142,11 @@ source changes in `SwiftTUI/swift-tui-web`, update the bundle in `swift-tui`
 with `Scripts/update_webhost_bundle.sh --web-checkout ../swift-tui-web`, run
 `bun run test`, and commit the resource update with the matching web release
 version in the commit message.
+
+Runnable examples and the WebExample static demo are validated in
+`SwiftTUI/swift-tui-examples`. Keep that checkout beside `swift-tui` and
+`swift-tui-web`, then run `Scripts/check_examples.sh --skip-clean` from the
+examples repo before tagging example-facing changes.
 
 A release is cut from `main` after the gate passes:
 
