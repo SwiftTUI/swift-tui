@@ -1,4 +1,3 @@
-import Layouts
 @_spi(Runners) import SwiftTUI
 
 public struct LayoutScrollBurstScenario: PerfScenario {
@@ -16,7 +15,7 @@ public struct LayoutScrollBurstScenario: PerfScenario {
       scenario: self,
       options: options
     ) {
-      VerticalScrollMeasuresContent()
+      PerfVerticalScrollProbeView()
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "row 0")
       let dispatchTime = monotonicSeconds()
@@ -39,5 +38,23 @@ public struct LayoutScrollBurstScenario: PerfScenario {
         )
       ]
     }
+  }
+}
+
+private struct PerfVerticalScrollProbeView: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Vertical scroll measures content").foregroundStyle(.muted)
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<30, id: \.self) { index in
+            Text("row \(index)")
+          }
+        }
+      }
+      .frame(height: 8)
+      .border(.separator)
+    }
+    .padding(1)
   }
 }

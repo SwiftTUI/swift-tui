@@ -100,7 +100,7 @@ flowchart LR
 | macOS package development and CI | Primary supported Apple-host path. GitHub `macos-26` is the macOS CI floor. |
 | Linux terminal builds and tests | Supported through `swiftly`. |
 | iOS package builds | Supported for host-compatible products; CI builds (does not run tests). PTY/terminal-embedding products are excluded. |
-| WASI / browser | Supported through `SwiftTUIWASI` and the `Platforms/Web` browser packages. |
+| WASI / browser | Supported through `SwiftTUIWASI` and the `SwiftTUI/swift-tui-web` browser packages. |
 | Android cross-compilation | `aarch64` builds with the Swift Android SDK. `x86_64` currently fails inside the vendored `swift-png` SIMD path — see [VISION-GAP.md](VISION-GAP.md). |
 | `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` (PTY embedding) | macOS and Linux only. |
 | `SwiftUIHost` | macOS only; excluded from Linux at compile time. |
@@ -111,19 +111,13 @@ restriction).
 
 ## The web packages
 
-The browser deployment story spans Swift and TypeScript:
+The Swift products that run browser surfaces live in this repo:
+`SwiftTUIWASI`, `SwiftTUIWebHost`, and `SwiftTUIWebHostCLI`.
 
-- **`SwiftTUIWASI`** — the Swift runner that builds for WASI and exposes the
-  manifest plus hosted-session story.
-- **`Platforms/Web`** (`@swifttui/web`) — the browser runtime that hosts a WASI
-  build, drawing raster output onto a canvas via the `web-surface` transport.
-- **`Platforms/WebBuild`** (`@swifttui/build`) — TypeScript build helpers for
-  manifest generation, WASI builds, wasm validation, and static packaging.
-- **`SwiftTUIWebHost`** — the native localhost-browser host; serves the browser
-  runtime over an embedded server instead of compiling the app to WASI.
-
-`Platforms/Web` and `Platforms/WebBuild` are Bun workspace packages, not Swift
-package products.
+Browser TypeScript source lives in `SwiftTUI/swift-tui-web` as
+`@swifttui/web` and `@swifttui/build`. `SwiftTUIWebHost` consumes a checked-in
+browser bundle under `Platforms/WebHost/Sources/SwiftTUIWebHost/Resources/browser`
+so Swift package consumers do not need Bun or npm for localhost WebHost use.
 
 ## Terminal-program embedding
 

@@ -34,8 +34,9 @@ release-facing `SwiftTUI` product re-exports this module through
 `SwiftTUIWebHostCLI` and includes animated GIF/image support for one-import
 apps. Other platform integrations compose with this module directly:
 `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`, `SwiftTUIWebHost`, and
-`SwiftTUIWebHostCLI`. Browser deployment through `Platforms/Web` remains the
-Bun package that consumes a `SwiftTUIWASI` build.
+`SwiftTUIWebHostCLI`. Browser deployment uses the `@swifttui/web` package in
+the sibling `SwiftTUI/swift-tui-web` repository to consume a `SwiftTUIWASI`
+build.
 
 Pointer input policy types such as `TerminalMouseInputResolution`,
 `TerminalMouseInputTrustPolicy`, and `TerminalMouseInputCompatibilityMatrix`

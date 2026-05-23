@@ -1,4 +1,3 @@
-import GalleryDemoViews
 @_spi(Runners) import SwiftTUI
 
 public struct GalleryAnimationClickScenario: PerfScenario {
@@ -12,48 +11,53 @@ public struct GalleryAnimationClickScenario: PerfScenario {
 
   @MainActor
   public func run(options: PerfScenarioRunOptions) async throws -> PerfScenarioRunResult {
-    try await withGalleryInitialTab("animations") {
-      try await PerfScenarioRunner.runWindow(
-        scenario: self,
-        options: options
-      ) {
-        GalleryView()
-      } drive: { driver in
-        _ = try await driver.waitForFrame(containing: "linear")
-        let cell = try driver.cell(containing: "linear")
-        let dispatchTime = monotonicSeconds()
-        let frameBeforeClick = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
-        driver.sendClick(at: cell)
-        let matchingFrame = try await driver.waitForFrame(
-          containing: "curve: linear",
-          afterFrame: frameBeforeClick
+    try await PerfScenarioRunner.runWindow(
+      scenario: self,
+      options: options
+    ) {
+      PerfAnimationProbeView()
+    } drive: { driver in
+      _ = try await driver.waitForFrame(containing: "linear")
+      let cell = try driver.cell(containing: "linear")
+      let dispatchTime = monotonicSeconds()
+      let frameBeforeClick = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
+      driver.sendClick(at: cell)
+      let matchingFrame = try await driver.waitForFrame(
+        containing: "curve: linear",
+        afterFrame: frameBeforeClick
+      )
+      return [
+        PerfEventRecord(
+          eventID: "gallery-animation-linear-click",
+          eventType: "mouse_click",
+          dispatchTimeSeconds: dispatchTime,
+          expectedVisualMarker: "curve: linear",
+          firstMatchingFrame: matchingFrame.frameNumber,
+          firstMatchingTimeSeconds: matchingFrame.timestampSeconds,
+          finalSettledFrame: matchingFrame.frameNumber,
+          finalSettledTimeSeconds: matchingFrame.timestampSeconds
         )
-        return [
-          PerfEventRecord(
-            eventID: "gallery-animation-linear-click",
-            eventType: "mouse_click",
-            dispatchTimeSeconds: dispatchTime,
-            expectedVisualMarker: "curve: linear",
-            firstMatchingFrame: matchingFrame.frameNumber,
-            firstMatchingTimeSeconds: matchingFrame.timestampSeconds,
-            finalSettledFrame: matchingFrame.frameNumber,
-            finalSettledTimeSeconds: matchingFrame.timestampSeconds
-          )
-        ]
-      }
+      ]
     }
   }
+}
 
-  private func withGalleryInitialTab<T>(
-    _ tab: String,
-    operation: () async throws -> T
-  ) async throws -> T {
-    let key = "GALLERY_INITIAL_TAB"
-    let oldValue = environmentValue(key)
-    try setEnvironmentValue(tab, for: key)
-    defer {
-      try? setEnvironmentValue(oldValue, for: key)
+private struct PerfAnimationProbeView: View {
+  @State private var colorBlue = false
+  @State private var curveLabel = "(tap a curve)"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Animation perf probe").foregroundStyle(.muted)
+      Text("curve: \(curveLabel)")
+        .foregroundStyle(colorBlue ? Color.blue : Color.red)
+      Button("linear") {
+        withAnimation(.linear(duration: .milliseconds(1500))) {
+          colorBlue.toggle()
+          curveLabel = "linear"
+        }
+      }
     }
-    return try await operation()
+    .padding(1)
   }
 }

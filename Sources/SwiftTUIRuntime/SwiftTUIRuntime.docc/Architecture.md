@@ -58,7 +58,7 @@ boundaries, the runtime pipeline, and the phase products that connect them.
   execution layers on top of `SwiftTUIRuntime`
 - host products and packages retain authored `SwiftTUIRuntime` apps inside
   platform-managed shells: `SwiftUIHost` for native SwiftUI, `SwiftTUIWebHost`
-  for localhost-browser launch, and `Platforms/Web` for browser deployment
+  for localhost-browser launch, and `@swifttui/web` for browser deployment
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
 - terminal-program embedding lives in `SwiftTUITerminal` and
@@ -184,7 +184,7 @@ Those integration layers serve four execution modes:
   `SwiftTUIWASI`
 - host-managed embedding via `SceneManifest(for:)` and
   `HostedRasterSurface` plus `HostedSceneSession(for:sceneID:surface:)`, as used by `SwiftUIHost` and
-  `Platforms/Web`
+  `@swifttui/web`
 - localhost-browser WebHost execution via `WebHostRunner` and the WebHost
   browser bridge in `SwiftTUIWebHost`
 

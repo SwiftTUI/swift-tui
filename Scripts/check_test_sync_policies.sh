@@ -37,7 +37,7 @@ count=$(
     --regexp 'DispatchSemaphore' \
     --regexp 'Task\.sleep' \
     --regexp '\.sleep\(for:' \
-    Tests Platforms/*/Tests Examples/*/Tests 2>/dev/null \
+    Tests Platforms/*/Tests 2>/dev/null \
     | awk -F: '{ sum += $2 } END { print sum + 0 }'
 )
 
@@ -63,7 +63,7 @@ if [ "$count" -gt "$baseline" ]; then
     --regexp 'DispatchSemaphore' \
     --regexp 'Task\.sleep' \
     --regexp '\.sleep\(for:' \
-    Tests Platforms/*/Tests Examples/*/Tests >&2 2>/dev/null || true
+    Tests Platforms/*/Tests >&2 2>/dev/null || true
   exit 1
 fi
 

@@ -8,7 +8,7 @@ checked-in semantic, Web/WASI, SwiftUI host, and accessible-output tests.
 Use VoiceOver on macOS for both terminal accessible output and the SwiftUI host.
 
 1. Start the gallery in linear accessible mode:
-   `swiftly run swift run --package-path Examples/gallery gallery-demo --accessible`
+   `swiftly run swift run --package-path ../swift-tui-examples/Examples/gallery gallery-demo --accessible`
 2. Confirm tab changes, focused controls, text input labels, live-region output,
    and `AccessibilityAnnouncer` messages are spoken in logical order.
 3. Exercise visual-only screens such as images, charts, canvas demos, and
@@ -23,7 +23,7 @@ The browser target is the preferred repeatable listening path because it mounts
 the semantic stream as ARIA beside the raster canvas.
 
 1. Start the gallery web surface:
-   `swiftly run swift run --package-path Examples/gallery gallery-demo --web --port 8080`
+   `swiftly run swift run --package-path ../swift-tui-examples/Examples/gallery gallery-demo --web --port 8080`
 2. Open `http://127.0.0.1:8080` and use the browser accessibility inspector to
    confirm roles, names, focus, and live regions.
 3. Listen with VoiceOver, NVDA, or Orca depending on host platform.

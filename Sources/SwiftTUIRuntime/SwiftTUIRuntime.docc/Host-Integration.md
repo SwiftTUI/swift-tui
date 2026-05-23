@@ -18,7 +18,7 @@ while a host owns an external presentation environment or embedding lifecycle.
 - **Host product** — retain ``HostedSceneSession`` values with explicit
   presentation surfaces such as ``HostedRasterSurface`` inside another app's
   lifecycle. `SwiftUIHost` does this for native SwiftUI on Apple platforms;
-  `Platforms/Web` does it for browser hosting on top of a WASI build.
+  `@swifttui/web` does it for browser hosting on top of a WASI build.
 - **WebHost runner and browser host** — import `SwiftTUIWebHost` for web-only
   localhost-browser launch, or use `SwiftTUIWebHostCLI` directly when one
   executable should support both terminal-native and `--web` launch without the

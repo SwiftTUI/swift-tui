@@ -184,8 +184,6 @@ Runs the exhaustive checked-in repo verification surface:
   - focused SwiftTUIWASI / WASISurfaceBridge tests
   - focused SwiftTUIWebHost tests
   - focused SwiftUIHost tests on Apple platforms
-  - Platforms/Web Bun tests
-  - Platforms/WebBuild Bun tests
   - Tools/TermUIPerf tests
 
 The script also checks required environment dependencies up front:
@@ -819,18 +817,6 @@ else
     "$(swift_command_text test --filter SwiftUIHostTests)" \
     run_swift test --filter SwiftUIHostTests
 fi
-
-run_step \
-  "Run Platforms/Web Bun tests" \
-  "$repo_root/Platforms/Web" \
-  "cd Platforms/Web && bun test" \
-  bun test
-
-run_step \
-  "Run Platforms/WebBuild Bun tests" \
-  "$repo_root/Platforms/WebBuild" \
-  "cd Platforms/WebBuild && bun test" \
-  bun test
 
 run_function_step \
   "Run Tools/TermUIPerf tests" \

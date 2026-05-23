@@ -32,7 +32,6 @@ struct StylingGuardTests {
       under: [
         packageRoot.appendingPathComponent("Sources"),
         packageRoot.appendingPathComponent("GUI"),
-        packageRoot.appendingPathComponent("Examples"),
         packageRoot.appendingPathComponent("docs"),
       ],
       allowedFileExtensions: ["swift", "ts", "md"],

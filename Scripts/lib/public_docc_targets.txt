@@ -1,7 +1,7 @@
 # DocC targets generated for the public website.
 # Format: target-name|docc-catalog-directory
-# Example packages under Examples/ are intentionally not listed; they are
-# runnable samples and regression surfaces, not externally linked products.
+# Example packages in SwiftTUI/swift-tui-examples are intentionally not listed;
+# they are runnable samples and regression surfaces, not externally linked products.
 # Every root package library product in Package.swift must appear here. The
 # list may also include support targets whose symbols are part of the published
 # reference through re-exported or dependent public APIs.

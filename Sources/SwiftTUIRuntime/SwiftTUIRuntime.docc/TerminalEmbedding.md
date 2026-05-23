@@ -110,7 +110,7 @@ SwiftTerm-backed VT emulation, focus-gated keyboard forwarding, X10 / 1000 /
 forwarding, OSC 0/2 title changes, OSC 7 working-directory changes, and OSC 8
 hyperlink state.
 
-`Examples/file-previewer` demonstrates the surface with Miller-column
+`swift-tui-examples/Examples/file-previewer` demonstrates the surface with Miller-column
 filesystem navigation and an embedded preview command in the rightmost column.
 
 ## Deferred Work

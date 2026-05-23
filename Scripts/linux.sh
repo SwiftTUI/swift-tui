@@ -73,10 +73,10 @@ Repo-aware:
   root-test         Run raw \`swiftly run swift test\` for root-package diagnosis
   cli-test          Run focused SwiftTUICLI tests from the root package
   cli-build-tests   Build root package tests without running them
-  examples          Build the Linux example packages
-  web               Build the browser examples
-  workflow          Mirror the Examples Linux workflow: examples + web
-  full              Run the Linux repo gate, then \`workflow\`
+  examples          Print where the extracted Linux example workflow lives
+  web               Print where the extracted browser workflow lives
+  workflow          Print where extracted example/web workflows live
+  full              Run the Linux repo gate
 
 Environment:
   LINUX_CONTAINER_TOOL  Force docker or podman
@@ -406,11 +406,8 @@ cmd_info() {
 }
 
 cmd_examples() {
-  ensure_swiftly
-  run_shell_script "
-    swiftly run swift --version
-    swiftly run swift build --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/examples-gallery") --package-path Examples/gallery
-  "
+  echo "Examples moved to SwiftTUI/swift-tui-examples." >&2
+  echo "Run Scripts/check_examples.sh --skip-clean from that sibling checkout." >&2
 }
 
 cmd_test() {
@@ -448,21 +445,8 @@ cmd_cli_build_tests() {
 }
 
 cmd_web() {
-  ensure_bun
-  ensure_wasm_sdk
-
-  run_shell_script "
-    export BUN_INSTALL=/root/.bun
-    export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
-
-    cd Examples/WebExample
-    bun install --frozen-lockfile
-    bun run build
-
-    cd ../../Platforms/Web
-    bun install --frozen-lockfile
-    bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
-  "
+  echo "Browser TypeScript packages moved to SwiftTUI/swift-tui-web." >&2
+  echo "WebExample packaging moved to SwiftTUI/swift-tui-examples." >&2
 }
 
 cmd_workflow() {
@@ -472,7 +456,6 @@ cmd_workflow() {
 
 cmd_full() {
   cmd_test
-  cmd_workflow
 }
 
 main() {

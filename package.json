@@ -14,11 +14,7 @@
     "test:all:clean": "sh ./Scripts/test_all.sh --clean",
     "test:coverage": "sh ./Scripts/report_test_coverage.sh"
   },
-  "workspaces": [
-    "Platforms/Web",
-    "Platforms/WebBuild",
-    "Examples/WebExample"
-  ],
+  "workspaces": [],
   "devDependencies": {
     "yaml": "^2.8.3"
   }
