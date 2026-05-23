@@ -11,13 +11,12 @@ Usage: Scripts/test_gate.sh [--clean] [--skip-bun-install]
 Runs the curated repo gate:
   - the same policy, root-package, platform-package, and tooling checks as
     Scripts/test_all.sh
-  - only Examples/gallery from the examples test set
 
 Pass --clean to delete every SwiftPM `.build` directory before any step runs,
 trading a from-scratch rebuild for a run that cannot be tripped by stale
 cross-package incremental artifacts.
 
-Use Scripts/test_all.sh for exhaustive example coverage.
+Example-package coverage lives in SwiftTUI/swift-tui-examples.
 EOF
 }
 
@@ -46,7 +45,6 @@ for argument; do
 done
 
 export STUI_TEST_RUNNER_NAME=test-gate
-export STUI_TEST_EXAMPLE_SCOPE=gate
 export STUI_TEST_COMMAND_TEXT="$command_text"
 
 exec sh "$repo_root/Scripts/test_all.sh" "$@"
