@@ -124,6 +124,18 @@ on a released tag, not `main`:
 `0.1.0` is the first release made under this policy. The earlier `0.0.1` tag
 predates it and is a pre-policy artifact.
 
+## Repository split release flow
+
+The Swift release anchor is `SwiftTUI/swift-tui`. Release tags in sibling repos
+must reference a released `swift-tui` tag, not an arbitrary branch SHA, unless
+the release is an internal preview.
+
+`SwiftTUIWebHost` ships a checked-in browser bundle. When the browser runtime
+source changes in `SwiftTUI/swift-tui-web`, update the bundle in `swift-tui`
+with `Scripts/update_webhost_bundle.sh --web-checkout ../swift-tui-web`, run
+`bun run test`, and commit the resource update with the matching web release
+version in the commit message.
+
 A release is cut from `main` after the gate passes:
 
 - `bun run test` is green.

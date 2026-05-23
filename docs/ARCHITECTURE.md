@@ -30,8 +30,12 @@ or terminal bytes.
 
 ## Modules and the dependency graph
 
-SwiftTUI is one Swift package. Internally it has three core targets and a set
-of product targets layered on top.
+`SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
+examples, and the public website may live in sibling organization repositories,
+but the public Swift products below remain in this package unless a later
+extraction explicitly promotes their package-private seams into stable public
+API. Internally it has three core targets and a set of product targets layered
+on top.
 
 ```mermaid
 flowchart TD
