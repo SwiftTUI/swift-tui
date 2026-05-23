@@ -1581,6 +1581,7 @@ class WebHostSceneRuntime {
   cellWidth = 8;
   cellHeight = 18;
   activePointerButton = "primary";
+  hasCapturedPointer = false;
   lastSentResize;
   isVisible = false;
   constructor(options) {
@@ -1755,6 +1756,7 @@ class WebHostSceneRuntime {
       }
       const button = pointerButton(event.button);
       this.activePointerButton = button;
+      this.hasCapturedPointer = true;
       this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
       this.onInput(encodeMouseInputMessage({
@@ -1767,8 +1769,9 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerUp = (event) => {
-      const location = this.cellLocation(event);
+      const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
       this.terminalMount.releasePointerCapture?.(event.pointerId);
+      this.hasCapturedPointer = false;
       if (!location) {
         return;
       }
@@ -1782,7 +1785,7 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerMove = (event) => {
-      const location = this.cellLocation(event);
+      const location = event.buttons && this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
       if (!location) {
         return;
       }
@@ -2081,17 +2084,24 @@ class WebHostSceneRuntime {
     return `${italic}${weight}${this.currentStyle.fontSize}px ${this.currentStyle.fontFamily}`;
   }
   cellLocation(event) {
+    const location = this.rawCellLocation(event);
+    if (!location) {
+      return;
+    }
+    const cellX = Math.floor(location.x);
+    const cellY = Math.floor(location.y);
+    if (cellX < 0 || cellY < 0 || cellX >= this.columns || cellY >= this.rows) {
+      return;
+    }
+    return location;
+  }
+  rawCellLocation(event) {
     const rect = this.canvas?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.();
     if (!rect) {
       return;
     }
     const x = (event.clientX - rect.left) / this.cellWidth;
     const y = (event.clientY - rect.top) / this.cellHeight;
-    const cellX = Math.floor(x);
-    const cellY = Math.floor(y);
-    if (cellX < 0 || cellY < 0 || cellX >= this.columns || cellY >= this.rows) {
-      return;
-    }
     return { x, y };
   }
 }
