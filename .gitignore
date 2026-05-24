@@ -74,6 +74,7 @@ reference
 output
 POST-GHOSTTY.md
 .perf/
+bazel-*
 
 # Local tool managers
 mise.toml

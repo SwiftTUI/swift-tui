@@ -1,0 +1,11 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_test(
+    name = "native_gate",
+    srcs = ["Tools/bazel/native_gate.sh"],
+    tags = [
+        "exclusive",
+        "local",
+        "no-sandbox",
+    ],
+)
