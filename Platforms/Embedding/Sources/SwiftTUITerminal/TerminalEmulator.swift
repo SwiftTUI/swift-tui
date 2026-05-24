@@ -13,6 +13,8 @@ public actor TerminalEmulator {
       delegate: delegate,
       options: TerminalOptions(cols: size.width, rows: size.height)
     )
+    self.terminal.silentLog = true
+    self.terminal.registerOscHandler(code: 133) { _ in }
   }
 
   public func feed(_ bytes: [UInt8]) -> [TerminalEmulatorEvent] {
@@ -163,10 +165,11 @@ public actor TerminalEmulator {
   ) -> RasterCell {
     let attribute = charData.attribute
     let style = rasterStyle(from: attribute)
+    let storedCharacter = terminal.getCharacter(for: charData)
     let character: Character =
-      attribute.style.contains(.invisible)
+      attribute.style.contains(.invisible) || isEmptyCellCharacter(storedCharacter)
       ? " "
-      : terminal.getCharacter(for: charData)
+      : storedCharacter
 
     return RasterCell(
       character: character,
@@ -174,6 +177,11 @@ public actor TerminalEmulator {
       style: style?.isDefault == true ? nil : style,
       hyperlink: charData.getPayload() as? String
     )
+  }
+
+  private static func isEmptyCellCharacter(_ character: Character) -> Bool {
+    character.unicodeScalars.count == 1
+      && character.unicodeScalars.first?.value == 0
   }
 
   private static func rasterStyle(from attribute: Attribute) -> ResolvedTextStyle? {

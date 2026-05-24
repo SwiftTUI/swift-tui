@@ -1,15 +1,42 @@
+import Foundation
 import SwiftTUIRuntime
 import Testing
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 @testable import SwiftTUITerminal
 
-@Suite("TerminalEmulator wrapper")
+@Suite("TerminalEmulator wrapper", .serialized)
 struct EmulatorWrapperTests {
   @Test("emulator initializes at requested size")
   func initSize() async {
     let emulator = TerminalEmulator(size: CellSize(width: 80, height: 24))
     let snapshot = await emulator.snapshot()
     #expect(snapshot.size == CellSize(width: 80, height: 24))
+  }
+
+  @Test("empty terminal cells snapshot as raster empties")
+  func emptyCellsSnapshotAsRasterEmpties() async {
+    let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
+    let snapshot = await emulator.snapshot()
+
+    #expect(snapshot.cells.allSatisfy { row in
+      row.allSatisfy { $0 == .empty }
+    })
+  }
+
+  @Test("OSC 133 shell integration markers are ignored quietly")
+  func osc133MarkersAreIgnoredQuietly() async {
+    let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
+    let output = await captureStandardOutput {
+      _ = await emulator.feed(Array("\u{1B}]133;A\u{07}".utf8))
+    }
+
+    #expect(output == "")
   }
 
   @Test("feeding plain ASCII produces visible cells")
@@ -83,4 +110,24 @@ struct EmulatorWrapperTests {
     let cell = (await emulator.snapshot()).cells[0][0]
     #expect(cell.style?.foregroundColor == .red)
   }
+}
+
+private func captureStandardOutput(
+  _ operation: () async -> Void
+) async -> String {
+  unsafe fflush(stdout)
+
+  let pipe = Pipe()
+  let original = dup(STDOUT_FILENO)
+  dup2(pipe.fileHandleForWriting.fileDescriptor, STDOUT_FILENO)
+
+  await operation()
+
+  unsafe fflush(stdout)
+  dup2(original, STDOUT_FILENO)
+  close(original)
+  pipe.fileHandleForWriting.closeFile()
+
+  let data = pipe.fileHandleForReading.readDataToEndOfFile()
+  return String(decoding: data, as: UTF8.self)
 }
