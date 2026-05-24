@@ -34,11 +34,11 @@ delay="${SCREENSHOT_DELAY:-2}"
 
 repo_root=$(cd -- "$(dirname "$0")/.." && pwd)
 examples_root="${SWIFTTUI_EXAMPLES_CHECKOUT:-"$repo_root/../swift-tui-examples"}"
-gallery="$examples_root/Examples/gallery/.build/arm64-apple-macosx/debug/gallery-demo"
+gallery="$examples_root/gallery/.build/arm64-apple-macosx/debug/gallery-demo"
 
 if [[ ! -x "$gallery" ]]; then
   echo "gallery-demo not built. Run:" >&2
-  echo "  swiftly run swift build --package-path $examples_root/Examples/gallery --product gallery-demo" >&2
+  echo "  swiftly run swift build --package-path $examples_root/gallery --product gallery-demo" >&2
   exit 69
 fi
 

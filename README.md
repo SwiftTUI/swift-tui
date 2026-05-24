@@ -144,14 +144,16 @@ struct MyApp: App, SwiftTUICommand {
 
 Apps without `SwiftTUICommand` still honor `NO_COLOR`, `LANG=C`, and the
 `SWIFTTUI_*` environment variables automatically. See
-[Examples/argparse](Examples/argparse) for a working demo.
+[`swift-tui-examples/argparse`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/argparse)
+for a working demo.
 
 ### Lower-level rendering
 
 If you need a single deterministic frame rather than an interactive session —
 for snapshots, previews, or non-interactive command output — resolve a `View`
 directly with `DefaultRenderer` and `TerminalSurfaceRenderer`. See
-[Examples/minimal](Examples/minimal) for the pattern and
+[`swift-tui-examples/minimal`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/minimal)
+for the pattern and
 [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) for the frame model.
 
 ## Using SwiftTUI from the web
@@ -200,9 +202,10 @@ The host page only needs to serve `Cross-Origin-Opener-Policy: same-origin`
 and `Cross-Origin-Embedder-Policy: require-corp` so the `SharedArrayBuffer`-backed
 stdin works; everything around the mount element is your own page chrome.
 
-[Examples/WebExample](Examples/WebExample) is the reference template — a
-complete Bun-served browser app whose load-bearing embedding code is roughly 60
-lines. Copy that pattern to adopt SwiftTUI in a web project.
+[`swift-tui-examples/WebExample`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebExample)
+is the reference template — a complete Bun-served browser app whose
+load-bearing embedding code is roughly 60 lines. Copy that pattern to adopt
+SwiftTUI in a web project.
 
 If you only want a native process that can open a browser window on `--web`,
 use the normal `SwiftTUI` dependency. For a narrower custom launcher, compose
@@ -231,25 +234,26 @@ covers that boundary and the platform support matrix.
 
 ## Examples
 
-The maintained examples are indexed in
-[Examples/README.md](Examples/README.md) — the fastest way to find a sample for
-a given product surface or run mode.
+The maintained examples live in the sibling
+[`SwiftTUI/swift-tui-examples`](https://github.com/SwiftTUI/swift-tui-examples)
+repository — the fastest way to find a sample for a given product surface or
+run mode.
 
 | Example | Demonstrates | Run |
 | --- | --- | --- |
-| [minimal](Examples/minimal) | Lowest-level snapshot rendering | `swiftly run swift run --package-path Examples/minimal minimal` |
-| [argparse](Examples/argparse) | `SwiftTUICommand`, consumer + framework flags, completions | `swiftly run swift run --package-path Examples/argparse argparse-demo --help` |
-| [gallery](Examples/gallery) | Component workbench: tabs, controls, input, images, charts, animation | `swiftly run swift run --package-path Examples/gallery gallery-demo` |
-| [layouts](Examples/layouts) | Layout catalog: stacks, frames, geometry, scrolling, overlays, shapes | `swiftly run swift run --package-path Examples/layouts layouts-demo` |
-| [LayoutsSwiftUI](Examples/LayoutsSwiftUI) | Native SwiftUI layout catalog beside the embedded SwiftTUI one | `swiftly run swift run --package-path Examples/LayoutsSwiftUI layouts-swiftui-demo` |
-| [file-previewer](Examples/file-previewer) | Miller-column browser with embedded terminal previews | `swiftly run swift run --package-path Examples/file-previewer FilePreviewerApp` |
-| [terminal-workspace](Examples/terminal-workspace) | Zellij-style tabs, split panes, command palette, persisted layout | `swiftly run swift run --package-path Examples/terminal-workspace terminal-workspace` |
-| [gitviz](Examples/gitviz) | Non-interactive `SwiftTUICharts` command suite over git history | `swiftly run swift run --package-path Examples/gitviz gitviz dashboard --path .` |
-| [gifcat](Examples/gifcat) | Terminal-native animated GIF playback | `swiftly run swift run --package-path Examples/gifcat gifcat nyan.gif` |
-| [gifeditor](Examples/gifeditor) | Full terminal GIF editor: canvas, layers, timeline, import/export | `swiftly run swift run --package-path Examples/gifeditor gifeditor` |
-| [SwiftUIExample](Examples/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via `SwiftUIHost` | Open `Examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
-| [WebHostExample](Examples/WebHostExample) | Smallest `SwiftTUI` convenience app with terminal and `--web` launch | `swiftly run swift run --package-path Examples/WebHostExample WebHostExample --web` |
-| [WebExample](Examples/WebExample) | Static browser/WASI deployment with `@swifttui/web` + `@swifttui/build` | `bun --cwd Examples/WebExample dev` |
+| [minimal](https://github.com/SwiftTUI/swift-tui-examples/tree/main/minimal) | Lowest-level snapshot rendering | `swiftly run swift run --package-path ../swift-tui-examples/minimal minimal` |
+| [argparse](https://github.com/SwiftTUI/swift-tui-examples/tree/main/argparse) | `SwiftTUICommand`, consumer + framework flags, completions | `swiftly run swift run --package-path ../swift-tui-examples/argparse argparse-demo --help` |
+| [gallery](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gallery) | Component workbench: tabs, controls, input, images, charts, animation | `swiftly run swift run --package-path ../swift-tui-examples/gallery gallery-demo` |
+| [layouts](https://github.com/SwiftTUI/swift-tui-examples/tree/main/layouts) | Layout catalog: stacks, frames, geometry, scrolling, overlays, shapes | `swiftly run swift run --package-path ../swift-tui-examples/layouts layouts-demo` |
+| [LayoutsSwiftUI](https://github.com/SwiftTUI/swift-tui-examples/tree/main/LayoutsSwiftUI) | Native SwiftUI layout catalog beside the embedded SwiftTUI one | `swiftly run swift run --package-path ../swift-tui-examples/LayoutsSwiftUI layouts-swiftui-demo` |
+| [file-previewer](https://github.com/SwiftTUI/swift-tui-examples/tree/main/file-previewer) | Miller-column browser with embedded terminal previews | `swiftly run swift run --package-path ../swift-tui-examples/file-previewer FilePreviewerApp` |
+| [terminal-workspace](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace) | Zellij-style tabs, split panes, command palette, persisted layout | `swiftly run swift run --package-path ../swift-tui-examples/terminal-workspace terminal-workspace` |
+| [gitviz](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gitviz) | Non-interactive `SwiftTUICharts` command suite over git history | `swiftly run swift run --package-path ../swift-tui-examples/gitviz gitviz dashboard --path .` |
+| [gifcat](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifcat) | Terminal-native animated GIF playback | `swiftly run swift run --package-path ../swift-tui-examples/gifcat gifcat nyan.gif` |
+| [gifeditor](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifeditor) | Full terminal GIF editor: canvas, layers, timeline, import/export | `swiftly run swift run --package-path ../swift-tui-examples/gifeditor gifeditor` |
+| [SwiftUIExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via `SwiftUIHost` | Open `../swift-tui-examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
+| [WebHostExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebHostExample) | Smallest `SwiftTUI` convenience app with terminal and `--web` launch | `swiftly run swift run --package-path ../swift-tui-examples/WebHostExample WebHostExample --web` |
+| [WebExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebExample) | Static browser/WASI deployment with `@swifttui/web` + `@swifttui/build` | `bun --cwd ../swift-tui-examples/WebExample dev` |
 
 ## Documentation
 

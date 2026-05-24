@@ -35,7 +35,7 @@ hooks = [
     name = "forbid unchecked concurrency and @safe escape hatches",
     entry = "./Scripts/check_concurrency_safety_policies.sh",
     language = "system",
-    files = '^(Package\.swift|(Sources|Tests|Runners|Examples)/.*\.swift)$',
+    files = '^(Package\.swift|(Sources|Tests|Runners)/.*\.swift)$',
     pass_filenames = false
   },
   {
@@ -43,7 +43,7 @@ hooks = [
     name = "forbid bare Thread.isMainThread without thread-ismain-ok justification",
     entry = "./Scripts/check_main_thread_usage.sh",
     language = "system",
-    files = '^((Sources|Tests|Runners|Examples|GUI)/.*\.swift|Scripts/check_main_thread_usage\.sh)$',
+    files = '^((Sources|Tests|Runners|GUI)/.*\.swift|Scripts/check_main_thread_usage\.sh)$',
     pass_filenames = false
   },
 ]
