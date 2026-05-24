@@ -1,6 +1,8 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
 package(default_visibility = ["//visibility:public"])
 
-native.sh_test(
+sh_test(
     name = "native_gate",
     srcs = ["Tools/bazel/native_gate.sh"],
     tags = [
