@@ -64,10 +64,10 @@ not create an independent roadmap.
 
 - [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) - repository ownership, release
   boundaries, and public documentation invariants.
-- [plans/2026-05-22-001-github-organization-split-plan.md](plans/2026-05-22-001-github-organization-split-plan.md) -
-  execution plan for splitting SwiftTUI across GitHub organization repositories
-  while preserving the one-package terminal/WebHost consumer path and coherent
-  DocC generation.
+
+Organization-level execution plans live in the `swift-tui-org` root
+`docs/plans/` directory so they can span child repositories without becoming
+framework package documentation.
 
 ## API reference
 
