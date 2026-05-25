@@ -8,13 +8,19 @@ struct CommittedFramePresentationResult {
 extension RunLoop {
   func presentationDamage(
     for artifacts: FrameArtifacts,
-    convergence: FocusSyncConvergenceState
+    convergence _: FocusSyncConvergenceState
   ) -> PresentationDamage? {
-    if convergence.rerenderedForFocusSync {
-      nil
-    } else {
-      artifacts.presentationDamage
-    }
+    // Async acquisition may commit renderer artifacts that are later withheld
+    // from the presentation stream. Frontends consume damage relative to the
+    // last surface they actually received, so derive that contract here.
+    RasterSurfaceDamageDiff.diff(
+      previous: previousPresentedRasterSurface,
+      current: artifacts.rasterSurface
+    )
+  }
+
+  func recordPresentedRasterSurface(_ surface: RasterSurface) {
+    previousPresentedRasterSurface = surface
   }
 
   func presentCommittedFrameWithDiagnosticsTiming(

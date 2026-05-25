@@ -114,6 +114,7 @@ extension RunLoop {
       damage: presentationDamage(for: artifacts, convergence: convergence),
       hasDiagnosticsLogger: hasDiagnosticsLogger
     )
+    recordPresentedRasterSurface(artifacts.rasterSurface)
     lifecycleCoordinator.applyCommittedFrame(
       plan: artifacts.commitPlan,
       currentLifecycleRegistry: localLifecycleRegistry,
