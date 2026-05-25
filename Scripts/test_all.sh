@@ -741,6 +741,12 @@ run_step \
   "Scripts/check_layout_work_stack_guardrails.sh" \
   Scripts/check_layout_work_stack_guardrails.sh
 
+run_step \
+  "Check Foundation-free layers (transitive)" \
+  "$repo_root" \
+  "Scripts/check_foundation_free_layers.sh" \
+  Scripts/check_foundation_free_layers.sh
+
 run_function_step \
   "Run SwiftTUICore tests" \
   "$(swift_command_text test --filter SwiftTUICoreTests)" \

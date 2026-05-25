@@ -17,9 +17,9 @@ hooks = [
   {
     id = "no-foundation-in-library-products",
     name = "forbid Foundation imports in library layers",
-    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/SwiftTUICore Sources/SwiftTUIViews Sources/SwiftTUI; then echo "Foundation imports are forbidden in the SwiftTUICore, SwiftTUIViews, and SwiftTUI library layers."; exit 1; fi'""",
+    entry = """zsh -lc 'if rg -n --glob "*.swift" "^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*(public[[:space:]]+)?(package[[:space:]]+)?import[[:space:]]+((struct|class|enum|protocol|typealias|func|var|let)[[:space:]]+)?Foundation([[:space:]]*$|[.])" Sources/SwiftTUICore Sources/SwiftTUIViews Sources/SwiftTUI Vendor/swift-figlet/Sources/EmbeddedFonts Vendor/swift-figlet/Sources/SwiftFiglet; then echo "Foundation imports are forbidden in the SwiftTUICore, SwiftTUIViews, and SwiftTUI library layers and in the vendored EmbeddedFonts/SwiftFiglet runtime sources they re-export. This also blocks @_implementationOnly / @_exported / @preconcurrency imports and Foundation.* submodule imports. (The offline Vendor/swift-figlet/Scripts generator may use Foundation.)"; exit 1; fi'""",
     language = "system",
-    files = '^Sources/(SwiftTUICore|SwiftTUIViews|SwiftTUI)/.*\.swift$',
+    files = '^(Sources/(SwiftTUICore|SwiftTUIViews|SwiftTUI)|Vendor/swift-figlet/Sources/(EmbeddedFonts|SwiftFiglet))/.*\.swift$',
     pass_filenames = false
   },
   {
@@ -27,7 +27,7 @@ hooks = [
     name = "enforce public surface and documentation guardrails",
     entry = "./Scripts/check_public_surface_policies.sh",
     language = "system",
-    files = '^(Package\.swift|README\.md|AGENTS\.md|docs/(ARCHITECTURE|PUBLIC-API)\.md|Sources/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUIRuntime/SwiftTUIRuntime\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
+    files = '^(Package\.swift|README\.md|AGENTS\.md|docs/(ARCHITECTURE|PUBLIC-API)\.md|Sources/.*\.swift|Platforms/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUIRuntime/SwiftTUIRuntime\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
   },
   {
@@ -35,7 +35,7 @@ hooks = [
     name = "forbid unchecked concurrency and @safe escape hatches",
     entry = "./Scripts/check_concurrency_safety_policies.sh",
     language = "system",
-    files = '^(Package\.swift|(Sources|Tests|Runners)/.*\.swift)$',
+    files = '^(Package\.swift|(Sources|Tests|Platforms)/.*\.swift)$',
     pass_filenames = false
   },
   {
@@ -43,7 +43,7 @@ hooks = [
     name = "forbid bare Thread.isMainThread without thread-ismain-ok justification",
     entry = "./Scripts/check_main_thread_usage.sh",
     language = "system",
-    files = '^((Sources|Tests|Runners|GUI)/.*\.swift|Scripts/check_main_thread_usage\.sh)$',
+    files = '^((Sources|Tests|Platforms)/.*\.swift|Scripts/check_main_thread_usage\.sh)$',
     pass_filenames = false
   },
 ]
