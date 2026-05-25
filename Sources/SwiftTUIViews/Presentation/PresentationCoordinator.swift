@@ -304,7 +304,12 @@ package func composePresentationPortalTree(
       kind: .view("PresentationPortalRoot"),
       children: [baseNode],
       environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction
+      transactionSnapshot: context.transaction,
+      surfaceComposition: .init(
+        role: .detachedOverlayRoot,
+        stableKey: context.identity.path,
+        invalidationScope: .fullSurfaceDiff
+      )
     )
   }
 
