@@ -165,8 +165,17 @@ CI runs on GitHub Actions. The macOS jobs use the `macos-26` runner, which is
 the macOS support floor; Linux jobs run on native amd64 and arm64 Ubuntu
 runners with a `swiftly`-managed toolchain. An iOS job builds (but does not
 run) the host-compatible products. The browser deployment workflow publishes
-the combined DocC archive. CI jobs also carry workflow-level caps: the Linux
-repo gate is capped at 45 minutes, the macOS repo gate at 30 minutes, the iOS
-build at 15 minutes, the Linux image build at 45 minutes, the Linux image
-manifest publish at 10 minutes, the perf smoke at 20 minutes, and Cloudflare
-Pages deployment at 30 minutes.
+the combined DocC archive.
+
+The default repo-gate workflow skips the slow public API symbol-graph check and
+`Tools/TermUIPerf` package tests. Those run in separate workflows instead:
+`Public API Baseline` is path-filtered to public-surface inputs, and
+`TermUIPerf Tests` runs when the perf package is touched, on schedule, or by
+manual dispatch. The repo-gate matrix summary includes per-lane durations so
+slow checks are visible without opening every job log.
+
+CI jobs also carry workflow-level caps: the Linux repo gate is capped at 45
+minutes, the macOS repo gate at 30 minutes, the iOS build at 15 minutes, the
+Linux image build at 45 minutes, the Linux image manifest publish at 10
+minutes, the perf smoke at 20 minutes, and Cloudflare Pages deployment at 30
+minutes.

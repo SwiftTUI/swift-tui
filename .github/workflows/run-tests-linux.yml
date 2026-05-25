@@ -48,6 +48,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Record lane start
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'LANE_STARTED_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Install Linux test dependencies
         shell: bash
         run: |
@@ -135,6 +141,8 @@ jobs:
         shell: bash
         env:
           STUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
+          STUI_SKIP_PUBLIC_API_BASELINE: "1"
+          STUI_SKIP_TERMUIPERF: "1"
         run: |
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
@@ -148,7 +156,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .ci-results
-          printf '%s|%s\n' "$LANE_ID" "$LANE_RESULT" > ".ci-results/$LANE_ID.result"
+          duration="-"
+          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
+            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
+          fi
+          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
 
       - name: Upload lane result
         if: always()
@@ -187,6 +199,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Record lane start
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'LANE_STARTED_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Install swiftly and Swift toolchain
         shell: bash
@@ -246,6 +264,8 @@ jobs:
         shell: bash
         env:
           STUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
+          STUI_SKIP_PUBLIC_API_BASELINE: "1"
+          STUI_SKIP_TERMUIPERF: "1"
         run: |
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
@@ -259,7 +279,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .ci-results
-          printf '%s|%s\n' "$LANE_ID" "$LANE_RESULT" > ".ci-results/$LANE_ID.result"
+          duration="-"
+          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
+            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
+          fi
+          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
 
       - name: Upload lane result
         if: always()
@@ -279,6 +303,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Record lane start
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'LANE_STARTED_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Select Xcode with Swift 6.3 support
         shell: bash
@@ -323,7 +353,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .ci-results
-          printf '%s|%s\n' "$LANE_ID" "$LANE_RESULT" > ".ci-results/$LANE_ID.result"
+          duration="-"
+          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
+            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
+          fi
+          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
 
       - name: Upload lane result
         if: always()
@@ -371,16 +405,16 @@ jobs:
           mkdir -p .ci-results
           expected_file=.ci-results/expected.txt
           cat > "$expected_file" <<'EOF'
-          linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|sh ./Scripts/test_gate.sh --skip-bun-install
+          linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
           EOF
           if [ "$RUN_ARM64" = "true" ]; then
             cat >> "$expected_file" <<'EOF'
-          linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|sh ./Scripts/test_gate.sh --skip-bun-install
+          linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
           EOF
           fi
           if [ "$RUN_MACOS" = "true" ]; then
             cat >> "$expected_file" <<'EOF'
-          macos|macOS repo gate|macOS|-|macos-26|sh ./Scripts/test_gate.sh --skip-bun-install
+          macos|macOS repo gate|macOS|-|macos-26|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
           EOF
           fi
           if [ "$RUN_IOS" = "true" ]; then

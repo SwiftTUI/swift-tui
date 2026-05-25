@@ -212,6 +212,10 @@ printing the captured log and failing the gate.
 
 For the curated repo gate, use Scripts/test_gate.sh. That runner keeps the same
 post-split non-example surface and writes a shorter test-gate log name.
+
+Set STUI_SKIP_PUBLIC_API_BASELINE=1 when the public API baseline is covered by
+the separate CI workflow. Set STUI_SKIP_TERMUIPERF=1 when Tools/TermUIPerf is
+covered by its path-filtered or scheduled workflow.
 EOF
 }
 
@@ -818,10 +822,16 @@ else
     run_swift test --filter SwiftUIHostTests
 fi
 
-run_function_step \
-  "Run Tools/TermUIPerf tests" \
-  "$(swift_command_text test --package-path Tools/TermUIPerf)" \
-  run_swift test --package-path Tools/TermUIPerf
+if [ "${STUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
+  skip_step \
+    "Run Tools/TermUIPerf tests" \
+    "covered by the separate TermUIPerf workflow"
+else
+  run_function_step \
+    "Run Tools/TermUIPerf tests" \
+    "$(swift_command_text test --package-path Tools/TermUIPerf)" \
+    run_swift test --package-path Tools/TermUIPerf
+fi
 
 if [ "$any_failed" -eq 0 ]; then
   print_summary

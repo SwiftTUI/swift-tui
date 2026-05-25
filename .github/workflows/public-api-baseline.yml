@@ -1,0 +1,142 @@
+name: Public API Baseline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/public-api-baseline.yml"
+      - ".swift-version"
+      - "Package.resolved"
+      - "Package.swift"
+      - "Platforms/**"
+      - "Scripts/generate_public_api_inventory.sh"
+      - "Scripts/lib/generate_public_api_inventory.ts"
+      - "docs/.public-api-baseline.txt"
+      - "docs/PUBLIC_API_BASELINE.md"
+      - "docs/public_api_overrides.yml"
+      - "Sources/**"
+  pull_request:
+    paths:
+      - ".github/workflows/public-api-baseline.yml"
+      - ".swift-version"
+      - "Package.resolved"
+      - "Package.swift"
+      - "Platforms/**"
+      - "Scripts/generate_public_api_inventory.sh"
+      - "Scripts/lib/generate_public_api_inventory.ts"
+      - "docs/.public-api-baseline.txt"
+      - "docs/PUBLIC_API_BASELINE.md"
+      - "docs/public_api_overrides.yml"
+      - "Sources/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-api-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUN_VERSION: "1.3.13"
+  SWIFTLY_VERSION: "1.1.1"
+
+jobs:
+  public-api-baseline:
+    name: Public API baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Linux policy dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            libcurl4-openssl-dev \
+            unzip
+
+      - name: Cache Swiftly toolchain
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.local/share/swiftly
+            ~/.local/bin/swiftly
+          key: ${{ runner.os }}-swiftly-${{ env.SWIFTLY_VERSION }}-${{ hashFiles('.swift-version') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftly-${{ env.SWIFTLY_VERSION }}-
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SWIFTLY_HOME_DIR="$HOME/.local/share/swiftly"
+          export SWIFTLY_BIN_DIR="$HOME/.local/bin"
+          mkdir -p "$SWIFTLY_BIN_DIR"
+          export PATH="$SWIFTLY_BIN_DIR:$PATH"
+
+          if ! command -v swiftly >/dev/null 2>&1 || [ ! -f "${SWIFTLY_HOME_DIR}/env.sh" ]; then
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+            cd "$tmpdir"
+            swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
+            curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
+            tar -zxf "$swiftly_archive"
+            ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+          fi
+
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.swift-version")"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
+          echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR" >> "$GITHUB_ENV"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-public-api-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-public-api-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-public-api-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-public-api-
+            ${{ runner.os }}-bun-
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Check public API baseline
+        shell: bash
+        env:
+          STUI_PUBLIC_API_SWIFT_JOBS: "4"
+        run: |
+          set -euo pipefail
+          Scripts/generate_public_api_inventory.sh --check
