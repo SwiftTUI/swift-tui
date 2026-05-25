@@ -79,8 +79,13 @@ extension RunLoop {
       self.hoveredPointerRouteID = nil
     }
 
-    let shouldApplyInitialDefaultFocus =
+    let previousModalFocusScopePath = currentModalFocusScopePath()
+    let nextModalFocusScopePath = activeModalFocusScopePath(
+      in: renderedArtifacts.semanticSnapshot.focusRegions
+    )
+    let shouldApplyDefaultFocus =
       focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
+      || (nextModalFocusScopePath != nil && nextModalFocusScopePath != previousModalFocusScopePath)
     let focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
     let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
@@ -89,7 +94,7 @@ extension RunLoop {
     let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
     let defaultFocusRequest = localDefaultFocusRegistry.desiredFocusRequest(
       focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
-      shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyInitialDefaultFocus
+      shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
     )
     let appliedDefaultFocusRequest = applyDesiredFocusRequest(defaultFocusRequest)
     let focusStateChanged = localFocusBindingRegistry.sync(
@@ -146,5 +151,29 @@ extension RunLoop {
     case .focus(let identity):
       return focusTracker.setFocus(to: identity)
     }
+  }
+
+  private func currentModalFocusScopePath() -> [Identity]? {
+    guard
+      let focusedIdentity = focusTracker.currentFocusIdentity,
+      let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity })
+    else {
+      return nil
+    }
+    return focusedRegion.modalFocusScopePath
+  }
+
+  private func activeModalFocusScopePath(
+    in regions: [FocusRegion]
+  ) -> [Identity]? {
+    guard
+      let firstRegion = regions.first,
+      let firstModalFocusScopePath = firstRegion.modalFocusScopePath
+    else {
+      return nil
+    }
+    return regions.allSatisfy { $0.modalFocusScopePath == firstModalFocusScopePath }
+      ? firstModalFocusScopePath
+      : nil
   }
 }
