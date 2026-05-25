@@ -65,6 +65,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []
   package var cancelledRenderCount = 0
   package var nextSemanticHostFrameSequence: UInt64 = 0
+  package var previousPresentedRasterSurface: RasterSurface?
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
 
