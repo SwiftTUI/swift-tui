@@ -62,8 +62,25 @@ private func configureNoSigPipe(_ fd: Int32) {
 }
 
 private func ttyName(_ fd: Int32) -> String? {
-  guard let cString = unsafe ttyname(fd) else {
+  var buffer = [CChar](repeating: 0, count: 4096)
+  let result = unsafe buffer.withUnsafeMutableBufferPointer { storage in
+    guard let baseAddress = storage.baseAddress else {
+      return ERANGE
+    }
+
+    return unsafe ttyname_r(fd, baseAddress, storage.count)
+  }
+
+  guard result == 0 else {
     return nil
   }
-  return unsafe String(cString: cString)
+
+  return unsafe buffer.withUnsafeBufferPointer { storage in
+    guard let baseAddress = storage.baseAddress else {
+      return nil
+    }
+
+    let path = unsafe String(cString: baseAddress)
+    return path.isEmpty ? nil : path
+  }
 }
