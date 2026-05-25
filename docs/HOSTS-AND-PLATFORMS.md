@@ -72,6 +72,23 @@ flowchart LR
 serializes the `web-surface` v2 wire frame for the browser. Each conforms to
 the host-frame surface protocols rather than reaching into the renderer.
 
+### Shared Raster Damage Contract
+
+All raster frontends consume the same damage contract: `RasterSurface` plus
+optional `PresentationDamage`.
+
+- `nil` damage means full repaint.
+- non-`nil` empty damage means no visible raster cells changed.
+- non-`nil` row/range damage is relative to the previous `RasterSurface`
+  actually presented by the same runtime/frontend pair.
+
+`RunLoop` derives this host-facing value from the frontend's presented raster
+history instead of forwarding private retained-layout invalidation or stale
+renderer artifact damage. Terminal, WASI/browser, localhost WebHost, and
+host-managed SwiftUI paths must not reinterpret retained-layout invalidation as
+frontend damage. If stale cells appear after this contract is satisfied, the
+bug belongs to that frontend's damage consumer.
+
 ## The terminal host
 
 `TerminalHost` is the POSIX terminal host.

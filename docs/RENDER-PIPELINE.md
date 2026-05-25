@@ -49,17 +49,39 @@ All seven products are gathered on `FrameArtifacts`. They are distinct types on
 purpose: each phase boundary is a typed contract, so a phase cannot silently
 consume a half-built product from two phases back.
 
-Presentation damage has two sources. Retained-layout damage is computed before
-rasterization and may let the rasterizer reuse unchanged rows. When that proof
-is unavailable, the frame tail compares the previous committed `RasterSurface`
-with the current `RasterSurface` after rasterization and emits host-facing
-row/range damage. The post-raster diff is the browser and native host fallback
-for broad state invalidations such as task-driven root updates.
-
 Semantics is computed from the placed tree alongside draw, and the
 `SemanticSnapshot` it produces — including the flat `accessibilityNodes`
 array — flows through to commit so every host can present it. See
 [ACCESSIBILITY.md](ACCESSIBILITY.md).
+
+## Host-Facing Raster Damage
+
+The renderer has two damage boundaries:
+
+- **Raster reuse hints** are private frame-tail inputs. They may let the
+  rasterizer reuse rows from the previous renderer-committed `RasterSurface`
+  while repainting a subset of rows. They are not frontend damage.
+- **Host-facing raster damage** is the public presentation contract. It is
+  derived from the previous `RasterSurface` actually presented to that frontend
+  and the current committed `RasterSurface` after rasterization.
+
+Renderer artifacts may also carry `FrameArtifacts.presentationDamage`. That
+value is relative to renderer-committed raster history, so `RunLoop` re-derives
+host-facing damage before presentation. Skipped or cancelled async artifacts
+therefore cannot leak stale retained renderer history to terminal, web, or
+host-managed frontends.
+
+Presentation surfaces, WebHost/web-surface canvas rendering, and hosted raster
+surfaces consume only host-facing raster damage. JSON frame output is rendered
+by `JSONFrameRenderer` and does not carry `PresentationDamage`. A non-`nil`
+damage value must cover every changed cell between the two committed raster
+surfaces. `nil` means the previous surface is unavailable or incompatible and
+consumers must repaint the full surface.
+
+Detached overlays, presentation portals, and isolated compositing groups mark
+shared `SurfaceCompositionMetadata`. When their topology changes, retained
+raster reuse is suppressed and host-facing damage is still derived from the
+actual raster diff.
 
 ## Raster Compositing
 
