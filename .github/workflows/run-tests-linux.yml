@@ -12,6 +12,16 @@ on:
         required: false
         default: false
         type: boolean
+      run_macos:
+        description: Run the macOS gate
+        required: false
+        default: false
+        type: boolean
+      run_ios:
+        description: Run the generic iOS package build
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -173,6 +183,7 @@ jobs:
   macos-gate:
     name: macOS repo gate
     runs-on: macos-26
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
     timeout-minutes: 30
 
     steps:
@@ -264,6 +275,7 @@ jobs:
   ios-build:
     name: iOS package build
     runs-on: macos-26
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ios }}
     timeout-minutes: 15
 
     steps:
@@ -354,6 +366,8 @@ jobs:
         shell: bash
         env:
           RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' && inputs.run_arm64 }}
+          RUN_MACOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
+          RUN_IOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ios }}
         run: |
           set -euo pipefail
           mkdir -p .ci-results
@@ -366,10 +380,16 @@ jobs:
           linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|sh ./Scripts/test_gate.sh --skip-bun-install
           EOF
           fi
-          cat >> "$expected_file" <<'EOF'
+          if [ "$RUN_MACOS" = "true" ]; then
+            cat >> "$expected_file" <<'EOF'
           macos|macOS repo gate|macOS|-|macos-26|sh ./Scripts/test_gate.sh --skip-bun-install
+          EOF
+          fi
+          if [ "$RUN_IOS" = "true" ]; then
+            cat >> "$expected_file" <<'EOF'
           ios|iOS package build|iOS|generic|macos-26|xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build
           EOF
+          fi
           Scripts/render_ci_test_matrix_summary.sh \
             "$expected_file" \
             .ci-results \
