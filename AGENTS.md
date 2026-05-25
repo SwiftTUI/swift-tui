@@ -8,7 +8,7 @@ repository. Keep this file concise. The architecture documentation in
 
 ```bash
 bun run test                                       # Repo gate: shared suite + policy checks
-bun run test:all                                   # Exhaustive test surface, including all examples
+bun run test:all                                   # Exhaustive checked-in primary-repo test surface
 swiftly run swift build                            # Build all root-package targets
 swiftly run swift test                             # Run root-package tests
 swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests             # One test suite
@@ -17,10 +17,11 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/     # 
 ```
 
 Always run `bun run test` after changes that touch shared code, platform
-products, examples, or repo tooling, and confirm it passes before considering
-work complete. Do not run repo-local builds or tests with bare `swift` or
-`xcrun swift` — use `swiftly run swift ...` so runs match the pinned toolchain.
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full toolchain, gate, and
+products, or repo tooling, and confirm it passes before considering work
+complete. Example-package coverage lives in `SwiftTUI/swift-tui-examples`.
+Do not run repo-local builds or tests with bare `swift` or `xcrun swift` — use
+`swiftly run swift ...` so runs match the pinned toolchain. See
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full toolchain, gate, and
 release story.
 
 ## Architecture (one-page summary)

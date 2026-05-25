@@ -70,8 +70,8 @@ runtime.
 | Swift 6.3.1   | Installed and selected through Swiftly                      |
 | bun           | Runs the repo gate scripts                                  |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
-| binaryen      | Present for sibling WebExample diagnostics                  |
-| brotli        | Present for sibling WebExample diagnostics                  |
+| binaryen      | Provides `wasm-opt` for local primary-repo Wasm diagnostics |
+| brotli        | Available for local primary-repo web artifact checks        |
 | ripgrep       | Used by repo tests; matches the GH Actions runner setup     |
 | git, curl, unzip, ca-certificates, jq | General build prerequisites           |
 
@@ -100,7 +100,6 @@ toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 ./Scripts/linux.sh test           # Linux repo gate (Scripts/test_gate.sh)
 ./Scripts/linux.sh root-test      # raw root-package swiftly run swift test
 ./Scripts/linux.sh cli-test       # focused SwiftTUICLI tests from the root package
-./Scripts/linux.sh examples       # Build Linux example packages
 ./Scripts/linux.sh examples       # Print the extracted examples workflow location
 ./Scripts/linux.sh web            # Print the extracted browser workflow location
 ./Scripts/linux.sh full           # repo gate
@@ -275,10 +274,9 @@ LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh full
 `linux.sh` keeps lazy installers for Swiftly, bun, and the Wasm SDK
 (`ensure_swiftly`, `ensure_bun`, `ensure_wasm_sdk`) specifically so this
 fallback continues to work. The first command that needs Swift will install
-Swiftly and the pinned Swift toolchain; the first `web` build will also be
-slow because it downloads bun, downloads the Wasm SDK, and installs
-binaryen/brotli/etc via apt. Subsequent runs reuse what got installed inside
-the container until `nuke`.
+Swiftly and the pinned Swift toolchain; the first command that needs Bun will
+install Bun and its apt prerequisites. Subsequent runs reuse what got installed
+inside the container until `nuke`.
 
 This path exists for resilience — don't make it the default. Every time it
 runs it re-downloads ~200MB of toolchain.

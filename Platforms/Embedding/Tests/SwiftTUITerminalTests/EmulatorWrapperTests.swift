@@ -116,7 +116,7 @@ struct EmulatorWrapperTests {
 private func captureStandardOutput(
   _ operation: () async -> Void
 ) async -> String {
-  unsafe fflush(stdout)
+  fflush(nil)
 
   let pipe = Pipe()
   let original = dup(STDOUT_FILENO)
@@ -124,7 +124,7 @@ private func captureStandardOutput(
 
   await operation()
 
-  unsafe fflush(stdout)
+  fflush(nil)
   dup2(original, STDOUT_FILENO)
   close(original)
   pipe.fileHandleForWriting.closeFile()
