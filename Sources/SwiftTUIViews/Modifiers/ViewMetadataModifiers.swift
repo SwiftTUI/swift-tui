@@ -300,6 +300,13 @@ package struct DrawEffectModifier: PrimitiveViewModifier {
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.drawEffects.append(effect)
+    if effect == .compositingGroup {
+      node.surfaceComposition = .init(
+        role: .isolatedCompositingGroup,
+        stableKey: node.identity.path,
+        invalidationScope: .compositedBounds
+      )
+    }
     return [node]
   }
 }

@@ -7,6 +7,94 @@ import Testing
 @MainActor
 @Suite
 struct PresentationSurfaceTests {
+  @Test("presentation overlays carry explicit surface composition metadata")
+  func presentationOverlaysCarrySurfaceCompositionMetadata() throws {
+    let contentRootIdentity = testIdentity("SurfaceCompositionRoot")
+    let portalIdentity = presentationPortalIdentity(for: contentRootIdentity)
+    let artifacts = DefaultRenderer().render(
+      Text("Workspace")
+        .sheet("Command palette", isPresented: .constant(true)) {
+          Text("Filter commands")
+        },
+      context: .init(identity: contentRootIdentity),
+      proposal: .init(width: 40, height: 10)
+    )
+
+    let entries = SurfaceTopologySignature(placedRoot: artifacts.placedTree).entries
+    #expect(
+      entries.contains {
+        $0.role == .stackingContext
+          && $0.stableKey == "overlay-stack:\(portalIdentity.path)"
+          && $0.invalidationScope == .fullSurfaceDiff
+      }
+    )
+    #expect(
+      entries.contains {
+        $0.role == .detachedOverlayHost
+          && $0.stableKey == "overlay-host:\(portalIdentity.path)/PortalHost/overlays"
+          && $0.invalidationScope == .fullSurfaceDiff
+      }
+    )
+    #expect(
+      entries.contains {
+        $0.role == .detachedOverlayEntry
+          && $0.invalidationScope == .fullSurfaceDiff
+      }
+    )
+    #expect(
+      entries.contains {
+        $0.role == .detachedOverlayEntry
+          && $0.stableKey?.isEmpty == false
+      }
+    )
+
+    let portalRootIdentity = testIdentity("SurfaceCompositionPortalRoot")
+    let portalRoot = composePresentationPortalTree(
+      baseNode: ResolvedNode(
+        identity: testIdentity("SurfaceCompositionContent"),
+        kind: .view("Content")
+      ),
+      portalState: PresentationPortalState().makeDraft(),
+      in: .init(identity: portalRootIdentity)
+    )
+    let portalRootTopology = SurfaceTopologySignature(
+      placedRoot: PlacedNode(
+        identity: portalRoot.identity,
+        kind: portalRoot.kind,
+        bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+        surfaceComposition: portalRoot.surfaceComposition
+      )
+    ).entries
+
+    #expect(
+      portalRootTopology.contains {
+        $0.role == .detachedOverlayRoot
+          && $0.stableKey == portalRootIdentity.path
+          && $0.invalidationScope == .fullSurfaceDiff
+      }
+    )
+  }
+
+  @Test("compositing groups carry explicit surface composition metadata")
+  func compositingGroupsCarrySurfaceCompositionMetadata() {
+    let rootIdentity = testIdentity("SurfaceCompositionCompositingGroupRoot")
+    let artifacts = DefaultRenderer().render(
+      Text("Layer")
+        .compositingGroup(),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 20, height: 4)
+    )
+
+    let entries = SurfaceTopologySignature(placedRoot: artifacts.placedTree).entries
+    #expect(
+      entries.contains {
+        $0.role == .isolatedCompositingGroup
+          && $0.stableKey == rootIdentity.path
+          && $0.invalidationScope == .compositedBounds
+      }
+    )
+  }
+
   @Test("alert renders an overlay surface and suppresses background focus")
   func alertRendersAndSuppressesBackgroundFocus() throws {
     let artifacts = DefaultRenderer().render(

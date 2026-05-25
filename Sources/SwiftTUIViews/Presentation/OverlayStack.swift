@@ -74,6 +74,11 @@ package func composeOverlayStackTree(
     environmentSnapshot: hostContext.environment,
     transactionSnapshot: hostContext.transaction,
     layoutBehavior: .overlay(alignment: .topLeading),
+    surfaceComposition: .init(
+      role: .stackingContext,
+      stableKey: "overlay-stack:\(context.identity.path)",
+      invalidationScope: .fullSurfaceDiff
+    ),
     semanticMetadata: stackSemantics
   )
 }
@@ -100,7 +105,12 @@ private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
         children: children,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        layoutBehavior: .overlay(alignment: .topLeading)
+        layoutBehavior: .overlay(alignment: .topLeading),
+        surfaceComposition: .init(
+          role: .detachedOverlayHost,
+          stableKey: "overlay-host:\(context.identity.path)",
+          invalidationScope: .fullSurfaceDiff
+        )
       )
     ]
   }
@@ -120,7 +130,12 @@ private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
         kind: .view(entry.kindName),
         children: [bodyNode],
         environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
+        transactionSnapshot: context.transaction,
+        surfaceComposition: .init(
+          role: .detachedOverlayEntry,
+          stableKey: entry.id,
+          invalidationScope: .fullSurfaceDiff
+        )
       )
     ]
   }
