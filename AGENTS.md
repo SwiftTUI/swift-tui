@@ -107,8 +107,14 @@ Full policy in [docs/PUBLIC-API.md](docs/PUBLIC-API.md#anyview-policy).
 ## Pre-commit Hooks (prek)
 
 - **swift-format** — auto-formats staged `.swift` files.
-- **no-foundation-in-library-products** — blocks `import Foundation` in the
-  Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` layers.
+- **no-foundation-in-library-products** — blocks `import Foundation` (including
+  `@_implementationOnly` / `@_exported` / `@preconcurrency` and `Foundation.*`
+  submodule forms) in the Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and
+  `SwiftTUI` layers and the vendored `EmbeddedFonts`/`SwiftFiglet` runtime they
+  re-export. The repo gate additionally runs `Scripts/check_foundation_free_layers.sh`,
+  which follows package resolution (via `-emit-loaded-module-trace`) to catch
+  Foundation reaching `SwiftTUICore`/`SwiftTUIViews` through any transitive
+  dependency.
 - **public-surface-policies** — enforces the guardrails documented in
   [docs/PUBLIC-API.md](docs/PUBLIC-API.md).
 - **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and

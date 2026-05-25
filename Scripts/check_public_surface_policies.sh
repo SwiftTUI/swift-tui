@@ -158,7 +158,7 @@ while IFS= read -r pattern; do
   if rg -n -P \
     --glob '*.swift' \
     --glob '!Sources/Vendor/**' \
-    -- "$pattern" Sources; then
+    -- "$pattern" Sources Platforms; then
     fail "Unexpected public AnyView-array or node-erasure surface matched $pattern."
   fi
 done <<'EOF'
@@ -176,12 +176,19 @@ public\s+init\s*\([^)]*localTaskRegistry:
 public\s+func\s+render\s*\([^)]*previousLifecycleState:
 EOF
 
+# Detect stored type-erasure members (AnyView and AnyScene) so each carries an
+# `AnyView policy:` justification comment. The alternation covers
+# `[AnyView]`/`[AnyScene]`, bare `AnyView`/`AnyScene`, and closures returning
+# either; the trailing `$` anchor keeps `AnyView` from matching as a prefix of
+# longer identifiers such as `AnyViewStorage`/`AnyViewModifier`.
+# Known limitation: this is a single-line detector. A stored member whose type
+# wraps onto the line after the colon is not matched.
 stored_anyview_matches=$(
   rg -n -P \
     --glob '*.swift' \
     --glob '!Sources/Vendor/**' \
-    -- '^\s*(public|internal|package|private|fileprivate)?\s*(var|let)\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*(\[\s*AnyView\s*\]|AnyView\??|\([^)]*\)\s*->\s*AnyView)\s*(=\s*.+)?$' \
-    Sources || true
+    -- '^\s*(public|internal|package|private|fileprivate)?\s*(var|let)\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*(\[\s*Any(View|Scene)\s*\]|Any(View|Scene)\??|\([^)]*\)\s*->\s*Any(View|Scene))\s*(=\s*.+)?$' \
+    Sources Platforms || true
 )
 
 if [ -n "$stored_anyview_matches" ]; then
@@ -203,7 +210,7 @@ fi
 
 while IFS= read -r declaration; do
   [ -z "$declaration" ] && continue
-  if rg -n --fixed-strings --quiet -- "$declaration" Sources; then
+  if rg -n --fixed-strings --quiet -- "$declaration" Sources Platforms; then
     fail "Unexpected public API seam declaration found: $declaration."
   fi
 done <<'EOF'
@@ -225,7 +232,7 @@ EOF
 
 while IFS= read -r symbol; do
   [ -z "$symbol" ] && continue
-  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$symbol" Sources; then
+  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$symbol" Sources Platforms; then
     fail "Retired modifier-wrapper seam reappeared in source: $symbol."
   fi
 done <<'EOF'
@@ -238,7 +245,7 @@ EOF
 
 while IFS= read -r symbol; do
   [ -z "$symbol" ] && continue
-  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$symbol" Sources; then
+  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$symbol" Sources Platforms; then
     fail "Unexpected runtime compatibility factory remains in source: $symbol."
   fi
 done <<'EOF'
@@ -248,7 +255,7 @@ EOF
 
 while IFS= read -r token; do
   [ -z "$token" ] && continue
-  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$token" Sources; then
+  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$token" Sources Platforms; then
     fail "Retired legacy identifier surface reappeared in source: $token."
   fi
 done <<'EOF'
