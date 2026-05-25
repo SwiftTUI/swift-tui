@@ -58,10 +58,11 @@ struct FrameTailInlineStageRenderer: Sendable {
     // draw, raster, and commit consumers. The retained layout baseline remains
     // `layout.baselinePlaced` and is the only placed tree stored for future
     // retained placement.
-    let presentationDamage = FrameTailPresentationDamageResolver.resolve(
+    let rasterReusePlan = FrameTailPresentationDamageResolver.resolve(
       rootIdentity: input.rootIdentity,
       placed: placed,
-      retainedLayout: input.retained.retainedLayout
+      retainedLayout: input.retained.retainedLayout,
+      previousSurfaceTopology: input.retained.previousSurfaceTopology
     )
     let semantics = renderSemantics(
       placed: placed,
@@ -74,7 +75,7 @@ struct FrameTailInlineStageRenderer: Sendable {
     let raster = rasterizeDrawTree(
       input,
       draw: draw.draw,
-      presentationDamage: presentationDamage,
+      rasterReuseDamage: rasterReusePlan.damage,
       clock: clock,
       beforeRaster: beforeRaster
     )
@@ -132,7 +133,7 @@ struct FrameTailInlineStageRenderer: Sendable {
   private func rasterizeDrawTree(
     _ input: FrameTailInput,
     draw: DrawNode,
-    presentationDamage: PresentationDamage?,
+    rasterReuseDamage: PresentationDamage?,
     clock: ContinuousClock?,
     beforeRaster: (@Sendable () -> Void)?
   ) -> FrameTailRasterOutput {
@@ -143,15 +144,13 @@ struct FrameTailInlineStageRenderer: Sendable {
         draw,
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
         previousSurface: previousSurface,
-        damage: presentationDamage
+        damage: rasterReuseDamage
       )
     }
-    let finalPresentationDamage =
-      rasterized.presentationDamage
-      ?? RasterSurfaceDamageDiff.diff(
-        previous: previousSurface,
-        current: rasterized.surface
-      )
+    let finalPresentationDamage = RasterSurfaceDamageDiff.diff(
+      previous: previousSurface,
+      current: rasterized.surface
+    )
     return .init(
       surface: rasterized.surface,
       drawnIdentities: rasterized.visibleIdentities,

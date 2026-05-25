@@ -13,7 +13,8 @@
 /// - Decorated/baseline-sensitive projection: ``placedTree``. A current frame
 ///   may commit an animation-decorated placed tree, but retained-layout
 ///   baselines must store the canonical placement product.
-/// - Advisory hints: ``presentationDamage`` and ``drawnIdentities``.
+/// - Host-facing raster damage: ``presentationDamage``.
+/// - Advisory visibility signals: ``drawnIdentities``.
 /// - Side-effect plan: ``commitPlan``.
 /// - Diagnostics: ``diagnostics``.
 public struct FrameArtifacts: Equatable, Sendable {
@@ -23,11 +24,14 @@ public struct FrameArtifacts: Equatable, Sendable {
   public var semanticSnapshot: SemanticSnapshot
   public var drawTree: DrawNode
   public var rasterSurface: RasterSurface
-  /// Optional retained-frame presentation damage.
+  /// Optional host-facing raster damage for this committed frame.
   ///
-  /// A non-`nil` value is an advisory hint for presentation surfaces that retain
-  /// the previous committed frame and can redraw only changed rows or ranges.
-  /// A `nil` value means the frame must be treated as a full repaint.
+  /// A non-`nil` value must describe the actual changed raster rows/ranges
+  /// between the previous committed `RasterSurface` and this frame's
+  /// `rasterSurface`. A `nil` value means the previous committed raster surface
+  /// is incompatible or unavailable, so consumers must repaint the full surface.
+  /// Private retained-layout reuse hints must not be exposed through this field
+  /// unless they have been proven to cover the actual raster diff.
   public var presentationDamage: PresentationDamage?
   /// Identities whose ``DrawNode`` had a non-empty visible rect after
   /// all ancestor clip bounds were applied during rasterization.

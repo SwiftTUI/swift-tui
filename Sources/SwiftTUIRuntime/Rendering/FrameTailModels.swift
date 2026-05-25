@@ -7,8 +7,10 @@ import Synchronization
 struct FrameTailRetainedInput {
   /// Previous committed baseline layout products for retained measure/place.
   var retainedLayout: RetainedLayoutSession
-  /// Previous committed raster surface used only for presentation damage.
+  /// Previous committed raster surface used for actual raster damage.
   var previousRasterSurface: RasterSurface?
+  /// Previous committed effective visual surface topology.
+  var previousSurfaceTopology: SurfaceTopologySignature?
 }
 
 /// Worker-safe input for measure/place through raster work.

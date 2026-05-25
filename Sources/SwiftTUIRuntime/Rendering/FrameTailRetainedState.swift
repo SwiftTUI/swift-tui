@@ -10,14 +10,15 @@ import Synchronization
 ///
 ///  - a `RetainedFrameIndex` over the baseline (pre-overlay) layout products,
 ///    for retained measurement and placement, and
-///  - the previous committed raster surface, used only for presentation-damage
-///    comparison.
+///  - the previous committed raster surface and visual surface topology, used
+///    to derive actual damage and decide whether raster reuse hints are safe.
 ///
 /// It never stores or previews an in-flight candidate frame.
 final class FrameTailRetainedState: Sendable {
   private struct State: Sendable {
     var previousFrameIndex: RetainedFrameIndex?
     var previousRasterSurface: RasterSurface?
+    var previousSurfaceTopology: SurfaceTopologySignature?
   }
 
   private let state = Mutex(State())
@@ -27,14 +28,15 @@ final class FrameTailRetainedState: Sendable {
   ) -> FrameTailRetainedInput {
     // Retained input is previous committed-frame state only: baseline layout
     // products for retained measurement/placement, plus the previous committed
-    // raster surface for presentation damage. It never previews a candidate.
+    // raster surface/topology for damage work. It never previews a candidate.
     state.withLock { state in
       .init(
         retainedLayout: RetainedLayoutSession(
           previousFrameIndex: state.previousFrameIndex,
           invalidatedIdentities: invalidatedIdentities
         ),
-        previousRasterSurface: state.previousRasterSurface
+        previousRasterSurface: state.previousRasterSurface,
+        previousSurfaceTopology: state.previousSurfaceTopology
       )
     }
   }
@@ -61,6 +63,9 @@ final class FrameTailRetainedState: Sendable {
     state.withLock { state in
       state.previousFrameIndex = .init(frame: indexable)
       state.previousRasterSurface = artifacts.rasterSurface
+      state.previousSurfaceTopology = SurfaceTopologySignature(
+        placedRoot: artifacts.placedTree
+      )
     }
   }
 }
