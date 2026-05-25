@@ -1,0 +1,111 @@
+name: TermUIPerf Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/termui-perf-tests.yml"
+      - ".swift-version"
+      - "Package.resolved"
+      - "Package.swift"
+      - "Tools/TermUIPerf/**"
+  pull_request:
+    paths:
+      - ".github/workflows/termui-perf-tests.yml"
+      - ".swift-version"
+      - "Package.resolved"
+      - "Package.swift"
+      - "Tools/TermUIPerf/**"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: termui-perf-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SWIFTLY_VERSION: "1.1.1"
+
+jobs:
+  termui-perf-tests:
+    name: TermUIPerf package tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Linux test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            libcurl4-openssl-dev \
+            unzip
+
+      - name: Cache Swiftly toolchain
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.local/share/swiftly
+            ~/.local/bin/swiftly
+          key: ${{ runner.os }}-swiftly-${{ env.SWIFTLY_VERSION }}-${{ hashFiles('.swift-version') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftly-${{ env.SWIFTLY_VERSION }}-
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SWIFTLY_HOME_DIR="$HOME/.local/share/swiftly"
+          export SWIFTLY_BIN_DIR="$HOME/.local/bin"
+          mkdir -p "$SWIFTLY_BIN_DIR"
+          export PATH="$SWIFTLY_BIN_DIR:$PATH"
+
+          if ! command -v swiftly >/dev/null 2>&1 || [ ! -f "${SWIFTLY_HOME_DIR}/env.sh" ]; then
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+            cd "$tmpdir"
+            swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
+            curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
+            tar -zxf "$swiftly_archive"
+            ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+          fi
+
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.swift-version")"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
+          echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR" >> "$GITHUB_ENV"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-termui-perf-tests-${{ hashFiles('Tools/TermUIPerf/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-termui-perf-tests-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Run TermUIPerf package tests
+        shell: bash
+        env:
+          DISABLE_EXPLICIT_PLATFORMS: "1"
+        run: |
+          set -euo pipefail
+          swiftly run swift test --package-path Tools/TermUIPerf

@@ -25,6 +25,25 @@ run_repo_policy_check() {
   esac
 }
 
+skip_repo_policy_check() {
+  mode=$1
+  title=$2
+  reason=$3
+
+  case "$mode" in
+  direct)
+    echo "[check_repo_policy_phase] SKIP: $title ($reason)"
+    ;;
+  test-all)
+    skip_step "$title" "$reason"
+    ;;
+  *)
+    >&2 echo "Unknown repo policy phase mode: $mode"
+    return 2
+    ;;
+  esac
+}
+
 run_repo_policy_phase() {
   repo_root=$1
   mode=$2
@@ -133,10 +152,17 @@ run_repo_policy_phase() {
     "./Scripts/check_test_sync_policies.sh" \
     ./Scripts/check_test_sync_policies.sh
 
-  run_repo_policy_check \
-    "$mode" \
-    "$repo_root" \
-    "Check public-API baseline" \
-    "./Scripts/generate_public_api_inventory.sh --check" \
-    ./Scripts/generate_public_api_inventory.sh --check
+  if [ "${STUI_SKIP_PUBLIC_API_BASELINE:-0}" = "1" ]; then
+    skip_repo_policy_check \
+      "$mode" \
+      "Check public-API baseline" \
+      "covered by the separate Public API Baseline workflow"
+  else
+    run_repo_policy_check \
+      "$mode" \
+      "$repo_root" \
+      "Check public-API baseline" \
+      "./Scripts/generate_public_api_inventory.sh --check" \
+      ./Scripts/generate_public_api_inventory.sh --check
+  fi
 }

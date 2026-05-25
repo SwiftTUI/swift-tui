@@ -20,18 +20,18 @@ golden_file=$tmp_dir/golden.md
 mkdir -p "$results_dir"
 
 cat >"$expected_file" <<'EOF'
-linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|sh ./Scripts/test_gate.sh --skip-bun-install
-linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|sh ./Scripts/test_gate.sh --skip-bun-install
-macos|macOS repo gate|macOS|-|macos-26|sh ./Scripts/test_gate.sh --skip-bun-install
+linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
+linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
+macos|macOS repo gate|macOS|-|macos-26|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
 ios|iOS package build|iOS|generic|macos-26|xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build
 EOF
 
 cat >"$results_dir/linux-amd64.result" <<'EOF'
-linux-amd64|success
+linux-amd64|success|840
 EOF
 
 cat >"$results_dir/linux-arm64.result" <<'EOF'
-linux-arm64|failure
+linux-arm64|failure|65
 EOF
 
 cat >"$results_dir/macos.result" <<'EOF'
@@ -41,12 +41,12 @@ EOF
 cat >"$golden_file" <<'EOF'
 ## CI Test Matrix
 
-| Lane | Platform | Arch | Runner | Result | Command |
-| --- | --- | --- | --- | --- | --- |
-| Linux repo gate | Linux | amd64 | ubuntu-24.04 | success | `sh ./Scripts/test_gate.sh --skip-bun-install` |
-| Linux repo gate | Linux | arm64 | ubuntu-24.04-arm | failure | `sh ./Scripts/test_gate.sh --skip-bun-install` |
-| macOS repo gate | macOS | - | macos-26 | success | `sh ./Scripts/test_gate.sh --skip-bun-install` |
-| iOS package build | iOS | generic | macos-26 | missing | `xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build` |
+| Lane | Platform | Arch | Runner | Result | Duration | Command |
+| --- | --- | --- | --- | --- | --- | --- |
+| Linux repo gate | Linux | amd64 | ubuntu-24.04 | success | 14m 0s | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| Linux repo gate | Linux | arm64 | ubuntu-24.04-arm | failure | 1m 5s | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| macOS repo gate | macOS | - | macos-26 | success | - | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| iOS package build | iOS | generic | macos-26 | missing | - | `xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build` |
 
 Overall result: failure (2 success, 1 failure, 1 missing)
 

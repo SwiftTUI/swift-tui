@@ -14,6 +14,7 @@ RESULTS_DIR contains one optional result file per expected id:
 
 Each result file contains:
   id|result
+  id|result|duration_seconds
 
 The output is a GitHub-flavored Markdown matrix summary.
 EOF
@@ -41,6 +42,33 @@ escape_cell() {
   printf '%s' "$1" | sed 's/|/\\|/g'
 }
 
+format_duration() {
+  seconds=$1
+
+  case "$seconds" in
+  "" | - | *[!0-9]*)
+    printf '%s' "-"
+    return
+    ;;
+  esac
+
+  if [ "$seconds" -lt 60 ]; then
+    printf '%ss' "$seconds"
+    return
+  fi
+
+  minutes=$((seconds / 60))
+  remainder=$((seconds % 60))
+  if [ "$minutes" -lt 60 ]; then
+    printf '%sm %ss' "$minutes" "$remainder"
+    return
+  fi
+
+  hours=$((minutes / 60))
+  minute_remainder=$((minutes % 60))
+  printf '%sh %sm' "$hours" "$minute_remainder"
+}
+
 append_count() {
   count=$1
   label=$2
@@ -65,8 +93,8 @@ other_count=0
 {
   echo "## CI Test Matrix"
   echo ""
-  echo "| Lane | Platform | Arch | Runner | Result | Command |"
-  echo "| --- | --- | --- | --- | --- | --- |"
+  echo "| Lane | Platform | Arch | Runner | Result | Duration | Command |"
+  echo "| --- | --- | --- | --- | --- | --- | --- |"
 
   while IFS='|' read -r id lane platform arch runner command; do
     case "$id" in
@@ -77,12 +105,16 @@ other_count=0
 
     total_count=$((total_count + 1))
     result=missing
+    duration_seconds=-
     result_file=$results_dir/$id.result
 
     if [ -f "$result_file" ]; then
-      IFS='|' read -r result_id recorded_result <"$result_file" || true
+      IFS='|' read -r result_id recorded_result recorded_duration <"$result_file" || true
       if [ "$result_id" = "$id" ] && [ -n "$recorded_result" ]; then
         result=$recorded_result
+        if [ -n "${recorded_duration:-}" ]; then
+          duration_seconds=$recorded_duration
+        fi
       fi
     fi
 
@@ -107,12 +139,13 @@ other_count=0
       ;;
     esac
 
-    printf '| %s | %s | %s | %s | %s | `%s` |\n' \
+    printf '| %s | %s | %s | %s | %s | %s | `%s` |\n' \
       "$(escape_cell "$lane")" \
       "$(escape_cell "$platform")" \
       "$(escape_cell "$arch")" \
       "$(escape_cell "$runner")" \
       "$(escape_cell "$result")" \
+      "$(format_duration "$duration_seconds")" \
       "$command"
   done <"$expected_file"
 
