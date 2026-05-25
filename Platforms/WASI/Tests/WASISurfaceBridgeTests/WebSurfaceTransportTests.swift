@@ -40,6 +40,41 @@ struct WebSurfaceTransportTests {
     #expect(metrics.strategy == .fullRepaint)
   }
 
+  @Test("host semantic present writes damage and incremental metrics")
+  func hostSemanticPresentWritesDamageAndIncrementalMetrics() throws {
+    let pipe = Pipe()
+    let host = WebSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 2),
+      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+      renderStyle: .init(appearance: .fallback)
+    )
+    let damage = PresentationDamage(
+      textRows: [.init(row: 1, columnRanges: [0..<1])]
+    )
+
+    let metrics = try host.present(
+      SemanticHostFrame(
+        sequence: 31,
+        raster: Self.basicSurface(),
+        semantics: .init(),
+        focusedIdentity: nil,
+        rasterDamage: damage
+      )
+    )
+
+    pipe.fileHandleForWriting.closeFile()
+    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    pipe.fileHandleForReading.closeFile()
+    let frame = try Self.decodedSurfaceFrame(output)
+    let decodedDamage = try #require(frame["damage"] as? [String: Any])
+
+    #expect(decodedDamage["requiresFullTextRepaint"] as? Bool == false)
+    #expect(decodedDamage["requiresFullGraphicsReplay"] as? Bool == false)
+    #expect(metrics.linesTouched == 1)
+    #expect(metrics.cellsChanged == 1)
+    #expect(metrics.strategy == .incremental)
+  }
+
   @Test("host exposes web sub-cell pointer capabilities before reported metrics arrive")
   func hostExposesWebSubCellPointerCapabilitiesBeforeMetrics() {
     let host = WebSurfaceTransport(
