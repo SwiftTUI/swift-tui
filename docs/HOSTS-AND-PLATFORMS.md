@@ -50,6 +50,13 @@ of focused contracts.
   - `DamageAwarePresentationSurface` — accepts incremental damage regions.
   - `SemanticHostFramePresentationSurface` — accepts the full semantic frame.
 
+| Host | Damage consumption |
+| --- | --- |
+| Terminal-native | `TerminalHost` uses damage to limit row/span diffing and terminal byte emission. |
+| WASI / browser | `WebSurfaceTransport` serializes damage into the web-surface frame; the browser canvas clears and redraws dirty rects only. |
+| Localhost WebHost | `WebSocketSurfaceTransport` serializes the same web-surface damage over WebSocket. |
+| Host-managed SwiftUI | `HostedRasterSurface` carries damage through `SemanticHostFrame`; `NativeTerminalSurfaceView` invalidates only dirty native rects. |
+
 ```mermaid
 flowchart LR
     commit["Committed frame"]
@@ -113,6 +120,11 @@ restriction).
 
 The Swift products that run browser surfaces live in this repo:
 `SwiftTUIWASI`, `SwiftTUIWebHost`, and `SwiftTUIWebHostCLI`.
+
+The WASI browser worker owns stdin and timer readiness for Swift code compiled
+to WASI. Its `poll_oneoff` adapter blocks on `SharedArrayBuffer`/`Atomics`
+rather than polling from JavaScript, and it must wake for clock deadlines,
+stdin readability, resize/style control messages, and queue closure.
 
 Browser TypeScript source lives in `SwiftTUI/swift-tui-web` as
 `@swifttui/web` and `@swifttui/build`. `SwiftTUIWebHost` consumes a checked-in

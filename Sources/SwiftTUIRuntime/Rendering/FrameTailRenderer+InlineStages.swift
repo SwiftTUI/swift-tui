@@ -137,18 +137,25 @@ struct FrameTailInlineStageRenderer: Sendable {
     beforeRaster: (@Sendable () -> Void)?
   ) -> FrameTailRasterOutput {
     beforeRaster?()
+    let previousSurface = input.retained.previousRasterSurface
     let (rasterized, duration) = measurePhase(clock: clock) {
       rasterizer.rasterizeCollectingVisibleIdentities(
         draw,
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
-        previousSurface: input.retained.previousRasterSurface,
+        previousSurface: previousSurface,
         damage: presentationDamage
       )
     }
+    let finalPresentationDamage =
+      rasterized.presentationDamage
+      ?? RasterSurfaceDamageDiff.diff(
+        previous: previousSurface,
+        current: rasterized.surface
+      )
     return .init(
       surface: rasterized.surface,
       drawnIdentities: rasterized.visibleIdentities,
-      presentationDamage: rasterized.presentationDamage,
+      presentationDamage: finalPresentationDamage,
       duration: duration
     )
   }

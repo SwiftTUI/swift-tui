@@ -111,6 +111,34 @@ struct HostedSurfaceRegressionTests {
   }
 
   @MainActor
+  @Test("hosted raster surface retains semantic frame damage")
+  func hostedRasterSurfaceRetainsSemanticFrameDamage() async throws {
+    let surface = hostedSurface()
+    let damage = PresentationDamage(textRows: [.init(row: 0, columnRanges: [1..<2])])
+
+    try surface.present(
+      SemanticHostFrame(
+        sequence: 2,
+        raster: RasterSurface(size: .init(width: 3, height: 1), lines: ["ABC"]),
+        semantics: .init(),
+        focusedIdentity: nil
+      )
+    )
+    try surface.present(
+      SemanticHostFrame(
+        sequence: 3,
+        raster: RasterSurface(size: .init(width: 3, height: 1), lines: ["AXC"]),
+        semantics: .init(),
+        focusedIdentity: nil,
+        rasterDamage: damage
+      )
+    )
+
+    let frame = await surface.waitForFrame { $0.sequence == 3 }
+    #expect(frame.rasterDamage == damage)
+  }
+
+  @MainActor
   @Test
   func hosted_surface_drag_gesture_receives_fractional_location() async throws {
     let surface = hostedSurface()

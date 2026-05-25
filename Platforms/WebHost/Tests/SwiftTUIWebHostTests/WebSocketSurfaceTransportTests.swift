@@ -79,6 +79,8 @@ struct WebSocketSurfaceTransportTests {
     let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
     let textRow = try #require(textRows.first)
 
+    #expect(decodedDamage["requiresFullTextRepaint"] as? Bool == false)
+    #expect(decodedDamage["requiresFullGraphicsReplay"] as? Bool == false)
     #expect(textRow.first as? Int == 1)
     #expect(textRow.dropFirst().first as? [[Int]] == [[0, 1]])
     #expect(metrics.linesTouched == 1)

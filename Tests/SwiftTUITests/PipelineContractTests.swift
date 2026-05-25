@@ -164,6 +164,40 @@ struct PipelineContractTests {
     #expect(updated.rasterSurface.lines.joined(separator: "\n").contains("Action"))
   }
 
+  @Test("renderer derives raster damage for broad state updates")
+  func rendererDerivesRasterDamageForBroadStateUpdates() {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("PipelineContractRasterDamageRoot")
+    let proposal = ProposedSize(width: 24, height: 3)
+
+    _ = renderer.render(
+      PipelineContractCommandView(value: 1),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    let updated = renderer.render(
+      PipelineContractCommandView(value: 2),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let damage = updated.presentationDamage
+    #expect(damage != nil)
+    #expect(damage?.requiresFullTextRepaint == false)
+    #expect(damage?.requiresFullGraphicsReplay == false)
+    #expect(damage?.textRows.isEmpty == false)
+
+    let diagnostics = damage.map {
+      PresentationDamageDiagnostics(
+        damage: $0,
+        surfaceWidth: updated.rasterSurface.size.width
+      )
+    }
+    #expect(
+      (diagnostics?.textCellCount ?? 0) < updated.rasterSurface.size.width
+        * updated.rasterSurface.size.height)
+  }
+
   @Test("incremental raster reuse matches fresh raster for mutation matrix")
   func incrementalRasterReuseMatchesFreshRasterForMutationMatrix() {
     let rasterizer = Rasterizer()

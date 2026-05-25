@@ -49,6 +49,13 @@ All seven products are gathered on `FrameArtifacts`. They are distinct types on
 purpose: each phase boundary is a typed contract, so a phase cannot silently
 consume a half-built product from two phases back.
 
+Presentation damage has two sources. Retained-layout damage is computed before
+rasterization and may let the rasterizer reuse unchanged rows. When that proof
+is unavailable, the frame tail compares the previous committed `RasterSurface`
+with the current `RasterSurface` after rasterization and emits host-facing
+row/range damage. The post-raster diff is the browser and native host fallback
+for broad state invalidations such as task-driven root updates.
+
 Semantics is computed from the placed tree alongside draw, and the
 `SemanticSnapshot` it produces — including the flat `accessibilityNodes`
 array — flows through to commit so every host can present it. See
@@ -131,7 +138,9 @@ flowchart TD
 - The worker is `FrameTailLayoutWorker`, backed by a serial `DispatchQueue`
   (`swift-tui.frame-tail-layout`) on Darwin and Linux. On WASI, where there is
   no background execution, an immediate inline worker runs the same stages
-  synchronously.
+  synchronously. Timer wakeup accuracy for async Swift tasks is still owned by
+  the browser worker's WASI scheduler; the render pipeline consumes the wakeups
+  after the WASI runtime resumes Swift tasks.
 - Built-in layout, custom layouts that conform to `SendableLayout`, framework
   `SendableLayout` containers, and snapshotted lazy child sources all run on
   the worker. A plain `Layout` conformer that is not `Sendable` falls back to
