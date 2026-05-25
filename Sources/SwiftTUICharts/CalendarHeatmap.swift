@@ -22,7 +22,7 @@ public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, Resolv
     days: [DateValue],
     range: ClosedRange<Date>? = nil,
     weekStart: CalendarHeatmapWeekStart = .sunday,
-    calendar: Calendar = .current,
+    calendar: Calendar,
     cellWidth: Int = 1,
     showsMonthHeader: Bool = true,
     showsDayLabels: Bool = true,
@@ -81,7 +81,7 @@ public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, Resolv
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let effectiveRange = range ?? inferDateRange(days) ?? Self.fallbackRange()
+    let effectiveRange = range ?? inferDateRange(days) ?? calendarHeatmapFallbackRange()
     let bucket = bucketDays(days, range: effectiveRange, calendar: calendar, weekStart: weekStart)
 
     return [
@@ -107,11 +107,6 @@ public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, Resolv
       )
     ]
   }
-
-  private static func fallbackRange() -> ClosedRange<Date> {
-    let now = Date()
-    return now...now
-  }
 }
 
 extension CalendarHeatmap where Label == EmptyView, Summary == Text {
@@ -119,7 +114,7 @@ extension CalendarHeatmap where Label == EmptyView, Summary == Text {
     days: [DateValue],
     range: ClosedRange<Date>? = nil,
     weekStart: CalendarHeatmapWeekStart = .sunday,
-    calendar: Calendar = .current,
+    calendar: Calendar,
     cellWidth: Int = 1,
     showsMonthHeader: Bool = true,
     showsDayLabels: Bool = true,
@@ -150,7 +145,7 @@ extension CalendarHeatmap where Label == Text, Summary == Text {
     days: [DateValue],
     range: ClosedRange<Date>? = nil,
     weekStart: CalendarHeatmapWeekStart = .sunday,
-    calendar: Calendar = .current,
+    calendar: Calendar,
     cellWidth: Int = 1,
     showsMonthHeader: Bool = true,
     showsDayLabels: Bool = true,
