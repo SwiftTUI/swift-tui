@@ -2,7 +2,8 @@
 import SwiftTUIViews
 import Testing
 
-@testable import SwiftTUIRuntime
+@_spi(Testing) @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
 
 @MainActor
 @Suite(.serialized)
@@ -44,6 +45,29 @@ struct HostedSceneSessionTests {
     var body: some Scene {
       WindowGroup("Primary", id: WindowIdentifier("primary")) {
         ClipboardTextEditorFixture()
+      }
+    }
+  }
+
+  private struct CounterSurfaceApp: App {
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        CounterSurfaceView()
+      }
+    }
+  }
+
+  @MainActor
+  private struct CounterSurfaceView: View {
+    @State private var count = 0
+
+    var body: some View {
+      Panel(id: "counter") {
+        Text("Count \(count)")
+          .focusable(true)
+      }
+      .keyCommand("Increment", key: .character("i"), modifiers: .ctrl) {
+        count += 1
       }
     }
   }
@@ -165,6 +189,60 @@ struct HostedSceneSessionTests {
 
     #expect(surfaceRecorder.latestSurface == semanticRecorder.latestSurface)
     #expect(semanticRecorder.frames.first?.sequence == 0)
+
+    let stopExitReason = try await session.stopAndWait()
+    let taskExitReason = try await task.value
+
+    #expect(stopExitReason == .inputEnded)
+    #expect(taskExitReason == .inputEnded)
+  }
+
+  @Test("hosted raster surface damage matches the committed raster diff")
+  func hostedRasterSurfaceDamageMatchesCommittedRasterDiff() async throws {
+    let surface = hostedSurface()
+    let session = try HostedSceneSession(
+      for: CounterSurfaceApp(),
+      sceneID: WindowIdentifier("primary"),
+      surface: surface
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    let firstFrames = await surface.waitForFrames { frames in
+      frames.contains { frame in
+        rasterText(in: frame).contains("Count 0")
+      }
+    }
+    let first = try #require(
+      firstFrames.first { frame in
+        rasterText(in: frame).contains("Count 0")
+      })
+
+    session.send(.key(.init(.character("i"), modifiers: .ctrl)))
+
+    let updatedFrames = await surface.waitForFrames { frames in
+      frames.contains { frame in
+        frame.sequence > first.sequence && rasterText(in: frame).contains("Count 1")
+      }
+    }
+    let second = try #require(
+      updatedFrames.first { frame in
+        frame.sequence > first.sequence && rasterText(in: frame).contains("Count 1")
+      })
+    let previous = try #require(
+      updatedFrames
+        .filter { frame in frame.sequence < second.sequence }
+        .max { lhs, rhs in lhs.sequence < rhs.sequence })
+
+    #expect(
+      second.rasterDamage
+        == RasterSurfaceDamageDiff.diff(
+          previous: previous.raster,
+          current: second.raster
+        )
+    )
 
     let stopExitReason = try await session.stopAndWait()
     let taskExitReason = try await task.value
@@ -334,6 +412,12 @@ struct HostedSceneSessionTests {
       }
     )
   }
+}
+
+private func rasterText(
+  in frame: SemanticHostFrame
+) -> String {
+  frame.raster.lines.joined(separator: "\n")
 }
 
 @MainActor
