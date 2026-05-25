@@ -76,6 +76,7 @@ extension ResolvedNode {
         == rhs.layoutDependentContent?.equivalenceSignature
       && lhs.drawMetadata == rhs.drawMetadata
       && lhs.drawEffects == rhs.drawEffects
+      && lhs.surfaceComposition == rhs.surfaceComposition
       && lhs.semanticMetadata == rhs.semanticMetadata
       && lhs.lifecycleMetadata == rhs.lifecycleMetadata
       && lhs.drawPayload == rhs.drawPayload

@@ -17,10 +17,15 @@ struct RetainedReuseInvariantTests {
     #expect(
       placed.resolvedMetadata == makeMetadata("first", semanticRole: .control, isTransient: true)
     )
+    #expect(
+      placed.resolvedMetadata.surfaceComposition
+        == makeMetadata("first", semanticRole: .control, isTransient: true).surfaceComposition
+    )
 
     placed.resolvedMetadata = replacement
 
     #expect(placed.resolvedMetadata == replacement)
+    #expect(placed.resolvedMetadata.surfaceComposition == replacement.surfaceComposition)
   }
 
   @Test("retained placement refreshes resolved metadata while preserving geometry")
@@ -70,9 +75,38 @@ struct RetainedReuseInvariantTests {
     #expect(refreshed.children.map(\.zIndex) == oldParent.children.map(\.zIndex))
     #expect(refreshed.resolvedMetadata == projectedMetadata(from: currentParent, using: engine))
     #expect(
+      refreshed.resolvedMetadata.surfaceComposition
+        == projectedMetadata(from: currentParent, using: engine).surfaceComposition
+    )
+    #expect(
       refreshed.children.first?.resolvedMetadata
         == projectedMetadata(from: currentChild, using: engine)
     )
+    #expect(
+      refreshed.children.first?.resolvedMetadata.surfaceComposition
+        == projectedMetadata(from: currentChild, using: engine).surfaceComposition
+    )
+  }
+
+  @Test("translated retained placement preserves surface composition")
+  func translatedRetainedPlacementPreservesSurfaceComposition() {
+    let engine = LayoutEngine()
+    let child = PlacedNode(
+      identity: testIdentity("Translated", "Child"),
+      resolvedMetadata: makeMetadata("translated-child", semanticRole: .control, isTransient: false),
+      bounds: rect(x: 1, y: 1, width: 2, height: 2)
+    )
+    let parent = PlacedNode(
+      identity: testIdentity("Translated", "Parent"),
+      resolvedMetadata: makeMetadata("translated-parent", semanticRole: .container, isTransient: false),
+      bounds: rect(x: 0, y: 0, width: 4, height: 4),
+      children: [child]
+    )
+
+    let translated = engine.translatedPlacement(parent, by: CellPoint(x: 3, y: 5))
+
+    #expect(translated.surfaceComposition == parent.surfaceComposition)
+    #expect(translated.children.first?.surfaceComposition == child.surfaceComposition)
   }
 
   @Test("PlacedNodeResolvedMetadata field manifest stays synchronized")
@@ -90,6 +124,7 @@ struct RetainedReuseInvariantTests {
         "layoutMetadata",
         "drawMetadata",
         "drawEffects",
+        "surfaceComposition",
         "semanticMetadata",
         "lifecycleMetadata",
         "drawPayload",
@@ -133,6 +168,7 @@ private func makeMetadata(
       imagePreference: "image-\(token)"
     ),
     drawEffects: .init([.blendMode(token == "second" ? .screen : .multiply)]),
+    surfaceComposition: surfaceComposition(for: token),
     semanticMetadata: .init(
       isFocusable: true,
       participatesInPointerHitTesting: true,
@@ -168,6 +204,7 @@ private func makeResolvedNode(
     layoutMetadata: metadata.layoutMetadata,
     drawMetadata: metadata.drawMetadata,
     drawEffects: metadata.drawEffects,
+    surfaceComposition: metadata.surfaceComposition,
     semanticMetadata: metadata.semanticMetadata,
     lifecycleMetadata: metadata.lifecycleMetadata,
     drawPayload: metadata.drawPayload
@@ -175,6 +212,16 @@ private func makeResolvedNode(
   resolved.isTransient = metadata.isTransient
   resolved.matchedGeometry = metadata.matchedGeometry
   return resolved
+}
+
+private func surfaceComposition(for token: String) -> SurfaceCompositionMetadata {
+  SurfaceCompositionMetadata(
+    role: token == "second" || token.hasPrefix("new")
+      ? .detachedOverlayEntry : .stackingContext,
+    stableKey: "surface-\(token)",
+    invalidationScope: token == "second" || token.hasPrefix("new")
+      ? .fullSurfaceDiff : .compositedBounds
+  )
 }
 
 private func projectedMetadata(

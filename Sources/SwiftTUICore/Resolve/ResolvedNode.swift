@@ -92,6 +92,7 @@ public struct ResolvedNode: Equatable, Sendable {
   }
   package var _boxedDrawMetadata: Boxed<DrawMetadata>
   package var drawEffects: DrawEffects
+  package var surfaceComposition: SurfaceCompositionMetadata
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   @_spi(Testing) public var drawPayload: DrawPayload
@@ -142,6 +143,7 @@ public struct ResolvedNode: Equatable, Sendable {
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
     drawEffects: DrawEffects = .init(),
+    surfaceComposition: SurfaceCompositionMetadata = .normal,
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
@@ -162,6 +164,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.layoutMetadata = layoutMetadata
     self._boxedDrawMetadata = Boxed(drawMetadata)
     self.drawEffects = drawEffects
+    self.surfaceComposition = surfaceComposition
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
@@ -188,6 +191,7 @@ public struct ResolvedNode: Equatable, Sendable {
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
     drawEffects: DrawEffects = .init(),
+    surfaceComposition: SurfaceCompositionMetadata = .normal,
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
@@ -205,6 +209,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.layoutMetadata = layoutMetadata
     self._boxedDrawMetadata = Boxed(drawMetadata)
     self.drawEffects = drawEffects
+    self.surfaceComposition = surfaceComposition
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload

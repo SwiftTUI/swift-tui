@@ -60,6 +60,78 @@ struct PipelineContractTests {
     }
   }
 
+  @Test("surface composition stable keys participate in topology equality")
+  func surfaceCompositionStableKeysParticipateInTopologyEquality() {
+    let first = SurfaceCompositionMetadata(
+      role: .detachedOverlayEntry,
+      stableKey: "surface-key-32879",
+      invalidationScope: .compositedBounds
+    )
+    let second = SurfaceCompositionMetadata(
+      role: .detachedOverlayEntry,
+      stableKey: "surface-key-41464",
+      invalidationScope: .compositedBounds
+    )
+
+    #expect(first.stableKey == "surface-key-32879")
+    #expect(second.stableKey == "surface-key-41464")
+    #expect(first != second)
+
+    let identity = testIdentity("PipelineContractSurfaceComposition")
+    let bounds = CellRect(
+      origin: .init(x: 0, y: 0),
+      size: .init(width: 8, height: 2)
+    )
+    let firstEntry = SurfaceTopologyEntry(
+      identity: identity,
+      role: first.role,
+      stableKey: first.stableKey,
+      invalidationScope: first.invalidationScope,
+      bounds: bounds,
+      zIndex: 0
+    )
+    let secondEntry = SurfaceTopologyEntry(
+      identity: identity,
+      role: second.role,
+      stableKey: second.stableKey,
+      invalidationScope: second.invalidationScope,
+      bounds: bounds,
+      zIndex: 0
+    )
+
+    #expect(firstEntry.stableKey == "surface-key-32879")
+    #expect(secondEntry.stableKey == "surface-key-41464")
+    #expect(firstEntry != secondEntry)
+  }
+
+  @Test("surface topology entry ordering distinguishes nil and empty stable keys")
+  func surfaceTopologyEntryOrderingDistinguishesNilAndEmptyStableKeys() {
+    let identity = testIdentity("PipelineContractSurfaceCompositionOrdering")
+    let bounds = CellRect(
+      origin: .init(x: 0, y: 0),
+      size: .init(width: 8, height: 2)
+    )
+    let nilKeyEntry = SurfaceTopologyEntry(
+      identity: identity,
+      role: .detachedOverlayEntry,
+      stableKey: nil,
+      invalidationScope: .compositedBounds,
+      bounds: bounds,
+      zIndex: 0
+    )
+    let emptyKeyEntry = SurfaceTopologyEntry(
+      identity: identity,
+      role: .detachedOverlayEntry,
+      stableKey: "",
+      invalidationScope: .compositedBounds,
+      bounds: bounds,
+      zIndex: 0
+    )
+
+    #expect(nilKeyEntry != emptyKeyEntry)
+    #expect([emptyKeyEntry, nilKeyEntry].sorted() == [nilKeyEntry, emptyKeyEntry])
+  }
+
   @Test("semantic host frames keep contiguous sequence and current frame payload")
   func semanticHostFramesKeepContiguousSequenceAndCurrentPayload() throws {
     let rootIdentity = testIdentity("PipelineContractSemanticHostRoot")
