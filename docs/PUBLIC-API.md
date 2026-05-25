@@ -189,9 +189,11 @@ These migration-era APIs are no longer public:
 - Runtime registry and replay types — `LocalActionRegistry`,
   `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`,
   `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`.
-- The global hotkey seam — the `.onKeyPress(...)` modifier, `HotkeyRegistry`,
-  `HotkeyBinding`, and keyboard-help compatibility APIs. Keys are now bound
-  through the ActionScope commands surface.
+- The global hotkey seam — `HotkeyRegistry`, `HotkeyBinding`, and the
+  keyboard-help compatibility APIs. Global, always-on key bindings are now bound
+  through the ActionScope commands surface. This removal does **not** include the
+  focused-key `View.onKeyPress(_:perform:)` modifier, which is a separate,
+  canonical API and remains part of the public surface.
 - The old public styling shims — `EnvironmentValues.theme` and the string-based
   `foregroundStyle`/`backgroundStyle`/`borderStyle` helpers.
 

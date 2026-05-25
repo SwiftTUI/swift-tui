@@ -57,6 +57,35 @@ explicit work-stack paths for parts of measurement and placement.
   explicit context threading through resolve, and interning of `Identity`
   values are all design-only — no corresponding code.
 
+## Animation, transitions, and gestures
+
+**Shipped.** Value-gated `.animation(_:value:)`, the timing-curve family
+(bezier, spring, repeat/autoreverse), `.transition(_:)` with opacity and offset
+effects, `matchedGeometryEffect`, `TapGesture`/`DragGesture` with
+`.updating`/`.onChanged`/`.onEnded`, and a `Transaction` that carries animation
+intent.
+
+**Not yet built.** These carry the SwiftUI API shape but a narrower behavior.
+Each is noted in a source doc comment; they are registered here so the
+divergence from SwiftUI is recorded rather than silent.
+
+- **Transition travel distance.** `.move(edge:)`, `.slide`, and `.push(from:)`
+  slide a fixed ±10 cells rather than the transitioning view's own measured
+  extent, so a view larger than 10 cells along the travel axis stays partly
+  visible mid-transition. SwiftUI slides the view fully off its own bounds.
+- **Custom `Transition` effects.** The transition compositor interpolates only
+  opacity and offset; other modifiers applied inside a custom `Transition.body`
+  are ignored, and there is no built-in `.scale` transition.
+- **`Gesture.updating(_:body:)` transaction.** The `inout Transaction` passed to
+  the closure is a no-op stand-in; mutations to it are discarded.
+- **`matchedGeometryEffect` size.** It interpolates position only, not size; a
+  matched pair that changes size snaps to the destination size for the whole
+  animation.
+- **`TapGesture` multi-tap timing.** Multi-tap counts have no inter-tap timeout:
+  consecutive on-target taps count as a multi-tap regardless of elapsed time.
+- **`Transaction` fields.** Only animation intent is exposed; other SwiftUI
+  transaction fields are not.
+
 ## Canvas and drawing
 
 **Shipped.** The continuous coordinate type system (`Point`/`CellPoint`/
