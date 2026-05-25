@@ -16,9 +16,10 @@ bun run test
 swiftly run swift test
 ```
 
-Run `bun run test` before proposing shared runtime, platform product, gallery,
-or tooling changes. Use `bun run test:all` when the change affects multiple
-examples or broad package behavior.
+Run `bun run test` before proposing shared runtime, platform product, or tooling
+changes in this repo. Use `bun run test:all` when the change affects broad
+primary-package behavior. Runnable examples are validated from the sibling
+`SwiftTUI/swift-tui-examples` checkout.
 
 ## Pull Request Expectations
 

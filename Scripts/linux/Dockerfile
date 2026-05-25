@@ -25,7 +25,7 @@ ARG WASM_SDK_CHECKSUM=bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d
 ARG BUN_INSTALL=/usr/local/bun
 
 LABEL org.opencontainers.image.title="swift-tui-linux" \
-      org.opencontainers.image.description="Swift toolchain + Bun + Wasm SDK + binaryen for SwiftTUI Linux/web builds" \
+      org.opencontainers.image.description="Swift toolchain + Bun + Wasm SDK for SwiftTUI Linux and Wasm checks" \
       org.opencontainers.image.source="https://github.com/SwiftTUI/swift-tui" \
       org.opencontainers.image.licenses="MIT"
 
@@ -40,13 +40,13 @@ ENV PATH="${BUN_INSTALL}/bin:${SWIFTLY_BIN_DIR}:${PATH}"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # System dependencies. The upstream swift image ships a slim Ubuntu base, so
-# we add the tools the SwiftTUI Linux + WebExample workflows actually use:
+# we add the tools the SwiftTUI Linux workflow and local primary-repo checks use:
 #   - curl/unzip:    bun installer + general fetch
 #   - libcurl dev:   Swiftly's downloaded Swift toolchains require it
 #   - ca-certificates+git: SwiftPM dependency resolution over HTTPS
 #   - ripgrep:       used by repo tests + matches the GH Actions runner setup
-#   - binaryen:      provides wasm-opt for sibling WebExample diagnostics
-#   - brotli:        WebExample wasm is shipped Brotli-compressed
+#   - binaryen:      provides wasm-opt for local primary-repo Wasm diagnostics
+#   - brotli:        available for local primary-repo web artifact checks
 #   - jq:            convenient for inspecting JSON in the container
 #
 # `--no-install-recommends` keeps the image close to the minimum, and we wipe

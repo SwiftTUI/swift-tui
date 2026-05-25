@@ -344,13 +344,13 @@ ensure_bun() {
     export BUN_INSTALL=/root/.bun
     export PATH="$BUN_INSTALL/bin:$PATH"
 
-    if command -v bun >/dev/null 2>&1 && command -v wasm-opt >/dev/null 2>&1; then
+    if command -v bun >/dev/null 2>&1; then
       exit 0
     fi
 
-    if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v wasm-opt >/dev/null 2>&1; then
+    if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
       apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip binaryen
+      DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip
     fi
 
     if ! command -v bun >/dev/null 2>&1; then
