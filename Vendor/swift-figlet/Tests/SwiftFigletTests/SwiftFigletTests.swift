@@ -153,8 +153,8 @@ private let testOnlyFontData = #"""
 
   #expect(fonts.contains(.slant))
   #expect(fonts.contains(.standard))
-  #expect(fonts.contains(.banner))
-  #expect(fonts.contains(.mono9))
+  #expect(fonts.contains(.doom))
+  #expect(fonts.contains(.small))
 }
 
 @Test func embeddedFontEnumMatchesTheGeneratedLibrary() {
