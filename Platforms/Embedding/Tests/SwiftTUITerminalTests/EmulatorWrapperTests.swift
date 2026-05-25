@@ -2,13 +2,13 @@ import Foundation
 import SwiftTUIRuntime
 import Testing
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 @testable import SwiftTUITerminal
+
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
 
 @Suite("TerminalEmulator wrapper", .serialized)
 struct EmulatorWrapperTests {
@@ -24,9 +24,10 @@ struct EmulatorWrapperTests {
     let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
     let snapshot = await emulator.snapshot()
 
-    #expect(snapshot.cells.allSatisfy { row in
-      row.allSatisfy { $0 == .empty }
-    })
+    #expect(
+      snapshot.cells.allSatisfy { row in
+        row.allSatisfy { $0 == .empty }
+      })
   }
 
   @Test("OSC 133 shell integration markers are ignored quietly")
