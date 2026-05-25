@@ -167,6 +167,8 @@ extension LayoutEngine {
       semanticRole: node.semanticRole,
       layoutMetadata: node.layoutMetadata,
       drawMetadata: node.drawMetadata,
+      drawEffects: node.drawEffects,
+      surfaceComposition: node.surfaceComposition,
       semanticMetadata: node.semanticMetadata,
       lifecycleMetadata: node.lifecycleMetadata,
       drawPayload: node.drawPayload,

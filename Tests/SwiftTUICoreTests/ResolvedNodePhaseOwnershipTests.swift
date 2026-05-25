@@ -43,6 +43,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("layoutMetadata", .measurement),
     ("_boxedDrawMetadata", .draw),
     ("drawEffects", .draw),
+    ("surfaceComposition", .damage),
     ("semanticMetadata", .semantics),
     ("lifecycleMetadata", .lifecycle),
     ("drawPayload", .draw),

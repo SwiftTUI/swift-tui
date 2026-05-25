@@ -22,6 +22,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
   package var drawEffects: DrawEffects
+  package var surfaceComposition: SurfaceCompositionMetadata
   package var semanticMetadata: SemanticMetadata
   package var lifecycleMetadata: LifecycleMetadata
   package var drawPayload: DrawPayload
@@ -36,6 +37,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
     drawEffects: DrawEffects = .init(),
+    surfaceComposition: SurfaceCompositionMetadata = .normal,
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
@@ -49,6 +51,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     self.layoutMetadata = layoutMetadata
     self.drawMetadata = drawMetadata
     self.drawEffects = drawEffects
+    self.surfaceComposition = surfaceComposition
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
@@ -68,6 +71,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
       layoutMetadata: resolved.layoutMetadata,
       drawMetadata: resolved.drawMetadata,
       drawEffects: resolved.drawEffects,
+      surfaceComposition: resolved.surfaceComposition,
       semanticMetadata: resolved.semanticMetadata,
       lifecycleMetadata: resolved.lifecycleMetadata,
       drawPayload: resolved.drawPayload,
@@ -101,6 +105,7 @@ public struct PlacedNode: Equatable, Sendable {
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
   package var drawEffects: DrawEffects
+  package var surfaceComposition: SurfaceCompositionMetadata
   private var _semanticMetadata: Boxed<SemanticMetadata>?
   public var semanticMetadata: SemanticMetadata {
     get { _semanticMetadata?.value ?? SemanticMetadata() }
@@ -167,6 +172,7 @@ public struct PlacedNode: Equatable, Sendable {
         layoutMetadata: layoutMetadata,
         drawMetadata: drawMetadata,
         drawEffects: drawEffects,
+        surfaceComposition: surfaceComposition,
         semanticMetadata: semanticMetadata,
         lifecycleMetadata: lifecycleMetadata,
         drawPayload: drawPayload,
@@ -202,6 +208,7 @@ public struct PlacedNode: Equatable, Sendable {
       layoutMetadata: resolvedMetadata.layoutMetadata,
       drawMetadata: resolvedMetadata.drawMetadata,
       drawEffects: resolvedMetadata.drawEffects,
+      surfaceComposition: resolvedMetadata.surfaceComposition,
       semanticMetadata: resolvedMetadata.semanticMetadata,
       lifecycleMetadata: resolvedMetadata.lifecycleMetadata,
       drawPayload: resolvedMetadata.drawPayload,
@@ -224,6 +231,7 @@ public struct PlacedNode: Equatable, Sendable {
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
     drawEffects: DrawEffects = .init(),
+    surfaceComposition: SurfaceCompositionMetadata = .normal,
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
@@ -243,6 +251,7 @@ public struct PlacedNode: Equatable, Sendable {
     self.layoutMetadata = layoutMetadata
     self.drawMetadata = drawMetadata
     self.drawEffects = drawEffects
+    self.surfaceComposition = surfaceComposition
     if semanticMetadata == SemanticMetadata() {
       _semanticMetadata = nil
     } else {
@@ -268,6 +277,7 @@ public struct PlacedNode: Equatable, Sendable {
     layoutMetadata = metadata.layoutMetadata
     drawMetadata = metadata.drawMetadata
     drawEffects = metadata.drawEffects
+    surfaceComposition = metadata.surfaceComposition
     semanticMetadata = metadata.semanticMetadata
     lifecycleMetadata = metadata.lifecycleMetadata
     drawPayload = metadata.drawPayload
@@ -313,5 +323,30 @@ public struct PlacedNode: Equatable, Sendable {
         stack.append(child)
       }
     }
+  }
+}
+
+extension PlacedNode {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.identity == rhs.identity
+      && lhs.kind == rhs.kind
+      && lhs.environmentSnapshot == rhs.environmentSnapshot
+      && lhs.bounds == rhs.bounds
+      && lhs.contentBounds == rhs.contentBounds
+      && lhs.clipBounds == rhs.clipBounds
+      && lhs.zIndex == rhs.zIndex
+      && lhs.children == rhs.children
+      && lhs.semanticRole == rhs.semanticRole
+      && lhs.layoutMetadata == rhs.layoutMetadata
+      && lhs.drawMetadata == rhs.drawMetadata
+      && lhs.drawEffects == rhs.drawEffects
+      && lhs.surfaceComposition == rhs.surfaceComposition
+      && lhs.semanticMetadata == rhs.semanticMetadata
+      && lhs.lifecycleMetadata == rhs.lifecycleMetadata
+      && lhs.drawPayload == rhs.drawPayload
+      && lhs.layoutBehavior == rhs.layoutBehavior
+      && lhs.subtreeNodeCount == rhs.subtreeNodeCount
+      && lhs.isTransient == rhs.isTransient
+      && lhs.matchedGeometry == rhs.matchedGeometry
   }
 }
