@@ -242,7 +242,7 @@ struct PipelineContractTests {
     let rootIdentity = testIdentity("PipelineContractRasterDamageRoot")
     let proposal = ProposedSize(width: 24, height: 3)
 
-    _ = renderer.render(
+    let initial = renderer.render(
       PipelineContractCommandView(value: 1),
       context: .init(identity: rootIdentity),
       proposal: proposal
@@ -254,6 +254,13 @@ struct PipelineContractTests {
     )
 
     let damage = updated.presentationDamage
+    #expect(
+      damage
+        == RasterSurfaceDamageDiff.diff(
+          previous: initial.rasterSurface,
+          current: updated.rasterSurface
+        )
+    )
     #expect(damage != nil)
     #expect(damage?.requiresFullTextRepaint == false)
     #expect(damage?.requiresFullGraphicsReplay == false)
