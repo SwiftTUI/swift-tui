@@ -104,6 +104,41 @@ struct CalendarHeatmapDateMathTests {
     #expect(bucket.grid[0][0] == 8)
   }
 
+  @Test("month headers come from an explicit locale input, pinned to en_US_POSIX")
+  func monthHeaderLocaleIsAnExplicitInput() {
+    let cal = Self.makeUTCGregorian()
+    // 2024-01-28 is a Sunday; column 1 (Feb 4) starts a new month, so it
+    // carries a label. Column 2 stays in February, so it is blank.
+    let first = Self.date("2024-01-28")
+    let columns = 3
+
+    let defaulted = monthHeaderLabels(firstColumnDate: first, columnCount: columns, calendar: cal)
+    let english = monthHeaderLabels(
+      firstColumnDate: first, columnCount: columns, calendar: cal,
+      locale: Locale(identifier: "en_US_POSIX"))
+    let french = monthHeaderLabels(
+      firstColumnDate: first, columnCount: columns, calendar: cal,
+      locale: Locale(identifier: "fr_FR"))
+
+    // The default is pinned to en_US_POSIX regardless of the machine locale...
+    #expect(defaulted == ["Jan", "Feb", ""])
+    #expect(defaulted == english)
+    // ...and the label source is genuinely the explicit locale input, not
+    // ambient Locale.current: a different locale produces different labels.
+    #expect(french != defaulted)
+  }
+
+  @Test("empty-data fallback range is a fixed reference instant, not wall-clock Date()")
+  func fallbackRangeIsDeterministic() {
+    let first = calendarHeatmapFallbackRange()
+    let second = calendarHeatmapFallbackRange()
+    #expect(first == second)
+    // A wall-clock fallback tracks "now" and breaks "same input -> same cells".
+    // The fallback must be a fixed reference instant.
+    let reference = Date(timeIntervalSinceReferenceDate: 0)
+    #expect(first == reference...reference)
+  }
+
   @Test("bucketDays spans multiple weeks with correct column assignment")
   func bucketDaysMultipleWeeks() {
     let cal = Self.makeUTCGregorian()

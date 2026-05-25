@@ -2,6 +2,15 @@ import Foundation
 import SwiftTUICore
 import SwiftTUIViews
 
+/// The range used when a `CalendarHeatmap` has neither an explicit `range`
+/// nor any `days` to infer one from. It must not depend on wall-clock time:
+/// the rendered frame is a pure function of its inputs, so an empty heatmap
+/// renders the same cells on every run.
+func calendarHeatmapFallbackRange() -> ClosedRange<Date> {
+  let reference = Date(timeIntervalSinceReferenceDate: 0)
+  return reference...reference
+}
+
 /// Returns the minimum-to-maximum date range covered by `days`, or `nil`
 /// when the input is empty.
 func inferDateRange(_ days: [DateValue]) -> ClosedRange<Date>? {
@@ -113,14 +122,20 @@ private func position(
   return (row: daysSinceStart % 7, col: daysSinceStart / 7)
 }
 
-private func monthHeaderLabels(
+func monthHeaderLabels(
   firstColumnDate: Date,
   columnCount: Int,
-  calendar: Calendar
+  calendar: Calendar,
+  locale: Locale = Locale(identifier: "en_US_POSIX")
 ) -> [String] {
   let formatter = DateFormatter()
   formatter.calendar = calendar
   formatter.timeZone = calendar.timeZone
+  // Pin the locale so month abbreviations are an explicit input, never the
+  // machine's ambient `Locale.current`. Matches the LineChart date axis,
+  // which formats with `Locale(identifier: "en_US_POSIX")` for the same
+  // "same input -> same cells" reason.
+  formatter.locale = locale
   formatter.dateFormat = "MMM"
 
   var labels = Array(repeating: "", count: columnCount)
