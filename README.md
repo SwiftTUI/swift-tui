@@ -169,7 +169,12 @@ Two npm packages make this a first-class web-consumer story:
 | [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) | Browser runtime — manifest loading, canvas rendering, ARIA mounting, WASI/WebSocket scene bridges |
 | [`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) | Build tooling — the `swifttui-web` CLI that compiles a SwiftTUI app into a WASI `app.wasm` and `scene-manifest.json` |
 
-Add both to your web project:
+These package names are reserved for the first public web release. Until that
+release is published, use the source checkout in
+[`SwiftTUI/swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) and the
+reference WebExample rather than expecting npm installation to succeed.
+
+After publication, add both to your web project:
 
 ```bash
 npm install @swifttui/web @swifttui/build
@@ -284,6 +289,11 @@ surface is being proven — keep your dependency pinned with `.upToNextMinor`. I
 is currently an alpha, single-maintainer, AI-assisted project. See
 [docs/VISION-GAP.md](docs/VISION-GAP.md) for where the code differs from intent
 and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the release policy.
+
+The sibling `swift-tui-web`, `swift-tui-examples`, and `swift-tui-site` repos
+are also pre-public. Their consumer-facing READMEs describe the intended
+standalone use, but the final public cutover still requires tag-aligned releases
+and published web packages.
 
 ## Contributing
 
