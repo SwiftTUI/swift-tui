@@ -71,12 +71,13 @@ Interactive:
 Repo-aware:
   test              Run the Linux repo gate used by CI
   root-test         Run raw \`swiftly run swift test\` for root-package diagnosis
+  root-build-tests  Run raw \`swiftly run swift build --build-tests\`
   cli-test          Run focused SwiftTUICLI tests from the root package
   cli-build-tests   Build root package tests without running them
   examples          Print where the extracted Linux example workflow lives
   web               Print where the extracted browser workflow lives
   workflow          Print where extracted example/web workflows live
-  full              Run the Linux repo gate
+  full              Run the full local Linux repo gate, including split CI checks
 
 Environment:
   LINUX_CONTAINER_TOOL  Force docker or podman
@@ -156,9 +157,12 @@ container_running() {
 
 container_matches_config() {
   ensure_container_tool
-  [[ "$("$CONTAINER_TOOL" inspect -f '{{.Config.WorkingDir}}' "$CONTAINER_NAME")" == "$CONTAINER_DIR" ]] &&
-    "$CONTAINER_TOOL" inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$CONTAINER_NAME" |
-      grep -Fxq "$CONTAINER_DIR"
+  [[ "$("$CONTAINER_TOOL" inspect -f '{{.Config.WorkingDir}}' "$CONTAINER_NAME")" == "$CONTAINER_DIR" ]] || return 1
+
+  local expected_mount
+  expected_mount="$(printf 'bind\t%s\t%s' "$REPO_DIR" "$CONTAINER_DIR")"
+  "$CONTAINER_TOOL" inspect -f '{{range .Mounts}}{{printf "%s\t%s\t%s\n" .Type .Source .Destination}}{{end}}' "$CONTAINER_NAME" |
+    grep -Fxq "$expected_mount"
 }
 
 ensure_volume() {
@@ -240,7 +244,7 @@ ensure_container() {
   ensure_volume "$SWIFTPM_CACHE_VOLUME"
 
   if container_exists && ! container_matches_config; then
-    log "Recreating $CONTAINER_NAME for workspace $CONTAINER_DIR"
+    log "Recreating $CONTAINER_NAME for workspace $REPO_DIR -> $CONTAINER_DIR"
     "$CONTAINER_TOOL" rm -f "$CONTAINER_NAME" >/dev/null
   fi
 
@@ -359,6 +363,17 @@ ensure_bun() {
   '
 }
 
+ensure_python3() {
+  run_shell_script '
+    if command -v python3 >/dev/null 2>&1; then
+      exit 0
+    fi
+
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y python3
+  '
+}
+
 ensure_wasm_sdk() {
   ensure_swiftly
   run_shell_script "
@@ -413,9 +428,13 @@ cmd_examples() {
 cmd_test() {
   ensure_swiftly
   ensure_bun
+  ensure_python3
   run_shell_script "
     export BUN_INSTALL=/root/.bun
     export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
+    export STUI_TEST_STEP_TIMEOUT_SECONDS=$(printf '%q' "${STUI_TEST_STEP_TIMEOUT_SECONDS:-1200}")
+    export STUI_SKIP_PUBLIC_API_BASELINE=$(printf '%q' "${STUI_SKIP_PUBLIC_API_BASELINE:-1}")
+    export STUI_SKIP_TERMUIPERF=$(printf '%q' "${STUI_SKIP_TERMUIPERF:-1}")
     sh ./Scripts/test_gate.sh --skip-bun-install
   "
 }
@@ -424,6 +443,14 @@ cmd_root_test() {
   ensure_swiftly
   run_shell_script "
     swiftly run swift test --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/root")
+  "
+}
+
+cmd_root_build_tests() {
+  ensure_swiftly
+  run_shell_script "
+    swiftly run swift build --build-tests \
+      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/root-build-tests")
   "
 }
 
@@ -455,7 +482,14 @@ cmd_workflow() {
 }
 
 cmd_full() {
-  cmd_test
+  ensure_swiftly
+  ensure_bun
+  ensure_python3
+  run_shell_script "
+    export BUN_INSTALL=/root/.bun
+    export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
+    sh ./Scripts/test_gate.sh --skip-bun-install
+  "
 }
 
 main() {
@@ -519,6 +553,9 @@ main() {
       ;;
     root-test)
       cmd_root_test
+      ;;
+    root-build-tests)
+      cmd_root_build_tests
       ;;
     cli-test)
       cmd_cli_test

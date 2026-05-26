@@ -6,7 +6,7 @@
 #   * Swiftly + the pinned Swift toolchain
 #   * Bun (system-wide install at /usr/local/bun)
 #   * Wasm Swift SDK (preinstalled at /root/.swiftpm/swift-sdks)
-#   * binaryen (wasm-opt), brotli, ripgrep, curl, unzip, git, ca-certificates
+#   * binaryen (wasm-opt), brotli, ripgrep, python3, curl, unzip, git, ca-certificates
 #
 # Build args mirror the variables Scripts/linux.sh exports so a bump to the
 # Swift toolchain or Wasm SDK is a one-line change in both places. CI passes
@@ -47,6 +47,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 #   - ripgrep:       used by repo tests + matches the GH Actions runner setup
 #   - binaryen:      provides wasm-opt for local primary-repo Wasm diagnostics
 #   - brotli:        available for local primary-repo web artifact checks
+#   - python3:       parses Swift loaded-module traces in policy checks
 #   - jq:            convenient for inspecting JSON in the container
 #
 # `--no-install-recommends` keeps the image close to the minimum, and we wipe
@@ -61,6 +62,7 @@ RUN apt-get update \
       ripgrep \
       binaryen \
       brotli \
+      python3 \
       jq \
  && rm -rf /var/lib/apt/lists/*
 
@@ -98,6 +100,7 @@ RUN swiftly --version \
  && bun --version \
  && wasm-opt --version \
  && brotli --version \
+ && python3 --version \
  && rg --version | head -n 1
 
 # Default working directory matches the host bind mount target in linux.sh.

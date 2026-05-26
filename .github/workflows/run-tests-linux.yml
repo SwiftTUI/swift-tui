@@ -65,6 +65,7 @@ jobs:
             git \
             jq \
             libcurl4-openssl-dev \
+            python3 \
             ripgrep \
             unzip
 
