@@ -49,35 +49,14 @@ let packageDependencies: [Package.Dependency] = [
     url: "https://github.com/swhitty/FlyingFox.git",
     from: "0.26.0"
   ),
-  .package(
-    path: "Vendor/UnixSignals"
-  ),
-  .package(
-    path: "Vendor/swift-figlet"
-  ),
-  .package(
-    path: "Vendor/swift-gif"
-  ),
-  .package(
-    path: "Vendor/swift-jpeg"
-  ),
-  .package(
-    path: "Vendor/swift-png"
-  ),
 ]
 
 let swiftTUIRuntimeDependencies: [Target.Dependency] = [
   "SwiftTUICore",
   "SwiftTUIViews",
-  .product(name: "EmbeddedFonts", package: "swift-figlet"),
-  .product(
-    name: "JPEG",
-    package: "swift-jpeg"
-  ),
-  .product(
-    name: "PNG",
-    package: "swift-png"
-  ),
+  "EmbeddedFonts",
+  "JPEG",
+  "PNG",
 ]
 
 let swiftTUITestDependencies: [Target.Dependency] = [
@@ -88,14 +67,8 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUITestSupport",
   "SwiftTUIAnimatedImage",
   "SwiftTUICharts",
-  .product(
-    name: "JPEG",
-    package: "swift-jpeg"
-  ),
-  .product(
-    name: "PNG",
-    package: "swift-png"
-  ),
+  "JPEG",
+  "PNG",
 ]
 
 #if os(Linux)
@@ -156,8 +129,8 @@ let package = Package(
         .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-        .product(name: "SwiftFiglet", package: "swift-figlet"),
-        .product(name: "EmbeddedFonts", package: "swift-figlet"),
+        "SwiftFiglet",
+        "EmbeddedFonts",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -166,7 +139,7 @@ let package = Package(
       name: "SwiftTUIViews",
       dependencies: [
         "SwiftTUICore",
-        .product(name: "EmbeddedFonts", package: "swift-figlet"),
+        "EmbeddedFonts",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -182,7 +155,7 @@ let package = Package(
       dependencies: [
         "SwiftTUICore",
         "SwiftTUIViews",
-        .product(name: "GIF", package: "swift-gif"),
+        "GIF",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -250,7 +223,7 @@ let package = Package(
         "SwiftTUIRuntime",
         "SwiftTUIArguments",
         "SwiftTUIPTYPrimitives",
-        .product(name: "UnixSignals", package: "UnixSignals"),
+        "UnixSignals",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Platforms/CLI/Sources/SwiftTUICLI",
@@ -303,6 +276,53 @@ let package = Package(
       path: "Tests/Support",
       swiftSettings: swiftSettings()
     ),
+
+    // -- Absorbed Vendor targets --
+    // Sources remain under Vendor/<pkg>/ on disk; the per-Vendor Package.swift
+    // files have been deleted. swift-tui now owns these modules as first-class
+    // targets, so the package has no local-path subpackage dependencies and
+    // can be consumed by external SwiftPM clients.
+    .target(
+      name: "UnixSignals",
+      dependencies: [
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+      ],
+      path: "Vendor/UnixSignals/Sources/UnixSignals",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftFiglet",
+      path: "Vendor/swift-figlet/Sources/SwiftFiglet",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "EmbeddedFonts",
+      dependencies: ["SwiftFiglet"],
+      path: "Vendor/swift-figlet/Sources/EmbeddedFonts",
+      swiftSettings: swiftSettings()
+    ),
+    .executableTarget(
+      name: "figlet",
+      dependencies: ["SwiftFiglet", "EmbeddedFonts"],
+      path: "Vendor/swift-figlet/Sources/figlet",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "GIF",
+      path: "Vendor/swift-gif/Sources/GIF",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "JPEG",
+      path: "Vendor/swift-jpeg/Sources/JPEG",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "PNG",
+      path: "Vendor/swift-png/Sources/PNG",
+      swiftSettings: swiftSettings()
+    ),
+
     .testTarget(
       name: "SwiftTUICoreTests",
       dependencies: [
@@ -418,6 +438,42 @@ let package = Package(
         "SwiftTUI",
         "SwiftTUITestSupport",
       ],
+      swiftSettings: swiftSettings()
+    ),
+
+    // -- Absorbed Vendor test targets --
+    .testTarget(
+      name: "UnixSignalsTests",
+      dependencies: [
+        "UnixSignals",
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+      ],
+      path: "Vendor/UnixSignals/Tests/UnixSignalsTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftFigletTests",
+      dependencies: ["SwiftFiglet", "EmbeddedFonts"],
+      path: "Vendor/swift-figlet/Tests/SwiftFigletTests",
+      exclude: ["Fixtures"],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "GIFTests",
+      dependencies: ["GIF"],
+      path: "Vendor/swift-gif/Sources/GIFTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "JPEGTests",
+      dependencies: ["JPEG"],
+      path: "Vendor/swift-jpeg/Sources/JPEGTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "PNGTests",
+      dependencies: ["PNG"],
+      path: "Vendor/swift-png/Sources/PNGTests",
       swiftSettings: swiftSettings()
     ),
   ]

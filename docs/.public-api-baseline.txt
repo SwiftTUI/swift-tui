@@ -1530,6 +1530,7 @@ SwiftTUICore.PixelSize.init(width:height:)
 SwiftTUICore.PixelSize.width
 SwiftTUICore.PixelSize.zero
 SwiftTUICore.PlacedNode
+SwiftTUICore.PlacedNode.==(_:_:)
 SwiftTUICore.PlacedNode.bounds
 SwiftTUICore.PlacedNode.children
 SwiftTUICore.PlacedNode.clipBounds

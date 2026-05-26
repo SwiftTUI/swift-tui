@@ -817,6 +817,33 @@ run_function_step \
   "$(swift_command_text test --filter SwiftTUIWebHostTests)" \
   run_swift test --filter SwiftTUIWebHostTests
 
+# Absorbed Vendor test targets (sources under Vendor/<pkg>/, targets first-class
+# inside swift-tui's Package.swift since the Vendor sub-packages were absorbed).
+run_function_step \
+  "Run UnixSignals tests" \
+  "$(swift_command_text test --filter UnixSignalsTests)" \
+  run_swift test --filter UnixSignalsTests
+
+run_function_step \
+  "Run SwiftFiglet tests" \
+  "$(swift_command_text test --filter SwiftFigletTests)" \
+  run_swift test --filter SwiftFigletTests
+
+run_function_step \
+  "Run GIF tests" \
+  "$(swift_command_text test --filter GIFTests)" \
+  run_swift test --filter GIFTests
+
+run_function_step \
+  "Run JPEG tests" \
+  "$(swift_command_text test --filter JPEGTests)" \
+  run_swift test --filter JPEGTests
+
+run_function_step \
+  "Run PNG tests" \
+  "$(swift_command_text test --filter PNGTests)" \
+  run_swift test --filter PNGTests
+
 if [ "$is_linux" -eq 1 ]; then
   skip_step \
     "Run SwiftUIHost tests" \
