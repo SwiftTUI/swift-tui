@@ -219,7 +219,7 @@ private let defaultWidth = 80
 private func detectedTerminalWidth() -> Int? {
   #if canImport(Darwin) || canImport(Glibc)
     var size = winsize()
-    let result = unsafe ioctl(STDOUT_FILENO, TIOCGWINSZ, &size)
+    let result = unsafe ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), &size)
     guard result == 0, size.ws_col > 0 else {
       return nil
     }

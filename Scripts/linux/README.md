@@ -97,12 +97,13 @@ toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 ./Scripts/linux.sh info           # Sanity check: prints toolchain versions
 
 # Run CI-shaped validation plus optional Linux-only build checks:
-./Scripts/linux.sh test           # Linux repo gate (Scripts/test_gate.sh)
+./Scripts/linux.sh test           # CI Linux repo gate (Scripts/test_gate.sh)
+./Scripts/linux.sh root-build-tests  # raw root-package swift build --build-tests
 ./Scripts/linux.sh root-test      # raw root-package swiftly run swift test
 ./Scripts/linux.sh cli-test       # focused SwiftTUICLI tests from the root package
 ./Scripts/linux.sh examples       # Print the extracted examples workflow location
 ./Scripts/linux.sh web            # Print the extracted browser workflow location
-./Scripts/linux.sh full           # repo gate
+./Scripts/linux.sh full           # local full gate, incl. split CI checks
 
 # Drop into the container for ad-hoc work:
 ./Scripts/linux.sh shell
@@ -114,9 +115,10 @@ toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 ./Scripts/linux.sh nuke           # Delete container AND SwiftPM cache volume
 ```
 
-`start` is idempotent: if the container is already running it does nothing,
-if it exists but is stopped it starts it, and if it doesn't exist it creates
-it. You don't need to babysit it.
+`start` is idempotent: if the container is already running with the expected
+bind-mounted repo it does nothing, if it exists but is stopped it starts it,
+and if it doesn't exist or points at an old checkout path it recreates it. You
+don't need to babysit it.
 
 ---
 
@@ -136,16 +138,23 @@ When you run `./Scripts/linux.sh test`, the script:
    - The SwiftPM cache **volume**, mounted at `/root/.cache/org.swift.swiftpm`.
 5. Sets `WORKDIR=/workspace`, then runs `sleep infinity` as PID 1 so the
    container stays alive between commands.
-6. `docker exec`s `sh ./Scripts/test_gate.sh --skip-bun-install` inside it, with
-   `DISABLE_EXPLICIT_PLATFORMS=1` so `Package.swift` skips the macOS/iOS
-   platform pins.
+6. `docker exec`s `sh ./Scripts/test_gate.sh --skip-bun-install` inside it,
+   with `DISABLE_EXPLICIT_PLATFORMS=1` so `Package.swift` skips the macOS/iOS
+   platform pins, and with the same public-API / TermUIPerf skip environment
+   that the GitHub Linux repo gate uses.
 
-Use `./Scripts/linux.sh root-test` when you specifically need a raw
-root-package `swiftly run swift test` run. The CI-shaped gate intentionally
-splits root tests by target through `Scripts/test_gate.sh`, and the broad
-SwiftTUI runtime step isolates the high-contention async lifecycle and
-frame-tail suites. CI also runs the Linux repo gate on native amd64 and arm64
-runners, so architecture coverage does not depend on x86 emulation.
+Use `./Scripts/linux.sh root-build-tests` when a Linux failure is a compile
+error and you want to avoid running tests. Use `./Scripts/linux.sh root-test`
+when you specifically need a raw root-package `swiftly run swift test` run. The
+CI-shaped gate intentionally splits root tests by target through
+`Scripts/test_gate.sh`, and the broad SwiftTUI runtime step isolates the
+high-contention async lifecycle and frame-tail suites. CI also runs the Linux
+repo gate on native amd64 and arm64 runners, so architecture coverage does not
+depend on x86 emulation.
+
+Use `./Scripts/linux.sh full` when you intentionally want the slower local
+superset that also runs the public API baseline and TermUIPerf tests covered by
+separate CI workflows.
 
 **Bind mounts vs named volumes** is the key distinction:
 
@@ -350,8 +359,8 @@ Check that the cache volume is actually mounted:
 ```
 
 You should see `…swiftpm-cache on /root/.cache/org.swift.swiftpm`. If not,
-the container was created against an older script version — `reset` and
-`start` to recreate.
+the container was created against an older script version — rerun the command
+with the current script so it can recreate the container.
 
 ### `./linux.sh shell` exits immediately
 
@@ -363,7 +372,8 @@ docker logs <container-name>
 ```
 
 Most common cause: image manifest changed and the named container is bound
-to an older config. `./Scripts/linux.sh reset` recreates it.
+to an older config. Rerun `./Scripts/linux.sh shell`; the current script
+recreates containers whose bind mount or workdir no longer matches.
 
 ### Switching between the prebuilt image and a vanilla one mid-session
 
