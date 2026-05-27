@@ -2,6 +2,241 @@ import CoreGraphics
 import Foundation
 import SwiftTUIRuntime
 
+struct NativeTerminalSurfaceConfirmedSlack: Equatable {
+  private struct AxisSlack: Equatable {
+    var preferred: Int
+    var capacity: Int
+  }
+
+  private var width: AxisSlack?
+  private var height: AxisSlack?
+
+  mutating func update(
+    preferredGridSize: CellSize?,
+    renderedGridSize: CellSize?
+  ) {
+    width = updatedAxisSlack(
+      preferred: preferredGridSize?.width,
+      rendered: renderedGridSize?.width,
+      current: width
+    )
+    height = updatedAxisSlack(
+      preferred: preferredGridSize?.height,
+      rendered: renderedGridSize?.height,
+      current: height
+    )
+  }
+
+  func confirmedPreferredWidth(
+    proposed: Int,
+    preferred: Int?,
+    rendered: Int?
+  ) -> Int? {
+    confirmedPreferred(
+      axisSlack: width,
+      proposed: proposed,
+      preferred: preferred,
+      rendered: rendered
+    )
+  }
+
+  func confirmedPreferredHeight(
+    proposed: Int,
+    preferred: Int?,
+    rendered: Int?
+  ) -> Int? {
+    confirmedPreferred(
+      axisSlack: height,
+      proposed: proposed,
+      preferred: preferred,
+      rendered: rendered
+    )
+  }
+
+  private func updatedAxisSlack(
+    preferred: Int?,
+    rendered: Int?,
+    current: AxisSlack?
+  ) -> AxisSlack? {
+    guard let preferred, let rendered else {
+      return nil
+    }
+
+    let normalizedPreferred = max(1, preferred)
+    let normalizedRendered = max(1, rendered)
+    if normalizedPreferred < normalizedRendered {
+      return AxisSlack(preferred: normalizedPreferred, capacity: normalizedRendered)
+    }
+    if let current, normalizedPreferred == current.preferred,
+      normalizedRendered <= current.capacity
+    {
+      return current
+    }
+    return nil
+  }
+
+  private func confirmedPreferred(
+    axisSlack: AxisSlack?,
+    proposed: Int,
+    preferred: Int?,
+    rendered: Int?
+  ) -> Int? {
+    guard let axisSlack, let preferred, let rendered else {
+      return nil
+    }
+
+    guard max(1, preferred) == axisSlack.preferred,
+      max(1, rendered) <= axisSlack.capacity,
+      max(1, proposed) <= axisSlack.capacity
+    else {
+      return nil
+    }
+
+    return axisSlack.preferred
+  }
+}
+
+struct NativeTerminalSurfaceSizeNegotiation: Equatable {
+  var size: CGSize
+  var probeGridSize: CellSize?
+}
+
+struct NativeTerminalSurfaceSizeNegotiator {
+  var cellSize: CGSize
+  var preferredGridSize: CellSize?
+  var renderedGridSize: CellSize?
+  var fallbackGridSize = CellSize(width: 80, height: 24)
+  var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
+
+  func sizeThatFits(
+    proposedWidth: CGFloat?,
+    proposedHeight: CGFloat?
+  ) -> CGSize {
+    negotiate(
+      proposedWidth: proposedWidth,
+      proposedHeight: proposedHeight
+    ).size
+  }
+
+  func negotiate(
+    proposedWidth: CGFloat?,
+    proposedHeight: CGFloat?
+  ) -> NativeTerminalSurfaceSizeNegotiation {
+    let width = resolvedAxis(
+      preferred: preferredGridSize?.width,
+      rendered: renderedGridSize?.width,
+      fallback: fallbackGridSize.width,
+      proposedLength: proposedWidth,
+      cellLength: cellSize.width
+    ) { proposed, preferred, rendered in
+      confirmedSlack.confirmedPreferredWidth(
+        proposed: proposed,
+        preferred: preferred,
+        rendered: rendered
+      )
+    }
+    let height = resolvedAxis(
+      preferred: preferredGridSize?.height,
+      rendered: renderedGridSize?.height,
+      fallback: fallbackGridSize.height,
+      proposedLength: proposedHeight,
+      cellLength: cellSize.height
+    ) { proposed, preferred, rendered in
+      confirmedSlack.confirmedPreferredHeight(
+        proposed: proposed,
+        preferred: preferred,
+        rendered: rendered
+      )
+    }
+
+    let probeGridSize: CellSize? =
+      if width.probeCells != nil || height.probeCells != nil {
+        CellSize(
+          width: width.probeCells ?? width.cells,
+          height: height.probeCells ?? height.cells
+        )
+      } else {
+        nil
+      }
+
+    return NativeTerminalSurfaceSizeNegotiation(
+      size: CGSize(
+        width: CGFloat(width.cells) * cellSize.width,
+        height: CGFloat(height.cells) * cellSize.height
+      ),
+      probeGridSize: probeGridSize
+    )
+  }
+
+  func intrinsicContentSize(
+    noIntrinsicMetric: CGFloat
+  ) -> CGSize {
+    guard let preferredGridSize else {
+      return CGSize(width: noIntrinsicMetric, height: noIntrinsicMetric)
+    }
+
+    return CGSize(
+      width: CGFloat(max(1, preferredGridSize.width)) * cellSize.width,
+      height: CGFloat(max(1, preferredGridSize.height)) * cellSize.height
+    )
+  }
+
+  private struct AxisNegotiation {
+    var cells: Int
+    var probeCells: Int?
+  }
+
+  private func resolvedAxis(
+    preferred: Int?,
+    rendered: Int?,
+    fallback: Int,
+    proposedLength: CGFloat?,
+    cellLength: CGFloat,
+    confirmedPreferred: (Int, Int?, Int?) -> Int?
+  ) -> AxisNegotiation {
+    let preferred = preferred.map { max(1, $0) }
+    let rendered = rendered.map { max(1, $0) }
+
+    if let proposedCells = proposedCells(
+      for: proposedLength,
+      cellLength: cellLength
+    ) {
+      if let confirmedPreferred = confirmedPreferred(proposedCells, preferred, rendered) {
+        return AxisNegotiation(
+          cells: max(1, min(confirmedPreferred, proposedCells)),
+          probeCells: nil
+        )
+      }
+
+      guard let preferred else {
+        return AxisNegotiation(cells: proposedCells, probeCells: nil)
+      }
+      if let rendered, proposedCells > rendered, preferred == rendered {
+        return AxisNegotiation(cells: preferred, probeCells: proposedCells)
+      }
+      return AxisNegotiation(cells: max(1, min(preferred, proposedCells)), probeCells: nil)
+    }
+
+    return AxisNegotiation(cells: max(1, preferred ?? rendered ?? fallback), probeCells: nil)
+  }
+
+  private func proposedCells(
+    for proposedLength: CGFloat?,
+    cellLength: CGFloat
+  ) -> Int? {
+    guard let proposedLength,
+      proposedLength.isFinite,
+      proposedLength > 0,
+      cellLength.isFinite,
+      cellLength > 0
+    else {
+      return nil
+    }
+
+    return max(1, Int((proposedLength / cellLength).rounded(.down)))
+  }
+}
+
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
   import AppKit
 
@@ -20,15 +255,29 @@ import SwiftTUIRuntime
 
     var focusPresentation: FocusPresentation = .none
     var allowsTextInput = false
+    var preferredGridSize: CellSize? {
+      didSet {
+        guard oldValue != preferredGridSize else {
+          return
+        }
+        invalidateNegotiatedSize()
+      }
+    }
     var onResize: ((CellSize, PixelSize?) -> Void)?
     var onInputEvent: ((InputEvent) -> Void)?
 
     private var metrics = NativeTerminalMetrics(style: .default)
-    private var lastPublishedGrid: CellSize?
-    private var lastPublishedCellPixelSize: PixelSize?
+    private var lastPublishedLayoutGrid: CellSize?
+    private var lastPublishedLayoutCellPixelSize: PixelSize?
+    private var lastRequestedSurfaceGrid: CellSize?
+    private var lastRequestedSurfaceCellPixelSize: PixelSize?
+    private var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+    override var intrinsicContentSize: NSSize {
+      sizeNegotiator.intrinsicContentSize(noIntrinsicMetric: NSView.noIntrinsicMetric)
+    }
 
     override init(frame frameRect: NSRect) {
       super.init(frame: frameRect)
@@ -73,6 +322,13 @@ import SwiftTUIRuntime
     ) {
       let previousSize = self.surface?.size
       self.surface = surface
+      confirmedSlack.update(
+        preferredGridSize: preferredGridSize,
+        renderedGridSize: surface?.size
+      )
+      if previousSize != surface?.size {
+        invalidateNegotiatedSize()
+      }
       invalidateSurface(previousSize: previousSize, surface: surface, damage: damage)
     }
 
@@ -156,7 +412,41 @@ import SwiftTUIRuntime
 
     private func updateMetrics() {
       metrics = NativeTerminalMetrics(style: style)
+      invalidateNegotiatedSize()
       publishGridIfNeeded()
+    }
+
+    func negotiatedSizeThatFits(
+      proposedWidth: CGFloat?,
+      proposedHeight: CGFloat?,
+      preferredGridSize: CellSize?
+    ) -> CGSize {
+      let negotiation = makeSizeNegotiator(preferredGridSize: preferredGridSize).negotiate(
+        proposedWidth: proposedWidth,
+        proposedHeight: proposedHeight
+      )
+      publishProbeGridIfNeeded(negotiation.probeGridSize)
+      return negotiation.size
+    }
+
+    private var sizeNegotiator: NativeTerminalSurfaceSizeNegotiator {
+      makeSizeNegotiator(preferredGridSize: preferredGridSize)
+    }
+
+    private func makeSizeNegotiator(
+      preferredGridSize: CellSize?
+    ) -> NativeTerminalSurfaceSizeNegotiator {
+      NativeTerminalSurfaceSizeNegotiator(
+        cellSize: metrics.cellSize,
+        preferredGridSize: preferredGridSize,
+        renderedGridSize: surface?.size,
+        confirmedSlack: confirmedSlack
+      )
+    }
+
+    private func invalidateNegotiatedSize() {
+      invalidateIntrinsicContentSize()
+      needsLayout = true
     }
 
     private func publishGridIfNeeded() {
@@ -166,12 +456,43 @@ import SwiftTUIRuntime
 
       let grid = metrics.gridSize(for: bounds.size)
       let cellPixelSize = metrics.cellPixelSize(scale: backingScale)
-      guard grid != lastPublishedGrid || cellPixelSize != lastPublishedCellPixelSize else {
+      guard
+        grid != lastPublishedLayoutGrid
+          || cellPixelSize != lastPublishedLayoutCellPixelSize
+      else {
         return
       }
 
-      lastPublishedGrid = grid
-      lastPublishedCellPixelSize = cellPixelSize
+      lastPublishedLayoutGrid = grid
+      lastPublishedLayoutCellPixelSize = cellPixelSize
+      publishSurfaceGridIfNeeded(grid, cellPixelSize: cellPixelSize)
+    }
+
+    private func publishProbeGridIfNeeded(
+      _ grid: CellSize?
+    ) {
+      guard let grid else {
+        return
+      }
+      publishSurfaceGridIfNeeded(
+        grid,
+        cellPixelSize: metrics.cellPixelSize(scale: backingScale)
+      )
+    }
+
+    private func publishSurfaceGridIfNeeded(
+      _ grid: CellSize,
+      cellPixelSize: PixelSize?
+    ) {
+      guard
+        grid != lastRequestedSurfaceGrid
+          || cellPixelSize != lastRequestedSurfaceCellPixelSize
+      else {
+        return
+      }
+
+      lastRequestedSurfaceGrid = grid
+      lastRequestedSurfaceCellPixelSize = cellPixelSize
       onResize?(grid, cellPixelSize)
     }
 
@@ -228,12 +549,23 @@ import SwiftTUIRuntime
       didSet { syncFirstResponder() }
     }
 
+    var preferredGridSize: CellSize? {
+      didSet {
+        guard oldValue != preferredGridSize else {
+          return
+        }
+        invalidateNegotiatedSize()
+      }
+    }
     var onResize: ((CellSize, PixelSize?) -> Void)?
     var onInputEvent: ((InputEvent) -> Void)?
 
     private var metrics = NativeTerminalMetrics(style: .default)
-    private var lastPublishedGrid: CellSize?
-    private var lastPublishedCellPixelSize: PixelSize?
+    private var lastPublishedLayoutGrid: CellSize?
+    private var lastPublishedLayoutCellPixelSize: PixelSize?
+    private var lastRequestedSurfaceGrid: CellSize?
+    private var lastRequestedSurfaceCellPixelSize: PixelSize?
+    private var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
 
     override init(frame: CGRect) {
       super.init(frame: frame)
@@ -248,6 +580,9 @@ import SwiftTUIRuntime
     }
 
     override var canBecomeFirstResponder: Bool { true }
+    override var intrinsicContentSize: CGSize {
+      sizeNegotiator.intrinsicContentSize(noIntrinsicMetric: UIView.noIntrinsicMetric)
+    }
     var hasText: Bool { false }
 
     override func layoutSubviews() {
@@ -281,6 +616,13 @@ import SwiftTUIRuntime
     ) {
       let previousSize = self.surface?.size
       self.surface = surface
+      confirmedSlack.update(
+        preferredGridSize: preferredGridSize,
+        renderedGridSize: surface?.size
+      )
+      if previousSize != surface?.size {
+        invalidateNegotiatedSize()
+      }
       invalidateSurface(previousSize: previousSize, surface: surface, damage: damage)
     }
 
@@ -392,7 +734,41 @@ import SwiftTUIRuntime
 
     private func updateMetrics() {
       metrics = NativeTerminalMetrics(style: style)
+      invalidateNegotiatedSize()
       publishGridIfNeeded()
+    }
+
+    func negotiatedSizeThatFits(
+      proposedWidth: CGFloat?,
+      proposedHeight: CGFloat?,
+      preferredGridSize: CellSize?
+    ) -> CGSize {
+      let negotiation = makeSizeNegotiator(preferredGridSize: preferredGridSize).negotiate(
+        proposedWidth: proposedWidth,
+        proposedHeight: proposedHeight
+      )
+      publishProbeGridIfNeeded(negotiation.probeGridSize)
+      return negotiation.size
+    }
+
+    private var sizeNegotiator: NativeTerminalSurfaceSizeNegotiator {
+      makeSizeNegotiator(preferredGridSize: preferredGridSize)
+    }
+
+    private func makeSizeNegotiator(
+      preferredGridSize: CellSize?
+    ) -> NativeTerminalSurfaceSizeNegotiator {
+      NativeTerminalSurfaceSizeNegotiator(
+        cellSize: metrics.cellSize,
+        preferredGridSize: preferredGridSize,
+        renderedGridSize: surface?.size,
+        confirmedSlack: confirmedSlack
+      )
+    }
+
+    private func invalidateNegotiatedSize() {
+      invalidateIntrinsicContentSize()
+      setNeedsLayout()
     }
 
     private func publishGridIfNeeded() {
@@ -402,12 +778,43 @@ import SwiftTUIRuntime
 
       let grid = metrics.gridSize(for: bounds.size)
       let cellPixelSize = metrics.cellPixelSize(scale: backingScale)
-      guard grid != lastPublishedGrid || cellPixelSize != lastPublishedCellPixelSize else {
+      guard
+        grid != lastPublishedLayoutGrid
+          || cellPixelSize != lastPublishedLayoutCellPixelSize
+      else {
         return
       }
 
-      lastPublishedGrid = grid
-      lastPublishedCellPixelSize = cellPixelSize
+      lastPublishedLayoutGrid = grid
+      lastPublishedLayoutCellPixelSize = cellPixelSize
+      publishSurfaceGridIfNeeded(grid, cellPixelSize: cellPixelSize)
+    }
+
+    private func publishProbeGridIfNeeded(
+      _ grid: CellSize?
+    ) {
+      guard let grid else {
+        return
+      }
+      publishSurfaceGridIfNeeded(
+        grid,
+        cellPixelSize: metrics.cellPixelSize(scale: backingScale)
+      )
+    }
+
+    private func publishSurfaceGridIfNeeded(
+      _ grid: CellSize,
+      cellPixelSize: PixelSize?
+    ) {
+      guard
+        grid != lastRequestedSurfaceGrid
+          || cellPixelSize != lastRequestedSurfaceCellPixelSize
+      else {
+        return
+      }
+
+      lastRequestedSurfaceGrid = grid
+      lastRequestedSurfaceCellPixelSize = cellPixelSize
       onResize?(grid, cellPixelSize)
     }
 

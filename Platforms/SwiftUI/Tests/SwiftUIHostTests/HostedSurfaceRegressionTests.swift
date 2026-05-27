@@ -139,6 +139,36 @@ struct HostedSurfaceRegressionTests {
   }
 
   @MainActor
+  @Test("semantic host frame reports measured window content size")
+  func semanticHostFrameReportsMeasuredWindowContentSize() async throws {
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 40, height: 10),
+      appearance: .fallback,
+      onFrame: { _ in }
+    )
+    let session = try HostedSceneSession(
+      for: NaturalSizeSurfaceApp(),
+      sceneID: "main",
+      surface: surface
+    )
+
+    let runTask = Task { try await session.start() }
+    defer {
+      session.stop()
+    }
+
+    let frame = await surface.waitForFrame { frame in
+      frame.raster.renderedText.contains("Natural")
+    }
+
+    #expect(frame.raster.size == .init(width: 40, height: 10))
+    #expect(frame.preferredLayoutSize == .init(width: 7, height: 1))
+
+    _ = try await session.stopAndWait()
+    _ = await runTask.result
+  }
+
+  @MainActor
   @Test
   func hosted_surface_drag_gesture_receives_fractional_location() async throws {
     let surface = hostedSurface()
@@ -243,6 +273,15 @@ private struct FractionalDragSurfaceApp: SwiftTUIRuntime.App {
   var body: some SwiftTUIRuntime.Scene {
     WindowGroup("Main", id: "main") {
       FractionalDragSurfaceView()
+    }
+  }
+}
+
+@MainActor
+private struct NaturalSizeSurfaceApp: SwiftTUIRuntime.App {
+  var body: some SwiftTUIRuntime.Scene {
+    WindowGroup("Main", id: "main") {
+      Text("Natural")
     }
   }
 }

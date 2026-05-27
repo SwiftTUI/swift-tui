@@ -139,6 +139,44 @@ import Testing
   }
 
   @MainActor
+  @Test
+  func native_surface_view_growth_probe_is_not_undone_by_unchanged_layout_bounds() {
+    let metrics = NativeTerminalMetrics(style: .default)
+    let visibleGrid = CellSize(width: 5, height: 3)
+    let probeGrid = CellSize(width: 12, height: 6)
+    let view = NativeTerminalSurfaceView(
+      frame: NSRect(
+        x: 0,
+        y: 0,
+        width: metrics.cellSize.width * CGFloat(visibleGrid.width),
+        height: metrics.cellSize.height * CGFloat(visibleGrid.height)
+      )
+    )
+    var resizes: [CellSize] = []
+    view.onResize = { size, _ in
+      resizes.append(size)
+    }
+    view.preferredGridSize = visibleGrid
+    view.present(
+      surface: RasterSurface(
+        size: visibleGrid,
+        lines: Array(repeating: "", count: visibleGrid.height)
+      ),
+      damage: nil
+    )
+
+    view.layout()
+    _ = view.negotiatedSizeThatFits(
+      proposedWidth: metrics.cellSize.width * CGFloat(probeGrid.width),
+      proposedHeight: metrics.cellSize.height * CGFloat(probeGrid.height),
+      preferredGridSize: visibleGrid
+    )
+    view.layout()
+
+    #expect(resizes == [visibleGrid, probeGrid])
+  }
+
+  @MainActor
   private func windowPoint(
     forLocal local: NSPoint,
     in view: NativeTerminalSurfaceView
