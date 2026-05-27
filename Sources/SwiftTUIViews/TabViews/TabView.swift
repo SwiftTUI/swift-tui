@@ -114,7 +114,8 @@ extension TabView {
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
-                delta: -1
+                delta: -1,
+                presentation: stylePresentation
               )
               return true
             case KeyPress(.arrowRight, modifiers: []):
@@ -123,7 +124,8 @@ extension TabView {
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
-                delta: 1
+                delta: 1,
+                presentation: stylePresentation
               )
               return true
             case KeyPress(.home, modifiers: []):
@@ -138,7 +140,32 @@ extension TabView {
             where storedTabOverflowMenuExpanded(in: ownerNode):
               setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               return true
-            case KeyPress(.arrowUp, modifiers: []), KeyPress(.arrowDown, modifiers: []):
+            case KeyPress(.arrowDown, modifiers: []):
+              if expandFocusedOverflowMenuIfNeeded(
+                ownerNode: ownerNode,
+                selectedIndex: selectedIndex,
+                optionCount: options.count,
+                presentation: stylePresentation
+              ) {
+                return true
+              }
+              return moveStoredOverflowMenuFocus(
+                ownerNode: ownerNode,
+                selectedIndex: selectedIndex,
+                optionCount: options.count,
+                delta: 1,
+                presentation: stylePresentation
+              )
+            case KeyPress(.arrowUp, modifiers: []):
+              if moveStoredOverflowMenuFocus(
+                ownerNode: ownerNode,
+                selectedIndex: selectedIndex,
+                optionCount: options.count,
+                delta: -1,
+                presentation: stylePresentation
+              ) {
+                return true
+              }
               return true
             case KeyPress(.tab, modifiers: []), KeyPress(.tab, modifiers: .shift):
               setStoredTabOverflowMenuExpanded(false, in: ownerNode)
@@ -153,6 +180,14 @@ extension TabView {
         identity: context.identity,
         handler: {
           withAuthoringContext(dynamicPropertyScope) {
+            if expandFocusedOverflowMenuIfNeeded(
+              ownerNode: ownerNode,
+              selectedIndex: selectedIndex,
+              optionCount: options.count,
+              presentation: stylePresentation
+            ) {
+              return true
+            }
             setStoredTabOverflowMenuExpanded(false, in: ownerNode)
             return activateBoundTabSelection(
               binding,
@@ -383,7 +418,8 @@ private func moveStoredTabFocus(
   ownerNode: SwiftTUICore.ViewNode?,
   selectedIndex: Int?,
   optionCount: Int,
-  delta: Int
+  delta: Int,
+  presentation: TabViewStylePresentation
 ) {
   guard let direction = delta == 0 ? nil : delta.signum(), optionCount > 0 else {
     return
@@ -396,11 +432,101 @@ private func moveStoredTabFocus(
       optionCount: optionCount
     )
     ?? (direction > 0 ? -1 : optionCount)
+
+  if let overflow = presentation.overflowMenu, !overflow.isExpanded {
+    let overflowIndices = Set(overflow.overflowIndices)
+    if overflowIndices.contains(currentIndex) {
+      let nextIndex =
+        if direction < 0, let lastVisible = presentation.visibleOptionIndices.last {
+          lastVisible
+        } else {
+          overflow.preferredOverflowFocusIndex ?? overflow.overflowIndices.first ?? currentIndex
+        }
+      setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+      return
+    }
+
+    let nextIndex = min(
+      max(currentIndex + direction, 0),
+      optionCount - 1
+    )
+    if overflowIndices.contains(nextIndex),
+      let overflowFocusIndex =
+        overflow.preferredOverflowFocusIndex ?? overflow.overflowIndices.first
+    {
+      setStoredFocusedTabIndex(overflowFocusIndex, in: ownerNode)
+    } else {
+      setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+    }
+    return
+  }
+
   let nextIndex = min(
     max(currentIndex + direction, 0),
     optionCount - 1
   )
   setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+}
+
+@MainActor
+private func expandFocusedOverflowMenuIfNeeded(
+  ownerNode: SwiftTUICore.ViewNode?,
+  selectedIndex: Int?,
+  optionCount: Int,
+  presentation: TabViewStylePresentation
+) -> Bool {
+  guard let overflow = presentation.overflowMenu, !overflow.isExpanded else {
+    return false
+  }
+  guard
+    let index = resolvedFocusedTabIndex(
+      storedIndex: storedFocusedTabIndex(in: ownerNode),
+      selectedIndex: selectedIndex,
+      optionCount: optionCount
+    ),
+    overflow.overflowIndices.contains(index)
+  else {
+    return false
+  }
+
+  setStoredTabOverflowMenuExpanded(true, in: ownerNode)
+  setStoredFocusedTabIndex(index, in: ownerNode)
+  return true
+}
+
+@MainActor
+private func moveStoredOverflowMenuFocus(
+  ownerNode: SwiftTUICore.ViewNode?,
+  selectedIndex: Int?,
+  optionCount: Int,
+  delta: Int,
+  presentation: TabViewStylePresentation
+) -> Bool {
+  guard let direction = delta == 0 ? nil : delta.signum(),
+    let overflow = presentation.overflowMenu,
+    overflow.isExpanded,
+    !overflow.overflowIndices.isEmpty
+  else {
+    return false
+  }
+
+  let currentIndex =
+    resolvedFocusedTabIndex(
+      storedIndex: storedFocusedTabIndex(in: ownerNode),
+      selectedIndex: selectedIndex,
+      optionCount: optionCount
+    )
+    ?? overflow.preferredOverflowFocusIndex
+    ?? overflow.overflowIndices[0]
+  let currentOverflowPosition =
+    overflow.overflowIndices.firstIndex(of: currentIndex)
+    ?? (direction > 0 ? -1 : overflow.overflowIndices.count)
+  let nextOverflowPosition = min(
+    max(currentOverflowPosition + direction, 0),
+    overflow.overflowIndices.count - 1
+  )
+  setStoredFocusedTabIndex(overflow.overflowIndices[nextOverflowPosition], in: ownerNode)
+  return true
 }
 
 @MainActor
