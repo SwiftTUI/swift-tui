@@ -209,7 +209,13 @@ struct NativeTerminalSurfaceSizeNegotiator {
       }
 
       guard let preferred else {
-        return AxisNegotiation(cells: proposedCells, probeCells: nil)
+        guard let rendered else {
+          return AxisNegotiation(cells: 1, probeCells: proposedCells)
+        }
+        return AxisNegotiation(
+          cells: max(1, min(rendered, proposedCells)),
+          probeCells: nil
+        )
       }
       if let rendered, proposedCells > rendered, preferred == rendered {
         return AxisNegotiation(cells: preferred, probeCells: proposedCells)
@@ -451,6 +457,9 @@ struct NativeTerminalSurfaceSizeNegotiator {
 
     private func publishGridIfNeeded() {
       guard bounds.width > 0, bounds.height > 0 else {
+        return
+      }
+      guard preferredGridSize != nil || surface != nil else {
         return
       }
 
@@ -773,6 +782,9 @@ struct NativeTerminalSurfaceSizeNegotiator {
 
     private func publishGridIfNeeded() {
       guard bounds.width > 0, bounds.height > 0 else {
+        return
+      }
+      guard preferredGridSize != nil || surface != nil else {
         return
       }
 
