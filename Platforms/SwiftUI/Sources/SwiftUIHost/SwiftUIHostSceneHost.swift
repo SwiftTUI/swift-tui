@@ -12,6 +12,7 @@ public final class SwiftUIHostSceneHost {
   public private(set) var focusPresentation: FocusPresentation = .none
   public private(set) var manualKeyboardPresentationRequested = false
   public private(set) var latestSurface: RasterSurface?
+  public private(set) var latestPreferredLayoutSize: CellSize?
   public private(set) var latestSemanticSnapshot: SemanticSnapshot?
   public private(set) var focusedAccessibilityIdentity: Identity?
   public private(set) var style: SwiftUIHostTerminalStyle
@@ -99,6 +100,7 @@ public final class SwiftUIHostSceneHost {
     focusPresentation = .none
     focusedAccessibilityIdentity = nil
     latestPresentationDamage = nil
+    latestPreferredLayoutSize = nil
     latestSemanticHostFrameSequence = nil
     accessibilityAnnouncer.reset()
     manualKeyboardPresentationRequested = false
@@ -157,6 +159,7 @@ public final class SwiftUIHostSceneHost {
     }
     latestSemanticHostFrameSequence = frame.sequence
     latestSurface = frame.raster
+    latestPreferredLayoutSize = frame.preferredLayoutSize
     latestSemanticSnapshot = frame.semantics
     focusedAccessibilityIdentity = frame.focusedIdentity
     latestPresentationDamage = frame.rasterDamage

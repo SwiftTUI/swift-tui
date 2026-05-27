@@ -34,7 +34,10 @@ private struct TerminalSurfaceHost: SwiftUI.View {
   let host: SwiftUIHostSceneHost
 
   var body: some SwiftUI.View {
-    TerminalSurfaceRepresentable(host: host)
+    TerminalSurfaceRepresentable(
+      host: host,
+      preferredLayoutSize: host.latestPreferredLayoutSize
+    )
       .background(.clear)
   }
 }
@@ -43,6 +46,7 @@ private struct TerminalSurfaceHost: SwiftUI.View {
   @available(macOS 14.0, *)
   private struct TerminalSurfaceRepresentable: NSViewRepresentable {
     let host: SwiftUIHostSceneHost
+    let preferredLayoutSize: CellSize?
 
     func makeNSView(context _: Context) -> NativeTerminalSurfaceView {
       let view = NativeTerminalSurfaceView(frame: .zero)
@@ -54,7 +58,20 @@ private struct TerminalSurfaceHost: SwiftUI.View {
       configure(view)
     }
 
+    func sizeThatFits(
+      _ proposal: SwiftUI.ProposedViewSize,
+      nsView: NativeTerminalSurfaceView,
+      context _: Context
+    ) -> CGSize? {
+      nsView.negotiatedSizeThatFits(
+        proposedWidth: proposal.width,
+        proposedHeight: proposal.height,
+        preferredGridSize: preferredLayoutSize
+      )
+    }
+
     private func configure(_ view: NativeTerminalSurfaceView) {
+      view.preferredGridSize = preferredLayoutSize
       view.present(
         surface: host.latestSurface,
         damage: host.latestPresentationDamage
@@ -75,6 +92,7 @@ private struct TerminalSurfaceHost: SwiftUI.View {
   @available(iOS 17.0, macCatalyst 17.0, *)
   private struct TerminalSurfaceRepresentable: UIViewRepresentable {
     let host: SwiftUIHostSceneHost
+    let preferredLayoutSize: CellSize?
 
     func makeUIView(context _: Context) -> NativeTerminalSurfaceView {
       let view = NativeTerminalSurfaceView(frame: .zero)
@@ -86,7 +104,20 @@ private struct TerminalSurfaceHost: SwiftUI.View {
       configure(view)
     }
 
+    func sizeThatFits(
+      _ proposal: SwiftUI.ProposedViewSize,
+      uiView: NativeTerminalSurfaceView,
+      context _: Context
+    ) -> CGSize? {
+      uiView.negotiatedSizeThatFits(
+        proposedWidth: proposal.width,
+        proposedHeight: proposal.height,
+        preferredGridSize: preferredLayoutSize
+      )
+    }
+
     private func configure(_ view: NativeTerminalSurfaceView) {
+      view.preferredGridSize = preferredLayoutSize
       view.present(
         surface: host.latestSurface,
         damage: host.latestPresentationDamage

@@ -228,25 +228,32 @@ public struct SemanticHostFrameCapabilities: OptionSet, Sendable {
 ///
 /// ``rasterDamage`` describes changed raster rows/ranges relative to the
 /// previous committed raster frame. It is not a semantic-tree diff.
+///
+/// ``preferredLayoutSize`` is the measured window content size before the
+/// host's raster surface minimum is applied. Native hosts can use it as an
+/// ideal size when negotiating with an outer layout system.
 public struct SemanticHostFrame: Equatable, Sendable {
   public var sequence: UInt64
   public var raster: RasterSurface
   public var semantics: SemanticSnapshot
   public var focusedIdentity: Identity?
   public var rasterDamage: PresentationDamage?
+  public var preferredLayoutSize: CellSize?
 
   public init(
     sequence: UInt64,
     raster: RasterSurface,
     semantics: SemanticSnapshot,
     focusedIdentity: Identity?,
-    rasterDamage: PresentationDamage? = nil
+    rasterDamage: PresentationDamage? = nil,
+    preferredLayoutSize: CellSize? = nil
   ) {
     self.sequence = sequence
     self.raster = raster
     self.semantics = semantics
     self.focusedIdentity = focusedIdentity
     self.rasterDamage = rasterDamage
+    self.preferredLayoutSize = preferredLayoutSize
   }
 }
 

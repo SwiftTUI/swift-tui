@@ -41,7 +41,8 @@ extension RunLoop {
           raster: artifacts.rasterSurface,
           semantics: artifacts.semanticSnapshot,
           focusedIdentity: focusTracker.currentFocusIdentity,
-          rasterDamage: damage
+          rasterDamage: damage,
+          preferredLayoutSize: preferredHostLayoutSize(for: artifacts)
         )
       )
     } else if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
@@ -154,4 +155,50 @@ extension RunLoop {
       strategy: .fullRepaint
     )
   }
+}
+
+private func preferredHostLayoutSize(
+  for artifacts: FrameArtifacts
+) -> CellSize? {
+  preferredWindowContentSize(
+    resolved: artifacts.resolvedTree,
+    measured: artifacts.measuredTree
+  )
+}
+
+private func preferredWindowContentSize(
+  resolved: ResolvedNode,
+  measured: MeasuredNode
+) -> CellSize? {
+  if isWindowHostLayout(resolved) {
+    let childMeasurements = measured.childMeasurements
+    guard !childMeasurements.isEmpty else {
+      return measured.measuredSize
+    }
+
+    return childMeasurements.reduce(into: CellSize.zero) { partial, child in
+      partial.width = max(partial.width, child.measuredSize.width)
+      partial.height = max(partial.height, child.measuredSize.height)
+    }
+  }
+
+  for (resolvedChild, measuredChild) in zip(resolved.children, measured.childMeasurements) {
+    if let size = preferredWindowContentSize(
+      resolved: resolvedChild,
+      measured: measuredChild
+    ) {
+      return size
+    }
+  }
+
+  return nil
+}
+
+private func isWindowHostLayout(
+  _ node: ResolvedNode
+) -> Bool {
+  guard case .view("WindowHostLayout") = node.kind else {
+    return false
+  }
+  return true
 }

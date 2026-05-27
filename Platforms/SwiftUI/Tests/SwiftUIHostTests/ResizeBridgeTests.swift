@@ -1,3 +1,4 @@
+import CoreGraphics
 import SwiftTUI
 import Testing
 
@@ -166,4 +167,87 @@ func bridge_tracks_keyboard_policy_from_focus_presentation() {
   )
   #expect(bridge.focusPresentationForTesting.semantics == .edit)
   #expect(bridge.allowsExpandedKeyboardPresentationForTesting)
+}
+
+@MainActor
+@Test
+func native_surface_sizing_prefers_measured_grid_over_available_space() {
+  let metrics = NativeTerminalMetrics(style: .default)
+  let negotiator = NativeTerminalSurfaceSizeNegotiator(
+    cellSize: metrics.cellSize,
+    preferredGridSize: .init(width: 12, height: 3),
+    renderedGridSize: .init(width: 80, height: 24)
+  )
+
+  let negotiated = negotiator.sizeThatFits(
+    proposedWidth: metrics.cellSize.width * 80,
+    proposedHeight: metrics.cellSize.height * 24
+  )
+
+  #expect(negotiated.width == metrics.cellSize.width * 12)
+  #expect(negotiated.height == metrics.cellSize.height * 3)
+}
+
+@MainActor
+@Test
+func native_surface_sizing_snaps_finite_proposals_to_cell_blocks() {
+  let metrics = NativeTerminalMetrics(style: .default)
+  let negotiator = NativeTerminalSurfaceSizeNegotiator(
+    cellSize: metrics.cellSize,
+    preferredGridSize: .init(width: 12, height: 3),
+    renderedGridSize: .init(width: 80, height: 24)
+  )
+
+  let negotiated = negotiator.sizeThatFits(
+    proposedWidth: metrics.cellSize.width * 5.75,
+    proposedHeight: nil
+  )
+
+  #expect(negotiated.width == metrics.cellSize.width * 5)
+  #expect(negotiated.height == metrics.cellSize.height * 3)
+}
+
+@MainActor
+@Test
+func native_surface_sizing_probes_growth_without_returning_full_parent_proposal() {
+  let metrics = NativeTerminalMetrics(style: .default)
+  let negotiator = NativeTerminalSurfaceSizeNegotiator(
+    cellSize: metrics.cellSize,
+    preferredGridSize: .init(width: 5, height: 3),
+    renderedGridSize: .init(width: 5, height: 3)
+  )
+
+  let negotiated = negotiator.negotiate(
+    proposedWidth: metrics.cellSize.width * 12,
+    proposedHeight: metrics.cellSize.height * 6
+  )
+
+  #expect(negotiated.size.width == metrics.cellSize.width * 5)
+  #expect(negotiated.size.height == metrics.cellSize.height * 3)
+  #expect(negotiated.probeGridSize == .init(width: 12, height: 6))
+}
+
+@MainActor
+@Test
+func native_surface_sizing_remembers_confirmed_slack_after_growth_probe() {
+  let metrics = NativeTerminalMetrics(style: .default)
+  var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
+  confirmedSlack.update(
+    preferredGridSize: .init(width: 7, height: 1),
+    renderedGridSize: .init(width: 12, height: 6)
+  )
+  let negotiator = NativeTerminalSurfaceSizeNegotiator(
+    cellSize: metrics.cellSize,
+    preferredGridSize: .init(width: 7, height: 1),
+    renderedGridSize: .init(width: 7, height: 1),
+    confirmedSlack: confirmedSlack
+  )
+
+  let negotiated = negotiator.sizeThatFits(
+    proposedWidth: metrics.cellSize.width * 12,
+    proposedHeight: metrics.cellSize.height * 6
+  )
+
+  #expect(negotiated.width == metrics.cellSize.width * 7)
+  #expect(negotiated.height == metrics.cellSize.height * 1)
 }
