@@ -125,7 +125,7 @@ on a released tag, not `main`:
 ```swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
-  .upToNextMinor(from: "0.0.1")
+  .upToNextMinor(from: "0.0.3")
 )
 ```
 
