@@ -62,10 +62,12 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     // `.gesture(_:)` rebuilds the tree on every resolve — without
     // this clear, the per-identity bindings array grows unboundedly
     // across frames, retaining discarded `GestureStateBox` instances.
-    context.localGestureStateRegistry?.clearBindings(for: node.identity)
+    if !gestureRegistry.hasCurrentPassRecognizer(for: node.identity) {
+      context.localGestureStateRegistry?.clearBindings(for: node.identity)
+    }
 
     let recognizer = gesture._makeRecognizer(context: buildContext)
-    gestureRegistry.register(identity: node.identity, recognizer: recognizer)
+    gestureRegistry.registerStacked(identity: node.identity, recognizer: recognizer)
 
     // Forward pointer events through the recognizer. The handler
     // closure looks up the *current* recognizer from

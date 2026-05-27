@@ -90,6 +90,80 @@ struct GestureViewModifierTests {
     #expect(region.captureOnPress == true)
   }
 
+  @Test("stacked .gesture modifiers share one pointer stream")
+  func stackedGestureModifiersSharePointerStream() throws {
+    @MainActor final class Box {
+      var tapLocation: Point?
+      var dragLocation: Point?
+      var longPressCount = 0
+    }
+    let box = Box()
+    let root = Identity(components: [IdentityComponent(rawValue: "stacked-gestures")])
+    var env = EnvironmentValues()
+    env.terminalSize = CellSize(width: 20, height: 5)
+
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+
+    var ctx = ResolveContext(identity: root, environmentValues: env)
+    ctx.localPointerHandlerRegistry = pointerRegistry
+    ctx.localGestureRegistry = gestureRegistry
+    ctx.localGestureStateRegistry = gestureStateRegistry
+
+    let artifacts = DefaultRenderer().render(
+      Text("Pointer")
+        .frame(minWidth: 10, maxWidth: 10, minHeight: 2, maxHeight: 2)
+        .gesture(
+          SpatialTapGesture().onEnded { value in
+            box.tapLocation = value.location
+          }
+        )
+        .gesture(
+          DragGesture(minimumDistance: 0).onChanged { value in
+            box.dragLocation = value.location
+          }
+        )
+        .onLongPressGesture(minimumDuration: .milliseconds(1)) {
+          box.longPressCount += 1
+        },
+      context: ctx,
+      proposal: .init(width: 20, height: 5)
+    )
+
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    let point = Point(x: Double(region.rect.origin.x + 2), y: Double(region.rect.origin.y))
+    let pointer = PointerLocation.subCell(
+      location: point,
+      source: .nativePixels,
+      metrics: .estimated
+    )
+    let t0 = MonotonicInstant.now()
+
+    _ = pointerRegistry.dispatch(
+      routeID: region.routeID,
+      event: .init(
+        kind: .down(.primary),
+        location: pointer,
+        targetRect: region.rect,
+        timestamp: t0
+      )
+    )
+    _ = pointerRegistry.dispatch(
+      routeID: region.routeID,
+      event: .init(
+        kind: .up(.primary),
+        location: pointer,
+        targetRect: region.rect,
+        timestamp: t0.advanced(by: .milliseconds(2))
+      )
+    )
+
+    #expect(box.tapLocation == Point(x: 2, y: 0))
+    #expect(box.dragLocation == Point(x: 2, y: 0))
+    #expect(box.longPressCount == 1)
+  }
+
   @Test(".gesture(LongPressGesture()) sets captureOnPress on the region")
   func longPressCaptures() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
