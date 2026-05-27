@@ -2586,6 +2586,7 @@ SwiftTUIRuntime.FrameDiagnosticRecord.totalFrameDuration
 SwiftTUIRuntime.FrameDiagnosticRecord.workerTimings
 SwiftTUIRuntime.FrameDiagnosticsLogger
 SwiftTUIRuntime.FrameDiagnosticsLogger.init(path:)
+SwiftTUIRuntime.FrameDiagnosticsLogger.init(recordHandler:)
 SwiftTUIRuntime.FrameDiagnosticsLogger.log(_:)
 SwiftTUIRuntime.HostedRasterSurface
 SwiftTUIRuntime.HostedRasterSurface.appearance

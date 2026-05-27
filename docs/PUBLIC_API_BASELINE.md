@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 3 |
-| `SwiftTUIRuntime` | 55 | 492 |
+| `SwiftTUIRuntime` | 55 | 493 |
 | `SwiftTUIViews` | 263 | 1405 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
@@ -54,7 +54,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ExitKeyBindings` — struct — 5 members
 - `FileOpenError` — enum — 2 members
 - `FrameDiagnosticRecord` — struct — 75 members
-- `FrameDiagnosticsLogger` — class — 2 members
+- `FrameDiagnosticsLogger` — class — 3 members
 - `HostedRasterSurface` — class — 14 members
 - `HostedSceneSession` — class — 11 members
 - `HostedSceneSessionError` — enum — 2 members

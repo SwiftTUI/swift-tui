@@ -142,7 +142,7 @@ its runs are comparative measurements, not a gate.
 
 - **`0.9.0` public beta.** The intended next milestone — broadening
   contributors and stabilizing the surface toward `1.0.0` — has not been
-  reached. The project is a single-maintainer `0.0.1` alpha.
+  reached. The project is a single-maintainer `0.0.3` alpha.
 - **Global documentation linting.** `AllPublicDeclarationsHaveDocumentation` is
   deliberately off. In its place, `generate_public_api_inventory.sh --check`
   runs a report-only ratchet that counts `canonical` public symbols with no
