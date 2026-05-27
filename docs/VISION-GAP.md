@@ -115,8 +115,8 @@ exist in the repo, and the localhost WebHost works.
 
 **Not yet built.**
 
-- **npm publishing** of `@swifttui/web` and `@swifttui/build` as consumable
-  packages with compiled artifacts, type declarations, and CSS entrypoints.
+- **npm publishing** of `@swifttui/web` and `@swifttui/build`. The public
+  pre-release uses GitHub release tarballs until npm publication is enabled.
 - A **SwiftPM plugin** wrapping the web build flow.
 - Localhost-WebHost extensions: a multi-scene host, remote/shared sessions, and
   lifecycle polish such as ephemeral ports, QR-code launch, and server
@@ -142,7 +142,7 @@ its runs are comparative measurements, not a gate.
 
 - **`0.9.0` public beta.** The intended next milestone — broadening
   contributors and stabilizing the surface toward `1.0.0` — has not been
-  reached. The project is a single-maintainer `0.1.0` alpha.
+  reached. The project is a single-maintainer `0.0.1` alpha.
 - **Global documentation linting.** `AllPublicDeclarationsHaveDocumentation` is
   deliberately off. In its place, `generate_public_api_inventory.sh --check`
   runs a report-only ratchet that counts `canonical` public symbols with no
@@ -151,5 +151,3 @@ its runs are comparative measurements, not a gate.
   off because it would also force low-value comments onto package-only seams.
 - **The name.** "SwiftTUI" collides with other terminal-UI projects in the
   Swift ecosystem. Whether to rename the package is unresolved.
-- **The `0.0.1` tag.** It predates the release policy and is kept only as a
-  historical artifact; it is not a supported entry point.

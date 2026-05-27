@@ -1,3 +1,6 @@
+SwiftTUI.App
+SwiftTUI.App.main()
+SwiftTUI.App.swiftTUIOptions
 SwiftTUIAnimatedImage.AnimatedGIF
 SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)
 SwiftTUIAnimatedImage.AnimatedGIF.decode(data:)
@@ -1074,7 +1077,8 @@ SwiftTUICore.FrameDropEligibility.Candidate
 SwiftTUICore.FrameDropEligibility.Candidate.additionalBlockers
 SwiftTUICore.FrameDropEligibility.Candidate.artifacts
 SwiftTUICore.FrameDropEligibility.Candidate.hasCompleteBarrierSignals
-SwiftTUICore.FrameDropEligibility.Candidate.init(artifacts:additionalBlockers:hasCompleteBarrierSignals:)
+SwiftTUICore.FrameDropEligibility.Candidate.init(artifacts:additionalBlockers:hasCompleteBarrierSignals:redundantHandlerInstallationsAreVisualOnly:)
+SwiftTUICore.FrameDropEligibility.Candidate.redundantHandlerInstallationsAreVisualOnly
 SwiftTUICore.FrameDropEligibility.Decision
 SwiftTUICore.FrameDropEligibility.Decision.canDropVisualOnly
 SwiftTUICore.FrameDropEligibility.Decision.mustCommit(blockers:)
@@ -2791,7 +2795,8 @@ SwiftTUIRuntime.SceneManifest.init(from:)
 SwiftTUIRuntime.SceneManifest.scenes
 SwiftTUIRuntime.SemanticHostFrame
 SwiftTUIRuntime.SemanticHostFrame.focusedIdentity
-SwiftTUIRuntime.SemanticHostFrame.init(sequence:raster:semantics:focusedIdentity:rasterDamage:)
+SwiftTUIRuntime.SemanticHostFrame.init(sequence:raster:semantics:focusedIdentity:rasterDamage:preferredLayoutSize:)
+SwiftTUIRuntime.SemanticHostFrame.preferredLayoutSize
 SwiftTUIRuntime.SemanticHostFrame.raster
 SwiftTUIRuntime.SemanticHostFrame.rasterDamage
 SwiftTUIRuntime.SemanticHostFrame.semantics
@@ -4655,6 +4660,7 @@ SwiftUIHost.SwiftUIHostSceneHost.focusedAccessibilityIdentity
 SwiftUIHost.SwiftUIHostSceneHost.init(app:descriptor:style:clipboardWriter:)
 SwiftUIHost.SwiftUIHostSceneHost.isRunning
 SwiftUIHost.SwiftUIHostSceneHost.lastError
+SwiftUIHost.SwiftUIHostSceneHost.latestPreferredLayoutSize
 SwiftUIHost.SwiftUIHostSceneHost.latestSemanticSnapshot
 SwiftUIHost.SwiftUIHostSceneHost.latestSurface
 SwiftUIHost.SwiftUIHostSceneHost.manualKeyboardPresentationRequested

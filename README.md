@@ -4,7 +4,7 @@
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI-1E90FF)
-![Status](https://img.shields.io/badge/status-0.1.0%20alpha-DAA520)
+![Status](https://img.shields.io/badge/status-0.0.1%20alpha-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
@@ -62,7 +62,7 @@ current alpha with `.upToNextMinor` so a minor release cannot break your build:
 ```swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
-  .upToNextMinor(from: "0.1.0")
+  .upToNextMinor(from: "0.0.1")
 )
 ```
 
@@ -169,16 +169,18 @@ Two npm packages make this a first-class web-consumer story:
 | [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) | Browser runtime — manifest loading, canvas rendering, ARIA mounting, WASI/WebSocket scene bridges |
 | [`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) | Build tooling — the `swifttui-web` CLI that compiles a SwiftTUI app into a WASI `app.wasm` and `scene-manifest.json` |
 
-These package names are reserved for the first public web release. Until that
-release is published, use the source checkout in
-[`SwiftTUI/swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) and the
-reference WebExample rather than expecting npm installation to succeed.
-
-After publication, add both to your web project:
+For the `0.0.1` public pre-release, the web packages are attached to the
+[`swift-tui-web` GitHub release](https://github.com/SwiftTUI/swift-tui-web/releases/tag/0.0.1)
+as npm-compatible tarballs while npm publishing is being finalized:
 
 ```bash
-npm install @swifttui/web @swifttui/build
+npm install \
+  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.1/swifttui-web-0.0.1.tgz \
+  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.1/swifttui-build-0.0.1.tgz
 ```
+
+After npm publication, those tarball URLs can be replaced with
+`@swifttui/web` and `@swifttui/build`.
 
 Compile your SwiftTUI `App` to WASI with the `swifttui-web` CLI — it drives the
 Swift toolchain and emits `app.wasm` plus a `scene-manifest.json` into your
@@ -291,9 +293,9 @@ is currently an alpha, single-maintainer, AI-assisted project. See
 and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the release policy.
 
 The sibling `swift-tui-web`, `swift-tui-examples`, and `swift-tui-site` repos
-are also pre-public. Their consumer-facing READMEs describe the intended
-standalone use, but the final public cutover still requires tag-aligned releases
-and published web packages.
+are public pre-release repositories as well. Each has its own `0.0.1` tag, and
+cross-repo defaults use public release tags or release artifacts rather than
+requiring sibling source checkouts.
 
 ## Contributing
 

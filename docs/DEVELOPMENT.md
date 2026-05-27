@@ -14,9 +14,10 @@ process.
   supported** — the pinned toolchain is the source of truth.
 - **Bun `1.3.13`** orchestrates the test and policy scripts.
 - **WASI** builds use the `swift-6.3.1-RELEASE_wasm` SDK.
-- When working on extracted examples, keep `swift-tui`,
-  `swift-tui-web`, and `swift-tui-examples` as sibling checkouts so local
-  package paths resolve correctly.
+- Extracted examples resolve the public `swift-tui` release tag by default. Keep
+  `swift-tui`, `swift-tui-web`, and `swift-tui-examples` as sibling checkouts
+  only when you are deliberately running coordination-local pre-tag integration
+  from `swift-tui-org`.
 
 ## Building and testing
 
@@ -28,10 +29,10 @@ process.
 | `bun run test:coverage` | Produce coverage data. Informational — there is no enforced coverage threshold. |
 | `bun run perf:list` / `perf:run` / `perf:compare` | Drive the `Tools/TermUIPerf` scenario harness. |
 
-The runnable example matrix lives in `SwiftTUI/swift-tui-examples`. From that
-sibling checkout, run `Scripts/check_examples.sh --skip-clean` to validate
-example packages, WebExample, and native host shells against this framework
-checkout.
+The runnable example matrix lives in `SwiftTUI/swift-tui-examples`. Its default
+gate validates against released public dependencies; use `swift-tui-org` when
+you need to test unreleased framework changes against the examples through the
+coordination overlay.
 
 Set `SWIFTTUI_TEST_TIMEOUT_SCALE` to widen async test timeouts on a slow or
 loaded machine.
@@ -124,12 +125,11 @@ on a released tag, not `main`:
 ```swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
-  .upToNextMinor(from: "0.1.0")
+  .upToNextMinor(from: "0.0.1")
 )
 ```
 
-`0.1.0` is the first release made under this policy. The earlier `0.0.1` tag
-predates it and is a pre-policy artifact.
+`0.0.1` is the first public pre-release made under this policy.
 
 ## Repository split release flow
 
@@ -144,9 +144,9 @@ with `Scripts/update_webhost_bundle.sh --web-checkout ../swift-tui-web`, run
 version in the commit message.
 
 Runnable examples and the WebExample static demo are validated in
-`SwiftTUI/swift-tui-examples`. Keep that checkout beside `swift-tui` and
-`swift-tui-web`, then run `Scripts/check_examples.sh --skip-clean` from the
-examples repo before tagging example-facing changes.
+`SwiftTUI/swift-tui-examples`. A fresh examples clone validates against public
+release dependencies by default. Use the coordination repo's pre-tag overlay
+gates when testing unreleased sibling checkout combinations before tagging.
 
 A release is cut from `main` after the gate passes:
 
