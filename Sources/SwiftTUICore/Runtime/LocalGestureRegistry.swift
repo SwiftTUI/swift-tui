@@ -45,8 +45,45 @@ package final class LocalGestureRegistry: Equatable {
     )
   }
 
+  package func registerStacked(
+    identity: Identity,
+    recognizer: AnyGestureRecognizer
+  ) {
+    guard let currentPassRecognizer = ViewNodeContext.current?.gestureRegistration(
+      for: identity
+    ) else {
+      register(identity: identity, recognizer: recognizer)
+      return
+    }
+
+    guard !currentPassRecognizer.isActive else {
+      if currentPassRecognizer !== recognizer {
+        recognizer.tearDown()
+      }
+      return
+    }
+
+    let stacked = AnyGestureRecognizer(
+      StackedGestureRecognizer(
+        recognizers: [
+          currentPassRecognizer,
+          recognizer,
+        ]
+      )
+    )
+    recognizers[identity] = stacked
+    ViewNodeContext.current?.recordGestureRegistration(
+      identity: identity,
+      recognizer: stacked
+    )
+  }
+
   package func recognizer(for identity: Identity) -> AnyGestureRecognizer? {
     recognizers[identity]
+  }
+
+  package func hasCurrentPassRecognizer(for identity: Identity) -> Bool {
+    ViewNodeContext.current?.gestureRegistration(for: identity) != nil
   }
 
   package func reset() {
@@ -145,6 +182,81 @@ package final class LocalGestureRegistry: Equatable {
   /// deadlines when the scheduler fires `.deadline`.
   package func activeRecognizers() -> [(Identity, AnyGestureRecognizer)] {
     recognizers.map { ($0.key, $0.value) }
+  }
+}
+
+@MainActor
+private final class StackedGestureRecognizer: GestureRecognizer {
+  typealias Value = Never
+
+  private let recognizers: [AnyGestureRecognizer]
+
+  init(recognizers: [AnyGestureRecognizer]) {
+    self.recognizers = recognizers
+  }
+
+  var phase: GestureRecognizerPhase {
+    if recognizers.contains(where: { $0.phase == .changed }) {
+      return .changed
+    }
+    if recognizers.contains(where: { $0.phase == .began }) {
+      return .began
+    }
+    if recognizers.contains(where: { !$0.phase.isTerminal }) {
+      return .possible
+    }
+    if recognizers.contains(where: { $0.phase == .ended }) {
+      return .ended
+    }
+    if recognizers.contains(where: { $0.phase == .failed }) {
+      return .failed
+    }
+    return .cancelled
+  }
+
+  var isActive: Bool {
+    recognizers.contains { $0.isActive }
+  }
+
+  func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
+    var sawHandled = false
+    var sawFailed = false
+
+    for recognizer in recognizers {
+      switch recognizer.handle(event: event) {
+      case .handled:
+        sawHandled = true
+      case .failed:
+        sawFailed = true
+      case .ignored:
+        break
+      }
+    }
+
+    if sawHandled {
+      return .handled
+    }
+    return sawFailed ? .failed : .ignored
+  }
+
+  func handleDeadline(at instant: MonotonicInstant) -> Bool {
+    var didTerminate = false
+    for recognizer in recognizers {
+      if recognizer.handleDeadline(at: instant) {
+        didTerminate = true
+      }
+    }
+    return didTerminate
+  }
+
+  func currentValue() -> Never? {
+    nil
+  }
+
+  func tearDown() {
+    for recognizer in recognizers {
+      recognizer.tearDown()
+    }
   }
 }
 
