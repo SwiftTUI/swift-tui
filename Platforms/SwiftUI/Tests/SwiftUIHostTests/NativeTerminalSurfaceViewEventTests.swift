@@ -177,6 +177,35 @@ import Testing
   }
 
   @MainActor
+  @Test
+  func native_surface_view_initial_probe_is_not_undone_by_placeholder_layout_bounds() {
+    let metrics = NativeTerminalMetrics(style: .default)
+    let placeholderGrid = CellSize(width: 1, height: 1)
+    let probeGrid = CellSize(width: 12, height: 6)
+    let view = NativeTerminalSurfaceView(
+      frame: NSRect(
+        x: 0,
+        y: 0,
+        width: metrics.cellSize.width * CGFloat(placeholderGrid.width),
+        height: metrics.cellSize.height * CGFloat(placeholderGrid.height)
+      )
+    )
+    var resizes: [CellSize] = []
+    view.onResize = { size, _ in
+      resizes.append(size)
+    }
+
+    _ = view.negotiatedSizeThatFits(
+      proposedWidth: metrics.cellSize.width * CGFloat(probeGrid.width),
+      proposedHeight: metrics.cellSize.height * CGFloat(probeGrid.height),
+      preferredGridSize: nil
+    )
+    view.layout()
+
+    #expect(resizes == [probeGrid])
+  }
+
+  @MainActor
   private func windowPoint(
     forLocal local: NSPoint,
     in view: NativeTerminalSurfaceView

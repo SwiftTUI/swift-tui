@@ -171,6 +171,26 @@ func bridge_tracks_keyboard_policy_from_focus_presentation() {
 
 @MainActor
 @Test
+func native_surface_initial_sizing_probes_parent_without_showing_warmup_grid() {
+  let metrics = NativeTerminalMetrics(style: .default)
+  let negotiator = NativeTerminalSurfaceSizeNegotiator(
+    cellSize: metrics.cellSize,
+    preferredGridSize: nil,
+    renderedGridSize: nil
+  )
+
+  let negotiated = negotiator.negotiate(
+    proposedWidth: metrics.cellSize.width * 120,
+    proposedHeight: metrics.cellSize.height * 40
+  )
+
+  #expect(negotiated.size.width == metrics.cellSize.width)
+  #expect(negotiated.size.height == metrics.cellSize.height)
+  #expect(negotiated.probeGridSize == .init(width: 120, height: 40))
+}
+
+@MainActor
+@Test
 func native_surface_sizing_prefers_measured_grid_over_available_space() {
   let metrics = NativeTerminalMetrics(style: .default)
   let negotiator = NativeTerminalSurfaceSizeNegotiator(
