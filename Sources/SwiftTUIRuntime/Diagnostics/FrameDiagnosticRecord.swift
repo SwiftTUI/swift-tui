@@ -80,3 +80,91 @@ public struct FrameDiagnosticRecord: Sendable {
   public var measurementCacheHitRate: Double?
   public var totalFrameDuration: Duration
 }
+
+extension FrameDiagnosticRecord {
+  package init(
+    frameNumber: Int,
+    causeSummary: String,
+    renderGenerations: FrameRenderGenerations = .init(),
+    desiredGeneration: UInt64 = 0,
+    presentationStrategy: String = "-",
+    presentationDuration: Duration = .zero,
+    totalFrameDuration: Duration = .zero
+  ) {
+    self.frameNumber = frameNumber
+    self.causeSummary = causeSummary
+    focusSyncRerenders = 0
+    invalidatedIdentityCount = 0
+    resolvedNodeCount = 0
+    resolvedNodesComputed = 0
+    resolvedNodesReused = 0
+    measuredNodeCount = 0
+    measuredNodesComputed = 0
+    measuredNodesReused = 0
+    placedNodeCount = 0
+    drawNodeCount = 0
+    interactionRegionCount = 0
+    focusRegionCount = 0
+    phaseTimings = nil
+    self.renderGenerations = renderGenerations
+    self.desiredGeneration = desiredGeneration
+    coalescedEventBatches = 0
+    coalescedWakeCauses = "-"
+    coalescedIntentRequests = 0
+    scheduledAnimationRequest = "-"
+    scheduledAnimationBatchID = nil
+    animationControllerActiveAnimationCount = 0
+    animationControllerHasPendingWork = false
+    workerTimings = nil
+    mainActorTimings = nil
+    customLayoutFallbackCount = 0
+    firstCustomLayoutFallbackIdentity = nil
+    layoutDependentRealizations = 0
+    layoutDependentRealizationCacheHits = 0
+    layoutDependentMainActorFallbacks = 0
+    geometryAnchorResolutionMissCount = 0
+    firstGeometryAnchorResolutionMissIdentity = nil
+    geometryMissingNamedCoordinateSpaceCount = 0
+    firstGeometryMissingNamedCoordinateSpaceName = nil
+    geometryDuplicateNamedCoordinateSpaceCount = 0
+    firstGeometryDuplicateNamedCoordinateSpaceName = nil
+    runtimePointerHandlerCount = 0
+    runtimePointerHoverHandlerCount = 0
+    runtimeGestureRecognizerCount = 0
+    runtimeGestureStateBindingCount = 0
+    runtimeIssues = []
+    staleFramePolicy = "-"
+    tailJobState = "-"
+    tailCancelReason = "-"
+    cancelledRenderCount = 0
+    newestDesiredAtTailStart = nil
+    newestDesiredAtTailResult = nil
+    dropEligibilityBlockers = []
+    dropDecision = "-"
+    dropGeneration = nil
+    newestDesiredAtDrop = nil
+    dropReconciliationMode = "-"
+    dropReconciliationEffects = "-"
+    presentationRecoveryAfterDrop = false
+    inputEventsQueuedDuringRenderSuspension = 0
+    self.presentationStrategy = presentationStrategy
+    presentationBytesWritten = 0
+    presentationLinesTouched = 0
+    presentationCellsChanged = 0
+    self.presentationDuration = presentationDuration
+    damageRowCount = nil
+    damageRangeAwareRowCount = nil
+    damageTextSpanCount = nil
+    damageTextCellCount = nil
+    damageGraphicsInvalidationCount = nil
+    damageRequiresFullTextRepaint = false
+    damageRequiresFullGraphicsReplay = false
+    presentationUsedSynchronizedOutput = false
+    presentationGraphicsReplayScope = "-"
+    presentationGraphicsAttachmentsReplayed = 0
+    presentationEditOperationLowering = "-"
+    presentationEditOperationCount = 0
+    measurementCacheHitRate = nil
+    self.totalFrameDuration = totalFrameDuration
+  }
+}

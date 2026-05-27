@@ -15,6 +15,7 @@ import SwiftTUICore
 public final class FrameDiagnosticsLogger {
   private let fileDescriptor: Int32
   private let ownsDescriptor: Bool
+  private let recordHandler: ((FrameDiagnosticRecord) -> Void)?
   private var headerWritten = false
 
   /// Creates a logger that writes to the given file path.
@@ -27,12 +28,21 @@ public final class FrameDiagnosticsLogger {
       }
       fileDescriptor = fd
       ownsDescriptor = true
+      recordHandler = nil
     #else
       // WASI builds have no POSIX file I/O exposed; the logger is unavailable.
       fileDescriptor = -1
       ownsDescriptor = false
+      recordHandler = nil
       return nil
     #endif
+  }
+
+  /// Creates a logger that forwards each record to an in-process handler.
+  public init(recordHandler: @escaping (FrameDiagnosticRecord) -> Void) {
+    fileDescriptor = -1
+    ownsDescriptor = false
+    self.recordHandler = recordHandler
   }
 
   deinit {
@@ -45,12 +55,16 @@ public final class FrameDiagnosticsLogger {
 
   /// Records a single frame's diagnostics.
   public func log(_ record: FrameDiagnosticRecord) {
-    if !headerWritten {
-      writeHeader()
-      headerWritten = true
+    if ownsDescriptor {
+      if !headerWritten {
+        writeHeader()
+        headerWritten = true
+      }
+
+      writeLine(FrameDiagnosticsTSVFormatting.fields(for: record).joined(separator: "\t"))
     }
 
-    writeLine(FrameDiagnosticsTSVFormatting.fields(for: record).joined(separator: "\t"))
+    recordHandler?(record)
   }
 
   private func writeHeader() {

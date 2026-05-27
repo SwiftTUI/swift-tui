@@ -1,7 +1,7 @@
 import SwiftTUICore
 
-enum FrameDiagnosticsTSVFormatting {
-  static let headerFields = [
+package enum FrameDiagnosticsTSVFormatting {
+  package static let headerFields = [
     "frame",
     "causes",
     "focus_syncs",
@@ -92,7 +92,7 @@ enum FrameDiagnosticsTSVFormatting {
     "total_ms",
   ]
 
-  static func fields(
+  package static func fields(
     for record: FrameDiagnosticRecord
   ) -> [String] {
     let timings = record.phaseTimings
