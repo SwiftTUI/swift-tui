@@ -1,4 +1,5 @@
 @_spi(Runners) import SwiftTUIRuntime
+import Foundation
 import WASISurfaceBridge
 
 #if canImport(Darwin)
@@ -34,6 +35,37 @@ package func resolveWASITransportMode(
     return .ansi
   default:
     return .surface
+  }
+}
+
+package func wasiSurfaceDeltaEnabled(
+  environmentValue: (String) -> String?
+) -> Bool {
+  switch environmentValue("TUIGUI_SURFACE_DELTA")?.lowercased() {
+  case "1", "true", "yes", "on":
+    return true
+  default:
+    return false
+  }
+}
+
+package func wasiFrameDiagnosticsEnabled(
+  environmentValue: (String) -> String?
+) -> Bool {
+  parseDiagnosticsFlag(environmentValue("TUIGUI_FRAME_DIAGNOSTICS"))
+    ?? parseDiagnosticsFlag(environmentValue("TERMUI_DIAGNOSTICS"))
+    ?? false
+}
+
+private func parseDiagnosticsFlag(_ value: String?) -> Bool? {
+  guard let value else {
+    return nil
+  }
+  switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+  case "", "0", "false", "off", "none":
+    return false
+  default:
+    return true
   }
 }
 
@@ -124,7 +156,10 @@ public enum WASIRunner {
       let host = WebSurfaceTransport(
         surfaceSize: wasiSurfaceSize(),
         renderStyle: wasiRenderStyle()
-          ?? .init(appearance: .fallback)
+          ?? .init(appearance: .fallback),
+        deltaEncodingEnabled: wasiSurfaceDeltaEnabled { name in
+          environmentValue(named: name)
+        }
       )
       let inputReader = WebSurfaceInputReader { message in
         switch message {
@@ -141,7 +176,12 @@ public enum WASIRunner {
         presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
-        surfaceName: "web-surface"
+        surfaceName: "web-surface",
+        diagnosticsLogger: wasiFrameDiagnosticsEnabled { name in
+          environmentValue(named: name)
+        } ? FrameDiagnosticsLogger(recordHandler: { record in
+          try? host.notifyFrameDiagnostic(record)
+        }) : nil
       )
       resources.runtimeIssueSink = RuntimeIssueSink { issue in
         try? host.notifyRuntimeIssue(issue)

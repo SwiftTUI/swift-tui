@@ -75,6 +75,184 @@ struct WebSurfaceTransportTests {
     #expect(metrics.strategy == .incremental)
   }
 
+  @Test("encoder emits frame diagnostics as typed records")
+  func encoderEmitsFrameDiagnosticRecords() throws {
+    let output = WebSurfaceFrameEncoder.encodeFrameDiagnostic(
+      Self.frameDiagnosticRecord(frameNumber: 42, causeSummary: "render \"tick\"")
+    )
+    let record = try Self.decodedTypedRecord(output, prefix: "\u{001E}frameDiagnostic:")
+
+    #expect(record["format"] as? String == "swift-tui-frame-diagnostics-v1")
+    let header = try #require(record["header"] as? [String])
+    let fields = try #require(record["fields"] as? [String])
+    #expect(header.first == "frame")
+    #expect(fields.first == "42")
+    #expect(header.contains("causes"))
+    #expect(fields[header.firstIndex(of: "causes") ?? 0] == "render \"tick\"")
+  }
+
+  @Test("host writes frame diagnostic records")
+  func hostWritesFrameDiagnosticRecords() throws {
+    let pipe = Pipe()
+    let host = WebSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 2),
+      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+      renderStyle: .init(appearance: .fallback)
+    )
+
+    try host.notifyFrameDiagnostic(Self.frameDiagnosticRecord(frameNumber: 7))
+    pipe.fileHandleForWriting.closeFile()
+    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    pipe.fileHandleForReading.closeFile()
+    let record = try Self.decodedTypedRecord(output, prefix: "\u{001E}frameDiagnostic:")
+    let fields = try #require(record["fields"] as? [String])
+
+    #expect(fields.first == "7")
+  }
+
+  @Test("delta-enabled encoder sends the first frame as a full frame")
+  func deltaEnabledEncoderSendsFirstFrameFull() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.basicSurface(),
+        damage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<1])]),
+        state: &state
+      )
+    )
+
+    #expect(frame["version"] as? Int == 1)
+    #expect(frame["encoding"] == nil)
+    #expect(frame["rows"] != nil)
+    #expect(frame["deltaRows"] == nil)
+  }
+
+  @Test("delta-disabled encoder does not populate baseline state")
+  func deltaDisabledEncoderDoesNotPopulateBaselineState() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: false)
+
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.imageSurface(),
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+    )
+
+    #expect(frame["encoding"] == nil)
+    #expect(frame["rows"] != nil)
+    #expect(frame["deltaRows"] == nil)
+    #expect(state.knownImageIDs.isEmpty == false)
+    #expect(state.hasBaseline == false)
+    #expect(state.baselineSize == nil)
+  }
+
+  @Test("delta-enabled encoder emits dirty rows after a baseline")
+  func deltaEnabledEncoderEmitsDirtyRowsAfterBaseline() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+
+    let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.changedSurface(),
+        sequence: 2,
+        semanticSnapshot: .init(),
+        focusedIdentity: nil,
+        damage: damage,
+        state: &state
+      )
+    )
+
+    #expect(frame["version"] as? Int == 3)
+    #expect(frame["encoding"] as? String == "delta")
+    #expect(frame["sequence"] as? Int == 2)
+    #expect(frame["rows"] == nil)
+    let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
+    #expect(deltaRows.count == 1)
+    #expect(deltaRows.first?.first as? Int == 1)
+    let decodedDamage = try #require(frame["damage"] as? [String: Any])
+    let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
+    #expect(textRows.first?.first as? Int == 1)
+    #expect(textRows.first?.dropFirst().first as? [[Int]] == [[1, 2]])
+  }
+
+  @Test("delta-enabled encoder emits duplicate damaged rows once")
+  func deltaEnabledEncoderEmitsDuplicateDamagedRowsOnce() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+    var damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
+    damage.textRows.append(.init(row: 1, columnRanges: [0..<1]))
+    damage.textRows.append(.init(row: -1))
+    damage.textRows.append(.init(row: 2))
+
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.changedSurface(),
+        damage: damage,
+        state: &state
+      )
+    )
+
+    let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
+    #expect(deltaRows.count == 1)
+    #expect(deltaRows.first?.first as? Int == 1)
+  }
+
+  @Test("delta-enabled encoder falls back to full frames for full repaint damage")
+  func deltaEnabledEncoderFallsBackForFullRepaintDamage() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.changedSurface(),
+        damage: PresentationDamage(
+          textRows: [.init(row: 1, columnRanges: [1..<2])],
+          requiresFullTextRepaint: true
+        ),
+        state: &state
+      )
+    )
+
+    #expect(frame["encoding"] == nil)
+    #expect(frame["rows"] != nil)
+    #expect(frame["deltaRows"] == nil)
+  }
+
+  @Test("delta-enabled encoder falls back to full frames when surface size changes")
+  func deltaEnabledEncoderFallsBackWhenSurfaceSizeChanges() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.wideSurface(),
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+    )
+
+    #expect(frame["width"] as? Int == 4)
+    #expect(frame["encoding"] == nil)
+    #expect(frame["rows"] != nil)
+    #expect(frame["deltaRows"] == nil)
+  }
+
+  @Test("delta frame is smaller than an equivalent full frame for one dirty row")
+  func deltaFrameIsSmallerThanEquivalentFullFrameForOneDirtyRow() throws {
+    let base = Self.largeSurface(dirtyRowText: "unchanged")
+    let changed = Self.largeSurface(dirtyRowText: "changed  ")
+    let damage = PresentationDamage(textRows: [.init(row: 5, columnRanges: [0..<8])])
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(base, state: &state)
+
+    let delta = WebSurfaceFrameEncoder.encode(changed, damage: damage, state: &state)
+    let full = WebSurfaceFrameEncoder.encode(changed, damage: damage)
+
+    #expect(delta.utf8.count < full.utf8.count)
+  }
+
   @Test("host exposes web sub-cell pointer capabilities before reported metrics arrive")
   func hostExposesWebSubCellPointerCapabilitiesBeforeMetrics() {
     let host = WebSurfaceTransport(
@@ -547,6 +725,36 @@ struct WebSurfaceTransportTests {
     )
   }
 
+  private static func changedSurface() -> RasterSurface {
+    RasterSurface(
+      size: .init(width: 2, height: 2),
+      lines: [
+        "OK",
+        " !",
+      ]
+    )
+  }
+
+  private static func wideSurface() -> RasterSurface {
+    RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: [
+        "OK  ",
+        " !  ",
+      ]
+    )
+  }
+
+  private static func largeSurface(dirtyRowText: String) -> RasterSurface {
+    let paddedDirtyRow = String(dirtyRowText.prefix(8)).padding(toLength: 8, withPad: " ", startingAt: 0)
+    return RasterSurface(
+      size: .init(width: 8, height: 10),
+      lines: (0..<10).map { row in
+        row == 5 ? paddedDirtyRow : "row\(row)    ".prefix(8).description
+      }
+    )
+  }
+
   private static func imageSurface() -> RasterSurface {
     let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
     return RasterSurface(
@@ -578,6 +786,32 @@ struct WebSurfaceTransportTests {
     let json = String(line.dropFirst(prefix.count))
     let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
     return try #require(decoded as? [String: Any])
+  }
+
+  private static func decodedTypedRecord(
+    _ output: String,
+    prefix: String
+  ) throws -> [String: Any] {
+    let line = output.trimmingCharacters(in: .newlines)
+    #expect(line.hasPrefix(prefix))
+    let json = String(line.dropFirst(prefix.count))
+    let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
+    return try #require(decoded as? [String: Any])
+  }
+
+  private static func frameDiagnosticRecord(
+    frameNumber: Int,
+    causeSummary: String = "render"
+  ) -> FrameDiagnosticRecord {
+    FrameDiagnosticRecord(
+      frameNumber: frameNumber,
+      causeSummary: causeSummary,
+      renderGenerations: .init(render: .init(UInt64(frameNumber))),
+      desiredGeneration: UInt64(frameNumber),
+      presentationStrategy: "incremental",
+      presentationDuration: .zero,
+      totalFrameDuration: .zero
+    )
   }
 
   private static func fixture(

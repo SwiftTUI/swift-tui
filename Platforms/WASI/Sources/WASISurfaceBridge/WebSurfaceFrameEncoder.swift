@@ -30,6 +30,16 @@ package enum WebSurfaceFrameEncoder {
     return "\u{001E}runtimeIssue:{\(fields.joined(separator: ","))}\n"
   }
 
+  package static func encodeFrameDiagnostic(
+    _ record: FrameDiagnosticRecord
+  ) -> String {
+    "\u{001E}frameDiagnostic:{"
+      + "\"format\":\"swift-tui-frame-diagnostics-v1\","
+      + "\"header\":[\(FrameDiagnosticsTSVFormatting.headerFields.map(jsonString).joined(separator: ","))],"
+      + "\"fields\":[\(FrameDiagnosticsTSVFormatting.fields(for: record).map(jsonString).joined(separator: ","))]"
+      + "}\n"
+  }
+
   package static func encode(
     _ surface: RasterSurface
   ) -> String {
@@ -69,6 +79,35 @@ package enum WebSurfaceFrameEncoder {
   }
 
   package static func encode(
+    _ surface: RasterSurface,
+    state: inout WebSurfaceFrameEncodingState
+  ) -> String {
+    encode(
+      surface,
+      sequence: nil,
+      semanticSnapshot: nil,
+      focusedIdentity: nil,
+      damage: nil,
+      state: &state
+    )
+  }
+
+  package static func encode(
+    _ surface: RasterSurface,
+    damage: PresentationDamage?,
+    state: inout WebSurfaceFrameEncodingState
+  ) -> String {
+    encode(
+      surface,
+      sequence: nil,
+      semanticSnapshot: nil,
+      focusedIdentity: nil,
+      damage: damage,
+      state: &state
+    )
+  }
+
+  package static func encode(
     _ frame: SemanticHostFrame
   ) -> String {
     var knownImageIDs: Set<String> = []
@@ -92,6 +131,71 @@ package enum WebSurfaceFrameEncoder {
     )
   }
 
+  package static func encode(
+    _ frame: SemanticHostFrame,
+    state: inout WebSurfaceFrameEncodingState
+  ) -> String {
+    encode(
+      frame.raster,
+      sequence: frame.sequence,
+      semanticSnapshot: frame.semantics,
+      focusedIdentity: frame.focusedIdentity,
+      damage: frame.rasterDamage,
+      state: &state
+    )
+  }
+
+  package static func encode(
+    _ surface: RasterSurface,
+    sequence: UInt64?,
+    semanticSnapshot: SemanticSnapshot?,
+    focusedIdentity: Identity?,
+    damage: PresentationDamage?,
+    state: inout WebSurfaceFrameEncodingState
+  ) -> String {
+    guard state.deltaEnabled else {
+      return encode(
+        surface,
+        sequence: sequence,
+        semanticSnapshot: semanticSnapshot,
+        focusedIdentity: focusedIdentity,
+        damage: damage,
+        knownImageIDs: &state.knownImageIDs
+      )
+    }
+
+    guard let damage,
+      state.hasBaseline,
+      let baselineSize = state.baselineSize,
+      baselineSize == surface.size,
+      !damage.requiresFullTextRepaint,
+      !damage.requiresFullGraphicsReplay
+    else {
+      let output = encode(
+        surface,
+        sequence: sequence,
+        semanticSnapshot: semanticSnapshot,
+        focusedIdentity: focusedIdentity,
+        damage: damage,
+        knownImageIDs: &state.knownImageIDs
+      )
+      updateBaseline(for: surface, state: &state)
+      return output
+    }
+
+    let output = encodeDelta(
+      surface,
+      sequence: sequence,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      damage: damage,
+      state: &state
+    )
+    state.hasBaseline = true
+    state.baselineSize = surface.size
+    return output
+  }
+
   private static func encode(
     _ surface: RasterSurface,
     sequence: UInt64?,
@@ -100,14 +204,9 @@ package enum WebSurfaceFrameEncoder {
     damage: PresentationDamage?,
     knownImageIDs: inout Set<String>
   ) -> String {
-    var styles: [ResolvedTextStyle?] = [nil]
-    let rows = surface.cells.enumerated().map { y, row in
-      encodeRow(
-        row,
-        y: y,
-        styles: &styles
-      )
-    }
+    let encoded = encodedRowsAndStyles(for: surface)
+    let styles = encoded.styles
+    let rows = encoded.rows
     let accessibilityTree = semanticSnapshot.map {
       encodeAccessibilityTree(
         $0.accessibilityNodes,
@@ -157,6 +256,99 @@ package enum WebSurfaceFrameEncoder {
     }
     json += "}\n"
     return json
+  }
+
+  private static func encodeDelta(
+    _ surface: RasterSurface,
+    sequence: UInt64?,
+    semanticSnapshot: SemanticSnapshot?,
+    focusedIdentity: Identity?,
+    damage: PresentationDamage,
+    state: inout WebSurfaceFrameEncodingState
+  ) -> String {
+    let rowIndexes = uniqueSortedRowIndexes(
+      from: damage,
+      height: surface.size.height
+    )
+    let deltaRows = rowIndexes.map { rowIndex in
+      "[\(rowIndex),\(encodeRow(surface.cells[rowIndex], y: rowIndex, styles: &state.persistentStyles))]"
+    }
+    let accessibilityTree = semanticSnapshot.map {
+      encodeAccessibilityTree(
+        $0.accessibilityNodes,
+        focusedIdentity: focusedIdentity
+      )
+    }
+    let accessibilityAnnouncements = semanticSnapshot.map {
+      encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
+    }
+
+    var json = "\u{001E}surface:{"
+    json += "\"version\":3"
+    json += ",\"encoding\":\"delta\""
+    if let sequence {
+      json += ",\"sequence\":\(sequence)"
+    }
+    json += ",\"width\":\(max(0, surface.size.width))"
+    json += ",\"height\":\(max(0, surface.size.height))"
+    json += ",\"styles\":["
+    json += state.persistentStyles.map(encodeStyle).joined(separator: ",")
+    json += "]"
+    json += ",\"deltaRows\":["
+    json += deltaRows.joined(separator: ",")
+    json += "]"
+    json += ",\"images\":["
+    json += encodeImages(
+      surface.imageAttachments,
+      knownImageIDs: &state.knownImageIDs
+    ).joined(separator: ",")
+    json += "]"
+    json += ",\"damage\":"
+    json += encodeDamage(damage)
+    if let accessibilityTree, !accessibilityTree.isEmpty {
+      json += ",\"accessibilityTree\":["
+      json += accessibilityTree.joined(separator: ",")
+      json += "]"
+    }
+    if let accessibilityAnnouncements, !accessibilityAnnouncements.isEmpty {
+      json += ",\"accessibilityAnnouncements\":["
+      json += accessibilityAnnouncements.joined(separator: ",")
+      json += "]"
+    }
+    json += "}\n"
+    return json
+  }
+
+  private static func encodedRowsAndStyles(
+    for surface: RasterSurface
+  ) -> (rows: [String], styles: [ResolvedTextStyle?]) {
+    var styles: [ResolvedTextStyle?] = [nil]
+    let rows = surface.cells.enumerated().map { y, row in
+      encodeRow(
+        row,
+        y: y,
+        styles: &styles
+      )
+    }
+    return (rows, styles)
+  }
+
+  private static func updateBaseline(
+    for surface: RasterSurface,
+    state: inout WebSurfaceFrameEncodingState
+  ) {
+    state.persistentStyles = encodedRowsAndStyles(for: surface).styles
+    state.hasBaseline = true
+    state.baselineSize = surface.size
+  }
+
+  private static func uniqueSortedRowIndexes(
+    from damage: PresentationDamage,
+    height: Int
+  ) -> [Int] {
+    Array(Set(damage.textRows.map(\.row)))
+      .filter { $0 >= 0 && $0 < height }
+      .sorted()
   }
 
   private static func encodeDamage(

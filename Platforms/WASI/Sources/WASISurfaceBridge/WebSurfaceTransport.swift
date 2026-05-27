@@ -11,7 +11,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
-    var transmittedImageIDs: Set<String>
+    var encodingState: WebSurfaceFrameEncodingState
   }
 
   private let state: Mutex<State>
@@ -30,7 +30,8 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
   package init(
     surfaceSize: CellSize,
     outputFileDescriptor: Int32 = webSurfaceStandardOutputFileDescriptor,
-    renderStyle: TerminalRenderStyle
+    renderStyle: TerminalRenderStyle,
+    deltaEncodingEnabled: Bool = false
   ) {
     self.outputFileDescriptor = outputFileDescriptor
     state = Mutex(
@@ -39,7 +40,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
         pointerInputCapabilities: Self.pointerInputCapabilities(for: nil),
-        transmittedImageIDs: []
+        encodingState: WebSurfaceFrameEncodingState(deltaEnabled: deltaEncodingEnabled)
       )
     )
   }
@@ -116,6 +117,10 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     try writeBytes(Array(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue).utf8))
   }
 
+  package func notifyFrameDiagnostic(_ record: FrameDiagnosticRecord) throws {
+    try writeBytes(Array(WebSurfaceFrameEncoder.encodeFrameDiagnostic(record).utf8))
+  }
+
   @discardableResult
   package func present(
     _ surface: RasterSurface
@@ -125,7 +130,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
         WebSurfaceFrameEncoder.encode(
           surface,
           damage: nil,
-          knownImageIDs: &state.transmittedImageIDs
+          state: &state.encodingState
         ).utf8
       )
     }
@@ -143,7 +148,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
       Array(
         WebSurfaceFrameEncoder.encode(
           frame,
-          knownImageIDs: &state.transmittedImageIDs
+          state: &state.encodingState
         ).utf8
       )
     }
