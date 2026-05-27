@@ -8,7 +8,9 @@ extension DefaultRenderer {
     newestDesiredGeneration: RenderGeneration,
     completedFramePolicy: CompletedFramePolicy? = nil,
     additionalBlockers:
-      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
+      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] },
+    redundantHandlerInstallationsAreVisualOnly:
+      @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false }
   ) -> CompletedFrameCandidate {
     let resolved = tailOutput.resolved
     let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
@@ -31,7 +33,9 @@ extension DefaultRenderer {
     let eligibility = CommittedFrameArtifactBuilder.eligibility(
       artifacts: artifacts,
       draft: draft,
-      additionalBlockers: additionalBlockers(artifacts)
+      additionalBlockers: additionalBlockers(artifacts),
+      redundantHandlerInstallationsAreVisualOnly:
+        redundantHandlerInstallationsAreVisualOnly(artifacts)
     )
     return CompletedFrameCandidate(
       draft: draft,
@@ -56,14 +60,17 @@ extension DefaultRenderer {
     newestDesiredGeneration: RenderGeneration,
     completedFramePolicy: CompletedFramePolicy? = nil,
     additionalBlockers:
-      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
+      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] },
+    redundantHandlerInstallationsAreVisualOnly:
+      @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false }
   ) -> CompletedFrameCandidateResolution {
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
       newestDesiredGeneration: newestDesiredGeneration,
       completedFramePolicy: completedFramePolicy,
-      additionalBlockers: additionalBlockers
+      additionalBlockers: additionalBlockers,
+      redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly
     )
     if candidate.dropDecision.canSkipCompletedFrame {
       discardCompletedFrameCandidate(

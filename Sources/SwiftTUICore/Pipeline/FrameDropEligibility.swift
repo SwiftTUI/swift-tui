@@ -163,15 +163,23 @@ public struct FrameDropEligibility: Equatable, Sendable {
     /// Whether every formerly `.unobservable` barrier has an explicit signal in
     /// `artifacts` or `additionalBlockers`.
     public var hasCompleteBarrierSignals: Bool
+    /// Whether handler installation entries are known to be redundant with the
+    /// last committed runtime routing graph. This lets stale visual-only frames
+    /// with stable interactive chrome drop without reinstalling equivalent
+    /// handlers.
+    public var redundantHandlerInstallationsAreVisualOnly: Bool
 
     public init(
       artifacts: FrameArtifacts,
       additionalBlockers: Set<Blocker> = [],
-      hasCompleteBarrierSignals: Bool = false
+      hasCompleteBarrierSignals: Bool = false,
+      redundantHandlerInstallationsAreVisualOnly: Bool = false
     ) {
       self.artifacts = artifacts
       self.additionalBlockers = additionalBlockers
       self.hasCompleteBarrierSignals = hasCompleteBarrierSignals
+      self.redundantHandlerInstallationsAreVisualOnly =
+        redundantHandlerInstallationsAreVisualOnly
     }
   }
 
@@ -276,6 +284,11 @@ public struct FrameDropEligibility: Equatable, Sendable {
     }
 
     for category in artifacts.commitPlan.effectCategories {
+      if category == .handlerInstallations,
+        candidate.redundantHandlerInstallationsAreVisualOnly
+      {
+        continue
+      }
       record(Blocker.blocker(for: category) ?? .unobservable)
     }
     if artifacts.diagnostics.work.customLayoutFallbackCount > 0 {

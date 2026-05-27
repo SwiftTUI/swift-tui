@@ -93,15 +93,24 @@ enum CommittedFrameArtifactBuilder {
   static func eligibility(
     artifacts: FrameArtifacts,
     draft: FrameHeadDraft,
-    additionalBlockers: Set<FrameDropEligibility.Blocker>
+    additionalBlockers: Set<FrameDropEligibility.Blocker>,
+    redundantHandlerInstallationsAreVisualOnly: Bool = false
   ) -> FrameDropEligibility {
-    FrameDropEligibility.classify(
+    let frameHeadBlockers =
+      if redundantHandlerInstallationsAreVisualOnly {
+        frameHeadDropBlockers(draft).subtracting([.handlerInstallations])
+      } else {
+        frameHeadDropBlockers(draft)
+      }
+    return FrameDropEligibility.classify(
       FrameDropEligibility.Candidate(
         artifacts: artifacts,
         additionalBlockers: additionalBlockers.union(
-          frameHeadDropBlockers(draft)
+          frameHeadBlockers
         ),
-        hasCompleteBarrierSignals: true
+        hasCompleteBarrierSignals: true,
+        redundantHandlerInstallationsAreVisualOnly:
+          redundantHandlerInstallationsAreVisualOnly
       ))
   }
 

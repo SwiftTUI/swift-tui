@@ -95,13 +95,29 @@ extension RunLoop {
     if scheduledFrame.animationRequest != .inherit {
       blockers.insert(.animationTransaction)
     }
-    if !artifacts.semanticSnapshot.focusRegions.isEmpty {
+    if artifacts.semanticSnapshot.focusRegions != latestSemanticSnapshot.focusRegions {
       blockers.insert(.focusGraph)
     }
-    if !artifacts.semanticSnapshot.scrollRoutes.isEmpty {
+    if artifacts.semanticSnapshot.scrollRoutes != latestSemanticSnapshot.scrollRoutes
+      || artifacts.semanticSnapshot.scrollTargets != latestSemanticSnapshot.scrollTargets
+      || artifacts.semanticSnapshot.selectionRoutes != latestSemanticSnapshot.selectionRoutes
+    {
       blockers.insert(.scrollSync)
     }
     return blockers
+  }
+
+  func completedFrameHasStableInteractionRouting(
+    artifacts: FrameArtifacts
+  ) -> Bool {
+    let snapshot = artifacts.semanticSnapshot
+    return snapshot.interactionRegions == latestSemanticSnapshot.interactionRegions
+      && snapshot.focusRegions == latestSemanticSnapshot.focusRegions
+      && snapshot.navigationRoutes == latestSemanticSnapshot.navigationRoutes
+      && snapshot.scrollRoutes == latestSemanticSnapshot.scrollRoutes
+      && snapshot.scrollTargets == latestSemanticSnapshot.scrollTargets
+      && snapshot.selectionRoutes == latestSemanticSnapshot.selectionRoutes
+      && snapshot.namedCoordinateSpaces == latestSemanticSnapshot.namedCoordinateSpaces
   }
 
   private func recordSkippedFrameProgress(

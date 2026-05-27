@@ -204,6 +204,8 @@ public struct DefaultRenderer {
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
         _ in []
       },
+    redundantHandlerInstallationsAreVisualOnly:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false },
     awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void = {},
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
@@ -271,7 +273,9 @@ public struct DefaultRenderer {
             tailOutput: tailOutput,
             newestDesiredGeneration: newestGeneration,
             completedFramePolicy: completedFramePolicy,
-            additionalBlockers: completedFrameAdditionalBlockers
+            additionalBlockers: completedFrameAdditionalBlockers,
+            redundantHandlerInstallationsAreVisualOnly:
+              redundantHandlerInstallationsAreVisualOnly
           ) {
           case .dropped(let runtimeIssues, let dropDecision):
             return CancellableRenderOutcome(

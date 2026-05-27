@@ -656,6 +656,53 @@ struct TabViewSurfaceTests {
     )
   }
 
+  @Test("literal tab overflow trigger expands from keyboard focus")
+  func literalTabOverflowTriggerExpandsFromKeyboardFocus() {
+    final class SelectionBox {
+      var value = "one"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = CellSize(width: 24, height: 8)
+    environmentValues.focusedIdentity = testIdentity("Tabs")
+
+    let context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues,
+      localActionRegistry: actionRegistry,
+      localKeyHandlerRegistry: keyRegistry,
+      applyEnvironmentValues: true
+    )
+
+    _ = renderer.render(
+      overflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    )
+
+    #expect(keyRegistry.dispatch(identity: testIdentity("Tabs"), keyPress: KeyPress(.arrowRight)))
+    #expect(keyRegistry.dispatch(identity: testIdentity("Tabs"), keyPress: KeyPress(.arrowRight)))
+    #expect(actionRegistry.dispatch(identity: testIdentity("Tabs")))
+    #expect(selectionBox.value == "one")
+
+    let expandedSurface = renderer.render(
+      overflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    ).rasterSurface.lines.joined(separator: "\n")
+
+    #expect(expandedSurface.contains("Three"))
+    #expect(expandedSurface.contains("Four"))
+  }
+
   @Test("selected literal tab uses foreground chrome without filling its background")
   func selectedLiteralTabUsesForegroundChromeWithoutFill() throws {
     let artifacts = renderTabArtifacts(

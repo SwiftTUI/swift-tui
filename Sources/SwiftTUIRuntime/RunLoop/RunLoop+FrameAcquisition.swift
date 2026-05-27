@@ -110,12 +110,17 @@ extension RunLoop {
             : renderIntentDiagnostics.desiredGeneration
         )
       },
-      completedFramePolicy: renderMode == .asyncNoDrop ? .orderedCommitOnly : nil,
+      completedFramePolicy:
+        (renderMode == .asyncNoCancel || renderMode == .asyncNoDrop)
+        ? .orderedCommitOnly : nil,
       completedFrameAdditionalBlockers: { artifacts in
         self.completedFrameAdditionalDropBlockers(
           artifacts: artifacts,
           scheduledFrame: scheduledFrame
         )
+      },
+      redundantHandlerInstallationsAreVisualOnly: { artifacts in
+        self.completedFrameHasStableInteractionRouting(artifacts: artifacts)
       },
       awaitQueuedCancellationSignal: awaitQueuedTailCancellationSignalForMode,
       shouldCancelQueued: shouldCancelQueuedTailForMode
