@@ -19,9 +19,7 @@ public struct SwiftUIHostAppView<A: SwiftTUIRuntime.App>: SwiftUI.View {
         }
       }
       SceneTerminalSurface(host: state.currentSceneHost)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .ignoresSafeArea(.container, edges: .bottom)
     .task {
       state.start()
     }
