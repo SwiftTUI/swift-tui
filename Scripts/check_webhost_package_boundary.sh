@@ -21,9 +21,10 @@ target_block() {
 
 if rg -n --fixed-strings 'SwiftTUIWebHost' Platforms/CLI/Sources Sources \
   --glob '*.swift' \
-  | rg -v '^Sources/SwiftTUI/SwiftTUI\.swift:.*SwiftTUIWebHostCLI$'
+  | rg -v '^Sources/SwiftTUI/SwiftTUI\.swift:.*SwiftTUIWebHostCLI$' \
+  | rg -v '^Sources/SwiftTUI/App\.swift:.*SwiftTUIWebHostCLI$'
 then
-  fail 'Only the SwiftTUI convenience re-export may reference SwiftTUIWebHostCLI outside Platforms/WebHost.'
+  fail 'Only the SwiftTUI convenience target may reference SwiftTUIWebHostCLI outside Platforms/WebHost.'
 fi
 
 if rg -n --fixed-strings 'FlyingFox' Platforms/CLI/Sources Sources \
@@ -49,6 +50,16 @@ esac
 case "$swift_tui_target_block" in
   *SwiftTUIAnimatedImage*) ;;
   *) fail 'The SwiftTUI target should depend on SwiftTUIAnimatedImage.' ;;
+esac
+
+case "$swift_tui_target_block" in
+  *SwiftTUIArguments*) ;;
+  *) fail 'The SwiftTUI target should depend on SwiftTUIArguments.' ;;
+esac
+
+case "$swift_tui_target_block" in
+  *SwiftTUIRuntime*) ;;
+  *) fail 'The SwiftTUI target should depend on SwiftTUIRuntime.' ;;
 esac
 
 case "$swift_tui_target_block" in
