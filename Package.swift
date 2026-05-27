@@ -171,6 +171,8 @@ let package = Package(
       name: "SwiftTUI",
       dependencies: [
         "SwiftTUIAnimatedImage",
+        "SwiftTUIArguments",
+        "SwiftTUIRuntime",
         "SwiftTUIWebHostCLI",
       ],
       path: "Sources/SwiftTUI",

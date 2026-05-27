@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Runners) import SwiftTUI
+@_spi(Runners) import SwiftTUIRuntime
 @_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing

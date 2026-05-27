@@ -1,5 +1,5 @@
 import ArgumentParser
-import SwiftTUI
+import SwiftTUIRuntime
 import Testing
 
 @testable import SwiftTUIArguments

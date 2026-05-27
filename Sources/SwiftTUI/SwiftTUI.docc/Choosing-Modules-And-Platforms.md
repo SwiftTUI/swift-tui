@@ -23,7 +23,8 @@ struct DemoApp: App {
 `SwiftTUI` is the convenience product for batteries-included executables. It
 re-exports the view/runtime surface, shared argument parsing, the combined
 terminal/WebHost runner that provides the default `App.main()` behavior, and
-animated GIF/image support.
+animated GIF/image support. Its `App` protocol is the command-enabled
+convenience overlay over `SwiftTUIRuntime.App`.
 
 When your app needs a narrower launch or hosting story, choose one of the
 sibling root-package products directly.
@@ -32,7 +33,7 @@ sibling root-package products directly.
 
 | App shape | Depend on | Import |
 | --- | --- | --- |
-| Batteries-included executable: terminal by default, `--web` when requested, animated GIF/images available | `SwiftTUI` | `import SwiftTUI` |
+| Batteries-included executable: terminal by default, `--web` when requested, animated GIF/images available, and `App` conforms to `SwiftTUICommand` | `SwiftTUI` | `import SwiftTUI` |
 | Shared view package or custom host/launcher | `SwiftTUIRuntime` | `import SwiftTUIRuntime` |
 | Explicit terminal runner control | `SwiftTUIRuntime` + `SwiftTUICLI` | `import SwiftTUIRuntime` and `import SwiftTUICLI` |
 | WASI executable or manifest-mode app | `SwiftTUIWASI` | `import SwiftTUIWASI` |
@@ -120,6 +121,8 @@ Use `SwiftTUIRuntime` for shared app declarations when another product owns the
 outer shell. Host products build `SceneManifest` values and retain
 `HostedSceneSession` values with explicit presentation surfaces such as
 `HostedRasterSurface` instead of relying on the convenience `App.main()`.
+This `App` is `SwiftTUIRuntime.App`, not the command-enabled `SwiftTUI.App`
+overlay.
 
 ```swift
 import SwiftTUIRuntime
