@@ -89,6 +89,24 @@ package enum TextFigureSupport {
   private static let metricsCacheCapacity = 256
   private static let metricsCache = Mutex<MetricsCacheStorage>(.init())
 
+  // Forced once from `layoutMetrics`; the closure reads the static cache
+  // directly, so no weak capture is needed and the registration lives for
+  // the process lifetime alongside the namespace.
+  private static let memoryMetricsRegistration: Void = {
+    MemoryMetricRegistry.shared.registerPermanent(
+      ClosureMemoryMetricProvider {
+        metricsCache.withLock { storage in
+          MemoryMetricSnapshot(
+            name: "TextFigureSupport.metricsCache",
+            count: storage.entries.count,
+            detail: ["order": storage.order.count]
+          )
+        }
+      }
+    )
+    return ()
+  }()
+
   package static var availableFonts: [TextFigureFont] {
     TextFigureFont.allCases
   }
@@ -96,6 +114,7 @@ package enum TextFigureSupport {
   package static func layoutMetrics(
     for payload: TextFigurePayload
   ) -> TextFigureLayoutMetrics {
+    _ = memoryMetricsRegistration
     guard !payload.content.isEmpty else {
       return .init(minimumWidth: 0, idealSize: .zero)
     }
