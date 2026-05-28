@@ -2,8 +2,7 @@ import SwiftTUICore
 
 extension RunLoop {
   @MainActor
-  func logCommittedFrameDiagnostics(
-    diagnosticsLogger: FrameDiagnosticsLogger?,
+  func emitCommittedFrameSample(
     artifacts: FrameArtifacts,
     scheduledFrame: ScheduledFrame,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
@@ -20,34 +19,47 @@ extension RunLoop {
     presentationDuration: Duration,
     renderedFrames: Int
   ) {
-    guard let diagnosticsLogger else {
+    guard let frameSink else {
       return
     }
-
-    diagnosticsLogger.log(
-      committedFrameDiagnosticRecord(
-        artifacts: artifacts,
-        scheduledFrame: scheduledFrame,
-        renderIntentDiagnostics: renderIntentDiagnostics,
-        focusSyncRerenders: focusSyncRerenders,
-        focusGraphChanged: focusGraphChanged,
-        focusBindingChanged: focusBindingChanged,
-        focusedValuesChanged: focusedValuesChanged,
-        scrollPositionChanged: scrollPositionChanged,
-        preferenceObservationChanged: preferenceObservationChanged,
-        tailJobState: tailJobState,
-        completedFrameDropDecision: completedFrameDropDecision,
-        animationControllerHasPendingWork: animationControllerHasPendingWork,
-        presentationMetrics: presentationMetrics,
-        presentationDuration: presentationDuration,
-        renderedFrames: renderedFrames
-      )
+    let inputEventsQueuedDuringRenderSuspension =
+      renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
+    let dropEligibilityBlockers = frameDropEligibilityBlockers(
+      artifacts: artifacts,
+      scheduledFrame: scheduledFrame,
+      focusGraphChanged: focusGraphChanged,
+      focusBindingChanged: focusBindingChanged,
+      focusedValuesChanged: focusedValuesChanged,
+      scrollPositionChanged: scrollPositionChanged,
+      preferenceObservationChanged: preferenceObservationChanged,
+      diagnosticsRequireFullRecord: true
     )
+
+    let sample = CommittedFrameSample(
+      frameNumber: renderedFrames,
+      scheduledFrame: scheduledFrame,
+      diagnostics: artifacts.diagnostics,
+      desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+      coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+      coalescedWakeCauses: renderIntentDiagnostics.coalescedWakeCauses,
+      intentRequestCount: renderIntentDiagnostics.intentRequestCount,
+      focusSyncRerenders: focusSyncRerenders,
+      animationControllerActiveAnimationCount: renderer
+        .internalAnimationController.activeAnimationCount,
+      animationControllerHasPendingWork: animationControllerHasPendingWork,
+      cancelledRenderCount: cancelledRenderCount,
+      inputEventsQueuedDuringRenderSuspension: inputEventsQueuedDuringRenderSuspension,
+      dropEligibilityBlockers: dropEligibilityBlockers,
+      completedFrameDropDecision: completedFrameDropDecision,
+      tailJobState: tailJobState,
+      presentationMetrics: presentationMetrics,
+      presentationDuration: presentationDuration
+    )
+    frameSink.record(.committed(sample))
   }
 
   @MainActor
-  func logCancelledFrameTail(
-    diagnosticsLogger: FrameDiagnosticsLogger?,
+  func emitCancelledFrameTail(
     renderedFrames: Int,
     scheduledFrame: ScheduledFrame,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
@@ -58,35 +70,40 @@ extension RunLoop {
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool
   ) {
-    guard let diagnosticsLogger else {
+    guard let frameSink else {
       return
     }
-    diagnosticsLogger.log(
-      zeroArtifactRecord(
-        frameNumber: renderedFrames + 1,
-        scheduledFrame: scheduledFrame,
-        renderIntentDiagnostics: renderIntentDiagnostics,
-        renderGeneration: renderGeneration,
-        runtimeIssues: runtimeIssues,
-        staleFramePolicy: "cancel_pending_before_start",
-        tailJobState: tailJobState.rawValue,
-        tailCancelReason: tailCancelReason,
-        newestDesiredAtTailResult: nextRenderIntentGeneration,
-        animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
-        animationControllerHasPendingWork: animationControllerHasPendingWork,
-        dropEligibilityBlockers: [],
-        dropDecision: "-",
-        dropGeneration: nil,
-        newestDesiredAtDrop: nil,
-        dropReconciliationMode: "-",
-        dropReconciliationEffects: "-"
-      )
+    let inputEventsQueuedDuringRenderSuspension =
+      renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
+    let sample = ZeroArtifactFrameSample(
+      frameNumber: renderedFrames + 1,
+      scheduledFrame: scheduledFrame,
+      desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+      coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+      coalescedWakeCauses: renderIntentDiagnostics.coalescedWakeCauses,
+      intentRequestCount: renderIntentDiagnostics.intentRequestCount,
+      renderGeneration: renderGeneration,
+      runtimeIssues: runtimeIssues,
+      staleFramePolicy: "cancel_pending_before_start",
+      tailJobState: tailJobState.rawValue,
+      tailCancelReason: tailCancelReason,
+      newestDesiredAtTailResult: nextRenderIntentGeneration,
+      animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
+      animationControllerHasPendingWork: animationControllerHasPendingWork,
+      cancelledRenderCount: cancelledRenderCount,
+      inputEventsQueuedDuringRenderSuspension: inputEventsQueuedDuringRenderSuspension,
+      dropEligibilityBlockers: [],
+      dropDecision: "-",
+      dropGeneration: nil,
+      newestDesiredAtDrop: nil,
+      dropReconciliationMode: "-",
+      dropReconciliationEffects: "-"
     )
+    frameSink.record(.zeroArtifact(sample))
   }
 
   @MainActor
-  func logDroppedCompletedFrame(
-    diagnosticsLogger: FrameDiagnosticsLogger?,
+  func emitDroppedCompletedFrame(
     renderedFrames: Int,
     scheduledFrame: ScheduledFrame,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
@@ -97,7 +114,7 @@ extension RunLoop {
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool
   ) {
-    guard let diagnosticsLogger else {
+    guard let frameSink else {
       return
     }
     let reconciliation =
@@ -105,26 +122,32 @@ extension RunLoop {
       ?? .blocked(
         reason: .dropEligibilityBlockers
       )
-    diagnosticsLogger.log(
-      zeroArtifactRecord(
-        frameNumber: renderedFrames + 1,
-        scheduledFrame: scheduledFrame,
-        renderIntentDiagnostics: renderIntentDiagnostics,
-        renderGeneration: renderGeneration,
-        runtimeIssues: runtimeIssues,
-        staleFramePolicy: "drop_completed_visual_only",
-        tailJobState: FrameTailJobState.droppedCompleted.rawValue,
-        tailCancelReason: "-",
-        newestDesiredAtTailResult: newestDesiredGeneration.rawValue,
-        animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
-        animationControllerHasPendingWork: animationControllerHasPendingWork,
-        dropEligibilityBlockers: droppedFrameBlockers(from: decision),
-        dropDecision: decision?.action.rawValue ?? "-",
-        dropGeneration: renderGeneration.rawValue,
-        newestDesiredAtDrop: newestDesiredGeneration.rawValue,
-        dropReconciliationMode: reconciliation.mode.rawValue,
-        dropReconciliationEffects: reconciliation.effectSummary
-      )
+    let inputEventsQueuedDuringRenderSuspension =
+      renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
+    let sample = ZeroArtifactFrameSample(
+      frameNumber: renderedFrames + 1,
+      scheduledFrame: scheduledFrame,
+      desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+      coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+      coalescedWakeCauses: renderIntentDiagnostics.coalescedWakeCauses,
+      intentRequestCount: renderIntentDiagnostics.intentRequestCount,
+      renderGeneration: renderGeneration,
+      runtimeIssues: runtimeIssues,
+      staleFramePolicy: "drop_completed_visual_only",
+      tailJobState: FrameTailJobState.droppedCompleted.rawValue,
+      tailCancelReason: "-",
+      newestDesiredAtTailResult: newestDesiredGeneration.rawValue,
+      animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
+      animationControllerHasPendingWork: animationControllerHasPendingWork,
+      cancelledRenderCount: cancelledRenderCount,
+      inputEventsQueuedDuringRenderSuspension: inputEventsQueuedDuringRenderSuspension,
+      dropEligibilityBlockers: droppedFrameBlockers(from: decision),
+      dropDecision: decision?.action.rawValue ?? "-",
+      dropGeneration: renderGeneration.rawValue,
+      newestDesiredAtDrop: newestDesiredGeneration.rawValue,
+      dropReconciliationMode: reconciliation.mode.rawValue,
+      dropReconciliationEffects: reconciliation.effectSummary
     )
+    frameSink.record(.zeroArtifact(sample))
   }
 }

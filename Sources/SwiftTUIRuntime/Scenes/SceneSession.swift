@@ -281,6 +281,11 @@ import SwiftTUIViews
       }
     )
     runLoop.diagnosticsLogger = resources.diagnosticsLogger
+    if let frameSink = ProfilingRegistry.shared.frameSink {
+      // A profiled build installs a sink via `.profiling()`; it supersedes the
+      // legacy per-session logger.
+      runLoop.frameSink = frameSink
+    }
     runLoop.runtimeIssueSink = resources.runtimeIssueSink
     runLoop.progressProbe = resources.progressProbe
     if let renderMode = resources.renderMode {

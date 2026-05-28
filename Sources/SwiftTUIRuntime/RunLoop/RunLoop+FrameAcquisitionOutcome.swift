@@ -27,8 +27,7 @@ extension RunLoop {
       )
       cancelledRenderCount += 1
       replayCancelledFrameIntent(scheduledFrame)
-      logCancelledFrameTail(
-        diagnosticsLogger: diagnosticsLogger,
+      emitCancelledFrameTail(
         renderedFrames: renderedFrames,
         scheduledFrame: scheduledFrame,
         renderIntentDiagnostics: renderIntentDiagnostics,
@@ -53,8 +52,7 @@ extension RunLoop {
         convergence.lifecycleCarryForward,
         into: &deferredLifecycleCarryForward
       )
-      logDroppedCompletedFrame(
-        diagnosticsLogger: diagnosticsLogger,
+      emitDroppedCompletedFrame(
         renderedFrames: renderedFrames,
         scheduledFrame: scheduledFrame,
         renderIntentDiagnostics: renderIntentDiagnostics,
