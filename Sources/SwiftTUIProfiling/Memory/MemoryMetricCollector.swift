@@ -11,6 +11,7 @@ package import SwiftTUICore
 package struct MemoryMetricCollector: Sendable {
   package init() {}
 
+  @MainActor
   package func collect() -> [MemoryMetricSnapshot] {
     var snapshots = MemoryMetricRegistry.shared.snapshotAll()
     snapshots.append(
