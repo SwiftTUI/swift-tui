@@ -19,7 +19,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 |---|---:|---:|
 | `SwiftTUI` | 1 | 3 |
 | `SwiftTUIRuntime` | 55 | 493 |
-| `SwiftTUIProfiling` | 8 | 49 |
+| `SwiftTUIProfiling` | 8 | 50 |
 | `SwiftTUIViews` | 263 | 1405 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
@@ -107,7 +107,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 - `CPUSample` — struct — 8 members
 - `CPUSampleCollector` — class — 3 members
-- `CPUSampler` — enum — 4 members
+- `CPUSampler` — enum — 5 members
 - `CPUSamplerError` — enum — 3 members
 - `ProcessCPUReading` — struct — 6 members
 - `ProfileActivation` — class — 2 members
