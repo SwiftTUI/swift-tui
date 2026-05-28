@@ -12,6 +12,7 @@ package final class ProfilingRegistry: Sendable {
 
   private struct State {
     var frameSink: (any FrameDiagnosticSink)?
+    var progressObserver: (any RunLoopProgressObserver)?
   }
 
   private let state = Mutex(State())
@@ -21,5 +22,10 @@ package final class ProfilingRegistry: Sendable {
   package var frameSink: (any FrameDiagnosticSink)? {
     get { state.withLock { $0.frameSink } }
     set { state.withLock { $0.frameSink = newValue } }
+  }
+
+  package var progressObserver: (any RunLoopProgressObserver)? {
+    get { state.withLock { $0.progressObserver } }
+    set { state.withLock { $0.progressObserver = newValue } }
   }
 }

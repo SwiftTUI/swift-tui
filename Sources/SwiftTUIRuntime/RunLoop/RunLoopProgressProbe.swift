@@ -40,6 +40,15 @@ import SwiftTUICore
   }
 }
 
+/// Run-loop **quiescence/await** primitive. Tests synchronize poll-free on
+/// run-loop progress through `idle()`/`frameCommitted(where:)`/`event(where:)`,
+/// without linking a profiling product. The retained `recordedEvents` is
+/// load-bearing here: it lets an `await` resolve against an event that already
+/// fired before the await was registered.
+///
+/// The *perf* event log is a separate concern — the runtime forwards every
+/// recorded event to the ``RunLoopProgressObserver`` installed in
+/// ``ProfilingRegistry`` (the profiling product's event log).
 @_spi(Runners) @MainActor public final class RunLoopProgressProbe {
   private struct Waiter {
     var predicate: @MainActor (RunLoopProgressEvent) -> Bool
@@ -121,5 +130,8 @@ import SwiftTUICore
     for continuation in resumedWaiters {
       continuation.resume(returning: event)
     }
+
+    // Forward to the profiling product's event log, if one is installed.
+    ProfilingRegistry.shared.progressObserver?.record(event)
   }
 }
