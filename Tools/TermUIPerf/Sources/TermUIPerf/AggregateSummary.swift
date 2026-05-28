@@ -139,3 +139,24 @@ public enum AggregateReducer {
       frameIntervalP50Ms: PerfStat(values: summaries.compactMap(\.frameIntervalMs.p50)))
   }
 }
+
+extension AggregateReducer {
+  public static func format(_ aggregate: PerfAggregateSummary) -> String {
+    var lines = [
+      "scenario: \(aggregate.scenario) (\(aggregate.renderMode), n=\(aggregate.iterationCount))"
+    ]
+    lines.append(line("total CPU seconds", aggregate.totalCPUSeconds))
+    lines.append(line("committed frames", aggregate.committedFrameCount))
+    lines.append(line("CPU seconds/frame", aggregate.cpuSecondsPerCommittedFrame))
+    lines.append(line("input latency p95 ms", aggregate.inputToPresentLatencyP95Ms))
+    lines.append(line("frame interval p50 ms", aggregate.frameIntervalP50Ms))
+    return lines.joined(separator: "\n")
+  }
+
+  private static func line(_ label: String, _ stat: PerfStat) -> String {
+    let median = String(format: "%.4f", stat.median)
+    let stddev = String(format: "%.4f", stat.stddev)
+    let cv = String(format: "%.1f", stat.coefficientOfVariation * 100)
+    return "\(label): \(median) +/- \(stddev) (CV \(cv)%)"
+  }
+}

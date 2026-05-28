@@ -82,6 +82,22 @@ struct AggregateReducerTests {
     #expect(aggregate.totalCPUSeconds.sampleCount == 2)
   }
 
+  @Test("AggregateReducer.format renders median +/- stddev and CV percent")
+  func aggregateReducerFormatsHumanReadableSummary() {
+    let aggregate = AggregateReducer.reduce([
+      summary(cpuSeconds: 5.0, committed: 270, latencyP95: 22.0, intervalP50: 36.0),
+      summary(cpuSeconds: 5.4, committed: 274, latencyP95: 24.0, intervalP50: 36.0),
+      summary(cpuSeconds: 5.8, committed: 278, latencyP95: 26.0, intervalP50: 36.0),
+    ])
+
+    let output = AggregateReducer.format(aggregate)
+
+    #expect(output.contains("scenario: gallery-animation-click (async, n=3)"))
+    #expect(output.contains("total CPU seconds: 5.4000 +/- 0.4000"))
+    #expect(output.contains("CV 7.4%"))
+    #expect(output.contains("committed frames:"))
+  }
+
   private func approx(_ actual: Double, _ expected: Double) -> Bool {
     abs(actual - expected) < 0.000_001
   }
