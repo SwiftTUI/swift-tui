@@ -37,6 +37,19 @@ struct AggregateComparisonTests {
     #expect(cpu.verdict == .inconclusive)
   }
 
+  @Test("format renders per-metric verdict lines")
+  func formatRendersVerdictLines() {
+    let comparison = CompareCommand.compareAggregates(
+      base: aggregate(cpuValues: [5.0, 5.4, 5.8]),
+      candidate: aggregate(cpuValues: [2.6, 3.0, 3.4]))
+
+    let output = CompareCommand.format(comparison)
+
+    #expect(output.contains("scenario: gallery-animation-click"))
+    #expect(output.contains("total CPU seconds: 5.4000 -> 3.0000"))
+    #expect(output.contains("[real]"))
+  }
+
   private func metric(
     _ comparison: AggregateComparison,
     _ name: String
