@@ -121,12 +121,19 @@ public protocol PerfScenario {
 }
 
 public enum PerfScenarioRegistry {
+  /// Extension point for scenarios registered at startup that cannot live in
+  /// this package's committed sources — e.g. coordination-only scenarios that
+  /// depend on a sibling repo (the example gallery). Populated before argument
+  /// parsing; empty in a clean checkout.
+  @MainActor
+  public static var additionalScenarios: [any PerfScenario] = []
+
   @MainActor
   public static var all: [any PerfScenario] {
     [
       GalleryAnimationClickScenario(),
       LayoutScrollBurstScenario(),
-    ]
+    ] + additionalScenarios
   }
 
   @MainActor
@@ -259,6 +266,7 @@ public enum PerfScenarioRunner {
     )
 
     let startedAt = timestampString()
+    let memorySampler = PerfMemorySampler()
     var events: [PerfEventRecord] = []
     let cpuReadings = try await withRenderModeEnvironment(options.renderMode) {
       try await CPUSampler.collect(interval: options.cpuSampleInterval) { @MainActor in
@@ -271,17 +279,21 @@ public enum PerfScenarioRunner {
           )
         }
 
+        var memoryTask: Task<Void, Never>?
         do {
           _ = try await waitForPresentedFrame(in: terminalHost)
+          memoryTask = memorySampler.startSampling(interval: .milliseconds(500))
           events = try await drive(
             PerfScenarioDriver(
               inputReader: inputReader,
               terminalHost: terminalHost
             ))
+          memoryTask?.cancel()
           inputReader.finish()
           signalReader.finish()
           _ = try await runTask.value
         } catch {
+          memoryTask?.cancel()
           inputReader.finish()
           signalReader.finish()
           runTask.cancel()
@@ -322,6 +334,10 @@ public enum PerfScenarioRunner {
     try writeString(
       PerfTSVWriter.cpuTSV(cpuSamples),
       to: runDirectory.appendingPathComponent("cpu.tsv")
+    )
+    try writeString(
+      memorySampler.tsv(),
+      to: runDirectory.appendingPathComponent("memory.tsv")
     )
     try writeJSON(summary, to: runDirectory.appendingPathComponent("summary.json"))
 
