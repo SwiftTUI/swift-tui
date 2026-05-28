@@ -2,7 +2,11 @@ import Foundation
 
 /// Result of a perf run: every per-iteration result, plus one aggregate per mode.
 public struct PerfRunOutcome: Sendable {
+  /// All per-iteration results, ordered `modes x iterations` (i.e. the first
+  /// `iterations` entries are mode[0], the next `iterations` are mode[1], ...).
+  /// Read `result.metadata.renderMode` to attribute an entry to its mode.
   public var perIteration: [PerfScenarioRunResult]
+  /// One aggregate per render mode, in `config.modes` order.
   public var aggregates: [PerfAggregateSummary]
 
   public init(perIteration: [PerfScenarioRunResult], aggregates: [PerfAggregateSummary]) {
@@ -44,7 +48,11 @@ public enum RunCommand {
   }
 
   /// Writes `aggregate-<scenario>-<mode>.json` at the artifact root so
-  /// `CompareCommand.compareAggregates` can load it later.
+  /// `CompareCommand.compareAggregates` can load it later. The filename is
+  /// stable (no timestamp), so repeated runs into the SAME `--artifacts-root`
+  /// overwrite it; the per-iteration run directories are timestamped and are
+  /// never clobbered. For a baseline-vs-candidate comparison, run the two into
+  /// distinct artifact roots (or copy the aggregate aside) before comparing.
   private static func writeAggregate(
     _ aggregate: PerfAggregateSummary,
     to artifactRoot: URL
