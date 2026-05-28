@@ -108,6 +108,29 @@ struct TextLayoutCacheTests {
     #expect(cache.accessLogDepth <= capacity * 4)
   }
 
+  @Test("unique-key-per-frame churn plateaus at capacity")
+  func uniqueKeyChurnStaysBoundedAtCapacity() {
+    // Reproduces the gallery's "Task Progress" tab: the shimmer/spinner mints a
+    // NEW text-layout key every frame, so every lookup misses, stores, and
+    // evicts. The entry map must plateau at capacity rather than grow without
+    // bound — the access log must stay bounded too.
+    let capacity = 16
+    let cache = TextLayoutCache(capacity: capacity)
+    let options = TextLayoutOptions(width: nil)
+    let frames = 5000
+
+    for frame in 0..<frames {
+      _ = cache.layout(for: "frame-\(frame)", options: options)
+    }
+
+    let metrics = cache.metrics
+    #expect(metrics.entries == capacity)
+    #expect(metrics.misses == frames)
+    #expect(metrics.stores == frames)
+    #expect(metrics.evictions == frames - capacity)
+    #expect(cache.accessLogDepth <= capacity * 4)
+  }
+
   @Test("cache eviction keeps the most recently used entry")
   func evictionKeepsMostRecentlyUsedEntry() {
     let cache = TextLayoutCache(capacity: 2)
