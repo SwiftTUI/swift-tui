@@ -2480,6 +2480,7 @@ SwiftTUIProfiling.CPUSampleCollector.init(interval:)
 SwiftTUIProfiling.CPUSampleCollector.start()
 SwiftTUIProfiling.CPUSampleCollector.stop()
 SwiftTUIProfiling.CPUSampler
+SwiftTUIProfiling.CPUSampler.collect(interval:during:)
 SwiftTUIProfiling.CPUSampler.defaultSampleInterval
 SwiftTUIProfiling.CPUSampler.deltas(from:)
 SwiftTUIProfiling.CPUSampler.readCurrentUsage()
