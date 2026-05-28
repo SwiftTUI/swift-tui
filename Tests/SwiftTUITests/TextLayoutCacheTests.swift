@@ -81,6 +81,33 @@ struct TextLayoutCacheTests {
     #expect(metrics.evictions == 0)
   }
 
+  @Test("warm-cache hits keep the access log bounded")
+  func warmCacheHitsKeepAccessLogBounded() {
+    // Reproduces the gallery's "Borders & Shapes" leak: a continuous animation
+    // re-lays-out the same static text every frame. Every lookup is a cache
+    // hit, so the entry map stays well under capacity and never triggers
+    // eviction — the only path that drains the LRU access log. The log must
+    // not grow without bound.
+    let capacity = 8
+    let cache = TextLayoutCache(capacity: capacity)
+    let options = TextLayoutOptions(width: nil)
+    let labels = (0..<capacity).map { "label-\($0)" }
+
+    for label in labels {
+      _ = cache.layout(for: label, options: options)
+    }
+    for _ in 0..<2000 {
+      for label in labels {
+        _ = cache.layout(for: label, options: options)
+      }
+    }
+
+    let metrics = cache.metrics
+    #expect(metrics.entries == capacity)
+    #expect(metrics.evictions == 0)
+    #expect(cache.accessLogDepth <= capacity * 4)
+  }
+
   @Test("cache eviction keeps the most recently used entry")
   func evictionKeepsMostRecentlyUsedEntry() {
     let cache = TextLayoutCache(capacity: 2)

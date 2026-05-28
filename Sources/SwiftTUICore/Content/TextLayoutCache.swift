@@ -74,6 +74,12 @@ package final class TextLayoutCache: Sendable {
     }
   }
 
+  // Test-facing: depth of the LRU access log. The regression suite uses this to
+  // assert the log stays bounded under warm, hit-dominated workloads.
+  var accessLogDepth: Int {
+    storage.withLock { $0.order.count }
+  }
+
   package func reset() {
     storage.withLock { storage in
       storage.entries.removeAll(keepingCapacity: true)
@@ -103,7 +109,7 @@ package final class TextLayoutCache: Sendable {
       let generation = nextGeneration(in: &storage)
       cached.generation = generation
       storage.entries[key] = cached
-      storage.order.append(.init(key: key, generation: generation))
+      recordAccess(key, generation: generation, in: &storage)
       return cached.result
     }) {
       return cached
@@ -120,7 +126,7 @@ package final class TextLayoutCache: Sendable {
         let generation = nextGeneration(in: &storage)
         cached.generation = generation
         storage.entries[key] = cached
-        storage.order.append(.init(key: key, generation: generation))
+        recordAccess(key, generation: generation, in: &storage)
         return cached.result
       }
 
@@ -130,7 +136,7 @@ package final class TextLayoutCache: Sendable {
         result: result,
         generation: generation
       )
-      storage.order.append(.init(key: key, generation: generation))
+      recordAccess(key, generation: generation, in: &storage)
       evictIfNeeded(in: &storage)
       return result
     }
@@ -141,6 +147,41 @@ package final class TextLayoutCache: Sendable {
   ) -> UInt64 {
     storage.nextGeneration &+= 1
     return storage.nextGeneration
+  }
+
+  private func recordAccess(
+    _ key: Key,
+    generation: UInt64,
+    in storage: inout Storage
+  ) {
+    storage.order.append(.init(key: key, generation: generation))
+    compactAccessLogIfNeeded(in: &storage)
+  }
+
+  /// Rebuilds `order` from the live, current-generation records once it
+  /// materially outgrows the entry map.
+  ///
+  /// `order` gains a record on every access (hit or store) but is only drained
+  /// by `evictIfNeeded`, which runs solely on the store path and only while the
+  /// entry map is over capacity. A warm, hit-dominated workload — e.g. an
+  /// animation re-laying out the same text every frame — keeps the entry map
+  /// under capacity, so eviction never fires and `order` would otherwise grow
+  /// without bound. Compaction keeps exactly one record per live entry (the
+  /// most recent access), preserving recency order, so the log stays O(live).
+  private func compactAccessLogIfNeeded(
+    in storage: inout Storage
+  ) {
+    let liveCount = storage.entries.count
+    guard storage.order.count > max(capacity, liveCount) * 2 else {
+      return
+    }
+    var compacted: Deque<AccessRecord> = []
+    compacted.reserveCapacity(liveCount)
+    for record in storage.order
+    where storage.entries[record.key]?.generation == record.generation {
+      compacted.append(record)
+    }
+    storage.order = compacted
   }
 
   private func evictIfNeeded(
