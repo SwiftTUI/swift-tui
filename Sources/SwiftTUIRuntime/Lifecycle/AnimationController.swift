@@ -321,6 +321,21 @@ package final class AnimationController: Sendable {
     }.count
   }
 
+  /// Occupancy reading for the profiling memory signal. Computed, so it stays
+  /// outside the checkpoint totality contract.
+  package var memoryMetricSnapshot: MemoryMetricSnapshot {
+    MemoryMetricSnapshot(
+      name: "AnimationController.activeAnimations",
+      count: activeAnimations.count,
+      detail: [
+        "registered": registeredAnimations.count,
+        "completions": completionClosures.count,
+        "batchRefCounts": batchRefCounts.count,
+        "pendingEmptyBatches": pendingEmptyBatchCompletions.count,
+      ]
+    )
+  }
+
   package var frameDropEligibilityBlockers: Set<FrameDropEligibility.Blocker> {
     var blockers: Set<FrameDropEligibility.Blocker> = []
     if lastFrameHeadCompletionCount > 0 || !completionClosures.isEmpty

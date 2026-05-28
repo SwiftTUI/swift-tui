@@ -24,6 +24,10 @@ final class FrameTailRenderer: Sendable {
     self.rasterizer = rasterizer
   }
 
+  package var memoryMetricSnapshot: MemoryMetricSnapshot {
+    retainedState.memoryMetricSnapshot
+  }
+
   private var inlineStages: FrameTailInlineStageRenderer {
     FrameTailInlineStageRenderer(
       layoutEngine: layoutEngine,
