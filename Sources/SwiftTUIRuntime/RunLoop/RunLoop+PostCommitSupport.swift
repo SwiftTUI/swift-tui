@@ -26,11 +26,11 @@ extension RunLoop {
   func presentCommittedFrameWithDiagnosticsTiming(
     _ artifacts: FrameArtifacts,
     damage: PresentationDamage?,
-    hasDiagnosticsLogger: Bool
+    hasFrameSink: Bool
   ) throws -> CommittedFramePresentationResult {
     let presentStart: ContinuousClock.Instant?
     let presentClock: ContinuousClock?
-    if hasDiagnosticsLogger {
+    if hasFrameSink {
       let clock = ContinuousClock()
       presentClock = clock
       presentStart = clock.now

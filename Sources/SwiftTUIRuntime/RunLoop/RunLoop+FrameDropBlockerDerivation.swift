@@ -8,13 +8,6 @@ import SwiftTUICore
 // with the artifact-level signals, decide whether a completed frame is
 // visual-only or must commit.
 extension RunLoop {
-  func causeSummary(for scheduledFrame: ScheduledFrame) -> String {
-    scheduledFrame.causes
-      .map(\.rawValue)
-      .sorted()
-      .joined(separator: "+")
-  }
-
   func frameDropEligibilityBlockers(
     artifacts: FrameArtifacts,
     scheduledFrame: ScheduledFrame,

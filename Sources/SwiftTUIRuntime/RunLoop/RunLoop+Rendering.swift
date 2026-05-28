@@ -7,7 +7,7 @@ extension RunLoop {
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
-    let hasDiagnosticsLogger = diagnosticsLogger != nil
+    let hasFrameSink = frameSink != nil
     while var scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
@@ -66,7 +66,7 @@ extension RunLoop {
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
         acquisition: FrameAcquisitionState(),
-        hasDiagnosticsLogger: hasDiagnosticsLogger,
+        hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
@@ -88,7 +88,7 @@ extension RunLoop {
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     convergence: FocusSyncConvergenceState,
     acquisition: FrameAcquisitionState,
-    hasDiagnosticsLogger: Bool,
+    hasFrameSink: Bool,
     renderedFrames: inout Int
   ) throws {
     var artifacts = acquiredArtifacts
@@ -112,7 +112,7 @@ extension RunLoop {
     let presentationResult = try presentCommittedFrameWithDiagnosticsTiming(
       artifacts,
       damage: presentationDamage(for: artifacts, convergence: convergence),
-      hasDiagnosticsLogger: hasDiagnosticsLogger
+      hasFrameSink: hasFrameSink
     )
     recordPresentedRasterSurface(artifacts.rasterSurface)
     lifecycleCoordinator.applyCommittedFrame(
@@ -155,8 +155,7 @@ extension RunLoop {
       tailJobState: acquisition.tailJobState
     )
 
-    logCommittedFrameDiagnostics(
-      diagnosticsLogger: diagnosticsLogger,
+    emitCommittedFrameSample(
       artifacts: artifacts,
       scheduledFrame: scheduledFrame,
       renderIntentDiagnostics: renderIntentDiagnostics,
@@ -208,7 +207,7 @@ extension RunLoop {
   ) async throws -> RunLoopExitReason? {
     observationBridge.attachInvalidator(scheduler)
 
-    let hasDiagnosticsLogger = diagnosticsLogger != nil
+    let hasFrameSink = frameSink != nil
     frameLoop: while var scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
@@ -289,7 +288,7 @@ extension RunLoop {
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
         acquisition: acquisition,
-        hasDiagnosticsLogger: hasDiagnosticsLogger,
+        hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
