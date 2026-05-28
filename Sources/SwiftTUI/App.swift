@@ -1,7 +1,12 @@
-import Foundation
 public import SwiftTUIArguments
 public import SwiftTUIRuntime
 import SwiftTUIWebHostCLI
+
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
 
 /// The batteries-included SwiftTUI app protocol.
 ///
@@ -43,12 +48,11 @@ extension App {
   private static func runParsedCommand() async throws {
     var command = try parseSwiftTUIRootCommand()
     if let script = completionScript(forParsedCommand: command) {
-      FileHandle.standardOutput.write(Data(script.utf8))
+      writeToStandardOutput(script)
       return
     }
-    if let installedURL = try installCompletionScript(forParsedCommand: command) {
-      let message = "Installed completion script at \(installedURL.path)\n"
-      FileHandle.standardOutput.write(Data(message.utf8))
+    if let installedPath = try installCompletionScript(forParsedCommand: command) {
+      writeToStandardOutput("Installed completion script at \(installedPath)\n")
       return
     }
     if let appCommand = command as? Self {
@@ -59,5 +63,17 @@ extension App {
       return
     }
     try command.run()
+  }
+}
+
+/// Writes UTF-8 text to standard output without Foundation, keeping the
+/// batteries-included layer free of `import Foundation`.
+private func writeToStandardOutput(_ text: String) {
+  var text = text
+  text.withUTF8 { buffer in
+    guard let base = buffer.baseAddress, buffer.count > 0 else {
+      return
+    }
+    _ = unsafe write(STDOUT_FILENO, base, buffer.count)
   }
 }

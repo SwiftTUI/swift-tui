@@ -69,14 +69,19 @@ extension SwiftTUICommand {
     return completionScript(for: printCommand.shell.completionShell)
   }
 
+  /// Installs the completion script for an `install` subcommand and returns the
+  /// destination file path, or `nil` when `command` is not an install request.
+  ///
+  /// Returns a plain path string (not a `URL`) so the batteries-included
+  /// `SwiftTUI` layer can consume it without importing Foundation.
   public nonisolated static func installCompletionScript(
     forParsedCommand command: any ParsableCommand
-  ) throws -> URL? {
+  ) throws -> String? {
     guard let installCommand = command as? CompletionsCommand.Install else {
       return nil
     }
     let script = completionScript(for: installCommand.shell.completionShell)
-    return try installCommand.install(script: script, commandName: _commandName)
+    return try installCommand.install(script: script, commandName: _commandName).path
   }
 
   public nonisolated static func completionCommand(

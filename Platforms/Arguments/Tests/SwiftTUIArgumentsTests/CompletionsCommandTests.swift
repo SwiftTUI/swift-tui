@@ -99,11 +99,11 @@ struct CompletionsCommandTests {
     let command = try TestSwiftTUICommand.parseAsRoot([
       "completions", "install", "fish", "--output", outputURL.path,
     ])
-    let installedURL = try TestSwiftTUICommand.installCompletionScript(forParsedCommand: command)
-    let installed = try #require(installedURL)
+    let installedPath = try TestSwiftTUICommand.installCompletionScript(forParsedCommand: command)
+    let installed = try #require(installedPath)
 
-    #expect(installed.path == outputURL.path)
-    let script = try String(contentsOf: installed, encoding: .utf8)
+    #expect(installed == outputURL.path)
+    let script = try String(contentsOfFile: installed, encoding: .utf8)
     #expect(script.contains("-l 'accessible'"))
     #expect(script.contains("-l 'widgets'"))
     #expect(script.contains("completions"))
