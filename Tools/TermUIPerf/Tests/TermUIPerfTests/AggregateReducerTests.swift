@@ -50,7 +50,70 @@ struct AggregateReducerTests {
     #expect(approx(stat.coefficientOfVariation, 0.0))
   }
 
+  @Test("AggregateReducer reduces per-iteration summaries into per-metric stats")
+  func aggregateReducerReducesSummaries() {
+    let aggregate = AggregateReducer.reduce([
+      summary(cpuSeconds: 5.0, committed: 270, latencyP95: 22.0, intervalP50: 36.0),
+      summary(cpuSeconds: 5.4, committed: 274, latencyP95: 24.0, intervalP50: 36.0),
+      summary(cpuSeconds: 5.8, committed: 278, latencyP95: 26.0, intervalP50: 36.0),
+    ])
+
+    #expect(aggregate.scenario == "gallery-animation-click")
+    #expect(aggregate.renderMode == "async")
+    #expect(aggregate.iterationCount == 3)
+    #expect(approx(aggregate.totalCPUSeconds.median, 5.4))
+    #expect(approx(aggregate.totalCPUSeconds.mean, 5.4))
+    #expect(aggregate.committedFrameCount.sampleCount == 3)
+    #expect(approx(aggregate.committedFrameCount.median, 274))
+    #expect(approx(aggregate.inputToPresentLatencyP95Ms.median, 24.0))
+    #expect(approx(aggregate.frameIntervalP50Ms.stddev, 0.0))
+  }
+
+  @Test("AggregateReducer drops nil optional metrics before aggregating")
+  func aggregateReducerSkipsNilMetrics() {
+    let aggregate = AggregateReducer.reduce([
+      summary(cpuSeconds: 5.0, committed: 270, latencyP95: nil, intervalP50: 36.0),
+      summary(cpuSeconds: 5.4, committed: 274, latencyP95: 24.0, intervalP50: 36.0),
+    ])
+
+    // Only one summary had a non-nil latency p95, so the stat has one sample.
+    #expect(aggregate.inputToPresentLatencyP95Ms.sampleCount == 1)
+    #expect(approx(aggregate.inputToPresentLatencyP95Ms.median, 24.0))
+    #expect(aggregate.totalCPUSeconds.sampleCount == 2)
+  }
+
   private func approx(_ actual: Double, _ expected: Double) -> Bool {
     abs(actual - expected) < 0.000_001
+  }
+
+  private func summary(
+    cpuSeconds: Double,
+    committed: Int,
+    latencyP95: Double?,
+    intervalP50: Double?
+  ) -> PerfSummary {
+    PerfSummary(
+      scenario: "gallery-animation-click",
+      renderMode: "async",
+      iterationCount: 1,
+      committedFrameCount: committed,
+      skippedFrameCount: 0,
+      inputToPresentLatencyMs: PerfDistribution(count: 1, p50: nil, p95: latencyP95, p99: nil),
+      inputToSettledLatencyMs: PerfDistribution(count: 0, p50: nil, p95: nil, p99: nil),
+      frameIntervalMs: PerfDistribution(count: 1, p50: intervalP50, p95: nil, p99: nil),
+      totalCPUSeconds: cpuSeconds,
+      cpuSecondsPerCommittedFrame: cpuSeconds / Double(committed),
+      cpuSecondsPerInputEvent: nil,
+      mainActorBlockedRatio: nil,
+      mainActorSuspendedRatio: nil,
+      workerLayoutEnqueueMs: PerfDistribution(count: 0, p50: nil, p95: nil, p99: nil),
+      workerLayoutComputeMs: PerfDistribution(count: 0, p50: nil, p95: nil, p99: nil),
+      workerRasterEnqueueMs: PerfDistribution(count: 0, p50: nil, p95: nil, p99: nil),
+      workerRasterComputeMs: PerfDistribution(count: 0, p50: nil, p95: nil, p99: nil),
+      presentationDurationMs: PerfDistribution(count: 0, p50: nil, p95: nil, p99: nil),
+      cancellationCount: 0,
+      completedDropCount: 0,
+      customLayoutFallbackCount: 0,
+      layoutDependentMainActorFallbackCount: 0)
   }
 }
