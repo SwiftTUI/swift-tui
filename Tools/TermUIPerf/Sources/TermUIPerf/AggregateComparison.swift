@@ -67,6 +67,20 @@ extension CompareCommand {
     return AggregateComparison(scenario: base.scenario, metrics: metrics)
   }
 
+  public static func format(_ comparison: AggregateComparison) -> String {
+    var lines = ["scenario: \(comparison.scenario)"]
+    for metric in comparison.metrics {
+      let base = String(format: "%.4f", metric.baseMedian)
+      let candidate = String(format: "%.4f", metric.candidateMedian)
+      let delta = String(format: "%+.4f", metric.delta)
+      let band = String(format: "%.4f", metric.noiseBand)
+      lines.append(
+        "\(metric.metric): \(base) -> \(candidate) (\(delta), band \(band)) "
+          + "[\(metric.verdict.rawValue)]")
+    }
+    return lines.joined(separator: "\n")
+  }
+
   /// Compares one metric. The noise band is `sigma * max(base.stddev,
   /// candidate.stddev)`; when both stddevs are 0 (perfectly consistent runs)
   /// the band is 0, so any nonzero median delta is reported `.real`. A metric
