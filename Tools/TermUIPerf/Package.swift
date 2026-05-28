@@ -21,7 +21,8 @@ let package = Package(
     .executableTarget(
       name: "TermUIPerf",
       dependencies: [
-        .product(name: "SwiftTUI", package: "swift-tui")
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUIProfiling", package: "swift-tui"),
       ]
     ),
     .testTarget(

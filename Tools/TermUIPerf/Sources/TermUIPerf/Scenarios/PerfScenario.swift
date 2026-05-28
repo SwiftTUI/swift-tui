@@ -1,6 +1,7 @@
 import Dispatch
 import Foundation
 @_spi(Runners) import SwiftTUI
+import SwiftTUIProfiling
 
 #if canImport(Darwin)
   import Darwin
@@ -88,7 +89,7 @@ public struct PerfScenarioRunOptions: Equatable, Sendable {
     artifactRoot: URL = URL(fileURLWithPath: PerfRunConfig.defaultArtifactsRoot, isDirectory: true),
     configuration: String = PerfRunConfig.defaultConfiguration,
     terminalSize: PerfTerminalSize? = nil,
-    cpuSampleInterval: Duration = CPUSampler.defaultSampleInterval
+    cpuSampleInterval: Duration = .milliseconds(50)
   ) {
     self.renderMode = renderMode
     self.iterations = iterations
@@ -256,7 +257,7 @@ public enum PerfScenarioRunner {
 
     let startedAt = timestampString()
     var events: [PerfEventRecord] = []
-    let cpuSamples = try await withRenderModeEnvironment(options.renderMode) {
+    let cpuReadings = try await withRenderModeEnvironment(options.renderMode) {
       try await CPUSampler.collect(interval: options.cpuSampleInterval) { @MainActor in
         let runTask = Task { @MainActor in
           try await selection.run(
@@ -286,6 +287,7 @@ public enum PerfScenarioRunner {
         }
       }
     }
+    let cpuSamples = cpuReadings.map(PerfCPUSample.init(from:))
 
     let metadata = PerfRunMetadata(
       gitSHA: gitSHA(),

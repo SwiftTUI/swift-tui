@@ -128,6 +128,25 @@ public enum CPUSampler {
     zip(readings, readings.dropFirst()).map(sampleDelta)
   }
 
+  /// Samples CPU at `interval` across `operation`, returning the per-interval
+  /// deltas. Convenience for scripted runs; the periodic profiling signal uses
+  /// the lower-level primitives directly.
+  @MainActor
+  public static func collect(
+    interval: Duration = defaultSampleInterval,
+    during operation: () async throws -> Void
+  ) async throws -> [CPUSample] {
+    let collector = CPUSampleCollector(interval: interval)
+    try await collector.start()
+    do {
+      try await operation()
+      return try await collector.stop()
+    } catch {
+      _ = try? await collector.stop()
+      throw error
+    }
+  }
+
   private static let clockEpoch = ContinuousClock.now
 
   private static func monotonicSeconds() -> Double {
