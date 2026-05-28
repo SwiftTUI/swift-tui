@@ -18,21 +18,21 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 3 |
-| `SwiftTUIRuntime` | 54 | 488 |
-| `SwiftTUIProfiling` | 8 | 50 |
-| `SwiftTUIViews` | 263 | 1405 |
+| `SwiftTUIRuntime` | 56 | 493 |
+| `SwiftTUIProfiling` | 9 | 52 |
+| `SwiftTUIViews` | 269 | 1426 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
-| `SwiftTUITerminal` | 12 | 121 |
+| `SwiftTUITerminal` | 13 | 124 |
 | `SwiftTUITerminalWorkspace` | 14 | 118 |
-| `SwiftTUICLI` | 5 | 22 |
-| `SwiftTUIWASI` | 2 | 6 |
+| `SwiftTUICLI` | 6 | 25 |
+| `SwiftTUIWASI` | 3 | 8 |
 | `SwiftTUIWebHost` | 3 | 16 |
-| `SwiftTUIWebHostCLI` | 1 | 5 |
+| `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftUIHost` | 7 | 62 |
-| `SwiftTUICore` | 270 | 2134 |
+| `SwiftTUICore` | 272 | 2142 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -43,7 +43,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIRuntime
 
-### Canonical surface (54)
+### Canonical surface (56)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
@@ -66,6 +66,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `KeyParser` — struct — 2 members
 - `MouseButton` — enum — 3 members
 - `MouseEvent` — struct — 14 members
+- `Never` — extension — 2 members
 - `PasteEvent` — struct — 2 members
 - `PresentationMetrics` — typealias
 - `PresentationSurface` — protocol — 5 members
@@ -75,6 +76,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RunLoopExitReason` — enum — 3 members
 - `RunLoopResult` — struct — 4 members
 - `RuntimeConfiguration` — struct — 56 members
+- `RuntimeIssueSink` — extension — 1 member
 - `RuntimeRenderMode` — enum — 9 members
 - `Scene` — protocol — 2 members
 - `SceneBuilder` — enum — 10 members
@@ -102,7 +104,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIProfiling
 
-### Canonical surface (8)
+### Canonical surface (9)
 
 - `CPUSample` — struct — 8 members
 - `CPUSampleCollector` — class — 3 members
@@ -112,12 +114,14 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ProfileActivation` — class — 2 members
 - `ProfileConfig` — struct — 13 members
 - `ProfilingScene` — struct — 2 members
+- `Scene` — extension — 1 member
 
 ## SwiftTUIViews
 
-### Canonical surface (263)
+### Canonical surface (269)
 
 - `AccessibilityAnnouncer` — enum — 1 member
+- `ActionScope` — extension — 5 members
 - `ActivePaletteCommand` — struct — 4 members
 - `AnchorPreferenceTransformModifier` — struct
 - `AnchorPreferenceWritingModifier` — struct
@@ -182,6 +186,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `DragGesture` — struct — 16 members
 - `DrawMetadataModifier` — struct
 - `DropDestinationRegistrationModifier` — struct
+- `Duration` — extension — 1 member
 - `Ellipse` — struct — 2 members
 - `EmptyView` — struct — 1 member
 - `Environment` — struct — 2 members
@@ -240,6 +245,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `LayoutValueModifier` — struct
 - `LazyHStack` — struct — 3 members
 - `LazyVStack` — struct — 3 members
+- `LinearGradient` — extension — 1 member
 - `Link` — struct — 4 members
 - `LinkButtonStyle` — struct — 3 members
 - `List` — struct — 10 members
@@ -253,6 +259,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `NamedCoordinateSpaceModifier` — struct
 - `Namespace` — struct — 3 members
 - `NavigationStack` — struct — 3 members
+- `Never` — extension — 3 members
 - `neverBody()` — func
 - `OffsetModifier` — struct
 - `OpenLinkAction` — struct — 4 members
@@ -289,6 +296,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `PresentationChrome` — enum — 3 members
 - `ProgressView` — struct — 10 members
 - `ProposedViewSize` — typealias
+- `RadialGradient` — extension — 1 member
 - `RadioGroupPickerStyle` — struct — 4 members
 - `Rectangle` — struct — 2 members
 - `ResetFocusAction` — struct — 5 members
@@ -309,6 +317,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SemanticMetadataModifier` — struct
 - `SendableLayout` — protocol — 3 members
 - `Shape` — protocol — 13 members
+- `ShapeStyle` — extension — 4 members
 - `Slider` — struct — 4 members
 - `Spacer` — struct — 2 members
 - `SpatialTapGesture` — struct — 9 members
@@ -447,7 +456,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUITerminal
 
-### Canonical surface (12)
+### Canonical surface (13)
 
 - `ChildProcessPty` — class — 10 members
 - `TerminalBufferKind` — enum — 2 members
@@ -461,6 +470,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalProcessSession` — class — 13 members
 - `TerminalSession` — protocol — 11 members
 - `TerminalView` — struct — 2 members
+- `View` — extension — 2 members
 
 ## SwiftTUITerminalWorkspace
 
@@ -483,8 +493,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUICLI
 
-### Canonical surface (5)
+### Canonical surface (6)
 
+- `App` — extension — 2 members
 - `RenderOnce` — enum — 4 members
 - `ScenePty` — class — 5 members
 - `SignalReader` — class — 2 members
@@ -493,8 +504,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIWASI
 
-### Canonical surface (2)
+### Canonical surface (3)
 
+- `App` — extension — 1 member
 - `WASIRunner` — enum — 2 members
 - `WASIRunnerError` — enum — 2 members
 
@@ -508,8 +520,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIWebHostCLI
 
-### Canonical surface (1)
+### Canonical surface (2)
 
+- `App` — extension — 2 members
 - `WebHostCLIRunner` — enum — 4 members
 
 ## SwiftUIHost
@@ -530,7 +543,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (270)
+### Canonical surface (272)
 
 - `AccessibilityAnnouncement` — struct — 3 members
 - `AccessibilityNode` — struct — 10 members
@@ -592,6 +605,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `CustomLayoutHandle` — class — 4 members
 - `CustomLayoutProxy` — protocol — 5 members
 - `DeltaEMethod` — enum — 5 members
+- `Double` — extension — 3 members
 - `DrawCommand` — enum — 14 members
 - `DrawExtractor` — struct — 2 members
 - `DrawNode` — struct — 7 members
@@ -644,6 +658,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ImagePayload` — struct — 6 members
 - `ImageScalingMode` — enum — 4 members
 - `ImageSource` — enum — 3 members
+- `Int` — extension — 3 members
 - `InteractionRegion` — struct — 8 members
 - `interpolateHue(from:to:t:path:)` — func
 - `Invalidating` — protocol — 1 member

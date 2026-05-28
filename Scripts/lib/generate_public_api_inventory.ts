@@ -173,15 +173,6 @@ interface OverrideFile {
 // ---------------------------------------------------------------------------
 // Data model
 
-const TYPE_KIND_IDS = new Set([
-  "swift.struct",
-  "swift.class",
-  "swift.enum",
-  "swift.protocol",
-  "swift.typealias",
-  "swift.actor",
-]);
-
 const KIND_LABELS: Record<string, string> = {
   "swift.struct": "struct",
   "swift.class": "class",
@@ -218,6 +209,13 @@ interface TopLevelEntry {
   classification: Classification;
   /** whether the declaration carries a `///` documentation comment */
   hasDoc: boolean;
+  /**
+   * True when this entry is not a type defined by the module but an extension
+   * the module adds to a type owned by another module (e.g. `Scene.profiling`).
+   * Such entries contribute their members to the flat baseline but never a bare
+   * owner line, and are exempt from the doc-comment ratchet.
+   */
+  isExternalExtension: boolean;
 }
 
 interface MemberEntry {
@@ -270,23 +268,38 @@ async function loadOverrides(path: string): Promise<{
   };
 }
 
-async function loadSymbolGraph(
+/**
+ * Symbols for one module, split by provenance. `main` comes from
+ * `${module}.symbols.json`; `external` is the union of every
+ * `${module}@Other.symbols.json` extension graph — the symbols the module adds
+ * to types it does not own. Returns `undefined` only when the main graph is
+ * absent (used for missing-module detection).
+ */
+async function loadModuleSymbols(
   symbolgraphDir: string,
   module: ModuleName,
-): Promise<SymbolGraph | undefined> {
-  const path = join(symbolgraphDir, `${module}.symbols.json`);
-  const file = Bun.file(path);
-  if (!(await file.exists())) {
+): Promise<{ main: SymbolGraphSymbol[]; external: SymbolGraphSymbol[] } | undefined> {
+  const mainFile = Bun.file(join(symbolgraphDir, `${module}.symbols.json`));
+  if (!(await mainFile.exists())) {
     return undefined;
   }
-  return (await file.json()) as SymbolGraph;
+  const main = ((await mainFile.json()) as SymbolGraph).symbols;
+
+  const external: SymbolGraphSymbol[] = [];
+  const glob = new Glob(`${module}@*.symbols.json`);
+  for await (const name of glob.scan({ cwd: symbolgraphDir, onlyFiles: true })) {
+    const graph = (await Bun.file(join(symbolgraphDir, name)).json()) as SymbolGraph;
+    external.push(...graph.symbols);
+  }
+  return { main, external };
 }
 
 // ---------------------------------------------------------------------------
 // Build the report
 
 function buildModuleReport(
-  graph: SymbolGraph,
+  mainSymbols: ReadonlyArray<SymbolGraphSymbol>,
+  externalSymbols: ReadonlyArray<SymbolGraphSymbol>,
   module: ModuleName,
   classifications: ReadonlyMap<string, Classification>,
   moduleDefaults: ReadonlyMap<string, Classification>,
@@ -297,50 +310,71 @@ function buildModuleReport(
   const topLevelByName = new Map<string, TopLevelEntry>();
   const orphanMembers: SymbolGraphSymbol[] = [];
 
-  // First pass: top-level types.
-  for (const sym of graph.symbols) {
+  // First pass: top-level symbols the module defines itself (types as well as
+  // free functions / properties / operators).
+  for (const sym of mainSymbols) {
     if (isSynthesizedSymbol(sym)) continue;
     if (sym.accessLevel !== "public" && sym.accessLevel !== "open") continue;
     if (sym.pathComponents.length !== 1) continue;
-    if (!TYPE_KIND_IDS.has(sym.kind.identifier)) {
-      // top-level functions / properties / operators get their own bucket
-      const qualifiedName = `${module}.${sym.pathComponents.join(".")}`;
-      topLevelByName.set(sym.pathComponents[0]!, {
-        qualifiedName,
-        name: sym.pathComponents[0]!,
-        kindLabel: KIND_LABELS[sym.kind.identifier] ?? sym.kind.identifier,
-        kindId: sym.kind.identifier,
-        members: [],
-        classification: classifications.get(qualifiedName) ?? moduleDefault,
-        hasDoc: hasDocComment(sym),
-      });
-      continue;
-    }
-    const qualifiedName = `${module}.${sym.pathComponents[0]!}`;
-    topLevelByName.set(sym.pathComponents[0]!, {
+    const name = sym.pathComponents[0]!;
+    const qualifiedName = `${module}.${name}`;
+    topLevelByName.set(name, {
       qualifiedName,
-      name: sym.pathComponents[0]!,
+      name,
       kindLabel: KIND_LABELS[sym.kind.identifier] ?? sym.kind.identifier,
       kindId: sym.kind.identifier,
       members: [],
       classification: classifications.get(qualifiedName) ?? moduleDefault,
       hasDoc: hasDocComment(sym),
+      isExternalExtension: false,
     });
   }
 
-  // Second pass: members.
-  for (const sym of graph.symbols) {
+  // Second pass: members the module defines on its own top-level types.
+  for (const sym of mainSymbols) {
     if (isSynthesizedSymbol(sym)) continue;
     if (sym.accessLevel !== "public" && sym.accessLevel !== "open") continue;
     if (sym.pathComponents.length < 2) continue;
-    const ownerName = sym.pathComponents[0]!;
-    const owner = topLevelByName.get(ownerName);
+    const owner = topLevelByName.get(sym.pathComponents[0]!);
     if (!owner) {
       orphanMembers.push(sym);
       continue;
     }
     owner.members.push({
       pathInModule: sym.pathComponents.join("."),
+      kindLabel: KIND_LABELS[sym.kind.identifier] ?? sym.kind.identifier,
+    });
+  }
+
+  // Third pass: members the module adds to types it does not own (extensions on
+  // external types, from `${module}@Other.symbols.json`). Each distinct
+  // external owner becomes a synthetic `isExternalExtension` entry. Members are
+  // de-duplicated by path so overloads that share one textual signature (e.g.
+  // `App.main()`) collapse to a single flat-baseline line.
+  for (const sym of externalSymbols) {
+    if (isSynthesizedSymbol(sym)) continue;
+    if (sym.accessLevel !== "public" && sym.accessLevel !== "open") continue;
+    if (sym.pathComponents.length < 2) continue;
+    const ownerName = sym.pathComponents[0]!;
+    let owner = topLevelByName.get(ownerName);
+    if (!owner) {
+      const qualifiedName = `${module}.${ownerName}`;
+      owner = {
+        qualifiedName,
+        name: ownerName,
+        kindLabel: "extension",
+        kindId: "swift.extension",
+        members: [],
+        classification: classifications.get(qualifiedName) ?? moduleDefault,
+        hasDoc: true,
+        isExternalExtension: true,
+      };
+      topLevelByName.set(ownerName, owner);
+    }
+    const pathInModule = sym.pathComponents.join(".");
+    if (owner.members.some((m) => m.pathInModule === pathInModule)) continue;
+    owner.members.push({
+      pathInModule,
       kindLabel: KIND_LABELS[sym.kind.identifier] ?? sym.kind.identifier,
     });
   }
@@ -472,7 +506,11 @@ function renderFlatBaseline(reports: ReadonlyArray<ModuleReport>): string {
   const lines: string[] = [];
   for (const report of reports) {
     for (const entry of report.topLevel) {
-      lines.push(`${report.module}.${entry.name}`);
+      // External-extension entries do not define the owner type, so emit only
+      // their member lines, never a bare `Module.Owner` line.
+      if (!entry.isExternalExtension) {
+        lines.push(`${report.module}.${entry.name}`);
+      }
       for (const m of entry.members) {
         lines.push(`${report.module}.${m.pathInModule}`);
       }
@@ -522,7 +560,11 @@ async function checkDrift(
           module: report.module,
           qualifiedName: entry.qualifiedName,
         });
-      } else if (entry.classification === "canonical" && !entry.hasDoc) {
+      } else if (
+        entry.classification === "canonical" &&
+        !entry.hasDoc &&
+        !entry.isExternalExtension
+      ) {
         undocumentedCanonical.push({
           module: report.module,
           qualifiedName: entry.qualifiedName,
@@ -584,8 +626,8 @@ async function main(): Promise<void> {
   const reports: ModuleReport[] = [];
   const missingModules: ModuleName[] = [];
   for (const module of ALL_MODULES) {
-    const graph = await loadSymbolGraph(args.symbolgraphDir, module);
-    if (!graph) {
+    const symbols = await loadModuleSymbols(args.symbolgraphDir, module);
+    if (!symbols) {
       console.error(
         `[generate_public_api_inventory] WARN: no symbol graph for ${module}`,
       );
@@ -594,7 +636,8 @@ async function main(): Promise<void> {
     }
     reports.push(
       buildModuleReport(
-        graph,
+        symbols.main,
+        symbols.external,
         module,
         overrides.classification,
         overrides.moduleDefaults,
