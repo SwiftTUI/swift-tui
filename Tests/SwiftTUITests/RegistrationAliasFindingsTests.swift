@@ -4,8 +4,9 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// Characterization test suite for Item 7 of
-/// `docs/proposals/ARCHITECTURE_NOTES.md`.
+/// Characterization test suite for the registration alias layer — the
+/// view-resolution seam where a node's registered alias can diverge from
+/// its resolved identity.
 ///
 /// These tests don't exist to catch regressions in the traditional
 /// sense — they exist to **pin the current behavior** of the

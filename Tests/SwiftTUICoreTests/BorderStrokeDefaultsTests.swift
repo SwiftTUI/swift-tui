@@ -6,9 +6,9 @@ import Testing
 /// regression in the implicit `StrokeStyle()` defaults is caught
 /// immediately.
 ///
-/// See `docs/plans/2026-04-26-003-border-stroke-simplification-plan.md`
-/// and `docs/proposals/BORDERS_AND_STROKES.md` for the migration
-/// history that established these defaults.
+/// These defaults are the outcome of unifying border and stroke styling
+/// onto a single `StrokeStyle`: an empty `StrokeStyle()` is a rounded,
+/// one-cell, outset border.
 @Test("StrokeStyle.init produces rounded by default")
 func strokeStyleInitDefaultIsRounded() {
   let style = StrokeStyle()
