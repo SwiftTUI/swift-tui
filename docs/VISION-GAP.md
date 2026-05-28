@@ -1,8 +1,7 @@
 # Vision Gap
 
 This document is the **only gap register** in the documentation. Every other
-document describes the code as it is at `HEAD`, unless a gap entry links to a
-focused proposal that scopes one unbuilt item. This one records, concretely,
+document describes the code as it is at `HEAD`. This one records, concretely,
 where the code falls short of the project's intent ([VISION.md](VISION.md)).
 
 Each entry states what is **shipped today** and what is **not yet built**. None
@@ -105,8 +104,11 @@ content such as text, fills, strokes, and borders.
 
 **Not yet built.** Image pixels are not part of the blend-mode compositor.
 `Image(...).blendMode(...)` and `AnimatedImage(...).blendMode(...)` still emit
-unblended image attachments. The implementation scope is captured in
-[Image Blend Mode Proposal](proposals/IMAGE_BLEND_MODE.md).
+unblended image attachments. Closing this gap means precomposing a blended
+image variant: sampling the captured cell backdrop under the image's visible
+bounds, applying the active `BlendMode` in linear sRGB, and presenting the
+result through the existing attachment path so unblended images keep their fast
+native path.
 
 ## Web packaging
 
