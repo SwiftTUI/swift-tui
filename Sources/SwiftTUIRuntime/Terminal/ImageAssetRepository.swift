@@ -257,6 +257,16 @@ final class ImageAssetRepository: Sendable {
     return nil
   }
 
+  func occupancy() -> (resolutionCount: Int, decodedCount: Int, approxBytes: Int) {
+    storage.withLockUnchecked { storage in
+      let approxBytes = storage.decodedImages.values.reduce(0) { total, image in
+        total + image.encodedBytes.count
+          + image.pixels.count * MemoryLayout<RGBAImagePixel>.stride
+      }
+      return (storage.resolutions.count, storage.decodedImages.count, approxBytes)
+    }
+  }
+
   private func intrinsicCellSize(
     pixelSize: PixelSize,
     cellPixelSize: PixelSize
@@ -275,7 +285,26 @@ final class ImageAssetRepository: Sendable {
   }
 }
 
-let sharedImageAssetRepository = ImageAssetRepository()
+let sharedImageAssetRepository: ImageAssetRepository = {
+  let repo = ImageAssetRepository()
+  // Only the shared repository is counted; per-test instances never register,
+  // so the occupancy signal tracks the real process-lived decode cache.
+  MemoryMetricRegistry.shared.registerPermanent(
+    ClosureMemoryMetricProvider { [weak repo] in
+      guard let repo else {
+        return MemoryMetricSnapshot(name: "ImageAssetRepository.decodedImages", count: 0)
+      }
+      let occupancy = repo.occupancy()
+      return MemoryMetricSnapshot(
+        name: "ImageAssetRepository.decodedImages",
+        count: occupancy.decodedCount,
+        approxBytes: occupancy.approxBytes,
+        detail: ["resolutions": occupancy.resolutionCount]
+      )
+    }
+  )
+  return repo
+}()
 
 private func joinedPath(
   root: String,
