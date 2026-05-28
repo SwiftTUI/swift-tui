@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 #
 # Capture a screenshot of the gallery demo running in kitty.app, with the
-# gallery starting on a chosen tab via the GALLERY_INITIAL_TAB env var.
+# gallery starting on a chosen tab via the gallery's --tab option.
 #
 # Usage:
-#   Scripts/screenshot_gallery.sh <output.png> [tab-name]
+#   Scripts/screenshot_gallery.sh <output.png> [tab-key]
 #
 # Environment:
-#   SCREENSHOT_TAB     Same as positional [tab-name]; defaults to "counter".
-#                      Recognised: counter, todo, calculator, borders,
-#                      images, animations, files, physics.
+#   SCREENSHOT_TAB     Same as positional [tab-key]; defaults to "counter".
+#                      Recognised: counter, todo, calculator,
+#                      borders-and-shapes, images, animations, file-drop,
+#                      physics. Run `gallery-demo --help` for the full list.
 #   SCREENSHOT_DELAY   Seconds to wait after kitty launches before
 #                      capturing. Default: 2.
 #
@@ -48,11 +49,11 @@ if [[ ! -x "$kitty_bin" ]]; then
   exit 69
 fi
 
-GALLERY_INITIAL_TAB="$tab" "$kitty_bin" \
+"$kitty_bin" \
   --override remember_window_size=no \
   --override initial_window_width=1200 \
   --override initial_window_height=720 \
-  -e "$gallery" >/dev/null 2>&1 &
+  -e "$gallery" --tab "$tab" >/dev/null 2>&1 &
 kpid=$!
 
 cleanup() {
