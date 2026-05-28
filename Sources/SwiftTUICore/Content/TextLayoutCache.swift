@@ -52,7 +52,31 @@ package final class TextLayoutCache: Sendable {
     var nextGeneration: UInt64 = 0
   }
 
-  package static let shared = TextLayoutCache()
+  package static let shared: TextLayoutCache = {
+    let cache = TextLayoutCache()
+    // Only the shared cache is counted; non-shared instances (tests) never
+    // register, so the occupancy signal tracks the real process-lived cache.
+    MemoryMetricRegistry.shared.registerPermanent(
+      ClosureMemoryMetricProvider { [weak cache] in
+        guard let cache else {
+          return MemoryMetricSnapshot(name: "TextLayoutCache.entries", count: 0)
+        }
+        let metrics = cache.metrics
+        return MemoryMetricSnapshot(
+          name: "TextLayoutCache.entries",
+          count: metrics.entries,
+          detail: [
+            "order": cache.accessLogDepth,
+            "lookups": metrics.lookups,
+            "hits": metrics.hits,
+            "misses": metrics.misses,
+            "evictions": metrics.evictions,
+          ]
+        )
+      }
+    )
+    return cache
+  }()
 
   private let capacity: Int
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())

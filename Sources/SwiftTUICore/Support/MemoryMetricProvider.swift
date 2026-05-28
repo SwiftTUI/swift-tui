@@ -35,6 +35,21 @@ package protocol MemoryMetricProvider: Sendable {
   func snapshot() -> MemoryMetricSnapshot
 }
 
+/// Provider backed by a closure, so a store can register occupancy reporting
+/// without declaring a dedicated provider type. The closure should capture its
+/// store weakly when the store is graph-scoped.
+package struct ClosureMemoryMetricProvider: MemoryMetricProvider {
+  private let body: @Sendable () -> MemoryMetricSnapshot
+
+  package init(_ body: @escaping @Sendable () -> MemoryMetricSnapshot) {
+    self.body = body
+  }
+
+  package func snapshot() -> MemoryMetricSnapshot {
+    body()
+  }
+}
+
 /// Process-wide registry of occupancy providers.
 ///
 /// Stores register a provider near their declaration and hold the returned
@@ -57,7 +72,8 @@ package final class MemoryMetricRegistry: Sendable {
 
   /// Registers a provider and returns a token whose lifetime controls
   /// registration. The provider is snapshotted by ``snapshotAll()`` until the
-  /// token is released.
+  /// token is released. Use this for graph-scoped stores so a leaked store
+  /// keeps its provider registered.
   package func register(_ provider: any MemoryMetricProvider) -> Token {
     let id = state.withLock { state -> UInt64 in
       let id = state.nextID
@@ -66,6 +82,17 @@ package final class MemoryMetricRegistry: Sendable {
       return id
     }
     return Token(id: id, registry: self)
+  }
+
+  /// Registers a provider that stays for the process lifetime. Use this for
+  /// process-lived singletons that never tear down, where managing a token
+  /// would be pure ceremony. The provider should still capture its store
+  /// weakly to avoid an intentional-immortality reference cycle.
+  package func registerPermanent(_ provider: any MemoryMetricProvider) {
+    state.withLock { state in
+      state.providers[state.nextID] = provider
+      state.nextID += 1
+    }
   }
 
   /// Number of currently-registered providers. A monotonically climbing count
