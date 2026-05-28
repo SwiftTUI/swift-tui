@@ -121,6 +121,8 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
 public enum AggregateReducer {
   /// Reduces per-iteration summaries into one aggregate. The `summaries` array
   /// must be non-empty; scenario/renderMode are taken from the first element.
+  /// A per-metric `PerfStat.sampleCount` may be less than `iterationCount` when
+  /// that optional metric was absent for some iterations (nils are dropped).
   public static func reduce(_ summaries: [PerfSummary]) -> PerfAggregateSummary {
     precondition(!summaries.isEmpty, "AggregateReducer.reduce requires >= 1 summary")
     let first = summaries[0]
