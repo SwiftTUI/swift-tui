@@ -26,9 +26,12 @@ private func run(arguments: [String]) async throws {
       print(scenarioName)
     }
   case .run(let config):
-    let results = try await RunCommand.run(config)
-    for result in results {
+    let outcome = try await RunCommand.run(config)
+    for result in outcome.perIteration {
       print(result.runDirectory.path)
+    }
+    for aggregate in outcome.aggregates {
+      print(AggregateReducer.format(aggregate))
     }
   case .compare(let config):
     let result = try CompareCommand.compare(config)

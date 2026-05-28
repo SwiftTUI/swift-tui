@@ -1,24 +1,60 @@
 import Foundation
 
+/// Result of a perf run: every per-iteration result, plus one aggregate per mode.
+public struct PerfRunOutcome: Sendable {
+  public var perIteration: [PerfScenarioRunResult]
+  public var aggregates: [PerfAggregateSummary]
+
+  public init(perIteration: [PerfScenarioRunResult], aggregates: [PerfAggregateSummary]) {
+    self.perIteration = perIteration
+    self.aggregates = aggregates
+  }
+}
+
 public enum RunCommand {
   @MainActor
-  public static func run(_ config: PerfRunConfig) async throws -> [PerfScenarioRunResult] {
+  public static func run(_ config: PerfRunConfig) async throws -> PerfRunOutcome {
     guard let scenario = PerfScenarioRegistry.scenario(named: config.scenario) else {
       throw PerfParseError.unknownScenario(config.scenario.rawValue)
     }
 
-    var results: [PerfScenarioRunResult] = []
     let artifactRoot = URL(fileURLWithPath: config.artifactsRoot, isDirectory: true)
+    var perIteration: [PerfScenarioRunResult] = []
+    var aggregates: [PerfAggregateSummary] = []
+
     for mode in config.modes {
-      let result = try await scenario.run(
-        options: PerfScenarioRunOptions(
-          renderMode: mode,
-          iterations: config.iterations,
-          artifactRoot: artifactRoot,
-          configuration: config.configuration
-        ))
-      results.append(result)
+      var modeSummaries: [PerfSummary] = []
+      for _ in 0..<config.iterations {
+        let result = try await scenario.run(
+          options: PerfScenarioRunOptions(
+            renderMode: mode,
+            iterations: 1,
+            artifactRoot: artifactRoot,
+            configuration: config.configuration
+          ))
+        modeSummaries.append(result.summary)
+        perIteration.append(result)
+      }
+      let aggregate = AggregateReducer.reduce(modeSummaries)
+      aggregates.append(aggregate)
+      try writeAggregate(aggregate, to: artifactRoot)
     }
-    return results
+
+    return PerfRunOutcome(perIteration: perIteration, aggregates: aggregates)
+  }
+
+  /// Writes `aggregate-<scenario>-<mode>.json` at the artifact root so
+  /// `CompareCommand.compareAggregates` can load it later.
+  private static func writeAggregate(
+    _ aggregate: PerfAggregateSummary,
+    to artifactRoot: URL
+  ) throws {
+    try FileManager.default.createDirectory(
+      at: artifactRoot, withIntermediateDirectories: true)
+    let name = "aggregate-\(aggregate.scenario)-\(aggregate.renderMode).json"
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+    let data = try encoder.encode(aggregate)
+    try data.write(to: artifactRoot.appendingPathComponent(name))
   }
 }
