@@ -37,6 +37,19 @@ struct AggregateReducerTests {
     #expect(approx(stat.coefficientOfVariation, 0.0))
   }
 
+  @Test("PerfStat with no values is all zeros")
+  func perfStatEmptyInputIsAllZeros() {
+    let stat = PerfStat(values: [])
+
+    #expect(stat.sampleCount == 0)
+    #expect(approx(stat.median, 0.0))
+    #expect(approx(stat.mean, 0.0))
+    #expect(approx(stat.stddev, 0.0))
+    #expect(approx(stat.min, 0.0))
+    #expect(approx(stat.max, 0.0))
+    #expect(approx(stat.coefficientOfVariation, 0.0))
+  }
+
   private func approx(_ actual: Double, _ expected: Double) -> Bool {
     abs(actual - expected) < 0.000_001
   }
