@@ -74,3 +74,66 @@ public struct PerfStat: Codable, Equatable, Sendable {
     case coefficientOfVariation = "coefficient_of_variation"
   }
 }
+
+/// Cross-iteration aggregate over the headline metrics of N `PerfSummary`s.
+public struct PerfAggregateSummary: Codable, Equatable, Sendable {
+  public var scenario: String
+  public var renderMode: String
+  public var iterationCount: Int
+  public var totalCPUSeconds: PerfStat
+  public var committedFrameCount: PerfStat
+  public var cpuSecondsPerCommittedFrame: PerfStat
+  public var inputToPresentLatencyP95Ms: PerfStat
+  public var frameIntervalP50Ms: PerfStat
+
+  public init(
+    scenario: String,
+    renderMode: String,
+    iterationCount: Int,
+    totalCPUSeconds: PerfStat,
+    committedFrameCount: PerfStat,
+    cpuSecondsPerCommittedFrame: PerfStat,
+    inputToPresentLatencyP95Ms: PerfStat,
+    frameIntervalP50Ms: PerfStat
+  ) {
+    self.scenario = scenario
+    self.renderMode = renderMode
+    self.iterationCount = iterationCount
+    self.totalCPUSeconds = totalCPUSeconds
+    self.committedFrameCount = committedFrameCount
+    self.cpuSecondsPerCommittedFrame = cpuSecondsPerCommittedFrame
+    self.inputToPresentLatencyP95Ms = inputToPresentLatencyP95Ms
+    self.frameIntervalP50Ms = frameIntervalP50Ms
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case scenario
+    case renderMode = "render_mode"
+    case iterationCount = "iteration_count"
+    case totalCPUSeconds = "total_cpu_seconds"
+    case committedFrameCount = "committed_frame_count"
+    case cpuSecondsPerCommittedFrame = "cpu_seconds_per_committed_frame"
+    case inputToPresentLatencyP95Ms = "input_to_present_latency_p95_ms"
+    case frameIntervalP50Ms = "frame_interval_p50_ms"
+  }
+}
+
+public enum AggregateReducer {
+  /// Reduces per-iteration summaries into one aggregate. The `summaries` array
+  /// must be non-empty; scenario/renderMode are taken from the first element.
+  public static func reduce(_ summaries: [PerfSummary]) -> PerfAggregateSummary {
+    precondition(!summaries.isEmpty, "AggregateReducer.reduce requires >= 1 summary")
+    let first = summaries[0]
+    return PerfAggregateSummary(
+      scenario: first.scenario,
+      renderMode: first.renderMode,
+      iterationCount: summaries.count,
+      totalCPUSeconds: PerfStat(values: summaries.map(\.totalCPUSeconds)),
+      committedFrameCount: PerfStat(values: summaries.map { Double($0.committedFrameCount) }),
+      cpuSecondsPerCommittedFrame: PerfStat(
+        values: summaries.compactMap(\.cpuSecondsPerCommittedFrame)),
+      inputToPresentLatencyP95Ms: PerfStat(
+        values: summaries.compactMap(\.inputToPresentLatencyMs.p95)),
+      frameIntervalP50Ms: PerfStat(values: summaries.compactMap(\.frameIntervalMs.p50)))
+  }
+}
