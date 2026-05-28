@@ -1,5 +1,6 @@
 import Foundation
 import SwiftTUI
+import SwiftTUIProfiling
 
 public struct PerfTerminalSize: Codable, Equatable, Sendable {
   public var columns: Int
@@ -152,6 +153,19 @@ public struct PerfCPUSample: Codable, Equatable, Sendable {
     case totalCPUSeconds = "total_cpu_seconds"
     case wallDeltaSeconds = "wall_delta_seconds"
     case estimatedCPUPercent = "estimated_cpu_percent"
+  }
+
+  /// Maps a sample from the shared `SwiftTUIProfiling.CPUSampler` into the
+  /// perf artifact DTO (dropping the resident-size field the artifacts omit).
+  public init(from sample: CPUSample) {
+    self.init(
+      timestampSeconds: sample.timestampSeconds,
+      userCPUSeconds: sample.userCPUSeconds,
+      systemCPUSeconds: sample.systemCPUSeconds,
+      totalCPUSeconds: sample.totalCPUSeconds,
+      wallDeltaSeconds: sample.wallDeltaSeconds,
+      estimatedCPUPercent: sample.estimatedCPUPercent
+    )
   }
 }
 
