@@ -3,6 +3,7 @@ import Testing
 @testable import SwiftTUICore
 @testable import SwiftTUIProfiling
 
+@MainActor
 @Suite
 struct MemoryMetricCollectorTests {
   @Test("Collector reports the shared TextLayoutCache plus the providerCount meta metric")

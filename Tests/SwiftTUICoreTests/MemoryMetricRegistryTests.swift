@@ -4,9 +4,10 @@ import Testing
 
 private struct StubProvider: MemoryMetricProvider {
   let value: MemoryMetricSnapshot
-  func snapshot() -> MemoryMetricSnapshot { value }
+  @MainActor func snapshot() -> MemoryMetricSnapshot { value }
 }
 
+@MainActor
 @Suite
 struct MemoryMetricRegistryTests {
   @Test("A registered provider is counted and snapshotted")

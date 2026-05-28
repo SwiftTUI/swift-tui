@@ -31,20 +31,26 @@ package struct MemoryMetricSnapshot: Sendable, Equatable {
 /// graph-scoped, so that staying registered never keeps the store alive. A
 /// store whose lifetime ends without its registration token being released is
 /// exactly the leak the occupancy signal is meant to surface.
+/// `snapshot()` is `@MainActor` so providers can read `@MainActor`-isolated
+/// stores (the view graph, the animation controller) directly. The signal is
+/// sampled periodically off the run loop's actor, never on a hot path, so the
+/// main-actor hop costs nothing measurable; lock-guarded stores read fine from
+/// the main actor too.
 package protocol MemoryMetricProvider: Sendable {
-  func snapshot() -> MemoryMetricSnapshot
+  @MainActor func snapshot() -> MemoryMetricSnapshot
 }
 
 /// Provider backed by a closure, so a store can register occupancy reporting
 /// without declaring a dedicated provider type. The closure should capture its
 /// store weakly when the store is graph-scoped.
 package struct ClosureMemoryMetricProvider: MemoryMetricProvider {
-  private let body: @Sendable () -> MemoryMetricSnapshot
+  private let body: @MainActor () -> MemoryMetricSnapshot
 
-  package init(_ body: @escaping @Sendable () -> MemoryMetricSnapshot) {
+  package init(_ body: @escaping @MainActor () -> MemoryMetricSnapshot) {
     self.body = body
   }
 
+  @MainActor
   package func snapshot() -> MemoryMetricSnapshot {
     body()
   }
@@ -102,7 +108,9 @@ package final class MemoryMetricRegistry: Sendable {
     state.withLock { $0.providers.count }
   }
 
-  /// Snapshots every registered provider. Order is unspecified.
+  /// Snapshots every registered provider. Order is unspecified. Runs on the
+  /// main actor so providers may read `@MainActor`-isolated stores.
+  @MainActor
   package func snapshotAll() -> [MemoryMetricSnapshot] {
     let providers = state.withLock { Array($0.providers.values) }
     return providers.map { $0.snapshot() }

@@ -84,6 +84,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// per-frame emit path is a single branch and no diagnostics work runs.
   package var frameSink: (any FrameDiagnosticSink)?
 
+  /// Registration tokens for this session's graph-scoped occupancy providers.
+  /// Released on deinit, which deregisters them — so a leaked run loop keeps its
+  /// providers registered and shows up in `MemoryMetricRegistry.providerCount`.
+  private var memoryMetricTokens: [MemoryMetricRegistry.Token] = []
+
   /// Optional host channel for runtime issue notifications.
   public var runtimeIssueSink: RuntimeIssueSink?
 
@@ -133,6 +138,21 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         },
         onEnd: { [renderSuspensionDiagnostics] in
           renderSuspensionDiagnostics.endSuspension()
+        }
+      )
+    )
+    registerMemoryMetricProviders()
+  }
+
+  private func registerMemoryMetricProviders() {
+    let viewGraph = renderer.viewGraph
+    memoryMetricTokens.append(
+      MemoryMetricRegistry.shared.register(
+        ClosureMemoryMetricProvider { [weak viewGraph] in
+          guard let viewGraph else {
+            return MemoryMetricSnapshot(name: "ViewGraph.nodesByIdentity", count: 0)
+          }
+          return viewGraph.memoryMetricSnapshot
         }
       )
     )

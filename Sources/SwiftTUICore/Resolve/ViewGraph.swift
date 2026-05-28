@@ -118,6 +118,19 @@ package final class ViewGraph {
   private var currentFrameID: UInt64
   private var liveIdentities: Set<Identity>
 
+  /// Occupancy reading for the profiling memory signal. Computed, so it stays
+  /// outside the checkpoint totality contract above.
+  package var memoryMetricSnapshot: MemoryMetricSnapshot {
+    MemoryMetricSnapshot(
+      name: "ViewGraph.nodesByIdentity",
+      count: nodesByIdentity.count,
+      detail: [
+        "liveIdentities": liveIdentities.count,
+        "invalidatedIdentities": invalidatedIdentities.count,
+      ]
+    )
+  }
+
   package init() {
     nodesByIdentity = [:]
     rootEvaluator = nil
