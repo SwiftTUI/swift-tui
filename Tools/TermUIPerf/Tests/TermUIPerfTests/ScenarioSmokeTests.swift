@@ -54,9 +54,8 @@ struct ScenarioSmokeTests {
     #expect(outcome.aggregates[0].iterationCount == 2)
     #expect(outcome.aggregates[0].totalCPUSeconds.sampleCount == 2)
 
-    let aggregateFile =
-      artifactRoot
-      .appendingPathComponent("aggregate-gallery-animation-click-sync.json")
+    let aggregateFile = artifactRoot.appendingPathComponent(
+      "aggregate-\(outcome.aggregates[0].scenario)-\(outcome.aggregates[0].renderMode).json")
     #expect(FileManager.default.fileExists(atPath: aggregateFile.path))
   }
 
