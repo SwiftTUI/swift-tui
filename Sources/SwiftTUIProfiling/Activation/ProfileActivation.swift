@@ -14,8 +14,8 @@ import SwiftTUIRuntime
 /// runtime frame contract into them, and runs the periodic memory/CPU timers.
 /// Activation is idempotent and a complete no-op when no config resolves.
 @MainActor
-package final class ProfileActivation {
-  package static let shared = ProfileActivation()
+public final class ProfileActivation {
+  public static let shared = ProfileActivation()
 
   private var activated = false
   private var sinks: [any ProfileSink] = []
@@ -85,7 +85,7 @@ package final class ProfileActivation {
 
   /// Cancels the timers and flushes every sink's reduced report. Call at app
   /// shutdown so buffered sinks (summary) produce output.
-  package func finish() {
+  public func finish() {
     for task in timerTasks {
       task.cancel()
     }

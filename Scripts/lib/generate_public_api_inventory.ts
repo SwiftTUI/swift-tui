@@ -104,6 +104,7 @@ interface SymbolGraph {
 const PRIMARY_MODULES = [
   "SwiftTUI",
   "SwiftTUIRuntime",
+  "SwiftTUIProfiling",
   "SwiftTUIViews",
   "SwiftTUIAnimatedImage",
   "SwiftTUICharts",
