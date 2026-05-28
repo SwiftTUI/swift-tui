@@ -29,6 +29,15 @@ public struct AggregateMetricComparison: Codable, Equatable, Sendable {
     self.noiseBand = noiseBand
     self.verdict = verdict
   }
+
+  private enum CodingKeys: String, CodingKey {
+    case metric
+    case baseMedian = "base_median"
+    case candidateMedian = "candidate_median"
+    case delta
+    case noiseBand = "noise_band"
+    case verdict
+  }
 }
 
 public struct AggregateComparison: Codable, Equatable, Sendable {
@@ -38,6 +47,11 @@ public struct AggregateComparison: Codable, Equatable, Sendable {
   public init(scenario: String, metrics: [AggregateMetricComparison]) {
     self.scenario = scenario
     self.metrics = metrics
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case scenario
+    case metrics
   }
 }
 
