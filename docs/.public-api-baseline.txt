@@ -2634,10 +2634,6 @@ SwiftTUIRuntime.FrameDiagnosticRecord.tailCancelReason
 SwiftTUIRuntime.FrameDiagnosticRecord.tailJobState
 SwiftTUIRuntime.FrameDiagnosticRecord.totalFrameDuration
 SwiftTUIRuntime.FrameDiagnosticRecord.workerTimings
-SwiftTUIRuntime.FrameDiagnosticsLogger
-SwiftTUIRuntime.FrameDiagnosticsLogger.init(path:)
-SwiftTUIRuntime.FrameDiagnosticsLogger.init(recordHandler:)
-SwiftTUIRuntime.FrameDiagnosticsLogger.log(_:)
 SwiftTUIRuntime.HostedRasterSurface
 SwiftTUIRuntime.HostedRasterSurface.appearance
 SwiftTUIRuntime.HostedRasterSurface.capabilityProfile
@@ -2734,7 +2730,6 @@ SwiftTUIRuntime.PresentationSurfaceMetricsProvider.theme
 SwiftTUIRuntime.RasterPresentationSurface
 SwiftTUIRuntime.RasterPresentationSurface.present(_:)
 SwiftTUIRuntime.RunLoop
-SwiftTUIRuntime.RunLoop.diagnosticsLogger
 SwiftTUIRuntime.RunLoop.init(rootIdentity:renderer:presentationSurface:inputReader:signalReader:scheduler:stateContainer:focusTracker:focusPresentationHandler:keyHandler:environment:environmentValues:proposal:exitKeyBindings:viewBuilder:)
 SwiftTUIRuntime.RunLoop.init(rootIdentity:renderer:presentationSurface:inputReader:signalReader:scheduler:stateContainer:focusTracker:focusPresentationHandler:keyHandler:environment:environmentValues:proposal:exitKeyBindings:viewBuilder:)
 SwiftTUIRuntime.RunLoop.init(rootIdentity:renderer:presentationSurface:terminalInputReader:signalReader:scheduler:stateContainer:focusTracker:focusPresentationHandler:keyHandler:environment:environmentValues:proposal:exitKeyBindings:viewBuilder:)

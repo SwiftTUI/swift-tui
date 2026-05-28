@@ -233,6 +233,7 @@ Author once; pick the product that matches how you ship.
 | `SwiftTUITerminal` / `SwiftTUITerminalWorkspace` | Embedding terminal child processes or building split-pane workspaces |
 | `SwiftTUIAnimatedImage` | Composing animated-image support without the full `SwiftTUI` convenience product |
 | `SwiftTUICharts` | You need charting/graph views |
+| `SwiftTUIProfiling` | Opt-in profiling: add `.profiling()` and set `SWIFTTUI_PROFILE` for frame, memory-occupancy, and CPU/RSS signals (debug or release) |
 | `@swifttui/web` / `@swifttui/build` | Packaging a browser/WASI deployment |
 
 A *runner* owns process startup or launch routing; a *host* owns an external

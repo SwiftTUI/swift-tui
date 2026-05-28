@@ -1,5 +1,5 @@
-@_spi(Runners) import SwiftTUIRuntime
 import Foundation
+@_spi(Runners) import SwiftTUIRuntime
 import WASISurfaceBridge
 
 #if canImport(Darwin)
@@ -177,11 +177,12 @@ public enum WASIRunner {
         terminalInputReader: inputReader,
         signalReader: signalReader,
         surfaceName: "web-surface",
-        diagnosticsLogger: wasiFrameDiagnosticsEnabled { name in
+        frameSink: wasiFrameDiagnosticsEnabled { name in
           environmentValue(named: name)
-        } ? FrameDiagnosticsLogger(recordHandler: { record in
-          try? host.notifyFrameDiagnostic(record)
-        }) : nil
+        }
+          ? WASIFrameDiagnosticsSink(notify: { record in
+            try? host.notifyFrameDiagnostic(record)
+          }) : nil
       )
       resources.runtimeIssueSink = RuntimeIssueSink { issue in
         try? host.notifyRuntimeIssue(issue)

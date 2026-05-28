@@ -37,9 +37,9 @@ final class SceneRuntime {
     self.isPrimary = isPrimary
     self.lifecycle = SceneLifecycle(isPrimary: isPrimary)
 
-    let diagnosticsLogger: FrameDiagnosticsLogger? =
+    let frameSink: (any FrameDiagnosticSink)? =
       if isPrimary, let path = Self.diagnosticsFilePath(configuration: configuration) {
-        FrameDiagnosticsLogger(path: path)
+        FrameDiagnosticsFileSink(path: path)
       } else {
         nil
       }
@@ -60,7 +60,7 @@ final class SceneRuntime {
         presentationSurface: TerminalHost(capabilityProfile: capabilityProfile),
         terminalInputReader: InputReader(),
         signalReader: defaultSignalReader(),
-        diagnosticsLogger: diagnosticsLogger,
+        frameSink: frameSink,
         runtimeConfiguration: configuration
       )
       resources.runtimeIssueSink = .standardError

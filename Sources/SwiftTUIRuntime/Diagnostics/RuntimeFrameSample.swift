@@ -6,7 +6,7 @@ import SwiftTUICore
 /// input counts, eligibility blockers, animation-controller state). Holds no
 /// formatting or derived fields — the profiling product turns this into a
 /// `FrameDiagnosticRecord`.
-package enum RuntimeFrameSample: Sendable {
+@_spi(Runners) public enum RuntimeFrameSample: Sendable {
   case committed(CommittedFrameSample)
   case zeroArtifact(ZeroArtifactFrameSample)
 }
@@ -16,7 +16,7 @@ package enum RuntimeFrameSample: Sendable {
 /// The render-intent coalescing numbers are flattened in (rather than carrying
 /// the run-loop-nested `RenderIntentCoalescingDiagnostics`) so the sample stays
 /// a free, non-generic value type.
-package struct CommittedFrameSample: Sendable {
+@_spi(Runners) public struct CommittedFrameSample: Sendable {
   package var frameNumber: Int
   package var scheduledFrame: ScheduledFrame
   package var diagnostics: FrameDiagnostics
@@ -77,7 +77,7 @@ package struct CommittedFrameSample: Sendable {
 /// Inputs for a frame that produced no pipeline artifacts (cancelled tail or
 /// dropped completed). The string fields are run-loop facts (enum raw values
 /// and fixed policy tags), captured verbatim at the emit point.
-package struct ZeroArtifactFrameSample: Sendable {
+@_spi(Runners) public struct ZeroArtifactFrameSample: Sendable {
   package var frameNumber: Int
   package var scheduledFrame: ScheduledFrame
   package var desiredGeneration: UInt64

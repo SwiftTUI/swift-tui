@@ -1,9 +1,10 @@
 import Foundation
+@_spi(Runners) import SwiftTUIProfiling
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -44,8 +45,8 @@ struct PortalPrimitiveTests {
         PortalTaskProbe()
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let result = try await runLoop.run()
 

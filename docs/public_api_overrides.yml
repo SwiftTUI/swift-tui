@@ -173,7 +173,6 @@ classifications:
     - SwiftTUI.ExitKeyBindings
     - SwiftTUI.FileOpenError
     - SwiftTUI.FrameDiagnosticRecord
-    - SwiftTUI.FrameDiagnosticsLogger
     - SwiftTUI.HostedRasterSurface
     - SwiftTUI.HostedSceneSessionError
     - SwiftTUI.InProcessSignalReader
@@ -727,6 +726,7 @@ classifications:
   removed:
     # Compatibility-shim types that were retired. If any of these reappears
     # in the source, the --check run fails.
+    - SwiftTUI.FrameDiagnosticsLogger
     - SwiftTUIViews.HotkeyBinding
     - SwiftTUIViews.HotkeyRegistrationSnapshot
     - SwiftTUIViews.HotkeyRegistry

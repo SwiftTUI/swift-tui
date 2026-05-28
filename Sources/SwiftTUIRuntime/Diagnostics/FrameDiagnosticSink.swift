@@ -8,6 +8,6 @@ import SwiftTUICore
 /// and persistence belong to the sink (the profiling product), so the runtime
 /// pays only for gathering raw inputs — and nothing at all when no sink is
 /// installed.
-package protocol FrameDiagnosticSink: Sendable {
+@_spi(Runners) public protocol FrameDiagnosticSink: Sendable {
   @MainActor func record(_ sample: RuntimeFrameSample)
 }

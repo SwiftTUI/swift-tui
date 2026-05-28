@@ -1,4 +1,4 @@
-package import SwiftTUIRuntime
+@_spi(Runners) public import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin
@@ -15,12 +15,12 @@ package import SwiftTUIRuntime
 /// File I/O is unavailable on WASI, where `init(path:)` fails just as the
 /// legacy logger did.
 @MainActor
-package final class TSVFileSink: FrameDiagnosticSink {
+@_spi(Runners) public final class TSVFileSink: FrameDiagnosticSink {
   private let fileDescriptor: Int32
   private let ownsDescriptor: Bool
   private var headerWritten = false
 
-  package init?(path: String) {
+  @_spi(Runners) public init?(path: String) {
     #if !canImport(WASILibc)
       let fd = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
       guard fd >= 0 else {
@@ -43,7 +43,7 @@ package final class TSVFileSink: FrameDiagnosticSink {
     #endif
   }
 
-  package func record(_ sample: RuntimeFrameSample) {
+  @_spi(Runners) public func record(_ sample: RuntimeFrameSample) {
     let record = FrameRecordDerivation.record(from: sample)
     if !headerWritten {
       writeLine(FrameDiagnosticsTSVFormatting.headerFields.joined(separator: "\t"))

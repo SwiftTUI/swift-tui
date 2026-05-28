@@ -2,8 +2,8 @@ import Foundation
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUIProfiling
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIProfiling
+@_spi(Runners) @testable import SwiftTUIRuntime
 
 @MainActor
 @Suite
