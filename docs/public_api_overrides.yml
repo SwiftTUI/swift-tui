@@ -718,6 +718,22 @@ classifications:
     - SwiftTUICore.WakeCause
     - SwiftTUICore.XYZColor
 
+    # ─── External-type extensions ─────────────────────────────────────────
+    # Public API a module adds to a type it does not define (a sibling module's
+    # type or the stdlib). Surfaced from the `Module@Other.symbols.json`
+    # extension graphs. Only modules without a canonical `module_defaults`
+    # entry need to be listed here; App/View/Never/RuntimeIssueSink extensions
+    # in SwiftTUICLI/WASI/WebHostCLI/Terminal/Runtime inherit canonical.
+    - SwiftTUIProfiling.Scene
+    - SwiftTUIViews.ActionScope
+    - SwiftTUIViews.Duration
+    - SwiftTUIViews.LinearGradient
+    - SwiftTUIViews.Never
+    - SwiftTUIViews.RadialGradient
+    - SwiftTUIViews.ShapeStyle
+    - SwiftTUICore.Double
+    - SwiftTUICore.Int
+
   package-only-seam:
     # Transitional / lowering-layer types kept package-internal but reachable
     # for narrow compatibility paths (see PUBLIC_SURFACE_POLICY.md).

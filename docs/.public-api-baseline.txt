@@ -76,6 +76,8 @@ SwiftTUIArguments.SwiftTUIOptions.runtimeConfiguration(environment:isStdoutTTY:)
 SwiftTUIArguments.SwiftTUIOptions.scene
 SwiftTUIArguments.SwiftTUIOptions.verbose
 SwiftTUIArguments.SwiftTUIOptions.web
+SwiftTUICLI.App.main()
+SwiftTUICLI.App.run()
 SwiftTUICLI.RenderOnce
 SwiftTUICLI.RenderOnce.print(_:width:options:environment:isStdoutTTY:)
 SwiftTUICLI.RenderOnce.render(_:width:options:environment:isStdoutTTY:)
@@ -835,6 +837,9 @@ SwiftTUICore.DeltaEMethod.cie94
 SwiftTUICore.DeltaEMethod.ciede2000
 SwiftTUICore.DeltaEMethod.init(rawValue:)
 SwiftTUICore.DeltaEMethod.ok
+SwiftTUICore.Double.animatableData
+SwiftTUICore.Double.magnitudeSquared
+SwiftTUICore.Double.scale(by:)
 SwiftTUICore.DrawCommand
 SwiftTUICore.DrawCommand.==(_:_:)
 SwiftTUICore.DrawCommand.border(bounds:set:foreground:background:blend:blendPhase:sides:)
@@ -1248,6 +1253,9 @@ SwiftTUICore.ImageSource
 SwiftTUICore.ImageSource.data(_:)
 SwiftTUICore.ImageSource.fileURL(_:)
 SwiftTUICore.ImageSource.path(_:)
+SwiftTUICore.Int.animatableData
+SwiftTUICore.Int.magnitudeSquared
+SwiftTUICore.Int.scale(by:)
 SwiftTUICore.InteractionRegion
 SwiftTUICore.InteractionRegion.captureOnPress
 SwiftTUICore.InteractionRegion.contains(_:)
@@ -2516,6 +2524,7 @@ SwiftTUIProfiling.ProfileConfig.sinks
 SwiftTUIProfiling.ProfilingScene
 SwiftTUIProfiling.ProfilingScene.Body
 SwiftTUIProfiling.ProfilingScene.body
+SwiftTUIProfiling.Scene.profiling(_:)
 SwiftTUIRuntime.AnyScene
 SwiftTUIRuntime.AnyScene.Body
 SwiftTUIRuntime.AnyScene.body
@@ -2707,6 +2716,8 @@ SwiftTUIRuntime.MouseEvent.kind
 SwiftTUIRuntime.MouseEvent.location
 SwiftTUIRuntime.MouseEvent.modifiers
 SwiftTUIRuntime.MouseEvent.timestamp
+SwiftTUIRuntime.Never.Body
+SwiftTUIRuntime.Never.body
 SwiftTUIRuntime.PasteEvent
 SwiftTUIRuntime.PasteEvent.content
 SwiftTUIRuntime.PasteEvent.init(content:)
@@ -2803,6 +2814,7 @@ SwiftTUIRuntime.RuntimeConfiguration.noProgress
 SwiftTUIRuntime.RuntimeConfiguration.output
 SwiftTUIRuntime.RuntimeConfiguration.verbosity
 SwiftTUIRuntime.RuntimeConfiguration.web
+SwiftTUIRuntime.RuntimeIssueSink.standardError
 SwiftTUIRuntime.RuntimeRenderMode
 SwiftTUIRuntime.RuntimeRenderMode.async
 SwiftTUIRuntime.RuntimeRenderMode.asyncNoCancel
@@ -3125,6 +3137,8 @@ SwiftTUITerminal.TerminalSession.start()
 SwiftTUITerminal.TerminalView
 SwiftTUITerminal.TerminalView.body
 SwiftTUITerminal.TerminalView.init(session:onTitleChange:onExit:)
+SwiftTUITerminal.View.terminalTitleChanged(_:)
+SwiftTUITerminal.View.terminalWorkingDirectoryChanged(_:)
 SwiftTUITerminalWorkspace.TerminalPaneID
 SwiftTUITerminalWorkspace.TerminalPaneID.description
 SwiftTUITerminalWorkspace.TerminalPaneID.init(_:)
@@ -3250,6 +3264,11 @@ SwiftTUIViews.ASCIIOutlineStyle.init()
 SwiftTUIViews.ASCIIOutlineStyle.makeOutlineStylePresentation()
 SwiftTUIViews.AccessibilityAnnouncer
 SwiftTUIViews.AccessibilityAnnouncer.announce(_:politeness:)
+SwiftTUIViews.ActionScope.dropDestination(action:)
+SwiftTUIViews.ActionScope.keyCommand(_:key:modifiers:isEnabled:action:)
+SwiftTUIViews.ActionScope.paletteCommand(name:description:isEnabled:action:)
+SwiftTUIViews.ActionScope.paletteSheet(_:isPresented:content:)
+SwiftTUIViews.ActionScope.toolbar(style:)
 SwiftTUIViews.ActivePaletteCommand
 SwiftTUIViews.ActivePaletteCommand.action
 SwiftTUIViews.ActivePaletteCommand.description
@@ -3557,6 +3576,7 @@ SwiftTUIViews.DragGesture.init(minimumDistance:coordinateSpace:)
 SwiftTUIViews.DragGesture.minimumDistance
 SwiftTUIViews.DrawMetadataModifier
 SwiftTUIViews.DropDestinationRegistrationModifier
+SwiftTUIViews.Duration.totalSeconds
 SwiftTUIViews.Ellipse
 SwiftTUIViews.Ellipse.geometry
 SwiftTUIViews.Ellipse.init()
@@ -3795,6 +3815,7 @@ SwiftTUIViews.LazyVStack
 SwiftTUIViews.LazyVStack.alignment
 SwiftTUIViews.LazyVStack.init(alignment:spacing:content:)
 SwiftTUIViews.LazyVStack.spacing
+SwiftTUIViews.LinearGradient.init(stops:startPoint:endPoint:)
 SwiftTUIViews.Link
 SwiftTUIViews.Link.destination
 SwiftTUIViews.Link.init(_:destination:)
@@ -3859,6 +3880,9 @@ SwiftTUIViews.NavigationStack
 SwiftTUIViews.NavigationStack.id
 SwiftTUIViews.NavigationStack.init(id:root:)
 SwiftTUIViews.NavigationStack.init(root:)
+SwiftTUIViews.Never.Body
+SwiftTUIViews.Never.Value
+SwiftTUIViews.Never.body
 SwiftTUIViews.OffsetModifier
 SwiftTUIViews.OpenLinkAction
 SwiftTUIViews.OpenLinkAction.callAsFunction(_:)
@@ -3998,6 +4022,7 @@ SwiftTUIViews.ProgressView.isIndeterminate
 SwiftTUIViews.ProgressView.total
 SwiftTUIViews.ProgressView.value
 SwiftTUIViews.ProposedViewSize
+SwiftTUIViews.RadialGradient.init(stops:center:startRadius:endRadius:)
 SwiftTUIViews.RadioGroupPickerStyle
 SwiftTUIViews.RadioGroupPickerStyle.init()
 SwiftTUIViews.RadioGroupPickerStyle.makeBody(configuration:)
@@ -4095,6 +4120,10 @@ SwiftTUIViews.Shape.stroke(_:style:background:)
 SwiftTUIViews.Shape.strokeBorder(_:style:)
 SwiftTUIViews.Shape.strokeBorder(_:style:background:)
 SwiftTUIViews.Shape.strokeBorder(_:style:background:)
+SwiftTUIViews.ShapeStyle.linearGradient(colors:startPoint:endPoint:)
+SwiftTUIViews.ShapeStyle.linearGradient(stops:startPoint:endPoint:)
+SwiftTUIViews.ShapeStyle.radialGradient(colors:center:startRadius:endRadius:)
+SwiftTUIViews.ShapeStyle.radialGradient(stops:center:startRadius:endRadius:)
 SwiftTUIViews.Slider
 SwiftTUIViews.Slider.init(_:value:in:step:)
 SwiftTUIViews.Slider.init(_:value:in:step:)
@@ -4648,6 +4677,7 @@ SwiftTUIViews.ZStackLayout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.neverBody()
 SwiftTUIViews.withAnimation(_:_:)
 SwiftTUIViews.withAnimation(_:completionCriteria:_:completion:)
+SwiftTUIWASI.App.main()
 SwiftTUIWASI.WASIRunner
 SwiftTUIWASI.WASIRunner.run(_:)
 SwiftTUIWASI.WASIRunner.run(_:)
@@ -4670,6 +4700,8 @@ SwiftTUIWebHost.WebHostRunnerError
 SwiftTUIWebHost.WebHostRunnerError.description
 SwiftTUIWebHost.WebHostRunnerError.multipleScenesUnsupported(count:)
 SwiftTUIWebHost.WebHostRunnerError.sceneNotFound(_:available:)
+SwiftTUIWebHostCLI.App.main()
+SwiftTUIWebHostCLI.App.run()
 SwiftTUIWebHostCLI.WebHostCLIRunner
 SwiftTUIWebHostCLI.WebHostCLIRunner.run(_:)
 SwiftTUIWebHostCLI.WebHostCLIRunner.run(_:)
