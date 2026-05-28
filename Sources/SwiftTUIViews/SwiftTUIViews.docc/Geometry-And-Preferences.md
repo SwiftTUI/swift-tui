@@ -182,13 +182,14 @@ struct MissingNameProbe: View {
 }
 ```
 
-When running through a terminal `RunLoop`, install `FrameDiagnosticsLogger`
-and inspect the geometry columns:
+When running a profiled build, enable the frame TSV via `SwiftTUIProfiling` and
+inspect the geometry columns:
 
 ```swift
-runLoop.diagnosticsLogger = FrameDiagnosticsLogger(
-  path: "/tmp/swifttui-frames.tsv"
-)
+import SwiftTUIProfiling
+
+WindowGroup { ContentView() }
+  .profiling()   // then run with SWIFTTUI_PROFILE="frames;tsv=/tmp/swifttui-frames.tsv"
 ```
 
 The TSV columns `geometry_missing_named_coordinate_spaces` and

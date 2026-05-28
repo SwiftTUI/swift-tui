@@ -1,7 +1,7 @@
 import Dispatch
 import Foundation
 @_spi(Runners) import SwiftTUI
-import SwiftTUIProfiling
+@_spi(Runners) import SwiftTUIProfiling
 
 #if canImport(Darwin)
   import Darwin
@@ -235,7 +235,10 @@ public enum PerfScenarioRunner {
     let terminalHost = PerfTerminalHost(size: terminalSize)
     let inputReader = PerfScriptedInputReader()
     let signalReader = InProcessSignalReader()
-    let diagnosticsSink = try FrameDiagnosticsSink(runDirectory: runDirectory)
+    let framesURL = runDirectory.appendingPathComponent("frames.tsv")
+    guard let framesSink = TSVFileSink(path: framesURL.path) else {
+      throw PerfScenarioError.cannotCreateDiagnostics(framesURL.path)
+    }
     let scene = WindowGroup(scenario.name.rawValue) {
       content()
     }
@@ -252,7 +255,7 @@ public enum PerfScenarioRunner {
       presentationSurface: terminalHost,
       terminalInputReader: inputReader,
       signalReader: signalReader,
-      diagnosticsLogger: diagnosticsSink.logger
+      frameSink: framesSink
     )
 
     let startedAt = timestampString()

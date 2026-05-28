@@ -258,7 +258,8 @@ capture this: add `.profiling()` to a scene and set `SWIFTTUI_PROFILE` (for
 example `frames;tsv=/tmp/run.tsv`) to derive the rich per-frame record and write
 TSV/JSONL/summary output, alongside the memory-occupancy and CPU/RSS signals.
 See [the SwiftTUIProfiling DocC catalog](../Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc/SwiftTUIProfiling.md).
-The runtime also retains the lower-level `FrameDiagnosticsLogger` (used by the
-CLI/WASI runners and the WASI surface bridge). The `Tools/TermUIPerf` harness
-consumes the derived records to compare runs; it does not yet enforce pass/fail
-budgets.
+The runtime carries no diagnostics logger of its own: the CLI and WASI runners
+install small `FrameDiagnosticSink`s on the same contract (a TSV file for
+`TERMUI_DIAGNOSTICS`; a browser stream for the web surface), and `Tools/TermUIPerf`
+uses the product's `TSVFileSink`. The harness consumes the derived records to
+compare runs; it does not yet enforce pass/fail budgets.

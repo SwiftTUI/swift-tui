@@ -11,7 +11,7 @@ import SwiftTUIViews
   @_spi(Runners) public let scheduler: any FrameScheduling
   @_spi(Runners) public let surfaceName: String
   @_spi(Runners) public let environmentValues: [String: String]
-  @_spi(Runners) public let diagnosticsLogger: FrameDiagnosticsLogger?
+  @_spi(Runners) public let frameSink: (any FrameDiagnosticSink)?
   @_spi(Runners) public let progressProbe: RunLoopProgressProbe?
   @_spi(Runners) public var runtimeIssueSink: RuntimeIssueSink?
   @_spi(Runners) public let runtimeConfiguration: RuntimeConfiguration
@@ -26,7 +26,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
     runtimeConfiguration: RuntimeConfiguration = .default,
     renderMode: RuntimeRenderMode?,
@@ -38,7 +38,7 @@ import SwiftTUIViews
     self.scheduler = scheduler
     self.surfaceName = surfaceName
     self.environmentValues = environmentValues
-    self.diagnosticsLogger = diagnosticsLogger
+    self.frameSink = frameSink
     self.progressProbe = progressProbe
     self.runtimeIssueSink = nil
     self.runtimeConfiguration = runtimeConfiguration
@@ -53,7 +53,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
     runtimeConfiguration: RuntimeConfiguration = .default,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
@@ -65,7 +65,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: progressProbe,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: nil,
@@ -80,7 +80,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
     renderMode: RuntimeRenderMode?,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
@@ -92,7 +92,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: nil,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: renderMode,
@@ -107,7 +107,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
@@ -118,7 +118,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: nil,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: nil,
@@ -133,7 +133,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
     runtimeConfiguration: RuntimeConfiguration = .default,
     renderMode: RuntimeRenderMode?,
@@ -147,7 +147,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: progressProbe,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: renderMode,
@@ -162,7 +162,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
     runtimeConfiguration: RuntimeConfiguration = .default,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
@@ -175,7 +175,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: progressProbe,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: nil,
@@ -190,7 +190,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
     renderMode: RuntimeRenderMode?,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
@@ -203,7 +203,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: nil,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: renderMode,
@@ -218,7 +218,7 @@ import SwiftTUIViews
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
@@ -230,7 +230,7 @@ import SwiftTUIViews
       scheduler: scheduler,
       surfaceName: surfaceName,
       environmentValues: environmentValues,
-      diagnosticsLogger: diagnosticsLogger,
+      frameSink: frameSink,
       progressProbe: nil,
       runtimeConfiguration: runtimeConfiguration,
       renderMode: nil,
@@ -280,7 +280,7 @@ import SwiftTUIViews
         WindowHostView(content: configuration.makeScopedRootView())
       }
     )
-    runLoop.diagnosticsLogger = resources.diagnosticsLogger
+    runLoop.frameSink = resources.frameSink
     if let frameSink = ProfilingRegistry.shared.frameSink {
       // A profiled build installs a sink via `.profiling()`; it supersedes the
       // legacy per-session logger.

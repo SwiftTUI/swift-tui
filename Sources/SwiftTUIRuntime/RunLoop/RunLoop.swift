@@ -69,19 +69,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
 
-  /// Optional file-based diagnostics logger. When set, every rendered frame
-  /// emits a tab-separated record to the configured output file. Setting it
-  /// installs a legacy bridge as the active ``frameSink``.
-  public var diagnosticsLogger: FrameDiagnosticsLogger? {
-    didSet {
-      frameSink = diagnosticsLogger.map { FrameDiagnosticsLoggerSink($0) }
-    }
-  }
-
-  /// Active per-frame diagnostics sink. Installed either by ``diagnosticsLogger``
-  /// (legacy) or, in a profiled build, by the profiling product through
-  /// ``ProfilingRegistry`` when the session is constructed. When `nil` the
-  /// per-frame emit path is a single branch and no diagnostics work runs.
+  /// Active per-frame diagnostics sink. Installed by the profiling product (via
+  /// ``ProfilingRegistry``) or by a runner (via `SceneSessionResources.frameSink`)
+  /// when the session is constructed. When `nil` the per-frame emit path is a
+  /// single branch and no diagnostics work runs.
   package var frameSink: (any FrameDiagnosticSink)?
 
   /// Registration tokens for this session's graph-scoped occupancy providers.

@@ -1,4 +1,4 @@
-import SwiftTUIRuntime
+@_spi(Runners) import SwiftTUIRuntime
 
 #if canImport(Darwin)
   import Darwin

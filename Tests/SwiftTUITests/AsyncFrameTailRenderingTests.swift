@@ -1,11 +1,12 @@
 @unsafe @preconcurrency import Dispatch
 import Foundation
+@_spi(Runners) import SwiftTUIProfiling
 @_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 private enum AsyncFrameTailRaisedCenterAlignmentID: AlignmentID {
@@ -311,8 +312,8 @@ struct AsyncFrameTailRenderingTests {
         )
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let runTask = Task {
       try await runLoop.run()
@@ -482,8 +483,8 @@ struct AsyncFrameTailRenderingTests {
         }
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let runTask = Task {
       try await runLoop.run()
@@ -1042,8 +1043,8 @@ struct AsyncFrameTailRenderingTests {
         AsyncFrameTailCounterView(value: value)
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let runTask = Task {
       try await runLoop.run()
@@ -1142,8 +1143,8 @@ struct AsyncFrameTailRenderingTests {
       }
     )
     runLoop.renderMode = .async
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let runTask = Task {
       try await runLoop.run()
@@ -1234,8 +1235,8 @@ struct AsyncFrameTailRenderingTests {
       }
     )
     runLoop.renderMode = .sync
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
@@ -1306,8 +1307,8 @@ struct AsyncFrameTailRenderingTests {
       }
     )
     runLoop.renderMode = .asyncNoCancel
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let runTask = Task {
       try await runLoop.run()
@@ -1418,8 +1419,8 @@ struct AsyncFrameTailRenderingTests {
         AsyncSkippedVisualOnlyView(value: value)
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
@@ -1533,8 +1534,8 @@ struct AsyncFrameTailRenderingTests {
         AsyncSkippedStableInteractionVisualOnlyView(value: value)
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
@@ -1632,8 +1633,8 @@ struct AsyncFrameTailRenderingTests {
       }
     )
     runLoop.renderMode = .asyncNoDrop
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
@@ -1735,8 +1736,8 @@ struct AsyncFrameTailRenderingTests {
         AsyncFrameTailAnimatedOffsetView(value: value)
       }
     )
-    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
-    #expect(runLoop.diagnosticsLogger != nil)
+    runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
+    #expect(runLoop.frameSink != nil)
 
     let animationController = renderer.internalAnimationController
     AnimationRegistrationStorage.currentSink = animationController

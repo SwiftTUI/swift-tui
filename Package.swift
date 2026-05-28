@@ -62,6 +62,7 @@ let swiftTUIRuntimeDependencies: [Target.Dependency] = [
 let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUI",
   "SwiftTUIRuntime",
+  "SwiftTUIProfiling",
   "SwiftTUICore",
   "SwiftTUIViews",
   "SwiftTUITestSupport",

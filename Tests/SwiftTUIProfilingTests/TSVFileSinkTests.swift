@@ -2,43 +2,34 @@ import Foundation
 import SwiftTUICore
 import Testing
 
-@testable import SwiftTUIProfiling
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIProfiling
+@_spi(Runners) @testable import SwiftTUIRuntime
 
 @MainActor
 @Suite
 struct TSVFileSinkTests {
-  @Test("TSVFileSink reproduces the legacy logger output byte-for-byte")
-  func matchesLegacyLogger() throws {
+  @Test("TSVFileSink writes a single header then one row per sample")
+  func writesHeaderAndRows() throws {
     let samples: [RuntimeFrameSample] = [makeCommittedSample(), makeZeroArtifactSample()]
 
     let sinkPath = Self.temporaryPath()
-    let loggerPath = Self.temporaryPath()
-
     let sink = TSVFileSink(path: sinkPath)
-    let logger = FrameDiagnosticsLogger(path: loggerPath)
     #expect(sink != nil)
-    #expect(logger != nil)
-
     for sample in samples {
       sink?.record(sample)
-      logger?.log(FrameRecordDerivation.record(from: sample))
     }
 
-    let sinkBytes = try Data(contentsOf: URL(fileURLWithPath: sinkPath))
-    let loggerBytes = try Data(contentsOf: URL(fileURLWithPath: loggerPath))
-    #expect(sinkBytes == loggerBytes)
-
-    // The header is written exactly once, ahead of the data rows.
-    let lines = String(decoding: sinkBytes, as: UTF8.self)
-      .split(separator: "\n", omittingEmptySubsequences: true)
+    let text = try String(contentsOfFile: sinkPath, encoding: .utf8)
+    let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
     #expect(lines.count == samples.count + 1)
-    #expect(
-      Array(lines.first ?? "")
-        == Array(FrameDiagnosticsTSVFormatting.headerFields.joined(separator: "\t")))
+
+    let header = FrameDiagnosticsTSVFormatting.headerFields
+    #expect(String(lines[0]) == header.joined(separator: "\t"))
+    for row in lines.dropFirst() {
+      #expect(row.split(separator: "\t", omittingEmptySubsequences: false).count == header.count)
+    }
 
     try? FileManager.default.removeItem(atPath: sinkPath)
-    try? FileManager.default.removeItem(atPath: loggerPath)
   }
 
   @Test("init returns nil for an unwritable path")

@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 3 |
-| `SwiftTUIRuntime` | 55 | 493 |
+| `SwiftTUIRuntime` | 54 | 488 |
 | `SwiftTUIProfiling` | 8 | 50 |
 | `SwiftTUIViews` | 263 | 1405 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
@@ -43,7 +43,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIRuntime
 
-### Canonical surface (55)
+### Canonical surface (54)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
@@ -55,7 +55,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ExitKeyBindings` — struct — 5 members
 - `FileOpenError` — enum — 2 members
 - `FrameDiagnosticRecord` — struct — 75 members
-- `FrameDiagnosticsLogger` — class — 3 members
 - `HostedRasterSurface` — class — 14 members
 - `HostedSceneSession` — class — 11 members
 - `HostedSceneSessionError` — enum — 2 members
@@ -72,7 +71,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `PresentationSurface` — protocol — 5 members
 - `PresentationSurfaceMetricsProvider` — protocol — 9 members
 - `RasterPresentationSurface` — protocol — 1 member
-- `RunLoop` — class — 8 members
+- `RunLoop` — class — 7 members
 - `RunLoopExitReason` — enum — 3 members
 - `RunLoopResult` — struct — 4 members
 - `RuntimeConfiguration` — struct — 56 members
