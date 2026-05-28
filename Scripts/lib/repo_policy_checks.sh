@@ -54,16 +54,13 @@ run_repo_policy_phase() {
   # the top of the phase lets the gate fail fast on policy violations
   # that would otherwise only surface at `git commit` time.
   #
-  # Scope is the branch's diff against `origin/main` rather than
-  # `--all-files`.  Two reasons:
-  #
-  #   1. The pre-commit hook on the developer's machine is also scoped
-  #      to staged files, so the gate matches its scope — no surprise
-  #      reformats of files this branch didn't touch.
-  #   2. `swift-format` rewrites files in-place; running it across the
-  #      whole repo would silently reformat code unrelated to this
-  #      branch, producing a noisy diff and obscuring the actual
-  #      changes under review.
+  # Scope is prek's default — the staged change being committed — not a
+  # branch diff against `origin/main`.  This makes the gate match the
+  # commit-time pre-commit hook exactly: it checks the change you are
+  # committing, so `swift-format`'s in-place rewrites never touch files
+  # outside that change.  (Stage your work before running the gate to
+  # exercise the prek step; with a clean tree it is a no-op and the
+  # script-based policy steps below still run.)
   #
   # If `prek` is not installed locally the step is skipped — the
   # commit-time hooks still catch the same issues, and CI installs
@@ -73,9 +70,9 @@ run_repo_policy_phase() {
     run_repo_policy_check \
       "$mode" \
       "$repo_root" \
-      "Run prek hooks (branch diff vs origin/main)" \
-      "prek run --from-ref origin/main --to-ref HEAD" \
-      prek run --from-ref origin/main --to-ref HEAD
+      "Run prek hooks (staged change)" \
+      "prek run" \
+      prek run
   else
     echo "[check_repo_policy_phase] prek not on PATH — skipping prek run"
     echo "  install it from https://prek.j178.dev to catch policy"
