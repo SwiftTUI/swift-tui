@@ -161,6 +161,26 @@ custom launchers that do not want the convenience product.
 `SwiftTUICore` is target-level pipeline infrastructure, re-exported through
 `SwiftTUIRuntime` rather than published as its own product.
 
+### `SwiftTUIProfiling`
+
+`SwiftTUIProfiling` is the optional, opt-in profiling product. Nothing in the
+default graph depends on it, and it is zero-cost until activated. Its canonical
+public surface is the activation entry point and the reusable CPU sampler:
+
+- `ProfilingScene` and the `Scene.profiling(_:)` modifier — env-gated activation
+  via `SWIFTTUI_PROFILE`, or an explicit `ProfileConfig`.
+- `ProfileConfig` (with `Signal` and `SinkDescriptor`) — the programmatic
+  selection of signals and sinks.
+- `ProfileActivation` — owns the live session; call `finish()` at shutdown to
+  flush buffered sinks.
+- The CPU sampler family — `CPUSampler`, `CPUSample`, `CPUSampleCollector`,
+  `ProcessCPUReading`, `CPUSamplerError`.
+
+The record/derivation/TSV types it consumes stay in `SwiftTUIRuntime` (they are
+also used by `WASISurfaceBridge` and the runners), so the runtime never depends
+on the product. The sink and record-envelope types are package-internal for now;
+the environment grammar builds them.
+
 ### Root-package platform integration products
 
 Platform-specific execution and embedding are root-package products:
