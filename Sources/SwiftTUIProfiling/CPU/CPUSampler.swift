@@ -10,17 +10,17 @@
 
 /// A single raw reading of the process's accumulated CPU time and peak resident
 /// memory, taken from `getrusage(RUSAGE_SELF)`.
-package struct ProcessCPUReading: Sendable, Equatable {
-  package var timestampSeconds: Double
-  package var userCPUSeconds: Double
-  package var systemCPUSeconds: Double
-  package var maxResidentBytes: Int
+public struct ProcessCPUReading: Sendable, Equatable {
+  public var timestampSeconds: Double
+  public var userCPUSeconds: Double
+  public var systemCPUSeconds: Double
+  public var maxResidentBytes: Int
 
-  package var totalCPUSeconds: Double {
+  public var totalCPUSeconds: Double {
     userCPUSeconds + systemCPUSeconds
   }
 
-  package init(
+  public init(
     timestampSeconds: Double,
     userCPUSeconds: Double,
     systemCPUSeconds: Double,
@@ -35,16 +35,16 @@ package struct ProcessCPUReading: Sendable, Equatable {
 
 /// A CPU sample over the interval between two readings: per-kind CPU seconds
 /// consumed, the wall time elapsed, and the resulting busy estimate.
-package struct CPUSample: Sendable, Equatable {
-  package var timestampSeconds: Double
-  package var userCPUSeconds: Double
-  package var systemCPUSeconds: Double
-  package var totalCPUSeconds: Double
-  package var wallDeltaSeconds: Double
-  package var estimatedCPUPercent: Double
-  package var maxResidentBytes: Int
+public struct CPUSample: Sendable, Equatable {
+  public var timestampSeconds: Double
+  public var userCPUSeconds: Double
+  public var systemCPUSeconds: Double
+  public var totalCPUSeconds: Double
+  public var wallDeltaSeconds: Double
+  public var estimatedCPUPercent: Double
+  public var maxResidentBytes: Int
 
-  package init(
+  public init(
     timestampSeconds: Double,
     userCPUSeconds: Double,
     systemCPUSeconds: Double,
@@ -63,11 +63,11 @@ package struct CPUSample: Sendable, Equatable {
   }
 }
 
-package enum CPUSamplerError: Error, Equatable, CustomStringConvertible {
+public enum CPUSamplerError: Error, Equatable, CustomStringConvertible {
   case unavailable
   case getrusageFailed(errno: Int32)
 
-  package var description: String {
+  public var description: String {
     switch self {
     case .unavailable:
       "process CPU sampling is unavailable on this platform."
@@ -79,10 +79,10 @@ package enum CPUSamplerError: Error, Equatable, CustomStringConvertible {
 
 /// Reads process CPU/RSS via `getrusage`. Available on Darwin/Glibc/Android/
 /// Musl; a no-op that throws `.unavailable` on WASI.
-package enum CPUSampler {
-  package static let defaultSampleInterval: Duration = .milliseconds(250)
+public enum CPUSampler {
+  public static let defaultSampleInterval: Duration = .milliseconds(250)
 
-  package static func readCurrentUsage() throws -> ProcessCPUReading {
+  public static func readCurrentUsage() throws -> ProcessCPUReading {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
       var usage = rusage()
       #if canImport(Glibc)
@@ -104,7 +104,7 @@ package enum CPUSampler {
     #endif
   }
 
-  package static func sampleDelta(
+  public static func sampleDelta(
     from start: ProcessCPUReading,
     to end: ProcessCPUReading
   ) -> CPUSample {
@@ -124,7 +124,7 @@ package enum CPUSampler {
     )
   }
 
-  package static func deltas(from readings: [ProcessCPUReading]) -> [CPUSample] {
+  public static func deltas(from readings: [ProcessCPUReading]) -> [CPUSample] {
     zip(readings, readings.dropFirst()).map(sampleDelta)
   }
 
@@ -154,16 +154,16 @@ package enum CPUSampler {
 /// Drives periodic CPU sampling across an async operation, returning the
 /// per-interval deltas. The activation layer uses the lower-level
 /// ``CPUSampler`` primitives directly for the long-lived periodic signal.
-package actor CPUSampleCollector {
+public actor CPUSampleCollector {
   private let interval: Duration
   private var readings: [ProcessCPUReading] = []
   private var samplerTask: Task<Void, Never>?
 
-  package init(interval: Duration = CPUSampler.defaultSampleInterval) {
+  public init(interval: Duration = CPUSampler.defaultSampleInterval) {
     self.interval = interval
   }
 
-  package func start() throws {
+  public func start() throws {
     readings = [try CPUSampler.readCurrentUsage()]
     samplerTask = Task { [interval] in
       while !Task.isCancelled {
@@ -179,7 +179,7 @@ package actor CPUSampleCollector {
     }
   }
 
-  package func stop() throws -> [CPUSample] {
+  public func stop() throws -> [CPUSample] {
     samplerTask?.cancel()
     samplerTask = nil
     try record()

@@ -55,6 +55,16 @@ classifications:
     - SwiftTUI.WindowGroup
     - SwiftTUI.WindowIdentifier
 
+    # ─── Profiling (optional diagnostics product) ──────────────────────────
+    - SwiftTUIProfiling.CPUSample
+    - SwiftTUIProfiling.CPUSampleCollector
+    - SwiftTUIProfiling.CPUSampler
+    - SwiftTUIProfiling.CPUSamplerError
+    - SwiftTUIProfiling.ProcessCPUReading
+    - SwiftTUIProfiling.ProfileActivation
+    - SwiftTUIProfiling.ProfileConfig
+    - SwiftTUIProfiling.ProfilingScene
+
     # ─── View (authoring surface) ───────────────────────────────────────────
     - SwiftTUIViews.AccessibilityAnnouncer
     - SwiftTUIViews.AnyLayout
