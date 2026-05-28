@@ -23,6 +23,22 @@ final class FrameTailRetainedState: Sendable {
 
   private let state = Mutex(State())
 
+  /// Occupancy reading for the profiling memory signal. Reads the retained
+  /// frame index under the same lock that guards the stored state.
+  package var memoryMetricSnapshot: MemoryMetricSnapshot {
+    state.withLock { state in
+      MemoryMetricSnapshot(
+        name: "RetainedFrameIndex.placedByIdentity",
+        count: state.previousFrameIndex?.placedByIdentity.count ?? 0,
+        approxBytes: state.previousRasterSurface.map { $0.size.width * $0.size.height },
+        detail: [
+          "resolved": state.previousFrameIndex?.resolvedByIdentity.count ?? 0,
+          "measured": state.previousFrameIndex?.measuredByIdentity.count ?? 0,
+        ]
+      )
+    }
+  }
+
   func input(
     invalidatedIdentities: Set<Identity>
   ) -> FrameTailRetainedInput {

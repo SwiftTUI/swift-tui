@@ -156,6 +156,52 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         }
       )
     )
+
+    let animationController = renderer.internalAnimationController
+    memoryMetricTokens.append(
+      MemoryMetricRegistry.shared.register(
+        ClosureMemoryMetricProvider { [weak animationController] in
+          guard let animationController else {
+            return MemoryMetricSnapshot(name: "AnimationController.activeAnimations", count: 0)
+          }
+          return animationController.memoryMetricSnapshot
+        }
+      )
+    )
+
+    if let measurementCache = renderer.layoutEngine.cache {
+      memoryMetricTokens.append(
+        MemoryMetricRegistry.shared.register(
+          ClosureMemoryMetricProvider { [weak measurementCache] in
+            guard let measurementCache else {
+              return MemoryMetricSnapshot(name: "MeasurementCache.entriesByIdentity", count: 0)
+            }
+            let metrics = measurementCache.metrics
+            return MemoryMetricSnapshot(
+              name: "MeasurementCache.entriesByIdentity",
+              count: measurementCache.count,
+              detail: [
+                "lookups": metrics.lookups,
+                "hits": metrics.hits,
+                "misses": metrics.misses,
+              ]
+            )
+          }
+        )
+      )
+    }
+
+    let frameTailRenderer = renderer.frameTailRenderer
+    memoryMetricTokens.append(
+      MemoryMetricRegistry.shared.register(
+        ClosureMemoryMetricProvider { [weak frameTailRenderer] in
+          guard let frameTailRenderer else {
+            return MemoryMetricSnapshot(name: "RetainedFrameIndex.placedByIdentity", count: 0)
+          }
+          return frameTailRenderer.memoryMetricSnapshot
+        }
+      )
+    )
   }
 
   package convenience init(
