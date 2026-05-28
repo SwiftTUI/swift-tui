@@ -247,8 +247,18 @@ frame is covered in [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 
 ## Diagnostics
 
-`FrameDiagnosticsLogger` records per-frame phase timings, worker enqueue and
-compute time, main-actor blocked and suspended time, input events seen during
-render suspension, and the cancellation/drop policy state. The `Tools/TermUIPerf`
-harness consumes these logs to compare runs; it does not yet enforce pass/fail
+Each committed frame produces a `RuntimeFrameSample` — raw phase timings, worker
+enqueue and compute time, main-actor blocked and suspended time, input events
+seen during render suspension, and the cancellation/drop policy state. The
+runtime emits it to a `FrameDiagnosticSink` only when one is installed; with no
+sink the per-frame path is a single branch.
+
+The optional **`SwiftTUIProfiling`** product is the consumer-facing way to
+capture this: add `.profiling()` to a scene and set `SWIFTTUI_PROFILE` (for
+example `frames;tsv=/tmp/run.tsv`) to derive the rich per-frame record and write
+TSV/JSONL/summary output, alongside the memory-occupancy and CPU/RSS signals.
+See [the SwiftTUIProfiling DocC catalog](../Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc/SwiftTUIProfiling.md).
+The runtime also retains the lower-level `FrameDiagnosticsLogger` (used by the
+CLI/WASI runners and the WASI surface bridge). The `Tools/TermUIPerf` harness
+consumes the derived records to compare runs; it does not yet enforce pass/fail
 budgets.

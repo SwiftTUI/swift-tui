@@ -63,6 +63,7 @@ flowchart TD
     SwiftTUITerminalWorkspace --> SwiftTUITerminal
     SwiftTUICharts --> SwiftTUIViews
     SwiftTUIAnimatedImage --> SwiftTUIViews
+    SwiftTUIProfiling["SwiftTUIProfiling<br/>(optional, opt-in)"] --> SwiftTUIRuntime
 ```
 
 ### Core targets
@@ -94,6 +95,14 @@ flowchart TD
 - **`SwiftTUIAnimatedImage`** — finite, pre-composed animated-image playback and
   GIF import/export. It is available as a standalone product for narrow
   compositions and is included by the `SwiftTUI` convenience product.
+- **`SwiftTUIProfiling`** — optional, opt-in profiling and diagnostics. It adds a
+  `.profiling()` scene modifier (env-gated via `SWIFTTUI_PROFILE`) carrying three
+  independently selectable signals — per-frame timing, memory occupancy, and
+  CPU/RSS — routed to TSV, JSONL, or summary sinks. Nothing in the default graph
+  depends on it; activation is zero-cost until requested. It builds on the
+  runtime's neutral emit contract (`FrameDiagnosticSink` / `RuntimeFrameSample`)
+  and the `SwiftTUICore` occupancy registry, so the runtime never depends on the
+  product. Not included in the `SwiftTUI` convenience import.
 
 ### Platform, host, and embedding products
 
@@ -132,6 +141,8 @@ Sources/
   SwiftTUICharts/      Chart views  + SwiftTUICharts.docc
   SwiftTUIAnimatedImage/  Animated image playback  + .docc
   SwiftTUI/            Convenience re-export target  + SwiftTUI.docc
+  SwiftTUIProfiling/   Activation, Sinks, CPU, Memory, Progress  + .docc
+                       (optional opt-in profiling product)
 Platforms/             Arguments, CLI, WASI, WebHost,
                        Embedding, SwiftUI  (sources for the product targets)
 Vendor/                swift-figlet, swift-gif, swift-jpeg, swift-png,
