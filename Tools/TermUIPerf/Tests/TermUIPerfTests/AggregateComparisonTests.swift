@@ -48,6 +48,7 @@ struct AggregateComparisonTests {
     #expect(output.contains("scenario: gallery-animation-click"))
     #expect(output.contains("total CPU seconds: 5.4000 -> 3.0000"))
     #expect(output.contains("[real]"))
+    #expect(output.contains("(-2.4000, band 0.8000)"))
   }
 
   private func metric(
