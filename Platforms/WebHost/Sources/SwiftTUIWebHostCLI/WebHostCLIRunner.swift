@@ -100,8 +100,8 @@ extension App where Self: SwiftTUICommand {
         FileHandle.standardOutput.write(Data(script.utf8))
         return
       }
-      if let installedURL = try installCompletionScript(forParsedCommand: command) {
-        let message = "Installed completion script at \(installedURL.path)\n"
+      if let installedPath = try installCompletionScript(forParsedCommand: command) {
+        let message = "Installed completion script at \(installedPath)\n"
         FileHandle.standardOutput.write(Data(message.utf8))
         return
       }
