@@ -5,35 +5,35 @@ import Testing
 
 struct AggregateComparisonTests {
   @Test("delta beyond the noise band is flagged real")
-  func deltaBeyondNoiseBandIsReal() {
+  func deltaBeyondNoiseBandIsReal() throws {
     // base CPU ~5.4 +/- 0.4; candidate ~3.0 +/- 0.4. 2-sigma band = 0.8.
     let comparison = CompareCommand.compareAggregates(
       base: aggregate(cpuValues: [5.0, 5.4, 5.8]),
       candidate: aggregate(cpuValues: [2.6, 3.0, 3.4]))
 
-    let cpu = try! #require(metric(comparison, "total CPU seconds"))
+    let cpu = try #require(metric(comparison, "total CPU seconds"))
     #expect(cpu.verdict == .real)
     #expect(approx(cpu.delta, -2.4))
   }
 
   @Test("delta within the noise band is flagged within noise")
-  func deltaWithinNoiseBandIsWithinNoise() {
+  func deltaWithinNoiseBandIsWithinNoise() throws {
     // base ~5.4 +/- 0.4; candidate ~5.5 +/- 0.4. 2-sigma band = 0.8 > |0.1|.
     let comparison = CompareCommand.compareAggregates(
       base: aggregate(cpuValues: [5.0, 5.4, 5.8]),
       candidate: aggregate(cpuValues: [5.1, 5.5, 5.9]))
 
-    let cpu = try! #require(metric(comparison, "total CPU seconds"))
+    let cpu = try #require(metric(comparison, "total CPU seconds"))
     #expect(cpu.verdict == .withinNoise)
   }
 
   @Test("single-sample inputs are inconclusive (no noise estimate)")
-  func singleSampleIsInconclusive() {
+  func singleSampleIsInconclusive() throws {
     let comparison = CompareCommand.compareAggregates(
       base: aggregate(cpuValues: [5.0]),
       candidate: aggregate(cpuValues: [3.0]))
 
-    let cpu = try! #require(metric(comparison, "total CPU seconds"))
+    let cpu = try #require(metric(comparison, "total CPU seconds"))
     #expect(cpu.verdict == .inconclusive)
   }
 
