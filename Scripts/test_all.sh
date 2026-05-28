@@ -758,6 +758,11 @@ run_function_step \
   run_swift test --filter SwiftTUIViewsTests
 
 run_function_step \
+  "Run SwiftTUIProfiling tests" \
+  "$(swift_command_text test --filter SwiftTUIProfilingTests)" \
+  run_swift test --filter SwiftTUIProfilingTests
+
+run_function_step \
   "Run SwiftTUI async lifecycle tests" \
   "$(swift_command_text test --filter SwiftTUITests.AsyncLifecycleGenerationTests)" \
   run_swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests

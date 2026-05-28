@@ -96,6 +96,7 @@ let packageProducts: [Product] =
   [
     .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
     .library(name: "SwiftTUIRuntime", targets: ["SwiftTUIRuntime"]),
+    .library(name: "SwiftTUIProfiling", targets: ["SwiftTUIProfiling"]),
     .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
     .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
     .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
@@ -176,6 +177,15 @@ let package = Package(
         "SwiftTUIWebHostCLI",
       ],
       path: "Sources/SwiftTUI",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIProfiling",
+      dependencies: [
+        "SwiftTUICore",
+        "SwiftTUIRuntime",
+      ],
+      path: "Sources/SwiftTUIProfiling",
       swiftSettings: swiftSettings()
     ),
     .target(
@@ -287,7 +297,7 @@ let package = Package(
     .target(
       name: "UnixSignals",
       dependencies: [
-        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
       ],
       path: "Vendor/UnixSignals/Sources/UnixSignals",
       swiftSettings: swiftSettings()
@@ -337,6 +347,15 @@ let package = Package(
       dependencies: [
         "SwiftTUICore",
         "SwiftTUIViews",
+      ],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUIProfilingTests",
+      dependencies: [
+        "SwiftTUIProfiling",
+        "SwiftTUIRuntime",
+        "SwiftTUICore",
       ],
       swiftSettings: swiftSettings()
     ),
