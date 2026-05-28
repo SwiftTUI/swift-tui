@@ -67,6 +67,10 @@ extension CompareCommand {
     return AggregateComparison(scenario: base.scenario, metrics: metrics)
   }
 
+  /// Compares one metric. The noise band is `sigma * max(base.stddev,
+  /// candidate.stddev)`; when both stddevs are 0 (perfectly consistent runs)
+  /// the band is 0, so any nonzero median delta is reported `.real`. A metric
+  /// with fewer than 2 samples on either side is `.inconclusive`.
   private static func metricComparison(
     _ name: String,
     _ base: PerfStat,
