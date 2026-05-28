@@ -9,17 +9,25 @@ public struct ProfileConfig: Sendable, Equatable {
     case cpu(interval: Duration)
   }
 
-  /// A sink the `SWIFTTUI_PROFILE` grammar can name. The in-process `handler`
-  /// sink is programmatic-only and is therefore not represented here.
+  /// A sink the `SWIFTTUI_PROFILE` grammar can name. The in-process handler
+  /// sink used by the package's programmatic activation seam is internal and
+  /// not grammar-nameable, so it has no descriptor here.
   public enum SinkDescriptor: Sendable, Equatable {
+    /// Append each record as a row to a tab-separated file at `path`.
     case tsv(path: String)
+    /// Append each record as a line of JSON to a file at `path`.
     case jsonl(path: String)
+    /// Buffer records and emit one reduced report to stderr on
+    /// ``ProfileActivation/finish()``.
     case summary
   }
 
+  /// The signals to run. Empty means activation is a no-op.
   public var signals: Set<Signal>
+  /// Where records go. Empty falls back to a stderr ``SinkDescriptor/summary``.
   public var sinks: [SinkDescriptor]
 
+  /// Creates a config that runs `signals` and routes their records to `sinks`.
   public init(signals: Set<Signal>, sinks: [SinkDescriptor]) {
     self.signals = signals
     self.sinks = sinks

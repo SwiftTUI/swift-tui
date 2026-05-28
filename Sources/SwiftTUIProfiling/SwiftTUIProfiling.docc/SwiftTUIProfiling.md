@@ -16,8 +16,9 @@ data. The runtime never depends on the product.
 
 ### Activating
 
-Add the ``ProfilingScene/body`` modifier to a scene and gate it with an
-environment variable:
+Add the `profiling()` modifier to a scene and gate it with an environment
+variable. It wraps the scene in a ``ProfilingScene`` whose `body` activates
+profiling during scene setup:
 
 ```swift
 import SwiftTUIProfiling
@@ -41,6 +42,16 @@ Three signals are each independently opt-in, named in the config or env var:
 - **memory** — periodic occupancy snapshots of long-lived stores (caches, the
   view graph, retained frames, the animation controller).
 - **cpu** — periodic process CPU and resident-size samples.
+
+The **frames** and **memory** signals have no standalone public types — you
+reach them only by naming them in the env grammar or in a ``ProfileConfig``.
+The **cpu** signal additionally exposes a reusable sampling API (``CPUSampler``
+and friends, under **CPU sampling** below) that you can drive directly outside
+the activation path.
+
+Records are routed to sinks selected by ``ProfileConfig/SinkDescriptor`` (or the
+`tsv=`/`jsonl=`/`summary` tokens in the grammar). With no sink named, activation
+falls back to a stderr ``ProfileConfig/SinkDescriptor/summary``.
 
 ### The `SWIFTTUI_PROFILE` grammar
 
@@ -67,8 +78,13 @@ emit their reduced report.
 ### Activation
 
 - ``ProfilingScene``
-- ``ProfileConfig``
 - ``ProfileActivation``
+
+### Configuring signals and sinks
+
+- ``ProfileConfig``
+- ``ProfileConfig/Signal``
+- ``ProfileConfig/SinkDescriptor``
 
 ### CPU sampling
 

@@ -14,8 +14,11 @@ public struct ProcessCPUReading: Sendable, Equatable {
   public var timestampSeconds: Double
   public var userCPUSeconds: Double
   public var systemCPUSeconds: Double
+  /// Peak resident set size in bytes, normalized across platforms (`getrusage`
+  /// reports bytes on Darwin and kilobytes on Linux).
   public var maxResidentBytes: Int
 
+  /// User plus system CPU time.
   public var totalCPUSeconds: Double {
     userCPUSeconds + systemCPUSeconds
   }
@@ -40,8 +43,13 @@ public struct CPUSample: Sendable, Equatable {
   public var userCPUSeconds: Double
   public var systemCPUSeconds: Double
   public var totalCPUSeconds: Double
+  /// Wall-clock time the sampling interval spanned.
   public var wallDeltaSeconds: Double
+  /// Busy estimate: `totalCPUSeconds / wallDeltaSeconds * 100`. One fully busy
+  /// core reads as 100%, so multi-core work can exceed 100%.
   public var estimatedCPUPercent: Double
+  /// Peak resident set size in bytes at the end of the interval. See
+  /// ``ProcessCPUReading/maxResidentBytes``.
   public var maxResidentBytes: Int
 
   public init(
@@ -63,8 +71,11 @@ public struct CPUSample: Sendable, Equatable {
   }
 }
 
+/// Why a CPU reading could not be taken.
 public enum CPUSamplerError: Error, Equatable, CustomStringConvertible {
+  /// Process CPU sampling is not supported on this platform (e.g. WASI).
   case unavailable
+  /// The underlying `getrusage` call failed with this `errno`.
   case getrusageFailed(errno: Int32)
 
   public var description: String {
