@@ -100,7 +100,7 @@ public struct PerfScenarioRunOptions: Equatable, Sendable {
   }
 }
 
-public struct PerfScenarioRunResult {
+public struct PerfScenarioRunResult: Sendable {
   public var runDirectory: URL
   public var metadata: PerfRunMetadata
   public var events: [PerfEventRecord]
