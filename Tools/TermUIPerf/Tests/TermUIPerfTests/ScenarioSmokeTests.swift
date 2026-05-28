@@ -33,6 +33,33 @@ struct ScenarioSmokeTests {
     }
   }
 
+  @Test("RunCommand runs N iterations and writes one aggregate per mode")
+  @MainActor
+  func runCommandRunsIterationsAndWritesAggregate() async throws {
+    let artifactRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-perf-iterate-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+    let config = PerfRunConfig(
+      scenario: .galleryAnimationClick,
+      modes: [.sync],
+      iterations: 2,
+      artifactsRoot: artifactRoot.path,
+      configuration: "debug")
+
+    let outcome = try await RunCommand.run(config)
+
+    #expect(outcome.perIteration.count == 2)
+    #expect(outcome.aggregates.count == 1)
+    #expect(outcome.aggregates[0].iterationCount == 2)
+    #expect(outcome.aggregates[0].totalCPUSeconds.sampleCount == 2)
+
+    let aggregateFile =
+      artifactRoot
+      .appendingPathComponent("aggregate-gallery-animation-click-sync.json")
+    #expect(FileManager.default.fileExists(atPath: aggregateFile.path))
+  }
+
   private func fileExists(_ name: String, in directory: URL) -> Bool {
     FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path)
   }
