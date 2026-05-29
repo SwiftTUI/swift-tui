@@ -9,6 +9,10 @@
 ///
 /// The predicate is a pure function with no runtime dependencies and is
 /// therefore unit-testable in isolation.
+///
+/// - Note: The predicate is only as sound as the caller's `drawnIdentities`
+///   set. An identity that appeared on-screen but was never recorded there
+///   would cause live content to be incorrectly elided.
 package enum OffscreenFrameElision {
   /// Returns `true` when the frame is safe to skip.
   ///

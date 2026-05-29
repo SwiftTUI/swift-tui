@@ -28,6 +28,17 @@ struct OffscreenFrameElisionTests {
     #expect(result == true)
   }
 
+  @Test("Elides when nothing has ever been drawn (virgin surface)")
+  func elidesWhenDrawnIdentitiesIsEmpty() {
+    let result = OffscreenFrameElision.shouldElide(
+      causes: [.deadline],
+      animationRequest: .inherit,
+      redrawIdentities: [testIdentity("1")],
+      drawnIdentities: []
+    )
+    #expect(result == true)
+  }
+
   // MARK: - Does not elide
 
   @Test("Does not elide when redraw overlaps drawn")
@@ -56,7 +67,7 @@ struct OffscreenFrameElisionTests {
   }
 
   @Test("Does not elide when an explicit animation transaction is present")
-  func doesNotElideWhenExplicitAnimationTransaction() throws {
+  func doesNotElideWhenExplicitAnimationTransaction() {
     let box = AnyHashableSendable(0)
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
