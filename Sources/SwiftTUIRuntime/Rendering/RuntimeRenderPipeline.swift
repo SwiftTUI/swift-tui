@@ -43,7 +43,7 @@ enum CancellableFrameTailLayoutStageResult {
 ///
 /// `.rendered` carries the committed artifacts; `.elided` reports that the
 /// off-screen elision gate fired right after animation injection — the
-/// handler's `elideIfOffscreen` closure has already run the reduced commit
+/// handler's `commitElidedFrameIfOffscreen` closure has already run the reduced commit
 /// (`commitElidedFrame`), so no tail, present, or artifacts are produced.
 package enum RenderExecutionResult {
   case rendered(FrameArtifacts)
@@ -69,7 +69,7 @@ struct OneShotRenderStageHandlers {
   /// Evaluated immediately after `animationInjection`. Returns `true` once it
   /// has run the reduced commit for an off-screen-only animation tick, telling
   /// the executor to skip the tail, present, and commit stages.
-  var elideIfOffscreen: (FrameHeadDraft) -> Bool
+  var commitElidedFrameIfOffscreen: (FrameHeadDraft) -> Bool
   var latePreferenceReconciliation: (FrameTailInput, ContinuousClock?) -> ReconciledFrameTailLayout
   var fusedFrameTail: (FrameHeadDraft, ReconciledFrameTailLayout) -> FrameTailOutput
   var commit: (FrameHeadDraft, ReconciledFrameTailLayout, FrameTailOutput) -> FrameArtifacts
@@ -78,8 +78,8 @@ struct OneShotRenderStageHandlers {
 /// Per-stage handlers for the abortable async render path, keyed by stage.
 struct AsyncRenderStageHandlers {
   var animationInjection: (FrameHeadDraft) -> FrameHeadDraft
-  /// See ``OneShotRenderStageHandlers/elideIfOffscreen``.
-  var elideIfOffscreen: (FrameHeadDraft) -> Bool
+  /// See ``OneShotRenderStageHandlers/commitElidedFrameIfOffscreen``.
+  var commitElidedFrameIfOffscreen: (FrameHeadDraft) -> Bool
   var latePreferenceReconciliation: (FrameHeadDraft) async -> AsyncFrameTailLayoutStageOutput?
   var fusedFrameTail:
     (FrameHeadDraft, AsyncFrameTailLayoutStageOutput) async ->
@@ -90,8 +90,8 @@ struct AsyncRenderStageHandlers {
 /// Per-stage handlers for the cancellable async render path, keyed by stage.
 struct CancellableRenderStageHandlers {
   var animationInjection: (FrameHeadDraft) -> FrameHeadDraft
-  /// See ``OneShotRenderStageHandlers/elideIfOffscreen``.
-  var elideIfOffscreen: (FrameHeadDraft) -> Bool
+  /// See ``OneShotRenderStageHandlers/commitElidedFrameIfOffscreen``.
+  var commitElidedFrameIfOffscreen: (FrameHeadDraft) -> Bool
   var latePreferenceReconciliation:
     (FrameHeadDraft) async ->
       CancellableFrameTailLayoutStageResult
@@ -142,7 +142,7 @@ struct RuntimeRenderPipeline: Sendable {
         break
       case .animationInjection:
         currentDraft = handlers.animationInjection(currentDraft)
-        elided = handlers.elideIfOffscreen(currentDraft)
+        elided = handlers.commitElidedFrameIfOffscreen(currentDraft)
       case .latePreferenceReconciliation:
         reconciledLayout = handlers.latePreferenceReconciliation(
           currentDraft.frameTailInput,
@@ -190,7 +190,7 @@ struct RuntimeRenderPipeline: Sendable {
         break
       case .animationInjection:
         currentDraft = handlers.animationInjection(currentDraft)
-        elided = handlers.elideIfOffscreen(currentDraft)
+        elided = handlers.commitElidedFrameIfOffscreen(currentDraft)
       case .latePreferenceReconciliation:
         guard let layout = await handlers.latePreferenceReconciliation(currentDraft) else {
           preconditionFailure("Non-cancellable frame tail unexpectedly cancelled.")
@@ -241,7 +241,7 @@ struct RuntimeRenderPipeline: Sendable {
         break
       case .animationInjection:
         currentDraft = handlers.animationInjection(currentDraft)
-        elided = handlers.elideIfOffscreen(currentDraft)
+        elided = handlers.commitElidedFrameIfOffscreen(currentDraft)
       case .latePreferenceReconciliation:
         switch await handlers.latePreferenceReconciliation(currentDraft) {
         case .cancelledBeforeStart:

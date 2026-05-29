@@ -360,7 +360,7 @@ public struct DefaultRenderer {
             mode: .abortable
           )
         },
-        elideIfOffscreen: renderer.makeElideIfOffscreen(
+        commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
           elisionAnimationRequest: elisionAnimationRequest
         ),
@@ -448,7 +448,7 @@ public struct DefaultRenderer {
   /// before returning `true`. When `elisionCauses` is empty (the public
   /// preview entry points) the predicate can never fire.
   @MainActor
-  private func makeElideIfOffscreen(
+  private func makeCommitElidedFrameIfOffscreen(
     elisionCauses: Set<WakeCause>,
     elisionAnimationRequest: AnimationRequest
   ) -> (FrameHeadDraft) -> Bool {
@@ -493,7 +493,7 @@ public struct DefaultRenderer {
             mode: .oneShot
           )
         },
-        elideIfOffscreen: renderer.makeElideIfOffscreen(
+        commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
           elisionAnimationRequest: elisionAnimationRequest
         ),
@@ -580,7 +580,7 @@ public struct DefaultRenderer {
             mode: .abortable
           )
         },
-        elideIfOffscreen: renderer.makeElideIfOffscreen(
+        commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
           elisionAnimationRequest: elisionAnimationRequest
         ),
@@ -709,9 +709,9 @@ public struct DefaultRenderer {
   }
 
   /// Records one elided frame, incrementing ``elidedFrameCount``.
-  /// Call this when a frame is skipped because all drawn identities are
-  /// off-screen. Wiring into the render/run-loop path is deferred to a
-  /// later task — this method provides the plumbing only.
+  /// Called from the run loop's elided-frame path (the `.elided` arm in
+  /// `renderPendingFramesAsync`) when a frame is skipped because all drawn
+  /// identities are off-screen.
   @MainActor
   package func recordElidedFrame() {
     elidedFrameCounter.increment()
