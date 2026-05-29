@@ -56,6 +56,19 @@ struct MemoryGrowthAnalyzerTests {
     #expect(row.leakSuspected == false)
   }
 
+  @Test("tsv emits a header and one row per provider")
+  func tsvEmitsHeaderAndRows() {
+    let analysis = MemoryGrowthAnalyzer.analyze(
+      samples(provider: "leak", counts: [0, 10, 20, 30, 40, 50, 60, 70], step: 1.0))
+    let tsv = MemoryGrowthAnalyzer.tsv(analysis)
+
+    #expect(
+      tsv.hasPrefix(
+        "provider\tsamples\tfirst_count\tlast_count\tslope_per_s\tplateaued\tleak_suspected\n"))
+    #expect(tsv.contains("leak\t8\t0\t70\t"))
+    #expect(tsv.contains("\ttrue"))
+  }
+
   func samples(provider: String, counts: [Int], step: Double) -> [PerfMemorySampler.Sample] {
     counts.enumerated().map { index, count in
       PerfMemorySampler.Sample(
