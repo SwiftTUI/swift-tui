@@ -76,12 +76,20 @@ public enum PerfScenarioError: Error, Equatable, CustomStringConvertible {
 }
 
 public struct PerfScenarioRunOptions: Equatable, Sendable {
+  /// Default cadence for the occupancy/memory sampler (was a magic literal).
+  public static let defaultMemorySampleInterval = Duration.milliseconds(500)
+  /// Default post-drive idle window during which memory keeps sampling, so a
+  /// bounded cache has time to reach its plateau and a leak has time to show.
+  public static let defaultMemoryIdleWindow = Duration.seconds(2)
+
   public var renderMode: RuntimeRenderMode
   public var iterations: Int
   public var artifactRoot: URL
   public var configuration: String
   public var terminalSize: PerfTerminalSize?
   public var cpuSampleInterval: Duration
+  public var memorySampleInterval: Duration
+  public var memoryIdleWindow: Duration
 
   public init(
     renderMode: RuntimeRenderMode = .async,
@@ -89,7 +97,9 @@ public struct PerfScenarioRunOptions: Equatable, Sendable {
     artifactRoot: URL = URL(fileURLWithPath: PerfRunConfig.defaultArtifactsRoot, isDirectory: true),
     configuration: String = PerfRunConfig.defaultConfiguration,
     terminalSize: PerfTerminalSize? = nil,
-    cpuSampleInterval: Duration = .milliseconds(50)
+    cpuSampleInterval: Duration = .milliseconds(50),
+    memorySampleInterval: Duration = defaultMemorySampleInterval,
+    memoryIdleWindow: Duration = defaultMemoryIdleWindow
   ) {
     self.renderMode = renderMode
     self.iterations = iterations
@@ -97,6 +107,8 @@ public struct PerfScenarioRunOptions: Equatable, Sendable {
     self.configuration = configuration
     self.terminalSize = terminalSize
     self.cpuSampleInterval = cpuSampleInterval
+    self.memorySampleInterval = memorySampleInterval
+    self.memoryIdleWindow = memoryIdleWindow
   }
 }
 
@@ -282,12 +294,15 @@ public enum PerfScenarioRunner {
         var memoryTask: Task<Void, Never>?
         do {
           _ = try await waitForPresentedFrame(in: terminalHost)
-          memoryTask = memorySampler.startSampling(interval: .milliseconds(500))
+          memoryTask = memorySampler.startSampling(interval: options.memorySampleInterval)
           events = try await drive(
             PerfScenarioDriver(
               inputReader: inputReader,
               terminalHost: terminalHost
             ))
+          if options.memoryIdleWindow > .zero {
+            try? await Task.sleep(for: options.memoryIdleWindow)
+          }
           memoryTask?.cancel()
           inputReader.finish()
           signalReader.finish()
@@ -338,6 +353,10 @@ public enum PerfScenarioRunner {
     try writeString(
       memorySampler.tsv(),
       to: runDirectory.appendingPathComponent("memory.tsv")
+    )
+    try writeString(
+      MemoryGrowthAnalyzer.tsv(MemoryGrowthAnalyzer.analyze(memorySampler.samples)),
+      to: runDirectory.appendingPathComponent("memory_growth.tsv")
     )
     try writeJSON(summary, to: runDirectory.appendingPathComponent("summary.json"))
 
