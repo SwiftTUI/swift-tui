@@ -83,7 +83,7 @@ struct PerfRunConfigTests {
 
     #expect(
       error?.description
-        == "unknown scenario 'missing-scenario'. Known scenarios: gallery-animation-click, layout-scroll-burst."
+        == "unknown scenario 'missing-scenario'. Known scenarios: gallery-animation-click, layout-scroll-burst, synthetic-continuous-animation, synthetic-offscreen-phase-animator, synthetic-text-shimmer."
     )
   }
 
