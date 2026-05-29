@@ -103,6 +103,7 @@ struct OffscreenFrameElisionRuntimeTests {
     // Tick past the animation's nominal duration so the batch completes;
     // because the draft's frame-head transaction is active, the completion
     // is deferred rather than fired immediately.
+    // (uses the supplied timestamp, not the wall clock — deterministic by construction)
     let past = t0.advanced(by: .milliseconds(200))
     let draftTick = draftController.applyInterpolations(to: &frame2, at: past)
     #expect(fireCount.count == 0, "completion must be deferred, not fired, before commit")

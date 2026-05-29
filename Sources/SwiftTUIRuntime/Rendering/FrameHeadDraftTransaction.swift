@@ -72,6 +72,12 @@ package final class FrameHeadTransaction {
     self.checkpoints = checkpoints
   }
 
+  /// Commits the rendered-frame draft transaction: fires deferred animation
+  /// completions, publishes advanced animation/observation/portal/graph state
+  /// to live, and returns registration diagnostics.
+  ///
+  /// - SeeAlso: ``commitElided()`` — an intentionally identical sibling for the
+  ///   elision path; keep both in sync until they intentionally diverge.
   package func commit() -> RuntimeRegistrationDiagnostics {
     precondition(!didCommit && !didDiscard)
     let diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)

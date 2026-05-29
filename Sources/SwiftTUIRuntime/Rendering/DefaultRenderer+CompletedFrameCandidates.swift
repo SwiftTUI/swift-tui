@@ -196,6 +196,7 @@ extension DefaultRenderer {
   @MainActor
   func commitElidedFrame(draft: FrameHeadDraft) {
     draft.transaction.materializePreparedState()
+    // Registration diagnostics are not propagated for elided frames; no FrameArtifacts is produced.
     _ = draft.transaction.commitElided()
     recordElidedFrame()
   }
