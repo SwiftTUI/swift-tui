@@ -59,6 +59,35 @@ struct ScenarioSmokeTests {
     #expect(FileManager.default.fileExists(atPath: aggregateFile.path))
   }
 
+  @Test("run writes memory_growth.tsv and honors the memory sample interval")
+  @MainActor
+  func runWritesMemoryGrowthArtifact() async throws {
+    let artifactRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-perf-memgrowth-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+    let result = try await GalleryAnimationClickScenario().run(
+      options: PerfScenarioRunOptions(
+        renderMode: .sync,
+        iterations: 1,
+        artifactRoot: artifactRoot,
+        configuration: "debug",
+        cpuSampleInterval: .milliseconds(5),
+        memorySampleInterval: .milliseconds(20),
+        memoryIdleWindow: .milliseconds(200)))
+
+    let growthURL = result.runDirectory.appendingPathComponent("memory_growth.tsv")
+    #expect(FileManager.default.fileExists(atPath: growthURL.path))
+    let growth = try String(contentsOf: growthURL, encoding: .utf8)
+    #expect(growth.hasPrefix("provider\tsamples\t"))
+
+    let memory = try String(
+      contentsOf: result.runDirectory.appendingPathComponent("memory.tsv"), encoding: .utf8)
+    let distinctElapsed = Set(
+      memory.split(separator: "\n").dropFirst().compactMap { $0.split(separator: "\t").first })
+    #expect(distinctElapsed.count >= 2)
+  }
+
   private func fileExists(_ name: String, in directory: URL) -> Bool {
     FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path)
   }
