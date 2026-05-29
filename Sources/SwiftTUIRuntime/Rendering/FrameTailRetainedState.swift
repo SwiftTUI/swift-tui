@@ -6,12 +6,14 @@ import Synchronization
 ///
 /// This is the frame tail's only piece of cross-frame mutable state, so it is
 /// kept apart from the value-type model structs in `FrameTailModels.swift`. It
-/// retains exactly two things behind a `Mutex`:
+/// retains three things behind a `Mutex`:
 ///
 ///  - a `RetainedFrameIndex` over the baseline (pre-overlay) layout products,
-///    for retained measurement and placement, and
+///    for retained measurement and placement,
 ///  - the previous committed raster surface and visual surface topology, used
-///    to derive actual damage and decide whether raster reuse hints are safe.
+///    to derive actual damage and decide whether raster reuse hints are safe, and
+///  - the previous committed frame's drawn-identity set, used as a geometric
+///    visibility signal for scheduling policy (e.g. offscreen-frame elision).
 ///
 /// It never stores or previews an in-flight candidate frame.
 final class FrameTailRetainedState: Sendable {

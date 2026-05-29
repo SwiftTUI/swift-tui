@@ -28,6 +28,7 @@ final class FrameTailRenderer: Sendable {
     retainedState.memoryMetricSnapshot
   }
 
+  /// The set of identities drawn in the last committed frame; empty before the first commit.
   var previousDrawnIdentities: Set<Identity> {
     retainedState.previousDrawnIdentities
   }
