@@ -69,6 +69,16 @@ struct MemoryGrowthAnalyzerTests {
     #expect(tsv.contains("\ttrue"))
   }
 
+  @Test("positive but sub-threshold growth is not a leak suspect")
+  func subThresholdGrowthIsNotLeak() {
+    // counts 0..5 sampled every 10s -> slope 0.1/s, below the 0.5 threshold.
+    let analysis = MemoryGrowthAnalyzer.analyze(
+      samples(provider: "slow", counts: [0, 1, 2, 3, 4, 5], step: 10.0))
+    let row = analysis.rows.first { $0.provider == "slow" }!
+    #expect(approx(row.slopePerSecond, 0.1))
+    #expect(row.leakSuspected == false)
+  }
+
   func samples(provider: String, counts: [Int], step: Double) -> [PerfMemorySampler.Sample] {
     counts.enumerated().map { index, count in
       PerfMemorySampler.Sample(
