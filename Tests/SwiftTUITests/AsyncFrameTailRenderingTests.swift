@@ -362,7 +362,7 @@ struct AsyncFrameTailRenderingTests {
           && row["cancelled_render_count"] != nil
           && row["newest_desired_at_tail_start"] != nil
           && row["newest_desired_at_tail_result"] != nil
-          && (row["drop_blockers"] ?? "").contains("diagnosticsFullRecord")
+          && !(row["drop_blockers"] ?? "").contains("diagnosticsFullRecord")
           && !(row["drop_blockers"] ?? "").contains("retainedLayoutBaseline")
           && !(row["drop_blockers"] ?? "").contains("retainedRasterBaseline")
           && row["desired_generation"] != nil
