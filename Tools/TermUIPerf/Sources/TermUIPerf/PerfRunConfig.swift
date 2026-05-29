@@ -47,6 +47,9 @@ public struct PerfCompareConfig: Equatable, Sendable {
 public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case galleryAnimationClick = "gallery-animation-click"
   case layoutScrollBurst = "layout-scroll-burst"
+  case syntheticOffscreenPhaseAnimator = "synthetic-offscreen-phase-animator"
+  case syntheticContinuousAnimation = "synthetic-continuous-animation"
+  case syntheticTextShimmer = "synthetic-text-shimmer"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()
