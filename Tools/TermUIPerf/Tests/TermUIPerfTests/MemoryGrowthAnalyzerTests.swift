@@ -79,6 +79,42 @@ struct MemoryGrowthAnalyzerTests {
     #expect(row.leakSuspected == false)
   }
 
+  @Test("multiple providers are grouped, ordered by first appearance, one row each")
+  func multipleProvidersGroupedAndOrdered() {
+    // Each tick carries two providers: "leak" (unbounded) then "flat".
+    let leakCounts = [0, 10, 20, 30, 40, 50, 60, 70]
+    let samples = leakCounts.enumerated().map { index, leak in
+      PerfMemorySampler.Sample(
+        elapsedSeconds: Double(index),
+        snapshots: [
+          ProfiledMemorySnapshot(name: "leak", count: leak, approxBytes: nil),
+          ProfiledMemorySnapshot(name: "flat", count: 5, approxBytes: nil),
+        ])
+    }
+    let analysis = MemoryGrowthAnalyzer.analyze(samples)
+
+    #expect(analysis.rows.count == 2)
+    #expect(analysis.rows[0].provider == "leak")  // first-seen order preserved
+    #expect(analysis.rows[1].provider == "flat")
+    #expect(analysis.rows[0].leakSuspected == true)
+    #expect(analysis.rows[1].leakSuspected == false)
+  }
+
+  @Test("at the 4-sample floor, steep growth still flags but gentle growth reads plateaued")
+  func fourSampleBoundaryBehavior() {
+    // Steep: 0->300 over 4 samples -> tail [200,300] not flat -> leak flagged.
+    let steep = MemoryGrowthAnalyzer.analyze(
+      samples(provider: "steep", counts: [0, 100, 200, 300], step: 1.0))
+    #expect(steep.rows[0].leakSuspected == true)
+
+    // Gentle: 0->2 then flat -> 4-sample tail [2,2] reads plateaued (known
+    // coarse-screen limitation; documented on analyze()).
+    let gentle = MemoryGrowthAnalyzer.analyze(
+      samples(provider: "gentle", counts: [0, 1, 2, 2], step: 1.0))
+    #expect(gentle.rows[0].plateaued == true)
+    #expect(gentle.rows[0].leakSuspected == false)
+  }
+
   func samples(provider: String, counts: [Int], step: Double) -> [PerfMemorySampler.Sample] {
     counts.enumerated().map { index, count in
       PerfMemorySampler.Sample(
