@@ -79,6 +79,10 @@ public struct FrameDiagnosticRecord: Sendable {
   public var presentationEditOperationCount: Int
   public var measurementCacheHitRate: Double?
   public var totalFrameDuration: Duration
+  /// Whether this frame was elided (skipped) because all drawn identities
+  /// were off-screen. Defaults to `false`; set to `true` by the run loop
+  /// when off-screen frame elision fires (wired in a later task).
+  public var elided: Bool
 }
 
 extension FrameDiagnosticRecord {
@@ -166,5 +170,6 @@ extension FrameDiagnosticRecord {
     presentationEditOperationCount = 0
     measurementCacheHitRate = nil
     self.totalFrameDuration = totalFrameDuration
+    elided = false
   }
 }

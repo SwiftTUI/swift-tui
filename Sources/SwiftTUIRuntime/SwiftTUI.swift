@@ -26,6 +26,7 @@ public struct DefaultRenderer {
   private let debugObservationBridgeTracker: DebugObservationBridgeTracker
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
+  private let elidedFrameCounter: ElidedFrameCounter
 
   let frameTailRenderer: FrameTailRenderer
   // Visibility note: `frameTailCoordinator` and `prepareFrameHead` are
@@ -82,6 +83,7 @@ public struct DefaultRenderer {
     debugObservationBridgeTracker = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
+    elidedFrameCounter = .init()
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -521,5 +523,21 @@ public struct DefaultRenderer {
     _ hooks: FrameRenderSuspensionHooks?
   ) {
     frameTailRenderer.setRenderSuspensionHooks(hooks)
+  }
+
+  /// The number of frames that have been recorded as elided (off-screen).
+  /// Starts at zero; incremented by ``recordElidedFrame()``.
+  @MainActor
+  package var elidedFrameCount: Int {
+    elidedFrameCounter.count
+  }
+
+  /// Records one elided frame, incrementing ``elidedFrameCount``.
+  /// Call this when a frame is skipped because all drawn identities are
+  /// off-screen. Wiring into the render/run-loop path is deferred to a
+  /// later task — this method provides the plumbing only.
+  @MainActor
+  package func recordElidedFrame() {
+    elidedFrameCounter.increment()
   }
 }

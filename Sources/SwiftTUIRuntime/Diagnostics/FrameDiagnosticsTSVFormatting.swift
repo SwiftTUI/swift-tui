@@ -90,6 +90,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "present_edit_ops",
     "cache_hit",
     "total_ms",
+    "elided",
   ]
 
   package static func fields(
@@ -217,6 +218,7 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.presentationEditOperationCount),
       cacheHit,
       totalMs,
+      record.elided ? "1" : "0",
     ]
   }
 
