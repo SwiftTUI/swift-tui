@@ -41,18 +41,11 @@ public struct SyntheticRepeatForeverScenario: PerfScenario {
 }
 
 private struct PerfRepeatForeverProbeView: View {
-  @State private var phase: Double = 0
-
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("continuous-anim")
       Spinner(.brailleLoop)
     }
     .padding(1)
-    .onAppear {
-      withAnimation(.linear(duration: .milliseconds(2000)).repeatForever(autoreverses: true)) {
-        phase = 1.0
-      }
-    }
   }
 }
