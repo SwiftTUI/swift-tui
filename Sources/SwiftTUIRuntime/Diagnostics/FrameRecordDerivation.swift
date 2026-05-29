@@ -118,7 +118,8 @@ package enum FrameRecordDerivation {
         .rawValue,
       presentationEditOperationCount: sample.presentationMetrics.editOperationCount,
       measurementCacheHitRate: cacheHitRate,
-      totalFrameDuration: pipelineTotal + sample.presentationDuration
+      totalFrameDuration: pipelineTotal + sample.presentationDuration,
+      elided: false
     )
   }
 
@@ -203,7 +204,8 @@ package enum FrameRecordDerivation {
       presentationEditOperationLowering: "-",
       presentationEditOperationCount: 0,
       measurementCacheHitRate: nil,
-      totalFrameDuration: .zero
+      totalFrameDuration: .zero,
+      elided: false
     )
   }
 

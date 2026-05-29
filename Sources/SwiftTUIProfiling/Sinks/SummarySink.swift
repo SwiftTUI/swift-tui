@@ -22,6 +22,7 @@ package final class SummarySink: ProfileSink {
   }
 
   private var frameCount = 0
+  private var elidedFrameCount = 0
   private var maxFrameDurationSeconds = 0.0
   private var memoryByName: [String: MemoryEntry] = [:]
   private var cpuPeakPercent = 0.0
@@ -33,6 +34,7 @@ package final class SummarySink: ProfileSink {
     switch record {
     case .frame(let frame):
       frameCount += 1
+      if frame.elided { elidedFrameCount += 1 }
       maxFrameDurationSeconds = max(maxFrameDurationSeconds, seconds(frame.totalFrameDuration))
     case .memory(let snapshots):
       for snapshot in snapshots {
@@ -57,7 +59,8 @@ package final class SummarySink: ProfileSink {
     var lines = ["=== SwiftTUI profiling summary ==="]
     if frameCount > 0 {
       lines.append(
-        "frames: \(frameCount) committed, worst total \(milliseconds(maxFrameDurationSeconds))")
+        "frames: \(frameCount) committed, \(elidedFrameCount) elided, worst total \(milliseconds(maxFrameDurationSeconds))"
+      )
     }
     if !memoryByName.isEmpty {
       lines.append("memory occupancy (last / max):")

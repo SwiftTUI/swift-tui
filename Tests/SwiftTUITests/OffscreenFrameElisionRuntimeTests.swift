@@ -12,6 +12,12 @@ struct OffscreenFrameElisionRuntimeTests {
     #expect(renderer.frameTailRenderer.previousDrawnIdentities.isEmpty)
   }
 
+  @Test("elidedFrameCount starts at zero")
+  func elidedFrameCountStartsZero() {
+    let renderer = DefaultRenderer()
+    #expect(renderer.elidedFrameCount == 0)
+  }
+
   @Test("previousDrawnIdentities reflects the set stored by storeCommittedFrame")
   func previousDrawnIdentitiesRoundTrips() {
     let retainedState = FrameTailRetainedState()
