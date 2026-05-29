@@ -9,6 +9,47 @@ import SwiftTUICore
 @_spi(Runners) public enum RuntimeFrameSample: Sendable {
   case committed(CommittedFrameSample)
   case zeroArtifact(ZeroArtifactFrameSample)
+  case elided(ElidedFrameSample)
+}
+
+/// Inputs for an off-screen-elided frame. Like ``ZeroArtifactFrameSample`` it
+/// produces no pipeline artifacts, but it is distinct: the frame ran its
+/// reduced commit (firing completions, advancing animation state) and is
+/// recorded as `elided` rather than cancelled or dropped. The animation
+/// controller scalars are captured at the emit point, after the reduced commit
+/// has published the advanced live state.
+@_spi(Runners) public struct ElidedFrameSample: Sendable {
+  package var frameNumber: Int
+  package var scheduledFrame: ScheduledFrame
+  package var desiredGeneration: UInt64
+  package var coalescedEventBatches: Int
+  package var coalescedWakeCauses: Set<WakeCause>
+  package var intentRequestCount: Int
+  package var animationControllerActiveAnimationCount: Int
+  package var animationControllerHasPendingWork: Bool
+  package var cancelledRenderCount: Int
+
+  package init(
+    frameNumber: Int,
+    scheduledFrame: ScheduledFrame,
+    desiredGeneration: UInt64,
+    coalescedEventBatches: Int,
+    coalescedWakeCauses: Set<WakeCause>,
+    intentRequestCount: Int,
+    animationControllerActiveAnimationCount: Int,
+    animationControllerHasPendingWork: Bool,
+    cancelledRenderCount: Int
+  ) {
+    self.frameNumber = frameNumber
+    self.scheduledFrame = scheduledFrame
+    self.desiredGeneration = desiredGeneration
+    self.coalescedEventBatches = coalescedEventBatches
+    self.coalescedWakeCauses = coalescedWakeCauses
+    self.intentRequestCount = intentRequestCount
+    self.animationControllerActiveAnimationCount = animationControllerActiveAnimationCount
+    self.animationControllerHasPendingWork = animationControllerHasPendingWork
+    self.cancelledRenderCount = cancelledRenderCount
+  }
 }
 
 /// Inputs for a normally committed frame.
