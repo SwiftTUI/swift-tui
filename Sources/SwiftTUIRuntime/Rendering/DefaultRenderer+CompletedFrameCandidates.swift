@@ -181,6 +181,25 @@ extension DefaultRenderer {
     draft.transaction.commit()
   }
 
+  /// Commits a prepared frame head for an ELIDED frame: fires deferred
+  /// animation completions on real-time schedule and publishes the advanced
+  /// animation/observation/portal/graph state to live — WITHOUT running the
+  /// rendering tail (place → raster) or presenting a frame.
+  ///
+  /// Materializes prepared state first, mirroring
+  /// ``commitCompletedFrameCandidate(_:)``: the abortable executor may have
+  /// suspended prepared state during the animation-injection worker-snapshot
+  /// branch, so the prepared head must be restored before the sub-drafts
+  /// commit. After this returns the caller must NOT run the frame tail or
+  /// present — ``FrameHeadTransaction/commitElided()`` has already advanced
+  /// live state.
+  @MainActor
+  func commitElidedFrame(draft: FrameHeadDraft) {
+    draft.transaction.materializePreparedState()
+    _ = draft.transaction.commitElided()
+    recordElidedFrame()
+  }
+
   @MainActor
   func previewCompletedFrameCommit(
     draft: FrameHeadDraft,

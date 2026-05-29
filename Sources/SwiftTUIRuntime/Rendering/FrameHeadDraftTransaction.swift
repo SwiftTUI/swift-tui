@@ -82,6 +82,25 @@ package final class FrameHeadTransaction {
     return diagnostics
   }
 
+  /// Commits the frame-head draft transaction for an ELIDED frame — fires
+  /// deferred animation completions and publishes advanced
+  /// animation/observation/portal/graph state to live — WITHOUT a rendering
+  /// tail or presentation.
+  ///
+  /// Commits the same four sub-drafts as ``commit()`` and is byte-identical
+  /// to it; the distinct name makes the elision intent explicit and reserves a
+  /// future seam. Precondition: the caller must NOT run
+  /// finalizeFrame/commitPlanner/present afterward.
+  package func commitElided() -> RuntimeRegistrationDiagnostics {
+    precondition(!didCommit && !didDiscard)
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)
+    observationDraft?.commit()
+    presentationPortalDraft.commit()
+    animationDraft.commit()
+    didCommit = true
+    return diagnostics
+  }
+
   package func materializePreparedState() {
     precondition(!didCommit && !didDiscard)
     guard let checkpoints else {
