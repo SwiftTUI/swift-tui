@@ -58,6 +58,31 @@ extension RunLoop {
   }
 
   @MainActor
+  func emitElidedFrame(
+    renderedFrames: Int,
+    scheduledFrame: ScheduledFrame,
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics
+  ) {
+    guard let frameSink else {
+      return
+    }
+    let sample = ElidedFrameSample(
+      frameNumber: renderedFrames,
+      scheduledFrame: scheduledFrame,
+      desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+      coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+      coalescedWakeCauses: renderIntentDiagnostics.coalescedWakeCauses,
+      intentRequestCount: renderIntentDiagnostics.intentRequestCount,
+      animationControllerActiveAnimationCount: renderer
+        .internalAnimationController.activeAnimationCount,
+      animationControllerHasPendingWork: renderer
+        .internalAnimationController.lastTickResult.hasPendingWork,
+      cancelledRenderCount: cancelledRenderCount
+    )
+    frameSink.record(.elided(sample))
+  }
+
+  @MainActor
   func emitCancelledFrameTail(
     renderedFrames: Int,
     scheduledFrame: ScheduledFrame,

@@ -173,11 +173,20 @@ public struct DefaultRenderer {
     context: ResolveContext = .init(),
     proposal: ProposedSize = .unspecified
   ) -> FrameArtifacts {
-    renderView(
+    switch renderView(
       root,
       context: context,
-      proposal: proposal
-    )
+      proposal: proposal,
+      elisionCauses: [],
+      elisionAnimationRequest: .inherit
+    ) {
+    case .rendered(let artifacts):
+      return artifacts
+    case .elided:
+      preconditionFailure(
+        "Off-screen elision must never fire for the public one-shot renderer (empty causes)."
+      )
+    }
   }
 
   /// Renders `root` into complete frame artifacts, suspending while the
@@ -188,10 +197,59 @@ public struct DefaultRenderer {
     context: ResolveContext = .init(),
     proposal: ProposedSize = .unspecified
   ) async -> FrameArtifacts {
+    switch await renderViewAsync(
+      root,
+      context: context,
+      proposal: proposal,
+      elisionCauses: [],
+      elisionAnimationRequest: .inherit
+    ) {
+    case .rendered(let artifacts):
+      return artifacts
+    case .elided:
+      preconditionFailure(
+        "Off-screen elision must never fire for the public async renderer (empty causes)."
+      )
+    }
+  }
+
+  /// Run-loop entry point for the synchronous one-shot path that may elide an
+  /// off-screen-only animation tick. Returns ``RenderExecutionResult/elided``
+  /// when the gate fires (the reduced commit has already run); otherwise the
+  /// committed artifacts.
+  @MainActor
+  package func renderEliding<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest
+  ) -> RenderExecutionResult {
+    renderView(
+      root,
+      context: context,
+      proposal: proposal,
+      elisionCauses: elisionCauses,
+      elisionAnimationRequest: elisionAnimationRequest
+    )
+  }
+
+  /// Run-loop entry point for the abortable async path that may elide an
+  /// off-screen-only animation tick. See ``renderEliding(_:context:proposal:elisionCauses:elisionAnimationRequest:)``.
+  @MainActor
+  package func renderAsyncEliding<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest
+  ) async -> RenderExecutionResult {
     await renderViewAsync(
       root,
       context: context,
-      proposal: proposal
+      proposal: proposal,
+      elisionCauses: elisionCauses,
+      elisionAnimationRequest: elisionAnimationRequest
     )
   }
 
@@ -211,6 +269,81 @@ public struct DefaultRenderer {
     awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void = {},
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
+    switch await renderCancellableExecution(
+      root,
+      context: context,
+      proposal: proposal,
+      elisionCauses: [],
+      elisionAnimationRequest: .inherit,
+      newestDesiredGeneration: newestDesiredGeneration,
+      completedFramePolicy: completedFramePolicy,
+      completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
+      redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly,
+      awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
+      shouldCancelQueued: shouldCancelQueued
+    ) {
+    case .rendered(let outcome):
+      return outcome
+    case .elided:
+      preconditionFailure(
+        "Off-screen elision must never fire for renderAsyncCancellable (empty causes)."
+      )
+    }
+  }
+
+  /// Run-loop entry point for the cancellable async path that may elide an
+  /// off-screen-only animation tick. Returns
+  /// ``CancellableRenderExecutionResult/elided`` when the gate fires (the
+  /// reduced commit has already run); otherwise the cancellable outcome.
+  @MainActor
+  package func renderAsyncCancellableEliding<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest,
+    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
+    completedFramePolicy: CompletedFramePolicy? = nil,
+    completedFrameAdditionalBlockers:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
+        _ in []
+      },
+    redundantHandlerInstallationsAreVisualOnly:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false },
+    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void = {},
+    shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
+  ) async -> CancellableRenderExecutionResult {
+    await renderCancellableExecution(
+      root,
+      context: context,
+      proposal: proposal,
+      elisionCauses: elisionCauses,
+      elisionAnimationRequest: elisionAnimationRequest,
+      newestDesiredGeneration: newestDesiredGeneration,
+      completedFramePolicy: completedFramePolicy,
+      completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
+      redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly,
+      awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
+      shouldCancelQueued: shouldCancelQueued
+    )
+  }
+
+  @MainActor
+  private func renderCancellableExecution<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest,
+    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration?,
+    completedFramePolicy: CompletedFramePolicy?,
+    completedFrameAdditionalBlockers:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker>,
+    redundantHandlerInstallationsAreVisualOnly:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Bool,
+    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void,
+    shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
+  ) async -> CancellableRenderExecutionResult {
     let renderer = self
     let draft = renderer.computeFrameHead(
       root,
@@ -227,6 +360,10 @@ public struct DefaultRenderer {
             mode: .abortable
           )
         },
+        elideIfOffscreen: renderer.makeElideIfOffscreen(
+          elisionCauses: elisionCauses,
+          elisionAnimationRequest: elisionAnimationRequest
+        ),
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(
             draft,
@@ -305,12 +442,41 @@ public struct DefaultRenderer {
     )
   }
 
+  /// Builds the executor-stage off-screen elision closure. The closure runs
+  /// the gate predicate against the post-animation-injection draft tick and,
+  /// when it fires, performs the reduced commit (``commitElidedFrame(draft:)``)
+  /// before returning `true`. When `elisionCauses` is empty (the public
+  /// preview entry points) the predicate can never fire.
+  @MainActor
+  private func makeElideIfOffscreen(
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest
+  ) -> (FrameHeadDraft) -> Bool {
+    { [self] draft in
+      let tick = draft.animationDraft.controller.lastTickResult
+      guard
+        OffscreenFrameElision.shouldElide(
+          causes: elisionCauses,
+          animationRequest: elisionAnimationRequest,
+          redrawIdentities: tick.redrawIdentities,
+          drawnIdentities: frameTailRenderer.previousDrawnIdentities
+        )
+      else {
+        return false
+      }
+      commitElidedFrame(draft: draft)
+      return true
+    }
+  }
+
   @MainActor
   private func renderView<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize
-  ) -> FrameArtifacts {
+    proposal: ProposedSize,
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest
+  ) -> RenderExecutionResult {
     let renderer = self
     let draft = renderer.computeFrameHead(
       root,
@@ -327,6 +493,10 @@ public struct DefaultRenderer {
             mode: .oneShot
           )
         },
+        elideIfOffscreen: renderer.makeElideIfOffscreen(
+          elisionCauses: elisionCauses,
+          elisionAnimationRequest: elisionAnimationRequest
+        ),
         latePreferenceReconciliation: { input, clock in
           renderer.frameTailCoordinator.renderLayoutResolvingLatePreferences(
             input,
@@ -390,8 +560,10 @@ public struct DefaultRenderer {
   private func renderViewAsync<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize
-  ) async -> FrameArtifacts {
+    proposal: ProposedSize,
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest
+  ) async -> RenderExecutionResult {
     let renderer = self
     let draft = renderer.computeFrameHead(
       root,
@@ -408,6 +580,10 @@ public struct DefaultRenderer {
             mode: .abortable
           )
         },
+        elideIfOffscreen: renderer.makeElideIfOffscreen(
+          elisionCauses: elisionCauses,
+          elisionAnimationRequest: elisionAnimationRequest
+        ),
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(draft) {
           case .cancelledBeforeStart:

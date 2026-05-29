@@ -42,35 +42,53 @@ extension RunLoop {
     convergence: FocusSyncConvergenceState
   ) async -> FrameAcquisitionOutcome {
     if renderMode == .sync {
-      let renderedArtifacts = renderer.render(
+      switch renderer.renderEliding(
         viewBuilder(
           (
             state: currentState,
             focusedIdentity: focusTracker.currentFocusIdentity
           )),
         context: resolveContext(for: scheduledFrame),
-        proposal: proposal()
-      )
-      return .rendered(renderedArtifacts, .completed, nil)
+        proposal: proposal(),
+        elisionCauses: scheduledFrame.causes,
+        elisionAnimationRequest: scheduledFrame.animationRequest
+      ) {
+      case .rendered(let renderedArtifacts):
+        return .rendered(renderedArtifacts, .completed, nil)
+      case .elided:
+        return .elided
+      }
     }
     if eventPump == nil {
-      let renderedArtifacts = await renderer.renderAsync(
+      switch await renderer.renderAsyncEliding(
         viewBuilder(
           (
             state: currentState,
             focusedIdentity: focusTracker.currentFocusIdentity
           )),
         context: resolveContext(for: scheduledFrame),
-        proposal: proposal()
-      )
-      return .rendered(renderedArtifacts, .completed, nil)
+        proposal: proposal(),
+        elisionCauses: scheduledFrame.causes,
+        elisionAnimationRequest: scheduledFrame.animationRequest
+      ) {
+      case .rendered(let renderedArtifacts):
+        return .rendered(renderedArtifacts, .completed, nil)
+      case .elided:
+        return .elided
+      }
     }
 
-    let renderOutcome = await acquireCancellableFrameArtifacts(
+    let renderOutcome: CancellableRenderOutcome
+    switch await acquireCancellableFrameArtifacts(
       scheduledFrame: scheduledFrame,
       currentState: currentState,
       renderIntentDiagnostics: renderIntentDiagnostics
-    )
+    ) {
+    case .rendered(let outcome):
+      renderOutcome = outcome
+    case .elided:
+      return .elided
+    }
     if let skippedFrame = recordSkippedCancellableFrame(
       renderOutcome,
       scheduledFrame: scheduledFrame,
@@ -94,8 +112,8 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame,
     currentState: State,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics
-  ) async -> CancellableRenderOutcome {
-    await renderer.renderAsyncCancellable(
+  ) async -> CancellableRenderExecutionResult {
+    await renderer.renderAsyncCancellableEliding(
       viewBuilder(
         (
           state: currentState,
@@ -103,6 +121,8 @@ extension RunLoop {
         )),
       context: resolveContext(for: scheduledFrame),
       proposal: proposal(),
+      elisionCauses: scheduledFrame.causes,
+      elisionAnimationRequest: scheduledFrame.animationRequest,
       newestDesiredGeneration: {
         RenderGeneration(
           self.scheduler.hasPendingFrame(at: .now())
@@ -110,8 +130,7 @@ extension RunLoop {
             : renderIntentDiagnostics.desiredGeneration
         )
       },
-      completedFramePolicy:
-        (renderMode == .asyncNoCancel || renderMode == .asyncNoDrop)
+      completedFramePolicy: (renderMode == .asyncNoCancel || renderMode == .asyncNoDrop)
         ? .orderedCommitOnly : nil,
       completedFrameAdditionalBlockers: { artifacts in
         self.completedFrameAdditionalDropBlockers(

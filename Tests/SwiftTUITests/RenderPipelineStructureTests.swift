@@ -117,8 +117,14 @@ struct RenderPipelineStructureTests {
     #expect(!combinedSource.contains("renderAsyncFusedFrameTail("))
     #expect(!combinedSource.contains("renderCancellableFusedFrameTail("))
 
+    // The cancellable strategy's commit-or-drop logic lives in the shared
+    // `renderCancellableExecution` core (the public `renderAsyncCancellable`
+    // and elision-aware `renderAsyncCancellableEliding` are thin wrappers over
+    // it). Pin the core so the strategy keeps routing through the shared
+    // `resolveCompletedFrameCandidate` rather than the lower-level candidate
+    // helpers.
     let cancellableBody = try Self.functionBody(
-      named: "renderAsyncCancellable",
+      named: "renderCancellableExecution",
       in: source
     )
     #expect(!cancellableBody.contains("makeCompletedFrameCandidate("))

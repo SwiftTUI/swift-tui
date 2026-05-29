@@ -251,6 +251,34 @@ extension RunLoop {
           // acquisition step already reported issues, carried lifecycle
           // forward, and logged the tail. Abandon this frame.
           continue frameLoop
+        case .elided:
+          // Off-screen elision fired: `commitElidedFrame` (inside the gate
+          // closure) already fired deferred completions and published the
+          // advanced animation state to live, but no tail ran and nothing
+          // was presented. Keep the animation loop alive by rescheduling the
+          // next deadline from the now-live tick result, carry lifecycle
+          // forward (no tail consumed it), record the diagnostic, advance the
+          // frame counter, and abandon the rest of this frame.
+          appendLifecycleCarryForward(
+            convergence.lifecycleCarryForward,
+            into: &deferredLifecycleCarryForward
+          )
+          requestNextAnimationFrameIfNeeded(
+            renderer.internalAnimationController.lastTickResult
+          )
+          renderedFrames += 1
+          emitElidedFrame(
+            renderedFrames: renderedFrames,
+            scheduledFrame: scheduledFrame,
+            renderIntentDiagnostics: renderIntentDiagnostics
+          )
+          progressProbe?.record(
+            .frameCommitted,
+            frameNumber: renderedFrames,
+            desiredGeneration: renderIntentDiagnostics.desiredGeneration
+          )
+          previousRenderedState = currentState
+          continue frameLoop
         case .rendered(let renderedArtifacts, let tailJobState, let dropDecision):
           acquisition.tailJobState = tailJobState
           acquisition.completedFrameDropDecision = dropDecision

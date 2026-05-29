@@ -12,6 +12,8 @@ package enum FrameRecordDerivation {
       committedRecord(committed)
     case .zeroArtifact(let zero):
       zeroArtifactRecord(zero)
+    case .elided(let elided):
+      elidedRecord(elided)
     }
   }
 
@@ -206,6 +208,91 @@ package enum FrameRecordDerivation {
       measurementCacheHitRate: nil,
       totalFrameDuration: .zero,
       elided: false
+    )
+  }
+
+  private static func elidedRecord(
+    _ sample: ElidedFrameSample
+  ) -> FrameDiagnosticRecord {
+    FrameDiagnosticRecord(
+      frameNumber: sample.frameNumber,
+      causeSummary: causeSummary(for: sample.scheduledFrame),
+      focusSyncRerenders: 0,
+      invalidatedIdentityCount: sample.scheduledFrame.invalidatedIdentities.count,
+      resolvedNodeCount: 0,
+      resolvedNodesComputed: 0,
+      resolvedNodesReused: 0,
+      measuredNodeCount: 0,
+      measuredNodesComputed: 0,
+      measuredNodesReused: 0,
+      placedNodeCount: 0,
+      drawNodeCount: 0,
+      interactionRegionCount: 0,
+      focusRegionCount: 0,
+      phaseTimings: nil,
+      renderGenerations: .init(),
+      desiredGeneration: sample.desiredGeneration,
+      coalescedEventBatches: sample.coalescedEventBatches,
+      coalescedWakeCauses: formattedWakeCauses(sample.coalescedWakeCauses),
+      coalescedIntentRequests: sample.intentRequestCount,
+      scheduledAnimationRequest: formattedAnimationRequest(
+        sample.scheduledFrame.animationRequest
+      ),
+      scheduledAnimationBatchID: sample.scheduledFrame.animationBatchID?.value,
+      animationControllerActiveAnimationCount: sample.animationControllerActiveAnimationCount,
+      animationControllerHasPendingWork: sample.animationControllerHasPendingWork,
+      workerTimings: nil,
+      mainActorTimings: nil,
+      customLayoutFallbackCount: 0,
+      firstCustomLayoutFallbackIdentity: nil,
+      layoutDependentRealizations: 0,
+      layoutDependentRealizationCacheHits: 0,
+      layoutDependentMainActorFallbacks: 0,
+      geometryAnchorResolutionMissCount: 0,
+      firstGeometryAnchorResolutionMissIdentity: nil,
+      geometryMissingNamedCoordinateSpaceCount: 0,
+      firstGeometryMissingNamedCoordinateSpaceName: nil,
+      geometryDuplicateNamedCoordinateSpaceCount: 0,
+      firstGeometryDuplicateNamedCoordinateSpaceName: nil,
+      runtimePointerHandlerCount: 0,
+      runtimePointerHoverHandlerCount: 0,
+      runtimeGestureRecognizerCount: 0,
+      runtimeGestureStateBindingCount: 0,
+      runtimeIssues: [],
+      staleFramePolicy: "elided_offscreen",
+      tailJobState: "-",
+      tailCancelReason: "-",
+      cancelledRenderCount: sample.cancelledRenderCount,
+      newestDesiredAtTailStart: sample.desiredGeneration,
+      newestDesiredAtTailResult: sample.desiredGeneration,
+      dropEligibilityBlockers: [],
+      dropDecision: "-",
+      dropGeneration: nil,
+      newestDesiredAtDrop: nil,
+      dropReconciliationMode: "-",
+      dropReconciliationEffects: "-",
+      presentationRecoveryAfterDrop: false,
+      inputEventsQueuedDuringRenderSuspension: 0,
+      presentationStrategy: "-",
+      presentationBytesWritten: 0,
+      presentationLinesTouched: 0,
+      presentationCellsChanged: 0,
+      presentationDuration: .zero,
+      damageRowCount: nil,
+      damageRangeAwareRowCount: nil,
+      damageTextSpanCount: nil,
+      damageTextCellCount: nil,
+      damageGraphicsInvalidationCount: nil,
+      damageRequiresFullTextRepaint: false,
+      damageRequiresFullGraphicsReplay: false,
+      presentationUsedSynchronizedOutput: false,
+      presentationGraphicsReplayScope: "-",
+      presentationGraphicsAttachmentsReplayed: 0,
+      presentationEditOperationLowering: "-",
+      presentationEditOperationCount: 0,
+      measurementCacheHitRate: nil,
+      totalFrameDuration: .zero,
+      elided: true
     )
   }
 

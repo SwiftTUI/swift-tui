@@ -5,10 +5,15 @@ extension RunLoop {
   /// iteration. Models the strategy boundary from ADR-0021: `.rendered`
   /// carries a frame plus its tail state; `.skipped` reports that the tail
   /// job was cancelled-before-start or dropped-completed and the enclosing
-  /// frame must be abandoned without invoking the shared per-frame body.
+  /// frame must be abandoned without invoking the shared per-frame body;
+  /// `.elided` reports that the off-screen elision gate fired — the reduced
+  /// commit already ran (firing completions and publishing animation state),
+  /// so the frame must reschedule the next deadline and emit its diagnostic
+  /// without running the tail or presenting.
   enum FrameAcquisitionOutcome {
     case rendered(FrameArtifacts, FrameTailJobState, CompletedFrameDropDecision?)
     case skipped
+    case elided
   }
 
   func recordSkippedCancellableFrame(
