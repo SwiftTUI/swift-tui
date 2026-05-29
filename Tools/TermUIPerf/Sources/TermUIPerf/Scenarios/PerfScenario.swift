@@ -145,6 +145,9 @@ public enum PerfScenarioRegistry {
     [
       GalleryAnimationClickScenario(),
       LayoutScrollBurstScenario(),
+      SyntheticPhaseAnimatorScenario(),
+      SyntheticRepeatForeverScenario(),
+      SyntheticShimmerScenario(),
     ] + additionalScenarios
   }
 
