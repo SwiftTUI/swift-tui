@@ -4,6 +4,14 @@ import SwiftTUIViews
 extension RunLoop {
   // MARK: - Frame driver (F2: unified sync/async per-frame body, ADR-0021)
 
+  /// Synchronous frame driver, retained as a test entry point.
+  ///
+  /// This driver predates off-screen frame elision and intentionally does not
+  /// include an `.elided` arm. Production drives the run loop exclusively
+  /// through ``renderPendingFramesAsync(renderedFrames:eventPump:)``, which is
+  /// fully wired to the elision gate via `acquireFrameArtifactsAsync`. This
+  /// function is only invoked from synchronous test helpers; adding elision
+  /// complexity here would serve no production path.
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 

@@ -125,7 +125,7 @@ struct OffscreenFrameElisionRuntimeTests {
 
   // MARK: - Executor short-circuit
 
-  /// When `elideIfOffscreen` fires right after animation injection, the
+  /// When `commitElidedFrameIfOffscreen` fires right after animation injection, the
   /// synchronous one-shot executor must skip every remaining stage —
   /// late-preference reconciliation, the fused frame tail, and commit — and
   /// return ``RenderExecutionResult/elided``. The tail/commit handlers flip a
@@ -144,7 +144,7 @@ struct OffscreenFrameElisionRuntimeTests {
       head: draft,
       handlers: OneShotRenderStageHandlers(
         animationInjection: { $0 },
-        elideIfOffscreen: { _ in true },
+        commitElidedFrameIfOffscreen: { _ in true },
         latePreferenceReconciliation: { _, _ in
           reached.latePreference = true
           Issue.record("latePreferenceReconciliation ran for an elided one-shot frame")
@@ -191,7 +191,7 @@ struct OffscreenFrameElisionRuntimeTests {
       head: draft,
       handlers: AsyncRenderStageHandlers(
         animationInjection: { $0 },
-        elideIfOffscreen: { _ in true },
+        commitElidedFrameIfOffscreen: { _ in true },
         latePreferenceReconciliation: { _ in
           reached.latePreference = true
           Issue.record("latePreferenceReconciliation ran for an elided async frame")
