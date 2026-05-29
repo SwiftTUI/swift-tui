@@ -25,6 +25,37 @@ struct MemoryGrowthAnalyzerTests {
     #expect(row.leakSuspected == false)
   }
 
+  @Test("steady unbounded growth is a leak suspect")
+  func steadyUnboundedGrowthIsLeakSuspect() {
+    let analysis = MemoryGrowthAnalyzer.analyze(
+      samples(provider: "leak", counts: [0, 10, 20, 30, 40, 50, 60, 70], step: 1.0))
+    let row = analysis.rows.first { $0.provider == "leak" }!
+    #expect(row.slopePerSecond > 0.5)
+    #expect(row.plateaued == false)
+    #expect(row.leakSuspected == true)
+  }
+
+  @Test("rises then plateaus is NOT a leak suspect (bounded cache)")
+  func risesThenPlateausIsNotLeak() {
+    let analysis = MemoryGrowthAnalyzer.analyze(
+      samples(
+        provider: "cache",
+        counts: [0, 64, 128, 192, 256, 256, 256, 256, 256, 256],
+        step: 1.0))
+    let row = analysis.rows.first { $0.provider == "cache" }!
+    #expect(row.plateaued == true)
+    #expect(row.leakSuspected == false)
+  }
+
+  @Test("flat series is not a leak suspect")
+  func flatSeriesIsNotLeak() {
+    let analysis = MemoryGrowthAnalyzer.analyze(
+      samples(provider: "flat", counts: [42, 42, 42, 42, 42], step: 1.0))
+    let row = analysis.rows.first { $0.provider == "flat" }!
+    #expect(approx(row.slopePerSecond, 0.0))
+    #expect(row.leakSuspected == false)
+  }
+
   func samples(provider: String, counts: [Int], step: Double) -> [PerfMemorySampler.Sample] {
     counts.enumerated().map { index, count in
       PerfMemorySampler.Sample(
