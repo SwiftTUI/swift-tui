@@ -9,6 +9,8 @@ public struct MemoryGrowthRow: Codable, Equatable, Sendable {
   public var lastCount: Int
   public var slopePerSecond: Double
   public var plateaued: Bool
+  /// True when `slopePerSecond` exceeds the threshold AND the tail has not
+  /// plateaued. Bounded caches are excluded by the plateau check, not the slope.
   public var leakSuspected: Bool
 
   public init(
@@ -49,6 +51,11 @@ public struct MemoryGrowthAnalysis: Codable, Equatable, Sendable {
 }
 
 public enum MemoryGrowthAnalyzer {
+  /// Growth rate above which a provider is a leak candidate **when its tail has
+  /// not plateaued**. 0.5 objects/second = at least one extra object every 2 s
+  /// over the run. Bounded caches are NOT excluded by this threshold (they grow
+  /// fast while filling) — they are excluded by `isPlateaued`: a cache that fills
+  /// to a cap has a high fill-phase slope but a flat tail.
   public static let defaultSlopeThresholdPerSecond = 0.5
   public static let defaultPlateauTailFraction = 0.5
   public static let defaultPlateauTolerance = 0.05
