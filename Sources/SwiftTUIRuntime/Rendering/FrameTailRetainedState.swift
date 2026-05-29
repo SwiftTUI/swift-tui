@@ -17,11 +17,18 @@ import Synchronization
 final class FrameTailRetainedState: Sendable {
   private struct State: Sendable {
     var previousFrameIndex: RetainedFrameIndex?
+    var previousDrawnIdentities: Set<Identity>?
     var previousRasterSurface: RasterSurface?
     var previousSurfaceTopology: SurfaceTopologySignature?
   }
 
   private let state = Mutex(State())
+
+  /// The set of identities that were geometrically visible in the previous
+  /// committed frame. Returns an empty set when no frame has committed yet.
+  var previousDrawnIdentities: Set<Identity> {
+    state.withLock { $0.previousDrawnIdentities ?? [] }
+  }
 
   /// Occupancy reading for the profiling memory signal. Reads the retained
   /// frame index under the same lock that guards the stored state.
@@ -78,6 +85,7 @@ final class FrameTailRetainedState: Sendable {
     indexable.placedTree = baselinePlacedTree
     state.withLock { state in
       state.previousFrameIndex = .init(frame: indexable)
+      state.previousDrawnIdentities = artifacts.drawnIdentities
       state.previousRasterSurface = artifacts.rasterSurface
       state.previousSurfaceTopology = SurfaceTopologySignature(
         placedRoot: artifacts.placedTree

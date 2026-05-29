@@ -28,6 +28,10 @@ final class FrameTailRenderer: Sendable {
     retainedState.memoryMetricSnapshot
   }
 
+  var previousDrawnIdentities: Set<Identity> {
+    retainedState.previousDrawnIdentities
+  }
+
   private var inlineStages: FrameTailInlineStageRenderer {
     FrameTailInlineStageRenderer(
       layoutEngine: layoutEngine,
