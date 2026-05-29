@@ -15,8 +15,7 @@ extension RunLoop {
     focusBindingChanged: Bool,
     focusedValuesChanged: Bool,
     scrollPositionChanged: Bool,
-    preferenceObservationChanged: Bool,
-    diagnosticsRequireFullRecord: Bool
+    preferenceObservationChanged: Bool
   ) -> Set<FrameDropEligibility.Blocker> {
     var additionalBlockers = renderer.internalAnimationController.frameDropEligibilityBlockers
     if focusGraphChanged {
@@ -36,9 +35,6 @@ extension RunLoop {
     }
     if scheduledFrame.animationRequest != .inherit {
       additionalBlockers.insert(.animationTransaction)
-    }
-    if diagnosticsRequireFullRecord {
-      additionalBlockers.insert(.diagnosticsFullRecord)
     }
     return FrameDropEligibility.classify(
       artifacts,

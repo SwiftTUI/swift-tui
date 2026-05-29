@@ -31,8 +31,7 @@ extension RunLoop {
       focusBindingChanged: focusBindingChanged,
       focusedValuesChanged: focusedValuesChanged,
       scrollPositionChanged: scrollPositionChanged,
-      preferenceObservationChanged: preferenceObservationChanged,
-      diagnosticsRequireFullRecord: true
+      preferenceObservationChanged: preferenceObservationChanged
     )
 
     let sample = CommittedFrameSample(
