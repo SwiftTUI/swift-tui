@@ -129,6 +129,20 @@ extension Rasterizer {
         // an animation ticks invalidates the animated identity which
         // forces that subtree's bounds into dirtyRows, so the paint
         // walk will still descend into it.
+        //
+        // Off-screen frame elision soundness depends on this set being a
+        // strict paint-visibility predicate: a clipped-out identity must
+        // NEVER be recorded here.  The elision gate (see
+        // Pipeline/OffscreenFrameElision.swift) skips a deadline-only frame
+        // when its redraw set is DISJOINT from the committed
+        // `drawnIdentities`.  `redrawIdentities` only ever names the
+        // directly-animated identity, so for an off-screen animation
+        // (including a layout-affecting one) disjointness holds precisely
+        // because the clipped child is absent here.  If a future
+        // "optimization" recorded laid-out-but-clipped identities, an
+        // off-screen animation that DID push visible cells would still look
+        // disjoint and would be wrongly elided — silently voiding elision
+        // correctness.  Keep this gated on positive post-clip extent.
         if visibility.bounds.size.width > 0, visibility.bounds.size.height > 0 {
           visibleIdentities.insert(node.identity)
         }

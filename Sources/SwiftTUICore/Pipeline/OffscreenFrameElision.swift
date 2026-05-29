@@ -12,7 +12,11 @@
 ///
 /// - Note: The predicate is only as sound as the caller's `drawnIdentities`
 ///   set. An identity that appeared on-screen but was never recorded there
-///   would cause live content to be incorrectly elided.
+///   would cause live content to be incorrectly elided. The load-bearing
+///   invariant — clipped-out identities must NEVER be recorded in
+///   `drawnIdentities` — is documented at the recording site in
+///   `Raster/Rasterizer+Paint.swift`; it is what makes eliding an off-screen
+///   animation (paint-only or layout-affecting) sound.
 package enum OffscreenFrameElision {
   /// Returns `true` when the frame is safe to skip.
   ///
