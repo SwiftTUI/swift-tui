@@ -29,6 +29,13 @@ final class FrameTailRenderer: Sendable {
   }
 
   /// The set of identities drawn in the last committed frame; empty before the first commit.
+  ///
+  /// Reads the `Mutex`-guarded retained state directly rather than via
+  /// `workerExecutor.sync` (unlike the sibling accessors): the off-screen
+  /// elision gate calls this on the main actor right after animation injection,
+  /// and only ever observes the *previous committed* frame's value (never an
+  /// in-flight candidate), so routing it through the worker executor would only
+  /// serialize the hot gate against worker jobs for no correctness gain.
   var previousDrawnIdentities: Set<Identity> {
     retainedState.previousDrawnIdentities
   }
