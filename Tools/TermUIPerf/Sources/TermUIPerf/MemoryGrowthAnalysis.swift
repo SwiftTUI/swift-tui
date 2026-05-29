@@ -60,6 +60,15 @@ public enum MemoryGrowthAnalyzer {
   public static let defaultPlateauTailFraction = 0.5
   public static let defaultPlateauTolerance = 0.05
 
+  /// Computes per-provider growth slope + plateau over a run's memory samples.
+  ///
+  /// Accuracy scales with sample count: `plateaued`/`leakSuspected` are only
+  /// trustworthy with roughly >= 8 samples. The default harness config (500ms
+  /// interval, 2s idle ~ 4-5 samples) is a COARSE SCREEN — at ~4 samples the
+  /// plateau tail is only 2 points, so gentle leaks can read as plateaued. A
+  /// flagged (or suspicious) provider should be re-run with a finer
+  /// `memorySampleInterval` and a longer `memoryIdleWindow` to confirm. The
+  /// `sample_count` column records how many samples backed each row.
   static func analyze(
     _ samples: [PerfMemorySampler.Sample],
     slopeThresholdPerSecond: Double = defaultSlopeThresholdPerSecond,
