@@ -67,6 +67,19 @@ extension RuntimeRegistrationSet {
     dropDestinationRegistry?.removeSubtrees(rootedAt: roots)
   }
 
+  /// After a scoped `.subtrees` restore, re-sorts the only registries whose
+  /// cross-node restore order is observable — the global append-ordered focus
+  /// lists — into canonical identity order, so the result is byte-identical to
+  /// a full rebuild. The dict/route-keyed registries are order-independent, and
+  /// the per-identity handler lists (key/termination) come from a single node
+  /// each (their within-identity order is preserved by the scoped restore and
+  /// their cross-identity dispatch order is determined by the focus/identity
+  /// path at dispatch time, not restore order), so none of those need this.
+  package func normalizeScopedRestoreOrder() {
+    defaultFocusRegistry?.normalizeOrderByIdentity()
+    focusBindingRegistry?.normalizeOrderByIdentity()
+  }
+
   package func pruneOrphanedGestures(
     keeping liveIdentities: Set<Identity>
   ) {
