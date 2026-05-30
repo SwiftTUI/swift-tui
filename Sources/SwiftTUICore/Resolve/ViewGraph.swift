@@ -694,7 +694,8 @@ package final class ViewGraph {
 
   package func recordReusedSubtree(
     _ subtree: ResolvedNode,
-    invalidator: (any Invalidating)?
+    invalidator: (any Invalidating)?,
+    retained: Bool = false
   ) {
     let node = nodeForIdentity(for: subtree.identity)
     node.prepareForFrame(currentFrameID)
@@ -708,21 +709,37 @@ package final class ViewGraph {
       invalidator: invalidator
     )
     let previousResolvedIdentity = node.resolvedIdentity
-    let childNodes = subtree.children.map { child -> ViewNode in
-      recordReusedSubtree(
-        child,
-        invalidator: invalidator
+    if retained {
+      // Retained subtree: this root passed reusableSnapshot's full disjointness
+      // check (no identity or structural intersection with the frame's
+      // invalidation), so every descendant is unchanged. Its committed snapshot
+      // carries the whole subtree by value, and descendant presence
+      // (`hasCommittedPresence`) and liveness (`liveIdentities`) both persist
+      // across `beginFrame` — so we skip the O(subtree) descendant recursion and
+      // refresh only this root. The root's children are unchanged, so
+      // `ViewNode.apply` takes its same-children fast path; the structural diff is
+      // a no-op (no structural intersection) and is skipped with the recursion.
+      node.apply(
+        resolved: subtree,
+        children: node.children
       )
-      return nodeForIdentity(for: child.identity)
+    } else {
+      let childNodes = subtree.children.map { child -> ViewNode in
+        recordReusedSubtree(
+          child,
+          invalidator: invalidator
+        )
+        return nodeForIdentity(for: child.identity)
+      }
+      applyStructuralChildDiff(
+        for: node,
+        resolved: subtree
+      )
+      node.apply(
+        resolved: subtree,
+        children: childNodes
+      )
     }
-    applyStructuralChildDiff(
-      for: node,
-      resolved: subtree
-    )
-    node.apply(
-      resolved: subtree,
-      children: childNodes
-    )
     let emitsOwnLifecycleEvents = nodeEmitsOwnLifecycleEvents(node)
 
     if !node.wasPresentAtFrameStart {
@@ -814,7 +831,8 @@ package final class ViewGraph {
       let snapshot = node.snapshot()
       recordReusedSubtree(
         snapshot,
-        invalidator: invalidator
+        invalidator: invalidator,
+        retained: true
       )
       return snapshot
     }
@@ -835,7 +853,8 @@ package final class ViewGraph {
     let snapshot = node.snapshot()
     recordReusedSubtree(
       snapshot,
-      invalidator: invalidator
+      invalidator: invalidator,
+      retained: true
     )
     return snapshot
   }
