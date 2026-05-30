@@ -267,10 +267,10 @@ func resolveView<V: View>(
       invalidator: context.invalidationProxy?.invalidator
     )
   {
-    context.viewGraph?.recordReusedSubtree(
-      reused,
-      invalidator: context.invalidationProxy?.invalidator
-    )
+    // `reusableSnapshot` already recorded this subtree — every non-nil return
+    // routes through `recordReusedSubtree` — so re-recording here only hit the
+    // `wasVisitedThisFrame` guard and returned at the root (a no-op). Drop it
+    // and just restore registrations + tally the reuse.
     context.viewGraph?.restoreRuntimeRegistrations(
       for: reused,
       into: context.runtimeRegistrations
