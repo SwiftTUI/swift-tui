@@ -50,6 +50,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case syntheticOffscreenPhaseAnimator = "synthetic-offscreen-phase-animator"
   case syntheticContinuousAnimation = "synthetic-continuous-animation"
   case syntheticTextShimmer = "synthetic-text-shimmer"
+  case syntheticNarrowInvalidation = "synthetic-narrow-invalidation"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()

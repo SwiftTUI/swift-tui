@@ -148,6 +148,7 @@ public enum PerfScenarioRegistry {
       SyntheticPhaseAnimatorScenario(),
       SyntheticRepeatForeverScenario(),
       SyntheticShimmerScenario(),
+      SyntheticNarrowInvalidationScenario(),
     ] + additionalScenarios
   }
 
