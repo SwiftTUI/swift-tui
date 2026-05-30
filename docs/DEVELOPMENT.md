@@ -179,3 +179,12 @@ minutes, the macOS repo gate at 30 minutes, the iOS build at 15 minutes, the
 Linux image build at 45 minutes, the Linux image manifest publish at 10
 minutes, the perf smoke at 20 minutes, and Cloudflare Pages deployment at 30
 minutes.
+
+## Known test flakes
+
+The gate has **no automatic test retries**, and is deterministic by design
+(poll-free synchronisation, no in-gate wall-clock budgets). A small number of
+tests are nonetheless known to fail spuriously under heavy parallel load. Before
+attributing a gate failure to your change, match its signature against
+[KNOWN-TEST-FLAKES.md](KNOWN-TEST-FLAKES.md) — the single register of known
+flakes and the triage rule for telling a flake from a real regression.
