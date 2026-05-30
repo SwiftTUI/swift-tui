@@ -23,6 +23,7 @@ flowchart TD
     A11Y["ACCESSIBILITY.md<br/>semantic substrate"]
     API["PUBLIC-API.md<br/>public surface policy"]
     DEV["DEVELOPMENT.md<br/>build, test, release"]
+    FLAKES["KNOWN-TEST-FLAKES.md<br/>known flaky tests"]
 
     README --> VISION
     README --> ARCH
@@ -33,6 +34,7 @@ flowchart TD
     ARCH --> HOSTS
     ARCH --> A11Y
     ARCH --> API
+    DEV --> FLAKES
 ```
 
 ## Contents
@@ -48,6 +50,7 @@ flowchart TD
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds four accessibility consumers. |
 | [PUBLIC-API.md](PUBLIC-API.md) | The public surface policy and inventory: what is canonical, what is package-only, and what was removed. |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Toolchains, the build/test gate, fixture policy, and the release process. |
+| [KNOWN-TEST-FLAKES.md](KNOWN-TEST-FLAKES.md) | The register of known, pre-existing flaky tests and how to tell a flake from a real regression. |
 
 ## API reference
 
