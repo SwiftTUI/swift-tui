@@ -75,6 +75,17 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
 
+  /// Test seam for the **frame-readiness clock**: the instant the drain compares
+  /// against pending scheduler deadlines when deciding which frames are ready to
+  /// consume (`scheduler.consumeReadyFrame(at:)`). Production reads the real
+  /// monotonic clock. A runtime test can pin it to a frozen instant to drive
+  /// virtual time deterministically — an off-screen animation's auto-rescheduled
+  /// deadlines all land in the real future relative to a frozen `t0`, so they
+  /// stay invisible to the drain and cannot perturb frame counts under load.
+  /// Only *frame readiness* routes through this seam; real-time waiting (the
+  /// event-pump sleeps) still uses the wall clock. See `docs/KNOWN-TEST-FLAKES.md`.
+  package var frameReadinessClock: () -> MonotonicInstant = { .now() }
+
   /// Active per-frame diagnostics sink. Installed by the profiling product (via
   /// ``ProfilingRegistry``) or by a runner (via `SceneSessionResources.frameSink`)
   /// when the session is constructed. When `nil` the per-frame emit path is a

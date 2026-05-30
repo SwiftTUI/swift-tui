@@ -234,6 +234,14 @@ struct OffscreenFrameElisionRuntimeTests {
     let rootIdentity = testIdentity("ElisionNoRestartTrap", "Root")
     let terminal = ElisionProbeTerminalHost(surfaceSize: terminalSize)
     let scheduler = FrameScheduler()
+    // Freeze the run loop's frame-readiness clock to a single instant captured
+    // before any frame is consumed. The off-screen `repeatForever` keeps
+    // rescheduling its animation deadline at the REAL future (`> frozenNow`), so
+    // pinning the consume instant to `frozenNow` makes those reschedules
+    // invisible to the drain: only the test's explicit deadline/invalidation
+    // requests drive frames. That is what makes the elision/present counts below
+    // deterministic under parallel load. See docs/KNOWN-TEST-FLAKES.md.
+    let frozenNow = MonotonicInstant.now()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
@@ -258,6 +266,7 @@ struct OffscreenFrameElisionRuntimeTests {
         OffscreenAnimatedProbe()
       }
     )
+    runLoop.frameReadinessClock = { frozenNow }
 
     AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
     TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
@@ -278,7 +287,7 @@ struct OffscreenFrameElisionRuntimeTests {
       eventPump: nil
     )
     runLoop.renderer.enableSelectiveEvaluation()
-    while scheduler.hasPendingFrame(at: .now()) {
+    while scheduler.hasPendingFrame(at: frozenNow) {
       _ = try await runLoop.renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
         eventPump: nil
@@ -293,7 +302,9 @@ struct OffscreenFrameElisionRuntimeTests {
     let presentsBefore = terminal.presentCount
 
     // Drive a pure animation-deadline frame: this is the case the gate elides.
-    scheduler.requestDeadline(.now())
+    // Consumed at the frozen instant, so ONLY this deadline is ready — the
+    // animation's own (real-future) rescheduled deadline stays invisible.
+    scheduler.requestDeadline(frozenNow)
     _ = try await runLoop.renderPendingFramesAsync(
       renderedFrames: &renderedFrames,
       eventPump: nil
@@ -311,9 +322,14 @@ struct OffscreenFrameElisionRuntimeTests {
     )
 
     // Invariant 2 (no-restart trap): the loop is not frozen — eliding still
-    // scheduled the next animation deadline.
+    // scheduled the next animation deadline. Assert a future wake exists rather
+    // than probing the real clock at a fixed offset (the original
+    // `hasPendingFrame(at: .now() + 100ms)` was the load-flaky part): the
+    // rescheduled deadline lands at some real instant `> frozenNow`, so
+    // `nextWakeInstant(after:)` returns it regardless of how far real time has
+    // drifted under load.
     #expect(
-      scheduler.hasPendingFrame(at: .now().advanced(by: .milliseconds(100))),
+      scheduler.nextWakeInstant(after: frozenNow) != nil,
       "eliding must still reschedule the next animation deadline so the loop keeps ticking"
     )
 

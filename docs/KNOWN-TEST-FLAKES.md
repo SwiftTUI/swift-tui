@@ -50,45 +50,48 @@ injected delays) — see issue #12 for the investigation and suspect seams.
 
 **Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29).
 
-### 2. `OffscreenFrameElisionRuntimeTests` — off-screen deadline tick (real-time deadline race)
+---
+
+## Fixed flakes
+
+### 2. `OffscreenFrameElisionRuntimeTests` — off-screen deadline tick (real-time deadline race) — FIXED 2026-05-30
 
 **Test.** `OffscreenFrameElisionRuntimeTests` →
-`offscreenDeadlineTickElidesWithoutFreezingThenOnScreenRenders`
-("off-screen deadline tick elides but reschedules; on-screen invalidation
-renders"), in `Tests/SwiftTUITests/OffscreenFrameElisionRuntimeTests.swift`.
+`offscreenDeadlineTickElidesWithoutFreezingThenOnScreenRenders`, in
+`Tests/SwiftTUITests/OffscreenFrameElisionRuntimeTests.swift`.
 
-**Signature.** Under heavy parallel test load it fails at one of three
-assertions (which one varies run-to-run):
-- the in-flight `repeatForever` animation reads `activeAnimationCount == 0`
-  (the animation appears to have died), and/or the loop did not reschedule its
-  next deadline (`hasPendingFrame` is false); **or**
-- after the on-screen invalidation, `elidedFrameCount` advanced by an extra
-  frame (`elidedFrameCount != elidedBeforeInvalidation`).
+**Was.** Under heavy parallel test load it failed at one of three assertions
+(which one varied run-to-run): the in-flight `repeatForever` read
+`activeAnimationCount == 0`; the loop appeared not to reschedule
+(`hasPendingFrame` false); or `elidedFrameCount` advanced an extra frame after
+the on-screen invalidation. The async drain consumed frames at the real
+`.now()` (`scheduler.consumeReadyFrame(at: .now())`), so the off-screen
+`repeatForever`'s self-rescheduled animation deadline (`now + minimumLeadTime`
+under load) drifted into "ready" between the test's scheduler operations and was
+drained as an unexpected extra frame, perturbing the test's exact
+`elidedFrameCount` equality. Proven pre-existing: failed identically on `main`
+with zero retained reuse (3/3 under full-gate load on `3aaa8282`), independent of
+the H2 work; passed in isolation.
 
-**Root cause.** A real-time-clock race, **not** a logic regression. The test
-drives real `.now()`-based animation deadlines; `renderPendingFramesAsync`
-consumes ready frames at the real `.now()`. Under CPU contention, real time
-advances between the test's scheduler operations, so the rescheduled ~100 ms
-animation deadline becomes ready and is drained alongside the on-screen
-invalidation (producing the extra elision), or the controller's per-frame state
-is read at an unlucky instant.
+**Fix.** Two parts:
+1. **Injectable frame-readiness clock.** `RunLoop.frameReadinessClock` (default
+   real `.now()`) now supplies the instant both frame drivers compare against
+   pending scheduler deadlines (`consumeReadyFrame(at:)`). Production behaviour
+   is unchanged; a runtime test can pin it to drive virtual time. Only *frame
+   readiness* routes through it — real-time waiting (the event-pump sleeps) still
+   uses the wall clock.
+2. **Pinned-instant test.** The test freezes the clock to a single `frozenNow`
+   captured before any frame is consumed. Every deadline the off-screen
+   animation auto-reschedules lands at the real future (`> frozenNow`), so it is
+   invisible to the drain — only the test's explicit deadline/invalidation
+   requests drive frames, making the elision/present counts deterministic. The
+   one real-clock assertion (`hasPendingFrame(at: .now() + 100 ms)`) became
+   `nextWakeInstant(after: frozenNow) != nil` — the load-independent statement of
+   the same "loop isn't frozen" invariant.
 
-**Proven pre-existing.** This fails identically on **`main` with zero retained
-reuse** (`canReuse` always returns `false` pre-enabler — verified failing 3/3
-runs under full-gate load on `3aaa8282`), on the H2 enabler-only commit, and
-with the H2 scoped-reuse fix. It **passes in isolation** on all three. The H2
-investigation initially mis-attributed this to retained reuse / an animation
-"gap"; that was an isolation-vs-load artifact. There is no reuse mechanism to
-"fix" here.
-
-**How to confirm it's this, not your change.** Run the test in isolation
-(`swift test --filter offscreenDeadlineTickElidesWithoutFreezingThenOnScreenRenders`)
-— it passes. The failure only appears under the parallel load of the full gate.
-
-**Status.** Open. Fix direction: harden the test to be load-deterministic —
-drive it on a controlled/injected clock instead of `.now()`, or assert on the
-frame's *causes* (`[.deadline]` vs. `.invalidation`) rather than on
-`elidedFrameCount`, so a concurrently-ready deadline cannot perturb the count.
+**Verification.** 11/11 suite green in isolation; **25/25 green under 18-core CPU
+saturation** (the original failed 3/3 under full-gate load). Deterministic by
+construction — no timing window remains.
 
 ---
 
@@ -100,9 +103,10 @@ When `bun run test` reports a failure:
    per failed step).
 2. **Match against an entry above** — same test, same assertion family, same
    crash site? If yes, it is the known flake.
-3. **Re-run in isolation** with the printed `--filter`. Both active flakes
-   **pass in isolation**; a deterministic isolated failure means it is *not*
-   these flakes and is real.
+3. **Re-run in isolation** with the printed `--filter`. The active flake (#1) is
+   load/timing-sensitive and does not reproduce deterministically in isolation;
+   a deterministic isolated failure therefore means it is *not* the flake and is
+   real.
 4. **Never** wave off an unmatched signature as "probably the flake." Add a new
    entry here only after confirming load/timing-sensitivity (passes isolated,
    fails under load) and ruling out a real defect.
@@ -118,6 +122,12 @@ sources of test flake:
   primitives in `Tests/Support` instead of `sleep`/polling — see
   `SwiftTUITestSupport.docc` ("Poll-free synchronisation primitives for
   deterministic, flake-resistant tests") and `Synchronising-Without-Polling.md`.
+- **Injectable frame-readiness clock.** A runtime test that drives animation
+  deadlines can pin `RunLoop.frameReadinessClock` to a frozen instant, so the
+  loop decides frame readiness against virtual time instead of the wall clock.
+  Self-rescheduled animation deadlines then land in the real future relative to
+  the frozen instant and stay invisible to the drain, so CPU contention cannot
+  perturb frame counts (see fixed flake #2).
 - **No wall-clock budget assertions in the gate.** The one wall-clock
   blunder-detector (`RenderPipelineStructureTests.composedRenderTimeBudget`) is
   opt-in behind `STUI_RUN_WALLCLOCK_PERF` and **skipped** by the repo gate; do
