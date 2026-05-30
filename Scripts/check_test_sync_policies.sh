@@ -13,6 +13,29 @@
 # anti-pattern occurrences that still exist. New code may not push the count
 # above the baseline. Converting a test lowers the count; lower the baseline
 # to lock the improvement in.
+#
+# Matched primitives: waitUntil(, valueWithTimeout(, DispatchSemaphore,
+# Task.sleep, .sleep(for:, usleep(, nanosleep(, Thread.sleep. The fixed-sleep
+# forms (usleep/nanosleep/Thread.sleep) were added 2026-05-30 after a flake
+# audit found they slipped past the original regex set.
+#
+# Baseline composition (10): 6 DispatchSemaphore barriers
+# (TerminalPresentationTests x4, AsyncFrameTailRenderingTests x1,
+# TerminalHostPresentationBatchingTests x1) + 4 fixed sleeps
+# (InteractiveRuntimeTests x2 usleep, AnimationRepeatForeverGrowthTests x1
+# usleep, RenderDiffTests x1 Thread.sleep).
+#
+# NOTE: all 4 fixed sleeps are deliberate *presentation-latency injections*
+# inside mock present()/presentObserver methods — they simulate a slow terminal
+# present so a test can exercise frame batching/diffing (e.g.
+# runLoopBatchesQueuedScrollBursts needs present to be slow so scroll events
+# queue and coalesce). They are NOT timeout-driven synchronisation; the real
+# waits in those tests are already signal-based (MainActorConditionSignal). Do
+# not "convert" them to signals — that would defeat the latency they inject.
+# They are grandfathered into the baseline so the ratchet still blocks *new*
+# fixed sleeps. The lasting fix is to route latency injection through a named
+# Tests/Support helper the regex can exclude (then drop the baseline to 6); the
+# DispatchSemaphore barriers are the genuine sync anti-pattern to ratchet down.
 
 set -eu
 
@@ -37,6 +60,9 @@ count=$(
     --regexp 'DispatchSemaphore' \
     --regexp 'Task\.sleep' \
     --regexp '\.sleep\(for:' \
+    --regexp '\busleep\(' \
+    --regexp '\bnanosleep\(' \
+    --regexp 'Thread\.sleep' \
     Tests Platforms/*/Tests 2>/dev/null \
     | awk -F: '{ sum += $2 } END { print sum + 0 }'
 )
@@ -63,6 +89,9 @@ if [ "$count" -gt "$baseline" ]; then
     --regexp 'DispatchSemaphore' \
     --regexp 'Task\.sleep' \
     --regexp '\.sleep\(for:' \
+    --regexp '\busleep\(' \
+    --regexp '\bnanosleep\(' \
+    --regexp 'Thread\.sleep' \
     Tests Platforms/*/Tests >&2 2>/dev/null || true
   exit 1
 fi

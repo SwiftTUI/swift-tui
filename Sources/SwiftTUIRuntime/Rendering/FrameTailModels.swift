@@ -129,13 +129,24 @@ final class RenderGenerationSequencer: Sendable {
 
 package struct FrameTailRenderHooks: Sendable {
   package var beforeLayout: (@Sendable () -> Void)?
+  /// Fires on the frame-tail worker immediately before the animation overlay is
+  /// applied to the placed tree (`applyPlacedAnimationOverlaySnapshot`), i.e.
+  /// just before the off-main `Boxed._modify` writes that decorate the shared
+  /// tree. Production default `nil` (no-op). A test can park the worker here to
+  /// hold the box-mutation window open while the main actor concurrently reads
+  /// the aliased tree — see the run-loop memory-corruption repro (swift-tui#12).
+  /// The existing `beforeRaster` seam fires *after* the overlay write, so it
+  /// cannot bracket that mutation.
+  package var beforeOverlayApply: (@Sendable () -> Void)?
   package var beforeRaster: (@Sendable () -> Void)?
 
   package init(
     beforeLayout: (@Sendable () -> Void)? = nil,
+    beforeOverlayApply: (@Sendable () -> Void)? = nil,
     beforeRaster: (@Sendable () -> Void)? = nil
   ) {
     self.beforeLayout = beforeLayout
+    self.beforeOverlayApply = beforeOverlayApply
     self.beforeRaster = beforeRaster
   }
 }

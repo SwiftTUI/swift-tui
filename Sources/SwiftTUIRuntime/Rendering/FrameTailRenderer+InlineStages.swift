@@ -47,9 +47,11 @@ struct FrameTailInlineStageRenderer: Sendable {
     placed: PlacedNode,
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
     clock: ContinuousClock?,
+    beforeOverlayApply: (@Sendable () -> Void)?,
     beforeRaster: (@Sendable () -> Void)?
   ) -> FrameTailOutput {
     var placed = placed
+    beforeOverlayApply?()
     applyPlacedAnimationOverlaySnapshot(
       animationOverlaySnapshot,
       to: &placed
