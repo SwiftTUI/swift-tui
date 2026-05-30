@@ -54,16 +54,56 @@ frame-tail worker immediately before the off-main overlay write, so a test can
 park the worker inside that window and race a concurrent main-actor read. Wired +
 ordering-guarded by `Tests/SwiftTUITests/FrameTailOverlayApplyHookTests.swift`. To
 serialize a repro run, set `STUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--num-workers
-1`). **Sharpened hypothesis:** the `Boxed` copy-on-write path the seam brackets is
-likely *safe* under value semantics (worker copies-on-write its own box; the shared
-`_BoxStorage` is `Mutex`-guarded with atomic refcount). The **stronger corruptor
-candidate** is the unsynchronized `assumeIsolated` dictionary writes
-(`ForEachIndexedChildSource.cache`, `LayoutProxyBox.cachedStates`) reached off-main
-when the layout-offload eligibility scan misses a live source/handle — target that
-path next. Full analysis: org-root `docs/reports/2026-05-30-flake-bcd-investigation.md`.
+1`). The `Boxed` copy-on-write path the seam brackets was judged *safe* under value
+semantics (worker copies-on-write its own box; the shared `_BoxStorage` is
+`Mutex`-guarded with atomic refcount).
 
-**Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29); repro
-instrument landed 2026-05-30, crashing experiment not yet run.
+**Identified off-main-reach paths now EXHAUSTED (2026-05-30).** Both static paths by
+which a live `@MainActor` `ForEachIndexedChildSource` (its mutable `cache` dictionary
+is the torn-byte corruptor candidate) could reach the off-main frame-tail worker are
+**closed**:
+
+- *Current-frame offload* — the eligibility scan forces a full
+  `indexedChildSourceWorkerSnapshot` conversion (a live source has
+  `canRunOnWorker == false`) before anything goes off-main, so the worker only ever
+  sees the value-type snapshot.
+- *Retained-reuse* — verified by a 6-agent adversarial trace (workflow `w1u1xkuj0`).
+  The one-shot/sync commit path **does** retain a live, un-converted source (the
+  snapshot conversion is gated `mode == .abortable`, which one-shot skips:
+  `injectAnimations` → reconcile → `commitOneShotFrame` → `storeCommittedFrame` →
+  `RetainedFrameIndex` stores the whole `ResolvedNode`), and a later frame's off-main
+  worker **does** read that retained source (`RetainedInvalidationSummary.init` →
+  `source.identityRoot`, on the `swift-tui.frame-tail-renderer` queue). **But every
+  reachable off-main accessor reads immutable `let` storage** (`identityRoot`,
+  `measurementSignature`) under `MainActor.assumeIsolated` — a benign read (or a clean
+  isolation trap), never a torn write. The sole mutator (`cache[index] = …` in
+  `child(at:)`) is invoked only on the *current* node's source, which off-main is
+  always the value-type snapshot — never the retained live source.
+  `computeSupportsRetainedReuse` further returns `false` for any source-bearing node,
+  so `isEquivalentFor*` is never even invoked on a source subtree. The mutable
+  `LayoutProxyBox.cachedStates` is likewise unreachable (retained reuse returns cached
+  values; it never calls `measureContainer`). This vector therefore **cannot produce
+  #12's corruption signature** — the crash-repro build was cancelled rather than built.
+
+**Consequence.** With both identified paths closed and the `Boxed` COW path judged
+value-semantics-safe, **#12's corruption mechanism is currently unidentified**. Static
+analysis has exhausted the named candidates; the honest next move (if/when #12 is
+re-prioritized) is *dynamic* — reproduce the SEGV under load with the `assumeIsolated`
+sites + eligibility scan annotated/under TSan — not another static repro harness.
+
+*Separate, real-but-benign finding.* The one-shot commit path stores a live
+`@MainActor` source into retained state with no snapshot conversion
+(`commitOneShotFrame` → `storeCommittedFrame`). It is harmless today (off-main reuse
+only reads immutable storage) but is a latent soundness gap: if retained reuse ever
+began calling `child(at:)` off-main it would become the corruptor. Optional
+defense-in-depth: snapshot-convert in the one-shot commit path before
+`storeCommittedFrame` (weigh against the full-tree recursion cost on every one-shot
+commit). Full analysis: org-root `docs/reports/2026-05-30-flake-bcd-investigation.md`.
+
+**Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29). Both identified
+static off-main-reach paths closed 2026-05-30 (see above); the corruption mechanism is
+now unidentified, so the next move is dynamic instrumentation rather than a static
+repro. The `beforeOverlayApply` repro instrument remains available but is not the path.
 
 ---
 
