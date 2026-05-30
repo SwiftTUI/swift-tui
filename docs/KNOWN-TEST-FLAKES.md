@@ -48,7 +48,22 @@ matches the above. Re-run; if it does not reproduce deterministically, it is
 the flake. A real fix needs a forced-repro harness (widen the race window via
 injected delays) — see issue #12 for the investigation and suspect seams.
 
-**Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29).
+**Repro instrument (2026-05-30).** A production-default-`nil` worker seam,
+`FrameTailRenderHooks.beforeOverlayApply` (`FrameTailModels.swift`), fires on the
+frame-tail worker immediately before the off-main overlay write, so a test can
+park the worker inside that window and race a concurrent main-actor read. Wired +
+ordering-guarded by `Tests/SwiftTUITests/FrameTailOverlayApplyHookTests.swift`. To
+serialize a repro run, set `STUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--num-workers
+1`). **Sharpened hypothesis:** the `Boxed` copy-on-write path the seam brackets is
+likely *safe* under value semantics (worker copies-on-write its own box; the shared
+`_BoxStorage` is `Mutex`-guarded with atomic refcount). The **stronger corruptor
+candidate** is the unsynchronized `assumeIsolated` dictionary writes
+(`ForEachIndexedChildSource.cache`, `LayoutProxyBox.cachedStates`) reached off-main
+when the layout-offload eligibility scan misses a live source/handle — target that
+path next. Full analysis: org-root `docs/reports/2026-05-30-flake-bcd-investigation.md`.
+
+**Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29); repro
+instrument landed 2026-05-30, crashing experiment not yet run.
 
 ---
 

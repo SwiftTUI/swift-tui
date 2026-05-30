@@ -461,9 +461,21 @@ for argument in "$@"; do
 done
 
 run_swift() {
-  if [ "$#" -gt 0 ] && [ "$1" = "test" ] && [ -n "${STUI_SWIFT_TEST_SKIP_REGEX:-}" ]; then
-    swiftly run swift "$@" --skip "$STUI_SWIFT_TEST_SKIP_REGEX"
-    return
+  # Opt-in test-run modifiers, composed onto any `swift test` invocation. Both
+  # default off, so the gate's behaviour is unchanged unless an operator sets
+  # them deliberately (e.g. to bisect a load-sensitive flake such as the
+  # run-loop SIGSEGV in docs/KNOWN-TEST-FLAKES.md):
+  #   STUI_SWIFT_TEST_SKIP_REGEX — skip tests matching a regex.
+  #   STUI_SWIFT_TEST_SERIALIZED — run tests serially (--num-workers 1) so a
+  #     timing-dependent interleaving is reproducible/bisectable rather than
+  #     racing across parallel workers.
+  if [ "$#" -gt 0 ] && [ "$1" = "test" ]; then
+    if [ -n "${STUI_SWIFT_TEST_SKIP_REGEX:-}" ]; then
+      set -- "$@" --skip "$STUI_SWIFT_TEST_SKIP_REGEX"
+    fi
+    if [ -n "${STUI_SWIFT_TEST_SERIALIZED:-}" ]; then
+      set -- "$@" --num-workers 1
+    fi
   fi
 
   swiftly run swift "$@"

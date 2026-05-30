@@ -124,6 +124,7 @@ final class FrameTailRenderer: Sendable {
         placed: placed,
         animationOverlaySnapshot: animationOverlaySnapshot,
         clock: clock,
+        beforeOverlayApply: renderHooks.withLock { $0?.beforeOverlayApply },
         beforeRaster: renderHooks.withLock { $0?.beforeRaster }
       )
     }
@@ -152,6 +153,7 @@ final class FrameTailRenderer: Sendable {
         placed: placed,
         animationOverlaySnapshot: animationOverlaySnapshot,
         clock: clock,
+        beforeOverlayApply: self.renderHooks.withLock { $0?.beforeOverlayApply },
         beforeRaster: self.renderHooks.withLock { $0?.beforeRaster }
       )
     }
