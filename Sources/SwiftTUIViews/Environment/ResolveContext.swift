@@ -281,6 +281,16 @@ public struct ResolveContext: Equatable, Sendable {
     effectiveFrameResolveInputs?.invalidatedIdentities ?? invalidatedIdentities
   }
 
+  /// Whether retained reuse is suppressed for this frame. When true,
+  /// `resolveView` recomputes every reached node instead of taking the
+  /// retained-reuse fast path, even for subtrees disjoint from the invalidation
+  /// set. Set by the run loop on reuse-unsafe frames (focus move or in-flight
+  /// property animation); see ``FrameResolveInputs/suppressRetainedReuse``.
+  @MainActor
+  package var effectiveSuppressesRetainedReuse: Bool {
+    effectiveFrameResolveInputs?.suppressRetainedReuse ?? false
+  }
+
   @MainActor
   package var effectiveInvalidationSummary: InvalidationSummary {
     effectiveFrameResolveInputs?.invalidationSummary ?? invalidationSummary

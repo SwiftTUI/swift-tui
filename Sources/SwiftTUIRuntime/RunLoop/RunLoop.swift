@@ -60,6 +60,12 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var terminalPointerHoverEnabled = false
   package var postActionInvalidationIdentities: Set<Identity> = []
   package var previousRenderedState: State?
+  /// Focus identity committed by the previous frame. Compared at the start of
+  /// each frame to detect a focus move, which gates retained `ViewNode` reuse
+  /// off (see ``shouldSuppressRetainedReuseForFrameSafety()``): focus is
+  /// deliberately excluded from `EnvironmentSnapshot` equality, so a reused
+  /// focus-reading subtree would otherwise show stale focus.
+  package var previousFrameFocusIdentity: Identity?
   package var nextRenderIntentGeneration: UInt64 = 1
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []

@@ -17,6 +17,15 @@ package struct FrameResolveInputs {
   package var proposal: ProposedSize
   package var usesSelectiveEvaluation: Bool
   package var environmentRequiresRootEvaluation: Bool
+  /// When true, `resolveView` must not take the retained-reuse fast path this
+  /// frame even for subtrees disjoint from the invalidation set. The run loop
+  /// sets this (alongside `forceRootEvaluation`) on frames that are unsafe to
+  /// reuse — a focus move (focus is excluded from `EnvironmentSnapshot`
+  /// equality, so a reused focus-reading subtree shows stale focus) or an
+  /// in-flight property-scope animation (a reused subtree's body never re-runs,
+  /// so its `repeatForever` registration decays). See
+  /// ``ResolveContext/effectiveSuppressesRetainedReuse``.
+  package var suppressRetainedReuse: Bool
 
   package init(
     invalidatedIdentities: Set<Identity>,
@@ -27,7 +36,8 @@ package struct FrameResolveInputs {
     transaction: TransactionSnapshot,
     proposal: ProposedSize,
     usesSelectiveEvaluation: Bool,
-    environmentRequiresRootEvaluation: Bool
+    environmentRequiresRootEvaluation: Bool,
+    suppressRetainedReuse: Bool = false
   ) {
     self.invalidatedIdentities = invalidatedIdentities
     self.invalidationSummary = invalidationSummary
@@ -38,6 +48,7 @@ package struct FrameResolveInputs {
     self.proposal = proposal
     self.usesSelectiveEvaluation = usesSelectiveEvaluation
     self.environmentRequiresRootEvaluation = environmentRequiresRootEvaluation
+    self.suppressRetainedReuse = suppressRetainedReuse
   }
 }
 
@@ -113,6 +124,12 @@ package final class FrameResolveState {
   /// or during focus sync re-renders.
   package var forceRootEvaluation: Bool = false
 
+  /// When true, the next call to ``prepareInputs(from:proposal:)`` will mark the
+  /// frame's inputs to skip retained reuse in `resolveView`. The RunLoop sets
+  /// this on reuse-unsafe frames (focus move or in-flight property animation).
+  /// One-shot: consumed and reset by ``prepareInputs(from:proposal:)``.
+  package var suppressRetainedReuse: Bool = false
+
   private var previousFocusedIdentity: Identity?
   private var previousPressedIdentity: Identity?
   private var previousProposal: ProposedSize?
@@ -137,6 +154,8 @@ package final class FrameResolveState {
     previousPressedIdentity = newPressed
     previousProposal = proposal
     forceRootEvaluation = false
+    let suppressReuse = suppressRetainedReuse
+    suppressRetainedReuse = false
 
     let usesSelectiveEvaluation =
       selectiveEvaluationEnabled
@@ -152,7 +171,8 @@ package final class FrameResolveState {
       transaction: context.transaction,
       proposal: proposal,
       usesSelectiveEvaluation: usesSelectiveEvaluation,
-      environmentRequiresRootEvaluation: environmentRequiresRootEvaluation
+      environmentRequiresRootEvaluation: environmentRequiresRootEvaluation,
+      suppressRetainedReuse: suppressReuse
     )
   }
 }
