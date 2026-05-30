@@ -319,6 +319,19 @@ package final class ViewNode {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    // Reuse fast path: an unchanged reused subtree hands back exactly the nodes
+    // already attached, in the same order (recordReusedSubtree resolves each child
+    // via nodeForIdentity). The detach and re-parent loops below are then no-ops
+    // and the identity Set is pure O(children) overhead, so refresh the committed
+    // snapshot and bail. Structural changes (reorder/add/remove) fail the check and
+    // take the full reconciliation path.
+    if childrenReferToSameNodes(as: children) {
+      committed = resolved
+      isCommittedSnapshotFresh = true
+      invalidateAncestorCachedSnapshots()
+      return
+    }
+
     let newChildrenByIdentity = Set(children.map(\.identity))
     for child in self.children
     where !newChildrenByIdentity.contains(child.identity) && child.parent === self {
@@ -335,6 +348,18 @@ package final class ViewNode {
       child.parent = self
     }
     invalidateAncestorCachedSnapshots()
+  }
+
+  private func childrenReferToSameNodes(
+    as candidate: [ViewNode]
+  ) -> Bool {
+    guard candidate.count == children.count else {
+      return false
+    }
+    for index in candidate.indices where candidate[index] !== children[index] {
+      return false
+    }
+    return true
   }
 
   package func canReuse(
