@@ -349,7 +349,11 @@ package final class ViewNode {
       && isCommittedSnapshotFresh
       && committed.supportsRetainedReuse
       && committed.environmentSnapshot == environment
-      && committed.transactionSnapshot == transaction
+      // Compare resolve-time transaction *intent* (animation request + batch),
+      // not the full snapshot: the per-frame `debugSignature` (the frame's cause
+      // summary) otherwise changes every frame and defeats retained reuse for
+      // subtrees disjoint from the invalidation. See `TransactionSnapshot.isReuseEquivalent`.
+      && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
   }
 
   package var hasDirtyAncestor: Bool {
