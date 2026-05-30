@@ -148,4 +148,65 @@ struct ResolveReuseAncestorInvalidationTests {
     #expect(rendered.contains("2 *"))
     #expect(!rendered.contains("0 *"))
   }
+
+  /// Guards the H2 enabler (`TransactionSnapshot.isReuseEquivalent`): a sibling
+  /// disjoint from the invalidation must reuse across frames even though the
+  /// per-frame transaction `debugSignature` (the frame's cause summary) changes
+  /// every frame. Before the enabler, `canReuse`'s full `==` on the transaction
+  /// saw the changing `debugSignature` and defeated all retained reuse, so the
+  /// whole tree re-resolved every invalidation frame.
+  @Test("disjoint-sibling reuse survives a per-frame transaction debugSignature change")
+  func disjointSiblingReuseSurvivesDebugSignatureChange() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let rootIdentity = testIdentity("DisjointReuse")
+    let aID = testIdentity("DisjointReuse", "A")
+    let bID = testIdentity("DisjointReuse", "B")
+
+    struct TwoSiblings: View {
+      let aID: Identity
+      let bID: Identity
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("A0")
+            Text("A1")
+          }
+          .id(aID)
+          VStack(alignment: .leading, spacing: 0) {
+            Text("B0")
+            Text("B1")
+          }
+          .id(bID)
+        }
+      }
+    }
+
+    _ = renderer.render(
+      TwoSiblings(aID: aID, bID: bID),
+      context: .init(
+        identity: rootIdentity,
+        transaction: TransactionSnapshot(debugSignature: "frame-1")
+      )
+    )
+
+    // Invalidate only the A subtree, under a DIFFERENT debugSignature than the
+    // first frame. The B subtree is disjoint and must reuse despite the
+    // signature change.
+    let second = renderer.render(
+      TwoSiblings(aID: aID, bID: bID),
+      context: .init(
+        identity: rootIdentity,
+        transaction: TransactionSnapshot(debugSignature: "frame-2"),
+        invalidatedIdentities: [aID]
+      )
+    )
+
+    #expect(second.diagnostics.work.resolvedNodesReused > 0)
+    let rendered = second.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("A0"))
+    #expect(rendered.contains("B0"))
+  }
 }
