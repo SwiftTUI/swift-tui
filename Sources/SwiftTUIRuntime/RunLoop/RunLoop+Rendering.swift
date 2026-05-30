@@ -16,7 +16,7 @@ extension RunLoop {
     observationBridge.attachInvalidator(scheduler)
 
     let hasFrameSink = frameSink != nil
-    while var scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+    while var scheduledFrame = scheduler.consumeReadyFrame(at: frameReadinessClock()) {
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
@@ -228,7 +228,7 @@ extension RunLoop {
     observationBridge.attachInvalidator(scheduler)
 
     let hasFrameSink = frameSink != nil
-    frameLoop: while var scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+    frameLoop: while var scheduledFrame = scheduler.consumeReadyFrame(at: frameReadinessClock()) {
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
