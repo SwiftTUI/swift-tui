@@ -162,6 +162,34 @@ package final class LocalDefaultFocusRegistry: Equatable {
     candidates.append(contentsOf: snapshot.candidates)
   }
 
+  /// Re-sorts the append-ordered scope/candidate lists into canonical
+  /// identity order (stable within an identity). A scoped `.subtrees` restore
+  /// re-appends the changed subtree's entries at the end; normalizing restores
+  /// the same order a full rebuild produces (nodes restored in
+  /// `liveIdentities.sorted()` order), so default-focus resolution — which
+  /// returns the first matching candidate — is byte-identical regardless of
+  /// which subtree was invalidated.
+  package func normalizeOrderByIdentity() {
+    scopes = Self.stableSortedByIdentity(scopes, by: \.identity)
+    candidates = Self.stableSortedByIdentity(candidates, by: \.identity)
+  }
+
+  private static func stableSortedByIdentity<Element>(
+    _ elements: [Element],
+    by identity: (Element) -> Identity
+  ) -> [Element] {
+    elements.enumerated()
+      .sorted { lhs, rhs in
+        let lhsIdentity = identity(lhs.element)
+        let rhsIdentity = identity(rhs.element)
+        if lhsIdentity != rhsIdentity {
+          return lhsIdentity < rhsIdentity
+        }
+        return lhs.offset < rhs.offset
+      }
+      .map(\.element)
+  }
+
   private func focusRequest(
     in namespace: MatchedGeometryNamespace,
     focusRegions: [FocusRegion]
@@ -339,6 +367,22 @@ package final class LocalFocusBindingRegistry: Equatable {
     }
 
     registrations.append(contentsOf: snapshot)
+  }
+
+  /// Re-sorts the append-ordered registration list into canonical identity
+  /// order (stable within an identity), matching a full rebuild's order after a
+  /// scoped `.subtrees` restore. See
+  /// ``LocalDefaultFocusRegistry/normalizeOrderByIdentity()``.
+  package func normalizeOrderByIdentity() {
+    registrations =
+      registrations.enumerated()
+      .sorted { lhs, rhs in
+        if lhs.element.identity != rhs.element.identity {
+          return lhs.element.identity < rhs.element.identity
+        }
+        return lhs.offset < rhs.offset
+      }
+      .map(\.element)
   }
 
   private func orderedGroups(

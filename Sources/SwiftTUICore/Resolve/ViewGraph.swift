@@ -1010,6 +1010,22 @@ package final class ViewGraph {
     )
   }
 
+  /// Scoped counterpart to ``restoreCurrentFrameRuntimeRegistrations``: restores
+  /// runtime registrations for ONLY the live subtrees rooted at `roots`, walking
+  /// each root's ViewNode subtree (O(subtree)) instead of the full live-identity
+  /// set. Used on `.subtrees` publication frames, where the preceding
+  /// `removeSubtrees(rootedAt:)` cleared exactly these subtrees and untouched
+  /// subtrees' registrations remain valid in place — so re-publishing the whole
+  /// tree (the former behavior) is redundant O(tree) work.
+  package func restoreRuntimeRegistrationSubtrees(
+    rootedAt roots: [Identity],
+    into registrations: RuntimeRegistrationSet
+  ) {
+    for root in roots {
+      nodesByIdentity[root]?.restoreRuntimeRegistrations(into: registrations)
+    }
+  }
+
   private func pruneLifecycleEvaluationOwners(
     ownedBy ownerIdentity: Identity
   ) {

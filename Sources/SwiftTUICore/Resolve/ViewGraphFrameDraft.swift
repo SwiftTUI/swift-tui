@@ -84,13 +84,28 @@ package final class ViewGraphFrameDraft {
     precondition(!didCommit && !didDiscard)
     switch runtimeRegistrationPublication {
     case .unchanged:
-      break
+      // Nothing re-evaluated: registrations are unchanged. Re-publish the full
+      // set (current behavior — leaves the live registry equal to last frame).
+      viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     case .all:
       liveRegistrations.resetAll()
+      viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     case .subtrees(let roots):
+      // The reset is scoped to `roots`; scope the restore to match instead of
+      // re-publishing the whole tree. Untouched subtrees' registrations stay in
+      // place, so the result equals a full rebuild for the changed subtrees —
+      // this is the O(tree) commit win (the reset already removed exactly these
+      // subtrees). See the registration-restore fix plan.
       liveRegistrations.removeSubtrees(rootedAt: roots)
+      viewGraph.restoreRuntimeRegistrationSubtrees(
+        rootedAt: roots,
+        into: liveRegistrations
+      )
+      // The scoped restore re-appends the changed subtree's focus registrations
+      // at the end; normalize the order-sensitive focus lists back to canonical
+      // identity order so the live registry is byte-identical to a full rebuild.
+      liveRegistrations.normalizeScopedRestoreOrder()
     }
-    viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     didCommit = true
     return liveRegistrations.diagnostics()
   }
