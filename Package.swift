@@ -336,6 +336,35 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
 
+    // Launch-entry-point regression fixtures. Tiny executables that
+    // `EntryPointLaunchTests` runs under a PTY to prove `@main` starts the
+    // runtime and a bare `MyApp.main()` is rejected with a diagnostic. They are
+    // build-order dependencies of that test target, not importable modules.
+    .executableTarget(
+      name: "EntryPointFixtureAtMain",
+      dependencies: ["SwiftTUI"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureAtMain",
+      swiftSettings: swiftSettings()
+    ),
+    .executableTarget(
+      name: "EntryPointFixtureBare",
+      dependencies: ["SwiftTUI"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureBare",
+      swiftSettings: swiftSettings()
+    ),
+    .executableTarget(
+      name: "EntryPointFixtureCLIBare",
+      dependencies: ["SwiftTUICLI", "SwiftTUIArguments"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureCLIBare",
+      swiftSettings: swiftSettings()
+    ),
+    .executableTarget(
+      name: "EntryPointFixtureWebHostCLIBare",
+      dependencies: ["SwiftTUIWebHostCLI", "SwiftTUIArguments"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureWebHostCLIBare",
+      swiftSettings: swiftSettings()
+    ),
+
     .testTarget(
       name: "SwiftTUICoreTests",
       dependencies: [
@@ -460,6 +489,21 @@ let package = Package(
         "SwiftTUI",
         "SwiftTUITestSupport",
       ],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "EntryPointLaunchTests",
+      dependencies: [
+        "SwiftTUIArguments",
+        "SwiftTUICore",
+        "SwiftTUIPTYPrimitives",
+        "SwiftTUITerminal",
+        "EntryPointFixtureAtMain",
+        "EntryPointFixtureBare",
+        "EntryPointFixtureCLIBare",
+        "EntryPointFixtureWebHostCLIBare",
+      ],
+      path: "Tests/EntryPointLaunchTests",
       swiftSettings: swiftSettings()
     ),
 

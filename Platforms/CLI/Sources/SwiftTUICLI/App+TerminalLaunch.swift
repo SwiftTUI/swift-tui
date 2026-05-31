@@ -72,6 +72,18 @@ extension App where Self: SwiftTUICommand {
       exit(withError: error)
     }
   }
+
+  /// Diagnostic shim for the synchronous-`main()` launch trap, co-located with
+  /// the async `main()` above. See `SwiftTUI.App.main() -> Never` for the full
+  /// rationale: a bare `MyApp.main()` (or `await MyApp.main()`) otherwise
+  /// resolves to swift-argument-parser's synchronous `ParsableCommand.main()`
+  /// overload and never starts the runtime. This `-> Never` overload is the
+  /// most-derived *synchronous* `main()` for terminal-native commands, so a
+  /// bare call selects it for a loud, accurate failure, while staying invisible
+  /// to `@main` synthesis.
+  public static func main() -> Never {
+    failSynchronousLaunch(commandType: self)
+  }
 }
 
 private func exitLaunch(withError error: any Error) -> Never {
