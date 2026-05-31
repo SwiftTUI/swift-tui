@@ -4,13 +4,6 @@
 import Foundation
 import PackageDescription
 
-let nativeRuntimePlatforms: [PackageDescription.Platform] = [
-  .macOS,
-  .linux,
-  .android,
-  .iOS,
-]
-
 let explicitPlatforms = ProcessInfo.processInfo.environment["DISABLE_EXPLICIT_PLATFORMS"] != "1"
 
 let packagePlatforms: [SupportedPlatform]? = {
@@ -109,7 +102,7 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
     .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
     .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
-    // Exported so example packages can synchronise their tests on
+    // Exported so example packages can synchronize their tests on
     // the shared poll-free signals instead of timeout-based waiting.
     .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
   ]
