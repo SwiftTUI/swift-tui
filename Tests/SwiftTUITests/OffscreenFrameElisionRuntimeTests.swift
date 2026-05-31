@@ -280,18 +280,23 @@ struct OffscreenFrameElisionRuntimeTests {
     // Mount the tree (and run the onAppear-triggered follow-up) so the
     // repeatForever animation is in flight and the off-screen border has been
     // committed once (clipped, so it is absent from previousDrawnIdentities).
+    //
+    // The mount + onAppear-follow-up settle MUST use the SYNCHRONOUS driver. The
+    // async driver suspends at `acquireFrameArtifactsAsync` and can drop a
+    // committed frame's tail under heavy parallel MainActor contention; if the
+    // onAppear-follow-up frame (the one whose resolve registers the
+    // `repeatForever` animation) is dropped, `activeAnimationCount` stays 0 and
+    // this test flakes. `renderPendingFrames` shares the exact same
+    // `applyAcquiredFrame` body but renders straight-line with no suspension and
+    // no drop arm, so the registration is deterministic. The elision path under
+    // test is still exercised by the ASYNC deadline tick below. See
+    // docs/KNOWN-TEST-FLAKES.md.
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     runLoop.renderer.enableSelectiveEvaluation()
     while scheduler.hasPendingFrame(at: frozenNow) {
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
-      )
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     }
 
     #expect(
@@ -413,16 +418,18 @@ struct OffscreenFrameElisionRuntimeTests {
     // previousDrawnIdentities).
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
+    // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
+    // and can drop the onAppear-follow-up frame's tail under heavy parallel
+    // MainActor contention, leaving the animation unregistered
+    // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
+    // shares the exact same `applyAcquiredFrame` body but renders straight-line
+    // with no suspension and no drop arm, so registration is deterministic; the
+    // elision path under test is still driven via the ASYNC ticks below. See
+    // docs/KNOWN-TEST-FLAKES.md.
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     runLoop.renderer.enableSelectiveEvaluation()
     while scheduler.hasPendingFrame(at: .now()) {
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
-      )
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     }
 
     #expect(
@@ -563,16 +570,18 @@ struct OffscreenFrameElisionRuntimeTests {
 
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
+    // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
+    // and can drop the onAppear-follow-up frame's tail under heavy parallel
+    // MainActor contention, leaving the animation unregistered
+    // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
+    // shares the exact same `applyAcquiredFrame` body but renders straight-line
+    // with no suspension and no drop arm, so registration is deterministic; the
+    // elision path under test is still driven via the ASYNC ticks below. See
+    // docs/KNOWN-TEST-FLAKES.md.
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     runLoop.renderer.enableSelectiveEvaluation()
     while scheduler.hasPendingFrame(at: .now()) {
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
-      )
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     }
 
     #expect(
@@ -691,16 +700,18 @@ struct OffscreenFrameElisionRuntimeTests {
     // previousDrawnIdentities because it is below the 2-row viewport).
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
+    // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
+    // and can drop the onAppear-follow-up frame's tail under heavy parallel
+    // MainActor contention, leaving the animation unregistered
+    // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
+    // shares the exact same `applyAcquiredFrame` body but renders straight-line
+    // with no suspension and no drop arm, so registration is deterministic; the
+    // elision path under test is still driven via the ASYNC ticks below. See
+    // docs/KNOWN-TEST-FLAKES.md.
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     runLoop.renderer.enableSelectiveEvaluation()
     while scheduler.hasPendingFrame(at: .now()) {
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
-      )
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     }
 
     let controller = runLoop.renderer.internalAnimationController
@@ -828,12 +839,19 @@ struct OffscreenFrameElisionRuntimeTests {
     // transition starts. The off-screen border has not yet appeared (it is
     // gated behind `!showPanel`), so the only animation in flight is the
     // unambiguous finite removal.
+    //
+    // This setup MUST use the SYNCHRONOUS driver. The async driver suspends at
+    // `acquireFrameArtifactsAsync` and can drop a committed frame's tail under
+    // heavy parallel MainActor contention; if the onAppear-follow-up frame (the
+    // one whose resolve starts the removal transition) is dropped, the removal
+    // never registers and `removingIdentities` is empty here. `renderPendingFrames`
+    // shares the exact same `applyAcquiredFrame` body but renders straight-line
+    // with no suspension and no drop arm, so the removal start is deterministic.
+    // The elision path under test is still exercised by the ASYNC deadline ticks
+    // in Phase 1/2 below. See docs/KNOWN-TEST-FLAKES.md.
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     let controller = runLoop.renderer.internalAnimationController
     runLoop.renderer.enableSelectiveEvaluation()
 
@@ -866,12 +884,12 @@ struct OffscreenFrameElisionRuntimeTests {
 
     // The off-screen border now appears (it was gated behind `!showPanel`); run
     // any pending follow-up frames so its onAppear starts the repeatForever
-    // animation on a frame distinct from the removal.
+    // animation on a frame distinct from the removal. Synchronous driver again:
+    // the async path could drop the border's onAppear-follow-up frame under
+    // contention, leaving its repeatForever unregistered. The elided ticks under
+    // test are driven via the ASYNC path in Phase 2 below.
     while scheduler.hasPendingFrame(at: .now()) && ticks < maxTicks {
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
-      )
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       ticks += 1
     }
     #expect(

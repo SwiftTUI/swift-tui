@@ -148,6 +148,47 @@ the H2 work; passed in isolation.
 saturation** (the original failed 3/3 under full-gate load). Deterministic by
 construction — no timing window remains.
 
+> **Follow-on (#3 below).** The clock fix above closed the deadline-drift race
+> but the same suite carried a *second, independent* flake — the onAppear
+> registration drop — that the isolated 25/25 saturation run could not surface
+> (it needs the full suite's cross-suite MainActor contention). Fixed 2026-05-31.
+
+---
+
+### 3. `OffscreenFrameElisionRuntimeTests` — onAppear registration dropped by the async driver during setup — FIXED 2026-05-31
+
+**Tests.** `OffscreenFrameElisionRuntimeTests` (in
+`Tests/SwiftTUITests/OffscreenFrameElisionRuntimeTests.swift`) →
+`offscreenDeadlineTickElidesWithoutFreezingThenOnScreenRenders` (lines 297/331),
+`removalTransitionInterleavedWithElisionDrains` (line 840), plus the
+setup-registration assertions in the off-screen-completion, on-screen, and
+layout-animation tests.
+
+**Was.** A mechanism independent of #2 (the frame-readiness clock did not cover
+it). Each test mounts its probe and lets the view's `onAppear` register the
+animation (`withAnimation`) or start a removal transition, then asserts the
+intermediate state (`activeAnimationCount > 0` / `removingIdentities` non-empty)
+before driving the elision under test. That setup used the ASYNC driver
+`renderPendingFramesAsync`, which suspends at `acquireFrameArtifactsAsync` and can
+DROP a committed frame's tail under heavy parallel MainActor contention (the
+`.skipped`/completed-frame-drop arm). When the onAppear-follow-up frame — the one
+whose resolve registers the animation/removal — was dropped, registration never
+happened and the setup assertion failed. Reproduced **8/8** under 28-process CPU
+saturation against the full `SwiftTUITests` suite; passed 12/12 with the suite in
+isolation even under CPU load — the drop needs the *full* suite's cross-suite
+parallel MainActor contention, which is why #2's isolated 25/25 saturation did not
+surface it.
+
+**Fix.** Drive every SETUP phase (mount + the onAppear-follow-up settle, and the
+post-removal border-appearance settle) with the SYNCHRONOUS driver
+`renderPendingFrames`. It shares the exact same `applyAcquiredFrame` body but
+renders straight-line — no suspension, no `.elided`/`.skipped` drop arm — so the
+registration is deterministic. The elision path under test is unchanged: every
+test still drives its deadline ticks through the ASYNC `renderPendingFramesAsync`.
+
+**Verification.** **0/12 green under 28-process CPU saturation against the full
+`SwiftTUITests` suite** — the identical harness reproduced the pre-fix flake 8/8.
+
 ---
 
 ## Triage checklist
