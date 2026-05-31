@@ -43,9 +43,15 @@ extension LayoutEngine {
       supportsRetainedLayoutReuse(for: resolved),
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),
-      let previousPlaced = retainedLayout.placedNode(for: resolved.identity),
-      previousResolved.isEquivalentForPlacement(to: resolved)
+      let previousPlaced = retainedLayout.placedNode(for: resolved.identity)
     else {
+      return nil
+    }
+
+    // One walk decides both reuse validity (geometry) and whether the
+    // geometry-stable metadata mirrors are also unchanged.
+    let equivalence = previousResolved.placementEquivalence(to: resolved)
+    guard equivalence != .divergent else {
       return nil
     }
 
@@ -53,15 +59,26 @@ extension LayoutEngine {
     let translationMeasurementMatches = isEquivalentForViewportTranslation(
       previousMeasured, measured)
 
+    // `placementEquivalence` deliberately ignores resolved metadata that does
+    // not affect geometry so visual, semantic, lifecycle, and animation-tick
+    // mutations can reuse cached layout. When the subtree is fully `.identical`,
+    // the cached placed subtree already mirrors the current resolved tree, so it
+    // is returned untouched — skipping the O(subtree) metadata-sync rebuild that
+    // otherwise made placement reuse nearly as costly as recomputation. When
+    // only geometry matches (`.geometryReusable`), the mirrors are refreshed
+    // from the current resolved tree while preserving cached bounds.
+    let skipMetadataSync = equivalence == .identical
+    func reuse(_ placed: PlacedNode) -> PlacedNode {
+      skipMetadataSync
+        ? placed
+        : synchronizeRetainedPhaseMetadata(placed: placed, from: resolved)
+    }
+
     if previousPlaced.bounds == bounds {
       guard measurementMatches else {
         return nil
       }
-      // `isEquivalentForPlacement` deliberately ignores resolved metadata
-      // that does not affect geometry so visual, semantic, lifecycle, and
-      // animation tick mutations can reuse layout. Refresh those mirrors from
-      // the current resolved tree while preserving cached bounds.
-      return synchronizeRetainedPhaseMetadata(placed: previousPlaced, from: resolved)
+      return reuse(previousPlaced)
     }
 
     guard
@@ -77,13 +94,10 @@ extension LayoutEngine {
       y: bounds.origin.y - previousPlaced.bounds.origin.y
     )
     if delta == .zero {
-      return synchronizeRetainedPhaseMetadata(placed: previousPlaced, from: resolved)
+      return reuse(previousPlaced)
     }
 
-    return synchronizeRetainedPhaseMetadata(
-      placed: translatedPlacement(previousPlaced, by: delta),
-      from: resolved
-    )
+    return reuse(translatedPlacement(previousPlaced, by: delta))
   }
 
   /// Walks a reused placed subtree in parallel with the current
