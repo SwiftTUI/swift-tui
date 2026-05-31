@@ -84,9 +84,13 @@ package final class ViewGraphFrameDraft {
     precondition(!didCommit && !didDiscard)
     switch runtimeRegistrationPublication {
     case .unchanged:
-      // Nothing re-evaluated: registrations are unchanged. Re-publish the full
-      // set (current behavior — leaves the live registry equal to last frame).
-      viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+      // Nothing was re-evaluated, so no node's registrations changed. The live
+      // registry already holds the last committed (canonical) state, so there is
+      // nothing to do: re-publishing would be redundant O(tree) work AND would
+      // append duplicates into the order-sensitive focus lists (which are not
+      // reset on this path). Skipping leaves the registry byte-identical to a
+      // full rebuild.
+      break
     case .all:
       liveRegistrations.resetAll()
       viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
