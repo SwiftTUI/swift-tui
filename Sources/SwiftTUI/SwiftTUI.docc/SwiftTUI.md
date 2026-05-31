@@ -23,6 +23,14 @@ struct DemoApp: App {
 }
 ```
 
+> Important: Launch SwiftTUI apps with `@main`. `App.main()` is `async`, and
+> `@main` binds that asynchronous entry point. Do **not** add a top-level
+> `DemoApp.main()` call in a `main.swift`: unlike synchronous `SwiftUI.App`,
+> that resolves to swift-argument-parser's synchronous `ParsableCommand.main()`
+> overload and never starts the runtime (`await DemoApp.main()` does not change
+> the selection). SwiftTUI rejects that path with a precise diagnostic instead
+> of starting silently, so use `@main`.
+
 Apps that define their own command-line options keep those options on the app
 type and add the standard option group:
 
@@ -42,8 +50,8 @@ struct DemoApp: App {
 }
 ```
 
-The default `App.main()` uses the terminal runner unless the parsed
-configuration requests `--web`, in which case it launches the localhost
+The default `App.main()` (bound by `@main`) uses the terminal runner unless the
+parsed configuration requests `--web`, in which case it launches the localhost
 WebHost bridge. Use `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWebHost`, or
 `SwiftTUIWebHostCLI` directly when building a narrower custom graph. Add peer
 products such as `SwiftTUICharts`, `SwiftTUITerminal`, or

@@ -6,6 +6,8 @@ public import SwiftTUIRuntime
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(WASILibc)
+  import WASILibc
 #endif
 
 /// A SwiftTUI command with framework-managed argument parsing.
@@ -101,5 +103,63 @@ extension SwiftTUICommand {
     }
 
     return try parseAsRoot(arguments)
+  }
+}
+
+/// The synchronous-launch diagnostic text for a command type named `name`.
+///
+/// Factored out of `failSynchronousLaunch(commandType:)` so the wording can be
+/// asserted by a unit test without terminating the test process.
+package func synchronousLaunchDiagnosticMessage(commandTypeName name: String) -> String {
+  """
+  SwiftTUI: `\(name)` was launched through the synchronous `main()` entry \
+  point, so the runtime never started.
+
+  SwiftTUI apps are asynchronous -- `App.main()` is `async`. A bare \
+  `\(name).main()` call, or `await \(name).main()`, resolves to \
+  swift-argument-parser's synchronous `ParsableCommand.main()` overload \
+  instead of the async entry point, and that overload does not start the \
+  runtime.
+
+  Launch the app with `@main` and remove any explicit `main()` call:
+
+      @main
+      struct \(name): App {
+        var body: some Scene { /* ... */ }
+      }
+
+  """
+}
+
+/// Writes the synchronous-launch diagnostic to standard error and exits.
+///
+/// Shared by the `static func main() -> Never` diagnostic shims that each
+/// launch layer co-locates with its async `main()` (see `SwiftTUI.App`,
+/// `SwiftTUICLI`, and `SwiftTUIWebHostCLI`). Kept free of `ArgumentParser`'s own
+/// (`#if DEBUG`-only) configuration-failure path so the message is identical and
+/// present in DEBUG and release builds alike.
+package func failSynchronousLaunch(commandType: Any.Type) -> Never {
+  let message = synchronousLaunchDiagnosticMessage(
+    commandTypeName: String(describing: commandType)
+  )
+  writeToStandardError(message)
+  #if canImport(Darwin)
+    Darwin.exit(EXIT_FAILURE)
+  #elseif canImport(Glibc)
+    Glibc.exit(EXIT_FAILURE)
+  #elseif canImport(WASILibc)
+    WASILibc.exit(EXIT_FAILURE)
+  #else
+    fatalError(message)
+  #endif
+}
+
+private func writeToStandardError(_ text: String) {
+  var text = text
+  text.withUTF8 { buffer in
+    guard let base = buffer.baseAddress, buffer.count > 0 else {
+      return
+    }
+    _ = unsafe write(STDERR_FILENO, base, buffer.count)
   }
 }

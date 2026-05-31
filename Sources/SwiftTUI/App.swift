@@ -38,6 +38,28 @@ extension App {
     }
   }
 
+  /// Diagnostic shim for the synchronous-`main()` launch trap.
+  ///
+  /// `App` refines `SwiftTUICommand` → `AsyncParsableCommand`, whose entry
+  /// point is `static func main() async` — bound correctly by `@main`. A bare
+  /// top-level `MyApp.main()` (the muscle-memory from synchronous
+  /// `SwiftUI.App.main()`), or `await MyApp.main()`, instead resolves to
+  /// swift-argument-parser's *synchronous* `ParsableCommand.main()` overload,
+  /// which never starts the runtime: in DEBUG it aborts with a misleading
+  /// "asynchronous root command needs availability annotation" message, and in
+  /// release the guard is compiled out, so it silently parses-as-root and
+  /// prints the usage screen.
+  ///
+  /// This overload, co-located with the async `main()` above, shadows that
+  /// path. It is the most-derived *synchronous* `main()`, so a bare call
+  /// selects it and gets a single loud, accurate failure in DEBUG and release
+  /// alike, while its `-> Never` return keeps it invisible to `@main` synthesis
+  /// (`() -> Never` is not a valid `@main` entry-point signature). `@main` apps
+  /// still bind the async entry point with no ambiguity.
+  public static func main() -> Never {
+    failSynchronousLaunch(commandType: self)
+  }
+
   private nonisolated static var usesStoredSwiftTUIOptions: Bool {
     Mirror(reflecting: Self.init()).children.contains { child in
       child.label == "_swiftTUIOptions" || child.label == "swiftTUIOptions"

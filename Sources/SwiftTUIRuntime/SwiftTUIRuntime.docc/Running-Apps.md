@@ -75,8 +75,18 @@ It does not pull in runner products on its own.
 
 For ordinary apps, import `SwiftTUI` and mark your app type with `@main` to use
 the default launcher. It runs in the terminal by default and switches to the
-localhost WebHost when `--web` is present. When you need a terminal-only
-explicit launcher, compose `SwiftTUIRuntime` with `SwiftTUICLI` and call:
+localhost WebHost when `--web` is present.
+
+`@main` is the supported launch form. Because `App` refines an
+`AsyncParsableCommand`, `App.main()` is `async` and only `@main` binds it
+correctly. A bare top-level `MyApp.main()` (or `await MyApp.main()`) instead
+selects swift-argument-parser's synchronous `ParsableCommand.main()` overload
+and never starts the runtime; SwiftTUI rejects that path with a precise
+diagnostic in DEBUG and release alike rather than failing silently. Mark the
+app type `@main` and do not add an explicit `main()` call.
+
+When you need a terminal-only explicit launcher, compose `SwiftTUIRuntime` with
+`SwiftTUICLI` and call:
 
 ```swift
 try await TerminalRunner.run(MyApp.self)

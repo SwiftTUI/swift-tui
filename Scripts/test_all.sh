@@ -834,6 +834,11 @@ run_function_step \
   "$(swift_command_text test --filter SwiftTUIWebHostTests)" \
   run_swift test --filter SwiftTUIWebHostTests
 
+run_function_step \
+  "Run entry-point launch tests" \
+  "$(swift_command_text test --filter EntryPointLaunchTests)" \
+  run_swift test --filter EntryPointLaunchTests
+
 # Absorbed Vendor test targets (sources under Vendor/<pkg>/, targets first-class
 # inside swift-tui's Package.swift since the Vendor sub-packages were absorbed).
 run_function_step \
