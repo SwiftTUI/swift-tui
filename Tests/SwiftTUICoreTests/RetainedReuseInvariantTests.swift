@@ -93,12 +93,14 @@ struct RetainedReuseInvariantTests {
     let engine = LayoutEngine()
     let child = PlacedNode(
       identity: testIdentity("Translated", "Child"),
-      resolvedMetadata: makeMetadata("translated-child", semanticRole: .control, isTransient: false),
+      resolvedMetadata: makeMetadata(
+        "translated-child", semanticRole: .control, isTransient: false),
       bounds: rect(x: 1, y: 1, width: 2, height: 2)
     )
     let parent = PlacedNode(
       identity: testIdentity("Translated", "Parent"),
-      resolvedMetadata: makeMetadata("translated-parent", semanticRole: .container, isTransient: false),
+      resolvedMetadata: makeMetadata(
+        "translated-parent", semanticRole: .container, isTransient: false),
       bounds: rect(x: 0, y: 0, width: 4, height: 4),
       children: [child]
     )
@@ -107,6 +109,86 @@ struct RetainedReuseInvariantTests {
 
     #expect(translated.surfaceComposition == parent.surfaceComposition)
     #expect(translated.children.first?.surfaceComposition == child.surfaceComposition)
+  }
+
+  @Test(
+    "placementEquivalence reports identical for a byte-identical subtree and the sync is a no-op")
+  func placementEquivalenceReportsIdenticalAndSyncIsNoOp() {
+    let engine = LayoutEngine()
+    let metadata = makeMetadata("eq", semanticRole: .control, isTransient: false)
+    let child = makeResolvedNode(
+      identity: testIdentity("Identical", "Child"),
+      metadata: metadata
+    )
+    let parent = makeResolvedNode(
+      identity: testIdentity("Identical", "Parent"),
+      metadata: metadata,
+      children: [child]
+    )
+
+    #expect(parent.placementEquivalence(to: parent) == .identical)
+
+    // Because the subtree is identical, the cached placed subtree already
+    // mirrors it: a metadata sync produces a byte-identical node, so returning
+    // the cached subtree untouched (the fast-path skip) is sound.
+    let placed = placedTree(from: parent, using: engine)
+    #expect(engine.synchronizeRetainedPhaseMetadata(placed: placed, from: parent) == placed)
+  }
+
+  @Test("placementEquivalence reports geometryReusable when only a metadata mirror changes")
+  func placementEquivalenceReportsGeometryReusableForMetadataOnlyChange() {
+    let base = PlacedNodeResolvedMetadata()
+    var recolored = base
+    recolored.drawEffects = .init([.blendMode(.screen)])
+
+    let identity = testIdentity("MetadataOnly")
+    let original = makeResolvedNode(identity: identity, metadata: base)
+    let changed = makeResolvedNode(identity: identity, metadata: recolored)
+
+    // Geometry is unchanged but a geometry-stable mirror (drawEffects) differs:
+    // the cached placement is still reusable, but it must be re-synced — the
+    // fast-path skip must NOT fire here, or the change would be dropped.
+    #expect(original.placementEquivalence(to: changed) == .geometryReusable)
+  }
+
+  @Test("placementEquivalence propagates a descendant metadata change to the root")
+  func placementEquivalencePropagatesDescendantMetadataChange() {
+    let base = PlacedNodeResolvedMetadata()
+    var recolored = base
+    recolored.drawEffects = .init([.blendMode(.screen)])
+
+    let childIdentity = testIdentity("Descendant", "Child")
+    let parentIdentity = testIdentity("Descendant", "Parent")
+    let parentOriginal = makeResolvedNode(
+      identity: parentIdentity,
+      metadata: base,
+      children: [makeResolvedNode(identity: childIdentity, metadata: base)]
+    )
+    let parentChanged = makeResolvedNode(
+      identity: parentIdentity,
+      metadata: base,
+      children: [makeResolvedNode(identity: childIdentity, metadata: recolored)]
+    )
+
+    // The root metadata is unchanged, but a descendant's metadata differs — the
+    // root must report `.geometryReusable`, never `.identical`, so the sync runs
+    // and refreshes the descendant.
+    #expect(parentOriginal.placementEquivalence(to: parentChanged) == .geometryReusable)
+  }
+
+  @Test("placementEquivalence reports divergent when geometry changes")
+  func placementEquivalenceReportsDivergentForGeometryChange() {
+    let base = PlacedNodeResolvedMetadata()
+    var reshaped = base
+    reshaped.drawPayload = .text("changed-geometry")
+
+    let identity = testIdentity("Divergent")
+    let original = makeResolvedNode(identity: identity, metadata: base)
+    let changed = makeResolvedNode(identity: identity, metadata: reshaped)
+
+    // `drawPayload` participates in the geometry gate, so a change makes the
+    // subtree non-reusable.
+    #expect(original.placementEquivalence(to: changed) == .divergent)
   }
 
   @Test("PlacedNodeResolvedMetadata field manifest stays synchronized")
@@ -231,6 +313,28 @@ private func projectedMetadata(
   PlacedNodeResolvedMetadata(
     resolved: resolved,
     semanticRole: engine.semanticRole(for: resolved)
+  )
+}
+
+/// Builds a placed subtree from a resolved subtree exactly as placement would —
+/// each node's `resolvedMetadata` is the projection of its resolved node — so a
+/// subsequent sync against the same resolved tree sees no change.
+private func placedTree(
+  from resolved: ResolvedNode,
+  using engine: LayoutEngine,
+  origin: Int = 0
+) -> PlacedNode {
+  var childOrigin = origin + 1
+  let children = resolved.children.map { child -> PlacedNode in
+    let placedChild = placedTree(from: child, using: engine, origin: childOrigin)
+    childOrigin += 10
+    return placedChild
+  }
+  return PlacedNode(
+    identity: resolved.identity,
+    resolvedMetadata: projectedMetadata(from: resolved, using: engine),
+    bounds: rect(x: origin, y: origin, width: 8, height: 8),
+    children: children
   )
 }
 
