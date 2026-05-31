@@ -19,11 +19,22 @@
 # forms (usleep/nanosleep/Thread.sleep) were added 2026-05-30 after a flake
 # audit found they slipped past the original regex set.
 #
-# Baseline composition (10): 6 DispatchSemaphore barriers
+# Baseline composition (11): 6 DispatchSemaphore barriers
 # (TerminalPresentationTests x4, AsyncFrameTailRenderingTests x1,
 # TerminalHostPresentationBatchingTests x1) + 4 fixed sleeps
 # (InteractiveRuntimeTests x2 usleep, AnimationRepeatForeverGrowthTests x1
-# usleep, RenderDiffTests x1 Thread.sleep).
+# usleep, RenderDiffTests x1 Thread.sleep) + 1 process watchdog
+# (EntryPointLaunchTests x1 Task.sleep).
+#
+# NOTE: the EntryPointLaunchTests occurrence is a *process watchdog backstop*,
+# not timeout-driven synchronisation. `runFixture` reads a launched fixture's
+# PTY output event-by-event and stops the moment the expected marker appears;
+# the real wait is the event-driven read loop. The `Task.sleep` only arms a
+# SIGKILL that fires if a wedged or never-rendering fixture would otherwise hang
+# the suite forever — there is no signal to await because the failure mode is
+# the absence of one. It cannot be converted to AsyncEvent/MainActorCondition-
+# Signal/AsyncStream and is grandfathered like the fixed-sleep latency
+# injections above.
 #
 # NOTE: all 4 fixed sleeps are deliberate *presentation-latency injections*
 # inside mock present()/presentObserver methods — they simulate a slow terminal

@@ -195,6 +195,18 @@ let package = Package(
       name: "SwiftTUIPTYCPrimitives",
       path: "Platforms/Embedding/Sources/SwiftTUIPTYCPrimitives"
     ),
+    // C shim that exposes `dladdr` to `EntryPointLaunchTests` so the suite can
+    // resolve the loaded test-bundle path and locate sibling fixture
+    // executables. `dladdr`/`Dl_info` are GNU extensions Swift's `Glibc`
+    // overlay does not surface on Linux; the C side defines `_GNU_SOURCE` and
+    // links `dl` so the symbol resolves on every platform.
+    .target(
+      name: "CEntryPointImageLocator",
+      path: "Tests/CEntryPointImageLocator",
+      linkerSettings: [
+        .linkedLibrary("dl", .when(platforms: [.linux]))
+      ]
+    ),
     .target(
       name: "SwiftTUIPTYPrimitives",
       dependencies: [
@@ -491,6 +503,7 @@ let package = Package(
         "SwiftTUICore",
         "SwiftTUIPTYPrimitives",
         "SwiftTUITerminal",
+        "CEntryPointImageLocator",
         "EntryPointFixtureAtMain",
         "EntryPointFixtureBare",
         "EntryPointFixtureCLIBare",

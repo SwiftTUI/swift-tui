@@ -1,3 +1,4 @@
+import CEntryPointImageLocator
 import Foundation
 import SwiftTUIArguments
 import SwiftTUICore
@@ -5,6 +6,8 @@ import SwiftTUIPTYPrimitives
 import SwiftTUITerminal
 import Testing
 
+// Signal constants (`SIGKILL`) come from the platform C library; `dladdr` is
+// reached through `CEntryPointImageLocator` because `Glibc` does not surface it.
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -171,7 +174,9 @@ struct EntryPointLaunchTests {
   /// path (inside `.build/<triple>/<config>/…`); we then ascend to the
   /// directory that actually contains the fixture binary. This works for both
   /// the macOS `.xctest` bundle layout and the flat Linux layout, and naturally
-  /// follows the DEBUG/release configuration the suite was built in.
+  /// follows the DEBUG/release configuration the suite was built in. `dladdr`
+  /// is reached through the `CEntryPointImageLocator` C shim because Swift's
+  /// `Glibc` overlay does not surface it on Linux.
   private static func fixtureExecutableURL(named name: String) throws -> URL {
     let imagePath = try #require(testImagePath(), "could not resolve the test image path")
     var directory = URL(fileURLWithPath: imagePath).deletingLastPathComponent()
@@ -186,9 +191,8 @@ struct EntryPointLaunchTests {
   }
 
   private static func testImagePath() -> String? {
-    var info = unsafe Dl_info()
     let address = unsafe unsafeBitCast(ImageAnchor.self, to: UnsafeRawPointer.self)
-    guard unsafe dladdr(address, &info) != 0, let name = unsafe info.dli_fname else {
+    guard let name = unsafe swift_tui_image_path_containing(address) else {
       return nil
     }
     return unsafe String(cString: name)
