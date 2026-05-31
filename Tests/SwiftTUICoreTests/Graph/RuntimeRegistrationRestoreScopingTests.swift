@@ -75,6 +75,52 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(candidates.map(\.identity) == [aIdentity, bIdentity])
   }
 
+  @Test(".unchanged commit re-publishes nothing — registry stays byte-identical (no focus dup)")
+  func unchangedCommitLeavesRegistryByteIdentical() {
+    let rootIdentity = testIdentity("Root")
+    let aIdentity = testIdentity("Root", "A")
+    let bIdentity = testIdentity("Root", "B")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    seedTwoFocusableSiblings(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      aIdentity: aIdentity,
+      bIdentity: bIdentity,
+      namespace: namespace
+    )
+
+    // Full publish into the live registry — the canonical state.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+
+    // Commit an `.unchanged` frame: nothing was re-evaluated, so no dirty plan is
+    // recorded and the publication stays at its `.unchanged` default. Committing
+    // must NOT re-publish (which would append duplicate focus candidates).
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    graphDraft.commitRuntimeRegistrations(from: graph)
+
+    // Oracle: a full rebuild of the same committed graph.
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+    // No duplication: exactly the two candidates, once each.
+    let candidates = liveRegistrations.defaultFocusRegistry?.snapshot().candidates ?? []
+    #expect(candidates.map(\.identity) == [aIdentity, bIdentity])
+  }
+
   @MainActor
   private func seedTwoFocusableSiblings(
     graph: ViewGraph,
