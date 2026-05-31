@@ -1,5 +1,6 @@
 SwiftTUI.App
 SwiftTUI.App.main()
+SwiftTUI.App.main()
 SwiftTUI.App.swiftTUIOptions
 SwiftTUIAnimatedImage.AnimatedGIF
 SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)
