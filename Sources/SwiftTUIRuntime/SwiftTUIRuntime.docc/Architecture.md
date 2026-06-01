@@ -82,7 +82,7 @@ For a deeper look at how those pieces fit together at the host boundary, see <do
 
 ## Frame Pipeline
 
-`DefaultRenderer` executes one composed runtime pipeline:
+``DefaultRenderer`` executes one composed runtime pipeline:
 
 ```text
 head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
@@ -98,10 +98,10 @@ Within that composition, the typed phase products still flow in this order:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-This product ordering is visible in `RuntimeRenderPipeline` stage metadata,
-``FrameArtifacts``, diagnostics, and the regression suites. It is not a claim
-that the production runtime schedules seven independent closure stages for each
-frame.
+The product model is documented in
+<doc:SwiftTUICore/Rendering-Pipeline>. The runtime scheduling, cancellation,
+commit policy, diagnostics, and host handoff are documented in
+<doc:Runtime-Render-Pipeline>.
 
 ## Coordinate Domains
 
@@ -114,53 +114,6 @@ This split lets the same authored app run on cell-only terminals and on native,
 web, or terminal-pixel hosts. The semantic snapshot can route against stable
 cell regions while the handler receives the most precise point the runtime can
 provide.
-
-### Resolve
-
-- Public `View` values are lowered into `ResolvedNode` trees
-- Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
-- Environment and metadata are merged here
-- Root presentation entries are declared during normal base resolution. The
-  portal root reconciles those entries, then composes active overlays around the
-  resolved base tree so the displayed base subtree keeps its authored identity
-  space
-- Reuse is conservative and keyed by identity, invalidation scope, and compatible context
-
-### Measure
-
-- The layout engine probes resolved nodes under proposals and produces `MeasuredNode` trees
-- Measurement is cacheable and side-effect free
-- Custom layouts, alignment, spacing, `fixedSize`, and text measurement live here
-
-### Place
-
-- The same layout engine turns measured nodes into `PlacedNode` trees
-- Placement is the authoritative geometry source for interaction regions, content bounds, scrolling extents, and later composition
-
-### Semantics
-
-- The semantic extractor walks the placed tree to derive focus regions, interaction regions, action routes, selection routes, and scroll routes
-- Disabled state, interaction gates, and hit policy are respected here so
-  non-interactive nodes fall out of routing
-
-### Draw
-
-- The draw extractor lowers placed nodes into draw commands
-- Styling, text payloads, rules, shapes, collection chrome, table chrome, and indicators are handled here
-
-### Raster
-
-- The rasterizer converts draw commands into a cell surface with styled runs
-- Terminal capability adaptation is not part of layout; it happens later during presentation
-- Raster cells are data, not terminal bytes. The presentation layer is
-  responsible for sanitizing control scalars and hyperlink destinations before
-  writing to a terminal stream.
-
-### Commit
-
-- The commit planner packages semantic, lifecycle, and handler-installation work into a `CommitPlan`
-- The view graph owns lifecycle state and emits explicit appear, disappear, task-start, and task-cancel operations during frame finalization
-- Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
 
 ## Runtime Model
 
@@ -221,6 +174,6 @@ convenience product.
 ## See Also
 
 - <doc:Runtime>
+- <doc:Runtime-Render-Pipeline>
 - <doc:Vision>
 - <doc:Host-Integration>
-- [Architecture details](https://github.com/SwiftTUI/swift-tui/blob/main/docs/ARCHITECTURE.md)

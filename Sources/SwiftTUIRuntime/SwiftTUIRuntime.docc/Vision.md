@@ -36,6 +36,5 @@ SwiftTUI provides:
 
 - <doc:Architecture>
 - <doc:Runtime>
+- <doc:Runtime-Render-Pipeline>
 - <doc:Host-Integration>
-- [Project Vision](https://github.com/SwiftTUI/swift-tui/blob/main/docs/VISION.md)
-- [Vision Gap](https://github.com/SwiftTUI/swift-tui/blob/main/docs/VISION-GAP.md)

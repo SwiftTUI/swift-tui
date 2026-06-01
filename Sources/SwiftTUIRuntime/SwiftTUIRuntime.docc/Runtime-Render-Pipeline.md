@@ -22,8 +22,8 @@ path both produce ``FrameArtifacts``. The interactive path adds invalidation
 coalescing, frame-tail cancellation, completed-frame drop policy, host-facing
 damage derivation, and presentation to a concrete surface.
 
-For the phase-product reference, see the `SwiftTUICore` article
-`SwiftTUICore/Rendering-Pipeline`.
+For the phase-product reference, see
+<doc:SwiftTUICore/Rendering-Pipeline>.
 
 ## Interactive Callpath
 

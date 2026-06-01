@@ -14,9 +14,9 @@ browser, or host-managed surface. The runtime may schedule measure, place,
 semantics, draw, and raster as a fused frame-tail performance node, but the
 products retain distinct ownership and diagnostics.
 
-This article describes the product model. For the implementation walkthrough,
-runtime callpath, host clients, and profiling guidance, see the
-[render pipeline code walkthrough](https://github.com/SwiftTUI/swift-tui/blob/main/docs/RENDER-PIPELINE.md).
+This article describes the product model. For runtime scheduling, cancellation,
+host handoff, and diagnostics, see
+<doc:SwiftTUIRuntime/Runtime-Render-Pipeline>.
 
 ## Runtime Mapping
 
@@ -31,10 +31,10 @@ The runtime stages are scheduling boundaries, not new frame products.
 `semantics`, `draw`, and `raster` usually run in the fused frame tail. `commit`
 publishes the resulting frame products plus lifecycle and handler effects.
 
-The direct `DefaultRenderer.render` snapshot path and the interactive run-loop
-path both produce ``FrameArtifacts``. The interactive path adds invalidation
-coalescing, frame-tail cancellation, stale-frame drop policy, host-facing
-presentation damage, and presentation to a concrete surface.
+The direct ``SwiftTUIRuntime/DefaultRenderer`` snapshot path and the interactive
+run-loop path both produce ``FrameArtifacts``. The interactive path adds
+invalidation coalescing, frame-tail cancellation, completed-frame disposition,
+host-facing presentation damage, and presentation to a concrete surface.
 
 ## Phase Roles
 
@@ -111,3 +111,5 @@ frontend contract.
 - ``FrameArtifacts``
 - ``FrameDiagnostics``
 - ``CommitPlan``
+- ``SwiftTUIRuntime/DefaultRenderer``
+- ``SwiftTUIRuntime/RunLoop``

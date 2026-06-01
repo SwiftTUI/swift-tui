@@ -46,6 +46,6 @@ they do not need terminal raw-mode or byte-writing methods.
 
 - <doc:Running-Apps>
 - <doc:Architecture>
+- <doc:Runtime-Render-Pipeline>
 - <doc:Runtime>
 - <doc:Vision>
-- [Platform and Host Integration](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md)

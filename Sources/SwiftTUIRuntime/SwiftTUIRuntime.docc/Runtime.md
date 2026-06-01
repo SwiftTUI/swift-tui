@@ -18,7 +18,8 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 
 For interactive sessions, the runtime owns the terminal alternate-screen buffer while running. That gives each ``WindowGroup`` a clean full-canvas presentation surface and restores the previous shell buffer on exit.
 
-For the underlying phases, see <doc:Architecture>.
+For the underlying phase products and runtime scheduling, see
+<doc:Runtime-Render-Pipeline>.
 
 ## Root-Hoisted Presentations
 
@@ -195,7 +196,7 @@ The CLI runner installs a crash guard before the session enters raw mode. If the
 ## See Also
 
 - <doc:Architecture>
+- <doc:Runtime-Render-Pipeline>
 - <doc:Vision>
 - <doc:Host-Integration>
 - <doc:Running-Apps>
-- [Render pipeline](https://github.com/SwiftTUI/swift-tui/blob/main/docs/RENDER-PIPELINE.md)
