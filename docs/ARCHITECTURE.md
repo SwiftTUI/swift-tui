@@ -1,9 +1,11 @@
 # Architecture
 
-This document describes how the SwiftTUI codebase is organized: its modules,
-its products, the dependency graph, the source layout, and the layout model.
-For the rendering internals see [RENDER-PIPELINE.md](RENDER-PIPELINE.md); for
-the execution environments see [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
+This internal document describes how the SwiftTUI codebase is organized: its
+modules, products, dependency graph, source layout, and layout model. For the
+developer-facing rendering internals, see
+[`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md);
+for internal execution-environment notes, see
+[HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 
 ## The big picture
 
@@ -162,7 +164,8 @@ each producing a distinct value type (`ResolvedNode`, `MeasuredNode`,
 The runtime drives those phases through a small **stage pipeline**
 (`head → animationInjection → latePreferenceReconciliation → fusedFrameTail →
 commit`) that decides what runs on the main actor versus a frame-tail worker.
-The full mechanics are in [RENDER-PIPELINE.md](RENDER-PIPELINE.md).
+The full developer-facing mechanics are in
+[`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
 
 ## The layout model
 
@@ -200,7 +203,8 @@ isolation is stated explicitly, never inferred. `View`, `Scene`, and `App` are
 `@MainActor` authoring protocols, and APIs that evaluate authored `body` trees
 (`Resolver.resolve`, `DefaultRenderer.render`) are `@MainActor`. The heavy
 middle of the pipeline runs off the main actor on a frame-tail worker; the
-boundaries are spelled out in [RENDER-PIPELINE.md](RENDER-PIPELINE.md). The repo
+boundaries are spelled out in
+[`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md). The repo
 forbids `@unchecked Sendable` and `nonisolated(unsafe)`; shared mutable state
 uses honest isolation or `Synchronization` primitives.
 

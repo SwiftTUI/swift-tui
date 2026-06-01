@@ -5,9 +5,9 @@ You author `View` values the same way you would for SwiftUI; SwiftTUI resolves,
 lays out, and renders them as terminal text, a browser canvas, or a raster
 surface embedded in a host app.
 
-This folder holds the **architecture and project documentation**. Per-API
-reference lives in the in-source DocC catalogs (see
-[API reference](#api-reference) below).
+This folder holds **internal architecture and project documentation** for
+maintainers. Developer-facing guides and API reference live in the in-source
+DocC catalogs (see [API reference](#api-reference) below).
 
 ## Map
 
@@ -18,7 +18,7 @@ flowchart TD
     GAP["VISION-GAP.md<br/>code vs. intent"]
     ARCH["ARCHITECTURE.md<br/>modules, products, layout"]
     SPLIT["REPOSITORY-SPLIT.md<br/>repository ownership"]
-    PIPE["RENDER-PIPELINE.md<br/>render callpath walkthrough"]
+    PIPE["RENDER-PIPELINE.md<br/>internal DocC pointer"]
     HOSTS["HOSTS-AND-PLATFORMS.md<br/>execution modes, platforms"]
     A11Y["ACCESSIBILITY.md<br/>semantic substrate"]
     API["PUBLIC-API.md<br/>public surface policy"]
@@ -45,7 +45,7 @@ flowchart TD
 | [VISION-GAP.md](VISION-GAP.md) | The concrete differences between the code at `HEAD` and the project's stated intent. The single gap register for the documentation. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, products, the dependency graph, source layout, layout model, and a glossary. The starting point for understanding the codebase. |
 | [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) | Repository ownership, release boundaries, and public documentation invariants. |
-| [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | Code walkthrough from app entry points through the run loop, renderer stages, phase products, host presentation, diagnostics, and runtime performance characteristics. |
+| [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | Internal compatibility pointer to the DocC render pipeline guides. |
 | [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) | The four execution modes, the platform support matrix, and terminal-program embedding. |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds four accessibility consumers. |
 | [PUBLIC-API.md](PUBLIC-API.md) | The public surface policy and inventory: what is canonical, what is package-only, and what was removed. |
@@ -56,9 +56,9 @@ flowchart TD
 
 Per-symbol API documentation is authored as DocC catalogs alongside the source:
 
-- `Sources/SwiftTUICore/SwiftTUICore.docc` — geometry, the frame pipeline, cell/pixel metrics.
+- `Sources/SwiftTUICore/SwiftTUICore.docc` — geometry, phase products, cell/pixel metrics.
 - `Sources/SwiftTUIViews/SwiftTUIViews.docc` — authoring views, state, focus, gestures, drawing.
-- `Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc` — the runtime, hosting, running apps.
+- `Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc` — the runtime, runtime render pipeline, hosting, running apps.
 - `Sources/SwiftTUICharts/SwiftTUICharts.docc` — charts and dashboards.
 - `Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc` — animated image playback.
 - `Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc` — optional profiling: `.profiling()`, the `SWIFTTUI_PROFILE` grammar, and the frame/memory/CPU signals.

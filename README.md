@@ -154,8 +154,8 @@ for snapshots, previews, or non-interactive command output — resolve a `View`
 directly with `DefaultRenderer` and `TerminalSurfaceRenderer`. See
 [`swift-tui-examples/minimal`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/minimal)
 for the pattern and
-[docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) for the frame model,
-runtime callpath, and performance characteristics.
+[SwiftTUIRuntime DocC](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md)
+for the runtime callpath, frame model, diagnostics, and host handoff.
 
 ## Using SwiftTUI from the web
 
@@ -268,12 +268,12 @@ run mode.
 
 Live API reference: <https://swifttui.sh/docs/documentation/>
 
-[docs/README.md](docs/README.md) is the canonical index for architecture and
-project documentation. Common entry points:
+[docs/README.md](docs/README.md) indexes internal architecture and project
+documentation. Developer-facing guides live in DocC. Common entry points:
 
 - [docs/VISION.md](docs/VISION.md) — what SwiftTUI is for.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules, products, layout model.
-- [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) — the render callpath, frame pipeline, clients, and performance characteristics.
+- [SwiftTUIRuntime DocC render pipeline](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md) — the runtime callpath, frame pipeline, diagnostics, and host handoff.
 - [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) — execution modes and platform support.
 - [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — the semantic substrate.
 - [docs/PUBLIC-API.md](docs/PUBLIC-API.md) — the public surface policy.

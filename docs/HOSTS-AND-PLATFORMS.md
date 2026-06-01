@@ -1,8 +1,9 @@
 # Hosts and Platforms
 
-The render pipeline ([RENDER-PIPELINE.md](RENDER-PIPELINE.md)) produces a
-committed frame. A **host** presents that frame. The same authored app can run
-under four different hosts; the pipeline above them is identical.
+The render pipeline
+([DocC source](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md))
+produces a committed frame. A **host** presents that frame. The same authored app
+can run under four different hosts; the pipeline above them is identical.
 
 ## The four execution modes
 

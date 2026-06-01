@@ -2,7 +2,8 @@
 
 Guidance for Claude Code and other agentic assistants working in this
 repository. Keep this file concise. The architecture documentation in
-[`docs/`](docs/README.md) is the source of truth — update it there, not here.
+[`docs/`](docs/README.md) holds internal project notes. Developer-facing guides
+live in the DocC catalogs under `Sources/`.
 
 ## Build & Test Commands
 
@@ -51,8 +52,9 @@ The fused tail produces the seven typed phase products in order:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
-[docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md).
+Full developer-facing detail lives in
+[Runtime-Render-Pipeline.md](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md);
+internal source-layout context lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Development Guidelines
 
@@ -69,7 +71,7 @@ Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
   graph isolation (`RunLoop` / invalidator-backed) from no-invalidator
   `DefaultRenderer` snapshot behavior; do not replace graph-scoped imperative
   state with a last-bound global fallback. See
-  [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md).
+  [Runtime-Render-Pipeline.md](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
 - For wrapper-hosted or scene-hosted regressions, reproduce against the
   composed runtime path, not just the inner view in isolation.
 - Keep terminal-output sanitization at the presentation boundary, covering both
@@ -141,5 +143,6 @@ condition-based waits over fixed sleeps. See
 
 ## Documentation
 
-[docs/README.md](docs/README.md) is the canonical index. Per-symbol API
-reference lives in the `*.docc` catalogs under `Sources/`.
+[docs/README.md](docs/README.md) indexes internal project documentation.
+Developer-facing guides and per-symbol API reference live in the `*.docc`
+catalogs under `Sources/`.
