@@ -154,7 +154,8 @@ for snapshots, previews, or non-interactive command output — resolve a `View`
 directly with `DefaultRenderer` and `TerminalSurfaceRenderer`. See
 [`swift-tui-examples/minimal`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/minimal)
 for the pattern and
-[docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) for the frame model.
+[docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) for the frame model,
+runtime callpath, and performance characteristics.
 
 ## Using SwiftTUI from the web
 
@@ -272,7 +273,7 @@ project documentation. Common entry points:
 
 - [docs/VISION.md](docs/VISION.md) — what SwiftTUI is for.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules, products, layout model.
-- [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) — the frame pipeline and frame-drop policy.
+- [docs/RENDER-PIPELINE.md](docs/RENDER-PIPELINE.md) — the render callpath, frame pipeline, clients, and performance characteristics.
 - [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) — execution modes and platform support.
 - [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — the semantic substrate.
 - [docs/PUBLIC-API.md](docs/PUBLIC-API.md) — the public surface policy.

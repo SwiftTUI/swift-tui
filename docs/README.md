@@ -18,7 +18,7 @@ flowchart TD
     GAP["VISION-GAP.md<br/>code vs. intent"]
     ARCH["ARCHITECTURE.md<br/>modules, products, layout"]
     SPLIT["REPOSITORY-SPLIT.md<br/>repository ownership"]
-    PIPE["RENDER-PIPELINE.md<br/>frame pipeline internals"]
+    PIPE["RENDER-PIPELINE.md<br/>render callpath walkthrough"]
     HOSTS["HOSTS-AND-PLATFORMS.md<br/>execution modes, platforms"]
     A11Y["ACCESSIBILITY.md<br/>semantic substrate"]
     API["PUBLIC-API.md<br/>public surface policy"]
@@ -45,7 +45,7 @@ flowchart TD
 | [VISION-GAP.md](VISION-GAP.md) | The concrete differences between the code at `HEAD` and the project's stated intent. The single gap register for the documentation. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, products, the dependency graph, source layout, layout model, and a glossary. The starting point for understanding the codebase. |
 | [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) | Repository ownership, release boundaries, and public documentation invariants. |
-| [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | The seven phase products, the runtime stage pipeline, off-main rendering, and frame-drop policy. |
+| [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | Code walkthrough from app entry points through the run loop, renderer stages, phase products, host presentation, diagnostics, and runtime performance characteristics. |
 | [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) | The four execution modes, the platform support matrix, and terminal-program embedding. |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds four accessibility consumers. |
 | [PUBLIC-API.md](PUBLIC-API.md) | The public surface policy and inventory: what is canonical, what is package-only, and what was removed. |
