@@ -15,8 +15,8 @@ semantics, draw, and raster as a fused frame-tail performance node, but the
 products retain distinct ownership and diagnostics.
 
 This article describes the product model. For runtime scheduling, cancellation,
-host handoff, and diagnostics, see
-<doc:SwiftTUIRuntime/Runtime-Render-Pipeline>.
+host handoff, and diagnostics, see the Runtime Render Pipeline article in the
+`SwiftTUIRuntime` documentation.
 
 ## Runtime Mapping
 
@@ -31,10 +31,10 @@ The runtime stages are scheduling boundaries, not new frame products.
 `semantics`, `draw`, and `raster` usually run in the fused frame tail. `commit`
 publishes the resulting frame products plus lifecycle and handler effects.
 
-The direct ``SwiftTUIRuntime/DefaultRenderer`` snapshot path and the interactive
-run-loop path both produce ``FrameArtifacts``. The interactive path adds
-invalidation coalescing, frame-tail cancellation, completed-frame disposition,
-host-facing presentation damage, and presentation to a concrete surface.
+The direct `DefaultRenderer.render` snapshot path and the interactive run-loop
+path both produce ``FrameArtifacts``. The interactive path adds invalidation
+coalescing, frame-tail cancellation, completed-frame disposition, host-facing
+presentation damage, and presentation to a concrete surface.
 
 ## Phase Roles
 
@@ -111,5 +111,3 @@ frontend contract.
 - ``FrameArtifacts``
 - ``FrameDiagnostics``
 - ``CommitPlan``
-- ``SwiftTUIRuntime/DefaultRenderer``
-- ``SwiftTUIRuntime/RunLoop``

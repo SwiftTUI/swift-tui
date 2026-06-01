@@ -18,12 +18,12 @@ loop, renderer orchestration, frame-tail scheduling, cancellation, frame-drop
 policy, commit side effects, diagnostics, and presentation to a host surface.
 
 The direct ``DefaultRenderer`` snapshot path and the interactive ``RunLoop``
-path both produce ``FrameArtifacts``. The interactive path adds invalidation
+path both produce `FrameArtifacts`. The interactive path adds invalidation
 coalescing, frame-tail cancellation, completed-frame drop policy, host-facing
 damage derivation, and presentation to a concrete surface.
 
-For the phase-product reference, see
-<doc:SwiftTUICore/Rendering-Pipeline>.
+For the phase-product reference, see the Rendering Pipeline article in
+`SwiftTUICore`.
 
 ## Interactive Callpath
 
@@ -91,7 +91,7 @@ interactive run loop's rendering workhorse. It owns:
 
 The renderer exposes three execution strategies over the same stage order:
 
-- `render(...)`: one-shot, synchronous, returns ``FrameArtifacts``.
+- `render(...)`: one-shot, synchronous, returns `FrameArtifacts`.
 - `renderAsync(...)`: asynchronous frame tail, non-cancellable.
 - `renderAsyncCancellable(...)`: asynchronous frame tail with queued-tail
   cancellation and completed-frame disposition policy.
@@ -164,7 +164,7 @@ Commit turns a completed draft into a committed frame candidate. It packages
 lifecycle events, semantic handlers, runtime registrations, transaction effects,
 retained frame-tail state, and diagnostics. A completed candidate can be:
 
-- committed and returned as ``FrameArtifacts``;
+- committed and returned as `FrameArtifacts`;
 - dropped by completed-frame policy;
 - cancelled before its tail starts;
 - elided when an animation-deadline frame has no visible drawn effect.
@@ -187,7 +187,7 @@ The runtime stages preserve the same typed product order documented by
 | raster | `RasterSurface` | Paint draw commands into styled terminal cells and image attachments. |
 | commit | `CommitPlan` | Package lifecycle, handler installation, semantic snapshot, and transaction work. |
 
-All seven products are gathered on ``FrameArtifacts`` for inspection and retained
+All seven products are gathered on `FrameArtifacts` for inspection and retained
 reuse. Hosts should consume committed host contracts such as
 ``SemanticHostFrame`` instead of reaching into renderer-private retained state.
 
@@ -250,7 +250,7 @@ see <doc:Host-Integration>.
 ## Diagnostics
 
 With no sink installed, frame diagnostics are a branch in the committed-frame
-path. When a sink is installed, the runtime emits ``RuntimeFrameSample`` values
+path. When a sink is installed, the runtime emits `RuntimeFrameSample` values
 for committed frames, zero-artifact outcomes, and elisions.
 
 A committed sample includes:

@@ -98,9 +98,9 @@ Within that composition, the typed phase products still flow in this order:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-The product model is documented in
-<doc:SwiftTUICore/Rendering-Pipeline>. The runtime scheduling, cancellation,
-commit policy, diagnostics, and host handoff are documented in
+The product model is documented in the Rendering Pipeline article in
+`SwiftTUICore`. The runtime scheduling, cancellation, commit policy,
+diagnostics, and host handoff are documented in
 <doc:Runtime-Render-Pipeline>.
 
 ## Coordinate Domains
