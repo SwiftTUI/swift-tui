@@ -67,6 +67,7 @@ are re-exported from the core pipeline layer.
 ### Guides
 
 - <doc:Architecture>
+- <doc:Runtime-Render-Pipeline>
 - <doc:Runtime>
 - <doc:Vision>
 - <doc:Host-Integration>
