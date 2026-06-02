@@ -16,10 +16,13 @@ public struct SummaryComparison: Equatable, Sendable {
   public var inputLatencyP95Delta: Double?
   public var totalCPUSecondsDelta: Double
   public var cpuSecondsPerCommittedFrameDelta: Double?
+  public var cpuSecondsPerDiagnosticFrameDelta: Double?
   public var mainActorBlockedRatioDelta: Double?
   public var workerLayoutEnqueueP95Delta: Double?
   public var workerLayoutComputeP95Delta: Double?
-  public var cancellationCountDelta: Int
+  public var diagnosticFrameCountDelta: Int
+  public var elidedFrameCountDelta: Int
+  public var cancelledFrameCountDelta: Int
   public var completedDropCountDelta: Int
   public var customLayoutFallbackCountDelta: Int
   public var layoutDependentMainActorFallbackCountDelta: Int
@@ -56,6 +59,10 @@ public enum CompareCommand {
       candidate.cpuSecondsPerCommittedFrame,
       base.cpuSecondsPerCommittedFrame
     )
+    let cpuPerDiagnosticFrameDelta = delta(
+      candidate.cpuSecondsPerDiagnosticFrame,
+      base.cpuSecondsPerDiagnosticFrame
+    )
     let mainActorBlockedDelta = delta(
       candidate.mainActorBlockedRatio,
       base.mainActorBlockedRatio
@@ -72,6 +79,7 @@ public enum CompareCommand {
       inputLatencyP95Delta: latencyP95Delta,
       totalCPUSecondsDelta: totalCPUDelta,
       cpuSecondsPerCommittedFrameDelta: cpuPerFrameDelta,
+      cpuSecondsPerDiagnosticFrameDelta: cpuPerDiagnosticFrameDelta,
       mainActorBlockedRatioDelta: mainActorBlockedDelta,
       workerLayoutEnqueueP95Delta: delta(
         candidate.workerLayoutEnqueueMs.p95,
@@ -81,7 +89,9 @@ public enum CompareCommand {
         candidate.workerLayoutComputeMs.p95,
         base.workerLayoutComputeMs.p95
       ),
-      cancellationCountDelta: candidate.cancellationCount - base.cancellationCount,
+      diagnosticFrameCountDelta: candidate.diagnosticFrameCount - base.diagnosticFrameCount,
+      elidedFrameCountDelta: candidate.elidedFrameCount - base.elidedFrameCount,
+      cancelledFrameCountDelta: candidate.cancelledFrameCount - base.cancelledFrameCount,
       completedDropCountDelta: candidate.completedDropCount - base.completedDropCount,
       customLayoutFallbackCountDelta: candidate.customLayoutFallbackCount
         - base.customLayoutFallbackCount,
@@ -101,10 +111,13 @@ public enum CompareCommand {
     input latency p95 ms: \(format(comparison.base.inputToPresentLatencyMs.p95)) -> \(format(comparison.candidate.inputToPresentLatencyMs.p95)) (\(formatDelta(comparison.inputLatencyP95Delta)))
     total CPU seconds: \(format(comparison.base.totalCPUSeconds)) -> \(format(comparison.candidate.totalCPUSeconds)) (\(formatDelta(comparison.totalCPUSecondsDelta)))
     CPU seconds/frame: \(format(comparison.base.cpuSecondsPerCommittedFrame)) -> \(format(comparison.candidate.cpuSecondsPerCommittedFrame)) (\(formatDelta(comparison.cpuSecondsPerCommittedFrameDelta)))
+    CPU seconds/diagnostic frame: \(format(comparison.base.cpuSecondsPerDiagnosticFrame)) -> \(format(comparison.candidate.cpuSecondsPerDiagnosticFrame)) (\(formatDelta(comparison.cpuSecondsPerDiagnosticFrameDelta)))
     main-actor blocked ratio: \(format(comparison.base.mainActorBlockedRatio)) -> \(format(comparison.candidate.mainActorBlockedRatio)) (\(formatDelta(comparison.mainActorBlockedRatioDelta)))
     worker layout enqueue p95 ms: \(format(comparison.base.workerLayoutEnqueueMs.p95)) -> \(format(comparison.candidate.workerLayoutEnqueueMs.p95)) (\(formatDelta(comparison.workerLayoutEnqueueP95Delta)))
     worker layout compute p95 ms: \(format(comparison.base.workerLayoutComputeMs.p95)) -> \(format(comparison.candidate.workerLayoutComputeMs.p95)) (\(formatDelta(comparison.workerLayoutComputeP95Delta)))
-    cancellations: \(comparison.base.cancellationCount) -> \(comparison.candidate.cancellationCount) (\(formatSigned(comparison.cancellationCountDelta)))
+    diagnostic frames: \(comparison.base.diagnosticFrameCount) -> \(comparison.candidate.diagnosticFrameCount) (\(formatSigned(comparison.diagnosticFrameCountDelta)))
+    elided frames: \(comparison.base.elidedFrameCount) -> \(comparison.candidate.elidedFrameCount) (\(formatSigned(comparison.elidedFrameCountDelta)))
+    cancelled frames: \(comparison.base.cancelledFrameCount) -> \(comparison.candidate.cancelledFrameCount) (\(formatSigned(comparison.cancelledFrameCountDelta)))
     completed drops: \(comparison.base.completedDropCount) -> \(comparison.candidate.completedDropCount) (\(formatSigned(comparison.completedDropCountDelta)))
     custom layout fallbacks: \(comparison.base.customLayoutFallbackCount) -> \(comparison.candidate.customLayoutFallbackCount) (\(formatSigned(comparison.customLayoutFallbackCountDelta)))
     layout-dependent main-actor fallbacks: \(comparison.base.layoutDependentMainActorFallbackCount) -> \(comparison.candidate.layoutDependentMainActorFallbackCount) (\(formatSigned(comparison.layoutDependentMainActorFallbackCountDelta)))
@@ -124,14 +137,21 @@ public enum CompareCommand {
     latencyP95Delta: Double?,
     totalCPUSecondsDelta: Double
   ) -> CompareClassification {
-    guard let latencyP95Delta else {
-      return .inconclusive
-    }
-
-    let latencyImproved = latencyP95Delta < -0.5
-    let latencyFlat = abs(latencyP95Delta) <= 0.5
+    let latencyImproved = latencyP95Delta.map { $0 < -0.5 } ?? false
+    let latencyFlat = latencyP95Delta.map { abs($0) <= 0.5 } ?? true
     let cpuRegressed = totalCPUSecondsDelta > 0.01
+    let cpuImproved = totalCPUSecondsDelta < -0.01
     let cpuSameOrBetter = totalCPUSecondsDelta <= 0.01
+
+    if latencyP95Delta == nil {
+      if cpuImproved {
+        return .clearWin
+      }
+      if cpuRegressed {
+        return .cpuRegression
+      }
+      return .noMeaningfulMovement
+    }
 
     if latencyImproved && cpuSameOrBetter {
       return .clearWin

@@ -60,6 +60,7 @@ enum PerfFrameDiagnosticsTSVReader {
         mainActorBlockedMs: double("main_actor_blocked_ms", fields, column),
         mainActorSuspendedMs: double("main_actor_suspended_ms", fields, column),
         presentationDurationMs: double("present_ms", fields, column),
+        elided: bool("elided", fields, column),
         customLayoutFallbacks: int("custom_layout_fallbacks", fields, column),
         layoutDependentMainActorFallbacks: int(
           "layout_dependent_main_actor_fallbacks",
@@ -100,6 +101,22 @@ enum PerfFrameDiagnosticsTSVReader {
       return 0
     }
     return Int(fields[index]) ?? 0
+  }
+
+  private static func bool(
+    _ name: String,
+    _ fields: [String],
+    _ column: [String: Int]
+  ) -> Bool {
+    guard let index = column[name], index < fields.count else {
+      return false
+    }
+    switch fields[index].lowercased() {
+    case "1", "true", "yes":
+      return true
+    default:
+      return false
+    }
   }
 
   private static func double(

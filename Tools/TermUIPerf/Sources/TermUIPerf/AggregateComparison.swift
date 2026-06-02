@@ -70,8 +70,19 @@ extension CompareCommand {
       metricComparison(
         "committed frames", base.committedFrameCount, candidate.committedFrameCount, sigma),
       metricComparison(
+        "diagnostic frames", base.diagnosticFrameCount, candidate.diagnosticFrameCount, sigma),
+      metricComparison(
+        "elided frames", base.elidedFrameCount, candidate.elidedFrameCount, sigma),
+      metricComparison(
+        "cancelled frames", base.cancelledFrameCount, candidate.cancelledFrameCount, sigma),
+      metricComparison(
+        "completed drops", base.completedDropCount, candidate.completedDropCount, sigma),
+      metricComparison(
         "CPU seconds/frame", base.cpuSecondsPerCommittedFrame,
         candidate.cpuSecondsPerCommittedFrame, sigma),
+      metricComparison(
+        "CPU seconds/diagnostic frame", base.cpuSecondsPerDiagnosticFrame,
+        candidate.cpuSecondsPerDiagnosticFrame, sigma),
       metricComparison(
         "input latency p95 ms", base.inputToPresentLatencyP95Ms,
         candidate.inputToPresentLatencyP95Ms, sigma),

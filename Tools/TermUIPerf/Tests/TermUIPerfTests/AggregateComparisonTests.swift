@@ -65,7 +65,12 @@ struct AggregateComparisonTests {
       iterationCount: cpuValues.count,
       totalCPUSeconds: PerfStat(values: cpuValues),
       committedFrameCount: PerfStat(values: cpuValues.map { _ in 274 }),
+      diagnosticFrameCount: PerfStat(values: cpuValues.map { _ in 300 }),
+      elidedFrameCount: PerfStat(values: cpuValues.map { _ in 20 }),
+      cancelledFrameCount: PerfStat(values: cpuValues.map { _ in 2 }),
+      completedDropCount: PerfStat(values: cpuValues.map { _ in 4 }),
       cpuSecondsPerCommittedFrame: PerfStat(values: cpuValues.map { $0 / 274 }),
+      cpuSecondsPerDiagnosticFrame: PerfStat(values: cpuValues.map { $0 / 300 }),
       inputToPresentLatencyP95Ms: PerfStat(values: cpuValues.map { _ in 22 }),
       frameIntervalP50Ms: PerfStat(values: cpuValues.map { _ in 36 }))
   }

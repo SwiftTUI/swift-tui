@@ -47,8 +47,22 @@ struct CompareCommandTests {
     #expect(output.contains("classification: latency win with CPU cost"))
     #expect(output.contains("input latency p95 ms:"))
     #expect(output.contains("total CPU seconds:"))
+    #expect(output.contains("CPU seconds/diagnostic frame:"))
+    #expect(output.contains("elided frames:"))
     #expect(output.contains("worker layout compute p95 ms:"))
     #expect(output.contains("layout-dependent main-actor fallbacks:"))
+  }
+
+  @Test("compare classifies idle CPU-only improvements without latency")
+  func compareClassifiesIdleCPUOnlyImprovements() {
+    let comparison = CompareCommand.compare(
+      base: summary(latencyValues: [], cpuSeconds: 1.0, mode: "async"),
+      candidate: summary(latencyValues: [], cpuSeconds: 0.8, mode: "async")
+    )
+
+    #expect(comparison.classification == .clearWin)
+    #expect(comparison.inputLatencyP95Delta == nil)
+    #expect(isApproximately(comparison.totalCPUSecondsDelta, -0.2))
   }
 
   @Test("compare loads summary files from run directories")
@@ -94,12 +108,16 @@ struct CompareCommandTests {
       renderMode: mode,
       iterationCount: 3,
       committedFrameCount: 3,
-      skippedFrameCount: 0,
+      diagnosticFrameCount: 5,
+      skippedFrameCount: 2,
+      elidedFrameCount: 1,
+      cancelledFrameCount: 1,
       inputToPresentLatencyMs: PerfDistribution(values: latencyValues),
       inputToSettledLatencyMs: PerfDistribution(values: latencyValues),
       frameIntervalMs: PerfDistribution(values: [10, 12]),
       totalCPUSeconds: cpuSeconds,
       cpuSecondsPerCommittedFrame: cpuSeconds / 3,
+      cpuSecondsPerDiagnosticFrame: cpuSeconds / 5,
       cpuSecondsPerInputEvent: cpuSeconds / 3,
       mainActorBlockedRatio: 0.1,
       mainActorSuspendedRatio: 0.2,
@@ -108,7 +126,6 @@ struct CompareCommandTests {
       workerRasterEnqueueMs: PerfDistribution(values: [1, 1, 2]),
       workerRasterComputeMs: PerfDistribution(values: [2, 3, 4]),
       presentationDurationMs: PerfDistribution(values: [1, 2]),
-      cancellationCount: 1,
       completedDropCount: 2,
       customLayoutFallbackCount: 3,
       layoutDependentMainActorFallbackCount: 4

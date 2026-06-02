@@ -59,7 +59,10 @@ struct SummaryReducerTests {
 
     #expect(isApproximately(summary.totalCPUSeconds, 0.6))
     #expect(summary.committedFrameCount == 2)
+    #expect(summary.diagnosticFrameCount == 3)
+    #expect(summary.skippedFrameCount == 1)
     #expect(isApproximately(summary.cpuSecondsPerCommittedFrame, 0.3))
+    #expect(isApproximately(summary.cpuSecondsPerDiagnosticFrame, 0.2))
     #expect(summary.completedDropCount == 1)
   }
 
@@ -77,7 +80,7 @@ struct SummaryReducerTests {
 
     #expect(summary.mainActorBlockedRatio == nil)
     #expect(summary.workerLayoutComputeMs.count == 0)
-    #expect(summary.cancellationCount == 1)
+    #expect(summary.cancelledFrameCount == 1)
     #expect(summary.skippedFrameCount == 1)
   }
 
@@ -92,17 +95,46 @@ struct SummaryReducerTests {
         frame(
           number: 2,
           totalMs: nil,
+          staleFramePolicy: "elided_offscreen",
           tailJobState: "-",
-          dropDecision: "-"
+          dropDecision: "-",
+          elided: true
         ),
         frame(number: 3, tailJobState: "dropped_completed", dropDecision: "drop_visual_only"),
       ]
     )
 
     #expect(summary.committedFrameCount == 1)
+    #expect(summary.diagnosticFrameCount == 3)
     #expect(summary.skippedFrameCount == 2)
+    #expect(summary.elidedFrameCount == 1)
     #expect(summary.presentationDurationMs.count == 1)
     #expect(isApproximately(summary.presentationDurationMs.p50, 3))
+  }
+
+  @Test("idle events do not contribute latency or input-event CPU ratios")
+  func idleEventsDoNotContributeLatencyOrInputRatios() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [
+        event(id: "idle", eventType: "idle", dispatch: 2.00, present: 1.00),
+        event(id: "click", eventType: "mouse_click", dispatch: 3.00, present: 3.02),
+      ],
+      cpuSamples: [
+        PerfCPUSample(
+          timestampSeconds: 0,
+          userCPUSeconds: 0.2,
+          systemCPUSeconds: 0.1,
+          wallDeltaSeconds: 0.5,
+          estimatedCPUPercent: 60
+        )
+      ],
+      frames: [frame(number: 1)]
+    )
+
+    #expect(summary.inputToPresentLatencyMs.count == 1)
+    #expect(isApproximately(summary.inputToPresentLatencyMs.p50, 20))
+    #expect(isApproximately(summary.cpuSecondsPerInputEvent, 0.3))
   }
 
   @Test("summary JSON key names are stable")
@@ -123,8 +155,13 @@ struct SummaryReducerTests {
 
     #expect(object.keys.contains("input_to_present_latency_ms"))
     #expect(object.keys.contains("cpu_seconds_per_committed_frame"))
+    #expect(object.keys.contains("cpu_seconds_per_diagnostic_frame"))
     #expect(object.keys.contains("main_actor_blocked_ratio"))
     #expect(object.keys.contains("worker_layout_compute_ms"))
+    #expect(object.keys.contains("diagnostic_frame_count"))
+    #expect(object.keys.contains("elided_frame_count"))
+    #expect(object.keys.contains("cancelled_frame_count"))
+    #expect(!object.keys.contains("cancellation_count"))
   }
 
   @Test("TSV writers keep deterministic headers and nil placeholders")
@@ -173,12 +210,13 @@ struct SummaryReducerTests {
 
   private func event(
     id: String,
+    eventType: String = "input",
     dispatch: Double,
     present: Double
   ) -> PerfEventRecord {
     PerfEventRecord(
       eventID: id,
-      eventType: "input",
+      eventType: eventType,
       dispatchTimeSeconds: dispatch,
       expectedVisualMarker: id,
       firstMatchingFrame: 1,
@@ -192,8 +230,10 @@ struct SummaryReducerTests {
     number: Int,
     presentedAt: Double? = nil,
     totalMs: Double? = 10,
+    staleFramePolicy: String = "commit_ordered",
     tailJobState: String = "completed",
-    dropDecision: String = "commit_ordered"
+    dropDecision: String = "commit_ordered",
+    elided: Bool = false
   ) -> PerfFrameRecord {
     PerfFrameRecord(
       frameNumber: number,
@@ -206,9 +246,11 @@ struct SummaryReducerTests {
       mainActorBlockedMs: totalMs == nil ? nil : 1,
       mainActorSuspendedMs: totalMs == nil ? nil : 2,
       presentationDurationMs: 3,
+      elided: elided,
       customLayoutFallbacks: 1,
       layoutDependentMainActorFallbacks: 2,
       tailJobState: tailJobState,
+      staleFramePolicy: staleFramePolicy,
       dropDecision: dropDecision
     )
   }

@@ -82,7 +82,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   public var iterationCount: Int
   public var totalCPUSeconds: PerfStat
   public var committedFrameCount: PerfStat
+  public var diagnosticFrameCount: PerfStat
+  public var elidedFrameCount: PerfStat
+  public var cancelledFrameCount: PerfStat
+  public var completedDropCount: PerfStat
   public var cpuSecondsPerCommittedFrame: PerfStat
+  public var cpuSecondsPerDiagnosticFrame: PerfStat
   public var inputToPresentLatencyP95Ms: PerfStat
   public var frameIntervalP50Ms: PerfStat
 
@@ -92,7 +97,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     iterationCount: Int,
     totalCPUSeconds: PerfStat,
     committedFrameCount: PerfStat,
+    diagnosticFrameCount: PerfStat,
+    elidedFrameCount: PerfStat,
+    cancelledFrameCount: PerfStat,
+    completedDropCount: PerfStat,
     cpuSecondsPerCommittedFrame: PerfStat,
+    cpuSecondsPerDiagnosticFrame: PerfStat,
     inputToPresentLatencyP95Ms: PerfStat,
     frameIntervalP50Ms: PerfStat
   ) {
@@ -101,7 +111,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.iterationCount = iterationCount
     self.totalCPUSeconds = totalCPUSeconds
     self.committedFrameCount = committedFrameCount
+    self.diagnosticFrameCount = diagnosticFrameCount
+    self.elidedFrameCount = elidedFrameCount
+    self.cancelledFrameCount = cancelledFrameCount
+    self.completedDropCount = completedDropCount
     self.cpuSecondsPerCommittedFrame = cpuSecondsPerCommittedFrame
+    self.cpuSecondsPerDiagnosticFrame = cpuSecondsPerDiagnosticFrame
     self.inputToPresentLatencyP95Ms = inputToPresentLatencyP95Ms
     self.frameIntervalP50Ms = frameIntervalP50Ms
   }
@@ -112,7 +127,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     case iterationCount = "iteration_count"
     case totalCPUSeconds = "total_cpu_seconds"
     case committedFrameCount = "committed_frame_count"
+    case diagnosticFrameCount = "diagnostic_frame_count"
+    case elidedFrameCount = "elided_frame_count"
+    case cancelledFrameCount = "cancelled_frame_count"
+    case completedDropCount = "completed_drop_count"
     case cpuSecondsPerCommittedFrame = "cpu_seconds_per_committed_frame"
+    case cpuSecondsPerDiagnosticFrame = "cpu_seconds_per_diagnostic_frame"
     case inputToPresentLatencyP95Ms = "input_to_present_latency_p95_ms"
     case frameIntervalP50Ms = "frame_interval_p50_ms"
   }
@@ -132,8 +152,14 @@ public enum AggregateReducer {
       iterationCount: summaries.count,
       totalCPUSeconds: PerfStat(values: summaries.map(\.totalCPUSeconds)),
       committedFrameCount: PerfStat(values: summaries.map { Double($0.committedFrameCount) }),
+      diagnosticFrameCount: PerfStat(values: summaries.map { Double($0.diagnosticFrameCount) }),
+      elidedFrameCount: PerfStat(values: summaries.map { Double($0.elidedFrameCount) }),
+      cancelledFrameCount: PerfStat(values: summaries.map { Double($0.cancelledFrameCount) }),
+      completedDropCount: PerfStat(values: summaries.map { Double($0.completedDropCount) }),
       cpuSecondsPerCommittedFrame: PerfStat(
         values: summaries.compactMap(\.cpuSecondsPerCommittedFrame)),
+      cpuSecondsPerDiagnosticFrame: PerfStat(
+        values: summaries.compactMap(\.cpuSecondsPerDiagnosticFrame)),
       inputToPresentLatencyP95Ms: PerfStat(
         values: summaries.compactMap(\.inputToPresentLatencyMs.p95)),
       frameIntervalP50Ms: PerfStat(values: summaries.compactMap(\.frameIntervalMs.p50)))
@@ -147,13 +173,21 @@ extension AggregateReducer {
     ]
     lines.append(line("total CPU seconds", aggregate.totalCPUSeconds))
     lines.append(line("committed frames", aggregate.committedFrameCount))
+    lines.append(line("diagnostic frames", aggregate.diagnosticFrameCount))
+    lines.append(line("elided frames", aggregate.elidedFrameCount))
+    lines.append(line("cancelled frames", aggregate.cancelledFrameCount))
+    lines.append(line("completed drops", aggregate.completedDropCount))
     lines.append(line("CPU seconds/frame", aggregate.cpuSecondsPerCommittedFrame))
+    lines.append(line("CPU seconds/diagnostic frame", aggregate.cpuSecondsPerDiagnosticFrame))
     lines.append(line("input latency p95 ms", aggregate.inputToPresentLatencyP95Ms))
     lines.append(line("frame interval p50 ms", aggregate.frameIntervalP50Ms))
     return lines.joined(separator: "\n")
   }
 
   private static func line(_ label: String, _ stat: PerfStat) -> String {
+    guard stat.sampleCount > 0 else {
+      return "\(label): n/a (0 samples)"
+    }
     let median = String(format: "%.4f", stat.median)
     let stddev = String(format: "%.4f", stat.stddev)
     let cv = String(format: "%.1f", stat.coefficientOfVariation * 100)

@@ -7,9 +7,9 @@ struct FrameDiagnosticsTSVReaderTests {
   func readerParsesDiagnosticFieldsAndPresentationTimestamps() throws {
     let records = try PerfFrameDiagnosticsTSVReader.parse(
       """
-      frame\ttotal_ms\tworker_layout_enqueue_ms\tworker_layout_compute_ms\tworker_raster_enqueue_ms\tworker_raster_compute_ms\tmain_actor_blocked_ms\tmain_actor_suspended_ms\tcustom_layout_fallbacks\tlayout_dependent_main_actor_fallbacks\tstale_frame_policy\ttail_job_state\tcancelled_render_count\tdrop_decision\tpresent_ms
-      1\t10.50\t1.25\t2.50\t0.75\t3.00\t0.50\t1.00\t2\t3\tcommit_ordered\tcompleted\t4\tcommit_ordered\t0.12
-      2\t-\t-\t-\t-\t-\t-\t-\t0\t0\telided_offscreen\t-\t4\t-\t-
+      frame\ttotal_ms\tworker_layout_enqueue_ms\tworker_layout_compute_ms\tworker_raster_enqueue_ms\tworker_raster_compute_ms\tmain_actor_blocked_ms\tmain_actor_suspended_ms\tcustom_layout_fallbacks\tlayout_dependent_main_actor_fallbacks\tstale_frame_policy\ttail_job_state\tcancelled_render_count\tdrop_decision\tpresent_ms\telided
+      1\t10.50\t1.25\t2.50\t0.75\t3.00\t0.50\t1.00\t2\t3\tcommit_ordered\tcompleted\t4\tcommit_ordered\t0.12\t0
+      2\t-\t-\t-\t-\t-\t-\t-\t0\t0\telided_offscreen\t-\t4\t-\t-\t1
       """,
       presentedAt: [1: 20.0]
     )
@@ -25,6 +25,7 @@ struct FrameDiagnosticsTSVReaderTests {
     #expect(records[0].mainActorBlockedMs == 0.50)
     #expect(records[0].mainActorSuspendedMs == 1.00)
     #expect(records[0].presentationDurationMs == 0.12)
+    #expect(records[0].elided == false)
     #expect(records[0].customLayoutFallbacks == 2)
     #expect(records[0].layoutDependentMainActorFallbacks == 3)
     #expect(records[0].tailJobState == "completed")
@@ -35,6 +36,7 @@ struct FrameDiagnosticsTSVReaderTests {
     #expect(records[1].frameNumber == 2)
     #expect(records[1].presentedAtSeconds == nil)
     #expect(records[1].totalMs == nil)
+    #expect(records[1].elided == true)
     #expect(records[1].tailJobState == "-")
     #expect(records[1].staleFramePolicy == "elided_offscreen")
     #expect(records[1].dropDecision == "-")
@@ -44,9 +46,9 @@ struct FrameDiagnosticsTSVReaderTests {
   func parsedElidedRowsContributeToSkippedFrameSummaries() throws {
     let records = try PerfFrameDiagnosticsTSVReader.parse(
       """
-      frame\ttotal_ms\ttail_job_state\tstale_frame_policy\tdrop_decision
-      1\t10.0\tcompleted\tcommit_ordered\tcommit_ordered
-      2\t-\t-\telided_offscreen\t-
+      frame\ttotal_ms\ttail_job_state\tstale_frame_policy\tdrop_decision\telided
+      1\t10.0\tcompleted\tcommit_ordered\tcommit_ordered\t0
+      2\t-\t-\telided_offscreen\t-\t1
       """,
       presentedAt: [1: 10.0]
     )
@@ -59,7 +61,9 @@ struct FrameDiagnosticsTSVReaderTests {
     )
 
     #expect(summary.committedFrameCount == 1)
+    #expect(summary.diagnosticFrameCount == 2)
     #expect(summary.skippedFrameCount == 1)
+    #expect(summary.elidedFrameCount == 1)
     #expect(summary.frameIntervalMs.count == 0)
   }
 
