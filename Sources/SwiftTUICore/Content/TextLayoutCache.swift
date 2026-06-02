@@ -23,6 +23,7 @@ package final class TextLayoutCache: Sendable {
     package var misses: Int
     package var stores: Int
     package var evictions: Int
+    package var bypassedStores: Int
 
     package init(
       entries: Int = 0,
@@ -30,7 +31,8 @@ package final class TextLayoutCache: Sendable {
       hits: Int = 0,
       misses: Int = 0,
       stores: Int = 0,
-      evictions: Int = 0
+      evictions: Int = 0,
+      bypassedStores: Int = 0
     ) {
       self.entries = entries
       self.lookups = lookups
@@ -38,6 +40,7 @@ package final class TextLayoutCache: Sendable {
       self.misses = misses
       self.stores = stores
       self.evictions = evictions
+      self.bypassedStores = bypassedStores
     }
   }
 
@@ -49,7 +52,10 @@ package final class TextLayoutCache: Sendable {
     var misses = 0
     var stores = 0
     var evictions = 0
+    var bypassedStores = 0
     var nextGeneration: UInt64 = 0
+    var admissionCandidates: [Key: UInt64] = [:]
+    var admissionOrder: Deque<AccessRecord> = []
   }
 
   package static let shared: TextLayoutCache = {
@@ -71,6 +77,7 @@ package final class TextLayoutCache: Sendable {
             "hits": metrics.hits,
             "misses": metrics.misses,
             "evictions": metrics.evictions,
+            "bypassedStores": metrics.bypassedStores,
           ]
         )
       }
@@ -93,7 +100,8 @@ package final class TextLayoutCache: Sendable {
         hits: storage.hits,
         misses: storage.misses,
         stores: storage.stores,
-        evictions: storage.evictions
+        evictions: storage.evictions,
+        bypassedStores: storage.bypassedStores
       )
     }
   }
@@ -113,7 +121,10 @@ package final class TextLayoutCache: Sendable {
       storage.misses = 0
       storage.stores = 0
       storage.evictions = 0
+      storage.bypassedStores = 0
       storage.nextGeneration = 0
+      storage.admissionCandidates.removeAll(keepingCapacity: true)
+      storage.admissionOrder.removeAll(keepingCapacity: true)
     }
   }
 
@@ -154,6 +165,12 @@ package final class TextLayoutCache: Sendable {
         return cached.result
       }
 
+      if shouldBypassStore(for: key, in: &storage) {
+        storage.bypassedStores += 1
+        recordAdmissionCandidate(key, in: &storage)
+        return result
+      }
+
       storage.stores += 1
       let generation = nextGeneration(in: &storage)
       storage.entries[key] = .init(
@@ -180,6 +197,55 @@ package final class TextLayoutCache: Sendable {
   ) {
     storage.order.append(.init(key: key, generation: generation))
     compactAccessLogIfNeeded(in: &storage)
+  }
+
+  private func shouldBypassStore(
+    for key: Key,
+    in storage: inout Storage
+  ) -> Bool {
+    guard storage.entries.count >= capacity else {
+      return false
+    }
+    if storage.admissionCandidates.removeValue(forKey: key) != nil {
+      return false
+    }
+    return true
+  }
+
+  private func recordAdmissionCandidate(
+    _ key: Key,
+    in storage: inout Storage
+  ) {
+    let generation = nextGeneration(in: &storage)
+    storage.admissionCandidates[key] = generation
+    storage.admissionOrder.append(.init(key: key, generation: generation))
+    compactAdmissionCandidatesIfNeeded(in: &storage)
+  }
+
+  private func compactAdmissionCandidatesIfNeeded(
+    in storage: inout Storage
+  ) {
+    let limit = max(1, capacity * 2)
+    while storage.admissionCandidates.count > limit {
+      guard let victim = storage.admissionOrder.popFirst() else {
+        storage.admissionCandidates.removeAll(keepingCapacity: true)
+        return
+      }
+      guard storage.admissionCandidates[victim.key] == victim.generation else {
+        continue
+      }
+      storage.admissionCandidates.removeValue(forKey: victim.key)
+    }
+    guard storage.admissionOrder.count > limit * 2 else {
+      return
+    }
+    var compacted: Deque<AccessRecord> = []
+    compacted.reserveCapacity(storage.admissionCandidates.count)
+    for record in storage.admissionOrder
+    where storage.admissionCandidates[record.key] == record.generation {
+      compacted.append(record)
+    }
+    storage.admissionOrder = compacted
   }
 
   /// Rebuilds `order` from the live, current-generation records once it

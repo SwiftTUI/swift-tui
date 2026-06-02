@@ -111,9 +111,8 @@ struct TextLayoutCacheTests {
   @Test("unique-key-per-frame churn plateaus at capacity")
   func uniqueKeyChurnStaysBoundedAtCapacity() {
     // Reproduces the gallery's "Task Progress" tab: the shimmer/spinner mints a
-    // NEW text-layout key every frame, so every lookup misses, stores, and
-    // evicts. The entry map must plateau at capacity rather than grow without
-    // bound — the access log must stay bounded too.
+    // NEW text-layout key every frame. Once the cache is full, one-shot keys
+    // should bypass storage instead of evicting useful warm entries.
     let capacity = 16
     let cache = TextLayoutCache(capacity: capacity)
     let options = TextLayoutOptions(width: nil)
@@ -126,33 +125,37 @@ struct TextLayoutCacheTests {
     let metrics = cache.metrics
     #expect(metrics.entries == capacity)
     #expect(metrics.misses == frames)
-    #expect(metrics.stores == frames)
-    #expect(metrics.evictions == frames - capacity)
+    #expect(metrics.stores == capacity)
+    #expect(metrics.bypassedStores == frames - capacity)
+    #expect(metrics.evictions == 0)
     #expect(cache.accessLogDepth <= capacity * 4)
   }
 
-  @Test("cache eviction keeps the most recently used entry")
-  func evictionKeepsMostRecentlyUsedEntry() {
+  @Test("full cache bypasses one-shot misses and admits a second sighting")
+  func fullCacheBypassesOneShotMissesAndAdmitsSecondSighting() {
     let cache = TextLayoutCache(capacity: 2)
     let options = TextLayoutOptions(width: nil)
 
     let firstAlpha = cache.layout(for: "alpha", options: options)
     let firstBeta = cache.layout(for: "beta", options: options)
     let refreshedAlpha = cache.layout(for: "alpha", options: options)
-    _ = cache.layout(for: "gamma", options: options)
+    let firstGamma = cache.layout(for: "gamma", options: options)
     let retainedAlpha = cache.layout(for: "alpha", options: options)
     let reloadedBeta = cache.layout(for: "beta", options: options)
+    let admittedGamma = cache.layout(for: "gamma", options: options)
 
     #expect(refreshedAlpha == firstAlpha)
+    #expect(firstGamma == admittedGamma)
     #expect(retainedAlpha == firstAlpha)
     #expect(reloadedBeta == firstBeta)
 
     let metrics = cache.metrics
     #expect(metrics.entries == 2)
-    #expect(metrics.lookups == 6)
-    #expect(metrics.hits == 2)
+    #expect(metrics.lookups == 7)
+    #expect(metrics.hits == 3)
     #expect(metrics.misses == 4)
-    #expect(metrics.stores == 4)
-    #expect(metrics.evictions == 2)
+    #expect(metrics.stores == 3)
+    #expect(metrics.evictions == 1)
+    #expect(metrics.bypassedStores == 1)
   }
 }
