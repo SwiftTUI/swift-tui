@@ -77,7 +77,8 @@ extension RunLoop {
         .internalAnimationController.activeAnimationCount,
       animationControllerHasPendingWork: renderer
         .internalAnimationController.lastTickResult.hasPendingWork,
-      cancelledRenderCount: cancelledRenderCount
+      cancelledRenderCount: cancelledRenderCount,
+      timings: renderer.elidedFrameTimings
     )
     frameSink.record(.elided(sample))
   }

@@ -28,6 +28,7 @@ import SwiftTUICore
   package var animationControllerActiveAnimationCount: Int
   package var animationControllerHasPendingWork: Bool
   package var cancelledRenderCount: Int
+  package var timings: ElidedFrameTimings
 
   package init(
     frameNumber: Int,
@@ -38,7 +39,8 @@ import SwiftTUICore
     intentRequestCount: Int,
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool,
-    cancelledRenderCount: Int
+    cancelledRenderCount: Int,
+    timings: ElidedFrameTimings = .empty
   ) {
     self.frameNumber = frameNumber
     self.scheduledFrame = scheduledFrame
@@ -49,6 +51,7 @@ import SwiftTUICore
     self.animationControllerActiveAnimationCount = animationControllerActiveAnimationCount
     self.animationControllerHasPendingWork = animationControllerHasPendingWork
     self.cancelledRenderCount = cancelledRenderCount
+    self.timings = timings
   }
 }
 

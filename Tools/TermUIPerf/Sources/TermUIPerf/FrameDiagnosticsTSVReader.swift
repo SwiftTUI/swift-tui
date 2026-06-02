@@ -60,6 +60,30 @@ enum PerfFrameDiagnosticsTSVReader {
         mainActorBlockedMs: double("main_actor_blocked_ms", fields, column),
         mainActorSuspendedMs: double("main_actor_suspended_ms", fields, column),
         presentationDurationMs: double("present_ms", fields, column),
+        elidedHeadTotalMs: double("elided_head_total_ms", fields, column),
+        elidedGraphCheckpointCreateMs: double(
+          "elided_graph_checkpoint_create_ms",
+          fields,
+          column
+        ),
+        elidedGraphCheckpointRestoreMs: double(
+          "elided_graph_checkpoint_restore_ms",
+          fields,
+          column
+        ),
+        elidedResolveCheckpointRestoreMs: double(
+          "elided_resolve_checkpoint_restore_ms",
+          fields,
+          column
+        ),
+        elidedAnimationTickMs: double("elided_animation_tick_ms", fields, column),
+        elidedCommitRuntimeRegistrationsMs: double(
+          "elided_commit_runtime_registrations_ms",
+          fields,
+          column
+        ),
+        elidedAnimationCommitMs: double("elided_animation_commit_ms", fields, column),
+        elidedCommitMs: double("elided_commit_ms", fields, column),
         elided: bool("elided", fields, column),
         customLayoutFallbacks: int("custom_layout_fallbacks", fields, column),
         layoutDependentMainActorFallbacks: int(

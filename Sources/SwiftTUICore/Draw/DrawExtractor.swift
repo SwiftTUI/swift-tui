@@ -4,7 +4,7 @@ public struct DrawExtractor: Sendable {
 
   /// Extracts a draw tree from a placed tree.
   public func extract(from placed: borrowing PlacedNode) -> DrawNode {
-    extractIteratively(from: placed)
+    extractIteratively(from: placed, retained: nil)
   }
 
   package func extract(
@@ -14,7 +14,7 @@ public struct DrawExtractor: Sendable {
     if let input, input.proof == .wholeTreeIdentical {
       return input.previousDraw
     }
-    return extract(from: placed)
+    return extractIteratively(from: placed, retained: input)
   }
 }
 
@@ -58,7 +58,8 @@ private enum ExtractionStep {
 
 extension DrawExtractor {
   private func extractIteratively(
-    from root: PlacedNode
+    from root: PlacedNode,
+    retained input: RetainedDrawExtractionInput?
   ) -> DrawNode {
     var steps: [ExtractionStep] = [
       .descend(
@@ -75,6 +76,15 @@ extension DrawExtractor {
     while let step = steps.popLast() {
       switch step {
       case .descend(let node, let inheritedBorderMask, let isInBackgroundSubtree):
+        if inheritedBorderMask == nil,
+          !isInBackgroundSubtree,
+          input?.proof.canReuseSubtree(rootedAt: node.identity) == true,
+          let previousDraw = input?.previousDrawNode(for: node.identity)
+        {
+          builtNodes.append(previousDraw)
+          continue
+        }
+
         let children = Array(node.children)
         let overlayBorderMask = overlayBorderMask(
           kind: node.kind,

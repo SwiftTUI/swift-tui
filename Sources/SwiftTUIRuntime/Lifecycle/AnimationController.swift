@@ -329,6 +329,93 @@ package final class AnimationController: Sendable {
     }
   }
 
+  package var preFrameHeadOffscreenPropertyAnimationRedrawIdentities: Set<Identity>? {
+    guard !isFrameHeadTransactionActive else { return nil }
+    guard !activeAnimations.isEmpty else { return nil }
+    guard removingIdentities.isEmpty else { return nil }
+    guard pendingEmptyBatchCompletions.isEmpty else { return nil }
+    guard transitionsByIdentity.isEmpty,
+      previousTransitionsByIdentity.isEmpty,
+      pendingTransitionsByIdentity.isEmpty
+    else {
+      return nil
+    }
+    guard activeAnimations.values.allSatisfy({ animation in
+      if case .property = animation.kind {
+        return true
+      }
+      return false
+    }) else {
+      return nil
+    }
+
+    return Set(activeAnimations.keys.map(\.identity))
+  }
+
+  /// Advances a deadline-only off-screen property-animation tick without
+  /// resolving a new frame head. This deliberately handles only the state that
+  /// ``preFrameHeadOffscreenPropertyAnimationRedrawIdentities`` proves safe:
+  /// in-tree property animations with no active transition/removal/placed-level
+  /// overlay bookkeeping.
+  @discardableResult
+  package func advancePreFrameHeadOffscreenPropertyAnimationTick(
+    at timestamp: MonotonicInstant
+  ) -> AnimationTickResult {
+    guard preFrameHeadOffscreenPropertyAnimationRedrawIdentities != nil else {
+      preconditionFailure("Pre-frame-head off-screen animation tick is not eligible.")
+    }
+
+    lastFrameHeadCompletionCount = 0
+
+    var keysToRemove: [AnimationKey] = []
+    var completedBatches: [AnimationBatchID] = []
+    var redrawIdentities: Set<Identity> = []
+    var latestDeadline: MonotonicInstant = timestamp
+    var hasPendingWork = false
+
+    for (key, animation) in activeAnimations {
+      guard case .property = animation.kind else {
+        preconditionFailure("Pre-frame-head off-screen tick only supports property animations.")
+      }
+      guard let anim = registeredAnimations[animation.animationBox] else {
+        keysToRemove.append(key)
+        if let batchID = animation.batchID { completedBatches.append(batchID) }
+        continue
+      }
+
+      let elapsed = animation.startTime.duration(to: timestamp)
+      var state = animation.customState
+      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+      activeAnimations[key]?.customState = state
+
+      guard evaluated != nil else {
+        keysToRemove.append(key)
+        if let batchID = animation.batchID { completedBatches.append(batchID) }
+        redrawIdentities.insert(key.identity)
+        continue
+      }
+
+      redrawIdentities.insert(key.identity)
+      latestDeadline = timestamp.advanced(by: frameInterval)
+      hasPendingWork = true
+    }
+
+    for key in keysToRemove {
+      activeAnimations.removeValue(forKey: key)
+    }
+    for batchID in completedBatches {
+      releaseBatch(batchID)
+    }
+
+    let result = AnimationTickResult(
+      hasPendingWork: hasPendingWork,
+      nextDeadline: hasPendingWork ? latestDeadline : nil,
+      redrawIdentities: redrawIdentities
+    )
+    lastTickResult = result
+    return result
+  }
+
   /// Occupancy reading for the profiling memory signal. Computed, so it stays
   /// outside the checkpoint totality contract.
   package var memoryMetricSnapshot: MemoryMetricSnapshot {

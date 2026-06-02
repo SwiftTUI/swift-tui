@@ -18,6 +18,7 @@ struct DefaultRendererFrameHeadCoordinator {
   var presentationPortalState: PresentationPortalState
   var animationController: AnimationController
   var renderGenerationSequencer: RenderGenerationSequencer
+  var elidedFrameTimingRecorder: ElidedFrameTimingRecorder
   var frameTailRenderer: FrameTailRenderer
   var storeObservationBridge: @MainActor (ObservationBridge?) -> Void
   var renderPipelineContentTree: (ResolvedNode) -> ResolvedNode
@@ -29,13 +30,23 @@ struct DefaultRendererFrameHeadCoordinator {
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
     let clock = ContinuousClock()
+    elidedFrameTimingRecorder.reset()
+    let headStart = elidedFrameTimingRecorder.start()
+    defer {
+      elidedFrameTimingRecorder.record(.headTotal, since: headStart)
+    }
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = preparedResolveContext(context)
     let registrationDraft = FrameHeadRegistrationDraft()
+    let graphCheckpoint = elidedFrameTimingRecorder.measure(
+      .graphCheckpointCreate
+    ) {
+      mode == .abortable ? viewGraph.makeCheckpoint() : nil
+    }
     let graphDraft = ViewGraphFrameDraft(
       liveRegistrations: resolveContext.runtimeRegistrations,
-      checkpoint: mode == .abortable ? viewGraph.makeCheckpoint() : nil
+      checkpoint: graphCheckpoint
     )
     let animationDraft = animationController.makeFrameDraft()
     resolveContext = resolveContext.replacingRuntimeRegistrations(
@@ -84,6 +95,7 @@ struct DefaultRendererFrameHeadCoordinator {
       presentationPortalDraft: portal.draft,
       observationDraft: observationDraft,
       animationDraft: animationDraft,
+      elidedFrameTimingRecorder: elidedFrameTimingRecorder,
       checkpoints: checkpoints
     )
     if mode == .abortable {
@@ -112,11 +124,13 @@ struct DefaultRendererFrameHeadCoordinator {
     var draft = draft
     var resolved = draft.resolved
     let animationTimestamp = MonotonicInstant.now()
-    AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
-      to: &resolved,
-      transaction: draft.frameContext.transaction,
-      timestamp: animationTimestamp
-    )
+    elidedFrameTimingRecorder.measure(.animationTick) {
+      AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
+        to: &resolved,
+        transaction: draft.frameContext.transaction,
+        timestamp: animationTimestamp
+      )
+    }
 
     var frameTailInput = draft.frameTailInput
     frameTailInput.resolved = resolved
@@ -317,7 +331,9 @@ struct DefaultRendererFrameHeadCoordinator {
       guard let baseline else {
         preconditionFailure("Abortable frame heads require baseline checkpoints.")
       }
-      graphDraft.recordPreparedCheckpoint(from: viewGraph)
+      elidedFrameTimingRecorder.measure(.graphCheckpointCreate) {
+        graphDraft.recordPreparedCheckpoint(from: viewGraph)
+      }
       return FrameHeadCheckpoints(
         baselineFrameState: baseline.frameState,
         baselineFrameInputs: baseline.frameInputs,

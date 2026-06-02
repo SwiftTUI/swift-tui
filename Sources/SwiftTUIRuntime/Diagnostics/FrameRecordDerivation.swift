@@ -121,7 +121,15 @@ package enum FrameRecordDerivation {
       presentationEditOperationCount: sample.presentationMetrics.editOperationCount,
       measurementCacheHitRate: cacheHitRate,
       totalFrameDuration: pipelineTotal + sample.presentationDuration,
-      elided: false
+      elided: false,
+      elidedHeadTotalDuration: nil,
+      elidedGraphCheckpointCreateDuration: nil,
+      elidedGraphCheckpointRestoreDuration: nil,
+      elidedResolveCheckpointRestoreDuration: nil,
+      elidedAnimationTickDuration: nil,
+      elidedCommitRuntimeRegistrationsDuration: nil,
+      elidedAnimationCommitDuration: nil,
+      elidedCommitDuration: nil
     )
   }
 
@@ -207,7 +215,15 @@ package enum FrameRecordDerivation {
       presentationEditOperationCount: 0,
       measurementCacheHitRate: nil,
       totalFrameDuration: .zero,
-      elided: false
+      elided: false,
+      elidedHeadTotalDuration: nil,
+      elidedGraphCheckpointCreateDuration: nil,
+      elidedGraphCheckpointRestoreDuration: nil,
+      elidedResolveCheckpointRestoreDuration: nil,
+      elidedAnimationTickDuration: nil,
+      elidedCommitRuntimeRegistrationsDuration: nil,
+      elidedAnimationCommitDuration: nil,
+      elidedCommitDuration: nil
     )
   }
 
@@ -292,7 +308,16 @@ package enum FrameRecordDerivation {
       presentationEditOperationCount: 0,
       measurementCacheHitRate: nil,
       totalFrameDuration: .zero,
-      elided: true
+      elided: true,
+      elidedHeadTotalDuration: sample.timings.headTotal,
+      elidedGraphCheckpointCreateDuration: sample.timings.graphCheckpointCreate,
+      elidedGraphCheckpointRestoreDuration: sample.timings.graphCheckpointRestore,
+      elidedResolveCheckpointRestoreDuration: sample.timings.resolveCheckpointRestore,
+      elidedAnimationTickDuration: sample.timings.animationTick,
+      elidedCommitRuntimeRegistrationsDuration:
+        sample.timings.commitRuntimeRegistrations,
+      elidedAnimationCommitDuration: sample.timings.animationCommit,
+      elidedCommitDuration: sample.timings.commit
     )
   }
 

@@ -27,6 +27,7 @@ public struct DefaultRenderer {
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
   private let elidedFrameCounter: ElidedFrameCounter
+  private let elidedFrameTimingRecorder: ElidedFrameTimingRecorder
 
   let frameTailRenderer: FrameTailRenderer
   // Visibility note: `frameTailCoordinator` and `prepareFrameHead` are
@@ -50,6 +51,7 @@ public struct DefaultRenderer {
       presentationPortalState: presentationPortalState,
       animationController: animationController,
       renderGenerationSequencer: renderGenerationSequencer,
+      elidedFrameTimingRecorder: elidedFrameTimingRecorder,
       frameTailRenderer: frameTailRenderer,
       storeObservationBridge: { bridge in
         observationBridgeTracker.store(bridge)
@@ -84,6 +86,7 @@ public struct DefaultRenderer {
     animationController = .init()
     renderGenerationSequencer = .init()
     elidedFrameCounter = .init()
+    elidedFrameTimingRecorder = .init()
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -345,6 +348,12 @@ public struct DefaultRenderer {
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderExecutionResult {
     let renderer = self
+    if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
+      elisionCauses: elisionCauses,
+      elisionAnimationRequest: elisionAnimationRequest
+    ) {
+      return .elided
+    }
     let draft = renderer.computeFrameHead(
       root,
       context: context,
@@ -470,6 +479,37 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  private func elideOffscreenAnimationBeforeFrameHeadIfPossible(
+    elisionCauses: Set<WakeCause>,
+    elisionAnimationRequest: AnimationRequest
+  ) -> Bool {
+    guard let redrawIdentities =
+      animationController.preFrameHeadOffscreenPropertyAnimationRedrawIdentities
+    else {
+      return false
+    }
+    guard
+      OffscreenFrameElision.shouldElide(
+        causes: elisionCauses,
+        animationRequest: elisionAnimationRequest,
+        redrawIdentities: redrawIdentities,
+        drawnIdentities: frameTailRenderer.previousDrawnIdentities
+      )
+    else {
+      return false
+    }
+
+    elidedFrameTimingRecorder.reset()
+    let tickStart = elidedFrameTimingRecorder.start()
+    animationController.advancePreFrameHeadOffscreenPropertyAnimationTick(
+      at: MonotonicInstant.now()
+    )
+    elidedFrameTimingRecorder.record(.animationTick, since: tickStart)
+    recordElidedFrame()
+    return true
+  }
+
+  @MainActor
   private func renderView<V: View>(
     _ root: V,
     context: ResolveContext,
@@ -478,6 +518,12 @@ public struct DefaultRenderer {
     elisionAnimationRequest: AnimationRequest
   ) -> RenderExecutionResult {
     let renderer = self
+    if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
+      elisionCauses: elisionCauses,
+      elisionAnimationRequest: elisionAnimationRequest
+    ) {
+      return .elided
+    }
     let draft = renderer.computeFrameHead(
       root,
       context: context,
@@ -565,6 +611,12 @@ public struct DefaultRenderer {
     elisionAnimationRequest: AnimationRequest
   ) async -> RenderExecutionResult {
     let renderer = self
+    if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
+      elisionCauses: elisionCauses,
+      elisionAnimationRequest: elisionAnimationRequest
+    ) {
+      return .elided
+    }
     let draft = renderer.computeFrameHead(
       root,
       context: context,
@@ -738,5 +790,15 @@ public struct DefaultRenderer {
   @MainActor
   package func recordElidedFrame() {
     elidedFrameCounter.increment()
+  }
+
+  @MainActor
+  package func setElidedFrameTimingDiagnosticsEnabled(_ isEnabled: Bool) {
+    elidedFrameTimingRecorder.isEnabled = isEnabled
+  }
+
+  @MainActor
+  package var elidedFrameTimings: ElidedFrameTimings {
+    elidedFrameTimingRecorder.snapshot
   }
 }

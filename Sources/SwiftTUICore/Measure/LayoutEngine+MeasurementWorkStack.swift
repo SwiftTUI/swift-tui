@@ -6,11 +6,10 @@ extension LayoutEngine {
   ) -> MeasuredNode {
     var work: [MeasurementWorkItem] = [.measure(resolved, proposal)]
     var results: [MeasuredNode] = []
+    var localMetrics = LayoutWorkMetrics()
 
     while let item = work.popLast() {
-      passContext?.updateWorkMetrics {
-        $0.measurementWorkStackSteps += 1
-      }
+      localMetrics.measurementWorkStackSteps += 1
 
       switch item {
       case .measure(let node, let proposal):
@@ -18,6 +17,7 @@ extension LayoutEngine {
           of: node,
           proposal: proposal,
           passContext: passContext,
+          localMetrics: &localMetrics,
           work: &work,
           results: &results
         )
@@ -289,6 +289,11 @@ extension LayoutEngine {
     }
 
     precondition(results.count == 1, "measurement work stack left \(results.count) roots")
+    passContext?.updateWorkMetrics {
+      $0.measurementWorkStackSteps += localMetrics.measurementWorkStackSteps
+      $0.measuredNodesComputed += localMetrics.measuredNodesComputed
+      $0.measuredNodesReused += localMetrics.measuredNodesReused
+    }
     return results[0]
   }
 
@@ -296,6 +301,7 @@ extension LayoutEngine {
     of node: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
@@ -310,9 +316,7 @@ extension LayoutEngine {
       retainedLayout: passContext?.retainedLayout,
       hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant
     ) {
-      passContext?.updateWorkMetrics {
-        $0.measuredNodesReused += retained.subtreeNodeCount
-      }
+      localMetrics.measuredNodesReused += retained.subtreeNodeCount
       results.append(retained)
       return
     }
@@ -320,16 +324,12 @@ extension LayoutEngine {
     if !hasInvalidatedIndexedDescendant,
       let cached = cache?.lookup(resolved: node, proposal: proposal)
     {
-      passContext?.updateWorkMetrics {
-        $0.measuredNodesReused += cached.subtreeNodeCount
-      }
+      localMetrics.measuredNodesReused += cached.subtreeNodeCount
       results.append(cached)
       return
     }
 
-    passContext?.updateWorkMetrics {
-      $0.measuredNodesComputed += 1
-    }
+    localMetrics.measuredNodesComputed += 1
 
     if let boundary = node.layoutDependentContent {
       let measured = MeasuredNode(

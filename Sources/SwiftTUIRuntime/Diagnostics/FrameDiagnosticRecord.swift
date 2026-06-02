@@ -83,6 +83,14 @@ public struct FrameDiagnosticRecord: Sendable {
   /// were off-screen. Defaults to `false`; set to `true` by the run loop
   /// when off-screen frame elision fires (wired in a later task).
   public var elided: Bool
+  public var elidedHeadTotalDuration: Duration?
+  public var elidedGraphCheckpointCreateDuration: Duration?
+  public var elidedGraphCheckpointRestoreDuration: Duration?
+  public var elidedResolveCheckpointRestoreDuration: Duration?
+  public var elidedAnimationTickDuration: Duration?
+  public var elidedCommitRuntimeRegistrationsDuration: Duration?
+  public var elidedAnimationCommitDuration: Duration?
+  public var elidedCommitDuration: Duration?
 }
 
 extension FrameDiagnosticRecord {
@@ -171,5 +179,13 @@ extension FrameDiagnosticRecord {
     measurementCacheHitRate = nil
     self.totalFrameDuration = totalFrameDuration
     elided = false
+    elidedHeadTotalDuration = nil
+    elidedGraphCheckpointCreateDuration = nil
+    elidedGraphCheckpointRestoreDuration = nil
+    elidedResolveCheckpointRestoreDuration = nil
+    elidedAnimationTickDuration = nil
+    elidedCommitRuntimeRegistrationsDuration = nil
+    elidedAnimationCommitDuration = nil
+    elidedCommitDuration = nil
   }
 }

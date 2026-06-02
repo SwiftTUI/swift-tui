@@ -205,6 +205,145 @@ struct OffscreenFrameElisionRuntimeTests {
     #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts == nil)
   }
 
+  @Test("retained phase proof identifies clean sibling subtrees")
+  func retainedPhaseProofIdentifiesCleanSiblingSubtrees() {
+    let retainedState = FrameTailRetainedState()
+    let root = testIdentity("RetainedPhaseSubtrees", "Root")
+    let dirty = testIdentity("RetainedPhaseSubtrees", "Dirty")
+    let clean = testIdentity("RetainedPhaseSubtrees", "Clean")
+    let previousPlaced = PlacedNode(
+      identity: root,
+      bounds: .init(origin: .zero, size: .init(width: 8, height: 2)),
+      children: [
+        PlacedNode(
+          identity: dirty,
+          bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
+          drawPayload: .text("dirty-1")
+        ),
+        PlacedNode(
+          identity: clean,
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 8, height: 1)),
+          drawPayload: .text("clean")
+        ),
+      ]
+    )
+    let currentPlaced = PlacedNode(
+      identity: root,
+      bounds: previousPlaced.bounds,
+      children: [
+        PlacedNode(
+          identity: dirty,
+          bounds: previousPlaced.children[0].bounds,
+          drawPayload: .text("dirty-2")
+        ),
+        previousPlaced.children[1],
+      ]
+    )
+    let artifacts = makeStoredArtifacts(
+      identity: root,
+      placed: previousPlaced,
+      semantics: .init(),
+      draw: DrawExtractor().extract(from: previousPlaced)
+    )
+    retainedState.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: previousPlaced,
+      proposal: .init(width: .finite(8), height: .finite(2))
+    )
+
+    let retained = retainedState.input(invalidatedIdentities: [dirty])
+    let proof = retained.phaseExtractionProof(
+      for: .init(width: .finite(8), height: .finite(2)),
+      placed: currentPlaced,
+      animationOverlaySnapshot: .init()
+    )
+
+    #expect(proof.canReuseSubtree(rootedAt: clean))
+    #expect(!proof.canReuseSubtree(rootedAt: dirty))
+  }
+
+  // MARK: - Pre-frame-head offscreen property animation tick
+
+  @Test("pre-frame-head offscreen property tick advances live animation state")
+  func preFrameHeadOffscreenPropertyTickAdvancesLiveAnimationState() {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let leafIdentity = testIdentity("PreHeadElision", "Leaf")
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(
+      resolvedLeaf(identity: leafIdentity, opacity: 1.0),
+      transaction: .init(),
+      timestamp: t0
+    )
+
+    var animatingTransaction = TransactionSnapshot()
+    animatingTransaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      resolvedLeaf(identity: leafIdentity, opacity: 0.0),
+      transaction: animatingTransaction,
+      timestamp: t0
+    )
+
+    #expect(
+      controller.preFrameHeadOffscreenPropertyAnimationRedrawIdentities
+        == [leafIdentity]
+    )
+
+    let tick = controller.advancePreFrameHeadOffscreenPropertyAnimationTick(
+      at: t0.advanced(by: .milliseconds(20))
+    )
+
+    #expect(tick.hasPendingWork)
+    #expect(tick.nextDeadline != nil)
+    #expect(tick.redrawIdentities == [leafIdentity])
+    #expect(controller.lastTickResult.hasPendingWork == tick.hasPendingWork)
+    #expect(controller.lastTickResult.nextDeadline == tick.nextDeadline)
+    #expect(controller.lastTickResult.redrawIdentities == tick.redrawIdentities)
+    #expect(controller.activeAnimationCount == 1)
+  }
+
+  @Test("pre-frame-head offscreen property tick fires finite animation completion")
+  func preFrameHeadOffscreenPropertyTickFiresFiniteCompletion() {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(90_201)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = testIdentity("PreHeadElision", "CompletingLeaf")
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(
+      resolvedLeaf(identity: leafIdentity, opacity: 1.0),
+      transaction: .init(),
+      timestamp: t0
+    )
+
+    var animatingTransaction = TransactionSnapshot()
+    animatingTransaction.animationRequest = .animate(animation.animationBox)
+    animatingTransaction.animationBatchID = batchID
+    controller.processResolvedTree(
+      resolvedLeaf(identity: leafIdentity, opacity: 0.0),
+      transaction: animatingTransaction,
+      timestamp: t0
+    )
+
+    let tick = controller.advancePreFrameHeadOffscreenPropertyAnimationTick(
+      at: t0.advanced(by: .milliseconds(200))
+    )
+
+    #expect(!tick.hasPendingWork)
+    #expect(tick.nextDeadline == nil)
+    #expect(tick.redrawIdentities == [leafIdentity])
+    #expect(fireCount.count == 1)
+    #expect(controller.activeAnimationCount == 0)
+  }
+
   // MARK: - commitElided (reduced-commit path)
 
   /// The correctness-critical invariant for the reduced-commit path:
@@ -1112,6 +1251,7 @@ struct OffscreenFrameElisionRuntimeTests {
       presentationPortalDraft: PresentationPortalState().makeDraft(),
       observationDraft: nil,
       animationDraft: liveController.makeFrameDraft(),
+      elidedFrameTimingRecorder: ElidedFrameTimingRecorder(),
       checkpoints: nil
     )
   }
@@ -1139,6 +1279,16 @@ private func makeStoredArtifacts(
     commitPlan: CommitPlan(
       transaction: .init(), semanticSnapshot: semantics, lifecycle: [], handlerInstallations: []),
     diagnostics: .init()
+  )
+}
+
+private func resolvedLeaf(identity: Identity, opacity: Double) -> ResolvedNode {
+  var metadata = DrawMetadata()
+  metadata.baseStyle.explicitOpacity = opacity
+  return ResolvedNode(
+    identity: identity,
+    kind: .view("Leaf"),
+    drawMetadata: metadata
   )
 }
 

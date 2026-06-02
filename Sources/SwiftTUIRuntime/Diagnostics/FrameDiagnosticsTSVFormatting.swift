@@ -91,6 +91,14 @@ package enum FrameDiagnosticsTSVFormatting {
     "cache_hit",
     "total_ms",
     "elided",
+    "elided_head_total_ms",
+    "elided_graph_checkpoint_create_ms",
+    "elided_graph_checkpoint_restore_ms",
+    "elided_resolve_checkpoint_restore_ms",
+    "elided_animation_tick_ms",
+    "elided_commit_runtime_registrations_ms",
+    "elided_animation_commit_ms",
+    "elided_commit_ms",
   ]
 
   package static func fields(
@@ -117,6 +125,22 @@ package enum FrameDiagnosticsTSVFormatting {
     let mainActorSuspendedMs = formatMs(mainActorTimings?.suspended)
     let presentMs = formatMs(record.presentationDuration)
     let totalMs = formatMs(record.totalFrameDuration)
+    let elidedHeadTotalMs = formatMs(record.elidedHeadTotalDuration)
+    let elidedGraphCheckpointCreateMs = formatMs(
+      record.elidedGraphCheckpointCreateDuration
+    )
+    let elidedGraphCheckpointRestoreMs = formatMs(
+      record.elidedGraphCheckpointRestoreDuration
+    )
+    let elidedResolveCheckpointRestoreMs = formatMs(
+      record.elidedResolveCheckpointRestoreDuration
+    )
+    let elidedAnimationTickMs = formatMs(record.elidedAnimationTickDuration)
+    let elidedCommitRuntimeRegistrationsMs = formatMs(
+      record.elidedCommitRuntimeRegistrationsDuration
+    )
+    let elidedAnimationCommitMs = formatMs(record.elidedAnimationCommitDuration)
+    let elidedCommitMs = formatMs(record.elidedCommitDuration)
     let cacheHit =
       record.measurementCacheHitRate.map { rate in
         let pct = Int(rate * 1000)
@@ -219,6 +243,14 @@ package enum FrameDiagnosticsTSVFormatting {
       cacheHit,
       totalMs,
       record.elided ? "1" : "0",
+      elidedHeadTotalMs,
+      elidedGraphCheckpointCreateMs,
+      elidedGraphCheckpointRestoreMs,
+      elidedResolveCheckpointRestoreMs,
+      elidedAnimationTickMs,
+      elidedCommitRuntimeRegistrationsMs,
+      elidedAnimationCommitMs,
+      elidedCommitMs,
     ]
   }
 

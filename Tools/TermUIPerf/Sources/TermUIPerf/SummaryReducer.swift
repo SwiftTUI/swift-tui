@@ -11,6 +11,14 @@ public struct PerfFrameRecord: Equatable, Sendable {
   public var mainActorBlockedMs: Double?
   public var mainActorSuspendedMs: Double?
   public var presentationDurationMs: Double?
+  public var elidedHeadTotalMs: Double?
+  public var elidedGraphCheckpointCreateMs: Double?
+  public var elidedGraphCheckpointRestoreMs: Double?
+  public var elidedResolveCheckpointRestoreMs: Double?
+  public var elidedAnimationTickMs: Double?
+  public var elidedCommitRuntimeRegistrationsMs: Double?
+  public var elidedAnimationCommitMs: Double?
+  public var elidedCommitMs: Double?
   public var elided: Bool
   public var customLayoutFallbacks: Int
   public var layoutDependentMainActorFallbacks: Int
@@ -30,6 +38,14 @@ public struct PerfFrameRecord: Equatable, Sendable {
     mainActorBlockedMs: Double? = nil,
     mainActorSuspendedMs: Double? = nil,
     presentationDurationMs: Double? = nil,
+    elidedHeadTotalMs: Double? = nil,
+    elidedGraphCheckpointCreateMs: Double? = nil,
+    elidedGraphCheckpointRestoreMs: Double? = nil,
+    elidedResolveCheckpointRestoreMs: Double? = nil,
+    elidedAnimationTickMs: Double? = nil,
+    elidedCommitRuntimeRegistrationsMs: Double? = nil,
+    elidedAnimationCommitMs: Double? = nil,
+    elidedCommitMs: Double? = nil,
     elided: Bool = false,
     customLayoutFallbacks: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
@@ -48,6 +64,14 @@ public struct PerfFrameRecord: Equatable, Sendable {
     self.mainActorBlockedMs = mainActorBlockedMs
     self.mainActorSuspendedMs = mainActorSuspendedMs
     self.presentationDurationMs = presentationDurationMs
+    self.elidedHeadTotalMs = elidedHeadTotalMs
+    self.elidedGraphCheckpointCreateMs = elidedGraphCheckpointCreateMs
+    self.elidedGraphCheckpointRestoreMs = elidedGraphCheckpointRestoreMs
+    self.elidedResolveCheckpointRestoreMs = elidedResolveCheckpointRestoreMs
+    self.elidedAnimationTickMs = elidedAnimationTickMs
+    self.elidedCommitRuntimeRegistrationsMs = elidedCommitRuntimeRegistrationsMs
+    self.elidedAnimationCommitMs = elidedAnimationCommitMs
+    self.elidedCommitMs = elidedCommitMs
     self.elided = elided
     self.customLayoutFallbacks = customLayoutFallbacks
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
@@ -122,6 +146,14 @@ public struct PerfSummary: Codable, Equatable, Sendable {
   public var workerRasterEnqueueMs: PerfDistribution
   public var workerRasterComputeMs: PerfDistribution
   public var presentationDurationMs: PerfDistribution
+  public var elidedHeadTotalMs: PerfDistribution
+  public var elidedGraphCheckpointCreateMs: PerfDistribution
+  public var elidedGraphCheckpointRestoreMs: PerfDistribution
+  public var elidedResolveCheckpointRestoreMs: PerfDistribution
+  public var elidedAnimationTickMs: PerfDistribution
+  public var elidedCommitRuntimeRegistrationsMs: PerfDistribution
+  public var elidedAnimationCommitMs: PerfDistribution
+  public var elidedCommitMs: PerfDistribution
   public var completedDropCount: Int
   public var customLayoutFallbackCount: Int
   public var layoutDependentMainActorFallbackCount: Int
@@ -149,6 +181,14 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     workerRasterEnqueueMs: PerfDistribution,
     workerRasterComputeMs: PerfDistribution,
     presentationDurationMs: PerfDistribution,
+    elidedHeadTotalMs: PerfDistribution = PerfDistribution(values: []),
+    elidedGraphCheckpointCreateMs: PerfDistribution = PerfDistribution(values: []),
+    elidedGraphCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
+    elidedResolveCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
+    elidedAnimationTickMs: PerfDistribution = PerfDistribution(values: []),
+    elidedCommitRuntimeRegistrationsMs: PerfDistribution = PerfDistribution(values: []),
+    elidedAnimationCommitMs: PerfDistribution = PerfDistribution(values: []),
+    elidedCommitMs: PerfDistribution = PerfDistribution(values: []),
     completedDropCount: Int,
     customLayoutFallbackCount: Int,
     layoutDependentMainActorFallbackCount: Int
@@ -175,6 +215,14 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     self.workerRasterEnqueueMs = workerRasterEnqueueMs
     self.workerRasterComputeMs = workerRasterComputeMs
     self.presentationDurationMs = presentationDurationMs
+    self.elidedHeadTotalMs = elidedHeadTotalMs
+    self.elidedGraphCheckpointCreateMs = elidedGraphCheckpointCreateMs
+    self.elidedGraphCheckpointRestoreMs = elidedGraphCheckpointRestoreMs
+    self.elidedResolveCheckpointRestoreMs = elidedResolveCheckpointRestoreMs
+    self.elidedAnimationTickMs = elidedAnimationTickMs
+    self.elidedCommitRuntimeRegistrationsMs = elidedCommitRuntimeRegistrationsMs
+    self.elidedAnimationCommitMs = elidedAnimationCommitMs
+    self.elidedCommitMs = elidedCommitMs
     self.completedDropCount = completedDropCount
     self.customLayoutFallbackCount = customLayoutFallbackCount
     self.layoutDependentMainActorFallbackCount = layoutDependentMainActorFallbackCount
@@ -203,9 +251,123 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     case workerRasterEnqueueMs = "worker_raster_enqueue_ms"
     case workerRasterComputeMs = "worker_raster_compute_ms"
     case presentationDurationMs = "presentation_duration_ms"
+    case elidedHeadTotalMs = "elided_head_total_ms"
+    case elidedGraphCheckpointCreateMs = "elided_graph_checkpoint_create_ms"
+    case elidedGraphCheckpointRestoreMs = "elided_graph_checkpoint_restore_ms"
+    case elidedResolveCheckpointRestoreMs = "elided_resolve_checkpoint_restore_ms"
+    case elidedAnimationTickMs = "elided_animation_tick_ms"
+    case elidedCommitRuntimeRegistrationsMs =
+      "elided_commit_runtime_registrations_ms"
+    case elidedAnimationCommitMs = "elided_animation_commit_ms"
+    case elidedCommitMs = "elided_commit_ms"
     case completedDropCount = "completed_drop_count"
     case customLayoutFallbackCount = "custom_layout_fallback_count"
     case layoutDependentMainActorFallbackCount = "layout_dependent_main_actor_fallback_count"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      scenario: try container.decode(String.self, forKey: .scenario),
+      renderMode: try container.decode(String.self, forKey: .renderMode),
+      iterationCount: try container.decode(Int.self, forKey: .iterationCount),
+      committedFrameCount: try container.decode(Int.self, forKey: .committedFrameCount),
+      diagnosticFrameCount: try container.decode(Int.self, forKey: .diagnosticFrameCount),
+      skippedFrameCount: try container.decode(Int.self, forKey: .skippedFrameCount),
+      elidedFrameCount: try container.decode(Int.self, forKey: .elidedFrameCount),
+      cancelledFrameCount: try container.decode(Int.self, forKey: .cancelledFrameCount),
+      inputToPresentLatencyMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .inputToPresentLatencyMs
+      ),
+      inputToSettledLatencyMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .inputToSettledLatencyMs
+      ),
+      frameIntervalMs: try container.decode(PerfDistribution.self, forKey: .frameIntervalMs),
+      totalCPUSeconds: try container.decode(Double.self, forKey: .totalCPUSeconds),
+      cpuSecondsPerCommittedFrame: try container.decodeIfPresent(
+        Double.self,
+        forKey: .cpuSecondsPerCommittedFrame
+      ),
+      cpuSecondsPerDiagnosticFrame: try container.decodeIfPresent(
+        Double.self,
+        forKey: .cpuSecondsPerDiagnosticFrame
+      ),
+      cpuSecondsPerInputEvent: try container.decodeIfPresent(
+        Double.self,
+        forKey: .cpuSecondsPerInputEvent
+      ),
+      mainActorBlockedRatio: try container.decodeIfPresent(
+        Double.self,
+        forKey: .mainActorBlockedRatio
+      ),
+      mainActorSuspendedRatio: try container.decodeIfPresent(
+        Double.self,
+        forKey: .mainActorSuspendedRatio
+      ),
+      workerLayoutEnqueueMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .workerLayoutEnqueueMs
+      ),
+      workerLayoutComputeMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .workerLayoutComputeMs
+      ),
+      workerRasterEnqueueMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .workerRasterEnqueueMs
+      ),
+      workerRasterComputeMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .workerRasterComputeMs
+      ),
+      presentationDurationMs: try container.decode(
+        PerfDistribution.self,
+        forKey: .presentationDurationMs
+      ),
+      elidedHeadTotalMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedHeadTotalMs
+      ) ?? PerfDistribution(values: []),
+      elidedGraphCheckpointCreateMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedGraphCheckpointCreateMs
+      ) ?? PerfDistribution(values: []),
+      elidedGraphCheckpointRestoreMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedGraphCheckpointRestoreMs
+      ) ?? PerfDistribution(values: []),
+      elidedResolveCheckpointRestoreMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedResolveCheckpointRestoreMs
+      ) ?? PerfDistribution(values: []),
+      elidedAnimationTickMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedAnimationTickMs
+      ) ?? PerfDistribution(values: []),
+      elidedCommitRuntimeRegistrationsMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedCommitRuntimeRegistrationsMs
+      ) ?? PerfDistribution(values: []),
+      elidedAnimationCommitMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedAnimationCommitMs
+      ) ?? PerfDistribution(values: []),
+      elidedCommitMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .elidedCommitMs
+      ) ?? PerfDistribution(values: []),
+      completedDropCount: try container.decode(Int.self, forKey: .completedDropCount),
+      customLayoutFallbackCount: try container.decode(
+        Int.self,
+        forKey: .customLayoutFallbackCount
+      ),
+      layoutDependentMainActorFallbackCount: try container.decode(
+        Int.self,
+        forKey: .layoutDependentMainActorFallbackCount
+      )
+    )
   }
 }
 
@@ -255,6 +417,26 @@ public enum SummaryReducer {
       presentationDurationMs: PerfDistribution(
         values: committedFrames.compactMap(\.presentationDurationMs)
       ),
+      elidedHeadTotalMs: PerfDistribution(values: frames.compactMap(\.elidedHeadTotalMs)),
+      elidedGraphCheckpointCreateMs: PerfDistribution(
+        values: frames.compactMap(\.elidedGraphCheckpointCreateMs)
+      ),
+      elidedGraphCheckpointRestoreMs: PerfDistribution(
+        values: frames.compactMap(\.elidedGraphCheckpointRestoreMs)
+      ),
+      elidedResolveCheckpointRestoreMs: PerfDistribution(
+        values: frames.compactMap(\.elidedResolveCheckpointRestoreMs)
+      ),
+      elidedAnimationTickMs: PerfDistribution(
+        values: frames.compactMap(\.elidedAnimationTickMs)
+      ),
+      elidedCommitRuntimeRegistrationsMs: PerfDistribution(
+        values: frames.compactMap(\.elidedCommitRuntimeRegistrationsMs)
+      ),
+      elidedAnimationCommitMs: PerfDistribution(
+        values: frames.compactMap(\.elidedAnimationCommitMs)
+      ),
+      elidedCommitMs: PerfDistribution(values: frames.compactMap(\.elidedCommitMs)),
       completedDropCount: completedDropCount(frames),
       customLayoutFallbackCount: frames.reduce(0) { $0 + $1.customLayoutFallbacks },
       layoutDependentMainActorFallbackCount: frames.reduce(0) {

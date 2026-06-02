@@ -1,6 +1,13 @@
+import Foundation
+
 /// Converts draw commands into a terminal cell surface.
 public struct Rasterizer: Sendable {
   internal static let emptyCompositingStyle = ResolvedTextStyle()
+
+  package enum IncrementalRasterVerificationPolicy: Sendable {
+    case verifySoundDamage
+    case trustSoundDamage
+  }
 
   package typealias RasterizationResult = (
     surface: RasterSurface,
@@ -14,6 +21,8 @@ public struct Rasterizer: Sendable {
     case sampledRadial(RadialGradient)
     case tile(TileStyle)
   }
+
+  private var incrementalVerificationPolicy: IncrementalRasterVerificationPolicy
 
   /// Proof token for the incremental repaint adapter.
   ///
@@ -49,6 +58,15 @@ public struct Rasterizer: Sendable {
   }
 
   public init() {
+    self.init(
+      incrementalVerificationPolicy: Self.defaultIncrementalVerificationPolicy()
+    )
+  }
+
+  package init(
+    incrementalVerificationPolicy: IncrementalRasterVerificationPolicy
+  ) {
+    self.incrementalVerificationPolicy = incrementalVerificationPolicy
   }
 
   /// Rasterizes a draw tree into a ``RasterSurface``.
@@ -210,15 +228,17 @@ public struct Rasterizer: Sendable {
       cells: cells,
       imageAttachments: imageAttachments
     )
-    // F13: when damage suppresses painting, verify against a fresh raster before
-    // returning the incremental surface. A mismatch means damage was incomplete,
-    // so the fresh result must force a full presentation repaint.
-    if let freshFallback = freshRasterizationIfIncrementalMismatch(
-      draw,
-      surfaceSize: surfaceSize,
-      incrementalSurface: surface
-    ) {
-      return freshFallback
+    if incrementalVerificationPolicy == .verifySoundDamage {
+      // F13: when damage suppresses painting, verify against a fresh raster
+      // before returning the incremental surface. A mismatch means damage was
+      // incomplete, so the fresh result must force a full presentation repaint.
+      if let freshFallback = freshRasterizationIfIncrementalMismatch(
+        draw,
+        surfaceSize: surfaceSize,
+        incrementalSurface: surface
+      ) {
+        return freshFallback
+      }
     }
 
     return (
@@ -246,5 +266,39 @@ public struct Rasterizer: Sendable {
     }
 
     return fresh
+  }
+
+  private static func defaultIncrementalVerificationPolicy()
+    -> IncrementalRasterVerificationPolicy
+  {
+    let environment = ProcessInfo.processInfo.environment
+    if environmentFlagIsEnabled(
+      environment["SWIFTTUI_RASTER_VERIFY_INCREMENTAL"]
+    ) {
+      return .verifySoundDamage
+    }
+    if environmentFlagIsEnabled(
+      environment["SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE"]
+    ) {
+      return .trustSoundDamage
+    }
+
+    #if DEBUG
+      return .verifySoundDamage
+    #else
+      return .trustSoundDamage
+    #endif
+  }
+
+  private static func environmentFlagIsEnabled(_ value: String?) -> Bool {
+    guard let value else {
+      return false
+    }
+    switch value.lowercased() {
+    case "1", "true", "yes", "on":
+      return true
+    default:
+      return false
+    }
   }
 }

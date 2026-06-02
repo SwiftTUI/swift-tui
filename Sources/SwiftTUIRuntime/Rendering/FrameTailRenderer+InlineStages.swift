@@ -145,6 +145,7 @@ struct FrameTailInlineStageRenderer: Sendable {
     let retainedInput = retained.map {
       RetainedDrawExtractionInput(
         previousDraw: $0.draw,
+        previousDrawByIdentity: $0.drawByIdentity,
         proof: proof
       )
     }
@@ -174,10 +175,12 @@ struct FrameTailInlineStageRenderer: Sendable {
         damage: rasterReuseDamage
       )
     }
-    let finalPresentationDamage = RasterSurfaceDamageDiff.diff(
-      previous: previousSurface,
-      current: rasterized.surface
-    )
+    let finalPresentationDamage =
+      rasterized.presentationDamage
+      ?? RasterSurfaceDamageDiff.diff(
+        previous: previousSurface,
+        current: rasterized.surface
+      )
     return .init(
       surface: rasterized.surface,
       drawnIdentities: rasterized.visibleIdentities,

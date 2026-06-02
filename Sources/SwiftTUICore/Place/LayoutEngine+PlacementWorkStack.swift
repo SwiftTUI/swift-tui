@@ -15,11 +15,10 @@ extension LayoutEngine {
       )
     ]
     var results: [PlacedNode] = []
+    var localMetrics = LayoutWorkMetrics()
 
     while let item = work.popLast() {
-      passContext?.updateWorkMetrics {
-        $0.placementWorkStackSteps += 1
-      }
+      localMetrics.placementWorkStackSteps += 1
 
       switch item {
       case .place(let node, let measured, let bounds, let viewportContext):
@@ -29,6 +28,7 @@ extension LayoutEngine {
           in: bounds,
           viewportContext: viewportContext,
           passContext: passContext,
+          localMetrics: &localMetrics,
           work: &work,
           results: &results
         )
@@ -46,6 +46,11 @@ extension LayoutEngine {
     }
 
     precondition(results.count == 1, "placement work stack left \(results.count) roots")
+    passContext?.updateWorkMetrics {
+      $0.placementWorkStackSteps += localMetrics.placementWorkStackSteps
+      $0.placedNodesComputed += localMetrics.placedNodesComputed
+      $0.placedNodesReused += localMetrics.placedNodesReused
+    }
     return results[0]
   }
 
@@ -55,6 +60,7 @@ extension LayoutEngine {
     in bounds: CellRect,
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [PlacementWorkItem],
     results: inout [PlacedNode]
   ) {
@@ -65,9 +71,7 @@ extension LayoutEngine {
       viewportContext: viewportContext,
       retainedLayout: passContext?.retainedLayout
     ) {
-      passContext?.updateWorkMetrics {
-        $0.placedNodesReused += retained.placed.subtreeNodeCount
-      }
+      localMetrics.placedNodesReused += retained.placed.subtreeNodeCount
       if let fragment = retained.placedFrameFragment {
         passContext?.recordPlacedFrameFragment(fragment)
       } else {
@@ -77,9 +81,7 @@ extension LayoutEngine {
       return
     }
 
-    passContext?.updateWorkMetrics {
-      $0.placedNodesComputed += 1
-    }
+    localMetrics.placedNodesComputed += 1
 
     passContext?.recordPlacedFrame(
       identity: node.identity,

@@ -1,6 +1,18 @@
-package enum RetainedPhaseExtractionProof: Sendable {
+package enum RetainedPhaseExtractionProof: Equatable, Sendable {
   case none
   case wholeTreeIdentical
+  case subtreesIdentical(Set<Identity>)
+
+  package func canReuseSubtree(rootedAt identity: Identity) -> Bool {
+    switch self {
+    case .none:
+      return false
+    case .wholeTreeIdentical:
+      return true
+    case .subtreesIdentical(let identities):
+      return identities.contains(identity)
+    }
+  }
 }
 
 package struct RetainedPhaseExtractionSignature: Equatable, Sendable {
@@ -104,14 +116,24 @@ package struct RetainedSemanticExtractionInput: Sendable {
 
 package struct RetainedDrawExtractionInput: Sendable {
   package var previousDraw: DrawNode
+  package var previousDrawByIdentity: [Identity: DrawNode]
   package var proof: RetainedPhaseExtractionProof
 
   package init(
     previousDraw: DrawNode,
+    previousDrawByIdentity: [Identity: DrawNode] = [:],
     proof: RetainedPhaseExtractionProof
   ) {
     self.previousDraw = previousDraw
+    self.previousDrawByIdentity = previousDrawByIdentity
     self.proof = proof
+  }
+
+  package func previousDrawNode(for identity: Identity) -> DrawNode? {
+    if previousDraw.identity == identity {
+      return previousDraw
+    }
+    return previousDrawByIdentity[identity]
   }
 }
 

@@ -39,6 +39,7 @@ package final class FrameHeadTransaction {
   package let presentationPortalDraft: PresentationPortalDraft
   package let observationDraft: ObservationBridgeDraft?
   package let animationDraft: AnimationFrameDraft
+  private let elidedFrameTimingRecorder: ElidedFrameTimingRecorder
   package let checkpoints: FrameHeadCheckpoints?
 
   private let viewGraph: ViewGraph
@@ -59,6 +60,7 @@ package final class FrameHeadTransaction {
     presentationPortalDraft: PresentationPortalDraft,
     observationDraft: ObservationBridgeDraft?,
     animationDraft: AnimationFrameDraft,
+    elidedFrameTimingRecorder: ElidedFrameTimingRecorder,
     checkpoints: FrameHeadCheckpoints?
   ) {
     self.viewGraph = viewGraph
@@ -69,6 +71,7 @@ package final class FrameHeadTransaction {
     self.presentationPortalDraft = presentationPortalDraft
     self.observationDraft = observationDraft
     self.animationDraft = animationDraft
+    self.elidedFrameTimingRecorder = elidedFrameTimingRecorder
     self.checkpoints = checkpoints
   }
 
@@ -99,10 +102,16 @@ package final class FrameHeadTransaction {
   /// finalizeFrame/commitPlanner/present afterward.
   package func commitElided() -> RuntimeRegistrationDiagnostics {
     precondition(!didCommit && !didDiscard)
-    let diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)
+    let diagnostics = elidedFrameTimingRecorder.measure(
+      .commitRuntimeRegistrations
+    ) {
+      graphDraft.commitRuntimeRegistrations(from: viewGraph)
+    }
     observationDraft?.commit()
     presentationPortalDraft.commit()
-    animationDraft.commit()
+    elidedFrameTimingRecorder.measure(.animationCommit) {
+      animationDraft.commit()
+    }
     didCommit = true
     return diagnostics
   }
@@ -112,13 +121,17 @@ package final class FrameHeadTransaction {
     guard let checkpoints else {
       return
     }
-    graphDraft.materializePreparedState(
-      in: viewGraph,
-      preservingCurrentStateMutations: hasSuspendedPreparedState
-    )
+    elidedFrameTimingRecorder.measure(.graphCheckpointRestore) {
+      graphDraft.materializePreparedState(
+        in: viewGraph,
+        preservingCurrentStateMutations: hasSuspendedPreparedState
+      )
+    }
     observationDraft?.resumeRecording()
-    frameState.restoreCheckpoint(checkpoints.preparedFrameState)
-    frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
+    elidedFrameTimingRecorder.measure(.resolveCheckpointRestore) {
+      frameState.restoreCheckpoint(checkpoints.preparedFrameState)
+      frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
+    }
   }
 
   package func recordPreparedGraphState() {
@@ -134,14 +147,22 @@ package final class FrameHeadTransaction {
     guard let checkpoints else {
       return
     }
-    graphDraft.restoreBaselineState(
-      in: viewGraph,
-      preservingCurrentStateMutations: hasSuspendedPreparedState
-    )
+    elidedFrameTimingRecorder.measure(.graphCheckpointRestore) {
+      graphDraft.restoreBaselineState(
+        in: viewGraph,
+        preservingCurrentStateMutations: hasSuspendedPreparedState
+      )
+    }
     observationDraft?.suspendRecording()
-    frameState.restoreCheckpoint(checkpoints.baselineFrameState)
-    frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+    elidedFrameTimingRecorder.measure(.resolveCheckpointRestore) {
+      frameState.restoreCheckpoint(checkpoints.baselineFrameState)
+      frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+    }
     hasSuspendedPreparedState = true
+  }
+
+  package func measureElidedCommit<Value>(_ operation: () -> Value) -> Value {
+    elidedFrameTimingRecorder.measure(.commit, operation)
   }
 
   package func discard() {

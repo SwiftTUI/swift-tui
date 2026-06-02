@@ -23,13 +23,53 @@ struct FrameTailRetainedInput {
     guard
       let previous = previousPhaseProducts,
       previous.proposal == proposal,
-      animationOverlaySnapshot.isEmpty,
-      let currentSignature = RetainedPhaseExtractionSignature.make(from: placed),
-      previous.signature == currentSignature
+      animationOverlaySnapshot.isEmpty
     else {
       return .none
     }
-    return .wholeTreeIdentical
+    if let currentSignature = RetainedPhaseExtractionSignature.make(from: placed),
+      previous.signature == currentSignature
+    {
+      return .wholeTreeIdentical
+    }
+    guard let previousFrameIndex = retainedLayout.previousFrameIndex else {
+      return .none
+    }
+
+    var reusableRoots: Set<Identity> = []
+    collectReusablePhaseSubtrees(
+      placed,
+      previousFrameIndex: previousFrameIndex,
+      invalidationSummary: retainedLayout.invalidationSummary,
+      reusableRoots: &reusableRoots
+    )
+    return reusableRoots.isEmpty ? .none : .subtreesIdentical(reusableRoots)
+  }
+
+  private func collectReusablePhaseSubtrees(
+    _ node: PlacedNode,
+    previousFrameIndex: RetainedFrameIndex,
+    invalidationSummary: RetainedInvalidationSummary,
+    reusableRoots: inout Set<Identity>
+  ) {
+    if !invalidationSummary.intersectsSubtree(at: node.identity),
+      let previousPlaced = previousFrameIndex.placedNode(for: node.identity),
+      let currentSignature = RetainedPhaseExtractionSignature.make(from: node),
+      let previousSignature = RetainedPhaseExtractionSignature.make(from: previousPlaced),
+      currentSignature == previousSignature
+    {
+      reusableRoots.insert(node.identity)
+      return
+    }
+
+    for child in node.children {
+      collectReusablePhaseSubtrees(
+        child,
+        previousFrameIndex: previousFrameIndex,
+        invalidationSummary: invalidationSummary,
+        reusableRoots: &reusableRoots
+      )
+    }
   }
 }
 
@@ -38,6 +78,7 @@ struct RetainedFrameTailPhaseProducts: Sendable {
   var signature: RetainedPhaseExtractionSignature
   var semantics: SemanticSnapshot
   var draw: DrawNode
+  var drawByIdentity: [Identity: DrawNode]
 }
 
 /// Worker-safe input for measure/place through raster work.

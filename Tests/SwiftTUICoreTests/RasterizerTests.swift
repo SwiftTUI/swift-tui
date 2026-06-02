@@ -791,6 +791,41 @@ struct RasterizerTests {
     #expect(verified.presentationDamage == nil)
   }
 
+  @Test("trusted incremental raster policy skips fresh fallback for incomplete damage")
+  func trustedIncrementalPolicySkipsFreshFallbackForIncompleteDamage() {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    let minimumSize = CellSize(width: 6, height: 1)
+    let previous = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+      ])
+    let current = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+      ])
+
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: nil,
+      damage: nil
+    )
+    let trusted = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
+    )
+
+    #expect(trusted.surface != fresh.surface)
+    #expect(trusted.presentationDamage != nil)
+  }
+
   @Test("incremental raster reuse falls back to fresh raster for incompatible surface size")
   func incrementalRasterReuseFallsBackForIncompatibleSurfaceSize() {
     let rasterizer = Rasterizer()

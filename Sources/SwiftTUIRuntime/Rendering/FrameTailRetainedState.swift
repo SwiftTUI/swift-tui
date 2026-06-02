@@ -114,11 +114,28 @@ final class FrameTailRetainedState: Sendable {
             proposal: proposal,
             signature: effectiveSignature,
             semantics: artifacts.semanticSnapshot.retainedExtractionProduct,
-            draw: artifacts.drawTree
+            draw: artifacts.drawTree,
+            drawByIdentity: Self.drawIndex(artifacts.drawTree)
           )
         } else {
           nil
         }
+    }
+  }
+
+  private static func drawIndex(_ root: DrawNode) -> [Identity: DrawNode] {
+    var storage: [Identity: DrawNode] = [:]
+    indexDrawNode(root, into: &storage)
+    return storage
+  }
+
+  private static func indexDrawNode(
+    _ node: DrawNode,
+    into storage: inout [Identity: DrawNode]
+  ) {
+    storage[node.identity] = node
+    for child in node.children {
+      indexDrawNode(child, into: &storage)
     }
   }
 }

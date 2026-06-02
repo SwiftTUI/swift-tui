@@ -112,6 +112,44 @@ struct SummaryReducerTests {
     #expect(isApproximately(summary.presentationDurationMs.p50, 3))
   }
 
+  @Test("elided frame spans are summarized")
+  func elidedFrameSpansAreSummarized() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [],
+      cpuSamples: [],
+      frames: [
+        frame(number: 1),
+        frame(
+          number: 2,
+          totalMs: nil,
+          staleFramePolicy: "elided_offscreen",
+          tailJobState: "-",
+          dropDecision: "-",
+          elided: true,
+          elidedHeadTotalMs: 2.0,
+          elidedGraphCheckpointCreateMs: 0.4,
+          elidedGraphCheckpointRestoreMs: 0.5,
+          elidedResolveCheckpointRestoreMs: 0.2,
+          elidedAnimationTickMs: 0.7,
+          elidedCommitRuntimeRegistrationsMs: 0.1,
+          elidedAnimationCommitMs: 0.05,
+          elidedCommitMs: 0.8
+        ),
+      ]
+    )
+
+    #expect(summary.elidedHeadTotalMs.count == 1)
+    #expect(isApproximately(summary.elidedHeadTotalMs.p50, 2.0))
+    #expect(isApproximately(summary.elidedGraphCheckpointCreateMs.p50, 0.4))
+    #expect(isApproximately(summary.elidedGraphCheckpointRestoreMs.p50, 0.5))
+    #expect(isApproximately(summary.elidedResolveCheckpointRestoreMs.p50, 0.2))
+    #expect(isApproximately(summary.elidedAnimationTickMs.p50, 0.7))
+    #expect(isApproximately(summary.elidedCommitRuntimeRegistrationsMs.p50, 0.1))
+    #expect(isApproximately(summary.elidedAnimationCommitMs.p50, 0.05))
+    #expect(isApproximately(summary.elidedCommitMs.p50, 0.8))
+  }
+
   @Test("idle events do not contribute latency or input-event CPU ratios")
   func idleEventsDoNotContributeLatencyOrInputRatios() throws {
     let summary = SummaryReducer.reduce(
@@ -160,6 +198,8 @@ struct SummaryReducerTests {
     #expect(object.keys.contains("worker_layout_compute_ms"))
     #expect(object.keys.contains("diagnostic_frame_count"))
     #expect(object.keys.contains("elided_frame_count"))
+    #expect(object.keys.contains("elided_head_total_ms"))
+    #expect(object.keys.contains("elided_commit_ms"))
     #expect(object.keys.contains("cancelled_frame_count"))
     #expect(!object.keys.contains("cancellation_count"))
   }
@@ -233,7 +273,15 @@ struct SummaryReducerTests {
     staleFramePolicy: String = "commit_ordered",
     tailJobState: String = "completed",
     dropDecision: String = "commit_ordered",
-    elided: Bool = false
+    elided: Bool = false,
+    elidedHeadTotalMs: Double? = nil,
+    elidedGraphCheckpointCreateMs: Double? = nil,
+    elidedGraphCheckpointRestoreMs: Double? = nil,
+    elidedResolveCheckpointRestoreMs: Double? = nil,
+    elidedAnimationTickMs: Double? = nil,
+    elidedCommitRuntimeRegistrationsMs: Double? = nil,
+    elidedAnimationCommitMs: Double? = nil,
+    elidedCommitMs: Double? = nil
   ) -> PerfFrameRecord {
     PerfFrameRecord(
       frameNumber: number,
@@ -246,6 +294,14 @@ struct SummaryReducerTests {
       mainActorBlockedMs: totalMs == nil ? nil : 1,
       mainActorSuspendedMs: totalMs == nil ? nil : 2,
       presentationDurationMs: 3,
+      elidedHeadTotalMs: elidedHeadTotalMs,
+      elidedGraphCheckpointCreateMs: elidedGraphCheckpointCreateMs,
+      elidedGraphCheckpointRestoreMs: elidedGraphCheckpointRestoreMs,
+      elidedResolveCheckpointRestoreMs: elidedResolveCheckpointRestoreMs,
+      elidedAnimationTickMs: elidedAnimationTickMs,
+      elidedCommitRuntimeRegistrationsMs: elidedCommitRuntimeRegistrationsMs,
+      elidedAnimationCommitMs: elidedAnimationCommitMs,
+      elidedCommitMs: elidedCommitMs,
       elided: elided,
       customLayoutFallbacks: 1,
       layoutDependentMainActorFallbacks: 2,
