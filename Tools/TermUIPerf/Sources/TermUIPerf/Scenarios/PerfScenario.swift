@@ -338,11 +338,15 @@ public enum PerfScenarioRunner {
       startedAt: startedAt,
       endedAt: timestampString()
     )
+    let frameRecords = try PerfFrameDiagnosticsTSVReader.read(
+      from: framesURL,
+      presentedFrames: terminalHost.presentedFrames
+    )
     let summary = SummaryReducer.reduce(
       metadata: metadata,
       events: events,
       cpuSamples: cpuSamples,
-      frames: terminalHost.frameRecords
+      frames: frameRecords
     )
 
     try writeJSON(metadata, to: runDirectory.appendingPathComponent("run.json"))

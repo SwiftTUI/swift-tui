@@ -81,6 +81,30 @@ struct SummaryReducerTests {
     #expect(summary.skippedFrameCount == 1)
   }
 
+  @Test("presentation duration excludes skipped frames")
+  func presentationDurationExcludesSkippedFrames() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [],
+      cpuSamples: [],
+      frames: [
+        frame(number: 1),
+        frame(
+          number: 2,
+          totalMs: nil,
+          tailJobState: "-",
+          dropDecision: "-"
+        ),
+        frame(number: 3, tailJobState: "dropped_completed", dropDecision: "drop_visual_only"),
+      ]
+    )
+
+    #expect(summary.committedFrameCount == 1)
+    #expect(summary.skippedFrameCount == 2)
+    #expect(summary.presentationDurationMs.count == 1)
+    #expect(isApproximately(summary.presentationDurationMs.p50, 3))
+  }
+
   @Test("summary JSON key names are stable")
   func summaryJSONKeyNamesAreStable() throws {
     let summary = SummaryReducer.reduce(

@@ -182,7 +182,9 @@ public enum SummaryReducer {
       workerLayoutComputeMs: PerfDistribution(values: frames.compactMap(\.workerLayoutComputeMs)),
       workerRasterEnqueueMs: PerfDistribution(values: frames.compactMap(\.workerRasterEnqueueMs)),
       workerRasterComputeMs: PerfDistribution(values: frames.compactMap(\.workerRasterComputeMs)),
-      presentationDurationMs: PerfDistribution(values: frames.compactMap(\.presentationDurationMs)),
+      presentationDurationMs: PerfDistribution(
+        values: committedFrames.compactMap(\.presentationDurationMs)
+      ),
       cancellationCount: cancellationCount(frames),
       completedDropCount: completedDropCount(frames),
       customLayoutFallbackCount: frames.reduce(0) { $0 + $1.customLayoutFallbacks },
