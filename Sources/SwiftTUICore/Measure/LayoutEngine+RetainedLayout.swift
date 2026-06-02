@@ -1,6 +1,11 @@
 extension LayoutEngine {
   // MARK: - Retained layout
 
+  internal struct RetainedPlacementResult {
+    var placed: PlacedNode
+    var placedFrameFragment: PlacedFrameTableFragment?
+  }
+
   internal func retainedMeasurement(
     for resolved: ResolvedNode,
     proposal: ProposedSize,
@@ -30,7 +35,7 @@ extension LayoutEngine {
     bounds: CellRect,
     viewportContext: LazyStackViewportContext?,
     retainedLayout: RetainedLayoutSession?
-  ) -> PlacedNode? {
+  ) -> RetainedPlacementResult? {
     if viewportContext != nil, case .lazyStack = resolved.layoutBehavior {
       return nil
     }
@@ -68,6 +73,10 @@ extension LayoutEngine {
     // only geometry matches (`.geometryReusable`), the mirrors are refreshed
     // from the current resolved tree while preserving cached bounds.
     let skipMetadataSync = equivalence == .identical
+    let retainedFrameFragment =
+      skipMetadataSync
+      ? retainedLayout.placedFrameFragment(for: resolved.identity)
+      : nil
     func reuse(_ placed: PlacedNode) -> PlacedNode {
       skipMetadataSync
         ? placed
@@ -78,7 +87,10 @@ extension LayoutEngine {
       guard measurementMatches else {
         return nil
       }
-      return reuse(previousPlaced)
+      return .init(
+        placed: reuse(previousPlaced),
+        placedFrameFragment: retainedFrameFragment
+      )
     }
 
     guard
@@ -94,10 +106,16 @@ extension LayoutEngine {
       y: bounds.origin.y - previousPlaced.bounds.origin.y
     )
     if delta == .zero {
-      return reuse(previousPlaced)
+      return .init(
+        placed: reuse(previousPlaced),
+        placedFrameFragment: retainedFrameFragment
+      )
     }
 
-    return reuse(translatedPlacement(previousPlaced, by: delta))
+    return .init(
+      placed: reuse(translatedPlacement(previousPlaced, by: delta)),
+      placedFrameFragment: retainedFrameFragment?.translated(by: delta)
+    )
   }
 
   /// Walks a reused placed subtree in parallel with the current

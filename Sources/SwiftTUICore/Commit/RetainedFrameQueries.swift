@@ -26,6 +26,12 @@ package struct RetainedFrameIndex: Sendable {
   package let resolvedByIdentity: [Identity: ResolvedNode]
   package let measuredByIdentity: [Identity: MeasuredNode]
   package let placedByIdentity: [Identity: PlacedNode]
+  private let placedFrameEntries: [PlacedFrameTableEntry]
+  private let placedFrameEntryRangesByIdentity: [Identity: Range<Int>]
+
+  package var placedFrameEntryCount: Int {
+    placedFrameEntries.count
+  }
 
   package init(frame: FrameArtifacts) {
     var resolvedByIdentity: [Identity: ResolvedNode] = [:]
@@ -37,8 +43,17 @@ package struct RetainedFrameIndex: Sendable {
     self.measuredByIdentity = measuredByIdentity
 
     var placedByIdentity: [Identity: PlacedNode] = [:]
-    Self.index(frame.placedTree, into: &placedByIdentity)
+    var placedFrameEntries: [PlacedFrameTableEntry] = []
+    var placedFrameEntryRangesByIdentity: [Identity: Range<Int>] = [:]
+    Self.index(
+      frame.placedTree,
+      into: &placedByIdentity,
+      placedFrameEntries: &placedFrameEntries,
+      placedFrameEntryRangesByIdentity: &placedFrameEntryRangesByIdentity
+    )
     self.placedByIdentity = placedByIdentity
+    self.placedFrameEntries = placedFrameEntries
+    self.placedFrameEntryRangesByIdentity = placedFrameEntryRangesByIdentity
   }
 
   package func resolvedNode(
@@ -57,6 +72,15 @@ package struct RetainedFrameIndex: Sendable {
     for identity: Identity
   ) -> PlacedNode? {
     placedByIdentity[identity]
+  }
+
+  package func placedFrameFragment(
+    for identity: Identity
+  ) -> PlacedFrameTableFragment? {
+    guard let range = placedFrameEntryRangesByIdentity[identity] else {
+      return nil
+    }
+    return .init(entries: placedFrameEntries[range])
   }
 
   private static func index(
@@ -81,12 +105,28 @@ package struct RetainedFrameIndex: Sendable {
 
   private static func index(
     _ node: PlacedNode,
-    into storage: inout [Identity: PlacedNode]
+    into storage: inout [Identity: PlacedNode],
+    placedFrameEntries: inout [PlacedFrameTableEntry],
+    placedFrameEntryRangesByIdentity: inout [Identity: Range<Int>]
   ) {
+    let start = placedFrameEntries.count
     storage[node.identity] = node
+    placedFrameEntries.append(
+      .init(
+        identity: node.identity,
+        bounds: node.bounds,
+        namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
+      )
+    )
     for child in node.children {
-      index(child, into: &storage)
+      index(
+        child,
+        into: &storage,
+        placedFrameEntries: &placedFrameEntries,
+        placedFrameEntryRangesByIdentity: &placedFrameEntryRangesByIdentity
+      )
     }
+    placedFrameEntryRangesByIdentity[node.identity] = start..<placedFrameEntries.count
   }
 }
 
@@ -222,6 +262,12 @@ package struct RetainedLayoutSession: Sendable {
     for identity: Identity
   ) -> PlacedNode? {
     previousFrameIndex?.placedNode(for: identity)
+  }
+
+  package func placedFrameFragment(
+    for identity: Identity
+  ) -> PlacedFrameTableFragment? {
+    previousFrameIndex?.placedFrameFragment(for: identity)
   }
 
   package func invalidationAffectsSubtree(

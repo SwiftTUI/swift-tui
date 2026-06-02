@@ -15,7 +15,7 @@ extension SnapshotRenderer {
       "measuredWork=computed:\(diagnostics.work.measuredNodesComputed) reused:\(diagnostics.work.measuredNodesReused)"
     )
     lines.append(
-      "placedWork=computed:\(diagnostics.work.placedNodesComputed) reused:\(diagnostics.work.placedNodesReused)"
+      "placedWork=computed:\(diagnostics.work.placedNodesComputed) reused:\(diagnostics.work.placedNodesReused) frameTableEntriesReused:\(diagnostics.work.placedFrameTableEntriesReused)"
     )
     lines.append(
       "layoutDependent=realized:\(diagnostics.work.layoutDependentRealizations) cacheHits:\(diagnostics.work.layoutDependentRealizationCacheHits) mainActorFallbacks:\(diagnostics.work.layoutDependentMainActorFallbacks)"

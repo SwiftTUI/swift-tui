@@ -43,6 +43,7 @@ final class FrameTailRetainedState: Sendable {
         detail: [
           "resolved": state.previousFrameIndex?.resolvedByIdentity.count ?? 0,
           "measured": state.previousFrameIndex?.measuredByIdentity.count ?? 0,
+          "placedFrameEntries": state.previousFrameIndex?.placedFrameEntryCount ?? 0,
         ]
       )
     }

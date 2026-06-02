@@ -55,6 +55,7 @@ public struct FrameDiagnosticWork: Equatable, Sendable {
   public var measuredNodesReused: Int
   public var placedNodesComputed: Int
   public var placedNodesReused: Int
+  public var placedFrameTableEntriesReused: Int
   public var layoutDependentRealizations: Int
   public var layoutDependentRealizationCacheHits: Int
   public var layoutDependentMainActorFallbacks: Int
@@ -69,6 +70,7 @@ public struct FrameDiagnosticWork: Equatable, Sendable {
     measuredNodesReused: Int = 0,
     placedNodesComputed: Int = 0,
     placedNodesReused: Int = 0,
+    placedFrameTableEntriesReused: Int = 0,
     layoutDependentRealizations: Int = 0,
     layoutDependentRealizationCacheHits: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
@@ -82,6 +84,7 @@ public struct FrameDiagnosticWork: Equatable, Sendable {
     self.measuredNodesReused = measuredNodesReused
     self.placedNodesComputed = placedNodesComputed
     self.placedNodesReused = placedNodesReused
+    self.placedFrameTableEntriesReused = placedFrameTableEntriesReused
     self.layoutDependentRealizations = layoutDependentRealizations
     self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks

@@ -142,6 +142,14 @@ package final class LayoutPassContext: Sendable {
     }
   }
 
+  package func recordPlacedFrameFragment(
+    _ fragment: PlacedFrameTableFragment
+  ) {
+    state.withLock {
+      $0.workMetrics.placedFrameTableEntriesReused += $0.placedFrameTable.record(fragment)
+    }
+  }
+
   package func enterCustomLayoutCompatibilityBoundary(
     identity: Identity,
     debugName: String,

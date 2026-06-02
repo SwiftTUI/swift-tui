@@ -66,10 +66,14 @@ extension LayoutEngine {
       retainedLayout: passContext?.retainedLayout
     ) {
       passContext?.updateWorkMetrics {
-        $0.placedNodesReused += retained.subtreeNodeCount
+        $0.placedNodesReused += retained.placed.subtreeNodeCount
       }
-      passContext?.recordPlacedFrames(in: retained)
-      results.append(retained)
+      if let fragment = retained.placedFrameFragment {
+        passContext?.recordPlacedFrameFragment(fragment)
+      } else {
+        passContext?.recordPlacedFrames(in: retained.placed)
+      }
+      results.append(retained.placed)
       return
     }
 

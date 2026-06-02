@@ -162,6 +162,7 @@ extension FrameDiagnostics {
           measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
           placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
           placedNodesReused: layoutWork?.placedNodesReused ?? 0,
+          placedFrameTableEntriesReused: layoutWork?.placedFrameTableEntriesReused ?? 0,
           layoutDependentRealizations: layoutWork?.layoutDependentRealizations ?? 0,
           layoutDependentRealizationCacheHits:
             layoutWork?.layoutDependentRealizationCacheHits ?? 0,

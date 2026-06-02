@@ -789,7 +789,11 @@ struct LayoutEngineTests {
       axis: .vertical,
       children: [
         leaf("row-0", size: .init(width: 2, height: 1)),
-        leaf("row-1", size: .init(width: 2, height: 1)),
+        leaf(
+          "row-1",
+          size: .init(width: 2, height: 1),
+          semanticMetadata: .init(namedCoordinateSpaceName: "middle-row")
+        ),
         leaf("row-2", size: .init(width: 2, height: 1)),
       ]
     )
@@ -835,8 +839,84 @@ struct LayoutEngineTests {
     #expect(shifted.bounds.origin == .init(x: 0, y: -1))
     #expect(shifted.contentBounds.origin == .init(x: 0, y: -1))
     #expect(shifted.children.map(\.bounds.origin.y) == [-1, 0, 1])
+    #expect(passContext.placedFrameTable == placedFrameTable(for: shifted))
+    #expect(
+      passContext.placedFrameTable.namedCoordinateSpaces["middle-row"]
+        == shifted.children[1].bounds
+    )
     #expect(passContext.workMetrics.placedNodesComputed == 0)
     #expect(passContext.workMetrics.placedNodesReused == 4)
+    #expect(passContext.workMetrics.placedFrameTableEntriesReused == 4)
+  }
+
+  @Test("retained placement carries identical placed frame table fragments")
+  func retainedPlacementCarriesIdenticalPlacedFrameTableFragments() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "container",
+      axis: .vertical,
+      semanticMetadata: .init(namedCoordinateSpaceName: "shared"),
+      children: [
+        leaf(
+          "row-0",
+          size: .init(width: 3, height: 1),
+          semanticMetadata: .init(namedCoordinateSpaceName: "shared")
+        ),
+        leaf(
+          "row-1",
+          size: .init(width: 3, height: 1),
+          semanticMetadata: .init(namedCoordinateSpaceName: "row-one")
+        ),
+      ]
+    )
+
+    let measured = engine.measure(resolved, proposal: .init(width: 8, height: 2))
+    let bounds = CellRect(origin: .zero, size: measured.measuredSize)
+    let initialPlaced = engine.place(
+      resolved,
+      measured: measured,
+      in: bounds,
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: resolved,
+      measuredTree: measured,
+      placedTree: initialPlaced,
+      semanticSnapshot: .init(),
+      drawTree: .init(identity: resolved.identity, bounds: bounds),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let retainedLayout = RetainedLayoutSession(
+      previousFrameIndex: .init(frame: previousFrame),
+      invalidatedIdentities: []
+    )
+    let passContext = LayoutPassContext(retainedLayout: retainedLayout)
+
+    let placed = engine.place(
+      resolved,
+      measured: measured,
+      in: bounds,
+      passContext: passContext
+    )
+
+    #expect(passContext.placedFrameTable == placedFrameTable(for: placed))
+    #expect(
+      passContext.placedFrameTable.namedCoordinateSpaces["shared"]
+        == placed.children[0].bounds
+    )
+    #expect(
+      passContext.placedFrameTable.namedCoordinateSpaces["row-one"]
+        == placed.children[1].bounds
+    )
+    #expect(passContext.workMetrics.placedNodesComputed == 0)
+    #expect(passContext.workMetrics.placedNodesReused == 3)
+    #expect(passContext.workMetrics.placedFrameTableEntriesReused == 3)
+    #expect(
+      passContext.workMetrics.geometryResolutionDiagnostics.duplicateNamedCoordinateSpaceCount
+        == 1
+    )
   }
 
   @Test("retained placement synchronizes geometry-stable resolved metadata")
@@ -877,7 +957,10 @@ struct LayoutEngineTests {
       layoutBehavior: initialLayoutBehavior,
       layoutMetadata: layoutMetadata,
       drawMetadata: initialDrawMetadata,
-      semanticMetadata: .init(accessibilityLabel: "old"),
+      semanticMetadata: .init(
+        accessibilityLabel: "old",
+        namedCoordinateSpaceName: "old-space"
+      ),
       lifecycleMetadata: .init(appearHandlerIDs: ["old-appear"]),
       drawPayload: .text("Same")
     )
@@ -888,7 +971,10 @@ struct LayoutEngineTests {
       layoutBehavior: updatedLayoutBehavior,
       layoutMetadata: layoutMetadata,
       drawMetadata: updatedDrawMetadata,
-      semanticMetadata: .init(accessibilityLabel: "new"),
+      semanticMetadata: .init(
+        accessibilityLabel: "new",
+        namedCoordinateSpaceName: "new-space"
+      ),
       lifecycleMetadata: .init(appearHandlerIDs: ["new-appear"]),
       drawPayload: .text("Same")
     )
@@ -932,6 +1018,9 @@ struct LayoutEngineTests {
 
     #expect(passContext.workMetrics.placedNodesComputed == 0)
     #expect(passContext.workMetrics.placedNodesReused == 1)
+    #expect(passContext.workMetrics.placedFrameTableEntriesReused == 0)
+    #expect(passContext.placedFrameTable.namedCoordinateSpaces["old-space"] == nil)
+    #expect(passContext.placedFrameTable.namedCoordinateSpaces["new-space"] == bounds)
     #expect(placed.kind == updated.kind)
     #expect(placed.environmentSnapshot == environment)
     #expect(placed.layoutMetadata == layoutMetadata)
@@ -1024,6 +1113,7 @@ private func spacer(_ name: String) -> ResolvedNode {
 private func stack(
   _ name: String,
   axis: Axis,
+  semanticMetadata: SemanticMetadata = SemanticMetadata(),
   children: [ResolvedNode]
 ) -> ResolvedNode {
   ResolvedNode(
@@ -1035,8 +1125,25 @@ private func stack(
       spacing: 0,
       horizontalAlignment: .leading,
       verticalAlignment: .top
-    )
+    ),
+    semanticMetadata: semanticMetadata
   )
+}
+
+private func placedFrameTable(
+  for node: PlacedNode
+) -> PlacedFrameTable {
+  var table = PlacedFrameTable()
+  var work = [node]
+  while let current = work.popLast() {
+    table.record(
+      identity: current.identity,
+      bounds: current.bounds,
+      namedCoordinateSpaceName: current.semanticMetadata.namedCoordinateSpaceName
+    )
+    work.append(contentsOf: current.children.reversed())
+  }
+  return table
 }
 
 private final class NoOpCustomLayoutProxy: CustomLayoutProxy {

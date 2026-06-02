@@ -218,4 +218,78 @@ package struct PlacedFrameTable: Equatable, Sendable {
     }
     return frame
   }
+
+  @discardableResult
+  package mutating func record(
+    _ fragment: PlacedFrameTableFragment
+  ) -> Int {
+    var count = 0
+    for entry in fragment.entries {
+      record(
+        identity: entry.identity,
+        bounds: translated(entry.bounds, by: fragment.translation),
+        namedCoordinateSpaceName: entry.namedCoordinateSpaceName
+      )
+      count += 1
+    }
+    return count
+  }
+
+  private func translated(
+    _ rect: CellRect,
+    by delta: CellPoint
+  ) -> CellRect {
+    CellRect(
+      origin: .init(
+        x: rect.origin.x + delta.x,
+        y: rect.origin.y + delta.y
+      ),
+      size: rect.size
+    )
+  }
+}
+
+package struct PlacedFrameTableEntry: Equatable, Sendable {
+  package var identity: Identity
+  package var bounds: CellRect
+  package var namedCoordinateSpaceName: String?
+
+  package init(
+    identity: Identity,
+    bounds: CellRect,
+    namedCoordinateSpaceName: String?
+  ) {
+    self.identity = identity
+    self.bounds = bounds
+    self.namedCoordinateSpaceName = namedCoordinateSpaceName
+  }
+}
+
+package struct PlacedFrameTableFragment: Equatable, Sendable {
+  package var entries: ArraySlice<PlacedFrameTableEntry>
+  package var translation: CellPoint
+
+  package init(
+    entries: ArraySlice<PlacedFrameTableEntry>,
+    translation: CellPoint = .zero
+  ) {
+    self.entries = entries
+    self.translation = translation
+  }
+
+  package var count: Int {
+    entries.count
+  }
+
+  package func translated(
+    by delta: CellPoint
+  ) -> Self {
+    Self(
+      entries: entries,
+      translation: .init(
+        x: translation.x + delta.x,
+        y: translation.y + delta.y
+      )
+    )
+  }
 }
