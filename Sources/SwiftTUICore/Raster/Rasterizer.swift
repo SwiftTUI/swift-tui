@@ -1,4 +1,12 @@
-import Foundation
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#elseif canImport(WASILibc)
+  import WASILibc
+#elseif canImport(ucrt)
+  import ucrt
+#endif
 
 /// Converts draw commands into a terminal cell surface.
 public struct Rasterizer: Sendable {
@@ -271,14 +279,13 @@ public struct Rasterizer: Sendable {
   private static func defaultIncrementalVerificationPolicy()
     -> IncrementalRasterVerificationPolicy
   {
-    let environment = ProcessInfo.processInfo.environment
     if environmentFlagIsEnabled(
-      environment["SWIFTTUI_RASTER_VERIFY_INCREMENTAL"]
+      environmentValue(named: "SWIFTTUI_RASTER_VERIFY_INCREMENTAL")
     ) {
       return .verifySoundDamage
     }
     if environmentFlagIsEnabled(
-      environment["SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE"]
+      environmentValue(named: "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE")
     ) {
       return .trustSoundDamage
     }
@@ -299,6 +306,15 @@ public struct Rasterizer: Sendable {
       return true
     default:
       return false
+    }
+  }
+
+  private static func environmentValue(named name: String) -> String? {
+    unsafe name.withCString { cName in
+      guard let rawValue = unsafe getenv(cName) else {
+        return nil
+      }
+      return unsafe String(cString: rawValue)
     }
   }
 }

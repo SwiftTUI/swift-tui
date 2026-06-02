@@ -34,6 +34,7 @@ fi
 layers="SwiftTUICore SwiftTUIViews"
 scratch=".build/foundation-audit"
 
+rm -rf "$scratch"
 mkdir -p "$scratch"
 
 target_args=""
