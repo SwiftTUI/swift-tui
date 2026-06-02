@@ -11,6 +11,32 @@ struct FrameTailRetainedInput {
   var previousRasterSurface: RasterSurface?
   /// Previous committed effective visual surface topology.
   var previousSurfaceTopology: SurfaceTopologySignature?
+  /// Previous committed effective phase products that are safe to reuse only
+  /// when the current frame can prove the effective placed tree is identical.
+  var previousPhaseProducts: RetainedFrameTailPhaseProducts?
+
+  package func phaseExtractionProof(
+    for proposal: ProposedSize,
+    placed: PlacedNode,
+    animationOverlaySnapshot: PlacedAnimationOverlaySnapshot
+  ) -> RetainedPhaseExtractionProof {
+    guard
+      let previous = previousPhaseProducts,
+      previous.proposal == proposal,
+      previous.placed == placed,
+      animationOverlaySnapshot.isEmpty
+    else {
+      return .none
+    }
+    return .wholeTreeIdentical
+  }
+}
+
+struct RetainedFrameTailPhaseProducts: Sendable {
+  var proposal: ProposedSize
+  var placed: PlacedNode
+  var semantics: SemanticSnapshot
+  var draw: DrawNode
 }
 
 /// Worker-safe input for measure/place through raster work.

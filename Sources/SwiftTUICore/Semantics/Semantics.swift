@@ -161,6 +161,16 @@ public struct SemanticExtractor: Sendable {
       accessibilityWarnings: accessibilityWarnings
     )
   }
+
+  package func extract(
+    from placed: PlacedNode,
+    retained input: RetainedSemanticExtractionInput?
+  ) -> SemanticSnapshot {
+    if let input, input.proof == .wholeTreeIdentical {
+      return input.previousSnapshot
+    }
+    return extract(from: placed)
+  }
 }
 
 extension SemanticExtractor {

@@ -13,7 +13,10 @@ import Synchronization
 ///  - the previous committed raster surface and visual surface topology, used
 ///    to derive actual damage and decide whether raster reuse hints are safe, and
 ///  - the previous committed frame's drawn-identity set, used as a geometric
-///    visibility signal for scheduling policy (e.g. offscreen-frame elision).
+///    visibility signal for scheduling policy (e.g. offscreen-frame elision),
+///    and
+///  - previous committed semantic/draw phase products for reuse only when the
+///    next frame proves the effective placed tree is identical.
 ///
 /// It never stores or previews an in-flight candidate frame.
 final class FrameTailRetainedState: Sendable {
@@ -22,6 +25,7 @@ final class FrameTailRetainedState: Sendable {
     var previousDrawnIdentities: Set<Identity>?
     var previousRasterSurface: RasterSurface?
     var previousSurfaceTopology: SurfaceTopologySignature?
+    var previousPhaseProducts: RetainedFrameTailPhaseProducts?
   }
 
   private let state = Mutex(State())
@@ -44,6 +48,7 @@ final class FrameTailRetainedState: Sendable {
           "resolved": state.previousFrameIndex?.resolvedByIdentity.count ?? 0,
           "measured": state.previousFrameIndex?.measuredByIdentity.count ?? 0,
           "placedFrameEntries": state.previousFrameIndex?.placedFrameEntryCount ?? 0,
+          "phaseProducts": state.previousPhaseProducts == nil ? 0 : 1,
         ]
       )
     }
@@ -62,7 +67,8 @@ final class FrameTailRetainedState: Sendable {
           invalidatedIdentities: invalidatedIdentities
         ),
         previousRasterSurface: state.previousRasterSurface,
-        previousSurfaceTopology: state.previousSurfaceTopology
+        previousSurfaceTopology: state.previousSurfaceTopology,
+        previousPhaseProducts: state.previousPhaseProducts
       )
     }
   }
@@ -82,7 +88,8 @@ final class FrameTailRetainedState: Sendable {
   /// `placedTree` as baseline — the two are identical.
   func storeCommittedFrame(
     _ artifacts: FrameArtifacts,
-    baselinePlacedTree: PlacedNode
+    baselinePlacedTree: PlacedNode,
+    proposal: ProposedSize
   ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
@@ -93,6 +100,17 @@ final class FrameTailRetainedState: Sendable {
       state.previousSurfaceTopology = SurfaceTopologySignature(
         placedRoot: artifacts.placedTree
       )
+      state.previousPhaseProducts =
+        if artifacts.placedTree == baselinePlacedTree {
+          RetainedFrameTailPhaseProducts(
+            proposal: proposal,
+            placed: artifacts.placedTree,
+            semantics: artifacts.semanticSnapshot,
+            draw: artifacts.drawTree
+          )
+        } else {
+          nil
+        }
     }
   }
 }

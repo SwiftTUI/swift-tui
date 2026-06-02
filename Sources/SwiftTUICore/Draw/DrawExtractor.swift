@@ -6,6 +6,16 @@ public struct DrawExtractor: Sendable {
   public func extract(from placed: borrowing PlacedNode) -> DrawNode {
     extractIteratively(from: placed)
   }
+
+  package func extract(
+    from placed: borrowing PlacedNode,
+    retained input: RetainedDrawExtractionInput?
+  ) -> DrawNode {
+    if let input, input.proof == .wholeTreeIdentical {
+      return input.previousDraw
+    }
+    return extract(from: placed)
+  }
 }
 
 private struct BorderMask {

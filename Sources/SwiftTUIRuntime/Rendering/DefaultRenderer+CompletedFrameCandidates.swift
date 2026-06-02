@@ -169,7 +169,8 @@ extension DefaultRenderer {
     )
     frameTailRenderer.storeCommittedFrame(
       artifacts,
-      baselinePlacedTree: baselinePlacedTree
+      baselinePlacedTree: baselinePlacedTree,
+      proposal: draft.frameTailInput.proposal
     )
     storeCommittedPresentationPortalState()
   }

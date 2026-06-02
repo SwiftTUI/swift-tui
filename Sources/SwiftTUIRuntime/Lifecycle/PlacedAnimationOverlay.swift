@@ -15,6 +15,12 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
     self.insertionOffsets = insertionOffsets
     self.matchedGeometryOffsets = matchedGeometryOffsets
   }
+
+  package var isEmpty: Bool {
+    removalOverlays.isEmpty
+      && insertionOffsets.isEmpty
+      && matchedGeometryOffsets.isEmpty
+  }
 }
 
 package struct PlacedRemovalOverlaySnapshot: Sendable {

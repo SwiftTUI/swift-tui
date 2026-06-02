@@ -66,12 +66,21 @@ struct FrameTailInlineStageRenderer: Sendable {
       retainedLayout: input.retained.retainedLayout,
       previousSurfaceTopology: input.retained.previousSurfaceTopology
     )
+    let extractionProof = input.retained.phaseExtractionProof(
+      for: input.proposal,
+      placed: placed,
+      animationOverlaySnapshot: animationOverlaySnapshot
+    )
     let semantics = renderSemantics(
       placed: placed,
+      retained: input.retained.previousPhaseProducts,
+      proof: extractionProof,
       clock: clock
     )
     let draw = renderDraw(
       placed: placed,
+      retained: input.retained.previousPhaseProducts,
+      proof: extractionProof,
       clock: clock
     )
     let raster = rasterizeDrawTree(
@@ -108,10 +117,19 @@ struct FrameTailInlineStageRenderer: Sendable {
 
   private func renderSemantics(
     placed: PlacedNode,
+    retained: RetainedFrameTailPhaseProducts?,
+    proof: RetainedPhaseExtractionProof,
     clock: ContinuousClock?
   ) -> FrameTailSemanticsOutput {
+    let retainedInput = retained.map {
+      RetainedSemanticExtractionInput(
+        previousPlaced: $0.placed,
+        previousSnapshot: $0.semantics,
+        proof: proof
+      )
+    }
     let (semantics, duration) = measurePhase(clock: clock) {
-      semanticExtractor.extract(from: placed)
+      semanticExtractor.extract(from: placed, retained: retainedInput)
     }
     return .init(
       semantics: semantics,
@@ -121,10 +139,19 @@ struct FrameTailInlineStageRenderer: Sendable {
 
   private func renderDraw(
     placed: PlacedNode,
+    retained: RetainedFrameTailPhaseProducts?,
+    proof: RetainedPhaseExtractionProof,
     clock: ContinuousClock?
   ) -> FrameTailDrawOutput {
+    let retainedInput = retained.map {
+      RetainedDrawExtractionInput(
+        previousPlaced: $0.placed,
+        previousDraw: $0.draw,
+        proof: proof
+      )
+    }
     let (draw, duration) = measurePhase(clock: clock) {
-      drawExtractor.extract(from: placed)
+      drawExtractor.extract(from: placed, retained: retainedInput)
     }
     return .init(
       draw: draw,

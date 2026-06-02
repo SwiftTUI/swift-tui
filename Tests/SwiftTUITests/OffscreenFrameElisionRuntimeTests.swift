@@ -42,8 +42,97 @@ struct OffscreenFrameElisionRuntimeTests {
         transaction: .init(), semanticSnapshot: .init(), lifecycle: [], handlerInstallations: []),
       diagnostics: .init()
     )
-    retainedState.storeCommittedFrame(artifacts, baselinePlacedTree: placed)
+    retainedState.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: placed,
+      proposal: .unspecified
+    )
     #expect(retainedState.previousDrawnIdentities == expected)
+  }
+
+  @Test("retained phase products round trip only for baseline-matching placed trees")
+  func retainedPhaseProductsRequireBaselineMatchingPlacedTree() {
+    let retainedState = FrameTailRetainedState()
+    let identity = testIdentity("Root")
+    let baseline = PlacedNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
+    let semantics = SemanticSnapshot(
+      focusRegions: [
+        FocusRegion(
+          identity: identity,
+          rect: baseline.bounds,
+          focusInteractions: .activate
+        )
+      ]
+    )
+    let draw = DrawNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
+    let matchingArtifacts = makeStoredArtifacts(
+      identity: identity,
+      placed: baseline,
+      semantics: semantics,
+      draw: draw
+    )
+
+    retainedState.storeCommittedFrame(
+      matchingArtifacts,
+      baselinePlacedTree: baseline,
+      proposal: .init(width: .finite(10), height: .finite(4))
+    )
+
+    let retained = retainedState.input(invalidatedIdentities: [])
+    #expect(retained.previousPhaseProducts?.proposal == .init(width: .finite(10), height: .finite(4)))
+    #expect(retained.previousPhaseProducts?.semantics == semantics)
+    #expect(retained.previousPhaseProducts?.draw == draw)
+    #expect(
+      retained.phaseExtractionProof(
+        for: .init(width: .finite(10), height: .finite(4)),
+        placed: baseline,
+        animationOverlaySnapshot: .init()
+      ) == .wholeTreeIdentical
+    )
+    #expect(
+      retained.phaseExtractionProof(
+        for: .init(width: .finite(11), height: .finite(4)),
+        placed: baseline,
+        animationOverlaySnapshot: .init()
+      ) == .none
+    )
+    var changedPlaced = baseline
+    changedPlaced.bounds = .init(origin: .zero, size: .init(width: 2, height: 1))
+    #expect(
+      retained.phaseExtractionProof(
+        for: .init(width: .finite(10), height: .finite(4)),
+        placed: changedPlaced,
+        animationOverlaySnapshot: .init()
+      ) == .none
+    )
+    #expect(
+      retained.phaseExtractionProof(
+        for: .init(width: .finite(10), height: .finite(4)),
+        placed: baseline,
+        animationOverlaySnapshot: .init(
+          insertionOffsets: [
+            .init(identity: identity, dx: 1, dy: 0)
+          ]
+        )
+      ) == .none
+    )
+
+    var decorated = baseline
+    decorated.bounds = .init(origin: .init(x: 1, y: 0), size: .zero)
+    let decoratedArtifacts = makeStoredArtifacts(
+      identity: identity,
+      placed: decorated,
+      semantics: semantics,
+      draw: draw
+    )
+
+    retainedState.storeCommittedFrame(
+      decoratedArtifacts,
+      baselinePlacedTree: baseline,
+      proposal: .init(width: .finite(10), height: .finite(4))
+    )
+
+    #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts == nil)
   }
 
   // MARK: - commitElided (reduced-commit path)
@@ -956,6 +1045,31 @@ struct OffscreenFrameElisionRuntimeTests {
       checkpoints: nil
     )
   }
+}
+
+private func makeStoredArtifacts(
+  identity: Identity,
+  placed: PlacedNode,
+  semantics: SemanticSnapshot,
+  draw: DrawNode
+) -> FrameArtifacts {
+  FrameArtifacts(
+    resolvedTree: ResolvedNode(identity: identity, kind: .root),
+    measuredTree: MeasuredNode(
+      identity: identity,
+      proposal: .unspecified,
+      measuredSize: .zero
+    ),
+    placedTree: placed,
+    semanticSnapshot: semantics,
+    drawTree: draw,
+    rasterSurface: .init(),
+    presentationDamage: nil,
+    drawnIdentities: [],
+    commitPlan: CommitPlan(
+      transaction: .init(), semanticSnapshot: semantics, lifecycle: [], handlerInstallations: []),
+    diagnostics: .init()
+  )
 }
 
 /// Records which post-injection stages a render executor reached. The

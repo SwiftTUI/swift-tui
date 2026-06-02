@@ -178,12 +178,14 @@ final class FrameTailRenderer: Sendable {
 
   func storeCommittedFrame(
     _ artifacts: FrameArtifacts,
-    baselinePlacedTree: PlacedNode
+    baselinePlacedTree: PlacedNode,
+    proposal: ProposedSize
   ) {
     workerExecutor.sync {
       retainedState.storeCommittedFrame(
         artifacts,
-        baselinePlacedTree: baselinePlacedTree
+        baselinePlacedTree: baselinePlacedTree,
+        proposal: proposal
       )
     }
   }
