@@ -209,4 +209,106 @@ struct ResolveReuseAncestorInvalidationTests {
     #expect(rendered.contains("A0"))
     #expect(rendered.contains("B0"))
   }
+
+  @Test("scoped retained-reuse suppression recomputes only affected reached subtrees")
+  func scopedRetainedReuseSuppressionKeepsUnaffectedReachedSubtreesReusable() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let rootIdentity = testIdentity("ScopedSuppression")
+    let aID = testIdentity("ScopedSuppression", "A")
+    let bID = testIdentity("ScopedSuppression", "B")
+    let cID = testIdentity("ScopedSuppression", "C")
+
+    struct ThreeSiblings: View {
+      let aValue: String
+      let aID: Identity
+      let bID: Identity
+      let cID: Identity
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("A:\(aValue)")
+          }
+          .id(aID)
+          VStack(alignment: .leading, spacing: 0) {
+            Text("B:stable")
+          }
+          .id(bID)
+          VStack(alignment: .leading, spacing: 0) {
+            Text("C:stable")
+          }
+          .id(cID)
+        }
+      }
+    }
+
+    _ = renderer.render(
+      ThreeSiblings(aValue: "0", aID: aID, bID: bID, cID: cID),
+      context: .init(identity: rootIdentity)
+    )
+
+    renderer.enableSelectiveEvaluation()
+    renderer.forceRootEvaluation()
+    renderer.suppressRetainedReuseForNextFrame(
+      .init(identities: [bID])
+    )
+
+    let updated = renderer.render(
+      ThreeSiblings(aValue: "1", aID: aID, bID: bID, cID: cID),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [aID]
+      )
+    )
+
+    let rendered = updated.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("A:1"))
+    #expect(rendered.contains("B:stable"))
+    #expect(rendered.contains("C:stable"))
+    #expect(updated.diagnostics.work.resolvedNodesReused > 0)
+    #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
+  }
+
+  @Test("runtime focus-state dependency tracking is limited to authored environment readers")
+  func runtimeFocusStateDependencyTrackingFindsEnvironmentReadersOnly() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let rootIdentity = testIdentity("RuntimeFocusDependency")
+    let readoutID = testIdentity("RuntimeFocusDependency", "Readout")
+    let buttonID = testIdentity("RuntimeFocusDependency", "Button")
+
+    struct FocusDependencyProbe: View {
+      let readoutID: Identity
+      let buttonID: Identity
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+            Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
+          }
+          .id(readoutID)
+          Button("Focusable") {}
+            .id(buttonID)
+        }
+      }
+    }
+
+    _ = renderer.render(
+      FocusDependencyProbe(readoutID: readoutID, buttonID: buttonID),
+      context: .init(identity: rootIdentity)
+    )
+
+    let dependencies = renderer.runtimeFocusStateDependentIdentities()
+    #expect(
+      dependencies.contains { identity in
+        identity == readoutID
+          || identity.isAncestor(of: readoutID)
+          || identity.isDescendant(of: readoutID)
+      }
+    )
+    #expect(!dependencies.contains(buttonID))
+  }
 }

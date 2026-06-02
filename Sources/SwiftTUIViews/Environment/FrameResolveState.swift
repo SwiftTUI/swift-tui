@@ -1,5 +1,50 @@
 package import SwiftTUICore
 
+package struct RetainedReuseSuppressionScope: Equatable, Sendable {
+  package var suppressesAll: Bool
+  package var identities: Set<Identity>
+
+  package static let none = Self()
+  package static let all = Self(suppressesAll: true)
+
+  package init(
+    suppressesAll: Bool = false,
+    identities: Set<Identity> = []
+  ) {
+    self.suppressesAll = suppressesAll
+    self.identities = identities
+  }
+
+  package var isEmpty: Bool {
+    !suppressesAll && identities.isEmpty
+  }
+
+  package mutating func formUnion(_ newIdentities: Set<Identity>) {
+    guard !suppressesAll else {
+      return
+    }
+    identities.formUnion(newIdentities)
+  }
+
+  package mutating func insert(_ identity: Identity) {
+    guard !suppressesAll else {
+      return
+    }
+    identities.insert(identity)
+  }
+
+  package func suppresses(identity: Identity) -> Bool {
+    if suppressesAll {
+      return true
+    }
+    return identities.contains { suppressedIdentity in
+      identity == suppressedIdentity
+        || identity.isAncestor(of: suppressedIdentity)
+        || identity.isDescendant(of: suppressedIdentity)
+    }
+  }
+}
+
 /// Value-owned inputs for one resolve pass.
 ///
 /// Stored evaluator closures can outlive the frame where they were first
@@ -17,15 +62,14 @@ package struct FrameResolveInputs {
   package var proposal: ProposedSize
   package var usesSelectiveEvaluation: Bool
   package var environmentRequiresRootEvaluation: Bool
-  /// When true, `resolveView` must not take the retained-reuse fast path this
-  /// frame even for subtrees disjoint from the invalidation set. The run loop
-  /// sets this (alongside `forceRootEvaluation`) on frames that are unsafe to
-  /// reuse — a focus move (focus is excluded from `EnvironmentSnapshot`
-  /// equality, so a reused focus-reading subtree shows stale focus) or an
-  /// in-flight property-scope animation (a reused subtree's body never re-runs,
-  /// so its `repeatForever` registration decays). See
-  /// ``ResolveContext/effectiveSuppressesRetainedReuse``.
-  package var suppressRetainedReuse: Bool
+  /// Retained-reuse suppression for reuse-unsafe identities this frame.
+  ///
+  /// The run loop sets this alongside `forceRootEvaluation` on frames where
+  /// some reached nodes must recompute even if they are disjoint from ordinary
+  /// invalidation: focus/press runtime readers and active property-animation
+  /// identities. The scope may still conservatively suppress all reached nodes
+  /// when animation work is identity-agnostic.
+  package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
 
   package init(
     invalidatedIdentities: Set<Identity>,
@@ -37,7 +81,7 @@ package struct FrameResolveInputs {
     proposal: ProposedSize,
     usesSelectiveEvaluation: Bool,
     environmentRequiresRootEvaluation: Bool,
-    suppressRetainedReuse: Bool = false
+    retainedReuseSuppressionScope: RetainedReuseSuppressionScope = .none
   ) {
     self.invalidatedIdentities = invalidatedIdentities
     self.invalidationSummary = invalidationSummary
@@ -48,7 +92,7 @@ package struct FrameResolveInputs {
     self.proposal = proposal
     self.usesSelectiveEvaluation = usesSelectiveEvaluation
     self.environmentRequiresRootEvaluation = environmentRequiresRootEvaluation
-    self.suppressRetainedReuse = suppressRetainedReuse
+    self.retainedReuseSuppressionScope = retainedReuseSuppressionScope
   }
 }
 
@@ -82,6 +126,7 @@ extension FrameResolveInputBox {
       package var proposal: ProposedSize
       package var usesSelectiveEvaluation: Bool
       package var environmentRequiresRootEvaluation: Bool
+      package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     }
 
     package var inputs: InputSnapshot?
@@ -106,7 +151,8 @@ extension FrameResolveInputBox {
           transaction: $0.transaction,
           proposal: $0.proposal,
           usesSelectiveEvaluation: $0.usesSelectiveEvaluation,
-          environmentRequiresRootEvaluation: $0.environmentRequiresRootEvaluation
+          environmentRequiresRootEvaluation: $0.environmentRequiresRootEvaluation,
+          retainedReuseSuppressionScope: $0.retainedReuseSuppressionScope
         )
       }
     )
@@ -124,11 +170,9 @@ package final class FrameResolveState {
   /// or during focus sync re-renders.
   package var forceRootEvaluation: Bool = false
 
-  /// When true, the next call to ``prepareInputs(from:proposal:)`` will mark the
-  /// frame's inputs to skip retained reuse in `resolveView`. The RunLoop sets
-  /// this on reuse-unsafe frames (focus move or in-flight property animation).
-  /// One-shot: consumed and reset by ``prepareInputs(from:proposal:)``.
-  package var suppressRetainedReuse: Bool = false
+  /// One-shot retained-reuse suppression consumed by
+  /// ``prepareInputs(from:proposal:)``.
+  package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope = .none
 
   private var previousFocusedIdentity: Identity?
   private var previousPressedIdentity: Identity?
@@ -154,8 +198,8 @@ package final class FrameResolveState {
     previousPressedIdentity = newPressed
     previousProposal = proposal
     forceRootEvaluation = false
-    let suppressReuse = suppressRetainedReuse
-    suppressRetainedReuse = false
+    let suppressionScope = retainedReuseSuppressionScope
+    retainedReuseSuppressionScope = .none
 
     let usesSelectiveEvaluation =
       selectiveEvaluationEnabled
@@ -172,7 +216,7 @@ package final class FrameResolveState {
       proposal: proposal,
       usesSelectiveEvaluation: usesSelectiveEvaluation,
       environmentRequiresRootEvaluation: environmentRequiresRootEvaluation,
-      suppressRetainedReuse: suppressReuse
+      retainedReuseSuppressionScope: suppressionScope
     )
   }
 }
@@ -180,6 +224,7 @@ package final class FrameResolveState {
 extension FrameResolveState {
   package struct Checkpoint {
     package var forceRootEvaluation: Bool
+    package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     package var previousFocusedIdentity: Identity?
     package var previousPressedIdentity: Identity?
     package var previousProposal: ProposedSize?
@@ -188,6 +233,7 @@ extension FrameResolveState {
   package func makeCheckpoint() -> Checkpoint {
     Checkpoint(
       forceRootEvaluation: forceRootEvaluation,
+      retainedReuseSuppressionScope: retainedReuseSuppressionScope,
       previousFocusedIdentity: previousFocusedIdentity,
       previousPressedIdentity: previousPressedIdentity,
       previousProposal: previousProposal
@@ -196,6 +242,7 @@ extension FrameResolveState {
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     forceRootEvaluation = checkpoint.forceRootEvaluation
+    retainedReuseSuppressionScope = checkpoint.retainedReuseSuppressionScope
     previousFocusedIdentity = checkpoint.previousFocusedIdentity
     previousPressedIdentity = checkpoint.previousPressedIdentity
     previousProposal = checkpoint.previousProposal
@@ -203,6 +250,7 @@ extension FrameResolveState {
 
   package struct DebugStateSnapshot: Equatable {
     package var forceRootEvaluation: Bool
+    package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     package var previousFocusedIdentity: Identity?
     package var previousPressedIdentity: Identity?
     package var previousProposal: ProposedSize?
@@ -212,6 +260,7 @@ extension FrameResolveState {
     let checkpoint = makeCheckpoint()
     return DebugStateSnapshot(
       forceRootEvaluation: checkpoint.forceRootEvaluation,
+      retainedReuseSuppressionScope: checkpoint.retainedReuseSuppressionScope,
       previousFocusedIdentity: checkpoint.previousFocusedIdentity,
       previousPressedIdentity: checkpoint.previousPressedIdentity,
       previousProposal: checkpoint.previousProposal

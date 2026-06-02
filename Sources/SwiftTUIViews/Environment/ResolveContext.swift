@@ -281,14 +281,17 @@ public struct ResolveContext: Equatable, Sendable {
     effectiveFrameResolveInputs?.invalidatedIdentities ?? invalidatedIdentities
   }
 
-  /// Whether retained reuse is suppressed for this frame. When true,
-  /// `resolveView` recomputes every reached node instead of taking the
-  /// retained-reuse fast path, even for subtrees disjoint from the invalidation
-  /// set. Set by the run loop on reuse-unsafe frames (focus move or in-flight
-  /// property animation); see ``FrameResolveInputs/suppressRetainedReuse``.
+  /// Returns whether retained reuse is suppressed for `identity` in this frame.
+  /// Suppressed identities recompute even when disjoint from ordinary
+  /// invalidation. The run loop scopes this to focus/press runtime readers and
+  /// active property-animation identities, with a conservative full-suppression
+  /// fallback for identity-agnostic animation work.
   @MainActor
-  package var effectiveSuppressesRetainedReuse: Bool {
-    effectiveFrameResolveInputs?.suppressRetainedReuse ?? false
+  package func effectiveSuppressesRetainedReuse(
+    at identity: Identity
+  ) -> Bool {
+    effectiveFrameResolveInputs?.retainedReuseSuppressionScope
+      .suppresses(identity: identity) ?? false
   }
 
   @MainActor

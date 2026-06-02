@@ -66,6 +66,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// deliberately excluded from `EnvironmentSnapshot` equality, so a reused
   /// focus-reading subtree would otherwise show stale focus.
   package var previousFrameFocusIdentity: Identity?
+  /// Press identity committed by the previous frame. Tracked for the same
+  /// scoped retained-reuse safety gate as focus.
+  package var previousFramePressedIdentity: Identity?
   package var nextRenderIntentGeneration: UInt64 = 1
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []

@@ -252,12 +252,12 @@ func resolveView<V: View>(
     context.suppressesStructuralLifecycle,
     for: context.identity
   )
-  // The run loop suppresses retained reuse on reuse-unsafe frames (focus move
-  // or in-flight property animation): forcing root evaluation only makes the
-  // walk *reach* every node — each reached node still independently chooses
-  // reuse here — so a full no-reuse frame additionally requires skipping this
-  // fast path. See `ResolveContext.effectiveSuppressesRetainedReuse`.
-  if !context.effectiveSuppressesRetainedReuse,
+  // The run loop suppresses retained reuse for reuse-unsafe identities (focus/
+  // press runtime readers and active property-animation identities): forcing
+  // root evaluation only makes the walk *reach* every node — each reached node
+  // still independently chooses reuse here — so affected nodes additionally
+  // skip this fast path.
+  if !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.reusableSnapshot(
       for: context.identity,
       invalidatedIdentities: context.effectiveInvalidatedIdentities,

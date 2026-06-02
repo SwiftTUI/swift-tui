@@ -321,6 +321,14 @@ package final class ViewGraph {
     queueDirty(dirtyIdentities)
   }
 
+  package func environmentDependentIdentities(
+    for changedKeys: Set<ObjectIdentifier>
+  ) -> Set<Identity> {
+    changedKeys.reduce(into: Set<Identity>()) { partial, key in
+      partial.formUnion(environmentDependents[key] ?? [])
+    }
+  }
+
   package func setRootEvaluator(
     rootIdentity: Identity,
     _ evaluate: @escaping @MainActor () -> Void

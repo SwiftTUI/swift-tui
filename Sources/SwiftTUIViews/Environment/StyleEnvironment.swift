@@ -89,6 +89,25 @@ private enum PickerLineWidthKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+  package static var runtimeFocusStateDependencyKeys: Set<ObjectIdentifier> {
+    [
+      ObjectIdentifier(FocusedIdentityKey.self),
+      ObjectIdentifier(PressedIdentityKey.self),
+    ]
+  }
+
+  package static func runtimeFocusStateDependencyKey(
+    for keyPath: AnyKeyPath
+  ) -> ObjectIdentifier? {
+    if keyPath == \EnvironmentValues.focusedIdentity {
+      return ObjectIdentifier(FocusedIdentityKey.self)
+    }
+    if keyPath == \EnvironmentValues.pressedIdentity {
+      return ObjectIdentifier(PressedIdentityKey.self)
+    }
+    return nil
+  }
+
   public var terminalAppearance: TerminalAppearance {
     get { self[TerminalAppearanceKey.self] }
     set { self[TerminalAppearanceKey.self] = newValue }

@@ -682,14 +682,27 @@ public struct DefaultRenderer {
     frameState.forceRootEvaluation = true
   }
 
-  /// Suppresses the retained-reuse fast path for the next render so every
-  /// reached node recomputes. Pair with ``forceRootEvaluation()`` (which makes
-  /// the walk reach every node) to produce a full no-reuse frame. The run loop
-  /// uses this on reuse-unsafe frames (focus move or in-flight property
-  /// animation); see `FrameResolveState.suppressRetainedReuse`.
+  /// Suppresses retained reuse for a scoped set of identities on the next
+  /// render. Pair with ``forceRootEvaluation()`` when those identities may be
+  /// outside the normal dirty frontier.
+  @MainActor
+  package func suppressRetainedReuseForNextFrame(
+    _ scope: RetainedReuseSuppressionScope
+  ) {
+    frameState.retainedReuseSuppressionScope = scope
+  }
+
+  /// Suppresses retained reuse for every reached node on the next render.
   @MainActor
   package func suppressRetainedReuseForNextFrame() {
-    frameState.suppressRetainedReuse = true
+    suppressRetainedReuseForNextFrame(.all)
+  }
+
+  @MainActor
+  package func runtimeFocusStateDependentIdentities() -> Set<Identity> {
+    viewGraph.environmentDependentIdentities(
+      for: EnvironmentValues.runtimeFocusStateDependencyKeys
+    )
   }
 
   @MainActor

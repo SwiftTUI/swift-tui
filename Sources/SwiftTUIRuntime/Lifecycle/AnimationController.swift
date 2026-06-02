@@ -321,6 +321,14 @@ package final class AnimationController: Sendable {
     }.count
   }
 
+  package var activePropertyAnimationIdentities: Set<Identity> {
+    activeAnimations.keys.reduce(into: Set<Identity>()) { partial, key in
+      if case .property = key.scope {
+        partial.insert(key.identity)
+      }
+    }
+  }
+
   /// Occupancy reading for the profiling memory signal. Computed, so it stays
   /// outside the checkpoint totality contract.
   package var memoryMetricSnapshot: MemoryMetricSnapshot {

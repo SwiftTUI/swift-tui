@@ -34,19 +34,19 @@ extension RunLoop {
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
 
-      let suppressReuseForFrameSafety = shouldSuppressRetainedReuseForFrameSafety()
+      let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
       var artifacts: FrameArtifacts?
       while true {
-        if convergence.rerenderedForFocusSync || suppressReuseForFrameSafety {
+        if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
           renderer.forceRootEvaluation()
         }
-        if suppressReuseForFrameSafety {
-          // Reuse-unsafe frame: forcing root evaluation only makes the walk
-          // *reach* every node — each reached node still independently chooses
-          // reuse — so suppress the fast path to recompute them. Scoped to the
-          // safety gate only: focus-sync rerenders must keep reuse to carry
-          // first-pass measurement/scroll state across the convergence loop.
-          renderer.suppressRetainedReuseForNextFrame()
+        if !retainedReuseSuppressionScope.isEmpty {
+          // Reuse-unsafe identities: forcing root evaluation only makes the
+          // walk *reach* every node — each reached node still independently
+          // chooses reuse — so suppress the fast path for the affected scope.
+          // Focus-sync rerenders still keep reuse to carry first-pass
+          // measurement/scroll state across the convergence loop.
+          renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let renderedArtifacts = renderer.render(
           viewBuilder(
@@ -139,8 +139,9 @@ extension RunLoop {
     )
     updateFocusPresentation(focusPresentation)
     // Record the committed focus so the next frame's reuse-safety gate can
-    // detect a focus move (see ``shouldSuppressRetainedReuseForFrameSafety()``).
+    // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
     previousFrameFocusIdentity = focusTracker.currentFocusIdentity
+    previousFramePressedIdentity = pressedIdentity
     let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
       since: previousPreferenceObservations
     )
@@ -253,18 +254,18 @@ extension RunLoop {
       // difference (ADR-0021); the per-iteration side effects
       // (`processFocusSyncIteration`) and post-acquisition body
       // (`applyAcquiredFrame`) are shared with the synchronous driver.
-      let suppressReuseForFrameSafety = shouldSuppressRetainedReuseForFrameSafety()
+      let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
       convergenceLoop: while true {
-        if convergence.rerenderedForFocusSync || suppressReuseForFrameSafety {
+        if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
           renderer.forceRootEvaluation()
         }
-        if suppressReuseForFrameSafety {
-          // Reuse-unsafe frame: forcing root evaluation only makes the walk
-          // *reach* every node — each reached node still independently chooses
-          // reuse — so suppress the fast path to recompute them. Scoped to the
-          // safety gate only: focus-sync rerenders must keep reuse to carry
-          // first-pass measurement/scroll state across the convergence loop.
-          renderer.suppressRetainedReuseForNextFrame()
+        if !retainedReuseSuppressionScope.isEmpty {
+          // Reuse-unsafe identities: forcing root evaluation only makes the
+          // walk *reach* every node — each reached node still independently
+          // chooses reuse — so suppress the fast path for the affected scope.
+          // Focus-sync rerenders still keep reuse to carry first-pass
+          // measurement/scroll state across the convergence loop.
+          renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let acquired = await acquireFrameArtifactsAsync(
           scheduledFrame: scheduledFrame,
@@ -362,33 +363,56 @@ extension RunLoop {
   }
 
   /// Scoped-reuse safety gate. Retained `ViewNode` reuse (enabled via
-  /// `TransactionSnapshot.isReuseEquivalent`) is only correct on "inert"
-  /// interaction frames. It is unsafe in two cases the always-recompute
-  /// behavior used to mask:
+  /// `TransactionSnapshot.isReuseEquivalent`) needs selective suppression for
+  /// runtime state that is intentionally outside `EnvironmentSnapshot` equality
+  /// and for active property animations whose registrations must stay fresh:
   ///
-  /// 1. **Focus moved.** Focus is deliberately kept out of
+  /// 1. **Focus/press moved.** Focus and press are deliberately kept out of
   ///    `EnvironmentSnapshot` equality (see `EnvironmentRuntimeStateTests`), so
-  ///    a focus-reading subtree such as `EnvironmentReader(\.focusedIdentity)`
-  ///    would reuse a stale focus value when only a non-graph focus move
-  ///    occurred (which never triggers focus-sync rerender).
+  ///    runtime-state readers would reuse stale values unless those readers and
+  ///    the old/new controls recompute.
   /// 2. **A property-scope animation is in flight.** A reused subtree's body
   ///    never re-runs, so its `withAnimation`/`repeatForever` is never
-  ///    re-registered and `activeAnimationCount` decays to zero. Forcing a full
-  ///    frame while the animation is live re-runs the body each tick, keeping
-  ///    the registration (and the off-screen elision loop) alive.
+  ///    re-registered and `activeAnimationCount` decays to zero. Recomputing
+  ///    the active identities each tick keeps the registration alive.
   ///
-  /// Forcing a full no-reuse frame in these cases trades the reuse win on
-  /// focus-change frames (user-paced) and animation frames (already a full
-  /// render) to keep the H2 win on rapid same-focus, no-animation interaction.
-  /// `hasPendingWork` complements `activeAnimationCount` as the broader
-  /// "animation loop must continue" signal, guarding the load-sensitive decay.
-  private func shouldSuppressRetainedReuseForFrameSafety() -> Bool {
-    if focusTracker.currentFocusIdentity != previousFrameFocusIdentity {
-      return true
+  /// Identity-agnostic pending animation work still falls back to full
+  /// suppression because there is no narrower subtree to name.
+  private func retainedReuseSuppressionScopeForFrameSafety()
+    -> RetainedReuseSuppressionScope
+  {
+    var scope = RetainedReuseSuppressionScope()
+
+    let currentFocusIdentity = focusTracker.currentFocusIdentity
+    if currentFocusIdentity != previousFrameFocusIdentity {
+      scope.formUnion(renderer.runtimeFocusStateDependentIdentities())
+      if let previousFrameFocusIdentity {
+        scope.insert(previousFrameFocusIdentity)
+      }
+      if let currentFocusIdentity {
+        scope.insert(currentFocusIdentity)
+      }
     }
+
+    if pressedIdentity != previousFramePressedIdentity {
+      scope.formUnion(renderer.runtimeFocusStateDependentIdentities())
+      if let previousFramePressedIdentity {
+        scope.insert(previousFramePressedIdentity)
+      }
+      if let pressedIdentity {
+        scope.insert(pressedIdentity)
+      }
+    }
+
     let controller = renderer.internalAnimationController
-    return controller.activeAnimationCount > 0
-      || controller.lastTickResult.hasPendingWork
+    let activePropertyIdentities = controller.activePropertyAnimationIdentities
+    scope.formUnion(activePropertyIdentities)
+    if controller.lastTickResult.hasPendingWork,
+      activePropertyIdentities.isEmpty
+    {
+      return .all
+    }
+    return scope
   }
 
   private func appendPendingAccessibilityAnnouncements(

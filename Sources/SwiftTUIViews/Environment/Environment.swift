@@ -153,7 +153,8 @@ public struct Environment<Value: Sendable> {
   }
 
   public var wrappedValue: Value {
-    (EnvironmentValuesStorage.current ?? EnvironmentValues())[keyPath: keyPath]
+    EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
+    return (EnvironmentValuesStorage.current ?? EnvironmentValues())[keyPath: keyPath]
   }
 }
 
@@ -185,9 +186,23 @@ public struct EnvironmentReader<Value, Content: View>: PrimitiveView, Resolvable
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let view = withAuthoringContext(authoringContext) {
       context.trackingObservableAccess {
-        content(context.environmentValues[keyPath: keyPath])
+        EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
+        return content(context.environmentValues[keyPath: keyPath])
       }
     }
     return view.resolveElements(in: context)
+  }
+}
+
+extension EnvironmentValues {
+  package static func recordRuntimeFocusStateDependencyRead<Value>(
+    for keyPath: KeyPath<EnvironmentValues, Value>
+  ) {
+    guard let key = runtimeFocusStateDependencyKey(for: keyPath) else {
+      return
+    }
+    MainActor.assumeIsolated {
+      ViewNodeContext.current?.recordEnvironmentRead(key)
+    }
   }
 }
