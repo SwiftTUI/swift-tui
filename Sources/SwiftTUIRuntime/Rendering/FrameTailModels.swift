@@ -23,8 +23,9 @@ struct FrameTailRetainedInput {
     guard
       let previous = previousPhaseProducts,
       previous.proposal == proposal,
-      previous.placed == placed,
-      animationOverlaySnapshot.isEmpty
+      animationOverlaySnapshot.isEmpty,
+      let currentSignature = RetainedPhaseExtractionSignature.make(from: placed),
+      previous.signature == currentSignature
     else {
       return .none
     }
@@ -34,7 +35,7 @@ struct FrameTailRetainedInput {
 
 struct RetainedFrameTailPhaseProducts: Sendable {
   var proposal: ProposedSize
-  var placed: PlacedNode
+  var signature: RetainedPhaseExtractionSignature
   var semantics: SemanticSnapshot
   var draw: DrawNode
 }

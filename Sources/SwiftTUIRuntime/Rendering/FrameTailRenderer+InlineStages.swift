@@ -123,7 +123,6 @@ struct FrameTailInlineStageRenderer: Sendable {
   ) -> FrameTailSemanticsOutput {
     let retainedInput = retained.map {
       RetainedSemanticExtractionInput(
-        previousPlaced: $0.placed,
         previousSnapshot: $0.semantics,
         proof: proof
       )
@@ -145,7 +144,6 @@ struct FrameTailInlineStageRenderer: Sendable {
   ) -> FrameTailDrawOutput {
     let retainedInput = retained.map {
       RetainedDrawExtractionInput(
-        previousPlaced: $0.placed,
         previousDraw: $0.draw,
         proof: proof
       )

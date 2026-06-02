@@ -93,6 +93,12 @@ final class FrameTailRetainedState: Sendable {
   ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
+    let effectiveSignature = RetainedPhaseExtractionSignature.make(
+      from: artifacts.placedTree
+    )
+    let baselineSignature = RetainedPhaseExtractionSignature.make(
+      from: baselinePlacedTree
+    )
     state.withLock { state in
       state.previousFrameIndex = .init(frame: indexable)
       state.previousDrawnIdentities = artifacts.drawnIdentities
@@ -101,11 +107,13 @@ final class FrameTailRetainedState: Sendable {
         placedRoot: artifacts.placedTree
       )
       state.previousPhaseProducts =
-        if artifacts.placedTree == baselinePlacedTree {
+        if let effectiveSignature,
+          effectiveSignature == baselineSignature
+        {
           RetainedFrameTailPhaseProducts(
             proposal: proposal,
-            placed: artifacts.placedTree,
-            semantics: artifacts.semanticSnapshot,
+            signature: effectiveSignature,
+            semantics: artifacts.semanticSnapshot.retainedExtractionProduct,
             draw: artifacts.drawTree
           )
         } else {

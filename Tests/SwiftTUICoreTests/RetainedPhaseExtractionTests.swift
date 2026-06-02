@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUICore
+@_spi(Testing) @testable import SwiftTUICore
 
 @Suite
 struct RetainedPhaseExtractionTests {
@@ -25,7 +25,6 @@ struct RetainedPhaseExtractionTests {
     )
 
     let retained = RetainedSemanticExtractionInput(
-      previousPlaced: previous,
       previousSnapshot: previousSnapshot,
       proof: .none
     )
@@ -53,7 +52,6 @@ struct RetainedPhaseExtractionTests {
     )
 
     let retained = RetainedSemanticExtractionInput(
-      previousPlaced: placed,
       previousSnapshot: previousSnapshot,
       proof: .wholeTreeIdentical
     )
@@ -79,7 +77,6 @@ struct RetainedPhaseExtractionTests {
     )
 
     let retained = RetainedDrawExtractionInput(
-      previousPlaced: previous,
       previousDraw: previousDraw,
       proof: .none
     )
@@ -112,7 +109,6 @@ struct RetainedPhaseExtractionTests {
     )
 
     let retained = RetainedDrawExtractionInput(
-      previousPlaced: placed,
       previousDraw: previousDraw,
       proof: .wholeTreeIdentical
     )
@@ -120,5 +116,28 @@ struct RetainedPhaseExtractionTests {
     let extracted = DrawExtractor().extract(from: placed, retained: retained)
 
     #expect(extracted == previousDraw)
+  }
+
+  @Test("retained phase signature rejects type-erased draw payloads")
+  func retainedPhaseSignatureRejectsTypeErasedDrawPayloads() {
+    struct Dots: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setPixel(x: 0, y: 0)
+      }
+    }
+
+    let ordinary = PlacedNode(
+      identity: testIdentity("text"),
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      drawPayload: .text("stable")
+    )
+    let canvas = PlacedNode(
+      identity: testIdentity("canvas"),
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      drawPayload: .canvas(.init(drawing: Dots()))
+    )
+
+    #expect(RetainedPhaseExtractionSignature.make(from: ordinary) != nil)
+    #expect(RetainedPhaseExtractionSignature.make(from: canvas) == nil)
   }
 }

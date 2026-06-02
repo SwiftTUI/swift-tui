@@ -83,6 +83,10 @@ struct OffscreenFrameElisionRuntimeTests {
     #expect(retained.previousPhaseProducts?.semantics == semantics)
     #expect(retained.previousPhaseProducts?.draw == draw)
     #expect(
+      retained.previousPhaseProducts?.signature
+        == RetainedPhaseExtractionSignature.make(from: baseline)
+    )
+    #expect(
       retained.phaseExtractionProof(
         for: .init(width: .finite(10), height: .finite(4)),
         placed: baseline,
@@ -130,6 +134,72 @@ struct OffscreenFrameElisionRuntimeTests {
       decoratedArtifacts,
       baselinePlacedTree: baseline,
       proposal: .init(width: .finite(10), height: .finite(4))
+    )
+
+    #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts == nil)
+  }
+
+  @Test("retained phase products strip post-commit accessibility announcements")
+  func retainedPhaseProductsStripPostCommitAccessibilityAnnouncements() {
+    let retainedState = FrameTailRetainedState()
+    let identity = testIdentity("Root")
+    let baseline = PlacedNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
+    let extractionSemantics = SemanticSnapshot(
+      focusRegions: [
+        FocusRegion(
+          identity: identity,
+          rect: baseline.bounds,
+          focusInteractions: .activate
+        )
+      ]
+    )
+    var committedSemantics = extractionSemantics
+    committedSemantics.accessibilityAnnouncements = [
+      .init(message: "copied", politeness: .polite)
+    ]
+    let draw = DrawNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
+    let artifacts = makeStoredArtifacts(
+      identity: identity,
+      placed: baseline,
+      semantics: committedSemantics,
+      draw: draw
+    )
+
+    retainedState.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: baseline,
+      proposal: .unspecified
+    )
+
+    #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts?.semantics == extractionSemantics)
+  }
+
+  @Test("retained phase products skip unsafe type-erased draw payloads")
+  func retainedPhaseProductsSkipUnsafeTypeErasedDrawPayloads() {
+    struct Dots: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setPixel(x: 0, y: 0)
+      }
+    }
+
+    let retainedState = FrameTailRetainedState()
+    let identity = testIdentity("Root")
+    let baseline = PlacedNode(
+      identity: identity,
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      drawPayload: .canvas(.init(drawing: Dots()))
+    )
+    let artifacts = makeStoredArtifacts(
+      identity: identity,
+      placed: baseline,
+      semantics: .init(),
+      draw: DrawNode(identity: identity, bounds: baseline.bounds)
+    )
+
+    retainedState.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: baseline,
+      proposal: .unspecified
     )
 
     #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts == nil)
