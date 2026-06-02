@@ -4,7 +4,7 @@
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI-1E90FF)
-![Status](https://img.shields.io/badge/status-0.0.8%20alpha-DAA520)
+![Status](https://img.shields.io/badge/status-0.0.9%20alpha-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
@@ -62,7 +62,7 @@ current alpha with `.upToNextMinor` so a minor release cannot break your build:
 ```swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
-  .upToNextMinor(from: "0.0.8")
+  .upToNextMinor(from: "0.0.9")
 )
 ```
 
@@ -170,14 +170,14 @@ Two npm packages make this a first-class web-consumer story:
 | [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) | Browser runtime — manifest loading, canvas rendering, ARIA mounting, WASI/WebSocket scene bridges |
 | [`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) | Build tooling — the `swifttui-web` CLI that compiles a SwiftTUI app into a WASI `app.wasm` and `scene-manifest.json` |
 
-For the `0.0.8` public pre-release, the web packages are attached to the
-[`swift-tui-web` GitHub release](https://github.com/SwiftTUI/swift-tui-web/releases/tag/0.0.8)
+For the `0.0.9` public pre-release, the web packages are attached to the
+[`swift-tui-web` GitHub release](https://github.com/SwiftTUI/swift-tui-web/releases/tag/0.0.9)
 as npm-compatible tarballs while npm publishing is being finalized:
 
 ```bash
 npm install \
-  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.8/swifttui-web-0.0.8.tgz \
-  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.8/swifttui-build-0.0.8.tgz
+  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.9/swifttui-web-0.0.9.tgz \
+  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.9/swifttui-build-0.0.9.tgz
 ```
 
 After npm publication, those tarball URLs can be replaced with
@@ -295,7 +295,7 @@ is currently an alpha, single-maintainer, AI-assisted project. See
 and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the release policy.
 
 The sibling `swift-tui-web`, `swift-tui-examples`, and `swift-tui-site` repos
-are public pre-release repositories as well. Each has its own `0.0.8` tag, and
+are public pre-release repositories as well. Each has its own `0.0.9` tag, and
 cross-repo defaults use public release tags or release artifacts rather than
 requiring sibling source checkouts.
 
