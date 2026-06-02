@@ -1,5 +1,6 @@
 import Dispatch
 @_spi(Runners) import SwiftTUI
+@_spi(Runners) import SwiftTUIRuntime
 
 public struct PerfPresentedFrame {
   public var frameNumber: Int
@@ -40,14 +41,20 @@ public final class PerfTerminalHost: PresentationSurface {
 
   @discardableResult
   public func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    let metrics = TerminalPresentationMetrics(
-      bytesWritten: 0,
-      linesTouched: surface.size.height,
-      cellsChanged: surface.size.width * surface.size.height,
-      strategy: .fullRepaint,
-      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
-      graphicsAttachmentsReplayed: surface.imageAttachments.count
+    recordPresentedFrame(
+      surface: surface,
+      metrics: TerminalPresentationMetrics.rasterHostMetrics(
+        for: surface,
+        damage: nil
+      )
     )
+  }
+
+  @discardableResult
+  private func recordPresentedFrame(
+    surface: RasterSurface,
+    metrics: TerminalPresentationMetrics
+  ) -> TerminalPresentationMetrics {
     presentedFrames.append(
       PerfPresentedFrame(
         frameNumber: presentedFrames.count + 1,
@@ -91,5 +98,21 @@ public final class PerfTerminalHost: PresentationSurface {
 
   private static func monotonicSeconds() -> Double {
     Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000
+  }
+}
+
+@_spi(Runners)
+extension PerfTerminalHost: SemanticHostFramePresentationSurface {
+  public var semanticHostFrameCapabilities: SemanticHostFrameCapabilities { [.rasterDamage] }
+
+  @discardableResult
+  public func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
+    recordPresentedFrame(
+      surface: frame.raster,
+      metrics: TerminalPresentationMetrics.rasterHostMetrics(
+        for: frame.raster,
+        damage: frame.rasterDamage
+      )
+    )
   }
 }

@@ -85,7 +85,7 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
     )
   }
 
-  package static func rasterHostMetrics(
+  @_spi(Runners) public static func rasterHostMetrics(
     for surface: RasterSurface,
     damage: PresentationDamage?,
     bytesWritten: Int = 0,
