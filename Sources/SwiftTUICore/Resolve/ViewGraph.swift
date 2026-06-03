@@ -1397,13 +1397,29 @@ package final class ViewGraph {
         let existingEntityIdentity =
           existing.committed.entityIdentity
           ?? entityRoutingTable.entityByNodeID[existing.viewNodeID]
-        if let existingEntityIdentity,
-          existingEntityIdentity != entityIdentity
-        {
-          removeSubtree(rootedAt: existing)
-        } else {
+        if existingEntityIdentity == entityIdentity {
           entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
           return existing
+        }
+        // A different entity (or none) occupies this `Identity` slot. A
+        // duplicate-occurrence sibling (`occurrence > 0`, e.g. the second `7`
+        // in `ForEach([7, 7])`) shares an `Identity` with the primary
+        // (`occurrence == 0`) sibling but is a *distinct* runtime lifetime: it
+        // must not adopt or evict the primary's node. Fall through to mint a
+        // fresh `ViewNodeID` so duplicate-id siblings get independent
+        // `@State`/lifecycle (G13). Cross-frame reuse of each occurrence is
+        // handled above by the entity route; this fallback only runs on first
+        // allocation, so the `nodeIDByIdentity` index landing on the
+        // last-resolved occurrence is acceptable — the node store
+        // (`nodesByNodeID`), entity routing, and parent→child teardown all
+        // track both siblings.
+        if entityIdentity.occurrence == 0 {
+          if existingEntityIdentity != nil {
+            removeSubtree(rootedAt: existing)
+          } else {
+            entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
+            return existing
+          }
         }
       } else {
         return existing
@@ -1477,7 +1493,13 @@ package final class ViewGraph {
       guard let node = nodeIfExists(for: viewNodeID),
         let entityIdentity = node.committed.entityIdentity,
         !activeEntities.contains(entityIdentity),
-        !node.wasVisitedThisFrame
+        // Use the frame-stamped `visitedThisFrame` signal, not the stored
+        // `wasVisitedThisFrame` bool: a genuinely-gone node is never
+        // re-prepared in the frame it disappears, so the stored bool stays
+        // stale-`true` from its last live frame and would wrongly skip the
+        // teardown — leaking the node (and, for duplicate-id siblings, the
+        // occurrence-`>0` lifetime) in `nodesByNodeID` forever (G13).
+        !node.visitedThisFrame(currentFrameID)
       else {
         continue
       }

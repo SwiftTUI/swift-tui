@@ -198,7 +198,7 @@ struct EntityRoutingTests {
     #expect(graph.entityRoutingTable.entityByNodeID.isEmpty)
   }
 
-  @Test("duplicate ForEach ids should resolve to distinct ViewNodeIDs (known gap: they alias)")
+  @Test("duplicate ForEach ids resolve to distinct ViewNodeIDs")
   func duplicateIDsShouldResolveToDistinctViewNodeIDs() {
     let renderer = DefaultRenderer()
     _ = renderer.render(
@@ -217,19 +217,51 @@ struct EntityRoutingTests {
         .map(\.viewNodeID)
     )
 
-    // KNOWN GAP — `swift-tui/docs/VISION-GAP.md` ("Duplicate explicit ids"),
-    // remediation G13. Same-collection duplicate ids currently alias to ONE
-    // `ViewNode` because `ViewGraph.nodeForIdentity` keys the node store on
-    // `Identity` (a 1:1 `nodeIDByIdentity`), so the second element reuses the
-    // first's node and only one survives. This asserts the *correct* end state —
-    // two distinct runtime lifetimes — wrapped in `withKnownIssue` so it documents
-    // the bug today and fails loudly (prompting removal of the wrapper) once
-    // `nodeForIdentity` is made occurrence-aware.
-    withKnownIssue(
-      "duplicate ForEach ids alias to one ViewNodeID — G13 node-store fix pending"
-    ) {
-      #expect(elementNodeIDs.count == 2)
+    // G13 (closed) — same-collection duplicate ids (`ForEach([7, 7])`) now get
+    // distinct runtime lifetimes. `ViewGraph.nodeForIdentity` is
+    // occurrence-aware: a duplicate-occurrence sibling no longer adopts or
+    // evicts the primary's node, so both elements coexist as separate
+    // `ViewNode`s. See `swift-tui/docs/VISION-GAP.md` ("Duplicate explicit ids").
+    #expect(elementNodeIDs.count == 2)
+  }
+
+  @Test("duplicate-id siblings tear down without orphaning node-store entries")
+  func duplicateIDSiblingsTearDownWithoutOrphans() {
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("EntityRoutingDupChurn")
+
+    func elementNodeCount() -> Int {
+      renderer.debugRuntimeSubsystemSnapshot().viewGraph.nodesByNodeID.values
+        .filter { node in
+          node.committed.structuralPath.components.last.map {
+            "\($0)".contains("ForEachElement")
+          } ?? false
+        }
+        .count
     }
+
+    _ = renderer.render(
+      EntityRoutingVariableDuplicateRoot(values: [7, 7]),
+      context: .init(identity: identity)
+    )
+    #expect(elementNodeCount() == 2)
+
+    _ = renderer.render(
+      EntityRoutingVariableDuplicateRoot(values: [7]),
+      context: .init(identity: identity)
+    )
+    #expect(elementNodeCount() == 1)
+
+    _ = renderer.render(
+      EntityRoutingVariableDuplicateRoot(values: []),
+      context: .init(identity: identity)
+    )
+    #expect(elementNodeCount() == 0)
+
+    // The collision collapse must not leave orphaned entity routes behind.
+    let graph = renderer.debugRuntimeSubsystemSnapshot().viewGraph
+    #expect(graph.entityRoutingTable.nodeIDByEntity.isEmpty)
+    #expect(graph.entityRoutingTable.entityByNodeID.isEmpty)
   }
 }
 
@@ -237,6 +269,18 @@ private struct EntityRoutingDuplicateIDRoot: View {
   var body: some View {
     VStack {
       ForEach([7, 7], id: \.self) { value in
+        Text("Dup \(value)")
+      }
+    }
+  }
+}
+
+private struct EntityRoutingVariableDuplicateRoot: View {
+  let values: [Int]
+
+  var body: some View {
+    VStack {
+      ForEach(values, id: \.self) { value in
         Text("Dup \(value)")
       }
     }

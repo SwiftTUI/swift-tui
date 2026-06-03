@@ -86,23 +86,24 @@ identity-changing moves via the persistent `EntityRoutingTable`.
   subtree rebuild — duplicate-id siblings get no cross-reorder
   `@State`/animation/focus preservation in that case. This is user error and
   undefined in SwiftUI too; the limit is recorded rather than modeled away.
-  > **Confirmed gap — containment is incomplete at the node store.** The claim
-  > (Stages 5–6) that colliding siblings receive *distinct `ViewNodeID`s* does
-  > **not** hold for same-collection duplicates. A probe rendering
-  > `ForEach([7, 7])` through `DefaultRenderer` produced a graph with **one**
-  > element node (`…/VStack[0]/ForEachElement[1]`) and a single `EntityRoutingTable`
-  > entry — the first element is gone. Cause: `ViewGraph.nodeForIdentity` keys the
-  > node store on `Identity`, and duplicate ids share an `Identity`, so the two
-  > elements find-or-create the **same** `ViewNode` (last-writer-wins on the
-  > structural slot). Stage 3's `occurrence` disambiguation lives on the
-  > entity/diff axis (`ChildDescriptor`, verified by `StructuralDiffTests`) and
-  > never reaches the node-allocation key. So same-collection duplicate ids still
-  > **alias one runtime lifetime and one `@State` slot** — the exact pre-migration
-  > behavior the containment was meant to retire. Closing it means routing
-  > `nodeForIdentity` through the occurrence/structural axis (a Stage-5/6
-  > node-store change), or the docs must drop the "distinct `ViewNodeID` / never
-  > aliased" claim. Tracked as remediation **G13** (doc 008). (Observed in the
-  > `DefaultRenderer` snapshot path; worth confirming under the live `RunLoop`.)
+  > **Node-store containment (G13, closed).** Same-collection duplicate ids now
+  > receive *distinct `ViewNodeID`s*. `ViewGraph.nodeForIdentity` is
+  > occurrence-aware: when a duplicate-occurrence sibling (`occurrence > 0`, e.g.
+  > the second `7` in `ForEach([7, 7])`) collides on the `Identity` it shares with
+  > the primary (`occurrence == 0`), it no longer adopts or evicts the primary's
+  > node — it mints a fresh lifetime, so both siblings coexist as separate
+  > `ViewNode`s with independent `@State`. Cross-frame routing of each occurrence
+  > is handled by the entity-keyed `EntityRoutingTable`; the 1:1 `nodeIDByIdentity`
+  > stays an *index* (last-writer-wins on the shared key is harmless because the
+  > node store, entity routing, and parent→child teardown all track both siblings).
+  > Teardown was corrected alongside: the deferred entity-routed removal prune now
+  > keys on the frame-stamped `visitedThisFrame` signal instead of the stored
+  > `wasVisitedThisFrame` bool, which stayed stale-`true` for a node in the frame it
+  > disappeared and previously leaked gone entity-routed nodes in `nodesByNodeID`.
+  > Verified by `EntityRoutingTests.duplicateIDsShouldResolveToDistinctViewNodeIDs`
+  > and `…duplicateIDSiblingsTearDownWithoutOrphans` (a
+  > `ForEach([7, 7]) → [7] → []` churn asserting the node store and routing table
+  > return to empty). The collision-*count*-change limit above still holds.
 - **Runtime registries key containment on `Identity`-as-structural-projection.**
   The commit-path invalidation engine reasons over `StructuralPath`, and the live
   resolve/retained classifiers carry real structural adjacency. But the per-frame
