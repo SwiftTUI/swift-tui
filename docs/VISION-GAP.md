@@ -86,6 +86,19 @@ identity-changing moves via the persistent `EntityRoutingTable`.
   duplicate-id siblings get no cross-reorder `@State`/animation/focus
   preservation in that case. This is user error and undefined in SwiftUI too;
   the limit is recorded rather than modeled away.
+- **Runtime registries key containment on `Identity`-as-structural-projection.**
+  The commit-path invalidation engine reasons over `StructuralPath`, and the live
+  resolve/retained classifiers carry real structural adjacency. But the per-frame
+  runtime registries (focus, scroll, command, drop, pointer, preference,
+  lifecycle) still evaluate subtree containment with `Identity.isAncestor` /
+  `isDescendant`. This is **deliberate**, not a missed migration: `Identity` and
+  `StructuralPath` are lossless mutual projections with an identical
+  component-wise prefix relation, so these checks are already structurally
+  correct; rewriting them to construct a `StructuralPath` per check would add an
+  allocation to hot containment paths (pointer hit-testing, focus, scroll) for no
+  behavioral gain — a net perf regression. Re-keying the stored `scopePath`
+  element type to `StructuralPath` (to avoid per-check construction) is a large
+  refactor parked until it earns its cost.
 
 ## Animation, transitions, and gestures
 
