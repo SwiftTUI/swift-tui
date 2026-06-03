@@ -32,25 +32,19 @@ struct Phase2LifecycleFixtureTests {
 
     let plan = fixture.commitPlan()
 
-    #expect(
-      plan.lifecycle == [
-        .init(
-          identity: testIdentity("Branch", "A"),
-          operation: .taskCancel(.init(id: "task-A", priority: .medium))
-        ),
-        .init(
-          identity: testIdentity("Branch", "A"),
-          operation: .disappear(handlerIDs: ["disappear-A"])
-        ),
-        .init(
-          identity: testIdentity("Branch", "B"),
-          operation: .appear(handlerIDs: ["appear-B"])
-        ),
-        .init(
-          identity: testIdentity("Branch", "B"),
-          operation: .taskStart(.init(id: "task-B", priority: .medium))
-        ),
-      ])
+    #expect(plan.lifecycle.map(\.identity) == [
+      testIdentity("Branch", "A"),
+      testIdentity("Branch", "A"),
+      testIdentity("Branch", "B"),
+      testIdentity("Branch", "B"),
+    ])
+    #expect(plan.lifecycle.map(\.operation) == [
+      .taskCancel(.init(id: "task-A", priority: .medium)),
+      .disappear(handlerIDs: ["disappear-A"]),
+      .appear(handlerIDs: ["appear-B"]),
+      .taskStart(.init(id: "task-B", priority: .medium)),
+    ])
+    #expect(plan.lifecycle.map { $0.viewNodeID != nil } == [true, false, false, true])
   }
 
   @Test("nested child lifecycle metadata is diffed independently of stable parents")
@@ -83,16 +77,14 @@ struct Phase2LifecycleFixtureTests {
 
     let plan = fixture.commitPlan()
 
-    #expect(
-      plan.lifecycle == [
-        .init(
-          identity: testIdentity("Container", "Leaf"),
-          operation: .appear(handlerIDs: ["appear-leaf"])
-        ),
-        .init(
-          identity: testIdentity("Container", "Leaf"),
-          operation: .taskStart(.init(id: "task-leaf", priority: .high))
-        ),
-      ])
+    #expect(plan.lifecycle.map(\.identity) == [
+      testIdentity("Container", "Leaf"),
+      testIdentity("Container", "Leaf"),
+    ])
+    #expect(plan.lifecycle.map(\.operation) == [
+      .appear(handlerIDs: ["appear-leaf"]),
+      .taskStart(.init(id: "task-leaf", priority: .high)),
+    ])
+    #expect(plan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
   }
 }

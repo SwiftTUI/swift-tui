@@ -1,9 +1,9 @@
 struct ViewGraphDirtyEvaluationPlanningInput {
   var hasRoot: Bool
-  var invalidatedIdentities: Set<Identity>
-  var graphLocalDirtyIdentities: Set<Identity>
-  var nodesByIdentity: [Identity: ViewNode]
-  var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
+  var invalidatedNodeIDs: Set<ViewNodeID>
+  var graphLocalDirtyNodeIDs: Set<ViewNodeID>
+  var nodesByNodeID: [ViewNodeID: ViewNode]
+  var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
 }
 
 struct ViewGraphDirtyEvaluationTargetPlan {
@@ -16,25 +16,25 @@ enum ViewGraphDirtyEvaluationPlanner {
     input: ViewGraphDirtyEvaluationPlanningInput
   ) -> ViewGraphDirtyEvaluationTargetPlan? {
     guard input.hasRoot,
-      !input.graphLocalDirtyIdentities.isEmpty,
-      !input.invalidatedIdentities.isEmpty
+      !input.graphLocalDirtyNodeIDs.isEmpty,
+      !input.invalidatedNodeIDs.isEmpty
     else {
       return nil
     }
 
-    // Every invalidated identity that has a node in the graph must be tracked
-    // as graph-local dirty. Identities without graph nodes cannot produce a
+    // Every invalidated node that still exists in the graph must be tracked
+    // as graph-local dirty. Missing node ids cannot produce a
     // dirty frontier and are safe to ignore.
-    let graphKnownInvalidated = input.invalidatedIdentities.filter {
-      input.nodesByIdentity[$0] != nil
+    let graphKnownInvalidated = input.invalidatedNodeIDs.filter {
+      input.nodesByNodeID[$0] != nil
     }
-    guard graphKnownInvalidated.isSubset(of: input.graphLocalDirtyIdentities) else {
+    guard graphKnownInvalidated.isSubset(of: input.graphLocalDirtyNodeIDs) else {
       return nil
     }
 
     let dirtyFrontier = dirtyFrontierNodes(
-      graphLocalDirtyIdentities: input.graphLocalDirtyIdentities,
-      nodesByIdentity: input.nodesByIdentity
+      graphLocalDirtyNodeIDs: input.graphLocalDirtyNodeIDs,
+      nodesByNodeID: input.nodesByNodeID
     )
 
     guard !dirtyFrontier.isEmpty else {
@@ -46,8 +46,8 @@ enum ViewGraphDirtyEvaluationPlanner {
     for node in dirtyFrontier {
       let target = evaluatorTarget(
         for: node,
-        nodesByIdentity: input.nodesByIdentity,
-        lifecycleEvaluationOwnersByIdentity: input.lifecycleEvaluationOwnersByIdentity
+        nodesByNodeID: input.nodesByNodeID,
+        lifecycleEvaluationOwnersByNodeID: input.lifecycleEvaluationOwnersByNodeID
       )
       guard let target,
         targetIdentities.insert(target.identity).inserted
@@ -61,14 +61,14 @@ enum ViewGraphDirtyEvaluationPlanner {
   }
 
   private static func dirtyFrontierNodes(
-    graphLocalDirtyIdentities: Set<Identity>,
-    nodesByIdentity: [Identity: ViewNode]
+    graphLocalDirtyNodeIDs: Set<ViewNodeID>,
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) -> [ViewNode] {
     var frontier: [ViewNode] = []
-    var frontierIdentities: Set<Identity> = []
+    var frontierNodeIDs: Set<ViewNodeID> = []
 
-    for identity in graphLocalDirtyIdentities {
-      guard let node = nodesByIdentity[identity],
+    for viewNodeID in graphLocalDirtyNodeIDs {
+      guard let node = nodesByNodeID[viewNodeID],
         node.isDirty
       else {
         continue
@@ -91,7 +91,7 @@ enum ViewGraphDirtyEvaluationPlanner {
       }
 
       guard !hasDirtyAncestor,
-        frontierIdentities.insert(node.identity).inserted
+        frontierNodeIDs.insert(node.viewNodeID).inserted
       else {
         continue
       }
@@ -127,8 +127,8 @@ enum ViewGraphDirtyEvaluationPlanner {
 
   private static func lifecycleEvaluationOwnerAncestor(
     of node: ViewNode,
-    nodesByIdentity: [Identity: ViewNode],
-    lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
   ) -> ViewNode? {
     var current: ViewNode? = node
     var visited: Set<ObjectIdentifier> = []
@@ -138,8 +138,8 @@ enum ViewGraphDirtyEvaluationPlanner {
       guard visited.insert(candidateID).inserted else {
         return nil
       }
-      if let ownerIdentity = lifecycleEvaluationOwnersByIdentity[candidate.identity],
-        let ownerNode = nodesByIdentity[ownerIdentity]
+      if let ownerNodeID = lifecycleEvaluationOwnersByNodeID[candidate.viewNodeID],
+        let ownerNode = nodesByNodeID[ownerNodeID]
       {
         return ownerNode
       }
@@ -151,13 +151,13 @@ enum ViewGraphDirtyEvaluationPlanner {
 
   private static func evaluatorTarget(
     for dirtyNode: ViewNode,
-    nodesByIdentity: [Identity: ViewNode],
-    lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
   ) -> ViewNode? {
     if let lifecycleOwner = lifecycleEvaluationOwnerAncestor(
       of: dirtyNode,
-      nodesByIdentity: nodesByIdentity,
-      lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity
+      nodesByNodeID: nodesByNodeID,
+      lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
     ) {
       return lifecycleOwner.hasEvaluator
         ? lifecycleOwner

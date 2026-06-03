@@ -64,6 +64,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         entityIdentity,
         at: elementContext.structuralPath
       )
+      context.viewGraph?.refreshResolvedMetadata(for: elementNode)
       if elementNode.identity == elementContext.identity,
         elementNode.kind == .view("EmptyView")
       {
@@ -178,6 +179,7 @@ extension ForEach: DeclaredChildrenView {
           entityIdentity,
           at: elementContext.structuralPath
         )
+        context.viewGraph?.refreshResolvedMetadata(for: resolved)
         return resolved
       }
     }

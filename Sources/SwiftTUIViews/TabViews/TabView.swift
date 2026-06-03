@@ -40,7 +40,7 @@ extension TabView {
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
-    let ownerNode = context.viewGraph?.nodeForIdentity(context.identity)
+    let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
     let options = resolvedOptions(in: context.child(component: .named("TabOptions")))
     let selectedIndex =
       options.firstIndex { option in
@@ -109,43 +109,74 @@ extension TabView {
           return withAuthoringContext(dynamicPropertyScope) {
             switch keyPress {
             case KeyPress(.arrowLeft, modifiers: []):
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+              setStoredTabOverflowMenuExpanded(
+                false,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
               moveStoredTabFocus(
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
                 delta: -1,
-                presentation: stylePresentation
+                presentation: stylePresentation,
+                invalidationIdentity: context.identity
               )
               return true
             case KeyPress(.arrowRight, modifiers: []):
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+              setStoredTabOverflowMenuExpanded(
+                false,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
               moveStoredTabFocus(
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
                 delta: 1,
-                presentation: stylePresentation
+                presentation: stylePresentation,
+                invalidationIdentity: context.identity
               )
               return true
             case KeyPress(.home, modifiers: []):
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
-              setStoredFocusedTabIndex(0, in: ownerNode)
+              setStoredTabOverflowMenuExpanded(
+                false,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
+              setStoredFocusedTabIndex(
+                0,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
               return true
             case KeyPress(.end, modifiers: []):
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
-              setStoredFocusedTabIndex(max(0, options.count - 1), in: ownerNode)
+              setStoredTabOverflowMenuExpanded(
+                false,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
+              setStoredFocusedTabIndex(
+                max(0, options.count - 1),
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
               return true
             case KeyPress(.escape, modifiers: [])
             where storedTabOverflowMenuExpanded(in: ownerNode):
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+              setStoredTabOverflowMenuExpanded(
+                false,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
               return true
             case KeyPress(.arrowDown, modifiers: []):
               if expandFocusedOverflowMenuIfNeeded(
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
-                presentation: stylePresentation
+                presentation: stylePresentation,
+                invalidationIdentity: context.identity
               ) {
                 return true
               }
@@ -154,7 +185,8 @@ extension TabView {
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
                 delta: 1,
-                presentation: stylePresentation
+                presentation: stylePresentation,
+                invalidationIdentity: context.identity
               )
             case KeyPress(.arrowUp, modifiers: []):
               if moveStoredOverflowMenuFocus(
@@ -162,14 +194,23 @@ extension TabView {
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
                 delta: -1,
-                presentation: stylePresentation
+                presentation: stylePresentation,
+                invalidationIdentity: context.identity
               ) {
                 return true
               }
               return true
             case KeyPress(.tab, modifiers: []), KeyPress(.tab, modifiers: .shift):
-              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
-              setStoredFocusedTabIndex(nil, in: ownerNode)
+              setStoredTabOverflowMenuExpanded(
+                false,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
+              setStoredFocusedTabIndex(
+                nil,
+                in: ownerNode,
+                invalidationIdentity: context.identity
+              )
               return false
             default:
               return false
@@ -184,16 +225,22 @@ extension TabView {
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
               optionCount: options.count,
-              presentation: stylePresentation
+              presentation: stylePresentation,
+              invalidationIdentity: context.identity
             ) {
               return true
             }
-            setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+            setStoredTabOverflowMenuExpanded(
+              false,
+              in: ownerNode,
+              invalidationIdentity: context.identity
+            )
             return activateBoundTabSelection(
               binding,
               focusedIndexOwnerNode: ownerNode,
               orderedTags: orderedTags,
-              selectedIndex: selectedIndex
+              selectedIndex: selectedIndex,
+              invalidationIdentity: context.identity
             )
           }
         },
@@ -256,7 +303,7 @@ extension TabView {
     // primary strip or an overflow surface. Keep the registered route family
     // complete and let the style choose which wrappers it renders.
     for index in options.indices {
-      let routeID = primaryRouteID(
+      let routeID = runtimePrimaryRouteID(
         for: tabItemIdentity(
           for: context.identity,
           index: index
@@ -268,8 +315,16 @@ extension TabView {
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          setStoredTabOverflowMenuExpanded(false, in: ownerNode)
-          setStoredFocusedTabIndex(index, in: ownerNode)
+          setStoredTabOverflowMenuExpanded(
+            false,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+          setStoredFocusedTabIndex(
+            index,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
           return setBoundSelection(binding, to: options[index].tag)
         }
       }
@@ -279,7 +334,7 @@ extension TabView {
       return
     }
 
-    let triggerRouteID = primaryRouteID(
+    let triggerRouteID = runtimePrimaryRouteID(
       for: tabOverflowTriggerIdentity(for: context.identity)
     )
     pointerRegistry.register(routeID: triggerRouteID) { event in
@@ -289,16 +344,24 @@ extension TabView {
 
       return withAuthoringContext(dynamicPropertyScope) {
         let nextExpanded = !storedTabOverflowMenuExpanded(in: ownerNode)
-        setStoredTabOverflowMenuExpanded(nextExpanded, in: ownerNode)
+        setStoredTabOverflowMenuExpanded(
+          nextExpanded,
+          in: ownerNode,
+          invalidationIdentity: context.identity
+        )
         if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
-          setStoredFocusedTabIndex(focusIndex, in: ownerNode)
+          setStoredFocusedTabIndex(
+            focusIndex,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
         }
         return true
       }
     }
 
     for index in options.indices {
-      let routeID = primaryRouteID(
+      let routeID = runtimePrimaryRouteID(
         for: tabOverflowItemIdentity(
           for: context.identity,
           index: index
@@ -310,8 +373,16 @@ extension TabView {
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          setStoredFocusedTabIndex(index, in: ownerNode)
-          setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+          setStoredFocusedTabIndex(
+            index,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+          setStoredTabOverflowMenuExpanded(
+            false,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
           return setBoundSelection(binding, to: options[index].tag)
         }
       }
@@ -419,7 +490,8 @@ private func moveStoredTabFocus(
   selectedIndex: Int?,
   optionCount: Int,
   delta: Int,
-  presentation: TabViewStylePresentation
+  presentation: TabViewStylePresentation,
+  invalidationIdentity: Identity? = nil
 ) {
   guard let direction = delta == 0 ? nil : delta.signum(), optionCount > 0 else {
     return
@@ -442,7 +514,11 @@ private func moveStoredTabFocus(
         } else {
           overflow.preferredOverflowFocusIndex ?? overflow.overflowIndices.first ?? currentIndex
         }
-      setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+      setStoredFocusedTabIndex(
+        nextIndex,
+        in: ownerNode,
+        invalidationIdentity: invalidationIdentity
+      )
       return
     }
 
@@ -454,9 +530,17 @@ private func moveStoredTabFocus(
       let overflowFocusIndex =
         overflow.preferredOverflowFocusIndex ?? overflow.overflowIndices.first
     {
-      setStoredFocusedTabIndex(overflowFocusIndex, in: ownerNode)
+      setStoredFocusedTabIndex(
+        overflowFocusIndex,
+        in: ownerNode,
+        invalidationIdentity: invalidationIdentity
+      )
     } else {
-      setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+      setStoredFocusedTabIndex(
+        nextIndex,
+        in: ownerNode,
+        invalidationIdentity: invalidationIdentity
+      )
     }
     return
   }
@@ -465,7 +549,11 @@ private func moveStoredTabFocus(
     max(currentIndex + direction, 0),
     optionCount - 1
   )
-  setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+  setStoredFocusedTabIndex(
+    nextIndex,
+    in: ownerNode,
+    invalidationIdentity: invalidationIdentity
+  )
 }
 
 @MainActor
@@ -473,7 +561,8 @@ private func expandFocusedOverflowMenuIfNeeded(
   ownerNode: SwiftTUICore.ViewNode?,
   selectedIndex: Int?,
   optionCount: Int,
-  presentation: TabViewStylePresentation
+  presentation: TabViewStylePresentation,
+  invalidationIdentity: Identity? = nil
 ) -> Bool {
   guard let overflow = presentation.overflowMenu, !overflow.isExpanded else {
     return false
@@ -489,8 +578,16 @@ private func expandFocusedOverflowMenuIfNeeded(
     return false
   }
 
-  setStoredTabOverflowMenuExpanded(true, in: ownerNode)
-  setStoredFocusedTabIndex(index, in: ownerNode)
+  setStoredTabOverflowMenuExpanded(
+    true,
+    in: ownerNode,
+    invalidationIdentity: invalidationIdentity
+  )
+  setStoredFocusedTabIndex(
+    index,
+    in: ownerNode,
+    invalidationIdentity: invalidationIdentity
+  )
   return true
 }
 
@@ -500,7 +597,8 @@ private func moveStoredOverflowMenuFocus(
   selectedIndex: Int?,
   optionCount: Int,
   delta: Int,
-  presentation: TabViewStylePresentation
+  presentation: TabViewStylePresentation,
+  invalidationIdentity: Identity? = nil
 ) -> Bool {
   guard let direction = delta == 0 ? nil : delta.signum(),
     let overflow = presentation.overflowMenu,
@@ -525,7 +623,11 @@ private func moveStoredOverflowMenuFocus(
     max(currentOverflowPosition + direction, 0),
     overflow.overflowIndices.count - 1
   )
-  setStoredFocusedTabIndex(overflow.overflowIndices[nextOverflowPosition], in: ownerNode)
+  setStoredFocusedTabIndex(
+    overflow.overflowIndices[nextOverflowPosition],
+    in: ownerNode,
+    invalidationIdentity: invalidationIdentity
+  )
   return true
 }
 
@@ -534,7 +636,8 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
   _ selectionBinding: Binding<SelectionValue>,
   focusedIndexOwnerNode: SwiftTUICore.ViewNode?,
   orderedTags: [SelectionTag],
-  selectedIndex: Int?
+  selectedIndex: Int?,
+  invalidationIdentity: Identity? = nil
 ) -> Bool {
   guard
     let index = resolvedFocusedTabIndex(
@@ -546,7 +649,11 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
   else {
     return false
   }
-  setStoredFocusedTabIndex(index, in: focusedIndexOwnerNode)
+  setStoredFocusedTabIndex(
+    index,
+    in: focusedIndexOwnerNode,
+    invalidationIdentity: invalidationIdentity
+  )
   return setBoundSelection(selectionBinding, to: orderedTags[index])
 }
 
@@ -566,11 +673,13 @@ private func storedFocusedTabIndex(
 @MainActor
 private func setStoredFocusedTabIndex(
   _ index: Int?,
-  in ownerNode: SwiftTUICore.ViewNode?
+  in ownerNode: SwiftTUICore.ViewNode?,
+  invalidationIdentity: Identity? = nil
 ) {
   ownerNode?.setStateSlot(
     ordinal: tabFocusedIndexStateSlot,
-    value: index
+    value: index,
+    invalidationIdentity: invalidationIdentity
   )
 }
 
@@ -590,11 +699,13 @@ private func storedTabOverflowMenuExpanded(
 @MainActor
 private func setStoredTabOverflowMenuExpanded(
   _ isExpanded: Bool,
-  in ownerNode: SwiftTUICore.ViewNode?
+  in ownerNode: SwiftTUICore.ViewNode?,
+  invalidationIdentity: Identity? = nil
 ) {
   ownerNode?.setStateSlot(
     ordinal: tabOverflowMenuExpandedStateSlot,
-    value: isExpanded
+    value: isExpanded,
+    invalidationIdentity: invalidationIdentity
   )
 }
 

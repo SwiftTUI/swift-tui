@@ -19,6 +19,7 @@ package final class TaskRegistration: Sendable {
 @MainActor
 package final class LocalTaskRegistry: Equatable {
   private var registrations: [Identity: TaskRegistration] = [:]
+  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -34,6 +35,7 @@ package final class LocalTaskRegistry: Equatable {
     registration: TaskRegistration
   ) {
     registrations[identity] = registration
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordTaskRegistration(
       identity: identity,
       registration: registration
@@ -48,6 +50,7 @@ package final class LocalTaskRegistry: Equatable {
 
   package func reset() {
     registrations.removeAll(keepingCapacity: true)
+    ownersByIdentity.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -58,9 +61,10 @@ package final class LocalTaskRegistry: Equatable {
     }
 
     for identity in registrations.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
+      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
     }) {
       registrations.removeValue(forKey: identity)
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
@@ -69,7 +73,8 @@ package final class LocalTaskRegistry: Equatable {
   }
 
   package func restore(
-    _ snapshot: [Identity: TaskRegistration]
+    _ snapshot: [Identity: TaskRegistration],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
     guard !snapshot.isEmpty else {
       return
@@ -77,15 +82,7 @@ package final class LocalTaskRegistry: Equatable {
 
     for (identity, registration) in snapshot {
       registrations[identity] = registration
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

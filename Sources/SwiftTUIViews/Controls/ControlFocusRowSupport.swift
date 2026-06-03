@@ -97,8 +97,8 @@ package func textEditorBody(
       .foregroundStyle(chrome.foregroundStyle)
       .drawMetadata(.init(opacity: chrome.opacity))
     }
-    .padding(.init(horizontal: 1, vertical: 1))
   }
+  .padding(.init(horizontal: 1, vertical: 1))
   .focusable(false)
   .background {
     RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)

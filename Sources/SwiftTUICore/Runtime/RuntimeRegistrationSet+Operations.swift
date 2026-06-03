@@ -81,10 +81,10 @@ extension RuntimeRegistrationSet {
   }
 
   package func pruneOrphanedGestures(
-    keeping liveIdentities: Set<Identity>
+    keeping liveNodeIDs: Set<ViewNodeID>
   ) {
-    gestureRegistry?.prune(keeping: liveIdentities)
-    gestureStateRegistry?.prune(keeping: liveIdentities)
+    gestureRegistry?.prune(keeping: liveNodeIDs)
+    gestureStateRegistry?.prune(keeping: liveNodeIDs)
   }
 
   package func restore(
@@ -96,23 +96,51 @@ extension RuntimeRegistrationSet {
         !(activeGestureIdentities.contains(routeID.identity)
           && (pointerHandlerRegistry?.hasHandler(routeID: routeID) ?? false))
       }
-    actionRegistry?.restore(handlers.actionRegistrations)
-    keyHandlerRegistry?.restore(handlers.keyHandlerRegistrations)
-    keyHandlerRegistry?.restoreKeyPressHandlers(
-      handlers.keyPressHandlerRegistrations
+    actionRegistry?.restore(
+      handlers.actionRegistrations,
+      ownersByIdentity: handlers.actionRegistrationOwners
     )
-    keyHandlerRegistry?.restorePasteHandlers(handlers.pasteHandlerRegistrations)
-    terminationRegistry?.restore(handlers.terminationHandlerRegistrations)
-    pointerHandlerRegistry?.restore(pointerHandlerRegistrations)
-    pointerHandlerRegistry?.restoreHover(handlers.pointerHoverHandlerRegistrations)
-    gestureRegistry?.restore(handlers.gestureRegistrations)
-    gestureStateRegistry?.restore(handlers.gestureStateRegistrations)
+    keyHandlerRegistry?.restore(
+      handlers.keyHandlerRegistrations,
+      ownersByIdentity: handlers.keyHandlerRegistrationOwners
+    )
+    keyHandlerRegistry?.restoreKeyPressHandlers(
+      handlers.keyPressHandlerRegistrations,
+      ownersByIdentity: handlers.keyPressHandlerRegistrationOwners
+    )
+    keyHandlerRegistry?.restorePasteHandlers(
+      handlers.pasteHandlerRegistrations,
+      ownersByIdentity: handlers.pasteHandlerRegistrationOwners
+    )
+    terminationRegistry?.restore(
+      handlers.terminationHandlerRegistrations,
+      ownersByIdentity: handlers.terminationHandlerRegistrationOwners
+    )
+    pointerHandlerRegistry?.restore(
+      pointerHandlerRegistrations,
+      ownersByRouteID: handlers.pointerHandlerRegistrationOwners
+    )
+    pointerHandlerRegistry?.restoreHover(
+      handlers.pointerHoverHandlerRegistrations,
+      ownersByRouteID: handlers.pointerHoverHandlerRegistrationOwners
+    )
+    gestureRegistry?.restore(
+      handlers.gestureRegistrations,
+      ownersByIdentity: handlers.gestureRegistrationOwners
+    )
+    gestureStateRegistry?.restore(
+      handlers.gestureStateRegistrations,
+      ownersByIdentity: handlers.gestureStateRegistrationOwners
+    )
     defaultFocusRegistry?.restore(handlers.defaultFocusRegistrations)
     focusBindingRegistry?.restore(handlers.focusBindingRegistrations)
     focusedValuesRegistry?.restore(handlers.focusedValuesRegistrations)
     scrollPositionRegistry?.restore(handlers.scrollPositionRegistrations)
     lifecycleRegistry?.restore(handlers.lifecycleRegistrations)
-    taskRegistry?.restore(handlers.taskRegistrations)
+    taskRegistry?.restore(
+      handlers.taskRegistrations,
+      ownersByIdentity: handlers.taskRegistrationOwners
+    )
     preferenceObservationRegistry?.restore(
       handlers.preferenceObservationRegistrations
     )

@@ -41,10 +41,7 @@ enum FrameTailPresentationDamageResolver {
         return .init(damage: nil, barriers: [.unresolvedInvalidatedIdentity])
       }
       guard
-        let previousPath = placedPath(
-          to: identity,
-          in: previousFrameIndex.placedByIdentity
-        ),
+        let previousPath = previousFrameIndex.placedPath(to: identity),
         let currentPath = placedPath(
           to: identity,
           in: currentPlacedByIdentity

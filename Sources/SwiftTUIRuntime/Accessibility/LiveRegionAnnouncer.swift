@@ -15,7 +15,7 @@ package struct LiveRegionAnnouncement: Equatable, Sendable {
 
 package struct LiveRegionAnnouncer: Equatable, Sendable {
   private var hasBaseline = false
-  private var previousLabelsByIdentity: [Identity: String] = [:]
+  private var previousLabelsByKey: [LiveRegionKey: String] = [:]
 
   package init() {}
 
@@ -23,11 +23,11 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
     for snapshot: SemanticSnapshot
   ) -> [LiveRegionAnnouncement] {
     let candidates = liveRegionCandidates(in: snapshot.accessibilityNodes)
-    let currentLabelsByIdentity = Dictionary(
-      uniqueKeysWithValues: candidates.map { ($0.identity, $0.label) }
+    let currentLabelsByKey = Dictionary(
+      uniqueKeysWithValues: candidates.map { ($0.key, $0.label) }
     )
     defer {
-      previousLabelsByIdentity = currentLabelsByIdentity
+      previousLabelsByKey = currentLabelsByKey
       hasBaseline = true
     }
 
@@ -36,7 +36,7 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
     }
 
     let changed = candidates.filter { candidate in
-      guard let previous = previousLabelsByIdentity[candidate.identity] else {
+      guard let previous = previousLabelsByKey[candidate.key] else {
         return false
       }
       return previous != candidate.label
@@ -71,6 +71,7 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
         return nil
       }
       return LiveRegionCandidate(
+        key: node.viewNodeID.map(LiveRegionKey.viewNode) ?? .identity(node.identity),
         identity: node.identity,
         politeness: politeness,
         label: label
@@ -169,7 +170,13 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
 }
 
 private struct LiveRegionCandidate: Equatable, Sendable {
+  var key: LiveRegionKey
   var identity: Identity
   var politeness: AccessibilityPoliteness
   var label: String
+}
+
+private enum LiveRegionKey: Hashable, Sendable {
+  case viewNode(ViewNodeID)
+  case identity(Identity)
 }

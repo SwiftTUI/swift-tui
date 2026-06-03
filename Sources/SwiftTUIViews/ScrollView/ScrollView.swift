@@ -111,7 +111,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           .horizontal
         )
 
-        let rootRouteID = primaryRouteID(for: context.identity)
+        let rootRouteID = runtimePrimaryRouteID(for: context.identity)
         context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
           guard case .scrolled(let deltaX, let deltaY) = event.kind else {
             return false
@@ -151,7 +151,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
 
         let registerIndicatorPointerHandler: (ScrollIndicatorAxis, Identity) -> Void = {
           axis, identity in
-          let routeID = primaryRouteID(for: identity)
+          let routeID = runtimePrimaryRouteID(for: identity)
           context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
             switch event.kind {
             case .down(.primary), .dragged(.primary), .up(.primary):

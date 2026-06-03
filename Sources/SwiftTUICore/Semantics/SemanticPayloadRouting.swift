@@ -91,7 +91,7 @@ extension SemanticExtractor {
         InteractionRegion(
           identity: identity,
           rect: clippedRect,
-          routeID: primaryRouteID(for: identity),
+          routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
           hitTestOrder: nextHitTestOrder,
           captureOnPress: true
         )
@@ -154,7 +154,7 @@ extension SemanticExtractor {
         InteractionRegion(
           identity: identity,
           rect: clippedRect,
-          routeID: primaryRouteID(for: identity),
+          routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
           hitTestOrder: nextHitTestOrder,
           captureOnPress: node.semanticMetadata.captureOnPress
         )
@@ -217,7 +217,7 @@ extension SemanticExtractor {
         InteractionRegion(
           identity: identity,
           rect: clippedRect,
-          routeID: primaryRouteID(for: identity),
+          routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
           hitTestOrder: nextHitTestOrder,
           captureOnPress: node.semanticMetadata.captureOnPress
         )
@@ -283,7 +283,7 @@ extension SemanticExtractor {
           InteractionRegion(
             identity: fragmentIdentity,
             rect: clippedRect,
-            routeID: primaryRouteID(for: fragmentIdentity),
+            routeID: primaryRouteID(for: fragmentIdentity, ownerNodeID: node.viewNodeID),
             hitTestOrder: nextHitTestOrder,
             captureOnPress: node.semanticMetadata.captureOnPress
           )

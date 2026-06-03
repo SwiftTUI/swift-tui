@@ -9,13 +9,13 @@ package import SwiftTUIViews
 /// result type out keeps the sampling file focused on the algorithm.
 package struct PlacedAnimationOverlaySamplingResult: Sendable {
   package var snapshot: PlacedAnimationOverlaySnapshot
-  package var removalCustomStates: [Identity: AnimationState]
+  package var removalCustomStates: [ViewNodeID: AnimationState]
   package var activeAnimationCustomStates: [AnimationKey: AnimationState]
   package var completedAnimationKeys: [AnimationKey]
 
   package init(
     snapshot: PlacedAnimationOverlaySnapshot,
-    removalCustomStates: [Identity: AnimationState] = [:],
+    removalCustomStates: [ViewNodeID: AnimationState] = [:],
     activeAnimationCustomStates: [AnimationKey: AnimationState] = [:],
     completedAnimationKeys: [AnimationKey] = []
   ) {

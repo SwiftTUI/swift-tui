@@ -126,15 +126,6 @@ public struct DefaultRenderer {
     )
   }
 
-  /// Package-only accessor exposing the renderer's internal
-  /// `ViewGraph.registrationAliasDiagnostics`, to let tests measure the alias layer's
-  /// actual workload against the hypothesis that divergences come from a
-  /// small, enumerable set of view patterns.
-  @MainActor
-  package var debugRegistrationAliasDiagnostics: RegistrationAliasDiagnostics {
-    viewGraph.registrationAliasDiagnostics
-  }
-
   @MainActor
   package func debugRuntimeSubsystemSnapshot() -> RuntimeSubsystemSnapshot {
     let presentationEntries = presentationPortalState.overlayEntries().map {
@@ -760,6 +751,11 @@ public struct DefaultRenderer {
   @MainActor
   package func liveIdentitySnapshot() -> Set<Identity> {
     viewGraph.liveIdentitySnapshot()
+  }
+
+  @MainActor
+  package func liveNodeIDSnapshot() -> Set<ViewNodeID> {
+    viewGraph.liveNodeIDSnapshot()
   }
 
   @MainActor

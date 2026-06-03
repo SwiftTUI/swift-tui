@@ -24,6 +24,7 @@ package final class LocalTerminationRegistry: Equatable {
   package typealias Handler = @MainActor (TerminationRequest) -> TerminationDisposition
 
   private var handlers: [Identity: [Handler]] = [:]
+  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -39,6 +40,7 @@ package final class LocalTerminationRegistry: Equatable {
     handler: @escaping Handler
   ) {
     handlers[identity, default: []].append(handler)
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordTerminationHandlerRegistration(
       identity: identity,
       handler: handler
@@ -82,6 +84,7 @@ package final class LocalTerminationRegistry: Equatable {
 
   package func reset() {
     handlers.removeAll(keepingCapacity: true)
+    ownersByIdentity.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -92,9 +95,10 @@ package final class LocalTerminationRegistry: Equatable {
     }
 
     for identity in handlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
+      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
     }) {
       handlers.removeValue(forKey: identity)
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
@@ -102,22 +106,17 @@ package final class LocalTerminationRegistry: Equatable {
     handlers
   }
 
-  package func restore(_ snapshot: [Identity: [Handler]]) {
+  package func restore(
+    _ snapshot: [Identity: [Handler]],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (identity, handlers) in snapshot {
       self.handlers[identity] = handlers
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

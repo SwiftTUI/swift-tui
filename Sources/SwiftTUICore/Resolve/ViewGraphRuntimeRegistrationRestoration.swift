@@ -1,30 +1,60 @@
 @MainActor
 package enum ViewGraphRuntimeRegistrationRestorer {
   package static func restoreLiveIdentities(
-    _ identities: Set<Identity>,
+    _ viewNodeIDs: Set<ViewNodeID>,
     into registrations: RuntimeRegistrationSet,
-    nodesByIdentity: [Identity: ViewNode]
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    for identity in identities.sorted() {
-      nodesByIdentity[identity]?.restoreOwnRuntimeRegistrations(into: registrations)
+    let nodes = viewNodeIDs.compactMap { nodesByNodeID[$0] }
+    for node in nodes.sorted(by: canonicalNodeOrder) {
+      node.restoreOwnRuntimeRegistrations(into: registrations)
     }
+  }
+
+  private static func canonicalNodeOrder(
+    lhs: ViewNode,
+    rhs: ViewNode
+  ) -> Bool {
+    if lhs.identity == rhs.identity {
+      return lhs.viewNodeID < rhs.viewNodeID
+    }
+    return lhs.identity < rhs.identity
   }
 
   package static func restoreResolvedSubtree(
     _ resolved: ResolvedNode,
     into registrations: RuntimeRegistrationSet,
-    nodesByIdentity: [Identity: ViewNode],
-    registrationAliasesByIdentity: [Identity: Set<Identity>]
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
   ) {
-    guard let node = nodesByIdentity[resolved.identity] else {
-      return
+    var restoredNodeIDs: Set<ViewNodeID> = []
+    restoreResolvedSubtree(
+      resolved,
+      into: registrations,
+      nodesByNodeID: nodesByNodeID,
+      nodeIDsByStructuralPath: nodeIDsByStructuralPath,
+      restoredNodeIDs: &restoredNodeIDs
+    )
+  }
+
+  private static func restoreResolvedSubtree(
+    _ resolved: ResolvedNode,
+    into registrations: RuntimeRegistrationSet,
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>],
+    restoredNodeIDs: inout Set<ViewNodeID>
+  ) {
+    var nodeIDs = nodeIDsByStructuralPath[resolved.structuralPath] ?? []
+    if let viewNodeID = resolved.viewNodeID {
+      nodeIDs.insert(viewNodeID)
     }
 
-    node.restoreOwnRuntimeRegistrations(
-      into: registrations
-    )
-    for aliasIdentity in registrationAliasesByIdentity[resolved.identity] ?? [] {
-      nodesByIdentity[aliasIdentity]?.restoreOwnRuntimeRegistrations(
+    let nodes = nodeIDs.compactMap { nodesByNodeID[$0] }
+    for node in nodes.sorted(by: canonicalNodeOrder) {
+      guard restoredNodeIDs.insert(node.viewNodeID).inserted else {
+        continue
+      }
+      node.restoreOwnRuntimeRegistrations(
         into: registrations
       )
     }
@@ -33,8 +63,9 @@ package enum ViewGraphRuntimeRegistrationRestorer {
       restoreResolvedSubtree(
         child,
         into: registrations,
-        nodesByIdentity: nodesByIdentity,
-        registrationAliasesByIdentity: registrationAliasesByIdentity
+        nodesByNodeID: nodesByNodeID,
+        nodeIDsByStructuralPath: nodeIDsByStructuralPath,
+        restoredNodeIDs: &restoredNodeIDs
       )
     }
   }

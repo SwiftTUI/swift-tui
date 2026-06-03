@@ -34,6 +34,7 @@ struct ViewGraphTests {
           operation: .appear(handlerIDs: ["appear-leaf"])
         ),
         .init(
+          viewNodeID: ViewNodeID(rawValue: 2),
           identity: testIdentity("Root", "Leaf"),
           operation: .taskStart(task)
         ),
@@ -74,6 +75,7 @@ struct ViewGraphTests {
     #expect(
       events == [
         .init(
+          viewNodeID: ViewNodeID(rawValue: 2),
           identity: testIdentity("Root", "Leaf"),
           operation: .taskCancel(task)
         ),
@@ -147,6 +149,100 @@ struct ViewGraphTests {
     #expect(usedDirtyFrontier)
     #expect(rootEvaluatorCalls == 0)
     #expect(rootNodeEvaluatorCalls == 1)
+  }
+
+  @Test("unmapped invalidation falls back to root evaluation")
+  func unmappedInvalidationFallsBackToRootEvaluation() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root
+      )
+    )
+
+    var rootEvaluations = 0
+    graph.setRootEvaluator(rootIdentity: rootIdentity) {
+      rootEvaluations += 1
+    }
+
+    graph.beginFrame()
+    graph.invalidate([testIdentity("Root", "RemovedAlias")])
+
+    #expect(graph.hasDirtyWork)
+    #expect(graph.evaluateDirtyNodes() == false)
+    #expect(rootEvaluations == 1)
+
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+    #expect(!graph.hasDirtyWork)
+  }
+
+  @Test("ViewNodeID is stable for live identities and reminted after removal")
+  func viewNodeIDTracksRuntimeLifetime() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(
+            identity: childIdentity,
+            kind: .view("Child")
+          )
+        ]
+      )
+    )
+    let firstIDs = graph.debugTotalStateSnapshot().nodeIDByIdentity
+    let firstRootID = firstIDs[rootIdentity]
+    let firstChildID = firstIDs[childIdentity]
+
+    #expect(firstRootID != nil)
+    #expect(firstChildID != nil)
+    #expect(firstRootID != firstChildID)
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(
+            identity: childIdentity,
+            kind: .view("Child")
+          )
+        ]
+      )
+    )
+    let reappliedIDs = graph.debugTotalStateSnapshot().nodeIDByIdentity
+    #expect(reappliedIDs[rootIdentity] == firstRootID)
+    #expect(reappliedIDs[childIdentity] == firstChildID)
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root
+      )
+    )
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(
+            identity: childIdentity,
+            kind: .view("Child")
+          )
+        ]
+      )
+    )
+
+    let remountedIDs = graph.debugTotalStateSnapshot().nodeIDByIdentity
+    #expect(remountedIDs[rootIdentity] == firstRootID)
+    #expect(remountedIDs[childIdentity] != firstChildID)
   }
 
   @Test("dependency indices reindex when a node's reads change")
@@ -415,12 +511,13 @@ struct ViewGraphTests {
     #expect(dropCounter.count == 1)
   }
 
-  @Test("runtime registration restore includes alias command and drop handlers")
-  func runtimeRegistrationRestoreIncludesAliasCommandAndDropHandlers() {
+  @Test("runtime registration restore includes same-structural-path command and drop handlers")
+  func runtimeRegistrationRestoreIncludesSameStructuralPathCommandAndDropHandlers() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let targetIdentity = testIdentity("Root", "Target")
-    let aliasIdentity = testIdentity("Root", "Alias")
+    let contributorIdentity = testIdentity("Root", "Contributor")
+    let structuralPath = StructuralPath(identity: testIdentity("Root", "Slot"))
     let binding = KeyBinding(key: .character("a"), modifiers: .ctrl)
     let commandCounter = RegistrationCounter()
     let dropCounter = RegistrationCounter()
@@ -430,17 +527,21 @@ struct ViewGraphTests {
     let targetNode = graph.beginEvaluation(identity: targetIdentity, invalidator: nil)
     graph.finishEvaluation(
       targetNode,
-      resolved: ResolvedNode(identity: targetIdentity, kind: .view("Target")),
+      resolved: ResolvedNode(
+        identity: targetIdentity,
+        structuralPath: structuralPath,
+        kind: .view("Target")
+      ),
       accessedStateSlots: 0
     )
-    let aliasNode = graph.beginEvaluation(identity: aliasIdentity, invalidator: nil)
-    aliasNode.recordCommandRegistration(
+    let contributorNode = graph.beginEvaluation(identity: contributorIdentity, invalidator: nil)
+    contributorNode.recordCommandRegistration(
       CommandRegistrySnapshot(
         keyCommandsByScope: [
-          aliasIdentity: [
+          contributorIdentity: [
             binding: RegisteredKeyCommand(
               binding: binding,
-              description: "Alias",
+              description: "Contributor",
               isEnabled: true,
               action: { commandCounter.increment() }
             )
@@ -448,10 +549,10 @@ struct ViewGraphTests {
         ]
       )
     )
-    aliasNode.recordDropDestinationRegistration(
+    contributorNode.recordDropDestinationRegistration(
       DropDestinationRegistrySnapshot(
         handlersByScope: [
-          aliasIdentity: { _, _ in
+          contributorIdentity: { _, _ in
             dropCounter.increment()
             return true
           }
@@ -459,14 +560,13 @@ struct ViewGraphTests {
       )
     )
     graph.finishEvaluation(
-      aliasNode,
-      resolved: ResolvedNode(identity: aliasIdentity, kind: .view("Alias")),
+      contributorNode,
+      resolved: ResolvedNode(
+        identity: targetIdentity,
+        structuralPath: structuralPath,
+        kind: .view("Target")
+      ),
       accessedStateSlots: 0
-    )
-    graph.recordRegistrationAlias(
-      from: aliasIdentity,
-      to: targetIdentity,
-      resolvedKind: .view("Target")
     )
     graph.finishEvaluation(
       rootNode,
@@ -474,7 +574,11 @@ struct ViewGraphTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: targetIdentity, kind: .view("Target"))
+          ResolvedNode(
+            identity: targetIdentity,
+            structuralPath: structuralPath,
+            kind: .view("Target")
+          )
         ]
       ),
       accessedStateSlots: 0
@@ -489,21 +593,21 @@ struct ViewGraphTests {
 
     #expect(
       registrations.commandRegistry?.keyCommand(
-        at: aliasIdentity,
+        at: contributorIdentity,
         matching: binding
       ) != nil
     )
     #expect(
       registrations.commandRegistry?.dispatch(
         key: binding,
-        along: [rootIdentity, aliasIdentity]
+        along: [rootIdentity, contributorIdentity]
       ) == true
     )
     #expect(commandCounter.count == 1)
     #expect(
       registrations.dropDestinationRegistry?.dispatch(
-        paths: [DroppedPath("/tmp/alias.txt")],
-        along: [rootIdentity, aliasIdentity]
+        paths: [DroppedPath("/tmp/contributor.txt")],
+        along: [rootIdentity, contributorIdentity]
       ) == true
     )
     #expect(dropCounter.count == 1)
@@ -514,17 +618,17 @@ struct ViewGraphTests {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let targetIdentity = testIdentity("Root", "Target")
-    let aliasIdentity = testIdentity("Root", "Alias")
+    let contributorIdentity = testIdentity("Root", "Contributor")
     let originalBinding = KeyBinding(key: .character("o"), modifiers: .ctrl)
     let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
     let originalCounter = RegistrationCounter()
     let draftCounter = RegistrationCounter()
 
-    seedAliasCommandGraph(
+    seedStructuralPathContributorCommandGraph(
       graph: graph,
       rootIdentity: rootIdentity,
       targetIdentity: targetIdentity,
-      aliasIdentity: aliasIdentity,
+      contributorIdentity: contributorIdentity,
       binding: originalBinding,
       description: "Original",
       counter: originalCounter
@@ -536,14 +640,14 @@ struct ViewGraphTests {
     graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     #expect(
       liveRegistrations.commandRegistry?.keyCommand(
-        at: aliasIdentity,
+        at: contributorIdentity,
         matching: originalBinding
       ) != nil
     )
 
     let registrationDraft = FrameHeadRegistrationDraft()
     registrationDraft.draftRegistrations.commandRegistry?.registerKeyCommand(
-      at: aliasIdentity,
+      at: contributorIdentity,
       binding: draftBinding,
       description: "Draft",
       isEnabled: true
@@ -559,14 +663,14 @@ struct ViewGraphTests {
 
     #expect(
       liveRegistrations.commandRegistry?.keyCommand(
-        at: aliasIdentity,
+        at: contributorIdentity,
         matching: draftBinding
       ) == nil
     )
     #expect(
       liveRegistrations.commandRegistry?.dispatch(
         key: originalBinding,
-        along: [rootIdentity, aliasIdentity]
+        along: [rootIdentity, contributorIdentity]
       ) == true
     )
     #expect(originalCounter.count == 1)
@@ -616,7 +720,10 @@ struct ViewGraphTests {
       resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
       accessedStateSlots: 0
     )
-    graphDraft.recordDirtyEvaluationPlan(.init(frontierIdentities: [childIdentity]))
+    let childNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[childIdentity]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [childNodeID], frontierIdentities: [childIdentity])
+    )
 
     graphDraft.discard(from: graph)
 
@@ -718,22 +825,23 @@ struct ViewGraphTests {
     #expect(draftCounter.count == 0)
   }
 
-  @Test("checkpoint restore preserves alias registration restore")
-  func checkpointRestorePreservesAliasRegistrationRestore() {
+  @Test("checkpoint restore preserves same-structural-path registration restore")
+  func checkpointRestorePreservesSameStructuralPathRegistrationRestore() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let targetIdentity = testIdentity("Root", "Target")
-    let aliasIdentity = testIdentity("Root", "Alias")
+    let contributorIdentity = testIdentity("Root", "Contributor")
+    let structuralPath = StructuralPath(identity: testIdentity("Root", "Slot"))
     let originalBinding = KeyBinding(key: .character("o"), modifiers: .ctrl)
     let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
     let originalCounter = RegistrationCounter()
     let draftCounter = RegistrationCounter()
 
-    seedAliasCommandGraph(
+    seedStructuralPathContributorCommandGraph(
       graph: graph,
       rootIdentity: rootIdentity,
       targetIdentity: targetIdentity,
-      aliasIdentity: aliasIdentity,
+      contributorIdentity: contributorIdentity,
       binding: originalBinding,
       description: "Original",
       counter: originalCounter
@@ -741,24 +849,23 @@ struct ViewGraphTests {
     let checkpoint = graph.makeCheckpoint()
 
     graph.beginFrame()
-    let aliasNode = graph.beginEvaluation(identity: aliasIdentity, invalidator: nil)
-    aliasNode.recordCommandRegistration(
+    let contributorNode = graph.beginEvaluation(identity: contributorIdentity, invalidator: nil)
+    contributorNode.recordCommandRegistration(
       commandSnapshot(
-        identity: aliasIdentity,
+        identity: contributorIdentity,
         binding: draftBinding,
         description: "Draft",
         counter: draftCounter
       )
     )
     graph.finishEvaluation(
-      aliasNode,
-      resolved: ResolvedNode(identity: aliasIdentity, kind: .view("Alias")),
+      contributorNode,
+      resolved: ResolvedNode(
+        identity: targetIdentity,
+        structuralPath: structuralPath,
+        kind: .view("Target")
+      ),
       accessedStateSlots: 0
-    )
-    graph.recordRegistrationAlias(
-      from: aliasIdentity,
-      to: targetIdentity,
-      resolvedKind: .view("Target")
     )
 
     graph.restoreCheckpoint(checkpoint)
@@ -772,20 +879,20 @@ struct ViewGraphTests {
 
     #expect(
       registrations.commandRegistry?.keyCommand(
-        at: aliasIdentity,
+        at: contributorIdentity,
         matching: originalBinding
       ) != nil
     )
     #expect(
       registrations.commandRegistry?.keyCommand(
-        at: aliasIdentity,
+        at: contributorIdentity,
         matching: draftBinding
       ) == nil
     )
     #expect(
       registrations.commandRegistry?.dispatch(
         key: originalBinding,
-        along: [rootIdentity, aliasIdentity]
+        along: [rootIdentity, contributorIdentity]
       ) == true
     )
     #expect(originalCounter.count == 1)
@@ -868,41 +975,46 @@ private func seedCommandGraph(
 }
 
 @MainActor
-private func seedAliasCommandGraph(
+private func seedStructuralPathContributorCommandGraph(
   graph: ViewGraph,
   rootIdentity: Identity,
   targetIdentity: Identity,
-  aliasIdentity: Identity,
+  contributorIdentity: Identity,
   binding: KeyBinding,
   description: String,
   counter: RegistrationCounter
 ) {
+  let structuralPath = StructuralPath(identity: testIdentity("Root", "Slot"))
+
   graph.beginFrame()
   let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
   let targetNode = graph.beginEvaluation(identity: targetIdentity, invalidator: nil)
   graph.finishEvaluation(
     targetNode,
-    resolved: ResolvedNode(identity: targetIdentity, kind: .view("Target")),
+    resolved: ResolvedNode(
+      identity: targetIdentity,
+      structuralPath: structuralPath,
+      kind: .view("Target")
+    ),
     accessedStateSlots: 0
   )
-  let aliasNode = graph.beginEvaluation(identity: aliasIdentity, invalidator: nil)
-  aliasNode.recordCommandRegistration(
+  let contributorNode = graph.beginEvaluation(identity: contributorIdentity, invalidator: nil)
+  contributorNode.recordCommandRegistration(
     commandSnapshot(
-      identity: aliasIdentity,
+      identity: contributorIdentity,
       binding: binding,
       description: description,
       counter: counter
     )
   )
   graph.finishEvaluation(
-    aliasNode,
-    resolved: ResolvedNode(identity: aliasIdentity, kind: .view("Alias")),
+    contributorNode,
+    resolved: ResolvedNode(
+      identity: targetIdentity,
+      structuralPath: structuralPath,
+      kind: .view("Target")
+    ),
     accessedStateSlots: 0
-  )
-  graph.recordRegistrationAlias(
-    from: aliasIdentity,
-    to: targetIdentity,
-    resolvedKind: .view("Target")
   )
   graph.finishEvaluation(
     rootNode,
@@ -910,7 +1022,11 @@ private func seedAliasCommandGraph(
       identity: rootIdentity,
       kind: .root,
       children: [
-        ResolvedNode(identity: targetIdentity, kind: .view("Target"))
+        ResolvedNode(
+          identity: targetIdentity,
+          structuralPath: structuralPath,
+          kind: .view("Target")
+        )
       ]
     ),
     accessedStateSlots: 0

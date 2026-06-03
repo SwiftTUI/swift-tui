@@ -16,6 +16,7 @@ public enum SemanticRole: String, Equatable, Sendable {
 /// `PlacedNode`. It deliberately does not prescribe `PlacedNode`'s physical
 /// storage shape.
 package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   package var kind: NodeKind
   package var environmentSnapshot: EnvironmentSnapshot
   package var semanticRole: SemanticRole
@@ -31,6 +32,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var matchedGeometry: MatchedGeometryConfig?
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     kind: NodeKind = .view("Unknown"),
     environmentSnapshot: EnvironmentSnapshot = .init(),
     semanticRole: SemanticRole = .generic,
@@ -45,6 +47,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     isTransient: Bool = false,
     matchedGeometry: MatchedGeometryConfig? = nil
   ) {
+    self.viewNodeID = viewNodeID
     self.kind = kind
     self.environmentSnapshot = environmentSnapshot
     self.semanticRole = semanticRole
@@ -65,6 +68,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     semanticRole: SemanticRole
   ) {
     self.init(
+      viewNodeID: resolved.viewNodeID,
       kind: resolved.kind,
       environmentSnapshot: resolved.environmentSnapshot,
       semanticRole: semanticRole,
@@ -89,6 +93,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
 /// refreshed through `PlacedNodeResolvedMetadata`; they are not independent
 /// sources of resolved truth.
 public struct PlacedNode: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   public var identity: Identity
   package var kind: NodeKind
   public var environmentSnapshot: EnvironmentSnapshot
@@ -166,6 +171,7 @@ public struct PlacedNode: Equatable, Sendable {
   package var resolvedMetadata: PlacedNodeResolvedMetadata {
     get {
       PlacedNodeResolvedMetadata(
+        viewNodeID: viewNodeID,
         kind: kind,
         environmentSnapshot: environmentSnapshot,
         semanticRole: semanticRole,
@@ -187,6 +193,7 @@ public struct PlacedNode: Equatable, Sendable {
   }
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     resolvedMetadata: PlacedNodeResolvedMetadata,
     bounds: CellRect,
@@ -196,6 +203,7 @@ public struct PlacedNode: Equatable, Sendable {
     children: [PlacedNode] = []
   ) {
     self.init(
+      viewNodeID: viewNodeID ?? resolvedMetadata.viewNodeID,
       identity: identity,
       kind: resolvedMetadata.kind,
       environmentSnapshot: resolvedMetadata.environmentSnapshot,
@@ -219,6 +227,7 @@ public struct PlacedNode: Equatable, Sendable {
   }
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     kind: NodeKind = .view("Unknown"),
     environmentSnapshot: EnvironmentSnapshot = .init(),
@@ -239,6 +248,7 @@ public struct PlacedNode: Equatable, Sendable {
     isTransient: Bool = false,
     matchedGeometry: MatchedGeometryConfig? = nil
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.kind = kind
     self.environmentSnapshot = environmentSnapshot
@@ -271,6 +281,7 @@ public struct PlacedNode: Equatable, Sendable {
   }
 
   private mutating func applyResolvedMetadata(_ metadata: PlacedNodeResolvedMetadata) {
+    viewNodeID = metadata.viewNodeID
     kind = metadata.kind
     environmentSnapshot = metadata.environmentSnapshot
     semanticRole = metadata.semanticRole

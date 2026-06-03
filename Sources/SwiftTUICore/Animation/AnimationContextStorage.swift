@@ -75,10 +75,25 @@ package enum AnimationRegistrationStorage {
 }
 
 /// Sink used by the View-layer `.transition()` modifier to register
-/// per-identity transitions with the renderer's animation controller.
+/// per-node transitions with the renderer's animation controller.
 @MainActor
 package protocol TransitionRegistrationSink: AnyObject, Sendable {
   func registerTransition(for identity: Identity, transition: any Sendable)
+  func registerTransition(
+    for identity: Identity,
+    viewNodeID: ViewNodeID?,
+    transition: any Sendable
+  )
+}
+
+extension TransitionRegistrationSink {
+  package func registerTransition(
+    for identity: Identity,
+    viewNodeID: ViewNodeID?,
+    transition: any Sendable
+  ) {
+    registerTransition(for: identity, transition: transition)
+  }
 }
 
 @MainActor

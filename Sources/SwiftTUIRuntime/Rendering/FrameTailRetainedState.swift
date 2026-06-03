@@ -41,12 +41,12 @@ final class FrameTailRetainedState: Sendable {
   package var memoryMetricSnapshot: MemoryMetricSnapshot {
     state.withLock { state in
       MemoryMetricSnapshot(
-        name: "RetainedFrameIndex.placedByIdentity",
-        count: state.previousFrameIndex?.placedByIdentity.count ?? 0,
+        name: "RetainedFrameIndex.placedByNodeID",
+        count: state.previousFrameIndex?.placedByNodeID.count ?? 0,
         approxBytes: state.previousRasterSurface.map { $0.size.width * $0.size.height },
         detail: [
-          "resolved": state.previousFrameIndex?.resolvedByIdentity.count ?? 0,
-          "measured": state.previousFrameIndex?.measuredByIdentity.count ?? 0,
+          "resolved": state.previousFrameIndex?.resolvedByNodeID.count ?? 0,
+          "measured": state.previousFrameIndex?.measuredByNodeID.count ?? 0,
           "structural": state.previousFrameIndex?.structuralFrame.postorder.count ?? 0,
           "placedFrameEntries": state.previousFrameIndex?.placedFrameEntryCount ?? 0,
           "phaseProducts": state.previousPhaseProducts == nil ? 0 : 1,
@@ -119,7 +119,7 @@ final class FrameTailRetainedState: Sendable {
             signature: effectiveSignature,
             semantics: artifacts.semanticSnapshot.retainedExtractionProduct,
             draw: artifacts.drawTree,
-            drawByIdentity: Self.drawIndex(artifacts.drawTree)
+            drawByNodeID: Self.drawIndex(artifacts.drawTree)
           )
         } else {
           nil
@@ -127,17 +127,19 @@ final class FrameTailRetainedState: Sendable {
     }
   }
 
-  private static func drawIndex(_ root: DrawNode) -> [Identity: DrawNode] {
-    var storage: [Identity: DrawNode] = [:]
+  private static func drawIndex(_ root: DrawNode) -> [ViewNodeID: DrawNode] {
+    var storage: [ViewNodeID: DrawNode] = [:]
     indexDrawNode(root, into: &storage)
     return storage
   }
 
   private static func indexDrawNode(
     _ node: DrawNode,
-    into storage: inout [Identity: DrawNode]
+    into storage: inout [ViewNodeID: DrawNode]
   ) {
-    storage[node.identity] = node
+    if let viewNodeID = node.viewNodeID {
+      storage[viewNodeID] = node
+    }
     for child in node.children {
       indexDrawNode(child, into: &storage)
     }

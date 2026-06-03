@@ -1106,17 +1106,26 @@ struct AnimationPipelineIntegrationTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
     // Manually register the transition against the controller, then
     // seed the controller with a prior frame state by calling
     // processResolvedTree and capturePlacedTree directly — this
     // avoids needing a full view-layer transition modifier setup.
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
     // Seed: leaf present in the prior resolved + placed trees.
-    let leafResolved = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leafResolved = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let priorResolved = ResolvedNode(
       identity: rootIdentity,
       kind: .view("Root"),
@@ -1195,6 +1204,7 @@ struct AnimationPipelineIntegrationTests {
     let leafIdentity = Identity(
       components: [.named("root"), .named("parent"), .named("leaf")]
     )
+    let leafNodeID = ViewNodeID(rawValue: 3)
 
     // Frame 1: only root exists (simulates a different tab active).
     let frame1 = ResolvedNode(
@@ -1208,10 +1218,18 @@ struct AnimationPipelineIntegrationTests {
     // Frame 2: parent + leaf appear together under an animate
     // transaction.  Register a .opacity transition on the leaf.
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
-    let leafNode = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leafNode = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let parentNode = ResolvedNode(
       identity: parentIdentity,
       kind: .view("Parent"),
@@ -1257,6 +1275,7 @@ struct AnimationPipelineIntegrationTests {
     let leafIdentity = Identity(
       components: [.named("root"), .named("container"), .named("leaf")]
     )
+    let leafNodeID = ViewNodeID(rawValue: 4)
     let siblingIdentity = Identity(
       components: [.named("root"), .named("container"), .named("sibling")]
     )
@@ -1264,10 +1283,18 @@ struct AnimationPipelineIntegrationTests {
     // Frame 1: root → container(2 children: leaf + sibling).
     // Register .opacity transition on the leaf.
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
-    let leafNode = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leafNode = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let siblingNode = ResolvedNode(identity: siblingIdentity, kind: .view("Sibling"))
     let containerNode = ResolvedNode(
       identity: containerIdentity,
@@ -1330,6 +1357,7 @@ struct AnimationPipelineIntegrationTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
     // Frame 1: root exists, leaf absent.
     let frame1 = ResolvedNode(
@@ -1342,10 +1370,18 @@ struct AnimationPipelineIntegrationTests {
 
     // Frame 2: leaf appears under root with an animate transaction.
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
-    let leafNode = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leafNode = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let frame2 = ResolvedNode(
       identity: rootIdentity,
       kind: .view("Root"),
@@ -1466,15 +1502,24 @@ struct AnimationControllerPropertyTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
-    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let root = ResolvedNode(
       identity: rootIdentity,
       kind: .view("Root"),
       children: [leaf]
     )
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(root, transaction: .init(), timestamp: t0)
@@ -1515,11 +1560,13 @@ struct AnimationControllerPropertyTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
     // Leaf already has a .offset(x: 5, y: 0) layout.  The removal
     // transition is .move(edge: .trailing) which adds offsetX=10.
     // Expect the composed offset to be x=15.
     let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
       identity: leafIdentity,
       kind: .view("Leaf"),
       layoutBehavior: .offset(x: 5, y: 0)
@@ -1533,6 +1580,7 @@ struct AnimationControllerPropertyTests {
     controller.beginTransitionCollection()
     controller.registerTransition(
       for: leafIdentity,
+      viewNodeID: leafNodeID,
       transition: AnyTransition.move(edge: .trailing)
     )
     controller.finishTransitionCollection()
@@ -1593,6 +1641,7 @@ struct AnimationControllerPropertyTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
     // Frame 0: root alone — seeds previousIdentities so the leaf
     // insertion on frame 1 is a conditional toggle, not a structural
@@ -1609,11 +1658,16 @@ struct AnimationControllerPropertyTests {
     controller.beginTransitionCollection()
     controller.registerTransition(
       for: leafIdentity,
+      viewNodeID: leafNodeID,
       transition: AnyTransition.move(edge: .leading)
     )
     controller.finishTransitionCollection()
 
-    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let root = ResolvedNode(
       identity: rootIdentity,
       kind: .view("Root"),
@@ -1712,8 +1766,10 @@ struct AnimationControllerPropertyTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
     let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
       identity: leafIdentity,
       kind: .view("Leaf"),
       layoutBehavior: .frame(width: 20, height: 10, alignment: .center)
@@ -1727,6 +1783,7 @@ struct AnimationControllerPropertyTests {
     controller.beginTransitionCollection()
     controller.registerTransition(
       for: leafIdentity,
+      viewNodeID: leafNodeID,
       transition: AnyTransition.move(edge: .trailing)
     )
     controller.finishTransitionCollection()
@@ -1794,6 +1851,7 @@ struct AnimationControllerPropertyTests {
 
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
 
     // Frame 0: root alone — seeds previousIdentities so the leaf
     // insertion on frame 1 is a conditional toggle, not a structural
@@ -1809,13 +1867,23 @@ struct AnimationControllerPropertyTests {
     // Frame 1: leaf inserted with .opacity transition under
     // withAnimation intent → starts the fade-in.
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
     let frame1 = ResolvedNode(
       identity: rootIdentity,
       kind: .view("Root"),
-      children: [ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))]
+      children: [
+        ResolvedNode(
+          viewNodeID: leafNodeID,
+          identity: leafIdentity,
+          kind: .view("Leaf")
+        )
+      ]
     )
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
@@ -2522,12 +2590,18 @@ struct AnimationControllerRemovalTests {
 
     // Register the transition for the soon-to-be-removed child.
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
     // Frame 1: parent has the leaf as a child.
     let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
       identity: leafIdentity,
       kind: .view("Leaf")
     )
@@ -2608,15 +2682,24 @@ struct AnimationControllerRemovalTests {
     let leafIdentity = Identity(
       components: [.named("overlay"), .named("padding"), .named("leaf")]
     )
+    let leafNodeID = ViewNodeID(rawValue: 3)
 
     // Register the transition on the leaf (that's where
     // TransitionViewModifier attaches it).
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
     // Frame 1: overlay → padding → leaf present.
-    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let padding = ResolvedNode(
       identity: paddingIdentity,
       kind: .view("Padding"),
@@ -2683,12 +2766,21 @@ struct AnimationControllerRemovalTests {
     controller.register(animation)
 
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
     // Frame 1: leaf present.
-    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
       kind: .view("Root"),
@@ -2740,12 +2832,21 @@ struct AnimationControllerRemovalTests {
     controller.register(animation)
 
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    let leafNodeID = ViewNodeID(rawValue: 2)
     controller.beginTransitionCollection()
-    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: leafIdentity,
+      viewNodeID: leafNodeID,
+      transition: AnyTransition.opacity
+    )
     controller.finishTransitionCollection()
 
     // Frame 1: leaf present.
-    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let leaf = ResolvedNode(
+      viewNodeID: leafNodeID,
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
     let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
       kind: .view("Root"),

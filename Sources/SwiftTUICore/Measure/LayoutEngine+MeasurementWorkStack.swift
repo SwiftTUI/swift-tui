@@ -333,6 +333,7 @@ extension LayoutEngine {
 
     if let boundary = node.layoutDependentContent {
       let measured = MeasuredNode(
+        viewNodeID: node.viewNodeID,
         identity: node.identity,
         proposal: proposal,
         measuredSize: boundary.sizingPolicy.measuredSize(for: proposal),
@@ -549,6 +550,7 @@ extension LayoutEngine {
       else {
         results.append(
           MeasuredNode(
+            viewNodeID: node.viewNodeID,
             identity: node.identity,
             proposal: proposal,
             measuredSize: .zero,

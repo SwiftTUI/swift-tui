@@ -183,6 +183,7 @@ extension SemanticExtractor {
     }
 
     return AccessibilityNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       parentIdentity: parentIdentity,
       rect: semanticBounds(for: node),

@@ -77,7 +77,7 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     // preserves an `isActive` recognizer across rebuilds — so the
     // recognizer resolved here on one resolve may end up being kept
     // across the next, and we must route events to whichever wins.
-    let routeID = primaryRouteID(for: node.identity)
+    let routeID = runtimePrimaryRouteID(for: node.identity)
     let gestureRegistryRef = gestureRegistry
     let handlerIdentity = node.identity
     pointerRegistry.register(routeID: routeID) { event in

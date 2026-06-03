@@ -186,7 +186,8 @@ struct DiagnosticsAndCacheTests {
       Text("Hello")
       Text("World")
     }
-    let resolved = root.resolve(in: .init(identity: testIdentity("Root")))
+    var resolved = root.resolve(in: .init(identity: testIdentity("Root")))
+    assignTestViewNodeIDs(to: &resolved)
     let cache = MeasurementCache()
     let engine = LayoutEngine(cache: cache)
 
@@ -1096,4 +1097,25 @@ struct DiagnosticsAndCacheTests {
     #expect(snapshot.contains("triggeredDeadline=10.000"))
     #expect(snapshot.contains("nextDeadline=nil"))
   }
+}
+
+private func assignTestViewNodeIDs(
+  to node: inout ResolvedNode,
+  nextRawValue: inout UInt64
+) {
+  node.viewNodeID = ViewNodeID(rawValue: nextRawValue)
+  nextRawValue &+= 1
+  for index in node._storedChildren.indices {
+    assignTestViewNodeIDs(
+      to: &node._storedChildren[index],
+      nextRawValue: &nextRawValue
+    )
+  }
+}
+
+private func assignTestViewNodeIDs(
+  to node: inout ResolvedNode
+) {
+  var nextRawValue: UInt64 = 1
+  assignTestViewNodeIDs(to: &node, nextRawValue: &nextRawValue)
 }

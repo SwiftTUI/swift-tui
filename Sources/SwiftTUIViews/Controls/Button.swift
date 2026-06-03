@@ -109,10 +109,10 @@ extension Button {
     let buttonStyle = context.environmentValues.buttonStyle
 
     if context.environmentValues.isEnabled, let action {
-      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+      let dynamicPropertyScope = authoringScope ?? currentAuthoringContext()
       let mutationScope =
-        currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope)
+        ImperativeAuthoringContextSnapshot(authoringScope)
+        ?? currentImperativeAuthoringContextSnapshot()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {

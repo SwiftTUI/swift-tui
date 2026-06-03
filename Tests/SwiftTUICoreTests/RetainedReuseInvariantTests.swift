@@ -200,6 +200,7 @@ struct RetainedReuseInvariantTests {
 
     #expect(
       fields == [
+        "viewNodeID",
         "kind",
         "environmentSnapshot",
         "semanticRole",

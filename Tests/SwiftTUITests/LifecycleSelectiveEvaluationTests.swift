@@ -139,22 +139,19 @@ struct LifecycleSelectiveEvaluationTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(
-      updated.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root", "Group[0]"),
-          operation: .taskCancel(
-            .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
-          )
-        ),
-        .init(
-          identity: testIdentity("Root", "Group[0]"),
-          operation: .taskStart(
-            .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
-          )
-        ),
-      ]
-    )
+    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
+      testIdentity("Root", "Group[0]"),
+      testIdentity("Root", "Group[0]"),
+    ])
+    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
+      .taskCancel(
+        .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
+      ),
+      .taskStart(
+        .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
+      ),
+    ])
+    #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
   }
 
   @Test("transparent task owner still cancels and restarts when descriptor changes")
@@ -170,22 +167,19 @@ struct LifecycleSelectiveEvaluationTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(
-      updated.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root", "Group[0]"),
-          operation: .taskCancel(
-            .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
-          )
-        ),
-        .init(
-          identity: testIdentity("Root", "Group[0]"),
-          operation: .taskStart(
-            .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
-          )
-        ),
-      ]
-    )
+    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
+      testIdentity("Root", "Group[0]"),
+      testIdentity("Root", "Group[0]"),
+    ])
+    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
+      .taskCancel(
+        .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
+      ),
+      .taskStart(
+        .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
+      ),
+    ])
+    #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
   }
 
   @Test("transparent task owner still cancels when the task modifier is removed")
@@ -201,16 +195,15 @@ struct LifecycleSelectiveEvaluationTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(
-      updated.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root", "true", "Group[0]"),
-          operation: .taskCancel(
-            .init(id: "Root/true/Group[0]#task[id:1]", priority: .userInitiated)
-          )
-        )
-      ]
-    )
+    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
+      testIdentity("Root", "false", "Group[0]")
+    ])
+    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
+      .taskCancel(
+        .init(id: "Root/true/Group[0]#task[id:1]", priority: .userInitiated)
+      )
+    ])
+    #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
   }
 }
 

@@ -1,54 +1,90 @@
 package struct LifecycleStateNode: Equatable, Sendable {
+  var viewNodeID: ViewNodeID?
   var identity: Identity
   var appearHandlerIDs: [String]
   var disappearHandlerIDs: [String]
   var task: TaskDescriptor?
 }
 
+package enum ViewportLifecycleKey: Hashable, Sendable {
+  case viewNode(ViewNodeID)
+  case identity(Identity)
+}
+
 extension ViewGraph {
   package struct Checkpoint {
     package var root: ViewNode?
-    package var nodesByIdentity: [Identity: ViewNode]
+    package var nodesByNodeID: [ViewNodeID: ViewNode]
+    package var nodeIDByIdentity: [Identity: ViewNodeID]
+    package var identityByNodeID: [ViewNodeID: Identity]
+    package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
+    package var nextViewNodeIDRawValue: UInt64
     package var rootEvaluator: (@MainActor () -> Void)?
     package var evaluationRootIdentity: Identity?
-    package var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
-    package var viewportLifecycleOrder: [Identity]
-    package var frameOrder: [Identity]
+    package var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
+    package var viewportLifecycleOrder: [ViewportLifecycleKey]
+    package var frameOrder: [ViewNodeID]
     package var stableTaskCancelEvents: [LifecycleEvent]
     package var stableTaskStartEvents: [LifecycleEvent]
     package var structuralAppearEvents: [LifecycleEvent]
     package var structuralTaskCancelEvents: [LifecycleEvent]
     package var structuralDisappearEvents: [LifecycleEvent]
-    package var invalidatedIdentities: Set<Identity>
-    package var graphLocalDirtyIdentities: Set<Identity>
+    package var requiresRootEvaluation: Bool
+    package var invalidatedNodeIDs: Set<ViewNodeID>
+    package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var latestLifecycleEvents: [LifecycleEvent]
     package var stateMutationKeys: Set<StateSlotKey>
-    package var registrationAliasesByIdentity: [Identity: Set<Identity>]
-    package var registrationAliasTargets: [Identity: Identity]
-    package var registrationAliasDiagnostics: RegistrationAliasDiagnostics
-    package var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
-    package var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
-    package var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
-    package var taskDescriptorIdentitySlots: [Identity: TaskDescriptorIdentitySlot]
+    package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
+    package var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
+    package var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
+    package var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]
+    package var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot]
     package var nextTaskDescriptorIdentityToken: UInt64
-    package var stateSlotDependents: [StateSlotKey: Set<Identity>]
-    package var environmentDependents: [ObjectIdentifier: Set<Identity>]
-    package var observableDependents: [ObjectIdentifier: Set<Identity>]
+    package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
+    package var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>]
+    package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
     package var currentFrameID: UInt64
-    package var liveIdentities: Set<Identity>
-    package var nodeCheckpoints: [Identity: ViewNode.Checkpoint]
+    package var liveNodeIDs: Set<ViewNodeID>
+    package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   }
 
   package struct StateMutationOverlay {
-    package var stateSlots: [StateSlotKey: AnyStateSlot]
-    package var invalidatedIdentities: Set<Identity>
-    package var graphLocalDirtyIdentities: Set<Identity>
+    package var stateSlots: [StateMutationSlotKey: AnyStateSlot]
+    package var requiresRootEvaluation: Bool
+    package var invalidatedNodeIDs: Set<ViewNodeID>
+    package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var stateMutationKeys: Set<StateSlotKey>
+    package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
+  }
+}
+
+package struct StateMutationSlotKey: Hashable, Sendable {
+  package var viewNodeID: ViewNodeID?
+  package var identity: Identity
+  package var ordinal: Int
+
+  package init(
+    viewNodeID: ViewNodeID?,
+    identity: Identity,
+    ordinal: Int
+  ) {
+    self.viewNodeID = viewNodeID
+    self.identity = identity
+    self.ordinal = ordinal
   }
 }
 
 package struct DirtyEvaluationPlan: Equatable, Sendable {
+  package let frontierNodeIDs: [ViewNodeID]
   package let frontierIdentities: [Identity]
+
+  package init(
+    frontierNodeIDs: [ViewNodeID],
+    frontierIdentities: [Identity]
+  ) {
+    self.frontierNodeIDs = frontierNodeIDs
+    self.frontierIdentities = frontierIdentities
+  }
 }
 
 /// Retained `.task(id:)` comparison state for one lifecycle identity.

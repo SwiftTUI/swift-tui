@@ -4,6 +4,7 @@
 @MainActor
 package final class LocalGestureRegistry: Equatable {
   private var recognizers: [Identity: AnyGestureRecognizer] = [:]
+  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -39,6 +40,7 @@ package final class LocalGestureRegistry: Equatable {
       }
     }
     recognizers[identity] = recognizer
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordGestureRegistration(
       identity: identity,
       recognizer: recognizer
@@ -72,6 +74,7 @@ package final class LocalGestureRegistry: Equatable {
       )
     )
     recognizers[identity] = stacked
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordGestureRegistration(
       identity: identity,
       recognizer: stacked
@@ -98,14 +101,17 @@ package final class LocalGestureRegistry: Equatable {
     // Subtree teardown (`removeSubtrees`) remains aggressive: if the
     // owning view genuinely disappears, its recognizer should die.
     var preserved: [Identity: AnyGestureRecognizer] = [:]
+    var preservedOwners: [Identity: RuntimeRegistrationOwnerKey] = [:]
     for (identity, recognizer) in recognizers {
       if recognizer.isActive {
         preserved[identity] = recognizer
+        preservedOwners[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
       } else {
         recognizer.tearDown()
       }
     }
     recognizers = preserved
+    ownersByIdentity = preservedOwners
   }
 
   package func activeIdentities(
@@ -115,7 +121,7 @@ package final class LocalGestureRegistry: Equatable {
     return Set(
       recognizers.compactMap { identity, recognizer in
         guard recognizer.isActive,
-          identityMatchesAnySubtreeRoot(identity, roots: roots)
+          (ownersByIdentity[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots)
         else {
           return nil
         }
@@ -138,18 +144,25 @@ package final class LocalGestureRegistry: Equatable {
   ) {
     guard !roots.isEmpty else { return }
     for identity in recognizers.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
+      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
         && !preservedIdentities.contains($0)
     }) {
       recognizers.removeValue(forKey: identity)?.tearDown()
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
   package func prune(
-    keeping liveIdentities: Set<Identity>
+    keeping liveNodeIDs: Set<ViewNodeID>
   ) {
-    for identity in recognizers.keys.filter({ !liveIdentities.contains($0) }) {
+    for identity in recognizers.keys.filter({
+      guard let viewNodeID = ownersByIdentity[$0]?.viewNodeID else {
+        return true
+      }
+      return !liveNodeIDs.contains(viewNodeID)
+    }) {
       recognizers.removeValue(forKey: identity)?.tearDown()
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
@@ -160,7 +173,10 @@ package final class LocalGestureRegistry: Equatable {
     recognizers
   }
 
-  package func restore(_ snapshot: [Identity: AnyGestureRecognizer]) {
+  package func restore(
+    _ snapshot: [Identity: AnyGestureRecognizer],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else { return }
     for (identity, recognizer) in snapshot {
       if let existing = recognizers[identity] {
@@ -168,6 +184,8 @@ package final class LocalGestureRegistry: Equatable {
           if existing !== recognizer {
             recognizer.tearDown()
           }
+          self.ownersByIdentity[identity] =
+            ownersByIdentity[identity] ?? self.ownersByIdentity[identity] ?? .init(identity: identity)
           continue
         }
         if existing !== recognizer {
@@ -175,6 +193,7 @@ package final class LocalGestureRegistry: Equatable {
         }
       }
       recognizers[identity] = recognizer
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
   }
 
@@ -257,14 +276,5 @@ private final class StackedGestureRecognizer: GestureRecognizer {
     for recognizer in recognizers {
       recognizer.tearDown()
     }
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

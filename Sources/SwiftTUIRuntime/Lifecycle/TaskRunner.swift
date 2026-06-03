@@ -3,29 +3,32 @@ import SwiftTUICore
 @MainActor
 final class TaskRunner {
   private struct ActiveTask {
+    var identity: Identity
     var descriptor: TaskDescriptor
     var generation: Int
     var task: Task<Void, Never>
   }
 
-  private var activeTasks: [Identity: ActiveTask] = [:]
+  private var activeTasks: [ViewNodeID: ActiveTask] = [:]
   private var nextGeneration = 0
 
   func start(
+    viewNodeID: ViewNodeID,
     identity: Identity,
     registration: TaskRegistration
   ) {
-    cancel(identity: identity)
+    cancel(viewNodeID: viewNodeID)
 
     nextGeneration += 1
     let generation = nextGeneration
     let descriptor = registration.descriptor
     let task = Task(priority: taskPriority(for: descriptor.priority)) { [weak self] in
       await registration.run()
-      self?.finish(identity: identity, generation: generation)
+      self?.finish(viewNodeID: viewNodeID, generation: generation)
     }
 
-    activeTasks[identity] = ActiveTask(
+    activeTasks[viewNodeID] = ActiveTask(
+      identity: identity,
       descriptor: descriptor,
       generation: generation,
       task: task
@@ -33,16 +36,16 @@ final class TaskRunner {
   }
 
   func cancel(
-    identity: Identity,
+    viewNodeID: ViewNodeID,
     matching descriptor: TaskDescriptor? = nil
   ) {
-    guard let activeTask = activeTasks[identity] else {
+    guard let activeTask = activeTasks[viewNodeID] else {
       return
     }
     guard descriptor == nil || descriptor == activeTask.descriptor else {
       return
     }
-    activeTasks.removeValue(forKey: identity)
+    activeTasks.removeValue(forKey: viewNodeID)
 
     activeTask.task.cancel()
   }
@@ -56,17 +59,20 @@ final class TaskRunner {
   }
 
   package var activeTaskDescriptors: [Identity: TaskDescriptor] {
-    activeTasks.mapValues(\.descriptor)
+    Dictionary(
+      activeTasks.values.map { ($0.identity, $0.descriptor) },
+      uniquingKeysWith: { _, latest in latest }
+    )
   }
 
   private func finish(
-    identity: Identity,
+    viewNodeID: ViewNodeID,
     generation: Int
   ) {
-    guard activeTasks[identity]?.generation == generation else {
+    guard activeTasks[viewNodeID]?.generation == generation else {
       return
     }
-    activeTasks.removeValue(forKey: identity)
+    activeTasks.removeValue(forKey: viewNodeID)
   }
 
   private func taskPriority(

@@ -35,6 +35,7 @@ public final class AnyGestureStateBinding {
 @MainActor
 package final class LocalGestureStateRegistry: Equatable {
   private var bindingsByIdentity: [Identity: [AnyGestureStateBinding]] = [:]
+  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -50,6 +51,7 @@ package final class LocalGestureStateRegistry: Equatable {
     binding: AnyGestureStateBinding
   ) {
     bindingsByIdentity[identity, default: []].append(binding)
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordGestureStateBinding(
       identity: identity,
       binding: binding
@@ -73,6 +75,7 @@ package final class LocalGestureStateRegistry: Equatable {
   /// state.
   package func clearBindings(for identity: Identity) {
     bindingsByIdentity.removeValue(forKey: identity)
+    ownersByIdentity.removeValue(forKey: identity)
   }
 
   package func resetAll(for identity: Identity) {
@@ -89,6 +92,7 @@ package final class LocalGestureStateRegistry: Equatable {
     // values because that genuinely corresponds to the view
     // disappearing.
     bindingsByIdentity.removeAll(keepingCapacity: true)
+    ownersByIdentity.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -97,22 +101,29 @@ package final class LocalGestureStateRegistry: Equatable {
   ) {
     guard !roots.isEmpty else { return }
     for identity in bindingsByIdentity.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
+      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
         && !preservedIdentities.contains($0)
     }) {
       if let bindings = bindingsByIdentity.removeValue(forKey: identity) {
         for binding in bindings { binding.resetToSeed() }
       }
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
   package func prune(
-    keeping liveIdentities: Set<Identity>
+    keeping liveNodeIDs: Set<ViewNodeID>
   ) {
-    for identity in bindingsByIdentity.keys.filter({ !liveIdentities.contains($0) }) {
+    for identity in bindingsByIdentity.keys.filter({
+      guard let viewNodeID = ownersByIdentity[$0]?.viewNodeID else {
+        return true
+      }
+      return !liveNodeIDs.contains(viewNodeID)
+    }) {
       if let bindings = bindingsByIdentity.removeValue(forKey: identity) {
         for binding in bindings { binding.resetToSeed() }
       }
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
@@ -123,19 +134,14 @@ package final class LocalGestureStateRegistry: Equatable {
     bindingsByIdentity
   }
 
-  package func restore(_ snapshot: [Identity: [AnyGestureStateBinding]]) {
+  package func restore(
+    _ snapshot: [Identity: [AnyGestureStateBinding]],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else { return }
     for (identity, bindings) in snapshot {
       bindingsByIdentity[identity] = bindings
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

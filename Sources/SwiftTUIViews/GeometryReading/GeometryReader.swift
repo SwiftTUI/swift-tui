@@ -53,7 +53,7 @@ public struct GeometryProxy: Equatable, Sendable {
 
   /// Resolves a bounds anchor in this proxy's local coordinate space.
   public subscript(anchor: Anchor<Rect>) -> Rect {
-    guard let sourceFrame = placedFrameTable.frame(for: anchor.payload.identity) else {
+    guard let sourceFrame = placedFrameTable.frame(for: anchor.payload) else {
       return .zero
     }
 
@@ -67,7 +67,7 @@ public struct GeometryProxy: Equatable, Sendable {
 
   /// Resolves a point anchor in this proxy's local coordinate space.
   public subscript(anchor: Anchor<Point>) -> Point {
-    guard let sourceFrame = placedFrameTable.frame(for: anchor.payload.identity) else {
+    guard let sourceFrame = placedFrameTable.frame(for: anchor.payload) else {
       return .zero
     }
 

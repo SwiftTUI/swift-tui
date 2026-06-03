@@ -1,6 +1,7 @@
 @MainActor
 enum ViewGraphLifecycleEventCollector {
   static func appendTaskCancelEvent(
+    viewNodeID: ViewNodeID?,
     identity: Identity,
     task: TaskDescriptor,
     isStructural: Bool,
@@ -9,6 +10,7 @@ enum ViewGraphLifecycleEventCollector {
     stableTaskStartEvents: [LifecycleEvent]
   ) {
     let event = LifecycleEvent(
+      viewNodeID: viewNodeID,
       identity: identity,
       operation: .taskCancel(task)
     )
@@ -30,6 +32,7 @@ enum ViewGraphLifecycleEventCollector {
   }
 
   static func appendTaskStartEvent(
+    viewNodeID: ViewNodeID?,
     identity: Identity,
     task: TaskDescriptor,
     stableTaskCancelEvents: [LifecycleEvent],
@@ -37,6 +40,7 @@ enum ViewGraphLifecycleEventCollector {
     stableTaskStartEvents: inout [LifecycleEvent]
   ) {
     let event = LifecycleEvent(
+      viewNodeID: viewNodeID,
       identity: identity,
       operation: .taskStart(task)
     )
@@ -55,14 +59,14 @@ enum ViewGraphLifecycleEventCollector {
 
   static func nodeEmitsOwnLifecycleEvents(
     _ node: ViewNode,
-    ownerIdentity: Identity?,
+    ownerNodeID: ViewNodeID?,
     ownerExists: Bool
   ) -> Bool {
     guard node.participatesInStructuralLifecycle else {
       return false
     }
-    guard let ownerIdentity,
-      ownerIdentity != node.identity,
+    guard let ownerNodeID,
+      ownerNodeID != node.viewNodeID,
       ownerExists
     else {
       return true
@@ -73,10 +77,11 @@ enum ViewGraphLifecycleEventCollector {
   static func frameLifecycleEventPlan(
     resolved: ResolvedNode,
     placed: PlacedNode?,
-    nodesByIdentity: [Identity: ViewNode],
-    frameOrder: [Identity],
-    viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode],
-    viewportLifecycleOrder: [Identity],
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    nodeIDByIdentity: [Identity: ViewNodeID],
+    frameOrder: [ViewNodeID],
+    viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode],
+    viewportLifecycleOrder: [ViewportLifecycleKey],
     stableTaskCancelEvents: [LifecycleEvent],
     stableTaskStartEvents: [LifecycleEvent],
     structuralAppearEvents: [LifecycleEvent],
@@ -87,16 +92,17 @@ enum ViewGraphLifecycleEventCollector {
       resolved: resolved,
       placed: placed,
       input: ViewGraphLifecyclePlanningInput(
-        viewportLifecycleNodesByIdentity: viewportLifecycleNodesByIdentity,
+        viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
         viewportLifecycleOrder: viewportLifecycleOrder,
-        changeHandlerIDsByIdentity: frameOrder.compactMap { identity in
-          guard let node = nodesByIdentity[identity],
+        nodeIDByIdentity: nodeIDByIdentity,
+        changeHandlerIDsByIdentity: frameOrder.compactMap { viewNodeID in
+          guard let node = nodesByNodeID[viewNodeID],
             !node.pendingChangeHandlerIDs.isEmpty
           else {
             return nil
           }
           return (
-            identity: identity,
+            identity: node.identity,
             handlerIDs: node.pendingChangeHandlerIDs
           )
         },

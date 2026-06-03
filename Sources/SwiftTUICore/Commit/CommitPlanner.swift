@@ -40,6 +40,7 @@ public struct CommitPlanner {
       }
 
     return .init(
+      viewNodeID: event.viewNodeID,
       identity: event.identity,
       operation: operation
     )

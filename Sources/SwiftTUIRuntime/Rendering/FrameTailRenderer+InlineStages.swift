@@ -145,7 +145,7 @@ struct FrameTailInlineStageRenderer: Sendable {
     let retainedInput = retained.map {
       RetainedDrawExtractionInput(
         previousDraw: $0.draw,
-        previousDrawByIdentity: $0.drawByIdentity,
+        previousDrawByNodeID: $0.drawByNodeID,
         proof: proof
       )
     }

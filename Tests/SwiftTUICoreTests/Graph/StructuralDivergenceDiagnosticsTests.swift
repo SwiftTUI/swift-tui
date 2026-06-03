@@ -87,28 +87,6 @@
       #expect(duplicateRecord.producers == [.view("Row"), .view("Row")])
     }
 
-    @Test("registration alias diagnostics are folded into the divergence report")
-    func registrationAliasDiagnosticsAreFolded() {
-      var aliasDiagnostics = RegistrationAliasDiagnostics()
-      aliasDiagnostics.record(
-        from: testIdentity("Root", "Group[0]"),
-        to: testIdentity("Root", "Group[0]", "ID[example]"),
-        resolvedKind: .view("Text")
-      )
-
-      let report = StructuralDivergenceDiagnostics.report(
-        from: [],
-        registrationAliasDiagnostics: aliasDiagnostics
-      )
-
-      #expect(report.registrationAliasDivergences.count == 1)
-      let divergence = report.registrationAliasDivergences[0]
-      #expect(divergence.registration == testIdentity("Root", "Group[0]"))
-      #expect(divergence.committed == testIdentity("Root", "Group[0]", "ID[example]"))
-      #expect(divergence.producerDescription == "view(Text)")
-      #expect(divergence.count == 1)
-    }
-
     @Test("portal placement roles are surfaced from resolved surface metadata")
     func portalPlacementRolesAreReported() {
       let entry = ResolvedNode(

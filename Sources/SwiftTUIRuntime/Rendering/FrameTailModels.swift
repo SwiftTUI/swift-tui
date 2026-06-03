@@ -78,7 +78,7 @@ struct RetainedFrameTailPhaseProducts: Sendable {
   var signature: RetainedPhaseExtractionSignature
   var semantics: SemanticSnapshot
   var draw: DrawNode
-  var drawByIdentity: [Identity: DrawNode]
+  var drawByNodeID: [ViewNodeID: DrawNode]
 }
 
 /// Worker-safe input for measure/place through raster work.

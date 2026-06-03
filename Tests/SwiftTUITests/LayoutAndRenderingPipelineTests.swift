@@ -166,18 +166,17 @@ struct LayoutAndRenderingPipelineTests {
     #expect(counters.appearCount == 0)
     #expect(counters.disappearCount == 0)
     #expect(counters.taskCount == 0)
+    #expect(artifacts.commitPlan.lifecycle.map(\.identity) == [
+      testIdentity("Root"),
+      testIdentity("Root"),
+    ])
     #expect(
-      artifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root"),
-          operation: .appear(handlerIDs: ["Root#appear[0]"])
-        ),
-        .init(
-          identity: testIdentity("Root"),
-          operation: .taskStart(.init(id: "Root#task", priority: .userInitiated))
-        ),
+      artifacts.commitPlan.lifecycle.map(\.operation) == [
+        .appear(handlerIDs: ["Root#appear[0]"]),
+        .taskStart(.init(id: "Root#task", priority: .userInitiated)),
       ]
     )
+    #expect(artifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
     #expect(lifecycleRegistry.appearHandler(for: "Root#appear[0]") != nil)
     #expect(lifecycleRegistry.disappearHandler(for: "Root#disappear[0]") != nil)
 

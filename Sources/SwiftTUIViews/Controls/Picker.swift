@@ -80,7 +80,7 @@ extension Picker {
         }
       }
 
-      let rootRouteID = primaryRouteID(for: context.identity)
+      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
@@ -98,7 +98,7 @@ extension Picker {
       }
 
       for (index, option) in options.enumerated() {
-        let routeID = primaryRouteID(
+        let routeID = runtimePrimaryRouteID(
           for: pickerOptionIdentity(
             for: context.identity,
             index: index
@@ -116,7 +116,7 @@ extension Picker {
       }
 
       if pickerStyle.wantsTriggerPointerRoute {
-        let triggerRouteID = primaryRouteID(
+        let triggerRouteID = runtimePrimaryRouteID(
           for: pickerTriggerIdentity(for: context.identity)
         )
         context.localPointerHandlerRegistry?.register(routeID: triggerRouteID) { _ in

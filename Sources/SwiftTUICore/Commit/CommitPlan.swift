@@ -45,6 +45,7 @@ public enum LifecycleCommitOperation: Equatable, Sendable {
 
 /// A single lifecycle operation emitted for one identity.
 public struct LifecycleCommitEntry: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   public var identity: Identity
   public var operation: LifecycleCommitOperation
 
@@ -52,6 +53,17 @@ public struct LifecycleCommitEntry: Equatable, Sendable {
     identity: Identity,
     operation: LifecycleCommitOperation
   ) {
+    viewNodeID = nil
+    self.identity = identity
+    self.operation = operation
+  }
+
+  package init(
+    viewNodeID: ViewNodeID?,
+    identity: Identity,
+    operation: LifecycleCommitOperation
+  ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.operation = operation
   }

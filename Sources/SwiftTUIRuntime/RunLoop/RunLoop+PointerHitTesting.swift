@@ -152,13 +152,22 @@ extension RunLoop {
 
     while let current = nextIdentity {
       let candidateRouteID = primaryRouteID(for: current)
-      if candidateRouteID != routeID {
+      if !strictlySameRouteID(candidateRouteID, routeID) {
         candidates.append(candidateRouteID)
       }
       nextIdentity = current.parent
     }
 
     return candidates
+  }
+
+  private func strictlySameRouteID(
+    _ lhs: RouteID,
+    _ rhs: RouteID
+  ) -> Bool {
+    lhs.identity == rhs.identity
+      && lhs.kind == rhs.kind
+      && lhs.ownerNodeID == rhs.ownerNodeID
   }
 
   package func isActivationIdentity(

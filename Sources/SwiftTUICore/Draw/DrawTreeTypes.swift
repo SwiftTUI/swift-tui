@@ -279,6 +279,7 @@ extension DrawCommand {
 /// projected here; `DrawNode` is not a retained layout or semantic source of
 /// truth.
 public struct DrawNode: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   public var identity: Identity
   public var environmentSnapshot: EnvironmentSnapshot
   public var bounds: CellRect
@@ -300,6 +301,7 @@ public struct DrawNode: Equatable, Sendable {
   package private(set) var subtreeNodeCount: Int
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     environmentSnapshot: EnvironmentSnapshot = .init(),
     bounds: CellRect,
@@ -310,6 +312,7 @@ public struct DrawNode: Equatable, Sendable {
     postCommands: [DrawCommand] = [],
     children: [DrawNode] = []
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.environmentSnapshot = environmentSnapshot
     self.bounds = bounds

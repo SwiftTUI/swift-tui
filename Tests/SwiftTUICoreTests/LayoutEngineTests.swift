@@ -50,8 +50,8 @@ struct LayoutEngineTests {
     #expect(metrics2.hits == metrics1.hits + 1)
   }
 
-  @Test("measurement cache keeps at most four proposal variants per identity")
-  func measurementCacheCapsProposalVariantsPerIdentity() {
+  @Test("measurement cache keeps at most four proposal variants per node")
+  func measurementCacheCapsProposalVariantsPerNode() {
     let cache = MeasurementCache()
     let engine = LayoutEngine(cache: cache)
     let resolved = leaf("capped", size: .init(width: 6, height: 1))
@@ -84,8 +84,8 @@ struct LayoutEngineTests {
     #expect(afterEvictedLookup.stores == afterRetainedHit.stores + 1)
   }
 
-  @Test("measurement cache prunes dead identities")
-  func measurementCachePrunesDeadIdentities() {
+  @Test("measurement cache prunes dead node ids")
+  func measurementCachePrunesDeadNodeIDs() {
     let cache = MeasurementCache()
     let engine = LayoutEngine(cache: cache)
     let kept = leaf("kept", size: .init(width: 4, height: 1))
@@ -96,7 +96,7 @@ struct LayoutEngineTests {
     _ = engine.measure(pruned, proposal: .unspecified)
     let beforePrune = cache.metrics
 
-    cache.prune(keeping: [kept.identity])
+    cache.prune(keeping: [kept.viewNodeID!])
     let afterPrune = cache.metrics
 
     _ = engine.measure(kept, proposal: .unspecified)
@@ -144,7 +144,7 @@ struct LayoutEngineTests {
     #expect(metrics.hits == 0)
   }
 
-  @Test("stale cache eviction preserves other proposal variants for the same identity")
+  @Test("stale cache eviction preserves other proposal variants for the same node")
   func staleCacheEvictionPreservesSiblingProposals() {
     let cache = MeasurementCache()
     let original = leaf("shared", size: .init(width: 10, height: 5))
@@ -1037,6 +1037,7 @@ struct LayoutEngineTests {
 private func leaf(
   _ name: String,
   size: CellSize,
+  viewNodeID: ViewNodeID? = nil,
   kind: NodeKind = .view("Test"),
   environmentSnapshot: EnvironmentSnapshot = .init(),
   layoutBehavior: LayoutBehavior = .intrinsic,
@@ -1047,6 +1048,7 @@ private func leaf(
   drawPayload: DrawPayload = .none
 ) -> ResolvedNode {
   ResolvedNode(
+    viewNodeID: viewNodeID ?? testViewNodeID(name),
     identity: testIdentity(name),
     kind: kind,
     environmentSnapshot: environmentSnapshot,
@@ -1058,6 +1060,15 @@ private func leaf(
     drawPayload: drawPayload,
     intrinsicSize: size
   )
+}
+
+private func testViewNodeID(_ name: String) -> ViewNodeID {
+  var hash: UInt64 = 14_695_981_039_346_656_037
+  for byte in name.utf8 {
+    hash ^= UInt64(byte)
+    hash &*= 1_099_511_628_211
+  }
+  return ViewNodeID(rawValue: hash)
 }
 
 private func lazyStack(
@@ -1137,6 +1148,7 @@ private func placedFrameTable(
   var work = [node]
   while let current = work.popLast() {
     table.record(
+      viewNodeID: current.viewNodeID,
       identity: current.identity,
       bounds: current.bounds,
       namedCoordinateSpaceName: current.semanticMetadata.namedCoordinateSpaceName

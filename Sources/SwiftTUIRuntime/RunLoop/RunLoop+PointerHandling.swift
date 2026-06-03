@@ -261,7 +261,10 @@ extension RunLoop {
     // Scroll events should not move keyboard focus — the scroll target
     // is resolved independently via scrollTarget(at:).
     if let scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
-      let routeID = primaryRouteID(for: scrollRoute.identity)
+      let routeID = primaryRouteID(
+        for: scrollRoute.identity,
+        ownerNodeID: scrollRoute.viewNodeID
+      )
       let handled = dispatchPointerEvent(
         preferredRouteID: routeID,
         identity: scrollRoute.identity,

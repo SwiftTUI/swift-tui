@@ -39,11 +39,14 @@ package struct RegisteredKeyCommand: Sendable {
 
 package struct CommandRegistrySnapshot: Sendable {
   package var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]]
+  package var ownersByScope: [Identity: RuntimeRegistrationOwnerKey]
 
   package init(
-    keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:]
+    keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:],
+    ownersByScope: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
     self.keyCommandsByScope = keyCommandsByScope
+    self.ownersByScope = ownersByScope
   }
 
   package var isEmpty: Bool {
@@ -63,6 +66,7 @@ package struct CommandRegistrySnapshot: Sendable {
 @MainActor
 package final class CommandRegistry: Equatable {
   private var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:]
+  private var ownersByScope: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -86,9 +90,11 @@ package final class CommandRegistry: Equatable {
       action: action
     )
     keyCommandsByScope[scope] = table
+    ownersByScope[scope] = .current(identity: scope)
     ViewNodeContext.current?.recordCommandRegistration(
       CommandRegistrySnapshot(
-        keyCommandsByScope: [scope: table]
+        keyCommandsByScope: [scope: table],
+        ownersByScope: [scope: ownersByScope[scope] ?? .init(identity: scope)]
       )
     )
   }
@@ -126,11 +132,13 @@ package final class CommandRegistry: Equatable {
   /// Clears every registration.
   package func reset() {
     keyCommandsByScope.removeAll(keepingCapacity: true)
+    ownersByScope.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> CommandRegistrySnapshot {
     CommandRegistrySnapshot(
-      keyCommandsByScope: keyCommandsByScope
+      keyCommandsByScope: keyCommandsByScope,
+      ownersByScope: ownersByScope
     )
   }
 
@@ -141,6 +149,7 @@ package final class CommandRegistry: Equatable {
 
     for (identity, commands) in snapshot.keyCommandsByScope {
       keyCommandsByScope[identity] = commands
+      ownersByScope[identity] = snapshot.ownersByScope[identity] ?? .init(identity: identity)
     }
   }
 
@@ -152,17 +161,9 @@ package final class CommandRegistry: Equatable {
   package func removeSubtrees(rootedAt roots: [Identity]) {
     guard !roots.isEmpty else { return }
     for identity in keyCommandsByScope.keys
-    where commandRegistryIdentityMatchesAnySubtreeRoot(identity, roots: roots) {
+    where (ownersByScope[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots) {
       keyCommandsByScope.removeValue(forKey: identity)
+      ownersByScope.removeValue(forKey: identity)
     }
-  }
-}
-
-private func commandRegistryIdentityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

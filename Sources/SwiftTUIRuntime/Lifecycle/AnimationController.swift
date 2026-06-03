@@ -57,14 +57,17 @@ package final class AnimationController: Sendable {
   private var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant] = [:]
   /// Registrations collected during the *current* frame's resolve pass.
   /// Used to look up transitions on INSERTION.
-  private var transitionsByIdentity: [Identity: AnyTransition] = [:]
+  private var transitionsByNodeID: [ViewNodeID: AnyTransition] = [:]
+  private var transitionIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
   /// Registrations that were live at the end of the *previous* frame's
   /// resolve pass.  Used to look up transitions on REMOVAL, because the
   /// disappearing view's `.transition()` modifier is not evaluated in
   /// the current frame — its branch is gone.
-  private var previousTransitionsByIdentity: [Identity: AnyTransition] = [:]
-  private var pendingTransitionsByIdentity: [Identity: AnyTransition] = [:]
-  private var removingIdentities: [Identity: RemovalEntry] = [:]
+  private var previousTransitionsByNodeID: [ViewNodeID: AnyTransition] = [:]
+  private var previousTransitionIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
+  private var pendingTransitionsByNodeID: [ViewNodeID: AnyTransition] = [:]
+  private var pendingTransitionIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
+  private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
   private var previousIdentities: Set<Identity> = []
   package private(set) var lastTickResult: AnimationTickResult = .init()
   private var isFrameHeadTransactionActive = false
@@ -143,10 +146,13 @@ package final class AnimationController: Sendable {
       completionClosures: completionClosures,
       batchRefCounts: batchRefCounts,
       pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
-      transitionsByIdentity: transitionsByIdentity,
-      previousTransitionsByIdentity: previousTransitionsByIdentity,
-      pendingTransitionsByIdentity: pendingTransitionsByIdentity,
-      removingIdentities: removingIdentities,
+      transitionsByNodeID: transitionsByNodeID,
+      transitionIdentitiesByNodeID: transitionIdentitiesByNodeID,
+      previousTransitionsByNodeID: previousTransitionsByNodeID,
+      previousTransitionIdentitiesByNodeID: previousTransitionIdentitiesByNodeID,
+      pendingTransitionsByNodeID: pendingTransitionsByNodeID,
+      pendingTransitionIdentitiesByNodeID: pendingTransitionIdentitiesByNodeID,
+      removingNodes: removingNodes,
       previousIdentities: previousIdentities,
       lastTickResult: lastTickResult,
       isFrameHeadTransactionActive: isFrameHeadTransactionActive,
@@ -168,10 +174,13 @@ package final class AnimationController: Sendable {
     completionClosures = checkpoint.completionClosures
     batchRefCounts = checkpoint.batchRefCounts
     pendingEmptyBatchCompletions = checkpoint.pendingEmptyBatchCompletions
-    transitionsByIdentity = checkpoint.transitionsByIdentity
-    previousTransitionsByIdentity = checkpoint.previousTransitionsByIdentity
-    pendingTransitionsByIdentity = checkpoint.pendingTransitionsByIdentity
-    removingIdentities = checkpoint.removingIdentities
+    transitionsByNodeID = checkpoint.transitionsByNodeID
+    transitionIdentitiesByNodeID = checkpoint.transitionIdentitiesByNodeID
+    previousTransitionsByNodeID = checkpoint.previousTransitionsByNodeID
+    previousTransitionIdentitiesByNodeID = checkpoint.previousTransitionIdentitiesByNodeID
+    pendingTransitionsByNodeID = checkpoint.pendingTransitionsByNodeID
+    pendingTransitionIdentitiesByNodeID = checkpoint.pendingTransitionIdentitiesByNodeID
+    removingNodes = checkpoint.removingNodes
     previousIdentities = checkpoint.previousIdentities
     lastTickResult = checkpoint.lastTickResult
     isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
@@ -228,10 +237,14 @@ package final class AnimationController: Sendable {
       completionClosureBatchIDs: Set(completionClosures.keys),
       batchRefCounts: batchRefCounts,
       pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
-      transitionIdentities: Set(transitionsByIdentity.keys),
-      previousTransitionIdentities: Set(previousTransitionsByIdentity.keys),
-      pendingTransitionIdentities: Set(pendingTransitionsByIdentity.keys),
-      removingIdentities: Set(removingIdentities.keys),
+      transitionNodeIDs: Set(transitionsByNodeID.keys),
+      transitionIdentities: Set(transitionIdentitiesByNodeID.values),
+      previousTransitionNodeIDs: Set(previousTransitionsByNodeID.keys),
+      previousTransitionIdentities: Set(previousTransitionIdentitiesByNodeID.values),
+      pendingTransitionNodeIDs: Set(pendingTransitionsByNodeID.keys),
+      pendingTransitionIdentities: Set(pendingTransitionIdentitiesByNodeID.values),
+      removingNodeIDs: Set(removingNodes.keys),
+      removingIdentities: removingIdentitySet,
       previousIdentities: previousIdentities,
       lastTickHasPendingWork: lastTickResult.hasPendingWork,
       lastTickNextDeadline: lastTickResult.nextDeadline,
@@ -281,15 +294,15 @@ package final class AnimationController: Sendable {
     at timestamp: MonotonicInstant
   ) -> PlacedAnimationOverlaySnapshot {
     let result = PlacedAnimationOverlaySampling.sample(
-      removingIdentities: removingIdentities,
+      removingNodes: removingNodes,
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
       tree: tree,
       timestamp: timestamp
     )
 
-    for (identity, state) in result.removalCustomStates {
-      removingIdentities[identity]?.customState = state
+    for (viewNodeID, state) in result.removalCustomStates {
+      removingNodes[viewNodeID]?.customState = state
     }
     for (key, state) in result.activeAnimationCustomStates {
       activeAnimations[key]?.customState = state
@@ -329,14 +342,18 @@ package final class AnimationController: Sendable {
     }
   }
 
+  private var removingIdentitySet: Set<Identity> {
+    Set(removingNodes.values.map(\.identity))
+  }
+
   package var preFrameHeadOffscreenPropertyAnimationRedrawIdentities: Set<Identity>? {
     guard !isFrameHeadTransactionActive else { return nil }
     guard !activeAnimations.isEmpty else { return nil }
-    guard removingIdentities.isEmpty else { return nil }
+    guard removingNodes.isEmpty else { return nil }
     guard pendingEmptyBatchCompletions.isEmpty else { return nil }
-    guard transitionsByIdentity.isEmpty,
-      previousTransitionsByIdentity.isEmpty,
-      pendingTransitionsByIdentity.isEmpty
+    guard transitionsByNodeID.isEmpty,
+      previousTransitionsByNodeID.isEmpty,
+      pendingTransitionsByNodeID.isEmpty
     else {
       return nil
     }
@@ -438,8 +455,8 @@ package final class AnimationController: Sendable {
     {
       blockers.insert(.animationCompletion)
     }
-    if !transitionsByIdentity.isEmpty || !previousTransitionsByIdentity.isEmpty
-      || !pendingTransitionsByIdentity.isEmpty || !removingIdentities.isEmpty
+    if !transitionsByNodeID.isEmpty || !previousTransitionsByNodeID.isEmpty
+      || !pendingTransitionsByNodeID.isEmpty || !removingNodes.isEmpty
       || activeAnimations.keys.contains(where: { key in
         if case .property = key.scope {
           return false
@@ -458,13 +475,15 @@ package final class AnimationController: Sendable {
   /// The PREVIOUS frame's registrations are preserved so removal
   /// detection can still find transitions for views whose branches are
   /// gone.  Registrations for identities whose subtrees are not
-  /// re-evaluated this frame survive in `transitionsByIdentity` via a
+  /// re-evaluated this frame survive in `transitionsByNodeID` via a
   /// merge in ``finishTransitionCollection()``; stale entries for
   /// identities that leave the tree are pruned at the end of
   /// ``processResolvedTree(_:transaction:timestamp:)``.
   package func beginTransitionCollection() {
-    previousTransitionsByIdentity = transitionsByIdentity
-    pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
+    previousTransitionsByNodeID = transitionsByNodeID
+    previousTransitionIdentitiesByNodeID = transitionIdentitiesByNodeID
+    pendingTransitionsByNodeID.removeAll(keepingCapacity: true)
+    pendingTransitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
   }
 
   package func finishTransitionCollection() {
@@ -473,8 +492,10 @@ package final class AnimationController: Sendable {
     // across selective-evaluation frames.  Without this, a
     // PhaseAnimator-only tick would wipe every other subtree's
     // transition and the next removal couldn't find it.
-    for (identity, transition) in pendingTransitionsByIdentity {
-      transitionsByIdentity[identity] = transition
+    for (viewNodeID, transition) in pendingTransitionsByNodeID {
+      transitionsByNodeID[viewNodeID] = transition
+      transitionIdentitiesByNodeID[viewNodeID] =
+        pendingTransitionIdentitiesByNodeID[viewNodeID]
     }
   }
 
@@ -513,6 +534,8 @@ package final class AnimationController: Sendable {
     var newParentByIdentity: [Identity: Identity] = [:]
     var newChildIndexByIdentity: [Identity: Int] = [:]
     var newMatchedKeysByIdentity: [Identity: MatchedGeometryKey] = [:]
+    var newNodeIDByIdentity: [Identity: ViewNodeID] = [:]
+    var newLiveNodeIDs: Set<ViewNodeID> = []
     processNode(
       node,
       parentIdentity: nil,
@@ -522,7 +545,9 @@ package final class AnimationController: Sendable {
       snapshotAccumulator: &newSnapshots,
       parentAccumulator: &newParentByIdentity,
       childIndexAccumulator: &newChildIndexByIdentity,
-      matchedKeyAccumulator: &newMatchedKeysByIdentity
+      matchedKeyAccumulator: &newMatchedKeysByIdentity,
+      nodeIDAccumulator: &newNodeIDByIdentity,
+      liveNodeIDAccumulator: &newLiveNodeIDs
     )
 
     // Detect insertions and removals by diffing identity sets.  Skip
@@ -532,7 +557,7 @@ package final class AnimationController: Sendable {
     let resolvedDiff = AnimationResolvedIdentityDiff.make(
       newSnapshots: newSnapshots,
       previousIdentities: previousIdentities,
-      removingIdentities: Set(removingIdentities.keys)
+      removingIdentities: removingIdentitySet
     )
     let newIdentities = resolvedDiff.newIdentities
     let insertedIdentities = resolvedDiff.insertedIdentities
@@ -595,7 +620,9 @@ package final class AnimationController: Sendable {
       {
         continue
       }
-      guard let transition = transitionsByIdentity[identity] else { continue }
+      guard let viewNodeID = newNodeIDByIdentity[identity],
+        let transition = transitionsByNodeID[viewNodeID]
+      else { continue }
       enqueueInsertionAnimation(
         identity: identity,
         transition: transition,
@@ -619,29 +646,32 @@ package final class AnimationController: Sendable {
     // point — and capture the deepest disappearing ancestor as the
     // subtree to inject.  This way the entire wrapped unit fades out.
     for identity in removedIdentities {
-      guard removingIdentities[identity] == nil else { continue }
-      // If the removed identity's matched-geometry key was
-      // consumed by a match on this frame, the counterpart insertion
-      // already owns the visual transition.  Skip the removal
-      // overlay so the old view just disappears.
-      if let previousRoot = previousTreeRoot,
+      guard let previousRoot = previousTreeRoot,
         let previousNode = AnimationTreeQueries.findResolvedNode(
           in: previousRoot,
           identity: identity
         ),
-        let removedConfig = previousNode.matchedGeometry,
+        let removedNodeID = previousNode.viewNodeID,
+        removingNodes[removedNodeID] == nil
+      else { continue }
+
+      // If the removed identity's matched-geometry key was
+      // consumed by a match on this frame, the counterpart insertion
+      // already owns the visual transition.  Skip the removal
+      // overlay so the old view just disappears.
+      if let removedConfig = previousNode.matchedGeometry,
         matchedKeysConsumedByMatch.contains(removedConfig.key)
       {
         continue
       }
       // Removal look-up uses the PREVIOUS frame's registrations: the
       // disappearing view's `.transition()` modifier isn't evaluated in
-      // the current frame (its branch is gone), so `transitionsByIdentity`
+      // the current frame (its branch is gone), so `transitionsByNodeID`
       // no longer contains an entry for it.  The previous frame captured
       // the registration while the view was still present.
-      guard let transition = previousTransitionsByIdentity[identity],
-        let previousRoot = previousTreeRoot
-      else { continue }
+      guard let transition = previousTransitionsByNodeID[removedNodeID] else {
+        continue
+      }
 
       // Resolve the injection point: the deepest disappearing ancestor (the
       // subtree to inject) and the first surviving ancestor it attaches to.
@@ -729,7 +759,8 @@ package final class AnimationController: Sendable {
         placedSnapshot = nil
       }
 
-      removingIdentities[identity] = RemovalEntry(
+      removingNodes[removedNodeID] = RemovalEntry(
+        identity: identity,
         snapshot: subtree,
         parentIdentity: injectionParent,
         childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
@@ -741,13 +772,16 @@ package final class AnimationController: Sendable {
       )
     }
 
-    // Prune transition registrations for identities that are no
-    // longer in the live tree.  Their registration was already
-    // copied into previousTransitionsByIdentity at the start of
-    // this frame, so any removal that needed it has already found
-    // it.  Pruning prevents unbounded growth of the map.
-    transitionsByIdentity = transitionsByIdentity.filter { key, _ in
-      newIdentities.contains(key)
+    // Prune transition registrations for nodes that are no longer
+    // in the live tree. Their registration was already copied into
+    // previousTransitionsByNodeID at the start of this frame, so any
+    // removal that needed it has already found it. Pruning prevents
+    // unbounded growth of the map.
+    transitionsByNodeID = transitionsByNodeID.filter { viewNodeID, _ in
+      newLiveNodeIDs.contains(viewNodeID)
+    }
+    transitionIdentitiesByNodeID = transitionIdentitiesByNodeID.filter { viewNodeID, _ in
+      newLiveNodeIDs.contains(viewNodeID)
     }
 
     previousSnapshots = newSnapshots
@@ -894,7 +928,9 @@ package final class AnimationController: Sendable {
     snapshotAccumulator: inout [Identity: AnimatableSnapshot],
     parentAccumulator: inout [Identity: Identity],
     childIndexAccumulator: inout [Identity: Int],
-    matchedKeyAccumulator: inout [Identity: MatchedGeometryKey]
+    matchedKeyAccumulator: inout [Identity: MatchedGeometryKey],
+    nodeIDAccumulator: inout [Identity: ViewNodeID],
+    liveNodeIDAccumulator: inout Set<ViewNodeID>
   ) {
     let snapshot = AnimatableSnapshot.extract(from: node)
     let previous = previousSnapshots[node.identity]
@@ -932,6 +968,10 @@ package final class AnimationController: Sendable {
     if let config = node.matchedGeometry {
       matchedKeyAccumulator[node.identity] = config.key
     }
+    if let viewNodeID = node.viewNodeID {
+      nodeIDAccumulator[node.identity] = viewNodeID
+      liveNodeIDAccumulator.insert(viewNodeID)
+    }
 
     for (index, child) in node.children.enumerated() {
       processNode(
@@ -943,7 +983,9 @@ package final class AnimationController: Sendable {
         snapshotAccumulator: &snapshotAccumulator,
         parentAccumulator: &parentAccumulator,
         childIndexAccumulator: &childIndexAccumulator,
-        matchedKeyAccumulator: &matchedKeyAccumulator
+        matchedKeyAccumulator: &matchedKeyAccumulator,
+        nodeIDAccumulator: &nodeIDAccumulator,
+        liveNodeIDAccumulator: &liveNodeIDAccumulator
       )
     }
   }
@@ -1074,7 +1116,7 @@ package final class AnimationController: Sendable {
   ) -> AnimationTickResult {
     guard
       !activeAnimations.isEmpty
-        || !removingIdentities.isEmpty
+        || !removingNodes.isEmpty
         || !pendingEmptyBatchCompletions.isEmpty
     else {
       lastTickResult = AnimationTickResult()
@@ -1170,10 +1212,10 @@ package final class AnimationController: Sendable {
 
     // Process removal entries: compute interpolated transition modifiers
     // and prepare them for injection back into the tree.
-    var removalsToPurge: [Identity] = []
+    var removalsToPurge: [ViewNodeID] = []
     var injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
 
-    for (identity, entry) in removingIdentities {
+    for (viewNodeID, entry) in removingNodes {
       let modifiers: TransitionModifiers
       var animationComplete = false
 
@@ -1184,7 +1226,7 @@ package final class AnimationController: Sendable {
         // Write the updated custom state back so the next tick of
         // the exit transition carries user bookkeeping forward
         // (matches the active-animation tick loop pattern).
-        removingIdentities[identity]?.customState = state
+        removingNodes[viewNodeID]?.customState = state
         if let progress = evaluated {
           // Interpolate from the entry's captured starting opacity
           // (normally 1.0 = identity, but may be lower if this
@@ -1207,8 +1249,8 @@ package final class AnimationController: Sendable {
       }
 
       if animationComplete {
-        removalsToPurge.append(identity)
-        redrawIdentities.insert(identity)
+        removalsToPurge.append(viewNodeID)
+        redrawIdentities.insert(entry.identity)
         continue
       }
 
@@ -1235,13 +1277,13 @@ package final class AnimationController: Sendable {
           )
         }
       }
-      redrawIdentities.insert(identity)
+      redrawIdentities.insert(entry.identity)
       latestDeadline = timestamp.advanced(by: frameInterval)
       hasPendingWork = true
     }
 
-    for identity in removalsToPurge {
-      removingIdentities.removeValue(forKey: identity)
+    for viewNodeID in removalsToPurge {
+      removingNodes.removeValue(forKey: viewNodeID)
     }
 
     // Apply interpolated values for in-tree animations.
@@ -1331,7 +1373,7 @@ package final class AnimationController: Sendable {
   /// or the view tree is completely reset.
   ///
   /// Clears every stored field so no stale state leaks across a reset —
-  /// leaving `removingIdentities` or `previousTreeRoot` alive would cause
+  /// leaving `removingNodes` or `previousTreeRoot` alive would cause
   /// the next tick after reset to try to re-inject a subtree from a
   /// previous-generation tree.
   package func reset() {
@@ -1347,10 +1389,13 @@ package final class AnimationController: Sendable {
     completionClosures.removeAll(keepingCapacity: true)
     batchRefCounts.removeAll(keepingCapacity: true)
     pendingEmptyBatchCompletions.removeAll(keepingCapacity: true)
-    transitionsByIdentity.removeAll(keepingCapacity: true)
-    previousTransitionsByIdentity.removeAll(keepingCapacity: true)
-    pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
-    removingIdentities.removeAll(keepingCapacity: true)
+    transitionsByNodeID.removeAll(keepingCapacity: true)
+    transitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
+    previousTransitionsByNodeID.removeAll(keepingCapacity: true)
+    previousTransitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
+    pendingTransitionsByNodeID.removeAll(keepingCapacity: true)
+    pendingTransitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
+    removingNodes.removeAll(keepingCapacity: true)
     previousIdentities.removeAll(keepingCapacity: true)
     lastTickResult = .init()
     isFrameHeadTransactionActive = false
@@ -1425,8 +1470,18 @@ extension AnimationController: TransitionRegistrationSink {
     for identity: Identity,
     transition: any Sendable
   ) {
+    registerTransition(for: identity, viewNodeID: nil, transition: transition)
+  }
+
+  package func registerTransition(
+    for identity: Identity,
+    viewNodeID: ViewNodeID?,
+    transition: any Sendable
+  ) {
+    guard let viewNodeID else { return }
     if let anyTransition = transition as? AnyTransition {
-      pendingTransitionsByIdentity[identity] = anyTransition
+      pendingTransitionsByNodeID[viewNodeID] = anyTransition
+      pendingTransitionIdentitiesByNodeID[viewNodeID] = identity
     }
   }
 }

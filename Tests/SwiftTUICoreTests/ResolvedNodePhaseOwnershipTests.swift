@@ -16,6 +16,7 @@ struct ResolvedNodePhaseOwnershipTests {
 }
 
 private enum ResolvedNodePhaseOwnership: String {
+  case runtime
   case identity
   case structure
   case measurement
@@ -33,7 +34,13 @@ private enum ResolvedNodePhaseOwnership: String {
 // owner here before relying on later pipeline products to mirror or ignore it.
 private let resolvedNodePhaseOwnershipManifest:
   [(field: String, owner: ResolvedNodePhaseOwnership)] = [
+    ("viewNodeID", .runtime),
     ("identity", .identity),
+    ("structuralPath", .structure),
+    ("structuralEdgeRole", .structure),
+    ("entityIdentity", .identity),
+    ("entityStructuralPath", .structure),
+    ("declarationOwnerEdge", .structure),
     ("kind", .structure),
     ("typeDiscriminator", .structure),
     ("_storedChildren", .structure),

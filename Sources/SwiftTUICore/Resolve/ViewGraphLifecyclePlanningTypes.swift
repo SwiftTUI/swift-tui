@@ -8,16 +8,17 @@
 /// bookkeeping the graph carries forward to the next frame.
 struct ViewGraphFrameLifecycleEventPlan {
   var events: [LifecycleEvent]
-  var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
-  var viewportLifecycleOrder: [Identity]
+  var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
+  var viewportLifecycleOrder: [ViewportLifecycleKey]
 }
 
 /// Everything the planner needs to derive a frame's lifecycle event plan:
 /// prior viewport-lifecycle state, this frame's change handlers, and the
 /// already-collected stable and structural event streams.
 struct ViewGraphLifecyclePlanningInput {
-  var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
-  var viewportLifecycleOrder: [Identity]
+  var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
+  var viewportLifecycleOrder: [ViewportLifecycleKey]
+  var nodeIDByIdentity: [Identity: ViewNodeID]
   var changeHandlerIDsByIdentity: [(identity: Identity, handlerIDs: [String])]
   var stableTaskCancelEvents: [LifecycleEvent]
   var stableTaskStartEvents: [LifecycleEvent]

@@ -2,10 +2,14 @@ extension ViewGraph {
   package func makeCheckpoint() -> Checkpoint {
     return Checkpoint(
       root: root,
-      nodesByIdentity: nodesByIdentity,
+      nodesByNodeID: nodesByNodeID,
+      nodeIDByIdentity: nodeIDByIdentity,
+      identityByNodeID: identityByNodeID,
+      nodeIDsByStructuralPath: nodeIDsByStructuralPath,
+      nextViewNodeIDRawValue: nextViewNodeIDRawValue,
       rootEvaluator: rootEvaluator,
       evaluationRootIdentity: evaluationRootIdentity,
-      viewportLifecycleNodesByIdentity: viewportLifecycleNodesByIdentity,
+      viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
       viewportLifecycleOrder: viewportLifecycleOrder,
       frameOrder: frameOrder,
       stableTaskCancelEvents: stableTaskCancelEvents,
@@ -13,35 +17,38 @@ extension ViewGraph {
       structuralAppearEvents: structuralAppearEvents,
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
-      invalidatedIdentities: invalidatedIdentities,
-      graphLocalDirtyIdentities: graphLocalDirtyIdentities,
+      requiresRootEvaluation: requiresRootEvaluation,
+      invalidatedNodeIDs: invalidatedNodeIDs,
+      graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
       latestLifecycleEvents: latestLifecycleEvents,
       stateMutationKeys: stateMutationKeys,
-      registrationAliasesByIdentity: registrationAliasesByIdentity,
-      registrationAliasTargets: registrationAliasTargets,
-      registrationAliasDiagnostics: registrationAliasDiagnostics,
-      lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity,
+      stateMutationNodeIDsByKey: stateMutationNodeIDsByKey,
+      lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
       lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
       lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
-      taskDescriptorIdentitySlots: taskDescriptorIdentitySlots,
+      taskDescriptorNodeSlots: taskDescriptorNodeSlots,
       nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
       stateSlotDependents: stateSlotDependents,
       environmentDependents: environmentDependents,
       observableDependents: observableDependents,
       currentFrameID: currentFrameID,
-      liveIdentities: liveIdentities,
+      liveNodeIDs: liveNodeIDs,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(
-        nodesByIdentity
+        nodesByNodeID
       )
     )
   }
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     root = checkpoint.root
-    nodesByIdentity = checkpoint.nodesByIdentity
+    nodesByNodeID = checkpoint.nodesByNodeID
+    nodeIDByIdentity = checkpoint.nodeIDByIdentity
+    identityByNodeID = checkpoint.identityByNodeID
+    nodeIDsByStructuralPath = checkpoint.nodeIDsByStructuralPath
+    nextViewNodeIDRawValue = checkpoint.nextViewNodeIDRawValue
     rootEvaluator = checkpoint.rootEvaluator
     evaluationRootIdentity = checkpoint.evaluationRootIdentity
-    viewportLifecycleNodesByIdentity = checkpoint.viewportLifecycleNodesByIdentity
+    viewportLifecycleNodesByKey = checkpoint.viewportLifecycleNodesByKey
     viewportLifecycleOrder = checkpoint.viewportLifecycleOrder
     frameOrder = checkpoint.frameOrder
     stableTaskCancelEvents = checkpoint.stableTaskCancelEvents
@@ -49,27 +56,26 @@ extension ViewGraph {
     structuralAppearEvents = checkpoint.structuralAppearEvents
     structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
     structuralDisappearEvents = checkpoint.structuralDisappearEvents
-    invalidatedIdentities = checkpoint.invalidatedIdentities
-    graphLocalDirtyIdentities = checkpoint.graphLocalDirtyIdentities
+    requiresRootEvaluation = checkpoint.requiresRootEvaluation
+    invalidatedNodeIDs = checkpoint.invalidatedNodeIDs
+    graphLocalDirtyNodeIDs = checkpoint.graphLocalDirtyNodeIDs
     latestLifecycleEvents = checkpoint.latestLifecycleEvents
     stateMutationKeys = checkpoint.stateMutationKeys
-    registrationAliasesByIdentity = checkpoint.registrationAliasesByIdentity
-    registrationAliasTargets = checkpoint.registrationAliasTargets
-    registrationAliasDiagnostics = checkpoint.registrationAliasDiagnostics
-    lifecycleEvaluationOwnersByIdentity = checkpoint.lifecycleEvaluationOwnersByIdentity
+    stateMutationNodeIDsByKey = checkpoint.stateMutationNodeIDsByKey
+    lifecycleEvaluationOwnersByNodeID = checkpoint.lifecycleEvaluationOwnersByNodeID
     lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
     lifecycleEvaluationTargetsRecordedByOwner = checkpoint.lifecycleEvaluationTargetsRecordedByOwner
-    taskDescriptorIdentitySlots = checkpoint.taskDescriptorIdentitySlots
+    taskDescriptorNodeSlots = checkpoint.taskDescriptorNodeSlots
     nextTaskDescriptorIdentityToken = checkpoint.nextTaskDescriptorIdentityToken
     stateSlotDependents = checkpoint.stateSlotDependents
     environmentDependents = checkpoint.environmentDependents
     observableDependents = checkpoint.observableDependents
     currentFrameID = checkpoint.currentFrameID
-    liveIdentities = checkpoint.liveIdentities
+    liveNodeIDs = checkpoint.liveNodeIDs
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
-      nodesByIdentity: checkpoint.nodesByIdentity
+      nodesByNodeID: checkpoint.nodesByNodeID
     )
   }
 }
@@ -83,59 +89,186 @@ package final class ViewGraph {
   // escapes checkpoint coverage.
   package private(set) var root: ViewNode?
 
-  private var nodesByIdentity: [Identity: ViewNode]
+  private var nodesByNodeID: [ViewNodeID: ViewNode]
+  private var nodeIDByIdentity: [Identity: ViewNodeID]
+  private var identityByNodeID: [ViewNodeID: Identity]
+  private var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
+  private var nextViewNodeIDRawValue: UInt64
   private var rootEvaluator: (@MainActor () -> Void)?
   private var evaluationRootIdentity: Identity?
-  private var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
-  private var viewportLifecycleOrder: [Identity]
-  private var frameOrder: [Identity]
+  private var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
+  private var viewportLifecycleOrder: [ViewportLifecycleKey]
+  private var frameOrder: [ViewNodeID]
   private var stableTaskCancelEvents: [LifecycleEvent]
   private var stableTaskStartEvents: [LifecycleEvent]
   private var structuralAppearEvents: [LifecycleEvent]
   private var structuralTaskCancelEvents: [LifecycleEvent]
   private var structuralDisappearEvents: [LifecycleEvent]
-  private var invalidatedIdentities: Set<Identity>
-  private var graphLocalDirtyIdentities: Set<Identity>
+  private var requiresRootEvaluation: Bool
+  private var invalidatedNodeIDs: Set<ViewNodeID>
+  private var graphLocalDirtyNodeIDs: Set<ViewNodeID>
   private var latestLifecycleEvents: [LifecycleEvent]
   private var stateMutationKeys: Set<StateSlotKey>
-  private var registrationAliasesByIdentity: [Identity: Set<Identity>]
-  private var registrationAliasTargets: [Identity: Identity]
-  private var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
-  private var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
-  private var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
-  private var taskDescriptorIdentitySlots: [Identity: TaskDescriptorIdentitySlot]
+  private var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
+  private var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
+  private var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
+  private var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]
+  private var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot]
   private var nextTaskDescriptorIdentityToken: UInt64
-  /// Instrumentation that tracks non-trivial `recordRegistrationAlias`
-  /// calls so the alias layer's
-  /// actual workload can be measured against the architecture doc's
-  /// hypothesis that divergences come from a small, enumerable set of
-  /// view patterns.  Always on, bounded memory — safe to leave enabled
-  /// in production.
-  package private(set) var registrationAliasDiagnostics: RegistrationAliasDiagnostics
-  private var stateSlotDependents: [StateSlotKey: Set<Identity>]
-  private var environmentDependents: [ObjectIdentifier: Set<Identity>]
-  private var observableDependents: [ObjectIdentifier: Set<Identity>]
+  private var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
+  private var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>]
+  private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
   private var currentFrameID: UInt64
-  private var liveIdentities: Set<Identity>
+  private var liveNodeIDs: Set<ViewNodeID>
+
+  private var nodesByIdentity: [Identity: ViewNode] {
+    Dictionary(
+      uniqueKeysWithValues: nodeIDByIdentity.compactMap { identity, viewNodeID in
+        guard let node = nodesByNodeID[viewNodeID] else {
+          return nil
+        }
+        return (identity, node)
+      }
+    )
+  }
+
+  private func nodeIfExists(
+    for identity: Identity
+  ) -> ViewNode? {
+    guard let viewNodeID = nodeIDByIdentity[identity] else {
+      return nil
+    }
+    return nodesByNodeID[viewNodeID]
+  }
+
+  private func nodeIfExists(
+    for viewNodeID: ViewNodeID
+  ) -> ViewNode? {
+    nodesByNodeID[viewNodeID]
+  }
+
+  private func nodeForResolvedNode(
+    _ resolved: ResolvedNode
+  ) -> ViewNode {
+    if let viewNodeID = resolved.viewNodeID,
+      let node = nodeIfExists(for: viewNodeID)
+    {
+      return node
+    }
+    return nodeForIdentity(for: resolved.identity)
+  }
+
+  private func nodeIDsForResolvedNode(
+    _ resolved: ResolvedNode
+  ) -> Set<ViewNodeID> {
+    var viewNodeIDs = nodeIDsByStructuralPath[resolved.structuralPath] ?? []
+    if let viewNodeID = resolved.viewNodeID {
+      viewNodeIDs.insert(viewNodeID)
+    }
+    return viewNodeIDs
+  }
+
+  private func viewNodeID(
+    for identity: Identity
+  ) -> ViewNodeID? {
+    nodeIDByIdentity[identity]
+  }
+
+  private func identities(
+    for viewNodeIDs: Set<ViewNodeID>
+  ) -> Set<Identity> {
+    Set(viewNodeIDs.compactMap { identityByNodeID[$0] })
+  }
+
+  private func nodeIDs(
+    for identities: Set<Identity>
+  ) -> Set<ViewNodeID> {
+    Set(identities.compactMap { nodeIDByIdentity[$0] })
+  }
+
+  private func applyResolvedNode(
+    _ node: ViewNode,
+    resolved: ResolvedNode,
+    children: [ViewNode]
+  ) {
+    let previousStructuralPath = node.committed.structuralPath
+    let previousResolvedIdentity = node.resolvedIdentity
+    node.apply(
+      resolved: resolved,
+      children: children
+    )
+    reindexIdentity(
+      for: node,
+      previousResolvedIdentity: previousResolvedIdentity
+    )
+    reindexStructuralPath(
+      for: node,
+      previous: previousStructuralPath
+    )
+  }
+
+  private func reindexIdentity(
+    for node: ViewNode,
+    previousResolvedIdentity: Identity
+  ) {
+    if previousResolvedIdentity != node.identity,
+      previousResolvedIdentity != node.resolvedIdentity,
+      nodeIDByIdentity[previousResolvedIdentity] == node.viewNodeID
+    {
+      nodeIDByIdentity.removeValue(forKey: previousResolvedIdentity)
+    }
+    nodeIDByIdentity[node.identity] = node.viewNodeID
+    nodeIDByIdentity[node.resolvedIdentity] = node.viewNodeID
+    identityByNodeID[node.viewNodeID] = node.resolvedIdentity
+  }
+
+  private func reindexStructuralPath(
+    for node: ViewNode,
+    previous: StructuralPath
+  ) {
+    if previous != node.committed.structuralPath {
+      nodeIDsByStructuralPath[previous]?.remove(node.viewNodeID)
+      if nodeIDsByStructuralPath[previous]?.isEmpty == true {
+        nodeIDsByStructuralPath.removeValue(forKey: previous)
+      }
+    }
+    nodeIDsByStructuralPath[node.committed.structuralPath, default: []].insert(
+      node.viewNodeID
+    )
+  }
+
+  private func nodeIDsForInvalidation(
+    _ identities: Set<Identity>
+  ) -> Set<ViewNodeID> {
+    let viewNodeIDs = nodeIDs(for: identities)
+    if viewNodeIDs.count != identities.count {
+      requiresRootEvaluation = true
+    }
+    return viewNodeIDs
+  }
 
   /// Occupancy reading for the profiling memory signal. Computed, so it stays
   /// outside the checkpoint totality contract above.
   package var memoryMetricSnapshot: MemoryMetricSnapshot {
     MemoryMetricSnapshot(
       name: "ViewGraph.nodesByIdentity",
-      count: nodesByIdentity.count,
+      count: nodesByNodeID.count,
       detail: [
-        "liveIdentities": liveIdentities.count,
-        "invalidatedIdentities": invalidatedIdentities.count,
+        "liveNodeIDs": liveNodeIDs.count,
+        "invalidatedNodeIDs": invalidatedNodeIDs.count,
       ]
     )
   }
 
   package init() {
-    nodesByIdentity = [:]
+    nodesByNodeID = [:]
+    nodeIDByIdentity = [:]
+    identityByNodeID = [:]
+    nodeIDsByStructuralPath = [:]
+    nextViewNodeIDRawValue = 0
     rootEvaluator = nil
     evaluationRootIdentity = nil
-    viewportLifecycleNodesByIdentity = [:]
+    viewportLifecycleNodesByKey = [:]
     viewportLifecycleOrder = []
     frameOrder = []
     stableTaskCancelEvents = []
@@ -143,34 +276,37 @@ package final class ViewGraph {
     structuralAppearEvents = []
     structuralTaskCancelEvents = []
     structuralDisappearEvents = []
-    invalidatedIdentities = []
-    graphLocalDirtyIdentities = []
+    requiresRootEvaluation = false
+    invalidatedNodeIDs = []
+    graphLocalDirtyNodeIDs = []
     latestLifecycleEvents = []
     stateMutationKeys = []
-    registrationAliasesByIdentity = [:]
-    registrationAliasTargets = [:]
-    lifecycleEvaluationOwnersByIdentity = [:]
+    stateMutationNodeIDsByKey = [:]
+    lifecycleEvaluationOwnersByNodeID = [:]
     lifecycleEvaluationTargetsByOwner = [:]
     lifecycleEvaluationTargetsRecordedByOwner = [:]
-    taskDescriptorIdentitySlots = [:]
+    taskDescriptorNodeSlots = [:]
     nextTaskDescriptorIdentityToken = 0
-    registrationAliasDiagnostics = .init()
     stateSlotDependents = [:]
     environmentDependents = [:]
     observableDependents = [:]
     currentFrameID = 0
-    liveIdentities = []
+    liveNodeIDs = []
   }
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
     DebugTotalStateSnapshot(
       root: root?.identity,
-      nodesByIdentity: nodesByIdentity.mapValues { node in
+      nodesByNodeID: nodesByNodeID.mapValues { node in
         node.debugTotalStateSnapshot()
       },
+      nodeIDByIdentity: nodeIDByIdentity,
+      identityByNodeID: identityByNodeID,
+      nodeIDsByStructuralPath: nodeIDsByStructuralPath,
+      nextViewNodeIDRawValue: nextViewNodeIDRawValue,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
-      viewportLifecycleNodesByIdentity: viewportLifecycleNodesByIdentity,
+      viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
       viewportLifecycleOrder: viewportLifecycleOrder,
       frameOrder: frameOrder,
       stableTaskCancelEvents: stableTaskCancelEvents,
@@ -178,31 +314,30 @@ package final class ViewGraph {
       structuralAppearEvents: structuralAppearEvents,
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
-      invalidatedIdentities: invalidatedIdentities,
-      graphLocalDirtyIdentities: graphLocalDirtyIdentities,
+      requiresRootEvaluation: requiresRootEvaluation,
+      invalidatedNodeIDs: invalidatedNodeIDs,
+      graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
       latestLifecycleEvents: latestLifecycleEvents,
       stateMutationKeys: stateMutationKeys,
-      registrationAliasesByIdentity: registrationAliasesByIdentity,
-      registrationAliasTargets: registrationAliasTargets,
-      lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity,
+      stateMutationNodeIDsByKey: stateMutationNodeIDsByKey,
+      lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
       lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
       lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
-      taskDescriptorIdentitySlots: taskDescriptorIdentitySlots.mapValues(\.label),
+      taskDescriptorNodeSlots: taskDescriptorNodeSlots.mapValues(\.label),
       nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
-      registrationAliasDiagnostics: registrationAliasDiagnostics,
       stateSlotDependents: stateSlotDependents,
       environmentDependents: debugObjectDependencySnapshot(environmentDependents),
       observableDependents: debugObjectDependencySnapshot(observableDependents),
       currentFrameID: currentFrameID,
-      liveIdentities: liveIdentities
+      liveNodeIDs: liveNodeIDs
     )
   }
 
   package func invalidate(_ identities: Set<Identity>) {
     ViewGraphInvalidationPlanner.invalidate(
-      identities,
-      invalidatedIdentities: &invalidatedIdentities,
-      nodesByIdentity: nodesByIdentity
+      nodeIDsForInvalidation(identities),
+      invalidatedNodeIDs: &invalidatedNodeIDs,
+      nodesByNodeID: nodesByNodeID
     )
   }
 
@@ -212,13 +347,13 @@ package final class ViewGraph {
   /// to reach into per-node state slot storage without triggering
   /// invalidation.
   package func nodeForIdentity(_ identity: Identity) -> ViewNode? {
-    nodesByIdentity[identity]
+    nodeIfExists(for: identity)
   }
 
   package func containsNode(
     for identity: Identity
   ) -> Bool {
-    nodesByIdentity[identity] != nil
+    nodeIfExists(for: identity) != nil
   }
 
   /// Invalidates identities AND queues them as graph-local dirty so that
@@ -227,10 +362,10 @@ package final class ViewGraph {
   /// with existing graph nodes are queued.
   package func invalidateAndQueueDirty(_ identities: Set<Identity>) {
     ViewGraphInvalidationPlanner.invalidateAndQueueDirty(
-      identities,
-      invalidatedIdentities: &invalidatedIdentities,
-      graphLocalDirtyIdentities: &graphLocalDirtyIdentities,
-      nodesByIdentity: nodesByIdentity
+      nodeIDsForInvalidation(identities),
+      invalidatedNodeIDs: &invalidatedNodeIDs,
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
     )
   }
 
@@ -238,41 +373,74 @@ package final class ViewGraph {
     _ identities: Set<Identity>
   ) {
     ViewGraphInvalidationPlanner.queueDirty(
-      identities,
-      graphLocalDirtyIdentities: &graphLocalDirtyIdentities,
-      nodesByIdentity: nodesByIdentity
+      nodeIDsForInvalidation(identities),
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
     )
   }
 
   package func queueDirtyForStateChange(
     _ key: StateSlotKey
   ) {
+    let ownerNodeID = viewNodeID(for: key.identity)
     stateMutationKeys.insert(key)
-    queueDirty(
-      ViewGraphInvalidationPlanner.stateChangeDirtyIdentities(
+    if let ownerNodeID {
+      stateMutationNodeIDsByKey[key, default: []].insert(ownerNodeID)
+    }
+    ViewGraphInvalidationPlanner.queueDirty(
+      ViewGraphInvalidationPlanner.stateChangeDirtyNodeIDs(
         for: key,
+        ownerNodeID: ownerNodeID,
         stateSlotDependents: stateSlotDependents
-      )
+      ),
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
     )
   }
 
   package func stateMutationOverlay() -> StateMutationOverlay {
-    var stateSlots: [StateSlotKey: AnyStateSlot] = [:]
+    var stateSlots: [StateMutationSlotKey: AnyStateSlot] = [:]
     for key in stateMutationKeys {
-      guard
-        let slot = nodesByIdentity[key.identity]?.stateSlotStorage(
+      var capturedSlot = false
+      for viewNodeID in stateMutationNodeIDsByKey[key] ?? [] {
+        guard
+          let slot = nodeIfExists(for: viewNodeID)?.stateSlotStorage(
+            ordinal: key.ordinal
+          )
+        else {
+          continue
+        }
+        stateSlots[
+          StateMutationSlotKey(
+            viewNodeID: viewNodeID,
+            identity: key.identity,
+            ordinal: key.ordinal
+          )
+        ] = slot
+        capturedSlot = true
+      }
+      guard !capturedSlot,
+        let slot = nodeIfExists(for: key.identity)?.stateSlotStorage(
           ordinal: key.ordinal
         )
       else {
         continue
       }
-      stateSlots[key] = slot
+      stateSlots[
+        StateMutationSlotKey(
+          viewNodeID: nil,
+          identity: key.identity,
+          ordinal: key.ordinal
+        )
+      ] = slot
     }
     return StateMutationOverlay(
       stateSlots: stateSlots,
-      invalidatedIdentities: invalidatedIdentities,
-      graphLocalDirtyIdentities: graphLocalDirtyIdentities,
-      stateMutationKeys: stateMutationKeys
+      requiresRootEvaluation: requiresRootEvaluation,
+      invalidatedNodeIDs: invalidatedNodeIDs,
+      graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
+      stateMutationKeys: stateMutationKeys,
+      stateMutationNodeIDsByKey: stateMutationNodeIDsByKey
     )
   }
 
@@ -280,52 +448,69 @@ package final class ViewGraph {
     _ overlay: StateMutationOverlay
   ) {
     for (key, slot) in overlay.stateSlots {
-      guard let node = nodesByIdentity[key.identity] else {
+      let node =
+        key.viewNodeID.flatMap { nodeIfExists(for: $0) }
+        ?? nodeIfExists(for: key.identity)
+      guard let node else {
         continue
       }
       node.restoreStateSlot(ordinal: key.ordinal, slot: slot)
       node.markDirty()
     }
-    invalidatedIdentities.formUnion(overlay.invalidatedIdentities)
-    graphLocalDirtyIdentities.formUnion(overlay.graphLocalDirtyIdentities)
+    requiresRootEvaluation = requiresRootEvaluation || overlay.requiresRootEvaluation
+    invalidatedNodeIDs.formUnion(overlay.invalidatedNodeIDs)
+    graphLocalDirtyNodeIDs.formUnion(overlay.graphLocalDirtyNodeIDs)
     stateMutationKeys.formUnion(overlay.stateMutationKeys)
+    for (key, viewNodeIDs) in overlay.stateMutationNodeIDsByKey {
+      stateMutationNodeIDsByKey[key, default: []].formUnion(viewNodeIDs)
+    }
   }
 
   package func queueDirtyForObservationChange(
     observedBy identity: Identity
   ) {
-    let dirtyIdentities =
-      ViewGraphInvalidationPlanner.observationChangeDirtyIdentities(
-        observedBy: identity,
-        nodesByIdentity: nodesByIdentity,
+    guard let viewNodeID = viewNodeID(for: identity) else {
+      return
+    }
+    ViewGraphInvalidationPlanner.queueDirty(
+      ViewGraphInvalidationPlanner.observationChangeDirtyNodeIDs(
+        observedBy: viewNodeID,
+        nodesByNodeID: nodesByNodeID,
         observableDependents: observableDependents
-      )
-    queueDirty(dirtyIdentities)
+      ),
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
+    )
   }
 
   package func invalidateEnvironmentReaders(
     within identities: Set<Identity>,
     changedKeys: Set<ObjectIdentifier>
   ) {
-    let dirtyIdentities = ViewGraphInvalidationPlanner.environmentReaderDirtyIdentities(
+    let dirtyNodeIDs = ViewGraphInvalidationPlanner.environmentReaderDirtyNodeIDs(
       within: identities,
       changedKeys: changedKeys,
-      environmentDependents: environmentDependents
+      environmentDependents: environmentDependents,
+      identityByNodeID: identityByNodeID
     )
-    guard !dirtyIdentities.isEmpty else {
+    guard !dirtyNodeIDs.isEmpty else {
       invalidate(identities)
       return
     }
 
-    invalidatedIdentities.formUnion(dirtyIdentities)
-    queueDirty(dirtyIdentities)
+    invalidatedNodeIDs.formUnion(dirtyNodeIDs)
+    ViewGraphInvalidationPlanner.queueDirty(
+      dirtyNodeIDs,
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
+    )
   }
 
   package func environmentDependentIdentities(
     for changedKeys: Set<ObjectIdentifier>
   ) -> Set<Identity> {
     changedKeys.reduce(into: Set<Identity>()) { partial, key in
-      partial.formUnion(environmentDependents[key] ?? [])
+      partial.formUnion(identities(for: environmentDependents[key] ?? []))
     }
   }
 
@@ -344,60 +529,29 @@ package final class ViewGraph {
     nodeForIdentity(for: identity).setEvaluator(evaluate)
   }
 
-  package func recordRegistrationAlias(
-    from aliasIdentity: Identity,
-    to identity: Identity,
-    resolvedKind: NodeKind
-  ) {
-    if let previousTarget = registrationAliasTargets[aliasIdentity],
-      previousTarget != identity
-    {
-      registrationAliasesByIdentity[previousTarget]?.remove(aliasIdentity)
-      if registrationAliasesByIdentity[previousTarget]?.isEmpty == true {
-        registrationAliasesByIdentity.removeValue(forKey: previousTarget)
-      }
-    }
-
-    if aliasIdentity == identity {
-      registrationAliasTargets.removeValue(forKey: aliasIdentity)
-      registrationAliasesByIdentity[identity]?.remove(aliasIdentity)
-      if registrationAliasesByIdentity[identity]?.isEmpty == true {
-        registrationAliasesByIdentity.removeValue(forKey: identity)
-      }
-      return
-    }
-
-    // Instrumentation for Item 7: record the divergence so the alias
-    // layer's actual workload is observable.  This is the only place
-    // in the codebase that reaches the "from != to" branch, so it's
-    // the authoritative point of measurement.
-    registrationAliasDiagnostics.record(
-      from: aliasIdentity,
-      to: identity,
-      resolvedKind: resolvedKind
-    )
-
-    registrationAliasTargets[aliasIdentity] = identity
-    registrationAliasesByIdentity[identity, default: []].insert(aliasIdentity)
-  }
-
   package func recordLifecycleEvaluationOwner(
     target targetIdentity: Identity,
     owner ownerIdentity: Identity
   ) {
-    if let previousOwner = lifecycleEvaluationOwnersByIdentity[targetIdentity],
-      previousOwner != ownerIdentity
+    guard
+      let targetNodeID = viewNodeID(for: targetIdentity),
+      let ownerNodeID = viewNodeID(for: ownerIdentity)
+    else {
+      return
+    }
+    if let previousOwner = lifecycleEvaluationOwnersByNodeID[targetNodeID],
+      previousOwner != ownerNodeID
     {
-      lifecycleEvaluationTargetsByOwner[previousOwner]?.remove(targetIdentity)
+      lifecycleEvaluationTargetsByOwner[previousOwner]?.remove(targetNodeID)
       if lifecycleEvaluationTargetsByOwner[previousOwner]?.isEmpty == true {
         lifecycleEvaluationTargetsByOwner.removeValue(forKey: previousOwner)
       }
     }
 
-    lifecycleEvaluationOwnersByIdentity[targetIdentity] = ownerIdentity
-    lifecycleEvaluationTargetsByOwner[ownerIdentity, default: []].insert(targetIdentity)
-    if lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity] != nil {
-      lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity, default: []].insert(targetIdentity)
+    lifecycleEvaluationOwnersByNodeID[targetNodeID] = ownerNodeID
+    lifecycleEvaluationTargetsByOwner[ownerNodeID, default: []].insert(targetNodeID)
+    if lifecycleEvaluationTargetsRecordedByOwner[ownerNodeID] != nil {
+      lifecycleEvaluationTargetsRecordedByOwner[ownerNodeID, default: []].insert(targetNodeID)
     }
   }
 
@@ -405,7 +559,18 @@ package final class ViewGraph {
     for identity: Identity,
     value: ID
   ) -> String {
-    if let slot = taskDescriptorIdentitySlots[identity],
+    let viewNodeID = nodeForIdentity(for: identity).viewNodeID
+    return taskDescriptorIdentityLabel(
+      for: viewNodeID,
+      value: value
+    )
+  }
+
+  package func taskDescriptorIdentityLabel<ID: Equatable>(
+    for viewNodeID: ViewNodeID,
+    value: ID
+  ) -> String {
+    if let slot = taskDescriptorNodeSlots[viewNodeID],
       slot.matches(value)
     {
       return slot.label
@@ -413,7 +578,7 @@ package final class ViewGraph {
 
     nextTaskDescriptorIdentityToken &+= 1
     let label = "id:\(nextTaskDescriptorIdentityToken)"
-    taskDescriptorIdentitySlots[identity] = TaskDescriptorIdentitySlot(
+    taskDescriptorNodeSlots[viewNodeID] = TaskDescriptorIdentitySlot(
       label: label,
       value: value
     )
@@ -421,14 +586,17 @@ package final class ViewGraph {
   }
 
   package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {
+    guard !requiresRootEvaluation else {
+      return nil
+    }
     guard
       let targetPlan = ViewGraphDirtyEvaluationPlanner.targetPlan(
         input: ViewGraphDirtyEvaluationPlanningInput(
           hasRoot: root != nil,
-          invalidatedIdentities: invalidatedIdentities,
-          graphLocalDirtyIdentities: graphLocalDirtyIdentities,
-          nodesByIdentity: nodesByIdentity,
-          lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity
+          invalidatedNodeIDs: invalidatedNodeIDs,
+          graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
+          nodesByNodeID: nodesByNodeID,
+          lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
         )
       )
     else {
@@ -446,13 +614,14 @@ package final class ViewGraph {
     }
 
     return DirtyEvaluationPlan(
+      frontierNodeIDs: targetPlan.targetNodes.map(\.viewNodeID),
       frontierIdentities: targetPlan.targetNodes.map(\.identity)
     )
   }
 
   /// Whether any identities are dirty and need evaluation this frame.
   package var hasDirtyWork: Bool {
-    !invalidatedIdentities.isEmpty || !graphLocalDirtyIdentities.isEmpty
+    requiresRootEvaluation || !invalidatedNodeIDs.isEmpty || !graphLocalDirtyNodeIDs.isEmpty
   }
 
   package func evaluateDirtyNodes(
@@ -461,16 +630,16 @@ package final class ViewGraph {
     guard let plan = plan ?? selectiveDirtyEvaluationPlan() else {
       rootEvaluator?()
       if let evaluationRootIdentity {
-        root = nodesByIdentity[evaluationRootIdentity]
+        root = nodeIfExists(for: evaluationRootIdentity)
       }
       return false
     }
 
-    for identity in plan.frontierIdentities {
-      nodesByIdentity[identity]?.evaluate()
+    for viewNodeID in plan.frontierNodeIDs {
+      nodesByNodeID[viewNodeID]?.evaluate()
     }
     if let evaluationRootIdentity {
-      root = nodesByIdentity[evaluationRootIdentity]
+      root = nodeIfExists(for: evaluationRootIdentity)
     }
     return true
   }
@@ -494,7 +663,7 @@ package final class ViewGraph {
     let node = nodeForIdentity(for: identity)
     node.prepareForFrame(currentFrameID)
     if !node.wasVisitedThisFrame {
-      frameOrder.append(identity)
+      frameOrder.append(node.viewNodeID)
     }
     node.beginEvaluation(
       frameID: currentFrameID,
@@ -502,7 +671,7 @@ package final class ViewGraph {
       suppressesStructuralLifecycle: suppressesStructuralLifecycle
     )
     if node.isAtOutermostEvaluationDepth {
-      lifecycleEvaluationTargetsRecordedByOwner[identity] = []
+      lifecycleEvaluationTargetsRecordedByOwner[node.viewNodeID] = []
     }
     return node
   }
@@ -511,18 +680,19 @@ package final class ViewGraph {
     _ suppressesStructuralLifecycle: Bool,
     for identity: Identity
   ) {
-    nodesByIdentity[identity]?.setSuppressesStructuralLifecycle(suppressesStructuralLifecycle)
+    nodeIfExists(for: identity)?.setSuppressesStructuralLifecycle(suppressesStructuralLifecycle)
   }
 
+  @discardableResult
   package func finishEvaluation(
     _ node: ViewNode,
     resolved: ResolvedNode,
     accessedStateSlots: Int
-  ) {
+  ) -> ResolvedNode? {
     let previousDependencies = node.dependencies
     let previousResolvedIdentity = node.resolvedIdentity
     guard node.finishEvaluation(accessedStateSlots: accessedStateSlots) else {
-      return
+      return nil
     }
 
     let resolved = resolvedPreservingLayoutDependentChildren(
@@ -534,14 +704,13 @@ package final class ViewGraph {
       replacedBy: resolved.identity,
       for: node
     )
-    let childNodes = resolved.children.map { child in
-      nodeForIdentity(for: child.identity)
-    }
+    let childNodes = resolved.children.map(nodeForResolvedNode)
     applyStructuralChildDiff(
       for: node,
       resolved: resolved
     )
-    node.apply(
+    applyResolvedNode(
+      node,
       resolved: resolved,
       children: childNodes
     )
@@ -551,21 +720,28 @@ package final class ViewGraph {
     )
 
     let emitsOwnLifecycleEvents = nodeEmitsOwnLifecycleEvents(node)
+    let didChangeResolvedIdentity = previousResolvedIdentity != node.resolvedIdentity
 
     if node.wasPresentAtFrameStart {
       if let previousTask = node.previousLifecycleMetadata.task,
         previousTask != node.lifecycleMetadata.task,
         emitsOwnLifecycleEvents
       {
-        appendTaskCancelEvent(
-          identity: previousResolvedIdentity,
-          task: previousTask,
-          isStructural: false
-        )
+        let removedTaskAcrossResolvedIdentityChange =
+          didChangeResolvedIdentity && node.lifecycleMetadata.task == nil
+        if !didChangeResolvedIdentity || removedTaskAcrossResolvedIdentityChange {
+          appendTaskCancelEvent(
+            identity: removedTaskAcrossResolvedIdentityChange
+              ? node.resolvedIdentity : previousResolvedIdentity,
+            task: previousTask,
+            isStructural: false
+          )
+        }
       }
       if let currentTask = node.lifecycleMetadata.task,
         currentTask != node.previousLifecycleMetadata.task,
-        emitsOwnLifecycleEvents
+        emitsOwnLifecycleEvents,
+        !didChangeResolvedIdentity
       {
         appendTaskStartEvent(
           identity: node.resolvedIdentity,
@@ -595,26 +771,26 @@ package final class ViewGraph {
       node.setLifecycleState(.appearing)
     }
     pruneLifecycleEvaluationOwners(ownedBy: node.identity)
+    return node.committed
   }
 
   package func installLayoutDependentChildren(
     for identity: Identity,
     children: [ResolvedNode]
   ) {
-    guard let node = nodesByIdentity[identity] else {
+    guard let node = nodeIfExists(for: identity) else {
       return
     }
 
     var resolved = node.snapshot()
     resolved.children = children
-    let childNodes = children.map { child in
-      nodeForIdentity(for: child.identity)
-    }
+    let childNodes = children.map(nodeForResolvedNode)
     applyStructuralChildDiff(
       for: node,
       resolved: resolved
     )
-    node.apply(
+    applyResolvedNode(
+      node,
       resolved: resolved,
       children: childNodes
     )
@@ -624,7 +800,7 @@ package final class ViewGraph {
     for identity: Identity,
     children: [ResolvedNode]
   ) {
-    guard let node = nodesByIdentity[identity] else {
+    guard let node = nodeIfExists(for: identity) else {
       return
     }
 
@@ -634,6 +810,18 @@ package final class ViewGraph {
       for: node,
       resolved: resolved
     )
+  }
+
+  package func refreshResolvedMetadata(
+    for resolved: ResolvedNode
+  ) {
+    let node: ViewNode?
+    if let viewNodeID = resolved.viewNodeID {
+      node = nodeIfExists(for: viewNodeID)
+    } else {
+      node = nodeIfExists(for: resolved.identity)
+    }
+    node?.refreshResolvedMetadata(from: resolved)
   }
 
   private func resolvedPreservingLayoutDependentChildren(
@@ -663,7 +851,7 @@ package final class ViewGraph {
     guard previousResolvedIdentity != node.identity else {
       return
     }
-    guard let previousResolvedRoot = nodesByIdentity[previousResolvedIdentity] else {
+    guard let previousResolvedRoot = nodeIfExists(for: previousResolvedIdentity) else {
       return
     }
     guard previousResolvedRoot.parent == nil else {
@@ -678,7 +866,7 @@ package final class ViewGraph {
   package func pruneDetachedIdentitySubtree(
     rootedAt identity: Identity
   ) {
-    let staleNodes = nodesByIdentity.values
+    let staleNodes = nodesByNodeID.values
       .filter { node in
         node.prepareForFrame(currentFrameID)
         return (node.identity == identity || node.identity.isDescendant(of: identity))
@@ -693,7 +881,7 @@ package final class ViewGraph {
       }
 
     for node in staleNodes {
-      guard nodesByIdentity[node.identity] != nil else {
+      guard nodeIfExists(for: node.viewNodeID) != nil else {
         continue
       }
       removeSubtree(rootedAt: node)
@@ -705,13 +893,13 @@ package final class ViewGraph {
     invalidator: (any Invalidating)?,
     retained: Bool = false
   ) {
-    let node = nodeForIdentity(for: subtree.identity)
+    let node = nodeForResolvedNode(subtree)
     node.prepareForFrame(currentFrameID)
 
     if node.wasVisitedThisFrame {
       return
     }
-    frameOrder.append(subtree.identity)
+    frameOrder.append(node.viewNodeID)
     node.beginReuse(
       frameID: currentFrameID,
       invalidator: invalidator
@@ -727,7 +915,8 @@ package final class ViewGraph {
       // refresh only this root. The root's children are unchanged, so
       // `ViewNode.apply` takes its same-children fast path; the structural diff is
       // a no-op (no structural intersection) and is skipped with the recursion.
-      node.apply(
+      applyResolvedNode(
+        node,
         resolved: subtree,
         children: node.children
       )
@@ -737,18 +926,20 @@ package final class ViewGraph {
           child,
           invalidator: invalidator
         )
-        return nodeForIdentity(for: child.identity)
+        return nodeForResolvedNode(child)
       }
       applyStructuralChildDiff(
         for: node,
         resolved: subtree
       )
-      node.apply(
+      applyResolvedNode(
+        node,
         resolved: subtree,
         children: childNodes
       )
     }
     let emitsOwnLifecycleEvents = nodeEmitsOwnLifecycleEvents(node)
+    let didChangeResolvedIdentity = previousResolvedIdentity != node.resolvedIdentity
 
     if !node.wasPresentAtFrameStart {
       if emitsOwnLifecycleEvents,
@@ -775,15 +966,21 @@ package final class ViewGraph {
         previousTask != node.lifecycleMetadata.task,
         emitsOwnLifecycleEvents
       {
-        appendTaskCancelEvent(
-          identity: previousResolvedIdentity,
-          task: previousTask,
-          isStructural: false
-        )
+        let removedTaskAcrossResolvedIdentityChange =
+          didChangeResolvedIdentity && node.lifecycleMetadata.task == nil
+        if !didChangeResolvedIdentity || removedTaskAcrossResolvedIdentityChange {
+          appendTaskCancelEvent(
+            identity: removedTaskAcrossResolvedIdentityChange
+              ? node.resolvedIdentity : previousResolvedIdentity,
+            task: previousTask,
+            isStructural: false
+          )
+        }
       }
       if let currentTask = node.lifecycleMetadata.task,
         currentTask != node.previousLifecycleMetadata.task,
-        emitsOwnLifecycleEvents
+        emitsOwnLifecycleEvents,
+        !didChangeResolvedIdentity
       {
         appendTaskStartEvent(
           identity: node.resolvedIdentity,
@@ -802,7 +999,7 @@ package final class ViewGraph {
     transaction: TransactionSnapshot,
     invalidator: (any Invalidating)?
   ) -> ResolvedNode? {
-    guard let node = nodesByIdentity[identity] else {
+    guard let node = nodeIfExists(for: identity) else {
       return nil
     }
     guard !invalidatedIdentities.isEmpty else {
@@ -888,7 +1085,7 @@ package final class ViewGraph {
     rootIdentity: Identity
   ) -> [LifecycleEvent] {
     guard let root else {
-      self.root = nodesByIdentity[rootIdentity]
+      self.root = nodeIfExists(for: rootIdentity)
       return []
     }
     return finalizeFrame(
@@ -923,10 +1120,10 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
-    root = nodesByIdentity[rootIdentity]
+    root = nodeIfExists(for: rootIdentity)
 
-    for identity in frameOrder {
-      guard let node = nodesByIdentity[identity] else {
+    for viewNodeID in frameOrder {
+      guard let node = nodesByNodeID[viewNodeID] else {
         continue
       }
       node.setCommittedPresence(true)
@@ -941,13 +1138,15 @@ package final class ViewGraph {
       placed: placed
     )
     latestLifecycleEvents = lifecyclePlan.events
-    viewportLifecycleNodesByIdentity = lifecyclePlan.viewportLifecycleNodesByIdentity
+    viewportLifecycleNodesByKey = lifecyclePlan.viewportLifecycleNodesByKey
     viewportLifecycleOrder = lifecyclePlan.viewportLifecycleOrder
 
-    liveIdentities.formUnion(frameOrder)
-    invalidatedIdentities.removeAll(keepingCapacity: true)
-    graphLocalDirtyIdentities.removeAll(keepingCapacity: true)
+    liveNodeIDs.formUnion(frameOrder)
+    requiresRootEvaluation = false
+    invalidatedNodeIDs.removeAll(keepingCapacity: true)
+    graphLocalDirtyNodeIDs.removeAll(keepingCapacity: true)
     stateMutationKeys.removeAll(keepingCapacity: true)
+    stateMutationNodeIDsByKey.removeAll(keepingCapacity: true)
     return latestLifecycleEvents
   }
 
@@ -961,7 +1160,7 @@ package final class ViewGraph {
   package func snapshot(
     rootIdentity: Identity
   ) -> ResolvedNode {
-    guard let root = nodesByIdentity[rootIdentity] else {
+    guard let root = nodeIfExists(for: rootIdentity) else {
       fatalError("View graph has no node for root identity \(rootIdentity).")
     }
     self.root = root
@@ -971,29 +1170,33 @@ package final class ViewGraph {
   package func dependencies(
     for identity: Identity
   ) -> DependencySet? {
-    nodesByIdentity[identity]?.dependencies
+    nodeIfExists(for: identity)?.dependencies
   }
 
   package func stateDependentIdentities(
     for key: StateSlotKey
   ) -> Set<Identity> {
-    stateSlotDependents[key] ?? []
+    identities(for: stateSlotDependents[key] ?? [])
   }
 
   package func environmentDependentIdentities(
     for key: ObjectIdentifier
   ) -> Set<Identity> {
-    environmentDependents[key] ?? []
+    identities(for: environmentDependents[key] ?? [])
   }
 
   package func observableDependentIdentities(
     for key: ObjectIdentifier
   ) -> Set<Identity> {
-    observableDependents[key] ?? []
+    identities(for: observableDependents[key] ?? [])
   }
 
   package func liveIdentitySnapshot() -> Set<Identity> {
-    liveIdentities
+    identities(for: liveNodeIDs)
+  }
+
+  package func liveNodeIDSnapshot() -> Set<ViewNodeID> {
+    liveNodeIDs
   }
 
   package func restoreRuntimeRegistrations(
@@ -1003,8 +1206,8 @@ package final class ViewGraph {
     ViewGraphRuntimeRegistrationRestorer.restoreResolvedSubtree(
       resolved,
       into: registrations,
-      nodesByIdentity: nodesByIdentity,
-      registrationAliasesByIdentity: registrationAliasesByIdentity
+      nodesByNodeID: nodesByNodeID,
+      nodeIDsByStructuralPath: nodeIDsByStructuralPath
     )
   }
 
@@ -1012,9 +1215,9 @@ package final class ViewGraph {
     into registrations: RuntimeRegistrationSet
   ) {
     ViewGraphRuntimeRegistrationRestorer.restoreLiveIdentities(
-      liveIdentities,
+      liveNodeIDs,
       into: registrations,
-      nodesByIdentity: nodesByIdentity
+      nodesByNodeID: nodesByNodeID
     )
   }
 
@@ -1030,42 +1233,45 @@ package final class ViewGraph {
     into registrations: RuntimeRegistrationSet
   ) {
     for root in roots {
-      nodesByIdentity[root]?.restoreRuntimeRegistrations(into: registrations)
+      nodeIfExists(for: root)?.restoreRuntimeRegistrations(into: registrations)
     }
   }
 
   private func pruneLifecycleEvaluationOwners(
     ownedBy ownerIdentity: Identity
   ) {
+    guard let ownerNodeID = viewNodeID(for: ownerIdentity) else {
+      return
+    }
     guard
       let recordedTargets = lifecycleEvaluationTargetsRecordedByOwner.removeValue(
-        forKey: ownerIdentity
+        forKey: ownerNodeID
       )
     else {
       return
     }
-    guard let targets = lifecycleEvaluationTargetsByOwner[ownerIdentity] else {
+    guard let targets = lifecycleEvaluationTargetsByOwner[ownerNodeID] else {
       return
     }
     let staleTargets = targets.subtracting(recordedTargets)
     for target in staleTargets {
-      lifecycleEvaluationOwnersByIdentity.removeValue(forKey: target)
+      lifecycleEvaluationOwnersByNodeID.removeValue(forKey: target)
     }
     if recordedTargets.isEmpty {
-      lifecycleEvaluationTargetsByOwner.removeValue(forKey: ownerIdentity)
+      lifecycleEvaluationTargetsByOwner.removeValue(forKey: ownerNodeID)
     } else {
-      lifecycleEvaluationTargetsByOwner[ownerIdentity] = recordedTargets
+      lifecycleEvaluationTargetsByOwner[ownerNodeID] = recordedTargets
     }
   }
 
   private func nodeEmitsOwnLifecycleEvents(
     _ node: ViewNode
   ) -> Bool {
-    let ownerIdentity = lifecycleEvaluationOwnersByIdentity[node.identity]
+    let ownerNodeID = lifecycleEvaluationOwnersByNodeID[node.viewNodeID]
     return ViewGraphLifecycleEventCollector.nodeEmitsOwnLifecycleEvents(
       node,
-      ownerIdentity: ownerIdentity,
-      ownerExists: ownerIdentity.map { nodesByIdentity[$0] != nil } ?? false
+      ownerNodeID: ownerNodeID,
+      ownerExists: ownerNodeID.map { nodesByNodeID[$0] != nil } ?? false
     )
   }
 
@@ -1075,6 +1281,7 @@ package final class ViewGraph {
     isStructural: Bool
   ) {
     ViewGraphLifecycleEventCollector.appendTaskCancelEvent(
+      viewNodeID: viewNodeID(for: identity),
       identity: identity,
       task: task,
       isStructural: isStructural,
@@ -1089,6 +1296,7 @@ package final class ViewGraph {
     task: TaskDescriptor
   ) {
     ViewGraphLifecycleEventCollector.appendTaskStartEvent(
+      viewNodeID: viewNodeID(for: identity),
       identity: identity,
       task: task,
       stableTaskCancelEvents: stableTaskCancelEvents,
@@ -1102,7 +1310,7 @@ package final class ViewGraph {
     invalidatedIdentities: Set<Identity>
   ) -> Bool {
     for invalidatedIdentity in invalidatedIdentities {
-      guard let invalidatedNode = nodesByIdentity[invalidatedIdentity] else {
+      guard let invalidatedNode = nodeIfExists(for: invalidatedIdentity) else {
         continue
       }
       if invalidatedNode === node
@@ -1118,13 +1326,20 @@ package final class ViewGraph {
   private func nodeForIdentity(
     for identity: Identity
   ) -> ViewNode {
-    if let existing = nodesByIdentity[identity] {
+    if let existing = nodeIfExists(for: identity) {
       return existing
     }
 
-    let node = ViewNode(identity: identity)
+    nextViewNodeIDRawValue &+= 1
+    let viewNodeID = ViewNodeID(rawValue: nextViewNodeIDRawValue)
+    let node = ViewNode(
+      viewNodeID: viewNodeID,
+      identity: identity
+    )
     node.ownerGraph = self
-    nodesByIdentity[identity] = node
+    nodesByNodeID[viewNodeID] = node
+    nodeIDByIdentity[identity] = viewNodeID
+    identityByNodeID[viewNodeID] = identity
     return node
   }
 
@@ -1132,10 +1347,12 @@ package final class ViewGraph {
     for node: ViewNode,
     resolved: ResolvedNode
   ) {
+    let previousSnapshot = node.snapshot()
+    let retainedChildNodeIDs = Set(resolved.children.compactMap(\.viewNodeID))
     let plan = ViewGraphStructuralReconciler.removalPlan(
-      oldChildDescriptors: node.childDescriptors,
+      oldChildDescriptors: previousSnapshot.children.map(ChildDescriptor.init),
       currentChildCount: node.children.count,
-      committedChildren: node.committed.children,
+      committedChildren: previousSnapshot.children,
       newChildren: resolved.children
     )
 
@@ -1144,9 +1361,13 @@ package final class ViewGraph {
       else {
         continue
       }
+      let removedNode = node.children[removal.oldIndex]
+      guard !retainedChildNodeIDs.contains(removedNode.viewNodeID) else {
+        continue
+      }
 
       removeSubtree(
-        rootedAt: node.children[removal.oldIndex],
+        rootedAt: removedNode,
         committedSnapshot: removal.committedSnapshot
       )
     }
@@ -1156,7 +1377,7 @@ package final class ViewGraph {
     rootedAt node: ViewNode,
     committedSnapshot: ResolvedNode? = nil
   ) {
-    guard let current = nodesByIdentity[node.identity],
+    guard let current = nodesByNodeID[node.viewNodeID],
       current === node
     else {
       return
@@ -1211,46 +1432,60 @@ package final class ViewGraph {
     node.setCommittedPresence(false)
     node.parent = nil
     removeDependencyEdges(for: node)
-    liveIdentities.remove(node.identity)
+    liveNodeIDs.remove(node.viewNodeID)
+    invalidatedNodeIDs.remove(node.viewNodeID)
+    graphLocalDirtyNodeIDs.remove(node.viewNodeID)
 
-    if let owner = lifecycleEvaluationOwnersByIdentity.removeValue(forKey: node.identity) {
-      lifecycleEvaluationTargetsByOwner[owner]?.remove(node.identity)
+    if let owner = lifecycleEvaluationOwnersByNodeID.removeValue(forKey: node.viewNodeID) {
+      lifecycleEvaluationTargetsByOwner[owner]?.remove(node.viewNodeID)
       if lifecycleEvaluationTargetsByOwner[owner]?.isEmpty == true {
         lifecycleEvaluationTargetsByOwner.removeValue(forKey: owner)
       }
     }
-    if let targets = lifecycleEvaluationTargetsByOwner.removeValue(forKey: node.identity) {
+    if let targets = lifecycleEvaluationTargetsByOwner.removeValue(forKey: node.viewNodeID) {
       for target in targets {
-        lifecycleEvaluationOwnersByIdentity.removeValue(forKey: target)
+        lifecycleEvaluationOwnersByNodeID.removeValue(forKey: target)
       }
     }
+    lifecycleEvaluationTargetsRecordedByOwner.removeValue(forKey: node.viewNodeID)
 
-    if let target = registrationAliasTargets.removeValue(forKey: node.identity) {
-      registrationAliasesByIdentity[target]?.remove(node.identity)
-      if registrationAliasesByIdentity[target]?.isEmpty == true {
-        registrationAliasesByIdentity.removeValue(forKey: target)
-      }
+    nodeIDsByStructuralPath[node.committed.structuralPath]?.remove(node.viewNodeID)
+    if nodeIDsByStructuralPath[node.committed.structuralPath]?.isEmpty == true {
+      nodeIDsByStructuralPath.removeValue(forKey: node.committed.structuralPath)
     }
-    registrationAliasesByIdentity.removeValue(forKey: node.identity)
-    taskDescriptorIdentitySlots.removeValue(forKey: node.identity)
-    nodesByIdentity.removeValue(forKey: node.identity)
+    taskDescriptorNodeSlots.removeValue(forKey: node.viewNodeID)
+    if nodeIDByIdentity[node.identity] == node.viewNodeID {
+      nodeIDByIdentity.removeValue(forKey: node.identity)
+    }
+    if nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID {
+      nodeIDByIdentity.removeValue(forKey: node.resolvedIdentity)
+    }
+    identityByNodeID.removeValue(forKey: node.viewNodeID)
+    nodesByNodeID.removeValue(forKey: node.viewNodeID)
   }
 
   private func removeResolvedSubtree(
     _ resolved: ResolvedNode
   ) {
-    if let node = nodesByIdentity[resolved.identity] {
-      removeSubtree(
-        rootedAt: node,
-        committedSnapshot: resolved
-      )
+    let nodes = nodeIDsForResolvedNode(resolved)
+      .compactMap { nodeIfExists(for: $0) }
+      .sorted { lhs, rhs in
+        if lhs.identity == rhs.identity {
+          return lhs.viewNodeID < rhs.viewNodeID
+        }
+        return lhs.identity < rhs.identity
+      }
+    if !nodes.isEmpty {
+      for node in nodes {
+        removeSubtree(
+          rootedAt: node,
+          committedSnapshot: resolved
+        )
+      }
       return
     }
 
-    let aliasNodes = (registrationAliasesByIdentity[resolved.identity] ?? [])
-      .compactMap { nodesByIdentity[$0] }
-      .sorted { $0.identity < $1.identity }
-    if let node = aliasNodes.first {
+    if let node = nodeIfExists(for: resolved.identity) {
       removeSubtree(
         rootedAt: node,
         committedSnapshot: resolved
@@ -1268,7 +1503,7 @@ package final class ViewGraph {
     previous: DependencySet
   ) {
     ViewGraphDependencyIndex.reindex(
-      identity: node.identity,
+      viewNodeID: node.viewNodeID,
       previous: previous,
       current: node.dependencies,
       stateSlotDependents: &stateSlotDependents,
@@ -1281,7 +1516,7 @@ package final class ViewGraph {
     for node: ViewNode
   ) {
     ViewGraphDependencyIndex.remove(
-      identity: node.identity,
+      viewNodeID: node.viewNodeID,
       dependencies: node.dependencies,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
@@ -1296,9 +1531,10 @@ package final class ViewGraph {
     ViewGraphLifecycleEventCollector.frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed,
-      nodesByIdentity: nodesByIdentity,
+      nodesByNodeID: nodesByNodeID,
+      nodeIDByIdentity: nodeIDByIdentity,
       frameOrder: frameOrder,
-      viewportLifecycleNodesByIdentity: viewportLifecycleNodesByIdentity,
+      viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
       viewportLifecycleOrder: viewportLifecycleOrder,
       stableTaskCancelEvents: stableTaskCancelEvents,
       stableTaskStartEvents: stableTaskStartEvents,

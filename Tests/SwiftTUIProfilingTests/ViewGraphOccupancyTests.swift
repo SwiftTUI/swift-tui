@@ -11,7 +11,7 @@ struct ViewGraphOccupancyTests {
     let snapshot = ViewGraph().memoryMetricSnapshot
     #expect(snapshot.name == "ViewGraph.nodesByIdentity")
     #expect(snapshot.count == 0)
-    #expect(snapshot.detail?["liveIdentities"] == 0)
+    #expect(snapshot.detail?["liveNodeIDs"] == 0)
   }
 
   @Test("A MainActor-isolated provider is surfaced by the collector")

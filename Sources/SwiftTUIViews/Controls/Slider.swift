@@ -162,8 +162,8 @@ extension Slider {
         }
       }
 
-      let rootRouteID = primaryRouteID(for: context.identity)
-      let trackRouteID = primaryRouteID(
+      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+      let trackRouteID = runtimePrimaryRouteID(
         for: sliderTrackIdentity(for: context.identity)
       )
 

@@ -1,21 +1,21 @@
 @MainActor
 enum ViewGraphNodeCheckpointing {
   static func makeNodeCheckpoints(
-    _ nodesByIdentity: [Identity: ViewNode]
-  ) -> [Identity: ViewNode.Checkpoint] {
+    _ nodesByNodeID: [ViewNodeID: ViewNode]
+  ) -> [ViewNodeID: ViewNode.Checkpoint] {
     Dictionary(
-      uniqueKeysWithValues: nodesByIdentity.map { identity, node in
-        (identity, node.makeCheckpoint())
+      uniqueKeysWithValues: nodesByNodeID.map { viewNodeID, node in
+        (viewNodeID, node.makeCheckpoint())
       }
     )
   }
 
   static func restoreNodeCheckpoints(
-    _ nodeCheckpoints: [Identity: ViewNode.Checkpoint],
-    nodesByIdentity: [Identity: ViewNode]
+    _ nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint],
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    for (identity, node) in nodesByIdentity {
-      guard let nodeCheckpoint = nodeCheckpoints[identity] else {
+    for (viewNodeID, node) in nodesByNodeID {
+      guard let nodeCheckpoint = nodeCheckpoints[viewNodeID] else {
         continue
       }
       node.restoreCheckpoint(nodeCheckpoint)

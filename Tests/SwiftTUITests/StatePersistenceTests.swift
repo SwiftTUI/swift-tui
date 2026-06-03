@@ -86,14 +86,13 @@ struct StatePersistenceTests {
       )
     )
 
-    #expect(
-      artifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("StatefulOnChangeInitial"),
-          operation: .change(handlerIDs: ["StatefulOnChangeInitial#change[0]"])
-        )
-      ]
-    )
+    #expect(artifacts.commitPlan.lifecycle.map(\.identity) == [
+      testIdentity("StatefulOnChangeInitial")
+    ])
+    #expect(artifacts.commitPlan.lifecycle.map(\.operation) == [
+      .change(handlerIDs: ["StatefulOnChangeInitial#change[0]"])
+    ])
+    #expect(artifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
 
     await MainActor.run {
       lifecycleRegistry.changeHandler(for: "StatefulOnChangeInitial#change[0]")?()
@@ -140,14 +139,13 @@ struct StatePersistenceTests {
       )
     )
 
-    #expect(
-      updated.commitPlan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("StatefulOnChangeRerender"),
-          operation: .change(handlerIDs: ["StatefulOnChangeRerender#change[0]"])
-        )
-      ]
-    )
+    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
+      testIdentity("StatefulOnChangeRerender")
+    ])
+    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
+      .change(handlerIDs: ["StatefulOnChangeRerender#change[0]"])
+    ])
+    #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
 
     await MainActor.run {
       lifecycleRegistry.changeHandler(for: "StatefulOnChangeRerender#change[0]")?()

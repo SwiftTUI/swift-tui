@@ -54,7 +54,6 @@ struct ViewGraphCheckpointTotalityTests {
     let rootIdentity = testIdentity("CheckpointRoot")
     let childIdentity = testIdentity("CheckpointRoot", "Child")
     let insertedIdentity = testIdentity("CheckpointRoot", "Inserted")
-    let aliasIdentity = testIdentity("CheckpointRoot", "Alias")
 
     graph.setRootEvaluator(rootIdentity: rootIdentity) {}
     _ = graph.applySnapshot(
@@ -75,11 +74,6 @@ struct ViewGraphCheckpointTotalityTests {
     )
     graph.setEvaluator(for: childIdentity) {}
     graph.invalidateAndQueueDirty([childIdentity])
-    graph.recordRegistrationAlias(
-      from: aliasIdentity,
-      to: childIdentity,
-      resolvedKind: .view("Child")
-    )
 
     let before = graph.debugTotalStateSnapshot()
     let checkpoint = graph.makeCheckpoint()
@@ -105,11 +99,6 @@ struct ViewGraphCheckpointTotalityTests {
       )
     )
     graph.invalidateAndQueueDirty([insertedIdentity])
-    graph.recordRegistrationAlias(
-      from: aliasIdentity,
-      to: insertedIdentity,
-      resolvedKind: .view("Inserted")
-    )
 
     #expect(graph.debugTotalStateSnapshot() != before)
 

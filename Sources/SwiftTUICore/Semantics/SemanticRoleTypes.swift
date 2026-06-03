@@ -188,6 +188,7 @@ public enum RouteKind: Hashable, Sendable, CustomStringConvertible {
 public struct RouteID: Hashable, Sendable, CustomStringConvertible {
   public var identity: Identity
   public var kind: RouteKind
+  package var ownerNodeID: ViewNodeID?
 
   public init(
     identity: Identity,
@@ -195,9 +196,37 @@ public struct RouteID: Hashable, Sendable, CustomStringConvertible {
   ) {
     self.identity = identity
     self.kind = kind
+    ownerNodeID = nil
+  }
+
+  package init(
+    identity: Identity,
+    kind: RouteKind = .primary,
+    ownerNodeID: ViewNodeID?
+  ) {
+    self.identity = identity
+    self.kind = kind
+    self.ownerNodeID = ownerNodeID
   }
 
   public var description: String {
     "\(identity.path)#\(kind)"
+  }
+
+  public static func == (lhs: RouteID, rhs: RouteID) -> Bool {
+    guard lhs.identity == rhs.identity, lhs.kind == rhs.kind else {
+      return false
+    }
+    switch (lhs.ownerNodeID, rhs.ownerNodeID) {
+    case (.some(let lhsID), .some(let rhsID)):
+      return lhsID == rhsID
+    case (.none, _), (_, .none):
+      return true
+    }
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(identity)
+    hasher.combine(kind)
   }
 }

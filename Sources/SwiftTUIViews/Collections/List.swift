@@ -73,6 +73,9 @@ extension List {
     if isEnabled {
       let binding = selection
       let dynamicPropertyScope = currentAuthoringContext()
+      let mutationScope =
+        currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(dynamicPropertyScope)
       let activate: @MainActor (SelectionTag) -> Bool = { tag in
         guard let value = pickerSelectionValue(from: tag, as: SelectionValue.self) else {
           return false
@@ -94,7 +97,7 @@ extension List {
           guard let selectedIndex, rows.indices.contains(selectedIndex) else {
             return false
           }
-          return withAuthoringContext(dynamicPropertyScope) {
+          return withImperativeAuthoringContext(mutationScope) {
             activate(rows[selectedIndex].tag)
           }
         default:
@@ -105,7 +108,7 @@ extension List {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
+        return withImperativeAuthoringContext(mutationScope) {
           stepBoundSelection(
             binding,
             orderedTags: rows.map(\.tag),
@@ -114,7 +117,7 @@ extension List {
         }
       }
 
-      let rootRouteID = primaryRouteID(for: context.identity)
+      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
@@ -122,7 +125,7 @@ extension List {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
+        return withImperativeAuthoringContext(mutationScope) {
           stepBoundSelection(
             binding,
             orderedTags: rows.map(\.tag),
@@ -139,7 +142,7 @@ extension List {
         context.localActionRegistry?.register(
           identity: rowIdentity,
           handler: {
-            withAuthoringContext(dynamicPropertyScope) {
+            withImperativeAuthoringContext(mutationScope) {
               activate(row.tag)
             }
           },
@@ -164,7 +167,7 @@ extension List {
             max(rowIndex + delta, rows.startIndex),
             rows.index(before: rows.endIndex)
           )
-          _ = withAuthoringContext(dynamicPropertyScope) {
+          _ = withImperativeAuthoringContext(mutationScope) {
             setBoundSelection(binding, to: rows[targetIndex].tag)
           }
           return false

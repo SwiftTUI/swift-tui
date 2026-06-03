@@ -9,6 +9,7 @@
 /// mirrors from the current `ResolvedNode` before semantics, draw, lifecycle, or
 /// animation code observes them.
 public struct ResolvedNode: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   public var identity: Identity
   package var structuralPath: StructuralPath
   package var structuralEdgeRole: StructuralEdgeRole
@@ -144,6 +145,7 @@ public struct ResolvedNode: Equatable, Sendable {
   public var isTransient: Bool = false
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     structuralPath: StructuralPath? = nil,
     structuralEdgeRole: StructuralEdgeRole? = nil,
@@ -162,6 +164,7 @@ public struct ResolvedNode: Equatable, Sendable {
     intrinsicSize: CellSize? = nil,
     layoutDependentContent: LayoutDependentContentBoundary? = nil
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.structuralEdgeRole = structuralEdgeRole ?? surfaceComposition.role
@@ -198,6 +201,7 @@ public struct ResolvedNode: Equatable, Sendable {
   }
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     structuralPath: StructuralPath? = nil,
     structuralEdgeRole: StructuralEdgeRole? = nil,
@@ -218,6 +222,7 @@ public struct ResolvedNode: Equatable, Sendable {
     indexedChildSource: (any IndexedChildSource)? = nil,
     layoutDependentContent: LayoutDependentContentBoundary? = nil
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.structuralEdgeRole =

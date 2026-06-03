@@ -124,21 +124,25 @@ struct RetainedPhaseExtractionTests {
     let dirtyID = testIdentity("retained-draw-root", "dirty")
     let cleanID = testIdentity("retained-draw-root", "clean")
     let dirty = PlacedNode(
+      viewNodeID: ViewNodeID(rawValue: 2),
       identity: dirtyID,
       bounds: .init(origin: .zero, size: .init(width: 5, height: 1)),
       drawPayload: .text("dirty")
     )
     let clean = PlacedNode(
+      viewNodeID: ViewNodeID(rawValue: 3),
       identity: cleanID,
       bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 5, height: 1)),
       drawPayload: .text("clean")
     )
     let placed = PlacedNode(
+      viewNodeID: ViewNodeID(rawValue: 1),
       identity: rootID,
       bounds: .init(origin: .zero, size: .init(width: 5, height: 2)),
       children: [dirty, clean]
     )
     let cachedCleanDraw = DrawNode(
+      viewNodeID: ViewNodeID(rawValue: 3),
       identity: cleanID,
       bounds: clean.bounds,
       commands: [
@@ -153,6 +157,7 @@ struct RetainedPhaseExtractionTests {
       ]
     )
     let previousDraw = DrawNode(
+      viewNodeID: ViewNodeID(rawValue: 1),
       identity: rootID,
       bounds: placed.bounds,
       children: [
@@ -162,7 +167,7 @@ struct RetainedPhaseExtractionTests {
     )
     let retained = RetainedDrawExtractionInput(
       previousDraw: previousDraw,
-      previousDrawByIdentity: [cleanID: cachedCleanDraw],
+      previousDrawByNodeID: [ViewNodeID(rawValue: 3): cachedCleanDraw],
       proof: .subtreesIdentical([cleanID])
     )
 

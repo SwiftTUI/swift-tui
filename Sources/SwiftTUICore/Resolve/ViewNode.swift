@@ -1,5 +1,6 @@
 @MainActor
 package final class ViewNode {
+  package let viewNodeID: ViewNodeID
   package let identity: Identity
   package weak var invalidator: (any Invalidating)?
   package weak var ownerGraph: ViewGraph?
@@ -67,8 +68,10 @@ package final class ViewNode {
   private var evaluator: (@MainActor () -> Void)?
 
   package init(
+    viewNodeID: ViewNodeID,
     identity: Identity
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     committed = ResolvedNode(
       identity: identity,
@@ -98,6 +101,15 @@ package final class ViewNode {
     preparedFrameID = 0
     visitedFrameID = 0
     evaluator = nil
+  }
+
+  package convenience init(
+    identity: Identity
+  ) {
+    self.init(
+      viewNodeID: ViewNodeID(rawValue: 0),
+      identity: identity
+    )
   }
 
   package func prepareForFrame(
@@ -192,7 +204,8 @@ package final class ViewNode {
 
   package func setStateSlot<Value>(
     ordinal: Int,
-    value: Value
+    value: Value,
+    invalidationIdentity: Identity? = nil
   ) {
     var slot = stateSlots[ordinal] ?? .init()
     let didChange = slot.set(value)
@@ -201,18 +214,19 @@ package final class ViewNode {
       ownerGraph?.queueDirtyForStateChange(
         .init(identity: identity, ordinal: ordinal)
       )
+      let invalidationIdentity = invalidationIdentity ?? identity
       let animationRequest = AnimationContextStorage.currentRequest
       let batchID = AnimationContextStorage.currentBatchID
       if animationRequest != .inherit || batchID != nil,
         let animationAware = invalidator as? any AnimationAwareInvalidating
       {
         animationAware.requestInvalidation(
-          of: [identity],
+          of: [invalidationIdentity],
           animation: animationRequest,
           batchID: batchID
         )
       } else {
-        invalidator?.requestInvalidation(of: [identity])
+        invalidator?.requestInvalidation(of: [invalidationIdentity])
       }
     }
   }
@@ -319,6 +333,14 @@ package final class ViewNode {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    refreshChildResolvedMetadata(
+      from: resolved.children,
+      children: children
+    )
+    let resolved = resolvedWithRuntimeNodeIDs(
+      resolved,
+      children: children
+    )
     // Reuse fast path: an unchanged reused subtree hands back exactly the nodes
     // already attached, in the same order (recordReusedSubtree resolves each child
     // via nodeForIdentity). The detach and re-parent loops below are then no-ops
@@ -350,6 +372,30 @@ package final class ViewNode {
     invalidateAncestorCachedSnapshots()
   }
 
+  private func refreshChildResolvedMetadata(
+    from resolvedChildren: [ResolvedNode],
+    children: [ViewNode]
+  ) {
+    guard resolvedChildren.count == children.count else {
+      return
+    }
+
+    for (resolvedChild, child) in zip(resolvedChildren, children) {
+      child.refreshResolvedMetadata(from: resolvedChild)
+    }
+  }
+
+  package func refreshResolvedMetadata(
+    from resolved: ResolvedNode
+  ) {
+    committed.structuralPath = resolved.structuralPath
+    committed.structuralEdgeRole = resolved.structuralEdgeRole
+    committed.entityIdentity = resolved.entityIdentity
+    committed.entityStructuralPath = resolved.entityStructuralPath
+    committed.declarationOwnerEdge = resolved.declarationOwnerEdge
+    committed.typeDiscriminator = resolved.typeDiscriminator
+  }
+
   private func childrenReferToSameNodes(
     as candidate: [ViewNode]
   ) -> Bool {
@@ -360,6 +406,24 @@ package final class ViewNode {
       return false
     }
     return true
+  }
+
+  private func resolvedWithRuntimeNodeIDs(
+    _ resolved: ResolvedNode,
+    children: [ViewNode]
+  ) -> ResolvedNode {
+    var resolved = resolved
+    resolved.viewNodeID = viewNodeID
+    if resolved.children.count == children.count {
+      let stampedChildren = zip(resolved.children, children).map { childResolved, childNode in
+        childNode.resolvedWithRuntimeNodeIDs(
+          childResolved,
+          children: childNode.children
+        )
+      }
+      resolved.setChildrenPreservingDerivedState(stampedChildren)
+    }
+    return resolved
   }
 
   package func canReuse(
@@ -539,32 +603,26 @@ package final class ViewNode {
   }
 
   package func recordLifecycleAppearRegistration(
-    handlerID: String,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    _ registration: LifecycleHandlerRegistration
   ) {
     registeredHandlers.recordLifecycleAppear(
-      handlerID: handlerID,
-      handler: handler
+      registration
     )
   }
 
   package func recordLifecycleDisappearRegistration(
-    handlerID: String,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    _ registration: LifecycleHandlerRegistration
   ) {
     registeredHandlers.recordLifecycleDisappear(
-      handlerID: handlerID,
-      handler: handler
+      registration
     )
   }
 
   package func recordLifecycleChangeRegistration(
-    handlerID: String,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    _ registration: LifecycleHandlerRegistration
   ) {
     registeredHandlers.recordLifecycleChange(
-      handlerID: handlerID,
-      handler: handler
+      registration
     )
   }
 
@@ -754,6 +812,7 @@ package final class ViewNode {
 
 extension ViewNode {
   package struct Checkpoint {
+    package var viewNodeID: ViewNodeID
     package var invalidator: (any Invalidating)?
     package var ownerGraph: ViewGraph?
     package var parent: ViewNode?
@@ -786,6 +845,7 @@ extension ViewNode {
 
   package func makeCheckpoint() -> Checkpoint {
     Checkpoint(
+      viewNodeID: viewNodeID,
       invalidator: invalidator,
       ownerGraph: ownerGraph,
       parent: parent,
@@ -818,6 +878,10 @@ extension ViewNode {
   }
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    precondition(
+      checkpoint.viewNodeID == viewNodeID,
+      "Cannot restore checkpoint for \(checkpoint.viewNodeID) onto \(viewNodeID)."
+    )
     invalidator = checkpoint.invalidator
     ownerGraph = checkpoint.ownerGraph
     parent = checkpoint.parent
@@ -853,6 +917,7 @@ extension ViewNode {
 extension ViewNode {
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
     DebugTotalStateSnapshot(
+      viewNodeID: viewNodeID,
       invalidatorInstalled: invalidator != nil,
       ownerGraphInstalled: ownerGraph != nil,
       parentIdentity: parent?.identity,

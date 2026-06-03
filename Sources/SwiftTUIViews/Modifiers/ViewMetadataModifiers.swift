@@ -196,7 +196,9 @@ public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let explicitIdentity = context.identity.explicitID(id)
-    var resolved = content.resolve(in: context.replacingIdentity(with: explicitIdentity))
+    var resolved = content.resolveOwned(
+      in: context.replacingIdentity(with: explicitIdentity)
+    )
     resolved.attachingEntityIdentity(
       EntityIdentity(id),
       at: context.structuralPath
@@ -212,7 +214,11 @@ package struct ExactIdentityModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    [content.resolve(in: context.replacingIdentity(with: identity))]
+    [
+      content.resolveOwned(
+        in: context.replacingIdentity(with: identity)
+      )
+    ]
   }
 }
 

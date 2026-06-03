@@ -28,6 +28,25 @@ package struct ModifierContentInputs<Base: View> {
     }
   }
 
+  private func applyOwnedAuthoringContext<Result>(
+    in context: ResolveContext,
+    _ body: () -> Result
+  ) -> Result {
+    let rebased = authoringContext.map { scope in
+      AuthoringContext(
+        viewIdentity: context.identity,
+        structuralIdentity: context.structuralPath.identityProjection,
+        structuralPath: context.structuralPath,
+        focusedValues: context.focusedValues,
+        viewNode: ViewNodeContext.current,
+        ordinalTracker: scope.ordinalTracker
+      )
+    }
+    return withAuthoringContext(rebased) {
+      body()
+    }
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     applyAuthoringContext {
       let erased: Any = base
@@ -41,6 +60,18 @@ package struct ModifierContentInputs<Base: View> {
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     applyAuthoringContext {
       resolveView(base, in: context)
+    }
+  }
+
+  package func resolveOwned(in context: ResolveContext) -> ResolvedNode {
+    applyOwnedAuthoringContext(in: context) {
+      var resolved = normalizeResolvedElements(
+        resolveViewElements(base, in: context),
+        in: context
+      )
+      assignEntityIdentityOccurrences(to: &resolved._storedChildren)
+      resolved.structuralPath = context.structuralPath
+      return resolved
     }
   }
 }

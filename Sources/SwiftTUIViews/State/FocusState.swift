@@ -39,6 +39,7 @@ private final class FocusStateStorage<Value: Equatable> {
 
 @MainActor
 private struct FocusStateLocation<Value: Equatable> {
+  var bindingKey: FocusBindingKey
   var bindingID: String
   var snapshot: () -> FocusStateSnapshot<Value>
   var requestValue: (Value) -> Void
@@ -194,6 +195,10 @@ public struct FocusState<Value: Equatable> {
     let seedSnapshot = box.currentLocalSnapshot()
 
     if let viewNode = context.viewNode {
+      let bindingKey = FocusBindingKey(
+        ownerNodeID: viewNode.viewNodeID,
+        suffix: .stateSlot(ordinal: ordinal)
+      )
       let bindingID = "\(viewNode.identity.path)#FocusState[\(ordinal)]"
       let storage = viewNode.stateSlot(
         ordinal: ordinal,
@@ -204,6 +209,7 @@ public struct FocusState<Value: Equatable> {
       )
 
       return FocusStateLocation(
+        bindingKey: bindingKey,
         bindingID: bindingID,
         snapshot: {
           storage.currentSnapshot()
@@ -227,6 +233,10 @@ public struct FocusState<Value: Equatable> {
 
   private func localLocation() -> FocusStateLocation<Value> {
     FocusStateLocation(
+      bindingKey: FocusBindingKey(
+        ownerNodeID: nil,
+        suffix: .local(ObjectIdentifier(box))
+      ),
       bindingID: "FocusState.local[\(ObjectIdentifier(box))]",
       snapshot: {
         box.currentLocalSnapshot()
@@ -243,6 +253,10 @@ public struct FocusState<Value: Equatable> {
 
 @MainActor
 extension FocusState.Binding {
+  package var bindingKey: FocusBindingKey {
+    location.bindingKey
+  }
+
   package var bindingID: String {
     location.bindingID
   }
@@ -287,6 +301,7 @@ public struct BoolFocusBindingModifier: PrimitiveViewModifier {
     let node = content.resolve(in: context)
     context.localFocusBindingRegistry?.register(
       identity: node.identity,
+      bindingKey: binding.bindingKey,
       bindingID: binding.bindingID,
       hasPendingRequest: binding.hasPendingRequest,
       isSelected: binding.wrappedValue,
@@ -310,6 +325,7 @@ public struct OptionalFocusBindingModifier<Value: Hashable>: PrimitiveViewModifi
     let node = content.resolve(in: context)
     context.localFocusBindingRegistry?.register(
       identity: node.identity,
+      bindingKey: binding.bindingKey,
       bindingID: binding.bindingID,
       hasPendingRequest: binding.hasPendingRequest,
       isSelected: binding.wrappedValue == value,

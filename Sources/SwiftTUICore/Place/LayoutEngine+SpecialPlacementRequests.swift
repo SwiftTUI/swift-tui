@@ -153,6 +153,7 @@ extension LayoutEngine {
       alignment: alignment
     )
     passContext?.recordPlacedFrame(
+      viewNodeID: resolved.children[primaryIndex].viewNodeID,
       identity: resolved.children[primaryIndex].identity,
       bounds: CellRect(
         origin: primaryOrigin,

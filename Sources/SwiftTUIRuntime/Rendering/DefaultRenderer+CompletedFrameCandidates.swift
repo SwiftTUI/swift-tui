@@ -144,7 +144,7 @@ extension DefaultRenderer {
     }
     applyWorkerCustomLayoutCacheUpdates(workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+      keeping: viewGraph.liveNodeIDSnapshot()
     )
     return CommittedFrameEffects(
       commitPlan: commit,

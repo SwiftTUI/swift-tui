@@ -96,6 +96,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         entityIdentities[index],
         at: elementContext.structuralPath
       )
+      childContext.viewGraph?.refreshResolvedMetadata(for: normalized)
       cache[index] = normalized
       return normalized
     }

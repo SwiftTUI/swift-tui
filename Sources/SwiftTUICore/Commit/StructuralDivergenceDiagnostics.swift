@@ -24,8 +24,7 @@
     }
 
     package static func report(
-      from snapshots: [StructuralDivergenceSnapshot],
-      registrationAliasDiagnostics: RegistrationAliasDiagnostics = .init()
+      from snapshots: [StructuralDivergenceSnapshot]
     ) -> StructuralDivergenceReport {
       var pathVsStructuralParentMismatches:
         [StructuralDivergenceReport.PathParentMismatch] = []
@@ -75,20 +74,9 @@
         )
       }
 
-      let registrationAliasDivergences =
-        registrationAliasDiagnostics.topDivergences(limit: Int.max).map { entry in
-          StructuralDivergenceReport.RegistrationAliasDivergence(
-            registration: entry.key.fromIdentity,
-            committed: entry.key.toIdentity,
-            producerDescription: entry.key.kindDescription,
-            count: entry.count
-          )
-        }
-
       return StructuralDivergenceReport(
         pathVsStructuralParentMismatches: pathVsStructuralParentMismatches,
         duplicateRuntimeIdentities: duplicateRuntimeIdentities,
-        registrationAliasDivergences: registrationAliasDivergences,
         portalPlacementRoles: portalPlacementRoles,
         frameCount: snapshots.count
       )
@@ -210,13 +198,6 @@
       package let producers: [NodeKind]
     }
 
-    package struct RegistrationAliasDivergence: Sendable {
-      package let registration: Identity
-      package let committed: Identity
-      package let producerDescription: String
-      package let count: Int
-    }
-
     package struct PortalPlacementRole: Sendable {
       package let node: Identity
       package let structuralParent: Identity?
@@ -226,7 +207,6 @@
 
     package let pathVsStructuralParentMismatches: [PathParentMismatch]
     package let duplicateRuntimeIdentities: [DuplicateRuntimeIdentity]
-    package let registrationAliasDivergences: [RegistrationAliasDivergence]
     package let portalPlacementRoles: [PortalPlacementRole]
     package let frameCount: Int
 
@@ -239,9 +219,6 @@
         "structural_divergence\tduplicate_runtime_identities\t\(duplicateRuntimeIdentities.count)"
       )
       lines.append(
-        "structural_divergence\tregistration_alias_divergences\t\(registrationAliasDivergences.count)"
-      )
-      lines.append(
         "structural_divergence\tportal_placement_roles\t\(portalPlacementRoles.count)"
       )
       return lines.joined(separator: "\n") + "\n"
@@ -250,13 +227,11 @@
     package init(
       pathVsStructuralParentMismatches: [PathParentMismatch],
       duplicateRuntimeIdentities: [DuplicateRuntimeIdentity],
-      registrationAliasDivergences: [RegistrationAliasDivergence],
       portalPlacementRoles: [PortalPlacementRole],
       frameCount: Int
     ) {
       self.pathVsStructuralParentMismatches = pathVsStructuralParentMismatches
       self.duplicateRuntimeIdentities = duplicateRuntimeIdentities
-      self.registrationAliasDivergences = registrationAliasDivergences
       self.portalPlacementRoles = portalPlacementRoles
       self.frameCount = frameCount
     }

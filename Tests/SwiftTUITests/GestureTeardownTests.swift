@@ -103,7 +103,7 @@ struct GestureTeardownTests {
       gestureRegistry: gestureReg,
       gestureStateRegistry: stateReg
     )
-    registrations.pruneOrphanedGestures(keeping: [])
+    registrations.pruneOrphanedGestures(keeping: [] as Set<ViewNodeID>)
 
     #expect(tracker.tornDown == true)
     #expect(gestureReg.recognizer(for: identity) == nil)

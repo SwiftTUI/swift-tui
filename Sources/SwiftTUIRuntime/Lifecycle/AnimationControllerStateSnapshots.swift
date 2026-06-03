@@ -15,10 +15,13 @@ extension AnimationController {
     package var completionClosures: [AnimationBatchID: @Sendable () -> Void]
     package var batchRefCounts: [AnimationBatchID: Int]
     package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
-    package var transitionsByIdentity: [Identity: AnyTransition]
-    package var previousTransitionsByIdentity: [Identity: AnyTransition]
-    package var pendingTransitionsByIdentity: [Identity: AnyTransition]
-    package var removingIdentities: [Identity: RemovalEntry]
+    package var transitionsByNodeID: [ViewNodeID: AnyTransition]
+    package var transitionIdentitiesByNodeID: [ViewNodeID: Identity]
+    package var previousTransitionsByNodeID: [ViewNodeID: AnyTransition]
+    package var previousTransitionIdentitiesByNodeID: [ViewNodeID: Identity]
+    package var pendingTransitionsByNodeID: [ViewNodeID: AnyTransition]
+    package var pendingTransitionIdentitiesByNodeID: [ViewNodeID: Identity]
+    package var removingNodes: [ViewNodeID: RemovalEntry]
     package var previousIdentities: Set<Identity>
     package var lastTickResult: AnimationTickResult
     package var isFrameHeadTransactionActive: Bool
@@ -39,9 +42,13 @@ extension AnimationController {
     package var completionClosureBatchIDs: Set<AnimationBatchID>
     package var batchRefCounts: [AnimationBatchID: Int]
     package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
+    package var transitionNodeIDs: Set<ViewNodeID>
     package var transitionIdentities: Set<Identity>
+    package var previousTransitionNodeIDs: Set<ViewNodeID>
     package var previousTransitionIdentities: Set<Identity>
+    package var pendingTransitionNodeIDs: Set<ViewNodeID>
     package var pendingTransitionIdentities: Set<Identity>
+    package var removingNodeIDs: Set<ViewNodeID>
     package var removingIdentities: Set<Identity>
     package var previousIdentities: Set<Identity>
     package var lastTickHasPendingWork: Bool

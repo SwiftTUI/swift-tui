@@ -59,7 +59,7 @@ extension RunLoop {
   ) throws -> FocusSyncIterationOutcome {
     latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
     runtimeRegistrations.pruneOrphanedGestures(
-      keeping: renderer.liveIdentitySnapshot()
+      keeping: renderer.liveNodeIDSnapshot()
     )
     try updateTerminalPointerHoverModeIfNeeded()
 

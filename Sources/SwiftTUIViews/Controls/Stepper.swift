@@ -179,11 +179,11 @@ extension Stepper {
         }
       }
 
-      let rootRouteID = primaryRouteID(for: context.identity)
-      let decrementRouteID = primaryRouteID(
+      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+      let decrementRouteID = runtimePrimaryRouteID(
         for: stepperDecrementIdentity(for: context.identity)
       )
-      let incrementRouteID = primaryRouteID(
+      let incrementRouteID = runtimePrimaryRouteID(
         for: stepperIncrementIdentity(for: context.identity)
       )
 

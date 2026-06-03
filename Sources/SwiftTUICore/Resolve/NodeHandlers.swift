@@ -1,58 +1,89 @@
+@MainActor
 package struct NodeHandlers {
   package var actionRegistrations: [Identity: LocalActionRegistry.Registration]
+  package var actionRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler]
+  package var keyHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]]
+  package var keyPressHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var pasteHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.PasteHandler]]
+  package var pasteHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]]
+  package var terminationHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
+  package var pointerHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey]
   package var pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler]
+  package var pointerHoverHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey]
   package var gestureRegistrations: [Identity: AnyGestureRecognizer]
+  package var gestureRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
+  package var gestureStateRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var defaultFocusRegistrations: DefaultFocusRegistrationSnapshot
   package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
   package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
   package var scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot]
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
+  package var taskRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
   package var commandRegistrations: CommandRegistrySnapshot
   package var dropDestinationRegistrations: DropDestinationRegistrySnapshot
 
   package init(
     actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
+    actionRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
+    keyHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]] = [:],
+    keyPressHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     pasteHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.PasteHandler]] = [:],
+    pasteHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]] = [:],
+    terminationHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
+    pointerHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:],
     pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler] = [:],
+    pointerHoverHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:],
     gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
+    gestureRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
+    gestureStateRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     defaultFocusRegistrations: DefaultFocusRegistrationSnapshot = .init(),
     focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
     focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
     scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:],
+    taskRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = [],
     commandRegistrations: CommandRegistrySnapshot = .init(),
     dropDestinationRegistrations: DropDestinationRegistrySnapshot = .init()
   ) {
     self.actionRegistrations = actionRegistrations
+    self.actionRegistrationOwners = actionRegistrationOwners
     self.keyHandlerRegistrations = keyHandlerRegistrations
+    self.keyHandlerRegistrationOwners = keyHandlerRegistrationOwners
     self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
+    self.keyPressHandlerRegistrationOwners = keyPressHandlerRegistrationOwners
     self.pasteHandlerRegistrations = pasteHandlerRegistrations
+    self.pasteHandlerRegistrationOwners = pasteHandlerRegistrationOwners
     self.terminationHandlerRegistrations = terminationHandlerRegistrations
+    self.terminationHandlerRegistrationOwners = terminationHandlerRegistrationOwners
     self.pointerHandlerRegistrations = pointerHandlerRegistrations
+    self.pointerHandlerRegistrationOwners = pointerHandlerRegistrationOwners
     self.pointerHoverHandlerRegistrations = pointerHoverHandlerRegistrations
+    self.pointerHoverHandlerRegistrationOwners = pointerHoverHandlerRegistrationOwners
     self.gestureRegistrations = gestureRegistrations
+    self.gestureRegistrationOwners = gestureRegistrationOwners
     self.gestureStateRegistrations = gestureStateRegistrations
+    self.gestureStateRegistrationOwners = gestureStateRegistrationOwners
     self.defaultFocusRegistrations = defaultFocusRegistrations
     self.focusBindingRegistrations = focusBindingRegistrations
     self.focusedValuesRegistrations = focusedValuesRegistrations
     self.scrollPositionRegistrations = scrollPositionRegistrations
     self.lifecycleRegistrations = lifecycleRegistrations
     self.taskRegistrations = taskRegistrations
+    self.taskRegistrationOwners = taskRegistrationOwners
     self.preferenceObservationRegistrations = preferenceObservationRegistrations
     self.commandRegistrations = commandRegistrations
     self.dropDestinationRegistrations = dropDestinationRegistrations
@@ -67,6 +98,7 @@ package struct NodeHandlers {
     handler: @escaping LocalActionRegistry.Handler,
     followUpInvalidationIdentity: Identity?
   ) {
+    actionRegistrationOwners[identity] = .current(identity: identity)
     actionRegistrations[identity] = .init(
       handler: handler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
@@ -77,6 +109,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.Handler
   ) {
+    keyHandlerRegistrationOwners[identity] = .current(identity: identity)
     keyHandlerRegistrations[identity] = handler
   }
 
@@ -84,6 +117,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
+    keyPressHandlerRegistrationOwners[identity] = .current(identity: identity)
     keyPressHandlerRegistrations[identity, default: []].append(handler)
   }
 
@@ -91,6 +125,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.PasteHandler
   ) {
+    pasteHandlerRegistrationOwners[identity] = .current(identity: identity)
     pasteHandlerRegistrations[identity, default: []].append(handler)
   }
 
@@ -98,6 +133,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalTerminationRegistry.Handler
   ) {
+    terminationHandlerRegistrationOwners[identity] = .current(identity: identity)
     terminationHandlerRegistrations[identity, default: []].append(handler)
   }
 
@@ -105,6 +141,7 @@ package struct NodeHandlers {
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
+    pointerHandlerRegistrationOwners[routeID] = .current(identity: routeID.identity)
     pointerHandlerRegistrations[routeID] = handler
   }
 
@@ -112,6 +149,7 @@ package struct NodeHandlers {
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
+    pointerHoverHandlerRegistrationOwners[routeID] = .current(identity: routeID.identity)
     pointerHoverHandlerRegistrations[routeID] = handler
   }
 
@@ -119,6 +157,7 @@ package struct NodeHandlers {
     identity: Identity,
     recognizer: AnyGestureRecognizer
   ) {
+    gestureRegistrationOwners[identity] = .current(identity: identity)
     gestureRegistrations[identity] = recognizer
   }
 
@@ -126,6 +165,7 @@ package struct NodeHandlers {
     identity: Identity,
     binding: AnyGestureStateBinding
   ) {
+    gestureStateRegistrationOwners[identity] = .current(identity: identity)
     gestureStateRegistrations[identity, default: []].append(binding)
   }
 
@@ -183,30 +223,28 @@ package struct NodeHandlers {
   }
 
   package mutating func recordLifecycleAppear(
-    handlerID: String,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    _ registration: LifecycleHandlerRegistration
   ) {
-    lifecycleRegistrations.appearHandlers[handlerID] = handler
+    lifecycleRegistrations.recordAppear(registration)
   }
 
   package mutating func recordLifecycleDisappear(
-    handlerID: String,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    _ registration: LifecycleHandlerRegistration
   ) {
-    lifecycleRegistrations.disappearHandlers[handlerID] = handler
+    lifecycleRegistrations.recordDisappear(registration)
   }
 
   package mutating func recordLifecycleChange(
-    handlerID: String,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    _ registration: LifecycleHandlerRegistration
   ) {
-    lifecycleRegistrations.changeHandlers[handlerID] = handler
+    lifecycleRegistrations.recordChange(registration)
   }
 
   package mutating func recordTask(
     identity: Identity,
     registration: TaskRegistration
   ) {
+    taskRegistrationOwners[identity] = .current(identity: identity)
     taskRegistrations[identity] = registration
   }
 
@@ -221,6 +259,8 @@ package struct NodeHandlers {
   ) {
     for (identity, commands) in registration.keyCommandsByScope {
       commandRegistrations.keyCommandsByScope[identity] = commands
+      commandRegistrations.ownersByScope[identity] =
+        registration.ownersByScope[identity] ?? .current(identity: identity)
     }
   }
 
@@ -229,6 +269,8 @@ package struct NodeHandlers {
   ) {
     for (identity, handler) in registration.handlersByScope {
       dropDestinationRegistrations.handlersByScope[identity] = handler
+      dropDestinationRegistrations.ownersByScope[identity] =
+        registration.ownersByScope[identity] ?? .current(identity: identity)
     }
   }
 }

@@ -519,14 +519,13 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(box.events.isEmpty)
+    #expect(initialArtifacts.commitPlan.lifecycle.map(\.identity) == [testIdentity("Root")])
     #expect(
-      initialArtifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root"),
-          operation: .change(handlerIDs: ["Root#change[0]"])
-        )
+      initialArtifacts.commitPlan.lifecycle.map(\.operation) == [
+        .change(handlerIDs: ["Root#change[0]"])
       ]
     )
+    #expect(initialArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
 
     await MainActor.run {
       lifecycleRegistry.changeHandler(for: "Root#change[0]")?()
@@ -543,14 +542,13 @@ struct SwiftUISurfaceTests {
       )
     )
 
+    #expect(updatedArtifacts.commitPlan.lifecycle.map(\.identity) == [testIdentity("Root")])
     #expect(
-      updatedArtifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root"),
-          operation: .change(handlerIDs: ["Root#change[0]"])
-        )
+      updatedArtifacts.commitPlan.lifecycle.map(\.operation) == [
+        .change(handlerIDs: ["Root#change[0]"])
       ]
     )
+    #expect(updatedArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
 
     await MainActor.run {
       lifecycleRegistry.changeHandler(for: "Root#change[0]")?()
@@ -625,14 +623,13 @@ struct SwiftUISurfaceTests {
       )
     )
 
+    #expect(artifacts.commitPlan.lifecycle.map(\.identity) == [testIdentity("Root")])
     #expect(
-      artifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root"),
-          operation: .change(handlerIDs: ["Root#change[0]"])
-        )
+      artifacts.commitPlan.lifecycle.map(\.operation) == [
+        .change(handlerIDs: ["Root#change[0]"])
       ]
     )
+    #expect(artifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
 
     await MainActor.run {
       lifecycleRegistry.changeHandler(for: "Root#change[0]")?()
@@ -706,46 +703,35 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
+    let rowIdentity = testIdentity("Root", "true", "VStack[0]")
+    #expect(shownArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
-      shownArtifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .appear(handlerIDs: ["Root/true/VStack[0]#appear[0]"])
-        ),
-        .init(
-          identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .taskStart(
-            .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated))
-        ),
+      shownArtifacts.commitPlan.lifecycle.map(\.operation) == [
+        .appear(handlerIDs: ["Root/true/VStack[0]#appear[0]"]),
+        .taskStart(
+          .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated)),
       ]
     )
+    #expect(shownArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
+    #expect(updatedTaskArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
-      updatedTaskArtifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .taskCancel(
-            .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated))
-        ),
-        .init(
-          identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .taskStart(
-            .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated))
-        ),
+      updatedTaskArtifacts.commitPlan.lifecycle.map(\.operation) == [
+        .taskCancel(
+          .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated)),
+        .taskStart(
+          .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated)),
       ]
     )
+    #expect(updatedTaskArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
+    #expect(removedArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
-      removedArtifacts.commitPlan.lifecycle == [
-        .init(
-          identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .taskCancel(
-            .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated))
-        ),
-        .init(
-          identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .disappear(handlerIDs: ["Root/true/VStack[0]#disappear[0]"])
-        ),
+      removedArtifacts.commitPlan.lifecycle.map(\.operation) == [
+        .taskCancel(
+          .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated)),
+        .disappear(handlerIDs: ["Root/true/VStack[0]#disappear[0]"]),
       ]
     )
+    #expect(removedArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, false])
   }
 
   @Test("focus changes do not emit lifecycle deltas for stable public lifecycle owners")

@@ -32,6 +32,7 @@ private struct BorderMask {
 /// payload snapshots from the current placed node. Grouping those reads keeps
 /// the projection boundary explicit without changing `PlacedNode` storage.
 private struct DrawPhaseProjection {
+  var viewNodeID: ViewNodeID?
   var identity: Identity
   var environmentSnapshot: EnvironmentSnapshot
   var bounds: CellRect
@@ -79,7 +80,7 @@ extension DrawExtractor {
         if inheritedBorderMask == nil,
           !isInBackgroundSubtree,
           input?.proof.canReuseSubtree(rootedAt: node.identity) == true,
-          let previousDraw = input?.previousDrawNode(for: node.identity)
+          let previousDraw = input?.previousDrawNode(for: node)
         {
           builtNodes.append(previousDraw)
           continue
@@ -365,6 +366,7 @@ extension DrawExtractor {
     }
 
     return DrawNode(
+      viewNodeID: projection.viewNodeID,
       identity: identity,
       environmentSnapshot: environmentSnapshot,
       bounds: bounds,
@@ -386,6 +388,7 @@ extension DrawExtractor {
     from placed: borrowing PlacedNode
   ) -> DrawPhaseProjection {
     DrawPhaseProjection(
+      viewNodeID: placed.viewNodeID,
       identity: placed.identity,
       environmentSnapshot: placed.environmentSnapshot,
       bounds: placed.bounds,

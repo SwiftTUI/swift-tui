@@ -53,7 +53,7 @@ package struct RuntimeSubsystemSnapshot: Equatable {
 
   package struct ObservationBridgeSnapshot: Equatable {
     package var currentPass: UInt64
-    package var observedPasses: [Identity: UInt64]
+    package var observedPasses: [Identity: ObservationPassRecord]
     package var invalidatorID: ObjectIdentifier?
     package var viewGraphID: ObjectIdentifier?
   }

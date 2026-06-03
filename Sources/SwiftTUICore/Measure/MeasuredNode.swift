@@ -61,6 +61,7 @@ package typealias LazyStackViewportContext = ScrollViewportContext
 /// resolve only to correlate retained cache entries and child placement; this
 /// type does not carry resolved metadata forward to later phases.
 public struct MeasuredNode: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   public var identity: Identity
   public var proposal: ProposedSize
   public var measuredSize: CellSize
@@ -72,6 +73,24 @@ public struct MeasuredNode: Equatable, Sendable {
   public var containerAllocationSnapshot: ContainerAllocationSnapshot?
   package private(set) var subtreeNodeCount: Int
 
+  package init(
+    viewNodeID: ViewNodeID? = nil,
+    identity: Identity,
+    proposal: ProposedSize,
+    measuredSize: CellSize,
+    childMeasurements: [MeasuredNode] = [],
+    containerAllocationSnapshot: ContainerAllocationSnapshot? = nil
+  ) {
+    self.viewNodeID = viewNodeID
+    self.identity = identity
+    self.proposal = proposal
+    self.measuredSize = measuredSize
+    self.childMeasurements = childMeasurements
+    self.containerAllocationSnapshot = containerAllocationSnapshot
+    subtreeNodeCount = 1
+    recomputeSubtreeNodeCount()
+  }
+
   public init(
     identity: Identity,
     proposal: ProposedSize,
@@ -79,6 +98,7 @@ public struct MeasuredNode: Equatable, Sendable {
     childMeasurements: [MeasuredNode] = [],
     containerAllocationSnapshot: ContainerAllocationSnapshot? = nil
   ) {
+    self.viewNodeID = nil
     self.identity = identity
     self.proposal = proposal
     self.measuredSize = measuredSize

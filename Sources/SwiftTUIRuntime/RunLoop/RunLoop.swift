@@ -222,11 +222,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         MemoryMetricRegistry.shared.register(
           ClosureMemoryMetricProvider { [weak measurementCache] in
             guard let measurementCache else {
-              return MemoryMetricSnapshot(name: "MeasurementCache.entriesByIdentity", count: 0)
+              return MemoryMetricSnapshot(name: "MeasurementCache.entriesByNodeID", count: 0)
             }
             let metrics = measurementCache.metrics
             return MemoryMetricSnapshot(
-              name: "MeasurementCache.entriesByIdentity",
+              name: "MeasurementCache.entriesByNodeID",
               count: measurementCache.count,
               detail: [
                 "lookups": metrics.lookups,
@@ -244,7 +244,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       MemoryMetricRegistry.shared.register(
         ClosureMemoryMetricProvider { [weak frameTailRenderer] in
           guard let frameTailRenderer else {
-            return MemoryMetricSnapshot(name: "RetainedFrameIndex.placedByIdentity", count: 0)
+            return MemoryMetricSnapshot(name: "RetainedFrameIndex.placedByNodeID", count: 0)
           }
           return frameTailRenderer.memoryMetricSnapshot
         }

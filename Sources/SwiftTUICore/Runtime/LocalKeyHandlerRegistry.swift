@@ -54,6 +54,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   private var handlers: [Identity: Handler] = [:]
   private var keyPressHandlers: [Identity: [KeyPressHandler]] = [:]
   private var pasteHandlers: [Identity: [PasteHandler]] = [:]
+  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -68,6 +69,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     handler: @escaping Handler
   ) {
     handlers[identity] = handler
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordKeyHandlerRegistration(
       identity: identity,
       handler: handler
@@ -79,6 +81,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     keyPressHandler: @escaping KeyPressHandler
   ) {
     keyPressHandlers[identity, default: []].append(keyPressHandler)
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordKeyPressHandlerRegistration(
       identity: identity,
       handler: keyPressHandler
@@ -90,6 +93,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     pasteHandler: @escaping PasteHandler
   ) {
     pasteHandlers[identity, default: []].append(pasteHandler)
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordPasteHandlerRegistration(
       identity: identity,
       handler: pasteHandler
@@ -152,6 +156,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     handlers.removeAll(keepingCapacity: true)
     keyPressHandlers.removeAll(keepingCapacity: true)
     pasteHandlers.removeAll(keepingCapacity: true)
+    ownersByIdentity.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -161,21 +166,16 @@ package final class LocalKeyHandlerRegistry: Equatable {
       return
     }
 
-    for identity in handlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
-    }) {
+    for identity in handlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
       handlers.removeValue(forKey: identity)
     }
-    for identity in keyPressHandlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
-    }) {
+    for identity in keyPressHandlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
       keyPressHandlers.removeValue(forKey: identity)
     }
-    for identity in pasteHandlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
-    }) {
+    for identity in pasteHandlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
       pasteHandlers.removeValue(forKey: identity)
     }
+    pruneOwnerMap()
   }
 
   package func snapshot() -> [Identity: Handler] {
@@ -190,42 +190,59 @@ package final class LocalKeyHandlerRegistry: Equatable {
     pasteHandlers
   }
 
-  package func restore(_ snapshot: [Identity: Handler]) {
+  package func restore(
+    _ snapshot: [Identity: Handler],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (identity, handler) in snapshot {
       handlers[identity] = handler
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
   }
 
-  package func restoreKeyPressHandlers(_ snapshot: [Identity: [KeyPressHandler]]) {
+  package func restoreKeyPressHandlers(
+    _ snapshot: [Identity: [KeyPressHandler]],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (identity, handlers) in snapshot {
       keyPressHandlers[identity] = handlers
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
   }
 
-  package func restorePasteHandlers(_ snapshot: [Identity: [PasteHandler]]) {
+  package func restorePasteHandlers(
+    _ snapshot: [Identity: [PasteHandler]],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (identity, handlers) in snapshot {
       pasteHandlers[identity] = handlers
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
   }
-}
 
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
+  private func matchesAnySubtreeRoot(
+    _ identity: Identity,
+    roots: [Identity]
+  ) -> Bool {
+    (ownersByIdentity[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots)
+  }
+
+  private func pruneOwnerMap() {
+    let liveIdentities = Set(handlers.keys)
+      .union(keyPressHandlers.keys)
+      .union(pasteHandlers.keys)
+    ownersByIdentity = ownersByIdentity.filter { liveIdentities.contains($0.key) }
   }
 }

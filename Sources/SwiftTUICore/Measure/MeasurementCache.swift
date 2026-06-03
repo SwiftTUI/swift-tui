@@ -1,7 +1,7 @@
 import DequeModule
 import Synchronization
 
-/// A retained cache of measured subtrees keyed by identity and proposal.
+/// A retained cache of measured subtrees keyed by runtime node id and proposal.
 public final class MeasurementCache: Sendable {
   private struct CachedMeasurement: Sendable {
     let resolved: ResolvedNode
@@ -14,15 +14,15 @@ public final class MeasurementCache: Sendable {
     let generation: UInt64
   }
 
-  private struct IdentityStorage {
+  private struct NodeStorage {
     var entries: [ProposedSize: CachedMeasurement] = [:]
     var order: Deque<AccessRecord> = []
   }
 
-  private static let maxProposalVariantsPerIdentity = 4
+  private static let maxProposalVariantsPerNode = 4
 
   private struct Storage {
-    var entriesByIdentity: [Identity: IdentityStorage] = [:]
+    var entriesByNodeID: [ViewNodeID: NodeStorage] = [:]
     var entryCount = 0
     var epochGeneration = 0
     var accessGeneration: UInt64 = 0
@@ -66,13 +66,17 @@ public final class MeasurementCache: Sendable {
   ) -> MeasuredNode? {
     storage.withLock { storage in
       storage.lookups += 1
-      guard var identityStorage = storage.entriesByIdentity[resolved.identity] else {
+      guard let viewNodeID = resolved.viewNodeID else {
+        storage.misses += 1
+        return nil
+      }
+      guard var nodeStorage = storage.entriesByNodeID[viewNodeID] else {
         storage.misses += 1
         return nil
       }
 
-      guard let cached = identityStorage.entries[proposal] else {
-        storage.entriesByIdentity[resolved.identity] = identityStorage
+      guard let cached = nodeStorage.entries[proposal] else {
+        storage.entriesByNodeID[viewNodeID] = nodeStorage
         storage.misses += 1
         return nil
       }
@@ -81,26 +85,26 @@ public final class MeasurementCache: Sendable {
       // entry is stale we evict it here so subsequent lookups don't keep
       // re-fetching and re-rejecting the same mismatching cache line.
       guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
-        identityStorage.entries.removeValue(forKey: proposal)
+        nodeStorage.entries.removeValue(forKey: proposal)
         storage.entryCount -= 1
-        if identityStorage.entries.isEmpty {
-          storage.entriesByIdentity.removeValue(forKey: resolved.identity)
+        if nodeStorage.entries.isEmpty {
+          storage.entriesByNodeID.removeValue(forKey: viewNodeID)
         } else {
-          storage.entriesByIdentity[resolved.identity] = identityStorage
+          storage.entriesByNodeID[viewNodeID] = nodeStorage
         }
         storage.invalidations += 1
         return nil
       }
 
       let generation = nextGeneration(in: &storage)
-      identityStorage.entries[proposal] = .init(
+      nodeStorage.entries[proposal] = .init(
         resolved: cached.resolved,
         node: cached.node,
         generation: generation
       )
-      identityStorage.order.append(.init(proposal: proposal, generation: generation))
-      compactOrderIfNeeded(in: &identityStorage)
-      storage.entriesByIdentity[resolved.identity] = identityStorage
+      nodeStorage.order.append(.init(proposal: proposal, generation: generation))
+      compactOrderIfNeeded(in: &nodeStorage)
+      storage.entriesByNodeID[viewNodeID] = nodeStorage
       storage.hits += 1
       return cached.node
     }
@@ -113,37 +117,40 @@ public final class MeasurementCache: Sendable {
   ) {
     storage.withLock { storage in
       storage.stores += 1
-      var identityStorage = storage.entriesByIdentity[node.identity] ?? .init()
+      guard let viewNodeID = node.viewNodeID ?? resolved.viewNodeID else {
+        return
+      }
+      var nodeStorage = storage.entriesByNodeID[viewNodeID] ?? .init()
       let generation = nextGeneration(in: &storage)
 
-      if identityStorage.entries[node.proposal] == nil {
+      if nodeStorage.entries[node.proposal] == nil {
         storage.entryCount += 1
       }
 
-      identityStorage.entries[node.proposal] = CachedMeasurement(
+      nodeStorage.entries[node.proposal] = CachedMeasurement(
         resolved: resolved,
         node: node,
         generation: generation
       )
-      identityStorage.order.append(.init(proposal: node.proposal, generation: generation))
-      compactOrderIfNeeded(in: &identityStorage)
-      let shouldKeepIdentity = evictIfNeeded(
-        for: node.identity,
-        in: &identityStorage,
+      nodeStorage.order.append(.init(proposal: node.proposal, generation: generation))
+      compactOrderIfNeeded(in: &nodeStorage)
+      let shouldKeepNode = evictIfNeeded(
+        for: viewNodeID,
+        in: &nodeStorage,
         storage: &storage
       )
-      if shouldKeepIdentity {
-        storage.entriesByIdentity[node.identity] = identityStorage
+      if shouldKeepNode {
+        storage.entriesByNodeID[viewNodeID] = nodeStorage
       }
     }
   }
 
   package func prune(
-    keeping identities: Set<Identity>
+    keeping viewNodeIDs: Set<ViewNodeID>
   ) {
     storage.withLock { storage in
-      let retained = storage.entriesByIdentity.filter { identities.contains($0.key) }
-      storage.entriesByIdentity = retained
+      let retained = storage.entriesByNodeID.filter { viewNodeIDs.contains($0.key) }
+      storage.entriesByNodeID = retained
       storage.entryCount = retained.reduce(0) { $0 + $1.value.entries.count }
     }
   }
@@ -153,7 +160,7 @@ public final class MeasurementCache: Sendable {
     storage.withLock { storage in
       storage.epochGeneration += 1
       storage.accessGeneration = 0
-      storage.entriesByIdentity.removeAll(keepingCapacity: true)
+      storage.entriesByNodeID.removeAll(keepingCapacity: true)
       storage.entryCount = 0
       storage.lookups = 0
       storage.hits = 0
@@ -171,31 +178,31 @@ public final class MeasurementCache: Sendable {
   }
 
   private func evictIfNeeded(
-    for identity: Identity,
-    in identityStorage: inout IdentityStorage,
+    for viewNodeID: ViewNodeID,
+    in nodeStorage: inout NodeStorage,
     storage: inout Storage
   ) -> Bool {
-    guard identityStorage.entries.count > Self.maxProposalVariantsPerIdentity else {
+    guard nodeStorage.entries.count > Self.maxProposalVariantsPerNode else {
       return true
     }
 
-    while identityStorage.entries.count > Self.maxProposalVariantsPerIdentity {
-      guard let victim = identityStorage.order.popFirst() else {
+    while nodeStorage.entries.count > Self.maxProposalVariantsPerNode {
+      guard let victim = nodeStorage.order.popFirst() else {
         break
       }
-      guard let cached = identityStorage.entries[victim.proposal] else {
+      guard let cached = nodeStorage.entries[victim.proposal] else {
         continue
       }
       guard cached.generation == victim.generation else {
         continue
       }
 
-      identityStorage.entries.removeValue(forKey: victim.proposal)
+      nodeStorage.entries.removeValue(forKey: victim.proposal)
       storage.entryCount -= 1
     }
 
-    if identityStorage.entries.isEmpty {
-      storage.entriesByIdentity.removeValue(forKey: identity)
+    if nodeStorage.entries.isEmpty {
+      storage.entriesByNodeID.removeValue(forKey: viewNodeID)
       return false
     }
 
@@ -203,26 +210,26 @@ public final class MeasurementCache: Sendable {
   }
 
   private func compactOrderIfNeeded(
-    in identityStorage: inout IdentityStorage
+    in nodeStorage: inout NodeStorage
   ) {
-    guard !identityStorage.entries.isEmpty else {
-      identityStorage.order.removeAll(keepingCapacity: true)
+    guard !nodeStorage.entries.isEmpty else {
+      nodeStorage.order.removeAll(keepingCapacity: true)
       return
     }
 
-    let threshold = max(16, identityStorage.entries.count * 8)
-    guard identityStorage.order.count > threshold else {
+    let threshold = max(16, nodeStorage.entries.count * 8)
+    guard nodeStorage.order.count > threshold else {
       return
     }
 
     var compacted: Deque<AccessRecord> = []
-    let liveEntries = identityStorage.entries.sorted { lhs, rhs in
+    let liveEntries = nodeStorage.entries.sorted { lhs, rhs in
       lhs.value.generation < rhs.value.generation
     }
     for (proposal, entry) in liveEntries {
       compacted.append(.init(proposal: proposal, generation: entry.generation))
     }
-    identityStorage.order = compacted
+    nodeStorage.order = compacted
   }
 }
 

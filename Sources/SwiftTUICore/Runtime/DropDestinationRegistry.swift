@@ -24,11 +24,14 @@ package typealias DropDestinationHandler =
 
 package struct DropDestinationRegistrySnapshot: Sendable {
   package var handlersByScope: [Identity: DropDestinationHandler]
+  package var ownersByScope: [Identity: RuntimeRegistrationOwnerKey]
 
   package init(
-    handlersByScope: [Identity: DropDestinationHandler] = [:]
+    handlersByScope: [Identity: DropDestinationHandler] = [:],
+    ownersByScope: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
     self.handlersByScope = handlersByScope
+    self.ownersByScope = ownersByScope
   }
 
   package var isEmpty: Bool {
@@ -44,6 +47,7 @@ package struct DropDestinationRegistrySnapshot: Sendable {
 @MainActor
 package final class DropDestinationRegistry: Equatable {
   private var handlersByScope: [Identity: DropDestinationHandler] = [:]
+  private var ownersByScope: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -65,9 +69,11 @@ package final class DropDestinationRegistry: Equatable {
     handler: @escaping DropDestinationHandler
   ) {
     handlersByScope[scope] = handler
+    ownersByScope[scope] = .current(identity: scope)
     ViewNodeContext.current?.recordDropDestinationRegistration(
       DropDestinationRegistrySnapshot(
-        handlersByScope: [scope: handler]
+        handlersByScope: [scope: handler],
+        ownersByScope: [scope: ownersByScope[scope] ?? .init(identity: scope)]
       )
     )
   }
@@ -113,11 +119,13 @@ package final class DropDestinationRegistry: Equatable {
   /// Clears every registration.
   package func reset() {
     handlersByScope.removeAll(keepingCapacity: true)
+    ownersByScope.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> DropDestinationRegistrySnapshot {
     DropDestinationRegistrySnapshot(
-      handlersByScope: handlersByScope
+      handlersByScope: handlersByScope,
+      ownersByScope: ownersByScope
     )
   }
 
@@ -128,6 +136,7 @@ package final class DropDestinationRegistry: Equatable {
 
     for (identity, handler) in snapshot.handlersByScope {
       handlersByScope[identity] = handler
+      ownersByScope[identity] = snapshot.ownersByScope[identity] ?? .init(identity: identity)
     }
   }
 
@@ -137,17 +146,9 @@ package final class DropDestinationRegistry: Equatable {
   package func removeSubtrees(rootedAt roots: [Identity]) {
     guard !roots.isEmpty else { return }
     for identity in handlersByScope.keys
-    where dropDestinationIdentityMatchesAnySubtreeRoot(identity, roots: roots) {
+    where (ownersByScope[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots) {
       handlersByScope.removeValue(forKey: identity)
+      ownersByScope.removeValue(forKey: identity)
     }
-  }
-}
-
-private func dropDestinationIdentityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

@@ -1,22 +1,22 @@
 @MainActor
 package enum ViewGraphDependencyIndex {
   package static func reindex(
-    identity: Identity,
+    viewNodeID: ViewNodeID,
     previous: DependencySet,
     current: DependencySet,
-    stateSlotDependents: inout [StateSlotKey: Set<Identity>],
-    environmentDependents: inout [ObjectIdentifier: Set<Identity>],
-    observableDependents: inout [ObjectIdentifier: Set<Identity>]
+    stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
+    environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
+    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>]
   ) {
     remove(
-      identity: identity,
+      viewNodeID: viewNodeID,
       dependencies: previous,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
       observableDependents: &observableDependents
     )
     insert(
-      identity: identity,
+      viewNodeID: viewNodeID,
       dependencies: current,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
@@ -25,41 +25,41 @@ package enum ViewGraphDependencyIndex {
   }
 
   package static func remove(
-    identity: Identity,
+    viewNodeID: ViewNodeID,
     dependencies: DependencySet,
-    stateSlotDependents: inout [StateSlotKey: Set<Identity>],
-    environmentDependents: inout [ObjectIdentifier: Set<Identity>],
-    observableDependents: inout [ObjectIdentifier: Set<Identity>]
+    stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
+    environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
+    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>]
   ) {
     remove(
-      identity,
+      viewNodeID,
       from: dependencies.stateSlotReads,
       in: &stateSlotDependents
     )
     remove(
-      identity,
+      viewNodeID,
       from: dependencies.environmentReads,
       in: &environmentDependents
     )
     remove(
-      identity,
+      viewNodeID,
       from: dependencies.observableReads,
       in: &observableDependents
     )
   }
 
   package static func observableDependents(
-    triggeredBy identity: Identity,
-    nodesByIdentity: [Identity: ViewNode],
-    observableDependents: [ObjectIdentifier: Set<Identity>]
-  ) -> Set<Identity> {
-    guard let dependencies = nodesByIdentity[identity]?.dependencies,
+    triggeredBy viewNodeID: ViewNodeID,
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
+  ) -> Set<ViewNodeID> {
+    guard let dependencies = nodesByNodeID[viewNodeID]?.dependencies,
       !dependencies.observableReads.isEmpty
     else {
       return []
     }
 
-    return dependencies.observableReads.reduce(into: Set<Identity>()) { partial, key in
+    return dependencies.observableReads.reduce(into: Set<ViewNodeID>()) { partial, key in
       partial.formUnion(observableDependents[key] ?? [])
     }
   }
@@ -67,10 +67,12 @@ package enum ViewGraphDependencyIndex {
   package static func environmentDependents(
     within roots: Set<Identity>,
     changedKeys: Set<ObjectIdentifier>,
-    environmentDependents: [ObjectIdentifier: Set<Identity>]
-  ) -> Set<Identity> {
+    environmentDependents: [ObjectIdentifier: Set<ViewNodeID>],
+    identityByNodeID: [ViewNodeID: Identity]
+  ) -> Set<ViewNodeID> {
     changedKeys.reduce(into: Set<Identity>()) { partial, key in
-      let dependents = environmentDependents[key] ?? []
+      let dependents = (environmentDependents[key] ?? [])
+        .compactMap { identityByNodeID[$0] }
       partial.formUnion(
         dependents.filter { dependent in
           roots.contains { root in
@@ -78,40 +80,47 @@ package enum ViewGraphDependencyIndex {
           }
         }
       )
+    }.reduce(into: Set<ViewNodeID>()) { partial, identity in
+      guard
+        let viewNodeID = identityByNodeID.first(where: { $0.value == identity })?.key
+      else {
+        return
+      }
+      partial.insert(viewNodeID)
     }
   }
 
   private static func insert(
-    identity: Identity,
+    viewNodeID: ViewNodeID,
     dependencies: DependencySet,
-    stateSlotDependents: inout [StateSlotKey: Set<Identity>],
-    environmentDependents: inout [ObjectIdentifier: Set<Identity>],
-    observableDependents: inout [ObjectIdentifier: Set<Identity>]
+    stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
+    environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
+    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>]
   ) {
     insert(
-      identity,
+      viewNodeID,
       into: dependencies.stateSlotReads,
       in: &stateSlotDependents
     )
     insert(
-      identity,
+      viewNodeID,
       into: dependencies.environmentReads,
       in: &environmentDependents
     )
     insert(
-      identity,
+      viewNodeID,
       into: dependencies.observableReads,
       in: &observableDependents
     )
   }
 
   private static func remove<Key: Hashable>(
-    _ identity: Identity,
+    _ viewNodeID: ViewNodeID,
     from keys: Set<Key>,
-    in index: inout [Key: Set<Identity>]
+    in index: inout [Key: Set<ViewNodeID>]
   ) {
     for key in keys {
-      index[key]?.remove(identity)
+      index[key]?.remove(viewNodeID)
       if index[key]?.isEmpty == true {
         index.removeValue(forKey: key)
       }
@@ -119,12 +128,12 @@ package enum ViewGraphDependencyIndex {
   }
 
   private static func insert<Key: Hashable>(
-    _ identity: Identity,
+    _ viewNodeID: ViewNodeID,
     into keys: Set<Key>,
-    in index: inout [Key: Set<Identity>]
+    in index: inout [Key: Set<ViewNodeID>]
   ) {
     for key in keys {
-      index[key, default: []].insert(identity)
+      index[key, default: []].insert(viewNodeID)
     }
   }
 }

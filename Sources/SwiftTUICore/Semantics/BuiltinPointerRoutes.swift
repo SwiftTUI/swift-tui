@@ -34,9 +34,20 @@ package enum BuiltinPointerRouteComponent {
 }
 
 package func primaryRouteID(
+  for identity: Identity,
+  ownerNodeID: ViewNodeID? = nil
+) -> RouteID {
+  RouteID(identity: identity, ownerNodeID: ownerNodeID)
+}
+
+@MainActor
+package func runtimePrimaryRouteID(
   for identity: Identity
 ) -> RouteID {
-  RouteID(identity: identity)
+  primaryRouteID(
+    for: identity,
+    ownerNodeID: ViewNodeContext.current?.viewNodeID
+  )
 }
 
 package func childRouteID(

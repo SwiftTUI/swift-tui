@@ -169,10 +169,10 @@ final class FrameTailRenderer: Sendable {
   }
 
   func pruneMeasurementCache(
-    keeping identities: Set<Identity>
+    keeping viewNodeIDs: Set<ViewNodeID>
   ) {
     workerExecutor.sync {
-      layoutEngine.cache?.prune(keeping: identities)
+      layoutEngine.cache?.prune(keeping: viewNodeIDs)
     }
   }
 

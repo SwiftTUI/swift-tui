@@ -8,10 +8,12 @@ public struct Anchor<Value: Sendable>: Equatable, Hashable, Sendable {
   package var payload: AnchorPayload
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     kind: AnchorKind
   ) {
     payload = AnchorPayload(
+      viewNodeID: viewNodeID,
       identity: identity,
       kind: kind
     )
@@ -78,13 +80,16 @@ package enum AnchorKind: Equatable, Hashable, Sendable {
 }
 
 package struct AnchorPayload: Equatable, Hashable, Sendable {
+  package var viewNodeID: ViewNodeID?
   package var identity: Identity
   package var kind: AnchorKind
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     kind: AnchorKind
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.kind = kind
   }
@@ -159,17 +164,20 @@ package final class GeometryResolutionDiagnosticsRecorder: Sendable {
 }
 
 package struct PlacedFrameTable: Equatable, Sendable {
+  package private(set) var framesByNodeID: [ViewNodeID: CellRect]
   package private(set) var framesByIdentity: [Identity: CellRect]
   package private(set) var namedCoordinateSpaces: [String: CellRect]
   package private(set) var namedCoordinateSpaceIdentities: [String: Identity]
   package let diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
 
   package init(
+    framesByNodeID: [ViewNodeID: CellRect] = [:],
     framesByIdentity: [Identity: CellRect] = [:],
     namedCoordinateSpaces: [String: CellRect] = [:],
     namedCoordinateSpaceIdentities: [String: Identity] = [:],
     diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder? = nil
   ) {
+    self.framesByNodeID = framesByNodeID
     self.framesByIdentity = framesByIdentity
     self.namedCoordinateSpaces = namedCoordinateSpaces
     self.namedCoordinateSpaceIdentities = namedCoordinateSpaceIdentities
@@ -180,7 +188,8 @@ package struct PlacedFrameTable: Equatable, Sendable {
     lhs: Self,
     rhs: Self
   ) -> Bool {
-    lhs.framesByIdentity == rhs.framesByIdentity
+    lhs.framesByNodeID == rhs.framesByNodeID
+      && lhs.framesByIdentity == rhs.framesByIdentity
       && lhs.namedCoordinateSpaces == rhs.namedCoordinateSpaces
       && lhs.namedCoordinateSpaceIdentities == rhs.namedCoordinateSpaceIdentities
   }
@@ -190,10 +199,14 @@ package struct PlacedFrameTable: Equatable, Sendable {
   }
 
   package mutating func record(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     bounds: CellRect,
     namedCoordinateSpaceName: String?
   ) {
+    if let viewNodeID {
+      framesByNodeID[viewNodeID] = bounds
+    }
     framesByIdentity[identity] = bounds
 
     if let namedCoordinateSpaceName {
@@ -219,6 +232,17 @@ package struct PlacedFrameTable: Equatable, Sendable {
     return frame
   }
 
+  package func frame(
+    for payload: AnchorPayload
+  ) -> CellRect? {
+    if let viewNodeID = payload.viewNodeID,
+      let frame = framesByNodeID[viewNodeID]
+    {
+      return frame
+    }
+    return frame(for: payload.identity)
+  }
+
   @discardableResult
   package mutating func record(
     _ fragment: PlacedFrameTableFragment
@@ -226,6 +250,7 @@ package struct PlacedFrameTable: Equatable, Sendable {
     var count = 0
     for entry in fragment.entries {
       record(
+        viewNodeID: entry.viewNodeID,
         identity: entry.identity,
         bounds: translated(entry.bounds, by: fragment.translation),
         namedCoordinateSpaceName: entry.namedCoordinateSpaceName
@@ -250,15 +275,18 @@ package struct PlacedFrameTable: Equatable, Sendable {
 }
 
 package struct PlacedFrameTableEntry: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   package var identity: Identity
   package var bounds: CellRect
   package var namedCoordinateSpaceName: String?
 
   package init(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     bounds: CellRect,
     namedCoordinateSpaceName: String?
   ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.bounds = bounds
     self.namedCoordinateSpaceName = namedCoordinateSpaceName

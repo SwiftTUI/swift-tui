@@ -75,6 +75,7 @@ public struct FocusRegion: Equatable, Sendable {
 /// Scroll metadata extracted for a scrollable node.
 public struct ScrollRoute: Equatable, Sendable {
   public var identity: Identity
+  package var viewNodeID: ViewNodeID?
   public var viewportRect: CellRect
   public var contentBounds: CellRect
   /// Current clamped scroll offset of this region. Defaults to `.zero`; it is
@@ -92,6 +93,19 @@ public struct ScrollRoute: Equatable, Sendable {
     contentOffset: CellPoint = .zero
   ) {
     self.identity = identity
+    viewNodeID = nil
+    self.viewportRect = viewportRect
+    self.contentBounds = contentBounds
+  }
+
+  package init(
+    identity: Identity,
+    viewNodeID: ViewNodeID?,
+    viewportRect: CellRect,
+    contentBounds: CellRect
+  ) {
+    self.identity = identity
+    self.viewNodeID = viewNodeID
     self.viewportRect = viewportRect
     self.contentBounds = contentBounds
     self.contentOffset = contentOffset
@@ -156,6 +170,7 @@ public struct NavigationRoute: Equatable, Sendable {
 
 /// Accessibility metadata extracted for assistive-technology consumers.
 public struct AccessibilityNode: Equatable, Sendable {
+  package var viewNodeID: ViewNodeID?
   public var identity: Identity
   public var parentIdentity: Identity?
   public var rect: CellRect
@@ -177,6 +192,31 @@ public struct AccessibilityNode: Equatable, Sendable {
     liveRegion: AccessibilityPoliteness? = nil,
     cursorAnchor: CellPoint? = nil
   ) {
+    viewNodeID = nil
+    self.identity = identity
+    self.parentIdentity = parentIdentity
+    self.rect = rect
+    self.role = role
+    self.label = label
+    self.hint = hint
+    self.hidden = hidden
+    self.liveRegion = liveRegion
+    self.cursorAnchor = cursorAnchor
+  }
+
+  package init(
+    viewNodeID: ViewNodeID?,
+    identity: Identity,
+    parentIdentity: Identity? = nil,
+    rect: CellRect,
+    role: AccessibilityRole,
+    label: String? = nil,
+    hint: String? = nil,
+    hidden: Bool = false,
+    liveRegion: AccessibilityPoliteness? = nil,
+    cursorAnchor: CellPoint? = nil
+  ) {
+    self.viewNodeID = viewNodeID
     self.identity = identity
     self.parentIdentity = parentIdentity
     self.rect = rect

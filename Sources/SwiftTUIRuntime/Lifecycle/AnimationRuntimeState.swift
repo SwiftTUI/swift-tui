@@ -93,6 +93,7 @@ package struct AnimationTickResult: Sendable {
 /// identity and child-index needed to re-inject the subtree in roughly
 /// the same visual position during the removal animation.
 package struct RemovalEntry: Sendable {
+  package var identity: Identity
   package var snapshot: ResolvedNode
   package var parentIdentity: Identity?
   package var childIndex: Int

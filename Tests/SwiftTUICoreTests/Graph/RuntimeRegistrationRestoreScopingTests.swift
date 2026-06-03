@@ -51,7 +51,10 @@ struct RuntimeRegistrationRestoreScopingTests {
       liveRegistrations: liveRegistrations,
       checkpoint: nil
     )
-    graphDraft.recordDirtyEvaluationPlan(.init(frontierIdentities: [aIdentity]))
+    let aNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[aIdentity]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [aNodeID], frontierIdentities: [aIdentity])
+    )
     graphDraft.commitRuntimeRegistrations(from: graph)
 
     // Oracle: a full rebuild of the same committed graph.
@@ -121,6 +124,113 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(candidates.map(\.identity) == [aIdentity, bIdentity])
   }
 
+  @Test("structured lifecycle teardown preserves path-colliding sibling component")
+  func structuredLifecycleTeardownPreservesPathCollidingSiblingComponent() {
+    let preservedIdentity = Identity(components: ["Root", "A/B"])
+    let removedRoot = Identity(components: ["Root", "A"])
+    let removedIdentity = Identity(components: ["Root", "A", "B"])
+    let registry = LocalLifecycleRegistry()
+
+    _ = ViewNodeContext.withCurrentValue(
+      ViewNode(viewNodeID: ViewNodeID(rawValue: 1), identity: preservedIdentity)
+    ) {
+      registry.registerAppear(identity: preservedIdentity, ordinal: 0) {}
+    }
+    _ = ViewNodeContext.withCurrentValue(
+      ViewNode(viewNodeID: ViewNodeID(rawValue: 2), identity: removedIdentity)
+    ) {
+      registry.registerAppear(identity: removedIdentity, ordinal: 0) {}
+    }
+
+    #expect(Set(registry.snapshot().appearHandlers.keys).count == 1)
+    #expect(registry.snapshot().appearRegistrations.count == 2)
+
+    registry.removeSubtrees(rootedAt: [removedRoot])
+
+    let identities = Set(registry.snapshot().appearRegistrations.values.map(\.identity))
+    #expect(identities == [preservedIdentity])
+  }
+
+  @Test("structured preference teardown preserves path-colliding sibling component")
+  func structuredPreferenceTeardownPreservesPathCollidingSiblingComponent() {
+    let preservedIdentity = Identity(components: ["Root", "A/B"])
+    let removedRoot = Identity(components: ["Root", "A"])
+    let removedIdentity = Identity(components: ["Root", "A", "B"])
+    let registry = LocalPreferenceObservationRegistry()
+
+    ViewNodeContext.withCurrentValue(
+      ViewNode(viewNodeID: ViewNodeID(rawValue: 1), identity: preservedIdentity)
+    ) {
+      registry.register(
+        identity: preservedIdentity,
+        key: RuntimeRegistrationPathCollisionPreferenceKey.self,
+        value: 1
+      ) { _ in }
+    }
+    ViewNodeContext.withCurrentValue(
+      ViewNode(viewNodeID: ViewNodeID(rawValue: 2), identity: removedIdentity)
+    ) {
+      registry.register(
+        identity: removedIdentity,
+        key: RuntimeRegistrationPathCollisionPreferenceKey.self,
+        value: 2
+      ) { _ in }
+    }
+
+    #expect(Set(registry.snapshot().map(\.handlerID)).count == 1)
+    #expect(registry.snapshot().count == 2)
+
+    registry.removeSubtrees(rootedAt: [removedRoot])
+
+    let identities = Set(registry.snapshot().map(\.identity))
+    #expect(identities == [preservedIdentity])
+  }
+
+  @Test("structured focus binding keys isolate path-colliding binding IDs")
+  func structuredFocusBindingKeysIsolatePathCollidingBindingIDs() {
+    let preservedIdentity = Identity(components: ["Root", "A/B"])
+    let removedRoot = Identity(components: ["Root", "A"])
+    let removedIdentity = Identity(components: ["Root", "A", "B"])
+    let bindingID = "\(preservedIdentity)#FocusState[0]"
+    let registry = LocalFocusBindingRegistry()
+
+    registry.register(
+      identity: preservedIdentity,
+      bindingKey: FocusBindingKey(
+        ownerNodeID: ViewNodeID(rawValue: 1),
+        suffix: .stateSlot(ordinal: 0)
+      ),
+      bindingID: bindingID,
+      hasPendingRequest: false,
+      isSelected: true,
+      applyRuntimeFocus: { _ in false }
+    )
+    registry.register(
+      identity: removedIdentity,
+      bindingKey: FocusBindingKey(
+        ownerNodeID: ViewNodeID(rawValue: 2),
+        suffix: .stateSlot(ordinal: 0)
+      ),
+      bindingID: bindingID,
+      hasPendingRequest: true,
+      isSelected: false,
+      applyRuntimeFocus: { _ in false }
+    )
+
+    #expect(Set(registry.snapshot().map(\.bindingID)).count == 1)
+    #expect(Set(registry.snapshot().map(\.bindingKey)).count == 2)
+    #expect(
+      registry.desiredFocusRequest(allowedIdentities: [preservedIdentity]) == .clear
+    )
+
+    registry.removeSubtrees(rootedAt: [removedRoot])
+
+    #expect(registry.snapshot().map(\.identity) == [preservedIdentity])
+    #expect(
+      registry.desiredFocusRequest(allowedIdentities: [preservedIdentity]) == .none
+    )
+  }
+
   @MainActor
   private func seedTwoFocusableSiblings(
     graph: ViewGraph,
@@ -179,5 +289,16 @@ struct RuntimeRegistrationRestoreScopingTests {
         applyRuntimeFocus: { _ in false }
       )
     )
+  }
+}
+
+private enum RuntimeRegistrationPathCollisionPreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(
+    value: inout Int,
+    nextValue: () -> Int
+  ) {
+    value = nextValue()
   }
 }

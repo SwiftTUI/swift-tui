@@ -1,78 +1,85 @@
 @MainActor
 enum ViewGraphInvalidationPlanner {
   static func invalidate(
-    _ identities: Set<Identity>,
-    invalidatedIdentities: inout Set<Identity>,
-    nodesByIdentity: [Identity: ViewNode]
+    _ viewNodeIDs: Set<ViewNodeID>,
+    invalidatedNodeIDs: inout Set<ViewNodeID>,
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    invalidatedIdentities.formUnion(identities)
-    markDirty(identities, nodesByIdentity: nodesByIdentity)
+    invalidatedNodeIDs.formUnion(viewNodeIDs)
+    markDirty(viewNodeIDs, nodesByNodeID: nodesByNodeID)
   }
 
   static func invalidateAndQueueDirty(
-    _ identities: Set<Identity>,
-    invalidatedIdentities: inout Set<Identity>,
-    graphLocalDirtyIdentities: inout Set<Identity>,
-    nodesByIdentity: [Identity: ViewNode]
+    _ viewNodeIDs: Set<ViewNodeID>,
+    invalidatedNodeIDs: inout Set<ViewNodeID>,
+    graphLocalDirtyNodeIDs: inout Set<ViewNodeID>,
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    invalidatedIdentities.formUnion(identities)
-    for identity in identities {
-      guard let node = nodesByIdentity[identity] else {
+    invalidatedNodeIDs.formUnion(viewNodeIDs)
+    for viewNodeID in viewNodeIDs {
+      guard let node = nodesByNodeID[viewNodeID] else {
         continue
       }
       node.markDirty()
-      graphLocalDirtyIdentities.insert(identity)
+      graphLocalDirtyNodeIDs.insert(viewNodeID)
     }
   }
 
   static func queueDirty(
-    _ identities: Set<Identity>,
-    graphLocalDirtyIdentities: inout Set<Identity>,
-    nodesByIdentity: [Identity: ViewNode]
+    _ viewNodeIDs: Set<ViewNodeID>,
+    graphLocalDirtyNodeIDs: inout Set<ViewNodeID>,
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    graphLocalDirtyIdentities.formUnion(identities)
-    markDirty(identities, nodesByIdentity: nodesByIdentity)
+    graphLocalDirtyNodeIDs.formUnion(viewNodeIDs)
+    markDirty(viewNodeIDs, nodesByNodeID: nodesByNodeID)
   }
 
-  static func stateChangeDirtyIdentities(
+  static func stateChangeDirtyNodeIDs(
     for key: StateSlotKey,
-    stateSlotDependents: [StateSlotKey: Set<Identity>]
-  ) -> Set<Identity> {
-    Set([key.identity]).union(stateSlotDependents[key] ?? [])
+    ownerNodeID: ViewNodeID?,
+    stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
+  ) -> Set<ViewNodeID> {
+    var result = stateSlotDependents[key] ?? []
+    if let ownerNodeID {
+      result.insert(ownerNodeID)
+    }
+    return result
   }
 
-  static func observationChangeDirtyIdentities(
-    observedBy identity: Identity,
-    nodesByIdentity: [Identity: ViewNode],
-    observableDependents: [ObjectIdentifier: Set<Identity>]
-  ) -> Set<Identity> {
-    Set([identity]).union(
+  static func observationChangeDirtyNodeIDs(
+    observedBy viewNodeID: ViewNodeID,
+    nodesByNodeID: [ViewNodeID: ViewNode],
+    observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
+  ) -> Set<ViewNodeID> {
+    Set([viewNodeID]).union(
       ViewGraphDependencyIndex.observableDependents(
-        triggeredBy: identity,
-        nodesByIdentity: nodesByIdentity,
+        triggeredBy: viewNodeID,
+        nodesByNodeID: nodesByNodeID,
         observableDependents: observableDependents
       )
     )
   }
 
-  static func environmentReaderDirtyIdentities(
+  static func environmentReaderDirtyNodeIDs(
     within identities: Set<Identity>,
     changedKeys: Set<ObjectIdentifier>,
-    environmentDependents: [ObjectIdentifier: Set<Identity>]
-  ) -> Set<Identity> {
+    environmentDependents: [ObjectIdentifier: Set<ViewNodeID>],
+    identityByNodeID: [ViewNodeID: Identity]
+  ) -> Set<ViewNodeID> {
     ViewGraphDependencyIndex.environmentDependents(
       within: identities,
       changedKeys: changedKeys,
-      environmentDependents: environmentDependents
+      environmentDependents: environmentDependents,
+      identityByNodeID: identityByNodeID
     )
   }
 
   private static func markDirty(
-    _ identities: Set<Identity>,
-    nodesByIdentity: [Identity: ViewNode]
+    _ viewNodeIDs: Set<ViewNodeID>,
+    nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    for identity in identities {
-      nodesByIdentity[identity]?.markDirty()
+    for viewNodeID in viewNodeIDs {
+      nodesByNodeID[viewNodeID]?.markDirty()
     }
   }
 }

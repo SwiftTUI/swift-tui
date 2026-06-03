@@ -113,12 +113,14 @@ package final class LayoutPassContext: Sendable {
   }
 
   package func recordPlacedFrame(
+    viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     bounds: CellRect,
     namedCoordinateSpaceName: String?
   ) {
     state.withLock {
       $0.placedFrameTable.record(
+        viewNodeID: viewNodeID,
         identity: identity,
         bounds: bounds,
         namedCoordinateSpaceName: namedCoordinateSpaceName
@@ -133,6 +135,7 @@ package final class LayoutPassContext: Sendable {
       var work = [node]
       while let current = work.popLast() {
         $0.placedFrameTable.record(
+          viewNodeID: current.viewNodeID,
           identity: current.identity,
           bounds: current.bounds,
           namedCoordinateSpaceName: current.semanticMetadata.namedCoordinateSpaceName

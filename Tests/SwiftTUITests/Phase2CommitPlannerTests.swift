@@ -22,17 +22,17 @@ struct Phase2CommitPlannerTests {
       )
     )
 
-    #expect(
-      plan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .appear(handlerIDs: ["appear"])
-        ),
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .taskStart(task)
-        ),
-      ]
+    expectLifecycle(
+      plan.lifecycle,
+      identities: [
+        testIdentity("Root", "Leaf"),
+        testIdentity("Root", "Leaf"),
+      ],
+      operations: [
+        .appear(handlerIDs: ["appear"]),
+        .taskStart(task),
+      ],
+      hasNodeIDs: [false, true]
     )
   }
 
@@ -86,13 +86,11 @@ struct Phase2CommitPlannerTests {
       )
     )
 
-    #expect(
-      plan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .taskStart(task)
-        )
-      ]
+    expectLifecycle(
+      plan.lifecycle,
+      identities: [testIdentity("Root", "Leaf")],
+      operations: [.taskStart(task)],
+      hasNodeIDs: [true]
     )
   }
 
@@ -121,13 +119,11 @@ struct Phase2CommitPlannerTests {
       )
     )
 
-    #expect(
-      plan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .taskCancel(task)
-        )
-      ]
+    expectLifecycle(
+      plan.lifecycle,
+      identities: [testIdentity("Root", "Leaf")],
+      operations: [.taskCancel(task)],
+      hasNodeIDs: [true]
     )
   }
 
@@ -148,17 +144,17 @@ struct Phase2CommitPlannerTests {
       to: lifecycleTree(children: [])
     )
 
-    #expect(
-      plan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .taskCancel(task)
-        ),
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .disappear(handlerIDs: ["disappear"])
-        ),
-      ]
+    expectLifecycle(
+      plan.lifecycle,
+      identities: [
+        testIdentity("Root", "Leaf"),
+        testIdentity("Root", "Leaf"),
+      ],
+      operations: [
+        .taskCancel(task),
+        .disappear(handlerIDs: ["disappear"]),
+      ],
+      hasNodeIDs: [true, false]
     )
   }
 
@@ -189,17 +185,17 @@ struct Phase2CommitPlannerTests {
       )
     )
 
-    #expect(
-      plan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .taskCancel(firstTask)
-        ),
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "Leaf"),
-          operation: .taskStart(secondTask)
-        ),
-      ]
+    expectLifecycle(
+      plan.lifecycle,
+      identities: [
+        testIdentity("Root", "Leaf"),
+        testIdentity("Root", "Leaf"),
+      ],
+      operations: [
+        .taskCancel(firstTask),
+        .taskStart(secondTask),
+      ],
+      hasNodeIDs: [true, true]
     )
   }
 
@@ -299,18 +295,29 @@ struct Phase2CommitPlannerTests {
       lifecycleEvents: lifecycleEvents
     )
 
-    #expect(
-      plan.lifecycle == [
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "LazyVStack", "ID[1]"),
-          operation: .appear(handlerIDs: ["appear"])
-        ),
-        LifecycleCommitEntry(
-          identity: testIdentity("Root", "LazyVStack", "ID[1]"),
-          operation: .taskStart(task)
-        ),
-      ]
+    expectLifecycle(
+      plan.lifecycle,
+      identities: [
+        testIdentity("Root", "LazyVStack", "ID[1]"),
+        testIdentity("Root", "LazyVStack", "ID[1]"),
+      ],
+      operations: [
+        .appear(handlerIDs: ["appear"]),
+        .taskStart(task),
+      ],
+      hasNodeIDs: [false, false]
     )
+  }
+
+  private func expectLifecycle(
+    _ lifecycle: [LifecycleCommitEntry],
+    identities: [Identity],
+    operations: [LifecycleCommitOperation],
+    hasNodeIDs: [Bool]
+  ) {
+    #expect(lifecycle.map(\.identity) == identities)
+    #expect(lifecycle.map(\.operation) == operations)
+    #expect(lifecycle.map { $0.viewNodeID != nil } == hasNodeIDs)
   }
 
   private func planTransition(

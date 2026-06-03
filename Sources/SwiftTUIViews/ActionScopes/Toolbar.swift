@@ -364,10 +364,9 @@ private struct ToolbarItemsStrip<S: ToolbarStyle>: PrimitiveView, ResolvableView
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let layout = style.itemLayout
+    let buttons = VariadicView(items.map(ToolbarItemButton.init(config:)))
     let content = layout {
-      ForEach(items.indices, id: \.self) { index in
-        ToolbarItemButton(config: items[index])
-      }
+      buttons
     }
     // Frame-then-background so the fill covers the full row width, not
     // just the items' natural extent. Items stay flush-leading; the

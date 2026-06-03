@@ -54,13 +54,21 @@ package final class LifecycleCoordinator {
       }
     case .taskStart(let descriptor):
       guard let registration = currentTaskRegistry.registration(for: entry.identity),
-        registration.descriptor == descriptor
+        registration.descriptor == descriptor,
+        let viewNodeID = entry.viewNodeID
       else {
         return
       }
-      taskRunner.start(identity: entry.identity, registration: registration)
+      taskRunner.start(
+        viewNodeID: viewNodeID,
+        identity: entry.identity,
+        registration: registration
+      )
     case .taskCancel(let descriptor):
-      taskRunner.cancel(identity: entry.identity, matching: descriptor)
+      guard let viewNodeID = entry.viewNodeID else {
+        return
+      }
+      taskRunner.cancel(viewNodeID: viewNodeID, matching: descriptor)
     }
   }
 }

@@ -34,6 +34,7 @@ extension LayoutEngine {
       )
     }
     let measured = MeasuredNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       proposal: originalProposal,
       measuredSize: clampedSize(rawSize, proposal: clampingProposal),

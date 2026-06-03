@@ -13,6 +13,7 @@ extension LayoutEngine {
     )
 
     return PlacedNode(
+      viewNodeID: resolved.viewNodeID,
       identity: resolved.identity,
       resolvedMetadata: .init(
         resolved: resolved,
@@ -156,6 +157,7 @@ extension LayoutEngine {
     }
 
     return PlacedNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       kind: node.kind,
       environmentSnapshot: node.environmentSnapshot,

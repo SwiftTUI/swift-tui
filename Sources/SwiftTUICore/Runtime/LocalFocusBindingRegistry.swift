@@ -4,6 +4,25 @@ package enum FocusBindingRequest: Equatable, Sendable {
   case focus(Identity)
 }
 
+package enum FocusBindingKeySuffix: Hashable, Sendable, CustomStringConvertible {
+  case stateSlot(ordinal: Int)
+  case local(ObjectIdentifier)
+  case legacy(String)
+
+  package var description: String {
+    switch self {
+    case .stateSlot(let ordinal):
+      "FocusState[\(ordinal)]"
+    case .local(let identifier):
+      "FocusState.local[\(identifier)]"
+    case .legacy(let bindingID):
+      bindingID
+    }
+  }
+}
+
+package typealias FocusBindingKey = ViewNodeRuntimeKey<FocusBindingKeySuffix>
+
 package struct DefaultFocusScopeRegistrationSnapshot: Equatable, Sendable {
   package var namespace: MatchedGeometryNamespace
   package var identity: Identity
@@ -235,10 +254,27 @@ package final class LocalDefaultFocusRegistry: Equatable {
 
 package struct FocusBindingRegistrationSnapshot: Sendable {
   package var identity: Identity
+  package var bindingKey: FocusBindingKey
   package var bindingID: String
   package var hasPendingRequest: Bool
   package var isSelected: Bool
   package var applyRuntimeFocus: @MainActor @Sendable (Bool) -> Bool
+
+  package init(
+    identity: Identity,
+    bindingKey: FocusBindingKey,
+    bindingID: String,
+    hasPendingRequest: Bool,
+    isSelected: Bool,
+    applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
+  ) {
+    self.identity = identity
+    self.bindingKey = bindingKey
+    self.bindingID = bindingID
+    self.hasPendingRequest = hasPendingRequest
+    self.isSelected = isSelected
+    self.applyRuntimeFocus = applyRuntimeFocus
+  }
 
   package init(
     identity: Identity,
@@ -247,11 +283,17 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     isSelected: Bool,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
   ) {
-    self.identity = identity
-    self.bindingID = bindingID
-    self.hasPendingRequest = hasPendingRequest
-    self.isSelected = isSelected
-    self.applyRuntimeFocus = applyRuntimeFocus
+    self.init(
+      identity: identity,
+      bindingKey: FocusBindingKey(
+        ownerNodeID: nil,
+        suffix: .legacy(bindingID)
+      ),
+      bindingID: bindingID,
+      hasPendingRequest: hasPendingRequest,
+      isSelected: isSelected,
+      applyRuntimeFocus: applyRuntimeFocus
+    )
   }
 }
 
@@ -270,6 +312,7 @@ package final class LocalFocusBindingRegistry: Equatable {
 
   package func register(
     identity: Identity,
+    bindingKey: FocusBindingKey,
     bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
@@ -277,6 +320,7 @@ package final class LocalFocusBindingRegistry: Equatable {
   ) {
     let registration = FocusBindingRegistrationSnapshot(
       identity: identity,
+      bindingKey: bindingKey,
       bindingID: bindingID,
       hasPendingRequest: hasPendingRequest,
       isSelected: isSelected,
@@ -286,18 +330,38 @@ package final class LocalFocusBindingRegistry: Equatable {
     ViewNodeContext.current?.recordFocusBindingRegistration(registration)
   }
 
+  package func register(
+    identity: Identity,
+    bindingID: String,
+    hasPendingRequest: Bool,
+    isSelected: Bool,
+    applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
+  ) {
+    register(
+      identity: identity,
+      bindingKey: FocusBindingKey(
+        ownerNodeID: nil,
+        suffix: .legacy(bindingID)
+      ),
+      bindingID: bindingID,
+      hasPendingRequest: hasPendingRequest,
+      isSelected: isSelected,
+      applyRuntimeFocus: applyRuntimeFocus
+    )
+  }
+
   package func desiredFocusRequest(
     allowedIdentities: Set<Identity>
   ) -> FocusBindingRequest {
     let snapshot = self.snapshot()
-    var seenBindingIDs: Set<String> = []
+    var seenBindingKeys: Set<FocusBindingKey> = []
 
     for registration in snapshot {
-      guard seenBindingIDs.insert(registration.bindingID).inserted else {
+      guard seenBindingKeys.insert(registration.bindingKey).inserted else {
         continue
       }
 
-      let matching = snapshot.filter { $0.bindingID == registration.bindingID }
+      let matching = snapshot.filter { $0.bindingKey == registration.bindingKey }
       guard matching.contains(where: \.hasPendingRequest) else {
         continue
       }
@@ -388,18 +452,18 @@ package final class LocalFocusBindingRegistry: Equatable {
   private func orderedGroups(
     from snapshot: [FocusBindingRegistrationSnapshot]
   ) -> [[FocusBindingRegistrationSnapshot]] {
-    var grouped: [String: [FocusBindingRegistrationSnapshot]] = [:]
-    var orderedBindingIDs: [String] = []
+    var grouped: [FocusBindingKey: [FocusBindingRegistrationSnapshot]] = [:]
+    var orderedBindingKeys: [FocusBindingKey] = []
 
     for registration in snapshot {
-      if grouped[registration.bindingID] == nil {
-        orderedBindingIDs.append(registration.bindingID)
-        grouped[registration.bindingID] = []
+      if grouped[registration.bindingKey] == nil {
+        orderedBindingKeys.append(registration.bindingKey)
+        grouped[registration.bindingKey] = []
       }
-      grouped[registration.bindingID]?.append(registration)
+      grouped[registration.bindingKey]?.append(registration)
     }
 
-    return orderedBindingIDs.compactMap { grouped[$0] }
+    return orderedBindingKeys.compactMap { grouped[$0] }
   }
 }
 

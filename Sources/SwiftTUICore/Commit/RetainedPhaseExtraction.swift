@@ -116,24 +116,32 @@ package struct RetainedSemanticExtractionInput: Sendable {
 
 package struct RetainedDrawExtractionInput: Sendable {
   package var previousDraw: DrawNode
-  package var previousDrawByIdentity: [Identity: DrawNode]
+  package var previousDrawByNodeID: [ViewNodeID: DrawNode]
   package var proof: RetainedPhaseExtractionProof
 
   package init(
     previousDraw: DrawNode,
-    previousDrawByIdentity: [Identity: DrawNode] = [:],
+    previousDrawByNodeID: [ViewNodeID: DrawNode] = [:],
     proof: RetainedPhaseExtractionProof
   ) {
     self.previousDraw = previousDraw
-    self.previousDrawByIdentity = previousDrawByIdentity
+    self.previousDrawByNodeID = previousDrawByNodeID
     self.proof = proof
   }
 
-  package func previousDrawNode(for identity: Identity) -> DrawNode? {
-    if previousDraw.identity == identity {
+  package func previousDrawNode(for node: PlacedNode) -> DrawNode? {
+    if let viewNodeID = node.viewNodeID,
+      previousDraw.viewNodeID == viewNodeID
+    {
       return previousDraw
     }
-    return previousDrawByIdentity[identity]
+    if previousDraw.identity == node.identity {
+      return previousDraw
+    }
+    if let viewNodeID = node.viewNodeID {
+      return previousDrawByNodeID[viewNodeID]
+    }
+    return nil
   }
 }
 

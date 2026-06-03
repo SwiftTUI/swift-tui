@@ -31,7 +31,11 @@ public struct TransitionRegistrationModifier: PrimitiveViewModifier, Sendable {
     // diffing.
     if let sink = TransitionRegistrationStorage.effectiveSink {
       for node in nodes {
-        sink.registerTransition(for: node.identity, transition: transition)
+        sink.registerTransition(
+          for: node.identity,
+          viewNodeID: node.viewNodeID ?? ViewNodeContext.current?.viewNodeID,
+          transition: transition
+        )
       }
     }
     return nodes

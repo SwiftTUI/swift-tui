@@ -32,6 +32,7 @@ extension ViewNode {
       package var dropDestinationIdentities: [String]
     }
 
+    package var viewNodeID: ViewNodeID
     package var invalidatorInstalled: Bool
     package var ownerGraphInstalled: Bool
     package var parentIdentity: Identity?

@@ -15,6 +15,7 @@ package final class LocalActionRegistry: Equatable {
   }
 
   private var handlers: [Identity: Registration] = [:]
+  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -32,6 +33,7 @@ package final class LocalActionRegistry: Equatable {
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
     handlers[identity] = registration
+    ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordActionRegistration(
       identity: identity,
       handler: handler,
@@ -58,6 +60,7 @@ package final class LocalActionRegistry: Equatable {
 
   package func reset() {
     handlers.removeAll(keepingCapacity: true)
+    ownersByIdentity.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -68,9 +71,10 @@ package final class LocalActionRegistry: Equatable {
     }
 
     for identity in handlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0, roots: roots)
+      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
     }) {
       handlers.removeValue(forKey: identity)
+      ownersByIdentity.removeValue(forKey: identity)
     }
   }
 
@@ -78,22 +82,17 @@ package final class LocalActionRegistry: Equatable {
     handlers
   }
 
-  package func restore(_ snapshot: [Identity: Registration]) {
+  package func restore(
+    _ snapshot: [Identity: Registration],
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (identity, registration) in snapshot {
       handlers[identity] = registration
+      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

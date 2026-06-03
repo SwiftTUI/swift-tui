@@ -3,14 +3,14 @@ package import SwiftTUIViews
 
 package enum PlacedAnimationOverlaySampling {
   package static func sample(
-    removingIdentities: [Identity: RemovalEntry],
+    removingNodes: [ViewNodeID: RemovalEntry],
     activeAnimations: [AnimationKey: ActiveAnimation],
     registeredAnimations: [AnimationBox: Animation],
     tree: PlacedNode,
     timestamp: MonotonicInstant
   ) -> PlacedAnimationOverlaySamplingResult {
     let removalResult = sampleRemovalOverlays(
-      removingIdentities: removingIdentities,
+      removingNodes: removingNodes,
       registeredAnimations: registeredAnimations,
       timestamp: timestamp
     )
@@ -45,7 +45,7 @@ package enum PlacedAnimationOverlaySampling {
 
   private struct RemovalSamplingResult {
     var overlays: [PlacedRemovalOverlaySnapshot] = []
-    var customStates: [Identity: AnimationState] = [:]
+    var customStates: [ViewNodeID: AnimationState] = [:]
   }
 
   private struct OffsetSamplingResult {
@@ -55,13 +55,13 @@ package enum PlacedAnimationOverlaySampling {
   }
 
   private static func sampleRemovalOverlays(
-    removingIdentities: [Identity: RemovalEntry],
+    removingNodes: [ViewNodeID: RemovalEntry],
     registeredAnimations: [AnimationBox: Animation],
     timestamp: MonotonicInstant
   ) -> RemovalSamplingResult {
     var result = RemovalSamplingResult()
 
-    for (identity, entry) in removingIdentities {
+    for (viewNodeID, entry) in removingNodes {
       guard let placedSnapshot = entry.placedSnapshot,
         let parentId = entry.parentIdentity
       else {
@@ -77,7 +77,7 @@ package enum PlacedAnimationOverlaySampling {
       let elapsed = entry.startTime.duration(to: timestamp)
       var state = entry.customState
       let evaluated = animation.evaluate(elapsed: elapsed, state: &state)
-      result.customStates[identity] = state
+      result.customStates[viewNodeID] = state
 
       guard let progress = evaluated else {
         continue

@@ -1,5 +1,31 @@
+package struct PreferenceObservationKeySuffix: Hashable, Sendable,
+  CustomStringConvertible
+{
+  package var preferenceKeyID: ObjectIdentifier
+  package var keyDebugName: String
+  package var ordinal: Int
+
+  package init<K: PreferenceKey>(
+    key: K.Type,
+    keyDebugName: String,
+    ordinal: Int
+  ) {
+    preferenceKeyID = ObjectIdentifier(key)
+    self.keyDebugName = keyDebugName
+    self.ordinal = ordinal
+  }
+
+  package var description: String {
+    "preference[\(keyDebugName)][\(ordinal)]"
+  }
+}
+
+package typealias PreferenceObservationKey =
+  ViewNodeRuntimeKey<PreferenceObservationKeySuffix>
+
 package struct PreferenceObservationRegistrationSnapshot: Sendable {
   package var identity: Identity
+  package var key: PreferenceObservationKey
   package var handlerID: String
   fileprivate let box: any PreferenceObservationBox
 
@@ -9,10 +35,12 @@ package struct PreferenceObservationRegistrationSnapshot: Sendable {
 
   fileprivate init(
     identity: Identity,
+    key: PreferenceObservationKey,
     handlerID: String,
     box: any PreferenceObservationBox
   ) {
     self.identity = identity
+    self.key = key
     self.handlerID = handlerID
     self.box = box
   }
@@ -66,7 +94,8 @@ where Key.Value: Equatable {
 
 @MainActor
 package final class LocalPreferenceObservationRegistry: Equatable {
-  private var registrations: [String: PreferenceObservationRegistrationSnapshot] = [:]
+  private var registrations: [PreferenceObservationKey: PreferenceObservationRegistrationSnapshot] =
+    [:]
 
   package init() {}
 
@@ -88,16 +117,25 @@ package final class LocalPreferenceObservationRegistry: Equatable {
       registration.identity == identity
         && registration.keyDebugName == keyDebugName
     }
+    let registrationKey = PreferenceObservationKey(
+      ownerNodeID: ViewNodeContext.current?.viewNodeID,
+      suffix: .init(
+        key: key,
+        keyDebugName: keyDebugName,
+        ordinal: ordinal
+      )
+    )
     let handlerID = "\(identity)#preference[\(keyDebugName)][\(ordinal)]"
     let registration = PreferenceObservationRegistrationSnapshot(
       identity: identity,
+      key: registrationKey,
       handlerID: handlerID,
       box: TypedPreferenceObservationBox<K>(
         value: value,
         action: action
       )
     )
-    registrations[handlerID] = registration
+    registrations[registrationKey] = registration
     ViewNodeContext.current?.recordPreferenceObservationRegistration(
       registration
     )
@@ -107,12 +145,12 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     since previous: [PreferenceObservationRegistrationSnapshot]
   ) -> Bool {
     let previousByID = Dictionary(
-      uniqueKeysWithValues: previous.map { ($0.handlerID, $0) }
+      uniqueKeysWithValues: previous.map { ($0.key, $0) }
     )
 
     var appliedChange = false
-    for registration in registrations.values.sorted(by: { $0.handlerID < $1.handlerID }) {
-      if registration.box.changed(from: previousByID[registration.handlerID]?.box) {
+    for registration in sortedRegistrations() {
+      if registration.box.changed(from: previousByID[registration.key]?.box) {
         registration.box.apply()
         appliedChange = true
       }
@@ -131,15 +169,15 @@ package final class LocalPreferenceObservationRegistry: Equatable {
       return
     }
 
-    for (handlerID, _) in registrations.filter({
+    for (registrationKey, _) in registrations.filter({
       identityMatchesAnySubtreeRoot($0.value.identity, roots: roots)
     }) {
-      registrations.removeValue(forKey: handlerID)
+      registrations.removeValue(forKey: registrationKey)
     }
   }
 
   package func snapshot() -> [PreferenceObservationRegistrationSnapshot] {
-    registrations.values.sorted(by: { $0.handlerID < $1.handlerID })
+    sortedRegistrations()
   }
 
   package func restore(
@@ -150,7 +188,16 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     }
 
     for registration in snapshot {
-      registrations[registration.handlerID] = registration
+      registrations[registration.key] = registration
+    }
+  }
+
+  private func sortedRegistrations() -> [PreferenceObservationRegistrationSnapshot] {
+    registrations.values.sorted { lhs, rhs in
+      if lhs.handlerID != rhs.handlerID {
+        return lhs.handlerID < rhs.handlerID
+      }
+      return String(describing: lhs.key) < String(describing: rhs.key)
     }
   }
 }

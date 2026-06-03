@@ -107,6 +107,7 @@ public struct AnchorPreferenceWritingModifier<Key: PreferenceKey, Value: Sendabl
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     let anchor = Anchor<Value>(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       kind: source.kind
     )
@@ -130,6 +131,7 @@ public struct AnchorPreferenceTransformModifier<Key: PreferenceKey, Value: Senda
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     let anchor = Anchor<Value>(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       kind: source.kind
     )

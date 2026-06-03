@@ -59,11 +59,6 @@ package func appendDeclaredChildNodes<V: View>(
 
   if context.viewGraph != nil {
     let resolvedNode = resolveView(view, in: childContext)
-    context.viewGraph?.recordRegistrationAlias(
-      from: childContext.identity,
-      to: resolvedNode.identity,
-      resolvedKind: resolvedNode.kind
-    )
     if resolvedNode.identity == childContext.identity,
       resolvedNode.kind == .view("EmptyView")
     {
@@ -360,11 +355,15 @@ func resolveView<V: View>(
   }
   assignEntityIdentityOccurrences(to: &resolved._storedChildren)
   if let graphNode {
-    context.viewGraph?.finishEvaluation(
+    if let committed = context.viewGraph?.finishEvaluation(
       graphNode,
       resolved: resolved,
       accessedStateSlots: accessedStateSlots
-    )
+    ) {
+      resolved = committed
+    } else {
+      resolved.viewNodeID = graphNode.viewNodeID
+    }
   }
   resolved.structuralPath = context.structuralPath
   return resolved

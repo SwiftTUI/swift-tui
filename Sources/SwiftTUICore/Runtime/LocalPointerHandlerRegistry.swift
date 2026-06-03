@@ -78,6 +78,8 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   private var handlers: [RouteID: Handler] = [:]
   private var hoverHandlers: [RouteID: HoverHandler] = [:]
+  private var handlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  private var hoverHandlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
 
@@ -94,6 +96,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handler: @escaping Handler
   ) {
     handlers[routeID] = handler
+    handlerOwners[routeID] = .current(identity: routeID.identity)
     ViewNodeContext.current?.recordPointerHandlerRegistration(
       routeID: routeID,
       handler: handler
@@ -105,6 +108,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handler: @escaping HoverHandler
   ) {
     hoverHandlers[routeID] = handler
+    hoverHandlerOwners[routeID] = .current(identity: routeID.identity)
     ViewNodeContext.current?.recordPointerHoverHandlerRegistration(
       routeID: routeID,
       handler: handler
@@ -145,6 +149,8 @@ package final class LocalPointerHandlerRegistry: Equatable {
   package func reset() {
     handlers.removeAll(keepingCapacity: true)
     hoverHandlers.removeAll(keepingCapacity: true)
+    handlerOwners.removeAll(keepingCapacity: true)
+    hoverHandlerOwners.removeAll(keepingCapacity: true)
   }
 
   package func reset(
@@ -157,8 +163,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
     for routeID in handlers.keys.filter({ !preservedIdentities.contains($0.identity) }) {
       handlers.removeValue(forKey: routeID)
+      handlerOwners.removeValue(forKey: routeID)
     }
     hoverHandlers.removeAll(keepingCapacity: true)
+    hoverHandlerOwners.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -170,16 +178,18 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }
 
     for routeID in handlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+      (handlerOwners[$0] ?? .init(identity: $0.identity)).matchesAnySubtreeRoot(roots)
         && !preservedIdentities.contains($0.identity)
     }) {
       handlers.removeValue(forKey: routeID)
+      handlerOwners.removeValue(forKey: routeID)
     }
     for routeID in hoverHandlers.keys.filter({
-      identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+      (hoverHandlerOwners[$0] ?? .init(identity: $0.identity)).matchesAnySubtreeRoot(roots)
         && !preservedIdentities.contains($0.identity)
     }) {
       hoverHandlers.removeValue(forKey: routeID)
+      hoverHandlerOwners.removeValue(forKey: routeID)
     }
   }
 
@@ -191,32 +201,31 @@ package final class LocalPointerHandlerRegistry: Equatable {
     hoverHandlers
   }
 
-  package func restore(_ snapshot: [RouteID: Handler]) {
+  package func restore(
+    _ snapshot: [RouteID: Handler],
+    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (routeID, handler) in snapshot {
       handlers[routeID] = handler
+      handlerOwners[routeID] = ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
     }
   }
 
-  package func restoreHover(_ snapshot: [RouteID: HoverHandler]) {
+  package func restoreHover(
+    _ snapshot: [RouteID: HoverHandler],
+    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (routeID, handler) in snapshot {
       hoverHandlers[routeID] = handler
+      hoverHandlerOwners[routeID] = ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
     }
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

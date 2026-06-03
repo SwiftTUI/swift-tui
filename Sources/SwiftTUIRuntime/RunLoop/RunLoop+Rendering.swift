@@ -168,7 +168,7 @@ extension RunLoop {
     let animationTick = renderer.internalAnimationController.lastTickResult
     requestNextAnimationFrameIfNeeded(animationTick)
     observationBridge.prune(
-      keeping: renderer.liveIdentitySnapshot()
+      keeping: renderer.liveNodeIDSnapshot()
     )
     renderedFrames += 1
     progressProbe?.record(

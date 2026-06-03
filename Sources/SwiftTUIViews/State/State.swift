@@ -306,16 +306,24 @@ public struct State<Value> {
             }
             return retainedSeed
           }
-          return viewNode.stateSlot(
+          let liveViewNode =
+            viewNode.ownerGraph?.nodeForIdentity(viewNode.identity) ?? viewNode
+          return liveViewNode.stateSlot(
             ordinal: ordinal,
             seed: retainedSeed
           )
         },
         setValue: { [weak viewNode, weak box] newValue in
           if let viewNode {
-            viewNode.setStateSlot(ordinal: ordinal, value: newValue)
+            let liveViewNode =
+              viewNode.ownerGraph?.nodeForIdentity(viewNode.identity) ?? viewNode
+            liveViewNode.setStateSlot(
+              ordinal: ordinal,
+              value: newValue,
+              invalidationIdentity: baseIdentity
+            )
             box?.storeRetainedValue(newValue, for: storageIdentity)
-            if baseIdentity != storageIdentity, viewNode.invalidator == nil {
+            if baseIdentity != storageIdentity, liveViewNode.invalidator == nil {
               box?.storeRetainedValue(newValue, for: baseIdentity)
             }
           } else {

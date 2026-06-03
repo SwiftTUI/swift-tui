@@ -1,7 +1,7 @@
 private struct ViewGraphViewportLifecycleEventPlan {
   var events: [LifecycleEvent]
-  var nodesByIdentity: [Identity: LifecycleStateNode]
-  var order: [Identity]
+  var nodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
+  var order: [ViewportLifecycleKey]
 }
 
 @MainActor
@@ -14,8 +14,9 @@ enum ViewGraphLifecyclePlanner {
     let viewportPlan = viewportLifecycleEventPlan(
       from: resolved,
       placed: placed,
-      previousViewportLifecycleNodesByIdentity: input.viewportLifecycleNodesByIdentity,
-      previousViewportLifecycleOrder: input.viewportLifecycleOrder
+      previousViewportLifecycleNodesByKey: input.viewportLifecycleNodesByKey,
+      previousViewportLifecycleOrder: input.viewportLifecycleOrder,
+      nodeIDByIdentity: input.nodeIDByIdentity
     )
     let (
       viewportTaskCancels,
@@ -27,6 +28,7 @@ enum ViewGraphLifecyclePlanner {
       partitionLifecycleEvents(viewportPlan.events)
     let changeEvents = input.changeHandlerIDsByIdentity.map { identity, handlerIDs in
       LifecycleEvent(
+        viewNodeID: input.nodeIDByIdentity[identity],
         identity: identity,
         operation: .change(handlerIDs: handlerIDs)
       )
@@ -45,7 +47,7 @@ enum ViewGraphLifecyclePlanner {
         + viewportChanges
         + input.stableTaskStartEvents
         + viewportTaskStarts,
-      viewportLifecycleNodesByIdentity: viewportPlan.nodesByIdentity,
+      viewportLifecycleNodesByKey: viewportPlan.nodesByKey,
       viewportLifecycleOrder: viewportPlan.order
     )
   }
@@ -53,9 +55,10 @@ enum ViewGraphLifecyclePlanner {
   private static func collectViewportLifecycleEvents(
     from resolved: ResolvedNode,
     placed: PlacedNode?,
-    viewportLifecycleNodesByIdentity: inout [Identity: LifecycleStateNode],
-    seenIdentities: inout Set<Identity>,
-    order: inout [Identity],
+    viewportLifecycleNodesByKey: inout [ViewportLifecycleKey: LifecycleStateNode],
+    seenKeys: inout Set<ViewportLifecycleKey>,
+    order: inout [ViewportLifecycleKey],
+    nodeIDByIdentity: [Identity: ViewNodeID],
     taskCancels: inout [LifecycleEvent],
     appears: inout [LifecycleEvent],
     taskStarts: inout [LifecycleEvent]
@@ -65,8 +68,9 @@ enum ViewGraphLifecyclePlanner {
     {
       recordViewportLifecycleVisibility(
         of: placed,
-        viewportLifecycleNodesByIdentity: &viewportLifecycleNodesByIdentity,
-        seenIdentities: &seenIdentities,
+        viewportLifecycleNodesByKey: &viewportLifecycleNodesByKey,
+        seenKeys: &seenKeys,
+        nodeIDByIdentity: nodeIDByIdentity,
         order: &order,
         taskCancels: &taskCancels,
         appears: &appears,
@@ -81,9 +85,10 @@ enum ViewGraphLifecyclePlanner {
         placed: placed?.children.indices.contains(index) == true
           ? placed?.children[index]
           : nil,
-        viewportLifecycleNodesByIdentity: &viewportLifecycleNodesByIdentity,
-        seenIdentities: &seenIdentities,
+        viewportLifecycleNodesByKey: &viewportLifecycleNodesByKey,
+        seenKeys: &seenKeys,
         order: &order,
+        nodeIDByIdentity: nodeIDByIdentity,
         taskCancels: &taskCancels,
         appears: &appears,
         taskStarts: &taskStarts
@@ -94,12 +99,13 @@ enum ViewGraphLifecyclePlanner {
   private static func viewportLifecycleEventPlan(
     from resolved: ResolvedNode,
     placed: PlacedNode?,
-    previousViewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode],
-    previousViewportLifecycleOrder: [Identity]
+    previousViewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode],
+    previousViewportLifecycleOrder: [ViewportLifecycleKey],
+    nodeIDByIdentity: [Identity: ViewNodeID]
   ) -> ViewGraphViewportLifecycleEventPlan {
-    var nodesByIdentity = previousViewportLifecycleNodesByIdentity
-    var seenIdentities: Set<Identity> = []
-    var order: [Identity] = []
+    var nodesByKey = previousViewportLifecycleNodesByKey
+    var seenKeys: Set<ViewportLifecycleKey> = []
+    var order: [ViewportLifecycleKey] = []
     var taskCancels: [LifecycleEvent] = []
     var disappears: [LifecycleEvent] = []
     var appears: [LifecycleEvent] = []
@@ -108,22 +114,24 @@ enum ViewGraphLifecyclePlanner {
     collectViewportLifecycleEvents(
       from: resolved,
       placed: placed,
-      viewportLifecycleNodesByIdentity: &nodesByIdentity,
-      seenIdentities: &seenIdentities,
+      viewportLifecycleNodesByKey: &nodesByKey,
+      seenKeys: &seenKeys,
       order: &order,
+      nodeIDByIdentity: nodeIDByIdentity,
       taskCancels: &taskCancels,
       appears: &appears,
       taskStarts: &taskStarts
     )
 
-    for identity in previousViewportLifecycleOrder.reversed()
-    where !seenIdentities.contains(identity) {
-      guard let previousNode = nodesByIdentity.removeValue(forKey: identity) else {
+    for key in previousViewportLifecycleOrder.reversed()
+    where !seenKeys.contains(key) {
+      guard let previousNode = nodesByKey.removeValue(forKey: key) else {
         continue
       }
       if let task = previousNode.task {
         taskCancels.append(
           .init(
+            viewNodeID: previousNode.viewNodeID,
             identity: previousNode.identity,
             operation: .taskCancel(task)
           )
@@ -132,6 +140,7 @@ enum ViewGraphLifecyclePlanner {
       if !previousNode.disappearHandlerIDs.isEmpty {
         disappears.append(
           .init(
+            viewNodeID: previousNode.viewNodeID,
             identity: previousNode.identity,
             operation: .disappear(handlerIDs: previousNode.disappearHandlerIDs)
           )
@@ -141,7 +150,7 @@ enum ViewGraphLifecyclePlanner {
 
     return ViewGraphViewportLifecycleEventPlan(
       events: taskCancels + disappears + appears + taskStarts,
-      nodesByIdentity: nodesByIdentity,
+      nodesByKey: nodesByKey,
       order: order
     )
   }
@@ -187,27 +196,36 @@ enum ViewGraphLifecyclePlanner {
 
   private static func recordViewportLifecycleVisibility(
     of node: PlacedNode,
-    viewportLifecycleNodesByIdentity: inout [Identity: LifecycleStateNode],
-    seenIdentities: inout Set<Identity>,
-    order: inout [Identity],
+    viewportLifecycleNodesByKey: inout [ViewportLifecycleKey: LifecycleStateNode],
+    seenKeys: inout Set<ViewportLifecycleKey>,
+    nodeIDByIdentity: [Identity: ViewNodeID],
+    order: inout [ViewportLifecycleKey],
     taskCancels: inout [LifecycleEvent],
     appears: inout [LifecycleEvent],
     taskStarts: inout [LifecycleEvent]
   ) {
     if !node.lifecycleMetadata.isEmpty {
+      let key: ViewportLifecycleKey =
+        if let viewNodeID = nodeIDByIdentity[node.identity] {
+          .viewNode(viewNodeID)
+        } else {
+          .identity(node.identity)
+        }
       let currentNode = LifecycleStateNode(
+        viewNodeID: nodeIDByIdentity[node.identity],
         identity: node.identity,
         appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
         disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
         task: node.lifecycleMetadata.task
       )
-      let previousNode = viewportLifecycleNodesByIdentity[node.identity]
-      seenIdentities.insert(node.identity)
-      order.append(node.identity)
+      let previousNode = viewportLifecycleNodesByKey[key]
+      seenKeys.insert(key)
+      order.append(key)
 
       if previousNode == nil, !currentNode.appearHandlerIDs.isEmpty {
         appears.append(
           .init(
+            viewNodeID: currentNode.viewNodeID,
             identity: currentNode.identity,
             operation: .appear(handlerIDs: currentNode.appearHandlerIDs)
           )
@@ -216,6 +234,7 @@ enum ViewGraphLifecyclePlanner {
       if previousNode?.task != currentNode.task, let task = previousNode?.task {
         taskCancels.append(
           .init(
+            viewNodeID: currentNode.viewNodeID,
             identity: currentNode.identity,
             operation: .taskCancel(task)
           )
@@ -224,20 +243,22 @@ enum ViewGraphLifecyclePlanner {
       if previousNode?.task != currentNode.task, let task = currentNode.task {
         taskStarts.append(
           .init(
+            viewNodeID: currentNode.viewNodeID,
             identity: currentNode.identity,
             operation: .taskStart(task)
           )
         )
       }
 
-      viewportLifecycleNodesByIdentity[node.identity] = currentNode
+      viewportLifecycleNodesByKey[key] = currentNode
     }
 
     for child in node.children {
       recordViewportLifecycleVisibility(
         of: child,
-        viewportLifecycleNodesByIdentity: &viewportLifecycleNodesByIdentity,
-        seenIdentities: &seenIdentities,
+        viewportLifecycleNodesByKey: &viewportLifecycleNodesByKey,
+        seenKeys: &seenKeys,
+        nodeIDByIdentity: nodeIDByIdentity,
         order: &order,
         taskCancels: &taskCancels,
         appears: &appears,

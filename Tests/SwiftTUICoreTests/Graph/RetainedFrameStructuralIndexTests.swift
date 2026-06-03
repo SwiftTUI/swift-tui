@@ -37,7 +37,7 @@ struct RetainedFrameStructuralIndexTests {
 
     let index = RetainedFrameIndex(frame: frame(resolvedTree: root))
 
-    #expect(index.resolvedByIdentity[duplicate] != nil)
+    #expect(index.resolvedNode(for: duplicate) != nil)
     #expect(index.structuralFrame.nodes(for: duplicate).count == 2)
   }
 
@@ -143,14 +143,18 @@ struct RetainedFrameStructuralIndexTests {
 private func frame(
   resolvedTree: ResolvedNode
 ) -> FrameArtifacts {
-  FrameArtifacts(
+  let measured = measuredTree(from: resolvedTree)
+  let placed = placedTree(from: resolvedTree)
+  let draw = drawTree(from: resolvedTree)
+  return FrameArtifacts(
     resolvedTree: resolvedTree,
-    measuredTree: measuredTree(from: resolvedTree),
-    placedTree: placedTree(from: resolvedTree),
+    measuredTree: measured,
+    placedTree: placed,
     semanticSnapshot: .init(),
-    drawTree: drawTree(from: resolvedTree),
+    drawTree: draw,
     rasterSurface: .init(),
     presentationDamage: nil,
+    drawnIdentities: [],
     commitPlan: .init()
   )
 }

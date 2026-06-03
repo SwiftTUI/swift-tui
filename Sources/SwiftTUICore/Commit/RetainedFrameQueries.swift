@@ -4,7 +4,7 @@
 // recomputing untouched subtrees. Three value types make that retained state
 // queryable, from raw to refined:
 //
-//  - `RetainedFrameIndex` — flat identity → node lookup tables built once per
+//  - `RetainedFrameIndex` — flat `ViewNodeID` → node lookup tables built once per
 //    committed frame.
 //  - `RetainedInvalidationSummary` — classifies this frame's invalidations
 //    against the previous index (synthetic ancestors, affected indexed child
@@ -16,19 +16,23 @@
 // All three are `Sendable` and side-effect free. They previously lived in
 // `RetainedResolveFrame.swift` alongside the mutable `LayoutPassContext`.
 
-/// Identity index of the previous committed frame's canonical pipeline products.
+/// Runtime-lifetime index of the previous committed frame's canonical pipeline products.
 ///
-/// When this index is produced by frame-tail retained state, `placedByIdentity`
+/// When this index is produced by frame-tail retained state, `placedByNodeID`
 /// is expected to come from the baseline placed tree stored before animation
 /// overlays were injected. That keeps retained placement keyed to canonical
 /// layout, while overlays are re-applied from animation state each frame.
 package struct RetainedFrameIndex: Sendable {
-  package let resolvedByIdentity: [Identity: ResolvedNode]
-  package let measuredByIdentity: [Identity: MeasuredNode]
-  package let placedByIdentity: [Identity: PlacedNode]
+  package let resolvedByNodeID: [ViewNodeID: ResolvedNode]
+  package let measuredByNodeID: [ViewNodeID: MeasuredNode]
+  package let placedByNodeID: [ViewNodeID: PlacedNode]
   package let structuralFrame: StructuralFrameIndex
+  fileprivate let resolvedStructuralIndex: [Identity: ResolvedNode]
+  fileprivate let measuredStructuralIndex: [Identity: MeasuredNode]
+  fileprivate let placedStructuralIndex: [Identity: PlacedNode]
   private let placedFrameEntries: [PlacedFrameTableEntry]
-  private let placedFrameEntryRangesByIdentity: [Identity: Range<Int>]
+  private let placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>]
+  private let placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>]
 
   package var placedFrameEntryCount: Int {
     placedFrameEntries.count
@@ -37,26 +41,37 @@ package struct RetainedFrameIndex: Sendable {
   package init(frame: FrameArtifacts) {
     structuralFrame = StructuralFrameIndex(root: frame.resolvedTree)
 
-    var resolvedByIdentity: [Identity: ResolvedNode] = [:]
-    Self.index(frame.resolvedTree, into: &resolvedByIdentity)
-    self.resolvedByIdentity = resolvedByIdentity
+    var resolvedByNodeID: [ViewNodeID: ResolvedNode] = [:]
+    var resolvedStructuralIndex: [Identity: ResolvedNode] = [:]
+    Self.index(frame.resolvedTree, into: &resolvedByNodeID, structuralIndex: &resolvedStructuralIndex)
+    self.resolvedByNodeID = resolvedByNodeID
+    self.resolvedStructuralIndex = resolvedStructuralIndex
 
-    var measuredByIdentity: [Identity: MeasuredNode] = [:]
-    Self.index(frame.measuredTree, into: &measuredByIdentity)
-    self.measuredByIdentity = measuredByIdentity
+    var measuredByNodeID: [ViewNodeID: MeasuredNode] = [:]
+    var measuredStructuralIndex: [Identity: MeasuredNode] = [:]
+    Self.index(frame.measuredTree, into: &measuredByNodeID, structuralIndex: &measuredStructuralIndex)
+    self.measuredByNodeID = measuredByNodeID
+    self.measuredStructuralIndex = measuredStructuralIndex
 
-    var placedByIdentity: [Identity: PlacedNode] = [:]
+    var placedByNodeID: [ViewNodeID: PlacedNode] = [:]
+    var placedStructuralIndex: [Identity: PlacedNode] = [:]
     var placedFrameEntries: [PlacedFrameTableEntry] = []
-    var placedFrameEntryRangesByIdentity: [Identity: Range<Int>] = [:]
+    var placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>] = [:]
+    var placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>] = [:]
     Self.index(
       frame.placedTree,
-      into: &placedByIdentity,
+      into: &placedByNodeID,
+      structuralIndex: &placedStructuralIndex,
       placedFrameEntries: &placedFrameEntries,
-      placedFrameEntryRangesByIdentity: &placedFrameEntryRangesByIdentity
+      placedFrameEntryRangesByNodeID: &placedFrameEntryRangesByNodeID,
+      placedFrameEntryRangesByStructuralIdentity: &placedFrameEntryRangesByStructuralIdentity
     )
-    self.placedByIdentity = placedByIdentity
+    self.placedByNodeID = placedByNodeID
+    self.placedStructuralIndex = placedStructuralIndex
     self.placedFrameEntries = placedFrameEntries
-    self.placedFrameEntryRangesByIdentity = placedFrameEntryRangesByIdentity
+    self.placedFrameEntryRangesByNodeID = placedFrameEntryRangesByNodeID
+    self.placedFrameEntryRangesByStructuralIdentity =
+      placedFrameEntryRangesByStructuralIdentity
   }
 
   package init(
@@ -79,36 +94,58 @@ package struct RetainedFrameIndex: Sendable {
   package func isByteEquivalent(
     to other: RetainedFrameIndex
   ) -> Bool {
-    resolvedByIdentity == other.resolvedByIdentity
-      && measuredByIdentity == other.measuredByIdentity
-      && placedByIdentity == other.placedByIdentity
+    resolvedByNodeID == other.resolvedByNodeID
+      && measuredByNodeID == other.measuredByNodeID
+      && placedByNodeID == other.placedByNodeID
       && structuralFrame == other.structuralFrame
+      && resolvedStructuralIndex == other.resolvedStructuralIndex
+      && measuredStructuralIndex == other.measuredStructuralIndex
+      && placedStructuralIndex == other.placedStructuralIndex
       && placedFrameEntries == other.placedFrameEntries
-      && placedFrameEntryRangesByIdentity == other.placedFrameEntryRangesByIdentity
+      && placedFrameEntryRangesByNodeID == other.placedFrameEntryRangesByNodeID
+      && placedFrameEntryRangesByStructuralIdentity
+        == other.placedFrameEntryRangesByStructuralIdentity
   }
 
   package func resolvedNode(
     for identity: Identity
   ) -> ResolvedNode? {
-    resolvedByIdentity[identity]
+    resolvedStructuralIndex[identity]
   }
 
   package func measuredNode(
     for identity: Identity
   ) -> MeasuredNode? {
-    measuredByIdentity[identity]
+    measuredStructuralIndex[identity]
   }
 
   package func placedNode(
     for identity: Identity
   ) -> PlacedNode? {
-    placedByIdentity[identity]
+    placedStructuralIndex[identity]
+  }
+
+  package func placedPath(
+    to identity: Identity
+  ) -> [PlacedNode]? {
+    var identities: [Identity] = []
+    var currentIdentity: Identity? = identity
+
+    while let current = currentIdentity {
+      guard placedStructuralIndex[current] != nil else {
+        return nil
+      }
+      identities.append(current)
+      currentIdentity = current.parent
+    }
+
+    return identities.reversed().compactMap { placedStructuralIndex[$0] }
   }
 
   package func placedFrameFragment(
     for identity: Identity
   ) -> PlacedFrameTableFragment? {
-    guard let range = placedFrameEntryRangesByIdentity[identity] else {
+    guard let range = placedFrameEntryRangesByStructuralIdentity[identity] else {
       return nil
     }
     return .init(entries: placedFrameEntries[range])
@@ -116,34 +153,48 @@ package struct RetainedFrameIndex: Sendable {
 
   private static func index(
     _ node: ResolvedNode,
-    into storage: inout [Identity: ResolvedNode]
+    into storage: inout [ViewNodeID: ResolvedNode],
+    structuralIndex: inout [Identity: ResolvedNode]
   ) {
-    storage[node.identity] = node
+    if let viewNodeID = node.viewNodeID {
+      storage[viewNodeID] = node
+    }
+    structuralIndex[node.identity] = node
     for child in node.children {
-      index(child, into: &storage)
+      index(child, into: &storage, structuralIndex: &structuralIndex)
     }
   }
 
   private static func index(
     _ node: MeasuredNode,
-    into storage: inout [Identity: MeasuredNode]
+    into storage: inout [ViewNodeID: MeasuredNode],
+    structuralIndex: inout [Identity: MeasuredNode]
   ) {
-    storage[node.identity] = node
+    if let viewNodeID = node.viewNodeID {
+      storage[viewNodeID] = node
+    }
+    structuralIndex[node.identity] = node
     for child in node.childMeasurements {
-      index(child, into: &storage)
+      index(child, into: &storage, structuralIndex: &structuralIndex)
     }
   }
 
   private static func index(
     _ node: PlacedNode,
-    into storage: inout [Identity: PlacedNode],
+    into storage: inout [ViewNodeID: PlacedNode],
+    structuralIndex: inout [Identity: PlacedNode],
     placedFrameEntries: inout [PlacedFrameTableEntry],
-    placedFrameEntryRangesByIdentity: inout [Identity: Range<Int>]
+    placedFrameEntryRangesByNodeID: inout [ViewNodeID: Range<Int>],
+    placedFrameEntryRangesByStructuralIdentity: inout [Identity: Range<Int>]
   ) {
     let start = placedFrameEntries.count
-    storage[node.identity] = node
+    if let viewNodeID = node.viewNodeID {
+      storage[viewNodeID] = node
+    }
+    structuralIndex[node.identity] = node
     placedFrameEntries.append(
       .init(
+        viewNodeID: node.viewNodeID,
         identity: node.identity,
         bounds: node.bounds,
         namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
@@ -153,11 +204,16 @@ package struct RetainedFrameIndex: Sendable {
       index(
         child,
         into: &storage,
+        structuralIndex: &structuralIndex,
         placedFrameEntries: &placedFrameEntries,
-        placedFrameEntryRangesByIdentity: &placedFrameEntryRangesByIdentity
+        placedFrameEntryRangesByNodeID: &placedFrameEntryRangesByNodeID,
+        placedFrameEntryRangesByStructuralIdentity: &placedFrameEntryRangesByStructuralIdentity
       )
     }
-    placedFrameEntryRangesByIdentity[node.identity] = start..<placedFrameEntries.count
+    if let viewNodeID = node.viewNodeID {
+      placedFrameEntryRangesByNodeID[viewNodeID] = start..<placedFrameEntries.count
+    }
+    placedFrameEntryRangesByStructuralIdentity[node.identity] = start..<placedFrameEntries.count
   }
 }
 
@@ -200,7 +256,7 @@ package struct RetainedInvalidationSummary: Sendable {
     structuralFrame = previousStructuralFrame
     self.hasUnindexedInvalidations = hasUnindexedInvalidations
 
-    let previousResolvedIdentities = Set(previousFrameIndex.resolvedByIdentity.keys)
+    let previousResolvedIdentities = previousStructuralFrame.runtimeIdentities
     let syntheticInvalidatedIdentities = invalidatedIdentities.subtracting(
       previousResolvedIdentities)
 
@@ -228,7 +284,7 @@ package struct RetainedInvalidationSummary: Sendable {
 
     var affectedIndexedChildSourceRoots: Set<Identity> = []
     if !invalidatedIdentities.isEmpty {
-      for resolvedNode in previousFrameIndex.resolvedByIdentity.values {
+      for resolvedNode in previousFrameIndex.resolvedStructuralIndex.values {
         guard let source = resolvedNode.indexedChildSource else {
           continue
         }

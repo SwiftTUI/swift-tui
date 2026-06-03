@@ -136,7 +136,7 @@ extension Table {
         }
       }
 
-      let rootRouteID = primaryRouteID(for: context.identity)
+      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
@@ -158,7 +158,7 @@ extension Table {
           continue
         }
 
-        let routeID = primaryRouteID(
+        let routeID = runtimePrimaryRouteID(
           for: tableRowIdentity(
             for: context.identity,
             rowIndex: rowIndex

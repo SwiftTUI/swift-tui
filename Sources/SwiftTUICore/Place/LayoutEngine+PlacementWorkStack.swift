@@ -84,6 +84,7 @@ extension LayoutEngine {
     localMetrics.placedNodesComputed += 1
 
     passContext?.recordPlacedFrame(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       bounds: bounds,
       namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName

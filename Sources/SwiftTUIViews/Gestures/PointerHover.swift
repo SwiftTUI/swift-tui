@@ -18,7 +18,7 @@ public struct PointerHoverModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let routeID = primaryRouteID(for: node.identity)
+    let routeID = runtimePrimaryRouteID(for: node.identity)
     context.localPointerHandlerRegistry?.registerHover(
       routeID: routeID,
       handler: action

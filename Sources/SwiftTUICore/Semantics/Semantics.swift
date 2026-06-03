@@ -37,7 +37,10 @@ public struct SemanticExtractor: Sendable {
           && !interactionsDisabledOnChain
           && node.semanticMetadata.interactionAvailability.isEnabled
         let hitsAllowed = node.semanticMetadata.allowsHitTesting
-        let routeID = primaryRouteID(for: node.identity)
+        let routeID = primaryRouteID(
+          for: node.identity,
+          ownerNodeID: node.viewNodeID
+        )
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
@@ -102,6 +105,7 @@ public struct SemanticExtractor: Sendable {
           scrollRoutes.append(
             ScrollRoute(
               identity: node.identity,
+              viewNodeID: node.viewNodeID,
               viewportRect: node.bounds,
               contentBounds: node.contentBounds
             )
