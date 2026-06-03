@@ -77,13 +77,11 @@ struct PipelineContractTests {
     #expect(second.stableKey == "surface-key-41464")
     #expect(first != second)
 
-    let identity = testIdentity("PipelineContractSurfaceComposition")
     let bounds = CellRect(
       origin: .init(x: 0, y: 0),
       size: .init(width: 8, height: 2)
     )
     let firstEntry = SurfaceTopologyEntry(
-      identity: identity,
       role: first.role,
       stableKey: first.stableKey,
       invalidationScope: first.invalidationScope,
@@ -91,7 +89,6 @@ struct PipelineContractTests {
       zIndex: 0
     )
     let secondEntry = SurfaceTopologyEntry(
-      identity: identity,
       role: second.role,
       stableKey: second.stableKey,
       invalidationScope: second.invalidationScope,
@@ -106,13 +103,11 @@ struct PipelineContractTests {
 
   @Test("surface topology entry ordering distinguishes nil and empty stable keys")
   func surfaceTopologyEntryOrderingDistinguishesNilAndEmptyStableKeys() {
-    let identity = testIdentity("PipelineContractSurfaceCompositionOrdering")
     let bounds = CellRect(
       origin: .init(x: 0, y: 0),
       size: .init(width: 8, height: 2)
     )
     let nilKeyEntry = SurfaceTopologyEntry(
-      identity: identity,
       role: .detachedOverlayEntry,
       stableKey: nil,
       invalidationScope: .compositedBounds,
@@ -120,7 +115,6 @@ struct PipelineContractTests {
       zIndex: 0
     )
     let emptyKeyEntry = SurfaceTopologyEntry(
-      identity: identity,
       role: .detachedOverlayEntry,
       stableKey: "",
       invalidationScope: .compositedBounds,

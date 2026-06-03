@@ -193,7 +193,6 @@ package struct SurfaceTopologySignature: Equatable, Sendable {
     if node.surfaceComposition.participatesInTopologySignature {
       entries.append(
         SurfaceTopologyEntry(
-          identity: node.identity,
           role: node.surfaceComposition.role,
           stableKey: node.surfaceComposition.stableKey,
           invalidationScope: node.surfaceComposition.invalidationScope,
@@ -206,7 +205,10 @@ package struct SurfaceTopologySignature: Equatable, Sendable {
 }
 
 package struct SurfaceTopologyEntry: Equatable, Sendable, Comparable {
-  package var identity: Identity
+  // Deliberately carries no runtime `Identity`: a `ViewNodeID` re-key of a
+  // portal/overlay root must not perturb the topology signature (which would
+  // force a spurious full-surface diff). Participating nodes are distinguished
+  // by their structural `stableKey` (Stage 4) plus role/scope/geometry.
   package var role: SurfaceCompositionRole
   package var stableKey: String?
   package var invalidationScope: SurfaceInvalidationScope
@@ -219,9 +221,8 @@ package struct SurfaceTopologyEntry: Equatable, Sendable, Comparable {
 
   private static func comparisonTuple(_ entry: Self) -> [String] {
     [
-      entry.identity.path,
-      String(describing: entry.role),
       entry.stableKey.map { "1:\($0)" } ?? "0:",
+      String(describing: entry.role),
       String(describing: entry.invalidationScope),
       "\(entry.bounds.origin.x),\(entry.bounds.origin.y)",
       "\(entry.bounds.size.width),\(entry.bounds.size.height)",
