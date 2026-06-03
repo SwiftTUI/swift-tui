@@ -86,16 +86,23 @@ identity-changing moves via the persistent `EntityRoutingTable`.
   subtree rebuild — duplicate-id siblings get no cross-reorder
   `@State`/animation/focus preservation in that case. This is user error and
   undefined in SwiftUI too; the limit is recorded rather than modeled away.
-  > **Unverified — possible gap.** Whether occurrence-distinct siblings actually
-  > receive *distinct `ViewNodeID`s* (and therefore distinct `@State` slots) is
-  > **not yet confirmed at runtime.** A probe rendering `ForEach([7, 7])` found
-  > the two colliding elements collapse to a **single** `EntityRoutingTable`
-  > entry — so the entity-routing layer may not key on `occurrence`, and
-  > same-collection duplicates may still share one runtime lifetime. A
-  > characterization test (asserting the two element subtrees hold distinct
-  > `ViewNodeID`s in `nodesByNodeID`, not just the routing table) is needed to
-  > confirm whether the "distinct `ViewNodeID`" containment holds or is a real
-  > gap. Tracked as remediation **G13** (doc 008).
+  > **Confirmed gap — containment is incomplete at the node store.** The claim
+  > (Stages 5–6) that colliding siblings receive *distinct `ViewNodeID`s* does
+  > **not** hold for same-collection duplicates. A probe rendering
+  > `ForEach([7, 7])` through `DefaultRenderer` produced a graph with **one**
+  > element node (`…/VStack[0]/ForEachElement[1]`) and a single `EntityRoutingTable`
+  > entry — the first element is gone. Cause: `ViewGraph.nodeForIdentity` keys the
+  > node store on `Identity`, and duplicate ids share an `Identity`, so the two
+  > elements find-or-create the **same** `ViewNode` (last-writer-wins on the
+  > structural slot). Stage 3's `occurrence` disambiguation lives on the
+  > entity/diff axis (`ChildDescriptor`, verified by `StructuralDiffTests`) and
+  > never reaches the node-allocation key. So same-collection duplicate ids still
+  > **alias one runtime lifetime and one `@State` slot** — the exact pre-migration
+  > behavior the containment was meant to retire. Closing it means routing
+  > `nodeForIdentity` through the occurrence/structural axis (a Stage-5/6
+  > node-store change), or the docs must drop the "distinct `ViewNodeID` / never
+  > aliased" claim. Tracked as remediation **G13** (doc 008). (Observed in the
+  > `DefaultRenderer` snapshot path; worth confirming under the live `RunLoop`.)
 - **Runtime registries key containment on `Identity`-as-structural-projection.**
   The commit-path invalidation engine reasons over `StructuralPath`, and the live
   resolve/retained classifiers carry real structural adjacency. But the per-frame
