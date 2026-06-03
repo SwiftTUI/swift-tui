@@ -43,13 +43,15 @@ package struct RetainedFrameIndex: Sendable {
 
     var resolvedByNodeID: [ViewNodeID: ResolvedNode] = [:]
     var resolvedStructuralIndex: [Identity: ResolvedNode] = [:]
-    Self.index(frame.resolvedTree, into: &resolvedByNodeID, structuralIndex: &resolvedStructuralIndex)
+    Self.index(
+      frame.resolvedTree, into: &resolvedByNodeID, structuralIndex: &resolvedStructuralIndex)
     self.resolvedByNodeID = resolvedByNodeID
     self.resolvedStructuralIndex = resolvedStructuralIndex
 
     var measuredByNodeID: [ViewNodeID: MeasuredNode] = [:]
     var measuredStructuralIndex: [Identity: MeasuredNode] = [:]
-    Self.index(frame.measuredTree, into: &measuredByNodeID, structuralIndex: &measuredStructuralIndex)
+    Self.index(
+      frame.measuredTree, into: &measuredByNodeID, structuralIndex: &measuredStructuralIndex)
     self.measuredByNodeID = measuredByNodeID
     self.measuredStructuralIndex = measuredStructuralIndex
 
@@ -74,6 +76,17 @@ package struct RetainedFrameIndex: Sendable {
       placedFrameEntryRangesByStructuralIdentity
   }
 
+  /// Derives the next retained index from the previous one plus the new frame.
+  ///
+  /// **The incremental fragment patch (Stage 1 L3) is deferred:** this currently
+  /// performs a full rebuild (`init(frame:)`), so `previous` is unused except by
+  /// the debug check below. Measurement shows retained-index construction is a
+  /// sub-1% slice of frame time (off the critical path; `resolve_ms` dominates),
+  /// so the incremental patcher was not worth its complexity — see
+  /// `docs/VISION-GAP.md` (Structural identity). Until a real patch path lands,
+  /// the `#if DEBUG` byte-equivalence check compares two full rebuilds and is
+  /// therefore inert; it is retained as the oracle scaffold that becomes
+  /// meaningful the moment the patched and rebuilt indexes can differ.
   package init(
     patching previous: RetainedFrameIndex?,
     with frame: FrameArtifacts
@@ -81,6 +94,8 @@ package struct RetainedFrameIndex: Sendable {
     self.init(frame: frame)
 
     #if DEBUG
+      // Inert until the incremental patch path exists (see doc comment): this
+      // compares a full rebuild against another full rebuild.
       if previous != nil {
         let rebuilt = RetainedFrameIndex(frame: frame)
         precondition(

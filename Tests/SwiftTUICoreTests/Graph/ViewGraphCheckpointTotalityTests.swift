@@ -48,6 +48,32 @@ struct ViewGraphCheckpointTotalityTests {
     #expect(Set(viewNodeCheckpointFields) == Set(viewNodeFields))
   }
 
+  @Test("checkpoint totality set-equality rejects any single missing map (guard has teeth)")
+  func totalityGuardCatchesMissingField() throws {
+    let viewGraphFields = try parsedStoredVarNames(
+      typeKind: "class",
+      typeName: "ViewGraph",
+      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraph.swift"
+    )
+    let checkpointFields = try parsedStoredVarNames(
+      typeKind: "struct",
+      typeName: "Checkpoint",
+      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphState.swift"
+    )
+    let expected = Set(viewGraphFields + ["nodeCheckpoints"])
+
+    // Sanity: the real checkpoint field set is total (mirrors the positive test).
+    #expect(Set(checkpointFields) == expected)
+    // Teeth: dropping any single covered field must break the equality the
+    // positive guard asserts — proving a quietly-missed re-keyed map would fail
+    // the totality gate rather than slip through (doc 006 Stage 5 Test #5).
+    #expect(!checkpointFields.isEmpty)
+    for omitted in checkpointFields {
+      let incomplete = Set(checkpointFields.filter { $0 != omitted })
+      #expect(incomplete != expected)
+    }
+  }
+
   @Test("checkpoint then mutate then restore is identity over graph state")
   func checkpointRestoreRoundTrips() {
     let graph = ViewGraph()

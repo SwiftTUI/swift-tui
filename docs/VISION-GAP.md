@@ -56,6 +56,37 @@ explicit work-stack paths for parts of measurement and placement.
   explicit context threading through resolve, and interning of `Identity`
   values are all design-only — no corresponding code.
 
+## Structural identity
+
+**Shipped.** The four-axis identity model is built and integrated: a distinct
+opaque `ViewNodeID` for runtime lifetime, `StructuralPath` for ordered tree
+position, `EntityIdentity` for explicit user/data identity, and a re-rooted
+`StateSlotKey {owner: ViewNodeID, ordinal}` plus typed `StateGraphScopeID` for
+state slots. The registration-alias layer and the `__SwiftTUIStateGraph` path
+string-splice are gone; `@State`, focus, and animation continuity survive
+identity-changing moves via the persistent `EntityRoutingTable`.
+
+**Not yet built / accepted limits.**
+
+- **Incremental retained-index patch.** `RetainedFrameIndex` is rebuilt in full
+  every committed frame; `init(patching:with:)` currently delegates to a full
+  rebuild, so the structural-fragment diff/reuse/prune path (the Stage 1 "L3"
+  perf win) does not exist, and its `#if DEBUG` byte-equivalence oracle is inert
+  (it compares two rebuilds). This is a deliberate deferral, not an oversight:
+  the `synthetic-narrow-invalidation` corpus shows retained-index construction
+  is a sub-1% slice of frame time and off the critical path (`resolve_ms`
+  dominates at ~40%), so the incremental patcher was not worth its complexity.
+- **Duplicate explicit ids — lifetime preservation.** Duplicate runtime
+  identities (a non-unique `ForEach` id keypath, or a reused `.id(_:)`) are
+  *contained*, not aliased: each colliding sibling gets a distinct
+  `EntityIdentity.occurrence` and a distinct `ViewNodeID`, and a non-fatal
+  diagnostic fires. But occurrence is a containment mechanism, not a lifetime
+  key: it is assigned by resolved order, so a change to the collision *count*
+  re-aligns the survivors and falls back to a conservative subtree rebuild —
+  duplicate-id siblings get no cross-reorder `@State`/animation/focus
+  preservation in that case. This is user error and undefined in SwiftUI too;
+  the limit is recorded rather than modeled away.
+
 ## Animation, transitions, and gestures
 
 **Shipped.** Value-gated `.animation(_:value:)`, the timing-curve family
