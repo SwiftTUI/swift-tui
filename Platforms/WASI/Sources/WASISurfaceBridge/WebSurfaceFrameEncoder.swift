@@ -216,9 +216,13 @@ package enum WebSurfaceFrameEncoder {
     let accessibilityAnnouncements = semanticSnapshot.map {
       encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
     }
+    let scrollRegions = semanticSnapshot.map {
+      encodeScrollRegions($0.scrollRoutes)
+    }
     let hasV2Fields =
       sequence != nil || accessibilityTree?.isEmpty == false
       || accessibilityAnnouncements?.isEmpty == false
+      || scrollRegions?.isEmpty == false
     let version = hasV2Fields ? 2 : 1
 
     var json = "\u{001E}surface:{"
@@ -254,6 +258,11 @@ package enum WebSurfaceFrameEncoder {
       json += accessibilityAnnouncements.joined(separator: ",")
       json += "]"
     }
+    if let scrollRegions, !scrollRegions.isEmpty {
+      json += ",\"scrollRegions\":["
+      json += scrollRegions.joined(separator: ",")
+      json += "]"
+    }
     json += "}\n"
     return json
   }
@@ -281,6 +290,9 @@ package enum WebSurfaceFrameEncoder {
     }
     let accessibilityAnnouncements = semanticSnapshot.map {
       encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
+    }
+    let scrollRegions = semanticSnapshot.map {
+      encodeScrollRegions($0.scrollRoutes)
     }
 
     var json = "\u{001E}surface:{"
@@ -313,6 +325,11 @@ package enum WebSurfaceFrameEncoder {
     if let accessibilityAnnouncements, !accessibilityAnnouncements.isEmpty {
       json += ",\"accessibilityAnnouncements\":["
       json += accessibilityAnnouncements.joined(separator: ",")
+      json += "]"
+    }
+    if let scrollRegions, !scrollRegions.isEmpty {
+      json += ",\"scrollRegions\":["
+      json += scrollRegions.joined(separator: ",")
       json += "]"
     }
     json += "}\n"
@@ -419,6 +436,25 @@ package enum WebSurfaceFrameEncoder {
         fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
       }
       return "{" + fields.joined(separator: ",") + "}"
+    }
+  }
+
+  /// Encodes per-region scroll extents for scroll-chaining: the viewport rect,
+  /// the current clamped offset, and the total content size. The browser host
+  /// recomputes the per-direction scroll headroom from these (mirroring the
+  /// `min(max(0, offset), max(0, content - viewport))` clamp) to decide whether
+  /// to capture the wheel or let it chain to the page. See
+  /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
+  private static func encodeScrollRegions(
+    _ routes: [ScrollRoute]
+  ) -> [String] {
+    routes.map { route in
+      "{"
+        + "\"id\":\(jsonString(route.identity.path)),"
+        + "\"rect\":\(encodeRect(route.viewportRect)),"
+        + "\"offset\":\(encodePoint(route.contentOffset)),"
+        + "\"content\":[\(route.contentBounds.size.width),\(route.contentBounds.size.height)]"
+        + "}"
     }
   }
 

@@ -66,6 +66,27 @@ package final class LocalScrollPositionRegistry: Equatable {
     latestScrollTargets = scrollTargets
   }
 
+  /// Returns copies of `routes` with `contentOffset` populated from each
+  /// region's live scroll offset. Routes without a live registration are
+  /// returned unchanged (keeping their `.zero` offset).
+  ///
+  /// Used at the web-host presentation boundary to publish scroll extents for
+  /// scroll-chaining; see `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in
+  /// the coordination root.
+  package func routesWithCurrentOffsets(
+    _ routes: [ScrollRoute]
+  ) -> [ScrollRoute] {
+    routes.map { route in
+      guard let registration = registrations[route.identity] else {
+        return route
+      }
+      let offset = registration.currentOffset()
+      var enriched = route
+      enriched.contentOffset = CellPoint(x: offset.x, y: offset.y)
+      return enriched
+    }
+  }
+
   @discardableResult
   package func scrollToTarget(
     _ query: ScrollTargetQuery,

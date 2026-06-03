@@ -434,6 +434,56 @@ struct WebSurfaceTransportTests {
     #expect(announcements[1]["politeness"] as? String == "polite")
   }
 
+  @Test("encoder emits per-region scroll extents for scroll-chaining")
+  func encoderEmitsScrollRegions() throws {
+    let root = Identity(components: ["root"])
+    let list = root.child("list")
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        SemanticHostFrame(
+          sequence: 13,
+          raster: Self.basicSurface(),
+          semantics: SemanticSnapshot(
+            scrollRoutes: [
+              ScrollRoute(
+                identity: list,
+                viewportRect: .init(origin: .init(x: 0, y: 1), size: .init(width: 4, height: 3)),
+                contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10)),
+                contentOffset: .init(x: 0, y: 2)
+              )
+            ]
+          ),
+          focusedIdentity: nil
+        )
+      )
+    )
+
+    #expect(frame["version"] as? Int == 2)
+    let regions = try #require(frame["scrollRegions"] as? [[String: Any]])
+    #expect(regions.count == 1)
+    let region = try #require(regions.first)
+    #expect(region["id"] as? String == "root/list")
+    #expect(region["rect"] as? [Int] == [0, 1, 4, 3])
+    #expect(region["offset"] as? [Int] == [0, 2])
+    #expect(region["content"] as? [Int] == [4, 10])
+  }
+
+  @Test("encoder omits scrollRegions when there are no scrollable regions")
+  func encoderOmitsScrollRegionsWhenEmpty() throws {
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        SemanticHostFrame(
+          sequence: 14,
+          raster: Self.basicSurface(),
+          semantics: SemanticSnapshot(),
+          focusedIdentity: nil
+        )
+      )
+    )
+
+    #expect(frame["scrollRegions"] == nil)
+  }
+
   @Test("encoder emits image data once and then reuses the cached image id")
   func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
     var knownImageIDs: Set<String> = []

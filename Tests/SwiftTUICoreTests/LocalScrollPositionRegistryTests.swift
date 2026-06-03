@@ -298,4 +298,36 @@ struct LocalScrollPositionRegistryTests {
     #expect(changed)
     #expect(offset == .init(x: 0, y: 5))
   }
+
+  @Test("routesWithCurrentOffsets fills the live offset and leaves unregistered routes at zero")
+  func routesWithCurrentOffsetsFillsLiveOffset() {
+    let registry = LocalScrollPositionRegistry()
+    let registered = testIdentity("Scroll")
+    let unregistered = testIdentity("Other")
+    var offset = ScrollOffset(x: 1, y: 4)
+
+    registry.register(
+      identity: registered,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+
+    let routes = [
+      ScrollRoute(
+        identity: registered,
+        viewportRect: .init(origin: .zero, size: .init(width: 4, height: 3)),
+        contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10))
+      ),
+      ScrollRoute(
+        identity: unregistered,
+        viewportRect: .init(origin: .zero, size: .init(width: 4, height: 3)),
+        contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10))
+      ),
+    ]
+
+    let enriched = registry.routesWithCurrentOffsets(routes)
+    #expect(enriched.count == 2)
+    #expect(enriched[0].contentOffset == .init(x: 1, y: 4))
+    #expect(enriched[1].contentOffset == .zero)
+  }
 }

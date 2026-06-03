@@ -1833,8 +1833,9 @@ SwiftTUICore.ScrollRole.scrollView
 SwiftTUICore.ScrollRole.table
 SwiftTUICore.ScrollRoute
 SwiftTUICore.ScrollRoute.contentBounds
+SwiftTUICore.ScrollRoute.contentOffset
 SwiftTUICore.ScrollRoute.identity
-SwiftTUICore.ScrollRoute.init(identity:viewportRect:contentBounds:)
+SwiftTUICore.ScrollRoute.init(identity:viewportRect:contentBounds:contentOffset:)
 SwiftTUICore.ScrollRoute.viewportRect
 SwiftTUICore.SectionRole
 SwiftTUICore.SectionRole.content

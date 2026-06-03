@@ -77,15 +77,24 @@ public struct ScrollRoute: Equatable, Sendable {
   public var identity: Identity
   public var viewportRect: CellRect
   public var contentBounds: CellRect
+  /// Current clamped scroll offset of this region. Defaults to `.zero`; it is
+  /// populated from the live scroll-position registry only at the web-host
+  /// presentation boundary, where it is published as scroll-extent metadata so
+  /// the browser host can implement scroll-chaining (capture the wheel only
+  /// while the region can still scroll in that direction). See
+  /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
+  public var contentOffset: CellPoint
 
   public init(
     identity: Identity,
     viewportRect: CellRect,
-    contentBounds: CellRect
+    contentBounds: CellRect,
+    contentOffset: CellPoint = .zero
   ) {
     self.identity = identity
     self.viewportRect = viewportRect
     self.contentBounds = contentBounds
+    self.contentOffset = contentOffset
   }
 }
 
