@@ -197,6 +197,50 @@ struct EntityRoutingTests {
     #expect(graph.entityRoutingTable.nodeIDByEntity.isEmpty)
     #expect(graph.entityRoutingTable.entityByNodeID.isEmpty)
   }
+
+  @Test("duplicate ForEach ids should resolve to distinct ViewNodeIDs (known gap: they alias)")
+  func duplicateIDsShouldResolveToDistinctViewNodeIDs() {
+    let renderer = DefaultRenderer()
+    _ = renderer.render(
+      EntityRoutingDuplicateIDRoot(),
+      context: .init(identity: testIdentity("EntityRoutingDup"))
+    )
+
+    let graph = renderer.debugRuntimeSubsystemSnapshot().viewGraph
+    let elementNodeIDs = Set(
+      graph.nodesByNodeID.values
+        .filter { node in
+          node.committed.structuralPath.components.last.map {
+            "\($0)".contains("ForEachElement")
+          } ?? false
+        }
+        .map(\.viewNodeID)
+    )
+
+    // KNOWN GAP — `swift-tui/docs/VISION-GAP.md` ("Duplicate explicit ids"),
+    // remediation G13. Same-collection duplicate ids currently alias to ONE
+    // `ViewNode` because `ViewGraph.nodeForIdentity` keys the node store on
+    // `Identity` (a 1:1 `nodeIDByIdentity`), so the second element reuses the
+    // first's node and only one survives. This asserts the *correct* end state —
+    // two distinct runtime lifetimes — wrapped in `withKnownIssue` so it documents
+    // the bug today and fails loudly (prompting removal of the wrapper) once
+    // `nodeForIdentity` is made occurrence-aware.
+    withKnownIssue(
+      "duplicate ForEach ids alias to one ViewNodeID — G13 node-store fix pending"
+    ) {
+      #expect(elementNodeIDs.count == 2)
+    }
+  }
+}
+
+private struct EntityRoutingDuplicateIDRoot: View {
+  var body: some View {
+    VStack {
+      ForEach([7, 7], id: \.self) { value in
+        Text("Dup \(value)")
+      }
+    }
+  }
 }
 
 private struct EntityRoutingIndependentForEachRoot: View {
