@@ -96,13 +96,15 @@ public struct ScrollRoute: Equatable, Sendable {
     viewNodeID = nil
     self.viewportRect = viewportRect
     self.contentBounds = contentBounds
+    self.contentOffset = contentOffset
   }
 
   package init(
     identity: Identity,
     viewNodeID: ViewNodeID?,
     viewportRect: CellRect,
-    contentBounds: CellRect
+    contentBounds: CellRect,
+    contentOffset: CellPoint = .zero
   ) {
     self.identity = identity
     self.viewNodeID = viewNodeID

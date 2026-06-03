@@ -5,6 +5,32 @@ import Testing
 @MainActor
 @Suite
 struct LocalScrollPositionRegistryTests {
+  @Test("scroll route initializers preserve explicit content offsets")
+  func scrollRouteInitializersPreserveExplicitContentOffsets() {
+    let identity = testIdentity("Scroll")
+    let viewportRect = CellRect(origin: .zero, size: .init(width: 10, height: 4))
+    let contentBounds = CellRect(origin: .zero, size: .init(width: 10, height: 12))
+    let contentOffset = CellPoint(x: 2, y: 5)
+
+    let publicRoute = ScrollRoute(
+      identity: identity,
+      viewportRect: viewportRect,
+      contentBounds: contentBounds,
+      contentOffset: contentOffset
+    )
+
+    let packageRoute = ScrollRoute(
+      identity: identity,
+      viewNodeID: ViewNodeID(rawValue: 1),
+      viewportRect: viewportRect,
+      contentBounds: contentBounds,
+      contentOffset: contentOffset
+    )
+
+    #expect(publicRoute.contentOffset == contentOffset)
+    #expect(packageRoute.contentOffset == contentOffset)
+  }
+
   @Test("focused rect below viewport scrolls by the minimum reveal delta")
   func focusedRectBelowViewportScrollsByMinimumRevealDelta() {
     let registry = LocalScrollPositionRegistry()
