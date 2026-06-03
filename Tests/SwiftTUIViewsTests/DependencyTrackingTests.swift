@@ -26,13 +26,13 @@ private final class DependencyObservableModel {
 struct DependencyTrackingTests {
   @Test("state reads populate graph dependencies")
   func stateReadsPopulateDependencies() throws {
-    let dependencies = try resolveDependencies(
+    let (dependencies, snapshot) = try resolveDependenciesWithSnapshot(
       StateDependencyProbe()
     )
 
     let stateRead = try #require(dependencies.stateSlotReads.first)
     #expect(dependencies.stateSlotReads.count == 1)
-    #expect(stateRead.identity == testIdentity("Root"))
+    #expect(snapshot.nodeIDByIdentity[testIdentity("Root")] == stateRead.owner)
   }
 
   @Test("environment reads populate graph dependencies")
@@ -126,6 +126,20 @@ private func resolveDependencies<V: View>(
   _ view: V,
   environmentValues: EnvironmentValues = .init()
 ) throws -> DependencySet {
+  return try resolveDependenciesWithSnapshot(
+    view,
+    environmentValues: environmentValues
+  ).dependencies
+}
+
+@MainActor
+private func resolveDependenciesWithSnapshot<V: View>(
+  _ view: V,
+  environmentValues: EnvironmentValues = .init()
+) throws -> (
+  dependencies: DependencySet,
+  snapshot: ViewGraph.DebugTotalStateSnapshot
+) {
   let graph = ViewGraph()
   graph.beginFrame()
 
@@ -137,5 +151,8 @@ private func resolveDependencies<V: View>(
   context.viewGraph = graph
 
   _ = Resolver().resolve(view, in: context)
-  return try #require(graph.dependencies(for: testIdentity("Root")))
+  return (
+    try #require(graph.dependencies(for: testIdentity("Root"))),
+    graph.debugTotalStateSnapshot()
+  )
 }

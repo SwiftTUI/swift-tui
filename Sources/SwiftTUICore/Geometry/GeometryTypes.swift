@@ -709,6 +709,16 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     debugDescription = String(reflecting: value)
   }
 
+  package init<ID: Hashable & Sendable>(
+    forEachValue value: ID,
+    occurrence: Int = 0,
+    scope: StructuralPath
+  ) {
+    self.value = AnyID(ScopedForEachEntityID(scope: scope, value: value))
+    self.occurrence = occurrence
+    debugDescription = String(reflecting: value)
+  }
+
   private init(
     value: AnyID,
     occurrence: Int,
@@ -742,6 +752,11 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     hasher.combine(value)
     hasher.combine(occurrence)
   }
+}
+
+private struct ScopedForEachEntityID<Value: Hashable & Sendable>: Hashable, Sendable {
+  var scope: StructuralPath
+  var value: Value
 }
 
 /// A single proposed dimension used during measure.

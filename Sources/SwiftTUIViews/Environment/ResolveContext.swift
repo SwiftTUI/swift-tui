@@ -447,6 +447,7 @@ extension ResolveContext {
     observationBridge = nil
     viewGraph = nil
     imageAssetResolver = nil
+    frameInputs = nil
     suppressesStructuralLifecycle = false
     requestDeadline = nil
   }

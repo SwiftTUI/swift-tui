@@ -19,11 +19,11 @@ public struct TerminalView<Session: TerminalSession>: View {
   }
 
   public var body: some View {
-    let _ = updateGeneration
+    let generation = updateGeneration
     EnvironmentReader(\.terminalEventHandlers) { terminalEventHandlers in
       EnvironmentReader(\.clipboardWriteAction) { clipboardWriteAction in
         GeometryReader { proxy in
-          ForeignSurface(payload: SessionGridPayload(session: session))
+          ForeignSurface(payload: SessionGridPayload(session: session, generation: generation))
             .focusable(true)
             .onKeyPress { keyPress in
               guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
@@ -72,8 +72,10 @@ private struct TerminalViewLifecycleID: Equatable {
 
 private struct SessionGridPayload<Session: TerminalSession>: ForeignSurfacePayload {
   let session: Session
+  let generation: UInt64
 
   var grid: ForeignGrid {
-    session.cachedSnapshot
+    _ = generation
+    return session.cachedSnapshot
   }
 }

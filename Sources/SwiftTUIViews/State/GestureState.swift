@@ -20,7 +20,7 @@ public final class GestureStateBox<Value> {
   public let slotOrdinal: Int
   private let seed: Value
   private var localValue: Value
-  private var boundLocationsByIdentity: [Identity: GestureStateLocation<Value>] = [:]
+  private var boundLocationsByOwner: [StateStorageOwner: GestureStateLocation<Value>] = [:]
 
   public init(seed: Value, slotOrdinal: Int) {
     self.seed = seed
@@ -64,13 +64,12 @@ public final class GestureStateBox<Value> {
 
   fileprivate func remember(
     _ location: GestureStateLocation<Value>,
-    for identity: Identity,
-    graphID: ViewGraphScopeID?
+    for owner: StateStorageOwner
   ) {
-    boundLocationsByIdentity[identity] = location
-    if let graphID {
+    boundLocationsByOwner[owner] = location
+    if let graphID = owner.graphScope {
       GestureStateGraphBindingRegistry.shared.remember(
-        identity,
+        owner,
         for: ObjectIdentifier(self),
         graphID: graphID
       )
@@ -78,38 +77,36 @@ public final class GestureStateBox<Value> {
   }
 
   fileprivate func rememberedLocation(
-    for identity: Identity
+    for owner: StateStorageOwner
   ) -> GestureStateLocation<Value>? {
-    boundLocationsByIdentity[identity]
+    boundLocationsByOwner[owner]
   }
 
   fileprivate func currentLocation(
-    in viewGraphID: ViewGraphScopeID
+    in viewGraphID: StateGraphScopeID
   ) -> GestureStateLocation<Value>? {
     guard
-      let identity = GestureStateGraphBindingRegistry.shared.currentIdentity(
+      let owner = GestureStateGraphBindingRegistry.shared.currentOwner(
         for: ObjectIdentifier(self),
         graphID: viewGraphID
       )
     else {
       return nil
     }
-    return boundLocationsByIdentity[identity]
+    return boundLocationsByOwner[owner]
   }
 
   private func scopedLocation() -> GestureStateLocation<Value>? {
     guard let context = AuthoringContextStorage.current else {
       return nil
     }
-    let graphID = graphScopeID(for: context) ?? graphScopeID(from: context.viewIdentity)
-    let storageIdentity = stateStorageIdentity(
-      for: context.viewIdentity,
-      graphID: graphScopeID(for: context)
-    )
-    if let existing = rememberedLocation(for: storageIdentity) {
+    guard let storageOwner = stateStorageOwner(for: context) else {
+      return nil
+    }
+    if let existing = rememberedLocation(for: storageOwner) {
       return existing
     }
-    if let graphID {
+    if let graphID = storageOwner.graphScope {
       return currentLocation(in: graphID)
     }
     return nil
@@ -129,32 +126,32 @@ public final class GestureStateBox<Value> {
 private final class GestureStateGraphBindingRegistry: Sendable {
   static let shared = GestureStateGraphBindingRegistry()
 
-  private let currentIdentityByBoxAndGraph = Mutex<
-    [ObjectIdentifier: [ViewGraphScopeID: Identity]]
+  private let currentOwnerByBoxAndGraph = Mutex<
+    [ObjectIdentifier: [StateGraphScopeID: StateStorageOwner]]
   >([:])
 
   func remember(
-    _ identity: Identity,
+    _ owner: StateStorageOwner,
     for boxID: ObjectIdentifier,
-    graphID: ViewGraphScopeID
+    graphID: StateGraphScopeID
   ) {
-    currentIdentityByBoxAndGraph.withLock { identities in
-      identities[boxID, default: [:]][graphID] = identity
+    currentOwnerByBoxAndGraph.withLock { owners in
+      owners[boxID, default: [:]][graphID] = owner
     }
   }
 
-  func currentIdentity(
+  func currentOwner(
     for boxID: ObjectIdentifier,
-    graphID: ViewGraphScopeID
-  ) -> Identity? {
-    currentIdentityByBoxAndGraph.withLock { identities in
-      identities[boxID]?[graphID]
+    graphID: StateGraphScopeID
+  ) -> StateStorageOwner? {
+    currentOwnerByBoxAndGraph.withLock { owners in
+      owners[boxID]?[graphID]
     }
   }
 
   func forget(boxID: ObjectIdentifier) {
-    currentIdentityByBoxAndGraph.withLock { identities in
-      identities[boxID] = nil
+    currentOwnerByBoxAndGraph.withLock { owners in
+      owners[boxID] = nil
     }
   }
 }
@@ -237,27 +234,24 @@ public struct GestureState<Value> {
     guard let context = AuthoringContextStorage.current else {
       return nil
     }
-    let graphID = graphScopeID(for: context) ?? graphScopeID(from: context.viewIdentity)
-    let storageIdentity = stateStorageIdentity(
-      for: context.viewIdentity,
-      graphID: graphScopeID(for: context)
-    )
+    guard let storageOwner = stateStorageOwner(for: context) else {
+      return nil
+    }
 
     if ViewNodeContext.current != nil {
       let location = makeLocation(for: context)
       box.remember(
         location,
-        for: storageIdentity,
-        graphID: graphID
+        for: storageOwner
       )
       _ = location.getValue()  // triggers dependency tracking
       return location
     }
     // Not in a resolve pass -- action/lifecycle closure.
-    if let existing = box.rememberedLocation(for: storageIdentity) {
+    if let existing = box.rememberedLocation(for: storageOwner) {
       return existing
     }
-    if let graphID {
+    if let graphID = storageOwner.graphScope {
       return box.currentLocation(in: graphID)
     }
     return nil
@@ -283,13 +277,27 @@ public struct GestureState<Value> {
 
     return GestureStateLocation(
       getValue: {
-        viewNode.stateSlot(ordinal: ordinal, seed: trueSeed)
+        let liveViewNode =
+          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+        return liveViewNode.stateSlot(ordinal: ordinal, seed: trueSeed)
       },
       setValue: { newValue in
-        viewNode.setStateSlot(ordinal: ordinal, value: newValue)
+        let liveViewNode =
+          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+        liveViewNode.setStateSlot(
+          ordinal: ordinal,
+          value: newValue,
+          invalidationIdentity: context.viewIdentity
+        )
       },
       resetToSeed: {
-        viewNode.setStateSlot(ordinal: ordinal, value: trueSeed)
+        let liveViewNode =
+          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+        liveViewNode.setStateSlot(
+          ordinal: ordinal,
+          value: trueSeed,
+          invalidationIdentity: context.viewIdentity
+        )
       }
     )
   }

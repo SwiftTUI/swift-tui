@@ -14,18 +14,6 @@ package import SwiftTUICore
 // `StateSlotOrdinals` stay with `State.swift` — they are storage-slot
 // machinery, not authoring-context machinery.
 
-struct ViewGraphScopeID: Hashable, Sendable {
-  fileprivate let rawValue: UInt
-
-  package init(_ viewGraph: SwiftTUICore.ViewGraph) {
-    rawValue = UInt(bitPattern: ObjectIdentifier(viewGraph))
-  }
-
-  package init(rawValue: UInt) {
-    self.rawValue = rawValue
-  }
-}
-
 @MainActor
 package struct AuthoringContext {
   /// Owner identity — used for invalidation routing, `@State` ownership,
@@ -43,6 +31,8 @@ package struct AuthoringContext {
   var structuralPath: StructuralPath
   var focusedValues: FocusedValues
   var viewNode: SwiftTUICore.ViewNode?
+  var ownerNodeID: SwiftTUICore.ViewNodeID?
+  var stateGraphScope: StateGraphScopeID?
   var ordinalTracker: AuthoringOrdinalTracker = .init()
 
   /// Primary initializer. `structuralIdentity` defaults to `viewIdentity`
@@ -56,6 +46,8 @@ package struct AuthoringContext {
     structuralPath: StructuralPath? = nil,
     focusedValues: FocusedValues,
     viewNode: SwiftTUICore.ViewNode? = nil,
+    ownerNodeID: SwiftTUICore.ViewNodeID? = nil,
+    stateGraphScope: StateGraphScopeID? = nil,
     ordinalTracker: AuthoringOrdinalTracker = .init()
   ) {
     self.viewIdentity = viewIdentity
@@ -66,6 +58,9 @@ package struct AuthoringContext {
     self.structuralIdentity = structuralIdentity ?? resolvedStructuralPath.identityProjection
     self.focusedValues = focusedValues
     self.viewNode = viewNode
+    self.ownerNodeID = ownerNodeID ?? viewNode?.viewNodeID
+    self.stateGraphScope =
+      stateGraphScope ?? viewNode?.ownerGraph.map(StateGraphScopeID.init)
     self.ordinalTracker = ordinalTracker
   }
 }
@@ -80,45 +75,78 @@ package func currentAuthoringContext() -> AuthoringContext? {
 }
 
 @MainActor
-func graphScopeID(for context: AuthoringContext?) -> ViewGraphScopeID? {
-  context?.viewNode?.ownerGraph.map(ViewGraphScopeID.init)
+func graphScopeID(for context: AuthoringContext?) -> StateGraphScopeID? {
+  context?.stateGraphScope ?? context?.viewNode?.ownerGraph.map(StateGraphScopeID.init)
 }
 
-// Graph-scoped identities are internal storage identities. Public invalidation
-// and authored structural identities continue to use the base view identity.
-let stateGraphIdentityPrefix = "__SwiftTUIStateGraph["
-let stateGraphIdentitySuffix = "]"
+package struct StateStorageOwner: Hashable, Sendable {
+  package var graphScope: StateGraphScopeID?
+  package var ownerNodeID: ViewNodeID
 
-func stateStorageIdentity(
-  for viewIdentity: Identity,
-  graphID: ViewGraphScopeID?
-) -> Identity {
-  guard let graphID else {
-    return viewIdentity
+  package init(
+    graphScope: StateGraphScopeID?,
+    ownerNodeID: ViewNodeID
+  ) {
+    self.graphScope = graphScope
+    self.ownerNodeID = ownerNodeID
   }
-  return viewIdentity.child(
-    "\(stateGraphIdentityPrefix)\(graphID.rawValue)\(stateGraphIdentitySuffix)")
 }
 
-func graphScopeID(from identity: Identity) -> ViewGraphScopeID? {
-  guard
-    let component = identity.lastComponent,
-    component.hasPrefix(stateGraphIdentityPrefix),
-    component.hasSuffix(stateGraphIdentitySuffix)
-  else {
+@MainActor
+package func stateStorageOwner(
+  for context: AuthoringContext
+) -> StateStorageOwner? {
+  let ownerNodeID: ViewNodeID?
+  if let contextOwnerNodeID = context.ownerNodeID {
+    ownerNodeID = contextOwnerNodeID
+  } else {
+    ownerNodeID = context.viewNode?.viewNodeID
+  }
+  guard let ownerNodeID else {
     return nil
   }
-
-  let start = component.index(component.startIndex, offsetBy: stateGraphIdentityPrefix.count)
-  let end = component.index(component.endIndex, offsetBy: -stateGraphIdentitySuffix.count)
-  guard let rawValue = UInt(component[start..<end]) else {
-    return nil
-  }
-  return ViewGraphScopeID(rawValue: rawValue)
+  return StateStorageOwner(
+    graphScope: graphScopeID(for: context),
+    ownerNodeID: ownerNodeID
+  )
 }
 
-func baseStateStorageIdentity(from identity: Identity) -> Identity {
-  graphScopeID(from: identity) == nil ? identity : identity.parent ?? identity
+package struct DeferredAuthoringContextSnapshot: Sendable {
+  package let viewIdentity: Identity
+  package let structuralIdentity: Identity
+  package let structuralPath: StructuralPath
+  package let focusedValues: FocusedValues
+  package let ownerNodeID: SwiftTUICore.ViewNodeID?
+  package let stateGraphScope: StateGraphScopeID?
+
+  @MainActor
+  package init?(_ context: AuthoringContext? = currentAuthoringContext()) {
+    guard let context else {
+      return nil
+    }
+    viewIdentity = context.viewIdentity
+    structuralIdentity = context.structuralIdentity
+    structuralPath = context.structuralPath
+    focusedValues = context.focusedValues
+    ownerNodeID = context.ownerNodeID
+    stateGraphScope = graphScopeID(for: context)
+  }
+
+  @MainActor
+  package var authoringContext: AuthoringContext {
+    let ordinalTracker = AuthoringOrdinalTracker()
+    ordinalTracker.freeze()
+    return AuthoringContext(
+      viewIdentity: viewIdentity,
+      structuralIdentity: structuralIdentity,
+      structuralPath: structuralPath,
+      focusedValues: focusedValues,
+      viewNode: nil,
+      ownerNodeID: ownerNodeID,
+      stateGraphScope: stateGraphScope,
+      ordinalTracker: ordinalTracker
+    )
+  }
 }
 
 @MainActor
@@ -147,6 +175,8 @@ package func dynamicPropertyAuthoringContext(
       structuralPath: context.structuralPath,
       focusedValues: context.focusedValues,
       viewNode: viewNode,
+      ownerNodeID: current.ownerNodeID,
+      stateGraphScope: current.stateGraphScope,
       ordinalTracker: current.ordinalTracker
     )
   }
@@ -161,20 +191,7 @@ package func dynamicPropertyAuthoringContext(
 package func makeDeferredAuthoringContext(
   from context: AuthoringContext? = currentAuthoringContext()
 ) -> AuthoringContext? {
-  guard let context else {
-    return nil
-  }
-
-  let ordinalTracker = AuthoringOrdinalTracker()
-  ordinalTracker.freeze()
-  return AuthoringContext(
-    viewIdentity: context.viewIdentity,
-    structuralIdentity: context.structuralIdentity,
-    structuralPath: context.structuralPath,
-    focusedValues: context.focusedValues,
-    viewNode: context.viewNode,
-    ordinalTracker: ordinalTracker
-  )
+  DeferredAuthoringContextSnapshot(context)?.authoringContext
 }
 
 @MainActor
@@ -206,24 +223,27 @@ package func withAuthoringContext<Result>(
 package struct ImperativeAuthoringContextSnapshot: Sendable {
   package let viewIdentity: Identity
   package let focusedValues: FocusedValues
+  package let ownerNodeID: SwiftTUICore.ViewNodeID?
+  package let stateGraphScope: StateGraphScopeID?
 
   @MainActor
   package init?(_ context: AuthoringContext? = currentAuthoringContext()) {
     guard let context else {
       return nil
     }
-    viewIdentity = stateStorageIdentity(
-      for: context.viewIdentity,
-      graphID: graphScopeID(for: context)
-    )
+    viewIdentity = context.viewIdentity
     focusedValues = context.focusedValues
+    ownerNodeID = context.ownerNodeID
+    stateGraphScope = graphScopeID(for: context)
   }
 
   @MainActor
   fileprivate var authoringContext: AuthoringContext {
     AuthoringContext(
       viewIdentity: viewIdentity,
-      focusedValues: focusedValues
+      focusedValues: focusedValues,
+      ownerNodeID: ownerNodeID,
+      stateGraphScope: stateGraphScope
     )
   }
 }

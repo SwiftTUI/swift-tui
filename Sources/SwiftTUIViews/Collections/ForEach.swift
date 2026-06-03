@@ -22,7 +22,11 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolved: [ResolvedNode] = []
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
-    let entityIdentities = makeEntityIdentities(for: data, id: id)
+    let entityIdentities = makeEntityIdentities(
+      for: data,
+      id: id,
+      scope: context.structuralPath
+    )
     var elementOffset = 0
     for element in data {
       let currentElementOffset = elementOffset
@@ -31,10 +35,10 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         index: currentElementOffset
       )
       elementOffset += 1
+      let entityIdentity = entityIdentities[currentElementOffset]
       let elementContext = structuralElementContext.replacingIdentity(
         with: context.identity.explicitID(element[keyPath: id])
       )
-      let entityIdentity = entityIdentities[currentElementOffset]
       // Diverge structural identity per iteration so identity-deriving
       // modifiers such as `.panel()` (which reads
       // `scope.structuralIdentity`) see distinct positions for each
@@ -49,6 +53,8 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
           structuralPath: elementContext.structuralPath,
           focusedValues: scope.focusedValues,
           viewNode: scope.viewNode,
+          ownerNodeID: scope.ownerNodeID,
+          stateGraphScope: scope.stateGraphScope,
           ordinalTracker: scope.ordinalTracker
         )
       }
@@ -57,8 +63,14 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
           content(element)
         }
       }
+      let route = ResolveEntityRoute(
+        identity: entityIdentity,
+        structuralPath: elementContext.structuralPath
+      )
       var elementNode = withAuthoringContext(perIterationScope) {
-        resolveView(view, in: elementContext)
+        withResolveEntityRoute(route) {
+          resolveView(view, in: elementContext)
+        }
       }
       elementNode.attachResolvedForEachEntity(
         entityIdentity,
@@ -141,7 +153,11 @@ extension ForEach: DeclaredChildrenView {
     )
     nextIndex += 1
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
-    let entityIdentities = makeEntityIdentities(for: data, id: id)
+    let entityIdentities = makeEntityIdentities(
+      for: data,
+      id: id,
+      scope: childContext.structuralPath
+    )
 
     var elementOffset = 0
     for element in data {
@@ -151,10 +167,10 @@ extension ForEach: DeclaredChildrenView {
         index: currentElementOffset
       )
       elementOffset += 1
+      let entityIdentity = entityIdentities[currentElementOffset]
       let elementContext = structuralElementContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
-      let entityIdentity = entityIdentities[currentElementOffset]
       let perIterationScope = dynamicPropertyScope.map { scope in
         AuthoringContext(
           viewIdentity: scope.viewIdentity,
@@ -162,6 +178,8 @@ extension ForEach: DeclaredChildrenView {
           structuralPath: elementContext.structuralPath,
           focusedValues: scope.focusedValues,
           viewNode: scope.viewNode,
+          ownerNodeID: scope.ownerNodeID,
+          stateGraphScope: scope.stateGraphScope,
           ordinalTracker: scope.ordinalTracker
         )
       }
@@ -172,8 +190,14 @@ extension ForEach: DeclaredChildrenView {
       }
 
       visitor(view, elementContext) {
+        let route = ResolveEntityRoute(
+          identity: entityIdentity,
+          structuralPath: elementContext.structuralPath
+        )
         var resolved = withAuthoringContext(perIterationScope) {
-          resolveView(view, in: elementContext)
+          withResolveEntityRoute(route) {
+            resolveView(view, in: elementContext)
+          }
         }
         resolved.attachResolvedForEachEntity(
           entityIdentity,
@@ -206,7 +230,8 @@ extension ForEach where Data == Range<Int>, ID == Int {
 
 package func makeEntityIdentities<Data, ID>(
   for data: Data,
-  id: KeyPath<Data.Element, ID>
+  id: KeyPath<Data.Element, ID>,
+  scope: StructuralPath
 ) -> [EntityIdentity]
 where Data: RandomAccessCollection, ID: Hashable & Sendable {
   var counts: [ID: Int] = [:]
@@ -217,7 +242,13 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable {
     let value = element[keyPath: id]
     let occurrence = counts[value, default: 0]
     counts[value] = occurrence + 1
-    identities.append(EntityIdentity(value, occurrence: occurrence))
+    identities.append(
+      EntityIdentity(
+        forEachValue: value,
+        occurrence: occurrence,
+        scope: scope
+      )
+    )
   }
 
   return identities

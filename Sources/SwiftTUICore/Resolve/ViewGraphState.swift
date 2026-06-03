@@ -18,6 +18,7 @@ extension ViewGraph {
     package var nodeIDByIdentity: [Identity: ViewNodeID]
     package var identityByNodeID: [ViewNodeID: Identity]
     package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
+    package var entityRoutingTable: EntityRoutingTable
     package var nextViewNodeIDRawValue: UInt64
     package var rootEvaluator: (@MainActor () -> Void)?
     package var evaluationRootIdentity: Identity?
@@ -29,6 +30,7 @@ extension ViewGraph {
     package var structuralAppearEvents: [LifecycleEvent]
     package var structuralTaskCancelEvents: [LifecycleEvent]
     package var structuralDisappearEvents: [LifecycleEvent]
+    package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
     package var requiresRootEvaluation: Bool
     package var invalidatedNodeIDs: Set<ViewNodeID>
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
@@ -59,18 +61,12 @@ extension ViewGraph {
 }
 
 package struct StateMutationSlotKey: Hashable, Sendable {
-  package var viewNodeID: ViewNodeID?
-  package var identity: Identity
-  package var ordinal: Int
+  package var key: StateSlotKey
 
   package init(
-    viewNodeID: ViewNodeID?,
-    identity: Identity,
-    ordinal: Int
+    key: StateSlotKey
   ) {
-    self.viewNodeID = viewNodeID
-    self.identity = identity
-    self.ordinal = ordinal
+    self.key = key
   }
 }
 

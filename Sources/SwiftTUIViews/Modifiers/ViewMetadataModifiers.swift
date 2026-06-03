@@ -196,14 +196,30 @@ public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let explicitIdentity = context.identity.explicitID(id)
-    var resolved = content.resolveOwned(
-      in: context.replacingIdentity(with: explicitIdentity)
+    let entityIdentity = EntityIdentity(id)
+    let routedContext = context.replacingIdentity(with: explicitIdentity)
+    let route = ResolveEntityRoute(
+      identity: entityIdentity,
+      structuralPath: context.structuralPath
     )
+    context.viewGraph?.prepareEntityRoutedOwner(
+      entityIdentity,
+      for: ViewNodeContext.current
+    )
+    var resolved = withResolveEntityRoute(route) {
+      content.resolveOwned(in: routedContext)
+    }
     resolved.attachingEntityIdentity(
-      EntityIdentity(id),
+      entityIdentity,
       at: context.structuralPath
     )
     return [resolved]
+  }
+}
+
+extension IDModifier: EntityRouteProvidingModifier {
+  package func resolveEntityRouteIdentity(in context: ResolveContext) -> EntityIdentity {
+    EntityIdentity(id)
   }
 }
 

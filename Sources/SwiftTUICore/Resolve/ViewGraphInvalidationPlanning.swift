@@ -36,13 +36,10 @@ enum ViewGraphInvalidationPlanner {
 
   static func stateChangeDirtyNodeIDs(
     for key: StateSlotKey,
-    ownerNodeID: ViewNodeID?,
     stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
   ) -> Set<ViewNodeID> {
     var result = stateSlotDependents[key] ?? []
-    if let ownerNodeID {
-      result.insert(ownerNodeID)
-    }
+    result.insert(key.owner)
     return result
   }
 

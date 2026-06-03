@@ -262,6 +262,7 @@ func resolveView<V: View>(
   // Refresh the pass-owned inputs before resolving so invalidation helpers and
   // transaction-aware reuse checks observe the current frame.
   let context = context.applyingCurrentFrameResolveInputs()
+  let routeIdentity = entityRouteIdentity(for: view, in: context)
   context.viewGraph?.setSuppressesStructuralLifecycle(
     context.suppressesStructuralLifecycle,
     for: context.identity
@@ -299,6 +300,7 @@ func resolveView<V: View>(
 
   let graphNode = context.viewGraph?.beginEvaluation(
     identity: context.identity,
+    entityIdentity: routeIdentity,
     invalidator: context.invalidationProxy?.invalidator,
     suppressesStructuralLifecycle: context.suppressesStructuralLifecycle
   )
@@ -380,6 +382,8 @@ private func rebasedAuthoringContext(
     structuralPath: authoringContext.structuralPath,
     focusedValues: authoringContext.focusedValues,
     viewNode: viewNode,
+    ownerNodeID: authoringContext.ownerNodeID,
+    stateGraphScope: authoringContext.stateGraphScope,
     ordinalTracker: authoringContext.ordinalTracker
   )
 }

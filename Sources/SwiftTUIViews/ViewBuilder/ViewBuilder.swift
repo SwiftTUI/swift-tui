@@ -10,7 +10,7 @@ public enum ViewBuilder {
   }
 
   public static func buildExpression<V: View>(_ expression: V) -> V {
-    expression
+    return expression
   }
 
   public static func buildExpression(_ expression: ()) -> EmptyView {
@@ -24,7 +24,7 @@ public enum ViewBuilder {
   public static func buildBlock<each V: View>(
     _ views: repeat each V
   ) -> TupleView<repeat each V> {
-    TupleView((repeat each views))
+    return TupleView((repeat each views))
   }
 
   public static func buildOptional<Content: View>(

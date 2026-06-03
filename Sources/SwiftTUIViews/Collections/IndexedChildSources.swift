@@ -32,7 +32,11 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     self.id = id
     self.content = content
     self.childContext = childContext
-    entityIdentities = makeEntityIdentities(for: data, id: id)
+    entityIdentities = makeEntityIdentities(
+      for: data,
+      id: id,
+      scope: childContext.structuralPath
+    )
     authoringScope = currentAuthoringContext()
     identityRootStorage = childContext.identity
     countStorage = data.count
@@ -81,6 +85,8 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
           structuralPath: elementContext.structuralPath,
           focusedValues: scope.focusedValues,
           viewNode: scope.viewNode,
+          ownerNodeID: scope.ownerNodeID,
+          stateGraphScope: scope.stateGraphScope,
           ordinalTracker: scope.ordinalTracker
         )
       }
@@ -89,8 +95,14 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
           content(element)
         }
       }
+      let route = ResolveEntityRoute(
+        identity: entityIdentities[index],
+        structuralPath: elementContext.structuralPath
+      )
       var normalized = withAuthoringContext(perIterationScope) {
-        resolveView(view, in: elementContext)
+        withResolveEntityRoute(route) {
+          resolveView(view, in: elementContext)
+        }
       }
       normalized.attachResolvedForEachEntity(
         entityIdentities[index],

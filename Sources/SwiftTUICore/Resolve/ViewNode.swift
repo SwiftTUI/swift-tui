@@ -187,7 +187,7 @@ package final class ViewNode {
     stateSlots[ordinal] = slot
 
     dependencyTracker.recordStateRead(
-      .init(identity: identity, ordinal: ordinal)
+      .init(owner: viewNodeID, ordinal: ordinal)
     )
 
     guard slot.stores(Value.self) else {
@@ -212,7 +212,7 @@ package final class ViewNode {
     stateSlots[ordinal] = slot
     if didChange {
       ownerGraph?.queueDirtyForStateChange(
-        .init(identity: identity, ordinal: ordinal)
+        .init(owner: viewNodeID, ordinal: ordinal)
       )
       let invalidationIdentity = invalidationIdentity ?? identity
       let animationRequest = AnimationContextStorage.currentRequest
@@ -255,6 +255,10 @@ package final class ViewNode {
     slot: AnyStateSlot
   ) {
     stateSlots[ordinal] = slot
+  }
+
+  package func resetStateSlots() {
+    stateSlots.removeAll(keepingCapacity: false)
   }
 
   package func markDirty() {

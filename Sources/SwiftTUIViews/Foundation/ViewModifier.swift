@@ -39,6 +39,9 @@ package struct ModifierContentInputs<Base: View> {
         structuralPath: context.structuralPath,
         focusedValues: context.focusedValues,
         viewNode: ViewNodeContext.current,
+        ownerNodeID: ViewNodeContext.current?.viewNodeID ?? scope.ownerNodeID,
+        stateGraphScope: ViewNodeContext.current?.ownerGraph.map(StateGraphScopeID.init)
+          ?? scope.stateGraphScope,
         ordinalTracker: scope.ordinalTracker
       )
     }
@@ -151,6 +154,13 @@ extension ModifiedContent: ResolvableView where Content: View, Modifier: Primiti
     return withAuthoringContext(authoringContext) {
       modifier.resolve(content: inputs, in: context)
     }
+  }
+}
+
+extension ModifiedContent: EntityRouteProvidingView
+where Content: View, Modifier: EntityRouteProvidingModifier {
+  package func resolveEntityRouteIdentity(in context: ResolveContext) -> EntityIdentity? {
+    modifier.resolveEntityRouteIdentity(in: context)
   }
 }
 

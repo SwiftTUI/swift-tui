@@ -70,8 +70,8 @@ private struct DynamicStateLocation<Value> {
 private final class StateBox<Value> {
   private let slotOrdinal: Int
   private var seedValue: Value
-  private var boundLocationsByIdentity: [Identity: DynamicStateLocation<Value>]
-  private var retainedValuesByIdentity: [Identity: Value]
+  private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
+  private var retainedValuesByOwner: [StateStorageOwner: Value]
 
   init(
     seedValue: Value,
@@ -79,8 +79,8 @@ private final class StateBox<Value> {
   ) {
     self.slotOrdinal = slotOrdinal
     self.seedValue = seedValue
-    boundLocationsByIdentity = [:]
-    retainedValuesByIdentity = [:]
+    boundLocationsByOwner = [:]
+    retainedValuesByOwner = [:]
   }
 
   deinit {
@@ -97,48 +97,47 @@ private final class StateBox<Value> {
 
   func remember(
     _ location: DynamicStateLocation<Value>,
-    for identity: Identity,
-    graphID: ViewGraphScopeID?
+    for owner: StateStorageOwner
   ) {
-    boundLocationsByIdentity[identity] = location
-    if let graphID {
+    boundLocationsByOwner[owner] = location
+    if let graphID = owner.graphScope {
       StateGraphBindingRegistry.shared.remember(
-        identity,
+        owner,
         for: ObjectIdentifier(self),
         graphID: graphID
       )
     }
   }
 
-  func rememberedLocation(for identity: Identity) -> DynamicStateLocation<Value>? {
-    boundLocationsByIdentity[identity]
+  func rememberedLocation(for owner: StateStorageOwner) -> DynamicStateLocation<Value>? {
+    boundLocationsByOwner[owner]
   }
 
   func currentLocation(
-    in viewGraphID: ViewGraphScopeID
+    in viewGraphID: StateGraphScopeID
   ) -> DynamicStateLocation<Value>? {
     guard
-      let identity = StateGraphBindingRegistry.shared.currentIdentity(
+      let owner = StateGraphBindingRegistry.shared.currentOwner(
         for: ObjectIdentifier(self),
         graphID: viewGraphID
       )
     else {
       return nil
     }
-    return boundLocationsByIdentity[identity]
+    return boundLocationsByOwner[owner]
   }
 
   func retainedValue(
-    for identity: Identity
+    for owner: StateStorageOwner
   ) -> Value? {
-    retainedValuesByIdentity[identity]
+    retainedValuesByOwner[owner]
   }
 
   func storeRetainedValue(
     _ value: Value,
-    for identity: Identity
+    for owner: StateStorageOwner
   ) {
-    retainedValuesByIdentity[identity] = value
+    retainedValuesByOwner[owner] = value
   }
 
   var currentOrdinal: Int {
@@ -149,32 +148,32 @@ private final class StateBox<Value> {
 private final class StateGraphBindingRegistry: Sendable {
   static let shared = StateGraphBindingRegistry()
 
-  private let currentIdentityByBoxAndGraph = Mutex<
-    [ObjectIdentifier: [ViewGraphScopeID: Identity]]
+  private let currentOwnerByBoxAndGraph = Mutex<
+    [ObjectIdentifier: [StateGraphScopeID: StateStorageOwner]]
   >([:])
 
   func remember(
-    _ identity: Identity,
+    _ owner: StateStorageOwner,
     for boxID: ObjectIdentifier,
-    graphID: ViewGraphScopeID
+    graphID: StateGraphScopeID
   ) {
-    currentIdentityByBoxAndGraph.withLock { identities in
-      identities[boxID, default: [:]][graphID] = identity
+    currentOwnerByBoxAndGraph.withLock { owners in
+      owners[boxID, default: [:]][graphID] = owner
     }
   }
 
-  func currentIdentity(
+  func currentOwner(
     for boxID: ObjectIdentifier,
-    graphID: ViewGraphScopeID
-  ) -> Identity? {
-    currentIdentityByBoxAndGraph.withLock { identities in
-      identities[boxID]?[graphID]
+    graphID: StateGraphScopeID
+  ) -> StateStorageOwner? {
+    currentOwnerByBoxAndGraph.withLock { owners in
+      owners[boxID]?[graphID]
     }
   }
 
   func forget(boxID: ObjectIdentifier) {
-    currentIdentityByBoxAndGraph.withLock { identities in
-      identities[boxID] = nil
+    currentOwnerByBoxAndGraph.withLock { owners in
+      owners[boxID] = nil
     }
   }
 }
@@ -249,31 +248,28 @@ public struct State<Value> {
     guard let context = AuthoringContextStorage.current else {
       return nil
     }
-    let graphID = graphScopeID(for: context) ?? graphScopeID(from: context.viewIdentity)
-    let storageIdentity = stateStorageIdentity(
-      for: context.viewIdentity,
-      graphID: graphScopeID(for: context)
-    )
+    guard let storageOwner = stateStorageOwner(for: context) else {
+      return nil
+    }
 
     if ViewNodeContext.current != nil {
       let location = makeLocation(
         for: context,
-        storageIdentity: storageIdentity
+        storageOwner: storageOwner
       )
       box.remember(
         location,
-        for: storageIdentity,
-        graphID: graphID
+        for: storageOwner
       )
       _ = location.getValue()
       return location
     }
 
-    if let location = box.rememberedLocation(for: storageIdentity) {
+    if let location = box.rememberedLocation(for: storageOwner) {
       return location
     }
 
-    if let viewGraphID = graphID,
+    if let viewGraphID = storageOwner.graphScope,
       let location = box.currentLocation(in: viewGraphID)
     {
       return location
@@ -283,31 +279,23 @@ public struct State<Value> {
 
   private func makeLocation(
     for context: AuthoringContext,
-    storageIdentity: Identity
+    storageOwner: StateStorageOwner
   ) -> DynamicStateLocation<Value> {
     let ordinal = box.currentOrdinal
-    let baseIdentity = baseStateStorageIdentity(from: storageIdentity)
-    let baseRetainedSeed =
-      baseIdentity == storageIdentity ? nil : box.retainedValue(for: baseIdentity)
     let retainedSeed =
-      box.retainedValue(for: storageIdentity) ?? baseRetainedSeed ?? box.currentSeedValue()
+      box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
 
     if let viewNode = context.viewNode {
       return DynamicStateLocation(
         getValue: { [weak viewNode, weak box] in
           guard let viewNode else {
-            if let retainedValue = box?.retainedValue(for: storageIdentity) {
-              return retainedValue
-            }
-            if baseIdentity != storageIdentity,
-              let retainedValue = box?.retainedValue(for: baseIdentity)
-            {
+            if let retainedValue = box?.retainedValue(for: storageOwner) {
               return retainedValue
             }
             return retainedSeed
           }
           let liveViewNode =
-            viewNode.ownerGraph?.nodeForIdentity(viewNode.identity) ?? viewNode
+            viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
           return liveViewNode.stateSlot(
             ordinal: ordinal,
             seed: retainedSeed
@@ -316,21 +304,17 @@ public struct State<Value> {
         setValue: { [weak viewNode, weak box] newValue in
           if let viewNode {
             let liveViewNode =
-              viewNode.ownerGraph?.nodeForIdentity(viewNode.identity) ?? viewNode
+              viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
             liveViewNode.setStateSlot(
               ordinal: ordinal,
               value: newValue,
-              invalidationIdentity: baseIdentity
+              invalidationIdentity: context.viewIdentity
             )
-            box?.storeRetainedValue(newValue, for: storageIdentity)
-            if baseIdentity != storageIdentity, liveViewNode.invalidator == nil {
-              box?.storeRetainedValue(newValue, for: baseIdentity)
-            }
+            box?.updateSeedValue(newValue)
+            box?.storeRetainedValue(newValue, for: storageOwner)
           } else {
-            box?.storeRetainedValue(newValue, for: storageIdentity)
-            if baseIdentity != storageIdentity {
-              box?.storeRetainedValue(newValue, for: baseIdentity)
-            }
+            box?.updateSeedValue(newValue)
+            box?.storeRetainedValue(newValue, for: storageOwner)
           }
         }
       )
@@ -356,7 +340,7 @@ extension View {
         makeBody()
       }
       return withAuthoringContext(authoringContext) {
-        body.resolveElements(in: context)
+        return body.resolveElements(in: context)
       }
     }
 

@@ -249,7 +249,6 @@ struct ViewGraphTests {
   func dependencyIndicesReindexOnReevaluation() throws {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
-    let stateKey = StateSlotKey(identity: rootIdentity, ordinal: 0)
     let environmentKeyA = ObjectIdentifier(DependencyKeyA.self)
     let environmentKeyB = ObjectIdentifier(DependencyKeyB.self)
     let observableBox = DependencyObservableBox()
@@ -257,6 +256,7 @@ struct ViewGraphTests {
 
     graph.beginFrame()
     let node = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let stateKey = StateSlotKey(owner: node.viewNodeID, ordinal: 0)
     _ = node.stateSlot(ordinal: 0, seed: 0)
     node.recordEnvironmentRead(environmentKeyA)
     node.recordObservableRead(observableID)

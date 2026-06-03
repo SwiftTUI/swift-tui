@@ -91,13 +91,14 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
   public subscript<Value>(
     dynamicMember keyPath: ReferenceWritableKeyPath<Model, Value>
   ) -> Binding<Value> {
+    let model = wrappedValue
     // Register the observable property access while the enclosing body is
     // being built so writes map back into the existing invalidation pipeline.
-    ViewNodeContext.current?.recordObservableRead(ObjectIdentifier(wrappedValue))
-    _ = wrappedValue[keyPath: keyPath]
+    ViewNodeContext.current?.recordObservableRead(ObjectIdentifier(model))
+    _ = model[keyPath: keyPath]
     return Binding(
-      mainActorGet: { wrappedValue[keyPath: keyPath] },
-      set: { wrappedValue[keyPath: keyPath] = $0 }
+      mainActorGet: { model[keyPath: keyPath] },
+      set: { model[keyPath: keyPath] = $0 }
     )
   }
 }

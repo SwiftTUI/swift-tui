@@ -6,6 +6,7 @@ extension ViewGraph {
       nodeIDByIdentity: nodeIDByIdentity,
       identityByNodeID: identityByNodeID,
       nodeIDsByStructuralPath: nodeIDsByStructuralPath,
+      entityRoutingTable: entityRoutingTable,
       nextViewNodeIDRawValue: nextViewNodeIDRawValue,
       rootEvaluator: rootEvaluator,
       evaluationRootIdentity: evaluationRootIdentity,
@@ -17,6 +18,7 @@ extension ViewGraph {
       structuralAppearEvents: structuralAppearEvents,
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
+      pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
@@ -45,6 +47,7 @@ extension ViewGraph {
     nodeIDByIdentity = checkpoint.nodeIDByIdentity
     identityByNodeID = checkpoint.identityByNodeID
     nodeIDsByStructuralPath = checkpoint.nodeIDsByStructuralPath
+    entityRoutingTable = checkpoint.entityRoutingTable
     nextViewNodeIDRawValue = checkpoint.nextViewNodeIDRawValue
     rootEvaluator = checkpoint.rootEvaluator
     evaluationRootIdentity = checkpoint.evaluationRootIdentity
@@ -56,6 +59,7 @@ extension ViewGraph {
     structuralAppearEvents = checkpoint.structuralAppearEvents
     structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
     structuralDisappearEvents = checkpoint.structuralDisappearEvents
+    pendingEntityRoutedRemovalNodeIDs = checkpoint.pendingEntityRoutedRemovalNodeIDs
     requiresRootEvaluation = checkpoint.requiresRootEvaluation
     invalidatedNodeIDs = checkpoint.invalidatedNodeIDs
     graphLocalDirtyNodeIDs = checkpoint.graphLocalDirtyNodeIDs
@@ -93,6 +97,7 @@ package final class ViewGraph {
   private var nodeIDByIdentity: [Identity: ViewNodeID]
   private var identityByNodeID: [ViewNodeID: Identity]
   private var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
+  private var entityRoutingTable: EntityRoutingTable
   private var nextViewNodeIDRawValue: UInt64
   private var rootEvaluator: (@MainActor () -> Void)?
   private var evaluationRootIdentity: Identity?
@@ -104,6 +109,7 @@ package final class ViewGraph {
   private var structuralAppearEvents: [LifecycleEvent]
   private var structuralTaskCancelEvents: [LifecycleEvent]
   private var structuralDisappearEvents: [LifecycleEvent]
+  private var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
   private var requiresRootEvaluation: Bool
   private var invalidatedNodeIDs: Set<ViewNodeID>
   private var graphLocalDirtyNodeIDs: Set<ViewNodeID>
@@ -197,6 +203,7 @@ package final class ViewGraph {
       resolved: resolved,
       children: children
     )
+    bindEntityIdentity(from: resolved, to: node.viewNodeID)
     reindexIdentity(
       for: node,
       previousResolvedIdentity: previousResolvedIdentity
@@ -265,6 +272,7 @@ package final class ViewGraph {
     nodeIDByIdentity = [:]
     identityByNodeID = [:]
     nodeIDsByStructuralPath = [:]
+    entityRoutingTable = .init()
     nextViewNodeIDRawValue = 0
     rootEvaluator = nil
     evaluationRootIdentity = nil
@@ -276,6 +284,7 @@ package final class ViewGraph {
     structuralAppearEvents = []
     structuralTaskCancelEvents = []
     structuralDisappearEvents = []
+    pendingEntityRoutedRemovalNodeIDs = []
     requiresRootEvaluation = false
     invalidatedNodeIDs = []
     graphLocalDirtyNodeIDs = []
@@ -303,6 +312,7 @@ package final class ViewGraph {
       nodeIDByIdentity: nodeIDByIdentity,
       identityByNodeID: identityByNodeID,
       nodeIDsByStructuralPath: nodeIDsByStructuralPath,
+      entityRoutingTable: entityRoutingTable,
       nextViewNodeIDRawValue: nextViewNodeIDRawValue,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
@@ -314,6 +324,7 @@ package final class ViewGraph {
       structuralAppearEvents: structuralAppearEvents,
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
+      pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
@@ -350,6 +361,10 @@ package final class ViewGraph {
     nodeIfExists(for: identity)
   }
 
+  package func nodeForViewNodeID(_ viewNodeID: ViewNodeID) -> ViewNode? {
+    nodeIfExists(for: viewNodeID)
+  }
+
   package func containsNode(
     for identity: Identity
   ) -> Bool {
@@ -382,15 +397,11 @@ package final class ViewGraph {
   package func queueDirtyForStateChange(
     _ key: StateSlotKey
   ) {
-    let ownerNodeID = viewNodeID(for: key.identity)
     stateMutationKeys.insert(key)
-    if let ownerNodeID {
-      stateMutationNodeIDsByKey[key, default: []].insert(ownerNodeID)
-    }
+    stateMutationNodeIDsByKey[key, default: []].insert(key.owner)
     ViewGraphInvalidationPlanner.queueDirty(
       ViewGraphInvalidationPlanner.stateChangeDirtyNodeIDs(
         for: key,
-        ownerNodeID: ownerNodeID,
         stateSlotDependents: stateSlotDependents
       ),
       graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
@@ -412,15 +423,16 @@ package final class ViewGraph {
         }
         stateSlots[
           StateMutationSlotKey(
-            viewNodeID: viewNodeID,
-            identity: key.identity,
-            ordinal: key.ordinal
+            key: StateSlotKey(
+              owner: viewNodeID,
+              ordinal: key.ordinal
+            )
           )
         ] = slot
         capturedSlot = true
       }
       guard !capturedSlot,
-        let slot = nodeIfExists(for: key.identity)?.stateSlotStorage(
+        let slot = nodeIfExists(for: key.owner)?.stateSlotStorage(
           ordinal: key.ordinal
         )
       else {
@@ -428,9 +440,7 @@ package final class ViewGraph {
       }
       stateSlots[
         StateMutationSlotKey(
-          viewNodeID: nil,
-          identity: key.identity,
-          ordinal: key.ordinal
+          key: key
         )
       ] = slot
     }
@@ -448,13 +458,11 @@ package final class ViewGraph {
     _ overlay: StateMutationOverlay
   ) {
     for (key, slot) in overlay.stateSlots {
-      let node =
-        key.viewNodeID.flatMap { nodeIfExists(for: $0) }
-        ?? nodeIfExists(for: key.identity)
+      let node = nodeIfExists(for: key.key.owner)
       guard let node else {
         continue
       }
-      node.restoreStateSlot(ordinal: key.ordinal, slot: slot)
+      node.restoreStateSlot(ordinal: key.key.ordinal, slot: slot)
       node.markDirty()
     }
     requiresRootEvaluation = requiresRootEvaluation || overlay.requiresRootEvaluation
@@ -652,15 +660,20 @@ package final class ViewGraph {
     structuralAppearEvents.removeAll(keepingCapacity: true)
     structuralTaskCancelEvents.removeAll(keepingCapacity: true)
     structuralDisappearEvents.removeAll(keepingCapacity: true)
+    pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
   }
 
   package func beginEvaluation(
     identity: Identity,
+    entityIdentity: EntityIdentity? = nil,
     invalidator: (any Invalidating)?,
     suppressesStructuralLifecycle: Bool = false
   ) -> ViewNode {
-    let node = nodeForIdentity(for: identity)
+    let node = nodeForIdentity(
+      for: identity,
+      entityIdentity: entityIdentity
+    )
     node.prepareForFrame(currentFrameID)
     if !node.wasVisitedThisFrame {
       frameOrder.append(node.viewNodeID)
@@ -681,6 +694,24 @@ package final class ViewGraph {
     for identity: Identity
   ) {
     nodeIfExists(for: identity)?.setSuppressesStructuralLifecycle(suppressesStructuralLifecycle)
+  }
+
+  package func prepareEntityRoutedOwner(
+    _ entityIdentity: EntityIdentity,
+    for node: ViewNode?
+  ) {
+    guard let node else {
+      return
+    }
+    let existingEntityIdentity =
+      node.committed.entityIdentity
+      ?? entityRoutingTable.entityByNodeID[node.viewNodeID]
+    if let existingEntityIdentity,
+      existingEntityIdentity != entityIdentity
+    {
+      node.resetStateSlots()
+    }
+    entityRoutingTable.bind(entityIdentity, to: node.viewNodeID)
   }
 
   @discardableResult
@@ -1121,6 +1152,8 @@ package final class ViewGraph {
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
     root = nodeIfExists(for: rootIdentity)
+    let activeEntities = entityIdentities(in: resolved)
+    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
@@ -1142,6 +1175,9 @@ package final class ViewGraph {
     viewportLifecycleOrder = lifecyclePlan.viewportLifecycleOrder
 
     liveNodeIDs.formUnion(frameOrder)
+    releaseInactiveEntityRoutes(
+      activeEntities: activeEntities
+    )
     requiresRootEvaluation = false
     invalidatedNodeIDs.removeAll(keepingCapacity: true)
     graphLocalDirtyNodeIDs.removeAll(keepingCapacity: true)
@@ -1324,10 +1360,37 @@ package final class ViewGraph {
   }
 
   private func nodeForIdentity(
-    for identity: Identity
+    for identity: Identity,
+    entityIdentity: EntityIdentity? = nil
   ) -> ViewNode {
+    if let entityIdentity,
+      let routedNodeID = entityRoutingTable.route(entityIdentity)
+    {
+      if let routedNode = nodeIfExists(for: routedNodeID) {
+        nodeIDByIdentity[identity] = routedNodeID
+        identityByNodeID[routedNodeID] = identity
+        entityRoutingTable.bind(entityIdentity, to: routedNodeID)
+        return routedNode
+      }
+      entityRoutingTable.release(routedNodeID)
+    }
+
     if let existing = nodeIfExists(for: identity) {
-      return existing
+      if let entityIdentity {
+        let existingEntityIdentity =
+          existing.committed.entityIdentity
+          ?? entityRoutingTable.entityByNodeID[existing.viewNodeID]
+        if let existingEntityIdentity,
+          existingEntityIdentity != entityIdentity
+        {
+          removeSubtree(rootedAt: existing)
+        } else {
+          entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
+          return existing
+        }
+      } else {
+        return existing
+      }
     }
 
     nextViewNodeIDRawValue &+= 1
@@ -1340,7 +1403,69 @@ package final class ViewGraph {
     nodesByNodeID[viewNodeID] = node
     nodeIDByIdentity[identity] = viewNodeID
     identityByNodeID[viewNodeID] = identity
+    if let entityIdentity {
+      entityRoutingTable.bind(entityIdentity, to: viewNodeID)
+    }
     return node
+  }
+
+  private func bindEntityIdentity(
+    from resolved: ResolvedNode,
+    to viewNodeID: ViewNodeID
+  ) {
+    guard let entityIdentity = resolved.entityIdentity else {
+      return
+    }
+    entityRoutingTable.bind(entityIdentity, to: viewNodeID)
+  }
+
+  private func entityIdentities(
+    in resolved: ResolvedNode
+  ) -> Set<EntityIdentity> {
+    var entities: Set<EntityIdentity> = []
+    func visit(_ node: ResolvedNode) {
+      if let entityIdentity = node.entityIdentity {
+        entities.insert(entityIdentity)
+      }
+      for child in node.children {
+        visit(child)
+      }
+    }
+    visit(resolved)
+    return entities
+  }
+
+  private func releaseInactiveEntityRoutes(
+    activeEntities: Set<EntityIdentity>
+  ) {
+    entityRoutingTable.releaseEntities(notIn: activeEntities)
+    entityRoutingTable.releaseNodes(notIn: liveNodeIDs)
+  }
+
+  private func shouldDeferEntityRoutedRemoval(
+    of node: ViewNode
+  ) -> Bool {
+    guard let entityIdentity = node.committed.entityIdentity else {
+      return false
+    }
+    return entityRoutingTable.route(entityIdentity) == node.viewNodeID
+  }
+
+  private func prunePendingEntityRoutedRemovals(
+    activeEntities: Set<EntityIdentity>
+  ) {
+    let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
+    pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
+    for viewNodeID in pendingNodeIDs {
+      guard let node = nodeIfExists(for: viewNodeID),
+        let entityIdentity = node.committed.entityIdentity,
+        !activeEntities.contains(entityIdentity),
+        !node.wasVisitedThisFrame
+      else {
+        continue
+      }
+      removeSubtree(rootedAt: node)
+    }
   }
 
   private func applyStructuralChildDiff(
@@ -1363,6 +1488,10 @@ package final class ViewGraph {
       }
       let removedNode = node.children[removal.oldIndex]
       guard !retainedChildNodeIDs.contains(removedNode.viewNodeID) else {
+        continue
+      }
+      if shouldDeferEntityRoutedRemoval(of: removedNode) {
+        pendingEntityRoutedRemovalNodeIDs.insert(removedNode.viewNodeID)
         continue
       }
 
@@ -1460,6 +1589,7 @@ package final class ViewGraph {
     if nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID {
       nodeIDByIdentity.removeValue(forKey: node.resolvedIdentity)
     }
+    entityRoutingTable.release(node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
   }

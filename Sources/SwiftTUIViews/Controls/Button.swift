@@ -22,10 +22,11 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
     role: ButtonRole? = nil,
     @ViewBuilder label: () -> Label
   ) {
+    let authoringContext = currentAuthoringContext()
     self.role = role
     action = nil
     self.label = label()
-    authoringScope = currentAuthoringContext()
+    authoringScope = authoringContext
   }
 
   public init(
@@ -33,10 +34,11 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
     role: ButtonRole? = nil,
     action: @escaping @MainActor @Sendable () -> Void
   ) where Label == Text {
+    let authoringContext = currentAuthoringContext()
     self.role = role
     self.action = action
     label = Text(title)
-    authoringScope = currentAuthoringContext()
+    authoringScope = authoringContext
   }
 
   public init(
@@ -44,10 +46,11 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
     action: @escaping @MainActor @Sendable () -> Void,
     @ViewBuilder label: () -> Label
   ) {
+    let authoringContext = currentAuthoringContext()
     self.role = role
     self.action = action
     self.label = label()
-    authoringScope = currentAuthoringContext()
+    authoringScope = authoringContext
   }
 
   package func resolveElements(
@@ -110,13 +113,12 @@ extension Button {
 
     if context.environmentValues.isEnabled, let action {
       let dynamicPropertyScope = authoringScope ?? currentAuthoringContext()
-      let mutationScope =
-        ImperativeAuthoringContextSnapshot(authoringScope)
+      let mutationScope = ImperativeAuthoringContextSnapshot(dynamicPropertyScope)
         ?? currentImperativeAuthoringContextSnapshot()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          return withImperativeAuthoringContext(mutationScope) {
+          withImperativeAuthoringContext(mutationScope) {
             action()
             return true
           }
