@@ -177,9 +177,19 @@
     }
 
     private static func writeToStandardError(_ message: String) {
-      unsafe message.withCString { cMessage in
-        _ = fputs(cMessage, stderr)
-      }
+      #if canImport(Darwin) || canImport(Glibc)
+        var message = message
+        message.withUTF8 { buffer in
+          guard let base = buffer.baseAddress, buffer.count > 0 else {
+            return
+          }
+          _ = unsafe write(STDERR_FILENO, base, buffer.count)
+        }
+      #elseif canImport(WASILibc) || canImport(ucrt)
+        unsafe message.withCString { cMessage in
+          _ = fputs(cMessage, stderr)
+        }
+      #endif
     }
   }
 
