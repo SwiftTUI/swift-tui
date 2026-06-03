@@ -1,7 +1,7 @@
 {
   "name": "swift-tui-workspace",
   "private": true,
-  "version": "0.0.13",
+  "version": "0.0.14",
   "license": "MIT",
   "scripts": {
     "perf:compare": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf compare",
