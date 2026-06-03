@@ -276,7 +276,7 @@ public struct ResolvedNode: Equatable, Sendable {
     supportsRetainedReuse = Self.computeSupportsRetainedReuse(
       layoutBehavior: layoutBehavior,
       children: children,
-      indexedChildSource: indexedChildSource,
+      structuralEdgeRole: structuralEdgeRole,
       layoutDependentContent: layoutDependentContent
     )
   }
@@ -317,10 +317,16 @@ public struct ResolvedNode: Equatable, Sendable {
   private static func computeSupportsRetainedReuse(
     layoutBehavior: LayoutBehavior,
     children: [ResolvedNode],
-    indexedChildSource: (any IndexedChildSource)?,
+    structuralEdgeRole: StructuralEdgeRole,
     layoutDependentContent: LayoutDependentContentBoundary?
   ) -> Bool {
-    if indexedChildSource != nil {
+    // A `.viewportBarrier` edge (Stage 4) marks a lazy/indexed source whose
+    // placed children are a viewport-clipped subset — its interior is never
+    // retained-reusable. Driven off the typed edge role rather than re-deriving
+    // it from `indexedChildSource`, so the role is a live consumer, not a label
+    // that shadows the real predicate. (The role is maintained equivalent to
+    // `indexedChildSource != nil` at construction and on mutation.)
+    if structuralEdgeRole == .viewportBarrier {
       return false
     }
     if layoutDependentContent != nil {
