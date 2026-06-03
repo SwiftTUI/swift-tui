@@ -99,6 +99,8 @@ package enum SurfaceCompositionRole: Equatable, Sendable {
   case detachedOverlayHost
   case detachedOverlayEntry
   case isolatedCompositingGroup
+  case transientRemovalOverlay
+  case viewportBarrier
 
   fileprivate var rawTopologyValue: UInt8 {
     switch self {
@@ -108,6 +110,8 @@ package enum SurfaceCompositionRole: Equatable, Sendable {
     case .detachedOverlayHost: 3
     case .detachedOverlayEntry: 4
     case .isolatedCompositingGroup: 5
+    case .transientRemovalOverlay: 6
+    case .viewportBarrier: 7
     }
   }
 
@@ -119,10 +123,14 @@ package enum SurfaceCompositionRole: Equatable, Sendable {
     case 3: self = .detachedOverlayHost
     case 4: self = .detachedOverlayEntry
     case 5: self = .isolatedCompositingGroup
+    case 6: self = .transientRemovalOverlay
+    case 7: self = .viewportBarrier
     default: return nil
     }
   }
 }
+
+package typealias StructuralEdgeRole = SurfaceCompositionRole
 
 package enum SurfaceInvalidationScope: Equatable, Sendable {
   case localBounds

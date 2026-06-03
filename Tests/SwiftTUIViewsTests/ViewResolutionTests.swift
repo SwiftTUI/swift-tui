@@ -123,6 +123,8 @@ struct ViewResolutionTests {
 
     #expect(content.kind == .view("LazyVStack"))
     #expect(counter.count == 0)
+    #expect(content.structuralEdgeRole == .viewportBarrier)
+    #expect(content.indexedChildSource != nil)
   }
 
   @Test("LazyHStack with a single ForEach defers eager child resolution")
@@ -142,6 +144,8 @@ struct ViewResolutionTests {
 
     #expect(content.kind == .view("LazyHStack"))
     #expect(counter.count == 0)
+    #expect(content.structuralEdgeRole == .viewportBarrier)
+    #expect(content.indexedChildSource != nil)
   }
 
   @Test("LazyVStack with mixed static siblings still resolves ForEach eagerly")

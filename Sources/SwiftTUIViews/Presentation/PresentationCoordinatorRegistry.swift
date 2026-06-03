@@ -4,7 +4,7 @@ package import SwiftTUICore
 
 @MainActor
 package final class PresentationCoordinatorBox<C: ManagedPresentationCoordinator>
-where C.Item.ID: Sendable {
+where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
   package struct Checkpoint: Sendable {
     fileprivate var coordinator: StoredPresentationCoordinatorCheckpoint<C.Item>?
   }
@@ -97,9 +97,10 @@ where C.Item.ID: Sendable {
       return nil
     }
 
-    let stableID = "\(C.overlayKindName):\(String(reflecting: item.id))"
+    let stableID = "\(C.overlayKindName):\(item.portalEntryID.ownerStableKey)"
     return OverlayStackEntry(
       id: stableID,
+      portalEntryID: item.portalEntryID,
       ordering: PortalOrdering(
         zIndex: C.zIndex,
         activationOrdinal: coordinator.latestActivationOrdinal ?? 0,
@@ -140,7 +141,7 @@ private struct AnyPresentationCoordinatorBox {
 
   init<C>(
     _ box: PresentationCoordinatorBox<C>
-  ) where C: ManagedPresentationCoordinator, C.Item.ID: Sendable {
+  ) where C: ManagedPresentationCoordinator, C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     beginSynchronizingImpl = {
       box.beginSynchronizing()
     }

@@ -301,13 +301,15 @@ package func composePresentationPortalTree(
   guard !overlayEntries.isEmpty else {
     return ResolvedNode(
       identity: context.identity,
+      structuralPath: context.structuralPath,
+      structuralEdgeRole: .detachedOverlayRoot,
       kind: .view("PresentationPortalRoot"),
       children: [baseNode],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       surfaceComposition: .init(
         role: .detachedOverlayRoot,
-        stableKey: context.identity.path,
+        stableKey: context.structuralPath.description,
         invalidationScope: .fullSurfaceDiff
       )
     )

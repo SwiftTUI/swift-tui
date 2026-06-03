@@ -100,8 +100,13 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   }
 }
 
-package struct PromptPresentationItem: Identifiable, Sendable {
+package protocol PortalPresentationItem: Identifiable, Sendable where ID == String {
+  var portalEntryID: PortalEntryID { get }
+}
+
+package struct PromptPresentationItem: PortalPresentationItem {
   package var id: String
+  package var portalEntryID: PortalEntryID
   package var title: String
   package var descriptor: PromptPresentationDescriptor
   package var actionPayloads: [PortalContentPayload]
@@ -111,6 +116,7 @@ package struct PromptPresentationItem: Identifiable, Sendable {
 
   package init(
     id: String,
+    portalEntryID: PortalEntryID? = nil,
     title: String,
     descriptor: PromptPresentationDescriptor,
     actionPayloads: [PortalContentPayload],
@@ -119,6 +125,7 @@ package struct PromptPresentationItem: Identifiable, Sendable {
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
     self.id = id
+    self.portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
     self.title = title
     self.descriptor = descriptor
     self.actionPayloads = actionPayloads
@@ -128,8 +135,9 @@ package struct PromptPresentationItem: Identifiable, Sendable {
   }
 }
 
-package struct PopoverPresentationItem: Identifiable, Sendable {
+package struct PopoverPresentationItem: PortalPresentationItem {
   package var id: String
+  package var portalEntryID: PortalEntryID
   package var sourceIdentity: Identity
   package var attachmentAnchor: PopoverAttachmentAnchor
   package var arrowEdge: Edge?
@@ -138,6 +146,7 @@ package struct PopoverPresentationItem: Identifiable, Sendable {
 
   package init(
     id: String,
+    portalEntryID: PortalEntryID? = nil,
     sourceIdentity: Identity,
     attachmentAnchor: PopoverAttachmentAnchor,
     arrowEdge: Edge?,
@@ -145,6 +154,7 @@ package struct PopoverPresentationItem: Identifiable, Sendable {
     surfaceItem: PromptPresentationItem
   ) {
     self.id = id
+    self.portalEntryID = portalEntryID ?? surfaceItem.portalEntryID
     self.sourceIdentity = sourceIdentity
     self.attachmentAnchor = attachmentAnchor
     self.arrowEdge = arrowEdge
@@ -153,8 +163,9 @@ package struct PopoverPresentationItem: Identifiable, Sendable {
   }
 }
 
-package struct ToastPresentationItem: Identifiable, Sendable {
+package struct ToastPresentationItem: PortalPresentationItem {
   package var id: String
+  package var portalEntryID: PortalEntryID
   package var contentPayloads: [PortalContentPayload]
   package var presentation: ToastStylePresentation
   package var duration: Double?
@@ -162,12 +173,14 @@ package struct ToastPresentationItem: Identifiable, Sendable {
 
   package init(
     id: String,
+    portalEntryID: PortalEntryID? = nil,
     contentPayloads: [PortalContentPayload],
     presentation: ToastStylePresentation,
     duration: Double?,
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
     self.id = id
+    self.portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
     self.contentPayloads = contentPayloads
     self.presentation = presentation
     self.duration = duration
@@ -175,9 +188,30 @@ package struct ToastPresentationItem: Identifiable, Sendable {
   }
 }
 
+package func presentationAttachment(
+  for node: ResolvedNode,
+  token: String
+) -> PortalEntryID {
+  PortalEntryID(
+    sourceIdentity: node.identity,
+    sourceStructuralPath: node.structuralPath,
+    sourceEntityIdentity: node.entityIdentity,
+    token: token
+  )
+}
+
 package func presentationAttachmentID(
   for sourceIdentity: Identity,
   token: String
 ) -> String {
   "\(sourceIdentity.path)#\(token)"
+}
+
+private func fallbackPortalEntryID(
+  for id: String
+) -> PortalEntryID {
+  PortalEntryID(
+    sourceIdentity: Identity(components: ["__ImperativePresentation", id]),
+    token: id
+  )
 }

@@ -93,8 +93,10 @@ extension ResolvedNode {
     // `semanticMetadata` / focus / `layoutBehavior`, all compared here.
     var metadataIdentical =
       identity == other.identity
+      && structuralEdgeRole == other.structuralEdgeRole
       && entityIdentity == other.entityIdentity
       && entityStructuralPath == other.entityStructuralPath
+      && declarationOwnerEdge == other.declarationOwnerEdge
       && layoutBehavior == other.layoutBehavior
       && drawMetadata == other.drawMetadata
       && drawEffects == other.drawEffects
@@ -140,8 +142,10 @@ extension ResolvedNode {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.identity == rhs.identity
       && lhs.structuralPath == rhs.structuralPath
+      && lhs.structuralEdgeRole == rhs.structuralEdgeRole
       && lhs.entityIdentity == rhs.entityIdentity
       && lhs.entityStructuralPath == rhs.entityStructuralPath
+      && lhs.declarationOwnerEdge == rhs.declarationOwnerEdge
       && lhs.kind == rhs.kind
       && Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator)
       && lhs.children == rhs.children

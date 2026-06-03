@@ -66,6 +66,8 @@ enum AnimationTransitionOverlay {
 
   private static func markTransient(_ node: inout ResolvedNode) {
     node.isTransient = true
+    node.structuralEdgeRole = .transientRemovalOverlay
+    node.surfaceComposition.role = .transientRemovalOverlay
     var children = node.children
     for i in children.indices {
       markTransient(&children[i])
@@ -119,11 +121,13 @@ enum AnimationTransitionOverlay {
       )
       var wrapped = ResolvedNode(
         identity: wrapperIdentity,
+        structuralEdgeRole: .transientRemovalOverlay,
         kind: .view("TransitionOffset"),
         children: [node],
         environmentSnapshot: node.environmentSnapshot,
         transactionSnapshot: node.transactionSnapshot,
-        layoutBehavior: .offset(x: offsetX, y: offsetY)
+        layoutBehavior: .offset(x: offsetX, y: offsetY),
+        surfaceComposition: .init(role: .transientRemovalOverlay)
       )
       wrapped.isTransient = node.isTransient
       node = wrapped

@@ -1,18 +1,70 @@
 /// Stable identity for content declared in one subtree and hosted by a portal root.
 package struct PortalEntryID: Hashable, Sendable, CustomStringConvertible {
   package var sourceIdentity: Identity
+  package var sourceStructuralPath: StructuralPath
+  package var sourceEntityIdentity: EntityIdentity?
   package var token: String
 
   package init(
     sourceIdentity: Identity,
+    sourceStructuralPath: StructuralPath? = nil,
+    sourceEntityIdentity: EntityIdentity? = nil,
     token: String
   ) {
     self.sourceIdentity = sourceIdentity
+    self.sourceStructuralPath = sourceStructuralPath ?? StructuralPath(identity: sourceIdentity)
+    self.sourceEntityIdentity = sourceEntityIdentity
     self.token = token
   }
 
   package var description: String {
     "\(sourceIdentity.path)#\(token)"
+  }
+
+  package var ownerStableKey: String {
+    if let sourceEntityIdentity {
+      return "entity:\(sourceEntityIdentity.description)#\(token)"
+    }
+    return "source:\(sourceStructuralPath.description)#\(token)"
+  }
+
+  package var placementStableKey: String {
+    "entry:\(sourceStructuralPath.description)#\(token)"
+  }
+
+  package func declarationOwnerEdge(
+    placementRoot: StructuralPath
+  ) -> DeclarationOwnerEdge {
+    DeclarationOwnerEdge(
+      sourceIdentity: sourceIdentity,
+      sourceStructuralPath: sourceStructuralPath,
+      sourceEntityIdentity: sourceEntityIdentity,
+      placementRoot: placementRoot,
+      token: token
+    )
+  }
+}
+
+/// Typed back-edge from a placed portal entry to the node that declared it.
+package struct DeclarationOwnerEdge: Hashable, Sendable {
+  package var sourceIdentity: Identity
+  package var sourceStructuralPath: StructuralPath
+  package var sourceEntityIdentity: EntityIdentity?
+  package var placementRoot: StructuralPath
+  package var token: String
+
+  package init(
+    sourceIdentity: Identity,
+    sourceStructuralPath: StructuralPath,
+    sourceEntityIdentity: EntityIdentity?,
+    placementRoot: StructuralPath,
+    token: String
+  ) {
+    self.sourceIdentity = sourceIdentity
+    self.sourceStructuralPath = sourceStructuralPath
+    self.sourceEntityIdentity = sourceEntityIdentity
+    self.placementRoot = placementRoot
+    self.token = token
   }
 }
 

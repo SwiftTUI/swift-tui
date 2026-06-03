@@ -11,8 +11,10 @@
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
   package var structuralPath: StructuralPath
+  package var structuralEdgeRole: StructuralEdgeRole
   package var entityIdentity: EntityIdentity?
   package var entityStructuralPath: StructuralPath?
+  package var declarationOwnerEdge: DeclarationOwnerEdge?
   package var kind: NodeKind
   /// Stable per-Swift-type discriminator carried alongside `kind`.
   ///
@@ -102,6 +104,11 @@ public struct ResolvedNode: Equatable, Sendable {
   public var intrinsicSize: CellSize?
   package var indexedChildSource: (any IndexedChildSource)? {
     didSet {
+      if indexedChildSource != nil, structuralEdgeRole == .normal {
+        structuralEdgeRole = .viewportBarrier
+      } else if indexedChildSource == nil, structuralEdgeRole == .viewportBarrier {
+        structuralEdgeRole = .normal
+      }
       recomputeCustomLayoutFallbackSummary()
       recomputeSupportsRetainedReuse()
     }
@@ -139,6 +146,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package init(
     identity: Identity,
     structuralPath: StructuralPath? = nil,
+    structuralEdgeRole: StructuralEdgeRole? = nil,
     kind: NodeKind,
     children: [ResolvedNode] = [],
     environmentSnapshot: EnvironmentSnapshot = .init(),
@@ -156,8 +164,10 @@ public struct ResolvedNode: Equatable, Sendable {
   ) {
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
+    self.structuralEdgeRole = structuralEdgeRole ?? surfaceComposition.role
     self.entityIdentity = nil
     self.entityStructuralPath = nil
+    self.declarationOwnerEdge = nil
     self.kind = kind
     self.typeDiscriminator = nil
     // Assign the backing stores directly — the computed setters would
@@ -190,6 +200,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package init(
     identity: Identity,
     structuralPath: StructuralPath? = nil,
+    structuralEdgeRole: StructuralEdgeRole? = nil,
     kind: NodeKind,
     typeDiscriminator: ObjectIdentifier? = nil,
     children: [ResolvedNode] = [],
@@ -209,8 +220,11 @@ public struct ResolvedNode: Equatable, Sendable {
   ) {
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
+    self.structuralEdgeRole =
+      structuralEdgeRole ?? (indexedChildSource == nil ? surfaceComposition.role : .viewportBarrier)
     self.entityIdentity = nil
     self.entityStructuralPath = nil
+    self.declarationOwnerEdge = nil
     self.kind = kind
     self.typeDiscriminator = typeDiscriminator
     self._storedChildren = children

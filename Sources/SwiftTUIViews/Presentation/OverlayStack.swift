@@ -2,6 +2,7 @@ package import SwiftTUICore
 
 package struct OverlayStackEntry: Sendable {
   package var id: String
+  package var portalEntryID: PortalEntryID?
   package var ordering: PortalOrdering
   package var kindName: String
   package var modalPolicy: PortalModalPolicy
@@ -11,6 +12,7 @@ package struct OverlayStackEntry: Sendable {
 
   package init(
     id: String,
+    portalEntryID: PortalEntryID? = nil,
     ordering: PortalOrdering,
     kindName: String,
     modalPolicy: PortalModalPolicy,
@@ -19,12 +21,23 @@ package struct OverlayStackEntry: Sendable {
     payload: PortalContentPayload
   ) {
     self.id = id
+    self.portalEntryID = portalEntryID
     self.ordering = ordering
     self.kindName = kindName
     self.modalPolicy = modalPolicy
     self.acceptsEscape = acceptsEscape
     self.dismiss = dismiss
     self.payload = payload
+  }
+
+  package var surfaceStableKey: String {
+    portalEntryID?.placementStableKey ?? id
+  }
+
+  package func declarationOwnerEdge(
+    placementRoot: StructuralPath
+  ) -> DeclarationOwnerEdge? {
+    portalEntryID?.declarationOwnerEdge(placementRoot: placementRoot)
   }
 }
 
@@ -69,6 +82,7 @@ package func composeOverlayStackTree(
 
   return ResolvedNode(
     identity: context.identity,
+    structuralPath: context.structuralPath,
     kind: .view("OverlayStack"),
     children: [hostedBaseNode, overlayNode],
     environmentSnapshot: hostContext.environment,
@@ -76,7 +90,7 @@ package func composeOverlayStackTree(
     layoutBehavior: .overlay(alignment: .topLeading),
     surfaceComposition: .init(
       role: .stackingContext,
-      stableKey: "overlay-stack:\(context.identity.path)",
+      stableKey: "overlay-stack:\(context.structuralPath.description)",
       invalidationScope: .fullSurfaceDiff
     ),
     semanticMetadata: stackSemantics
@@ -108,7 +122,7 @@ private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
         layoutBehavior: .overlay(alignment: .topLeading),
         surfaceComposition: .init(
           role: .detachedOverlayHost,
-          stableKey: "overlay-host:\(context.identity.path)",
+          stableKey: "overlay-host:\(context.structuralPath.description)",
           invalidationScope: .fullSurfaceDiff
         )
       )
@@ -123,20 +137,25 @@ private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let bodyContext = context.child(component: .named("body"))
     let bodyNode = entry.payload.resolve(in: bodyContext)
+    var entryNode = ResolvedNode(
+      identity: context.identity,
+      structuralEdgeRole: .detachedOverlayEntry,
+      kind: .view(entry.kindName),
+      children: [bodyNode],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      surfaceComposition: .init(
+        role: .detachedOverlayEntry,
+        stableKey: entry.surfaceStableKey,
+        invalidationScope: .fullSurfaceDiff
+      )
+    )
+    entryNode.declarationOwnerEdge = entry.declarationOwnerEdge(
+      placementRoot: context.structuralPath
+    )
 
     return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view(entry.kindName),
-        children: [bodyNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        surfaceComposition: .init(
-          role: .detachedOverlayEntry,
-          stableKey: entry.id,
-          invalidationScope: .fullSurfaceDiff
-        )
-      )
+      entryNode
     ]
   }
 }

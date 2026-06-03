@@ -22,12 +22,11 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
     }
 
     let sourceIdentity = node.identity
+    let portalEntryID = presentationAttachment(for: node, token: spec.token)
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = PromptPresentationItem(
-      id: presentationAttachmentID(
-        for: sourceIdentity,
-        token: spec.token
-      ),
+      id: portalEntryID.description,
+      portalEntryID: portalEntryID,
       title: title,
       descriptor: spec.descriptor,
       actionPayloads: withAuthoringContext(actionsAuthoringContext) {
@@ -81,12 +80,11 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
     }
 
     let sourceIdentity = node.identity
+    let portalEntryID = presentationAttachment(for: node, token: spec.token)
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = PromptPresentationItem(
-      id: presentationAttachmentID(
-        for: sourceIdentity,
-        token: spec.token
-      ),
+      id: portalEntryID.description,
+      portalEntryID: portalEntryID,
       title: title,
       descriptor: spec.descriptor,
       actionPayloads: [],
@@ -161,11 +159,10 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
     let sourceIdentity = node.identity
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let spec = sheetPromptPresentationSpec(chrome: .dropdown)
+    let portalEntryID = presentationAttachment(for: node, token: spec.token)
     let item = PromptPresentationItem(
-      id: presentationAttachmentID(
-        for: sourceIdentity,
-        token: spec.token
-      ),
+      id: portalEntryID.description,
+      portalEntryID: portalEntryID,
       title: title,
       descriptor: spec.descriptor,
       actionPayloads: [],

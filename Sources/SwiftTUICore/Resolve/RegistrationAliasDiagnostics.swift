@@ -9,6 +9,11 @@
 /// patterns (`ForEach` explicit-ID stamping, custom `ResolvableView`
 /// identity rewrites, nested `AnyView`s), and that flattening identity
 /// at the context level could eliminate the alias layer entirely.
+/// Stage 4 of the structural-identity migration narrows the deletion
+/// plan: `.id(_:)` / `IDView` is the observed common producer, while
+/// custom `ResolvableView` identity rewrites remain the caveat to prove
+/// before Stage 5 deletes `registrationAliasesByIdentity`,
+/// `registrationAliasTargets`, and the remove/restore alias fan-out.
 ///
 /// This struct lets a live `ViewGraph` capture the exact set of
 /// divergences it observes so the hypothesis can be checked against

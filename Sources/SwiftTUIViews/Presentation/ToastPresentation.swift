@@ -266,12 +266,11 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     }
 
     let sourceIdentity = node.identity
+    let portalEntryID = presentationAttachment(for: node, token: "toast")
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = ToastPresentationItem(
-      id: presentationAttachmentID(
-        for: sourceIdentity,
-        token: "toast"
-      ),
+      id: portalEntryID.description,
+      portalEntryID: portalEntryID,
       contentPayloads: portalDeclaredBuilderChildren(from: toastContent),
       presentation: style.presentation(for: ToastStyleConfiguration()),
       duration: duration,

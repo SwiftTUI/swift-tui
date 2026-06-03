@@ -44,13 +44,63 @@ struct OverlayStackTests {
       ])
   }
 
+  @Test("overlay entries expose typed declaration owner edge and structural stable keys")
+  func overlayEntriesExposeDeclarationOwnerEdgeAndStructuralStableKeys() throws {
+    let baseNode = ResolvedNode(
+      identity: testIdentity("Scene", "Base"),
+      kind: .view("Base")
+    )
+    let portalContext = ResolveContext(identity: testIdentity("PortalRoot"))
+    let rekeyedContext = portalContext.replacingIdentity(with: testIdentity("RuntimePortalRoot"))
+    let sourceStructuralPath = StructuralPath(identity: testIdentity("Scene", "Owner"))
+    let sourceEntity = EntityIdentity("owner")
+    let portalEntryID = PortalEntryID(
+      sourceIdentity: testIdentity("Scene", "Owner"),
+      sourceStructuralPath: sourceStructuralPath,
+      sourceEntityIdentity: sourceEntity,
+      token: "sheet"
+    )
+
+    let stack = composeOverlayStackTree(
+      baseNode: baseNode,
+      entries: [
+        overlayEntry(
+          id: "legacy-entry-id",
+          portalEntryID: portalEntryID,
+          zIndex: 1,
+          activationOrdinal: 1
+        )
+      ],
+      in: rekeyedContext
+    )
+
+    let overlays = try #require(stack.children.last)
+    let entry = try #require(overlays.children.first)
+    let ownerEdge = try #require(entry.declarationOwnerEdge)
+
+    #expect(stack.identity == rekeyedContext.identity)
+    #expect(stack.structuralPath == portalContext.structuralPath)
+    #expect(stack.structuralEdgeRole == .stackingContext)
+    #expect(stack.surfaceComposition.stableKey == "overlay-stack:\(portalContext.structuralPath)")
+    #expect(overlays.surfaceComposition.stableKey == "overlay-host:\(overlays.structuralPath)")
+    #expect(entry.structuralEdgeRole == .detachedOverlayEntry)
+    #expect(entry.surfaceComposition.stableKey == portalEntryID.placementStableKey)
+    #expect(ownerEdge.sourceIdentity == testIdentity("Scene", "Owner"))
+    #expect(ownerEdge.sourceStructuralPath == sourceStructuralPath)
+    #expect(ownerEdge.sourceEntityIdentity == sourceEntity)
+    #expect(ownerEdge.placementRoot == entry.structuralPath)
+    #expect(ownerEdge.token == "sheet")
+  }
+
   private func overlayEntry(
     id: String,
+    portalEntryID: PortalEntryID? = nil,
     zIndex: Int,
     activationOrdinal: Int
   ) -> OverlayStackEntry {
     OverlayStackEntry(
       id: id,
+      portalEntryID: portalEntryID,
       ordering: .init(
         zIndex: zIndex,
         activationOrdinal: activationOrdinal,

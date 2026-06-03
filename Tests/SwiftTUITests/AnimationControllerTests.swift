@@ -62,6 +62,32 @@ struct AnimationControllerSnapshotTests {
     #expect(snapshot.borderColor == Color.green)
   }
 
+  @Test("removal snapshots carry transient-removal edge role")
+  func removalSnapshotsCarryTransientRemovalEdgeRole() throws {
+    let child = ResolvedNode(
+      identity: testIdentity("RemovalSnapshot", "Child"),
+      kind: .view("Child")
+    )
+    let root = ResolvedNode(
+      identity: testIdentity("RemovalSnapshot"),
+      kind: .view("Root"),
+      children: [child]
+    )
+
+    let snapshot = AnimationTransitionOverlay.resolvedRemovalSnapshot(
+      from: root,
+      applying: .identity
+    )
+    let snapshotChild = try #require(snapshot.children.first)
+
+    #expect(snapshot.isTransient)
+    #expect(snapshot.structuralEdgeRole == .transientRemovalOverlay)
+    #expect(snapshot.surfaceComposition.role == .transientRemovalOverlay)
+    #expect(snapshotChild.isTransient)
+    #expect(snapshotChild.structuralEdgeRole == .transientRemovalOverlay)
+    #expect(snapshotChild.surfaceComposition.role == .transientRemovalOverlay)
+  }
+
   @Test("local drawMetadata takes priority over environment snapshot")
   func localDrawMetadataWinsOverEnvironment() throws {
     var style = StyleEnvironmentSnapshot()

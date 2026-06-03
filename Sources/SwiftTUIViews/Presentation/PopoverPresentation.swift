@@ -83,12 +83,11 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
 
     let sourceIdentity = node.identity
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let itemID = presentationAttachmentID(
-      for: sourceIdentity,
-      token: "popover"
-    )
+    let portalEntryID = presentationAttachment(for: node, token: "popover")
+    let itemID = portalEntryID.description
     let item = popoverPresentationItem(
       id: itemID,
+      portalEntryID: portalEntryID,
       sourceIdentity: sourceIdentity,
       attachmentAnchor: attachmentAnchor,
       arrowEdge: arrowEdge,
@@ -135,12 +134,14 @@ package struct BuiltinItemPopoverPresentationModifier<
 
     let sourceIdentity = node.identity
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let itemID = presentationAttachmentID(
-      for: sourceIdentity,
+    let portalEntryID = presentationAttachment(
+      for: node,
       token: "popover:\(String(reflecting: currentItem.id))"
     )
+    let itemID = portalEntryID.description
     let item = popoverPresentationItem(
       id: itemID,
+      portalEntryID: portalEntryID,
       sourceIdentity: sourceIdentity,
       attachmentAnchor: attachmentAnchor,
       arrowEdge: arrowEdge,
@@ -197,10 +198,11 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let dismissedTipID = $dismissedTipID
     let actionAuthoringContext = actionAuthoringContext
-    let itemID = presentationAttachmentID(
-      for: sourceIdentity,
+    let portalEntryID = presentationAttachment(
+      for: node,
       token: "popoverTip:\(tipID)"
     )
+    let itemID = portalEntryID.description
     let dismiss: @MainActor @Sendable () -> Void = {
       [
         isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity, dismissedTipID,
@@ -223,6 +225,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     let tipActions = tip.actions
     let item = popoverPresentationItem(
       id: itemID,
+      portalEntryID: portalEntryID,
       sourceIdentity: sourceIdentity,
       attachmentAnchor: attachmentAnchor,
       arrowEdge: arrowEdge,
@@ -367,6 +370,7 @@ private struct PopoverPlacementLayout: Layout {
 
 private func popoverPresentationItem(
   id: String,
+  portalEntryID: PortalEntryID,
   sourceIdentity: Identity,
   attachmentAnchor: PopoverAttachmentAnchor,
   arrowEdge: Edge?,
@@ -376,6 +380,7 @@ private func popoverPresentationItem(
 ) -> PopoverPresentationItem {
   let surfaceItem = PromptPresentationItem(
     id: id,
+    portalEntryID: portalEntryID,
     title: "",
     descriptor: popoverPromptPresentationDescriptor(
       createsFocusScope: modalPolicy == .disablesBaseInteraction
@@ -387,6 +392,7 @@ private func popoverPresentationItem(
   )
   return PopoverPresentationItem(
     id: id,
+    portalEntryID: portalEntryID,
     sourceIdentity: sourceIdentity,
     attachmentAnchor: attachmentAnchor,
     arrowEdge: arrowEdge,

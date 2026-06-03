@@ -10,7 +10,7 @@ struct PresentationSurfaceTests {
   @Test("presentation overlays carry explicit surface composition metadata")
   func presentationOverlaysCarrySurfaceCompositionMetadata() throws {
     let contentRootIdentity = testIdentity("SurfaceCompositionRoot")
-    let portalIdentity = presentationPortalIdentity(for: contentRootIdentity)
+    let portalStructuralPath = StructuralPath(identity: contentRootIdentity)
     let artifacts = DefaultRenderer().render(
       Text("Workspace")
         .sheet("Command palette", isPresented: .constant(true)) {
@@ -24,14 +24,14 @@ struct PresentationSurfaceTests {
     #expect(
       entries.contains {
         $0.role == .stackingContext
-          && $0.stableKey == "overlay-stack:\(portalIdentity.path)"
+          && $0.stableKey == "overlay-stack:\(portalStructuralPath)"
           && $0.invalidationScope == .fullSurfaceDiff
       }
     )
     #expect(
       entries.contains {
         $0.role == .detachedOverlayHost
-          && $0.stableKey == "overlay-host:\(portalIdentity.path)/PortalHost/overlays"
+          && $0.stableKey == "overlay-host:\(portalStructuralPath)/PortalHost/overlays"
           && $0.invalidationScope == .fullSurfaceDiff
       }
     )
