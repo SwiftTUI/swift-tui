@@ -78,14 +78,24 @@ identity-changing moves via the persistent `EntityRoutingTable`.
   dominates at ~40%), so the incremental patcher was not worth its complexity.
 - **Duplicate explicit ids — lifetime preservation.** Duplicate runtime
   identities (a non-unique `ForEach` id keypath, or a reused `.id(_:)`) are
-  *contained*, not aliased: each colliding sibling gets a distinct
-  `EntityIdentity.occurrence` and a distinct `ViewNodeID`, and a non-fatal
-  diagnostic fires. But occurrence is a containment mechanism, not a lifetime
-  key: it is assigned by resolved order, so a change to the collision *count*
-  re-aligns the survivors and falls back to a conservative subtree rebuild —
-  duplicate-id siblings get no cross-reorder `@State`/animation/focus
-  preservation in that case. This is user error and undefined in SwiftUI too;
-  the limit is recorded rather than modeled away.
+  *contained* on the structural diff axis: each colliding sibling gets a distinct
+  `EntityIdentity.occurrence`, and a non-fatal diagnostic fires (verified at the
+  reconciliation level by `StructuralDiffTests`). Occurrence is a containment
+  mechanism, not a lifetime key: it is assigned by resolved order, so a change to
+  the collision *count* re-aligns the survivors and falls back to a conservative
+  subtree rebuild — duplicate-id siblings get no cross-reorder
+  `@State`/animation/focus preservation in that case. This is user error and
+  undefined in SwiftUI too; the limit is recorded rather than modeled away.
+  > **Unverified — possible gap.** Whether occurrence-distinct siblings actually
+  > receive *distinct `ViewNodeID`s* (and therefore distinct `@State` slots) is
+  > **not yet confirmed at runtime.** A probe rendering `ForEach([7, 7])` found
+  > the two colliding elements collapse to a **single** `EntityRoutingTable`
+  > entry — so the entity-routing layer may not key on `occurrence`, and
+  > same-collection duplicates may still share one runtime lifetime. A
+  > characterization test (asserting the two element subtrees hold distinct
+  > `ViewNodeID`s in `nodesByNodeID`, not just the routing table) is needed to
+  > confirm whether the "distinct `ViewNodeID`" containment holds or is a real
+  > gap. Tracked as remediation **G13** (doc 008).
 - **Runtime registries key containment on `Identity`-as-structural-projection.**
   The commit-path invalidation engine reasons over `StructuralPath`, and the live
   resolve/retained classifiers carry real structural adjacency. But the per-frame
