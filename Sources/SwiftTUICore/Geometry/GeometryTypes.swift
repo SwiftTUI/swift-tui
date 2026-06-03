@@ -695,6 +695,55 @@ package struct StructuralPath: Hashable, Sendable, Codable, CustomStringConverti
   }
 }
 
+package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
+  package var value: AnyID
+  package var occurrence: Int
+  package var debugDescription: String
+
+  package init<ID: Hashable & Sendable>(
+    _ value: ID,
+    occurrence: Int = 0
+  ) {
+    self.value = AnyID(value)
+    self.occurrence = occurrence
+    debugDescription = String(reflecting: value)
+  }
+
+  private init(
+    value: AnyID,
+    occurrence: Int,
+    debugDescription: String
+  ) {
+    self.value = value
+    self.occurrence = occurrence
+    self.debugDescription = debugDescription
+  }
+
+  package func withOccurrence(_ occurrence: Int) -> Self {
+    Self(
+      value: value,
+      occurrence: occurrence,
+      debugDescription: debugDescription
+    )
+  }
+
+  package var description: String {
+    occurrence == 0
+      ? debugDescription
+      : "\(debugDescription)#\(occurrence)"
+  }
+
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.value == rhs.value
+      && lhs.occurrence == rhs.occurrence
+  }
+
+  package func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+    hasher.combine(occurrence)
+  }
+}
+
 /// A single proposed dimension used during measure.
 public enum ProposedDimension: Equatable, Hashable, Sendable {
   case unspecified

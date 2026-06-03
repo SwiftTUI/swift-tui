@@ -99,7 +99,24 @@ package func resolveDeclaredChildren<V: View>(
     nextIndex: &nextIndex,
     into: &resolved
   )
+  assignEntityIdentityOccurrences(to: &resolved)
   return resolved
+}
+
+package func assignEntityIdentityOccurrences(to resolved: inout [ResolvedNode]) {
+  var counts: [AnyID: Int] = [:]
+
+  for index in resolved.indices {
+    guard let entityIdentity = resolved[index].entityIdentity,
+      resolved[index].entityStructuralPath == resolved[index].structuralPath
+    else {
+      continue
+    }
+
+    let occurrence = counts[entityIdentity.value, default: 0]
+    counts[entityIdentity.value] = occurrence + 1
+    resolved[index].entityIdentity = entityIdentity.withOccurrence(occurrence)
+  }
 }
 
 /// Walks the declared children of `view` using the same indexing scheme as
@@ -216,10 +233,12 @@ package func normalizeResolvedElements(
   case 1:
     return resolvedElements[0]
   default:
+    var groupedChildren = resolvedElements
+    assignEntityIdentityOccurrences(to: &groupedChildren)
     return ResolvedNode(
       identity: context.identity,
       kind: .view("Group"),
-      children: resolvedElements,
+      children: groupedChildren,
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction
     )
@@ -339,6 +358,7 @@ func resolveView<V: View>(
       }
     }
   }
+  assignEntityIdentityOccurrences(to: &resolved._storedChildren)
   if let graphNode {
     context.viewGraph?.finishEvaluation(
       graphNode,

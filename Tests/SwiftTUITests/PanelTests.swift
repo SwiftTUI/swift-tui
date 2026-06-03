@@ -31,6 +31,53 @@ struct PanelTests {
     #expect(resolved.structuralPath.description == "Root/VStack[0]")
   }
 
+  @Test(".id duplicate siblings get entity occurrences without identity-path churn")
+  func duplicateIDModifierSiblingsGetEntityOccurrences() {
+    let resolved = Resolver().resolve(
+      VStack {
+        Text("first").id("dup")
+        Text("second").id("dup")
+      },
+      in: ResolveContext(identity: testIdentity("Root"))
+    )
+
+    #expect(resolved.children.map(\.entityIdentity?.occurrence) == [0, 1])
+    #expect(
+      resolved.children.map(\.identity) == [
+        testIdentity("Root", "VStack[0]", "ID[\"dup\"]"),
+        testIdentity("Root", "VStack[1]", "ID[\"dup\"]"),
+      ])
+
+    let issues = resolved.duplicateEntityIdentityRuntimeIssues()
+    #expect(issues.count == 1)
+    #expect(issues[0].code == "identity.duplicateEntity")
+    #expect(issues[0].identity == testIdentity("Root", "VStack[1]", "ID[\"dup\"]"))
+  }
+
+  @Test("ForEach duplicate ids get deterministic entity occurrences")
+  func duplicateForEachIDsGetEntityOccurrences() {
+    let rows = ["dup", "dup"]
+    let resolved = Resolver().resolve(
+      VStack {
+        ForEach(rows, id: \.self) { row in
+          Text(row)
+        }
+      },
+      in: ResolveContext(identity: testIdentity("Root"))
+    )
+
+    #expect(resolved.children.map(\.entityIdentity?.occurrence) == [0, 1])
+    #expect(
+      resolved.children.map(\.identity) == [
+        testIdentity("Root", "VStack[0]", "ID[\"dup\"]"),
+        testIdentity("Root", "VStack[0]", "ID[\"dup\"]"),
+      ])
+
+    let issues = resolved.duplicateEntityIdentityRuntimeIssues()
+    #expect(issues.count == 1)
+    #expect(issues[0].code == "identity.duplicateEntity")
+  }
+
   @Test("Panel with explicit id exposes that id via ActionScope.ID")
   func panelExposesExplicitID() {
     let panel = Panel(id: "editor") { EmptyView() }

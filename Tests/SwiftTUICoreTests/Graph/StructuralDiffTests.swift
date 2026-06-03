@@ -6,18 +6,12 @@ import Testing
 struct StructuralDiffTests {
   @Test("reorder emits a move operation and no removals or insertions")
   func reorderEmitsMove() {
-    let a = ChildDescriptor(
-      identity: testIdentity("Root", "ID[0]"),
-      typeIdentity: "view:Row",
-      explicitID: "ID[0]"
-    )
-    let b = ChildDescriptor(
-      identity: testIdentity("Root", "ID[1]"),
-      typeIdentity: "view:Row",
-      explicitID: "ID[1]"
-    )
+    let a = keyedRow(id: 0, slot: 0)
+    let b = keyedRow(id: 1, slot: 1)
+    let movedA = keyedRow(id: 0, slot: 1)
+    let movedB = keyedRow(id: 1, slot: 0)
 
-    let operations = diffChildren(old: [a, b], new: [b, a])
+    let operations = diffChildren(old: [a, b], new: [movedB, movedA])
 
     let moves = operations.compactMap { operation -> (Int, Int)? in
       guard case .moved(let oldIndex, let newIndex) = operation else { return nil }
@@ -45,28 +39,12 @@ struct StructuralDiffTests {
   @Test("insertion and removal are emitted for unmatched descriptors")
   func insertionsAndRemovalsAreEmitted() {
     let old: [ChildDescriptor] = [
-      .init(
-        identity: testIdentity("Root", "ID[0]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[0]"
-      ),
-      .init(
-        identity: testIdentity("Root", "ID[1]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[1]"
-      ),
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
     ]
     let new: [ChildDescriptor] = [
-      .init(
-        identity: testIdentity("Root", "ID[1]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[1]"
-      ),
-      .init(
-        identity: testIdentity("Root", "ID[2]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[2]"
-      ),
+      keyedRow(id: 1, slot: 0),
+      keyedRow(id: 2, slot: 1),
     ]
 
     let operations = diffChildren(old: old, new: new)
@@ -84,16 +62,8 @@ struct StructuralDiffTests {
   func pureInsertionEmitsOnlyInserts() {
     let old: [ChildDescriptor] = []
     let new: [ChildDescriptor] = [
-      .init(
-        identity: testIdentity("Root", "ID[0]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[0]"
-      ),
-      .init(
-        identity: testIdentity("Root", "ID[1]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[1]"
-      ),
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
     ]
 
     let operations = diffChildren(old: old, new: new)
@@ -106,16 +76,8 @@ struct StructuralDiffTests {
   @Test("pure removal emits only removed operations")
   func pureRemovalEmitsOnlyRemovals() {
     let old: [ChildDescriptor] = [
-      .init(
-        identity: testIdentity("Root", "ID[0]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[0]"
-      ),
-      .init(
-        identity: testIdentity("Root", "ID[1]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[1]"
-      ),
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
     ]
     let new: [ChildDescriptor] = []
 
@@ -129,21 +91,9 @@ struct StructuralDiffTests {
   @Test("stable ordering emits only matched operations")
   func stableOrderingEmitsOnlyMatches() {
     let descriptors: [ChildDescriptor] = [
-      .init(
-        identity: testIdentity("Root", "ID[0]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[0]"
-      ),
-      .init(
-        identity: testIdentity("Root", "ID[1]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[1]"
-      ),
-      .init(
-        identity: testIdentity("Root", "ID[2]"),
-        typeIdentity: "view:Row",
-        explicitID: "ID[2]"
-      ),
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
+      keyedRow(id: 2, slot: 2),
     ]
 
     let operations = diffChildren(old: descriptors, new: descriptors)
@@ -156,4 +106,102 @@ struct StructuralDiffTests {
       ]
     )
   }
+
+  @Test("static unkeyed insertion shifts sibling identity")
+  func staticUnkeyedInsertionShiftsSiblingIdentity() {
+    let old: [ChildDescriptor] = [
+      unkeyed(type: "view:Row", slot: 0),
+      unkeyed(type: "view:Row", slot: 1),
+    ]
+    let new: [ChildDescriptor] = [
+      unkeyed(type: "view:Inserted", slot: 0),
+      unkeyed(type: "view:Row", slot: 1),
+      unkeyed(type: "view:Row", slot: 2),
+    ]
+
+    let operations = diffChildren(old: old, new: new)
+
+    #expect(operations.contains(.removed(oldIndex: 0)))
+    #expect(operations.contains(.inserted(newIndex: 0)))
+    #expect(operations.contains(.inserted(newIndex: 2)))
+  }
+
+  @Test("keyed insertion preserves shifted siblings")
+  func keyedInsertionPreservesShiftedSiblings() {
+    let old: [ChildDescriptor] = [
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
+    ]
+    let new: [ChildDescriptor] = [
+      keyedRow(id: 2, slot: 0),
+      keyedRow(id: 0, slot: 1),
+      keyedRow(id: 1, slot: 2),
+    ]
+
+    let operations = diffChildren(old: old, new: new)
+
+    #expect(operations.contains(.inserted(newIndex: 0)))
+    #expect(operations.contains(.matched(oldIndex: 0, newIndex: 1)))
+    #expect(operations.contains(.matched(oldIndex: 1, newIndex: 2)))
+    #expect(!operations.contains { if case .removed = $0 { return true } else { return false } })
+  }
+
+  @Test("duplicate keyed ids remain deterministic with occurrence ordinals")
+  func duplicateKeyedIDsUseOccurrenceOrdinals() {
+    let old: [ChildDescriptor] = [
+      keyedRow(id: "dup", occurrence: 0, slot: 0),
+      keyedRow(id: "dup", occurrence: 1, slot: 1),
+    ]
+    let new: [ChildDescriptor] = [
+      keyedRow(id: "dup", occurrence: 1, slot: 0),
+      keyedRow(id: "dup", occurrence: 0, slot: 1),
+    ]
+
+    let operations = diffChildren(old: old, new: new)
+    let removals = operations.filter {
+      if case .removed = $0 { return true }
+      return false
+    }
+    let insertions = operations.filter {
+      if case .inserted = $0 { return true }
+      return false
+    }
+
+    #expect(removals.isEmpty)
+    #expect(insertions.isEmpty)
+    #expect(operations.count == 2)
+  }
+}
+
+private func keyedRow<ID: Hashable & Sendable>(
+  id: ID,
+  occurrence: Int = 0,
+  slot: Int
+) -> ChildDescriptor {
+  let structuralPath = structuralSlot(slot)
+  return ChildDescriptor(
+    identity: testIdentity("Root", "ID[\(String(reflecting: id))]"),
+    structuralPath: structuralPath,
+    entityIdentity: EntityIdentity(id, occurrence: occurrence),
+    entityStructuralPath: structuralPath,
+    typeIdentity: "view:Row"
+  )
+}
+
+private func unkeyed(
+  type: String,
+  slot: Int
+) -> ChildDescriptor {
+  ChildDescriptor(
+    identity: testIdentity("Root", "Child[\(slot)]"),
+    structuralPath: structuralSlot(slot),
+    typeIdentity: type
+  )
+}
+
+private func structuralSlot(_ slot: Int) -> StructuralPath {
+  StructuralPath(components: [
+    .init(rawValue: "Root"),
+    .init(rawValue: "ForEachElement[\(slot)]"),
+  ])
 }

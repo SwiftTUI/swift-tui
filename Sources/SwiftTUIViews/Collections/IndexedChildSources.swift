@@ -9,13 +9,14 @@ package protocol IndexedChildSourceView {
 
 @MainActor
 package final class ForEachIndexedChildSource<Data, ID, Content>: IndexedChildSource
-where Data: RandomAccessCollection, ID: Hashable, Content: View {
+where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   private let countStorage: Int
   private let identityRootStorage: Identity
   private let measurementSignatureStorage: String
 
   private let data: Data
   private let id: KeyPath<Data.Element, ID>
+  private let entityIdentities: [EntityIdentity]
   private let content: @MainActor (Data.Element) -> Content
   private let childContext: ResolveContext
   private let authoringScope: AuthoringContext?
@@ -31,6 +32,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
     self.id = id
     self.content = content
     self.childContext = childContext
+    entityIdentities = makeEntityIdentities(for: data, id: id)
     authoringScope = currentAuthoringContext()
     identityRootStorage = childContext.identity
     countStorage = data.count
@@ -87,9 +89,13 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
           content(element)
         }
       }
-      let normalized = withAuthoringContext(perIterationScope) {
+      var normalized = withAuthoringContext(perIterationScope) {
         resolveView(view, in: elementContext)
       }
+      normalized.attachResolvedForEachEntity(
+        entityIdentities[index],
+        at: elementContext.structuralPath
+      )
       cache[index] = normalized
       return normalized
     }

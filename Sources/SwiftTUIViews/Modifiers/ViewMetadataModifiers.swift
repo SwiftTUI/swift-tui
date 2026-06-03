@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 extension View {
-  public func id<ID: Hashable>(_ id: ID) -> some View {
+  public func id<ID: Hashable & Sendable>(_ id: ID) -> some View {
     modifier(IDModifier(id: id))
   }
 
@@ -184,7 +184,7 @@ package func focusStructureMetadata(
   )
 }
 
-public struct IDModifier<ID: Hashable>: PrimitiveViewModifier {
+public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier {
   package var id: ID
 
   package init(id: ID) {
@@ -196,7 +196,12 @@ public struct IDModifier<ID: Hashable>: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let explicitIdentity = context.identity.explicitID(id)
-    return [content.resolve(in: context.replacingIdentity(with: explicitIdentity))]
+    var resolved = content.resolve(in: context.replacingIdentity(with: explicitIdentity))
+    resolved.attachingEntityIdentity(
+      EntityIdentity(id),
+      at: context.structuralPath
+    )
+    return [resolved]
   }
 }
 

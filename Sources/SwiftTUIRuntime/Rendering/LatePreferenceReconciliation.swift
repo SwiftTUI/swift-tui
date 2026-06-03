@@ -280,9 +280,10 @@ func layoutRuntimeIssues(
 private func rootRuntimeIssues(
   in resolved: ResolvedNode
 ) -> [RuntimeIssue] {
+  let duplicateEntityIssues = resolved.duplicateEntityIdentityRuntimeIssues()
   let unhostedToolbarItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
   guard !unhostedToolbarItems.isEmpty else {
-    return []
+    return duplicateEntityIssues
   }
 
   let titles =
@@ -297,7 +298,7 @@ private func rootRuntimeIssues(
     }
   let sourceIdentity =
     unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
-  return [
+  return duplicateEntityIssues + [
     RuntimeIssue(
       severity: .warning,
       code: "toolbar.unhostedItems",

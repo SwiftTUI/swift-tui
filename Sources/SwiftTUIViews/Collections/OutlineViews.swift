@@ -13,7 +13,7 @@ extension EnvironmentValues {
 
 /// Presents hierarchical collection data as an outline.
 public struct OutlineGroup<Data, ID, RowContent>: View
-where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
+where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
   private let elements: [Data.Element]
   private let id: (Data.Element) -> ID
   private let children: (Data.Element) -> [Data.Element]
@@ -124,7 +124,7 @@ extension List {
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   )
   where
-    Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
+    Data: RandomAccessCollection, ID: Hashable & Sendable, SelectionValue == ID?,
     Content == OutlineGroup<
       Data,
       ID,
@@ -153,7 +153,7 @@ extension List {
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   )
   where
-    Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
+    Data: RandomAccessCollection, ID: Hashable & Sendable, SelectionValue == ID?,
     Content == OutlineGroup<
       Data,
       ID,
@@ -175,7 +175,7 @@ extension List {
   }
 }
 
-extension List where SelectionValue: Hashable {
+extension List where SelectionValue: Hashable & Sendable {
   public init<Data, RowContent: View>(
     _ data: Data,
     selection: Binding<SelectionValue>,
@@ -184,6 +184,7 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
+    Data.Element.ID: Sendable,
     SelectionValue == Data.Element.ID,
     Content == OutlineGroup<
       Data,
@@ -208,6 +209,7 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
+    Data.Element.ID: Sendable,
     SelectionValue == Data.Element.ID,
     Content == OutlineGroup<
       Data,
@@ -232,6 +234,7 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
+    Data.Element.ID: Sendable,
     SelectionValue == Data.Element.ID?,
     Content == OutlineGroup<
       Data,
@@ -256,6 +259,7 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
+    Data.Element.ID: Sendable,
     SelectionValue == Data.Element.ID?,
     Content == OutlineGroup<
       Data,
@@ -273,7 +277,8 @@ extension List where SelectionValue: Hashable {
   }
 }
 
-extension OutlineGroup where Data.Element: Identifiable, ID == Data.Element.ID {
+extension OutlineGroup
+where Data.Element: Identifiable, Data.Element.ID: Sendable, ID == Data.Element.ID {
   public init(
     _ data: Data,
     children: KeyPath<Data.Element, [Data.Element]?>,
@@ -302,7 +307,7 @@ extension OutlineGroup where Data.Element: Identifiable, ID == Data.Element.ID {
 }
 
 package struct OutlineTree<Element, ID, RowContent>: View
-where ID: Hashable, RowContent: View {
+where ID: Hashable & Sendable, RowContent: View {
   package var elements: [Element]
   package var id: (Element) -> ID
   package var children: (Element) -> [Element]
@@ -357,7 +362,7 @@ where ID: Hashable, RowContent: View {
   }
 }
 
-private struct OutlineEntry<Element, ID: Hashable>: Identifiable {
+private struct OutlineEntry<Element, ID: Hashable & Sendable>: Identifiable {
   let id: ID
   let element: Element
   let children: [Element]

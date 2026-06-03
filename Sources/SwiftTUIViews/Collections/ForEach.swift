@@ -2,7 +2,7 @@ package import SwiftTUICore
 
 /// Generates repeated content from a random-access collection.
 public struct ForEach<Data, ID, Content>: PrimitiveView, ResolvableView
-where Data: RandomAccessCollection, ID: Hashable, Content: View {
+where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   public var data: Data
   public var id: KeyPath<Data.Element, ID>
   package let content: @MainActor (Data.Element) -> Content
@@ -22,16 +22,19 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolved: [ResolvedNode] = []
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+    let entityIdentities = makeEntityIdentities(for: data, id: id)
     var elementOffset = 0
     for element in data {
+      let currentElementOffset = elementOffset
       let structuralElementContext = context.indexedChild(
         kind: .init(rawValue: "ForEachElement"),
-        index: elementOffset
+        index: currentElementOffset
       )
       elementOffset += 1
       let elementContext = structuralElementContext.replacingIdentity(
         with: context.identity.explicitID(element[keyPath: id])
       )
+      let entityIdentity = entityIdentities[currentElementOffset]
       // Diverge structural identity per iteration so identity-deriving
       // modifiers such as `.panel()` (which reads
       // `scope.structuralIdentity`) see distinct positions for each
@@ -54,9 +57,13 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
           content(element)
         }
       }
-      let elementNode = withAuthoringContext(perIterationScope) {
+      var elementNode = withAuthoringContext(perIterationScope) {
         resolveView(view, in: elementContext)
       }
+      elementNode.attachResolvedForEachEntity(
+        entityIdentity,
+        at: elementContext.structuralPath
+      )
       if elementNode.identity == elementContext.identity,
         elementNode.kind == .view("EmptyView")
       {
@@ -133,17 +140,20 @@ extension ForEach: DeclaredChildrenView {
     )
     nextIndex += 1
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+    let entityIdentities = makeEntityIdentities(for: data, id: id)
 
     var elementOffset = 0
     for element in data {
+      let currentElementOffset = elementOffset
       let structuralElementContext = childContext.indexedChild(
         kind: .init(rawValue: "ForEachElement"),
-        index: elementOffset
+        index: currentElementOffset
       )
       elementOffset += 1
       let elementContext = structuralElementContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
+      let entityIdentity = entityIdentities[currentElementOffset]
       let perIterationScope = dynamicPropertyScope.map { scope in
         AuthoringContext(
           viewIdentity: scope.viewIdentity,
@@ -161,9 +171,14 @@ extension ForEach: DeclaredChildrenView {
       }
 
       visitor(view, elementContext) {
-        withAuthoringContext(perIterationScope) {
+        var resolved = withAuthoringContext(perIterationScope) {
           resolveView(view, in: elementContext)
         }
+        resolved.attachResolvedForEachEntity(
+          entityIdentity,
+          at: elementContext.structuralPath
+        )
+        return resolved
       }
     }
   }
@@ -184,5 +199,47 @@ extension ForEach where Data == Range<Int>, ID == Int {
     @ViewBuilder content: @escaping @MainActor (Int) -> Content
   ) {
     self.init(data, id: \.self, content: content)
+  }
+}
+
+package func makeEntityIdentities<Data, ID>(
+  for data: Data,
+  id: KeyPath<Data.Element, ID>
+) -> [EntityIdentity]
+where Data: RandomAccessCollection, ID: Hashable & Sendable {
+  var counts: [ID: Int] = [:]
+  var identities: [EntityIdentity] = []
+  identities.reserveCapacity(data.count)
+
+  for element in data {
+    let value = element[keyPath: id]
+    let occurrence = counts[value, default: 0]
+    counts[value] = occurrence + 1
+    identities.append(EntityIdentity(value, occurrence: occurrence))
+  }
+
+  return identities
+}
+
+extension ResolvedNode {
+  mutating func attachResolvedForEachEntity(
+    _ entityIdentity: EntityIdentity,
+    at entityStructuralPath: StructuralPath
+  ) {
+    if identity == entityStructuralPath.identityProjection,
+      kind == .view("Group")
+    {
+      for index in children.indices {
+        children[index].attachingEntityIdentity(
+          entityIdentity,
+          at: entityStructuralPath
+        )
+      }
+    } else {
+      attachingEntityIdentity(
+        entityIdentity,
+        at: entityStructuralPath
+      )
+    }
   }
 }

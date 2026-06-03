@@ -11,6 +11,8 @@
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
   package var structuralPath: StructuralPath
+  package var entityIdentity: EntityIdentity?
+  package var entityStructuralPath: StructuralPath?
   package var kind: NodeKind
   /// Stable per-Swift-type discriminator carried alongside `kind`.
   ///
@@ -154,6 +156,8 @@ public struct ResolvedNode: Equatable, Sendable {
   ) {
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
+    self.entityIdentity = nil
+    self.entityStructuralPath = nil
     self.kind = kind
     self.typeDiscriminator = nil
     // Assign the backing stores directly — the computed setters would
@@ -205,6 +209,8 @@ public struct ResolvedNode: Equatable, Sendable {
   ) {
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
+    self.entityIdentity = nil
+    self.entityStructuralPath = nil
     self.kind = kind
     self.typeDiscriminator = typeDiscriminator
     self._storedChildren = children
@@ -314,4 +320,14 @@ public struct ResolvedNode: Equatable, Sendable {
     }
   }
 
+}
+
+extension ResolvedNode {
+  package mutating func attachingEntityIdentity(
+    _ entityIdentity: EntityIdentity,
+    at entityStructuralPath: StructuralPath
+  ) {
+    self.entityIdentity = entityIdentity
+    self.entityStructuralPath = entityStructuralPath
+  }
 }
