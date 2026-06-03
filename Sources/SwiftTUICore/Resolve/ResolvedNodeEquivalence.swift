@@ -2,7 +2,7 @@ extension ResolvedNode {
   package func isEquivalentForMeasurement(
     to other: Self
   ) -> Bool {
-    identity == other.identity
+    structuralPath == other.structuralPath
       && kind == other.kind
       && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
       && environmentSnapshot == other.environmentSnapshot
@@ -27,7 +27,7 @@ extension ResolvedNode {
   package func isEquivalentForPlacement(
     to other: Self
   ) -> Bool {
-    identity == other.identity
+    structuralPath == other.structuralPath
       && kind == other.kind
       && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
       && environmentSnapshot == other.environmentSnapshot
@@ -71,7 +71,7 @@ extension ResolvedNode {
     to other: Self
   ) -> PlacementEquivalence {
     guard
-      identity == other.identity,
+      structuralPath == other.structuralPath,
       kind == other.kind,
       Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator),
       environmentSnapshot == other.environmentSnapshot,
@@ -92,7 +92,8 @@ extension ResolvedNode {
     // proven equal by the gate; `semanticRole` derives purely from
     // `semanticMetadata` / focus / `layoutBehavior`, all compared here.
     var metadataIdentical =
-      layoutBehavior == other.layoutBehavior
+      identity == other.identity
+      && layoutBehavior == other.layoutBehavior
       && drawMetadata == other.drawMetadata
       && drawEffects == other.drawEffects
       && surfaceComposition == other.surfaceComposition
@@ -136,6 +137,7 @@ extension ResolvedNode {
 extension ResolvedNode {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.identity == rhs.identity
+      && lhs.structuralPath == rhs.structuralPath
       && lhs.kind == rhs.kind
       && Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator)
       && lhs.children == rhs.children

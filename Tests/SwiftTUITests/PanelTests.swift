@@ -7,6 +7,30 @@ import Testing
 @MainActor
 @Suite
 struct PanelTests {
+  @Test("child advances structural path and replacing identity preserves it")
+  func replacingIdentityPreservesStructuralPath() {
+    let root = ResolveContext(identity: testIdentity("Root"))
+    let child = root.indexedChild(kind: .init(rawValue: "VStack"), index: 0)
+    let replaced = child.replacingIdentity(with: testIdentity("custom"))
+
+    #expect(child.identity == testIdentity("Root", "VStack[0]"))
+    #expect(child.structuralPath.description == "Root/VStack[0]")
+    #expect(replaced.identity == testIdentity("custom"))
+    #expect(replaced.structuralPath == child.structuralPath)
+  }
+
+  @Test(".id changes runtime identity without moving structural path")
+  func idModifierLeavesStructuralPathInPlace() {
+    let context = ResolveContext(identity: testIdentity("Root"))
+      .indexedChild(kind: .init(rawValue: "VStack"), index: 0)
+
+    let resolved = resolveView(Text("row").id("domain-id"), in: context)
+
+    #expect(resolved.identity != context.identity)
+    #expect(resolved.structuralPath == context.structuralPath)
+    #expect(resolved.structuralPath.description == "Root/VStack[0]")
+  }
+
   @Test("Panel with explicit id exposes that id via ActionScope.ID")
   func panelExposesExplicitID() {
     let panel = Panel(id: "editor") { EmptyView() }

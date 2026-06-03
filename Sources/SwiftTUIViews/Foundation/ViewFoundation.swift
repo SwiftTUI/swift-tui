@@ -278,7 +278,9 @@ func resolveView<V: View>(
     context.recordResolvedReuse(
       count: reused.subtreeNodeCount
     )
-    return reused
+    var structurallyStamped = reused
+    structurallyStamped.structuralPath = context.structuralPath
+    return structurallyStamped
   }
 
   let graphNode = context.viewGraph?.beginEvaluation(
@@ -294,7 +296,7 @@ func resolveView<V: View>(
   context.recordResolvedComputation()
   let erased: Any = view
   var accessedStateSlots = 0
-  let resolved = ViewUpdateGuard.withViewUpdate {
+  var resolved = ViewUpdateGuard.withViewUpdate {
     EnvironmentValuesStorage.$current.withValue(context.environmentValues) {
       ViewNodeContext.withValue(graphNode) {
         if erased is any ResolvableView {
@@ -344,6 +346,7 @@ func resolveView<V: View>(
       accessedStateSlots: accessedStateSlots
     )
   }
+  resolved.structuralPath = context.structuralPath
   return resolved
 }
 
@@ -355,6 +358,7 @@ private func rebasedAuthoringContext(
   AuthoringContext(
     viewIdentity: authoringContext.viewIdentity,
     structuralIdentity: authoringContext.structuralIdentity,
+    structuralPath: authoringContext.structuralPath,
     focusedValues: authoringContext.focusedValues,
     viewNode: viewNode,
     ordinalTracker: authoringContext.ordinalTracker

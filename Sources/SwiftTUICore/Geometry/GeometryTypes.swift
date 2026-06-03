@@ -657,6 +657,44 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 }
 
+package struct StructuralPath: Hashable, Sendable, Codable, CustomStringConvertible {
+  package let components: [IdentityComponent]
+
+  package init(components: [IdentityComponent] = []) {
+    self.components = components
+  }
+
+  package init(identity: Identity) {
+    components = identity.components.map { IdentityComponent(rawValue: $0) }
+  }
+
+  package var identityProjection: Identity {
+    Identity(components: components)
+  }
+
+  package var parent: Self? {
+    guard !components.isEmpty else {
+      return nil
+    }
+    return Self(components: Array(components.dropLast()))
+  }
+
+  package func appending(_ component: IdentityComponent) -> Self {
+    Self(components: components + [component])
+  }
+
+  package func isAncestor(of other: Self) -> Bool {
+    guard components.count <= other.components.count else {
+      return false
+    }
+    return zip(components, other.components).allSatisfy(==)
+  }
+
+  package var description: String {
+    components.map(\.rawValue).joined(separator: "/")
+  }
+}
+
 /// A single proposed dimension used during measure.
 public enum ProposedDimension: Equatable, Hashable, Sendable {
   case unspecified

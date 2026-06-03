@@ -40,6 +40,7 @@ package struct AuthoringContext {
   /// outermost authoring scope this equals `viewIdentity`; container
   /// iteration (e.g. `ForEach`) is the only context that diverges them.
   var structuralIdentity: Identity
+  var structuralPath: StructuralPath
   var focusedValues: FocusedValues
   var viewNode: SwiftTUICore.ViewNode?
   var ordinalTracker: AuthoringOrdinalTracker = .init()
@@ -52,12 +53,17 @@ package struct AuthoringContext {
   init(
     viewIdentity: Identity,
     structuralIdentity: Identity? = nil,
+    structuralPath: StructuralPath? = nil,
     focusedValues: FocusedValues,
     viewNode: SwiftTUICore.ViewNode? = nil,
     ordinalTracker: AuthoringOrdinalTracker = .init()
   ) {
     self.viewIdentity = viewIdentity
-    self.structuralIdentity = structuralIdentity ?? viewIdentity
+    let resolvedStructuralPath =
+      structuralPath ?? structuralIdentity.map(StructuralPath.init(identity:))
+      ?? StructuralPath(identity: viewIdentity)
+    self.structuralPath = resolvedStructuralPath
+    self.structuralIdentity = structuralIdentity ?? resolvedStructuralPath.identityProjection
     self.focusedValues = focusedValues
     self.viewNode = viewNode
     self.ordinalTracker = ordinalTracker
@@ -122,6 +128,7 @@ package func makeAuthoringContext(
 ) -> AuthoringContext {
   AuthoringContext(
     viewIdentity: context.identity,
+    structuralPath: context.structuralPath,
     focusedValues: context.focusedValues,
     viewNode: viewNode,
     ordinalTracker: .init()
@@ -137,6 +144,7 @@ package func dynamicPropertyAuthoringContext(
   if let current, current.viewNode === viewNode {
     return AuthoringContext(
       viewIdentity: context.identity,
+      structuralPath: context.structuralPath,
       focusedValues: context.focusedValues,
       viewNode: viewNode,
       ordinalTracker: current.ordinalTracker
@@ -162,6 +170,7 @@ package func makeDeferredAuthoringContext(
   return AuthoringContext(
     viewIdentity: context.viewIdentity,
     structuralIdentity: context.structuralIdentity,
+    structuralPath: context.structuralPath,
     focusedValues: context.focusedValues,
     viewNode: context.viewNode,
     ordinalTracker: ordinalTracker

@@ -59,7 +59,11 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
 
       let dataIndex = data.index(data.startIndex, offsetBy: index)
       let element = data[dataIndex]
-      let elementContext = childContext.replacingIdentity(
+      let structuralElementContext = childContext.indexedChild(
+        kind: .init(rawValue: "ForEachElement"),
+        index: index
+      )
+      let elementContext = structuralElementContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
       .suppressingStructuralLifecycle()
@@ -72,6 +76,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
         AuthoringContext(
           viewIdentity: scope.viewIdentity,
           structuralIdentity: elementContext.identity,
+          structuralPath: elementContext.structuralPath,
           focusedValues: scope.focusedValues,
           viewNode: scope.viewNode,
           ordinalTracker: scope.ordinalTracker

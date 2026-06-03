@@ -114,6 +114,51 @@ struct ChildDescriptorTests {
     #expect(lhs != rhs)
   }
 
+  @Test("same runtime identity in different structural slots does not match")
+  func structuralPathDistinguishesRuntimeIdentityCollisions() {
+    let lhs = ChildDescriptor(
+      identity: testIdentity("Root", "ID[dup]"),
+      structuralPath: StructuralPath(components: [
+        .init(rawValue: "Root"),
+        .init(rawValue: "ForEachElement[0]"),
+      ]),
+      typeIdentity: "view:Row",
+      explicitID: "ID[dup]"
+    )
+    let rhs = ChildDescriptor(
+      identity: testIdentity("Root", "ID[dup]"),
+      structuralPath: StructuralPath(components: [
+        .init(rawValue: "Root"),
+        .init(rawValue: "ForEachElement[1]"),
+      ]),
+      typeIdentity: "view:Row",
+      explicitID: "ID[dup]"
+    )
+
+    #expect(lhs != rhs)
+  }
+
+  @Test("runtime identity rewrite keeps the same positional descriptor")
+  func structuralPathIsThePositionalDescriptor() {
+    let structuralPath = StructuralPath(components: [
+      .init(rawValue: "Root"),
+      .init(rawValue: "VStack[0]"),
+    ])
+    let lhs = ChildDescriptor(
+      identity: testIdentity("Root", "Before"),
+      structuralPath: structuralPath,
+      typeIdentity: "view:Text"
+    )
+    let rhs = ChildDescriptor(
+      identity: testIdentity("Root", "After"),
+      structuralPath: structuralPath,
+      typeIdentity: "view:Text"
+    )
+
+    #expect(lhs == rhs)
+    #expect(lhs.hashValue == rhs.hashValue)
+  }
+
   @Test("descriptor built from ResolvedNode picks up the node's type discriminator")
   func resolvedNodeInitPropagatesDiscriminator() {
     let resolved = ResolvedNode(

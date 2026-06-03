@@ -181,6 +181,7 @@ package struct StructuralFrameIndex: Equatable, Sendable {
       subtreeRangeByNode[key] = subtreeStart..<postorder.count
       subtreeSignatureByNode[key] = Self.signature(
         identity: node.identity,
+        structuralPath: node.structuralPath,
         kind: node.kind,
         childSignatures: childSignatures
       )
@@ -190,11 +191,13 @@ package struct StructuralFrameIndex: Equatable, Sendable {
 
     private static func signature(
       identity: Identity,
+      structuralPath: StructuralPath,
       kind: NodeKind,
       childSignatures: [Int]
     ) -> Int {
       var hasher = Hasher()
       hasher.combine(identity)
+      hasher.combine(structuralPath)
       switch kind {
       case .root:
         hasher.combine("root")

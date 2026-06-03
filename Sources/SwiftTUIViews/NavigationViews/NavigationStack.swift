@@ -68,7 +68,7 @@ extension NavigationStack where ID == AnyID {
         "NavigationStack() requires an authoring context -- call it inside a View's body, or use NavigationStack(id:) with an explicit identity."
       )
     }
-    self.init(id: AnyID(scope.structuralIdentity), root: root)
+    self.init(id: AnyID(scope.structuralPath), root: root)
   }
 }
 

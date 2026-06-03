@@ -98,6 +98,6 @@ extension View {
         ".panel() requires an authoring context — call it inside a View's body, or use .panel(id:) with an explicit identity."
       )
     }
-    return Panel(id: AnyID(scope.structuralIdentity), containment: .open, content: self)
+    return Panel(id: AnyID(scope.structuralPath), containment: .open, content: self)
   }
 }

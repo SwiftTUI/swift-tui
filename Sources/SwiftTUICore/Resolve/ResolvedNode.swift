@@ -10,6 +10,7 @@
 /// animation code observes them.
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
+  package var structuralPath: StructuralPath
   package var kind: NodeKind
   /// Stable per-Swift-type discriminator carried alongside `kind`.
   ///
@@ -135,6 +136,7 @@ public struct ResolvedNode: Equatable, Sendable {
 
   package init(
     identity: Identity,
+    structuralPath: StructuralPath? = nil,
     kind: NodeKind,
     children: [ResolvedNode] = [],
     environmentSnapshot: EnvironmentSnapshot = .init(),
@@ -151,6 +153,7 @@ public struct ResolvedNode: Equatable, Sendable {
     layoutDependentContent: LayoutDependentContentBoundary? = nil
   ) {
     self.identity = identity
+    self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.kind = kind
     self.typeDiscriminator = nil
     // Assign the backing stores directly — the computed setters would
@@ -182,6 +185,7 @@ public struct ResolvedNode: Equatable, Sendable {
 
   package init(
     identity: Identity,
+    structuralPath: StructuralPath? = nil,
     kind: NodeKind,
     typeDiscriminator: ObjectIdentifier? = nil,
     children: [ResolvedNode] = [],
@@ -200,6 +204,7 @@ public struct ResolvedNode: Equatable, Sendable {
     layoutDependentContent: LayoutDependentContentBoundary? = nil
   ) {
     self.identity = identity
+    self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.kind = kind
     self.typeDiscriminator = typeDiscriminator
     self._storedChildren = children

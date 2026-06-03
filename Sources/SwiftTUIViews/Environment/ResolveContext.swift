@@ -25,6 +25,7 @@ public import SwiftTUICore
 /// other lowering seams remain package-only.
 public struct ResolveContext: Equatable, Sendable {
   public var identity: Identity
+  package var structuralPath: StructuralPath
   public var environment: EnvironmentSnapshot
   public var environmentValues: EnvironmentValues
   package var focusedValues: FocusedValues
@@ -132,7 +133,8 @@ public struct ResolveContext: Equatable, Sendable {
 
   package func child(component: IdentityComponent) -> Self {
     var childContext = Self(
-      identity: identity.child(component),
+      structuralIdentity: identity.child(component),
+      structuralPath: structuralPath.appending(component),
       environment: environment,
       environmentValues: environmentValues,
       transaction: transaction,
@@ -178,7 +180,8 @@ public struct ResolveContext: Equatable, Sendable {
 
   package func replacingIdentity(with identity: Identity) -> Self {
     var replacedContext = Self(
-      identity: identity,
+      structuralIdentity: identity,
+      structuralPath: structuralPath,
       environment: environment,
       environmentValues: environmentValues,
       transaction: transaction,
@@ -372,11 +375,46 @@ extension ResolveContext {
     localTaskRegistry: LocalTaskRegistry? = nil,
     applyEnvironmentValues: Bool
   ) {
+    self.init(
+      structuralIdentity: identity,
+      structuralPath: nil,
+      environment: environment,
+      environmentValues: environmentValues,
+      transaction: transaction,
+      invalidatedIdentities: invalidatedIdentities,
+      invalidationSummary: invalidationSummary,
+      forceRootEvaluation: forceRootEvaluation,
+      localActionRegistry: localActionRegistry,
+      localFocusedValuesRegistry: localFocusedValuesRegistry,
+      localKeyHandlerRegistry: localKeyHandlerRegistry,
+      localLifecycleRegistry: localLifecycleRegistry,
+      localTaskRegistry: localTaskRegistry,
+      applyEnvironmentValues: applyEnvironmentValues
+    )
+  }
+
+  private init(
+    structuralIdentity identity: Identity,
+    structuralPath: StructuralPath?,
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    transaction: TransactionSnapshot = .init(),
+    invalidatedIdentities: Set<Identity> = [],
+    invalidationSummary: InvalidationSummary? = nil,
+    forceRootEvaluation: Bool = false,
+    localActionRegistry: LocalActionRegistry? = nil,
+    localFocusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    localKeyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    localLifecycleRegistry: LocalLifecycleRegistry? = nil,
+    localTaskRegistry: LocalTaskRegistry? = nil,
+    applyEnvironmentValues: Bool
+  ) {
     let resolvedEnvironmentValues = Self.contextualEnvironmentValues(
       environmentValues,
       for: identity
     )
     self.identity = identity
+    self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.environmentValues = resolvedEnvironmentValues
     focusedValues = resolvedEnvironmentValues.focusedValues
     self.environment =
@@ -420,6 +458,7 @@ extension ResolveContext {
     rhs: ResolveContext
   ) -> Bool {
     lhs.identity == rhs.identity
+      && lhs.structuralPath == rhs.structuralPath
       && lhs.environment == rhs.environment
       && lhs.environmentValues == rhs.environmentValues
       && lhs.transaction == rhs.transaction

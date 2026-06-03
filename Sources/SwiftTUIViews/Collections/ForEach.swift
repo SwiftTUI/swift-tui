@@ -22,8 +22,14 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolved: [ResolvedNode] = []
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+    var elementOffset = 0
     for element in data {
-      let elementContext = context.replacingIdentity(
+      let structuralElementContext = context.indexedChild(
+        kind: .init(rawValue: "ForEachElement"),
+        index: elementOffset
+      )
+      elementOffset += 1
+      let elementContext = structuralElementContext.replacingIdentity(
         with: context.identity.explicitID(element[keyPath: id])
       )
       // Diverge structural identity per iteration so identity-deriving
@@ -37,6 +43,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
         AuthoringContext(
           viewIdentity: scope.viewIdentity,
           structuralIdentity: elementContext.identity,
+          structuralPath: elementContext.structuralPath,
           focusedValues: scope.focusedValues,
           viewNode: scope.viewNode,
           ordinalTracker: scope.ordinalTracker
@@ -127,14 +134,21 @@ extension ForEach: DeclaredChildrenView {
     nextIndex += 1
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
 
+    var elementOffset = 0
     for element in data {
-      let elementContext = childContext.replacingIdentity(
+      let structuralElementContext = childContext.indexedChild(
+        kind: .init(rawValue: "ForEachElement"),
+        index: elementOffset
+      )
+      elementOffset += 1
+      let elementContext = structuralElementContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
       let perIterationScope = dynamicPropertyScope.map { scope in
         AuthoringContext(
           viewIdentity: scope.viewIdentity,
           structuralIdentity: elementContext.identity,
+          structuralPath: elementContext.structuralPath,
           focusedValues: scope.focusedValues,
           viewNode: scope.viewNode,
           ordinalTracker: scope.ordinalTracker

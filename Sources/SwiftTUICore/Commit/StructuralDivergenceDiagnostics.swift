@@ -112,6 +112,7 @@
       records.append(
         .init(
           runtimeIdentity: node.identity,
+          structuralPath: node.structuralPath,
           structuralParent: structuralParent,
           pathParent: normalizedPathParent(of: node.identity),
           kind: node.kind,
@@ -153,6 +154,7 @@
   package struct StructuralDivergenceSnapshot: Sendable {
     package struct NodeRecord: Sendable {
       package let runtimeIdentity: Identity
+      package let structuralPath: StructuralPath
       package let structuralParent: Identity?
       package let pathParent: Identity?
       package let kind: NodeKind
@@ -164,6 +166,7 @@
 
       package init(
         runtimeIdentity: Identity,
+        structuralPath: StructuralPath,
         structuralParent: Identity?,
         pathParent: Identity?,
         kind: NodeKind,
@@ -174,6 +177,7 @@
         surfaceStableKey: String?
       ) {
         self.runtimeIdentity = runtimeIdentity
+        self.structuralPath = structuralPath
         self.structuralParent = structuralParent
         self.pathParent = pathParent
         self.kind = kind

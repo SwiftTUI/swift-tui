@@ -1,5 +1,6 @@
 package struct ChildDescriptor: Hashable, Sendable {
   package var identity: Identity
+  package var structuralPath: StructuralPath
   package var typeIdentity: String
   /// Refines the String `typeIdentity` with a stable per-Swift-type
   /// discriminator when one is available.  Two descriptors with the same
@@ -13,11 +14,13 @@ package struct ChildDescriptor: Hashable, Sendable {
 
   package init(
     identity: Identity,
+    structuralPath: StructuralPath? = nil,
     typeIdentity: String,
     typeDiscriminator: ObjectIdentifier? = nil,
     explicitID: String? = nil
   ) {
     self.identity = identity
+    self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.typeIdentity = typeIdentity
     self.typeDiscriminator = typeDiscriminator
     self.explicitID = explicitID
@@ -25,6 +28,7 @@ package struct ChildDescriptor: Hashable, Sendable {
 
   package init(resolvedNode: ResolvedNode) {
     identity = resolvedNode.identity
+    structuralPath = resolvedNode.structuralPath
     typeIdentity =
       switch resolvedNode.kind {
       case .root:
@@ -39,7 +43,7 @@ package struct ChildDescriptor: Hashable, Sendable {
   }
 
   package static func == (lhs: Self, rhs: Self) -> Bool {
-    guard lhs.identity == rhs.identity,
+    guard lhs.structuralPath == rhs.structuralPath,
       lhs.explicitID == rhs.explicitID,
       lhs.typeIdentity == rhs.typeIdentity
     else {
@@ -59,7 +63,7 @@ package struct ChildDescriptor: Hashable, Sendable {
     // between genuine same-name different-type pairs are allowed —
     // equality is the source of truth, and the refined `==` will
     // correctly reject them.
-    hasher.combine(identity)
+    hasher.combine(structuralPath)
     hasher.combine(typeIdentity)
     hasher.combine(explicitID)
   }
