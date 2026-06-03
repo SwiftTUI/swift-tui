@@ -41,9 +41,16 @@ package struct InvalidationSummary: Equatable, Sendable {
 
     var identitiesWithInvalidatedDescendants: Set<Identity> = []
     for invalidatedIdentity in invalidatedIdentities {
-      var ancestor = invalidatedIdentity.parent
+      // Walk structural ancestry on the `StructuralPath` axis rather than the
+      // `Identity` string, so the invalidation engine no longer treats
+      // `Identity` as a containment proxy. `StructuralPath(identity:)` is the
+      // lossless projection of the runtime identity, so for indexed identities
+      // this is behavior-preserving; genuine structural divergence (.id /
+      // ForEach / portals) is resolved upstream by the live-graph and
+      // `StructuralFrameIndex`-backed classifiers.
+      var ancestor = StructuralPath(identity: invalidatedIdentity).parent
       while let current = ancestor {
-        identitiesWithInvalidatedDescendants.insert(current)
+        identitiesWithInvalidatedDescendants.insert(current.identityProjection)
         ancestor = current.parent
       }
     }
@@ -69,9 +76,9 @@ package struct InvalidationSummary: Equatable, Sendable {
   package func hasInvalidatedAncestor(
     of identity: Identity
   ) -> Bool {
-    var ancestor = identity.parent
+    var ancestor = StructuralPath(identity: identity).parent
     while let current = ancestor {
-      if directlyInvalidated.contains(current) {
+      if directlyInvalidated.contains(current.identityProjection) {
         return true
       }
       ancestor = current.parent

@@ -151,7 +151,7 @@ package struct RetainedFrameIndex: Sendable {
         return nil
       }
       identities.append(current)
-      currentIdentity = current.parent
+      currentIdentity = StructuralPath(identity: current).parent?.identityProjection
     }
 
     return identities.reversed().compactMap { placedStructuralIndex[$0] }
@@ -285,9 +285,9 @@ package struct RetainedInvalidationSummary: Sendable {
           identitiesWithSyntheticInvalidatedAncestors.insert(identity)
           continue
         }
-        var ancestor = identity.parent
+        var ancestor = StructuralPath(identity: identity).parent
         while let current = ancestor {
-          if syntheticInvalidatedIdentities.contains(current) {
+          if syntheticInvalidatedIdentities.contains(current.identityProjection) {
             identitiesWithSyntheticInvalidatedAncestors.insert(identity)
             break
           }
