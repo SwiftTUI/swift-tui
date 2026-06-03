@@ -26,6 +26,7 @@ package struct RetainedFrameIndex: Sendable {
   package let resolvedByIdentity: [Identity: ResolvedNode]
   package let measuredByIdentity: [Identity: MeasuredNode]
   package let placedByIdentity: [Identity: PlacedNode]
+  package let structuralFrame: StructuralFrameIndex
   private let placedFrameEntries: [PlacedFrameTableEntry]
   private let placedFrameEntryRangesByIdentity: [Identity: Range<Int>]
 
@@ -34,6 +35,8 @@ package struct RetainedFrameIndex: Sendable {
   }
 
   package init(frame: FrameArtifacts) {
+    structuralFrame = StructuralFrameIndex(root: frame.resolvedTree)
+
     var resolvedByIdentity: [Identity: ResolvedNode] = [:]
     Self.index(frame.resolvedTree, into: &resolvedByIdentity)
     self.resolvedByIdentity = resolvedByIdentity
@@ -54,6 +57,34 @@ package struct RetainedFrameIndex: Sendable {
     self.placedByIdentity = placedByIdentity
     self.placedFrameEntries = placedFrameEntries
     self.placedFrameEntryRangesByIdentity = placedFrameEntryRangesByIdentity
+  }
+
+  package init(
+    patching previous: RetainedFrameIndex?,
+    with frame: FrameArtifacts
+  ) {
+    self.init(frame: frame)
+
+    #if DEBUG
+      if previous != nil {
+        let rebuilt = RetainedFrameIndex(frame: frame)
+        precondition(
+          isByteEquivalent(to: rebuilt),
+          "RetainedFrameIndex patch diverged from full rebuild"
+        )
+      }
+    #endif
+  }
+
+  package func isByteEquivalent(
+    to other: RetainedFrameIndex
+  ) -> Bool {
+    resolvedByIdentity == other.resolvedByIdentity
+      && measuredByIdentity == other.measuredByIdentity
+      && placedByIdentity == other.placedByIdentity
+      && structuralFrame == other.structuralFrame
+      && placedFrameEntries == other.placedFrameEntries
+      && placedFrameEntryRangesByIdentity == other.placedFrameEntryRangesByIdentity
   }
 
   package func resolvedNode(
@@ -132,6 +163,8 @@ package struct RetainedFrameIndex: Sendable {
 
 package struct RetainedInvalidationSummary: Sendable {
   private let base: InvalidationSummary
+  private let structuralFrame: StructuralFrameIndex?
+  private let hasUnindexedInvalidations: Bool
   package let identitiesWithSyntheticInvalidatedAncestors: Set<Identity>
   package let affectedIndexedChildSourceRoots: Set<Identity>
 
@@ -153,10 +186,19 @@ package struct RetainedInvalidationSummary: Sendable {
     self.base = base
 
     guard let previousFrameIndex else {
+      structuralFrame = nil
+      hasUnindexedInvalidations = false
       identitiesWithSyntheticInvalidatedAncestors = []
       affectedIndexedChildSourceRoots = []
       return
     }
+
+    let previousStructuralFrame = previousFrameIndex.structuralFrame
+    let hasUnindexedInvalidations = !invalidatedIdentities.isSubset(
+      of: previousStructuralFrame.runtimeIdentities
+    )
+    structuralFrame = previousStructuralFrame
+    self.hasUnindexedInvalidations = hasUnindexedInvalidations
 
     let previousResolvedIdentities = Set(previousFrameIndex.resolvedByIdentity.keys)
     let syntheticInvalidatedIdentities = invalidatedIdentities.subtracting(
@@ -165,6 +207,13 @@ package struct RetainedInvalidationSummary: Sendable {
     var identitiesWithSyntheticInvalidatedAncestors: Set<Identity> = []
     if !syntheticInvalidatedIdentities.isEmpty {
       for identity in previousResolvedIdentities {
+        if previousStructuralFrame.hasInvalidatedAncestor(
+          of: identity,
+          invalidatedIdentities: syntheticInvalidatedIdentities
+        ) == true {
+          identitiesWithSyntheticInvalidatedAncestors.insert(identity)
+          continue
+        }
         var ancestor = identity.parent
         while let current = ancestor {
           if syntheticInvalidatedIdentities.contains(current) {
@@ -183,7 +232,14 @@ package struct RetainedInvalidationSummary: Sendable {
         guard let source = resolvedNode.indexedChildSource else {
           continue
         }
-        if base.intersectsSubtree(at: source.identityRoot) {
+        let structuralResult = previousStructuralFrame.intersectsSubtree(
+          at: source.identityRoot,
+          invalidatedIdentities: invalidatedIdentities
+        )
+        if structuralResult == true
+          || ((structuralResult == nil || hasUnindexedInvalidations)
+            && base.intersectsSubtree(at: source.identityRoot))
+        {
           affectedIndexedChildSourceRoots.insert(source.identityRoot)
         }
       }
@@ -200,7 +256,15 @@ package struct RetainedInvalidationSummary: Sendable {
   package func containsInvalidatedDescendant(
     of identity: Identity
   ) -> Bool {
-    base.containsInvalidatedDescendant(of: identity)
+    if let structuralResult = structuralFrame?.containsInvalidatedDescendant(
+      of: identity,
+      invalidatedIdentities: directlyInvalidated
+    ) {
+      if structuralResult || !hasUnindexedInvalidations {
+        return structuralResult
+      }
+    }
+    return base.containsInvalidatedDescendant(of: identity)
   }
 
   package func hasSyntheticInvalidatedAncestor(
@@ -218,7 +282,15 @@ package struct RetainedInvalidationSummary: Sendable {
   package func intersectsSubtree(
     at identity: Identity
   ) -> Bool {
-    base.intersectsSubtree(at: identity)
+    if let structuralResult = structuralFrame?.intersectsSubtree(
+      at: identity,
+      invalidatedIdentities: directlyInvalidated
+    ) {
+      if structuralResult || !hasUnindexedInvalidations {
+        return structuralResult
+      }
+    }
+    return base.intersectsSubtree(at: identity)
   }
 }
 

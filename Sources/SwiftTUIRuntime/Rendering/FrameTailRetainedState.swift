@@ -47,6 +47,7 @@ final class FrameTailRetainedState: Sendable {
         detail: [
           "resolved": state.previousFrameIndex?.resolvedByIdentity.count ?? 0,
           "measured": state.previousFrameIndex?.measuredByIdentity.count ?? 0,
+          "structural": state.previousFrameIndex?.structuralFrame.postorder.count ?? 0,
           "placedFrameEntries": state.previousFrameIndex?.placedFrameEntryCount ?? 0,
           "phaseProducts": state.previousPhaseProducts == nil ? 0 : 1,
         ]
@@ -100,7 +101,10 @@ final class FrameTailRetainedState: Sendable {
       from: baselinePlacedTree
     )
     state.withLock { state in
-      state.previousFrameIndex = .init(frame: indexable)
+      state.previousFrameIndex = .init(
+        patching: state.previousFrameIndex,
+        with: indexable
+      )
       state.previousDrawnIdentities = artifacts.drawnIdentities
       state.previousRasterSurface = artifacts.rasterSurface
       state.previousSurfaceTopology = SurfaceTopologySignature(
