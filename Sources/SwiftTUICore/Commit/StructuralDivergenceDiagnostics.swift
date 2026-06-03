@@ -1,5 +1,13 @@
 #if DEBUG
-  import Foundation
+  #if canImport(Darwin)
+    import Darwin
+  #elseif canImport(Glibc)
+    import Glibc
+  #elseif canImport(WASILibc)
+    import WASILibc
+  #elseif canImport(ucrt)
+    import ucrt
+  #endif
 
   /// Debug-only evidence surface for the structural-identity migration.
   ///
@@ -83,13 +91,22 @@
     }
 
     package static func emitIfRequested(
+      _ report: StructuralDivergenceReport
+    ) {
+      guard environmentFlagIsEnabled(processEnvironmentValue(named: emissionEnvironmentVariable)) else {
+        return
+      }
+      writeToStandardError(report.machineReadableSummary)
+    }
+
+    package static func emitIfRequested(
       _ report: StructuralDivergenceReport,
-      environment: [String: String] = ProcessInfo.processInfo.environment
+      environment: [String: String]
     ) {
       guard environment[emissionEnvironmentVariable] == "1" else {
         return
       }
-      FileHandle.standardError.write(Data(report.machineReadableSummary.utf8))
+      writeToStandardError(report.machineReadableSummary)
     }
 
     private static func walk(
@@ -136,6 +153,33 @@
         return nil
       }
       return parent.components.isEmpty ? nil : parent
+    }
+
+    private static func environmentFlagIsEnabled(_ value: String?) -> Bool {
+      guard let value else {
+        return false
+      }
+      switch value.lowercased() {
+      case "1", "true", "yes", "on":
+        return true
+      default:
+        return false
+      }
+    }
+
+    private static func processEnvironmentValue(named name: String) -> String? {
+      unsafe name.withCString { cName in
+        guard let rawValue = unsafe getenv(cName) else {
+          return nil
+        }
+        return unsafe String(cString: rawValue)
+      }
+    }
+
+    private static func writeToStandardError(_ message: String) {
+      unsafe message.withCString { cMessage in
+        _ = fputs(cMessage, stderr)
+      }
     }
   }
 

@@ -38,14 +38,14 @@ struct ScenePtyTests {
   @Test("Attached client detection tracks slave open and close")
   func attachedClientDetection() async throws {
     try await withScenePty { pty in
-      #expect(await waitForScenePty(pty, attached: false))
+      #expect(await pty.hasAttachedClient() == false)
 
       let slaveFD = sceneOpen(pty.slavePath, O_RDWR | O_NOCTTY)
       #expect(slaveFD >= 0)
-      #expect(await waitForScenePty(pty, attached: true))
+      #expect(await pty.hasAttachedClient() == true)
 
       sceneClose(slaveFD)
-      #expect(await waitForScenePty(pty, attached: false))
+      #expect(await pty.hasAttachedClient() == false)
     }
   }
 
@@ -72,24 +72,6 @@ private func withScenePty<R>(
     await pty.close()
     throw error
   }
-}
-
-private func waitForScenePty(
-  _ pty: ScenePty,
-  attached expected: Bool,
-  timeout: Duration = .milliseconds(250)
-) async -> Bool {
-  let clock = ContinuousClock()
-  let deadline = clock.now.advanced(by: timeout)
-
-  repeat {
-    if await pty.hasAttachedClient() == expected {
-      return true
-    }
-    try? await Task.sleep(for: .milliseconds(5))
-  } while clock.now < deadline
-
-  return await pty.hasAttachedClient() == expected
 }
 
 private func withScenePtyPair<R>(

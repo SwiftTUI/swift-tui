@@ -32,7 +32,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftUIHost` | 7 | 62 |
-| `SwiftTUICore` | 272 | 2144 |
+| `SwiftTUICore` | 272 | 2146 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -735,7 +735,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RGBPrimaries` — struct — 5 members
 - `RichTextPayload` — struct — 3 members
 - `RichTextRun` — struct — 4 members
-- `RouteID` — struct — 4 members
+- `RouteID` — struct — 6 members
 - `RouteKind` — enum — 2 members
 - `RuntimeIssue` — struct — 7 members
 - `RuntimeIssueSeverity` — enum — 3 members

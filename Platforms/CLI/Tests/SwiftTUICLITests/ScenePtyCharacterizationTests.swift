@@ -18,7 +18,7 @@ struct ScenePtyCharacterizationTests {
   @Test("hasAttachedClient returns false when no client has opened the slave")
   func hasAttachedClientFalseInitially() async throws {
     try await withScenePty { pty in
-      #expect(await waitForScenePty(pty, attached: false))
+      #expect(await pty.hasAttachedClient() == false)
     }
   }
 }
@@ -35,22 +35,4 @@ private func withScenePty<R>(
     await pty.close()
     throw error
   }
-}
-
-private func waitForScenePty(
-  _ pty: ScenePty,
-  attached expected: Bool,
-  timeout: Duration = .milliseconds(250)
-) async -> Bool {
-  let clock = ContinuousClock()
-  let deadline = clock.now.advanced(by: timeout)
-
-  repeat {
-    if await pty.hasAttachedClient() == expected {
-      return true
-    }
-    try? await Task.sleep(for: .milliseconds(5))
-  } while clock.now < deadline
-
-  return await pty.hasAttachedClient() == expected
 }
