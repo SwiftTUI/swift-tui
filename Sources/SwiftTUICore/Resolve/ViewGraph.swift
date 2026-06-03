@@ -1082,6 +1082,16 @@ package final class ViewGraph {
       return nil
     }
 
+    // PERF (future, profiling-gated): this O(invalidated × path) scan computes the
+    // same predicate as `identityIntersectsInvalidation` above — both ask "is
+    // `identity`/`resolvedIdentity` directly invalidated, an ancestor of an
+    // invalidated id, or a descendant of one?" — but via a linear isDescendant
+    // sweep instead of the O(1) precomputed `invalidationSummary` sets. It is
+    // safely removable (replace with `if identityIntersectsInvalidation { nil }`)
+    // *only once* the invariant "the passed-in summary is built from exactly this
+    // `invalidatedIdentities` set" is enforced/proven; today the summary is a
+    // separate `FrameResolveInputs` field, so the scan stays as a defensive
+    // cross-check rather than coupling reuse correctness to that invariant.
     let conflictsWithInvalidation = invalidatedIdentities.contains { invalidatedIdentity in
       invalidatedIdentity == identity
         || invalidatedIdentity.isDescendant(of: identity)
