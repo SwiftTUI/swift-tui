@@ -37,10 +37,35 @@ public struct PerfRunConfig: Equatable, Sendable {
 public struct PerfCompareConfig: Equatable, Sendable {
   public var baseRunDirectory: String
   public var candidateRunDirectory: String
+  /// When `true` (or when `requireImprovement` is non-empty), `compare`
+  /// interprets its two arguments as aggregate summaries and exits non-zero on
+  /// a regression or an unmet improvement requirement.
+  public var gate: Bool
+  /// Metric names that must each show a `.real` improvement for the gate to
+  /// pass. Matched case/punctuation-insensitively against the aggregate metric
+  /// names (e.g. `cpu-seconds-per-frame` matches `CPU seconds/frame`).
+  public var requireImprovement: [String]
+  /// Standard-deviation multiplier for the noise band used by the gate.
+  public var sigma: Double
 
-  public init(baseRunDirectory: String, candidateRunDirectory: String) {
+  public init(
+    baseRunDirectory: String,
+    candidateRunDirectory: String,
+    gate: Bool = false,
+    requireImprovement: [String] = [],
+    sigma: Double = CompareCommand.defaultNoiseSigma
+  ) {
     self.baseRunDirectory = baseRunDirectory
     self.candidateRunDirectory = candidateRunDirectory
+    self.gate = gate
+    self.requireImprovement = requireImprovement
+    self.sigma = sigma
+  }
+
+  /// `true` when the gate should run (an explicit `--gate` or any
+  /// `--require-improvement` metric).
+  public var gateEnabled: Bool {
+    gate || !requireImprovement.isEmpty
   }
 }
 
@@ -69,6 +94,7 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
   case emptyModeList
   case unknownScenario(String)
   case compareArgumentCount(Int)
+  case invalidSigma(String)
 
   public var description: String {
     switch self {
@@ -94,6 +120,8 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
       return "unknown scenario '\(scenario)'. Known scenarios: \(knownScenarioList)."
     case .compareArgumentCount(let count):
       return "compare expects 2 run directories, got \(count)."
+    case .invalidSigma(let value):
+      return "invalid sigma '\(value)'. Use a non-negative number."
     }
   }
 
@@ -186,13 +214,51 @@ public enum PerfCommandParser {
   }
 
   private static func parseCompare(_ arguments: [String]) throws -> PerfCompareConfig {
-    guard arguments.count == 2 else {
-      throw PerfParseError.compareArgumentCount(arguments.count)
+    var positionals: [String] = []
+    var gate = false
+    var requireImprovement: [String] = []
+    var sigma = CompareCommand.defaultNoiseSigma
+
+    var index = arguments.startIndex
+    while index < arguments.endIndex {
+      let argument = arguments[index]
+      switch argument {
+      case "--gate":
+        gate = true
+      case "--require-improvement":
+        let value = try value(after: argument, in: arguments, at: &index)
+        requireImprovement.append(
+          contentsOf:
+            value
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        )
+      case "--sigma":
+        let value = try value(after: argument, in: arguments, at: &index)
+        guard let parsedSigma = Double(value), parsedSigma >= 0 else {
+          throw PerfParseError.invalidSigma(value)
+        }
+        sigma = parsedSigma
+      default:
+        if argument.hasPrefix("-") {
+          throw PerfParseError.unknownOption(argument)
+        }
+        positionals.append(argument)
+      }
+      index = arguments.index(after: index)
+    }
+
+    guard positionals.count == 2 else {
+      throw PerfParseError.compareArgumentCount(positionals.count)
     }
 
     return PerfCompareConfig(
-      baseRunDirectory: arguments[0],
-      candidateRunDirectory: arguments[1]
+      baseRunDirectory: positionals[0],
+      candidateRunDirectory: positionals[1],
+      gate: gate,
+      requireImprovement: requireImprovement,
+      sigma: sigma
     )
   }
 

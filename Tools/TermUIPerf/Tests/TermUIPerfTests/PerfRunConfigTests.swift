@@ -137,6 +137,60 @@ struct PerfRunConfigTests {
           )))
   }
 
+  @Test("compare command parses the gate flags")
+  func compareCommandParsesGateFlags() throws {
+    let command = try PerfCommandParser.parse([
+      "compare",
+      "base.json",
+      "candidate.json",
+      "--gate",
+      "--require-improvement", "total CPU seconds,CPU seconds/frame",
+      "--sigma", "3",
+    ])
+
+    #expect(
+      command
+        == .compare(
+          PerfCompareConfig(
+            baseRunDirectory: "base.json",
+            candidateRunDirectory: "candidate.json",
+            gate: true,
+            requireImprovement: ["total CPU seconds", "CPU seconds/frame"],
+            sigma: 3
+          )))
+  }
+
+  @Test("compare gate is enabled by --require-improvement alone")
+  func compareGateEnabledByRequireImprovement() throws {
+    let command = try PerfCommandParser.parse([
+      "compare", "base.json", "candidate.json",
+      "--require-improvement", "total CPU seconds",
+    ])
+
+    guard case .compare(let config) = command else {
+      Issue.record("expected a compare command")
+      return
+    }
+    #expect(config.gateEnabled)
+    #expect(!config.gate)
+  }
+
+  @Test("compare rejects an invalid sigma")
+  func compareRejectsInvalidSigma() throws {
+    #expect(throws: PerfParseError.invalidSigma("nope")) {
+      try PerfCommandParser.parse([
+        "compare", "base.json", "candidate.json", "--sigma", "nope",
+      ])
+    }
+  }
+
+  @Test("compare still rejects a wrong positional count alongside flags")
+  func compareRejectsWrongPositionalCount() throws {
+    #expect(throws: PerfParseError.compareArgumentCount(1)) {
+      try PerfCommandParser.parse(["compare", "only-one.json", "--gate"])
+    }
+  }
+
   @Test("list scenarios command parses without arguments")
   func listScenariosCommandParsesWithoutArguments() throws {
     let command = try PerfCommandParser.parse(["list-scenarios"])

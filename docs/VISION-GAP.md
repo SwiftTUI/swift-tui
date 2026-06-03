@@ -197,10 +197,17 @@ target. Android is a cross-compilation target, not a declared SwiftPM platform.
 ## Performance
 
 **Shipped.** The `Tools/TermUIPerf` harness records repeatable scenarios and
-compares runs from frame diagnostics.
+compares runs from frame diagnostics. `compare` has an opt-in **gate**:
+`compare <base-aggregate> <candidate-aggregate> --gate` exits non-zero when a
+watched lower-is-better metric shows a *real* regression (a median delta beyond
+the variance-aware noise band), and `--require-improvement <metric…>` makes the
+command additionally certify that each named metric shows a *real* improvement —
+so a claimed perf win is provable and a regression is catchable.
 
-**Not yet built.** The harness does not enforce pass/fail performance budgets;
-its runs are comparative measurements, not a gate.
+**Not yet built.** The gate is not yet wired into CI as a required budget check:
+it must be invoked explicitly against two aggregate runs, and there is no
+phase-level (`resolve_ms`) aggregate metric — resolve-time cost is gated via its
+`CPU seconds/frame` proxy, not a dedicated metric.
 
 ## Project and release
 

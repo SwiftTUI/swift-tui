@@ -34,8 +34,27 @@ private func run(arguments: [String]) async throws {
       print(AggregateReducer.format(aggregate))
     }
   case .compare(let config):
-    let result = try CompareCommand.compare(config)
-    print(CompareCommand.format(result))
+    if config.gateEnabled {
+      let base = try CompareCommand.loadAggregate(from: config.baseRunDirectory)
+      let candidate = try CompareCommand.loadAggregate(from: config.candidateRunDirectory)
+      let comparison = CompareCommand.compareAggregates(
+        base: base,
+        candidate: candidate,
+        sigma: config.sigma
+      )
+      print(CompareCommand.format(comparison))
+      let outcome = CompareCommand.evaluateGate(
+        comparison,
+        requireImprovement: config.requireImprovement
+      )
+      print(CompareCommand.formatGate(outcome))
+      if !outcome.passed {
+        exit(1)
+      }
+    } else {
+      let result = try CompareCommand.compare(config)
+      print(CompareCommand.format(result))
+    }
   }
 }
 
