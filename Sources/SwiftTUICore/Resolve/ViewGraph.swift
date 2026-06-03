@@ -1073,6 +1073,15 @@ package final class ViewGraph {
       return snapshot
     }
 
+    // If the live-graph structural check already rejects reuse, skip the
+    // O(invalidated × path) identity-conflict scan: its result cannot change the
+    // outcome (the guard below rejects on structural intersection regardless).
+    // Behavior-identical; avoids a redundant per-node scan on every frame where
+    // a structural intersection is present.
+    if structurallyIntersectsInvalidation {
+      return nil
+    }
+
     let conflictsWithInvalidation = invalidatedIdentities.contains { invalidatedIdentity in
       invalidatedIdentity == identity
         || invalidatedIdentity.isDescendant(of: identity)
@@ -1081,9 +1090,7 @@ package final class ViewGraph {
         || invalidatedIdentity.isDescendant(of: resolvedIdentity)
         || resolvedIdentity.isDescendant(of: invalidatedIdentity)
     }
-    guard !conflictsWithInvalidation,
-      !structurallyIntersectsInvalidation
-    else {
+    guard !conflictsWithInvalidation else {
       return nil
     }
     let snapshot = node.snapshot()
