@@ -3789,6 +3789,10 @@ SwiftTUIViews.InsetShape.insetAmount
 SwiftTUIViews.InsetShape.kindName
 SwiftTUIViews.InsettableShape
 SwiftTUIViews.InsettableShape.inset(by:)
+SwiftTUIViews.InsettableShape.strokeBorder(_:style:)
+SwiftTUIViews.InsettableShape.strokeBorder(_:style:background:)
+SwiftTUIViews.InsettableShape.strokeBorder(style:)
+SwiftTUIViews.InsettableShape.strokeBorder(style:background:)
 SwiftTUIViews.ItemNavigationDestinationModifier
 SwiftTUIViews.KeyCommandRegistrationModifier
 SwiftTUIViews.KeyPressMatch
@@ -4131,6 +4135,7 @@ SwiftTUIViews.SendableLayout.measurementReuseSignature
 SwiftTUIViews.SendableLayout.placementReuseSignature
 SwiftTUIViews.Shape
 SwiftTUIViews.Shape.body
+SwiftTUIViews.Shape.fill()
 SwiftTUIViews.Shape.fill(_:)
 SwiftTUIViews.Shape.geometry
 SwiftTUIViews.Shape.insetAmount
@@ -4139,10 +4144,8 @@ SwiftTUIViews.Shape.kindName
 SwiftTUIViews.Shape.kindName
 SwiftTUIViews.Shape.stroke(_:style:)
 SwiftTUIViews.Shape.stroke(_:style:background:)
-SwiftTUIViews.Shape.stroke(_:style:background:)
-SwiftTUIViews.Shape.strokeBorder(_:style:)
-SwiftTUIViews.Shape.strokeBorder(_:style:background:)
-SwiftTUIViews.Shape.strokeBorder(_:style:background:)
+SwiftTUIViews.Shape.stroke(style:)
+SwiftTUIViews.Shape.stroke(style:background:)
 SwiftTUIViews.ShapeStyle.linearGradient(colors:startPoint:endPoint:)
 SwiftTUIViews.ShapeStyle.linearGradient(stops:startPoint:endPoint:)
 SwiftTUIViews.ShapeStyle.radialGradient(colors:center:startRadius:endRadius:)
