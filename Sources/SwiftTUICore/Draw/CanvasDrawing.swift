@@ -74,17 +74,21 @@ public struct CanvasContext: Sendable {
   /// The grid used to pack in-cell drawing samples into terminal glyphs.
   public let grid: CanvasGrid
 
-  /// The grid-sample width of the drawing surface.
+  /// The grid-sample extent of the drawing surface.
   ///
-  /// This is retained while existing drawings migrate from integer grid
-  /// coordinates to primary cell-space APIs.
-  public let width: Int
+  /// This is ``size`` scaled by the active ``CanvasGrid``'s subdivisions — the
+  /// valid range for ``GridSample`` coordinates. Authored drawings normally
+  /// work in continuous cell space (``size`` plus ``Point`` APIs); reach for
+  /// `gridSize` only when addressing individual samples through ``GridSample``.
+  public var gridSize: GridSize {
+    GridSize(width: gridWidth, height: gridHeight)
+  }
+
+  /// The grid-sample width of the drawing surface.
+  package let gridWidth: Int
 
   /// The grid-sample height of the drawing surface.
-  ///
-  /// This is retained while existing drawings migrate from integer grid
-  /// coordinates to primary cell-space APIs.
-  public let height: Int
+  package let gridHeight: Int
 
   /// The default foreground color written to every cell the drawing
   /// touches. Starts as the environment's resolved foreground color.
@@ -106,8 +110,8 @@ public struct CanvasContext: Sendable {
     self.canvas = canvas
     self.size = canvas.size
     self.grid = canvas.grid
-    self.width = canvas.pixelWidth
-    self.height = canvas.pixelHeight
+    self.gridWidth = canvas.pixelWidth
+    self.gridHeight = canvas.pixelHeight
     self.foreground = foreground
     self.background = background
     self.gridCellStyles = Array(
@@ -121,8 +125,8 @@ public struct CanvasContext: Sendable {
   }
 
   /// Maps a continuous cell-space location to the active grid sample.
-  public func gridPoint(for location: Point) -> CellPoint {
-    CellPoint(
+  public func gridSample(for location: Point) -> GridSample {
+    GridSample(
       x: Self.gridCoordinate(
         location.x,
         subdivisions: grid.subdivisionsX,
@@ -137,13 +141,13 @@ public struct CanvasContext: Sendable {
   }
 
   /// Maps a pointer event location to the active grid sample.
-  public func gridPoint(for pointer: PointerLocation) -> CellPoint {
-    gridPoint(for: pointer.location)
+  public func gridSample(for pointer: PointerLocation) -> GridSample {
+    gridSample(for: pointer.location)
   }
 
   /// Sets the grid sample containing `location`.
   public mutating func setPixel(at location: Point) {
-    let point = gridPoint(for: location)
+    let point = gridSample(for: location)
     canvas.setPixel(x: point.x, y: point.y)
   }
 
@@ -157,7 +161,7 @@ public struct CanvasContext: Sendable {
     foreground: Color,
     background: Color? = nil
   ) {
-    let point = gridPoint(for: location)
+    let point = gridSample(for: location)
     canvas.setPixel(x: point.x, y: point.y)
     setGridStyle(
       ResolvedTextStyle(
@@ -171,7 +175,7 @@ public struct CanvasContext: Sendable {
 
   /// Clears the grid sample containing `location`.
   public mutating func clearPixel(at location: Point) {
-    let point = gridPoint(for: location)
+    let point = gridSample(for: location)
     canvas.clearPixel(x: point.x, y: point.y)
   }
 
@@ -180,8 +184,8 @@ public struct CanvasContext: Sendable {
     from start: Point,
     to end: Point
   ) {
-    let startPoint = gridPoint(for: start)
-    let endPoint = gridPoint(for: end)
+    let startPoint = gridSample(for: start)
+    let endPoint = gridSample(for: end)
     canvas.line(
       from: (x: startPoint.x, y: startPoint.y),
       to: (x: endPoint.x, y: endPoint.y)
@@ -209,7 +213,7 @@ public struct CanvasContext: Sendable {
     center: Point,
     radius: Double
   ) {
-    let centerPoint = gridPoint(for: center)
+    let centerPoint = gridSample(for: center)
     canvas.strokeEllipse(
       centerX: centerPoint.x,
       centerY: centerPoint.y,
@@ -223,7 +227,7 @@ public struct CanvasContext: Sendable {
     center: Point,
     radius: Double
   ) {
-    let centerPoint = gridPoint(for: center)
+    let centerPoint = gridSample(for: center)
     canvas.fillEllipse(
       centerX: centerPoint.x,
       centerY: centerPoint.y,
@@ -238,7 +242,7 @@ public struct CanvasContext: Sendable {
     radiusX: Double,
     radiusY: Double
   ) {
-    let centerPoint = gridPoint(for: center)
+    let centerPoint = gridSample(for: center)
     canvas.strokeEllipse(
       centerX: centerPoint.x,
       centerY: centerPoint.y,
@@ -253,7 +257,7 @@ public struct CanvasContext: Sendable {
     radiusX: Double,
     radiusY: Double
   ) {
-    let centerPoint = gridPoint(for: center)
+    let centerPoint = gridSample(for: center)
     canvas.fillEllipse(
       centerX: centerPoint.x,
       centerY: centerPoint.y,
@@ -262,138 +266,28 @@ public struct CanvasContext: Sendable {
     )
   }
 
-  /// Sets a single grid sample at `(x, y)`. Out-of-range coordinates are
-  /// silently clipped.
-  public mutating func setPixel(x: Int, y: Int) {
-    canvas.setPixel(x: x, y: y)
-  }
-
-  /// Sets a single grid sample with a per-cell style.
+  /// Lights a single grid sample. Out-of-range coordinates are silently
+  /// clipped.
   ///
-  /// Terminal glyphs have one foreground and one background per terminal
-  /// cell, not per grid sample. If multiple styled writes touch the same
-  /// terminal cell, the last style wins for that whole cell.
-  public mutating func setPixel(
-    x: Int,
-    y: Int,
-    foreground: Color,
-    background: Color? = nil
-  ) {
-    canvas.setPixel(x: x, y: y)
-    setGridStyle(
-      ResolvedTextStyle(
-        foregroundColor: foreground,
-        backgroundColor: background
-      ),
-      forGridX: x,
-      y: y
-    )
+  /// Grid samples are discrete sub-cell coordinates in the active
+  /// ``CanvasGrid`` (for example, the 2×4 Braille dots inside one terminal
+  /// cell). This is the escape hatch for drawings that already work in sample
+  /// coordinates; for continuous, resolution-independent drawing prefer
+  /// ``setPixel(at:)`` with a ``Point``. Map a ``Point`` to the sample
+  /// containing it with ``gridSample(for:)-(Point)``.
+  public mutating func setSample(_ sample: GridSample) {
+    canvas.setPixel(x: sample.x, y: sample.y)
   }
 
-  /// Clears a single grid sample at `(x, y)`.
-  public mutating func clearPixel(x: Int, y: Int) {
-    canvas.clearPixel(x: x, y: y)
-  }
-
-  /// Draws a Bresenham line between two grid-sample points.
-  public mutating func line(
-    from: (x: Int, y: Int),
-    to: (x: Int, y: Int)
-  ) {
-    canvas.line(from: from, to: to)
-  }
-
-  /// Draws the outline of a rectangle in grid samples.
-  public mutating func strokeRect(
-    x: Int,
-    y: Int,
-    width: Int,
-    height: Int
-  ) {
-    canvas.strokeRect(x: x, y: y, width: width, height: height)
-  }
-
-  /// Fills a rectangle in grid samples.
-  public mutating func fillRect(
-    x: Int,
-    y: Int,
-    width: Int,
-    height: Int
-  ) {
-    canvas.fillRect(x: x, y: y, width: width, height: height)
-  }
-
-  /// Draws the outline of a circle with the given grid-sample radius.
-  public mutating func strokeCircle(
-    centerX: Int,
-    centerY: Int,
-    radius: Int
-  ) {
-    canvas.strokeCircle(centerX: centerX, centerY: centerY, radius: radius)
-  }
-
-  /// Fills a disc with the given grid-sample radius.
-  public mutating func fillCircle(
-    centerX: Int,
-    centerY: Int,
-    radius: Int
-  ) {
-    canvas.fillCircle(centerX: centerX, centerY: centerY, radius: radius)
-  }
-
-  /// Draws the outline of an ellipse in grid samples.
-  public mutating func strokeEllipse(
-    centerX: Int,
-    centerY: Int,
-    radiusX: Int,
-    radiusY: Int
-  ) {
-    canvas.strokeEllipse(
-      centerX: centerX,
-      centerY: centerY,
-      radiusX: radiusX,
-      radiusY: radiusY
-    )
-  }
-
-  /// Fills an ellipse in grid samples.
-  public mutating func fillEllipse(
-    centerX: Int,
-    centerY: Int,
-    radiusX: Int,
-    radiusY: Int
-  ) {
-    canvas.fillEllipse(
-      centerX: centerX,
-      centerY: centerY,
-      radiusX: radiusX,
-      radiusY: radiusY
-    )
+  /// Clears a single grid sample.
+  public mutating func clearSample(_ sample: GridSample) {
+    canvas.clearPixel(x: sample.x, y: sample.y)
   }
 
   /// Writes one terminal cell directly.
   ///
-  /// Coordinates are in terminal cells, not Braille subpixels. Direct
-  /// cell writes are painted before Braille writes, so Braille output can
-  /// overlay a dense cell background while preserving that background.
-  public mutating func setCell(
-    x: Int,
-    y: Int,
-    character: Character = " ",
-    foreground: Color? = nil,
-    background: Color? = nil
-  ) {
-    setCell(
-      CanvasCell(
-        character: character,
-        foreground: foreground,
-        background: background
-      ),
-      at: CellPoint(x: x, y: y)
-    )
-  }
-
-  /// Writes one terminal cell directly.
+  /// Direct cell writes are painted before Braille writes, so Braille output
+  /// can overlay a dense cell background while preserving that background.
   public mutating func setCell(
     _ cell: CanvasCell,
     at location: CellPoint
@@ -425,24 +319,10 @@ public struct CanvasContext: Sendable {
 
   /// Fills one terminal cell with a background color.
   public mutating func fillCell(
-    x: Int,
-    y: Int,
-    color: Color
-  ) {
-    fillCell(color, at: CellPoint(x: x, y: y))
-  }
-
-  /// Fills one terminal cell with a background color.
-  public mutating func fillCell(
     _ color: Color,
     at location: CellPoint
   ) {
     setCell(CanvasCell(background: color), at: location)
-  }
-
-  /// Removes any direct terminal-cell write at `(x, y)`.
-  public mutating func clearCell(x: Int, y: Int) {
-    clearCell(at: CellPoint(x: x, y: y))
   }
 
   /// Removes any direct terminal-cell write at `location`.
@@ -460,7 +340,7 @@ public struct CanvasContext: Sendable {
     forGridX x: Int,
     y: Int
   ) {
-    guard x >= 0, x < width, y >= 0, y < height else {
+    guard x >= 0, x < gridWidth, y >= 0, y < gridHeight else {
       return
     }
     let cellX = x / grid.subdivisionsX

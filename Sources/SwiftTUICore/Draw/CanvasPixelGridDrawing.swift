@@ -69,7 +69,7 @@ public struct CanvasPixelGridDrawing: CanvasDrawing, Equatable {
         guard let color = pixel(x: x, y: y) else {
           continue
         }
-        context.fillCell(x: x, y: y, color: color)
+        context.fillCell(color, at: CellPoint(x: x, y: y))
       }
     }
   }
@@ -87,30 +87,28 @@ public struct CanvasPixelGridDrawing: CanvasDrawing, Equatable {
         let top = pixel(x: x, y: topY)
         let bottom = pixel(x: x, y: bottomY)
 
+        let location = CellPoint(x: x, y: cellY)
         switch (top, bottom) {
         case (nil, nil):
           continue
         case (let top?, let bottom?) where top == bottom:
-          context.fillCell(x: x, y: cellY, color: top)
+          context.fillCell(top, at: location)
         case (let top?, let bottom?):
           context.setCell(
-            x: x,
-            y: cellY,
+            at: location,
             character: "▀",
             foreground: top,
             background: bottom
           )
         case (let top?, nil):
           context.setCell(
-            x: x,
-            y: cellY,
+            at: location,
             character: "▀",
             foreground: top
           )
         case (nil, let bottom?):
           context.setCell(
-            x: x,
-            y: cellY,
+            at: location,
             character: "▄",
             foreground: bottom
           )

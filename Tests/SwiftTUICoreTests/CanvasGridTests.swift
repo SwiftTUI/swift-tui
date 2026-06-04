@@ -115,7 +115,7 @@ struct CanvasGridTests {
     )
 
     #expect(context.size == CellSize(width: 4, height: 2))
-    #expect(context.gridPoint(for: Point(x: 1.75, y: 0.25)) == CellPoint(x: 3, y: 0))
-    #expect(context.gridPoint(for: pointer) == CellPoint(x: 3, y: 0))
+    #expect(context.gridSample(for: Point(x: 1.75, y: 0.25)) == GridSample(x: 3, y: 0))
+    #expect(context.gridSample(for: pointer) == GridSample(x: 3, y: 0))
   }
 }

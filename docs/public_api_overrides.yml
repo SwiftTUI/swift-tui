@@ -76,6 +76,7 @@ classifications:
     - SwiftTUIViews.CanvasClosureDrawing
     - SwiftTUIViews.CanvasContext
     - SwiftTUIViews.CanvasDrawing
+    - SwiftTUIViews.CanvasInputDrawing
     - SwiftTUIViews.Capsule
     - SwiftTUIViews.Circle
     - SwiftTUIViews.ClipboardWriteAction
@@ -547,6 +548,8 @@ classifications:
     - SwiftTUICore.GestureRecognizerEventDisposition
     - SwiftTUICore.GestureRecognizerPhase
     - SwiftTUICore.Gradient
+    - SwiftTUICore.GridSample
+    - SwiftTUICore.GridSize
     - SwiftTUICore.HandlerInstallation
     - SwiftTUICore.HexFormat
     - SwiftTUICore.HexLetterCase

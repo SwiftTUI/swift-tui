@@ -182,7 +182,7 @@ struct RetainedPhaseExtractionTests {
   func retainedPhaseSignatureRejectsTypeErasedDrawPayloads() {
     struct Dots: CanvasDrawing, Equatable {
       func draw(into context: inout CanvasContext) {
-        context.setPixel(x: 0, y: 0)
+        context.setSample(GridSample(x: 0, y: 0))
       }
     }
 

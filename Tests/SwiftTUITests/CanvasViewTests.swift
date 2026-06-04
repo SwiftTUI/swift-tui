@@ -56,10 +56,10 @@ private struct UniformStyledPixel: CanvasDrawing, Equatable {
 
 private struct DirectCellGrid: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
-    context.fillCell(x: 0, y: 0, color: .red)
-    context.fillCell(x: 1, y: 0, color: .blue)
-    context.setCell(x: 0, y: 1, character: "x", foreground: .green)
-    context.fillCell(x: 99, y: 99, color: .white)
+    context.fillCell(.red, at: CellPoint(x: 0, y: 0))
+    context.fillCell(.blue, at: CellPoint(x: 1, y: 0))
+    context.setCell(at: CellPoint(x: 0, y: 1), character: "x", foreground: .green)
+    context.fillCell(.white, at: CellPoint(x: 99, y: 99))
   }
 }
 
@@ -79,7 +79,7 @@ private struct BrailleSameCellStyleConflict: CanvasDrawing, Equatable {
 
 private struct DirectCellsUnderBraille: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
-    context.fillCell(x: 0, y: 0, color: .blue)
+    context.fillCell(.blue, at: CellPoint(x: 0, y: 0))
     context.setPixel(at: .zero, foreground: .red)
   }
 }
@@ -255,7 +255,7 @@ struct CanvasViewTests {
   @Test("Canvas grid maps fractional cell coordinates into quadrant blocks")
   func canvasQuadrantGridCellSpaceDrawing() {
     let artifacts = DefaultRenderer().render(
-      Canvas(grid: .quadrant2x2, QuadrantCellSpaceMarks()).frame(width: 1, height: 1),
+      Canvas(QuadrantCellSpaceMarks(), grid: .quadrant2x2).frame(width: 1, height: 1),
       context: .init(identity: testIdentity("CanvasQuadrantGrid"))
     )
 
@@ -265,12 +265,12 @@ struct CanvasViewTests {
   @Test("Canvas grid maps fractional cell coordinates into vertical half blocks")
   func canvasVerticalHalfBlockCellSpaceDrawing() {
     let top = DefaultRenderer().render(
-      Canvas(grid: .verticalHalfBlock, VerticalHalfCellSpaceMark(half: .top))
+      Canvas(VerticalHalfCellSpaceMark(half: .top), grid: .verticalHalfBlock)
         .frame(width: 1, height: 1),
       context: .init(identity: testIdentity("CanvasVerticalHalfTop"))
     )
     let bottom = DefaultRenderer().render(
-      Canvas(grid: .verticalHalfBlock, VerticalHalfCellSpaceMark(half: .bottom))
+      Canvas(VerticalHalfCellSpaceMark(half: .bottom), grid: .verticalHalfBlock)
         .frame(width: 1, height: 1),
       context: .init(identity: testIdentity("CanvasVerticalHalfBottom"))
     )
@@ -286,8 +286,7 @@ struct CanvasViewTests {
       .blue, .green,
     ]
     let artifacts = DefaultRenderer().render(
-      Canvas(pixelGridWidth: 2, height: 2, pixels: pixels, mode: .fullCell)
-        .frame(width: 2, height: 2),
+      Canvas.pixelGrid(width: 2, height: 2, pixels: pixels, mode: .fullCell),
       context: .init(identity: testIdentity("CanvasFullCellPixelGrid"))
     )
     let cells = artifacts.rasterSurface.cells
@@ -306,8 +305,7 @@ struct CanvasViewTests {
     ]
     let mode = CanvasPixelGridMode.verticalHalfBlock
     let artifacts = DefaultRenderer().render(
-      Canvas(pixelGridWidth: 2, height: 3, pixels: pixels, mode: mode)
-        .frame(width: 2, height: mode.cellHeight(for: 3)),
+      Canvas.pixelGrid(width: 2, height: 3, pixels: pixels, mode: mode),
       context: .init(identity: testIdentity("CanvasHalfBlockPixelGrid"))
     )
     let cells = artifacts.rasterSurface.cells

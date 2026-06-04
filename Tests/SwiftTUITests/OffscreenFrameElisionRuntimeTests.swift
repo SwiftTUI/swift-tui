@@ -79,7 +79,8 @@ struct OffscreenFrameElisionRuntimeTests {
     )
 
     let retained = retainedState.input(invalidatedIdentities: [])
-    #expect(retained.previousPhaseProducts?.proposal == .init(width: .finite(10), height: .finite(4)))
+    #expect(
+      retained.previousPhaseProducts?.proposal == .init(width: .finite(10), height: .finite(4)))
     #expect(retained.previousPhaseProducts?.semantics == semantics)
     #expect(retained.previousPhaseProducts?.draw == draw)
     #expect(
@@ -171,14 +172,16 @@ struct OffscreenFrameElisionRuntimeTests {
       proposal: .unspecified
     )
 
-    #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts?.semantics == extractionSemantics)
+    #expect(
+      retainedState.input(invalidatedIdentities: []).previousPhaseProducts?.semantics
+        == extractionSemantics)
   }
 
   @Test("retained phase products skip unsafe type-erased draw payloads")
   func retainedPhaseProductsSkipUnsafeTypeErasedDrawPayloads() {
     struct Dots: CanvasDrawing, Equatable {
       func draw(into context: inout CanvasContext) {
-        context.setPixel(x: 0, y: 0)
+        context.setSample(GridSample(x: 0, y: 0))
       }
     }
 

@@ -15,6 +15,48 @@ public struct CellPoint: Equatable, Hashable, Sendable {
   public static let zero = Self(x: 0, y: 0)
 }
 
+/// An integer coordinate in a canvas's grid-sample space.
+///
+/// A ``Canvas`` is sized in terminal cells, but its ``CanvasGrid`` subdivides
+/// each cell into a fixed number of drawing samples (for example, 2×4 for
+/// Braille). `GridSample` addresses one of those sub-cell samples directly.
+///
+/// `GridSample` is intentionally distinct from ``CellPoint``: both carry an
+/// integer `x`/`y`, but they live in different coordinate spaces. A
+/// `GridSample` of `(1, 1)` is a single Braille dot, while a ``CellPoint`` of
+/// `(1, 1)` is a whole terminal cell (a 2×4 block of samples). Keeping them as
+/// separate types lets the compiler catch coordinate-space mix-ups that loose
+/// integers would silently allow. Map a continuous ``Point`` to the sample
+/// containing it with ``CanvasContext/gridSample(for:)-(Point)``.
+public struct GridSample: Equatable, Hashable, Sendable {
+  public var x: Int
+  public var y: Int
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+
+  public static let zero = Self(x: 0, y: 0)
+}
+
+/// An integer size in canvas grid samples.
+///
+/// The sample-space extent of a ``CanvasContext`` drawing surface — the cell
+/// ``CellSize`` multiplied by the active ``CanvasGrid``'s subdivisions. Read it
+/// from ``CanvasContext/gridSize``.
+public struct GridSize: Equatable, Hashable, Sendable {
+  public var width: Int
+  public var height: Int
+
+  public init(width: Int, height: Int) {
+    self.width = width
+    self.height = height
+  }
+
+  public static let zero = Self(width: 0, height: 0)
+}
+
 /// An integer size in terminal cells.
 public struct CellSize: Equatable, Hashable, Sendable {
   public var width: Int
