@@ -22,6 +22,10 @@ existing SwiftUI app shell.
 - ``SwiftUIHostAppState``
 - ``SwiftUIHostSceneDescriptor``
 
+### Scene Host
+
+- ``SwiftUIHostSceneHost``
+
 ### Styling
 
 - ``SwiftUIHostTerminalStyle``

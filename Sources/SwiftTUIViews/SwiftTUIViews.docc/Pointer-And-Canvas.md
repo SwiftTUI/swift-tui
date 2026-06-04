@@ -5,7 +5,7 @@
 SwiftTUI uses one coordinate space for authored interaction and drawing:
 continuous terminal cells.
 
-`Point(x: 4.25, y: 2.5)` means the middle of the cell at column 4, row 2. It
+`Point(x: 4.5, y: 2.5)` means the middle of the cell at column 4, row 2. It
 does not mean device pixels. Layout still uses integer `CellSize` and
 `CellRect`, but direct-manipulation APIs carry the fractional point when the
 runtime can obtain it.
@@ -64,7 +64,7 @@ placed rectangle. Rectangular shapes remain cell-denominated through
 
 ## Runtime Capability Display
 
-Read ``GeometryReader`` or `EnvironmentReader` when an app needs to show or
+Read ``GeometryReader`` or ``EnvironmentReader`` when an app needs to show or
 adapt to runtime precision:
 
 - `GeometryProxy.pointerInputCapabilities` describes whether events are

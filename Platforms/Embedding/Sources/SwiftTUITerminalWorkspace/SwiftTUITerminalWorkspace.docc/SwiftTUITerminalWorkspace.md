@@ -32,3 +32,9 @@ Use this product when an app needs a multiplexer-like surface. Use
 - ``TerminalWorkspaceTabID``
 - ``TerminalWorkspaceDirection``
 - ``TerminalSplitAxis``
+
+### Layout And Geometry
+
+- ``TerminalSplit``
+- ``TerminalWorkspaceLayout``
+- ``TerminalWorkspacePaneFrame``

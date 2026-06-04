@@ -23,3 +23,8 @@ directly when building a terminal-only custom launch path around
 ### One-Shot Output
 
 - ``RenderOnce``
+
+### PTY-Backed Scenes
+
+- ``ScenePty``
+- ``SignalReader``

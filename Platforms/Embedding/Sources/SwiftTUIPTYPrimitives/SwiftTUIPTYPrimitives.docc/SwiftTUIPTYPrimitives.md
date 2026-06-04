@@ -11,8 +11,17 @@ needs direct pty lifecycle control.
 
 ## Topics
 
+### Opening and Closing
+
+- ``openPTY()``
+- ``closeFD(_:)``
+
 ### PTY Lifecycle
 
 - ``PTYPair``
 - ``PTYHandles``
 - ``PTYError``
+
+### Resizing
+
+- ``ptyResize(masterFD:cols:rows:)``

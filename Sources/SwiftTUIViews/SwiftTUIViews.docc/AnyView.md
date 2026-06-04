@@ -161,7 +161,7 @@ struct InspectorList: View {
   let sections: [InspectorSection]
 
   var body: some View {
-    List(sections) { section in
+    ForEach(sections, id: \.id) { section in
       Section(section.title) {
         section.content
       }
