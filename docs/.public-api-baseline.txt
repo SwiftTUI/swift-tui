@@ -3785,8 +3785,6 @@ SwiftTUIViews.InsetShape.amount
 SwiftTUIViews.InsetShape.base
 SwiftTUIViews.InsetShape.geometry
 SwiftTUIViews.InsetShape.init(base:amount:)
-SwiftTUIViews.InsetShape.insetAmount
-SwiftTUIViews.InsetShape.kindName
 SwiftTUIViews.InsettableShape
 SwiftTUIViews.InsettableShape.inset(by:)
 SwiftTUIViews.InsettableShape.strokeBorder(_:style:)
@@ -4138,10 +4136,6 @@ SwiftTUIViews.Shape.body
 SwiftTUIViews.Shape.fill()
 SwiftTUIViews.Shape.fill(_:)
 SwiftTUIViews.Shape.geometry
-SwiftTUIViews.Shape.insetAmount
-SwiftTUIViews.Shape.insetAmount
-SwiftTUIViews.Shape.kindName
-SwiftTUIViews.Shape.kindName
 SwiftTUIViews.Shape.stroke(_:style:)
 SwiftTUIViews.Shape.stroke(_:style:background:)
 SwiftTUIViews.Shape.stroke(style:)

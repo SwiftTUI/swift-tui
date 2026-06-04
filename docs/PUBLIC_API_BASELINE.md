@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 56 | 506 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 270 | 1436 |
+| `SwiftTUIViews` | 270 | 1430 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
 | `SwiftTUIArguments` | 4 | 46 |
@@ -228,7 +228,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `InfoToastStyle` — struct — 2 members
 - `InlinePickerStyle` — struct — 4 members
 - `InsetGroupedListStyle` — struct — 4 members
-- `InsetShape` — struct — 6 members
+- `InsetShape` — struct — 4 members
 - `InsettableShape` — protocol — 5 members
 - `ItemNavigationDestinationModifier` — struct
 - `KeyCommandRegistrationModifier` — struct
@@ -317,7 +317,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SegmentedPickerStyle` — struct — 4 members
 - `SemanticMetadataModifier` — struct
 - `SendableLayout` — protocol — 3 members
-- `Shape` — protocol — 12 members
+- `Shape` — protocol — 8 members
 - `ShapeStyle` — extension — 4 members
 - `Slider` — struct — 4 members
 - `Spacer` — struct — 2 members

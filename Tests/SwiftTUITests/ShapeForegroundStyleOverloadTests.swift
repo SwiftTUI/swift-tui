@@ -91,3 +91,39 @@ struct ShapeForegroundStyleOverloadTests {
     #expect(stroked.rasterSurface != filled.rasterSurface)
   }
 }
+
+/// Guards the inset plumbing after `kindName`/`insetAmount` moved behind the
+/// `ShapeRendering` SPI: inset still flows into the rendered payload, and
+/// nested `inset(by:)` calls still accumulate. Both rely on `insetAmount`
+/// dispatching dynamically through `InsetShape` — they would silently break
+/// if it were ever demoted to a non-requirement extension helper.
+@MainActor
+@Suite("Shape inset accumulation")
+struct ShapeInsetAccumulationTests {
+
+  @Test("inset(by:) shrinks the rendered shape")
+  func insetShrinksShape() {
+    let inset = DefaultRenderer().render(
+      Rectangle().inset(by: 2).fill().frame(width: 12, height: 6),
+      context: .init(identity: testIdentity("RectInset"))
+    )
+    let full = DefaultRenderer().render(
+      Rectangle().fill().frame(width: 12, height: 6),
+      context: .init(identity: testIdentity("RectFull"))
+    )
+    #expect(inset.rasterSurface != full.rasterSurface)
+  }
+
+  @Test("nested inset(by:) accumulates")
+  func nestedInsetAccumulates() {
+    let nested = DefaultRenderer().render(
+      Rectangle().inset(by: 1).inset(by: 1).fill().frame(width: 12, height: 6),
+      context: .init(identity: testIdentity("RectNestedInset"))
+    )
+    let summed = DefaultRenderer().render(
+      Rectangle().inset(by: 2).fill().frame(width: 12, height: 6),
+      context: .init(identity: testIdentity("RectSummedInset"))
+    )
+    #expect(nested.rasterSurface == summed.rasterSurface)
+  }
+}
