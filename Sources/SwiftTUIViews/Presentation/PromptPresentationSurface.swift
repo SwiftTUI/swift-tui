@@ -148,9 +148,9 @@ package struct PromptPresentationSurface: View, ActionScope {
           presentationSemanticMetadata
         )
     case .dropdown:
-      // Full-width, top-aligned strip. No side or top border — a single
-      // soft bottom divider reads as a shadow under the content.
-      content
+      // Full-width, top-aligned strip. Dropdowns are command-palette-style
+      // surfaces: no title row or close button, just the supplied content.
+      contentBody
         .frame(
           maxWidth: .infinity,
           alignment: .topLeading

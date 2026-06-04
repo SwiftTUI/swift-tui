@@ -170,7 +170,7 @@ struct GalleryStyleDispatchTests {
     try runLoop.renderPendingFrames(renderedFrames: &rendered)
 
     let surfaceText = latestSurfaceText(for: runLoop)
-    #expect(surfaceText.contains("Command palette"))
+    #expect(!surfaceText.contains("Command palette"))
     #expect(surfaceText.contains("palette sheet"))
   }
 
@@ -195,7 +195,7 @@ struct GalleryStyleDispatchTests {
     try runLoop.renderPendingFrames(renderedFrames: &rendered)
 
     let surfaceText = latestSurfaceText(for: runLoop)
-    #expect(surfaceText.contains("Command palette"))
+    #expect(!surfaceText.contains("Command palette"))
     #expect(surfaceText.contains("palette sheet"))
   }
 

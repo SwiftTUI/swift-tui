@@ -7,6 +7,25 @@ import Testing
 @MainActor
 @Suite
 struct PresentationSurfaceTests {
+  @Test("dropdown presentations render content without title or close chrome")
+  func dropdownPresentationsRenderContentWithoutTitleOrCloseChrome() throws {
+    let artifacts = DefaultRenderer().render(
+      Panel(id: "PaletteHost") {
+        Text("Workspace")
+      }
+      .paletteSheet("Command palette", isPresented: .constant(true)) { _ in
+        Text("palette sheet")
+      },
+      context: .init(identity: testIdentity("DropdownPresentationChromeRoot")),
+      proposal: .init(width: 40, height: 10)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("palette sheet"))
+    #expect(!surface.contains("Command palette"))
+    #expect(!surface.contains("×"))
+  }
+
   @Test("presentation overlays carry explicit surface composition metadata")
   func presentationOverlaysCarrySurfaceCompositionMetadata() throws {
     let contentRootIdentity = testIdentity("SurfaceCompositionRoot")
