@@ -68,14 +68,22 @@ identity-changing moves via the persistent `EntityRoutingTable`.
 
 **Not yet built / accepted limits.**
 
-- **Incremental retained-index patch.** `RetainedFrameIndex` is rebuilt in full
-  every committed frame; `init(patching:with:)` currently delegates to a full
-  rebuild, so the structural-fragment diff/reuse/prune path (the Stage 1 "L3"
-  perf win) does not exist, and its `#if DEBUG` byte-equivalence oracle is inert
-  (it compares two rebuilds). This is a deliberate deferral, not an oversight:
-  the `synthetic-narrow-invalidation` corpus shows retained-index construction
-  is a sub-1% slice of frame time and off the critical path (`resolve_ms`
-  dominates at ~40%), so the incremental patcher was not worth its complexity.
+- **Incremental retained-index patch + maintained fold-up signature.**
+  `RetainedFrameIndex` is rebuilt in full every committed frame;
+  `init(patching:with:)` currently delegates to a full rebuild, so the
+  structural-fragment diff/reuse/prune path (the Stage 1 "L3" perf win) does not
+  exist, and its `#if DEBUG` byte-equivalence oracle is inert (it compares two
+  rebuilds). Relatedly, the `StructuralFrameIndex` subtree fold-up signature
+  (`subtreeSignatureByNode`, the Stage 1 "L2" hook) covers only identity /
+  structural path / kind / child signatures, not each retained reader's full
+  payload, and has **no live consumer** — its only consumer would be the
+  deferred patcher, so extending it now would add dead data. Both are a
+  deliberate deferral, not an oversight: the `synthetic-narrow-invalidation`
+  corpus shows retained-index construction is a sub-1% slice of frame time and
+  off the critical path (`resolve_ms` dominates at ~40%), so neither the richer
+  fold-up nor the incremental patcher was worth its complexity and commit-path
+  risk. The `TermUIPerf compare --gate` budget now exists to size the win before
+  the patcher is built, per the project's measurement-driven methodology.
 - **Duplicate explicit ids — lifetime preservation.** Duplicate runtime
   identities (a non-unique `ForEach` id keypath, or a reused `.id(_:)`) are
   *contained* on the structural diff axis: each colliding sibling gets a distinct
