@@ -1052,14 +1052,6 @@ package final class ViewGraph {
     let invalidationSummary =
       invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)
-    // INVARIANT (DEBUG): the summary passed by the caller must be built from
-    // exactly this `invalidatedIdentities` set. The conflict short-circuit below
-    // relies on it; enforcing it here turns the previously documented-but-
-    // unchecked coupling into one the suite verifies.
-    assert(
-      invalidationSummary.directlyInvalidated == invalidatedIdentities,
-      "reusableSnapshot invalidationSummary must be built from invalidatedIdentities"
-    )
     let resolvedIdentity = node.resolvedIdentity
     let identityIntersectsInvalidation =
       invalidationSummary.intersectsSubtree(at: identity)
@@ -1081,35 +1073,44 @@ package final class ViewGraph {
       return snapshot
     }
 
-    // Reaching here means `identityIntersectsInvalidation || structurally-
-    // IntersectsInvalidation` (the reuse path above returns only when both are
-    // false), so reuse is rejected. Both predicates are O(1)/O(depth): the
-    // structural-summary set lookups (`intersectsSubtree`) and the live-graph
-    // structural walk. The former O(invalidated × path) identity-axis conflict
-    // scan that ran here was a redundant third opinion — proven equivalent to
-    // `identityIntersectsInvalidation` across the whole suite by the DEBUG probe
-    // below — so production no longer pays for it (resolve_ms win, behind the
-    // `invalidationSummary == invalidatedIdentities` invariant asserted above).
-    #if DEBUG
-      // Defensive cross-check: the identity-axis predicate must still agree, so a
-      // future change that desynchronizes the structural-path summary from the
-      // identity axis is caught rather than silently over-rejecting (which would
-      // be a quiet reuse-rate regression, not a correctness bug).
-      let conflictsWithInvalidation = invalidatedIdentities.contains { invalidatedIdentity in
-        invalidatedIdentity == identity
-          || invalidatedIdentity.isDescendant(of: identity)
-          || identity.isDescendant(of: invalidatedIdentity)
-          || invalidatedIdentity == resolvedIdentity
-          || invalidatedIdentity.isDescendant(of: resolvedIdentity)
-          || resolvedIdentity.isDescendant(of: invalidatedIdentity)
-      }
-      assert(
-        conflictsWithInvalidation,
-        "reuse-rejection tail reached without an identity-axis conflict — the "
-          + "structural-summary intersection and the identity axis disagreed"
-      )
-    #endif
-    return nil
+    // If the live-graph structural check already rejects reuse, skip the
+    // O(invalidated × path) identity-conflict scan: its result cannot change the
+    // outcome (the guard below rejects on structural intersection regardless).
+    // Behavior-identical; avoids a redundant per-node scan on every frame where
+    // a structural intersection is present.
+    if structurallyIntersectsInvalidation {
+      return nil
+    }
+
+    // NOT redundant with `identityIntersectsInvalidation` — do NOT remove this
+    // (resolve_ms remediation tried and reverted it). Reaching here means the
+    // structural-summary `intersectsSubtree` reported an intersection while the
+    // live-graph structural walk did not. The summary walks ancestry on the
+    // `StructuralPath` projection and is a *conservative over-approximation* for
+    // divergent identities (`.id` / `ForEach` / portals); this precise
+    // identity-axis self/ancestor/descendant scan can — and across the suite,
+    // does — find no actual conflict, which legitimately rescues reuse the
+    // summary alone would reject. Dropping it converts those reuses into
+    // recomputes: behavior-safe but a measurable reuse-rate (resolve_ms)
+    // *regression*, the opposite of the intended win.
+    let conflictsWithInvalidation = invalidatedIdentities.contains { invalidatedIdentity in
+      invalidatedIdentity == identity
+        || invalidatedIdentity.isDescendant(of: identity)
+        || identity.isDescendant(of: invalidatedIdentity)
+        || invalidatedIdentity == resolvedIdentity
+        || invalidatedIdentity.isDescendant(of: resolvedIdentity)
+        || resolvedIdentity.isDescendant(of: invalidatedIdentity)
+    }
+    guard !conflictsWithInvalidation else {
+      return nil
+    }
+    let snapshot = node.snapshot()
+    recordReusedSubtree(
+      snapshot,
+      invalidator: invalidator,
+      retained: true
+    )
+    return snapshot
   }
 
   @discardableResult
