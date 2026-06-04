@@ -14,9 +14,11 @@ That gives the framework a few important properties:
 
 Use ``State`` for local value ownership and ``Binding`` for projection into child views.
 
-`@State` storage is keyed by view identity path plus source location, not by
-reference identity. That means moving a stateful view to a different identity
-path creates a distinct state slot, which matches SwiftUI-style expectations.
+`@State` storage is owned by a runtime `ViewNodeID` and a source-location
+ordinal, scoped to the active view graph. Unkeyed owners follow their
+`StructuralPath` in the resolved tree. Explicit `.id(...)` values and
+`ForEach` data keys produce an `EntityIdentity` that can route the same owner
+across structural moves, while changing the explicit id creates a new owner.
 
 Interactive runtime callbacks are additionally scoped to the view graph that
 registered them. Projected bindings, button actions, key commands, dismiss

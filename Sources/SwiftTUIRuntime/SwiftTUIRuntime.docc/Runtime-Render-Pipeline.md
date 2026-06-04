@@ -179,7 +179,7 @@ The runtime stages preserve the same typed product order documented by
 
 | Phase | Product | Responsibility |
 | --- | --- | --- |
-| resolve | `ResolvedNode` | Evaluate authored bodies and attach identity, state, environment, metadata, and runtime registrations. |
+| resolve | `ResolvedNode` | Evaluate authored bodies and attach the identity projection, `StructuralPath`, optional entity identity, state ownership, environment, metadata, and runtime registrations. |
 | measure | `MeasuredNode` | Negotiate sizes through `LayoutEngine` under layout proposals. |
 | place | `PlacedNode` | Assign integer-cell frames, content bounds, and placement-time metadata. |
 | semantics | `SemanticSnapshot` | Extract focus, interaction, scroll, selection, named coordinate-space, accessibility, and routing data. |

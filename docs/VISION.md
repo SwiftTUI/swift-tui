@@ -23,8 +23,10 @@ Concretely, faithfulness means:
 - **Recursive layout negotiation.** A parent proposes a size, a child reports
   what it wants, the parent places it. Modifier order changes the result.
 - **Graph-scoped state.** `@State`, `@Binding`, `@Environment`, `@FocusState`,
-  and the repo-owned `@Bindable` keep their SwiftUI semantics, including state
-  identity tied to a view's position in the resolved graph.
+  and the repo-owned `@Bindable` keep their SwiftUI semantics: unkeyed state is
+  tied to structural position in the resolved graph, while explicit `.id(...)`
+  and `ForEach` data identities can preserve a runtime owner across structural
+  moves.
 - **A body-only `View` protocol.** Authoring views never see the rendering
   pipeline. Lowering to primitives is internal.
 - **Declarative composition.** `@ViewBuilder`, `ViewModifier`, presentation

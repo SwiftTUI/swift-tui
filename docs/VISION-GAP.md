@@ -63,7 +63,7 @@ opaque `ViewNodeID` for runtime lifetime, `StructuralPath` for ordered tree
 position, `EntityIdentity` for explicit user/data identity, and a re-rooted
 `StateSlotKey {owner: ViewNodeID, ordinal}` plus typed `StateGraphScopeID` for
 state slots. The registration-alias layer and the `__SwiftTUIStateGraph` path
-string-splice are gone; `@State`, focus, and animation continuity survive
+string-splice are gone; `@State` follows entity-routed runtime lifetimes across
 identity-changing moves via the persistent `EntityRoutingTable`.
 
 **Not yet built / accepted limits.**
@@ -84,16 +84,17 @@ identity-changing moves via the persistent `EntityRoutingTable`.
   fold-up nor the incremental patcher was worth its complexity and commit-path
   risk. The `TermUIPerf compare --gate` budget now exists to size the win before
   the patcher is built, per the project's measurement-driven methodology.
-- **Duplicate explicit ids — lifetime preservation.** Duplicate runtime
-  identities (a non-unique `ForEach` id keypath, or a reused `.id(_:)`) are
-  *contained* on the structural diff axis: each colliding sibling gets a distinct
-  `EntityIdentity.occurrence`, and a non-fatal diagnostic fires (verified at the
-  reconciliation level by `StructuralDiffTests`). Occurrence is a containment
-  mechanism, not a lifetime key: it is assigned by resolved order, so a change to
-  the collision *count* re-aligns the survivors and falls back to a conservative
-  subtree rebuild — duplicate-id siblings get no cross-reorder
-  `@State`/animation/focus preservation in that case. This is user error and
-  undefined in SwiftUI too; the limit is recorded rather than modeled away.
+- **Duplicate explicit ids — lifetime preservation.** Duplicate entity ids (a
+  non-unique `ForEach` id keypath, or sibling `.id(_:)` values that collide
+  within the same structural scope) are *contained* on the structural diff axis:
+  each colliding sibling gets a distinct `EntityIdentity.occurrence`, and a
+  non-fatal diagnostic fires (verified at the reconciliation level by
+  `StructuralDiffTests`). Occurrence is a containment mechanism, not a lifetime
+  key: it is assigned by resolved order, so a change to the collision *count*
+  re-aligns the survivors and falls back to a conservative subtree rebuild —
+  duplicate-id siblings get no cross-reorder `@State`/animation/focus
+  preservation in that case. This is user error and undefined in SwiftUI too;
+  the limit is recorded rather than modeled away.
   > **Node-store containment (G13, closed).** Same-collection duplicate ids now
   > receive *distinct `ViewNodeID`s*. `ViewGraph.nodeForIdentity` is
   > occurrence-aware: when a duplicate-occurrence sibling (`occurrence > 0`, e.g.

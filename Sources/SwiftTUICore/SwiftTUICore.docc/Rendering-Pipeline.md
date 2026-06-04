@@ -40,8 +40,9 @@ presentation damage, and presentation to a concrete surface.
 
 ### Resolve
 
-Produces `ResolvedNode` trees with identity, state, merged environment, view
-metadata, and runtime registrations.
+Produces `ResolvedNode` trees with the resolved identity projection,
+`StructuralPath`, optional `EntityIdentity`, state ownership, merged
+environment, view metadata, and runtime registrations.
 
 ### Measure
 
