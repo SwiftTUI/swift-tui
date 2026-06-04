@@ -39,6 +39,25 @@ struct RetainedFrameStructuralIndexTests {
 
     #expect(index.resolvedNode(for: duplicate) != nil)
     #expect(index.structuralFrame.nodes(for: duplicate).count == 2)
+    // G12: the flat identity-keyed accessor collapses the collision
+    // last-writer-wins, but the index makes it queryable rather than silent.
+    #expect(index.duplicateRuntimeIdentities == [duplicate])
+  }
+
+  @Test("a collision-free frame reports no duplicate runtime identities")
+  func uniqueRuntimeIdentitiesReportNoDuplicates() {
+    let root = ResolvedNode(
+      identity: testIdentity("Root"),
+      kind: .root,
+      children: [
+        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Row")),
+        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view("Row")),
+      ]
+    )
+
+    let index = RetainedFrameIndex(frame: frame(resolvedTree: root))
+
+    #expect(index.duplicateRuntimeIdentities.isEmpty)
   }
 
   @Test("retained invalidation uses structural adjacency for present identities")
@@ -62,7 +81,8 @@ struct RetainedFrameStructuralIndexTests {
     )
 
     #expect(retainedLayout.invalidationAffectsSubtree(at: sibling.identity))
-    #expect(!retainedLayout.invalidationAffectsSubtree(at: pathDescendantButStructuralSibling.identity))
+    #expect(
+      !retainedLayout.invalidationAffectsSubtree(at: pathDescendantButStructuralSibling.identity))
   }
 
   @Test("retained invalidation still falls back for unindexed synthetic identities")

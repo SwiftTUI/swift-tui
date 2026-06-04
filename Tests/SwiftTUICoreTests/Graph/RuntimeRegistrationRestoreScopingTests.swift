@@ -78,6 +78,104 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(candidates.map(\.identity) == [aIdentity, bIdentity])
   }
 
+  @Test(
+    "scoped restore reproduces a full rebuild across a custom-ResolvableView identity rewrite (G7)")
+  func scopedRestoreMatchesFullRebuildAcrossIdentityRewrite() {
+    // Stage 5 deleted the registration-alias layer that bridged an authored
+    // identity to the (different) identity its resolved output re-roots to — the
+    // custom-`ResolvableView` identity-rewrite case. This is the gate evidence
+    // that the structural restore replacing it reproduces the old alias
+    // resolution: a node evaluated at `authored` but committing a resolved
+    // identity of `rewritten`, with focus registered at the rewritten identity,
+    // must scoped-restore to a registration set byte-identical to a full
+    // rebuild — including against an unchanged sibling that sorts after it.
+    let rootIdentity = testIdentity("Root")
+    let authored = testIdentity("Root", "Custom")
+    let rewritten = testIdentity("Root", "Custom", "Rewritten")
+    let bIdentity = testIdentity("Root", "Z")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let customNode = graph.beginEvaluation(identity: authored, invalidator: nil)
+    recordFocus(on: customNode, identity: rewritten, namespace: namespace)
+    graph.finishEvaluation(
+      customNode,
+      resolved: ResolvedNode(identity: rewritten, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    let bNode = graph.beginEvaluation(identity: bIdentity, invalidator: nil)
+    recordFocus(on: bNode, identity: bIdentity, namespace: namespace)
+    graph.finishEvaluation(
+      bNode,
+      resolved: ResolvedNode(identity: bIdentity, kind: .view("Z")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: rewritten, kind: .view("Custom")),
+          ResolvedNode(identity: bIdentity, kind: .view("Z")),
+        ]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved0 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved0, placed: nil)
+
+    // The rewrite is real: the node authored at `Custom` committed the resolved
+    // identity `Custom/Rewritten`.
+    #expect(graph.nodeForIdentity(authored)?.resolvedIdentity == rewritten)
+
+    // Frame 1: full publish — the canonical order.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+
+    // Frame 2: narrowly re-evaluate ONLY the custom subtree (authored identity),
+    // re-applying the same rewrite + focus, then commit with a scoped restore.
+    graph.beginFrame()
+    let custom2 = graph.beginEvaluation(identity: authored, invalidator: nil)
+    recordFocus(on: custom2, identity: rewritten, namespace: namespace)
+    graph.finishEvaluation(
+      custom2,
+      resolved: ResolvedNode(identity: rewritten, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved2, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    let customNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[authored]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [customNodeID], frontierIdentities: [authored])
+    )
+    graphDraft.commitRuntimeRegistrations(from: graph)
+
+    // Oracle: a full rebuild of the same committed graph.
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+    // Focus resolves at the rewritten identity, ahead of the later sibling —
+    // the scoped restore reproduced the alias resolution exactly.
+    let candidates = liveRegistrations.defaultFocusRegistry?.snapshot().candidates ?? []
+    #expect(candidates.map(\.identity) == [rewritten, bIdentity])
+  }
+
   @Test(".unchanged commit re-publishes nothing — registry stays byte-identical (no focus dup)")
   func unchangedCommitLeavesRegistryByteIdentical() {
     let rootIdentity = testIdentity("Root")

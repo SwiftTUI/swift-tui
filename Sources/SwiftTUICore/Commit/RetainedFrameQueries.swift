@@ -122,6 +122,29 @@ package struct RetainedFrameIndex: Sendable {
         == other.placedFrameEntryRangesByStructuralIdentity
   }
 
+  /// Runtime identities that resolved to more than one structural node this
+  /// frame — duplicate explicit ids (a non-unique `ForEach` id keypath or a
+  /// reused `.id(_:)`), which since the occurrence-aware node store get distinct
+  /// `ViewNodeID` lifetimes that nonetheless share one `Identity`.
+  ///
+  /// The flat identity-keyed accessors below (`resolvedNode(for:)`,
+  /// `measuredNode(for:)`, `placedNode(for:)`) collapse such collisions
+  /// last-writer-wins; the per-`ViewNodeID` tables (`resolvedByNodeID`, …) and
+  /// the multimap `structuralFrame` retain every sibling. Surfacing the
+  /// collisions here makes the collapse queryable from the commit path instead
+  /// of silent (G12); the resolve pass additionally emits a deterministic
+  /// `identity.duplicateEntity` `RuntimeIssue` per frame. Order is stable for a
+  /// fixed tree (it follows the deterministic structural walk).
+  package var duplicateRuntimeIdentities: [Identity] {
+    structuralFrame.nodeByRuntimeIdentity
+      .compactMap { identity, keys in keys.count > 1 ? identity : nil }
+  }
+
+  /// Returns the previous frame's resolved node for `identity`.
+  ///
+  /// Last-writer-wins for duplicate explicit ids — see
+  /// ``duplicateRuntimeIdentities``; use ``resolvedByNodeID`` keyed on the
+  /// unambiguous `ViewNodeID` when a specific duplicate sibling is required.
   package func resolvedNode(
     for identity: Identity
   ) -> ResolvedNode? {
