@@ -75,11 +75,16 @@ module.
 
 ## Commit, Lifecycle, And Tasks
 
-Lifecycle is identity-driven.
+Lifecycle is driven by runtime lifetimes, with the resolved `Identity` kept as
+the public/debug projection that appears in lifecycle events.
 
-- An identity appears when it is present in the next committed tree but absent from the previous one
-- An identity disappears when it is present in the previous committed tree but absent from the next one
-- Reordering, layout movement, focus changes, clipping changes, or scroll-position changes do not count as lifecycle transitions if identity is preserved
+- A node appears when its `ViewNodeID` is present in the next committed tree but
+  absent from the previous one
+- A node disappears when its `ViewNodeID` is present in the previous committed
+  tree but absent from the next one
+- Reordering, layout movement, focus changes, clipping changes, or
+  scroll-position changes do not count as lifecycle transitions if the runtime
+  lifetime is preserved
 - Off-screen or clipped nodes that remain in the tree do not disappear
 
 The view graph finalizes each frame into explicit lifecycle events. The commit planner only packages those events into the commit plan's lifecycle slot alongside semantic handler-installation work.
@@ -92,17 +97,20 @@ The view graph finalizes each frame into explicit lifecycle events. The commit p
 
 ### Task Rules
 
-- A task starts when an identity appears with a task descriptor
-- A task also starts when a stable identity gains a task descriptor
-- A task survives ordinary frame updates when the identity and task descriptor are unchanged
-- A task restarts when the descriptor changes on the same identity
-- A task cancels when its identity disappears, when its descriptor is replaced, or when the runtime shuts down
+- A task starts when a runtime node appears with a task descriptor
+- A task also starts when a stable runtime node gains a task descriptor
+- A task survives ordinary frame updates when the runtime node and task
+  descriptor are unchanged
+- A task restarts when the descriptor changes on the same runtime node
+- A task cancels when its runtime node disappears, when its descriptor is
+  replaced, or when the runtime shuts down
 - Selective dirty evaluation must re-run the graph node that authored lifecycle
   metadata before committing a descendant update that would otherwise drop that
   metadata. The lifecycle identity remains the resolved node identity; the
   evaluation owner is an internal graph-retention detail.
 
-The practical rule is simple: if identity is preserved, it is not a lifecycle transition.
+The practical rule is simple: if the runtime lifetime is preserved, it is not a
+lifecycle transition.
 
 ## State, Environment, Observation, And Isolation
 
@@ -133,12 +141,20 @@ The shipped ownership model is split into three categories:
 
 ### State Model
 
-- `@State` persistence is keyed by view identity path plus source location
-- Live runtime writes are additionally scoped to the view graph that registered
-  the callback, so the same stateful view instance can be mounted in another
-  live graph without inheriting the first graph's imperative writes
-- Rebinding the same view instance into a different identity path creates a different state slot
-- Keying only preserves state while the owning identity survives. State that must outlive active-tab bodies, deferred content, or presentation churn should be owned above those lazy seams and threaded down through bindings or explicit model state
+- `@State` persistence is keyed by graph scope, owner `ViewNodeID`, and the
+  declaration's source-location ordinal
+- Unkeyed owners follow their `StructuralPath`; explicitly keyed owners can
+  route the same `ViewNodeID` across structural moves through `EntityIdentity`
+- Live runtime writes are scoped to the view graph that registered the callback,
+  so the same stateful view instance can be mounted in another live graph
+  without inheriting the first graph's imperative writes
+- Rebinding the same unkeyed view instance into a different structural position
+  creates a different state slot; rebinding a keyed entity can preserve state
+  when the entity identity proves it is the same logical value
+- Keying only preserves state while the owning runtime lifetime survives or is
+  entity-routed. State that must outlive active-tab bodies, deferred content, or
+  presentation churn should be owned above those lazy seams and threaded down
+  through bindings or explicit model state
 - Active-tab local state may still be intentionally ephemeral across tab selection changes because `TabView` resolves only the selected body. Hoist only the state that must survive that tab churn; presentation open and close alone should not force the same reset
 - The state container invalidates only when an `Equatable` state change actually changes value
 - Projected bindings and local actions route through the same invalidation path

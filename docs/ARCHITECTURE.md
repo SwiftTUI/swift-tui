@@ -214,7 +214,8 @@ uses honest isolation or `Synchronization` primitives.
   `MeasuredNode`, `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`,
   `CommitPlan`). All seven are gathered on `FrameArtifacts`.
 - **Resolve** — turning an authored `View` tree into a `ResolvedNode` graph
-  with identity and state attached.
+  with the resolved identity projection, structural position, entity identity,
+  and state owner attached.
 - **Frame tail** — the off-main portion of a frame: measure through raster.
 - **Frame head** — the on-main portion that resolves the tree and stages
   side effects before the tail runs.

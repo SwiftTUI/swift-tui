@@ -29,16 +29,17 @@ AnyView
     +-- concrete content
 ```
 
-The wrapper identity follows the authored `AnyView` position. The payload
-identity includes the erased static payload type.
+The wrapper's structural identity follows the authored `AnyView` position. The
+payload identity includes the erased static payload type.
 
 If the same static payload type is rendered again, SwiftTUI preserves payload
 state, lifecycle registrations, focus registrations, action registrations, and
 measurement reuse. If the static payload type changes, SwiftTUI replaces the
 payload subtree and removes the old state and lifecycle registrations.
 
-Explicit `.id(...)` values inside the payload remain the authored identities
-used by focus, actions, and user-directed lookup. They do not override the
+Explicit `.id(...)` values inside the payload become entity identities used for
+routing a compatible runtime owner across structural moves, and they remain
+available for focus, actions, and user-directed lookup. They do not override the
 payload type boundary. An explicit ID inside `AnyView(Text(...))` will not keep
 the old state alive after the same position changes to `AnyView(VStack { ... })`.
 
@@ -56,9 +57,10 @@ The important differences are:
 - SwiftTUI uses the erased static payload type as the state-preservation
   boundary. Same static payload type preserves the payload subtree; changed
   static payload type replaces it.
-- SwiftTUI keeps explicit `.id(...)` values inside the payload as authored
-  identities for focus, actions, and lookup, but those IDs do not keep state
-  alive across a changed erased static payload type.
+- SwiftTUI keeps explicit `.id(...)` values inside the payload as entity
+  identities for compatible runtime-owner routing, focus, actions, and lookup,
+  but those IDs do not keep state alive across a changed erased static payload
+  type.
 - SwiftTUI's terminal renderer depends on structural reuse for incremental
   painting, measurement reuse, lifecycle cleanup, and task cancellation. Erasure
   that may be harmless in a small SwiftUI app can be visible in SwiftTUI as
@@ -277,10 +279,10 @@ struct SwitchingCell: View {
 }
 ```
 
-The inner `.id("cell")` remains useful for focus and action lookup, but it does
-not keep `ExpandedCell` state alive after the payload changes to `CompactCell`.
-If state must survive the mode switch, own it above the erased boundary and pass
-bindings or model references into each branch.
+The inner `.id("cell")` remains useful for compatible routing, focus, and action
+lookup, but it does not keep `ExpandedCell` state alive after the payload changes
+to `CompactCell`. If state must survive the mode switch, own it above the erased
+boundary and pass bindings or model references into each branch.
 
 ```swift
 struct SwitchingCell: View {
@@ -324,8 +326,8 @@ struct GoodScreen: View {
 ```
 
 Views are transient descriptions. Treating erased views as durable app state can
-freeze environment, focus, lifecycle, and identity assumptions at the wrong
-layer.
+freeze environment, focus, lifecycle, entity identity, and structural-position
+assumptions at the wrong layer.
 
 ## Dangerous: Erasing Every Row
 
@@ -337,8 +339,8 @@ let rows: [AnyView] = items.map { item in
 }
 ```
 
-This makes identity harder to audit and often moves row ownership away from the
-data that should drive it. Prefer:
+This makes structural position and entity identity harder to audit and often
+moves row ownership away from the data that should drive it. Prefer:
 
 ```swift
 ForEach(items) { item in
