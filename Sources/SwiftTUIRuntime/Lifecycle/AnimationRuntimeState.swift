@@ -36,6 +36,14 @@ package struct ActiveAnimation: Sendable {
   /// and applied to the tree.
   package var kind: AnimationKind
   package var animationBox: AnimationBox
+  /// The runtime entity (``ViewNodeID``) this animation belongs to, captured at
+  /// registration when the keying ``Identity`` still resolved to this node.
+  /// Property interpolation is applied by this id so an in-flight animation
+  /// follows an entity that moves to a new ``Identity`` (e.g. an `.id`-keyed
+  /// view re-parented between containers), instead of resetting (G10a). `nil`
+  /// for animations registered without a resolved node id; those fall back to
+  /// the ``AnimationKey`` identity.
+  package var ownerViewNodeID: ViewNodeID? = nil
   package var startTime: MonotonicInstant
   /// Per-key persistent state threaded into
   /// ``CustomAnimation/animate(value:time:context:)`` on each tick.

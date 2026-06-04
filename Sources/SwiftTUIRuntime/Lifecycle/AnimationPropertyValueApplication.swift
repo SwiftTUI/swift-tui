@@ -17,18 +17,38 @@ package enum AnimationPropertyValueApplication {
 
   package static func applyInterpolatedValues(
     tree: ResolvedNode,
-    interpolated: [Identity: [AnimatableSlot: AnyAnimatable]]
+    interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]],
+    interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]],
+    appliedIdentities: inout Set<Identity>
   ) -> ResolvedNode {
     var node = tree
-    if let values = interpolated[node.identity] {
+    // Entity-keyed values follow the node across an identity-changing move and
+    // take precedence over any identity-keyed fallback for the same slot.
+    var values = interpolatedByIdentity[node.identity]
+    if let viewNodeID = node.viewNodeID,
+      let byNodeID = interpolatedByNodeID[viewNodeID]
+    {
+      if values == nil {
+        values = byNodeID
+      } else {
+        values?.merge(byNodeID) { _, entityScoped in entityScoped }
+      }
+    }
+    if let values {
       for (slot, value) in values {
         applyValue(&node, slot: slot, value: value)
       }
+      appliedIdentities.insert(node.identity)
     }
     // Recursively apply interpolated values to children; the shape is unchanged
     // so bypass derived-state recomputes.
     let interpolatedChildren = node.children.map { child in
-      applyInterpolatedValues(tree: child, interpolated: interpolated)
+      applyInterpolatedValues(
+        tree: child,
+        interpolatedByNodeID: interpolatedByNodeID,
+        interpolatedByIdentity: interpolatedByIdentity,
+        appliedIdentities: &appliedIdentities
+      )
     }
     node.setChildrenPreservingDerivedState(interpolatedChildren)
     return node

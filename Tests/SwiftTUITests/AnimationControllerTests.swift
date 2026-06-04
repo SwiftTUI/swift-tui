@@ -1044,6 +1044,81 @@ struct AnimationPipelineIntegrationTests {
   }
 
   @Test(
+    "an in-flight property animation follows its entity across an identity-changing move (G10a)"
+  )
+  func propertyAnimationFollowsEntityAcrossMove() throws {
+    // G10a: a property animation is keyed by the owning entity (`ViewNodeID`),
+    // captured at registration, so when the entity is re-parented to a new
+    // structural `Identity` (e.g. an `.id`-keyed view moved between containers,
+    // its lifetime preserved by the EntityRoutingTable) the in-flight
+    // interpolation continues on the moved node instead of snapping/resetting.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+
+    let entityNodeID = ViewNodeID(rawValue: 777)
+    let identityInA = Identity(components: [.named("containerA"), .named("leaf")])
+    let identityInB = Identity(components: [.named("containerB"), .named("leaf")])
+
+    // Seed: leaf in container A, fully opaque, owned by `entityNodeID`.
+    var seedMetadata = DrawMetadata()
+    seedMetadata.baseStyle.explicitOpacity = 1.0
+    let seed = ResolvedNode(
+      viewNodeID: entityNodeID,
+      identity: identityInA,
+      kind: .view("Text"),
+      drawMetadata: seedMetadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(seed, transaction: .init(), timestamp: t0)
+
+    // Frame 2: same entity, opacity animating toward 0 — registers a property
+    // animation owned by `entityNodeID` at identity A.
+    var fadeMetadata = DrawMetadata()
+    fadeMetadata.baseStyle.explicitOpacity = 0.0
+    let fading = ResolvedNode(
+      viewNodeID: entityNodeID,
+      identity: identityInA,
+      kind: .view("Text"),
+      drawMetadata: fadeMetadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(fading, transaction: transaction, timestamp: t0)
+
+    // The entity has now moved to container B: a DIFFERENT `Identity`, the SAME
+    // `ViewNodeID`, presented at its own baseline opacity (1.0) with no local
+    // animation knowledge. Applying interpolations mid-flight must drive this
+    // moved node's opacity from the animation that was registered at identity A.
+    var movedMetadata = DrawMetadata()
+    movedMetadata.baseStyle.explicitOpacity = 1.0
+    var moved = ResolvedNode(
+      viewNodeID: entityNodeID,
+      identity: identityInB,
+      kind: .view("Text"),
+      drawMetadata: movedMetadata
+    )
+
+    let tick = controller.applyInterpolations(
+      to: &moved,
+      at: t0.advanced(by: .milliseconds(500))
+    )
+
+    guard let movedOpacity = moved.drawMetadata.baseStyle.explicitOpacity else {
+      Issue.record("moved node lost its opacity slot")
+      return
+    }
+    // Followed the entity: mid-flight value, not the moved node's 1.0 baseline
+    // (which is what an identity-keyed lookup would have left untouched) and not
+    // snapped to the 0.0 target.
+    #expect(movedOpacity < 0.999, "animation did not follow the entity to its new identity")
+    #expect(movedOpacity > 0.001, "animation snapped instead of interpolating")
+    // The moved node's *current* identity must be in the redraw set so it
+    // repaints under the live run loop, even though the animation was keyed at A.
+    #expect(tick.redrawIdentities.contains(identityInB))
+  }
+
+  @Test(
     "withAnimation color mutation enqueues an active animation through the pipeline"
   )
   func colorAnimationEnqueuesThroughFullPipeline() throws {

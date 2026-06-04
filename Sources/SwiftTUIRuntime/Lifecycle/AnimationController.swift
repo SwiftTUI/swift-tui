@@ -357,12 +357,14 @@ package final class AnimationController: Sendable {
     else {
       return nil
     }
-    guard activeAnimations.values.allSatisfy({ animation in
-      if case .property = animation.kind {
-        return true
-      }
-      return false
-    }) else {
+    guard
+      activeAnimations.values.allSatisfy({ animation in
+        if case .property = animation.kind {
+          return true
+        }
+        return false
+      })
+    else {
       return nil
     }
 
@@ -951,6 +953,7 @@ package final class AnimationController: Sendable {
         node.transactionSnapshot.animationBatchID ?? transaction.animationBatchID
       diffAndEnqueue(
         identity: node.identity,
+        viewNodeID: node.viewNodeID,
         previous: previous,
         current: snapshot,
         request: effectiveRequest,
@@ -1005,6 +1008,7 @@ package final class AnimationController: Sendable {
 
   private func diffAndEnqueue(
     identity: Identity,
+    viewNodeID: ViewNodeID?,
     previous: AnimatableSnapshot,
     current: AnimatableSnapshot,
     request: AnimationRequest,
@@ -1019,6 +1023,7 @@ package final class AnimationController: Sendable {
     for slot in slots {
       enqueueSlotChangeIfNeeded(
         identity: identity,
+        viewNodeID: viewNodeID,
         slot: slot,
         previous: previous[slot],
         current: current[slot],
@@ -1031,6 +1036,7 @@ package final class AnimationController: Sendable {
 
   private func enqueueSlotChangeIfNeeded(
     identity: Identity,
+    viewNodeID: ViewNodeID?,
     slot: AnimatableSlot,
     previous: AnyAnimatable?,
     current: AnyAnimatable?,
@@ -1075,6 +1081,7 @@ package final class AnimationController: Sendable {
       activeAnimations[key] = ActiveAnimation(
         kind: .property(from: effectiveFrom, to: current),
         animationBox: box,
+        ownerViewNodeID: viewNodeID,
         startTime: timestamp,
         batchID: batchID
       )
@@ -1128,8 +1135,12 @@ package final class AnimationController: Sendable {
     var latestDeadline: MonotonicInstant = timestamp
     var hasPendingWork = false
 
-    // Build per-identity interpolated value maps for fast tree walk.
-    var interpolated: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
+    // Build interpolated value maps for the fast tree walk. Property animations
+    // that captured their owning entity (`ownerViewNodeID`) are keyed by
+    // `ViewNodeID` so they follow the entity across an identity-changing move
+    // (G10a); the rest fall back to the registration `Identity`.
+    var interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]] = [:]
+    var interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
 
     // Record the batches that completed animations belong to so we can
     // release their ref counts in a second pass (after this iteration
@@ -1159,11 +1170,14 @@ package final class AnimationController: Sendable {
         // so the next tick carries user bookkeeping forward.
         activeAnimations[key]?.customState = state
 
+        let slot = AnimationPropertyValueApplication.propertySlot(for: key)
         guard let progress = evaluated else {
           // Animation complete — snap to final value and purge.
-          interpolated[key.identity, default: [:]][
-            AnimationPropertyValueApplication.propertySlot(for: key)
-          ] = to
+          if let ownerViewNodeID = animation.ownerViewNodeID {
+            interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = to
+          } else {
+            interpolatedByIdentity[key.identity, default: [:]][slot] = to
+          }
           keysToRemove.append(key)
           if let batchID = animation.batchID { completedBatches.append(batchID) }
           redrawIdentities.insert(key.identity)
@@ -1174,9 +1188,11 @@ package final class AnimationController: Sendable {
           to: to,
           progress: progress
         )
-        interpolated[key.identity, default: [:]][
-          AnimationPropertyValueApplication.propertySlot(for: key)
-        ] = value
+        if let ownerViewNodeID = animation.ownerViewNodeID {
+          interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = value
+        } else {
+          interpolatedByIdentity[key.identity, default: [:]][slot] = value
+        }
         redrawIdentities.insert(key.identity)
         latestDeadline = timestamp.advanced(by: frameInterval)
         hasPendingWork = true
@@ -1287,10 +1303,17 @@ package final class AnimationController: Sendable {
     }
 
     // Apply interpolated values for in-tree animations.
+    var appliedIdentities: Set<Identity> = []
     tree = AnimationPropertyValueApplication.applyInterpolatedValues(
       tree: tree,
-      interpolated: interpolated
+      interpolatedByNodeID: interpolatedByNodeID,
+      interpolatedByIdentity: interpolatedByIdentity,
+      appliedIdentities: &appliedIdentities
     )
+    // A node-id-keyed animation lands on the entity's *current* identity, which
+    // can differ from the registration `Identity` after a move; redraw the
+    // identities actually written so the moved view repaints (G10a).
+    redrawIdentities.formUnion(appliedIdentities)
 
     // Inject removal overlays at their previous parent/index.
     if !injectionsByParent.isEmpty {
