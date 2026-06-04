@@ -271,11 +271,13 @@ package final class AnimationController: Sendable {
   /// can't rewrite the layoutBehavior).
   package func applyPlacedOverlays(
     to tree: inout PlacedNode,
-    at timestamp: MonotonicInstant
+    at timestamp: MonotonicInstant,
+    surfaceSize: CellSize? = nil
   ) {
     let snapshot = placedAnimationOverlaySnapshot(
       for: tree,
-      at: timestamp
+      at: timestamp,
+      surfaceSize: surfaceSize
     )
     applyPlacedAnimationOverlaySnapshot(
       snapshot,
@@ -291,14 +293,16 @@ package final class AnimationController: Sendable {
   /// completions can fire. The returned snapshot is pure data.
   package func placedAnimationOverlaySnapshot(
     for tree: PlacedNode,
-    at timestamp: MonotonicInstant
+    at timestamp: MonotonicInstant,
+    surfaceSize: CellSize? = nil
   ) -> PlacedAnimationOverlaySnapshot {
     let result = PlacedAnimationOverlaySampling.sample(
       removingNodes: removingNodes,
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
       tree: tree,
-      timestamp: timestamp
+      timestamp: timestamp,
+      surfaceSize: surfaceSize
     )
 
     for (viewNodeID, state) in result.removalCustomStates {
@@ -892,16 +896,19 @@ package final class AnimationController: Sendable {
     // variant requires `resolved.children.first`).  The placed-level
     // path walks the post-layout tree and translates matching
     // bounds directly.
-    if modifiers.offsetX != nil || modifiers.offsetY != nil {
-      let fromX = modifiers.offsetX ?? 0
-      let fromY = modifiers.offsetY ?? 0
+    if modifiers.hasOffsetEffect {
+      let offsetModifiers = TransitionModifiers(
+        offsetX: modifiers.offsetX,
+        offsetY: modifiers.offsetY,
+        moveEdge: modifiers.moveEdge
+      )
       let offsetKey = AnimationKey(identity: identity, scope: .insertionOffset)
       if let existing = activeAnimations[offsetKey] {
         releaseBatch(existing.batchID)
       }
       retainBatch(batchID)
       activeAnimations[offsetKey] = ActiveAnimation(
-        kind: .insertionOffset(from: (x: fromX, y: fromY)),
+        kind: .insertionOffset(from: offsetModifiers),
         animationBox: box,
         startTime: timestamp,
         batchID: batchID
@@ -1119,7 +1126,8 @@ package final class AnimationController: Sendable {
   /// timestamp.  Returns a tick result describing scheduling needs.
   package func applyInterpolations(
     to tree: inout ResolvedNode,
-    at timestamp: MonotonicInstant
+    at timestamp: MonotonicInstant,
+    surfaceSize: CellSize? = nil
   ) -> AnimationTickResult {
     guard
       !activeAnimations.isEmpty
@@ -1252,7 +1260,8 @@ package final class AnimationController: Sendable {
           modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
             from: entry.startOpacity,
             to: entry.transition.removalModifiers(),
-            progress: progress
+            progress: progress,
+            surfaceSize: surfaceSize
           )
         } else {
           animationComplete = true

@@ -7,17 +7,21 @@ package enum PlacedAnimationOverlaySampling {
     activeAnimations: [AnimationKey: ActiveAnimation],
     registeredAnimations: [AnimationBox: Animation],
     tree: PlacedNode,
-    timestamp: MonotonicInstant
+    timestamp: MonotonicInstant,
+    surfaceSize: CellSize?
   ) -> PlacedAnimationOverlaySamplingResult {
+    let effectiveSurfaceSize = surfaceSize ?? tree.bounds.size
     let removalResult = sampleRemovalOverlays(
       removingNodes: removingNodes,
       registeredAnimations: registeredAnimations,
-      timestamp: timestamp
+      timestamp: timestamp,
+      surfaceSize: effectiveSurfaceSize
     )
     let insertionResult = sampleInsertionOffsets(
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
-      timestamp: timestamp
+      timestamp: timestamp,
+      surfaceSize: effectiveSurfaceSize
     )
     let matchedResult = sampleMatchedGeometryOffsets(
       activeAnimations: activeAnimations,
@@ -57,7 +61,8 @@ package enum PlacedAnimationOverlaySampling {
   private static func sampleRemovalOverlays(
     removingNodes: [ViewNodeID: RemovalEntry],
     registeredAnimations: [AnimationBox: Animation],
-    timestamp: MonotonicInstant
+    timestamp: MonotonicInstant,
+    surfaceSize: CellSize
   ) -> RemovalSamplingResult {
     var result = RemovalSamplingResult()
 
@@ -86,7 +91,8 @@ package enum PlacedAnimationOverlaySampling {
       let modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
         from: entry.startOpacity,
         to: entry.transition.removalModifiers(),
-        progress: progress
+        progress: progress,
+        surfaceSize: surfaceSize
       )
       result.overlays.append(
         .init(
@@ -104,7 +110,8 @@ package enum PlacedAnimationOverlaySampling {
   private static func sampleInsertionOffsets(
     activeAnimations: [AnimationKey: ActiveAnimation],
     registeredAnimations: [AnimationBox: Animation],
-    timestamp: MonotonicInstant
+    timestamp: MonotonicInstant,
+    surfaceSize: CellSize
   ) -> OffsetSamplingResult {
     var result = OffsetSamplingResult()
 
@@ -126,11 +133,12 @@ package enum PlacedAnimationOverlaySampling {
         continue
       }
 
+      let start = from.resolvedOffset(surfaceSize: surfaceSize)
       result.offsets.append(
         .init(
           identity: key.identity,
-          dx: Int(Double(from.x) * (1.0 - progress)),
-          dy: Int(Double(from.y) * (1.0 - progress))
+          dx: Int(Double(start.x) * (1.0 - progress)),
+          dy: Int(Double(start.y) * (1.0 - progress))
         )
       )
     }

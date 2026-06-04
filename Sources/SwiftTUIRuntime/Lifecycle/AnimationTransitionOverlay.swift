@@ -11,17 +11,17 @@ enum AnimationTransitionOverlay {
   static func interpolatedRemovalModifiers(
     from startOpacity: Double,
     to target: TransitionModifiers,
-    progress: Double
+    progress: Double,
+    surfaceSize: CellSize? = nil
   ) -> TransitionModifiers {
     var result = TransitionModifiers.identity
     if let targetOpacity = target.opacity {
       result.opacity = startOpacity + (targetOpacity - startOpacity) * progress
     }
-    if let targetOffsetX = target.offsetX {
-      result.offsetX = Int(Double(targetOffsetX) * progress)
-    }
-    if let targetOffsetY = target.offsetY {
-      result.offsetY = Int(Double(targetOffsetY) * progress)
+    if target.hasOffsetEffect {
+      let targetOffset = target.resolvedOffset(surfaceSize: surfaceSize)
+      result.offsetX = Int(Double(targetOffset.x) * progress)
+      result.offsetY = Int(Double(targetOffset.y) * progress)
     }
     return result
   }

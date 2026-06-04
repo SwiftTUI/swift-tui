@@ -19,10 +19,10 @@ package enum AnimationKind: Sendable {
   case property(from: AnyAnimatable, to: AnyAnimatable)
   /// A transition-driven insertion offset animation applied at
   /// placed level (cannot route through the slot path because it
-  /// operates on intrinsic-layout leaves).  The `from` tuple holds
-  /// the starting (x, y) delta; the animation interpolates from
-  /// `from` toward (0, 0).
-  case insertionOffset(from: (x: Int, y: Int))
+  /// operates on intrinsic-layout leaves).  The `from` modifiers hold
+  /// the starting delta; edge-relative moves are resolved against the
+  /// render surface during placed sampling.
+  case insertionOffset(from: TransitionModifiers)
   /// A matched-geometry translation animation between two placed
   /// bounds.  At progress 0 the target identity renders at
   /// `fromBounds`; at progress 1 it renders at its natural new

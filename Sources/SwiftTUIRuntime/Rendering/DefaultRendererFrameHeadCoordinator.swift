@@ -128,7 +128,8 @@ struct DefaultRendererFrameHeadCoordinator {
       AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
         to: &resolved,
         transaction: draft.frameContext.transaction,
-        timestamp: animationTimestamp
+        timestamp: animationTimestamp,
+        surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal)
       )
     }
 
@@ -409,7 +410,8 @@ private struct AnimationInjectionStage {
   func apply(
     to resolved: inout ResolvedNode,
     transaction: TransactionSnapshot,
-    timestamp: MonotonicInstant
+    timestamp: MonotonicInstant,
+    surfaceSize: CellSize?
   ) {
     let controller = animationDraft.controller
     controller.processResolvedTree(
@@ -419,7 +421,19 @@ private struct AnimationInjectionStage {
     )
     _ = controller.applyInterpolations(
       to: &resolved,
-      at: timestamp
+      at: timestamp,
+      surfaceSize: surfaceSize
     )
   }
+}
+
+private func animationSurfaceSize(for proposal: ProposedSize) -> CellSize? {
+  guard
+    case .finite(let width) = proposal.width,
+    case .finite(let height) = proposal.height
+  else {
+    return nil
+  }
+
+  return CellSize(width: max(0, width), height: max(0, height))
 }

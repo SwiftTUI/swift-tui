@@ -11,18 +11,55 @@ package struct TransitionModifiers: Sendable, Equatable {
   package var opacity: Double?
   package var offsetX: Int?
   package var offsetY: Int?
+  package var moveEdge: Edge?
 
   package init(
     opacity: Double? = nil,
     offsetX: Int? = nil,
-    offsetY: Int? = nil
+    offsetY: Int? = nil,
+    moveEdge: Edge? = nil
   ) {
     self.opacity = opacity
     self.offsetX = offsetX
     self.offsetY = offsetY
+    self.moveEdge = moveEdge
   }
 
   package static let identity = TransitionModifiers()
+
+  package var hasOffsetEffect: Bool {
+    offsetX != nil || offsetY != nil || moveEdge != nil
+  }
+
+  package func resolvedOffset(surfaceSize: CellSize?) -> (x: Int, y: Int) {
+    var x = offsetX ?? 0
+    var y = offsetY ?? 0
+
+    if let moveEdge, let surfaceSize {
+      switch moveEdge {
+      case .top:
+        y -= surfaceSize.height
+      case .bottom:
+        y += surfaceSize.height
+      case .leading:
+        x -= surfaceSize.width
+      case .trailing:
+        x += surfaceSize.width
+      }
+    }
+
+    return (x, y)
+  }
+
+  package func resolvingEdgeOffset(surfaceSize: CellSize?) -> TransitionModifiers {
+    guard hasOffsetEffect else { return self }
+    let offset = resolvedOffset(surfaceSize: surfaceSize)
+    return TransitionModifiers(
+      opacity: opacity,
+      offsetX: offset.x,
+      offsetY: offset.y
+    )
+  }
 
   /// Merges `other` on top of `self`, with non-nil values from `other`
   /// taking precedence.
@@ -30,7 +67,8 @@ package struct TransitionModifiers: Sendable, Equatable {
     TransitionModifiers(
       opacity: other.opacity ?? opacity,
       offsetX: other.offsetX ?? offsetX,
-      offsetY: other.offsetY ?? offsetY
+      offsetY: other.offsetY ?? offsetY,
+      moveEdge: other.moveEdge ?? moveEdge
     )
   }
 }
@@ -68,10 +106,9 @@ public struct AnyTransition: Sendable {
 
   /// Slides from a specific edge on insertion and back to it on removal.
   public static func move(edge: Edge) -> AnyTransition {
-    let (dx, dy) = moveOffset(for: edge)
     return AnyTransition(
-      insertion: { TransitionModifiers(offsetX: dx, offsetY: dy) },
-      removal: { TransitionModifiers(offsetX: dx, offsetY: dy) }
+      insertion: { TransitionModifiers(moveEdge: edge) },
+      removal: { TransitionModifiers(moveEdge: edge) }
     )
   }
 
@@ -92,11 +129,9 @@ public struct AnyTransition: Sendable {
   /// Push: inserted content slides in from `edge`, removed content
   /// slides out the opposite side.
   public static func push(from edge: Edge) -> AnyTransition {
-    let (dx, dy) = moveOffset(for: edge)
-    let (oppositeDx, oppositeDy) = moveOffset(for: oppositeEdge(edge))
     return AnyTransition(
-      insertion: { TransitionModifiers(offsetX: dx, offsetY: dy) },
-      removal: { TransitionModifiers(offsetX: oppositeDx, offsetY: oppositeDy) }
+      insertion: { TransitionModifiers(moveEdge: edge) },
+      removal: { TransitionModifiers(moveEdge: oppositeEdge(edge)) }
     )
   }
 
@@ -215,17 +250,6 @@ where Content: View, Modifier: ViewModifier {
       provider.contributeTransitionEffects(into: &modifiers)
     }
     AnyTransition.walk(view: content, into: &modifiers)
-  }
-}
-
-// MARK: - Helpers
-
-private func moveOffset(for edge: Edge) -> (Int, Int) {
-  switch edge {
-  case .top: return (0, -10)
-  case .bottom: return (0, 10)
-  case .leading: return (-10, 0)
-  case .trailing: return (10, 0)
   }
 }
 

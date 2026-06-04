@@ -45,7 +45,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     animationController.capturePlacedTree(layout.baselinePlaced)
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
-      at: draft.animationTimestamp
+      at: draft.animationTimestamp,
+      surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal)
     )
     return (placed, animationOverlaySnapshot)
   }
@@ -315,4 +316,15 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       suspensionDuration: layoutSuspensionDuration
     )
   }
+}
+
+private func animationSurfaceSize(for proposal: ProposedSize) -> CellSize? {
+  guard
+    case .finite(let width) = proposal.width,
+    case .finite(let height) = proposal.height
+  else {
+    return nil
+  }
+
+  return CellSize(width: max(0, width), height: max(0, height))
 }

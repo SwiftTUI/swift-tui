@@ -744,6 +744,12 @@ struct AnimationPipelineIntegrationTests {
       TransitionRegistrationStorage.currentSink = nil
     }
 
+    let surfaceSize = CellSize(width: 40, height: 5)
+    let proposal = ProposedSize(
+      width: .finite(surfaceSize.width),
+      height: .finite(surfaceSize.height)
+    )
+
     // Very long duration so consecutive renderer.render calls at
     // microsecond-apart real time produce different delta values.
     let animation = Animation.linear(duration: .milliseconds(1_000_000))
@@ -755,7 +761,8 @@ struct AnimationPipelineIntegrationTests {
     _ = renderer.render(
       VStack(alignment: .leading, spacing: 0) {
       },
-      context: ResolveContext(identity: rootIdentity)
+      context: ResolveContext(identity: rootIdentity),
+      proposal: proposal
     )
 
     // Frame 2: slide appears under animate intent.  Insertion animation
@@ -766,7 +773,14 @@ struct AnimationPipelineIntegrationTests {
       VStack(alignment: .leading, spacing: 0) {
         Text("hello").transition(.slide)
       },
-      context: ResolveContext(identity: rootIdentity, transaction: transaction)
+      context: ResolveContext(identity: rootIdentity, transaction: transaction),
+      proposal: proposal
+    )
+
+    let frame2TextBounds = Self.findTextBounds(frame2.placedTree, text: "hello")
+    #expect(
+      frame2TextBounds?.origin.x == -surfaceSize.width,
+      "slide insertion should start a full surface width offscreen, got \(String(describing: frame2TextBounds?.origin.x))"
     )
 
     // Verify the insertion animation was enqueued on frame 2.
@@ -782,7 +796,8 @@ struct AnimationPipelineIntegrationTests {
       VStack(alignment: .leading, spacing: 0) {
         Text("hello").transition(.slide)
       },
-      context: ResolveContext(identity: rootIdentity)
+      context: ResolveContext(identity: rootIdentity),
+      proposal: proposal
     )
     let frame3Count = controller.activeInsertionOffsetCount
     #expect(
@@ -907,6 +922,18 @@ struct AnimationPipelineIntegrationTests {
       total += countTransientNodes(child)
     }
     return total
+  }
+
+  private static func findTextBounds(_ node: PlacedNode, text: String) -> CellRect? {
+    if case .text(let rendered) = node.drawPayload, rendered == text {
+      return node.bounds
+    }
+    for child in node.children {
+      if let found = findTextBounds(child, text: text) {
+        return found
+      }
+    }
+    return nil
   }
 
   @Test(
@@ -1637,9 +1664,10 @@ struct AnimationControllerPropertyTests {
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
     let leafNodeID = ViewNodeID(rawValue: 2)
 
+    let surfaceSize = CellSize(width: 20, height: 5)
+
     // Leaf already has a .offset(x: 5, y: 0) layout.  The removal
-    // transition is .move(edge: .trailing) which adds offsetX=10.
-    // Expect the composed offset to be x=15.
+    // transition is .move(edge: .trailing), which adds the surface width.
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
@@ -1675,13 +1703,15 @@ struct AnimationControllerPropertyTests {
     let t1 = t0.advanced(by: .milliseconds(200))
     controller.processResolvedTree(frame2, transaction: transaction, timestamp: t1)
 
-    // Apply near the end of the removal — the transition progress
-    // should be near 1, which with .move(edge:.trailing) yields
-    // offsetX ≈ 10 for the transition modifier.  Composed with the
-    // leaf's existing offset of 5, the injected leaf's layoutBehavior
-    // should be .offset(x ≈ 15, y: 0).
+    // Apply near the end of the removal. With .move(edge: .trailing),
+    // the transition offset is based on the surface width and composes
+    // with the leaf's existing offset of 5.
     let tEnd = t1.advanced(by: .milliseconds(180))
-    _ = controller.applyInterpolations(to: &frame2, at: tEnd)
+    _ = controller.applyInterpolations(
+      to: &frame2,
+      at: tEnd,
+      surfaceSize: surfaceSize
+    )
 
     let injectedLeaf = frame2.children.first { $0.identity == leafIdentity }
     guard let injectedLeaf else {
@@ -1693,10 +1723,10 @@ struct AnimationControllerPropertyTests {
         "expected .offset layout on the injected leaf, got \(injectedLeaf.layoutBehavior)")
       return
     }
-    // At progress ~0.9, modifier offsetX = 10 * 0.9 = 9. Composed
-    // with the original 5 → 14.
+    // At progress ~0.9, modifier offsetX = 20 * 0.9 = 18. Composed
+    // with the original 5 -> 23.
     #expect(
-      x >= 10, "composed offset should include the existing 5 and transition offset, got \(x)")
+      x >= 20, "composed offset should include the existing 5 and transition offset, got \(x)")
     #expect(y == 0)
   }
 
@@ -1770,19 +1800,18 @@ struct AnimationControllerPropertyTests {
     )
 
     // Apply placed overlays at t0.  The move(edge: .leading) transition
-    // declares offsetX = -10 as the `from` value.  At progress 0, the
-    // interpolated delta is -10.  The leaf's bounds should be
-    // translated by (-10, 0) → origin.x = -10.
+    // resolves against the 20-column surface. At progress 0, the
+    // leaf's bounds should be translated by (-20, 0) -> origin.x = -20.
     controller.applyPlacedOverlays(to: &placed, at: t0)
 
     let leafAtStart = placed.children.first
     #expect(leafAtStart != nil)
     #expect(
-      leafAtStart?.bounds.origin.x == -10,
+      leafAtStart?.bounds.origin.x == -20,
       "insertion at t=0 should translate leaf by the transition's initial offset, got \(String(describing: leafAtStart?.bounds.origin.x))"
     )
 
-    // Halfway through the animation, delta should be -5.
+    // Halfway through the animation, delta should be -10.
     var placedHalf = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
@@ -1801,10 +1830,10 @@ struct AnimationControllerPropertyTests {
     )
     let leafAtHalf = placedHalf.children.first
     #expect(
-      leafAtHalf?.bounds.origin.x ?? 0 == -5
-        || leafAtHalf?.bounds.origin.x ?? 0 == -4
-        || leafAtHalf?.bounds.origin.x ?? 0 == -6,
-      "insertion halfway should translate by approx -5, got \(String(describing: leafAtHalf?.bounds.origin.x))"
+      leafAtHalf?.bounds.origin.x ?? 0 == -10
+        || leafAtHalf?.bounds.origin.x ?? 0 == -9
+        || leafAtHalf?.bounds.origin.x ?? 0 == -11,
+      "insertion halfway should translate by approx -10, got \(String(describing: leafAtHalf?.bounds.origin.x))"
     )
 
     // Well past the animation end, delta should be 0 (final position).
@@ -1878,7 +1907,11 @@ struct AnimationControllerPropertyTests {
     controller.processResolvedTree(frame2, transaction: transaction, timestamp: t1)
 
     let tMid = t1.advanced(by: .milliseconds(100))
-    _ = controller.applyInterpolations(to: &frame2, at: tMid)
+    _ = controller.applyInterpolations(
+      to: &frame2,
+      at: tMid,
+      surfaceSize: CellSize(width: 20, height: 10)
+    )
 
     // The leaf's frame layout must be preserved, so the injected
     // child should be an offset wrapper whose single child is the

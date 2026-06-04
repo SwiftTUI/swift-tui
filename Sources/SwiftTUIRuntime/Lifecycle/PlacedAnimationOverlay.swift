@@ -66,7 +66,10 @@ package func applyPlacedAnimationOverlaySnapshot(
     var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
     for removal in snapshot.removalOverlays {
       var clone = removal.snapshot
-      applyPlacedOverlayModifiers(removal.modifiers, to: &clone)
+      applyPlacedOverlayModifiers(
+        removal.modifiers.resolvingEdgeOffset(surfaceSize: tree.bounds.size),
+        to: &clone
+      )
       injections[removal.parentIdentity, default: []].append(
         (childIndex: removal.childIndex, snapshot: clone)
       )
