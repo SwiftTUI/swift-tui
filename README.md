@@ -4,7 +4,7 @@
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI-1E90FF)
-![Status](https://img.shields.io/badge/status-0.0.16%20alpha-DAA520)
+![Status](https://img.shields.io/badge/status-0.0.17%20alpha-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
@@ -62,7 +62,7 @@ current alpha with `.upToNextMinor` so a minor release cannot break your build:
 ```swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
-  .upToNextMinor(from: "0.0.16")
+  .upToNextMinor(from: "0.0.17")
 )
 ```
 
