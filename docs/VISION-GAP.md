@@ -104,6 +104,22 @@ identity-changing moves via the persistent `EntityRoutingTable`.
   > and `…duplicateIDSiblingsTearDownWithoutOrphans` (a
   > `ForEach([7, 7]) → [7] → []` churn asserting the node store and routing table
   > return to empty). The collision-*count*-change limit above still holds.
+- **Presentation GC keys on declaring `Identity`, not the owner entity.** Both
+  Stage-4 typed edge carriers now have live consumers — `structuralEdgeRole`
+  drives the retained-reuse viewport-barrier gate, and `DeclarationOwnerEdge`
+  participates in `ResolvedNode` placement-equivalence/equality (so an owner
+  change correctly defeats reuse). What is **not** done is routing the
+  *presentation* garbage collector through `declarationOwnerEdge.owner`:
+  `PresentationFamilyItemStore` still keys `declarativeItemsBySource` on the
+  declaring view's runtime `Identity` and reaps sources not re-synced this frame.
+  This is **deliberate**, not a missed migration: declarative presentation
+  continuity across an identity-changing move is already preserved on the
+  `item.id` axis (the activation-ordinal lookup searches every source by item id,
+  so z-order and identity survive a re-parent), the declaration flows through the
+  preference system carrying only `sourceIdentity` (not the owner entity), and
+  `DeclarationOwnerEdge` is populated only for portal-backed presentations — so an
+  entity-keyed GC would need an `Identity` fallback anyway. Re-keying the store to
+  the owner entity is parked until it earns its cost.
 - **Runtime registries key containment on `Identity`-as-structural-projection.**
   The commit-path invalidation engine reasons over `StructuralPath`, and the live
   resolve/retained classifiers carry real structural adjacency. But the per-frame
