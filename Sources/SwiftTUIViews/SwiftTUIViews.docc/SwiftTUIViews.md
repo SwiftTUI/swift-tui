@@ -87,6 +87,18 @@ Lowering helpers remain package-only implementation details.
 - ``HoverPhase``
 - <doc:Pointer-And-Canvas>
 
+### Shapes
+
+- ``Shape``
+- ``InsettableShape``
+- ``Rectangle``
+- ``RoundedRectangle``
+- ``Circle``
+- ``Ellipse``
+- ``Capsule``
+- <doc:Shapes>
+- <doc:AspectCorrectShapes>
+
 ### Guides
 
 - <doc:Authoring-Views>
@@ -95,3 +107,4 @@ Lowering helpers remain package-only implementation details.
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>
 - <doc:Focus>
+- <doc:Shapes>

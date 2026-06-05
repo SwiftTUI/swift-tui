@@ -15,9 +15,9 @@ extension Shape {
 
   /// Fills the shape with the inherited foreground style.
   ///
-  /// Mirrors SwiftUI's `fill(style:)`: with no explicit ``ShapeStyle`` the
+  /// Mirrors SwiftUI's `fill(style:)`: with no explicit ``SwiftTUICore/ShapeStyle`` the
   /// shape resolves through the active `foregroundStyle` (and ultimately the
-  /// semantic ``SemanticStyleRole/foreground`` role).
+  /// semantic ``SwiftTUICore/SemanticStyleRole/foreground`` role).
   public func fill() -> some View {
     ShapeRenderView(
       kindName: kindName,
@@ -147,8 +147,8 @@ extension InsettableShape {
   /// Strokes a border inside the shape with the inherited foreground style.
   ///
   /// Mirrors SwiftUI's `strokeBorder(style:antialiased:)`: with no explicit
-  /// ``ShapeStyle`` the border resolves through the active `foregroundStyle`
-  /// (and ultimately the semantic ``SemanticStyleRole/separator`` role).
+  /// ``SwiftTUICore/ShapeStyle`` the border resolves through the active `foregroundStyle`
+  /// (and ultimately the semantic ``SwiftTUICore/SemanticStyleRole/separator`` role).
   public func strokeBorder(
     style strokeStyle: StrokeStyle = .init()
   ) -> some View {
