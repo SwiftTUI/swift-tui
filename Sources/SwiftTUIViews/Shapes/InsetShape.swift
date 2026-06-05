@@ -17,11 +17,11 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
     base.geometry
   }
 
-  @_spi(ShapeRendering) public var kindName: String {
+  public var kindName: String {
     base.kindName
   }
 
-  @_spi(ShapeRendering) public var insetAmount: Int {
+  public var insetAmount: Int {
     base.insetAmount + max(0, amount)
   }
 

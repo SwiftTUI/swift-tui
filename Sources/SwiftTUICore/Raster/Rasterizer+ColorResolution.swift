@@ -11,7 +11,7 @@ extension Rasterizer {
     case .full:
       targetBounds = bounds
     case .interior(let strokeWidth):
-      let insetRect = insetBounds(bounds, by: strokeWidth, strokeBorder: true)
+      let insetRect = insetBounds(bounds, by: strokeWidth)
       guard insetRect.size.width > 0, insetRect.size.height > 0 else {
         return false
       }
@@ -55,6 +55,14 @@ extension Rasterizer {
       let isCorner =
         (x == minX || x == maxX) && (y == minY || y == maxY)
       return !isCorner
+    case .path(let boxed, let rule):
+      return pathContainsCell(
+        boxed.path,
+        rule: rule,
+        cellRelX: x - targetBounds.origin.x,
+        cellRelY: y - targetBounds.origin.y,
+        subpixelWidth: targetBounds.size.width * 2,
+        subpixelHeight: targetBounds.size.height * 4)
     }
   }
 
@@ -161,7 +169,7 @@ extension Rasterizer {
           return px >= cxSub - radius && px <= cxSub + radius
         }
       }
-    case .rectangle, .roundedRectangle:
+    case .rectangle, .roundedRectangle, .path:
       assertionFailure("curvedShapeContains called with non-curved geometry")
       return false
     }
@@ -169,8 +177,7 @@ extension Rasterizer {
 
   internal func insetBounds(
     _ bounds: CellRect,
-    by inset: Int,
-    strokeBorder _: Bool
+    by inset: Int
   ) -> CellRect {
     CellRect(
       origin: CellPoint(

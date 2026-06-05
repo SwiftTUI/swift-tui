@@ -2,16 +2,18 @@
 
 /// A view that renders a geometric shape using fill or stroke operations.
 ///
-/// Like SwiftUI's `Shape` (whose sole requirement is `path(in:)`), the only
-/// author-facing requirement is ``geometry``: a conforming type describes its
-/// shape and inherits fill/stroke/inset behavior. The rendering plumbing
-/// (``kindName`` and ``insetAmount``) is exposed only under the
-/// `ShapeRendering` SPI so it can dispatch dynamically through ``InsetShape``
-/// without leaking into the public, author-facing surface.
+/// The shape a conformer describes is ``geometry`` — the one requirement most
+/// shapes implement. ``kindName`` and ``insetAmount`` are rendering plumbing
+/// with defaults, so a conforming type normally implements only ``geometry``.
+/// They remain real (defaulted) requirements rather than SPI so that types
+/// *outside* this module can conform: an `@_spi` requirement has no visible
+/// default witness across a module boundary, which would force every external
+/// shape to restate them. `insetAmount` must also dispatch dynamically through
+/// ``InsetShape``, so it cannot be a non-requirement helper.
 public protocol Shape: View {
   var geometry: ShapeGeometry { get }
-  @_spi(ShapeRendering) var kindName: String { get }
-  @_spi(ShapeRendering) var insetAmount: Int { get }
+  var kindName: String { get }
+  var insetAmount: Int { get }
 }
 
 /// A shape that can be inset geometrically before being rendered.
@@ -22,11 +24,11 @@ extension Shape {
     fatalError("\(Self.self) is a shape and does not expose a composed body.")
   }
 
-  @_spi(ShapeRendering) public var kindName: String {
+  public var kindName: String {
     String(describing: Self.self)
   }
 
-  @_spi(ShapeRendering) public var insetAmount: Int {
+  public var insetAmount: Int {
     0
   }
 

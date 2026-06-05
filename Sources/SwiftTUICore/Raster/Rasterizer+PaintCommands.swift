@@ -14,7 +14,7 @@ extension Rasterizer {
       return
     }
 
-    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount), strokeBorder: true)
+    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount))
     guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
       return
     }
@@ -34,7 +34,11 @@ extension Rasterizer {
     // to the general cell-walking loop below (which calls
     // `shapeContains`, and that now knows about curved geometry).
     switch geometry {
-    case .circle, .ellipse, .capsule:
+    case .circle, .ellipse, .capsule, .path:
+      // Curved shapes and custom paths rasterize onto the Braille subpixel
+      // canvas (Route A). Tile styles need per-cell glyph writes, so they
+      // fall through to the cell-walk loop below (Route B), which calls
+      // `shapeContains` — now path-aware.
       if case .tile = colorMode {
         break
       }
@@ -306,6 +310,7 @@ extension Rasterizer {
     shapeBounds: CellRect,
     colorMode: ResolvedShapeColorMode,
     stroke: Bool,
+    strokeBorder: Bool = false,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
@@ -366,6 +371,16 @@ extension Rasterizer {
       }
     case .capsule:
       drawCapsule(into: &canvas, stroke: stroke, metrics: environment.cellPixelMetrics)
+    case .path(let boxed, let rule):
+      if stroke {
+        if strokeBorder {
+          strokeBorderPath(boxed.path, rule: rule, into: &canvas)
+        } else {
+          strokePath(boxed.path, into: &canvas)
+        }
+      } else {
+        fillPath(boxed.path, rule: rule, into: &canvas)
+      }
     case .rectangle, .roundedRectangle:
       // Not reachable: the caller dispatches these to the cell-aligned
       // paint path.  We still need the case for exhaustiveness.

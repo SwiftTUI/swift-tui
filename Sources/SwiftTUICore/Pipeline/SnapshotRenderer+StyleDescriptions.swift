@@ -139,6 +139,8 @@ extension SnapshotRenderer {
         "ellipse"
       case .capsule:
         "capsule"
+      case .path(let boxed, let fillRule):
+        "path(elements: \(boxed.path.elements.count), fill: \(fillRule))"
       }
     if insetAmount > 0 {
       return "\(base).inset(\(insetAmount))"

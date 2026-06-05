@@ -16,7 +16,7 @@ extension Rasterizer {
       return
     }
 
-    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount), strokeBorder: true)
+    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount))
     guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
       return
     }
@@ -28,12 +28,16 @@ extension Rasterizer {
     // Curved shapes draw their outline onto a Braille canvas so the
     // stroke resolves to sub-cell precision.
     switch geometry {
-    case .circle, .ellipse, .capsule:
+    case .circle, .ellipse, .capsule, .path:
+      // Curved shapes and custom paths stroke their outline onto the Braille
+      // canvas at sub-cell precision. For `.path`, `strokeBorder` keeps the
+      // outline inside the filled interior (mask intersection).
       paintBrailleShape(
         geometry: geometry,
         shapeBounds: shapeBounds,
         colorMode: foregroundColorMode,
         stroke: true,
+        strokeBorder: strokeBorder,
         environment: environment,
         cells: &cells,
         clip: clip,
@@ -47,7 +51,7 @@ extension Rasterizer {
 
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
-      let insetRect = insetBounds(shapeBounds, by: inset, strokeBorder: strokeBorder)
+      let insetRect = insetBounds(shapeBounds, by: inset)
       guard insetRect.size.width > 0, insetRect.size.height > 0 else {
         continue
       }

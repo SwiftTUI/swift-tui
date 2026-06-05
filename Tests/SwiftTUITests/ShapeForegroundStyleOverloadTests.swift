@@ -92,8 +92,7 @@ struct ShapeForegroundStyleOverloadTests {
   }
 }
 
-/// Guards the inset plumbing after `kindName`/`insetAmount` moved behind the
-/// `ShapeRendering` SPI: inset still flows into the rendered payload, and
+/// Guards the inset plumbing: inset still flows into the rendered payload, and
 /// nested `inset(by:)` calls still accumulate. Both rely on `insetAmount`
 /// dispatching dynamically through `InsetShape` — they would silently break
 /// if it were ever demoted to a non-requirement extension helper.
