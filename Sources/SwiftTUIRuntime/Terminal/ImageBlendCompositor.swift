@@ -22,23 +22,274 @@ struct BlendedImageVariant: Sendable {
   var attachment: RasterImageAttachment
 }
 
+package struct ImageBlendCompositorCachePolicy: Sendable, Equatable {
+  package static let `default` = ImageBlendCompositorCachePolicy(
+    maxEntries: 256,
+    maxDecodedPixels: 4 * 1024 * 1024,
+    maxEncodedBytes: 16 * 1024 * 1024
+  )
+
+  package var maxEntries: Int
+  package var maxDecodedPixels: Int
+  package var maxEncodedBytes: Int
+
+  package init(
+    maxEntries: Int,
+    maxDecodedPixels: Int,
+    maxEncodedBytes: Int
+  ) {
+    self.maxEntries = max(1, maxEntries)
+    self.maxDecodedPixels = max(0, maxDecodedPixels)
+    self.maxEncodedBytes = max(0, maxEncodedBytes)
+  }
+}
+
+package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
+  package var entryCount: Int
+  package var decodedPixelBytes: Int
+  package var encodedBytes: Int
+  package var accessGeneration: Int
+  package var evictionCount: Int
+  package var decodedHits: Int
+  package var decodedMisses: Int
+  package var encodedHits: Int
+  package var encodedMisses: Int
+
+  package var totalApproxBytes: Int {
+    decodedPixelBytes + encodedBytes
+  }
+}
+
 package final class ImageBlendCompositor: Sendable {
+  private struct CacheEntry: Sendable {
+    var id: String
+    var pixelSize: PixelSize
+    var encodedBytes: [UInt8]
+    var decodedImage: DecodedImage?
+    var attachment: RasterImageAttachment
+    var lastAccessGeneration: Int
+
+    var decodedPixelCount: Int {
+      decodedImage?.pixels.count ?? 0
+    }
+
+    var decodedPixelBytes: Int {
+      decodedPixelCount * MemoryLayout<RGBAImagePixel>.stride
+    }
+
+    var encodedByteCount: Int {
+      encodedBytes.count
+    }
+
+    var encodedPayload: BlendedImageEncodedPayload {
+      BlendedImageEncodedPayload(id: id, bytes: encodedBytes, pixelSize: pixelSize)
+    }
+
+    var decodedVariant: BlendedImageVariant? {
+      guard let decodedImage else {
+        return nil
+      }
+      return BlendedImageVariant(id: id, image: decodedImage, attachment: attachment)
+    }
+  }
+
   private struct Storage {
-    var decodedVariants: [ImageBlendCacheKey: BlendedImageVariant] = [:]
-    var encodedPayloads: [ImageBlendCacheKey: BlendedImageEncodedPayload] = [:]
+    var entries: [ImageBlendCacheKey: CacheEntry] = [:]
+    var accessGeneration = 0
+    var evictionCount = 0
+    var decodedHits = 0
+    var decodedMisses = 0
+    var encodedHits = 0
+    var encodedMisses = 0
+
+    mutating func decodedLookup(
+      for key: ImageBlendCacheKey
+    ) -> (variant: BlendedImageVariant?, encodedBytes: [UInt8]?) {
+      accessGeneration += 1
+      if var entry = entries[key] {
+        entry.lastAccessGeneration = accessGeneration
+        entries[key] = entry
+
+        if let variant = entry.decodedVariant {
+          decodedHits += 1
+          return (variant, entry.encodedBytes)
+        }
+
+        decodedMisses += 1
+        return (nil, entry.encodedBytes)
+      }
+
+      decodedMisses += 1
+      return (nil, nil)
+    }
+
+    mutating func encodedLookup(
+      for key: ImageBlendCacheKey
+    ) -> BlendedImageEncodedPayload? {
+      accessGeneration += 1
+      guard var entry = entries[key] else {
+        encodedMisses += 1
+        return nil
+      }
+
+      entry.lastAccessGeneration = accessGeneration
+      entries[key] = entry
+      encodedHits += 1
+      return entry.encodedPayload
+    }
+
+    mutating func storeDecodedVariant(
+      _ variant: BlendedImageVariant,
+      for key: ImageBlendCacheKey,
+      policy: ImageBlendCompositorCachePolicy
+    ) {
+      accessGeneration += 1
+      var entry = entries[key]
+        ?? CacheEntry(
+          id: variant.id,
+          pixelSize: variant.image.pixelSize,
+          encodedBytes: variant.image.encodedBytes,
+          decodedImage: nil,
+          attachment: variant.attachment,
+          lastAccessGeneration: accessGeneration
+        )
+      entry.id = variant.id
+      entry.pixelSize = variant.image.pixelSize
+      entry.encodedBytes = variant.image.encodedBytes
+      entry.decodedImage = variant.image
+      entry.attachment = variant.attachment
+      entry.lastAccessGeneration = accessGeneration
+      entries[key] = entry
+      evictIfNeeded(policy: policy, protecting: key)
+    }
+
+    mutating func storeEncodedPayload(
+      _ payload: BlendedImageEncodedPayload,
+      attachment: RasterImageAttachment,
+      for key: ImageBlendCacheKey,
+      policy: ImageBlendCompositorCachePolicy
+    ) {
+      accessGeneration += 1
+      var entry = entries[key]
+        ?? CacheEntry(
+          id: payload.id,
+          pixelSize: payload.pixelSize,
+          encodedBytes: payload.bytes,
+          decodedImage: nil,
+          attachment: attachment,
+          lastAccessGeneration: accessGeneration
+        )
+      entry.id = payload.id
+      entry.pixelSize = payload.pixelSize
+      entry.encodedBytes = payload.bytes
+      entry.attachment = attachment
+      entry.lastAccessGeneration = accessGeneration
+      entries[key] = entry
+      evictIfNeeded(policy: policy, protecting: key)
+    }
+
+    func snapshot() -> ImageBlendCompositorCacheSnapshot {
+      var decodedPixelBytes = 0
+      var encodedBytes = 0
+      for entry in entries.values {
+        decodedPixelBytes += entry.decodedPixelBytes
+        encodedBytes += entry.encodedByteCount
+      }
+      return ImageBlendCompositorCacheSnapshot(
+        entryCount: entries.count,
+        decodedPixelBytes: decodedPixelBytes,
+        encodedBytes: encodedBytes,
+        accessGeneration: accessGeneration,
+        evictionCount: evictionCount,
+        decodedHits: decodedHits,
+        decodedMisses: decodedMisses,
+        encodedHits: encodedHits,
+        encodedMisses: encodedMisses
+      )
+    }
+
+    private mutating func evictIfNeeded(
+      policy: ImageBlendCompositorCachePolicy,
+      protecting protectedKey: ImageBlendCacheKey
+    ) {
+      while violates(policy), let key = oldestEvictableKey(protecting: protectedKey) {
+        entries.removeValue(forKey: key)
+        evictionCount += 1
+      }
+    }
+
+    private func violates(
+      _ policy: ImageBlendCompositorCachePolicy
+    ) -> Bool {
+      let snapshot = snapshot()
+      return snapshot.entryCount > policy.maxEntries
+        || decodedPixelCount > policy.maxDecodedPixels
+        || snapshot.encodedBytes > policy.maxEncodedBytes
+    }
+
+    private var decodedPixelCount: Int {
+      entries.values.reduce(0) { $0 + $1.decodedPixelCount }
+    }
+
+    private func oldestEvictableKey(
+      protecting protectedKey: ImageBlendCacheKey
+    ) -> ImageBlendCacheKey? {
+      entries
+        .filter { key, _ in key != protectedKey }
+        .min { lhs, rhs in
+          lhs.value.lastAccessGeneration < rhs.value.lastAccessGeneration
+        }?
+        .key
+    }
   }
 
   private let repository: ImageAssetRepository
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+  private let cachePolicy: ImageBlendCompositorCachePolicy
+  private let storage: OSAllocatedUnfairLock<Storage>
+  private let memoryMetricToken: MemoryMetricRegistry.Token
 
   package convenience init() {
     self.init(repository: ImageAssetRepository())
   }
 
-  init(
-    repository: ImageAssetRepository
+  package convenience init(
+    cachePolicy: ImageBlendCompositorCachePolicy
   ) {
+    self.init(repository: ImageAssetRepository(), cachePolicy: cachePolicy)
+  }
+
+  init(
+    repository: ImageAssetRepository,
+    cachePolicy: ImageBlendCompositorCachePolicy = .default
+  ) {
+    let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
     self.repository = repository
+    self.cachePolicy = cachePolicy
+    self.storage = storage
+    memoryMetricToken = MemoryMetricRegistry.shared.register(
+      ClosureMemoryMetricProvider {
+        let snapshot = storage.withLockUnchecked { $0.snapshot() }
+        return MemoryMetricSnapshot(
+          name: "ImageBlendCompositor.variants",
+          count: snapshot.entryCount,
+          approxBytes: snapshot.totalApproxBytes,
+          detail: [
+            "accessGeneration": snapshot.accessGeneration,
+            "decodedPixelBytes": snapshot.decodedPixelBytes,
+            "encodedBytes": snapshot.encodedBytes,
+            "evictions": snapshot.evictionCount,
+            "decodedHits": snapshot.decodedHits,
+            "decodedMisses": snapshot.decodedMisses,
+            "encodedHits": snapshot.encodedHits,
+            "encodedMisses": snapshot.encodedMisses,
+          ]
+        )
+      }
+    )
+  }
+
+  package func cacheSnapshot() -> ImageBlendCompositorCacheSnapshot {
+    storage.withLockUnchecked { $0.snapshot() }
   }
 
   func decodedVariant(
@@ -48,7 +299,6 @@ package final class ImageBlendCompositor: Sendable {
   ) -> BlendedImageVariant? {
     guard
       let reference = imageReference(for: attachment),
-      let sourceImage = repository.decodedImage(for: reference),
       let compositing = attachment.compositing,
       !attachment.visibleBounds.isEmpty
     else {
@@ -71,8 +321,13 @@ package final class ImageBlendCompositor: Sendable {
       backdropSignature: compositing.backdropSignature,
       fallbackBackground: fallbackBackground
     )
-    if let cached = storage.withLockUnchecked({ $0.decodedVariants[key] }) {
+    let lookup = storage.withLockUnchecked { $0.decodedLookup(for: key) }
+    if let cached = lookup.variant {
       return cached
+    }
+
+    guard let sourceImage = repository.decodedImage(for: reference) else {
+      return nil
     }
 
     let pixels = blendedPixels(
@@ -87,15 +342,17 @@ package final class ImageBlendCompositor: Sendable {
     }
 
     let id = blendedImageID(for: key)
-    var presentationAttachment = attachment
-    presentationAttachment.bounds = attachment.visibleBounds
-    presentationAttachment.visibleBounds = attachment.visibleBounds
-    presentationAttachment.pixelSize = outputSize
+    let encodedBytes = lookup.encodedBytes
+      ?? ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize)
+    let presentationAttachment = blendedPresentationAttachment(
+      from: attachment,
+      outputSize: outputSize
+    )
 
     let variant = BlendedImageVariant(
       id: id,
       image: DecodedImage(
-        encodedBytes: ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize),
+        encodedBytes: encodedBytes,
         encodedFormat: .png,
         pixelSize: outputSize,
         pixels: pixels
@@ -104,7 +361,7 @@ package final class ImageBlendCompositor: Sendable {
     )
 
     storage.withLockUnchecked { storage in
-      storage.decodedVariants[key] = variant
+      storage.storeDecodedVariant(variant, for: key, policy: cachePolicy)
     }
     return variant
   }
@@ -133,27 +390,54 @@ package final class ImageBlendCompositor: Sendable {
       backdropSignature: compositing.backdropSignature,
       fallbackBackground: fallbackBackground
     )
-    if let cached = storage.withLockUnchecked({ $0.encodedPayloads[key] }) {
+    if let cached = storage.withLockUnchecked({ $0.encodedLookup(for: key) }) {
       return cached
     }
 
-    guard let variant = decodedVariant(
-      for: attachment,
+    guard let sourceImage = repository.decodedImage(for: reference) else {
+      return nil
+    }
+
+    let pixels = blendedPixels(
+      sourceImage: sourceImage,
+      attachment: attachment,
+      compositing: compositing,
       outputSize: outputSize,
       fallbackBackground: fallbackBackground
-    ) else {
+    )
+    guard pixels.count == outputSize.width * outputSize.height else {
       return nil
     }
 
     let payload = BlendedImageEncodedPayload(
-      id: variant.id,
-      bytes: variant.image.encodedBytes,
-      pixelSize: variant.image.pixelSize
+      id: blendedImageID(for: key),
+      bytes: ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize),
+      pixelSize: outputSize
+    )
+    let presentationAttachment = blendedPresentationAttachment(
+      from: attachment,
+      outputSize: outputSize
     )
     storage.withLockUnchecked { storage in
-      storage.encodedPayloads[key] = payload
+      storage.storeEncodedPayload(
+        payload,
+        attachment: presentationAttachment,
+        for: key,
+        policy: cachePolicy
+      )
     }
     return payload
+  }
+
+  private func blendedPresentationAttachment(
+    from attachment: RasterImageAttachment,
+    outputSize: PixelSize
+  ) -> RasterImageAttachment {
+    var presentationAttachment = attachment
+    presentationAttachment.bounds = attachment.visibleBounds
+    presentationAttachment.visibleBounds = attachment.visibleBounds
+    presentationAttachment.pixelSize = outputSize
+    return presentationAttachment
   }
 
   private func blendedPixels(
