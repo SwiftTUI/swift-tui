@@ -167,6 +167,7 @@ private final class GeometryReaderLayoutDependentContent<Content: View>:
   func realize(
     in realizationContext: LayoutRealizationContext
   ) -> [ResolvedNode] {
+    let authoringContext = liveAuthoringContext()
     let proxy = GeometryProxy(
       bounds: realizationContext.bounds,
       safeAreaInsets: realizationContext.safeAreaInsets,
@@ -187,12 +188,26 @@ private final class GeometryReaderLayoutDependentContent<Content: View>:
       .settingEnvironment(\.safeAreaInsets, to: realizationContext.safeAreaInsets)
     let resolved = resolveView(
       view.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading),
-      in: contentContext
+      in: contentContext,
+      authoringContextOverride: authoringContext
     )
     context.viewGraph?.installLayoutDependentChildren(
       for: realizationContext.boundaryIdentity,
       children: [resolved]
     )
     return [resolved]
+  }
+
+  private func liveAuthoringContext() -> AuthoringContext? {
+    guard var authoringContext else {
+      return nil
+    }
+    if authoringContext.viewNode == nil,
+      let ownerNodeID = authoringContext.ownerNodeID,
+      let liveNode = context.viewGraph?.nodeForViewNodeID(ownerNodeID)
+    {
+      authoringContext.viewNode = liveNode
+    }
+    return authoringContext
   }
 }
