@@ -477,6 +477,98 @@ struct RasterizerTests {
     #expect(surface.imageAttachments.count == 1)
     #expect(attachment.bounds == imageBounds)
     #expect(attachment.visibleBounds == CellRect(origin: .zero, size: .init(width: 4, height: 3)))
+    #expect(attachment.compositing == nil)
+  }
+
+  @Test("image attachments under blend mode capture destination backdrop metadata")
+  func imageAttachmentsUnderBlendModeCaptureDestinationBackdropMetadata() throws {
+    let rasterizer = Rasterizer()
+    let rootBounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+    let imageIdentity = testIdentity("image-blend")
+    let imageBounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let draw = DrawNode(
+      identity: testIdentity("image-blend-root"),
+      bounds: rootBounds,
+      commands: [fillCommand(bounds: rootBounds, color: .red)],
+      children: [
+        DrawNode(
+          identity: imageIdentity,
+          bounds: imageBounds,
+          drawEffects: .init([.blendMode(.multiply)]),
+          commands: [
+            .image(
+              bounds: imageBounds,
+              identity: imageIdentity,
+              payload: imagePayload()
+            )
+          ]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let attachment = try #require(surface.imageAttachments.first)
+    let compositing = try #require(attachment.compositing)
+
+    #expect(compositing.blendMode == .multiply)
+    #expect(compositing.cellPixelSize == .init(width: 8, height: 16))
+    #expect(compositing.destinationBackdrop.bounds == imageBounds)
+    #expect(compositing.destinationBackdrop.cells == [.init(backgroundColor: .red)])
+    #expect(compositing.sourceBackdrop == nil)
+  }
+
+  @Test("image blend metadata preserves blend and compositingGroup ordering")
+  func imageBlendMetadataPreservesBlendAndCompositingGroupOrdering() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let imageIdentity = testIdentity("image-order")
+
+    func renderedAttachment(
+      effects: DrawEffects
+    ) throws -> RasterImageAttachment {
+      let draw = DrawNode(
+        identity: testIdentity("image-order-root"),
+        bounds: bounds,
+        commands: [fillCommand(bounds: bounds, color: .red)],
+        children: [
+          DrawNode(
+            identity: testIdentity("image-order-group"),
+            bounds: bounds,
+            drawEffects: effects,
+            commands: [fillCommand(bounds: bounds, color: .blue)],
+            children: [
+              DrawNode(
+                identity: imageIdentity,
+                bounds: bounds,
+                commands: [
+                  .image(
+                    bounds: bounds,
+                    identity: imageIdentity,
+                    payload: imagePayload()
+                  )
+                ]
+              )
+            ]
+          )
+        ]
+      )
+      return try #require(rasterizer.rasterize(draw).imageAttachments.first)
+    }
+
+    let blendThenGroup = try renderedAttachment(
+      effects: .init([.blendMode(.multiply), .compositingGroup])
+    )
+    let groupThenBlend = try renderedAttachment(
+      effects: .init([.compositingGroup, .blendMode(.multiply)])
+    )
+    let blendThenGroupCompositing = try #require(blendThenGroup.compositing)
+    let groupThenBlendCompositing = try #require(groupThenBlend.compositing)
+
+    #expect(blendThenGroupCompositing.destinationBackdrop.cells == [.init(backgroundColor: .blue)])
+    #expect(blendThenGroupCompositing.sourceBackdrop == nil)
+    #expect(groupThenBlendCompositing.destinationBackdrop.cells == [.init(backgroundColor: .red)])
+    #expect(groupThenBlendCompositing.sourceBackdrop?.cells == [.init(backgroundColor: .blue)])
+    #expect(blendThenGroupCompositing != groupThenBlendCompositing)
   }
 
   @Test("incremental raster reuse retains image attachments outside dirty rows")
@@ -1078,6 +1170,18 @@ struct RasterizerTests {
     )
     #expect(frame2.visibleIdentities.contains(movingIdentity))
   }
+}
+
+private func imagePayload() -> ImagePayload {
+  ImagePayload(
+    source: .path("demo.png"),
+    resolvedAsset: ResolvedImageAsset(
+      reference: .filePath("/tmp/demo.png"),
+      pixelSize: .init(width: 8, height: 16),
+      intrinsicCellSize: .init(width: 1, height: 1),
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+  )
 }
 
 private struct CoreRasterRepaintMutation {

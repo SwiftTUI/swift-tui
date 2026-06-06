@@ -130,6 +130,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
         WebSurfaceFrameEncoder.encode(
           surface,
           damage: nil,
+          fallbackBackground: state.renderStyle.appearance.backgroundColor,
           state: &state.encodingState
         ).utf8
       )
@@ -148,6 +149,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
       Array(
         WebSurfaceFrameEncoder.encode(
           frame,
+          fallbackBackground: state.renderStyle.appearance.backgroundColor,
           state: &state.encodingState
         ).utf8
       )

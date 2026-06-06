@@ -125,6 +125,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
         WebSurfaceFrameEncoder.encode(
           surface,
           damage: nil,
+          fallbackBackground: state.renderStyle.appearance.backgroundColor,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )
@@ -143,6 +144,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
       Array(
         WebSurfaceFrameEncoder.encode(
           frame,
+          fallbackBackground: state.renderStyle.appearance.backgroundColor,
           knownImageIDs: &state.transmittedImageIDs
         ).utf8
       )

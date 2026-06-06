@@ -66,6 +66,7 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ surface: RasterSurface,
     damage: PresentationDamage? = nil,
+    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
@@ -74,12 +75,14 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: nil,
       focusedIdentity: nil,
       damage: damage,
+      fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     )
   }
 
   package static func encode(
     _ surface: RasterSurface,
+    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
     encode(
@@ -88,6 +91,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: nil,
       focusedIdentity: nil,
       damage: nil,
+      fallbackBackground: fallbackBackground,
       state: &state
     )
   }
@@ -95,6 +99,7 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ surface: RasterSurface,
     damage: PresentationDamage?,
+    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
     encode(
@@ -103,6 +108,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: nil,
       focusedIdentity: nil,
       damage: damage,
+      fallbackBackground: fallbackBackground,
       state: &state
     )
   }
@@ -119,6 +125,7 @@ package enum WebSurfaceFrameEncoder {
 
   package static func encode(
     _ frame: SemanticHostFrame,
+    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
@@ -127,12 +134,14 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: frame.semantics,
       focusedIdentity: frame.focusedIdentity,
       damage: frame.rasterDamage,
+      fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     )
   }
 
   package static func encode(
     _ frame: SemanticHostFrame,
+    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
     encode(
@@ -141,6 +150,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: frame.semantics,
       focusedIdentity: frame.focusedIdentity,
       damage: frame.rasterDamage,
+      fallbackBackground: fallbackBackground,
       state: &state
     )
   }
@@ -151,6 +161,7 @@ package enum WebSurfaceFrameEncoder {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage?,
+    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
     guard state.deltaEnabled else {
@@ -160,6 +171,7 @@ package enum WebSurfaceFrameEncoder {
         semanticSnapshot: semanticSnapshot,
         focusedIdentity: focusedIdentity,
         damage: damage,
+        fallbackBackground: fallbackBackground,
         knownImageIDs: &state.knownImageIDs
       )
     }
@@ -177,6 +189,7 @@ package enum WebSurfaceFrameEncoder {
         semanticSnapshot: semanticSnapshot,
         focusedIdentity: focusedIdentity,
         damage: damage,
+        fallbackBackground: fallbackBackground,
         knownImageIDs: &state.knownImageIDs
       )
       updateBaseline(for: surface, state: &state)
@@ -189,6 +202,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: semanticSnapshot,
       focusedIdentity: focusedIdentity,
       damage: damage,
+      fallbackBackground: fallbackBackground,
       state: &state
     )
     state.hasBaseline = true
@@ -202,6 +216,7 @@ package enum WebSurfaceFrameEncoder {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage?,
+    fallbackBackground: Color,
     knownImageIDs: inout Set<String>
   ) -> String {
     let encoded = encodedRowsAndStyles(for: surface)
@@ -241,6 +256,7 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"images\":["
     json += encodeImages(
       surface.imageAttachments,
+      fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     ).joined(separator: ",")
     json += "]"
@@ -273,6 +289,7 @@ package enum WebSurfaceFrameEncoder {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage,
+    fallbackBackground: Color,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
     let rowIndexes = uniqueSortedRowIndexes(
@@ -312,6 +329,7 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"images\":["
     json += encodeImages(
       surface.imageAttachments,
+      fallbackBackground: fallbackBackground,
       knownImageIDs: &state.knownImageIDs
     ).joined(separator: ",")
     json += "]"

@@ -73,6 +73,14 @@ rasterizer. Add `.compositingGroup()` when the subtree should first flatten into
 one terminal-cell layer before later effects, such as an outer blend mode, are
 applied.
 
+Image attachments follow the same ordering for decodable PNG/JPEG sources. When
+an `Image` has an active blend mode, hosts receive a precomposed image variant
+blended against the visible cell-background backdrop; unblended images keep the
+normal high-fidelity attachment path. `AnimatedImage` frames rendered through
+`Image(data:)` inherit this behavior. This first tranche blends against cell
+background colors, not glyph-shaped text, overlapping image layers, or GIF
+pass-through bytes.
+
 ## Preview And Inspection
 
 When you want to inspect authored output without running a full terminal

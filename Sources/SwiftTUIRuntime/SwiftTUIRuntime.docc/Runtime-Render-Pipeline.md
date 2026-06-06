@@ -247,6 +247,13 @@ Terminal-native, WASI/browser, localhost WebHost, and hosted SwiftUI surfaces al
 sit below this committed-frame boundary. For host selection and surface roles,
 see <doc:Host-Integration>.
 
+Raster image attachments are still presented after cell rasterization. If an
+attachment carries blend metadata, the host path asks the shared image
+compositor for a precomposed PNG variant keyed by the image reference, visible
+rect, blend mode, backdrop signature, cell pixel size, and host fallback
+background. Terminal graphics protocols, WASI/WebHost image records, and the
+SwiftUI host then draw that variant through their normal image routes.
+
 ## Diagnostics
 
 With no sink installed, frame diagnostics are a branch in the committed-frame

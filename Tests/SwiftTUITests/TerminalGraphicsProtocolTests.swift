@@ -390,6 +390,68 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
+  @Test("Kitty blended image variants replay by backdrop-aware image id")
+  func kittyBlendedImageVariantsReplayByBackdropAwareImageID() throws {
+    let renderer = TerminalImageRenderer(repository: ImageAssetRepository())
+    let graphicsCapabilities = TerminalGraphicsCapabilities(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty,
+      cellPixelSize: .init(width: 1, height: 1)
+    )
+    let pngBytes = try makePNGBytes(
+      width: 1,
+      height: 1,
+      pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]
+    )
+    var transmittedKittyImages: Set<UInt32> = []
+
+    let firstWrite = renderer.graphicsWriteSteps(
+      for: [
+        blendedRasterImageAttachment(
+          pngBytes: pngBytes,
+          background: .blue,
+          signature: 1
+        )
+      ],
+      capabilityProfile: .trueColor,
+      graphicsCapabilities: graphicsCapabilities,
+      fallbackBackground: .black,
+      transmittedKittyImages: &transmittedKittyImages
+    ).joined()
+    let stableBackdropWrite = renderer.graphicsWriteSteps(
+      for: [
+        blendedRasterImageAttachment(
+          pngBytes: pngBytes,
+          background: .blue,
+          signature: 1
+        )
+      ],
+      capabilityProfile: .trueColor,
+      graphicsCapabilities: graphicsCapabilities,
+      fallbackBackground: .black,
+      transmittedKittyImages: &transmittedKittyImages
+    ).joined()
+    let changedBackdropWrite = renderer.graphicsWriteSteps(
+      for: [
+        blendedRasterImageAttachment(
+          pngBytes: pngBytes,
+          background: .red,
+          signature: 2
+        )
+      ],
+      capabilityProfile: .trueColor,
+      graphicsCapabilities: graphicsCapabilities,
+      fallbackBackground: .black,
+      transmittedKittyImages: &transmittedKittyImages
+    ).joined()
+
+    #expect(firstWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    #expect(!firstWrite.contains("_Ga=p"))
+    #expect(stableBackdropWrite.contains("_Ga=p,q=2,C=1,c=1,r=1,i="))
+    #expect(!stableBackdropWrite.contains("_Ga=T"))
+    #expect(changedBackdropWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+  }
+
   @Test(
     "terminal host emits Kitty RGBA payloads (f=32 with s/v) for non-PNG inputs"
   )
@@ -490,6 +552,7 @@ struct TerminalGraphicsProtocolTests {
           for: [attachment],
           capabilityProfile: .trueColor,
           graphicsCapabilities: graphicsCapabilities,
+          fallbackBackground: .black,
           transmittedKittyImages: &transmittedKittyImages
         )
       )
@@ -1507,6 +1570,31 @@ private func countOccurrences(of needle: String, in haystack: String) -> Int {
     }
   }
   return count
+}
+
+private func blendedRasterImageAttachment(
+  pngBytes: [UInt8],
+  background: Color,
+  signature: UInt64
+) -> RasterImageAttachment {
+  let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+  var attachment = makeRasterImageAttachment(
+    pngBytes: pngBytes,
+    pixelSize: .init(width: 1, height: 1),
+    bounds: bounds,
+    identity: testIdentity("Root", "BlendedImage")
+  )
+  attachment.cellPixelSize = .init(width: 1, height: 1)
+  attachment.compositing = RasterImageCompositing(
+    blendMode: .multiply,
+    destinationBackdrop: RasterImageBackdrop(
+      bounds: bounds,
+      cells: [.init(backgroundColor: background)]
+    ),
+    cellPixelSize: .init(width: 1, height: 1),
+    backdropSignature: signature
+  )
+  return attachment
 }
 
 private func repoFixturePath(

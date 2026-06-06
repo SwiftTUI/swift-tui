@@ -11,6 +11,7 @@ enum TerminalImageRenderMode: String, Hashable, Sendable {
 
 private struct TerminalImageVariantKey: Sendable {
   var reference: ImageAssetReference
+  var variantID: String?
   var mode: TerminalImageRenderMode
   var outputSize: PixelSize
   var paletteSize: Int
@@ -19,6 +20,7 @@ private struct TerminalImageVariantKey: Sendable {
 extension TerminalImageVariantKey: Hashable {
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.reference == rhs.reference
+      && lhs.variantID == rhs.variantID
       && lhs.mode == rhs.mode
       && lhs.outputSize.width == rhs.outputSize.width
       && lhs.outputSize.height == rhs.outputSize.height
@@ -27,6 +29,7 @@ extension TerminalImageVariantKey: Hashable {
 
   func hash(into hasher: inout Hasher) {
     hasher.combine(reference)
+    hasher.combine(variantID)
     hasher.combine(mode)
     hasher.combine(outputSize.width)
     hasher.combine(outputSize.height)
@@ -42,12 +45,14 @@ final class TerminalImageRenderer: Sendable {
   }
 
   private let repository: ImageAssetRepository
+  private let blendCompositor: ImageBlendCompositor
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
 
   init(
     repository: ImageAssetRepository
   ) {
     self.repository = repository
+    blendCompositor = ImageBlendCompositor(repository: repository)
     MemoryMetricRegistry.shared.registerPermanent(
       ClosureMemoryMetricProvider { [weak self] in
         guard let self else {
@@ -92,7 +97,8 @@ final class TerminalImageRenderer: Sendable {
   func preparedSurface(
     for surface: RasterSurface,
     capabilityProfile: TerminalCapabilityProfile,
-    graphicsCapabilities: TerminalGraphicsCapabilities
+    graphicsCapabilities: TerminalGraphicsCapabilities,
+    fallbackBackground: Color
   ) -> RasterSurface {
     guard !surface.imageAttachments.isEmpty else {
       return surface
@@ -122,9 +128,15 @@ final class TerminalImageRenderer: Sendable {
     )
 
     for attachment in prepared.imageAttachments {
+      let presentation = presentationVariant(
+        for: attachment,
+        fallbackBackground: fallbackBackground
+      )
+      let displayAttachment = presentation?.attachment ?? attachment
       guard
         let overlay = fallbackOverlay(
-          for: attachment,
+          for: displayAttachment,
+          variant: presentation,
           capabilityProfile: capabilityProfile
         )
       else {
@@ -132,8 +144,8 @@ final class TerminalImageRenderer: Sendable {
       }
       apply(
         overlay: overlay,
-        for: attachment.bounds,
-        clippedTo: attachment.visibleBounds,
+        for: displayAttachment.bounds,
+        clippedTo: displayAttachment.visibleBounds,
         to: &prepared.cells,
         surfaceSize: prepared.size
       )
@@ -146,12 +158,14 @@ final class TerminalImageRenderer: Sendable {
     for surface: RasterSurface,
     capabilityProfile: TerminalCapabilityProfile,
     graphicsCapabilities: TerminalGraphicsCapabilities,
+    fallbackBackground: Color,
     transmittedKittyImages: inout Set<UInt32>
   ) -> [String] {
     graphicsWriteSteps(
       for: surface.imageAttachments,
       capabilityProfile: capabilityProfile,
       graphicsCapabilities: graphicsCapabilities,
+      fallbackBackground: fallbackBackground,
       transmittedKittyImages: &transmittedKittyImages
     )
   }
@@ -160,6 +174,7 @@ final class TerminalImageRenderer: Sendable {
     for attachments: [RasterImageAttachment],
     capabilityProfile: TerminalCapabilityProfile,
     graphicsCapabilities: TerminalGraphicsCapabilities,
+    fallbackBackground: Color,
     transmittedKittyImages: inout Set<UInt32>
   ) -> [String] {
     guard
@@ -174,22 +189,33 @@ final class TerminalImageRenderer: Sendable {
     for attachment in attachments.sorted(by: compareImageAttachments) {
       guard
         let reference = attachment.resolvedReference,
-        let image = repository.decodedImage(for: reference)
+        let sourceImage = repository.decodedImage(for: reference)
       else {
         continue
       }
 
       switch graphicsProtocol {
       case .kitty:
+        let presentation = presentationVariant(
+          for: attachment,
+          fallbackBackground: fallbackBackground
+        )
+        let displayAttachment = presentation?.attachment ?? attachment
+        let image = presentation?.image ?? sourceImage
         guard
           let placement = kittyPlacement(
-            for: attachment,
+            for: displayAttachment,
             imagePixelSize: image.pixelSize
           )
         else {
           continue
         }
-        let imageID = kittyImageID(reference: reference)
+        let imageID =
+          if let presentation {
+            stableIdentifier(from: Array(presentation.id.utf8))
+          } else {
+            kittyImageID(reference: reference)
+          }
         writeSteps.append(terminalSaveCursorSequence())
         writeSteps.append(terminalCursorSequence(to: placement.origin))
 
@@ -204,6 +230,7 @@ final class TerminalImageRenderer: Sendable {
           )
         } else if let payload = kittyPayload(
           for: reference,
+          variantID: presentation?.id,
           image: image
         ) {
           writeSteps.append(
@@ -221,9 +248,21 @@ final class TerminalImageRenderer: Sendable {
         writeSteps.append(terminalRestoreCursorSequence())
 
       case .sixel:
+        let outputSize = sixelOutputSize(
+          for: attachment.visibleBounds,
+          graphicsCapabilities: graphicsCapabilities
+        )
+        let presentation = presentationVariant(
+          for: attachment,
+          outputSize: outputSize,
+          fallbackBackground: fallbackBackground
+        )
+        let displayAttachment = presentation?.attachment ?? attachment
+        let image = presentation?.image ?? sourceImage
         guard
           let payload = sixelPayload(
-            for: attachment,
+            for: displayAttachment,
+            variantID: presentation?.id,
             image: image,
             capabilityProfile: capabilityProfile,
             graphicsCapabilities: graphicsCapabilities
@@ -233,7 +272,7 @@ final class TerminalImageRenderer: Sendable {
         }
 
         writeSteps.append(terminalSaveCursorSequence())
-        writeSteps.append(terminalCursorSequence(to: attachment.visibleBounds.origin))
+        writeSteps.append(terminalCursorSequence(to: displayAttachment.visibleBounds.origin))
         writeSteps.append(payload)
         writeSteps.append(terminalRestoreCursorSequence())
       }
@@ -244,15 +283,17 @@ final class TerminalImageRenderer: Sendable {
 
   private func fallbackOverlay(
     for attachment: RasterImageAttachment,
+    variant: BlendedImageVariant?,
     capabilityProfile: TerminalCapabilityProfile
   ) -> RasterImageOverlay? {
     guard
       let reference = attachment.resolvedReference,
-      let image = repository.decodedImage(for: reference)
+      let sourceImage = repository.decodedImage(for: reference)
     else {
       return nil
     }
 
+    let image = variant?.image ?? sourceImage
     let mode = fallbackRenderMode(for: capabilityProfile)
     let cellSize = attachment.bounds.size
     let outputSize = fallbackOutputSize(
@@ -263,6 +304,7 @@ final class TerminalImageRenderer: Sendable {
 
     let key = TerminalImageVariantKey(
       reference: reference,
+      variantID: variant?.id,
       mode: mode,
       outputSize: outputSize,
       paletteSize: paletteSize
@@ -290,6 +332,7 @@ final class TerminalImageRenderer: Sendable {
 
   private func kittyPayload(
     for reference: ImageAssetReference,
+    variantID: String?,
     image: DecodedImage
   ) -> KittyPayload? {
     guard !image.encodedBytes.isEmpty else {
@@ -298,6 +341,7 @@ final class TerminalImageRenderer: Sendable {
 
     let key = TerminalImageVariantKey(
       reference: reference,
+      variantID: variantID,
       mode: .kitty,
       outputSize: image.pixelSize,
       paletteSize: 0
@@ -319,6 +363,7 @@ final class TerminalImageRenderer: Sendable {
 
   private func sixelPayload(
     for attachment: RasterImageAttachment,
+    variantID: String?,
     image: DecodedImage,
     capabilityProfile: TerminalCapabilityProfile,
     graphicsCapabilities: TerminalGraphicsCapabilities
@@ -337,6 +382,7 @@ final class TerminalImageRenderer: Sendable {
     )
     let key = TerminalImageVariantKey(
       reference: reference,
+      variantID: variantID,
       mode: .sixel,
       outputSize: pixelSize,
       paletteSize: paletteBudget
@@ -360,6 +406,21 @@ final class TerminalImageRenderer: Sendable {
       storage.sixelPayloads[key] = payload
     }
     return payload
+  }
+
+  private func presentationVariant(
+    for attachment: RasterImageAttachment,
+    outputSize: PixelSize? = nil,
+    fallbackBackground: Color
+  ) -> BlendedImageVariant? {
+    guard attachment.compositing != nil else {
+      return nil
+    }
+    return blendCompositor.decodedVariant(
+      for: attachment,
+      outputSize: outputSize,
+      fallbackBackground: fallbackBackground
+    )
   }
 }
 

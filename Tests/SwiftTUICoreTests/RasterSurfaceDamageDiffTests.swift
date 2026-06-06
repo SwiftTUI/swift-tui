@@ -114,4 +114,67 @@ struct RasterSurfaceDamageDiffTests {
         ])
     )
   }
+
+  @Test("diff marks blended image rows dirty when only backdrop compositing changes")
+  func diffMarksBlendedImageRowsDirtyWhenOnlyBackdropCompositingChanges() {
+    let identity = Identity(components: ["image"])
+    let bounds = CellRect(origin: .init(x: 1, y: 1), size: .init(width: 2, height: 2))
+    let previous = RasterSurface(
+      size: .init(width: 5, height: 4),
+      lines: ["", "", "", ""],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: identity,
+          bounds: bounds,
+          source: .path("image.png"),
+          resolvedReference: .filePath("/tmp/image.png"),
+          pixelSize: .init(width: 16, height: 32),
+          cellPixelSize: .init(width: 8, height: 16),
+          compositing: imageCompositing(signature: 1, background: .red, bounds: bounds)
+        )
+      ]
+    )
+    let current = RasterSurface(
+      size: .init(width: 5, height: 4),
+      lines: ["", "", "", ""],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: identity,
+          bounds: bounds,
+          source: .path("image.png"),
+          resolvedReference: .filePath("/tmp/image.png"),
+          pixelSize: .init(width: 16, height: 32),
+          cellPixelSize: .init(width: 8, height: 16),
+          compositing: imageCompositing(signature: 2, background: .blue, bounds: bounds)
+        )
+      ]
+    )
+
+    #expect(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: current)
+        == PresentationDamage(textRows: [
+          .init(row: 1, columnRanges: [1..<3]),
+          .init(row: 2, columnRanges: [1..<3]),
+        ])
+    )
+  }
+}
+
+private func imageCompositing(
+  signature: UInt64,
+  background: Color,
+  bounds: CellRect
+) -> RasterImageCompositing {
+  RasterImageCompositing(
+    blendMode: .multiply,
+    destinationBackdrop: RasterImageBackdrop(
+      bounds: bounds,
+      cells: Array(
+        repeating: RasterImageBackdropCell(backgroundColor: background),
+        count: bounds.size.width * bounds.size.height
+      )
+    ),
+    cellPixelSize: .init(width: 8, height: 16),
+    backdropSignature: signature
+  )
 }

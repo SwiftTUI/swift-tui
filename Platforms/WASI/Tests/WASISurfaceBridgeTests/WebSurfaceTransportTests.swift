@@ -514,6 +514,53 @@ struct WebSurfaceTransportTests {
     #expect(secondImage["dataBase64"] == nil)
   }
 
+  @Test("encoder emits blended image payloads as cached png variants")
+  func encoderEmitsBlendedImagePayloadsAsCachedPNGVariants() throws {
+    var knownImageIDs: Set<String> = []
+    let firstFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(background: .blue, signature: 1),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let secondFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(background: .blue, signature: 1),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let changedBackdropFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(background: .red, signature: 2),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+
+    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+    let secondImage = try #require((secondFrame["images"] as? [[String: Any]])?.first)
+    let changedImage = try #require((changedBackdropFrame["images"] as? [[String: Any]])?.first)
+
+    let firstID = try #require(firstImage["id"] as? String)
+    let changedID = try #require(changedImage["id"] as? String)
+
+    #expect(firstID.hasPrefix("blend:png:"))
+    #expect(firstImage["format"] as? String == "png")
+    #expect(firstImage["bounds"] as? [Int] == [1, 0, 1, 1])
+    #expect(firstImage["visibleBounds"] as? [Int] == [1, 0, 1, 1])
+    #expect(firstImage["pixelSize"] as? [Int] == [1, 1])
+    #expect(firstImage["dataBase64"] != nil)
+
+    #expect(secondImage["id"] as? String == firstID)
+    #expect(secondImage["dataBase64"] == nil)
+
+    #expect(changedID.hasPrefix("blend:png:"))
+    #expect(changedID != firstID)
+    #expect(changedImage["dataBase64"] != nil)
+  }
+
   @Test("encoder emits presentation damage for browser partial redraws")
   func encoderEmitsPresentationDamage() throws {
     let frame = try Self.decodedSurfaceFrame(
@@ -824,6 +871,48 @@ struct WebSurfaceTransportTests {
           isResizable: true
         )
       ]
+    )
+  }
+
+  private static func blendedImageSurface(
+    background: Color,
+    signature: UInt64
+  ) -> RasterSurface {
+    let bytes = redPixelPNGBytes()
+    let bounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+    let visibleBounds = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 1, height: 1))
+    return RasterSurface(
+      size: .init(width: 2, height: 1),
+      lines: ["  "],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: .init(components: [.named("blended-image")]),
+          bounds: bounds,
+          visibleBounds: visibleBounds,
+          source: .data(bytes),
+          resolvedReference: .embeddedImage(bytes),
+          pixelSize: .init(width: 1, height: 1),
+          cellPixelSize: .init(width: 1, height: 1),
+          compositing: RasterImageCompositing(
+            blendMode: .multiply,
+            destinationBackdrop: RasterImageBackdrop(
+              bounds: visibleBounds,
+              cells: [.init(backgroundColor: background)]
+            ),
+            cellPixelSize: .init(width: 1, height: 1),
+            backdropSignature: signature
+          )
+        )
+      ]
+    )
+  }
+
+  private static func redPixelPNGBytes() -> [UInt8] {
+    Array(
+      Data(
+        base64Encoded:
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEElEQVR4AQEFAPr/AP8AAP8FAAH/+lyI0QAAAABJRU5ErkJggg=="
+      )!
     )
   }
 

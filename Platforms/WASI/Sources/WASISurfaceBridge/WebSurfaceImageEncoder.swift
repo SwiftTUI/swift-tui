@@ -34,14 +34,18 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
   }
 }
 
+private let webSurfaceImageBlendCompositor = ImageBlendCompositor()
+
 extension WebSurfaceFrameEncoder {
   package static func encodeImages(
     _ attachments: [RasterImageAttachment],
+    fallbackBackground: Color,
     knownImageIDs: inout Set<String>
   ) -> [String] {
     attachments.compactMap { attachment in
       encodeImage(
         attachment,
+        fallbackBackground: fallbackBackground,
         knownImageIDs: &knownImageIDs
       )
     }
@@ -49,29 +53,80 @@ extension WebSurfaceFrameEncoder {
 
   private static func encodeImage(
     _ attachment: RasterImageAttachment,
+    fallbackBackground: Color,
     knownImageIDs: inout Set<String>
   ) -> String? {
-    guard let bytes = imageBytes(for: attachment), !attachment.visibleBounds.isEmpty else {
+    guard !attachment.visibleBounds.isEmpty else {
       return nil
     }
-    let format = imageFormat(for: bytes)
 
-    let imageID = webImageID(for: bytes, format: format)
+    let payload = imagePayload(
+      for: attachment,
+      fallbackBackground: fallbackBackground
+    )
+    guard let payload else {
+      return nil
+    }
+
+    let imageID = payload.id
     let shouldTransmitData = knownImageIDs.insert(imageID).inserted
     var fields = [
       "\"id\":\(jsonString(imageID))",
-      "\"format\":\(jsonString(format.jsonValue))",
-      "\"bounds\":\(encodeRect(attachment.bounds))",
-      "\"visibleBounds\":\(encodeRect(attachment.visibleBounds))",
+      "\"format\":\(jsonString(payload.format.jsonValue))",
+      "\"bounds\":\(encodeRect(payload.bounds))",
+      "\"visibleBounds\":\(encodeRect(payload.visibleBounds))",
       "\"scalingMode\":\(jsonString(attachment.scalingMode.rawValue))",
     ]
-    if let pixelSize = attachment.pixelSize {
+    if let pixelSize = payload.pixelSize {
       fields.append("\"pixelSize\":\(encodeSize(pixelSize))")
     }
     if shouldTransmitData {
-      fields.append("\"dataBase64\":\(jsonString(base64Encoded(bytes)))")
+      fields.append("\"dataBase64\":\(jsonString(base64Encoded(payload.bytes)))")
     }
     return "{" + fields.joined(separator: ",") + "}"
+  }
+
+  private struct ImagePayload {
+    var bytes: [UInt8]
+    var format: WebSurfaceImageFormat
+    var id: String
+    var pixelSize: PixelSize?
+    var bounds: CellRect
+    var visibleBounds: CellRect
+  }
+
+  private static func imagePayload(
+    for attachment: RasterImageAttachment,
+    fallbackBackground: Color
+  ) -> ImagePayload? {
+    if attachment.compositing != nil,
+      let blended = webSurfaceImageBlendCompositor.encodedPNGPayload(
+        for: attachment,
+        fallbackBackground: fallbackBackground
+      )
+    {
+      return ImagePayload(
+        bytes: blended.bytes,
+        format: .png,
+        id: blended.id,
+        pixelSize: blended.pixelSize,
+        bounds: attachment.visibleBounds,
+        visibleBounds: attachment.visibleBounds
+      )
+    }
+
+    guard let bytes = imageBytes(for: attachment) else {
+      return nil
+    }
+    let format = imageFormat(for: bytes)
+    return ImagePayload(
+      bytes: bytes,
+      format: format,
+      id: webImageID(for: bytes, format: format),
+      pixelSize: attachment.pixelSize,
+      bounds: attachment.bounds,
+      visibleBounds: attachment.visibleBounds
+    )
   }
 
   private static func imageBytes(

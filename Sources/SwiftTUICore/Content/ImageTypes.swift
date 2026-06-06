@@ -67,6 +67,54 @@ public struct ImagePayload: Equatable, Sendable {
   }
 }
 
+/// A captured cell-background backdrop used to precompose a blended image.
+public struct RasterImageBackdrop: Equatable, Sendable {
+  public var bounds: CellRect
+  public var cells: [RasterImageBackdropCell]
+
+  public init(
+    bounds: CellRect,
+    cells: [RasterImageBackdropCell]
+  ) {
+    self.bounds = bounds
+    self.cells = cells
+  }
+}
+
+/// A single cell in a captured image-compositing backdrop.
+public struct RasterImageBackdropCell: Equatable, Sendable {
+  public var backgroundColor: Color?
+
+  public init(
+    backgroundColor: Color?
+  ) {
+    self.backgroundColor = backgroundColor
+  }
+}
+
+/// Raster-time metadata for precomposing an image with a captured backdrop.
+public struct RasterImageCompositing: Equatable, Sendable {
+  public var blendMode: BlendMode
+  public var destinationBackdrop: RasterImageBackdrop
+  public var sourceBackdrop: RasterImageBackdrop?
+  public var cellPixelSize: PixelSize
+  public var backdropSignature: UInt64
+
+  public init(
+    blendMode: BlendMode,
+    destinationBackdrop: RasterImageBackdrop,
+    sourceBackdrop: RasterImageBackdrop? = nil,
+    cellPixelSize: PixelSize,
+    backdropSignature: UInt64
+  ) {
+    self.blendMode = blendMode
+    self.destinationBackdrop = destinationBackdrop
+    self.sourceBackdrop = sourceBackdrop
+    self.cellPixelSize = cellPixelSize
+    self.backdropSignature = backdropSignature
+  }
+}
+
 /// A raster-time image placement that the host may present natively.
 public struct RasterImageAttachment: Equatable, Sendable {
   /// The full logical destination rect in terminal cells before viewport clipping.
@@ -77,8 +125,10 @@ public struct RasterImageAttachment: Equatable, Sendable {
   public var source: ImageSource
   public var resolvedReference: ImageAssetReference?
   public var pixelSize: PixelSize?
+  public var cellPixelSize: PixelSize?
   public var isResizable: Bool
   public var scalingMode: ImageScalingMode
+  public var compositing: RasterImageCompositing?
 
   public init(
     identity: Identity,
@@ -87,8 +137,10 @@ public struct RasterImageAttachment: Equatable, Sendable {
     source: ImageSource,
     resolvedReference: ImageAssetReference? = nil,
     pixelSize: PixelSize? = nil,
+    cellPixelSize: PixelSize? = nil,
     isResizable: Bool = false,
-    scalingMode: ImageScalingMode = .stretch
+    scalingMode: ImageScalingMode = .stretch,
+    compositing: RasterImageCompositing? = nil
   ) {
     self.identity = identity
     self.bounds = bounds
@@ -96,7 +148,9 @@ public struct RasterImageAttachment: Equatable, Sendable {
     self.source = source
     self.resolvedReference = resolvedReference
     self.pixelSize = pixelSize
+    self.cellPixelSize = cellPixelSize
     self.isResizable = isResizable
     self.scalingMode = scalingMode
+    self.compositing = compositing
   }
 }

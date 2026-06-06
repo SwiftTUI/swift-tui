@@ -308,7 +308,14 @@ extension SnapshotRenderer {
   }
 
   func describe(_ attachment: RasterImageAttachment) -> String {
-    "attachment[id=\(attachment.identity.path) \(describe(attachment.bounds)) source=\(describe(attachment.source)) ref=\(attachment.resolvedReference.map(describe) ?? "nil")]"
+    let compositing =
+      if let imageCompositing = attachment.compositing {
+        " blend=\(imageCompositing.blendMode.rawValue) backdrop=\(imageCompositing.backdropSignature)"
+      } else {
+        ""
+      }
+    return
+      "attachment[id=\(attachment.identity.path) \(describe(attachment.bounds)) source=\(describe(attachment.source)) ref=\(attachment.resolvedReference.map(describe) ?? "nil")\(compositing)]"
   }
 
   func describe(_ styleRun: RasterStyleRun) -> String {

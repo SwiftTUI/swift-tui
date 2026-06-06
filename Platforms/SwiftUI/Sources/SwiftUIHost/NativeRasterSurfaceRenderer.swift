@@ -22,6 +22,8 @@ import SwiftTUIRuntime
 // adapters it uses live in `NativeTerminalPlatformAdapters.swift`.
 
 enum NativeRasterSurfaceRenderer {
+  private static let imageBlendCompositor = ImageBlendCompositor()
+
   static func draw(
     surface: RasterSurface?,
     style: SwiftUIHostTerminalStyle,
@@ -70,6 +72,7 @@ enum NativeRasterSurfaceRenderer {
     for attachment in surface.imageAttachments {
       drawImageAttachment(
         attachment,
+        style: style,
         metrics: metrics,
         dirtyRect: dirtyBounds,
         context: context
@@ -274,11 +277,12 @@ enum NativeRasterSurfaceRenderer {
 
   private static func drawImageAttachment(
     _ attachment: RasterImageAttachment,
+    style: SwiftUIHostTerminalStyle,
     metrics: NativeTerminalMetrics,
     dirtyRect: CGRect,
     context _: CGContext
   ) {
-    guard let image = NativePlatformImage.terminalImage(from: attachment.source) else {
+    guard let image = nativeImage(for: attachment, style: style) else {
       return
     }
 
@@ -297,5 +301,22 @@ enum NativeRasterSurfaceRenderer {
       return
     }
     image.drawTerminalImage(in: rect)
+  }
+
+  private static func nativeImage(
+    for attachment: RasterImageAttachment,
+    style: SwiftUIHostTerminalStyle
+  ) -> NativePlatformImage? {
+    if attachment.compositing != nil,
+      let payload = imageBlendCompositor.encodedPNGPayload(
+        for: attachment,
+        fallbackBackground: style.palette.background
+      ),
+      let image = NativePlatformImage.terminalImage(from: .data(payload.bytes))
+    {
+      return image
+    }
+
+    return NativePlatformImage.terminalImage(from: attachment.source)
   }
 }

@@ -370,7 +370,8 @@ public enum TerminalHostError: Error {
       let preparedSurface = imageRenderer.preparedSurface(
         for: surface,
         capabilityProfile: capabilityProfile,
-        graphicsCapabilities: graphicsCapabilities
+        graphicsCapabilities: graphicsCapabilities,
+        fallbackBackground: appearance.backgroundColor
       )
       let plan = TerminalPresentationPlanner(
         capabilityProfile: capabilityProfile,
@@ -385,7 +386,8 @@ public enum TerminalHostError: Error {
       let emission = TerminalHostPresentationEmissionBuilder(
         capabilityProfile: capabilityProfile,
         usesTerminalEditOperations: usesTerminalEditOperations,
-        imageRenderer: imageRenderer
+        imageRenderer: imageRenderer,
+        fallbackBackground: appearance.backgroundColor
       ).build(
         for: preparedSurface,
         plan: plan,

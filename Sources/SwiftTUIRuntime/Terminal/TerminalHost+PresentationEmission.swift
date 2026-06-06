@@ -5,6 +5,7 @@ import SwiftTUICore
     var capabilityProfile: TerminalCapabilityProfile
     var usesTerminalEditOperations: Bool
     var imageRenderer: TerminalImageRenderer
+    var fallbackBackground: Color
 
     func build(
       for preparedSurface: RasterSurface,
@@ -68,6 +69,7 @@ import SwiftTUICore
         for: preparedSurface,
         capabilityProfile: capabilityProfile,
         graphicsCapabilities: graphicsCapabilities,
+        fallbackBackground: fallbackBackground,
         transmittedKittyImages: &transmittedKittyImages
       ) {
         emission.append(writeStep)
@@ -166,6 +168,7 @@ import SwiftTUICore
         for: attachments,
         capabilityProfile: capabilityProfile,
         graphicsCapabilities: graphicsCapabilities,
+        fallbackBackground: fallbackBackground,
         transmittedKittyImages: &transmittedKittyImages
       ) {
         emission.append(writeStep)

@@ -347,12 +347,26 @@ extension Rasterizer {
 
     var outputContext = applyingUngroupedEffects(effects, to: context)
     outputContext.clip = intersect(context.clip, layer.bounds)
+    let destinationCellsBeforeLayer = cells
     compositeLayerCells(
       from: layer,
       into: &cells,
       context: outputContext
     )
-    imageAttachments.append(contentsOf: layer.imageAttachments)
+    let carriedAttachments =
+      if let blendMode = outputContext.activeBlendMode {
+        layer.imageAttachments.map { attachment in
+          applyingPostGroupBlend(
+            blendMode,
+            to: attachment,
+            sourceCells: layer.cells,
+            destinationCells: destinationCellsBeforeLayer
+          )
+        }
+      } else {
+        layer.imageAttachments
+      }
+    imageAttachments.append(contentsOf: carriedAttachments)
   }
 
   private func compositeLayerCells(
@@ -656,6 +670,14 @@ extension Rasterizer {
         } else {
           visibleBounds = bounds
         }
+        let compositing =
+          imageCompositing(
+            blendMode: blendMode,
+            visibleBounds: visibleBounds,
+            sourceBackdrop: nil,
+            cellPixelSize: payload.resolvedAsset?.cellPixelSize,
+            destinationCells: cells
+          )
         imageAttachments.append(
           RasterImageAttachment(
             identity: identity,
@@ -664,8 +686,10 @@ extension Rasterizer {
             source: payload.source,
             resolvedReference: payload.resolvedAsset?.reference,
             pixelSize: payload.resolvedAsset?.pixelSize,
+            cellPixelSize: payload.resolvedAsset?.cellPixelSize,
             isResizable: payload.isResizable,
-            scalingMode: payload.scalingMode
+            scalingMode: payload.scalingMode,
+            compositing: compositing
           )
         )
       case .fill(let bounds, let geometry, let insetAmount, let style, let mode):
@@ -792,4 +816,183 @@ extension Rasterizer {
     }
   }
 
+  private func applyingPostGroupBlend(
+    _ blendMode: BlendMode,
+    to attachment: RasterImageAttachment,
+    sourceCells: [[RasterCell]],
+    destinationCells: [[RasterCell]]
+  ) -> RasterImageAttachment {
+    guard let cellPixelSize = attachment.cellPixelSize else {
+      return attachment
+    }
+
+    var updated = attachment
+    let sourceBackdrop = captureImageBackdrop(
+      in: sourceCells,
+      bounds: attachment.visibleBounds
+    )
+    updated.compositing = imageCompositing(
+      blendMode: blendMode,
+      visibleBounds: attachment.visibleBounds,
+      sourceBackdrop: sourceBackdrop,
+      cellPixelSize: cellPixelSize,
+      destinationCells: destinationCells
+    )
+    return updated
+  }
+
+  private func imageCompositing(
+    blendMode: BlendMode?,
+    visibleBounds: CellRect,
+    sourceBackdrop: RasterImageBackdrop?,
+    cellPixelSize: PixelSize?,
+    destinationCells: [[RasterCell]]
+  ) -> RasterImageCompositing? {
+    guard let blendMode,
+      let cellPixelSize,
+      visibleBounds.size.width > 0,
+      visibleBounds.size.height > 0
+    else {
+      return nil
+    }
+
+    let destinationBackdrop = captureImageBackdrop(
+      in: destinationCells,
+      bounds: visibleBounds
+    )
+    return RasterImageCompositing(
+      blendMode: blendMode,
+      destinationBackdrop: destinationBackdrop,
+      sourceBackdrop: sourceBackdrop,
+      cellPixelSize: cellPixelSize,
+      backdropSignature: imageCompositingSignature(
+        blendMode: blendMode,
+        destinationBackdrop: destinationBackdrop,
+        sourceBackdrop: sourceBackdrop,
+        cellPixelSize: cellPixelSize
+      )
+    )
+  }
+
+  private func captureImageBackdrop(
+    in cells: [[RasterCell]],
+    bounds: CellRect
+  ) -> RasterImageBackdrop {
+    guard bounds.size.width > 0, bounds.size.height > 0 else {
+      return RasterImageBackdrop(bounds: bounds, cells: [])
+    }
+
+    var backdropCells: [RasterImageBackdropCell] = []
+    backdropCells.reserveCapacity(bounds.size.width * bounds.size.height)
+    for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
+      for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
+        let backgroundColor: Color? =
+          if y >= 0, y < cells.count, x >= 0, x < cells[y].count {
+            cells[y][x].style?.backgroundColor
+          } else {
+            nil
+          }
+        backdropCells.append(RasterImageBackdropCell(backgroundColor: backgroundColor))
+      }
+    }
+
+    return RasterImageBackdrop(bounds: bounds, cells: backdropCells)
+  }
+
+  private func imageCompositingSignature(
+    blendMode: BlendMode,
+    destinationBackdrop: RasterImageBackdrop,
+    sourceBackdrop: RasterImageBackdrop?,
+    cellPixelSize: PixelSize
+  ) -> UInt64 {
+    var hash = DeterministicImageBackdropHasher()
+    hash.combine("blend")
+    hash.combine(blendMode.rawValue)
+    hash.combine("cell")
+    hash.combine(cellPixelSize.width)
+    hash.combine(cellPixelSize.height)
+    hash.combine("destination")
+    hash.combine(destinationBackdrop)
+    hash.combine("source")
+    if let sourceBackdrop {
+      hash.combine(sourceBackdrop)
+    } else {
+      hash.combine(0)
+    }
+    return hash.value
+  }
+}
+
+private struct DeterministicImageBackdropHasher {
+  private(set) var value: UInt64 = 0xcbf2_9ce4_8422_2325
+
+  mutating func combine(
+    _ string: String
+  ) {
+    for byte in string.utf8 {
+      combine(byte)
+    }
+    combine(UInt8(0))
+  }
+
+  mutating func combine(
+    _ value: Int
+  ) {
+    combine(UInt64(bitPattern: Int64(value)))
+  }
+
+  mutating func combine(
+    _ value: UInt64
+  ) {
+    var remaining = value
+    for _ in 0..<8 {
+      combine(UInt8(remaining & 0xFF))
+      remaining >>= 8
+    }
+  }
+
+  mutating func combine(
+    _ backdrop: RasterImageBackdrop
+  ) {
+    combine(backdrop.bounds.origin.x)
+    combine(backdrop.bounds.origin.y)
+    combine(backdrop.bounds.size.width)
+    combine(backdrop.bounds.size.height)
+    combine(backdrop.cells.count)
+    for cell in backdrop.cells {
+      combine(cell)
+    }
+  }
+
+  private mutating func combine(
+    _ cell: RasterImageBackdropCell
+  ) {
+    guard let color = cell.backgroundColor else {
+      combine(UInt8(0))
+      return
+    }
+    combine(UInt8(1))
+    combine(color.red.bitPattern)
+    combine(color.green.bitPattern)
+    combine(color.blue.bitPattern)
+    combine(color.alpha.bitPattern)
+    combine(color.profile.name)
+    combine(color.profile.whitePoint.name)
+    combine(color.profile.whitePoint.x.bitPattern)
+    combine(color.profile.whitePoint.y.bitPattern)
+    combine(color.profile.primaries.red.x.bitPattern)
+    combine(color.profile.primaries.red.y.bitPattern)
+    combine(color.profile.primaries.green.x.bitPattern)
+    combine(color.profile.primaries.green.y.bitPattern)
+    combine(color.profile.primaries.blue.x.bitPattern)
+    combine(color.profile.primaries.blue.y.bitPattern)
+    combine(String(describing: color.profile.transferFunction))
+  }
+
+  private mutating func combine(
+    _ byte: UInt8
+  ) {
+    value ^= UInt64(byte)
+    value &*= 0x100_0000_01b3
+  }
 }

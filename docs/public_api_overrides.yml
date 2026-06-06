@@ -624,7 +624,10 @@ classifications:
     - SwiftTUICore.ProposedSize
     - SwiftTUICore.RadialGradient
     - SwiftTUICore.RasterCell
+    - SwiftTUICore.RasterImageBackdrop
+    - SwiftTUICore.RasterImageBackdropCell
     - SwiftTUICore.RasterImageAttachment
+    - SwiftTUICore.RasterImageCompositing
     - SwiftTUICore.Rasterizer
     - SwiftTUICore.RasterStyleRun
     - SwiftTUICore.RasterSurface
