@@ -1718,7 +1718,11 @@ SwiftTUICore.RasterImageBackdrop.cells
 SwiftTUICore.RasterImageBackdrop.init(bounds:cells:)
 SwiftTUICore.RasterImageBackdropCell
 SwiftTUICore.RasterImageBackdropCell.backgroundColor
-SwiftTUICore.RasterImageBackdropCell.init(backgroundColor:)
+SwiftTUICore.RasterImageBackdropCell.foregroundColor
+SwiftTUICore.RasterImageBackdropCell.glyph
+SwiftTUICore.RasterImageBackdropCell.init(backgroundColor:foregroundColor:glyph:spanWidth:spanOffset:)
+SwiftTUICore.RasterImageBackdropCell.spanOffset
+SwiftTUICore.RasterImageBackdropCell.spanWidth
 SwiftTUICore.RasterImageCompositing
 SwiftTUICore.RasterImageCompositing.backdropSignature
 SwiftTUICore.RasterImageCompositing.blendMode

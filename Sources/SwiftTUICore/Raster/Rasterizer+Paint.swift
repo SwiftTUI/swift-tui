@@ -886,13 +886,32 @@ extension Rasterizer {
     backdropCells.reserveCapacity(bounds.size.width * bounds.size.height)
     for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
       for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
-        let backgroundColor: Color? =
+        let backdropCell: RasterImageBackdropCell =
           if y >= 0, y < cells.count, x >= 0, x < cells[y].count {
-            cells[y][x].style?.backgroundColor
+            if let leadX = cells[y][x].continuationLeadX,
+              leadX >= 0,
+              leadX < cells[y].count
+            {
+              RasterImageBackdropCell(
+                backgroundColor: cells[y][x].style?.backgroundColor,
+                foregroundColor: cells[y][x].style?.foregroundColor,
+                glyph: cells[y][leadX].character,
+                spanWidth: max(1, cells[y][leadX].spanWidth),
+                spanOffset: max(0, x - leadX)
+              )
+            } else {
+              RasterImageBackdropCell(
+                backgroundColor: cells[y][x].style?.backgroundColor,
+                foregroundColor: cells[y][x].style?.foregroundColor,
+                glyph: cells[y][x].character,
+                spanWidth: max(1, cells[y][x].spanWidth),
+                spanOffset: 0
+              )
+            }
           } else {
-            nil
+            RasterImageBackdropCell(backgroundColor: nil)
           }
-        backdropCells.append(RasterImageBackdropCell(backgroundColor: backgroundColor))
+        backdropCells.append(backdropCell)
       }
     }
 
@@ -967,7 +986,29 @@ private struct DeterministicImageBackdropHasher {
   private mutating func combine(
     _ cell: RasterImageBackdropCell
   ) {
-    guard let color = cell.backgroundColor else {
+    combine("bg")
+    combineOptionalColor(cell.backgroundColor)
+    combine("fg")
+    combineOptionalColor(cell.foregroundColor)
+    combine("glyph")
+    if let glyph = cell.glyph {
+      combine(UInt8(1))
+      combine(String(glyph))
+    } else {
+      combine(UInt8(0))
+    }
+    combine("span")
+    combine(cell.spanWidth)
+    combine("offset")
+    combine(cell.spanOffset)
+    combine("coverage")
+    combine(rasterBackdropCoverage(for: cell.glyph, spanWidth: cell.spanWidth))
+  }
+
+  private mutating func combineOptionalColor(
+    _ color: Color?
+  ) {
+    guard let color else {
       combine(UInt8(0))
       return
     }
@@ -987,6 +1028,25 @@ private struct DeterministicImageBackdropHasher {
     combine(color.profile.primaries.blue.x.bitPattern)
     combine(color.profile.primaries.blue.y.bitPattern)
     combine(String(describing: color.profile.transferFunction))
+  }
+
+  private mutating func combine(
+    _ coverage: RasterBackdropCoverage
+  ) {
+    switch coverage {
+    case .none:
+      combine("none")
+    case .full:
+      combine("full")
+    case .quadrant(let mask):
+      combine("quadrant")
+      combine(mask)
+    case .braille(let mask):
+      combine("braille")
+      combine(mask)
+    case .textApproximation:
+      combine("text")
+    }
   }
 
   private mutating func combine(

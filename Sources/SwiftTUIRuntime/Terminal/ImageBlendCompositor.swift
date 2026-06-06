@@ -522,6 +522,8 @@ package final class ImageBlendCompositor: Sendable {
       1,
       cellPixelSize.height
     )
+    let cellPixelWidth = max(1, cellPixelSize.width)
+    let cellPixelHeight = max(1, cellPixelSize.height)
 
     var pixels: [RGBAImagePixel] = []
     pixels.reserveCapacity(outputSize.width * outputSize.height)
@@ -538,11 +540,8 @@ package final class ImageBlendCompositor: Sendable {
         destinationCount: logicalOutputSize.height,
         sourceCount: sourceImage.pixelSize.height
       )
-      let backdropCellY = proportionalPixelSample(
-        destinationIndex: y,
-        destinationCount: outputSize.height,
-        sourceCount: visibleBounds.size.height
-      )
+      let backdropCellY = min(visibleBounds.size.height - 1, visiblePixelY / cellPixelHeight)
+      let backdropPixelY = visiblePixelY % cellPixelHeight
 
       for x in 0..<outputSize.width {
         let visiblePixelX = proportionalPixelSample(
@@ -556,26 +555,29 @@ package final class ImageBlendCompositor: Sendable {
           destinationCount: logicalOutputSize.width,
           sourceCount: sourceImage.pixelSize.width
         )
-        let backdropCellX = proportionalPixelSample(
-          destinationIndex: x,
-          destinationCount: outputSize.width,
-          sourceCount: visibleBounds.size.width
-        )
+        let backdropCellX = min(visibleBounds.size.width - 1, visiblePixelX / cellPixelWidth)
+        let backdropPixelX = visiblePixelX % cellPixelWidth
 
         let source = color(
           from: sourceImage.pixels[(sourceY * sourceImage.pixelSize.width) + sourceX]
         )
-        let destination = backdropColor(
+        let destination = backdropPixelColor(
           compositing.destinationBackdrop,
           relativeX: backdropCellX,
           relativeY: backdropCellY,
+          pixelX: backdropPixelX,
+          pixelY: backdropPixelY,
+          cellPixelSize: PixelSize(width: cellPixelWidth, height: cellPixelHeight),
           fallbackBackground: fallbackBackground
         )
         if let sourceBackdrop = compositing.sourceBackdrop {
-          let groupBackdrop = backdropColor(
+          let groupBackdrop = backdropPixelColor(
             sourceBackdrop,
             relativeX: backdropCellX,
             relativeY: backdropCellY,
+            pixelX: backdropPixelX,
+            pixelY: backdropPixelY,
+            cellPixelSize: PixelSize(width: cellPixelWidth, height: cellPixelHeight),
             fallbackBackground: fallbackBackground
           )
           let flattenedSource = source.composited(over: groupBackdrop)
@@ -625,10 +627,13 @@ package final class ImageBlendCompositor: Sendable {
     )
   }
 
-  private func backdropColor(
+  private func backdropPixelColor(
     _ backdrop: RasterImageBackdrop,
     relativeX: Int,
     relativeY: Int,
+    pixelX: Int,
+    pixelY: Int,
+    cellPixelSize: PixelSize,
     fallbackBackground: Color
   ) -> Color {
     guard backdrop.bounds.size.width > 0, backdrop.bounds.size.height > 0 else {
@@ -641,7 +646,78 @@ package final class ImageBlendCompositor: Sendable {
     guard index >= 0, index < backdrop.cells.count else {
       return fallbackBackground
     }
-    return backdrop.cells[index].backgroundColor ?? fallbackBackground
+    let cell = backdrop.cells[index]
+    let background = cell.backgroundColor ?? fallbackBackground
+    guard
+      let foreground = cell.foregroundColor,
+      coverage(
+        rasterBackdropCoverage(for: cell.glyph, spanWidth: cell.spanWidth),
+        containsPixelX: pixelX,
+        y: pixelY,
+        spanWidth: cell.spanWidth,
+        spanOffset: cell.spanOffset,
+        cellPixelSize: cellPixelSize
+      )
+    else {
+      return background
+    }
+    return foreground.composited(over: background)
+  }
+
+  private func coverage(
+    _ coverage: RasterBackdropCoverage,
+    containsPixelX pixelX: Int,
+    y pixelY: Int,
+    spanWidth: Int,
+    spanOffset: Int,
+    cellPixelSize: PixelSize
+  ) -> Bool {
+    let width = max(1, cellPixelSize.width)
+    let height = max(1, cellPixelSize.height)
+    let x = max(0, min(width - 1, pixelX))
+    let y = max(0, min(height - 1, pixelY))
+
+    switch coverage {
+    case .none:
+      return false
+    case .full:
+      return true
+    case .quadrant(let mask):
+      let column = min(1, (x * 2) / width)
+      let row = min(1, (y * 2) / height)
+      let bit: UInt8 = switch (row, column) {
+      case (0, 0): 0b0001
+      case (0, 1): 0b0010
+      case (1, 0): 0b0100
+      default: 0b1000
+      }
+      return (mask & bit) != 0
+    case .braille(let mask):
+      let column = min(1, (x * 2) / width)
+      let row = min(3, (y * 4) / height)
+      let bitIndex: UInt8 = switch (column, row) {
+      case (0, 0): 0
+      case (0, 1): 1
+      case (0, 2): 2
+      case (1, 0): 3
+      case (1, 1): 4
+      case (1, 2): 5
+      case (0, 3): 6
+      default: 7
+      }
+      return (mask & (UInt8(1) << bitIndex)) != 0
+    case .textApproximation:
+      let textSpanWidth = max(1, spanWidth)
+      let clampedOffset = max(0, min(textSpanWidth - 1, spanOffset))
+      let expandedWidth = width * textSpanWidth
+      let expandedX = (clampedOffset * width) + x
+      let horizontalInset = expandedWidth > 2 ? max(1, expandedWidth / 4) : 0
+      let verticalInset = height > 2 ? max(1, height / 5) : 0
+      return expandedX >= horizontalInset
+        && expandedX <= expandedWidth - 1 - horizontalInset
+        && y >= verticalInset
+        && y <= height - 1 - verticalInset
+    }
   }
 
   private func color(

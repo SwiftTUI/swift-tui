@@ -513,8 +513,115 @@ struct RasterizerTests {
     #expect(compositing.blendMode == .multiply)
     #expect(compositing.cellPixelSize == .init(width: 8, height: 16))
     #expect(compositing.destinationBackdrop.bounds == imageBounds)
-    #expect(compositing.destinationBackdrop.cells == [.init(backgroundColor: .red)])
+    #expect(compositing.destinationBackdrop.cells == [.init(backgroundColor: .red, glyph: " ")])
     #expect(compositing.sourceBackdrop == nil)
+  }
+
+  @Test("foreground-only glyph under blended image changes backdrop signature")
+  func foregroundOnlyGlyphUnderBlendedImageChangesBackdropSignature() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let imageIdentity = testIdentity("image-glyph-signature")
+
+    func renderedCompositing(
+      glyph: Character
+    ) throws -> RasterImageCompositing {
+      let draw = DrawNode(
+        identity: testIdentity("image-glyph-signature-root"),
+        bounds: bounds,
+        commands: [
+          .text(
+            bounds: bounds,
+            content: String(glyph),
+            style: .init(foregroundStyle: .color(.red)),
+            lineLimit: nil,
+            truncationMode: .tail,
+            wrappingStrategy: .wordBoundary
+          )
+        ],
+        children: [
+          DrawNode(
+            identity: imageIdentity,
+            bounds: bounds,
+            drawEffects: .init([.blendMode(.multiply)]),
+            commands: [
+              .image(
+                bounds: bounds,
+                identity: imageIdentity,
+                payload: imagePayload()
+              )
+            ]
+          )
+        ]
+      )
+      let attachment = try #require(rasterizer.rasterize(draw).imageAttachments.first)
+      return try #require(attachment.compositing)
+    }
+
+    let first = try renderedCompositing(glyph: "A")
+    let second = try renderedCompositing(glyph: "B")
+
+    #expect(
+      first.destinationBackdrop.cells
+        == [.init(backgroundColor: nil, foregroundColor: .red, glyph: "A")]
+    )
+    #expect(
+      second.destinationBackdrop.cells
+        == [.init(backgroundColor: nil, foregroundColor: .red, glyph: "B")]
+    )
+    #expect(first.backdropSignature != second.backdropSignature)
+  }
+
+  @Test("blended image over wide glyph continuation captures the lead glyph")
+  func blendedImageOverWideGlyphContinuationCapturesLeadGlyph() throws {
+    let rasterizer = Rasterizer()
+    let rootBounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+    let imageBounds = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 1, height: 1))
+    let imageIdentity = testIdentity("image-wide-continuation")
+    let draw = DrawNode(
+      identity: testIdentity("image-wide-continuation-root"),
+      bounds: rootBounds,
+      commands: [
+        .text(
+          bounds: rootBounds,
+          content: "界",
+          style: .init(foregroundStyle: .color(.red)),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ],
+      children: [
+        DrawNode(
+          identity: imageIdentity,
+          bounds: imageBounds,
+          drawEffects: .init([.blendMode(.multiply)]),
+          commands: [
+            .image(
+              bounds: imageBounds,
+              identity: imageIdentity,
+              payload: imagePayload()
+            )
+          ]
+        )
+      ]
+    )
+
+    let attachment = try #require(rasterizer.rasterize(draw).imageAttachments.first)
+    let compositing = try #require(attachment.compositing)
+
+    #expect(
+      compositing.destinationBackdrop.cells
+        == [
+          .init(
+            backgroundColor: nil,
+            foregroundColor: .red,
+            glyph: "界",
+            spanWidth: 2,
+            spanOffset: 1
+          )
+        ]
+    )
   }
 
   @Test("image blend metadata preserves blend and compositingGroup ordering")
@@ -564,10 +671,10 @@ struct RasterizerTests {
     let blendThenGroupCompositing = try #require(blendThenGroup.compositing)
     let groupThenBlendCompositing = try #require(groupThenBlend.compositing)
 
-    #expect(blendThenGroupCompositing.destinationBackdrop.cells == [.init(backgroundColor: .blue)])
+    #expect(blendThenGroupCompositing.destinationBackdrop.cells == [.init(backgroundColor: .blue, glyph: " ")])
     #expect(blendThenGroupCompositing.sourceBackdrop == nil)
-    #expect(groupThenBlendCompositing.destinationBackdrop.cells == [.init(backgroundColor: .red)])
-    #expect(groupThenBlendCompositing.sourceBackdrop?.cells == [.init(backgroundColor: .blue)])
+    #expect(groupThenBlendCompositing.destinationBackdrop.cells == [.init(backgroundColor: .red, glyph: " ")])
+    #expect(groupThenBlendCompositing.sourceBackdrop?.cells == [.init(backgroundColor: .blue, glyph: " ")])
     #expect(blendThenGroupCompositing != groupThenBlendCompositing)
   }
 

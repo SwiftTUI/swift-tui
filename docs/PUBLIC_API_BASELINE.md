@@ -32,7 +32,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftUIHost` | 7 | 62 |
-| `SwiftTUICore` | 279 | 2179 |
+| `SwiftTUICore` | 279 | 2183 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -726,7 +726,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RasterCell` — struct — 8 members
 - `RasterImageAttachment` — struct — 11 members
 - `RasterImageBackdrop` — struct — 3 members
-- `RasterImageBackdropCell` — struct — 2 members
+- `RasterImageBackdropCell` — struct — 6 members
 - `RasterImageCompositing` — struct — 6 members
 - `Rasterizer` — struct — 2 members
 - `RasterStyleRun` — struct — 6 members

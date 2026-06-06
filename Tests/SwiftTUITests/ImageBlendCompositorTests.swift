@@ -102,6 +102,183 @@ struct ImageBlendCompositorTests {
     )
   }
 
+  @Test("full-block glyph backdrop expands foreground across the cell")
+  func fullBlockGlyphBackdropExpandsForegroundAcrossCell() throws {
+    let pngBytes = try transparentPNGBytes(width: 2, height: 2)
+    let attachment = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(
+        blendMode: .normal,
+        destination: .blue,
+        destinationCells: [
+          .init(backgroundColor: .blue, foregroundColor: .red, glyph: "█")
+        ],
+        cellPixelSize: .init(width: 2, height: 2)
+      )
+    )
+
+    let variant = try #require(
+      ImageBlendCompositor().decodedVariant(
+        for: attachment,
+        fallbackBackground: .black
+      )
+    )
+
+    #expect(variant.image.pixels == Array(repeating: expectedPixel(.red), count: 4))
+  }
+
+  @Test("half-block glyph backdrop only covers its occupied pixels")
+  func halfBlockGlyphBackdropOnlyCoversOccupiedPixels() throws {
+    let pngBytes = try transparentPNGBytes(width: 2, height: 2)
+    let attachment = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(
+        blendMode: .normal,
+        destination: .blue,
+        destinationCells: [
+          .init(backgroundColor: .blue, foregroundColor: .red, glyph: "▀")
+        ],
+        cellPixelSize: .init(width: 2, height: 2)
+      )
+    )
+
+    let variant = try #require(
+      ImageBlendCompositor().decodedVariant(
+        for: attachment,
+        fallbackBackground: .black
+      )
+    )
+
+    #expect(
+      variant.image.pixels == [
+        expectedPixel(.red), expectedPixel(.red),
+        expectedPixel(.blue), expectedPixel(.blue),
+      ]
+    )
+  }
+
+  @Test("ordinary text glyph backdrop uses a centered approximation")
+  func ordinaryTextGlyphBackdropUsesCenteredApproximation() throws {
+    let pngBytes = try transparentPNGBytes(width: 3, height: 3)
+    let attachment = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(
+        blendMode: .normal,
+        destination: .blue,
+        destinationCells: [
+          .init(backgroundColor: .blue, foregroundColor: .red, glyph: "A")
+        ],
+        cellPixelSize: .init(width: 3, height: 3)
+      )
+    )
+
+    let variant = try #require(
+      ImageBlendCompositor().decodedVariant(
+        for: attachment,
+        fallbackBackground: .black
+      )
+    )
+
+    #expect(
+      variant.image.pixels == [
+        expectedPixel(.blue), expectedPixel(.blue), expectedPixel(.blue),
+        expectedPixel(.blue), expectedPixel(.red), expectedPixel(.blue),
+        expectedPixel(.blue), expectedPixel(.blue), expectedPixel(.blue),
+      ]
+    )
+  }
+
+  @Test("glyph backdrop without foreground uses only background")
+  func glyphBackdropWithoutForegroundUsesOnlyBackground() throws {
+    let pngBytes = try transparentPNGBytes(width: 2, height: 2)
+    let attachment = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(
+        blendMode: .normal,
+        destination: .blue,
+        destinationCells: [
+          .init(backgroundColor: .blue, glyph: "█")
+        ],
+        cellPixelSize: .init(width: 2, height: 2)
+      )
+    )
+
+    let variant = try #require(
+      ImageBlendCompositor().decodedVariant(
+        for: attachment,
+        fallbackBackground: .black
+      )
+    )
+
+    #expect(variant.image.pixels == Array(repeating: expectedPixel(.blue), count: 4))
+  }
+
+  @Test("braille glyph backdrop maps dots onto a two-by-four cell grid")
+  func brailleGlyphBackdropMapsDotsOntoSubcellGrid() throws {
+    let pngBytes = try transparentPNGBytes(width: 2, height: 4)
+    let attachment = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(
+        blendMode: .normal,
+        destination: .blue,
+        destinationCells: [
+          .init(backgroundColor: .blue, foregroundColor: .red, glyph: "\u{2801}")
+        ],
+        cellPixelSize: .init(width: 2, height: 4)
+      )
+    )
+
+    let variant = try #require(
+      ImageBlendCompositor().decodedVariant(
+        for: attachment,
+        fallbackBackground: .black
+      )
+    )
+
+    #expect(
+      variant.image.pixels == [
+        expectedPixel(.red), expectedPixel(.blue),
+        expectedPixel(.blue), expectedPixel(.blue),
+        expectedPixel(.blue), expectedPixel(.blue),
+        expectedPixel(.blue), expectedPixel(.blue),
+      ]
+    )
+  }
+
+  @Test("wide glyph continuation cell uses the lead glyph foreground")
+  func wideGlyphContinuationCellUsesLeadGlyphForeground() throws {
+    let bounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+    let pngBytes = try transparentPNGBytes(width: 2, height: 1)
+    let attachment = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(
+        blendMode: .normal,
+        destination: .blue,
+        bounds: bounds,
+        destinationCells: [
+          .init(backgroundColor: .blue, foregroundColor: .red, glyph: "界", spanWidth: 2),
+          .init(
+            backgroundColor: .blue,
+            foregroundColor: .red,
+            glyph: "界",
+            spanWidth: 2,
+            spanOffset: 1
+          ),
+        ]
+      ),
+      bounds: bounds
+    )
+
+    let variant = try #require(
+      ImageBlendCompositor().decodedVariant(
+        for: attachment,
+        fallbackBackground: .black
+      )
+    )
+
+    #expect(variant.image.pixels == [expectedPixel(.red), expectedPixel(.red)])
+  }
+
   @Test("repeated decoded requests hit one compositor cache entry")
   func repeatedDecodedRequestsHitOneCacheEntry() throws {
     let pngBytes = try makePNGBytes(
@@ -381,13 +558,17 @@ private func blendedAttachment(
   compositing: RasterImageCompositing,
   bounds: CellRect = CellRect(origin: .zero, size: .init(width: 1, height: 1))
 ) -> RasterImageAttachment {
-  RasterImageAttachment(
+  let cellPixelSize = compositing.cellPixelSize
+  return RasterImageAttachment(
     identity: testIdentity("Root", "Image"),
     bounds: bounds,
     source: .data(pngBytes),
     resolvedReference: .embeddedImage(pngBytes),
-    pixelSize: .init(width: bounds.size.width, height: bounds.size.height),
-    cellPixelSize: .init(width: 1, height: 1),
+    pixelSize: .init(
+      width: bounds.size.width * max(1, cellPixelSize.width),
+      height: bounds.size.height * max(1, cellPixelSize.height)
+    ),
+    cellPixelSize: cellPixelSize,
     compositing: compositing
   )
 }
@@ -397,30 +578,49 @@ private func imageCompositing(
   destination: Color,
   source: Color? = nil,
   bounds: CellRect = CellRect(origin: .zero, size: .init(width: 1, height: 1)),
+  destinationCells: [RasterImageBackdropCell]? = nil,
+  sourceCells: [RasterImageBackdropCell]? = nil,
+  cellPixelSize: PixelSize = .init(width: 1, height: 1),
   signature: UInt64? = nil
 ) -> RasterImageCompositing {
   let destinationBackdrop = RasterImageBackdrop(
     bounds: bounds,
-    cells: Array(
-      repeating: .init(backgroundColor: destination),
-      count: bounds.size.width * bounds.size.height
-    )
+    cells: destinationCells
+      ?? Array(
+        repeating: .init(backgroundColor: destination),
+        count: bounds.size.width * bounds.size.height
+      )
   )
   let sourceBackdrop = source.map { color in
     RasterImageBackdrop(
       bounds: bounds,
-      cells: Array(
-        repeating: .init(backgroundColor: color),
-        count: bounds.size.width * bounds.size.height
-      )
+      cells: sourceCells
+        ?? Array(
+          repeating: .init(backgroundColor: color),
+          count: bounds.size.width * bounds.size.height
+        )
     )
   }
   return RasterImageCompositing(
     blendMode: blendMode,
     destinationBackdrop: destinationBackdrop,
     sourceBackdrop: sourceBackdrop,
-    cellPixelSize: .init(width: 1, height: 1),
+    cellPixelSize: cellPixelSize,
     backdropSignature: signature ?? (source == nil ? 1 : 2)
+  )
+}
+
+private func transparentPNGBytes(
+  width: Int,
+  height: Int
+) throws -> [UInt8] {
+  try makePNGBytes(
+    width: width,
+    height: height,
+    pixels: Array(
+      repeating: rgbaPixel(red: 255, green: 0, blue: 0, alpha: 0),
+      count: width * height
+    )
   )
 }
 

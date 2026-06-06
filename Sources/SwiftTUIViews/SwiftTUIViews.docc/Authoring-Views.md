@@ -75,11 +75,14 @@ applied.
 
 Image attachments follow the same ordering for decodable PNG/JPEG sources. When
 an `Image` has an active blend mode, hosts receive a precomposed image variant
-blended against the visible cell-background backdrop; unblended images keep the
-normal high-fidelity attachment path. `AnimatedImage` frames rendered through
-`Image(data:)` inherit this behavior. This first tranche blends against cell
-background colors, not glyph-shaped text, overlapping image layers, or GIF
-pass-through bytes.
+blended against the visible cell backdrop; unblended images keep the normal
+high-fidelity attachment path. `AnimatedImage` frames rendered through
+`Image(data:)` inherit this behavior. The backdrop includes cell backgrounds and
+explicit foreground glyphs, with deterministic coverage approximations for
+block, braille, and ordinary text. Shaded block elements are treated as
+full-cell foreground in this approximation. It still does not claim exact
+terminal font masks, overlapping image-layer blending, or GIF pass-through byte
+blending.
 
 ## Preview And Inspection
 

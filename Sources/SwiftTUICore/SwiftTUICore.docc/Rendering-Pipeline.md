@@ -67,8 +67,9 @@ Lowers geometry plus metadata into draw commands and collection chrome.
 Converts draw commands into `RasterSurface`, a cell grid with styles,
 attachments, and continuation-cell handling. Image attachments remain host
 presentation records; when an image is under an active blend mode, the raster
-phase records cell-background backdrop metadata so the runtime can precompose a
-blended image variant without changing the cell grid model.
+phase records visible backdrop metadata, including cell backgrounds, explicit
+foreground colors, glyphs, and continuation spans, so the runtime can
+precompose a blended image variant without changing the cell grid model.
 
 ### Commit
 

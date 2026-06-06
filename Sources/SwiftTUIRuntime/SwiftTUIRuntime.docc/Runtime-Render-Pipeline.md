@@ -251,8 +251,10 @@ Raster image attachments are still presented after cell rasterization. If an
 attachment carries blend metadata, the host path asks the shared image
 compositor for a precomposed PNG variant keyed by the image reference, visible
 rect, blend mode, backdrop signature, cell pixel size, and host fallback
-background. Terminal graphics protocols, WASI/WebHost image records, and the
-SwiftUI host then draw that variant through their normal image routes.
+background. The compositor expands captured backgrounds and explicit foreground
+glyphs into a pixel backdrop using deterministic block, braille, and centered
+text approximations; terminal graphics protocols, WASI/WebHost image records,
+and the SwiftUI host then draw that variant through their normal image routes.
 
 ## Diagnostics
 

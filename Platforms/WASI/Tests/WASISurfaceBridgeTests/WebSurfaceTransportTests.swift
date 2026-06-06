@@ -561,6 +561,61 @@ struct WebSurfaceTransportTests {
     #expect(changedImage["dataBase64"] != nil)
   }
 
+  @Test("encoder emits a new blended png variant when backdrop glyph changes")
+  func encoderEmitsNewBlendedPNGVariantWhenBackdropGlyphChanges() throws {
+    var knownImageIDs: Set<String> = []
+    let firstFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(
+          background: nil,
+          foreground: .blue,
+          glyph: "A",
+          signature: 1
+        ),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let stableFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(
+          background: nil,
+          foreground: .blue,
+          glyph: "A",
+          signature: 1
+        ),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let changedGlyphFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(
+          background: nil,
+          foreground: .blue,
+          glyph: "B",
+          signature: 2
+        ),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+
+    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+    let stableImage = try #require((stableFrame["images"] as? [[String: Any]])?.first)
+    let changedImage = try #require((changedGlyphFrame["images"] as? [[String: Any]])?.first)
+    let firstID = try #require(firstImage["id"] as? String)
+    let changedID = try #require(changedImage["id"] as? String)
+
+    #expect(firstID.hasPrefix("blend:png:"))
+    #expect(firstImage["dataBase64"] != nil)
+    #expect(stableImage["id"] as? String == firstID)
+    #expect(stableImage["dataBase64"] == nil)
+    #expect(changedID.hasPrefix("blend:png:"))
+    #expect(changedID != firstID)
+    #expect(changedImage["dataBase64"] != nil)
+  }
+
   @Test("encoder process compositor evicts blended payloads under the default policy")
   func encoderProcessCompositorEvictsBlendedPayloadsUnderDefaultPolicy() throws {
     let before = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
@@ -897,7 +952,10 @@ struct WebSurfaceTransportTests {
   }
 
   private static func blendedImageSurface(
-    background: Color,
+    background: Color?,
+    foreground: Color? = nil,
+    glyph: Character? = nil,
+    spanWidth: Int = 1,
     signature: UInt64
   ) -> RasterSurface {
     let bytes = redPixelPNGBytes()
@@ -919,7 +977,14 @@ struct WebSurfaceTransportTests {
             blendMode: .multiply,
             destinationBackdrop: RasterImageBackdrop(
               bounds: visibleBounds,
-              cells: [.init(backgroundColor: background)]
+              cells: [
+                .init(
+                  backgroundColor: background,
+                  foregroundColor: foreground,
+                  glyph: glyph,
+                  spanWidth: spanWidth
+                )
+              ]
             ),
             cellPixelSize: .init(width: 1, height: 1),
             backdropSignature: signature

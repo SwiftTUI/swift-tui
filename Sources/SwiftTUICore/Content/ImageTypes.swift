@@ -67,7 +67,7 @@ public struct ImagePayload: Equatable, Sendable {
   }
 }
 
-/// A captured cell-background backdrop used to precompose a blended image.
+/// A captured cell backdrop used to precompose a blended image.
 public struct RasterImageBackdrop: Equatable, Sendable {
   public var bounds: CellRect
   public var cells: [RasterImageBackdropCell]
@@ -84,11 +84,23 @@ public struct RasterImageBackdrop: Equatable, Sendable {
 /// A single cell in a captured image-compositing backdrop.
 public struct RasterImageBackdropCell: Equatable, Sendable {
   public var backgroundColor: Color?
+  public var foregroundColor: Color?
+  public var glyph: Character?
+  public var spanWidth: Int
+  public var spanOffset: Int
 
   public init(
-    backgroundColor: Color?
+    backgroundColor: Color?,
+    foregroundColor: Color? = nil,
+    glyph: Character? = nil,
+    spanWidth: Int = 1,
+    spanOffset: Int = 0
   ) {
     self.backgroundColor = backgroundColor
+    self.foregroundColor = foregroundColor
+    self.glyph = glyph
+    self.spanWidth = spanWidth
+    self.spanOffset = spanOffset
   }
 }
 

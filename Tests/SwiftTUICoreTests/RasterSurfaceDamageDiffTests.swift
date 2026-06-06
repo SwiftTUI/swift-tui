@@ -158,11 +158,69 @@ struct RasterSurfaceDamageDiffTests {
         ])
     )
   }
+
+  @Test("diff marks blended image rows dirty when backdrop glyph foreground changes")
+  func diffMarksBlendedImageRowsDirtyWhenBackdropGlyphForegroundChanges() {
+    let identity = Identity(components: ["image"])
+    let bounds = CellRect(origin: .init(x: 1, y: 1), size: .init(width: 2, height: 2))
+    let previous = RasterSurface(
+      size: .init(width: 5, height: 4),
+      lines: ["", "", "", ""],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: identity,
+          bounds: bounds,
+          source: .path("image.png"),
+          resolvedReference: .filePath("/tmp/image.png"),
+          pixelSize: .init(width: 16, height: 32),
+          cellPixelSize: .init(width: 8, height: 16),
+          compositing: imageCompositing(
+            signature: 1,
+            background: nil,
+            foreground: .red,
+            glyph: "A",
+            bounds: bounds
+          )
+        )
+      ]
+    )
+    let current = RasterSurface(
+      size: .init(width: 5, height: 4),
+      lines: ["", "", "", ""],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: identity,
+          bounds: bounds,
+          source: .path("image.png"),
+          resolvedReference: .filePath("/tmp/image.png"),
+          pixelSize: .init(width: 16, height: 32),
+          cellPixelSize: .init(width: 8, height: 16),
+          compositing: imageCompositing(
+            signature: 2,
+            background: nil,
+            foreground: .green,
+            glyph: "B",
+            bounds: bounds
+          )
+        )
+      ]
+    )
+
+    #expect(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: current)
+        == PresentationDamage(textRows: [
+          .init(row: 1, columnRanges: [1..<3]),
+          .init(row: 2, columnRanges: [1..<3]),
+        ])
+    )
+  }
 }
 
 private func imageCompositing(
   signature: UInt64,
-  background: Color,
+  background: Color?,
+  foreground: Color? = nil,
+  glyph: Character? = nil,
   bounds: CellRect
 ) -> RasterImageCompositing {
   RasterImageCompositing(
@@ -170,7 +228,11 @@ private func imageCompositing(
     destinationBackdrop: RasterImageBackdrop(
       bounds: bounds,
       cells: Array(
-        repeating: RasterImageBackdropCell(backgroundColor: background),
+        repeating: RasterImageBackdropCell(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          glyph: glyph
+        ),
         count: bounds.size.width * bounds.size.height
       )
     ),
