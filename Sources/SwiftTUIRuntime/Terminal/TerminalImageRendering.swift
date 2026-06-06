@@ -49,10 +49,14 @@ final class TerminalImageRenderer: Sendable {
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
 
   init(
-    repository: ImageAssetRepository
+    repository: ImageAssetRepository,
+    blendCompositorCachePolicy: ImageBlendCompositorCachePolicy = .default
   ) {
     self.repository = repository
-    blendCompositor = ImageBlendCompositor(repository: repository)
+    blendCompositor = ImageBlendCompositor(
+      repository: repository,
+      cachePolicy: blendCompositorCachePolicy
+    )
     MemoryMetricRegistry.shared.registerPermanent(
       ClosureMemoryMetricProvider { [weak self] in
         guard let self else {
@@ -71,6 +75,10 @@ final class TerminalImageRenderer: Sendable {
         )
       }
     )
+  }
+
+  package func imageBlendCacheSnapshot() -> ImageBlendCompositorCacheSnapshot {
+    blendCompositor.cacheSnapshot()
   }
 
   func occupancy() -> (kitty: Int, sixel: Int, fallback: Int, approxBytes: Int) {
@@ -136,6 +144,7 @@ final class TerminalImageRenderer: Sendable {
       guard
         let overlay = fallbackOverlay(
           for: displayAttachment,
+          sourceReference: attachment.resolvedReference,
           variant: presentation,
           capabilityProfile: capabilityProfile
         )
@@ -262,6 +271,7 @@ final class TerminalImageRenderer: Sendable {
         guard
           let payload = sixelPayload(
             for: displayAttachment,
+            sourceReference: reference,
             variantID: presentation?.id,
             image: image,
             capabilityProfile: capabilityProfile,
@@ -283,17 +293,23 @@ final class TerminalImageRenderer: Sendable {
 
   private func fallbackOverlay(
     for attachment: RasterImageAttachment,
+    sourceReference: ImageAssetReference?,
     variant: BlendedImageVariant?,
     capabilityProfile: TerminalCapabilityProfile
   ) -> RasterImageOverlay? {
-    guard
-      let reference = attachment.resolvedReference,
-      let sourceImage = repository.decodedImage(for: reference)
-    else {
+    guard let reference = sourceReference else {
       return nil
     }
 
-    let image = variant?.image ?? sourceImage
+    let image: DecodedImage
+    if let variant {
+      image = variant.image
+    } else {
+      guard let sourceImage = repository.decodedImage(for: reference) else {
+        return nil
+      }
+      image = sourceImage
+    }
     let mode = fallbackRenderMode(for: capabilityProfile)
     let cellSize = attachment.bounds.size
     let outputSize = fallbackOutputSize(
@@ -363,15 +379,12 @@ final class TerminalImageRenderer: Sendable {
 
   private func sixelPayload(
     for attachment: RasterImageAttachment,
+    sourceReference: ImageAssetReference,
     variantID: String?,
     image: DecodedImage,
     capabilityProfile: TerminalCapabilityProfile,
     graphicsCapabilities: TerminalGraphicsCapabilities
   ) -> String? {
-    guard let reference = attachment.resolvedReference else {
-      return nil
-    }
-
     let pixelSize = sixelOutputSize(
       for: attachment.visibleBounds,
       graphicsCapabilities: graphicsCapabilities
@@ -381,7 +394,7 @@ final class TerminalImageRenderer: Sendable {
       graphicsCapabilities: graphicsCapabilities
     )
     let key = TerminalImageVariantKey(
-      reference: reference,
+      reference: sourceReference,
       variantID: variantID,
       mode: .sixel,
       outputSize: pixelSize,

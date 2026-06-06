@@ -126,9 +126,11 @@ struct ImageBlendCompositorTests {
     #expect(afterMiss.entryCount == 1)
     #expect(afterMiss.decodedMisses == 1)
     #expect(afterMiss.decodedHits == 0)
+    #expect(afterMiss.accessGeneration == 1)
     #expect(afterHit.entryCount == 1)
     #expect(afterHit.decodedMisses == 1)
     #expect(afterHit.decodedHits == 1)
+    #expect(afterHit.accessGeneration == 2)
   }
 
   @Test("LRU eviction bounds unique backdrop variants")
@@ -207,13 +209,39 @@ struct ImageBlendCompositorTests {
     #expect(afterEncoded.entryCount == 1)
     #expect(afterEncoded.decodedPixelBytes == 0)
     #expect(afterEncoded.encodedMisses == 1)
+    #expect(afterEncoded.accessGeneration == 1)
     #expect(afterDecoded.entryCount == 1)
     #expect(afterDecoded.decodedPixelBytes > 0)
     #expect(afterDecoded.decodedMisses == 1)
+    #expect(afterDecoded.accessGeneration == 2)
     #expect(variant.image.encodedBytes == payload.bytes)
     #expect(repeatedPayload == payload)
     #expect(afterEncodedHit.entryCount == 1)
     #expect(afterEncodedHit.encodedHits == 1)
+    #expect(afterEncodedHit.accessGeneration == 3)
+  }
+
+  @Test("embedded source bytes are fingerprinted instead of retained in the blended cache")
+  func embeddedSourceBytesAreFingerprintedInsteadOfRetainedInCache() throws {
+    let pngBytes = try makePNGBytes(
+      width: 64,
+      height: 64,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 64 * 64)
+    )
+    let compositor = ImageBlendCompositor(cachePolicy: cachePolicy(maxEntries: 4))
+
+    _ = try #require(
+      compositor.decodedVariant(
+        for: backdropVariant(pngBytes: pngBytes, background: .blue, signature: 1),
+        fallbackBackground: .black
+      )
+    )
+    let snapshot = compositor.cacheSnapshot()
+
+    #expect(snapshot.entryCount == 1)
+    #expect(snapshot.retainedMetadataBytes > 0)
+    #expect(snapshot.retainedMetadataBytes < pngBytes.count)
+    #expect(snapshot.totalApproxBytes < pngBytes.count)
   }
 
   @Test("oversize current entry is retained while older variants are evicted")
@@ -296,6 +324,7 @@ struct ImageBlendCompositorTests {
     #expect(metric.approxBytes == cacheSnapshot.totalApproxBytes)
     #expect(metric.detail?["encodedBytes"] == cacheSnapshot.encodedBytes)
     #expect(metric.detail?["decodedPixelBytes"] == cacheSnapshot.decodedPixelBytes)
+    #expect(metric.detail?["retainedMetadataBytes"] == cacheSnapshot.retainedMetadataBytes)
   }
 
   @Test("frame-like source and backdrop churn remains bounded by policy")

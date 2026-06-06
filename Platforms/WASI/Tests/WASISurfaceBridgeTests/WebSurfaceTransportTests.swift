@@ -4,7 +4,7 @@ import Testing
 
 @testable import WASISurfaceBridge
 
-@Suite
+@Suite(.serialized)
 struct WebSurfaceTransportTests {
   @Test("encoder emits the shared basic web-surface fixture")
   func encoderEmitsBasicFixture() throws {
@@ -559,6 +559,28 @@ struct WebSurfaceTransportTests {
     #expect(changedID.hasPrefix("blend:png:"))
     #expect(changedID != firstID)
     #expect(changedImage["dataBase64"] != nil)
+  }
+
+  @Test("encoder process compositor evicts blended payloads under the default policy")
+  func encoderProcessCompositorEvictsBlendedPayloadsUnderDefaultPolicy() throws {
+    let before = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
+    var knownImageIDs: Set<String> = []
+
+    for index in 0..<300 {
+      _ = WebSurfaceFrameEncoder.encode(
+        Self.blendedImageSurface(
+          background: .blue,
+          signature: UInt64(10_000 + index)
+        ),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    }
+
+    let after = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
+    #expect(after.entryCount <= 256)
+    #expect(after.evictionCount > before.evictionCount)
+    #expect(knownImageIDs.count == 300)
   }
 
   @Test("encoder emits presentation damage for browser partial redraws")

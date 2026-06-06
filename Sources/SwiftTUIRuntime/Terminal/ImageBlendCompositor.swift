@@ -48,6 +48,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   package var entryCount: Int
   package var decodedPixelBytes: Int
   package var encodedBytes: Int
+  package var retainedMetadataBytes: Int
   package var accessGeneration: Int
   package var evictionCount: Int
   package var decodedHits: Int
@@ -56,17 +57,49 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   package var encodedMisses: Int
 
   package var totalApproxBytes: Int {
-    decodedPixelBytes + encodedBytes
+    decodedPixelBytes + encodedBytes + retainedMetadataBytes
   }
 }
 
 package final class ImageBlendCompositor: Sendable {
+  private struct PresentationAttachment: Sendable {
+    var identity: Identity
+    var bounds: CellRect
+    var visibleBounds: CellRect
+    var pixelSize: PixelSize
+    var cellPixelSize: PixelSize?
+    var isResizable: Bool
+    var scalingMode: ImageScalingMode
+
+    var rasterAttachment: RasterImageAttachment {
+      RasterImageAttachment(
+        identity: identity,
+        bounds: bounds,
+        visibleBounds: visibleBounds,
+        source: .data([]),
+        resolvedReference: nil,
+        pixelSize: pixelSize,
+        cellPixelSize: cellPixelSize,
+        isResizable: isResizable,
+        scalingMode: scalingMode,
+        compositing: nil
+      )
+    }
+
+    var retainedByteEstimate: Int {
+      let identityBytes = identity.components.reduce(0) { total, component in
+        total + component.utf8.count
+      }
+      return identityBytes + (MemoryLayout<Int>.stride * 12) + 2
+    }
+  }
+
   private struct CacheEntry: Sendable {
     var id: String
     var pixelSize: PixelSize
     var encodedBytes: [UInt8]
     var decodedImage: DecodedImage?
-    var attachment: RasterImageAttachment
+    var presentationAttachment: PresentationAttachment
     var lastAccessGeneration: Int
 
     var decodedPixelCount: Int {
@@ -81,6 +114,12 @@ package final class ImageBlendCompositor: Sendable {
       encodedBytes.count
     }
 
+    var retainedMetadataBytes: Int {
+      id.utf8.count
+        + presentationAttachment.retainedByteEstimate
+        + (MemoryLayout<Int>.stride * 4)
+    }
+
     var encodedPayload: BlendedImageEncodedPayload {
       BlendedImageEncodedPayload(id: id, bytes: encodedBytes, pixelSize: pixelSize)
     }
@@ -89,7 +128,11 @@ package final class ImageBlendCompositor: Sendable {
       guard let decodedImage else {
         return nil
       }
-      return BlendedImageVariant(id: id, image: decodedImage, attachment: attachment)
+      return BlendedImageVariant(
+        id: id,
+        image: decodedImage,
+        attachment: presentationAttachment.rasterAttachment
+      )
     }
   }
 
@@ -105,12 +148,11 @@ package final class ImageBlendCompositor: Sendable {
     mutating func decodedLookup(
       for key: ImageBlendCacheKey
     ) -> (variant: BlendedImageVariant?, encodedBytes: [UInt8]?) {
-      accessGeneration += 1
       if var entry = entries[key] {
-        entry.lastAccessGeneration = accessGeneration
-        entries[key] = entry
-
         if let variant = entry.decodedVariant {
+          accessGeneration += 1
+          entry.lastAccessGeneration = accessGeneration
+          entries[key] = entry
           decodedHits += 1
           return (variant, entry.encodedBytes)
         }
@@ -126,12 +168,12 @@ package final class ImageBlendCompositor: Sendable {
     mutating func encodedLookup(
       for key: ImageBlendCacheKey
     ) -> BlendedImageEncodedPayload? {
-      accessGeneration += 1
       guard var entry = entries[key] else {
         encodedMisses += 1
         return nil
       }
 
+      accessGeneration += 1
       entry.lastAccessGeneration = accessGeneration
       entries[key] = entry
       encodedHits += 1
@@ -141,6 +183,7 @@ package final class ImageBlendCompositor: Sendable {
     mutating func storeDecodedVariant(
       _ variant: BlendedImageVariant,
       for key: ImageBlendCacheKey,
+      presentationAttachment: PresentationAttachment,
       policy: ImageBlendCompositorCachePolicy
     ) {
       accessGeneration += 1
@@ -150,14 +193,14 @@ package final class ImageBlendCompositor: Sendable {
           pixelSize: variant.image.pixelSize,
           encodedBytes: variant.image.encodedBytes,
           decodedImage: nil,
-          attachment: variant.attachment,
+          presentationAttachment: presentationAttachment,
           lastAccessGeneration: accessGeneration
         )
       entry.id = variant.id
       entry.pixelSize = variant.image.pixelSize
       entry.encodedBytes = variant.image.encodedBytes
       entry.decodedImage = variant.image
-      entry.attachment = variant.attachment
+      entry.presentationAttachment = presentationAttachment
       entry.lastAccessGeneration = accessGeneration
       entries[key] = entry
       evictIfNeeded(policy: policy, protecting: key)
@@ -165,7 +208,7 @@ package final class ImageBlendCompositor: Sendable {
 
     mutating func storeEncodedPayload(
       _ payload: BlendedImageEncodedPayload,
-      attachment: RasterImageAttachment,
+      presentationAttachment: PresentationAttachment,
       for key: ImageBlendCacheKey,
       policy: ImageBlendCompositorCachePolicy
     ) {
@@ -176,13 +219,13 @@ package final class ImageBlendCompositor: Sendable {
           pixelSize: payload.pixelSize,
           encodedBytes: payload.bytes,
           decodedImage: nil,
-          attachment: attachment,
+          presentationAttachment: presentationAttachment,
           lastAccessGeneration: accessGeneration
         )
       entry.id = payload.id
       entry.pixelSize = payload.pixelSize
       entry.encodedBytes = payload.bytes
-      entry.attachment = attachment
+      entry.presentationAttachment = presentationAttachment
       entry.lastAccessGeneration = accessGeneration
       entries[key] = entry
       evictIfNeeded(policy: policy, protecting: key)
@@ -191,14 +234,17 @@ package final class ImageBlendCompositor: Sendable {
     func snapshot() -> ImageBlendCompositorCacheSnapshot {
       var decodedPixelBytes = 0
       var encodedBytes = 0
-      for entry in entries.values {
+      var retainedMetadataBytes = 0
+      for (key, entry) in entries {
         decodedPixelBytes += entry.decodedPixelBytes
         encodedBytes += entry.encodedByteCount
+        retainedMetadataBytes += key.retainedByteEstimate + entry.retainedMetadataBytes
       }
       return ImageBlendCompositorCacheSnapshot(
         entryCount: entries.count,
         decodedPixelBytes: decodedPixelBytes,
         encodedBytes: encodedBytes,
+        retainedMetadataBytes: retainedMetadataBytes,
         accessGeneration: accessGeneration,
         evictionCount: evictionCount,
         decodedHits: decodedHits,
@@ -224,7 +270,7 @@ package final class ImageBlendCompositor: Sendable {
       let snapshot = snapshot()
       return snapshot.entryCount > policy.maxEntries
         || decodedPixelCount > policy.maxDecodedPixels
-        || snapshot.encodedBytes > policy.maxEncodedBytes
+        || snapshot.encodedBytes + snapshot.retainedMetadataBytes > policy.maxEncodedBytes
     }
 
     private var decodedPixelCount: Int {
@@ -277,6 +323,7 @@ package final class ImageBlendCompositor: Sendable {
             "accessGeneration": snapshot.accessGeneration,
             "decodedPixelBytes": snapshot.decodedPixelBytes,
             "encodedBytes": snapshot.encodedBytes,
+            "retainedMetadataBytes": snapshot.retainedMetadataBytes,
             "evictions": snapshot.evictionCount,
             "decodedHits": snapshot.decodedHits,
             "decodedMisses": snapshot.decodedMisses,
@@ -311,7 +358,7 @@ package final class ImageBlendCompositor: Sendable {
     }
 
     let key = ImageBlendCacheKey(
-      reference: reference,
+      source: sourceCacheKey(for: reference),
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds,
       outputSize: outputSize,
@@ -344,7 +391,7 @@ package final class ImageBlendCompositor: Sendable {
     let id = blendedImageID(for: key)
     let encodedBytes = lookup.encodedBytes
       ?? ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize)
-    let presentationAttachment = blendedPresentationAttachment(
+    let presentationAttachment = imageBlendPresentationAttachment(
       from: attachment,
       outputSize: outputSize
     )
@@ -357,11 +404,16 @@ package final class ImageBlendCompositor: Sendable {
         pixelSize: outputSize,
         pixels: pixels
       ),
-      attachment: presentationAttachment
+      attachment: presentationAttachment.rasterAttachment
     )
 
     storage.withLockUnchecked { storage in
-      storage.storeDecodedVariant(variant, for: key, policy: cachePolicy)
+      storage.storeDecodedVariant(
+        variant,
+        for: key,
+        presentationAttachment: presentationAttachment,
+        policy: cachePolicy
+      )
     }
     return variant
   }
@@ -380,7 +432,7 @@ package final class ImageBlendCompositor: Sendable {
 
     let outputSize = blendedOutputSize(for: attachment, compositing: compositing)
     let key = ImageBlendCacheKey(
-      reference: reference,
+      source: sourceCacheKey(for: reference),
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds,
       outputSize: outputSize,
@@ -414,14 +466,14 @@ package final class ImageBlendCompositor: Sendable {
       bytes: ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize),
       pixelSize: outputSize
     )
-    let presentationAttachment = blendedPresentationAttachment(
+    let presentationAttachment = imageBlendPresentationAttachment(
       from: attachment,
       outputSize: outputSize
     )
     storage.withLockUnchecked { storage in
       storage.storeEncodedPayload(
         payload,
-        attachment: presentationAttachment,
+        presentationAttachment: presentationAttachment,
         for: key,
         policy: cachePolicy
       )
@@ -429,15 +481,19 @@ package final class ImageBlendCompositor: Sendable {
     return payload
   }
 
-  private func blendedPresentationAttachment(
+  private func imageBlendPresentationAttachment(
     from attachment: RasterImageAttachment,
     outputSize: PixelSize
-  ) -> RasterImageAttachment {
-    var presentationAttachment = attachment
-    presentationAttachment.bounds = attachment.visibleBounds
-    presentationAttachment.visibleBounds = attachment.visibleBounds
-    presentationAttachment.pixelSize = outputSize
-    return presentationAttachment
+  ) -> PresentationAttachment {
+    PresentationAttachment(
+      identity: attachment.identity,
+      bounds: attachment.visibleBounds,
+      visibleBounds: attachment.visibleBounds,
+      pixelSize: outputSize,
+      cellPixelSize: attachment.cellPixelSize,
+      isResizable: attachment.isResizable,
+      scalingMode: attachment.scalingMode
+    )
   }
 
   private func blendedPixels(
@@ -619,7 +675,7 @@ package final class ImageBlendCompositor: Sendable {
 }
 
 private struct ImageBlendCacheKey: Hashable, Sendable {
-  var reference: ImageAssetReference
+  var source: ImageBlendSourceCacheKey
   var bounds: CellRect
   var visibleBounds: CellRect
   var outputSize: PixelSize
@@ -628,6 +684,59 @@ private struct ImageBlendCacheKey: Hashable, Sendable {
   var cellPixelSize: PixelSize
   var backdropSignature: UInt64
   var fallbackBackground: Color
+
+  var retainedByteEstimate: Int {
+    source.retainedByteEstimate
+      + fallbackBackground.profile.name.utf8.count
+      + (MemoryLayout<Int>.stride * 14)
+      + (MemoryLayout<UInt64>.stride * 5)
+  }
+}
+
+private enum ImageBlendSourceCacheKey: Hashable, Sendable {
+  case namedResource(String)
+  case filePath(String)
+  case embeddedImage(byteCount: Int, digest: UInt64, secondaryDigest: UInt64)
+
+  var retainedByteEstimate: Int {
+    switch self {
+    case .namedResource(let name):
+      name.utf8.count
+    case .filePath(let path):
+      path.utf8.count
+    case .embeddedImage:
+      MemoryLayout<Int>.stride + (MemoryLayout<UInt64>.stride * 2)
+    }
+  }
+}
+
+private func sourceCacheKey(
+  for reference: ImageAssetReference
+) -> ImageBlendSourceCacheKey {
+  switch reference {
+  case .namedResource(let name):
+    .namedResource(name)
+  case .filePath(let path):
+    .filePath(path)
+  case .embeddedImage(let bytes):
+    .embeddedImage(
+      byteCount: bytes.count,
+      digest: stableDigest(for: bytes, seed: 0xcbf2_9ce4_8422_2325),
+      secondaryDigest: stableDigest(for: bytes, seed: 0x8422_2325_cbf2_9ce4)
+    )
+  }
+}
+
+private func stableDigest(
+  for bytes: [UInt8],
+  seed: UInt64
+) -> UInt64 {
+  var hasher = ImageBlendStableHasher(seed: seed)
+  hasher.combine(bytes.count)
+  for byte in bytes {
+    hasher.combine(byte)
+  }
+  return hasher.value
 }
 
 private func proportionalPixelSample(
@@ -652,7 +761,7 @@ private func blendedImageID(
 ) -> String {
   var hasher = ImageBlendStableHasher()
   hasher.combine("swift-tui-blended-image-v1")
-  hasher.combine(key.reference)
+  hasher.combine(key.source)
   hasher.combine(key.bounds)
   hasher.combine(key.visibleBounds)
   hasher.combine(key.outputSize.width)
@@ -667,24 +776,29 @@ private func blendedImageID(
 }
 
 private struct ImageBlendStableHasher {
-  private(set) var value: UInt64 = 0xcbf2_9ce4_8422_2325
+  private(set) var value: UInt64
+
+  init(
+    seed: UInt64 = 0xcbf2_9ce4_8422_2325
+  ) {
+    value = seed
+  }
 
   mutating func combine(
-    _ reference: ImageAssetReference
+    _ source: ImageBlendSourceCacheKey
   ) {
-    switch reference {
+    switch source {
     case .namedResource(let name):
       combine("named")
       combine(name)
     case .filePath(let path):
       combine("file")
       combine(path)
-    case .embeddedImage(let bytes):
+    case .embeddedImage(let byteCount, let digest, let secondaryDigest):
       combine("embedded")
-      combine(bytes.count)
-      for byte in bytes {
-        combine(byte)
-      }
+      combine(byteCount)
+      combine(digest)
+      combine(secondaryDigest)
     }
   }
 
@@ -732,7 +846,7 @@ private struct ImageBlendStableHasher {
     }
   }
 
-  private mutating func combine(
+  mutating func combine(
     _ byte: UInt8
   ) {
     value ^= UInt64(byte)

@@ -37,6 +37,10 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
 private let webSurfaceImageBlendCompositor = ImageBlendCompositor()
 
 extension WebSurfaceFrameEncoder {
+  package static func imageBlendCacheSnapshot() -> ImageBlendCompositorCacheSnapshot {
+    webSurfaceImageBlendCompositor.cacheSnapshot()
+  }
+
   package static func encodeImages(
     _ attachments: [RasterImageAttachment],
     fallbackBackground: Color,

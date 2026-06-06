@@ -452,6 +452,52 @@ struct TerminalGraphicsProtocolTests {
     #expect(changedBackdropWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
   }
 
+  @Test("Kitty blended image replay survives renderer compositor eviction")
+  func kittyBlendedImageReplaySurvivesRendererCompositorEviction() throws {
+    let renderer = TerminalImageRenderer(
+      repository: ImageAssetRepository(),
+      blendCompositorCachePolicy: ImageBlendCompositorCachePolicy(
+        maxEntries: 2,
+        maxDecodedPixels: Int.max,
+        maxEncodedBytes: Int.max
+      )
+    )
+    let graphicsCapabilities = TerminalGraphicsCapabilities(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty,
+      cellPixelSize: .init(width: 1, height: 1)
+    )
+    let pngBytes = try makePNGBytes(
+      width: 1,
+      height: 1,
+      pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]
+    )
+    var transmittedKittyImages: Set<UInt32> = []
+
+    for index in 0..<3 {
+      let write = renderer.graphicsWriteSteps(
+        for: [
+          blendedRasterImageAttachment(
+            pngBytes: pngBytes,
+            background: index == 0 ? .blue : index == 1 ? .red : .green,
+            signature: UInt64(index + 1)
+          )
+        ],
+        capabilityProfile: .trueColor,
+        graphicsCapabilities: graphicsCapabilities,
+        fallbackBackground: .black,
+        transmittedKittyImages: &transmittedKittyImages
+      ).joined()
+
+      #expect(write.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    }
+
+    let snapshot = renderer.imageBlendCacheSnapshot()
+    #expect(snapshot.entryCount == 2)
+    #expect(snapshot.evictionCount == 1)
+    #expect(transmittedKittyImages.count == 3)
+  }
+
   @Test(
     "terminal host emits Kitty RGBA payloads (f=32 with s/v) for non-PNG inputs"
   )

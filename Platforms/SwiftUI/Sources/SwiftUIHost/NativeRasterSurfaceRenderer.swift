@@ -24,6 +24,10 @@ import SwiftTUIRuntime
 enum NativeRasterSurfaceRenderer {
   private static let imageBlendCompositor = ImageBlendCompositor()
 
+  static func imageBlendCacheSnapshot() -> ImageBlendCompositorCacheSnapshot {
+    imageBlendCompositor.cacheSnapshot()
+  }
+
   static func draw(
     surface: RasterSurface?,
     style: SwiftUIHostTerminalStyle,
