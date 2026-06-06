@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 56 | 506 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 270 | 1430 |
+| `SwiftTUIViews` | 270 | 1439 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
 | `SwiftTUIArguments` | 4 | 46 |
@@ -32,7 +32,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftUIHost` | 7 | 62 |
-| `SwiftTUICore` | 274 | 2144 |
+| `SwiftTUICore` | 276 | 2163 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -228,7 +228,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `InfoToastStyle` — struct — 2 members
 - `InlinePickerStyle` — struct — 4 members
 - `InsetGroupedListStyle` — struct — 4 members
-- `InsetShape` — struct — 4 members
+- `InsetShape` — struct — 6 members
 - `InsettableShape` — protocol — 5 members
 - `ItemNavigationDestinationModifier` — struct
 - `KeyCommandRegistrationModifier` — struct
@@ -317,7 +317,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SegmentedPickerStyle` — struct — 4 members
 - `SemanticMetadataModifier` — struct
 - `SendableLayout` — protocol — 3 members
-- `Shape` — protocol — 8 members
+- `Shape` — protocol — 15 members
 - `ShapeStyle` — extension — 4 members
 - `Slider` — struct — 4 members
 - `Spacer` — struct — 2 members
@@ -544,7 +544,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (274)
+### Canonical surface (275)
 
 - `AccessibilityAnnouncement` — struct — 3 members
 - `AccessibilityNode` — struct — 10 members
@@ -617,6 +617,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `EmptyAnimatableData` — struct — 8 members
 - `EnvironmentSnapshot` — struct — 5 members
 - `EventModifiers` — struct — 5 members
+- `FillRule` — enum — 2 members
 - `FocusedValueKey` — protocol — 1 member
 - `FocusedValues` — struct — 3 members
 - `FocusInteractions` — enum — 3 members
@@ -702,7 +703,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `OklchColor` — struct — 5 members
 - `OutlineStylePresentation` — struct — 11 members
 - `parseDroppedPaths(_:)` — func
-- `Path` — struct — 13 members
+- `Path` — struct — 27 members
 - `Phase` — enum — 8 members
 - `PixelPoint` — struct — 4 members
 - `PixelSize` — struct — 4 members
@@ -758,7 +759,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SemanticSnapshot` — struct — 10 members
 - `SemanticStyleRole` — enum — 15 members
 - `ShapeFillMode` — enum — 2 members
-- `ShapeGeometry` — enum — 5 members
+- `ShapeGeometry` — enum — 6 members
 - `ShapeOperation` — enum — 2 members
 - `ShapePayload` — struct — 4 members
 - `ShapeStyle` — protocol — 35 members
@@ -820,6 +821,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Visibility` — enum — 4 members
 - `WakeCause` — enum — 6 members
 - `XYZColor` — struct — 6 members
+
+### Package-only seams (1)
+
+- `BoxedPath` — struct
 
 ## SwiftTUIPTYCPrimitives
 

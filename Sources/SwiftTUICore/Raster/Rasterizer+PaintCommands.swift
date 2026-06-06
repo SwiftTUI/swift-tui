@@ -34,12 +34,34 @@ extension Rasterizer {
     // to the general cell-walking loop below (which calls
     // `shapeContains`, and that now knows about curved geometry).
     switch geometry {
-    case .circle, .ellipse, .capsule, .path:
-      // Curved shapes and custom paths rasterize onto the Braille subpixel
-      // canvas (Route A). Tile styles need per-cell glyph writes, so they
-      // fall through to the cell-walk loop below (Route B), which calls
-      // `shapeContains` — now path-aware.
+    case .circle, .ellipse, .capsule:
+      // Curved shapes rasterize onto the Braille subpixel canvas (Route A).
+      // Tile styles need per-cell glyph writes, so they fall through to the
+      // cell-walk loop below (Route B).
       if case .tile = colorMode {
+        break
+      }
+      paintBrailleShape(
+        geometry: geometry,
+        shapeBounds: shapeBounds,
+        colorMode: colorMode,
+        stroke: false,
+        environment: environment,
+        cells: &cells,
+        clip: clip,
+        blendMode: blendMode
+      )
+      return
+    case .path:
+      // Full foreground fills rasterize as Braille dots (Route A). Tile fills
+      // and masked-background fills (`.interior` mode — e.g. a custom-path
+      // border clipping a background) fall through to the cell-walk (Route B),
+      // which writes per-cell glyphs / backgrounds and honors the inset, via
+      // the now-path-aware `shapeContains`.
+      if case .tile = colorMode {
+        break
+      }
+      if case .interior = mode {
         break
       }
       paintBrailleShape(

@@ -518,6 +518,7 @@ classifications:
     - SwiftTUICore.EmptyAnimatableData
     - SwiftTUICore.EnvironmentSnapshot
     - SwiftTUICore.EventModifiers
+    - SwiftTUICore.FillRule
     - SwiftTUICore.FocusedValueKey
     - SwiftTUICore.FocusedValues
     - SwiftTUICore.FocusInteractions
@@ -741,6 +742,9 @@ classifications:
     # Transitional / lowering-layer types kept package-internal but reachable
     # for narrow compatibility paths (see PUBLIC_SURFACE_POLICY.md).
     - SwiftTUIViews.ResolvableView
+    # COW wrapper carried by ShapeGeometry.path; public only because it rides a
+    # public enum case. Its members are package — authors use Shape.path(in:).
+    - SwiftTUICore.BoxedPath
 
   removed:
     # Compatibility-shim types that were retired. If any of these reappears
