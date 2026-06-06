@@ -49,12 +49,26 @@ import Synchronization
   }
 }
 
+/// A wall-clock backstop for ``withStageBudget``.
+///
+/// The stage budget is the primary, hardware-independent bound, but it can only
+/// fire while the stage clock keeps advancing. If the runtime under test goes
+/// fully idle, the clock freezes and *both* the operation and the stage-budget
+/// waiter would otherwise suspend forever — a hang with no diagnostic. This
+/// ceiling guarantees the wait always terminates. It is set generously so a
+/// merely-slow CI runner never trips it; only a genuinely stalled runtime does.
+private let stageBudgetWallClockCeilingNanoseconds: UInt64 = 30_000_000_000
+
 /// Runs `operation`, abandoning it with `StageBudgetExceeded` if `budget`
 /// stages of `clock` elapse before it finishes.
 ///
 /// `operation` must be cancellation-aware: when the budget wins the race the
 /// operation task is cancelled, and the enclosing task group waits for it to
 /// unwind before this function returns.
+///
+/// A wall-clock backstop (see ``stageBudgetWallClockCeilingNanoseconds``) also
+/// abandons the wait if the stage clock stalls outright, so an idle runtime
+/// surfaces a `StageBudgetExceeded` instead of hanging forever.
 @_spi(Testing) public func withStageBudget<R: Sendable>(
   _ label: String,
   within budget: ProgressBudget,
@@ -69,6 +83,13 @@ import Synchronization
     group.addTask {
       await clock.waitForStage(atLeast: deadline)
       throw StageBudgetExceeded(label: label, stages: budget.stages)
+    }
+    group.addTask {
+      try await Task.sleep(nanoseconds: stageBudgetWallClockCeilingNanoseconds)
+      throw StageBudgetExceeded(
+        label: "\(label) [wall-clock backstop: stage clock stalled]",
+        stages: budget.stages
+      )
     }
     defer { group.cancelAll() }
     guard let result = try await group.next() else {
