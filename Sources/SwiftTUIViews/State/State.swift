@@ -284,8 +284,17 @@ public struct State<Value> {
     let ordinal = box.currentOrdinal
     let retainedSeed =
       box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
+    // Deferred authoring snapshots keep the owner node ID but drop the
+    // ViewNode reference. During a resolve pass, recover the live owner so
+    // deferred subtrees do not replace graph-backed state with seed storage.
+    let resolvedViewNode =
+      context.viewNode
+      ?? liveOwnerNode(
+        ownerNodeID: context.ownerNodeID,
+        stateGraphScope: context.stateGraphScope
+      )
 
-    if let viewNode = context.viewNode {
+    if let viewNode = resolvedViewNode {
       return DynamicStateLocation(
         getValue: { [weak viewNode, weak box] in
           guard let viewNode else {
@@ -326,6 +335,24 @@ public struct State<Value> {
         box.updateSeedValue(newValue)
       }
     )
+  }
+
+  private func liveOwnerNode(
+    ownerNodeID: ViewNodeID?,
+    stateGraphScope: StateGraphScopeID?
+  ) -> SwiftTUICore.ViewNode? {
+    guard
+      let ownerNodeID,
+      let currentGraph = ViewNodeContext.current?.ownerGraph
+    else {
+      return nil
+    }
+    if let stateGraphScope,
+      stateGraphScope != StateGraphScopeID(currentGraph)
+    {
+      return nil
+    }
+    return currentGraph.nodeForViewNodeID(ownerNodeID)
   }
 }
 

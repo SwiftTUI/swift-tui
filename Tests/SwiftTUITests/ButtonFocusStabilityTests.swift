@@ -141,6 +141,105 @@ struct ButtonFocusStabilityTests {
       "display should not still show v=A")
   }
 
+  @Test("trailing delete Button inside selected TabView content mutates content state")
+  func trailingDeleteButtonInsideSelectedTabViewContentMutatesState() async throws {
+    let terminalSize = CellSize(width: 20, height: 6)
+    let rootIdentity = testIdentity("TabViewTrailingDeleteButtonClick")
+    let tapCount = LockedBox<Int>(0)
+
+    enum TabSelection: Hashable {
+      case counter
+      case todo
+    }
+
+    struct Item: Identifiable, Hashable {
+      let id: Int
+      var title: String
+      var done = false
+    }
+
+    struct Fixture: View {
+      let tapCount: LockedBox<Int>
+      @State private var selection: TabSelection = .todo
+      @State private var items = [
+        Item(id: 1, title: "One"),
+        Item(id: 2, title: "Two"),
+      ]
+
+      var body: some View {
+        TabView(selection: $selection) {
+          Tab("Counter", value: TabSelection.counter) {
+            Text("Counter")
+          }
+          Tab("Todo", value: TabSelection.todo) {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(items) { item in
+                HStack(spacing: 1) {
+                  Toggle(item.title, isOn: doneBinding(for: item))
+                  Spacer()
+                  Button("×", role: .destructive) {
+                    tapCount.value += 1
+                    items.removeAll { $0.id == item.id }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      private func doneBinding(for item: Item) -> Binding<Bool> {
+        Binding(
+          get: {
+            items.first { $0.id == item.id }?.done ?? false
+          },
+          set: { newValue in
+            guard let index = items.firstIndex(where: { $0.id == item.id }) else {
+              return
+            }
+            items[index].done = newValue
+          }
+        )
+      }
+    }
+
+    let view = Fixture(tapCount: tapCount)
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let initial = DefaultRenderer().render(
+      view,
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let deleteLabel = try #require(
+      initial.placedTree.flattenedDescendants.first { node in
+        guard case .text("×") = node.drawPayload else { return false }
+        return node.bounds.origin.y > 1
+      }
+    )
+    let clickPoint = Point(deleteLabel.bounds.origin)
+
+    let host = RecordingTerminalHostLocal(size: terminalSize)
+    _ = try await Self.runHarness(
+      host: host,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: clickPoint)),
+        .mouse(.init(kind: .up(.primary), location: clickPoint)),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize
+    ) {
+      view
+    }
+
+    let finalSurface = try #require(host.lastPresentedSurface)
+    #expect(tapCount.value == 1)
+    #expect(!finalSurface.lines.contains(where: { $0.contains("One") }))
+    #expect(finalSurface.lines.contains(where: { $0.contains("Two") }))
+    #expect(finalSurface.lines.contains(where: { $0.contains("Todo") }))
+  }
+
   @Test("fixedSize VStack reconciles inner row Spacer against widest sibling")
   func fixedSizeReconcilesInnerRowSpacer() throws {
     let size = CellSize(width: 40, height: 10)
