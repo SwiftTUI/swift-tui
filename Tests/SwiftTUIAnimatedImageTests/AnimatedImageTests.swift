@@ -50,6 +50,28 @@ struct AnimatedImageTests {
     #expect(attachment.pixelSize == .init(width: 1, height: 1))
   }
 
+  @Test("AnimatedImage blendMode attaches compositing metadata to the current PNG frame")
+  func animatedImageBlendModeAttachesCompositingMetadataToCurrentPNGFrame() throws {
+    let frame = Self.frame(red: 255, green: 255, blue: 255)
+    let artifacts = DefaultRenderer().render(
+      ZStack(alignment: .topLeading) {
+        Rectangle().fill(Color.blue).frame(width: 1, height: 1)
+        AnimatedImage(frames: [frame], framesPerSecond: 12)
+          .blendMode(.multiply)
+      }
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+    let compositing = try #require(attachment.compositing)
+
+    #expect(attachment.resolvedReference == .embeddedImage(frame.imageData))
+    #expect(compositing.blendMode == .multiply)
+    #expect(
+      compositing.destinationBackdrop.bounds
+        == .init(origin: .zero, size: .init(width: 1, height: 1))
+    )
+    #expect(compositing.destinationBackdrop.cells == [.init(backgroundColor: .blue, glyph: " ")])
+  }
+
   @Test("AnimatedImage advances through every GIF-decoded frame")
   func animatedImageAdvancesThroughEveryGIFDecodedFrame() async throws {
     let frames = [
@@ -115,6 +137,76 @@ struct AnimatedImageTests {
     #expect(result.renderedFrames >= expectedFrameReferences.count)
   }
 
+  @Test(
+    "AnimatedImage blendMode advances distinct GIF-decoded PNG frames with compositing metadata")
+  func animatedImageBlendModeAdvancesDistinctGIFDecodedPNGFramesWithCompositingMetadata()
+    async throws
+  {
+    let frames = [
+      Self.frame(red: 255, green: 0, blue: 0),
+      Self.frame(red: 0, green: 0, blue: 255),
+      Self.frame(red: 0, green: 255, blue: 0),
+    ]
+    let sequence = AnimatedImageSequence(
+      frames: frames,
+      frameDelays: [
+        .milliseconds(20),
+        .milliseconds(20),
+        .milliseconds(20),
+      ]
+    )
+    let gifDecodedSequence = try AnimatedGIF.decode(data: AnimatedGIF.encode(sequence))
+    let expectedFrameReferences = gifDecodedSequence.frames.map {
+      ImageAssetReference.embeddedImage($0.imageData)
+    }
+    let host = AnimatedImageRecordingHost(size: CellSize(width: 4, height: 2))
+    let inputReader = AnimatedImageConditionalInputReader(
+      frameSignal: host.frameSignal
+    ) {
+      expectedFrameReferences.allSatisfy { reference in
+        host.observedCompositingByReference[reference]?.blendMode == .screen
+      }
+    }
+    let rootIdentity = Identity(components: ["animated-image.blended-gif-frames"])
+    let terminalSize = host.surfaceSize
+    var environment = EnvironmentValues()
+    environment.terminalAppearance = host.appearance
+    environment.terminalSize = terminalSize
+
+    let runLoop = SwiftTUIRuntime.RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: host,
+      inputReader: inputReader,
+      signalReader: nil,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environment,
+      proposal: ProposedSize(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        AnimatedImage(gifDecodedSequence)
+          .blendMode(.screen)
+      }
+    )
+
+    let result = try await runLoop.run()
+
+    #expect(
+      result.exitReason
+        == RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
+    )
+    for expectedReference in expectedFrameReferences {
+      let compositing = try #require(host.observedCompositingByReference[expectedReference])
+      #expect(compositing.blendMode == .screen)
+    }
+    #expect(result.renderedFrames >= expectedFrameReferences.count)
+  }
+
   @Test("AnimatedImage renders first frame without playback task under reduced motion")
   func animatedImageRendersFirstFrameWithoutPlaybackTaskUnderReducedMotion() throws {
     let frames = [
@@ -142,6 +234,38 @@ struct AnimatedImageTests {
 
     #expect(taskRegistry.snapshot().isEmpty)
     #expect(attachment.resolvedReference == .embeddedImage(frames[0].imageData))
+  }
+
+  @Test("AnimatedImage blendMode renders first frame with compositing under reduced motion")
+  func animatedImageBlendModeRendersFirstFrameWithCompositingUnderReducedMotion() throws {
+    let frames = [
+      Self.frame(red: 255, green: 0, blue: 0),
+      Self.frame(red: 0, green: 0, blue: 255),
+    ]
+    let sequence = AnimatedImageSequence(
+      frames: frames,
+      frameDelays: [.milliseconds(20), .milliseconds(20)]
+    )
+    let taskRegistry = LocalTaskRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.accessibilityReduceMotion = true
+
+    let artifacts = DefaultRenderer().render(
+      AnimatedImage(sequence)
+        .blendMode(.multiply),
+      context: ResolveContext(
+        identity: Identity(components: ["animated-image.blended-reduced-motion"]),
+        environmentValues: environmentValues,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+    let compositing = try #require(attachment.compositing)
+
+    #expect(taskRegistry.snapshot().isEmpty)
+    #expect(attachment.resolvedReference == .embeddedImage(frames[0].imageData))
+    #expect(compositing.blendMode == .multiply)
   }
 
   private static func frame(
@@ -173,6 +297,8 @@ private final class AnimatedImageRecordingHost: PresentationSurface {
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var observedReferences: [ImageAssetReference] = []
+  private(set) var observedCompositingByReference: [ImageAssetReference: RasterImageCompositing] =
+    [:]
 
   /// Notified after every present, so an awaited input reader can re-check its
   /// exit predicate the instant a frame lands instead of polling.
@@ -190,9 +316,15 @@ private final class AnimatedImageRecordingHost: PresentationSurface {
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    observedReferences.append(
-      contentsOf: surface.imageAttachments.compactMap(\.resolvedReference)
-    )
+    for attachment in surface.imageAttachments {
+      guard let reference = attachment.resolvedReference else {
+        continue
+      }
+      observedReferences.append(reference)
+      if let compositing = attachment.compositing {
+        observedCompositingByReference[reference] = compositing
+      }
+    }
     // The run loop only ever presents on the MainActor; `assumeIsolated`
     // bridges this nonisolated witness to the MainActor-isolated signal.
     let frameSignal = self.frameSignal

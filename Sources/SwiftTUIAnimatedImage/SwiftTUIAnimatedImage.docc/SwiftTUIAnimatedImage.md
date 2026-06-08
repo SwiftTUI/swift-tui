@@ -20,6 +20,13 @@ AnimatedImage(frames: frames, frameDelays: [.milliseconds(80), .milliseconds(120
 The frame list is finite and fully pre-composed. The module does not provide
 closure-based or arbitrary dynamic frame producers.
 
+GIF input is decoded into pre-composed PNG-backed frames before rendering.
+Those frames flow through the same `Image(data:)` surface as static images, so
+`AnimatedImage(...).blendMode(...)` participates in image blend-mode
+precomposition. Passing raw GIF container bytes directly to `Image(data:)`
+remains a host transport path for unblended web surfaces; SwiftTUI does not
+decode and blend arbitrary GIF containers outside `SwiftTUIAnimatedImage`.
+
 ## Topics
 
 ### Views

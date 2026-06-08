@@ -662,34 +662,10 @@ struct WebSurfaceTransportTests {
 
   @Test("encoder advertises gif format and ships dataBase64 for animated GIF inputs")
   func encoderAdvertisesGIFFormatAndShipsDataBase64() throws {
-    // GIF89a header followed by a few palette/data bytes — short, but
-    // long enough to trip the 6-byte magic check so the encoder picks
-    // .gif over the .png default.
-    let gifBytes: [UInt8] = [
-      0x47, 0x49, 0x46, 0x38, 0x39, 0x61,  // GIF89a
-      0x01, 0x00, 0x01, 0x00,  // 1x1 logical screen
-      0x80, 0x00, 0x00,
-    ]
-    let surface = RasterSurface(
-      size: .init(width: 4, height: 2),
-      lines: ["    ", "    "],
-      imageAttachments: [
-        RasterImageAttachment(
-          identity: .init(components: [.named("gif")]),
-          bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
-          visibleBounds: nil,
-          source: .data(gifBytes),
-          resolvedReference: .embeddedImage(gifBytes),
-          pixelSize: .init(width: 1, height: 1),
-          isResizable: false
-        )
-      ]
-    )
-
     var knownImageIDs: Set<String> = []
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        surface,
+        Self.gifSurface(compositing: nil),
         knownImageIDs: &knownImageIDs
       )
     )
@@ -699,6 +675,36 @@ struct WebSurfaceTransportTests {
     let id = try #require(image["id"] as? String)
     #expect(id.hasPrefix("gif:"))
     #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
+  }
+
+  @Test("encoder leaves blended raw GIF bytes as GIF pass-through when no frame decoder exists")
+  func encoderLeavesBlendedRawGIFBytesAsGIFPassThroughWhenNoFrameDecoderExists() throws {
+    var knownImageIDs: Set<String> = []
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.gifSurface(
+          compositing: RasterImageCompositing(
+            blendMode: .multiply,
+            destinationBackdrop: RasterImageBackdrop(
+              bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
+              cells: Array(repeating: .init(backgroundColor: .blue), count: 6)
+            ),
+            cellPixelSize: .init(width: 1, height: 1),
+            backdropSignature: 42
+          )
+        ),
+        fallbackBackground: .black,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let image = try #require((frame["images"] as? [[String: Any]])?.first)
+
+    #expect(image["format"] as? String == "gif")
+    let id = try #require(image["id"] as? String)
+    #expect(id.hasPrefix("gif:"))
+    #expect(!id.hasPrefix("blend:png:"))
+    #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
+    #expect(knownImageIDs == Set([id]))
   }
 
   @Test("parser handles resize and style commands split across chunks")
@@ -920,7 +926,8 @@ struct WebSurfaceTransportTests {
   }
 
   private static func largeSurface(dirtyRowText: String) -> RasterSurface {
-    let paddedDirtyRow = String(dirtyRowText.prefix(8)).padding(toLength: 8, withPad: " ", startingAt: 0)
+    let paddedDirtyRow = String(dirtyRowText.prefix(8)).padding(
+      toLength: 8, withPad: " ", startingAt: 0)
     return RasterSurface(
       size: .init(width: 8, height: 10),
       lines: (0..<10).map { row in
@@ -949,6 +956,39 @@ struct WebSurfaceTransportTests {
         )
       ]
     )
+  }
+
+  private static func gifSurface(
+    compositing: RasterImageCompositing?
+  ) -> RasterSurface {
+    let gifBytes = gifHeaderBytes()
+    return RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: .init(components: [.named("gif")]),
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
+          visibleBounds: nil,
+          source: .data(gifBytes),
+          resolvedReference: .embeddedImage(gifBytes),
+          pixelSize: .init(width: 1, height: 1),
+          isResizable: false,
+          compositing: compositing
+        )
+      ]
+    )
+  }
+
+  private static func gifHeaderBytes() -> [UInt8] {
+    // GIF89a header followed by a few palette/data bytes, long enough
+    // to trip the 6-byte magic check so the encoder picks .gif over
+    // the .png default.
+    [
+      0x47, 0x49, 0x46, 0x38, 0x39, 0x61,  // GIF89a
+      0x01, 0x00, 0x01, 0x00,  // 1x1 logical screen
+      0x80, 0x00, 0x00,
+    ]
   }
 
   private static func blendedImageSurface(

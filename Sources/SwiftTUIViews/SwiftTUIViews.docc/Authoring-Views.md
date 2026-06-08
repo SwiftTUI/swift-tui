@@ -77,12 +77,15 @@ Image attachments follow the same ordering for decodable PNG/JPEG sources. When
 an `Image` has an active blend mode, hosts receive a precomposed image variant
 blended against the visible cell backdrop; unblended images keep the normal
 high-fidelity attachment path. `AnimatedImage` frames rendered through
-`Image(data:)` inherit this behavior. The backdrop includes cell backgrounds and
-explicit foreground glyphs, with deterministic coverage approximations for
-block, braille, and ordinary text. Shaded block elements are treated as
-full-cell foreground in this approximation. It still does not claim exact
-terminal font masks, overlapping image-layer blending, or GIF pass-through byte
-blending.
+`Image(data:)` inherit this behavior because GIF input is decoded into
+pre-composed PNG-backed frames first. Raw GIF container bytes passed directly to
+`Image(data:)` are different: web surfaces may pass them through unchanged when
+unblended, and SwiftTUI does not decode or blend those GIF containers. The
+backdrop includes cell backgrounds and explicit foreground glyphs, with
+deterministic coverage approximations for block, braille, and ordinary text.
+Shaded block elements are treated as full-cell foreground in this
+approximation. It still does not claim exact terminal font masks, overlapping
+image-layer blending, or direct GIF byte blending.
 
 ## Preview And Inspection
 
