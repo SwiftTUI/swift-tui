@@ -2,9 +2,20 @@
 # See https://prek.j178.dev for more information.
 #:schema https://www.schemastore.org/prek.json
 
+default_install_hook_types = ["pre-commit", "commit-msg"]
+
 [[repos]]
 repo = "local"
 hooks = [
+  {
+    id = "no-ai-coauthors",
+    name = "forbid AI model Co-authored-by trailers",
+    entry = "./Scripts/check_commit_message_policy.sh",
+    language = "system",
+    stages = ["commit-msg"],
+    always_run = true,
+    pass_filenames = true
+  },
   {
     id = "swift-format",
     name = "run swift-format format",

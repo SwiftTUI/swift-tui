@@ -92,6 +92,9 @@ Hooks run through `prek` (`prek.toml`):
   `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI`.
 - `public-surface-policies`, `structured-concurrency-escape-hatches`,
   `main-thread-usage` — the source-policy checks.
+- `no-ai-coauthors` — the commit-message hook rejects `Co-authored-by:`
+  trailers whose entry matches common AI model names or AI-bot email
+  identities.
 
 ## Rendered text fixtures
 
