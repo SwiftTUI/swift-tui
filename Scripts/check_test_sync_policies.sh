@@ -19,12 +19,14 @@
 # forms (usleep/nanosleep/Thread.sleep) were added 2026-05-30 after a flake
 # audit found they slipped past the original regex set.
 #
-# Baseline composition (11): 6 DispatchSemaphore barriers
+# Baseline composition (13): 6 DispatchSemaphore barriers
 # (TerminalPresentationTests x4, AsyncFrameTailRenderingTests x1,
 # TerminalHostPresentationBatchingTests x1) + 4 fixed sleeps
 # (InteractiveRuntimeTests x2 usleep, AnimationRepeatForeverGrowthTests x1
-# usleep, RenderDiffTests x1 Thread.sleep) + 1 process watchdog
-# (EntryPointLaunchTests x1 Task.sleep).
+# usleep, RenderDiffTests x1 Thread.sleep) + 2 process/loop watchdogs
+# (EntryPointLaunchTests x1 Task.sleep, GeometryReaderSurfaceTests x1
+# Task.sleep) + 1 autonomous-workload tick (GeometryReaderSurfaceTests x1
+# Task.sleep).
 #
 # NOTE: the EntryPointLaunchTests occurrence is a *process watchdog backstop*,
 # not timeout-driven synchronisation. `runFixture` reads a launched fixture's
@@ -35,6 +37,24 @@
 # the absence of one. It cannot be converted to AsyncEvent/MainActorCondition-
 # Signal/AsyncStream and is grandfathered like the fixed-sleep latency
 # injections above.
+#
+# NOTE: the two GeometryReaderSurfaceTests occurrences (added 2026-06-07 with the
+# autonomous-task GeometryReader coverage) are the same two grandfathered shapes,
+# not the test's synchronisation. That test already synchronises on a
+# `MainActorConditionSignal` (notified from the mock host's `present()`) and an
+# `AsyncStream`-based quit reader awaiting `conditionSignal.wait(until:)`:
+#   - The 20 ms `Task.sleep` inside `GeometryReaderAutonomousTaskProbe.body`'s
+#     `.task` is the *tick interval of the autonomous workload under test* — a
+#     self-driving SwiftUI `.task` that periodically mutates state. It is the
+#     producer the test observes, not a waiter; converting it would delete the
+#     behaviour being verified. Same category as the fixed-sleep latency
+#     injections above.
+#   - The 20 s `Task.sleep` in `GeometryReaderAutonomousTaskQuitInputReader` is a
+#     *loop watchdog backstop*: the real wait is the adjacent
+#     `conditionSignal.wait(until: shouldQuit)`; the sleep only arms a synthetic
+#     ctrl-D quit if the run loop never pumps a frame, so a wedged loop fails
+#     instead of hanging the suite. Same un-awaitable "absence of a signal"
+#     failure mode as the EntryPointLaunchTests watchdog above.
 #
 # NOTE: all 4 fixed sleeps are deliberate *presentation-latency injections*
 # inside mock present()/presentObserver methods — they simulate a slow terminal
