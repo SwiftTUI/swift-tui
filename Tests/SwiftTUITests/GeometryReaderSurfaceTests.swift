@@ -326,9 +326,20 @@ struct GeometryReaderSurfaceTests {
       presentationSurface: terminal,
       terminalInputReader: GeometryReaderAutonomousTaskQuitInputReader(
         conditionSignal: conditionSignal,
-        timeoutNanoseconds: 20_000_000_000
+        timeoutNanoseconds: 200_000_000_000
       ) {
-        terminal.distinctCountValues.count >= 3
+        // The fix under test wires the GeometryReader-hosted `.task` to a live
+        // view node so it runs and its @State mutations drive presented frames.
+        // The structural proof is one autonomous frame beyond the initial
+        // render — i.e. >= 2 distinct counter values. The quit fires on that
+        // signal, so the test is bounded by the event, not the wall clock.
+        // Requiring *more* distinct frames would race the autonomous task's
+        // 20 ms cadence against cross-suite MainActor contention under
+        // full-suite parallel load, which starved the task to 2–3 ticks in 20 s
+        // on CI and made the old `>= 3` assertion flaky. The watchdog is only a
+        // backstop for the real regression (task never pumps), generously sized
+        // so the signal path always wins first under load.
+        terminal.distinctCountValues.count >= 2
           || taskRecorder.tickCount >= 20
       },
       signalReader: nil,
@@ -349,10 +360,12 @@ struct GeometryReaderSurfaceTests {
 
     #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
     #expect(
-      terminal.distinctCountValues.count >= 3,
+      terminal.distinctCountValues.count >= 2,
       """
-      GeometryReader-hosted autonomous state should present multiple distinct \
-      counter frames before input; values=\(terminal.distinctCountValues) \
+      GeometryReader-hosted autonomous .task should drive at least one state \
+      frame beyond the initial render (regression: the hosted task is not wired \
+      to a live node and never pumps, leaving a single initial frame); \
+      values=\(terminal.distinctCountValues) \
       presents=\(terminal.presentCount) taskTicks=\(taskRecorder.tickCount)
       """
     )

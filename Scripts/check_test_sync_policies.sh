@@ -49,8 +49,8 @@
 #     producer the test observes, not a waiter; converting it would delete the
 #     behaviour being verified. Same category as the fixed-sleep latency
 #     injections above.
-#   - The 20 s `Task.sleep` in `GeometryReaderAutonomousTaskQuitInputReader` is a
-#     *loop watchdog backstop*: the real wait is the adjacent
+#   - The multi-second `Task.sleep` in `GeometryReaderAutonomousTaskQuitInputReader`
+#     is a *loop watchdog backstop*: the real wait is the adjacent
 #     `conditionSignal.wait(until: shouldQuit)`; the sleep only arms a synthetic
 #     ctrl-D quit if the run loop never pumps a frame, so a wedged loop fails
 #     instead of hanging the suite. Same un-awaitable "absence of a signal"
