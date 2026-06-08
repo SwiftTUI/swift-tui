@@ -78,6 +78,32 @@ argument-parsing surface, the combined terminal/WebHost runner, and animated
 GIF/image support. Charts are still explicit: add `SwiftTUICharts` only when
 your app uses chart views.
 
+A complete minimal `Package.swift` for a terminal app:
+
+```swift
+// swift-tools-version: 6.3
+import PackageDescription
+
+let package = Package(
+  name: "DeployDashboard",
+  platforms: [.macOS(.v15)],
+  dependencies: [
+    .package(
+      url: "https://github.com/SwiftTUI/swift-tui",
+      .upToNextMinor(from: "0.0.18")
+    )
+  ],
+  targets: [
+    .executableTarget(
+      name: "DeployDashboard",
+      dependencies: [
+        .product(name: "SwiftTUI", package: "swift-tui")
+      ]
+    )
+  ]
+)
+```
+
 ## Building a terminal app
 
 Author a view, then an `@main` `App` — the same shapes you would write for
@@ -170,18 +196,21 @@ Two npm packages make this a first-class web-consumer story:
 | [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) | Browser runtime — manifest loading, canvas rendering, ARIA mounting, WASI/WebSocket scene bridges |
 | [`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) | Build tooling — the `swifttui-web` CLI that compiles a SwiftTUI app into a WASI `app.wasm` and `scene-manifest.json` |
 
-For the `0.0.18` public pre-release, the web packages are attached to the
+Both packages are published to the public npm registry:
+
+```bash
+npm install @swifttui/web @swifttui/build
+```
+
+They are also attached to each
 [`swift-tui-web` GitHub release](https://github.com/SwiftTUI/swift-tui-web/releases/tag/0.0.18)
-as npm-compatible tarballs while npm publishing is being finalized:
+as npm-compatible tarballs, if you prefer to pin a specific release asset:
 
 ```bash
 npm install \
   https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.18/swifttui-web-0.0.18.tgz \
   https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.18/swifttui-build-0.0.18.tgz
 ```
-
-After npm publication, those tarball URLs can be replaced with
-`@swifttui/web` and `@swifttui/build`.
 
 Compile your SwiftTUI `App` to WASI with the `swifttui-web` CLI — it drives the
 Swift toolchain and emits `app.wasm` plus a `scene-manifest.json` into your
@@ -293,6 +322,16 @@ surface is being proven — keep your dependency pinned with `.upToNextMinor`. I
 is currently an alpha, single-maintainer, AI-assisted project. See
 [docs/VISION-GAP.md](docs/VISION-GAP.md) for where the code differs from intent
 and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the release policy.
+
+**Known issues.** A non-deterministic memory-corruption crash (`SIGSEGV` /
+`SIGBUS` on the main thread) has been observed in the async-render path under
+heavy concurrent test-suite load, tracked as
+[`#12`](https://github.com/SwiftTUI/swift-tui/issues/12) and documented in
+[docs/KNOWN-TEST-FLAKES.md](docs/KNOWN-TEST-FLAKES.md). It is load- and
+timing-sensitive, not reproducible on demand, and clean under both
+AddressSanitizer and ThreadSanitizer; the mechanism is not yet identified. It
+has not been observed in normal single-app use, but is disclosed here for
+transparency — if you hit it, a reproduction on the issue would help.
 
 The sibling `swift-tui-web`, `swift-tui-examples`, and `swift-tui-site` repos
 are public pre-release repositories as well. Each has its own `0.0.18` tag, and
