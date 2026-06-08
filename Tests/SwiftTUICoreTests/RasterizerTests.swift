@@ -678,6 +678,142 @@ struct RasterizerTests {
     #expect(blendThenGroupCompositing != groupThenBlendCompositing)
   }
 
+  @Test("presentation layers preserve cell image cell paint order")
+  func presentationLayersPreserveCellImageCellPaintOrder() throws {
+    let rasterizer = Rasterizer()
+    let rootBounds = CellRect(origin: .zero, size: .init(width: 3, height: 1))
+    let imageBounds = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 1, height: 1))
+    let imageIdentity = testIdentity("presentation-layer-image")
+    let draw = DrawNode(
+      identity: testIdentity("presentation-layer-root"),
+      bounds: rootBounds,
+      commands: [fillCommand(bounds: rootBounds, color: .red)],
+      children: [
+        DrawNode(
+          identity: imageIdentity,
+          bounds: imageBounds,
+          commands: [
+            .image(
+              bounds: imageBounds,
+              identity: imageIdentity,
+              payload: .init(source: .path("middle.png"))
+            )
+          ]
+        ),
+        DrawNode(
+          identity: testIdentity("presentation-layer-text"),
+          bounds: imageBounds,
+          commands: [
+            .text(
+              bounds: imageBounds,
+              content: "T",
+              style: .init(),
+              lineLimit: nil,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
+          ]
+        ),
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+
+    #expect(surface.lines == [" T "])
+    #expect(surface.presentationLayers.map(layerContentKind) == [
+      "cells", "cells", "cells", "image", "cells",
+    ])
+    try #require(surface.presentationLayers.count > 3)
+    let imageLayer = surface.presentationLayers[3]
+    let textLayer = try #require(surface.presentationLayers.last)
+    #expect(imageAttachment(in: imageLayer)?.identity == imageIdentity)
+    #expect(cellFragment(in: textLayer)?.bounds == imageBounds)
+  }
+
+  @Test("presentation layers preserve image over image authoring order")
+  func presentationLayersPreserveImageOverImageAuthoringOrder() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let backIdentity = testIdentity("presentation-image-back")
+    let frontIdentity = testIdentity("presentation-image-front")
+    func imageNode(
+      identity: Identity,
+      source: String
+    ) -> DrawNode {
+      DrawNode(
+        identity: identity,
+        bounds: bounds,
+        commands: [
+          .image(
+            bounds: bounds,
+            identity: identity,
+            payload: .init(source: .path(source))
+          )
+        ]
+      )
+    }
+    let draw = DrawNode(
+      identity: testIdentity("presentation-image-root"),
+      bounds: bounds,
+      children: [
+        imageNode(identity: backIdentity, source: "back.png"),
+        imageNode(identity: frontIdentity, source: "front.png"),
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let layerImages = surface.presentationLayers.compactMap(imageAttachment)
+
+    #expect(surface.imageAttachments.map(\.identity) == [backIdentity, frontIdentity])
+    #expect(layerImages.map(\.identity) == [backIdentity, frontIdentity])
+  }
+
+  @Test("presentation layers carry active blend effects")
+  func presentationLayersCarryActiveBlendEffects() throws {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let draw = DrawNode(
+      identity: testIdentity("presentation-effect-root"),
+      bounds: bounds,
+      children: [
+        DrawNode(
+          identity: testIdentity("presentation-effect-child"),
+          bounds: bounds,
+          drawEffects: .init([.blendMode(.screen)]),
+          commands: [fillCommand(bounds: bounds, color: .blue)]
+        )
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    let layer = try #require(surface.presentationLayers.first)
+
+    #expect(layer.effects == [.blendMode(.screen)])
+  }
+
+  @Test("snapshot renderer includes presentation layer descriptions")
+  func snapshotRendererIncludesPresentationLayerDescriptions() {
+    let rasterizer = Rasterizer()
+    let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let imageIdentity = testIdentity("snapshot-image")
+    let draw = DrawNode(
+      identity: testIdentity("snapshot-root"),
+      bounds: bounds,
+      commands: [
+        .image(
+          bounds: bounds,
+          identity: imageIdentity,
+          payload: .init(source: .path("snapshot.png"))
+        )
+      ]
+    )
+
+    let snapshot = SnapshotRenderer().rasterSurface(rasterizer.rasterize(draw))
+
+    #expect(snapshot.contains("layers=#0 image[@(0,0) 1x1 id="))
+    #expect(snapshot.contains("snapshot-image"))
+  }
+
   @Test("incremental raster reuse retains image attachments outside dirty rows")
   func incrementalRasterReuseRetainsImageAttachmentsOutsideDirtyRows() throws {
     let rasterizer = Rasterizer()
@@ -1289,6 +1425,33 @@ private func imagePayload() -> ImagePayload {
       cellPixelSize: .init(width: 8, height: 16)
     )
   )
+}
+
+private func layerContentKind(_ layer: RasterPresentationLayer) -> String {
+  switch layer.content {
+  case .cells:
+    return "cells"
+  case .image:
+    return "image"
+  }
+}
+
+private func imageAttachment(
+  in layer: RasterPresentationLayer
+) -> RasterImageAttachment? {
+  if case .image(let attachment) = layer.content {
+    return attachment
+  }
+  return nil
+}
+
+private func cellFragment(
+  in layer: RasterPresentationLayer
+) -> RasterSurfaceFragment? {
+  if case .cells(let fragment) = layer.content {
+    return fragment
+  }
+  return nil
 }
 
 private struct CoreRasterRepaintMutation {

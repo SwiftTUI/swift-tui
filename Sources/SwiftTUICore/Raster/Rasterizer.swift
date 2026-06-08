@@ -173,6 +173,7 @@ public struct Rasterizer: Sendable {
     )
     var imageAttachments: [RasterImageAttachment] = []
     var visibleIdentities: Set<Identity> = []
+    let presentationRecorder = RasterPresentationLayerRecorder()
 
     paint(
       node: draw,
@@ -181,14 +182,16 @@ public struct Rasterizer: Sendable {
       clip: nil,
       dirtyRows: nil,
       dirtyRowRange: nil,
-      visibleIdentities: &visibleIdentities
+      visibleIdentities: &visibleIdentities,
+      presentationRecorder: presentationRecorder
     )
 
     return (
       RasterSurface(
         size: surfaceSize,
         cells: cells,
-        imageAttachments: imageAttachments
+        imageAttachments: imageAttachments,
+        presentationLayers: presentationRecorder.layers
       ),
       visibleIdentities,
       nil
@@ -207,6 +210,11 @@ public struct Rasterizer: Sendable {
     var imageAttachments = previousSurface.imageAttachments.filter { attachment in
       !visibleBounds(attachment.visibleBounds, intersectsAnyOf: dirtyRows)
     }
+    let presentationRecorder = RasterPresentationLayerRecorder(
+      layers: previousSurface.presentationLayers.filter { layer in
+        !visibleBounds(layer.bounds, intersectsAnyOf: dirtyRows)
+      }
+    )
     clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
 
     let dirtyRowRange: (min: Int, max: Int)
@@ -228,13 +236,17 @@ public struct Rasterizer: Sendable {
       clip: nil,
       dirtyRows: dirtyRows,
       dirtyRowRange: dirtyRowRange,
-      visibleIdentities: &visibleIdentities
+      visibleIdentities: &visibleIdentities,
+      presentationRecorder: presentationRecorder
     )
 
     let surface = RasterSurface(
       size: surfaceSize,
       cells: cells,
-      imageAttachments: imageAttachments
+      imageAttachments: imageAttachments,
+      presentationLayers: presentationRecorder.layers.sorted { lhs, rhs in
+        lhs.order < rhs.order
+      }
     )
     if incrementalVerificationPolicy == .verifySoundDamage {
       // F13: when damage suppresses painting, verify against a fresh raster

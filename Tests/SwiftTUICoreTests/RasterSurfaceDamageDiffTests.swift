@@ -214,6 +214,46 @@ struct RasterSurfaceDamageDiffTests {
         ])
     )
   }
+
+  @Test("diff marks rows dirty when presentation layer topology changes")
+  func diffMarksRowsDirtyWhenPresentationLayerTopologyChanges() {
+    let identity = Identity(components: ["layer-image"])
+    let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let image = RasterImageAttachment(
+      identity: identity,
+      bounds: bounds,
+      source: .path("image.png")
+    )
+    let fragment = RasterSurfaceFragment(
+      bounds: bounds,
+      cells: [[RasterCell(character: "A")]]
+    )
+    let previous = RasterSurface(
+      size: .init(width: 1, height: 1),
+      lines: ["A"],
+      imageAttachments: [image],
+      presentationLayers: [
+        RasterPresentationLayer(order: 0, bounds: bounds, content: .cells(fragment)),
+        RasterPresentationLayer(order: 1, bounds: bounds, content: .image(image)),
+      ]
+    )
+    let current = RasterSurface(
+      size: .init(width: 1, height: 1),
+      lines: ["A"],
+      imageAttachments: [image],
+      presentationLayers: [
+        RasterPresentationLayer(order: 0, bounds: bounds, content: .image(image)),
+        RasterPresentationLayer(order: 1, bounds: bounds, content: .cells(fragment)),
+      ]
+    )
+
+    #expect(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: current)
+        == PresentationDamage(textRows: [
+          .init(row: 0, columnRanges: [0..<1, 0..<1, 0..<1, 0..<1])
+        ])
+    )
+  }
 }
 
 private func imageCompositing(

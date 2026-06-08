@@ -8,7 +8,9 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -49,7 +51,9 @@ extension Rasterizer {
         environment: environment,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
       return
     case .path:
@@ -72,7 +76,9 @@ extension Rasterizer {
         environment: environment,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
       return
     case .rectangle, .roundedRectangle:
@@ -133,10 +139,12 @@ extension Rasterizer {
             ),
             atX: x,
             y: y,
-            cells: &cells,
-            clip: clip,
-            blendMode: blendMode
-          )
+              cells: &cells,
+              clip: clip,
+              blendMode: blendMode,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
+            )
           x += 1
           continue
         }
@@ -152,11 +160,21 @@ extension Rasterizer {
                 y: y,
                 cells: &cells,
                 clip: clip,
-                blendMode: blendMode
+                blendMode: blendMode,
+                presentationRecorder: presentationRecorder,
+                presentationEffects: presentationEffects
               )
             } else {
               // Translucent constant fill: tint existing cell in-place.
-              tintCell(atX: x, y: y, with: color, cells: &cells, clip: clip)
+              tintCell(
+                atX: x,
+                y: y,
+                with: color,
+                cells: &cells,
+                clip: clip,
+                presentationRecorder: presentationRecorder,
+                presentationEffects: presentationEffects
+              )
             }
           }
         } else if let constantColor {
@@ -169,7 +187,9 @@ extension Rasterizer {
             y: y,
             cells: &cells,
             clip: clip,
-            blendMode: blendMode
+            blendMode: blendMode,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects
           )
         } else {
           // Sampled (gradient) fill: resolve per-cell.
@@ -190,10 +210,20 @@ extension Rasterizer {
                   y: y,
                   cells: &cells,
                   clip: clip,
-                  blendMode: blendMode
+                  blendMode: blendMode,
+                  presentationRecorder: presentationRecorder,
+                  presentationEffects: presentationEffects
                 )
               } else {
-                tintCell(atX: x, y: y, with: fillColor, cells: &cells, clip: clip)
+                tintCell(
+                  atX: x,
+                  y: y,
+                  with: fillColor,
+                  cells: &cells,
+                  clip: clip,
+                  presentationRecorder: presentationRecorder,
+                  presentationEffects: presentationEffects
+                )
               }
             }
           } else {
@@ -209,7 +239,9 @@ extension Rasterizer {
               y: y,
               cells: &cells,
               clip: clip,
-              blendMode: blendMode
+              blendMode: blendMode,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
             )
           }
         }
@@ -232,7 +264,9 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     let cellW = bounds.size.width
     let cellH = bounds.size.height
@@ -284,7 +318,9 @@ extension Rasterizer {
           y: originY + cellY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
     }
@@ -315,7 +351,9 @@ extension Rasterizer {
           y: originY + cellY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
     }
@@ -337,7 +375,9 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     backgroundStyle: BorderBackgroundStyle? = nil,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     let cellW = shapeBounds.size.width
     let cellH = shapeBounds.size.height
@@ -451,7 +491,9 @@ extension Rasterizer {
           y: targetY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
     }
@@ -613,7 +655,9 @@ extension Rasterizer {
     y: Int,
     with overlay: Color,
     cells: inout [[RasterCell]],
-    clip: CellRect?
+    clip: CellRect?,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     if let clip {
       guard
@@ -631,6 +675,13 @@ extension Rasterizer {
     var cell = cells[y][x]
     cell.style = (cell.style ?? .init()).tinted(with: overlay)
     cells[y][x] = cell
+    presentationRecorder?.appendCellFragment(
+      from: cells,
+      x: x,
+      y: y,
+      width: max(1, cell.spanWidth),
+      effects: presentationEffects
+    )
   }
 
 }

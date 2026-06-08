@@ -2,6 +2,7 @@ extension Rasterizer {
   private struct PaintContext {
     var clip: CellRect?
     var activeBlendMode: BlendMode?
+    var presentationEffects: [DrawEffect]
     var dirtyRows: Set<Int>?
     var dirtyRowRange: (min: Int, max: Int)?
   }
@@ -72,7 +73,8 @@ extension Rasterizer {
     clip: CellRect?,
     dirtyRows: Set<Int>?,
     dirtyRowRange: (min: Int, max: Int)?,
-    visibleIdentities: inout Set<Identity>
+    visibleIdentities: inout Set<Identity>,
+    presentationRecorder: RasterPresentationLayerRecorder?
   ) {
     // Two frame kinds.  A `.visit` frame paints the node's `commands`
     // (pre-child commands) and then pushes its children plus, if the
@@ -93,6 +95,7 @@ extension Rasterizer {
     let initialContext = PaintContext(
       clip: clip,
       activeBlendMode: nil,
+      presentationEffects: [],
       dirtyRows: dirtyRows,
       dirtyRowRange: dirtyRowRange
     )
@@ -108,7 +111,9 @@ extension Rasterizer {
           imageAttachments: &imageAttachments,
           clip: context.clip,
           blendMode: context.activeBlendMode,
-          dirtyRows: context.dirtyRows
+          dirtyRows: context.dirtyRows,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: context.presentationEffects
         )
       case .visit(let node, let context):
         var nodeContext = context
@@ -167,7 +172,8 @@ extension Rasterizer {
             context: nodeContext,
             cells: &cells,
             imageAttachments: &imageAttachments,
-            visibleIdentities: &visibleIdentities
+            visibleIdentities: &visibleIdentities,
+            presentationRecorder: presentationRecorder
           )
           continue
         }
@@ -181,7 +187,9 @@ extension Rasterizer {
           imageAttachments: &imageAttachments,
           clip: nodeContext.clip,
           blendMode: nodeContext.activeBlendMode,
-          dirtyRows: nodeContext.dirtyRows
+          dirtyRows: nodeContext.dirtyRows,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: nodeContext.presentationEffects
         )
 
         // Schedule post-children commands first so they pop LAST
@@ -232,6 +240,13 @@ extension Rasterizer {
       switch effect {
       case .blendMode(let blendMode):
         updated.activeBlendMode = blendMode
+        updated.presentationEffects.removeAll { effect in
+          if case .blendMode = effect {
+            return true
+          }
+          return false
+        }
+        updated.presentationEffects.append(.blendMode(blendMode))
       case .compositingGroup:
         // Callers normally split groups before this helper. If a future
         // segment still contains a group marker, it has no streaming effect
@@ -276,7 +291,8 @@ extension Rasterizer {
     context: PaintContext,
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
-    visibleIdentities: inout Set<Identity>
+    visibleIdentities: inout Set<Identity>,
+    presentationRecorder: RasterPresentationLayerRecorder?
   ) {
     guard visibleBounds.size.width > 0, visibleBounds.size.height > 0 else {
       return
@@ -297,14 +313,16 @@ extension Rasterizer {
       clip: visibleBounds,
       dirtyRows: context.dirtyRows,
       dirtyRowRange: context.dirtyRowRange,
-      visibleIdentities: &visibleIdentities
+      visibleIdentities: &visibleIdentities,
+      presentationRecorder: nil
     )
     compositeLayer(
       layer,
       effects: split.effectsAfterGroup,
       context: context,
       cells: &cells,
-      imageAttachments: &imageAttachments
+      imageAttachments: &imageAttachments,
+      presentationRecorder: presentationRecorder
     )
   }
 
@@ -313,7 +331,8 @@ extension Rasterizer {
     effects: DrawEffects,
     context: PaintContext,
     cells: inout [[RasterCell]],
-    imageAttachments: inout [RasterImageAttachment]
+    imageAttachments: inout [RasterImageAttachment],
+    presentationRecorder: RasterPresentationLayerRecorder?
   ) {
     if let nestedGroup = splitAtFirstCompositingGroup(effects) {
       var intermediate = RasterLayer(
@@ -326,6 +345,7 @@ extension Rasterizer {
         to: PaintContext(
           clip: layer.bounds,
           activeBlendMode: nil,
+          presentationEffects: [],
           dirtyRows: context.dirtyRows,
           dirtyRowRange: context.dirtyRowRange
         )
@@ -333,14 +353,16 @@ extension Rasterizer {
       compositeLayerCells(
         from: layer,
         into: &intermediate.cells,
-        context: innerContext
+        context: innerContext,
+        presentationRecorder: nil
       )
       compositeLayer(
         intermediate,
         effects: nestedGroup.effectsAfterGroup,
         context: context,
         cells: &cells,
-        imageAttachments: &imageAttachments
+        imageAttachments: &imageAttachments,
+        presentationRecorder: presentationRecorder
       )
       return
     }
@@ -351,7 +373,8 @@ extension Rasterizer {
     compositeLayerCells(
       from: layer,
       into: &cells,
-      context: outputContext
+      context: outputContext,
+      presentationRecorder: presentationRecorder
     )
     let carriedAttachments =
       if let blendMode = outputContext.activeBlendMode {
@@ -366,13 +389,20 @@ extension Rasterizer {
       } else {
         layer.imageAttachments
       }
-    imageAttachments.append(contentsOf: carriedAttachments)
+    for attachment in carriedAttachments {
+      imageAttachments.append(attachment)
+      presentationRecorder?.appendImageAttachment(
+        attachment,
+        effects: outputContext.presentationEffects
+      )
+    }
   }
 
   private func compositeLayerCells(
     from layer: RasterLayer,
     into cells: inout [[RasterCell]],
-    context: PaintContext
+    context: PaintContext,
+    presentationRecorder: RasterPresentationLayerRecorder?
   ) {
     let startY = layer.bounds.origin.y
     let endY = startY + layer.bounds.size.height
@@ -400,7 +430,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: context.clip,
-          blendMode: context.activeBlendMode
+          blendMode: context.activeBlendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: context.presentationEffects
         )
       }
     }
@@ -423,7 +455,9 @@ extension Rasterizer {
     imageAttachments: inout [RasterImageAttachment],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
-    dirtyRows: Set<Int>? = nil
+    dirtyRows: Set<Int>? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     struct Frame {
       let command: DrawCommand
@@ -493,7 +527,9 @@ extension Rasterizer {
               y: bounds.origin.y + lineIndex,
               cells: &cells,
               clip: frame.clip,
-              blendMode: blendMode
+              blendMode: blendMode,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
             )
             x += cluster.cellWidth
             if x >= bounds.origin.x + bounds.size.width {
@@ -540,7 +576,9 @@ extension Rasterizer {
               y: bounds.origin.y + lineIndex,
               cells: &cells,
               clip: frame.clip,
-              blendMode: blendMode
+              blendMode: blendMode,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
             )
             x += cluster.cellWidth
           }
@@ -588,7 +626,9 @@ extension Rasterizer {
                 y: bounds.origin.y + lineIndex,
                 cells: &cells,
                 clip: frame.clip,
-                blendMode: blendMode
+                blendMode: blendMode,
+                presentationRecorder: presentationRecorder,
+                presentationEffects: presentationEffects
               )
               x += cluster.cellWidth
             }
@@ -652,7 +692,9 @@ extension Rasterizer {
               y: bounds.origin.y + lineIndex,
               cells: &cells,
               clip: frame.clip,
-              blendMode: blendMode
+              blendMode: blendMode,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
             )
             x += cluster.cellWidth
             if x >= bounds.origin.x + bounds.size.width {
@@ -678,19 +720,22 @@ extension Rasterizer {
             cellPixelSize: payload.resolvedAsset?.cellPixelSize,
             destinationCells: cells
           )
-        imageAttachments.append(
-          RasterImageAttachment(
-            identity: identity,
-            bounds: bounds,
-            visibleBounds: visibleBounds,
-            source: payload.source,
-            resolvedReference: payload.resolvedAsset?.reference,
-            pixelSize: payload.resolvedAsset?.pixelSize,
-            cellPixelSize: payload.resolvedAsset?.cellPixelSize,
-            isResizable: payload.isResizable,
-            scalingMode: payload.scalingMode,
-            compositing: compositing
-          )
+        let attachment = RasterImageAttachment(
+          identity: identity,
+          bounds: bounds,
+          visibleBounds: visibleBounds,
+          source: payload.source,
+          resolvedReference: payload.resolvedAsset?.reference,
+          pixelSize: payload.resolvedAsset?.pixelSize,
+          cellPixelSize: payload.resolvedAsset?.cellPixelSize,
+          isResizable: payload.isResizable,
+          scalingMode: payload.scalingMode,
+          compositing: compositing
+        )
+        imageAttachments.append(attachment)
+        presentationRecorder?.appendImageAttachment(
+          attachment,
+          effects: presentationEffects
         )
       case .fill(let bounds, let geometry, let insetAmount, let style, let mode):
         paintFill(
@@ -702,7 +747,9 @@ extension Rasterizer {
           environment: environment,
           cells: &cells,
           clip: frame.clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       case .stroke(
         let bounds, let geometry, let insetAmount, let style, let strokeStyle, let strokeBorder,
@@ -718,7 +765,9 @@ extension Rasterizer {
           environment: environment,
           cells: &cells,
           clip: frame.clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       case .rule(let bounds, let style, let strokeStyle, let stackAxis):
         paintRule(
@@ -729,7 +778,9 @@ extension Rasterizer {
           environment: environment,
           cells: &cells,
           clip: frame.clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       case .border(
         let bounds,
@@ -751,7 +802,9 @@ extension Rasterizer {
           environment: environment,
           cells: &cells,
           clip: frame.clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       case .canvas(let bounds, let payload, let foregroundStyle):
         paintCanvasDrawing(
@@ -761,7 +814,9 @@ extension Rasterizer {
           environment: environment,
           cells: &cells,
           clip: frame.clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       case .foreignSurface(let bounds, let payload):
         guard bounds.size.width > 0, bounds.size.height > 0 else {
@@ -805,10 +860,19 @@ extension Rasterizer {
                 y: y,
                 cells: &cells,
                 clip: frame.clip,
-                blendMode: blendMode
+                blendMode: blendMode,
+                presentationRecorder: presentationRecorder,
+                presentationEffects: presentationEffects
               )
             } else {
               cells[y][x] = sourceCell
+              presentationRecorder?.appendCellFragment(
+                from: cells,
+                x: x,
+                y: y,
+                width: max(1, sourceCell.spanWidth),
+                effects: presentationEffects
+              )
             }
           }
         }

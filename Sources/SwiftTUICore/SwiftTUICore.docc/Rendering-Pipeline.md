@@ -65,11 +65,18 @@ Lowers geometry plus metadata into draw commands and collection chrome.
 ### Raster
 
 Converts draw commands into `RasterSurface`, a cell grid with styles,
-attachments, and continuation-cell handling. Image attachments remain host
-presentation records; when an image is under an active blend mode, the raster
-phase records visible backdrop metadata, including cell backgrounds, explicit
-foreground colors, glyphs, and continuation spans, so the runtime can
-precompose a blended image variant without changing the cell grid model.
+attachments, image attachments, continuation-cell handling, and a package-level
+ordered presentation-layer sidecar. The final cell grid plus image attachments
+remain the compatibility boundary for hosts. The sidecar records compact cell
+fragments and image attachment paint events in raster order so package tests and
+future host replay paths can inspect authoring order without replacing the
+collapsed surface.
+
+Image attachments remain host presentation records; when an image is under an
+active blend mode, the raster phase records visible backdrop metadata, including
+cell backgrounds, explicit foreground colors, glyphs, and continuation spans,
+so the runtime can precompose a blended image variant without changing the cell
+grid model.
 
 ### Commit
 
@@ -88,10 +95,10 @@ semantic routing and Canvas packs continuous cell-space samples during raster.
 Later phases may carry named snapshots of earlier data, but those snapshots are
 not independent owners. `PlacedNodeResolvedMetadata` names the resolved metadata
 mirrored into placed nodes, `SemanticSnapshot` is a derived routing product,
-`DrawNode` is a placed-to-paint projection, and `RasterSurface` owns only the
-final cell grid plus raster attachments. Retained layout reuse must pair any
-relaxed equivalence predicate with a refresh path before downstream phases read
-the reused product.
+`DrawNode` is a placed-to-paint projection, and `RasterSurface` owns the final
+cell grid, raster attachments, and package-level presentation-order sidecar.
+Retained layout reuse must pair any relaxed equivalence predicate with a refresh
+path before downstream phases read the reused product.
 
 ## Performance Shape
 

@@ -1738,6 +1738,7 @@ SwiftTUICore.RasterStyleRun.style
 SwiftTUICore.RasterStyleRun.x
 SwiftTUICore.RasterStyleRun.y
 SwiftTUICore.RasterSurface
+SwiftTUICore.RasterSurface.==(_:_:)
 SwiftTUICore.RasterSurface.attachments
 SwiftTUICore.RasterSurface.cells
 SwiftTUICore.RasterSurface.imageAttachments

@@ -16,6 +16,7 @@ package enum RasterSurfaceDamageDiff {
     var rowRanges: [Int: [Range<Int>]] = [:]
     appendCellDiffs(previous: previous, current: current, to: &rowRanges)
     appendImageDiffs(previous: previous, current: current, to: &rowRanges)
+    appendPresentationLayerTopologyDiffs(previous: previous, current: current, to: &rowRanges)
 
     return PresentationDamage(
       textRows: rowRanges.keys.sorted().map { row in
@@ -76,6 +77,22 @@ package enum RasterSurfaceDamageDiff {
     }
   }
 
+  private static func appendPresentationLayerTopologyDiffs(
+    previous: RasterSurface,
+    current: RasterSurface,
+    to rowRanges: inout [Int: [Range<Int>]]
+  ) {
+    guard presentationLayerTopology(previous.presentationLayers)
+      != presentationLayerTopology(current.presentationLayers)
+    else {
+      return
+    }
+
+    for layer in previous.presentationLayers + current.presentationLayers {
+      append(rect: layer.bounds, to: &rowRanges)
+    }
+  }
+
   private static func append(
     rect: CellRect,
     to rowRanges: inout [Int: [Range<Int>]]
@@ -117,5 +134,55 @@ package enum RasterSurfaceDamageDiff {
     let lead = rasterCell.continuationLeadX ?? column
     let span = max(1, cell(in: row, at: lead).spanWidth)
     return max(0, lead)..<min(surfaceWidth, lead + span)
+  }
+}
+
+private struct RasterPresentationLayerTopology: Equatable {
+  var order: Int
+  var bounds: CellRect
+  var effects: [DrawEffect]
+  var content: RasterPresentationLayerTopologyContent
+}
+
+private enum RasterPresentationLayerTopologyContent: Equatable {
+  case cells
+  case image(RasterImageLayerTopology)
+}
+
+private struct RasterImageLayerTopology: Equatable {
+  var identity: Identity
+  var bounds: CellRect
+  var visibleBounds: CellRect
+  var compositingSignature: UInt64?
+}
+
+private func presentationLayerTopology(
+  _ layers: [RasterPresentationLayer]
+) -> [RasterPresentationLayerTopology] {
+  layers.map { layer in
+    RasterPresentationLayerTopology(
+      order: layer.order,
+      bounds: layer.bounds,
+      effects: layer.effects,
+      content: presentationLayerTopologyContent(layer.content)
+    )
+  }
+}
+
+private func presentationLayerTopologyContent(
+  _ content: RasterPresentationLayerContent
+) -> RasterPresentationLayerTopologyContent {
+  switch content {
+  case .cells:
+    return .cells
+  case .image(let attachment):
+    return .image(
+      RasterImageLayerTopology(
+        identity: attachment.identity,
+        bounds: attachment.bounds,
+        visibleBounds: attachment.visibleBounds,
+        compositingSignature: attachment.compositing?.backdropSignature
+      )
+    )
   }
 }

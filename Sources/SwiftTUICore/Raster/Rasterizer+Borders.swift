@@ -10,7 +10,9 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -42,7 +44,9 @@ extension Rasterizer {
         cells: &cells,
         clip: clip,
         backgroundStyle: backgroundStyle,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
       return
     case .rectangle, .roundedRectangle:
@@ -77,7 +81,9 @@ extension Rasterizer {
           y: minY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
         if maxY != minY {
           writeStrokeGlyph(
@@ -92,7 +98,9 @@ extension Rasterizer {
             y: maxY,
             cells: &cells,
             clip: clip,
-            blendMode: blendMode
+            blendMode: blendMode,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects
           )
         }
       }
@@ -111,7 +119,9 @@ extension Rasterizer {
             y: y,
             cells: &cells,
             clip: clip,
-            blendMode: blendMode
+            blendMode: blendMode,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects
           )
           if maxX != minX {
             writeStrokeGlyph(
@@ -126,7 +136,9 @@ extension Rasterizer {
               y: y,
               cells: &cells,
               clip: clip,
-              blendMode: blendMode
+              blendMode: blendMode,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
             )
           }
         }
@@ -144,7 +156,9 @@ extension Rasterizer {
         y: minY,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
       if maxX != minX {
         writeStrokeGlyph(
@@ -159,7 +173,9 @@ extension Rasterizer {
           y: minY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
       if maxY != minY {
@@ -175,7 +191,9 @@ extension Rasterizer {
           y: maxY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
       if maxX != minX, maxY != minY {
@@ -191,7 +209,9 @@ extension Rasterizer {
           y: maxY,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
     }
@@ -205,7 +225,9 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -241,7 +263,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
     } else {
@@ -259,7 +283,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
       }
     }
@@ -277,7 +303,9 @@ extension Rasterizer {
     y: Int,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     let resolvedStyle = ResolvedTextStyle(
       foregroundColor: resolveColor(
@@ -304,7 +332,9 @@ extension Rasterizer {
       y: y,
       cells: &cells,
       clip: clip,
-      blendMode: blendMode
+      blendMode: blendMode,
+      presentationRecorder: presentationRecorder,
+      presentationEffects: presentationEffects
     )
   }
 

@@ -59,6 +59,11 @@ public struct SnapshotRenderer {
         "images=\(surface.imageAttachments.map(describe).joined(separator: ", "))"
       )
     }
+    if !surface.presentationLayers.isEmpty {
+      lines.append(
+        "layers=\(surface.presentationLayers.map(describe).joined(separator: ", "))"
+      )
+    }
     if surface.lines.isEmpty {
       return lines.joined(separator: "\n")
     }

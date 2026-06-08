@@ -184,7 +184,7 @@ The runtime stages preserve the same typed product order documented by
 | place | `PlacedNode` | Assign integer-cell frames, content bounds, and placement-time metadata. |
 | semantics | `SemanticSnapshot` | Extract focus, interaction, scroll, selection, named coordinate-space, accessibility, and routing data. |
 | draw | `DrawNode` | Lower placed nodes into draw commands, borders, backgrounds, effects, and payload paint instructions. |
-| raster | `RasterSurface` | Paint draw commands into styled terminal cells and image attachments. |
+| raster | `RasterSurface` | Paint draw commands into styled terminal cells, image attachments, and a package-level ordered presentation-layer sidecar. |
 | commit | `CommitPlan` | Package lifecycle, handler installation, semantic snapshot, and transaction work. |
 
 All seven products are gathered on `FrameArtifacts` for inspection and retained
@@ -225,6 +225,13 @@ For hosts:
 - Non-`nil` empty damage means no visible raster cells changed.
 - Non-`nil` row/range damage is relative to the previous surface presented to
   the same host.
+
+`RasterSurface` also carries package-level ordered presentation layers. Current
+terminal, WebHost/WASI, and SwiftUI host paths continue to consume the collapsed
+cell grid plus image attachments. The damage derivation still returns row/range
+damage for those hosts, but it also treats presentation-layer topology changes
+as dirty row signals so future ordered-layer consumers can detect authoring-order
+changes even when the final collapsed cells are stable.
 
 ## Host Handoff
 

@@ -61,6 +61,43 @@ public struct RasterCell: Equatable, Sendable {
   }
 }
 
+package struct RasterSurfaceFragment: Equatable, Sendable {
+  package var bounds: CellRect
+  package var cells: [[RasterCell]]
+
+  package init(
+    bounds: CellRect,
+    cells: [[RasterCell]]
+  ) {
+    self.bounds = bounds
+    self.cells = cells
+  }
+}
+
+package struct RasterPresentationLayer: Equatable, Sendable {
+  package var order: Int
+  package var bounds: CellRect
+  package var content: RasterPresentationLayerContent
+  package var effects: [DrawEffect]
+
+  package init(
+    order: Int,
+    bounds: CellRect,
+    content: RasterPresentationLayerContent,
+    effects: [DrawEffect] = []
+  ) {
+    self.order = order
+    self.bounds = bounds
+    self.content = content
+    self.effects = effects
+  }
+}
+
+package enum RasterPresentationLayerContent: Equatable, Sendable {
+  case cells(RasterSurfaceFragment)
+  case image(RasterImageAttachment)
+}
+
 /// A 2D grid of terminal cells produced by rasterization.
 ///
 /// Raster owns the final cell grid, style runs as cell styles, attachments,
@@ -73,6 +110,7 @@ public struct RasterSurface: Equatable, Sendable {
   public var attachments: [String]
   public var imageAttachments: [RasterImageAttachment]
   public var metadata: [String: String]
+  package var presentationLayers: [RasterPresentationLayer]
 
   public init(
     size: CellSize = .zero,
@@ -86,6 +124,23 @@ public struct RasterSurface: Equatable, Sendable {
     self.attachments = attachments
     self.imageAttachments = imageAttachments
     self.metadata = metadata
+    self.presentationLayers = []
+  }
+
+  package init(
+    size: CellSize = .zero,
+    cells: [[RasterCell]] = [],
+    attachments: [String] = [],
+    imageAttachments: [RasterImageAttachment] = [],
+    metadata: [String: String] = [:],
+    presentationLayers: [RasterPresentationLayer] = []
+  ) {
+    self.size = size
+    self.cells = cells
+    self.attachments = attachments
+    self.imageAttachments = imageAttachments
+    self.metadata = metadata
+    self.presentationLayers = presentationLayers
   }
 
   public init(
@@ -101,6 +156,32 @@ public struct RasterSurface: Equatable, Sendable {
     self.attachments = attachments
     self.imageAttachments = imageAttachments
     self.metadata = metadata
+    self.presentationLayers = []
+  }
+
+  package init(
+    size: CellSize = .zero,
+    lines: [String],
+    styleRuns: [RasterStyleRun] = [],
+    attachments: [String] = [],
+    imageAttachments: [RasterImageAttachment] = [],
+    metadata: [String: String] = [:],
+    presentationLayers: [RasterPresentationLayer] = []
+  ) {
+    self.size = size
+    self.cells = Self.makeCells(size: size, lines: lines, styleRuns: styleRuns)
+    self.attachments = attachments
+    self.imageAttachments = imageAttachments
+    self.metadata = metadata
+    self.presentationLayers = presentationLayers
+  }
+
+  public static func == (lhs: RasterSurface, rhs: RasterSurface) -> Bool {
+    lhs.size == rhs.size
+      && lhs.cells == rhs.cells
+      && lhs.attachments == rhs.attachments
+      && lhs.imageAttachments == rhs.imageAttachments
+      && lhs.metadata == rhs.metadata
   }
 
   public var lines: [String] {

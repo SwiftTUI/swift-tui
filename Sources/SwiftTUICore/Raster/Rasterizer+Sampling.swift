@@ -191,7 +191,9 @@ extension Rasterizer {
     y: Int,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     let glyphWidth = max(1, width)
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
@@ -243,23 +245,29 @@ extension Rasterizer {
       hyperlink: hyperlink
     )
 
-    guard glyphWidth > 1 else {
-      return
+    if glyphWidth > 1 {
+      for offset in 1..<glyphWidth {
+        let targetX = x + offset
+        guard targetX >= 0, targetX < cells[y].count else {
+          continue
+        }
+        cells[y][targetX] = RasterCell(
+          character: " ",
+          spanWidth: 0,
+          continuationLeadX: x,
+          style: finalStyle,
+          hyperlink: hyperlink
+        )
+      }
     }
 
-    for offset in 1..<glyphWidth {
-      let targetX = x + offset
-      guard targetX >= 0, targetX < cells[y].count else {
-        continue
-      }
-      cells[y][targetX] = RasterCell(
-        character: " ",
-        spanWidth: 0,
-        continuationLeadX: x,
-        style: finalStyle,
-        hyperlink: hyperlink
-      )
-    }
+    presentationRecorder?.appendCellFragment(
+      from: cells,
+      x: x,
+      y: y,
+      width: glyphWidth,
+      effects: presentationEffects
+    )
   }
 
   internal func clearExistingGlyph(

@@ -318,6 +318,28 @@ extension SnapshotRenderer {
       "attachment[id=\(attachment.identity.path) \(describe(attachment.bounds)) source=\(describe(attachment.source)) ref=\(attachment.resolvedReference.map(describe) ?? "nil")\(compositing)]"
   }
 
+  func describe(_ layer: RasterPresentationLayer) -> String {
+    let effectDescription =
+      layer.effects.isEmpty
+      ? ""
+      : " effects=\(layer.effects.map(describe).joined(separator: "+"))"
+    switch layer.content {
+    case .cells(let fragment):
+      return "#\(layer.order) cells[\(describe(fragment.bounds))]\(effectDescription)"
+    case .image(let attachment):
+      return "#\(layer.order) image[\(describe(attachment.visibleBounds)) id=\(attachment.identity.path)]\(effectDescription)"
+    }
+  }
+
+  func describe(_ effect: DrawEffect) -> String {
+    switch effect {
+    case .blendMode(let blendMode):
+      return "blendMode(\(blendMode.rawValue))"
+    case .compositingGroup:
+      return "compositingGroup"
+    }
+  }
+
   func describe(_ styleRun: RasterStyleRun) -> String {
     "@(\(styleRun.x),\(styleRun.y))+\(styleRun.length){\(describe(styleRun.style))}"
   }

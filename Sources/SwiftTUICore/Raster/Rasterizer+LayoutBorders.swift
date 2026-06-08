@@ -20,7 +20,9 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     guard outer.size.width > 0, outer.size.height > 0 else {
       return
@@ -130,7 +132,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
         x += glyphWidth
         glyphIndex += 1
@@ -168,7 +172,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
         x += glyphWidth
         glyphIndex += 1
@@ -205,7 +211,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
         y += 1
         glyphIndex += 1
@@ -242,7 +250,9 @@ extension Rasterizer {
           y: y,
           cells: &cells,
           clip: clip,
-          blendMode: blendMode
+          blendMode: blendMode,
+          presentationRecorder: presentationRecorder,
+          presentationEffects: presentationEffects
         )
         y += 1
         glyphIndex += 1
@@ -264,7 +274,9 @@ extension Rasterizer {
       environment: environment,
       cells: &cells,
       clip: clip,
-      blendMode: blendMode
+      blendMode: blendMode,
+      presentationRecorder: presentationRecorder,
+      presentationEffects: presentationEffects
     )
   }
 
@@ -283,7 +295,9 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode?
+    blendMode: BlendMode?,
+    presentationRecorder: RasterPresentationLayerRecorder?,
+    presentationEffects: [DrawEffect]
   ) {
     if topWidth > 0 && leftWidth > 0 {
       let cornerX = outer.origin.x
@@ -304,7 +318,9 @@ extension Rasterizer {
         background: topBackground,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
     }
     if topWidth > 0 && rightWidth > 0 {
@@ -326,7 +342,9 @@ extension Rasterizer {
         background: topBackground,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
     }
     if bottomWidth > 0 && leftWidth > 0 {
@@ -348,7 +366,9 @@ extension Rasterizer {
         background: bottomBackground,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
     }
     if bottomWidth > 0 && rightWidth > 0 {
@@ -370,7 +390,9 @@ extension Rasterizer {
         background: bottomBackground,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
     }
   }
@@ -452,7 +474,9 @@ extension Rasterizer {
     y: Int,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     var resolved = ResolvedTextStyle()
     resolved.foregroundColor = foreground
@@ -465,7 +489,9 @@ extension Rasterizer {
       y: y,
       cells: &cells,
       clip: clip,
-      blendMode: blendMode
+      blendMode: blendMode,
+      presentationRecorder: presentationRecorder,
+      presentationEffects: presentationEffects
     )
   }
 
@@ -477,7 +503,9 @@ extension Rasterizer {
     background: Color?,
     cells: inout [[RasterCell]],
     clip: CellRect?,
-    blendMode: BlendMode? = nil
+    blendMode: BlendMode? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
   ) {
     guard !text.isEmpty else {
       return
@@ -494,7 +522,9 @@ extension Rasterizer {
         y: y,
         cells: &cells,
         clip: clip,
-        blendMode: blendMode
+        blendMode: blendMode,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
       )
       cursor += glyphWidth
     }
