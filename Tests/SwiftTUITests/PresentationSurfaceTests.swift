@@ -268,8 +268,8 @@ struct PresentationSurfaceTests {
     #expect(toastIndex < alertIndex)
   }
 
-  @Test("sheet shell uses presentation chrome that samples the interior background")
-  func sheetShellUsesPresentationChromeThatSamplesTheInteriorBackground() throws {
+  @Test("sheet shell uses a single-line presentation chrome with a full-bleed surface background")
+  func sheetShellUsesSingleLineChromeWithFullBleedBackground() throws {
     let proposal = ProposedSize(width: .finite(48), height: .finite(14))
     let rootIdentity = testIdentity("Root")
 
@@ -292,54 +292,56 @@ struct PresentationSurfaceTests {
       proposal: proposal
     )
 
-    let titleLocation = try #require(
-      findSubstring("Inspector", in: artifacts.rasterSurface.lines)
-    )
-    let topBorderCell = artifacts.rasterSurface.cells[titleLocation.y - 1][titleLocation.x]
+    let cells = artifacts.rasterSurface.cells
+
+    // The chrome is a square single-line box (no half-block glyphs). Anchor on
+    // the two opposite corners, then read the edges off the derived bounds.
     let topLeadingCorner = try #require(
-      findCharacter("▗", in: artifacts.rasterSurface.lines)
+      findCharacter("┌", in: artifacts.rasterSurface.lines)
     )
-    let rightBorderLocation = try #require(
-      findCharacter("▌", in: artifacts.rasterSurface.lines)
-    )
-    let rightBorderCell = artifacts.rasterSurface.cells[rightBorderLocation.y][
-      rightBorderLocation.x]
     let bottomTrailingCorner = try #require(
-      findCharacter("▘", in: artifacts.rasterSurface.lines)
+      findCharacter("┘", in: artifacts.rasterSurface.lines)
     )
-    let borderBackground = try #require(
-      topBorderCell.style?.backgroundColor
+    let minX = topLeadingCorner.x
+    let maxX = bottomTrailingCorner.x
+    let minY = topLeadingCorner.y
+    let maxY = bottomTrailingCorner.y
+
+    #expect(cells[minY][maxX].character == "┐")
+    #expect(cells[maxY][minX].character == "└")
+    #expect(cells[minY][minX + 1].character == "─")  // top edge
+    #expect(cells[minY + 2][minX].character == "│")  // left edge (a body row)
+    #expect(cells[minY + 2][maxX].character == "│")  // right edge (a body row)
+
+    // None of the legacy half-block chrome glyphs survive.
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(!surface.contains("▄"))
+    #expect(!surface.contains("▌"))
+    #expect(!surface.contains("▗"))
+    #expect(!surface.contains("▘"))
+
+    // Full bleed: every border cell carries the same surface fill as the
+    // interior, and that fill is distinct from the backdrop behind the sheet.
+    let interiorBackground = try #require(
+      cells[minY + 2][minX + 2].style?.backgroundColor
     )
-    let headerBackground = try #require(
-      artifacts.rasterSurface.cells[titleLocation.y][titleLocation.x].style?.backgroundColor
+    let topBorderBackground = try #require(
+      cells[minY][minX + 1].style?.backgroundColor
+    )
+    let leftBorderBackground = try #require(
+      cells[minY + 2][minX].style?.backgroundColor
     )
     let rightBorderBackground = try #require(
-      rightBorderCell.style?.backgroundColor
-    )
-    let rightInteriorBackground = try #require(
-      artifacts.rasterSurface.cells[rightBorderLocation.y][rightBorderLocation.x - 1].style?
-        .backgroundColor
+      cells[minY + 2][maxX].style?.backgroundColor
     )
     let underlyingBackground = try #require(
-      backgroundOnly.rasterSurface.cells[titleLocation.y - 1][titleLocation.x].style?
-        .backgroundColor
-    )
-    let rightUnderlyingBackground = try #require(
-      backgroundOnly.rasterSurface.cells[rightBorderLocation.y][rightBorderLocation.x].style?
-        .backgroundColor
+      backgroundOnly.rasterSurface.cells[minY][minX + 1].style?.backgroundColor
     )
 
-    #expect(topBorderCell.character == "▄")
-    #expect(artifacts.rasterSurface.cells[topLeadingCorner.y][topLeadingCorner.x].character == "▗")
-    #expect(rightBorderCell.character == "▌")
-    #expect(
-      artifacts.rasterSurface.cells[bottomTrailingCorner.y][bottomTrailingCorner.x].character
-        == "▘"
-    )
-    #expect(borderBackground == headerBackground)
-    #expect(borderBackground != underlyingBackground)
-    #expect(rightBorderBackground == rightInteriorBackground)
-    #expect(rightBorderBackground != rightUnderlyingBackground)
+    #expect(topBorderBackground == interiorBackground)
+    #expect(leftBorderBackground == interiorBackground)
+    #expect(rightBorderBackground == interiorBackground)
+    #expect(interiorBackground != underlyingBackground)
   }
 
   @Test("declarative reconciliation prunes stale overlays when the source subtree disappears")

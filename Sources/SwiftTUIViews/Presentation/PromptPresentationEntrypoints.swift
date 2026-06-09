@@ -40,7 +40,8 @@ package func alertPromptPresentationSpec() -> PromptPresentationSpec {
       scrollMinHeight: 2,
       scrollIdealHeight: 6,
       scrollMaxHeight: 10,
-      bodyMode: .messageAndActions
+      bodyMode: .messageAndActions,
+      borderStyle: .single
     ),
     reconcile: { registry, sourceIdentity, item in
       registry.alert.sync(
@@ -64,7 +65,8 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
       scrollMinHeight: 3,
       scrollIdealHeight: 4,
       scrollMaxHeight: 6,
-      bodyMode: .messageAndActions
+      bodyMode: .messageAndActions,
+      borderStyle: .single
     ),
     reconcile: { registry, sourceIdentity, item in
       registry.confirmationDialog.sync(
@@ -143,7 +145,11 @@ package func sheetPromptPresentationSpec(
       scrollIdealHeight: 12,
       scrollMaxHeight: 20,
       bodyMode: .contentOnly,
-      chrome: chrome
+      chrome: chrome,
+      // Surface-chromed sheets render a thin single-line border on a
+      // full-bleed surface fill (see `PromptPresentationSurface`). Dropdown
+      // chrome ignores this and draws its own bottom divider instead.
+      borderStyle: .single
     ),
     reconcile: { registry, sourceIdentity, item in
       registry.sheet.sync(

@@ -109,15 +109,22 @@ package struct PromptPresentationSurface: View, ActionScope {
     case .surface:
       content
         .background {
-          RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.terminalSurfaceBackground)
+          // Full-bleed: the surface fill covers the entire box, including the
+          // outermost ring where the border line is drawn. The single-line
+          // stroke below sits on this fill (it carries an explicit surface
+          // background), so the card reads edge-to-edge with a thin border
+          // rather than a chunky half-block frame.
+          Rectangle().fill(.terminalSurfaceBackground)
         }
         .overlay {
-          // .outset: chrome reserves layout space (frame grows). The rasterizer's
-          // interior-fill sampling for presentation chrome is a separate
-          // glyph-identity check, not a placement check.
-          RoundedRectangle(cornerRadius: 1).strokeBorder(
+          // Square single-line border drawn into the outermost cells of the
+          // filled box. The explicit `background` makes each glyph cell carry
+          // the surface fill, so the line bleeds with the card regardless of
+          // what sits behind the presentation.
+          Rectangle().strokeBorder(
             .terminalBorder(.accent),
-            style: item.descriptor.borderStyle
+            style: item.descriptor.borderStyle,
+            background: .terminalSurfaceBackground
           )
         }
         .frame(
