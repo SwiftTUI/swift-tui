@@ -16,37 +16,35 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    guard isPresented.wrappedValue else {
-      return [node]
-    }
-
-    let sourceIdentity = node.identity
-    let portalEntryID = presentationAttachment(for: node, token: spec.token)
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let item = PromptPresentationItem(
-      id: portalEntryID.description,
-      portalEntryID: portalEntryID,
-      title: title,
-      descriptor: spec.descriptor,
-      actionPayloads: withAuthoringContext(actionsAuthoringContext) {
-        portalDeclaredBuilderChildren(from: actions)
-      },
-      messagePayloads: withAuthoringContext(messageAuthoringContext) {
-        portalDeclaredBuilderChildren(from: message)
-      },
-      contentPayloads: [],
-      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-        withAuthoringContext(dismissAuthoringContext) {
-          isPresented.wrappedValue = false
+    return resolvePresentationModifier(
+      content: content,
+      isPresented: isPresented,
+      in: context
+    ) { background in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let item = PromptPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        title: title,
+        descriptor: spec.descriptor,
+        actionPayloads: withAuthoringContext(actionsAuthoringContext) {
+          portalDeclaredBuilderChildren(from: actions)
+        },
+        messagePayloads: withAuthoringContext(messageAuthoringContext) {
+          portalDeclaredBuilderChildren(from: message)
+        },
+        contentPayloads: [],
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            isPresented.wrappedValue = false
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
         }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-      }
-    )
+      )
 
-    node.preferenceValues.merge(
-      PresentationCoordinatorDeclarationPreferenceKey.self,
-      value: .init(
+      return .init(
         declarations: [
           .init(sourceIdentity: sourceIdentity) { registry in
             spec.reconcile(
@@ -57,8 +55,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
           }
         ]
       )
-    )
-    return [node]
+    }
   }
 }
 
@@ -74,35 +71,33 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    guard isPresented.wrappedValue else {
-      return [node]
-    }
-
-    let sourceIdentity = node.identity
-    let portalEntryID = presentationAttachment(for: node, token: spec.token)
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let item = PromptPresentationItem(
-      id: portalEntryID.description,
-      portalEntryID: portalEntryID,
-      title: title,
-      descriptor: spec.descriptor,
-      actionPayloads: [],
-      messagePayloads: [],
-      contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
-        portalDeclaredBuilderChildren(from: sheetContent)
-      },
-      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-        withAuthoringContext(dismissAuthoringContext) {
-          isPresented.wrappedValue = false
+    return resolvePresentationModifier(
+      content: content,
+      isPresented: isPresented,
+      in: context
+    ) { background in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let item = PromptPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        title: title,
+        descriptor: spec.descriptor,
+        actionPayloads: [],
+        messagePayloads: [],
+        contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
+          portalDeclaredBuilderChildren(from: sheetContent)
+        },
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            isPresented.wrappedValue = false
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
         }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-      }
-    )
+      )
 
-    node.preferenceValues.merge(
-      PresentationCoordinatorDeclarationPreferenceKey.self,
-      value: .init(
+      return .init(
         declarations: [
           .init(sourceIdentity: sourceIdentity) { registry in
             spec.reconcile(
@@ -113,8 +108,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
           }
         ]
       )
-    )
-    return [node]
+    }
   }
 }
 
@@ -147,40 +141,43 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-
-    let absorbed = node.preferenceValues[PaletteCommandsPreferenceKey.self]
-    node.preferenceValues[PaletteCommandsPreferenceKey.self] = []
-
-    guard isPresented.wrappedValue else {
-      return [node]
-    }
-
-    let sourceIdentity = node.identity
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let spec = sheetPromptPresentationSpec(chrome: .dropdown)
-    let portalEntryID = presentationAttachment(for: node, token: spec.token)
-    let item = PromptPresentationItem(
-      id: portalEntryID.description,
-      portalEntryID: portalEntryID,
-      title: title,
-      descriptor: spec.descriptor,
-      actionPayloads: [],
-      messagePayloads: [],
-      contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
-        portalDeclaredBuilderChildren(from: sheetContentBuilder(absorbed))
-      },
-      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-        withAuthoringContext(dismissAuthoringContext) {
-          isPresented.wrappedValue = false
-        }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+    // Absorbed `paletteCommand(...)` contributions are captured off the
+    // background before they are cleared, so they reach the sheet-content
+    // builder even when the background is reused (toggle-only frames) rather
+    // than re-resolved.
+    var absorbed: [ActivePaletteCommand] = []
+    return resolvePresentationModifier(
+      content: content,
+      isPresented: isPresented,
+      in: context,
+      prepareBackground: { background in
+        absorbed = background.preferenceValues[PaletteCommandsPreferenceKey.self]
+        background.preferenceValues[PaletteCommandsPreferenceKey.self] = []
       }
-    )
+    ) { background in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let item = PromptPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        title: title,
+        descriptor: spec.descriptor,
+        actionPayloads: [],
+        messagePayloads: [],
+        contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
+          portalDeclaredBuilderChildren(from: sheetContentBuilder(absorbed))
+        },
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            isPresented.wrappedValue = false
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+        }
+      )
 
-    node.preferenceValues.merge(
-      PresentationCoordinatorDeclarationPreferenceKey.self,
-      value: .init(
+      return .init(
         declarations: [
           .init(sourceIdentity: sourceIdentity) { registry in
             spec.reconcile(
@@ -191,8 +188,7 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
           }
         ]
       )
-    )
-    return [node]
+    }
   }
 }
 
