@@ -76,6 +76,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case syntheticContinuousAnimation = "synthetic-continuous-animation"
   case syntheticTextShimmer = "synthetic-text-shimmer"
   case syntheticNarrowInvalidation = "synthetic-narrow-invalidation"
+  case sheetOpenLatency = "sheet-open-latency"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()
