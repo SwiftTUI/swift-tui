@@ -186,9 +186,18 @@ package final class ViewNode {
     slot.initializeIfNeeded(with: seed())
     stateSlots[ordinal] = slot
 
-    dependencyTracker.recordStateRead(
-      .init(owner: viewNodeID, ordinal: ordinal)
-    )
+    let readKey = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+    if ReaderAttributionConfiguration.isEnabled,
+      let reader = ViewNodeContext.current
+    {
+      // Reader-attributed: the dependency belongs to the node actually
+      // evaluating this read (which may be a descendant consuming a projected
+      // binding), not the slot owner. A genuine self-read records on self
+      // (reader == self == owner), exactly as before.
+      reader.recordStateReadDependency(readKey)
+    } else {
+      dependencyTracker.recordStateRead(readKey)
+    }
 
     guard slot.stores(Value.self) else {
       let slotTypes = stateSlots.keys.sorted().map { index in
@@ -200,6 +209,15 @@ package final class ViewNode {
     }
 
     return slot.value(as: Value.self)
+  }
+
+  /// Records a state-read dependency on *this* node's tracker. Used by
+  /// reader-attributed reads so the dependency lands on the evaluating reader
+  /// rather than the slot owner (see ``ReaderAttributionConfiguration``).
+  package func recordStateReadDependency(
+    _ key: StateSlotKey
+  ) {
+    dependencyTracker.recordStateRead(key)
   }
 
   package func setStateSlot<Value>(
