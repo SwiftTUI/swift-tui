@@ -27,7 +27,9 @@
 public struct SheetOpenLatencyScenario: PerfScenario {
   public let name: PerfScenarioName = .sheetOpenLatency
   public let defaultTerminalSize = PerfTerminalSize(columns: 80, rows: 60)
-  public let scriptedEvents = ["toggle a command palette open/closed over a large static background"]
+  public let scriptedEvents = [
+    "toggle a command palette open/closed over a large static background"
+  ]
   public let visualMarkers = ["open sheet"]
   public let settlingDescription = "first frame that shows the open-sheet trigger"
 
@@ -41,6 +43,7 @@ public struct SheetOpenLatencyScenario: PerfScenario {
   public func run(options: PerfScenarioRunOptions) async throws -> PerfScenarioRunResult {
     let rowCount = Self.resolvedRowCount()
     let overlayKind = Self.resolvedOverlayKind()
+    let spike = Self.resolvedSpikeMode()
     return try await PerfScenarioRunner.runWindow(
       scenario: self,
       options: options
@@ -48,7 +51,8 @@ public struct SheetOpenLatencyScenario: PerfScenario {
       PerfSheetLatencyProbeView(
         rowCount: rowCount,
         columnCount: Self.columnCount,
-        overlayKind: overlayKind
+        overlayKind: overlayKind,
+        spike: spike
       )
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "open sheet")
@@ -133,6 +137,17 @@ public struct SheetOpenLatencyScenario: PerfScenario {
     // regime where incremental raster reuse wins large.
     environmentValue("TERMUI_PERF_SHEET_OVERLAY") == "popover" ? .popover : .palette
   }
+
+  // THROWAWAY SPIKE knob (TERMUI_PERF_SHEET_SPIKE=1): replace the standard
+  // `.sheet`/`.paletteSheet` (which makes the background a DESCENDANT of the
+  // @State owner) with an "ideal" structure where the toggle @State is owned by
+  // a SIBLING of the background. Tests the hypothesis that, with the toggle
+  // owned off the background's ancestor chain, the existing reuse machinery
+  // spares the background and resolve_ms goes flat across TERMUI_PERF_SHEET_TREE_ROWS.
+  private static func resolvedSpikeMode() -> Bool {
+    guard let raw = environmentValue("TERMUI_PERF_SHEET_SPIKE") else { return false }
+    return !raw.isEmpty && raw != "0"
+  }
 }
 
 enum OverlayKind: Sendable {
@@ -144,10 +159,22 @@ private struct PerfSheetLatencyProbeView: View {
   let rowCount: Int
   let columnCount: Int
   let overlayKind: OverlayKind
+  var spike: Bool = false
   @State private var sheetPresented = false
 
   var body: some View {
-    if overlayKind == .popover {
+    if spike {
+      // SPIKE: the toggle @State lives in `PerfSpikeTrigger`, a SIBLING of the
+      // background — neither is an ancestor of the other. Toggling it should
+      // dirty only the trigger, leaving the background reusable as a disjoint
+      // sibling (the regime `synthetic-narrow-invalidation` already measures
+      // working). No `.sheet`/`.paletteSheet`: the overlay is composed inside
+      // the sibling trigger, never wrapping the background.
+      VStack(alignment: .leading, spacing: 0) {
+        PerfSpikeTrigger()
+        PerfSpikeBackground(rowCount: rowCount, columnCount: columnCount)
+      }
+    } else if overlayKind == .popover {
       background
         // A compact popover: menu chrome, intrinsic-sized. Its footprint is a
         // few rows, so most of the background is reuse-eligible on open.
@@ -190,5 +217,49 @@ private struct PerfSheetLatencyProbeView: View {
         sheetPresented = false
       }
     }
+  }
+}
+
+/// SPIKE: owns the toggle `@State` and renders the overlay inline. A structural
+/// SIBLING of `PerfSpikeBackground` — toggling `sheetPresented` dirties only
+/// this subtree, never the background's ancestor chain.
+private struct PerfSpikeTrigger: View {
+  @State private var sheetPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("open sheet") {
+        sheetPresented = true
+      }
+      if sheetPresented {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Sheet body")
+          Button("Close sheet") {
+            sheetPresented = false
+          }
+        }
+      }
+    }
+  }
+}
+
+/// SPIKE: the large static background, identical in node shape to
+/// `PerfSheetLatencyProbeView.background` but owning NO toggle state, so it is a
+/// disjoint sibling of the toggle owner.
+private struct PerfSpikeBackground: View {
+  let rowCount: Int
+  let columnCount: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(Array(0..<rowCount), id: \.self) { row in
+        HStack(spacing: 1) {
+          ForEach(Array(0..<columnCount), id: \.self) { column in
+            Text("bg r\(row) c\(column)")
+          }
+        }
+      }
+    }
+    .padding(1)
   }
 }
