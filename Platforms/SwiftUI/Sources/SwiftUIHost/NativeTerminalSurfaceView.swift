@@ -2,244 +2,15 @@ import CoreGraphics
 import Foundation
 import SwiftTUIRuntime
 
-struct NativeTerminalSurfaceConfirmedSlack: Equatable {
-  private struct AxisSlack: Equatable {
-    var preferred: Int
-    var capacity: Int
-  }
-
-  private var width: AxisSlack?
-  private var height: AxisSlack?
-
-  mutating func update(
-    preferredGridSize: CellSize?,
-    renderedGridSize: CellSize?
-  ) {
-    width = updatedAxisSlack(
-      preferred: preferredGridSize?.width,
-      rendered: renderedGridSize?.width,
-      current: width
-    )
-    height = updatedAxisSlack(
-      preferred: preferredGridSize?.height,
-      rendered: renderedGridSize?.height,
-      current: height
-    )
-  }
-
-  func confirmedPreferredWidth(
-    proposed: Int,
-    preferred: Int?,
-    rendered: Int?
-  ) -> Int? {
-    confirmedPreferred(
-      axisSlack: width,
-      proposed: proposed,
-      preferred: preferred,
-      rendered: rendered
-    )
-  }
-
-  func confirmedPreferredHeight(
-    proposed: Int,
-    preferred: Int?,
-    rendered: Int?
-  ) -> Int? {
-    confirmedPreferred(
-      axisSlack: height,
-      proposed: proposed,
-      preferred: preferred,
-      rendered: rendered
-    )
-  }
-
-  private func updatedAxisSlack(
-    preferred: Int?,
-    rendered: Int?,
-    current: AxisSlack?
-  ) -> AxisSlack? {
-    guard let preferred, let rendered else {
-      return nil
-    }
-
-    let normalizedPreferred = max(1, preferred)
-    let normalizedRendered = max(1, rendered)
-    if normalizedPreferred < normalizedRendered {
-      return AxisSlack(preferred: normalizedPreferred, capacity: normalizedRendered)
-    }
-    if let current, normalizedPreferred == current.preferred,
-      normalizedRendered <= current.capacity
-    {
-      return current
-    }
-    return nil
-  }
-
-  private func confirmedPreferred(
-    axisSlack: AxisSlack?,
-    proposed: Int,
-    preferred: Int?,
-    rendered: Int?
-  ) -> Int? {
-    guard let axisSlack, let preferred, let rendered else {
-      return nil
-    }
-
-    guard max(1, preferred) == axisSlack.preferred,
-      max(1, rendered) <= axisSlack.capacity,
-      max(1, proposed) <= axisSlack.capacity
-    else {
-      return nil
-    }
-
-    return axisSlack.preferred
+private extension CGSize {
+  init(_ size: HostLengthSize) {
+    self.init(width: CGFloat(size.width), height: CGFloat(size.height))
   }
 }
 
-struct NativeTerminalSurfaceSizeNegotiation: Equatable {
-  var size: CGSize
-  var probeGridSize: CellSize?
-}
-
-struct NativeTerminalSurfaceSizeNegotiator {
-  var cellSize: CGSize
-  var preferredGridSize: CellSize?
-  var renderedGridSize: CellSize?
-  var fallbackGridSize = CellSize(width: 80, height: 24)
-  var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
-
-  func sizeThatFits(
-    proposedWidth: CGFloat?,
-    proposedHeight: CGFloat?
-  ) -> CGSize {
-    negotiate(
-      proposedWidth: proposedWidth,
-      proposedHeight: proposedHeight
-    ).size
-  }
-
-  func negotiate(
-    proposedWidth: CGFloat?,
-    proposedHeight: CGFloat?
-  ) -> NativeTerminalSurfaceSizeNegotiation {
-    let width = resolvedAxis(
-      preferred: preferredGridSize?.width,
-      rendered: renderedGridSize?.width,
-      fallback: fallbackGridSize.width,
-      proposedLength: proposedWidth,
-      cellLength: cellSize.width
-    ) { proposed, preferred, rendered in
-      confirmedSlack.confirmedPreferredWidth(
-        proposed: proposed,
-        preferred: preferred,
-        rendered: rendered
-      )
-    }
-    let height = resolvedAxis(
-      preferred: preferredGridSize?.height,
-      rendered: renderedGridSize?.height,
-      fallback: fallbackGridSize.height,
-      proposedLength: proposedHeight,
-      cellLength: cellSize.height
-    ) { proposed, preferred, rendered in
-      confirmedSlack.confirmedPreferredHeight(
-        proposed: proposed,
-        preferred: preferred,
-        rendered: rendered
-      )
-    }
-
-    let probeGridSize: CellSize? =
-      if width.probeCells != nil || height.probeCells != nil {
-        CellSize(
-          width: width.probeCells ?? width.cells,
-          height: height.probeCells ?? height.cells
-        )
-      } else {
-        nil
-      }
-
-    return NativeTerminalSurfaceSizeNegotiation(
-      size: CGSize(
-        width: CGFloat(width.cells) * cellSize.width,
-        height: CGFloat(height.cells) * cellSize.height
-      ),
-      probeGridSize: probeGridSize
-    )
-  }
-
-  func intrinsicContentSize(
-    noIntrinsicMetric: CGFloat
-  ) -> CGSize {
-    guard let preferredGridSize else {
-      return CGSize(width: noIntrinsicMetric, height: noIntrinsicMetric)
-    }
-
-    return CGSize(
-      width: CGFloat(max(1, preferredGridSize.width)) * cellSize.width,
-      height: CGFloat(max(1, preferredGridSize.height)) * cellSize.height
-    )
-  }
-
-  private struct AxisNegotiation {
-    var cells: Int
-    var probeCells: Int?
-  }
-
-  private func resolvedAxis(
-    preferred: Int?,
-    rendered: Int?,
-    fallback: Int,
-    proposedLength: CGFloat?,
-    cellLength: CGFloat,
-    confirmedPreferred: (Int, Int?, Int?) -> Int?
-  ) -> AxisNegotiation {
-    let preferred = preferred.map { max(1, $0) }
-    let rendered = rendered.map { max(1, $0) }
-
-    if let proposedCells = proposedCells(
-      for: proposedLength,
-      cellLength: cellLength
-    ) {
-      if let confirmedPreferred = confirmedPreferred(proposedCells, preferred, rendered) {
-        return AxisNegotiation(
-          cells: max(1, min(confirmedPreferred, proposedCells)),
-          probeCells: nil
-        )
-      }
-
-      guard let preferred else {
-        guard let rendered else {
-          return AxisNegotiation(cells: 1, probeCells: proposedCells)
-        }
-        return AxisNegotiation(
-          cells: max(1, min(rendered, proposedCells)),
-          probeCells: nil
-        )
-      }
-      if let rendered, proposedCells > rendered, preferred == rendered {
-        return AxisNegotiation(cells: preferred, probeCells: proposedCells)
-      }
-      return AxisNegotiation(cells: max(1, min(preferred, proposedCells)), probeCells: nil)
-    }
-
-    return AxisNegotiation(cells: max(1, preferred ?? rendered ?? fallback), probeCells: nil)
-  }
-
-  private func proposedCells(
-    for proposedLength: CGFloat?,
-    cellLength: CGFloat
-  ) -> Int? {
-    guard let proposedLength,
-      proposedLength.isFinite,
-      proposedLength > 0,
-      cellLength.isFinite,
-      cellLength > 0
-    else {
-      return nil
-    }
-
-    return max(1, Int((proposedLength / cellLength).rounded(.down)))
+private extension HostLengthSize {
+  init(_ size: CGSize) {
+    self.init(width: Double(size.width), height: Double(size.height))
   }
 }
 
@@ -277,12 +48,16 @@ struct NativeTerminalSurfaceSizeNegotiator {
     private var lastPublishedLayoutCellPixelSize: PixelSize?
     private var lastRequestedSurfaceGrid: CellSize?
     private var lastRequestedSurfaceCellPixelSize: PixelSize?
-    private var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
+    private var confirmedSlack = HostedSurfaceConfirmedSlack()
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
     override var intrinsicContentSize: NSSize {
-      sizeNegotiator.intrinsicContentSize(noIntrinsicMetric: NSView.noIntrinsicMetric)
+      CGSize(
+        sizeNegotiator.intrinsicContentSize(
+          noIntrinsicMetric: Double(NSView.noIntrinsicMetric)
+        )
+      )
     }
 
     override init(frame frameRect: NSRect) {
@@ -428,22 +203,22 @@ struct NativeTerminalSurfaceSizeNegotiator {
       preferredGridSize: CellSize?
     ) -> CGSize {
       let negotiation = makeSizeNegotiator(preferredGridSize: preferredGridSize).negotiate(
-        proposedWidth: proposedWidth,
-        proposedHeight: proposedHeight
+        proposedWidth: proposedWidth.map(Double.init),
+        proposedHeight: proposedHeight.map(Double.init)
       )
       publishProbeGridIfNeeded(negotiation.probeGridSize)
-      return negotiation.size
+      return CGSize(negotiation.size)
     }
 
-    private var sizeNegotiator: NativeTerminalSurfaceSizeNegotiator {
+    private var sizeNegotiator: HostedSurfaceSizeNegotiator {
       makeSizeNegotiator(preferredGridSize: preferredGridSize)
     }
 
     private func makeSizeNegotiator(
       preferredGridSize: CellSize?
-    ) -> NativeTerminalSurfaceSizeNegotiator {
-      NativeTerminalSurfaceSizeNegotiator(
-        cellSize: metrics.cellSize,
+    ) -> HostedSurfaceSizeNegotiator {
+      HostedSurfaceSizeNegotiator(
+        cellSize: HostLengthSize(metrics.cellSize),
         preferredGridSize: preferredGridSize,
         renderedGridSize: surface?.size,
         confirmedSlack: confirmedSlack
@@ -574,7 +349,7 @@ struct NativeTerminalSurfaceSizeNegotiator {
     private var lastPublishedLayoutCellPixelSize: PixelSize?
     private var lastRequestedSurfaceGrid: CellSize?
     private var lastRequestedSurfaceCellPixelSize: PixelSize?
-    private var confirmedSlack = NativeTerminalSurfaceConfirmedSlack()
+    private var confirmedSlack = HostedSurfaceConfirmedSlack()
 
     override init(frame: CGRect) {
       super.init(frame: frame)
@@ -590,7 +365,11 @@ struct NativeTerminalSurfaceSizeNegotiator {
 
     override var canBecomeFirstResponder: Bool { true }
     override var intrinsicContentSize: CGSize {
-      sizeNegotiator.intrinsicContentSize(noIntrinsicMetric: UIView.noIntrinsicMetric)
+      CGSize(
+        sizeNegotiator.intrinsicContentSize(
+          noIntrinsicMetric: Double(UIView.noIntrinsicMetric)
+        )
+      )
     }
     var hasText: Bool { false }
 
@@ -753,22 +532,22 @@ struct NativeTerminalSurfaceSizeNegotiator {
       preferredGridSize: CellSize?
     ) -> CGSize {
       let negotiation = makeSizeNegotiator(preferredGridSize: preferredGridSize).negotiate(
-        proposedWidth: proposedWidth,
-        proposedHeight: proposedHeight
+        proposedWidth: proposedWidth.map(Double.init),
+        proposedHeight: proposedHeight.map(Double.init)
       )
       publishProbeGridIfNeeded(negotiation.probeGridSize)
-      return negotiation.size
+      return CGSize(negotiation.size)
     }
 
-    private var sizeNegotiator: NativeTerminalSurfaceSizeNegotiator {
+    private var sizeNegotiator: HostedSurfaceSizeNegotiator {
       makeSizeNegotiator(preferredGridSize: preferredGridSize)
     }
 
     private func makeSizeNegotiator(
       preferredGridSize: CellSize?
-    ) -> NativeTerminalSurfaceSizeNegotiator {
-      NativeTerminalSurfaceSizeNegotiator(
-        cellSize: metrics.cellSize,
+    ) -> HostedSurfaceSizeNegotiator {
+      HostedSurfaceSizeNegotiator(
+        cellSize: HostLengthSize(metrics.cellSize),
         preferredGridSize: preferredGridSize,
         renderedGridSize: surface?.size,
         confirmedSlack: confirmedSlack

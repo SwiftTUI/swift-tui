@@ -29,7 +29,7 @@ package func openLinkInSystem(
       arguments: ["/usr/bin/open", destination.rawValue],
       searchPath: false
     )
-  #elseif os(Linux) || os(Android)
+  #elseif os(Linux)
     return spawnDetachedProcess(
       command: "xdg-open",
       arguments: ["xdg-open", destination.rawValue],
@@ -40,7 +40,7 @@ package func openLinkInSystem(
   #endif
 }
 
-#if canImport(Darwin) || canImport(Glibc) || canImport(Android)
+#if canImport(Darwin) || canImport(Glibc)
   private func spawnDetachedProcess(
     command: String,
     arguments: [String],

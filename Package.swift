@@ -102,6 +102,7 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
     .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
     .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
+    .library(name: "SwiftTUIAndroidHost", targets: ["SwiftTUIAndroidHost"]),
     // Exported so example packages can synchronize their tests on
     // the shared poll-free signals instead of timeout-based waiting.
     .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
@@ -287,6 +288,14 @@ let package = Package(
         "SwiftTUIWebHost",
       ],
       path: "Platforms/WebHost/Sources/SwiftTUIWebHostCLI",
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIAndroidHost",
+      dependencies: [
+        "SwiftTUIRuntime"
+      ],
+      path: "Platforms/Android/Sources/SwiftTUIAndroidHost",
       swiftSettings: swiftSettings()
     ),
     .target(
@@ -485,6 +494,15 @@ let package = Package(
         "SwiftTUITestSupport",
       ],
       path: "Platforms/WebHost/Tests/SwiftTUIWebHostTests",
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "SwiftTUIAndroidHostTests",
+      dependencies: [
+        "SwiftTUIAndroidHost",
+        "SwiftTUIRuntime",
+      ],
+      path: "Platforms/Android/Tests/SwiftTUIAndroidHostTests",
       swiftSettings: swiftSettings()
     ),
     .testTarget(

@@ -2,6 +2,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #endif
 
 public enum FigletError: Error, CustomStringConvertible, Sendable {
@@ -1753,8 +1755,11 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
 
     var buffer = [UInt8](repeating: 0, count: Int(size))
     let bufferCount = buffer.count
+    guard bufferCount > 0 else {
+      return []
+    }
     let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
-      unsafe fread(bytes.baseAddress, 1, bufferCount, file)
+      unsafe fread(bytes.baseAddress!, 1, bufferCount, file)
     }
 
     return Array(buffer.prefix(bytesRead))

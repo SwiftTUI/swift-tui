@@ -3,6 +3,8 @@
     import Darwin
   #elseif canImport(Glibc)
     import Glibc
+  #elseif canImport(Android)
+    import Android
   #elseif canImport(WASILibc)
     import WASILibc
   #elseif canImport(ucrt)
@@ -177,7 +179,7 @@
     }
 
     private static func writeToStandardError(_ message: String) {
-      #if canImport(Darwin) || canImport(Glibc)
+      #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
         var message = message
         message.withUTF8 { buffer in
           guard let base = buffer.baseAddress, buffer.count > 0 else {

@@ -1,7 +1,9 @@
 #if canImport(Darwin)
   internal import Darwin  // macOS, iOS, tvOS, watchOS
 #elseif canImport(Glibc)
-  internal import Glibc  // Linux, Android, some older Wasm
+  internal import Glibc  // Linux, some older Wasm
+#elseif canImport(Android)
+  internal import Android
 #elseif canImport(WASILibc)
   internal import WASILibc  // WebAssembly (WASI)
 #elseif canImport(ucrt)
