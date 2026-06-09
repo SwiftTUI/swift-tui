@@ -298,6 +298,19 @@ func resolveView<V: View>(
     return structurallyStamped
   }
 
+  // Diagnostic (inert unless SWIFTTUI_REUSE_TRACE): this node is being recomputed
+  // rather than reused — record why, to find what re-resolves the background on
+  // sheet/palette open.
+  if ReuseDenialTrace.isEnabled {
+    context.viewGraph?.recordReuseDenialIfTracing(
+      for: context.identity,
+      suppressed: context.effectiveSuppressesRetainedReuse(at: context.identity),
+      environment: context.environment,
+      transaction: context.transaction,
+      invalidatedIdentities: context.effectiveInvalidatedIdentities
+    )
+  }
+
   let graphNode = context.viewGraph?.beginEvaluation(
     identity: context.identity,
     entityIdentity: routeIdentity,

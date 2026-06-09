@@ -467,6 +467,51 @@ package final class ViewNode {
       && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
   }
 
+  /// Diagnostic mirror of ``canReuse(frameID:environment:transaction:)``:
+  /// returns the first failing condition as a label, or `nil` if `canReuse`
+  /// would succeed (so the caller can attribute the denial to invalidation
+  /// intersection instead). For `env-mismatch` it records the specific differing
+  /// environment keys into ``ReuseDenialTrace``. Used only when the trace is on.
+  package func canReuseDenialReason(
+    frameID: UInt64,
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot
+  ) -> String? {
+    prepareForFrame(frameID)
+    if !wasPresentAtFrameStart { return "not-present" }
+    if wasVisitedThisFrame { return "visited" }
+    if isDirty { return "dirty" }
+    if !isCommittedSnapshotFresh { return "stale-snapshot" }
+    if !committed.supportsRetainedReuse { return "no-retained-support" }
+    if committed.environmentSnapshot != environment {
+      recordEnvironmentSnapshotDiff(committed.environmentSnapshot, environment)
+      return "env-mismatch"
+    }
+    if !committed.transactionSnapshot.isReuseEquivalent(to: transaction) {
+      return "transaction"
+    }
+    return nil
+  }
+
+  private func recordEnvironmentSnapshotDiff(
+    _ committed: EnvironmentSnapshot,
+    _ current: EnvironmentSnapshot
+  ) {
+    guard ReuseDenialTrace.isEnabled else { return }
+    if committed.debugSignature != current.debugSignature {
+      ReuseDenialTrace.recordEnvironmentKeyDiff("debugSignature")
+    }
+    if committed.style != current.style {
+      ReuseDenialTrace.recordEnvironmentKeyDiff("style")
+    }
+    let committedValues = committed.values
+    let currentValues = current.values
+    for key in Set(committedValues.keys).union(currentValues.keys)
+    where committedValues[key] != currentValues[key] {
+      ReuseDenialTrace.recordEnvironmentKeyDiff("val:\(key)")
+    }
+  }
+
   package var hasDirtyAncestor: Bool {
     var current = parent
     var visited: Set<ObjectIdentifier> = []

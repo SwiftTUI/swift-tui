@@ -653,6 +653,9 @@ package final class ViewGraph {
   }
 
   package func beginFrame() {
+    // Diagnostic: flush the just-finished frame's reuse-denial histogram before
+    // starting the next one (inert unless SWIFTTUI_REUSE_TRACE is set).
+    ReuseDenialTrace.dumpAndReset(frameID: currentFrameID)
     currentFrameID &+= 1
     frameOrder.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
@@ -1019,6 +1022,50 @@ package final class ViewGraph {
         )
       }
       node.setLifecycleState(.alive)
+    }
+  }
+
+  /// Diagnostic-only: records WHY retained reuse was denied for `identity` this
+  /// frame, categorizing into suppressed / no-node / invalidated-empty / a
+  /// `canReuse` sub-reason / invalidation-conflict. Inert unless the trace is on.
+  /// Called from `resolveView` on the recompute path.
+  @MainActor
+  package func recordReuseDenialIfTracing(
+    for identity: Identity,
+    suppressed: Bool,
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot,
+    invalidatedIdentities: Set<Identity>
+  ) {
+    guard ReuseDenialTrace.isEnabled else {
+      return
+    }
+    if suppressed {
+      ReuseDenialTrace.record("suppressed")
+      return
+    }
+    guard let node = nodeIfExists(for: identity) else {
+      ReuseDenialTrace.record("no-node")
+      return
+    }
+    if invalidatedIdentities.isEmpty {
+      ReuseDenialTrace.record("invalidated-empty")
+      return
+    }
+    if let reason = node.canReuseDenialReason(
+      frameID: currentFrameID,
+      environment: environment,
+      transaction: transaction
+    ) {
+      ReuseDenialTrace.record(reason)
+      return
+    }
+    // canReuse would succeed, so the only remaining denial is an identity /
+    // structural intersection with the invalidation set. Capture the invalidated
+    // identities so the dirty ancestor blocking the background is visible.
+    ReuseDenialTrace.record("invalidation-conflict")
+    for invalidated in invalidatedIdentities {
+      ReuseDenialTrace.recordInvalidatedIdentity(invalidated.path)
     }
   }
 
