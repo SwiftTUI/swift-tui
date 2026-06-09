@@ -26,6 +26,39 @@ func android_host_scene_host_resizes_surface_and_pointer_capabilities() throws {
 
 @MainActor
 @Test
+func android_host_abi_start_publishes_first_frame_bytes() async throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+  let handle = AndroidHostHandleRegistry.register(host)
+  defer {
+    swift_tui_android_destroy(handle)
+  }
+
+  swift_tui_android_start(handle)
+
+  let frame = await host.surface.waitForFrame { frame in
+    rasterText(in: frame).contains("Android")
+  }
+  #expect(frame.sequence == 0)
+
+  await Task.yield()
+  let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
+  #expect(required > 0)
+
+  var bytes = [UInt8](repeating: 0, count: Int(required))
+  let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
+  }
+
+  #expect(copied == required)
+  let snapshot = try JSONDecoder().decode(AndroidHostFrameSnapshot.self, from: Data(bytes))
+  #expect(snapshot.sequence == 0)
+  #expect(snapshot.rows.joined(separator: "\n").contains("Android"))
+
+  swift_tui_android_stop(handle)
+}
+
+@MainActor
+@Test
 func android_host_handle_registry_copies_latest_frame_bytes() async throws {
   let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
   let handle = AndroidHostHandleRegistry.register(host)
@@ -63,4 +96,10 @@ private struct AndroidHostTestApp: App {
       Text("Android")
     }
   }
+}
+
+private func rasterText(
+  in frame: SemanticHostFrame
+) -> String {
+  frame.raster.lines.joined(separator: "\n")
 }

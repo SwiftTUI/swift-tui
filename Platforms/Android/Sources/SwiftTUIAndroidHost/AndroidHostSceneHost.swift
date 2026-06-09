@@ -1,4 +1,7 @@
-public import SwiftTUIRuntime
+@_spi(Runners) public import SwiftTUIRuntime
+#if os(Android)
+  @_spi(MainActorUtilities) import _Concurrency
+#endif
 import Synchronization
 
 private struct AndroidHostSceneHostState: Sendable {
@@ -122,6 +125,7 @@ public final class AndroidHostSceneHost {
       surfaceSize: style.initialSurfaceSize,
       appearance: style.renderStyle.appearance,
       theme: style.renderStyle.theme,
+      frameDelivery: .assumedMainActor,
       onFrame: { frame in
         state.updateFrame(frame)
       }
@@ -130,6 +134,7 @@ public final class AndroidHostSceneHost {
       for: app,
       sceneID: selectedSceneID,
       surface: surface,
+      renderMode: .sync,
       onFocusPresentationChange: { presentation in
         state.updateFocusPresentation(presentation)
       }
@@ -192,19 +197,35 @@ public final class AndroidHostSceneHost {
       return
     }
 
-    runTask = Task { @MainActor [weak self] in
-      guard let self else {
-        return
+    #if os(Android)
+      runTask = Task.immediate { @MainActor [weak self] in
+        guard let self else {
+          return
+        }
+        defer {
+          runTask = nil
+        }
+        do {
+          _ = try await session.start()
+        } catch {
+          state.updateLastErrorDescription(String(describing: error))
+        }
       }
-      defer {
-        runTask = nil
+    #else
+      runTask = Task { @MainActor [weak self] in
+        guard let self else {
+          return
+        }
+        defer {
+          runTask = nil
+        }
+        do {
+          _ = try await session.start()
+        } catch {
+          state.updateLastErrorDescription(String(describing: error))
+        }
       }
-      do {
-        _ = try await session.start()
-      } catch {
-        state.updateLastErrorDescription(String(describing: error))
-      }
-    }
+    #endif
   }
 
   @MainActor

@@ -1,6 +1,12 @@
 import SwiftTUICore
 import Synchronization
 
+@_spi(Runners)
+public enum HostedRasterSurfaceFrameDelivery: Sendable {
+  case asynchronousMainActor
+  case assumedMainActor
+}
+
 /// Raster and semantic presentation surface for retained non-terminal hosts.
 public final class HostedRasterSurface:
   PresentationSurfaceMetricsProvider, RasterPresentationSurface,
@@ -33,7 +39,7 @@ public final class HostedRasterSurface:
     state.withLock(\.pointerInputCapabilities)
   }
 
-  public init(
+  public convenience init(
     surfaceSize: CellSize,
     appearance: TerminalAppearance,
     theme: Theme? = nil,
@@ -41,10 +47,40 @@ public final class HostedRasterSurface:
     onFrame: @escaping @MainActor @Sendable (SemanticHostFrame) -> Void,
     onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil
   ) {
+    self.init(
+      surfaceSize: surfaceSize,
+      appearance: appearance,
+      theme: theme,
+      capabilityProfile: capabilityProfile,
+      frameDelivery: .asynchronousMainActor,
+      onFrame: onFrame,
+      onClipboardWrite: onClipboardWrite
+    )
+  }
+
+  @_spi(Runners)
+  public init(
+    surfaceSize: CellSize,
+    appearance: TerminalAppearance,
+    theme: Theme? = nil,
+    capabilityProfile: TerminalCapabilityProfile = .trueColor,
+    frameDelivery: HostedRasterSurfaceFrameDelivery,
+    onFrame: @escaping @MainActor @Sendable (SemanticHostFrame) -> Void,
+    onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil
+  ) {
     self.capabilityProfile = capabilityProfile
-    frameHandler = { frame in
-      Task { @MainActor in
-        onFrame(frame)
+    switch frameDelivery {
+    case .asynchronousMainActor:
+      frameHandler = { frame in
+        Task { @MainActor in
+          onFrame(frame)
+        }
+      }
+    case .assumedMainActor:
+      frameHandler = { frame in
+        MainActor.assumeIsolated {
+          onFrame(frame)
+        }
       }
     }
     clipboardWriter = onClipboardWrite

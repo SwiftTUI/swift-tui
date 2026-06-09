@@ -46,7 +46,7 @@ public func swift_tui_android_start(
     return
   }
 
-  Task { @MainActor in
+  MainActor.assumeIsolated {
     host.start()
   }
 }
@@ -59,7 +59,7 @@ public func swift_tui_android_stop(
     return
   }
 
-  Task { @MainActor in
+  MainActor.assumeIsolated {
     host.stop()
   }
 }
@@ -72,7 +72,7 @@ public func swift_tui_android_destroy(
     return
   }
 
-  Task { @MainActor in
+  MainActor.assumeIsolated {
     host.stop()
   }
 }
@@ -89,7 +89,7 @@ public func swift_tui_android_resize(
     return
   }
 
-  Task { @MainActor in
+  MainActor.assumeIsolated {
     host.resize(
       columns: Int(columns),
       rows: Int(rows),
@@ -113,7 +113,7 @@ public func swift_tui_android_send_input(
   }
 
   let payload = unsafe Array(UnsafeBufferPointer(start: bytes, count: Int(count)))
-  Task { @MainActor in
+  MainActor.assumeIsolated {
     host.sendInput(payload)
   }
 }

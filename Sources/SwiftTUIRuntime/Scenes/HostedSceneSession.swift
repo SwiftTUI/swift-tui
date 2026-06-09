@@ -1,3 +1,6 @@
+#if os(Android)
+  @_spi(MainActorUtilities) import _Concurrency
+#endif
 import SwiftTUIViews
 
 public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringConvertible {
@@ -31,6 +34,7 @@ public final class HostedSceneSession {
   private let stateContainer: StateContainer<SceneSessionState>
   private let focusTracker: FocusTracker
   private let runScene: HostedSceneRunner
+  private let renderMode: RuntimeRenderMode?
   private let onFocusPresentationChange: (@MainActor @Sendable (FocusPresentation) -> Void)?
   private let runtimeIssueSink: RuntimeIssueSink?
   private var runTask: Task<RunLoopExitReason, any Error>?
@@ -66,6 +70,45 @@ public final class HostedSceneSession {
           focusTracker: focusTracker
         )
       },
+      renderMode: nil,
+      runtimeIssueSink: runtimeIssueSink,
+      onFocusPresentationChange: onFocusPresentationChange
+    )
+  }
+
+  @_spi(Runners)
+  public convenience init<A: App>(
+    for app: A,
+    sceneID: WindowIdentifier,
+    surface: HostedRasterSurface,
+    renderMode: RuntimeRenderMode?,
+    runtimeIssueSink: RuntimeIssueSink? = nil,
+    onFocusPresentationChange:
+      (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
+  ) throws {
+    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
+    guard
+      let selection = collectWindowSceneSelections(from: app.body).first(where: {
+        $0.identifier == sceneID
+      })
+    else {
+      throw HostedSceneSessionError.sceneNotFound(sceneID)
+    }
+
+    self.init(
+      descriptor: selection.descriptor,
+      rootIdentity: selection.rootIdentity,
+      sessionName: sessionName,
+      surface: surface,
+      runScene: { resources, stateContainer, focusTracker in
+        try await selection.run(
+          sessionName: sessionName,
+          resources: resources,
+          stateContainer: stateContainer,
+          focusTracker: focusTracker
+        )
+      },
+      renderMode: renderMode,
       runtimeIssueSink: runtimeIssueSink,
       onFocusPresentationChange: onFocusPresentationChange
     )
@@ -77,6 +120,7 @@ public final class HostedSceneSession {
     sessionName: String,
     surface: HostedRasterSurface,
     runScene: @escaping HostedSceneRunner,
+    renderMode: RuntimeRenderMode? = nil,
     runtimeIssueSink: RuntimeIssueSink? = nil,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
@@ -84,6 +128,7 @@ public final class HostedSceneSession {
     self.descriptor = descriptor
     self.sessionName = sessionName
     self.runScene = runScene
+    self.renderMode = renderMode
     signalReader = InProcessSignalReader()
     self.surface = surface
     inputReader = InjectedTerminalInputReader { [signalReader, surface] message in
@@ -119,21 +164,34 @@ public final class HostedSceneSession {
       signalReader: signalReader,
       scheduler: scheduler,
       surfaceName: "hosted-\(descriptor.id.rawValue)",
+      renderMode: renderMode,
       focusPresentationHandler: { [weak self] presentation in
         self?.updateCurrentFocusPresentation(presentation)
       }
     )
     resources.runtimeIssueSink = runtimeIssueSink
 
-    let task = Task {
-      @MainActor [runScene, stateContainer, focusTracker, resources] in
-      let result = try await runScene(
-        resources,
-        stateContainer,
-        focusTracker
-      )
-      return result.exitReason
-    }
+    #if os(Android)
+      let task = Task.immediate {
+        @MainActor [runScene, stateContainer, focusTracker, resources] in
+        let result = try await runScene(
+          resources,
+          stateContainer,
+          focusTracker
+        )
+        return result.exitReason
+      }
+    #else
+      let task = Task {
+        @MainActor [runScene, stateContainer, focusTracker, resources] in
+        let result = try await runScene(
+          resources,
+          stateContainer,
+          focusTracker
+        )
+        return result.exitReason
+      }
+    #endif
 
     runTask = task
 
