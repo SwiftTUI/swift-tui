@@ -81,4 +81,86 @@ struct ReaderAttributionTests {
     // ...but the genuine downstream reader must be (the dependency moved, not lost).
     #expect(!dependents.isEmpty)
   }
+
+  /// Resolves the probe in a fresh graph, then locates the actual `@State` slot
+  /// from the dependency index and returns the owner node holding it plus the
+  /// slot's ordinal. Driving off the recorded key (rather than a guessed
+  /// ordinal) makes the write target exactly the slot the reader depends on.
+  private func resolvedStateSlot() -> (owner: SwiftTUICore.ViewNode, ordinal: Int)? {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: .init(),
+      applyEnvironmentValues: true
+    )
+    context.viewGraph = graph
+    _ = Resolver().resolve(ProjectingOwnerProbe(), in: context)
+
+    // Exactly one `@State` slot exists (the probe's `flag`). The key carries the
+    // owner node and ordinal regardless of attribution mode.
+    guard let key = graph.debugTotalStateSnapshot().stateSlotDependents.keys.first,
+      let owner = graph.nodeForViewNodeID(key.owner)
+    else {
+      return nil
+    }
+    return (owner, key.ordinal)
+  }
+
+  @Test("reader-attributed mode: a @State WRITE invalidates the genuine reader, not the owner")
+  func readerAttributedWriteInvalidatesReader() throws {
+    let previous = ReaderAttributionConfiguration.isEnabled
+    ReaderAttributionConfiguration.isEnabled = true
+    defer { ReaderAttributionConfiguration.isEnabled = previous }
+
+    let slot = try #require(resolvedStateSlot())
+    let spy = StateWriteRecordingInvalidator()
+    slot.owner.invalidator = spy
+
+    // Mimic `State.setValue`: the write passes the owner's view identity
+    // explicitly. Reader attribution must override it with the genuine reader.
+    slot.owner.setStateSlot(
+      ordinal: slot.ordinal,
+      value: true,
+      invalidationIdentity: slot.owner.identity
+    )
+
+    let invalidated = spy.requests.reduce(into: Set<Identity>()) { $0.formUnion($1) }
+    #expect(!invalidated.isEmpty, "the change must still schedule a frame")
+    #expect(
+      !invalidated.contains(slot.owner.identity),
+      "the projecting owner is an ancestor of disjoint subtrees; invalidating it defeats reuse"
+    )
+  }
+
+  @Test("legacy mode: a @State WRITE invalidates the owner (whole-subtree re-resolve)")
+  func legacyWriteInvalidatesOwner() throws {
+    let previous = ReaderAttributionConfiguration.isEnabled
+    ReaderAttributionConfiguration.isEnabled = false
+    defer { ReaderAttributionConfiguration.isEnabled = previous }
+
+    let slot = try #require(resolvedStateSlot())
+    let spy = StateWriteRecordingInvalidator()
+    slot.owner.invalidator = spy
+
+    slot.owner.setStateSlot(
+      ordinal: slot.ordinal,
+      value: true,
+      invalidationIdentity: slot.owner.identity
+    )
+
+    let invalidated = spy.requests.reduce(into: Set<Identity>()) { $0.formUnion($1) }
+    #expect(
+      invalidated.contains(slot.owner.identity),
+      "legacy attribution must invalidate the owner identity it was given"
+    )
+  }
+}
+
+private final class StateWriteRecordingInvalidator: Invalidating {
+  private(set) var requests: [Set<Identity>] = []
+
+  func requestInvalidation(of identities: Set<Identity>) {
+    requests.append(identities)
+  }
 }

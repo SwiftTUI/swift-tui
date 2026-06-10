@@ -229,24 +229,55 @@ package final class ViewNode {
     let didChange = slot.set(value)
     stateSlots[ordinal] = slot
     if didChange {
-      ownerGraph?.queueDirtyForStateChange(
-        .init(owner: viewNodeID, ordinal: ordinal)
+      let key = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+      ownerGraph?.queueDirtyForStateChange(key)
+      let invalidationIdentities = stateChangeInvalidationIdentities(
+        for: key,
+        explicit: invalidationIdentity
       )
-      let invalidationIdentity = invalidationIdentity ?? identity
       let animationRequest = AnimationContextStorage.currentRequest
       let batchID = AnimationContextStorage.currentBatchID
       if animationRequest != .inherit || batchID != nil,
         let animationAware = invalidator as? any AnimationAwareInvalidating
       {
         animationAware.requestInvalidation(
-          of: [invalidationIdentity],
+          of: invalidationIdentities,
           animation: animationRequest,
           batchID: batchID
         )
       } else {
-        invalidator?.requestInvalidation(of: [invalidationIdentity])
+        invalidator?.requestInvalidation(of: invalidationIdentities)
       }
     }
+  }
+
+  /// The identities to invalidate for a state-slot write.
+  ///
+  /// Legacy (reader attribution off): a single owner identity — the explicit
+  /// override when provided, else this node's identity — so the owner's whole
+  /// subtree re-resolves. This is the write-side mirror of the always-dirty-owner
+  /// term in ``ViewGraphInvalidationPlanner/stateChangeDirtyNodeIDs(for:stateSlotDependents:)``.
+  ///
+  /// Reader-attributed (flag on): the genuine readers recorded for this slot, so
+  /// a disjoint subtree (such as a sheet/palette background that only *projects*
+  /// the binding) is spared — completing the read-side attribution in
+  /// ``stateSlot(ordinal:seed:)``. Without this, the owner identity is still
+  /// invalidated and `conflictsWithInvalidation` blocks the whole background as
+  /// an ancestor, defeating reader attribution on open. Falls back to the owner
+  /// identity when no readers were recorded (deferred / conditional reads) so a
+  /// change is never dropped.
+  private func stateChangeInvalidationIdentities(
+    for key: StateSlotKey,
+    explicit: Identity?
+  ) -> Set<Identity> {
+    let ownerIdentity = explicit ?? identity
+    guard ReaderAttributionConfiguration.isEnabled,
+      let ownerGraph
+    else {
+      return [ownerIdentity]
+    }
+    let readers = ownerGraph.stateDependentIdentities(for: key)
+    return readers.isEmpty ? [ownerIdentity] : readers
   }
 
   /// Stores a value in a state slot without triggering invalidation or
