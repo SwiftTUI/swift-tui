@@ -538,6 +538,7 @@ classifications:
     - SwiftTUICore.FrameDiagnosticWork
     - SwiftTUICore.FrameDiagnostics
     - SwiftTUICore.FrameDropEligibility
+    - SwiftTUICore.FrameHeadTimings
     - SwiftTUICore.FrameMainActorTimings
     - SwiftTUICore.FramePhaseTimings
     - SwiftTUICore.FrameRenderGenerations

@@ -18,7 +18,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 529 |
+| `SwiftTUIRuntime` | 60 | 530 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 270 | 1439 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
@@ -33,7 +33,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftUIHost` | 7 | 62 |
 | `SwiftTUIAndroidHost` | 26 | 162 |
-| `SwiftTUICore` | 279 | 2184 |
+| `SwiftTUICore` | 280 | 2193 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -55,7 +55,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `EmptyScene` — struct — 3 members
 - `ExitKeyBindings` — struct — 5 members
 - `FileOpenError` — enum — 2 members
-- `FrameDiagnosticRecord` — struct — 84 members
+- `FrameDiagnosticRecord` — struct — 85 members
 - `HostedRasterSurface` — class — 14 members
 - `HostedSceneSession` — class — 11 members
 - `HostedSceneSessionError` — enum — 2 members
@@ -580,7 +580,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (278)
+### Canonical surface (279)
 
 - `AccessibilityAnnouncement` — struct — 3 members
 - `AccessibilityNode` — struct — 10 members
@@ -670,9 +670,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FrameDiagnosticPresentation` — struct — 2 members
 - `FrameDiagnosticRuntime` — struct — 3 members
 - `FrameDiagnostics` — struct — 8 members
-- `FrameDiagnosticTiming` — struct — 5 members
+- `FrameDiagnosticTiming` — struct — 6 members
 - `FrameDiagnosticWork` — struct — 14 members
 - `FrameDropEligibility` — struct — 41 members
+- `FrameHeadTimings` — struct — 7 members
 - `FrameMainActorTimings` — struct — 3 members
 - `FramePhaseTimings` — struct — 9 members
 - `FrameRenderGenerations` — struct — 6 members

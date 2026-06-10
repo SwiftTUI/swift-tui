@@ -40,6 +40,7 @@ package final class FrameHeadTransaction {
   package let observationDraft: ObservationBridgeDraft?
   package let animationDraft: AnimationFrameDraft
   private let elidedFrameTimingRecorder: ElidedFrameTimingRecorder
+  private let frameHeadTimingRecorder: FrameHeadTimingRecorder
   package let checkpoints: FrameHeadCheckpoints?
 
   private let viewGraph: ViewGraph
@@ -61,6 +62,7 @@ package final class FrameHeadTransaction {
     observationDraft: ObservationBridgeDraft?,
     animationDraft: AnimationFrameDraft,
     elidedFrameTimingRecorder: ElidedFrameTimingRecorder,
+    frameHeadTimingRecorder: FrameHeadTimingRecorder,
     checkpoints: FrameHeadCheckpoints?
   ) {
     self.viewGraph = viewGraph
@@ -72,6 +74,7 @@ package final class FrameHeadTransaction {
     self.observationDraft = observationDraft
     self.animationDraft = animationDraft
     self.elidedFrameTimingRecorder = elidedFrameTimingRecorder
+    self.frameHeadTimingRecorder = frameHeadTimingRecorder
     self.checkpoints = checkpoints
   }
 
@@ -122,15 +125,19 @@ package final class FrameHeadTransaction {
       return
     }
     elidedFrameTimingRecorder.measure(.graphCheckpointRestore) {
-      graphDraft.materializePreparedState(
-        in: viewGraph,
-        preservingCurrentStateMutations: hasSuspendedPreparedState
-      )
+      frameHeadTimingRecorder.measure(.graphCheckpointRestore) {
+        graphDraft.materializePreparedState(
+          in: viewGraph,
+          preservingCurrentStateMutations: hasSuspendedPreparedState
+        )
+      }
     }
     observationDraft?.resumeRecording()
     elidedFrameTimingRecorder.measure(.resolveCheckpointRestore) {
-      frameState.restoreCheckpoint(checkpoints.preparedFrameState)
-      frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
+      frameHeadTimingRecorder.measure(.resolveCheckpointRestore) {
+        frameState.restoreCheckpoint(checkpoints.preparedFrameState)
+        frameInputs.restoreCheckpoint(checkpoints.preparedFrameInputs)
+      }
     }
   }
 
@@ -148,21 +155,36 @@ package final class FrameHeadTransaction {
       return
     }
     elidedFrameTimingRecorder.measure(.graphCheckpointRestore) {
-      graphDraft.restoreBaselineState(
-        in: viewGraph,
-        preservingCurrentStateMutations: hasSuspendedPreparedState
-      )
+      frameHeadTimingRecorder.measure(.graphCheckpointRestore) {
+        graphDraft.restoreBaselineState(
+          in: viewGraph,
+          preservingCurrentStateMutations: hasSuspendedPreparedState
+        )
+      }
     }
     observationDraft?.suspendRecording()
     elidedFrameTimingRecorder.measure(.resolveCheckpointRestore) {
-      frameState.restoreCheckpoint(checkpoints.baselineFrameState)
-      frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+      frameHeadTimingRecorder.measure(.resolveCheckpointRestore) {
+        frameState.restoreCheckpoint(checkpoints.baselineFrameState)
+        frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+      }
     }
     hasSuspendedPreparedState = true
   }
 
   package func measureElidedCommit<Value>(_ operation: () -> Value) -> Value {
     elidedFrameTimingRecorder.measure(.commit, operation)
+  }
+
+  package var headTimings: FrameHeadTimings {
+    frameHeadTimingRecorder.snapshot
+  }
+
+  package func measureHeadTiming<Value>(
+    _ field: FrameHeadTimingField,
+    _ operation: () -> Value
+  ) -> Value {
+    frameHeadTimingRecorder.measure(field, operation)
   }
 
   package func discard() {
@@ -218,4 +240,5 @@ package struct FrameHeadDraft {
   var animationDraft: AnimationFrameDraft { transaction.animationDraft }
   /// The abort checkpoint bundle. `nil` for one-shot heads.
   var checkpoints: FrameHeadCheckpoints? { transaction.checkpoints }
+  @MainActor var headTimings: FrameHeadTimings { transaction.headTimings }
 }

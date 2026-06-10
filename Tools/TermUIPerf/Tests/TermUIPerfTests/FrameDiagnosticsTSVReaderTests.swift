@@ -7,9 +7,9 @@ struct FrameDiagnosticsTSVReaderTests {
   func readerParsesDiagnosticFieldsAndPresentationTimestamps() throws {
     let records = try PerfFrameDiagnosticsTSVReader.parse(
       """
-      frame\ttotal_ms\tworker_layout_enqueue_ms\tworker_layout_compute_ms\tworker_raster_enqueue_ms\tworker_raster_compute_ms\tmain_actor_blocked_ms\tmain_actor_suspended_ms\tcustom_layout_fallbacks\tlayout_dependent_main_actor_fallbacks\tstale_frame_policy\ttail_job_state\tcancelled_render_count\tdrop_decision\tpresent_ms\telided\telided_head_total_ms\telided_graph_checkpoint_create_ms\telided_graph_checkpoint_restore_ms\telided_resolve_checkpoint_restore_ms\telided_animation_tick_ms\telided_commit_runtime_registrations_ms\telided_animation_commit_ms\telided_commit_ms
-      1\t10.50\t1.25\t2.50\t0.75\t3.00\t0.50\t1.00\t2\t3\tcommit_ordered\tcompleted\t4\tcommit_ordered\t0.12\t0\t-\t-\t-\t-\t-\t-\t-\t-
-      2\t-\t-\t-\t-\t-\t-\t-\t0\t0\telided_offscreen\t-\t4\t-\t-\t1\t2.10\t0.30\t0.40\t0.20\t0.50\t0.10\t0.05\t0.60
+      frame\ttotal_ms\tworker_layout_enqueue_ms\tworker_layout_compute_ms\tworker_raster_enqueue_ms\tworker_raster_compute_ms\tmain_actor_blocked_ms\tmain_actor_suspended_ms\thead_prepare_ms\thead_graph_checkpoint_create_ms\thead_graph_checkpoint_restore_ms\thead_resolve_checkpoint_restore_ms\thead_animation_process_resolved_tree_ms\thead_animation_apply_interpolations_ms\tcustom_layout_fallbacks\tlayout_dependent_main_actor_fallbacks\tstale_frame_policy\ttail_job_state\tcancelled_render_count\tdrop_decision\tpresent_ms\telided\telided_head_total_ms\telided_graph_checkpoint_create_ms\telided_graph_checkpoint_restore_ms\telided_resolve_checkpoint_restore_ms\telided_animation_tick_ms\telided_commit_runtime_registrations_ms\telided_animation_commit_ms\telided_commit_ms
+      1\t10.50\t1.25\t2.50\t0.75\t3.00\t0.50\t1.00\t4.50\t0.30\t0.40\t0.20\t1.10\t0.60\t2\t3\tcommit_ordered\tcompleted\t4\tcommit_ordered\t0.12\t0\t-\t-\t-\t-\t-\t-\t-\t-
+      2\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t0\t0\telided_offscreen\t-\t4\t-\t-\t1\t2.10\t0.30\t0.40\t0.20\t0.50\t0.10\t0.05\t0.60
       """,
       presentedAt: [1: 20.0]
     )
@@ -24,6 +24,12 @@ struct FrameDiagnosticsTSVReaderTests {
     #expect(records[0].workerRasterComputeMs == 3.00)
     #expect(records[0].mainActorBlockedMs == 0.50)
     #expect(records[0].mainActorSuspendedMs == 1.00)
+    #expect(records[0].headPrepareMs == 4.50)
+    #expect(records[0].headGraphCheckpointCreateMs == 0.30)
+    #expect(records[0].headGraphCheckpointRestoreMs == 0.40)
+    #expect(records[0].headResolveCheckpointRestoreMs == 0.20)
+    #expect(records[0].headAnimationProcessResolvedTreeMs == 1.10)
+    #expect(records[0].headAnimationApplyInterpolationsMs == 0.60)
     #expect(records[0].presentationDurationMs == 0.12)
     #expect(records[0].elided == false)
     #expect(records[0].customLayoutFallbacks == 2)

@@ -150,6 +150,34 @@ struct SummaryReducerTests {
     #expect(isApproximately(summary.elidedCommitMs.p50, 0.8))
   }
 
+  @Test("committed frame head spans are summarized")
+  func committedFrameHeadSpansAreSummarized() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [],
+      cpuSamples: [],
+      frames: [
+        frame(
+          number: 1,
+          headPrepareMs: 4.0,
+          headGraphCheckpointCreateMs: 0.4,
+          headGraphCheckpointRestoreMs: 0.5,
+          headResolveCheckpointRestoreMs: 0.2,
+          headAnimationProcessResolvedTreeMs: 0.7,
+          headAnimationApplyInterpolationsMs: 0.3
+        )
+      ]
+    )
+
+    #expect(summary.headPrepareMs.count == 1)
+    #expect(isApproximately(summary.headPrepareMs.p50, 4.0))
+    #expect(isApproximately(summary.headGraphCheckpointCreateMs.p50, 0.4))
+    #expect(isApproximately(summary.headGraphCheckpointRestoreMs.p50, 0.5))
+    #expect(isApproximately(summary.headResolveCheckpointRestoreMs.p50, 0.2))
+    #expect(isApproximately(summary.headAnimationProcessResolvedTreeMs.p50, 0.7))
+    #expect(isApproximately(summary.headAnimationApplyInterpolationsMs.p50, 0.3))
+  }
+
   @Test("idle events do not contribute latency or input-event CPU ratios")
   func idleEventsDoNotContributeLatencyOrInputRatios() throws {
     let summary = SummaryReducer.reduce(
@@ -196,6 +224,8 @@ struct SummaryReducerTests {
     #expect(object.keys.contains("cpu_seconds_per_diagnostic_frame"))
     #expect(object.keys.contains("main_actor_blocked_ratio"))
     #expect(object.keys.contains("worker_layout_compute_ms"))
+    #expect(object.keys.contains("head_prepare_ms"))
+    #expect(object.keys.contains("head_animation_process_resolved_tree_ms"))
     #expect(object.keys.contains("diagnostic_frame_count"))
     #expect(object.keys.contains("elided_frame_count"))
     #expect(object.keys.contains("elided_head_total_ms"))
@@ -274,6 +304,12 @@ struct SummaryReducerTests {
     tailJobState: String = "completed",
     dropDecision: String = "commit_ordered",
     elided: Bool = false,
+    headPrepareMs: Double? = nil,
+    headGraphCheckpointCreateMs: Double? = nil,
+    headGraphCheckpointRestoreMs: Double? = nil,
+    headResolveCheckpointRestoreMs: Double? = nil,
+    headAnimationProcessResolvedTreeMs: Double? = nil,
+    headAnimationApplyInterpolationsMs: Double? = nil,
     elidedHeadTotalMs: Double? = nil,
     elidedGraphCheckpointCreateMs: Double? = nil,
     elidedGraphCheckpointRestoreMs: Double? = nil,
@@ -294,6 +330,12 @@ struct SummaryReducerTests {
       mainActorBlockedMs: totalMs == nil ? nil : 1,
       mainActorSuspendedMs: totalMs == nil ? nil : 2,
       presentationDurationMs: 3,
+      headPrepareMs: headPrepareMs,
+      headGraphCheckpointCreateMs: headGraphCheckpointCreateMs,
+      headGraphCheckpointRestoreMs: headGraphCheckpointRestoreMs,
+      headResolveCheckpointRestoreMs: headResolveCheckpointRestoreMs,
+      headAnimationProcessResolvedTreeMs: headAnimationProcessResolvedTreeMs,
+      headAnimationApplyInterpolationsMs: headAnimationApplyInterpolationsMs,
       elidedHeadTotalMs: elidedHeadTotalMs,
       elidedGraphCheckpointCreateMs: elidedGraphCheckpointCreateMs,
       elidedGraphCheckpointRestoreMs: elidedGraphCheckpointRestoreMs,

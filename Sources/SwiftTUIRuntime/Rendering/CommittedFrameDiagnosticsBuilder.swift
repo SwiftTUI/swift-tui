@@ -7,6 +7,7 @@ struct CommittedFrameDiagnosticInput {
   var resolved: ResolvedNode
   var tail: FrameTailOutput
   var phaseTimings: FramePhaseTimings
+  var headTimings: FrameHeadTimings
   var workerTimings: FrameWorkerTimings?
   var mainActorTimings: FrameMainActorTimings
   var runtimeIssues: [RuntimeIssue]
@@ -32,6 +33,7 @@ extension CommittedFrameArtifactBuilder {
       presentationDamage: input.tail.presentationDamage,
       presentationSurfaceWidth: input.tail.raster.size.width,
       phaseTimings: input.phaseTimings,
+      headTimings: input.headTimings,
       renderGenerations: .init(
         render: input.draft.renderGeneration,
         layoutInput: input.tailInputGeneration,

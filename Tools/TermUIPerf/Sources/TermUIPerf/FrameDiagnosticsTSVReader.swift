@@ -60,6 +60,28 @@ enum PerfFrameDiagnosticsTSVReader {
         mainActorBlockedMs: double("main_actor_blocked_ms", fields, column),
         mainActorSuspendedMs: double("main_actor_suspended_ms", fields, column),
         presentationDurationMs: double("present_ms", fields, column),
+        headPrepareMs: double("head_prepare_ms", fields, column),
+        headGraphCheckpointCreateMs: double("head_graph_checkpoint_create_ms", fields, column),
+        headGraphCheckpointRestoreMs: double(
+          "head_graph_checkpoint_restore_ms",
+          fields,
+          column
+        ),
+        headResolveCheckpointRestoreMs: double(
+          "head_resolve_checkpoint_restore_ms",
+          fields,
+          column
+        ),
+        headAnimationProcessResolvedTreeMs: double(
+          "head_animation_process_resolved_tree_ms",
+          fields,
+          column
+        ),
+        headAnimationApplyInterpolationsMs: double(
+          "head_animation_apply_interpolations_ms",
+          fields,
+          column
+        ),
         elidedHeadTotalMs: double("elided_head_total_ms", fields, column),
         elidedGraphCheckpointCreateMs: double(
           "elided_graph_checkpoint_create_ms",

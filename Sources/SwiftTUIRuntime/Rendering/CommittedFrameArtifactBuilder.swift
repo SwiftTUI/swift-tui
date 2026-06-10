@@ -23,6 +23,7 @@ enum CommittedFrameArtifactBuilder {
     )
   }
 
+  @MainActor
   static func makeOneShotArtifacts(
     draft: FrameHeadDraft,
     reconciledTailLayout: ReconciledFrameTailLayout,
@@ -55,6 +56,7 @@ enum CommittedFrameArtifactBuilder {
     )
   }
 
+  @MainActor
   static func makeCompletedFrameArtifacts(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
@@ -130,6 +132,7 @@ enum CommittedFrameArtifactBuilder {
     return adjustedTimings
   }
 
+  @MainActor
   private static func makeArtifacts(
     draft: FrameHeadDraft,
     tailInputGeneration: RenderGeneration,
@@ -151,6 +154,7 @@ enum CommittedFrameArtifactBuilder {
         resolved: resolved,
         tail: tail,
         phaseTimings: phaseTimings,
+        headTimings: draft.headTimings,
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
         runtimeIssues: runtimeIssues,

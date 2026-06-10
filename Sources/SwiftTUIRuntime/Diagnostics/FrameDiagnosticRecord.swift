@@ -17,6 +17,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var interactionRegionCount: Int
   public var focusRegionCount: Int
   public var phaseTimings: FramePhaseTimings?
+  public var headTimings: FrameHeadTimings?
   public var renderGenerations: FrameRenderGenerations
   public var desiredGeneration: UInt64
   public var coalescedEventBatches: Int
@@ -118,6 +119,7 @@ extension FrameDiagnosticRecord {
     interactionRegionCount = 0
     focusRegionCount = 0
     phaseTimings = nil
+    headTimings = nil
     self.renderGenerations = renderGenerations
     self.desiredGeneration = desiredGeneration
     coalescedEventBatches = 0

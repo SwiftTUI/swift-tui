@@ -104,17 +104,20 @@ public struct FrameDiagnosticPresentation: Equatable, Sendable {
 
 public struct FrameDiagnosticTiming: Equatable, Sendable {
   public var phaseTimings: FramePhaseTimings?
+  public var headTimings: FrameHeadTimings?
   public var renderGenerations: FrameRenderGenerations
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
 
   public init(
     phaseTimings: FramePhaseTimings? = nil,
+    headTimings: FrameHeadTimings? = nil,
     renderGenerations: FrameRenderGenerations = .init(),
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil
   ) {
     self.phaseTimings = phaseTimings
+    self.headTimings = headTimings
     self.renderGenerations = renderGenerations
     self.workerTimings = workerTimings
     self.mainActorTimings = mainActorTimings

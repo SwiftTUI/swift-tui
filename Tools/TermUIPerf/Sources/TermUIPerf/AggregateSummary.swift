@@ -90,6 +90,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   public var cpuSecondsPerDiagnosticFrame: PerfStat
   public var inputToPresentLatencyP95Ms: PerfStat
   public var frameIntervalP50Ms: PerfStat
+  public var headPrepareP50Ms: PerfStat
+  public var headGraphCheckpointCreateP50Ms: PerfStat
+  public var headGraphCheckpointRestoreP50Ms: PerfStat
+  public var headResolveCheckpointRestoreP50Ms: PerfStat
+  public var headAnimationProcessResolvedTreeP50Ms: PerfStat
+  public var headAnimationApplyInterpolationsP50Ms: PerfStat
 
   public init(
     scenario: String,
@@ -104,7 +110,13 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     cpuSecondsPerCommittedFrame: PerfStat,
     cpuSecondsPerDiagnosticFrame: PerfStat,
     inputToPresentLatencyP95Ms: PerfStat,
-    frameIntervalP50Ms: PerfStat
+    frameIntervalP50Ms: PerfStat,
+    headPrepareP50Ms: PerfStat = PerfStat(values: []),
+    headGraphCheckpointCreateP50Ms: PerfStat = PerfStat(values: []),
+    headGraphCheckpointRestoreP50Ms: PerfStat = PerfStat(values: []),
+    headResolveCheckpointRestoreP50Ms: PerfStat = PerfStat(values: []),
+    headAnimationProcessResolvedTreeP50Ms: PerfStat = PerfStat(values: []),
+    headAnimationApplyInterpolationsP50Ms: PerfStat = PerfStat(values: [])
   ) {
     self.scenario = scenario
     self.renderMode = renderMode
@@ -119,6 +131,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.cpuSecondsPerDiagnosticFrame = cpuSecondsPerDiagnosticFrame
     self.inputToPresentLatencyP95Ms = inputToPresentLatencyP95Ms
     self.frameIntervalP50Ms = frameIntervalP50Ms
+    self.headPrepareP50Ms = headPrepareP50Ms
+    self.headGraphCheckpointCreateP50Ms = headGraphCheckpointCreateP50Ms
+    self.headGraphCheckpointRestoreP50Ms = headGraphCheckpointRestoreP50Ms
+    self.headResolveCheckpointRestoreP50Ms = headResolveCheckpointRestoreP50Ms
+    self.headAnimationProcessResolvedTreeP50Ms = headAnimationProcessResolvedTreeP50Ms
+    self.headAnimationApplyInterpolationsP50Ms = headAnimationApplyInterpolationsP50Ms
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -135,6 +153,69 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     case cpuSecondsPerDiagnosticFrame = "cpu_seconds_per_diagnostic_frame"
     case inputToPresentLatencyP95Ms = "input_to_present_latency_p95_ms"
     case frameIntervalP50Ms = "frame_interval_p50_ms"
+    case headPrepareP50Ms = "head_prepare_p50_ms"
+    case headGraphCheckpointCreateP50Ms = "head_graph_checkpoint_create_p50_ms"
+    case headGraphCheckpointRestoreP50Ms = "head_graph_checkpoint_restore_p50_ms"
+    case headResolveCheckpointRestoreP50Ms = "head_resolve_checkpoint_restore_p50_ms"
+    case headAnimationProcessResolvedTreeP50Ms =
+      "head_animation_process_resolved_tree_p50_ms"
+    case headAnimationApplyInterpolationsP50Ms =
+      "head_animation_apply_interpolations_p50_ms"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      scenario: try container.decode(String.self, forKey: .scenario),
+      renderMode: try container.decode(String.self, forKey: .renderMode),
+      iterationCount: try container.decode(Int.self, forKey: .iterationCount),
+      totalCPUSeconds: try container.decode(PerfStat.self, forKey: .totalCPUSeconds),
+      committedFrameCount: try container.decode(PerfStat.self, forKey: .committedFrameCount),
+      diagnosticFrameCount: try container.decode(
+        PerfStat.self,
+        forKey: .diagnosticFrameCount
+      ),
+      elidedFrameCount: try container.decode(PerfStat.self, forKey: .elidedFrameCount),
+      cancelledFrameCount: try container.decode(PerfStat.self, forKey: .cancelledFrameCount),
+      completedDropCount: try container.decode(PerfStat.self, forKey: .completedDropCount),
+      cpuSecondsPerCommittedFrame: try container.decode(
+        PerfStat.self,
+        forKey: .cpuSecondsPerCommittedFrame
+      ),
+      cpuSecondsPerDiagnosticFrame: try container.decode(
+        PerfStat.self,
+        forKey: .cpuSecondsPerDiagnosticFrame
+      ),
+      inputToPresentLatencyP95Ms: try container.decode(
+        PerfStat.self,
+        forKey: .inputToPresentLatencyP95Ms
+      ),
+      frameIntervalP50Ms: try container.decode(PerfStat.self, forKey: .frameIntervalP50Ms),
+      headPrepareP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .headPrepareP50Ms
+      ) ?? PerfStat(values: []),
+      headGraphCheckpointCreateP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .headGraphCheckpointCreateP50Ms
+      ) ?? PerfStat(values: []),
+      headGraphCheckpointRestoreP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .headGraphCheckpointRestoreP50Ms
+      ) ?? PerfStat(values: []),
+      headResolveCheckpointRestoreP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .headResolveCheckpointRestoreP50Ms
+      ) ?? PerfStat(values: []),
+      headAnimationProcessResolvedTreeP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .headAnimationProcessResolvedTreeP50Ms
+      ) ?? PerfStat(values: []),
+      headAnimationApplyInterpolationsP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .headAnimationApplyInterpolationsP50Ms
+      ) ?? PerfStat(values: [])
+    )
   }
 }
 
@@ -162,7 +243,18 @@ public enum AggregateReducer {
         values: summaries.compactMap(\.cpuSecondsPerDiagnosticFrame)),
       inputToPresentLatencyP95Ms: PerfStat(
         values: summaries.compactMap(\.inputToPresentLatencyMs.p95)),
-      frameIntervalP50Ms: PerfStat(values: summaries.compactMap(\.frameIntervalMs.p50)))
+      frameIntervalP50Ms: PerfStat(values: summaries.compactMap(\.frameIntervalMs.p50)),
+      headPrepareP50Ms: PerfStat(values: summaries.compactMap(\.headPrepareMs.p50)),
+      headGraphCheckpointCreateP50Ms: PerfStat(
+        values: summaries.compactMap(\.headGraphCheckpointCreateMs.p50)),
+      headGraphCheckpointRestoreP50Ms: PerfStat(
+        values: summaries.compactMap(\.headGraphCheckpointRestoreMs.p50)),
+      headResolveCheckpointRestoreP50Ms: PerfStat(
+        values: summaries.compactMap(\.headResolveCheckpointRestoreMs.p50)),
+      headAnimationProcessResolvedTreeP50Ms: PerfStat(
+        values: summaries.compactMap(\.headAnimationProcessResolvedTreeMs.p50)),
+      headAnimationApplyInterpolationsP50Ms: PerfStat(
+        values: summaries.compactMap(\.headAnimationApplyInterpolationsMs.p50)))
   }
 }
 
@@ -181,6 +273,28 @@ extension AggregateReducer {
     lines.append(line("CPU seconds/diagnostic frame", aggregate.cpuSecondsPerDiagnosticFrame))
     lines.append(line("input latency p95 ms", aggregate.inputToPresentLatencyP95Ms))
     lines.append(line("frame interval p50 ms", aggregate.frameIntervalP50Ms))
+    lines.append(line("head prepare p50 ms", aggregate.headPrepareP50Ms))
+    lines.append(
+      line("head graph checkpoint create p50 ms", aggregate.headGraphCheckpointCreateP50Ms)
+    )
+    lines.append(
+      line("head graph checkpoint restore p50 ms", aggregate.headGraphCheckpointRestoreP50Ms)
+    )
+    lines.append(
+      line("head resolve checkpoint restore p50 ms", aggregate.headResolveCheckpointRestoreP50Ms)
+    )
+    lines.append(
+      line(
+        "head animation process tree p50 ms",
+        aggregate.headAnimationProcessResolvedTreeP50Ms
+      )
+    )
+    lines.append(
+      line(
+        "head animation apply interpolations p50 ms",
+        aggregate.headAnimationApplyInterpolationsP50Ms
+      )
+    )
     return lines.joined(separator: "\n")
   }
 

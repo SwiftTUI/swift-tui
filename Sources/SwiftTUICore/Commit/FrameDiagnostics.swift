@@ -131,6 +131,7 @@ extension FrameDiagnostics {
     presentationDamage: PresentationDamage? = nil,
     presentationSurfaceWidth: Int = 0,
     phaseTimings: FramePhaseTimings? = nil,
+    headTimings: FrameHeadTimings? = nil,
     renderGenerations: FrameRenderGenerations = .init(),
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil,
@@ -182,6 +183,7 @@ extension FrameDiagnostics {
       ),
       timing: .init(
         phaseTimings: phaseTimings,
+        headTimings: headTimings,
         renderGenerations: renderGenerations,
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings

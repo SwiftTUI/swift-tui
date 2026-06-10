@@ -30,19 +30,30 @@ struct DefaultRendererFrameHeadCoordinator {
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
     let clock = ContinuousClock()
+    let frameHeadTimingRecorder = FrameHeadTimingRecorder()
     elidedFrameTimingRecorder.reset()
     let headStart = elidedFrameTimingRecorder.start()
+    let prepareStart = frameHeadTimingRecorder.start()
     defer {
       elidedFrameTimingRecorder.record(.headTotal, since: headStart)
+      frameHeadTimingRecorder.record(.prepare, since: prepareStart)
     }
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = preparedResolveContext(context)
     let registrationDraft = FrameHeadRegistrationDraft()
-    let graphCheckpoint = elidedFrameTimingRecorder.measure(
-      .graphCheckpointCreate
-    ) {
-      mode == .abortable ? viewGraph.makeCheckpoint() : nil
+    let graphCheckpoint: ViewGraph.Checkpoint?
+    switch mode {
+    case .oneShot:
+      graphCheckpoint = nil
+    case .abortable:
+      graphCheckpoint = elidedFrameTimingRecorder.measure(
+        .graphCheckpointCreate
+      ) {
+        frameHeadTimingRecorder.measure(.graphCheckpointCreate) {
+          viewGraph.makeCheckpoint()
+        }
+      }
     }
     let graphDraft = ViewGraphFrameDraft(
       liveRegistrations: resolveContext.runtimeRegistrations,
@@ -84,7 +95,8 @@ struct DefaultRendererFrameHeadCoordinator {
     let checkpoints = preparedCheckpoints(
       for: mode,
       graphDraft: graphDraft,
-      baseline: baselineCheckpoints
+      baseline: baselineCheckpoints,
+      frameHeadTimingRecorder: frameHeadTimingRecorder
     )
     let transaction = FrameHeadTransaction(
       viewGraph: viewGraph,
@@ -96,6 +108,7 @@ struct DefaultRendererFrameHeadCoordinator {
       observationDraft: observationDraft,
       animationDraft: animationDraft,
       elidedFrameTimingRecorder: elidedFrameTimingRecorder,
+      frameHeadTimingRecorder: frameHeadTimingRecorder,
       checkpoints: checkpoints
     )
     if mode == .abortable {
@@ -129,7 +142,8 @@ struct DefaultRendererFrameHeadCoordinator {
         to: &resolved,
         transaction: draft.frameContext.transaction,
         timestamp: animationTimestamp,
-        surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal)
+        surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
+        frameHeadTransaction: draft.transaction
       )
     }
 
@@ -323,7 +337,8 @@ struct DefaultRendererFrameHeadCoordinator {
   private func preparedCheckpoints(
     for mode: FrameHeadMode,
     graphDraft: ViewGraphFrameDraft,
-    baseline: FrameHeadBaselineCheckpoints?
+    baseline: FrameHeadBaselineCheckpoints?,
+    frameHeadTimingRecorder: FrameHeadTimingRecorder
   ) -> FrameHeadCheckpoints? {
     switch mode {
     case .oneShot:
@@ -333,7 +348,9 @@ struct DefaultRendererFrameHeadCoordinator {
         preconditionFailure("Abortable frame heads require baseline checkpoints.")
       }
       elidedFrameTimingRecorder.measure(.graphCheckpointCreate) {
-        graphDraft.recordPreparedCheckpoint(from: viewGraph)
+        frameHeadTimingRecorder.measure(.graphCheckpointCreate) {
+          graphDraft.recordPreparedCheckpoint(from: viewGraph)
+        }
       }
       return FrameHeadCheckpoints(
         baselineFrameState: baseline.frameState,
@@ -411,19 +428,24 @@ private struct AnimationInjectionStage {
     to resolved: inout ResolvedNode,
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant,
-    surfaceSize: CellSize?
+    surfaceSize: CellSize?,
+    frameHeadTransaction: FrameHeadTransaction
   ) {
     let controller = animationDraft.controller
-    controller.processResolvedTree(
-      resolved,
-      transaction: transaction,
-      timestamp: timestamp
-    )
-    _ = controller.applyInterpolations(
-      to: &resolved,
-      at: timestamp,
-      surfaceSize: surfaceSize
-    )
+    frameHeadTransaction.measureHeadTiming(.animationProcessResolvedTree) {
+      controller.processResolvedTree(
+        resolved,
+        transaction: transaction,
+        timestamp: timestamp
+      )
+    }
+    frameHeadTransaction.measureHeadTiming(.animationApplyInterpolations) {
+      _ = controller.applyInterpolations(
+        to: &resolved,
+        at: timestamp,
+        surfaceSize: surfaceSize
+      )
+    }
   }
 }
 

@@ -20,6 +20,12 @@ package enum FrameDiagnosticsTSVFormatting {
     "raster_ms",
     "commit_ms",
     "pipeline_ms",
+    "head_prepare_ms",
+    "head_graph_checkpoint_create_ms",
+    "head_graph_checkpoint_restore_ms",
+    "head_resolve_checkpoint_restore_ms",
+    "head_animation_process_resolved_tree_ms",
+    "head_animation_apply_interpolations_ms",
     "desired_generation",
     "render_generation",
     "layout_input_generation",
@@ -113,6 +119,17 @@ package enum FrameDiagnosticsTSVFormatting {
     let rasterMs = formatMs(timings?.raster)
     let commitMs = formatMs(timings?.commit)
     let pipelineMs = formatMs(timings?.total)
+    let headTimings = record.headTimings
+    let headPrepareMs = formatMs(headTimings?.prepare)
+    let headGraphCheckpointCreateMs = formatMs(headTimings?.graphCheckpointCreate)
+    let headGraphCheckpointRestoreMs = formatMs(headTimings?.graphCheckpointRestore)
+    let headResolveCheckpointRestoreMs = formatMs(headTimings?.resolveCheckpointRestore)
+    let headAnimationProcessResolvedTreeMs = formatMs(
+      headTimings?.animationProcessResolvedTree
+    )
+    let headAnimationApplyInterpolationsMs = formatMs(
+      headTimings?.animationApplyInterpolations
+    )
     let workerTimings = record.workerTimings
     let renderGenerations = record.renderGenerations
     let layoutEnqueueMs = formatMs(workerTimings?.layoutEnqueueToStart)
@@ -172,6 +189,12 @@ package enum FrameDiagnosticsTSVFormatting {
       rasterMs,
       commitMs,
       pipelineMs,
+      headPrepareMs,
+      headGraphCheckpointCreateMs,
+      headGraphCheckpointRestoreMs,
+      headResolveCheckpointRestoreMs,
+      headAnimationProcessResolvedTreeMs,
+      headAnimationApplyInterpolationsMs,
       String(record.desiredGeneration),
       String(renderGenerations.render.rawValue),
       formatGeneration(renderGenerations.layoutInput),

@@ -36,6 +36,33 @@ public struct FramePhaseTimings: Equatable, Sendable {
   }
 }
 
+/// Timing summaries for the main-actor frame-head preparation work that wraps
+/// the measured resolve phase.
+public struct FrameHeadTimings: Equatable, Sendable {
+  public var prepare: Duration
+  public var graphCheckpointCreate: Duration
+  public var graphCheckpointRestore: Duration
+  public var resolveCheckpointRestore: Duration
+  public var animationProcessResolvedTree: Duration
+  public var animationApplyInterpolations: Duration
+
+  public init(
+    prepare: Duration = .zero,
+    graphCheckpointCreate: Duration = .zero,
+    graphCheckpointRestore: Duration = .zero,
+    resolveCheckpointRestore: Duration = .zero,
+    animationProcessResolvedTree: Duration = .zero,
+    animationApplyInterpolations: Duration = .zero
+  ) {
+    self.prepare = prepare
+    self.graphCheckpointCreate = graphCheckpointCreate
+    self.graphCheckpointRestore = graphCheckpointRestore
+    self.resolveCheckpointRestore = resolveCheckpointRestore
+    self.animationProcessResolvedTree = animationProcessResolvedTree
+    self.animationApplyInterpolations = animationApplyInterpolations
+  }
+}
+
 /// Monotonic identity assigned to one renderer pass.
 public struct RenderGeneration: Comparable, Equatable, Hashable, Sendable {
   public var rawValue: UInt64

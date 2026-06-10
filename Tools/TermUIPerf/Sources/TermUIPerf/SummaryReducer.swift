@@ -11,6 +11,12 @@ public struct PerfFrameRecord: Equatable, Sendable {
   public var mainActorBlockedMs: Double?
   public var mainActorSuspendedMs: Double?
   public var presentationDurationMs: Double?
+  public var headPrepareMs: Double?
+  public var headGraphCheckpointCreateMs: Double?
+  public var headGraphCheckpointRestoreMs: Double?
+  public var headResolveCheckpointRestoreMs: Double?
+  public var headAnimationProcessResolvedTreeMs: Double?
+  public var headAnimationApplyInterpolationsMs: Double?
   public var elidedHeadTotalMs: Double?
   public var elidedGraphCheckpointCreateMs: Double?
   public var elidedGraphCheckpointRestoreMs: Double?
@@ -38,6 +44,12 @@ public struct PerfFrameRecord: Equatable, Sendable {
     mainActorBlockedMs: Double? = nil,
     mainActorSuspendedMs: Double? = nil,
     presentationDurationMs: Double? = nil,
+    headPrepareMs: Double? = nil,
+    headGraphCheckpointCreateMs: Double? = nil,
+    headGraphCheckpointRestoreMs: Double? = nil,
+    headResolveCheckpointRestoreMs: Double? = nil,
+    headAnimationProcessResolvedTreeMs: Double? = nil,
+    headAnimationApplyInterpolationsMs: Double? = nil,
     elidedHeadTotalMs: Double? = nil,
     elidedGraphCheckpointCreateMs: Double? = nil,
     elidedGraphCheckpointRestoreMs: Double? = nil,
@@ -64,6 +76,12 @@ public struct PerfFrameRecord: Equatable, Sendable {
     self.mainActorBlockedMs = mainActorBlockedMs
     self.mainActorSuspendedMs = mainActorSuspendedMs
     self.presentationDurationMs = presentationDurationMs
+    self.headPrepareMs = headPrepareMs
+    self.headGraphCheckpointCreateMs = headGraphCheckpointCreateMs
+    self.headGraphCheckpointRestoreMs = headGraphCheckpointRestoreMs
+    self.headResolveCheckpointRestoreMs = headResolveCheckpointRestoreMs
+    self.headAnimationProcessResolvedTreeMs = headAnimationProcessResolvedTreeMs
+    self.headAnimationApplyInterpolationsMs = headAnimationApplyInterpolationsMs
     self.elidedHeadTotalMs = elidedHeadTotalMs
     self.elidedGraphCheckpointCreateMs = elidedGraphCheckpointCreateMs
     self.elidedGraphCheckpointRestoreMs = elidedGraphCheckpointRestoreMs
@@ -146,6 +164,12 @@ public struct PerfSummary: Codable, Equatable, Sendable {
   public var workerRasterEnqueueMs: PerfDistribution
   public var workerRasterComputeMs: PerfDistribution
   public var presentationDurationMs: PerfDistribution
+  public var headPrepareMs: PerfDistribution
+  public var headGraphCheckpointCreateMs: PerfDistribution
+  public var headGraphCheckpointRestoreMs: PerfDistribution
+  public var headResolveCheckpointRestoreMs: PerfDistribution
+  public var headAnimationProcessResolvedTreeMs: PerfDistribution
+  public var headAnimationApplyInterpolationsMs: PerfDistribution
   public var elidedHeadTotalMs: PerfDistribution
   public var elidedGraphCheckpointCreateMs: PerfDistribution
   public var elidedGraphCheckpointRestoreMs: PerfDistribution
@@ -181,6 +205,12 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     workerRasterEnqueueMs: PerfDistribution,
     workerRasterComputeMs: PerfDistribution,
     presentationDurationMs: PerfDistribution,
+    headPrepareMs: PerfDistribution = PerfDistribution(values: []),
+    headGraphCheckpointCreateMs: PerfDistribution = PerfDistribution(values: []),
+    headGraphCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
+    headResolveCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
+    headAnimationProcessResolvedTreeMs: PerfDistribution = PerfDistribution(values: []),
+    headAnimationApplyInterpolationsMs: PerfDistribution = PerfDistribution(values: []),
     elidedHeadTotalMs: PerfDistribution = PerfDistribution(values: []),
     elidedGraphCheckpointCreateMs: PerfDistribution = PerfDistribution(values: []),
     elidedGraphCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
@@ -215,6 +245,12 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     self.workerRasterEnqueueMs = workerRasterEnqueueMs
     self.workerRasterComputeMs = workerRasterComputeMs
     self.presentationDurationMs = presentationDurationMs
+    self.headPrepareMs = headPrepareMs
+    self.headGraphCheckpointCreateMs = headGraphCheckpointCreateMs
+    self.headGraphCheckpointRestoreMs = headGraphCheckpointRestoreMs
+    self.headResolveCheckpointRestoreMs = headResolveCheckpointRestoreMs
+    self.headAnimationProcessResolvedTreeMs = headAnimationProcessResolvedTreeMs
+    self.headAnimationApplyInterpolationsMs = headAnimationApplyInterpolationsMs
     self.elidedHeadTotalMs = elidedHeadTotalMs
     self.elidedGraphCheckpointCreateMs = elidedGraphCheckpointCreateMs
     self.elidedGraphCheckpointRestoreMs = elidedGraphCheckpointRestoreMs
@@ -251,6 +287,12 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     case workerRasterEnqueueMs = "worker_raster_enqueue_ms"
     case workerRasterComputeMs = "worker_raster_compute_ms"
     case presentationDurationMs = "presentation_duration_ms"
+    case headPrepareMs = "head_prepare_ms"
+    case headGraphCheckpointCreateMs = "head_graph_checkpoint_create_ms"
+    case headGraphCheckpointRestoreMs = "head_graph_checkpoint_restore_ms"
+    case headResolveCheckpointRestoreMs = "head_resolve_checkpoint_restore_ms"
+    case headAnimationProcessResolvedTreeMs = "head_animation_process_resolved_tree_ms"
+    case headAnimationApplyInterpolationsMs = "head_animation_apply_interpolations_ms"
     case elidedHeadTotalMs = "elided_head_total_ms"
     case elidedGraphCheckpointCreateMs = "elided_graph_checkpoint_create_ms"
     case elidedGraphCheckpointRestoreMs = "elided_graph_checkpoint_restore_ms"
@@ -326,6 +368,30 @@ public struct PerfSummary: Codable, Equatable, Sendable {
         PerfDistribution.self,
         forKey: .presentationDurationMs
       ),
+      headPrepareMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .headPrepareMs
+      ) ?? PerfDistribution(values: []),
+      headGraphCheckpointCreateMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .headGraphCheckpointCreateMs
+      ) ?? PerfDistribution(values: []),
+      headGraphCheckpointRestoreMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .headGraphCheckpointRestoreMs
+      ) ?? PerfDistribution(values: []),
+      headResolveCheckpointRestoreMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .headResolveCheckpointRestoreMs
+      ) ?? PerfDistribution(values: []),
+      headAnimationProcessResolvedTreeMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .headAnimationProcessResolvedTreeMs
+      ) ?? PerfDistribution(values: []),
+      headAnimationApplyInterpolationsMs: try container.decodeIfPresent(
+        PerfDistribution.self,
+        forKey: .headAnimationApplyInterpolationsMs
+      ) ?? PerfDistribution(values: []),
       elidedHeadTotalMs: try container.decodeIfPresent(
         PerfDistribution.self,
         forKey: .elidedHeadTotalMs
@@ -416,6 +482,22 @@ public enum SummaryReducer {
       workerRasterComputeMs: PerfDistribution(values: frames.compactMap(\.workerRasterComputeMs)),
       presentationDurationMs: PerfDistribution(
         values: committedFrames.compactMap(\.presentationDurationMs)
+      ),
+      headPrepareMs: PerfDistribution(values: committedFrames.compactMap(\.headPrepareMs)),
+      headGraphCheckpointCreateMs: PerfDistribution(
+        values: committedFrames.compactMap(\.headGraphCheckpointCreateMs)
+      ),
+      headGraphCheckpointRestoreMs: PerfDistribution(
+        values: committedFrames.compactMap(\.headGraphCheckpointRestoreMs)
+      ),
+      headResolveCheckpointRestoreMs: PerfDistribution(
+        values: committedFrames.compactMap(\.headResolveCheckpointRestoreMs)
+      ),
+      headAnimationProcessResolvedTreeMs: PerfDistribution(
+        values: committedFrames.compactMap(\.headAnimationProcessResolvedTreeMs)
+      ),
+      headAnimationApplyInterpolationsMs: PerfDistribution(
+        values: committedFrames.compactMap(\.headAnimationApplyInterpolationsMs)
       ),
       elidedHeadTotalMs: PerfDistribution(values: frames.compactMap(\.elidedHeadTotalMs)),
       elidedGraphCheckpointCreateMs: PerfDistribution(
