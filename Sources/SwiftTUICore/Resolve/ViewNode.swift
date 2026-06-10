@@ -186,9 +186,18 @@ package final class ViewNode {
     slot.initializeIfNeeded(with: seed())
     stateSlots[ordinal] = slot
 
-    dependencyTracker.recordStateRead(
-      .init(owner: viewNodeID, ordinal: ordinal)
-    )
+    let readKey = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+    if ReaderAttributionConfiguration.isEnabled,
+      let reader = ViewNodeContext.current
+    {
+      // Reader-attributed: the dependency belongs to the node actually
+      // evaluating this read (which may be a descendant consuming a projected
+      // binding), not the slot owner. A genuine self-read records on self
+      // (reader == self == owner), exactly as before.
+      reader.recordStateReadDependency(readKey)
+    } else {
+      dependencyTracker.recordStateRead(readKey)
+    }
 
     guard slot.stores(Value.self) else {
       let slotTypes = stateSlots.keys.sorted().map { index in
@@ -202,6 +211,15 @@ package final class ViewNode {
     return slot.value(as: Value.self)
   }
 
+  /// Records a state-read dependency on *this* node's tracker. Used by
+  /// reader-attributed reads so the dependency lands on the evaluating reader
+  /// rather than the slot owner (see ``ReaderAttributionConfiguration``).
+  package func recordStateReadDependency(
+    _ key: StateSlotKey
+  ) {
+    dependencyTracker.recordStateRead(key)
+  }
+
   package func setStateSlot<Value>(
     ordinal: Int,
     value: Value,
@@ -211,24 +229,55 @@ package final class ViewNode {
     let didChange = slot.set(value)
     stateSlots[ordinal] = slot
     if didChange {
-      ownerGraph?.queueDirtyForStateChange(
-        .init(owner: viewNodeID, ordinal: ordinal)
+      let key = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+      ownerGraph?.queueDirtyForStateChange(key)
+      let invalidationIdentities = stateChangeInvalidationIdentities(
+        for: key,
+        explicit: invalidationIdentity
       )
-      let invalidationIdentity = invalidationIdentity ?? identity
       let animationRequest = AnimationContextStorage.currentRequest
       let batchID = AnimationContextStorage.currentBatchID
       if animationRequest != .inherit || batchID != nil,
         let animationAware = invalidator as? any AnimationAwareInvalidating
       {
         animationAware.requestInvalidation(
-          of: [invalidationIdentity],
+          of: invalidationIdentities,
           animation: animationRequest,
           batchID: batchID
         )
       } else {
-        invalidator?.requestInvalidation(of: [invalidationIdentity])
+        invalidator?.requestInvalidation(of: invalidationIdentities)
       }
     }
+  }
+
+  /// The identities to invalidate for a state-slot write.
+  ///
+  /// Legacy (reader attribution off): a single owner identity — the explicit
+  /// override when provided, else this node's identity — so the owner's whole
+  /// subtree re-resolves. This is the write-side mirror of the always-dirty-owner
+  /// term in ``ViewGraphInvalidationPlanner/stateChangeDirtyNodeIDs(for:stateSlotDependents:)``.
+  ///
+  /// Reader-attributed (flag on): the genuine readers recorded for this slot, so
+  /// a disjoint subtree (such as a sheet/palette background that only *projects*
+  /// the binding) is spared — completing the read-side attribution in
+  /// ``stateSlot(ordinal:seed:)``. Without this, the owner identity is still
+  /// invalidated and `conflictsWithInvalidation` blocks the whole background as
+  /// an ancestor, defeating reader attribution on open. Falls back to the owner
+  /// identity when no readers were recorded (deferred / conditional reads) so a
+  /// change is never dropped.
+  private func stateChangeInvalidationIdentities(
+    for key: StateSlotKey,
+    explicit: Identity?
+  ) -> Set<Identity> {
+    let ownerIdentity = explicit ?? identity
+    guard ReaderAttributionConfiguration.isEnabled,
+      let ownerGraph
+    else {
+      return [ownerIdentity]
+    }
+    let readers = ownerGraph.stateDependentIdentities(for: key)
+    return readers.isEmpty ? [ownerIdentity] : readers
   }
 
   /// Stores a value in a state slot without triggering invalidation or
@@ -447,6 +496,51 @@ package final class ViewNode {
       // summary) otherwise changes every frame and defeats retained reuse for
       // subtrees disjoint from the invalidation. See `TransactionSnapshot.isReuseEquivalent`.
       && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
+  }
+
+  /// Diagnostic mirror of ``canReuse(frameID:environment:transaction:)``:
+  /// returns the first failing condition as a label, or `nil` if `canReuse`
+  /// would succeed (so the caller can attribute the denial to invalidation
+  /// intersection instead). For `env-mismatch` it records the specific differing
+  /// environment keys into ``ReuseDenialTrace``. Used only when the trace is on.
+  package func canReuseDenialReason(
+    frameID: UInt64,
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot
+  ) -> String? {
+    prepareForFrame(frameID)
+    if !wasPresentAtFrameStart { return "not-present" }
+    if wasVisitedThisFrame { return "visited" }
+    if isDirty { return "dirty" }
+    if !isCommittedSnapshotFresh { return "stale-snapshot" }
+    if !committed.supportsRetainedReuse { return "no-retained-support" }
+    if committed.environmentSnapshot != environment {
+      recordEnvironmentSnapshotDiff(committed.environmentSnapshot, environment)
+      return "env-mismatch"
+    }
+    if !committed.transactionSnapshot.isReuseEquivalent(to: transaction) {
+      return "transaction"
+    }
+    return nil
+  }
+
+  private func recordEnvironmentSnapshotDiff(
+    _ committed: EnvironmentSnapshot,
+    _ current: EnvironmentSnapshot
+  ) {
+    guard ReuseDenialTrace.isEnabled else { return }
+    if committed.debugSignature != current.debugSignature {
+      ReuseDenialTrace.recordEnvironmentKeyDiff("debugSignature")
+    }
+    if committed.style != current.style {
+      ReuseDenialTrace.recordEnvironmentKeyDiff("style")
+    }
+    let committedValues = committed.values
+    let currentValues = current.values
+    for key in Set(committedValues.keys).union(currentValues.keys)
+    where committedValues[key] != currentValues[key] {
+      ReuseDenialTrace.recordEnvironmentKeyDiff("val:\(key)")
+    }
   }
 
   package var hasDirtyAncestor: Bool {

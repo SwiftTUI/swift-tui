@@ -39,7 +39,13 @@ enum ViewGraphInvalidationPlanner {
     stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
   ) -> Set<ViewNodeID> {
     var result = stateSlotDependents[key] ?? []
-    result.insert(key.owner)
+    // Legacy: always dirty the owner (defense-in-depth for deferred / conditional
+    // reads). Reader-attributed mode dirties only genuine readers — a
+    // projection-only owner is recorded as no reader and is therefore spared,
+    // which is what takes sheet/palette open from O(background) to O(overlay).
+    if !ReaderAttributionConfiguration.isEnabled {
+      result.insert(key.owner)
+    }
     return result
   }
 
