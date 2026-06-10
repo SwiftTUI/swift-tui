@@ -14,17 +14,41 @@ omitted even when SwiftUI exposes a corresponding API.
 ## Accessibility
 
 **Shipped.** The semantic substrate, the terminal linear renderer,
-cursor-follows-focus, the Web/WASI ARIA tree, and the SwiftUI-host overlay that
-pushes runtime focus to VoiceOver.
+cursor-follows-focus, the Web/WASI ARIA tree, the SwiftUI-host overlay that
+pushes runtime focus to VoiceOver, and the Android host's Compose semantics
+overlay.
 
 **Not yet built.**
 
-- **Bidirectional focus.** Focus flows runtime → VoiceOver only.
-  VoiceOver-originated focus traversal is not fed back into SwiftTUI's runtime
-  focus.
+- **Bidirectional native accessibility focus.** Focus flows runtime →
+  VoiceOver/TalkBack only. Native assistive-technology-originated focus
+  traversal is not fed back into SwiftTUI's runtime focus.
 - **A WCAG-referenced conformance suite** and **automated screen-reader
   testing.** Accessibility is verified by unit tests and guardrail scripts, not
   by a conformance checklist.
+
+## Android host
+
+**Shipped.** `SwiftTUIAndroidHost` builds for `aarch64-unknown-linux-android28`
+and the `swift-tui-examples/AndroidGallery` app embeds `GalleryView()` in a
+Compose host. The frame snapshot carries styled cells, image attachment payloads,
+damage metadata, focus presentation, accessibility nodes, and announcements.
+The Compose renderer paints styled cells and embedded images, exposes a
+transparent semantics overlay, and bridges hardware keys plus basic touch
+activation.
+
+**Not yet built.**
+
+- **Full Android input parity.** IME composition, clipboard, link opening,
+  precise drag/scroll gestures, Android accessibility focus feedback, and
+  Android content URI import are not implemented.
+- **Retained Android damage rendering.** Damage rows/ranges are serialized, but
+  the current Compose renderer redraws the canvas rather than maintaining a
+  retained bitmap cache.
+- **Automated Android runtime gate.** `AndroidGallery` assembles locally, but
+  emulator/device smoke is not in CI.
+- **`x86_64` Android.** The first supported target is `arm64-v8a`; `x86_64`
+  Android remains blocked by the vendored `swift-png` SIMD path.
 
 ## Terminal-program embedding
 
@@ -110,4 +134,3 @@ native path.
 - **Ordered-layer compositing** of multiple overlapping blended images, and
   **native-host replay** of the precomposed variant outside the terminal image
   path.
-

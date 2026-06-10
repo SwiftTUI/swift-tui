@@ -1,7 +1,7 @@
 # Accessibility
 
 SwiftTUI builds accessibility into the render pipeline rather than bolting it
-on. Every frame produces one semantic snapshot; four different consumers
+on. Every frame produces one semantic snapshot; five different consumers
 present it. This document describes the substrate and those consumers.
 
 ## The semantic substrate
@@ -32,7 +32,7 @@ they present, so one snapshot stays valid regardless of focus movement.
 announcement to whatever accessibility target the active runtime exposes; calls
 made outside a running runtime are silently ignored.
 
-## One snapshot, four consumers
+## One snapshot, five consumers
 
 ```mermaid
 flowchart TD
@@ -45,9 +45,11 @@ flowchart TD
     snap --> cursor["Terminal: cursor-follows-focus"]
     snap --> web["Web / WASI: accessibilityTree JSON<br/>→ ARIA DOM mounter"]
     snap --> swiftui["SwiftUI host: HostedAccessibilityOverlay<br/>→ VoiceOver"]
+    snap --> android["Android host: Compose semantics overlay<br/>→ TalkBack"]
 
     focus["FocusTracker"] -.cross-referenced.-> cursor
     focus -.cross-referenced.-> swiftui
+    focus -.cross-referenced.-> android
 ```
 
 1. **Terminal linear renderer.** When the runtime output mode is `.accessible`,
@@ -64,10 +66,14 @@ flowchart TD
    accessibility overlay over the raster surface; each `AccessibilityNode`
    becomes a native element with role-derived traits. Runtime focus is pushed
    to VoiceOver (the overlay's focused element follows the runtime).
+5. **Android host.** `SwiftTUIAndroidHost` serializes accessibility nodes and
+   announcements into the Android frame snapshot. `AndroidGallery` mounts a
+   transparent Compose semantics overlay over the canvas so TalkBack can read
+   the semantic tree rather than a single opaque image.
 
-The runtime-to-VoiceOver direction is one-way: VoiceOver-originated focus
-traversal is not yet fed back into SwiftTUI's runtime focus. That gap, and the
-absence of a WCAG conformance suite, are tracked in
+The runtime-to-native-assistive-technology direction is one-way: VoiceOver- or
+TalkBack-originated focus traversal is not yet fed back into SwiftTUI's runtime
+focus. That gap, and the absence of a WCAG conformance suite, are tracked in
 [VISION-GAP.md](VISION-GAP.md).
 
 ## Reduced motion

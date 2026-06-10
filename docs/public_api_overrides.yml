@@ -796,6 +796,7 @@ module_defaults:
   SwiftTUIWebHost: canonical
   SwiftTUIWebHostCLI: canonical
   SwiftUIHost: canonical
+  SwiftTUIAndroidHost: canonical
   SwiftTUIPTYCPrimitives: package-only-seam
 
 # Global fallback for any symbol not otherwise classified.

@@ -52,12 +52,13 @@ private final class AndroidHostSceneHostStateBox: @unchecked Sendable {
   }
 
   func updateFrame(
-    _ frame: SemanticHostFrame
+    _ frame: SemanticHostFrame,
+    style: AndroidHostStyle
   ) {
     state.withLock { state in
       state.latestFrame = frame
       do {
-        state.latestFrameBytes = try AndroidHostFrameEncoder.encode(frame)
+        state.latestFrameBytes = try AndroidHostFrameEncoder.encode(frame, style: style)
         state.latestEncodingErrorDescription = nil
       } catch {
         state.latestFrameBytes = nil
@@ -127,7 +128,7 @@ public final class AndroidHostSceneHost {
       theme: style.renderStyle.theme,
       frameDelivery: .assumedMainActor,
       onFrame: { frame in
-        state.updateFrame(frame)
+        state.updateFrame(frame, style: style)
       }
     )
     let session = try HostedSceneSession(
@@ -287,6 +288,7 @@ public final class AndroidHostSceneHost {
     unsafe outBuffer.update(from: bytes, count: bytes.count)
     return bytes.count
   }
+
 }
 
 extension AndroidHostSceneHost: @unchecked Sendable {}

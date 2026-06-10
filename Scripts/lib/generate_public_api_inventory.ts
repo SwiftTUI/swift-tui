@@ -117,6 +117,7 @@ const PRIMARY_MODULES = [
   "SwiftTUIWebHost",
   "SwiftTUIWebHostCLI",
   "SwiftUIHost",
+  "SwiftTUIAndroidHost",
 ] as const;
 const PACKAGE_ONLY_MODULES = ["SwiftTUICore", "SwiftTUIPTYCPrimitives"] as const;
 const ALL_MODULES = [...PRIMARY_MODULES, ...PACKAGE_ONLY_MODULES] as const;

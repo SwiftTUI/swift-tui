@@ -3,9 +3,9 @@
 The render pipeline
 ([DocC source](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md))
 produces a committed frame. A **host** presents that frame. The same authored app
-can run under four different hosts; the pipeline above them is identical.
+can run under five different hosts; the pipeline above them is identical.
 
-## The four execution modes
+## The five execution modes
 
 ```mermaid
 flowchart TD
@@ -15,12 +15,14 @@ flowchart TD
 
     runtime --> term["Terminal-native<br/>SwiftTUICLI · TerminalHost"]
     runtime --> wasi["WASI / browser<br/>SwiftTUIWASI · canvas"]
-    runtime --> host["Host-managed<br/>SwiftUIHost · raster surface"]
+    runtime --> host["Host-managed Apple<br/>SwiftUIHost · raster surface"]
+    runtime --> androidHost["Host-managed Android<br/>SwiftTUIAndroidHost · Compose canvas"]
     runtime --> web["Localhost WebHost<br/>SwiftTUIWebHost · FlyingFox"]
 
     term --> termOut["Terminal text + ANSI"]
     wasi --> wasiOut["Browser canvas"]
     host --> hostOut["SwiftUI raster view"]
+    androidHost --> androidOut["Android Canvas + semantics overlay"]
     web --> webOut["Browser over WebSocket"]
 ```
 
@@ -28,7 +30,8 @@ flowchart TD
 | --- | --- | --- | --- |
 | Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI; raster output drawn onto a canvas via the `web-surface` transport. |
-| Host-managed | `SwiftUIHost` | A `SwiftUI` view inside an app | Retains `HostedSceneSession` values and draws a `HostedRasterSurface`. macOS-only. |
+| Host-managed Apple | `SwiftUIHost` | A `SwiftUI` view inside an app | Retains `HostedSceneSession` values and draws a `HostedRasterSurface`. macOS-only. |
+| Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains `HostedSceneSession` values behind a JNI/C ABI, serializes `SemanticHostFrame` snapshots, and draws styled cells/images plus a semantics overlay in Compose. `arm64-v8a` only. |
 | Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` v2 protocol. |
 
 A binary can support more than one mode. `SwiftTUIWebHostCLI` (`WebHostCLIRunner`)
@@ -57,6 +60,7 @@ of focused contracts.
 | WASI / browser | `WebSurfaceTransport` serializes damage into the web-surface frame; the browser canvas clears and redraws dirty rects only. |
 | Localhost WebHost | `WebSocketSurfaceTransport` serializes the same web-surface damage over WebSocket. |
 | Host-managed SwiftUI | `HostedRasterSurface` carries damage through `SemanticHostFrame`; `NativeTerminalSurfaceView` invalidates only dirty native rects. |
+| Host-managed Android | `SwiftTUIAndroidHost` serializes damage rows/ranges into the Android frame snapshot; the current Compose renderer consumes the metadata but still redraws the canvas. |
 
 ```mermaid
 flowchart LR
@@ -126,7 +130,7 @@ flowchart LR
 | Linux terminal builds and tests | Supported through `swiftly`. |
 | iOS package builds | Supported for host-compatible products; CI builds (does not run tests). PTY/terminal-embedding products are excluded. |
 | WASI / browser | Supported through `SwiftTUIWASI` and the `SwiftTUI/swift-tui-web` browser packages. |
-| Android cross-compilation | `aarch64` builds with the Swift Android SDK. `x86_64` currently fails inside the vendored `swift-png` SIMD path — see [VISION-GAP.md](VISION-GAP.md). |
+| Android host / cross-compilation | `SwiftTUIAndroidHost` builds for `aarch64-unknown-linux-android28` and is exercised by the `swift-tui-examples/AndroidGallery` Compose app. `x86_64` currently fails inside the vendored `swift-png` SIMD path — see [VISION-GAP.md](VISION-GAP.md). |
 | `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` (PTY embedding) | macOS and Linux only. |
 | `SwiftUIHost` | macOS only; excluded from Linux at compile time. |
 
