@@ -37,10 +37,46 @@ public struct AndroidHostTextLineStyleSnapshot: Codable, Equatable, Sendable {
   }
 }
 
+/// A single text-emphasis name in the Android frame snapshot.
+///
+/// Encodes as a bare JSON string (for example `"bold"`), so the wire format
+/// matches the Kotlin frame parser's expectations.
+public struct AndroidHostEmphasisToken: RawRepresentable, Codable, Hashable, Sendable,
+  ExpressibleByStringLiteral
+{
+  public var rawValue: String
+
+  public init(
+    rawValue: String
+  ) {
+    self.rawValue = rawValue
+  }
+
+  public init(
+    stringLiteral value: String
+  ) {
+    self.init(rawValue: value)
+  }
+
+  public init(
+    from decoder: any Decoder
+  ) throws {
+    let container = try decoder.singleValueContainer()
+    rawValue = try container.decode(String.self)
+  }
+
+  public func encode(
+    to encoder: any Encoder
+  ) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+}
+
 public struct AndroidHostTextStyleSnapshot: Codable, Equatable, Sendable {
   public var foregroundColor: AndroidHostColorSnapshot?
   public var backgroundColor: AndroidHostColorSnapshot?
-  public var emphasis: [String]
+  public var emphasis: [AndroidHostEmphasisToken]
   public var underlineStyle: AndroidHostTextLineStyleSnapshot?
   public var strikethroughStyle: AndroidHostTextLineStyleSnapshot?
   public var opacity: Double
@@ -50,7 +86,7 @@ public struct AndroidHostTextStyleSnapshot: Codable, Equatable, Sendable {
   ) {
     foregroundColor = style.foregroundColor.map(AndroidHostColorSnapshot.init)
     backgroundColor = style.backgroundColor.map(AndroidHostColorSnapshot.init)
-    emphasis = style.emphasis.debugNames
+    emphasis = style.emphasis.debugNames.map(AndroidHostEmphasisToken.init(rawValue:))
     underlineStyle = style.underlineStyle.map(AndroidHostTextLineStyleSnapshot.init)
     strikethroughStyle = style.strikethroughStyle.map(AndroidHostTextLineStyleSnapshot.init)
     opacity = style.opacity

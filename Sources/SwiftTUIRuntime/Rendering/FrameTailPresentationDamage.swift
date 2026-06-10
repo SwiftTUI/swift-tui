@@ -8,6 +8,8 @@ import SwiftTUICore
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(WASILibc)
+  import WASILibc
 #endif
 
 /// Computes a conservative private raster reuse hint for a frame tail.
@@ -245,10 +247,12 @@ enum FrameTailPresentationDamageResolver {
 
     // 1) The background's topology contribution must be byte-identical: with the
     //    overlay-presentation roles stripped, both signatures must be equal.
-    guard backgroundTopologyMatches(
-      previous: previousSurfaceTopology,
-      current: currentSurfaceTopology
-    ) else {
+    guard
+      backgroundTopologyMatches(
+        previous: previousSurfaceTopology,
+        current: currentSurfaceTopology
+      )
+    else {
       return nil
     }
 

@@ -32,7 +32,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftUIHost` | 7 | 62 |
-| `SwiftTUIAndroidHost` | 25 | 156 |
+| `SwiftTUIAndroidHost` | 26 | 162 |
 | `SwiftTUICore` | 279 | 2184 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
@@ -545,7 +545,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIAndroidHost
 
-### Canonical surface (25)
+### Canonical surface (26)
 
 - `AndroidHostAccessibilityAnnouncementSnapshot` — struct — 4 members
 - `AndroidHostAccessibilityNodeSnapshot` — struct — 12 members
@@ -553,6 +553,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `AndroidHostCellRectSnapshot` — struct — 6 members
 - `AndroidHostCellSnapshot` — struct — 9 members
 - `AndroidHostColorSnapshot` — struct — 3 members
+- `AndroidHostEmphasisToken` — struct — 5 members
 - `AndroidHostFocusPresentationSnapshot` — struct — 6 members
 - `AndroidHostFrameEncoder` — enum — 2 members
 - `AndroidHostFrameSnapshot` — struct — 20 members

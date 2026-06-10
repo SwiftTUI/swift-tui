@@ -183,6 +183,7 @@ Runs the exhaustive checked-in repo verification surface:
   - focused SwiftTUITerminal / PTY primitive tests
   - focused SwiftTUIWASI / WASISurfaceBridge tests
   - focused SwiftTUIWebHost tests
+  - focused SwiftTUIAndroidHost tests
   - focused SwiftUIHost tests on Apple platforms
   - Tools/TermUIPerf tests
 
@@ -833,6 +834,11 @@ run_function_step \
   "Run SwiftTUIWebHost tests" \
   "$(swift_command_text test --filter SwiftTUIWebHostTests)" \
   run_swift test --filter SwiftTUIWebHostTests
+
+run_function_step \
+  "Run SwiftTUIAndroidHost tests" \
+  "$(swift_command_text test --filter SwiftTUIAndroidHostTests)" \
+  run_swift test --filter SwiftTUIAndroidHostTests
 
 run_function_step \
   "Run entry-point launch tests" \

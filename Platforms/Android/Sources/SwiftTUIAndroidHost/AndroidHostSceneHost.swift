@@ -1,8 +1,9 @@
 @_spi(Runners) public import SwiftTUIRuntime
+import Synchronization
+
 #if os(Android)
   @_spi(MainActorUtilities) import _Concurrency
 #endif
-import Synchronization
 
 private struct AndroidHostSceneHostState: Sendable {
   var latestFrame: SemanticHostFrame?
@@ -14,7 +15,7 @@ private struct AndroidHostSceneHostState: Sendable {
   var lastErrorDescription: String?
 }
 
-private final class AndroidHostSceneHostStateBox: @unchecked Sendable {
+private final class AndroidHostSceneHostStateBox: Sendable {
   private let state: Mutex<AndroidHostSceneHostState>
 
   init(
@@ -98,7 +99,7 @@ public final class AndroidHostSceneHost {
   public let manifest: SceneManifest
   public let descriptor: SceneDescriptor
   public let surface: HostedRasterSurface
-  public let session: HostedSceneSession
+  @MainActor public let session: HostedSceneSession
 
   private let state: AndroidHostSceneHostStateBox
 
@@ -150,6 +151,7 @@ public final class AndroidHostSceneHost {
     )
   }
 
+  @MainActor
   private init(
     manifest: SceneManifest,
     descriptor: SceneDescriptor,
@@ -291,4 +293,4 @@ public final class AndroidHostSceneHost {
 
 }
 
-extension AndroidHostSceneHost: @unchecked Sendable {}
+extension AndroidHostSceneHost: Sendable {}
