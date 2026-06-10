@@ -74,10 +74,24 @@ package enum ReuseDenialTrace {
       line += " | invalidated: " + invalidatedIdentityPaths.sorted().joined(separator: ",")
     }
     line += "\n"
-    unsafe line.withCString { pointer in
-      _ = unsafe fputs(pointer, stderr)
-    }
+    writeToStandardError(line)
     reset()
+  }
+
+  private static func writeToStandardError(_ message: String) {
+    #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
+      var message = message
+      message.withUTF8 { buffer in
+        guard let base = buffer.baseAddress, buffer.count > 0 else {
+          return
+        }
+        _ = unsafe write(STDERR_FILENO, base, buffer.count)
+      }
+    #elseif canImport(WASILibc) || canImport(ucrt)
+      unsafe message.withCString { cMessage in
+        _ = fputs(cMessage, stderr)
+      }
+    #endif
   }
 
   private static func environmentDefault() -> Bool {
