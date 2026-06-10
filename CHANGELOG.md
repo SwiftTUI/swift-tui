@@ -8,19 +8,44 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.0.19] - 2026-06-10
+
+Lockstep release across the SwiftTUI org. Headline: a first preview of the
+host-managed Android surface.
+
 ### Added
 
+- **Android host (early preview).** A new `SwiftTUIAndroidHost` library
+  product and target under `Platforms/Android`: hosts SwiftTUI scenes behind
+  a `swift_tui_android_*` C ABI for JNI/Compose embedders, publishing
+  semantic host frames — styled cells, terminal colors,
+  underline/strikethrough decorations, image attachment records and
+  payloads, accessibility nodes and announcements, focus presentation, and
+  preferred layout size — as versioned JSON snapshots. Verified rendering
+  the gallery example on an arm64-v8a emulator. IME composition, clipboard,
+  link opening, and precise drag/scroll gestures remain follow-up work.
+- A platform-neutral `HostedSurfaceSizeNegotiator` in `SwiftTUIRuntime`,
+  shared by the SwiftUI and Android hosts for hosted-surface size
+  negotiation.
+- Ordered raster presentation layers.
+- GIF blend-behavior test coverage.
 - A complete copy-pasteable `Package.swift` example in the README.
 - README disclosure of the `#12` run-loop memory-corruption known issue.
 
 ### Changed
 
+- Broad Android compatibility across core, runtime, profiling, and terminal
+  I/O (`canImport(Android)` paths); the package cross-builds for
+  `aarch64-unknown-linux-android28` with the official Swift Android SDK.
+- Presentation sheets render with single-line full-bleed chrome.
+- `perf(termui)`: sheet-open-latency benchmark plus gated additive-overlay
+  raster reuse.
 - README: the web packages are now installed from npm
   (`npm install @swifttui/web @swifttui/build`); the GitHub-release tarball URLs
   are documented as a secondary, pin-a-release-asset option.
 - `docs/VISION-GAP.md` restored at `HEAD` (five docs link to it) and brought
   current: npm publishing and still-`Image` blend-mode precomposition are now
-  recorded as shipped; the project-status line reflects the `0.0.18` alpha.
+  recorded as shipped.
 
 ## [0.0.18] - 2026-06-07
 
