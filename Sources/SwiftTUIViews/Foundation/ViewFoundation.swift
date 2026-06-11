@@ -378,6 +378,7 @@ func resolveView<V: View>(
       resolved = committed
     } else {
       resolved.viewNodeID = graphNode.viewNodeID
+      resolved.recomputeSubtreeRuntimeNodeIDsStamped()
     }
   }
   resolved.structuralPath = context.structuralPath

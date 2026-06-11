@@ -952,6 +952,13 @@ package final class ViewGraph {
       // retained root instead of walking the whole subtree again.
       node.applyRetainedSnapshot(subtree)
     } else {
+      // Non-retained recursion: production resolve never reaches this branch
+      // (both `reusableSnapshot` returns pass `retained: true`); the only
+      // entry is `applySnapshot`, used by tests and snapshot hosting.  The
+      // runtime-ID stamping fast path relies on that reachability fact: a
+      // previously stamped tree re-applied here after descendant pruning
+      // would keep its dead stamps past the `nodeForResolvedNode` identity
+      // fallback (the debug stamp-coherence assertion trips on that case).
       let childNodes = subtree.children.map { child -> ViewNode in
         recordReusedSubtree(
           child,

@@ -61,6 +61,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("subtreeNodeCount", .derivedCache),
     ("customLayoutFallbackSummary", .derivedCache),
     ("supportsRetainedReuse", .derivedCache),
+    ("subtreeRuntimeNodeIDsStamped", .derivedCache),
     ("matchedGeometry", .placement),
     ("isTransient", .semantics),
   ]

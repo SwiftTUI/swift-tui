@@ -3,12 +3,18 @@
 /// Resolve owns the lowered tree shape, identity, environment, transaction,
 /// layout behavior, metadata, handlers, draw payloads, and authored-state
 /// snapshots that later phases consume.  Fields such as `preferenceValues`,
-/// `subtreeNodeCount`, and `supportsRetainedReuse` are derived cache inputs
+/// `subtreeNodeCount`, `supportsRetainedReuse`, and
+/// `subtreeRuntimeNodeIDsStamped` are derived cache inputs
 /// maintained beside the authoritative resolved data.  Later phase products may
 /// mirror subsets of this data, but every retained reuse path must refresh those
 /// mirrors from the current `ResolvedNode` before semantics, draw, lifecycle, or
 /// animation code observes them.
 public struct ResolvedNode: Equatable, Sendable {
+  /// Runtime graph node this value was committed for, stamped by
+  /// `ViewNode` applies.  Coupled to `subtreeRuntimeNodeIDsStamped`: writers
+  /// that stamp this field outside the `ViewNode` apply walk must call
+  /// `recomputeSubtreeRuntimeNodeIDsStamped()` afterwards or the derived
+  /// flag goes stale-false and silently disables the stamping fast path.
   package var viewNodeID: ViewNodeID?
   public var identity: Identity
   package var structuralPath: StructuralPath
@@ -47,6 +53,7 @@ public struct ResolvedNode: Equatable, Sendable {
       recomputeSubtreeNodeCount()
       recomputeCustomLayoutFallbackSummary()
       recomputeSupportsRetainedReuse()
+      recomputeSubtreeRuntimeNodeIDsStamped()
     }
   }
 
@@ -123,6 +130,19 @@ public struct ResolvedNode: Equatable, Sendable {
   package private(set) var subtreeNodeCount: Int
   package private(set) var customLayoutFallbackSummary: CustomLayoutFallbackSummary
   public var supportsRetainedReuse: Bool
+  /// Derived cache: `true` when this node and every descendant in
+  /// `_storedChildren` carry a non-nil `viewNodeID`.  `ViewNode`'s runtime-ID
+  /// stamping walk early-returns on fully stamped subtree values, which keeps
+  /// fresh-parent applies O(changed frontier) instead of re-stamping large
+  /// reused subtrees every frame.  Maintained by the inits, the public
+  /// `children` setter, and explicit `recomputeSubtreeRuntimeNodeIDsStamped()`
+  /// calls at the stamping sites; deliberately preserved (not recomputed) by
+  /// `setChildrenPreservingDerivedState(_:)`, whose animation-tick callers
+  /// substitute same-shape copies that keep their stamps.  Transient overlay
+  /// transforms may install unstamped wrappers under a preserved `true`
+  /// parent; such trees never re-enter graph applies.  Excluded from `==`
+  /// alongside `viewNodeID`.
+  package private(set) var subtreeRuntimeNodeIDsStamped: Bool
   /// Matched-geometry configuration set by
   /// `View.matchedGeometryEffect(id:in:isSource:)`.  When two
   /// views in different frames (typically behind an `if`/`else`
@@ -195,9 +215,11 @@ public struct ResolvedNode: Equatable, Sendable {
     subtreeNodeCount = 1
     customLayoutFallbackSummary = .init()
     self.supportsRetainedReuse = true
+    subtreeRuntimeNodeIDsStamped = false
     recomputeSubtreeNodeCount()
     recomputeCustomLayoutFallbackSummary()
     recomputeSupportsRetainedReuse()
+    recomputeSubtreeRuntimeNodeIDsStamped()
   }
 
   package init(
@@ -250,9 +272,11 @@ public struct ResolvedNode: Equatable, Sendable {
     subtreeNodeCount = 1
     customLayoutFallbackSummary = .init()
     self.supportsRetainedReuse = true
+    subtreeRuntimeNodeIDsStamped = false
     recomputeSubtreeNodeCount()
     recomputeCustomLayoutFallbackSummary()
     recomputeSupportsRetainedReuse()
+    recomputeSubtreeRuntimeNodeIDsStamped()
   }
 
   private mutating func recomputePreferenceValues() {
@@ -279,6 +303,16 @@ public struct ResolvedNode: Equatable, Sendable {
       structuralEdgeRole: structuralEdgeRole,
       layoutDependentContent: layoutDependentContent
     )
+  }
+
+  /// Single source of truth for the `subtreeRuntimeNodeIDsStamped` formula.
+  /// Every site that stamps `viewNodeID` outside the public `children`
+  /// setter (the `ViewNode` apply walk, retained-snapshot commits, the
+  /// nested-depth root stamp in view resolution) must call this afterwards.
+  package mutating func recomputeSubtreeRuntimeNodeIDsStamped() {
+    subtreeRuntimeNodeIDsStamped =
+      viewNodeID != nil
+      && _storedChildren.allSatisfy(\.subtreeRuntimeNodeIDsStamped)
   }
 
   private static func combinedPreferenceValues(

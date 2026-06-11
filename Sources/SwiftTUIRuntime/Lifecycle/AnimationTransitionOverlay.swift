@@ -116,6 +116,12 @@ enum AnimationTransitionOverlay {
       )
 
     default:
+      // The freshly built wrapper is unstamped, and the ancestor install at
+      // the top of this function preserves derived state — so an overlay
+      // subtree can carry `subtreeRuntimeNodeIDsStamped == true` parents
+      // above this unstamped node.  That is tolerated because overlay trees
+      // feed the frame tail only and never re-enter graph applies; do not
+      // route an overlay-derived tree back into `ViewNode.apply`.
       let wrapperIdentity = Identity(
         components: node.identity.components + ["__transitionOffset"]
       )

@@ -430,6 +430,7 @@ package final class ViewNode {
   ) {
     var snapshot = snapshot
     snapshot.viewNodeID = viewNodeID
+    snapshot.recomputeSubtreeRuntimeNodeIDsStamped()
     committed = snapshot
     isCommittedSnapshotFresh = true
     invalidateAncestorCachedSnapshots()
@@ -475,6 +476,20 @@ package final class ViewNode {
     _ resolved: ResolvedNode,
     children: [ViewNode]
   ) -> ResolvedNode {
+    // Fast path: a subtree value whose stamps are already complete and whose
+    // root carries this node's ID was produced from committed snapshots
+    // (retained reuse hands back `node.snapshot()`, child evaluations return
+    // their freshly committed roots), so every descendant stamp is already
+    // the one this walk would write.  Skipping the recursion keeps a fresh
+    // ancestor's apply O(direct children) instead of O(subtree) struct
+    // copies over large reused regions.  The one seam where a stale interior
+    // could hide under a matching root is the known divergent-resolvedIdentity
+    // capture-host orphaning bug (reuse-host guard work tracks it); the debug
+    // assertion below trips loudly if any such value reaches a skip.
+    if resolved.subtreeRuntimeNodeIDsStamped, resolved.viewNodeID == viewNodeID {
+      assertResolvedStampsCoherent(resolved, children: children)
+      return resolved
+    }
     var resolved = resolved
     resolved.viewNodeID = viewNodeID
     if resolved.children.count == children.count {
@@ -486,7 +501,38 @@ package final class ViewNode {
       }
       resolved.setChildrenPreservingDerivedState(stampedChildren)
     }
+    // Unconditional: Group splices and passthrough bodies legitimately leave
+    // the count guard unmet while the spliced children already carry their
+    // own committed stamps — the recompute (not the recursion) is what marks
+    // those subtrees complete.
+    resolved.recomputeSubtreeRuntimeNodeIDsStamped()
     return resolved
+  }
+
+  /// Debug-only coherence check for the stamping fast path: every value
+  /// stamp in the skipped subtree must equal the positionally paired live
+  /// node's ID wherever the pairing is defined (count-aligned levels), i.e.
+  /// exactly what the full walk would have written.
+  private func assertResolvedStampsCoherent(
+    _ resolved: ResolvedNode,
+    children: [ViewNode]
+  ) {
+    #if DEBUG
+      assert(
+        resolved.viewNodeID == viewNodeID,
+        "stamp skip: value stamp \(String(describing: resolved.viewNodeID)) "
+          + "diverges from live node \(viewNodeID) at \(identity)"
+      )
+      guard resolved.children.count == children.count else {
+        return
+      }
+      for (childResolved, childNode) in zip(resolved.children, children) {
+        childNode.assertResolvedStampsCoherent(
+          childResolved,
+          children: childNode.children
+        )
+      }
+    #endif
   }
 
   package func canReuse(
