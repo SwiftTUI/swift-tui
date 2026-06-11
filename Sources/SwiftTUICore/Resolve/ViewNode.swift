@@ -425,6 +425,16 @@ package final class ViewNode {
     invalidateAncestorCachedSnapshots()
   }
 
+  package func applyRetainedSnapshot(
+    _ snapshot: ResolvedNode
+  ) {
+    var snapshot = snapshot
+    snapshot.viewNodeID = viewNodeID
+    committed = snapshot
+    isCommittedSnapshotFresh = true
+    invalidateAncestorCachedSnapshots()
+  }
+
   private func refreshChildResolvedMetadata(
     from resolvedChildren: [ResolvedNode],
     children: [ViewNode]

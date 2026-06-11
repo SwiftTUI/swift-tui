@@ -947,13 +947,10 @@ package final class ViewGraph {
       // (`hasCommittedPresence`) and liveness (`liveIdentities`) both persist
       // across `beginFrame` — so we skip the O(subtree) descendant recursion and
       // refresh only this root. The root's children are unchanged, so
-      // `ViewNode.apply` takes its same-children fast path; the structural diff is
-      // a no-op (no structural intersection) and is skipped with the recursion.
-      applyResolvedNode(
-        node,
-        resolved: subtree,
-        children: node.children
-      )
+      // A retained snapshot already carries the unchanged descendants' runtime
+      // node IDs. Commit it directly so runtime-ID stamping stays O(1) at the
+      // retained root instead of walking the whole subtree again.
+      node.applyRetainedSnapshot(subtree)
     } else {
       let childNodes = subtree.children.map { child -> ViewNode in
         recordReusedSubtree(
