@@ -21,7 +21,11 @@ public import SwiftTUICore
 /// as a preference exactly as the background did before, so nothing downstream
 /// of the portal changes.
 struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
-  let isPresented: Binding<Bool>
+  /// Reads the presentation's activation state (`isPresented.wrappedValue`,
+  /// `item.wrappedValue != nil`, tip eligibility + dismissal `@State`, …).
+  /// Invoked only inside this leaf's resolve so every `@State`/binding read it
+  /// performs is reader-attributed to the leaf.
+  let isActive: @MainActor () -> Bool
   let makeDeclaration: @MainActor () -> PresentationCoordinatorDeclarationPreferenceValue
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -35,9 +39,9 @@ struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
     // The crux of Lever B: this read executes inside the trigger leaf's
     // ViewNodeContext, so reader-attributed `@State` tracking records the
     // dependency on THIS leaf rather than the binding's slot owner (an ancestor
-    // of the background). Toggling `isPresented` then dirties only this leaf,
-    // leaving the disjoint-sibling background reusable.
-    if isPresented.wrappedValue {
+    // of the background). Toggling the presentation state then dirties only
+    // this leaf, leaving the disjoint-sibling background reusable.
+    if isActive() {
       node.preferenceValues.merge(
         PresentationCoordinatorDeclarationPreferenceKey.self,
         value: makeDeclaration()
@@ -50,20 +54,22 @@ struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
 /// Shared resolve path for the builtin presentation modifiers, gated on
 /// reader-attribution.
 ///
-/// - When ``ReaderAttributionConfiguration/isEnabled`` is **off** (default),
-///   this is byte-identical to the pre-Lever-B behavior: resolve the background
-///   at `context.identity`, read `isPresented` there, and merge the declaration
-///   onto it.
-/// - When **on**, resolve the background at a `base` child so a zero-size
-///   ``PresentationTriggerLeaf`` sibling can own the `isPresented` read. A
-///   wrapper pins `context.identity` and parents `[background, trigger]` as
-///   disjoint siblings, so toggling `isPresented` spares the background.
+/// - When ``ReaderAttributionConfiguration/isEnabled`` is **off** (opt-out via
+///   `SWIFTTUI_READER_ATTRIBUTION=0`; the flag is on by default), this is
+///   byte-identical to the pre-Lever-B behavior: resolve the background at
+///   `context.identity`, read the activation state there, and merge the
+///   declaration onto it.
+/// - When **on** (default), resolve the background at a `base` child so a
+///   zero-size ``PresentationTriggerLeaf`` sibling can own the activation
+///   read. A wrapper pins `context.identity` and parents
+///   `[background, trigger]` as disjoint siblings, so toggling the
+///   presentation state spares the background.
 ///
 /// `prepareBackground` runs on the resolved background in both paths (e.g. the
 /// palette sheet absorbs and clears `PaletteCommandsPreferenceKey`). The
 /// `declaration` closure builds the coordinator declaration lazily from the
 /// resolved background; in the reader-attributed path it is invoked only when
-/// the trigger leaf observes `isPresented == true`, preserving the original
+/// the trigger leaf observes an active presentation, preserving the original
 /// "build the presentation item only while presented" laziness.
 @MainActor
 func resolvePresentationModifier<Base: View>(
@@ -71,13 +77,38 @@ func resolvePresentationModifier<Base: View>(
   isPresented: Binding<Bool>,
   in context: ResolveContext,
   prepareBackground: (inout ResolvedNode) -> Void = { _ in },
-  declaration: @escaping @MainActor (_ background: ResolvedNode) ->
+  declaration:
+    @escaping @MainActor (_ background: ResolvedNode) ->
+    PresentationCoordinatorDeclarationPreferenceValue
+) -> [ResolvedNode] {
+  resolvePresentationModifier(
+    content: content,
+    isActive: { isPresented.wrappedValue },
+    in: context,
+    prepareBackground: prepareBackground,
+    declaration: declaration
+  )
+}
+
+/// Generalized core of ``resolvePresentationModifier(content:isPresented:in:prepareBackground:declaration:)``
+/// for presentations whose activation state is not a plain `Binding<Bool>`
+/// (item bindings, tip eligibility + dismissal `@State`). `isActive` is read
+/// inside the trigger leaf's resolve so all of its `@State`/binding reads are
+/// reader-attributed to the leaf.
+@MainActor
+func resolvePresentationModifier<Base: View>(
+  content: ModifierContentInputs<Base>,
+  isActive: @escaping @MainActor () -> Bool,
+  in context: ResolveContext,
+  prepareBackground: (inout ResolvedNode) -> Void = { _ in },
+  declaration:
+    @escaping @MainActor (_ background: ResolvedNode) ->
     PresentationCoordinatorDeclarationPreferenceValue
 ) -> [ResolvedNode] {
   guard ReaderAttributionConfiguration.isEnabled else {
     var node = content.resolve(in: context)
     prepareBackground(&node)
-    guard isPresented.wrappedValue else {
+    guard isActive() else {
       return [node]
     }
     node.preferenceValues.merge(
@@ -90,7 +121,7 @@ func resolvePresentationModifier<Base: View>(
   var background = content.resolve(in: context.child(component: .named("base")))
   prepareBackground(&background)
   let resolvedBackground = background
-  let trigger = PresentationTriggerLeaf(isPresented: isPresented) {
+  let trigger = PresentationTriggerLeaf(isActive: isActive) {
     declaration(resolvedBackground)
   }
   let triggerNode = resolveView(

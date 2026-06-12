@@ -76,39 +76,43 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    guard isPresented.wrappedValue else {
-      return [node]
-    }
-
-    let sourceIdentity = node.identity
+    // Lever B for popovers: the `isPresented` read moves into the trigger
+    // leaf so toggling spares the disjoint-sibling background. See
+    // ``resolvePresentationModifier``.
+    let isPresented = isPresented
+    let attachmentAnchor = attachmentAnchor
+    let arrowEdge = arrowEdge
+    let popoverContent = popoverContent
+    let popoverContentAuthoringContext = popoverContentAuthoringContext
+    let dismissAuthoringContext = dismissAuthoringContext
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let portalEntryID = presentationAttachment(for: node, token: "popover")
-    let itemID = portalEntryID.description
-    let item = popoverPresentationItem(
-      id: itemID,
-      portalEntryID: portalEntryID,
-      sourceIdentity: sourceIdentity,
-      attachmentAnchor: attachmentAnchor,
-      arrowEdge: arrowEdge,
-      modalPolicy: .disablesBaseInteraction,
-      contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
-        portalDeclaredBuilderChildren(from: popoverContent)
-      },
-      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-        withAuthoringContext(dismissAuthoringContext) {
-          isPresented.wrappedValue = false
+    return resolvePresentationModifier(
+      content: content,
+      isPresented: isPresented,
+      in: context
+    ) { background in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(for: background, token: "popover")
+      let itemID = portalEntryID.description
+      let item = popoverPresentationItem(
+        id: itemID,
+        portalEntryID: portalEntryID,
+        sourceIdentity: sourceIdentity,
+        attachmentAnchor: attachmentAnchor,
+        arrowEdge: arrowEdge,
+        modalPolicy: .disablesBaseInteraction,
+        contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
+          portalDeclaredBuilderChildren(from: popoverContent)
+        },
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            isPresented.wrappedValue = false
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
         }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-      }
-    )
-
-    mergePopoverDeclaration(
-      item,
-      sourceIdentity: sourceIdentity,
-      into: &node
-    )
-    return [node]
+      )
+      return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
+    }
   }
 }
 
@@ -127,42 +131,50 @@ package struct BuiltinItemPopoverPresentationModifier<
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    guard let currentItem = item.wrappedValue else {
-      return [node]
-    }
-
-    let sourceIdentity = node.identity
+    // Lever B for item popovers: the `item` read moves into the trigger leaf
+    // so setting/clearing the item spares the disjoint-sibling background.
+    let itemBinding = item
+    let attachmentAnchor = attachmentAnchor
+    let arrowEdge = arrowEdge
+    let popoverContent = popoverContent
+    let popoverContentAuthoringContext = popoverContentAuthoringContext
+    let dismissAuthoringContext = dismissAuthoringContext
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let portalEntryID = presentationAttachment(
-      for: node,
-      token: "popover:\(String(reflecting: currentItem.id))"
-    )
-    let itemID = portalEntryID.description
-    let item = popoverPresentationItem(
-      id: itemID,
-      portalEntryID: portalEntryID,
-      sourceIdentity: sourceIdentity,
-      attachmentAnchor: attachmentAnchor,
-      arrowEdge: arrowEdge,
-      modalPolicy: .disablesBaseInteraction,
-      contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
-        portalDeclaredBuilderChildren(from: popoverContent(currentItem))
-      },
-      dismiss: { [item, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-        withAuthoringContext(dismissAuthoringContext) {
-          item.wrappedValue = nil
-        }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+    return resolvePresentationModifier(
+      content: content,
+      isActive: { itemBinding.wrappedValue != nil },
+      in: context
+    ) { background in
+      // Re-read inside the leaf's resolve: same call stack as the `isActive`
+      // check, and the read stays attributed to the leaf.
+      guard let currentItem = itemBinding.wrappedValue else {
+        return .init(declarations: [])
       }
-    )
-
-    mergePopoverDeclaration(
-      item,
-      sourceIdentity: sourceIdentity,
-      into: &node
-    )
-    return [node]
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(
+        for: background,
+        token: "popover:\(String(reflecting: currentItem.id))"
+      )
+      let itemID = portalEntryID.description
+      let item = popoverPresentationItem(
+        id: itemID,
+        portalEntryID: portalEntryID,
+        sourceIdentity: sourceIdentity,
+        attachmentAnchor: attachmentAnchor,
+        arrowEdge: arrowEdge,
+        modalPolicy: .disablesBaseInteraction,
+        contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
+          portalDeclaredBuilderChildren(from: popoverContent(currentItem))
+        },
+        dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            itemBinding.wrappedValue = nil
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+        }
+      )
+      return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
+    }
   }
 }
 
@@ -181,74 +193,80 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
+    // Lever B for tips: only the hot `isPresented` binding read moves into
+    // the trigger leaf. Tip eligibility and the one-shot dismissal `@State`
+    // stay read here (moving a `@State` read to the leaf would rebind its
+    // slot; dismissal is rare, so one background re-resolve on dismiss
+    // matches the previous behavior).
     guard let tip, tip.isEligible else {
-      return [node]
+      return [content.resolve(in: context)]
     }
 
     let tipID = String(reflecting: tip.id)
     if isPresented == nil, dismissedTipID == tipID {
-      return [node]
-    }
-    if let isPresented, !isPresented.wrappedValue {
-      return [node]
+      return [content.resolve(in: context)]
     }
 
-    let sourceIdentity = node.identity
-    let dismissInvalidator = context.invalidationProxy?.invalidator
-    let dismissedTipID = $dismissedTipID
+    let isPresented = isPresented
+    let attachmentAnchor = attachmentAnchor
+    let arrowEdge = arrowEdge
+    let action = action
     let actionAuthoringContext = actionAuthoringContext
-    let portalEntryID = presentationAttachment(
-      for: node,
-      token: "popoverTip:\(tipID)"
-    )
-    let itemID = portalEntryID.description
-    let dismiss: @MainActor @Sendable () -> Void = {
-      [
-        isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity, dismissedTipID,
-        tipID
-      ] in
-      withAuthoringContext(dismissAuthoringContext) {
-        if let isPresented {
-          isPresented.wrappedValue = false
-        } else {
-          dismissedTipID.wrappedValue = tipID
+    let dismissAuthoringContext = dismissAuthoringContext
+    let dismissedTipID = $dismissedTipID
+    let dismissInvalidator = context.invalidationProxy?.invalidator
+    return resolvePresentationModifier(
+      content: content,
+      isActive: { isPresented?.wrappedValue ?? true },
+      in: context
+    ) { background in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(
+        for: background,
+        token: "popoverTip:\(tipID)"
+      )
+      let itemID = portalEntryID.description
+      let dismiss: @MainActor @Sendable () -> Void = {
+        [
+          isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity,
+          dismissedTipID, tipID
+        ] in
+        withAuthoringContext(dismissAuthoringContext) {
+          if let isPresented {
+            isPresented.wrappedValue = false
+          } else {
+            dismissedTipID.wrappedValue = tipID
+          }
+        }
+        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+      }
+      let performAction: @MainActor @Sendable (PopoverTipAction) -> Void = { tipAction in
+        withAuthoringContext(actionAuthoringContext) {
+          action(tipAction)
         }
       }
-      dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+      let tipActions = tip.actions
+      let item = popoverPresentationItem(
+        id: itemID,
+        portalEntryID: portalEntryID,
+        sourceIdentity: sourceIdentity,
+        attachmentAnchor: attachmentAnchor,
+        arrowEdge: arrowEdge,
+        modalPolicy: tipActions.isEmpty ? .nonModal : .disablesBaseInteraction,
+        contentPayloads: portalDeclaredBuilderChildren(
+          from: PopoverTipContent(
+            title: tip.title,
+            message: tip.message,
+            icon: tip.icon,
+            actions: tipActions,
+            action: performAction,
+            dismiss: dismiss
+          )
+        ),
+        dismiss: dismiss
+      )
+      return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
     }
-    let performAction: @MainActor @Sendable (PopoverTipAction) -> Void = { tipAction in
-      withAuthoringContext(actionAuthoringContext) {
-        action(tipAction)
-      }
-    }
-    let tipActions = tip.actions
-    let item = popoverPresentationItem(
-      id: itemID,
-      portalEntryID: portalEntryID,
-      sourceIdentity: sourceIdentity,
-      attachmentAnchor: attachmentAnchor,
-      arrowEdge: arrowEdge,
-      modalPolicy: tipActions.isEmpty ? .nonModal : .disablesBaseInteraction,
-      contentPayloads: portalDeclaredBuilderChildren(
-        from: PopoverTipContent(
-          title: tip.title,
-          message: tip.message,
-          icon: tip.icon,
-          actions: tipActions,
-          action: performAction,
-          dismiss: dismiss
-        )
-      ),
-      dismiss: dismiss
-    )
-
-    mergePopoverDeclaration(
-      item,
-      sourceIdentity: sourceIdentity,
-      into: &node
-    )
-    return [node]
   }
 }
 
@@ -423,23 +441,19 @@ private func popoverPromptPresentationDescriptor(
 }
 
 @MainActor
-private func mergePopoverDeclaration(
+private func popoverDeclarationValue(
   _ item: PopoverPresentationItem,
-  sourceIdentity: Identity,
-  into node: inout ResolvedNode
-) {
-  node.preferenceValues.merge(
-    PresentationCoordinatorDeclarationPreferenceKey.self,
-    value: .init(
-      declarations: [
-        .init(sourceIdentity: sourceIdentity) { registry in
-          registry.popover.sync(
-            sourceIdentity: sourceIdentity,
-            items: [item]
-          )
-        }
-      ]
-    )
+  sourceIdentity: Identity
+) -> PresentationCoordinatorDeclarationPreferenceValue {
+  .init(
+    declarations: [
+      .init(sourceIdentity: sourceIdentity) { registry in
+        registry.popover.sync(
+          sourceIdentity: sourceIdentity,
+          items: [item]
+        )
+      }
+    ]
   )
 }
 

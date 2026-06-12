@@ -162,6 +162,102 @@ struct PresentationTriggerSplitTests {
       #expect(artifacts.resolvedTree.descendant(withText: "Sheet body") != nil)
     }
   }
+
+  // MARK: - Popover trigger split (the same Lever B pattern, popover modifiers)
+
+  @Test("popover: the trigger leaf is a disjoint sibling of the background")
+  func popoverTriggerLeafIsDisjointSiblingOfBackground() throws {
+    try withReaderAttribution(true) {
+      let renderer = DefaultRenderer()
+      let artifacts = renderer.render(
+        popoverTriggerRoot(isPresented: true),
+        context: .init(identity: testIdentity("Root")),
+        proposal: triggerProposal
+      )
+
+      let backgroundIdentity = try #require(
+        artifacts.resolvedTree.descendant(withText: "Base probe")?.identity
+      )
+      let triggerIdentity = try #require(
+        artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger"))?.identity
+      )
+
+      #expect(triggerIdentity != backgroundIdentity)
+      #expect(!triggerIdentity.isDescendant(of: backgroundIdentity))
+      #expect(!backgroundIdentity.isDescendant(of: triggerIdentity))
+      #expect(artifacts.resolvedTree.descendant(withText: "Popover body") != nil)
+    }
+  }
+
+  @Test("popover: invalidating only the trigger leaf spares the background")
+  func popoverInvalidatingTriggerSparesBackground() throws {
+    try withReaderAttribution(true) {
+      let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+      let rootIdentity = testIdentity("PopoverReuseRoot")
+
+      let closed = renderer.render(
+        popoverReuseProbe(isPresented: false),
+        context: .init(identity: rootIdentity),
+        proposal: triggerProposal
+      )
+      let triggerIdentity = try #require(
+        closed.resolvedTree.firstNode(ofKind: .view("__presentationTrigger"))?.identity
+      )
+
+      let opened = renderer.render(
+        popoverReuseProbe(isPresented: true),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [triggerIdentity]
+        ),
+        proposal: triggerProposal
+      )
+      #expect(opened.diagnostics.work.resolvedNodesReused > 0)
+      let rendered = opened.rasterSurface.lines.joined(separator: "\n")
+      #expect(rendered.contains("BG row 0"))
+      #expect(opened.resolvedTree.descendant(withText: "Popover body") != nil)
+    }
+  }
+
+  @Test("item popover: the trigger leaf owns the item read and the overlay presents")
+  func itemPopoverTriggerLeafPresentsOverlay() throws {
+    try withReaderAttribution(true) {
+      let renderer = DefaultRenderer()
+      let artifacts = renderer.render(
+        itemPopoverTriggerRoot(item: PopoverProbeItem(id: "alpha")),
+        context: .init(identity: testIdentity("Root")),
+        proposal: triggerProposal
+      )
+
+      #expect(
+        artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger")) != nil
+      )
+      #expect(artifacts.resolvedTree.descendant(withText: "Item alpha") != nil)
+
+      let dismissed = renderer.render(
+        itemPopoverTriggerRoot(item: nil),
+        context: .init(identity: testIdentity("Root")),
+        proposal: triggerProposal
+      )
+      #expect(dismissed.resolvedTree.descendant(withText: "Item alpha") == nil)
+    }
+  }
+
+  @Test("popover flag off: no trigger leaf, legacy structure presents")
+  func popoverFlagOffKeepsLegacyStructure() throws {
+    try withReaderAttribution(false) {
+      let renderer = DefaultRenderer()
+      let artifacts = renderer.render(
+        popoverTriggerRoot(isPresented: true),
+        context: .init(identity: testIdentity("Root")),
+        proposal: triggerProposal
+      )
+
+      #expect(artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger")) == nil)
+      #expect(artifacts.resolvedTree.descendant(withText: "Base probe") != nil)
+      #expect(artifacts.resolvedTree.descendant(withText: "Popover body") != nil)
+    }
+  }
 }
 
 private let triggerProposal = ProposedSize(width: .finite(40), height: .finite(10))
@@ -194,6 +290,47 @@ private func reuseProbe(
     isPresented: .constant(isPresented)
   ) {
     Text("Sheet body")
+  }
+  .frame(width: 40, height: 10, alignment: .topLeading)
+}
+
+@MainActor
+private func popoverTriggerRoot(
+  isPresented: Bool
+) -> some View {
+  Text("Base probe")
+    .popover(isPresented: .constant(isPresented)) {
+      Text("Popover body")
+    }
+    .frame(width: 40, height: 10, alignment: .topLeading)
+}
+
+private struct PopoverProbeItem: Identifiable, Sendable {
+  let id: String
+}
+
+@MainActor
+private func itemPopoverTriggerRoot(
+  item: PopoverProbeItem?
+) -> some View {
+  Text("Base probe")
+    .popover(item: .constant(item)) { item in
+      Text("Item \(item.id)")
+    }
+    .frame(width: 40, height: 10, alignment: .topLeading)
+}
+
+@MainActor
+private func popoverReuseProbe(
+  isPresented: Bool
+) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    ForEach(Array(0..<6), id: \.self) { row in
+      Text("BG row \(row)")
+    }
+  }
+  .popover(isPresented: .constant(isPresented)) {
+    Text("Popover body")
   }
   .frame(width: 40, height: 10, alignment: .topLeading)
 }
