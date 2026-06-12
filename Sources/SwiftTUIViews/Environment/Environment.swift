@@ -49,6 +49,13 @@ public struct EnvironmentValues: Equatable, Sendable {
   private var snapshotValues: [String: String]
   package var _focusedIdentity: Identity?
   package var _pressedIdentity: Identity?
+  /// Side-field like `_focusedIdentity`: the per-node focus-cone bake
+  /// (`ResolveContext.contextualEnvironmentValues`) must not enter the
+  /// reuse-compared snapshot, or every focus move env-mismatches the whole
+  /// divergent ancestor cone and recomputes disjoint subtrees. Readers are
+  /// invalidated through the `FocusedIdentityKey` runtime focus dependency
+  /// instead (`runtimeFocusStateDependencyKey(for:)`).
+  package var _isFocused: Bool
 
   /// Creates an empty environment container.
   public init() {
@@ -56,6 +63,7 @@ public struct EnvironmentValues: Equatable, Sendable {
     snapshotValues = [:]
     _focusedIdentity = nil
     _pressedIdentity = nil
+    _isFocused = false
   }
 
   public subscript<K: EnvironmentKey>(key: K.Type) -> K.Value {

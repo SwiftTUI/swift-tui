@@ -72,10 +72,6 @@ private enum PressedIdentityKey: EnvironmentKey {
   static let defaultValue: Identity? = nil
 }
 
-private enum IsFocusedKey: EnvironmentKey {
-  static let defaultValue = false
-}
-
 private enum IsFocusEffectEnabledKey: EnvironmentKey {
   static let defaultValue = true
 }
@@ -104,6 +100,11 @@ extension EnvironmentValues {
     }
     if keyPath == \EnvironmentValues.pressedIdentity {
       return ObjectIdentifier(PressedIdentityKey.self)
+    }
+    if keyPath == \EnvironmentValues.isFocused {
+      // `isFocused` is derived from `focusedIdentity` (the per-node cone
+      // bake), so readers share its runtime focus dependency.
+      return ObjectIdentifier(FocusedIdentityKey.self)
     }
     return nil
   }
@@ -193,8 +194,8 @@ extension EnvironmentValues {
   }
 
   public var isFocused: Bool {
-    get { self[IsFocusedKey.self] }
-    set { self[IsFocusedKey.self] = newValue }
+    get { _isFocused }
+    set { _isFocused = newValue }
   }
 
   public var isFocusEffectEnabled: Bool {

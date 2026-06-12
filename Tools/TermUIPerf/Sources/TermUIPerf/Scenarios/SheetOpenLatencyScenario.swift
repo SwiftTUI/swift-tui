@@ -44,6 +44,7 @@ public struct SheetOpenLatencyScenario: PerfScenario {
     let rowCount = Self.resolvedRowCount()
     let overlayKind = Self.resolvedOverlayKind()
     let spike = Self.resolvedSpikeMode()
+    let siblingTrigger = Self.resolvedSiblingTriggerMode()
     return try await PerfScenarioRunner.runWindow(
       scenario: self,
       options: options
@@ -52,7 +53,8 @@ public struct SheetOpenLatencyScenario: PerfScenario {
         rowCount: rowCount,
         columnCount: Self.columnCount,
         overlayKind: overlayKind,
-        spike: spike
+        spike: spike,
+        siblingTrigger: siblingTrigger
       )
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "open sheet")
@@ -148,6 +150,19 @@ public struct SheetOpenLatencyScenario: PerfScenario {
     guard let raw = environmentValue("TERMUI_PERF_SHEET_SPIKE") else { return false }
     return !raw.isEmpty && raw != "0"
   }
+
+  // De-amplified calibration knob (TERMUI_PERF_SHEET_TRIGGER=sibling): keep the
+  // REAL `.sheet`/`.paletteSheet` presentation (unlike the SPIKE knob, which
+  // bypasses it), but host the open-sheet trigger in a container that is a
+  // SIBLING of the background grid instead of co-located inside it. The
+  // co-located default puts the grid's container on the focus cone's divergent
+  // chain during settle-frame focus moves, amplifying the settle residual;
+  // real apps usually keep triggers in chrome outside the content pane. A/B of
+  // default vs sibling calibrates how much of the settle-frame recompute is
+  // scenario amplification vs real-world cost.
+  private static func resolvedSiblingTriggerMode() -> Bool {
+    environmentValue("TERMUI_PERF_SHEET_TRIGGER") == "sibling"
+  }
 }
 
 enum OverlayKind: Sendable {
@@ -160,6 +175,7 @@ private struct PerfSheetLatencyProbeView: View {
   let columnCount: Int
   let overlayKind: OverlayKind
   var spike: Bool = false
+  var siblingTrigger: Bool = false
   @State private var sheetPresented = false
 
   var body: some View {
@@ -191,23 +207,48 @@ private struct PerfSheetLatencyProbeView: View {
     }
   }
 
+  @ViewBuilder
   private var background: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Button("open sheet") {
-        sheetPresented = true
-      }
-      // Large, static background. It is disjoint from the overlay's `@State`, so
-      // it is reuse-eligible through resolve/measure/place and should NOT need a
-      // re-raster when the overlay opens over it.
-      ForEach(Array(0..<rowCount), id: \.self) { row in
-        HStack(spacing: 1) {
-          ForEach(Array(0..<columnCount), id: \.self) { column in
-            Text("bg r\(row) c\(column)")
+    if siblingTrigger {
+      // De-amplified shape: the trigger lives in its own container, a sibling
+      // of the grid container, so settle-frame focus moves between the sheet
+      // and the trigger keep the grid container off the focus cone's
+      // divergent chain.
+      VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("open sheet") {
+            sheetPresented = true
+          }
+        }
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(Array(0..<rowCount), id: \.self) { row in
+            HStack(spacing: 1) {
+              ForEach(Array(0..<columnCount), id: \.self) { column in
+                Text("bg r\(row) c\(column)")
+              }
+            }
           }
         }
       }
+      .padding(1)
+    } else {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("open sheet") {
+          sheetPresented = true
+        }
+        // Large, static background. It is disjoint from the overlay's `@State`, so
+        // it is reuse-eligible through resolve/measure/place and should NOT need a
+        // re-raster when the overlay opens over it.
+        ForEach(Array(0..<rowCount), id: \.self) { row in
+          HStack(spacing: 1) {
+            ForEach(Array(0..<columnCount), id: \.self) { column in
+              Text("bg r\(row) c\(column)")
+            }
+          }
+        }
+      }
+      .padding(1)
     }
-    .padding(1)
   }
 
   private var overlayContent: some View {
