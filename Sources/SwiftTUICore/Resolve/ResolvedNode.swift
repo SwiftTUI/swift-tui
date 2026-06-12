@@ -315,6 +315,16 @@ public struct ResolvedNode: Equatable, Sendable {
       && _storedChildren.allSatisfy(\.subtreeRuntimeNodeIDsStamped)
   }
 
+  /// Withdraws the subtree-completeness claim without touching the stamps
+  /// themselves.  The stamping walk calls this when it cannot pair this
+  /// value's children with the live node's children (count-mismatched Group
+  /// splices, capture-host injections): the child stamps may belong to other
+  /// live nodes, so the value must stay on the slow restamping path instead
+  /// of qualifying ancestors for the fast skip.
+  package mutating func markSubtreeRuntimeNodeIDsUnstamped() {
+    subtreeRuntimeNodeIDsStamped = false
+  }
+
   private static func combinedPreferenceValues(
     for children: [ResolvedNode]
   ) -> PreferenceValues {

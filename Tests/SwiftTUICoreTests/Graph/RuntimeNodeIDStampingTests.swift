@@ -141,13 +141,17 @@ struct RuntimeNodeIDStampingTests {
     expectStampsEqual(first, second)
   }
 
-  @Test("count-mismatched apply still recomputes the stamped flag")
-  func countMismatchedApplyRecomputesStampedFlag() throws {
+  @Test("count-mismatched apply does not claim the stamped flag")
+  func countMismatchedApplyRefusesStampedFlag() throws {
     // Group splices and passthrough bodies legitimately hand a parent a
     // resolved child whose own children do not align 1:1 with the child
-    // node's live children. The stamping walk cannot descend there, but the
-    // spliced grandchildren already carry their own committed stamps, so the
-    // unconditional tail recompute must still mark the subtree stamped.
+    // node's live children. The stamping walk cannot descend there, so it
+    // cannot verify that the spliced stamps were written against this live
+    // subtree — capture-host splices (the toolbar reconcile) inject children
+    // stamped by *other* live nodes. Claiming subtree completeness here let
+    // later applies fast-path over those foreign stamps (the gallery
+    // tab-switch stamp-coherence crash), so the walk must refuse the flag
+    // and leave the subtree to the slow restamping path.
     let graph = ViewGraph()
     _ = graph.applySnapshot(
       ResolvedNode(
@@ -184,7 +188,7 @@ struct RuntimeNodeIDStampingTests {
     )
 
     let reapplied = rootNodeUnwrapped.snapshot()
-    #expect(reapplied.subtreeRuntimeNodeIDsStamped)
+    #expect(reapplied.subtreeRuntimeNodeIDsStamped == false)
     #expect(reapplied.viewNodeID == rootNodeUnwrapped.viewNodeID)
     #expect(reapplied.children[0].viewNodeID == branchNodeUnwrapped.viewNodeID)
     #expect(reapplied.children[0].children[0].viewNodeID == ViewNodeID(rawValue: 99))

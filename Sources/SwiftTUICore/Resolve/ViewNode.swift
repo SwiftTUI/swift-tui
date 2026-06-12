@@ -511,10 +511,13 @@ package final class ViewNode {
     // their freshly committed roots), so every descendant stamp is already
     // the one this walk would write.  Skipping the recursion keeps a fresh
     // ancestor's apply O(direct children) instead of O(subtree) struct
-    // copies over large reused regions.  The one seam where a stale interior
-    // could hide under a matching root is the known divergent-resolvedIdentity
-    // capture-host orphaning bug (reuse-host guard work tracks it); the debug
-    // assertion below trips loudly if any such value reaches a skip.
+    // copies over large reused regions.  The flag is trustworthy because the
+    // count-guard-unmet branch below withdraws it whenever child stamps were
+    // spliced in unverified (Group splices, capture-host injections).  The
+    // remaining seam where a stale interior could hide under a matching root
+    // is the known divergent-resolvedIdentity capture-host orphaning bug
+    // (reuse-host guard work tracks it); the debug assertion below trips
+    // loudly if any such value reaches a skip.
     if resolved.subtreeRuntimeNodeIDsStamped, resolved.viewNodeID == viewNodeID {
       assertResolvedStampsCoherent(resolved, children: children)
       return resolved
@@ -529,12 +532,17 @@ package final class ViewNode {
         )
       }
       resolved.setChildrenPreservingDerivedState(stampedChildren)
+      resolved.recomputeSubtreeRuntimeNodeIDsStamped()
+    } else {
+      // Count guard unmet (Group splices, passthrough bodies, capture-host
+      // injections like the toolbar reconcile): the walk could not pair this
+      // value's children with this node's live children, so the child stamps
+      // are unverified and may belong to other live nodes.  Claiming subtree
+      // completeness here let a later apply fast-path over foreign stamps
+      // (the gallery tab-switch stamp-coherence crash), so withdraw the
+      // claim and leave this subtree to the slow restamping path.
+      resolved.markSubtreeRuntimeNodeIDsUnstamped()
     }
-    // Unconditional: Group splices and passthrough bodies legitimately leave
-    // the count guard unmet while the spliced children already carry their
-    // own committed stamps — the recompute (not the recursion) is what marks
-    // those subtrees complete.
-    resolved.recomputeSubtreeRuntimeNodeIDsStamped()
     return resolved
   }
 
