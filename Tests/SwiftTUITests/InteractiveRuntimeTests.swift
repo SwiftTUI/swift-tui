@@ -2653,6 +2653,81 @@ struct InteractiveRuntimeTests {
     )
   }
 
+  /// Island-staleness must feed reuse denial only, never the snapshot
+  /// rebuild: a regression here makes every animation tick rebuild the
+  /// committed tree from live children, which cannot span capture seams —
+  /// the pane truncates out of the frame (visible erasure) and its semantic
+  /// scroll routes flicker away, silently dropping scroll input.
+  @MainActor
+  @Test("animation frames keep a TabView-hosted pane's surface stable")
+  func animationFramesKeepTabHostedPaneSurfaceStable() async throws {
+    var descriptors: [Int32] = [0, 0]
+    #expect(unsafe pipe(&descriptors) == 0)
+
+    let readDescriptor = descriptors[0]
+    let writeDescriptor = descriptors[1]
+    var didCloseReadDescriptor = false
+    var didCloseWriteDescriptor = false
+    defer {
+      if !didCloseReadDescriptor {
+        _ = close(readDescriptor)
+      }
+      if !didCloseWriteDescriptor {
+        _ = close(writeDescriptor)
+      }
+    }
+
+    let currentFlags = fcntl(readDescriptor, F_GETFL)
+    #expect(currentFlags >= 0)
+    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+    let terminalSize = CellSize(width: 60, height: 20)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let scene = WindowGroup("Animated Pane Stability") {
+      TabHostedInternalStateGalleryFixture()
+    }
+
+    let inputReader = InputReader(fileDescriptor: readDescriptor)
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.AnimatedPaneStability",
+        presentationSurface: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Gallery row 0")
+    }
+    let baselineFrameCount = terminal.visibleFrames.count
+
+    // Frame-gate on the PhaseAnimator's own cadence: six further presents
+    // are all animation-driven (no input is sent).
+    await terminal.frameSignal.wait {
+      terminal.visibleFrames.count >= baselineFrameCount + 6
+    }
+
+    _ = close(writeDescriptor)
+    didCloseWriteDescriptor = true
+
+    let result = try await runTask.value
+
+    _ = close(readDescriptor)
+    didCloseReadDescriptor = true
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    let animationFrames = terminal.visibleFrames.dropFirst(baselineFrameCount - 1)
+    #expect(animationFrames.count >= 6)
+    for (offset, frame) in animationFrames.enumerated() {
+      #expect(
+        frame.contains("Gallery row 0"),
+        "animation frame +\(offset) erased the TabView-hosted pane — island staleness leaked into the snapshot rebuild"
+      )
+    }
+  }
+
   @Test("real InputReader scroll bursts update the visible gallery pane before any follow-up click")
   func realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
     var descriptors: [Int32] = [0, 0]

@@ -7,15 +7,27 @@ package final class ViewNode {
   package weak var parent: ViewNode?
   /// The node whose body resolution evaluated this node, captured at
   /// outermost `beginEvaluation`. Bridges island seams in the upward
-  /// freshness walks: capture-hosted content (deferred payloads, AnyView
+  /// invalidation walks: capture-hosted content (deferred payloads, AnyView
   /// shells, `.id`-re-rooted subtrees) is reachable from its host only
   /// through body resolution, not `parent` links, so a dirty island could
-  /// not stale its host spine and the spine was wrongly retained-reused
-  /// over it (the divergent-identity orphaning bug). Never cleared when a
-  /// frontier evaluator re-runs outside an enclosing resolution
-  /// (`ViewNodeContext.current == nil` there); weak, so a vanished host
-  /// degrades to the old walk-stops-here behavior.
+  /// not reach its host spine and the spine was wrongly retained-reused
+  /// over it (the divergent-identity orphaning bug). Past the seam the walk
+  /// sets `hasStaleIslandDescendant` (reuse denial) rather than clearing
+  /// snapshot freshness — see `invalidateCachedSnapshots(startingAt:)`.
+  /// Never cleared when a frontier evaluator re-runs outside an enclosing
+  /// resolution (`ViewNodeContext.current == nil` there); weak, so a
+  /// vanished host degrades to the old walk-stops-here behavior.
   package private(set) weak var evaluationHost: ViewNode?
+
+  /// Set when a node behind an island seam below this node was dirtied or
+  /// re-applied; consumed only by `canReuse`, so retained reuse cannot skip
+  /// the body re-resolve that re-captures the island content by value.
+  /// Cleared by `apply(resolved:children:)` (the body re-run that produced
+  /// the apply re-resolved everything below, islands included). Kept
+  /// separate from `isCommittedSnapshotFresh` deliberately: freshness
+  /// drives `snapshot()`'s rebuild-from-live-children, which cannot span an
+  /// island seam — clearing it above a seam truncates the rebuilt tree.
+  package private(set) var hasStaleIslandDescendant: Bool
 
   /// The most-recently-committed `ResolvedNode` for this node.
   ///
@@ -89,6 +101,7 @@ package final class ViewNode {
       kind: .view("EmptyView")
     )
     isCommittedSnapshotFresh = false
+    hasStaleIslandDescendant = false
     children = []
     stateSlots = [:]
     dependencies = .init()
@@ -417,6 +430,7 @@ package final class ViewNode {
     if childrenReferToSameNodes(as: children) {
       committed = resolved
       isCommittedSnapshotFresh = true
+      hasStaleIslandDescendant = false
       invalidateAncestorCachedSnapshots()
       return
     }
@@ -429,6 +443,7 @@ package final class ViewNode {
 
     committed = resolved
     isCommittedSnapshotFresh = true
+    hasStaleIslandDescendant = false
     self.children = children
     for child in children {
       guard child !== self else {
@@ -559,6 +574,7 @@ package final class ViewNode {
       && !wasVisitedThisFrame
       && !isDirty
       && isCommittedSnapshotFresh
+      && !hasStaleIslandDescendant
       && committed.supportsRetainedReuse
       && committed.environmentSnapshot == environment
       // Compare resolve-time transaction *intent* (animation request + batch),
@@ -583,6 +599,7 @@ package final class ViewNode {
     if wasVisitedThisFrame { return "visited" }
     if isDirty { return "dirty" }
     if !isCommittedSnapshotFresh { return "stale-snapshot" }
+    if hasStaleIslandDescendant { return "stale-island-descendant" }
     if !committed.supportsRetainedReuse { return "no-retained-support" }
     if committed.environmentSnapshot != environment {
       recordEnvironmentSnapshotDiff(committed.environmentSnapshot, environment)
@@ -891,25 +908,37 @@ package final class ViewNode {
   }
 
   private func invalidateCachedSnapshotUpward() {
-    var current: ViewNode? = self
-    var visited: Set<ObjectIdentifier> = []
-
-    while let node = current {
-      let nodeID = ObjectIdentifier(node)
-      guard visited.insert(nodeID).inserted else {
-        return
-      }
-      node.isCommittedSnapshotFresh = false
-      // `evaluationHost` carries the walk across island seams (capture
-      // hosts reachable only through body resolution); the host's body
-      // re-resolve is also what re-evaluates the island, so staling it is
-      // both necessary and sufficient.
-      current = node.parent ?? node.evaluationHost
-    }
+    invalidateCachedSnapshots(startingAt: self)
   }
 
   private func invalidateAncestorCachedSnapshots() {
-    var current = parent ?? evaluationHost
+    if let parent {
+      invalidateCachedSnapshots(startingAt: parent)
+    } else if let evaluationHost {
+      invalidateCachedSnapshots(startingAt: evaluationHost, crossedIslandSeam: true)
+    }
+  }
+
+  /// Walks ancestors propagating "a descendant changed" with split signals.
+  ///
+  /// Along live `parent` links the walk clears `isCommittedSnapshotFresh`,
+  /// whose `snapshot()` rebuild reconstructs the committed mirror from live
+  /// children. The moment the walk crosses an island seam (a node reachable
+  /// only via `evaluationHost` — capture-hosted content has no parent link to
+  /// its host), it switches to setting `hasStaleIslandDescendant` instead and
+  /// never touches freshness again: a host's live children do NOT mirror its
+  /// committed value across the seam, so clearing its freshness would make
+  /// `snapshot()`'s rebuild graft a structurally truncated tree (live
+  /// children only) and launder it as fresh — erasing the island interior
+  /// from the frame. `hasStaleIslandDescendant` is consumed only by
+  /// `canReuse`, denying retained reuse until the host's body re-resolve
+  /// re-captures the island by value; `apply` clears it.
+  private func invalidateCachedSnapshots(
+    startingAt start: ViewNode,
+    crossedIslandSeam: Bool = false
+  ) {
+    var current: ViewNode? = start
+    var crossedIslandSeam = crossedIslandSeam
     var visited: Set<ObjectIdentifier> = []
 
     while let node = current {
@@ -917,8 +946,17 @@ package final class ViewNode {
       guard visited.insert(nodeID).inserted else {
         return
       }
-      node.isCommittedSnapshotFresh = false
-      current = node.parent ?? node.evaluationHost
+      if crossedIslandSeam {
+        node.hasStaleIslandDescendant = true
+      } else {
+        node.isCommittedSnapshotFresh = false
+      }
+      if let parent = node.parent {
+        current = parent
+      } else {
+        current = node.evaluationHost
+        crossedIslandSeam = crossedIslandSeam || current != nil
+      }
     }
   }
 
@@ -991,6 +1029,7 @@ extension ViewNode {
     package var evaluationHost: ViewNode?
     package var committed: ResolvedNode
     package var isCommittedSnapshotFresh: Bool
+    package var hasStaleIslandDescendant: Bool
     package var children: [ViewNode]
     package var stateSlots: [Int: AnyStateSlot]
     package var dependencies: DependencySet
@@ -1025,6 +1064,7 @@ extension ViewNode {
       evaluationHost: evaluationHost,
       committed: committed,
       isCommittedSnapshotFresh: isCommittedSnapshotFresh,
+      hasStaleIslandDescendant: hasStaleIslandDescendant,
       children: children,
       stateSlots: stateSlots,
       dependencies: dependencies,
@@ -1062,6 +1102,7 @@ extension ViewNode {
     evaluationHost = checkpoint.evaluationHost
     committed = checkpoint.committed
     isCommittedSnapshotFresh = checkpoint.isCommittedSnapshotFresh
+    hasStaleIslandDescendant = checkpoint.hasStaleIslandDescendant
     children = checkpoint.children
     stateSlots = checkpoint.stateSlots
     dependencies = checkpoint.dependencies
