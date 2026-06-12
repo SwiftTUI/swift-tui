@@ -5,6 +5,17 @@ package final class ViewNode {
   package weak var invalidator: (any Invalidating)?
   package weak var ownerGraph: ViewGraph?
   package weak var parent: ViewNode?
+  /// The node whose body resolution evaluated this node, captured at
+  /// outermost `beginEvaluation`. Bridges island seams in the upward
+  /// freshness walks: capture-hosted content (deferred payloads, AnyView
+  /// shells, `.id`-re-rooted subtrees) is reachable from its host only
+  /// through body resolution, not `parent` links, so a dirty island could
+  /// not stale its host spine and the spine was wrongly retained-reused
+  /// over it (the divergent-identity orphaning bug). Never cleared when a
+  /// frontier evaluator re-runs outside an enclosing resolution
+  /// (`ViewNodeContext.current == nil` there); weak, so a vanished host
+  /// degrades to the old walk-stops-here behavior.
+  package private(set) weak var evaluationHost: ViewNode?
 
   /// The most-recently-committed `ResolvedNode` for this node.
   ///
@@ -139,6 +150,9 @@ package final class ViewNode {
     self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     if evaluationDepth == 0 {
       self.invalidator = invalidator
+      if let host = ViewNodeContext.current, host !== self {
+        evaluationHost = host
+      }
       wasVisitedThisFrame = true
       visitedFrameID = frameID
       isDirty = false
@@ -886,12 +900,16 @@ package final class ViewNode {
         return
       }
       node.isCommittedSnapshotFresh = false
-      current = node.parent
+      // `evaluationHost` carries the walk across island seams (capture
+      // hosts reachable only through body resolution); the host's body
+      // re-resolve is also what re-evaluates the island, so staling it is
+      // both necessary and sufficient.
+      current = node.parent ?? node.evaluationHost
     }
   }
 
   private func invalidateAncestorCachedSnapshots() {
-    var current = parent
+    var current = parent ?? evaluationHost
     var visited: Set<ObjectIdentifier> = []
 
     while let node = current {
@@ -900,7 +918,7 @@ package final class ViewNode {
         return
       }
       node.isCommittedSnapshotFresh = false
-      current = node.parent
+      current = node.parent ?? node.evaluationHost
     }
   }
 
@@ -970,6 +988,7 @@ extension ViewNode {
     package var invalidator: (any Invalidating)?
     package var ownerGraph: ViewGraph?
     package var parent: ViewNode?
+    package var evaluationHost: ViewNode?
     package var committed: ResolvedNode
     package var isCommittedSnapshotFresh: Bool
     package var children: [ViewNode]
@@ -1003,6 +1022,7 @@ extension ViewNode {
       invalidator: invalidator,
       ownerGraph: ownerGraph,
       parent: parent,
+      evaluationHost: evaluationHost,
       committed: committed,
       isCommittedSnapshotFresh: isCommittedSnapshotFresh,
       children: children,
@@ -1039,6 +1059,7 @@ extension ViewNode {
     invalidator = checkpoint.invalidator
     ownerGraph = checkpoint.ownerGraph
     parent = checkpoint.parent
+    evaluationHost = checkpoint.evaluationHost
     committed = checkpoint.committed
     isCommittedSnapshotFresh = checkpoint.isCommittedSnapshotFresh
     children = checkpoint.children

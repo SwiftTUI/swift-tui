@@ -2423,6 +2423,112 @@ struct InteractiveRuntimeTests {
     )
   }
 
+  /// Part 0 probe: the divergent-identity orphaning bug is masked one-shot by
+  /// the focus-flip env-mismatch on the FIRST scroll (frame 0 commits
+  /// focus-nil snapshots; default focus assignment makes every cone snapshot
+  /// recompute on the next pass). A SECOND scroll after the post-focus
+  /// snapshots settle rides the pure reuse path, so it exercises the
+  /// invalidation gates without the mask.
+  @MainActor
+  @Test("a second pointer scroll after settling still updates a WindowGroup-hosted scroll pane")
+  func secondPointerScrollAfterSettleUpdatesWindowGroupHostedScrollPane() async throws {
+    var descriptors: [Int32] = [0, 0]
+    #expect(unsafe pipe(&descriptors) == 0)
+
+    let readDescriptor = descriptors[0]
+    let writeDescriptor = descriptors[1]
+    var didCloseReadDescriptor = false
+    var didCloseWriteDescriptor = false
+    defer {
+      if !didCloseReadDescriptor {
+        _ = close(readDescriptor)
+      }
+      if !didCloseWriteDescriptor {
+        _ = close(writeDescriptor)
+      }
+    }
+
+    let currentFlags = fcntl(readDescriptor, F_GETFL)
+    #expect(currentFlags >= 0)
+    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+    let terminalSize = CellSize(width: 36, height: 10)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let scrollIdentity = testIdentity("SceneHostedSecondScroll", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+    let scene = WindowGroup("Scene Hosted Second Scroll") {
+      TabHostedTallExternalBindingScrollFixture(
+        scrollIdentity: scrollIdentity,
+        positionBox: positionBox
+      )
+    }
+    let rootIdentity = Identity(components: ["App", "Scene-Hosted-Second-Scroll"])
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: WindowHostView(
+          content: ScopedBuilder {
+            TabHostedTallExternalBindingScrollFixture(
+              scrollIdentity: scrollIdentity,
+              positionBox: positionBox
+            )
+          }
+        ),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let inputReader = InputReader(fileDescriptor: readDescriptor)
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.SceneHostedSecondScroll",
+        presentationSurface: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    await terminal.frameSignal.wait { !terminal.visibleFrames.isEmpty }
+
+    let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
+    try writeAllBytes(scrollBytes, to: writeDescriptor)
+
+    // Frame-gate: the first scroll must be VISIBLE before the second is sent,
+    // so the post-focus snapshots are committed and the one-shot focus-flip
+    // rescue is consumed. Visibility = "Row 0" has left the viewport.
+    await terminal.frameSignal.wait { positionBox.value.y >= 1 }
+    await terminal.frameSignal.wait {
+      !(terminal.visibleFrames.last ?? "Row 0").contains("Row 0")
+    }
+    let positionAfterFirstScroll = positionBox.value
+    let frameAfterFirstScroll = terminal.visibleFrames.last ?? ""
+
+    try writeAllBytes(scrollBytes, to: writeDescriptor)
+
+    _ = close(writeDescriptor)
+    didCloseWriteDescriptor = true
+
+    let result = try await runTask.value
+
+    _ = close(readDescriptor)
+    didCloseReadDescriptor = true
+
+    let finalFrame = terminal.visibleFrames.last ?? ""
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(
+      positionBox.value.y > positionAfterFirstScroll.y,
+      "the second scroll's binding write should land regardless of repaint"
+    )
+    #expect(
+      finalFrame != frameAfterFirstScroll,
+      "the second scroll must repaint the pane — a frozen surface here is the divergent-identity orphaning bug"
+    )
+  }
+
   @MainActor
   @Test("pointer scroll updates the visible surface for a WindowGroup-hosted scroll pane")
   func pointerScrollUpdatesVisibleSurfaceForWindowGroupHostedScrollPane() async throws {
