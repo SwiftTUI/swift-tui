@@ -109,6 +109,12 @@ package final class ViewGraphFrameDraft {
       // at the end; normalize the order-sensitive focus lists back to canonical
       // identity order so the live registry is byte-identical to a full rebuild.
       liveRegistrations.normalizeScopedRestoreOrder()
+      // The scoped restore above walks frontier-root ViewNode subtrees, which
+      // cannot reach capture-hosted island nodes (deferred tab bodies, portal
+      // content) that resolved this frame outside any frontier root. Autonomous
+      // tasks on such nodes must still reach the live registry or they never
+      // start, so republish the (infrequent) task registry from all live nodes.
+      viewGraph.republishAllTaskRegistrations(into: liveRegistrations)
     }
     didCommit = true
     return liveRegistrations.diagnostics()

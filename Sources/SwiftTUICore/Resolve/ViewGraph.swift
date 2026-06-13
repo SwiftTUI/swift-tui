@@ -1342,6 +1342,26 @@ package final class ViewGraph {
     }
   }
 
+  /// Republishes the task registry from EVERY live node, regardless of the
+  /// frame's runtime-registration publication scope. Scoped (`.subtrees`)
+  /// publication restores registrations by walking each frontier root's
+  /// ViewNode subtree, which cannot cross capture-host island seams (deferred
+  /// payloads, presentation-portal content, `.id`-re-rooted subtrees). An
+  /// autonomous `.task` registered on a node behind such a seam — e.g. a tab
+  /// body that first appears when its tab is selected — would otherwise never
+  /// reach the live task registry, so its start event is dropped and the task
+  /// never runs. Tasks are infrequent and the per-node check is a dictionary
+  /// emptiness test, so the full walk is cheap; high-volume registries keep the
+  /// scoped fast path.
+  package func republishAllTaskRegistrations(
+    into registrations: RuntimeRegistrationSet
+  ) {
+    registrations.taskRegistry?.reset()
+    for nodeID in liveNodeIDs {
+      nodesByNodeID[nodeID]?.restoreOwnTaskRegistrations(into: registrations)
+    }
+  }
+
   private func pruneLifecycleEvaluationOwners(
     ownedBy ownerIdentity: Identity
   ) {

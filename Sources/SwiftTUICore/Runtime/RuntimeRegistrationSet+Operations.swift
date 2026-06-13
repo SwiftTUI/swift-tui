@@ -148,6 +148,19 @@ extension RuntimeRegistrationSet {
     dropDestinationRegistry?.restore(handlers.dropDestinationRegistrations)
   }
 
+  /// Restores ONLY task registrations from a node's handlers. Used by the
+  /// always-full task republication that runs even on scoped-publication
+  /// frames, so an autonomous `.task` on a capture-hosted node (e.g. a
+  /// lazily-activated tab body, reachable from its host only across an island
+  /// seam) is never dropped by a frontier-scoped subtree restore that cannot
+  /// walk into the island.
+  package func restoreTasks(from handlers: NodeHandlers) {
+    taskRegistry?.restore(
+      handlers.taskRegistrations,
+      ownersByIdentity: handlers.taskRegistrationOwners
+    )
+  }
+
   package func diagnostics() -> RuntimeRegistrationDiagnostics {
     let gestureStateRegistrations = gestureStateRegistry?.snapshot() ?? [:]
     return RuntimeRegistrationDiagnostics(

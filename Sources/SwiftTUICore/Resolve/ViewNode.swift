@@ -863,6 +863,12 @@ package final class ViewNode {
     registrations.restore(from: registeredHandlers)
   }
 
+  package func restoreOwnTaskRegistrations(
+    into registrations: RuntimeRegistrationSet
+  ) {
+    registrations.restoreTasks(from: registeredHandlers)
+  }
+
   private func restoreRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet,
     traversedNodes: inout Set<ObjectIdentifier>
