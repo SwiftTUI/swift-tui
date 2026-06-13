@@ -40,6 +40,30 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.diagnostics.work.placedNodesReused == second.diagnostics.counts.placedNodes)
   }
 
+  @Test("toolbar strip rerender reuses resolved strip work without changing output")
+  @MainActor
+  func toolbarStripRerenderScenario() throws {
+    let harness = BenchmarkHarness()
+
+    let first = try harness.render(
+      ToolbarStripBenchmarkView(),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+    let second = try harness.render(
+      ToolbarStripBenchmarkView(),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    #expect(first.presentation.strategy == .fullRepaint)
+    #expect(second.presentation.strategy == .incremental)
+    #expect(second.presentation.bytesWritten == 0)
+    #expect(second.presentation.linesTouched == 0)
+    #expect(second.presentation.cellsChanged == 0)
+    #expect(second.diagnostics.work.resolvedNodesReused > 0)
+    #expect(
+      second.diagnostics.work.resolvedNodesComputed < first.diagnostics.work.resolvedNodesComputed)
+  }
+
   @Test("focused button press only recomputes the changing counter row")
   @MainActor
   func focusedButtonPressScenario() throws {
@@ -431,6 +455,22 @@ private struct IdleBenchmarkView: View {
       Text("Phase 1")
       Text("Idle rerender")
     }
+  }
+}
+
+private struct ToolbarStripBenchmarkView: View {
+  var body: some View {
+    Panel(id: "toolbar-benchmark") {
+      Text("Toolbar benchmark body")
+        .toolbarItem(
+          .init(title: "Save", position: .top, isEnabled: true, action: {})
+        )
+        .toolbarItem(
+          .init(title: "Reset", position: .top, isEnabled: true, action: {})
+        )
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 40, height: 6)
   }
 }
 

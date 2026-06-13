@@ -307,6 +307,69 @@ struct ToolbarTests {
     #expect(dispatchedMarkers == ["second"])
   }
 
+  @Test("Toolbar strip reuse is frame-product equivalent to fresh resolve")
+  func toolbarStripReuseIsFrameProductEquivalent() {
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+
+    func panel() -> some View {
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Save",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              systemHint: "S",
+              action: {}
+            )
+          )
+          .toolbarItem(
+            .init(
+              title: "Reset",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              systemHint: "R",
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+      .frame(width: 30, height: 6)
+    }
+
+    let first = renderer.render(
+      panel(),
+      context: .init(
+        identity: testIdentity("toolbar-equivalence-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let firstActionRegistrations = actionRegistrationSummary(actionRegistry)
+
+    let second = renderer.render(
+      panel(),
+      context: .init(
+        identity: testIdentity("toolbar-equivalence-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let secondActionRegistrations = actionRegistrationSummary(actionRegistry)
+
+    #expect(second.diagnostics.work.resolvedNodesReused > 0)
+    #expect(second.resolvedTree == first.resolvedTree)
+    #expect(second.measuredTree == first.measuredTree)
+    #expect(second.placedTree == first.placedTree)
+    #expect(second.semanticSnapshot == first.semanticSnapshot)
+    #expect(second.drawTree == first.drawTree)
+    #expect(second.rasterSurface == first.rasterSurface)
+    #expect(secondActionRegistrations == firstActionRegistrations)
+  }
+
   @Test("Unselected layout-dependent candidates do not leak toolbar items")
   func unselectedLayoutDependentCandidatesDoNotLeakToolbarItems() {
     let panel =
@@ -632,6 +695,25 @@ struct ToolbarTests {
       #expect(bodyRow < closeRow)
     }
   }
+}
+
+private struct ToolbarActionRegistrationSummary: Equatable {
+  var identity: Identity
+  var followUpInvalidationIdentity: Identity?
+}
+
+@MainActor
+private func actionRegistrationSummary(
+  _ registry: LocalActionRegistry
+) -> [ToolbarActionRegistrationSummary] {
+  registry.snapshot()
+    .map { identity, registration in
+      ToolbarActionRegistrationSummary(
+        identity: identity,
+        followUpInvalidationIdentity: registration.followUpInvalidationIdentity
+      )
+    }
+    .sorted { lhs, rhs in lhs.identity < rhs.identity }
 }
 
 private final class ToolbarIssueTerminalHost: PresentationSurface {
