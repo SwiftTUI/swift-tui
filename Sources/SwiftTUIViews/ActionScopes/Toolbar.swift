@@ -197,6 +197,7 @@ extension ResolvedNode {
     style: S,
     context: ResolveContext
   ) -> ResolvedNode {
+    let context = context.applyingCurrentFrameResolveInputs()
     let content = toolbarHostContent()
 
     guard !items.isEmpty else {
@@ -212,8 +213,11 @@ extension ResolvedNode {
     var absorbedPreferences = preferenceValues
     absorbedPreferences[ToolbarItemsPreferenceKey.self] = []
 
-    let stripNode = ToolbarItemsStrip(items: items, style: style).resolve(
-      in: context.child(component: .named("toolbar-strip"))
+    let stripContext = context.child(component: .named("toolbar-strip"))
+    let stripNode = resolvedToolbarItemsStrip(
+      items: items,
+      style: style,
+      context: stripContext
     )
 
     // Keep the scope boundary on `base` so toolbar-focus inherits the
@@ -296,6 +300,176 @@ private func isKind(
 ) -> Bool {
   if case .view(let n) = kind, n == name { return true }
   return false
+}
+
+private let toolbarStripReuseCacheNamespace = "SwiftTUI.toolbar-strip"
+
+@MainActor
+private func resolvedToolbarItemsStrip<S: ToolbarStyle>(
+  items: [ToolbarItemConfig],
+  style: S,
+  context: ResolveContext
+) -> ResolvedNode {
+  guard let signature = ToolbarStripSignature(items: items, style: style) else {
+    return ToolbarItemsStrip(items: items, style: style).resolve(in: context)
+  }
+
+  if !context.effectiveSuppressesRetainedReuse(at: context.identity),
+    let reused = context.viewGraph?.cachedReusableResolvedNode(
+    namespace: toolbarStripReuseCacheNamespace,
+    owner: context.identity,
+    signature: signature.cacheSignature,
+    environment: context.environment,
+    transaction: context.transaction
+  ) {
+    context.viewGraph?.recordReusedSubtree(
+      reused,
+      invalidator: context.invalidationProxy?.invalidator,
+      retained: true
+    )
+    context.viewGraph?.restoreRuntimeRegistrations(
+      for: reused,
+      into: context.runtimeRegistrations
+    )
+    refreshToolbarItemActionRegistrations(items, in: context)
+    context.recordResolvedReuse(count: reused.subtreeNodeCount)
+    var structurallyStamped = reused
+    structurallyStamped.structuralPath = context.structuralPath
+    return structurallyStamped
+  }
+
+  let resolved = ToolbarItemsStrip(items: items, style: style).resolve(in: context)
+  context.viewGraph?.storeResolvedNodeReuseCache(
+    namespace: toolbarStripReuseCacheNamespace,
+    owner: context.identity,
+    signature: signature.cacheSignature,
+    node: resolved
+  )
+  return resolved
+}
+
+@MainActor
+private func refreshToolbarItemActionRegistrations(
+  _ items: [ToolbarItemConfig],
+  in stripContext: ResolveContext
+) {
+  for (index, item) in items.enumerated() where item.isEnabled {
+    let identity = toolbarItemButtonIdentity(in: stripContext, index: index)
+    stripContext.viewGraph?.refreshActionRegistration(
+      identity: identity,
+      handler: {
+        item.action()
+        return true
+      },
+      followUpInvalidationIdentity: item.sourceIdentity,
+      in: stripContext.localActionRegistry
+    )
+  }
+}
+
+private func toolbarItemButtonIdentity(
+  in stripContext: ResolveContext,
+  index: Int
+) -> Identity {
+  stripContext
+    .child(component: .named("base"))
+    .child(component: .named("content"))
+    .indexedChild(kind: .init(rawValue: "Layout"), index: index)
+    .identity
+}
+
+private struct ToolbarStripSignature: Hashable {
+  var styleType: String
+  var placement: String
+  var layout: String
+  var items: [ToolbarStripItemSignature]
+
+  init?<S: ToolbarStyle>(
+    items: [ToolbarItemConfig],
+    style: S
+  ) {
+    guard let layout = toolbarLayoutSignature(style.itemLayout) else {
+      return nil
+    }
+    styleType = String(reflecting: S.self)
+    placement = toolbarPlacementSignature(style.placement)
+    self.layout = layout
+    self.items = items.map(ToolbarStripItemSignature.init(item:))
+  }
+
+  var cacheSignature: String {
+    String(reflecting: self)
+  }
+}
+
+private struct ToolbarStripItemSignature: Hashable {
+  var title: String
+  var icon: ToolbarStripIconSignature?
+  var position: String
+  var isEnabled: Bool
+  var systemHint: String?
+
+  init(item: ToolbarItemConfig) {
+    title = item.title
+    icon = item.icon.map(ToolbarStripIconSignature.init(icon:))
+    position = toolbarItemPositionSignature(item.position)
+    isEnabled = item.isEnabled
+    systemHint = item.systemHint
+  }
+}
+
+private struct ToolbarStripIconSignature: Hashable {
+  var source: ImageSource
+  var isResizable: Bool
+  var scalingMode: String
+
+  init(icon: Image) {
+    source = icon.source
+    isResizable = icon.isResizable
+    scalingMode = icon.scalingMode.rawValue
+  }
+}
+
+private func toolbarLayoutSignature<L: Layout>(
+  _ layout: L
+) -> String? {
+  let layoutType = String(reflecting: L.self)
+  if let builtinLayout = layout as? any BuiltinLayoutBehaviorProviding {
+    return "builtin:\(layoutType):\(String(reflecting: builtinLayout.builtinLayoutBehavior))"
+  }
+  if let sendableLayout = layout as? any SendableLayout {
+    return "sendable:\(layoutType):measure:\(sendableLayout.measurementReuseSignature):"
+      + "place:\(sendableLayout.placementReuseSignature)"
+  }
+
+  guard
+    let measurementLayout = layout as? any MeasurementLayoutReuseProviding,
+    let placementLayout = layout as? any PlacementLayoutReuseProviding
+  else {
+    return nil
+  }
+
+  return "custom:\(layoutType):measure:\(measurementLayout.measurementLayoutReuseSignature):"
+    + "place:\(placementLayout.placementLayoutReuseSignature)"
+}
+
+private func toolbarPlacementSignature(
+  _ placement: ToolbarPlacement
+) -> String {
+  switch placement {
+  case .top: "top"
+  case .bottom: "bottom"
+  }
+}
+
+private func toolbarItemPositionSignature(
+  _ position: ToolbarItemConfig.Position
+) -> String {
+  switch position {
+  case .top: "top"
+  case .bottom: "bottom"
+  case .automatic: "automatic"
+  }
 }
 
 private struct ToolbarScopeNode: PrimitiveView, ResolvableView {

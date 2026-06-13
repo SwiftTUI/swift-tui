@@ -35,6 +35,7 @@ extension ViewGraph {
       observableDependents: observableDependents,
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
+      resolvedNodeReuseCache: resolvedNodeReuseCache,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(
         nodesByNodeID
       )
@@ -76,6 +77,7 @@ extension ViewGraph {
     observableDependents = checkpoint.observableDependents
     currentFrameID = checkpoint.currentFrameID
     liveNodeIDs = checkpoint.liveNodeIDs
+    resolvedNodeReuseCache = checkpoint.resolvedNodeReuseCache
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
@@ -126,6 +128,8 @@ package final class ViewGraph {
   private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
   private var currentFrameID: UInt64
   private var liveNodeIDs: Set<ViewNodeID>
+  private var resolvedNodeReuseCache:
+    [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
 
   private var nodesByIdentity: [Identity: ViewNode] {
     Dictionary(
@@ -301,6 +305,7 @@ package final class ViewGraph {
     observableDependents = [:]
     currentFrameID = 0
     liveNodeIDs = []
+    resolvedNodeReuseCache = [:]
   }
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
@@ -340,7 +345,101 @@ package final class ViewGraph {
       environmentDependents: debugObjectDependencySnapshot(environmentDependents),
       observableDependents: debugObjectDependencySnapshot(observableDependents),
       currentFrameID: currentFrameID,
-      liveNodeIDs: liveNodeIDs
+      liveNodeIDs: liveNodeIDs,
+      resolvedNodeReuseCache: resolvedNodeReuseCache
+    )
+  }
+
+  package func cachedReusableResolvedNode(
+    namespace: String,
+    owner: Identity,
+    signature: String,
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot
+  ) -> ResolvedNode? {
+    let key = ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)
+    guard var entry = resolvedNodeReuseCache[key],
+      entry.signature == signature
+    else {
+      return nil
+    }
+
+    let cachedNode =
+      entry.node.viewNodeID.flatMap { nodeIfExists(for: $0) }
+      ?? nodeIfExists(for: entry.node.identity)
+    guard let node = cachedNode else {
+      resolvedNodeReuseCache.removeValue(forKey: key)
+      return nil
+    }
+
+    guard entry.node.environmentSnapshot == environment,
+      entry.node.transactionSnapshot.isReuseEquivalent(to: transaction)
+    else {
+      return nil
+    }
+
+    if entry.frameID == currentFrameID {
+      return entry.node
+    }
+
+    guard
+      node.canReuse(
+        frameID: currentFrameID,
+        environment: environment,
+        transaction: transaction
+      )
+    else {
+      return nil
+    }
+
+    entry.node = node.snapshot()
+    entry.frameID = currentFrameID
+    resolvedNodeReuseCache[key] = entry
+    return entry.node
+  }
+
+  package func storeResolvedNodeReuseCache(
+    namespace: String,
+    owner: Identity,
+    signature: String,
+    node: ResolvedNode
+  ) {
+    let key = ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)
+    resolvedNodeReuseCache[key] = ResolvedNodeReuseCacheEntry(
+      signature: signature,
+      node: node,
+      frameID: currentFrameID
+    )
+  }
+
+  package func refreshActionRegistration(
+    identity: Identity,
+    handler: @escaping LocalActionRegistry.Handler,
+    followUpInvalidationIdentity: Identity?,
+    in actionRegistry: LocalActionRegistry?
+  ) {
+    let registration = LocalActionRegistry.Registration(
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity
+    )
+    guard let node = nodeIfExists(for: identity) else {
+      actionRegistry?.restore([identity: registration])
+      return
+    }
+    let owner = RuntimeRegistrationOwnerKey(
+      viewNodeID: node.viewNodeID,
+      identity: identity,
+      structuralPath: StructuralPath(identity: identity)
+    )
+    actionRegistry?.restore(
+      [identity: registration],
+      ownersByIdentity: [identity: owner]
+    )
+    node.recordActionRegistration(
+      identity: identity,
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity,
+      owner: owner
     )
   }
 
@@ -1636,6 +1735,15 @@ package final class ViewGraph {
 
     node.prepareForFrame(currentFrameID)
     let snapshot = committedSnapshot ?? node.committed
+    removeResolvedNodeReuseCaches(rootedAt: node.identity)
+    if node.resolvedIdentity != node.identity {
+      removeResolvedNodeReuseCaches(rootedAt: node.resolvedIdentity)
+    }
+    if snapshot.identity != node.identity,
+      snapshot.identity != node.resolvedIdentity
+    {
+      removeResolvedNodeReuseCaches(rootedAt: snapshot.identity)
+    }
     if snapshot.children.isEmpty {
       for child in node.children {
         removeSubtree(rootedAt: child)
@@ -1714,6 +1822,17 @@ package final class ViewGraph {
     entityRoutingTable.release(node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
+  }
+
+  private func removeResolvedNodeReuseCaches(
+    rootedAt identity: Identity
+  ) {
+    resolvedNodeReuseCache = resolvedNodeReuseCache.filter { key, entry in
+      let ownerMatches = key.owner == identity || key.owner.isDescendant(of: identity)
+      let nodeMatches =
+        entry.node.identity == identity || entry.node.identity.isDescendant(of: identity)
+      return !ownerMatches && !nodeMatches
+    }
   }
 
   private func removeResolvedSubtree(

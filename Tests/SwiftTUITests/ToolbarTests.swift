@@ -254,6 +254,59 @@ struct ToolbarTests {
     #expect(actionCount == 1)
   }
 
+  @Test("Toolbar strip reuse refreshes current action handlers")
+  func toolbarStripReuseRefreshesCurrentActionHandlers() throws {
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    var dispatchedMarkers: [String] = []
+
+    func panel(actionMarker: String) -> some View {
+      let marker = actionMarker
+      return Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Stable",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              action: {
+                dispatchedMarkers.append(marker)
+              }
+            )
+          )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+      .frame(width: 20, height: 5)
+    }
+
+    _ = renderer.render(
+      panel(actionMarker: "first"),
+      context: .init(
+        identity: testIdentity("toolbar-reuse-action-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let second = renderer.render(
+      panel(actionMarker: "second"),
+      context: .init(
+        identity: testIdentity("toolbar-reuse-action-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let button = try #require(
+      second.semanticSnapshot.accessibilityNodes.first { node in
+        node.role == .button && node.label == "Stable"
+      }
+    )
+
+    #expect(second.diagnostics.work.resolvedNodesReused > 0)
+    #expect(actionRegistry.dispatch(identity: button.identity))
+    #expect(dispatchedMarkers == ["second"])
+  }
+
   @Test("Unselected layout-dependent candidates do not leak toolbar items")
   func unselectedLayoutDependentCandidatesDoNotLeakToolbarItems() {
     let panel =

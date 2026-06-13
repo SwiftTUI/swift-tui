@@ -98,7 +98,21 @@ package struct NodeHandlers {
     handler: @escaping LocalActionRegistry.Handler,
     followUpInvalidationIdentity: Identity?
   ) {
-    actionRegistrationOwners[identity] = .current(identity: identity)
+    recordAction(
+      identity: identity,
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity,
+      owner: .current(identity: identity)
+    )
+  }
+
+  package mutating func recordAction(
+    identity: Identity,
+    handler: @escaping LocalActionRegistry.Handler,
+    followUpInvalidationIdentity: Identity?,
+    owner: RuntimeRegistrationOwnerKey
+  ) {
+    actionRegistrationOwners[identity] = owner
     actionRegistrations[identity] = .init(
       handler: handler,
       followUpInvalidationIdentity: followUpInvalidationIdentity

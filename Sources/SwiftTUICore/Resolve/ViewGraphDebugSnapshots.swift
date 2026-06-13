@@ -39,6 +39,8 @@ extension ViewGraph {
     package var observableDependents: [ObjectDependencySnapshot]
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
+    package var resolvedNodeReuseCache:
+      [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
 
     package var invalidatedIdentities: Set<Identity> {
       identities(for: invalidatedNodeIDs)

@@ -679,6 +679,20 @@ package final class ViewNode {
     )
   }
 
+  package func recordActionRegistration(
+    identity: Identity,
+    handler: @escaping LocalActionRegistry.Handler,
+    followUpInvalidationIdentity: Identity?,
+    owner: RuntimeRegistrationOwnerKey
+  ) {
+    registeredHandlers.recordAction(
+      identity: identity,
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity,
+      owner: owner
+    )
+  }
+
   package func recordKeyHandlerRegistration(
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.Handler

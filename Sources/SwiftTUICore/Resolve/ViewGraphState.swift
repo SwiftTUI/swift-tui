@@ -11,6 +11,35 @@ package enum ViewportLifecycleKey: Hashable, Sendable {
   case identity(Identity)
 }
 
+package struct ResolvedNodeReuseCacheKey: Hashable, Sendable {
+  package var namespace: String
+  package var owner: Identity
+
+  package init(
+    namespace: String,
+    owner: Identity
+  ) {
+    self.namespace = namespace
+    self.owner = owner
+  }
+}
+
+package struct ResolvedNodeReuseCacheEntry: Equatable, Sendable {
+  package var signature: String
+  package var node: ResolvedNode
+  package var frameID: UInt64
+
+  package init(
+    signature: String,
+    node: ResolvedNode,
+    frameID: UInt64
+  ) {
+    self.signature = signature
+    self.node = node
+    self.frameID = frameID
+  }
+}
+
 extension ViewGraph {
   package struct Checkpoint {
     package var root: ViewNode?
@@ -47,6 +76,8 @@ extension ViewGraph {
     package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
+    package var resolvedNodeReuseCache:
+      [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
     package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   }
 
