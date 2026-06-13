@@ -64,6 +64,54 @@ struct Phase1BenchmarkScenariosTests {
       second.diagnostics.work.resolvedNodesComputed < first.diagnostics.work.resolvedNodesComputed)
   }
 
+  @Test("late-bubbled toolbar strip reuse reduces resolved work without changing output")
+  @MainActor
+  func lateBubbledToolbarPerfABScenario() throws {
+    let optimizedHarness = BenchmarkHarness()
+    let suppressedHarness = BenchmarkHarness()
+
+    _ = try optimizedHarness.render(
+      LateBubbledToolbarBenchmarkView(),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+    optimizedHarness.forceRootEvaluation()
+    let optimizedSecond = try optimizedHarness.render(
+      LateBubbledToolbarBenchmarkView(),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    _ = try suppressedHarness.render(
+      LateBubbledToolbarBenchmarkView(),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+    suppressedHarness.forceRootEvaluation()
+    suppressedHarness.suppressRetainedReuseForNextFrame(
+      at: Phase1BenchmarkIdentity.toolbarStrip
+    )
+    let suppressedSecond = try suppressedHarness.render(
+      LateBubbledToolbarBenchmarkView(),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    #expect(optimizedSecond.presentation == suppressedSecond.presentation)
+    #expect(optimizedSecond.presentation.strategy == .incremental)
+    #expect(optimizedSecond.presentation.bytesWritten == 0)
+    #expect(optimizedSecond.presentation.linesTouched == 0)
+    #expect(optimizedSecond.presentation.cellsChanged == 0)
+    #expect(
+      optimizedSecond.diagnostics.work.resolvedNodesComputed
+        < suppressedSecond.diagnostics.work.resolvedNodesComputed)
+    #expect(
+      optimizedSecond.diagnostics.work.resolvedNodesReused
+        > suppressedSecond.diagnostics.work.resolvedNodesReused)
+    #expect(
+      optimizedSecond.diagnostics.work.layoutDependentRealizations
+        == suppressedSecond.diagnostics.work.layoutDependentRealizations)
+    #expect(
+      optimizedSecond.diagnostics.counts.resolvedNodes
+        == suppressedSecond.diagnostics.counts.resolvedNodes)
+  }
+
   @Test("focused button press only recomputes the changing counter row")
   @MainActor
   func focusedButtonPressScenario() throws {
@@ -381,6 +429,14 @@ private final class BenchmarkHarness {
       presentation: presentation
     )
   }
+
+  func forceRootEvaluation() {
+    renderer.forceRootEvaluation()
+  }
+
+  func suppressRetainedReuseForNextFrame(at identity: Identity) {
+    renderer.suppressRetainedReuseForNextFrame(.init(identities: [identity]))
+  }
 }
 
 private final class BenchmarkPresentationController: TerminalControlling {
@@ -444,6 +500,9 @@ private final class ScrollBox: Sendable {
 
 private enum Phase1BenchmarkIdentity {
   static let root = testIdentity("Phase1Benchmark", "root")
+  static let toolbarStrip = root
+    .child(.named("content"))
+    .child(.named("toolbar-strip"))
   static let incrementButton = testIdentity("Phase1Benchmark", "button")
   static let inputField = testIdentity("Phase1Benchmark", "input")
   static let scrollRegion = testIdentity("Phase1Benchmark", "scroll")
@@ -471,6 +530,32 @@ private struct ToolbarStripBenchmarkView: View {
     }
     .toolbar(style: DefaultTopToolbarStyle())
     .frame(width: 40, height: 6)
+  }
+}
+
+private struct LateBubbledToolbarBenchmarkView: View {
+  var body: some View {
+    Panel(id: "late-toolbar-benchmark") {
+      GeometryReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Late toolbar benchmark")
+          Text("Body \(proxy.size.width)x\(proxy.size.height)")
+        }
+        .toolbarItem(
+          .init(
+            title: "Size \(proxy.size.width)x\(proxy.size.height)",
+            position: .bottom,
+            isEnabled: true,
+            action: {}
+          )
+        )
+        .toolbarItem(
+          .init(title: "Reset", position: .bottom, isEnabled: true, action: {})
+        )
+      }
+    }
+    .toolbar(style: DefaultBottomToolbarStyle())
+    .frame(width: 44, height: 8)
   }
 }
 
