@@ -266,7 +266,7 @@ private struct LiteralTabsTabStyleBody: View {
       if configuration.overflowTrigger?.isExpanded == true {
         HStack(alignment: .top, spacing: 0) {
           Spacer(minLength: 0)
-            .frame(width: configuration.overflowTrigger?.leadingWidth ?? 0)
+            .frame(width: literalTabsOverflowMenuLeadingWidth(configuration: configuration))
           LiteralTabsOverflowMenuView(configuration: configuration)
           Spacer(minLength: 0)
         }
@@ -764,6 +764,26 @@ private func literalTabOverflowMenuWidth(
     .map { tabLabelCellWidth(options[$0].label.displayText) }
     .max() ?? 0
   return maxLabelWidth + 2
+}
+
+private func literalTabsOverflowMenuLeadingWidth(
+  configuration: TabViewStyleBodyConfiguration
+) -> Int {
+  guard let trigger = configuration.overflowTrigger,
+    let overflow = configuration.presentation.overflowMenu
+  else {
+    return 0
+  }
+
+  let menuWidth =
+    literalTabOverflowMenuWidth(
+      options: configuration.options,
+      overflowIndices: overflow.overflowIndices
+    ) + overflow.contentPadding.horizontal
+  let triggerTrailingEdge = trigger.leadingWidth + literalTabWidth(label: trigger.label)
+  let rightAlignedLeading = triggerTrailingEdge - menuWidth
+  let maxLeading = configuration.availableWidth - menuWidth
+  return max(0, min(rightAlignedLeading, maxLeading))
 }
 
 private func literalTabWidth(

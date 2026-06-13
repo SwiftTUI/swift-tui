@@ -90,6 +90,110 @@ struct TabViewSurfaceTests {
     .id(testIdentity("Tabs"))
   }
 
+  private func longOverflowTabView(
+    selection: Binding<String>
+  ) -> some View {
+    TabView(selection: selection) {
+      Tab("One", value: "one") {
+        Text("One content")
+      }
+
+      Tab("Two", value: "two") {
+        Text("Two content")
+      }
+
+      Tab("Long Hidden Tab", value: "long") {
+        Text("Long content")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+    .id(testIdentity("Tabs"))
+  }
+
+  private func galleryLikeOverflowTabView(
+    selection: Binding<String>
+  ) -> some View {
+    TabView(selection: selection) {
+      Tab("Logo", value: "logo") {
+        Text("Logo content")
+      }
+
+      Tab("Counter", value: "counter") {
+        Text("Counter content")
+      }
+
+      Tab("Life", value: "life") {
+        Text("Life content")
+      }
+
+      Tab("Todo", value: "todo") {
+        Text("Todo content")
+      }
+
+      Tab("Forms & Containers", value: "forms") {
+        Text("Forms content")
+      }
+
+      Tab("Text Input", value: "text-input") {
+        Text("Text Input content")
+      }
+
+      Tab("Scroll Control", value: "scroll-control") {
+        Text("Scroll Control content")
+      }
+
+      Tab("Calculator", value: "calculator") {
+        Text("Calculator content")
+      }
+
+      Tab("Borders & Shapes", value: "borders") {
+        Text("Borders content")
+      }
+
+      Tab("Presentation Lab", value: "presentation") {
+        Text("Presentation content")
+      }
+
+      Tab("Navigation & Collections", value: "navigation") {
+        Text("Navigation content")
+      }
+
+      Tab("Images", value: "images") {
+        Text("Images content")
+      }
+
+      Tab("Animations", value: "animations") {
+        Text("Animations content")
+      }
+
+      Tab("File Drop", value: "file-drop") {
+        Text("File Drop content")
+      }
+
+      Tab("Popovers", value: "popovers") {
+        Text("Popovers content")
+      }
+
+      Tab("Pointer Lab", value: "pointer-lab") {
+        Text("Pointer Lab content")
+      }
+
+      Tab("Focus Context", value: "focus-context") {
+        Text("Focus Context content")
+      }
+
+      Tab("Physics", value: "physics") {
+        Text("Physics content")
+      }
+
+      Tab("Progress", value: "progress") {
+        Text("Progress content")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+    .id(testIdentity("Tabs"))
+  }
+
   private func renderOverflowTabArtifacts(
     selection: Binding<String>,
     focused: Bool = false,
@@ -703,6 +807,111 @@ struct TabViewSurfaceTests {
     #expect(expandedSurface.contains("Four"))
   }
 
+  @Test("literal tab overflow menu right-aligns to the trigger")
+  func literalTabOverflowMenuRightAlignsToTrigger() throws {
+    final class SelectionBox {
+      var value = "one"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+    let renderer = DefaultRenderer()
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = CellSize(width: 24, height: 8)
+
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues
+    )
+    context.localPointerHandlerRegistry = pointerRegistry
+
+    _ = renderer.render(
+      longOverflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    )
+
+    let triggerRouteID = primaryRouteID(
+      for: testIdentity("Tabs").child(.named("TabOverflowTrigger"))
+    )
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: triggerRouteID,
+        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+      )
+    )
+
+    let surface = renderer.render(
+      longOverflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    ).rasterSurface
+    let triggerBounds = try #require(boundsOfText("▴", in: surface))
+    let menuBounds = try #require(nonSpaceBounds(in: surface, rows: 3..<7))
+
+    #expect(menuBounds.maxX == triggerBounds.maxX + 2)
+    #expect(menuBounds.maxX <= surface.size.width)
+    #expect(surface.lines.joined(separator: "\n").contains("Long Hidden Tab"))
+  }
+
+  @Test("literal tab overflow menu stays onscreen for gallery-width tabs")
+  func literalTabOverflowMenuStaysOnscreenForGalleryWidthTabs() throws {
+    final class SelectionBox {
+      var value = "popovers"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+    let renderer = DefaultRenderer()
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = CellSize(width: 80, height: 24)
+
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues
+    )
+    context.localPointerHandlerRegistry = pointerRegistry
+
+    _ = renderer.render(
+      galleryLikeOverflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 80, height: 24)
+    )
+
+    let triggerRouteID = primaryRouteID(
+      for: testIdentity("Tabs").child(.named("TabOverflowTrigger"))
+    )
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: triggerRouteID,
+        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+      )
+    )
+
+    let surface = renderer.render(
+      galleryLikeOverflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 80, height: 24)
+    ).rasterSurface
+    let triggerBounds = try #require(boundsOfText("▲", in: surface))
+    let menuBounds = try #require(nonSpaceBounds(in: surface, rows: 3..<18))
+    let text = surface.lines.joined(separator: "\n")
+
+    #expect(menuBounds.origin.x < triggerBounds.origin.x)
+    #expect(menuBounds.maxX == triggerBounds.maxX + 2)
+    #expect(menuBounds.maxX <= surface.size.width)
+    #expect(text.contains("Navigation & Collections"))
+    #expect(text.contains("Popovers"))
+  }
+
   @Test("selected literal tab uses foreground chrome without filling its background")
   func selectedLiteralTabUsesForegroundChromeWithoutFill() throws {
     let artifacts = renderTabArtifacts(
@@ -833,6 +1042,53 @@ private func trimTrailingSpaces(
   _ line: String
 ) -> String {
   String(line.reversed().drop(while: { $0 == " " }).reversed())
+}
+
+private func boundsOfText(
+  _ target: String,
+  in surface: RasterSurface
+) -> CellRect? {
+  for (row, line) in surface.lines.enumerated() {
+    var index = line.startIndex
+    while index < line.endIndex {
+      if line[index...].hasPrefix(target) {
+        let column = line.distance(from: line.startIndex, to: index)
+        return CellRect(
+          origin: CellPoint(x: column, y: row),
+          size: CellSize(width: target.count, height: 1)
+        )
+      }
+      line.formIndex(after: &index)
+    }
+  }
+  return nil
+}
+
+private func nonSpaceBounds(
+  in surface: RasterSurface,
+  rows: Range<Int>
+) -> CellRect? {
+  var minX = Int.max
+  var minY = Int.max
+  var maxX = Int.min
+  var maxY = Int.min
+
+  for y in rows where surface.cells.indices.contains(y) {
+    for (x, cell) in surface.cells[y].enumerated() where cell.character != " " {
+      minX = min(minX, x)
+      minY = min(minY, y)
+      maxX = max(maxX, x)
+      maxY = max(maxY, y)
+    }
+  }
+
+  guard minX <= maxX, minY <= maxY else {
+    return nil
+  }
+  return CellRect(
+    origin: CellPoint(x: minX, y: minY),
+    size: CellSize(width: maxX - minX + 1, height: maxY - minY + 1)
+  )
 }
 
 private func hasFillCommand(
