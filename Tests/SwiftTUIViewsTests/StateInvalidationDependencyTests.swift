@@ -3,18 +3,19 @@ import Testing
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
-/// Proves the reader-attribution model (``ReaderAttributionConfiguration``) is
-/// active and correct: when a view only PROJECTS a binding (`$flag`) and a
-/// distinct descendant consumes it, the state-slot dependency is attributed to
-/// the projecting owner in legacy mode (owner-anchored + eager projection read)
-/// but to the genuine downstream reader in reader-attributed mode. That shift is
-/// what lets a `@State` toggle spare disjoint subtrees instead of re-resolving
-/// the owner's whole subtree.
+/// Proves the state invalidation dependency model around
+/// ``ReaderAttributionConfiguration``. The important split is:
+///
+/// - projecting `$state` is not a read in reader-attributed mode;
+/// - genuine `wrappedValue` reads are attributed to the evaluating reader;
+/// - writes retarget to recorded readers when they exist;
+/// - no-reader writes currently fall back to the state owner as a conservative
+///   characterization of the gap documented in the org-root invalidation plan.
 ///
 /// Serialized because it flips the process-level configuration flag.
 @MainActor
 @Suite(.serialized)
-struct ReaderAttributionTests {
+struct StateInvalidationDependencyTests {
   /// Owns `@State` and only PROJECTS it to a distinct descendant; it never reads
   /// `wrappedValue` in its own body. A sibling keeps the reader from collapsing
   /// onto the owner's identity.
@@ -38,9 +39,44 @@ struct ReaderAttributionTests {
     }
   }
 
+  private struct BindingForwarder: View {
+    @Binding var flag: Bool
+
+    var body: some View {
+      BindingValueReader(flag: $flag)
+    }
+  }
+
+  private struct ForwardingOwnerProbe: View {
+    @State private var flag = false
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("static-sibling")
+        BindingForwarder(flag: $flag)
+      }
+    }
+  }
+
+  private struct ConditionalStateReaderProbe: View {
+    @State private var value = 1
+    let showReader: Bool
+
+    var body: some View {
+      if showReader {
+        Text("Value \(value)")
+      } else {
+        Text("Hidden")
+      }
+    }
+  }
+
   /// Resolves the probe and returns the set of identities recorded as
   /// dependents of any `@State` slot (the reverse dependency index).
-  private func slotDependentIdentities(readerAttributed: Bool) -> Set<String> {
+  private func slotDependentIdentities<V: View>(
+    for view: V,
+    readerAttributed: Bool
+  ) -> Set<String> {
     let previous = ReaderAttributionConfiguration.isEnabled
     ReaderAttributionConfiguration.isEnabled = readerAttributed
     defer { ReaderAttributionConfiguration.isEnabled = previous }
@@ -53,7 +89,7 @@ struct ReaderAttributionTests {
       applyEnvironmentValues: true
     )
     context.viewGraph = graph
-    _ = Resolver().resolve(ProjectingOwnerProbe(), in: context)
+    _ = Resolver().resolve(view, in: context)
 
     let snapshot = graph.debugTotalStateSnapshot()
     var identities: Set<String> = []
@@ -69,17 +105,49 @@ struct ReaderAttributionTests {
 
   @Test("legacy mode: the projecting owner is a state-slot dependent")
   func legacyOwnerIsDependent() {
-    let dependents = slotDependentIdentities(readerAttributed: false)
+    let dependents = slotDependentIdentities(
+      for: ProjectingOwnerProbe(),
+      readerAttributed: false
+    )
     #expect(dependents.contains(testIdentity("Root").description))
   }
 
   @Test("reader-attributed mode: the projecting owner is spared; the reader depends")
   func readerAttributedSparesOwner() {
-    let dependents = slotDependentIdentities(readerAttributed: true)
+    let dependents = slotDependentIdentities(
+      for: ProjectingOwnerProbe(),
+      readerAttributed: true
+    )
     // The owner only projected `$flag`, so it must NOT be a dependent...
     #expect(!dependents.contains(testIdentity("Root").description))
     // ...but the genuine downstream reader must be (the dependency moved, not lost).
     #expect(!dependents.isEmpty)
+  }
+
+  @Test("reader-attributed mode: pass-through binding projection still spares the owner")
+  func readerAttributedPassThroughProjectionSparesOwner() {
+    let dependents = slotDependentIdentities(
+      for: ForwardingOwnerProbe(),
+      readerAttributed: true
+    )
+
+    #expect(!dependents.contains(testIdentity("Root").description))
+    #expect(!dependents.isEmpty)
+  }
+
+  @Test("conditional @State reads record dependencies only after the branch reads")
+  func conditionalStateReadsRecordOnlyWhenBranchReads() {
+    let hiddenDependents = slotDependentIdentities(
+      for: ConditionalStateReaderProbe(showReader: false),
+      readerAttributed: true
+    )
+    let shownDependents = slotDependentIdentities(
+      for: ConditionalStateReaderProbe(showReader: true),
+      readerAttributed: true
+    )
+
+    #expect(hiddenDependents.isEmpty)
+    #expect(!shownDependents.isEmpty)
   }
 
   /// Resolves the probe in a fresh graph, then locates the actual `@State` slot
@@ -154,6 +222,42 @@ struct ReaderAttributionTests {
       invalidated.contains(slot.owner.identity),
       "legacy attribution must invalidate the owner identity it was given"
     )
+  }
+
+  @Test("characterization: no-reader @State slot writes fall back to the owner")
+  func noReaderStateWriteFallsBackToOwner() throws {
+    let previous = ReaderAttributionConfiguration.isEnabled
+    ReaderAttributionConfiguration.isEnabled = true
+    defer { ReaderAttributionConfiguration.isEnabled = previous }
+
+    let graph = ViewGraph()
+    let ownerIdentity = testIdentity("Root")
+    graph.beginFrame()
+    let owner = graph.beginEvaluation(identity: ownerIdentity, invalidator: nil)
+    graph.finishEvaluation(
+      owner,
+      resolved: ResolvedNode(identity: ownerIdentity, kind: .root),
+      accessedStateSlots: 0
+    )
+
+    owner.setStateSlot(
+      ordinal: 0,
+      value: false,
+      invalidationIdentity: ownerIdentity
+    )
+    let unreadKey = StateSlotKey(owner: owner.viewNodeID, ordinal: 0)
+    #expect(graph.stateDependentIdentities(for: unreadKey).isEmpty)
+
+    let spy = StateWriteRecordingInvalidator()
+    owner.invalidator = spy
+    owner.setStateSlot(
+      ordinal: 0,
+      value: true,
+      invalidationIdentity: ownerIdentity
+    )
+
+    let invalidated = spy.requests.reduce(into: Set<Identity>()) { $0.formUnion($1) }
+    #expect(invalidated == [ownerIdentity])
   }
 }
 

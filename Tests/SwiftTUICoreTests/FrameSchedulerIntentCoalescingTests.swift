@@ -29,6 +29,27 @@ struct FrameSchedulerIntentCoalescingTests {
     #expect(frame?.invalidatedIdentities.count == 3)
   }
 
+  @Test("coalesced invalidations union identities and preserve transaction metadata")
+  func coalescedInvalidationsPreserveIdentitiesAndTransactionMetadata() throws {
+    let scheduler = FrameScheduler()
+    let firstIdentity = testIdentity("Root", "First")
+    let secondIdentity = testIdentity("Root", "Second")
+    let batchID = AnimationBatchID(42)
+
+    scheduler.requestInvalidation(of: [firstIdentity])
+    scheduler.requestInvalidation(
+      of: [secondIdentity],
+      animation: .disabled,
+      batchID: batchID
+    )
+
+    let frame = try #require(scheduler.consumeReadyFrame())
+    #expect(frame.intentRequestCount == 2)
+    #expect(frame.invalidatedIdentities == [firstIdentity, secondIdentity])
+    #expect(frame.animationRequest == .disabled)
+    #expect(frame.animationBatchID == batchID)
+  }
+
   @Test("requests of different kinds all increment the same counter")
   func mixedKindRequestsIncrementSameCounter() {
     let scheduler = FrameScheduler()

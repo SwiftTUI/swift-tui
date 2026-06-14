@@ -8,22 +8,34 @@ private enum DependencyTrackingKey: EnvironmentKey {
   static let defaultValue = "unset"
 }
 
+private enum DependencyObservableModelKey: EnvironmentKey {
+  static let defaultValue = DependencyObservableModel()
+}
+
 extension EnvironmentValues {
   fileprivate var dependencyTrackedValue: String {
     get { self[DependencyTrackingKey.self] }
     set { self[DependencyTrackingKey.self] = newValue }
   }
+
+  fileprivate var dependencyObservableModel: DependencyObservableModel {
+    get { self[DependencyObservableModelKey.self] }
+    set { self[DependencyObservableModelKey.self] = newValue }
+  }
 }
 
-@MainActor
 @Observable
-private final class DependencyObservableModel {
+private final class DependencyObservableModel: @unchecked Sendable {
   var name = "Ada"
+  var age = 37
+  var scores = [1, 2, 3]
 }
 
 @MainActor
 @Suite
-struct DependencyTrackingTests {
+struct DependencyModelTests {
+  // MARK: - State
+
   @Test("state reads populate graph dependencies")
   func stateReadsPopulateDependencies() throws {
     let (dependencies, snapshot) = try resolveDependenciesWithSnapshot(
@@ -34,6 +46,8 @@ struct DependencyTrackingTests {
     #expect(dependencies.stateSlotReads.count == 1)
     #expect(snapshot.nodeIDByIdentity[testIdentity("Root")] == stateRead.owner)
   }
+
+  // MARK: - Environment
 
   @Test("environment reads populate graph dependencies")
   func environmentReadsPopulateDependencies() throws {
@@ -69,6 +83,31 @@ struct DependencyTrackingTests {
     )
   }
 
+  @Test("observable environment reads record both the key and object token")
+  func observableEnvironmentReadsRecordKeyAndObjectToken() throws {
+    let model = DependencyObservableModel()
+    var environmentValues = EnvironmentValues()
+    environmentValues.dependencyObservableModel = model
+
+    let dependencies = try resolveDependencies(
+      ObservableEnvironmentDependencyProbe(),
+      environmentValues: environmentValues
+    )
+
+    #expect(
+      dependencies.environmentReads == [
+        ObjectIdentifier(DependencyObservableModelKey.self)
+      ]
+    )
+    #expect(
+      dependencies.observableReads == [
+        ObjectIdentifier(model)
+      ]
+    )
+  }
+
+  // MARK: - Observable
+
   @Test("observable-backed reads populate graph dependencies")
   func observableReadsPopulateDependencies() throws {
     let model = DependencyObservableModel()
@@ -82,6 +121,26 @@ struct DependencyTrackingTests {
         ObjectIdentifier(model)
       ]
     )
+  }
+
+  @Test("characterization: @Bindable graph keys are object tokens, not key paths")
+  func bindableReadsOfDifferentPropertiesShareObjectDependencyToken() throws {
+    let model = DependencyObservableModel()
+
+    let nameDependencies = try resolveDependencies(
+      ObservableDependencyProbe(model: model, property: .name)
+    )
+    let ageDependencies = try resolveDependencies(
+      ObservableDependencyProbe(model: model, property: .age)
+    )
+    let collectionDependencies = try resolveDependencies(
+      ObservableDependencyProbe(model: model, property: .firstScore)
+    )
+
+    let expected = Set([ObjectIdentifier(model)])
+    #expect(nameDependencies.observableReads == expected)
+    #expect(ageDependencies.observableReads == expected)
+    #expect(collectionDependencies.observableReads == expected)
   }
 }
 
@@ -111,13 +170,39 @@ private struct EnvironmentPropertyWrapperDependencyProbe: View {
 
 private struct ObservableDependencyProbe: View {
   @Bindable private var model: DependencyObservableModel
+  let property: ObservableProperty
 
-  init(model: DependencyObservableModel) {
+  init(
+    model: DependencyObservableModel,
+    property: ObservableProperty = .name
+  ) {
     _model = Bindable(model)
+    self.property = property
   }
 
   var body: some View {
-    Text($model.name.wrappedValue)
+    switch property {
+    case .name:
+      Text($model.name.wrappedValue)
+    case .age:
+      Text("\($model.age.wrappedValue)")
+    case .firstScore:
+      Text("\($model.scores.wrappedValue.first ?? -1)")
+    }
+  }
+}
+
+private enum ObservableProperty {
+  case name
+  case age
+  case firstScore
+}
+
+private struct ObservableEnvironmentDependencyProbe: View {
+  @Environment(\.dependencyObservableModel) private var model
+
+  var body: some View {
+    Text(model.name)
   }
 }
 

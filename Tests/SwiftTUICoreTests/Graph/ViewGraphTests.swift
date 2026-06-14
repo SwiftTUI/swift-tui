@@ -179,6 +179,38 @@ struct ViewGraphTests {
     #expect(!graph.hasDirtyWork)
   }
 
+  @Test("characterization: mapped invalidation without graph-local dirt falls back to root evaluation")
+  func mappedInvalidationWithoutDirtyCauseFallsBackToRootEvaluation() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+        ]
+      )
+    )
+
+    var rootEvaluations = 0
+    var childEvaluations = 0
+    graph.setRootEvaluator(rootIdentity: rootIdentity) {
+      rootEvaluations += 1
+    }
+    graph.setEvaluator(for: childIdentity) {
+      childEvaluations += 1
+    }
+
+    graph.beginFrame()
+    graph.invalidate([childIdentity])
+
+    #expect(graph.evaluateDirtyNodes() == false)
+    #expect(rootEvaluations == 1)
+    #expect(childEvaluations == 0)
+  }
+
   @Test("ViewNodeID is stable for live identities and reminted after removal")
   func viewNodeIDTracksRuntimeLifetime() {
     let graph = ViewGraph()
@@ -379,7 +411,7 @@ struct ViewGraphTests {
     #expect(unrelatedEvaluations == 0)
   }
 
-  @Test("observation changes reevaluate only nodes that share the observed token")
+  @Test("characterization: observation fan-out uses object tokens")
   func observationInvalidationUsesDependencyIndices() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
