@@ -8,7 +8,7 @@ import Testing
 @MainActor
 @Suite
 struct ResolveReuseAncestorInvalidationTests {
-  @Test("ancestor invalidation recomputes binding-driven descendants")
+  @Test("captured binding hazard: ancestor invalidation recomputes binding-driven descendants")
   func ancestorInvalidationRecomputesBindingDrivenDescendants() {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())

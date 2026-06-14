@@ -84,6 +84,70 @@ struct DependencyModelTests {
     #expect(snapshot.nodeIDByIdentity[testIdentity("Root")] == stateRead.owner)
   }
 
+  @Test("wrapper dependency manifest matches shipped axes")
+  func wrapperDependencyManifestMatchesShippedAxes() throws {
+    let model = DependencyObservableModel()
+    let manifest: [String: Set<DependencyAxis>] = [
+      "@State": [.stateSlot],
+      "@Binding": [],
+      "@Environment": [.environmentKey],
+      "EnvironmentReader": [.environmentKey],
+      "@Bindable": [.observableObjectToken],
+      "@GestureState": [.stateSlot],
+      "@FocusState": [.stateSlot],
+      "focus environment": [.runtimeFocusEnvironmentKey],
+    ]
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.dependencyTrackedValue = "tracked"
+
+    #expect(try dependencyAxes(StateDependencyProbe()) == manifest["@State"])
+    #expect(try dependencyAxes(BindingManifestProbe()) == manifest["@Binding"])
+    #expect(
+      try dependencyAxes(
+        EnvironmentPropertyWrapperDependencyProbe(),
+        environmentValues: environmentValues
+      ) == manifest["@Environment"]
+    )
+    #expect(
+      try dependencyAxes(
+        EnvironmentDependencyProbe(),
+        environmentValues: environmentValues
+      ) == manifest["EnvironmentReader"]
+    )
+    let bindableDependencies = try resolveDependencies(
+      ObservableDependencyProbe(model: model)
+    )
+    #expect(
+      dependencyAxes(bindableDependencies).isSuperset(
+        of: manifest["@Bindable"] ?? []
+      )
+    )
+    #expect(bindableDependencies.stateSlotReads.isEmpty)
+    #expect(bindableDependencies.observableReads == [ObjectIdentifier(model)])
+    #expect(
+      try dependencyAxes(GestureStateDependencyProbe())
+        == manifest["@GestureState"]
+    )
+    #expect(
+      try dependencyAxes(FocusStateDependencyProbe())
+        == manifest["@FocusState"]
+    )
+
+    let focusEnvironmentDependencies = try resolveDependencies(
+      FocusEnvironmentDependencyProbe()
+    )
+    #expect(
+      focusEnvironmentDependencies.environmentReads.isSubset(
+        of: EnvironmentValues.runtimeFocusStateDependencyKeys
+      )
+    )
+    #expect(
+      dependencyAxes(focusEnvironmentDependencies)
+        == manifest["focus environment"]
+    )
+  }
+
   // MARK: - Environment
 
   @Test("environment reads populate graph dependencies")
@@ -131,16 +195,44 @@ struct DependencyModelTests {
       environmentValues: environmentValues
     )
 
-    #expect(
-      dependencies.environmentReads == [
-        ObjectIdentifier(DependencyObservableModelKey.self)
-      ]
-    )
+    #expect(dependencies.environmentReads.contains(ObjectIdentifier(DependencyObservableModelKey.self)))
     #expect(
       dependencies.observableReads == [
         ObjectIdentifier(model)
       ]
     )
+  }
+
+  @Test("characterization: observable environment graph keys are object tokens, not key paths")
+  func observableEnvironmentReadsOfDifferentPropertiesShareObjectDependencyToken() throws {
+    let model = DependencyObservableModel()
+    var environmentValues = EnvironmentValues()
+    environmentValues.dependencyObservableModel = model
+
+    let nameDependencies = try resolveDependencies(
+      ObservableEnvironmentDependencyProbe(property: .name),
+      environmentValues: environmentValues
+    )
+    let ageDependencies = try resolveDependencies(
+      ObservableEnvironmentDependencyProbe(property: .age),
+      environmentValues: environmentValues
+    )
+    let collectionDependencies = try resolveDependencies(
+      ObservableEnvironmentDependencyProbe(property: .firstScore),
+      environmentValues: environmentValues
+    )
+
+    let expectedEnvironmentRead = ObjectIdentifier(DependencyObservableModelKey.self)
+    let expectedObservableReads = Set([ObjectIdentifier(model)])
+    // `@Environment` currently also carries authoring-context environment reads.
+    // The parity invariant here is that the authored environment key and the
+    // observable object token remain separate axes.
+    #expect(nameDependencies.environmentReads.contains(expectedEnvironmentRead))
+    #expect(ageDependencies.environmentReads.contains(expectedEnvironmentRead))
+    #expect(collectionDependencies.environmentReads.contains(expectedEnvironmentRead))
+    #expect(nameDependencies.observableReads == expectedObservableReads)
+    #expect(ageDependencies.observableReads == expectedObservableReads)
+    #expect(collectionDependencies.observableReads == expectedObservableReads)
   }
 
   // MARK: - Observable
@@ -186,6 +278,18 @@ private struct StateDependencyProbe: View {
 
   var body: some View {
     Text("Count \(count)")
+  }
+}
+
+private struct BindingManifestProbe: View {
+  @Binding var value: String
+
+  init() {
+    _value = .constant("constant")
+  }
+
+  var body: some View {
+    Text(value)
   }
 }
 
@@ -237,9 +341,45 @@ private enum ObservableProperty {
 
 private struct ObservableEnvironmentDependencyProbe: View {
   @Environment(\.dependencyObservableModel) private var model
+  let property: ObservableProperty
+
+  init(property: ObservableProperty = .name) {
+    self.property = property
+  }
 
   var body: some View {
-    Text(model.name)
+    switch property {
+    case .name:
+      Text(model.name)
+    case .age:
+      Text("\(model.age)")
+    case .firstScore:
+      Text("\(model.scores.first ?? -1)")
+    }
+  }
+}
+
+private struct GestureStateDependencyProbe: View {
+  @GestureState private var offset = 0
+
+  var body: some View {
+    Text("Offset \(offset)")
+  }
+}
+
+private struct FocusStateDependencyProbe: View {
+  @FocusState private var focused: Bool
+
+  var body: some View {
+    Text(focused ? "Focused" : "Blurred")
+  }
+}
+
+private struct FocusEnvironmentDependencyProbe: View {
+  var body: some View {
+    EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+      Text(focusedIdentity?.description ?? "none")
+    }
   }
 }
 
@@ -277,4 +417,46 @@ private func resolveDependenciesWithSnapshot<V: View>(
     try #require(graph.dependencies(for: testIdentity("Root"))),
     graph.debugTotalStateSnapshot()
   )
+}
+
+private enum DependencyAxis: Hashable {
+  case stateSlot
+  case environmentKey
+  case observableObjectToken
+  case runtimeFocusEnvironmentKey
+}
+
+@MainActor
+private func dependencyAxes<V: View>(
+  _ view: V,
+  environmentValues: EnvironmentValues = .init()
+) throws -> Set<DependencyAxis> {
+  dependencyAxes(
+    try resolveDependencies(
+      view,
+      environmentValues: environmentValues
+    )
+  )
+}
+
+private func dependencyAxes(
+  _ dependencies: DependencySet
+) -> Set<DependencyAxis> {
+  var axes: Set<DependencyAxis> = []
+  if !dependencies.stateSlotReads.isEmpty {
+    axes.insert(.stateSlot)
+  }
+  if !dependencies.observableReads.isEmpty {
+    axes.insert(.observableObjectToken)
+  }
+  let runtimeFocusReads = dependencies.environmentReads.intersection(
+    EnvironmentValues.runtimeFocusStateDependencyKeys
+  )
+  if !runtimeFocusReads.isEmpty {
+    axes.insert(.runtimeFocusEnvironmentKey)
+  }
+  if !dependencies.environmentReads.subtracting(runtimeFocusReads).isEmpty {
+    axes.insert(.environmentKey)
+  }
+  return axes
 }

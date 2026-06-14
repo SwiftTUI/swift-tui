@@ -71,6 +71,132 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(invalidator.requests == [[testIdentity("ObservedRoot")]])
   }
 
+  @Test("computed observable properties invalidate through backing stored reads")
+  func computedObservablePropertiesInvalidateThroughBackingStoredReads() {
+    let model = Phase4ObservableCounter()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var context = ResolveContext(identity: testIdentity("ComputedRoot"))
+    context.observationBridge = bridge
+
+    _ = renderer.render(
+      ComputedObservableCounterLabel(model: model),
+      context: context
+    )
+
+    model.count = 1
+
+    #expect(invalidator.requests == [[testIdentity("ComputedRoot")]])
+  }
+
+  @Test("committed observation passes re-arm after each observed change")
+  func committedObservationPassesRearmAfterEachObservedChange() {
+    let model = Phase4ObservableCounter()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var context = ResolveContext(identity: testIdentity("RearmedRoot"))
+    context.observationBridge = bridge
+
+    _ = renderer.render(
+      ObservableCounterLabel(model: model),
+      context: context
+    )
+
+    model.count = 1
+    #expect(invalidator.requests == [[testIdentity("RearmedRoot")]])
+
+    invalidator.clear()
+    var updatedContext = ResolveContext(
+      identity: testIdentity("RearmedRoot"),
+      invalidatedIdentities: [testIdentity("RearmedRoot")]
+    )
+    updatedContext.observationBridge = bridge
+    _ = renderer.render(
+      ObservableCounterLabel(model: model),
+      context: updatedContext
+    )
+
+    model.count = 2
+
+    #expect(invalidator.requests == [[testIdentity("RearmedRoot")]])
+  }
+
+  @Test("aborted observation frame restores committed registrations")
+  func abortedObservationFrameRestoresCommittedRegistrations() {
+    let committedModel = Phase4ObservableCounter()
+    let draftModel = Phase4ObservableCounter()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var committedContext = ResolveContext(identity: testIdentity("ObservationAbortRoot"))
+    committedContext.observationBridge = bridge
+    _ = renderer.render(
+      SwitchableObservableRoot(
+        showsDraft: false,
+        committedModel: committedModel,
+        draftModel: draftModel
+      ),
+      context: committedContext
+    )
+    bridge.prune(keeping: renderer.liveIdentitySnapshot())
+
+    var draftContext = ResolveContext(
+      identity: testIdentity("ObservationAbortRoot"),
+      invalidatedIdentities: [testIdentity("ObservationAbortRoot")]
+    )
+    draftContext.observationBridge = bridge
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      SwitchableObservableRoot(
+        showsDraft: true,
+        committedModel: committedModel,
+        draftModel: draftModel
+      ),
+      context: draftContext
+    )
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+    invalidator.clear()
+
+    draftModel.count = 1
+    #expect(invalidator.requests.isEmpty)
+
+    committedModel.count = 1
+    #expect(invalidator.requests == [[testIdentity("CommittedCounter")]])
+  }
+
+  @Test("characterization: collection element mutations fan out through object observation")
+  func collectionElementMutationsFanOutThroughObjectObservation() {
+    let model = Phase4ObservableScores()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var context = ResolveContext(identity: testIdentity("ScoresRoot"))
+    context.observationBridge = bridge
+    _ = renderer.render(
+      ObservableScoresRoot(model: model),
+      context: context
+    )
+
+    model.scores[0] = 11
+
+    #expect(
+      collectedInvalidatedIdentities(from: invalidator) == [
+        testIdentity("FirstScore"),
+        testIdentity("SecondScore"),
+      ]
+    )
+  }
+
   @Test("pruned observed identities stop invalidating removed subtrees")
   func prunedObservedIdentitiesStopInvalidatingRemovedSubtrees() throws {
     let model = Phase4ObservableCounter()
@@ -1066,11 +1192,20 @@ private final class Phase4ObservableCounter: Observable, Sendable {
       }
     }
   }
+
+  var countLabel: String {
+    "Count \(count)"
+  }
 }
 
 @Observable
 private final class Phase4ObservableForm {
   var name = ""
+}
+
+@Observable
+private final class Phase4ObservableScores {
+  var scores = [1, 2]
 }
 
 @Observable
@@ -1125,6 +1260,14 @@ private struct ObservableCounterLabel: View {
   }
 }
 
+private struct ComputedObservableCounterLabel: View {
+  let model: Phase4ObservableCounter
+
+  var body: some View {
+    Text(model.countLabel)
+  }
+}
+
 private struct ObservableCounterRoot: View {
   let model: Phase4ObservableCounter
 
@@ -1149,6 +1292,46 @@ private struct ConditionalObservableRoot: View {
           .id(testIdentity("ObservedCounter"))
       }
     }
+  }
+}
+
+private struct SwitchableObservableRoot: View {
+  let showsDraft: Bool
+  let committedModel: Phase4ObservableCounter
+  let draftModel: Phase4ObservableCounter
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if showsDraft {
+        ObservableCounterLabel(model: draftModel)
+          .id(testIdentity("DraftCounter"))
+      } else {
+        ObservableCounterLabel(model: committedModel)
+          .id(testIdentity("CommittedCounter"))
+      }
+    }
+  }
+}
+
+private struct ObservableScoresRoot: View {
+  let model: Phase4ObservableScores
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ObservableScoreLabel(model: model, index: 0)
+        .id(testIdentity("FirstScore"))
+      ObservableScoreLabel(model: model, index: 1)
+        .id(testIdentity("SecondScore"))
+    }
+  }
+}
+
+private struct ObservableScoreLabel: View {
+  let model: Phase4ObservableScores
+  let index: Int
+
+  var body: some View {
+    Text("Score \(model.scores[index])")
   }
 }
 

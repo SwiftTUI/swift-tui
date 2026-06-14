@@ -59,14 +59,32 @@ struct StateInvalidationDependencyTests {
   }
 
   private struct ConditionalStateReaderProbe: View {
-    @State private var value = 1
+    static let valueOrdinal = 1
+
+    @State private var value: Int
     let showReader: Bool
+
+    init(showReader: Bool) {
+      _value = State(initialValue: 1, line: 0, column: UInt(Self.valueOrdinal))
+      self.showReader = showReader
+    }
 
     var body: some View {
       if showReader {
         Text("Value \(value)")
       } else {
         Text("Hidden")
+      }
+    }
+  }
+
+  private struct DeferredBindingOwnerProbe: View {
+    @State private var flag = false
+
+    var body: some View {
+      EnvironmentReader(\.terminalSize) { _ in
+        BindingValueReader(flag: $flag)
+          .id(testIdentity("DeferredBindingReader"))
       }
     }
   }
@@ -148,6 +166,56 @@ struct StateInvalidationDependencyTests {
 
     #expect(hiddenDependents.isEmpty)
     #expect(!shownDependents.isEmpty)
+  }
+
+  @Test("characterization: hidden conditional @State writes fall back to the owner")
+  func hiddenConditionalStateWriteFallsBackToOwner() throws {
+    let previous = ReaderAttributionConfiguration.isEnabled
+    ReaderAttributionConfiguration.isEnabled = true
+    defer { ReaderAttributionConfiguration.isEnabled = previous }
+
+    let graph = ViewGraph()
+    let ownerIdentity = testIdentity("Root")
+    graph.beginFrame()
+    var context = ResolveContext(
+      identity: ownerIdentity,
+      environmentValues: .init(),
+      applyEnvironmentValues: true
+    )
+    context.viewGraph = graph
+    _ = Resolver().resolve(
+      ConditionalStateReaderProbe(showReader: false),
+      in: context
+    )
+
+    let owner = try #require(graph.nodeForIdentity(ownerIdentity))
+    let unreadKey = StateSlotKey(
+      owner: owner.viewNodeID,
+      ordinal: ConditionalStateReaderProbe.valueOrdinal
+    )
+    #expect(graph.stateDependentIdentities(for: unreadKey).isEmpty)
+
+    let spy = StateWriteRecordingInvalidator()
+    owner.invalidator = spy
+    owner.setStateSlot(
+      ordinal: ConditionalStateReaderProbe.valueOrdinal,
+      value: 2,
+      invalidationIdentity: ownerIdentity
+    )
+
+    let invalidated = spy.requests.reduce(into: Set<Identity>()) { $0.formUnion($1) }
+    #expect(invalidated == [ownerIdentity])
+  }
+
+  @Test("reader-attributed mode: deferred builder binding reads land on the descendant")
+  func deferredBuilderBindingReadsLandOnDescendant() {
+    let dependents = slotDependentIdentities(
+      for: DeferredBindingOwnerProbe(),
+      readerAttributed: true
+    )
+
+    #expect(!dependents.contains(testIdentity("Root").description))
+    #expect(!dependents.isEmpty)
   }
 
   /// Resolves the probe in a fresh graph, then locates the actual `@State` slot
