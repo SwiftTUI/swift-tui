@@ -3,6 +3,15 @@ public struct RuntimeRegistrationDiagnostics: Equatable, Sendable {
   public var pointerHoverHandlerCount: Int
   public var gestureRecognizerCount: Int
   public var gestureStateBindingCount: Int
+  private var publicationStorage: RuntimeRegistrationPublicationDiagnosticsStorage
+  package var publication: RuntimeRegistrationPublicationDiagnostics {
+    get {
+      publicationStorage.value
+    }
+    set {
+      publicationStorage.value = newValue
+    }
+  }
 
   public init(
     pointerHandlerCount: Int = 0,
@@ -14,6 +23,20 @@ public struct RuntimeRegistrationDiagnostics: Equatable, Sendable {
     self.pointerHoverHandlerCount = pointerHoverHandlerCount
     self.gestureRecognizerCount = gestureRecognizerCount
     self.gestureStateBindingCount = gestureStateBindingCount
+    self.publicationStorage = .init(value: .init())
+  }
+}
+
+// Keep package-only publication diagnostics out of the public synthesized
+// `RuntimeRegistrationDiagnostics` equality contract.
+private struct RuntimeRegistrationPublicationDiagnosticsStorage: Equatable, Sendable {
+  var value: RuntimeRegistrationPublicationDiagnostics
+
+  static func == (
+    lhs: RuntimeRegistrationPublicationDiagnosticsStorage,
+    rhs: RuntimeRegistrationPublicationDiagnosticsStorage
+  ) -> Bool {
+    true
   }
 }
 

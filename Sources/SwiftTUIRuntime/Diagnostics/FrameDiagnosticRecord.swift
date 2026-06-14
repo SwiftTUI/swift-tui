@@ -46,6 +46,17 @@ public struct FrameDiagnosticRecord: Sendable {
   public var runtimePointerHoverHandlerCount: Int
   public var runtimeGestureRecognizerCount: Int
   public var runtimeGestureStateBindingCount: Int
+  package var runtimePublicationMode: String = "-"
+  package var runtimeDirtyPlanResult: String = "-"
+  package var runtimePublicationSubtreeRootCount: Int = 0
+  package var runtimePublicationRestoredNodeCount: Int?
+  package var runtimePublicationInvalidatedIdentityCount: Int = 0
+  package var runtimePublicationUnmappedInvalidatedIdentityCount: Int = 0
+  package var runtimePublicationUnmappedInvalidatedIdentitySample: [Identity] = []
+  package var runtimePublicationPresentationPortalRootQueued: Bool?
+  package var runtimePublicationGraphCheckpointBaselineNodeCount: Int?
+  package var runtimePublicationGraphCheckpointPreparedNodeCount: Int?
+  package var runtimePublicationNonGraphCheckpointPresent: Bool?
   public var runtimeIssues: [RuntimeIssue]
   public var staleFramePolicy: String
   public var tailJobState: String

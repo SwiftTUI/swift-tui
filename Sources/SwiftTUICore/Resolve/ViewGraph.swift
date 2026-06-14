@@ -128,8 +128,7 @@ package final class ViewGraph {
   private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
   private var currentFrameID: UInt64
   private var liveNodeIDs: Set<ViewNodeID>
-  private var resolvedNodeReuseCache:
-    [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
+  private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
 
   private var nodesByIdentity: [Identity: ViewNode] {
     Dictionary(
@@ -693,9 +692,47 @@ package final class ViewGraph {
   }
 
   package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {
+    selectiveDirtyEvaluationPlanWithDiagnostics(invalidatedIdentities: []).plan
+  }
+
+  package func selectiveDirtyEvaluationPlanWithDiagnostics(
+    invalidatedIdentities: Set<Identity>
+  ) -> (plan: DirtyEvaluationPlan?, diagnostics: DirtyEvaluationPlanDiagnostics) {
+    let unmappedIdentities = unmappedInvalidatedIdentities(invalidatedIdentities)
+    let baseDiagnostics = dirtyPlanBaseDiagnostics(
+      invalidatedIdentities: invalidatedIdentities,
+      unmappedIdentities: unmappedIdentities
+    )
     guard !requiresRootEvaluation else {
-      return nil
+      let reason =
+        unmappedIdentities.isEmpty
+        ? "nil_root_evaluation_required"
+        : "nil_unmapped_invalidated_identity"
+      return (
+        nil,
+        baseDiagnostics(reason, 0)
+      )
     }
+    guard root != nil else {
+      return (nil, baseDiagnostics("nil_missing_root", 0))
+    }
+    guard !invalidatedNodeIDs.isEmpty || !graphLocalDirtyNodeIDs.isEmpty else {
+      return (nil, baseDiagnostics("nil_no_dirty_work", 0))
+    }
+    guard !invalidatedNodeIDs.isEmpty else {
+      return (nil, baseDiagnostics("nil_no_invalidated_nodes", 0))
+    }
+    guard !graphLocalDirtyNodeIDs.isEmpty else {
+      return (nil, baseDiagnostics("nil_no_graph_local_dirty_nodes", 0))
+    }
+
+    let graphKnownInvalidated = invalidatedNodeIDs.filter {
+      nodesByNodeID[$0] != nil
+    }
+    guard graphKnownInvalidated.isSubset(of: graphLocalDirtyNodeIDs) else {
+      return (nil, baseDiagnostics("nil_invalidated_nodes_not_graph_local_dirty", 0))
+    }
+
     guard
       let targetPlan = ViewGraphDirtyEvaluationPlanner.targetPlan(
         input: ViewGraphDirtyEvaluationPlanningInput(
@@ -707,7 +744,7 @@ package final class ViewGraph {
         )
       )
     else {
-      return nil
+      return (nil, baseDiagnostics("nil_no_frontier", 0))
     }
 
     for target in targetPlan.targetNodes {
@@ -717,13 +754,27 @@ package final class ViewGraph {
     guard !targetPlan.targetNodes.isEmpty,
       targetPlan.targetNodes.allSatisfy(\.hasEvaluator)
     else {
-      return nil
+      return (nil, baseDiagnostics("nil_missing_evaluator", targetPlan.targetNodes.count))
     }
 
-    return DirtyEvaluationPlan(
+    let plan = DirtyEvaluationPlan(
       frontierNodeIDs: targetPlan.targetNodes.map(\.viewNodeID),
       frontierIdentities: targetPlan.targetNodes.map(\.identity)
     )
+    return (
+      plan,
+      baseDiagnostics("formed", plan.frontierIdentities.count)
+    )
+  }
+
+  package func noDirtyWorkPlanDiagnostics(
+    invalidatedIdentities: Set<Identity>
+  ) -> DirtyEvaluationPlanDiagnostics {
+    let unmappedIdentities = unmappedInvalidatedIdentities(invalidatedIdentities)
+    return dirtyPlanBaseDiagnostics(
+      invalidatedIdentities: invalidatedIdentities,
+      unmappedIdentities: unmappedIdentities
+    )("unchanged_no_dirty_work", 0)
   }
 
   /// Whether any identities are dirty and need evaluation this frame.
@@ -1425,6 +1476,10 @@ package final class ViewGraph {
     )
   }
 
+  package var runtimeRegistrationLiveNodeCount: Int {
+    liveNodeIDs.count
+  }
+
   /// Scoped counterpart to ``restoreCurrentFrameRuntimeRegistrations``: restores
   /// runtime registrations for ONLY the live subtrees rooted at `roots`, walking
   /// each root's ViewNode subtree (O(subtree)) instead of the full live-identity
@@ -1439,6 +1494,23 @@ package final class ViewGraph {
     for root in roots {
       nodeIfExists(for: root)?.restoreRuntimeRegistrations(into: registrations)
     }
+  }
+
+  package func runtimeRegistrationSubtreeNodeCount(
+    rootedAt roots: [Identity]
+  ) -> Int {
+    var traversedNodes: Set<ObjectIdentifier> = []
+    var count = 0
+    for root in roots {
+      guard let node = nodeIfExists(for: root) else {
+        continue
+      }
+      count += runtimeRegistrationSubtreeNodeCount(
+        node,
+        traversedNodes: &traversedNodes
+      )
+    }
+    return count
   }
 
   /// Republishes the task registry from EVERY live node, regardless of the
@@ -1459,6 +1531,20 @@ package final class ViewGraph {
     for nodeID in liveNodeIDs {
       nodesByNodeID[nodeID]?.restoreOwnTaskRegistrations(into: registrations)
     }
+  }
+
+  private func runtimeRegistrationSubtreeNodeCount(
+    _ node: ViewNode,
+    traversedNodes: inout Set<ObjectIdentifier>
+  ) -> Int {
+    guard traversedNodes.insert(ObjectIdentifier(node)).inserted else {
+      return 0
+    }
+    var count = 1
+    for child in node.children {
+      count += runtimeRegistrationSubtreeNodeCount(child, traversedNodes: &traversedNodes)
+    }
+    return count
   }
 
   private func pruneLifecycleEvaluationOwners(
@@ -1556,6 +1642,29 @@ package final class ViewGraph {
       }
     }
     return false
+  }
+
+  private func unmappedInvalidatedIdentities(
+    _ invalidatedIdentities: Set<Identity>
+  ) -> [Identity] {
+    invalidatedIdentities
+      .filter { viewNodeID(for: $0) == nil }
+      .sorted()
+  }
+
+  private func dirtyPlanBaseDiagnostics(
+    invalidatedIdentities: Set<Identity>,
+    unmappedIdentities: [Identity]
+  ) -> (_ result: String, _ frontierRootCount: Int) -> DirtyEvaluationPlanDiagnostics {
+    { result, frontierRootCount in
+      DirtyEvaluationPlanDiagnostics(
+        result: result,
+        frontierRootCount: frontierRootCount,
+        invalidatedIdentityCount: invalidatedIdentities.count,
+        unmappedInvalidatedIdentityCount: unmappedIdentities.count,
+        unmappedInvalidatedIdentitySample: Array(unmappedIdentities.prefix(5))
+      )
+    }
   }
 
   private func nodeForIdentity(

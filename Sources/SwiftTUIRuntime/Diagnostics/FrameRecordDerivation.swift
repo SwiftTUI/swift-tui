@@ -19,6 +19,7 @@ package enum FrameRecordDerivation {
 
   private static func committedRecord(_ sample: CommittedFrameSample) -> FrameDiagnosticRecord {
     let diag = sample.diagnostics
+    let publication = diag.runtime.registrations.publication
     let damageDiagnostics = diag.presentation.damage
     let geometryDiagnostics = diag.geometryResolutionDiagnostics
     let cacheMetrics = diag.work.measurementCache
@@ -30,7 +31,7 @@ package enum FrameRecordDerivation {
       }
     let pipelineTotal = diag.timing.phaseTimings?.total ?? .zero
 
-    return FrameDiagnosticRecord(
+    var record = FrameDiagnosticRecord(
       frameNumber: sample.frameNumber,
       causeSummary: causeSummary(for: sample.scheduledFrame),
       focusSyncRerenders: sample.focusSyncRerenders,
@@ -132,6 +133,24 @@ package enum FrameRecordDerivation {
       elidedAnimationCommitDuration: nil,
       elidedCommitDuration: nil
     )
+    record.runtimePublicationMode = publication.publicationMode
+    record.runtimeDirtyPlanResult = publication.dirtyPlanResult
+    record.runtimePublicationSubtreeRootCount = publication.subtreeRootCount
+    record.runtimePublicationRestoredNodeCount = publication.restoredNodeCount
+    record.runtimePublicationInvalidatedIdentityCount = publication.invalidatedIdentityCount
+    record.runtimePublicationUnmappedInvalidatedIdentityCount =
+      publication.unmappedInvalidatedIdentityCount
+    record.runtimePublicationUnmappedInvalidatedIdentitySample =
+      publication.unmappedInvalidatedIdentitySample
+    record.runtimePublicationPresentationPortalRootQueued =
+      publication.presentationPortalRootQueued
+    record.runtimePublicationGraphCheckpointBaselineNodeCount =
+      publication.graphCheckpointBaselineNodeCount
+    record.runtimePublicationGraphCheckpointPreparedNodeCount =
+      publication.graphCheckpointPreparedNodeCount
+    record.runtimePublicationNonGraphCheckpointPresent =
+      publication.nonGraphCheckpointPresent
+    return record
   }
 
   private static func zeroArtifactRecord(

@@ -76,8 +76,7 @@ extension ViewGraph {
     package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
-    package var resolvedNodeReuseCache:
-      [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
+    package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
     package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   }
 
@@ -111,6 +110,28 @@ package struct DirtyEvaluationPlan: Equatable, Sendable {
   ) {
     self.frontierNodeIDs = frontierNodeIDs
     self.frontierIdentities = frontierIdentities
+  }
+}
+
+package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
+  package var result: String
+  package var frontierRootCount: Int
+  package var invalidatedIdentityCount: Int
+  package var unmappedInvalidatedIdentityCount: Int
+  package var unmappedInvalidatedIdentitySample: [Identity]
+
+  package init(
+    result: String,
+    frontierRootCount: Int = 0,
+    invalidatedIdentityCount: Int = 0,
+    unmappedInvalidatedIdentityCount: Int = 0,
+    unmappedInvalidatedIdentitySample: [Identity] = []
+  ) {
+    self.result = result
+    self.frontierRootCount = frontierRootCount
+    self.invalidatedIdentityCount = invalidatedIdentityCount
+    self.unmappedInvalidatedIdentityCount = unmappedInvalidatedIdentityCount
+    self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
   }
 }
 

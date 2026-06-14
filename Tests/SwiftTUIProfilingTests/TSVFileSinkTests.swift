@@ -25,6 +25,42 @@ struct TSVFileSinkTests {
 
     let header = FrameDiagnosticsTSVFormatting.headerFields
     #expect(String(lines[0]) == header.joined(separator: "\t"))
+    let headerColumns = Dictionary(
+      uniqueKeysWithValues: header.enumerated().map { ($1, $0) }
+    )
+    let firstRow = String(lines[1])
+      .split(separator: "\t", omittingEmptySubsequences: false)
+      .map(String.init)
+    #expect(
+      firstRow[headerColumns["runtime_publication_mode"]!] == "subtrees"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_dirty_plan_result"]!] == "formed"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_publication_subtree_roots"]!] == "2"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_publication_restored_nodes"]!] == "4"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_publication_unmapped_invalidated"]!] == "1"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_publication_unmapped_sample"]!] == "Root/Missing"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_publication_portal_root_queued"]!] == "1"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_baseline_nodes"]!] == "8"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_prepared_nodes"]!] == "9"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_non_graph_checkpoints"]!] == "1"
+    )
     for row in lines.dropFirst() {
       #expect(row.split(separator: "\t", omittingEmptySubsequences: false).count == header.count)
     }
@@ -55,11 +91,25 @@ struct TSVFileSinkTests {
   }
 
   private func makeCommittedSample() -> RuntimeFrameSample {
-    .committed(
+    var diagnostics = FrameDiagnostics()
+    diagnostics.runtime.registrations.publication = .init(
+      publicationMode: "subtrees",
+      dirtyPlanResult: "formed",
+      subtreeRootCount: 2,
+      restoredNodeCount: 4,
+      invalidatedIdentityCount: 3,
+      unmappedInvalidatedIdentityCount: 1,
+      unmappedInvalidatedIdentitySample: [Identity(components: ["Root", "Missing"])],
+      presentationPortalRootQueued: true,
+      graphCheckpointBaselineNodeCount: 8,
+      graphCheckpointPreparedNodeCount: 9,
+      nonGraphCheckpointPresent: true
+    )
+    return .committed(
       CommittedFrameSample(
         frameNumber: 7,
         scheduledFrame: makeScheduledFrame(),
-        diagnostics: FrameDiagnostics(),
+        diagnostics: diagnostics,
         desiredGeneration: 3,
         coalescedEventBatches: 1,
         coalescedWakeCauses: [],

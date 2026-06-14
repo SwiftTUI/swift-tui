@@ -79,10 +79,12 @@ struct DefaultRendererFrameHeadCoordinator {
       resolveContext: resolveContext,
       resolveInputs: resolveInputs
     )
+    graphDraft.recordPresentationPortalRootQueued(portal.queuedRoot)
     let resolvedHead = resolveGraphHead(
       resolveContext: resolveContext,
       graphDraft: graphDraft,
       animationDraft: animationDraft,
+      resolveInputs: resolveInputs,
       canUseSelectiveEvaluation: resolveInputs.usesSelectiveEvaluation,
       clock: clock
     )
@@ -258,15 +260,17 @@ struct DefaultRendererFrameHeadCoordinator {
     viewGraph.setEvaluator(for: presentationPortalContext.identity) {
       _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
     }
-    if !hasExistingPresentationPortalRoot
+    let shouldQueuePresentationPortalRoot =
+      !hasExistingPresentationPortalRoot
       || !resolveInputs.usesSelectiveEvaluation
       || !resolveInputs.invalidatedIdentities.isEmpty
-    {
+    if shouldQueuePresentationPortalRoot {
       viewGraph.queueDirty([presentationPortalContext.identity])
     }
 
     return PresentationPortalPreparation(
       graphRootIdentity: presentationPortalContext.identity,
+      queuedRoot: shouldQueuePresentationPortalRoot,
       draft: presentationPortalDraft
     )
   }
@@ -275,6 +279,7 @@ struct DefaultRendererFrameHeadCoordinator {
     resolveContext: ResolveContext,
     graphDraft: ViewGraphFrameDraft,
     animationDraft: AnimationFrameDraft,
+    resolveInputs: FrameResolveInputs,
     canUseSelectiveEvaluation: Bool,
     clock: ContinuousClock
   ) -> (resolved: ResolvedNode, resolveDuration: Duration) {
@@ -283,10 +288,33 @@ struct DefaultRendererFrameHeadCoordinator {
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
       // Nothing is dirty: keep the existing snapshot and leave root evaluator
       // registrations untouched for this frame.
+      let diagnostics =
+        RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
+        ? viewGraph.noDirtyWorkPlanDiagnostics(
+          invalidatedIdentities: resolveInputs.invalidatedIdentities
+        )
+        : nil
+      graphDraft.recordUnchangedDirtyEvaluation(diagnostics: diagnostics)
       resolveDuration = .zero
     } else {
-      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
-      graphDraft.recordDirtyEvaluationPlan(dirtyEvaluationPlan)
+      let dirtyEvaluation:
+        (
+          plan: DirtyEvaluationPlan?,
+          diagnostics: DirtyEvaluationPlanDiagnostics?
+        )
+      if RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled {
+        let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+          invalidatedIdentities: resolveInputs.invalidatedIdentities
+        )
+        dirtyEvaluation = (evaluation.plan, evaluation.diagnostics)
+      } else {
+        dirtyEvaluation = (viewGraph.selectiveDirtyEvaluationPlan(), nil)
+      }
+      let dirtyEvaluationPlan = dirtyEvaluation.plan
+      graphDraft.recordDirtyEvaluationPlan(
+        dirtyEvaluationPlan,
+        diagnostics: dirtyEvaluation.diagnostics
+      )
 
       (_, resolveDuration) = measurePhase(clock: clock) {
         withAnimationDraftSinks(animationDraft) {
@@ -411,6 +439,7 @@ private struct FrameHeadBaselineCheckpoints {
 
 private struct PresentationPortalPreparation {
   var graphRootIdentity: Identity
+  var queuedRoot: Bool
   var draft: PresentationPortalDraft
 }
 

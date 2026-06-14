@@ -179,7 +179,34 @@ struct ViewGraphTests {
     #expect(!graph.hasDirtyWork)
   }
 
-  @Test("characterization: mapped invalidation without graph-local dirt falls back to root evaluation")
+  @Test("dirty-plan diagnostics identify unmapped invalidation fallback")
+  func dirtyPlanDiagnosticsIdentifyUnmappedInvalidationFallback() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let removedIdentity = testIdentity("Root", "RemovedAlias")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root
+      )
+    )
+
+    graph.beginFrame()
+    graph.invalidate([removedIdentity])
+
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: [removedIdentity]
+    )
+
+    #expect(result.plan == nil)
+    #expect(result.diagnostics.result == "nil_unmapped_invalidated_identity")
+    #expect(result.diagnostics.invalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [removedIdentity])
+  }
+
+  @Test(
+    "characterization: mapped invalidation without graph-local dirt falls back to root evaluation")
   func mappedInvalidationWithoutDirtyCauseFallsBackToRootEvaluation() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
@@ -779,6 +806,52 @@ struct ViewGraphTests {
     )
     #expect(originalCounter.count == 1)
     #expect(draftCounter.count == 0)
+  }
+
+  @Test("frame draft publication diagnostics describe subtree commit")
+  func frameDraftPublicationDiagnosticsDescribeSubtreeCommit() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    seedCommandGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      childIdentity: childIdentity,
+      binding: KeyBinding(key: .character("x"), modifiers: .ctrl),
+      description: "Original",
+      counter: RegistrationCounter()
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+    graph.setEvaluator(for: childIdentity) {}
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: graph.makeCheckpoint(),
+      publicationDiagnosticsEnabled: true
+    )
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty([childIdentity])
+    let dirtyEvaluation = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: [childIdentity]
+    )
+    graphDraft.recordDirtyEvaluationPlan(
+      dirtyEvaluation.plan,
+      diagnostics: dirtyEvaluation.diagnostics
+    )
+
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: graph)
+
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+    #expect(diagnostics.publication.dirtyPlanResult == "formed")
+    #expect(diagnostics.publication.subtreeRootCount == 1)
+    #expect(diagnostics.publication.restoredNodeCount == 1)
+    #expect(diagnostics.publication.invalidatedIdentityCount == 1)
+    #expect(diagnostics.publication.unmappedInvalidatedIdentityCount == 0)
+    #expect(diagnostics.publication.graphCheckpointBaselineNodeCount == 2)
   }
 
   @Test("view graph frame draft discard restores graph without live registry mutation")

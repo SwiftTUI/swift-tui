@@ -61,6 +61,17 @@ package enum FrameDiagnosticsTSVFormatting {
     "runtime_pointer_hover_handlers",
     "runtime_gesture_recognizers",
     "runtime_gesture_state_bindings",
+    "runtime_publication_mode",
+    "runtime_dirty_plan_result",
+    "runtime_publication_subtree_roots",
+    "runtime_publication_restored_nodes",
+    "runtime_publication_invalidated",
+    "runtime_publication_unmapped_invalidated",
+    "runtime_publication_unmapped_sample",
+    "runtime_publication_portal_root_queued",
+    "runtime_graph_checkpoint_baseline_nodes",
+    "runtime_graph_checkpoint_prepared_nodes",
+    "runtime_non_graph_checkpoints",
     "runtime_issue_count",
     "runtime_issues",
     "stale_frame_policy",
@@ -169,6 +180,9 @@ package enum FrameDiagnosticsTSVFormatting {
     let damageCells = record.damageTextCellCount.map(String.init) ?? "-"
     let damageGraphics = record.damageGraphicsInvalidationCount.map(String.init) ?? "-"
     let scheduledAnimationBatch = record.scheduledAnimationBatchID.map(String.init) ?? "-"
+    let publicationUnmappedSample = record.runtimePublicationUnmappedInvalidatedIdentitySample
+      .map(\.path)
+      .joined(separator: ",")
 
     return [
       String(record.frameNumber),
@@ -230,6 +244,17 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.runtimePointerHoverHandlerCount),
       String(record.runtimeGestureRecognizerCount),
       String(record.runtimeGestureStateBindingCount),
+      record.runtimePublicationMode,
+      record.runtimeDirtyPlanResult,
+      String(record.runtimePublicationSubtreeRootCount),
+      formatOptionalInt(record.runtimePublicationRestoredNodeCount),
+      String(record.runtimePublicationInvalidatedIdentityCount),
+      String(record.runtimePublicationUnmappedInvalidatedIdentityCount),
+      publicationUnmappedSample.isEmpty ? "-" : sanitizeField(publicationUnmappedSample),
+      formatOptionalBool(record.runtimePublicationPresentationPortalRootQueued),
+      formatOptionalInt(record.runtimePublicationGraphCheckpointBaselineNodeCount),
+      formatOptionalInt(record.runtimePublicationGraphCheckpointPreparedNodeCount),
+      formatOptionalBool(record.runtimePublicationNonGraphCheckpointPresent),
       String(record.runtimeIssues.count),
       formatRuntimeIssues(record.runtimeIssues),
       record.staleFramePolicy,
@@ -291,6 +316,17 @@ package enum FrameDiagnosticsTSVFormatting {
 
   private static func formatGeneration(_ generation: RenderGeneration?) -> String {
     generation.map { String($0.rawValue) } ?? "-"
+  }
+
+  private static func formatOptionalInt(_ value: Int?) -> String {
+    value.map(String.init) ?? "-"
+  }
+
+  private static func formatOptionalBool(_ value: Bool?) -> String {
+    guard let value else {
+      return "-"
+    }
+    return value ? "1" : "0"
   }
 
   private static func formatDropBlockers(

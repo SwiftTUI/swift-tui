@@ -17,24 +17,51 @@ package final class ViewGraphFrameDraft {
   private var preparedCheckpoint: ViewGraph.Checkpoint?
   private(set) package var runtimeRegistrationPublication: RuntimeRegistrationPublication =
     .unchanged
+  private let publicationDiagnosticsEnabled: Bool
+  private var publicationDiagnostics = RuntimeRegistrationPublicationDiagnostics()
   private var didCommit = false
   private var didDiscard = false
 
   package init(
     liveRegistrations: RuntimeRegistrationSet,
-    checkpoint: ViewGraph.Checkpoint?
+    checkpoint: ViewGraph.Checkpoint?,
+    publicationDiagnosticsEnabled: Bool =
+      RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
   ) {
     self.liveRegistrations = liveRegistrations
     self.checkpoint = checkpoint
+    self.publicationDiagnosticsEnabled = publicationDiagnosticsEnabled
+    if publicationDiagnosticsEnabled {
+      publicationDiagnostics.graphCheckpointBaselineNodeCount = checkpoint?.nodesByNodeID.count
+      publicationDiagnostics.nonGraphCheckpointPresent = checkpoint != nil
+    }
   }
 
-  package func recordDirtyEvaluationPlan(_ plan: DirtyEvaluationPlan?) {
+  package func recordDirtyEvaluationPlan(
+    _ plan: DirtyEvaluationPlan?,
+    diagnostics dirtyPlanDiagnostics: DirtyEvaluationPlanDiagnostics? = nil
+  ) {
     precondition(!didCommit && !didDiscard)
     if let plan {
       recordSubtreePublication(rootedAt: plan.frontierIdentities)
     } else {
       runtimeRegistrationPublication = .all
     }
+    recordDirtyPlanDiagnostics(dirtyPlanDiagnostics)
+  }
+
+  package func recordUnchangedDirtyEvaluation(
+    diagnostics dirtyPlanDiagnostics: DirtyEvaluationPlanDiagnostics?
+  ) {
+    precondition(!didCommit && !didDiscard)
+    recordDirtyPlanDiagnostics(dirtyPlanDiagnostics)
+  }
+
+  package func recordPresentationPortalRootQueued(_ queued: Bool) {
+    guard publicationDiagnosticsEnabled else {
+      return
+    }
+    publicationDiagnostics.presentationPortalRootQueued = queued
   }
 
   package func recordPreparedCheckpoint(from viewGraph: ViewGraph) {
@@ -43,6 +70,10 @@ package final class ViewGraphFrameDraft {
       return
     }
     preparedCheckpoint = viewGraph.makeCheckpoint()
+    if publicationDiagnosticsEnabled {
+      publicationDiagnostics.graphCheckpointPreparedNodeCount =
+        preparedCheckpoint?.nodesByNodeID.count
+    }
   }
 
   package func materializePreparedState(
@@ -82,6 +113,7 @@ package final class ViewGraphFrameDraft {
     from viewGraph: ViewGraph
   ) -> RuntimeRegistrationDiagnostics {
     precondition(!didCommit && !didDiscard)
+    var restoredNodeCount: Int?
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live
@@ -90,8 +122,12 @@ package final class ViewGraphFrameDraft {
       // append duplicates into the order-sensitive focus lists (which are not
       // reset on this path). Skipping leaves the registry byte-identical to a
       // full rebuild.
+      restoredNodeCount = 0
       break
     case .all:
+      if publicationDiagnosticsEnabled {
+        restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
+      }
       liveRegistrations.resetAll()
       viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     case .subtrees(let roots):
@@ -100,6 +136,9 @@ package final class ViewGraphFrameDraft {
       // place, so the result equals a full rebuild for the changed subtrees —
       // this is the O(tree) commit win (the reset already removed exactly these
       // subtrees). See the registration-restore fix plan.
+      if publicationDiagnosticsEnabled {
+        restoredNodeCount = viewGraph.runtimeRegistrationSubtreeNodeCount(rootedAt: roots)
+      }
       liveRegistrations.removeSubtrees(rootedAt: roots)
       viewGraph.restoreRuntimeRegistrationSubtrees(
         rootedAt: roots,
@@ -117,7 +156,14 @@ package final class ViewGraphFrameDraft {
       viewGraph.republishAllTaskRegistrations(into: liveRegistrations)
     }
     didCommit = true
-    return liveRegistrations.diagnostics()
+    var diagnostics = liveRegistrations.diagnostics()
+    if publicationDiagnosticsEnabled {
+      publicationDiagnostics.publicationMode = publicationModeName
+      publicationDiagnostics.subtreeRootCount = publicationSubtreeRootCount
+      publicationDiagnostics.restoredNodeCount = restoredNodeCount
+      diagnostics.publication = publicationDiagnostics
+    }
+    return diagnostics
   }
 
   package func updateCommittedScrollGeometry(
@@ -153,6 +199,43 @@ package final class ViewGraphFrameDraft {
       runtimeRegistrationPublication = .subtrees(existing + roots)
     case .all:
       break
+    }
+  }
+
+  private func recordDirtyPlanDiagnostics(
+    _ dirtyPlanDiagnostics: DirtyEvaluationPlanDiagnostics?
+  ) {
+    guard publicationDiagnosticsEnabled,
+      let dirtyPlanDiagnostics
+    else {
+      return
+    }
+    publicationDiagnostics.dirtyPlanResult = dirtyPlanDiagnostics.result
+    publicationDiagnostics.invalidatedIdentityCount =
+      dirtyPlanDiagnostics.invalidatedIdentityCount
+    publicationDiagnostics.unmappedInvalidatedIdentityCount =
+      dirtyPlanDiagnostics.unmappedInvalidatedIdentityCount
+    publicationDiagnostics.unmappedInvalidatedIdentitySample =
+      dirtyPlanDiagnostics.unmappedInvalidatedIdentitySample
+  }
+
+  private var publicationModeName: String {
+    switch runtimeRegistrationPublication {
+    case .unchanged:
+      "unchanged"
+    case .all:
+      "all"
+    case .subtrees:
+      "subtrees"
+    }
+  }
+
+  private var publicationSubtreeRootCount: Int {
+    switch runtimeRegistrationPublication {
+    case .unchanged, .all:
+      0
+    case .subtrees(let roots):
+      roots.count
     }
   }
 }
