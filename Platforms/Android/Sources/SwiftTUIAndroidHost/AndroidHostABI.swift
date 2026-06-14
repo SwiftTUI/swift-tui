@@ -134,3 +134,20 @@ public func swift_tui_android_copy_latest_frame(
   )
   return Int32(clamping: needed)
 }
+
+@_cdecl("swift_tui_android_copy_clipboard_text")
+public func swift_tui_android_copy_clipboard_text(
+  _ handle: Int64,
+  _ outBuffer: UnsafeMutablePointer<UInt8>?,
+  _ capacity: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle) else {
+    return 0
+  }
+
+  let needed = unsafe host.copyPendingClipboardText(
+    to: outBuffer,
+    capacity: max(0, Int(capacity))
+  )
+  return Int32(clamping: needed)
+}

@@ -60,7 +60,7 @@ of focused contracts.
 | WASI / browser | `WebSurfaceTransport` serializes damage into the web-surface frame; the browser canvas clears and redraws dirty rects only. |
 | Localhost WebHost | `WebSocketSurfaceTransport` serializes the same web-surface damage over WebSocket. |
 | Host-managed SwiftUI | `HostedRasterSurface` carries damage through `SemanticHostFrame`; `NativeTerminalSurfaceView` invalidates only dirty native rects. |
-| Host-managed Android | `SwiftTUIAndroidHost` serializes damage rows/ranges into the Android frame snapshot; the current Compose renderer consumes the metadata but still redraws the canvas. |
+| Host-managed Android | `SwiftTUIAndroidHost` serializes damage rows/ranges into the Android frame snapshot; the Compose renderer keeps a retained bitmap and repaints only the damaged rows when a frame's damage is contiguous, falling back to a full repaint otherwise (size change, full-repaint flag, images present, or a skipped sequence). |
 
 ```mermaid
 flowchart LR

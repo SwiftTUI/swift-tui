@@ -13,6 +13,10 @@ private struct AndroidHostSceneHostState: Sendable {
   var surfaceSize: CellSize
   var cellPixelSize: PixelSize?
   var lastErrorDescription: String?
+  // Latest clipboard-write requested by the running app (an `onClipboardWrite`
+  // from the runtime). Drained exactly once when the client copies it across
+  // the ABI, so a system clipboard write happens per copy rather than per poll.
+  var pendingClipboardText: String?
 }
 
 private final class AndroidHostSceneHostStateBox: Sendable {
@@ -93,6 +97,42 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       state.cellPixelSize = cellPixelSize
     }
   }
+
+  func recordClipboardWrite(
+    _ text: String
+  ) {
+    // An empty write carries nothing to deliver; ignore it so a size query can
+    // never report a 0-byte payload that looks like "nothing pending".
+    guard !text.isEmpty else {
+      return
+    }
+    state.withLock { state in
+      state.pendingClipboardText = text
+    }
+  }
+
+  /// Copies the pending clipboard text as UTF-8 into `outBuffer`, draining it on
+  /// a successful copy. Mirrors `copyLatestFrameBytes`: a `nil` buffer or an
+  /// undersized `capacity` is a size query that reports the byte count without
+  /// draining, so the two-call (size-then-copy) ABI handshake delivers a copy
+  /// exactly once.
+  func copyPendingClipboardBytes(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int {
+    state.withLock { state in
+      guard let text = state.pendingClipboardText else {
+        return 0
+      }
+      let bytes = Array(text.utf8)
+      guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
+        return bytes.count
+      }
+      unsafe outBuffer.update(from: bytes, count: bytes.count)
+      state.pendingClipboardText = nil
+      return bytes.count
+    }
+  }
 }
 
 public final class AndroidHostSceneHost {
@@ -130,6 +170,10 @@ public final class AndroidHostSceneHost {
       frameDelivery: .assumedMainActor,
       onFrame: { frame in
         state.updateFrame(frame, style: style)
+      },
+      onClipboardWrite: { text in
+        state.recordClipboardWrite(text)
+        return true
       }
     )
     let session = try HostedSceneSession(
@@ -289,6 +333,15 @@ public final class AndroidHostSceneHost {
     }
     unsafe outBuffer.update(from: bytes, count: bytes.count)
     return bytes.count
+  }
+
+  /// Drains the latest app-requested clipboard text as UTF-8 bytes. The client
+  /// polls this across the ABI and forwards the bytes to the system clipboard.
+  public func copyPendingClipboardText(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int {
+    unsafe state.copyPendingClipboardBytes(to: outBuffer, capacity: capacity)
   }
 
 }

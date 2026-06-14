@@ -32,21 +32,29 @@ overlay.
 **Shipped.** `SwiftTUIAndroidHost` builds for `aarch64-unknown-linux-android28`
 and the `swift-tui-examples/AndroidGallery` app embeds `GalleryView()` in a
 Compose host. The frame snapshot carries styled cells, image attachment payloads,
-damage metadata, focus presentation, accessibility nodes, and announcements.
-The Compose renderer paints styled cells and embedded images, exposes a
-transparent semantics overlay, and bridges hardware keys plus basic touch
-activation.
+damage metadata, focus presentation, accessibility nodes, and announcements, and
+the host surfaces app-requested clipboard writes back across the JNI/C ABI
+(`swift_tui_android_copy_clipboard_text`). The Compose renderer paints styled
+cells and embedded images — drawing box-drawing, block, and braille glyphs
+procedurally for seamless tiling — maintains a retained bitmap and repaints only
+damaged rows when a frame's damage is contiguous, and exposes a transparent
+semantics overlay that speaks runtime announcements through TalkBack. Input
+bridges hardware keys (arrows, Home/End, Page Up/Down, Delete/Insert, and
+Ctrl/Alt modifiers), the soft keyboard for text-input focus, touch press/drag,
+wheel scroll, tap-to-open hyperlinks, and system clipboard copy and (bracketed)
+paste.
 
 **Not yet built.**
 
-- **Full Android input parity.** IME composition, clipboard, link opening,
-  precise drag/scroll gestures, Android accessibility focus feedback, and
-  Android content URI import are not implemented.
-- **Retained Android damage rendering.** Damage rows/ranges are serialized, but
-  the current Compose renderer redraws the canvas rather than maintaining a
-  retained bitmap cache.
-- **Automated Android runtime gate.** `AndroidGallery` assembles locally, but
-  emulator/device smoke is not in CI.
+- **Bidirectional Android accessibility focus and IME composition.** Runtime
+  focus reaches TalkBack, but TalkBack-originated focus traversal is not fed
+  back into the runtime, and full IME pre-edit/marked-text composition (beyond
+  committed text) is not implemented.
+- **Android content URI import.** SAF / `content://` ingestion into the runtime
+  drop path is not implemented.
+- **Automated Android runtime gate.** `AndroidGallery` assembles locally and the
+  Kotlin client logic now has JVM unit tests (`./gradlew testDebugUnitTest`,
+  which run without the NDK), but emulator/device smoke is not in CI.
 - **`x86_64` Android.** The first supported target is `arm64-v8a`; `x86_64`
   Android remains blocked by the vendored `swift-png` SIMD path.
 
