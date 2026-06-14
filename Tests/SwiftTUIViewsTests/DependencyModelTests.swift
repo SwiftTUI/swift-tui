@@ -1,4 +1,5 @@
 import Observation
+import Synchronization
 import Testing
 
 @testable import SwiftTUICore
@@ -24,11 +25,47 @@ extension EnvironmentValues {
   }
 }
 
-@Observable
-private final class DependencyObservableModel: @unchecked Sendable {
-  var name = "Ada"
-  var age = 37
-  var scores = [1, 2, 3]
+private final class DependencyObservableModel: Observable, Sendable {
+  private let observationRegistrar = ObservationRegistrar()
+  private let nameStorage = Mutex("Ada")
+  private let ageStorage = Mutex(37)
+  private let scoresStorage = Mutex([1, 2, 3])
+
+  var name: String {
+    get {
+      observationRegistrar.access(self, keyPath: \.name)
+      return nameStorage.withLock { $0 }
+    }
+    set {
+      observationRegistrar.withMutation(of: self, keyPath: \.name) {
+        nameStorage.withLock { $0 = newValue }
+      }
+    }
+  }
+
+  var age: Int {
+    get {
+      observationRegistrar.access(self, keyPath: \.age)
+      return ageStorage.withLock { $0 }
+    }
+    set {
+      observationRegistrar.withMutation(of: self, keyPath: \.age) {
+        ageStorage.withLock { $0 = newValue }
+      }
+    }
+  }
+
+  var scores: [Int] {
+    get {
+      observationRegistrar.access(self, keyPath: \.scores)
+      return scoresStorage.withLock { $0 }
+    }
+    set {
+      observationRegistrar.withMutation(of: self, keyPath: \.scores) {
+        scoresStorage.withLock { $0 = newValue }
+      }
+    }
+  }
 }
 
 @MainActor

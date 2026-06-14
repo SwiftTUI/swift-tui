@@ -113,6 +113,7 @@ SwiftTUIAndroidHost.AndroidHostRangeSnapshot.upperBound
 SwiftTUIAndroidHost.AndroidHostSceneHost
 SwiftTUIAndroidHost.AndroidHostSceneHost.cellPixelSize
 SwiftTUIAndroidHost.AndroidHostSceneHost.copyLatestFrameBytes(to:capacity:)
+SwiftTUIAndroidHost.AndroidHostSceneHost.copyPendingClipboardText(to:capacity:)
 SwiftTUIAndroidHost.AndroidHostSceneHost.descriptor
 SwiftTUIAndroidHost.AndroidHostSceneHost.focusPresentation
 SwiftTUIAndroidHost.AndroidHostSceneHost.init(app:sceneID:style:)
@@ -158,6 +159,7 @@ SwiftTUIAndroidHost.AndroidHostTextStyleSnapshot.init(from:)
 SwiftTUIAndroidHost.AndroidHostTextStyleSnapshot.opacity
 SwiftTUIAndroidHost.AndroidHostTextStyleSnapshot.strikethroughStyle
 SwiftTUIAndroidHost.AndroidHostTextStyleSnapshot.underlineStyle
+SwiftTUIAndroidHost.swift_tui_android_copy_clipboard_text(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_copy_latest_frame(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_destroy(_:)
 SwiftTUIAndroidHost.swift_tui_android_resize(_:_:_:_:_:)
