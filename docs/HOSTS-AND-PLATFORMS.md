@@ -130,7 +130,7 @@ flowchart LR
 | Linux terminal builds and tests | Supported through `swiftly`. |
 | iOS package builds | Supported for host-compatible products; CI builds (does not run tests). PTY/terminal-embedding products are excluded. |
 | WASI / browser | Supported through `SwiftTUIWASI` and the `SwiftTUI/swift-tui-web` browser packages. |
-| Android host / cross-compilation | `SwiftTUIAndroidHost` builds for `aarch64-unknown-linux-android28` and is exercised by the `swift-tui-examples/AndroidGallery` Compose app. `x86_64` currently fails inside the vendored `swift-png` SIMD path — see [VISION-GAP.md](VISION-GAP.md). |
+| Android host / cross-compilation | `SwiftTUIAndroidHost` cross-compiles for both `aarch64-unknown-linux-android28` and `x86_64-unknown-linux-android28` (the vendored `swift-png`/`JPEG` image path builds for x86_64; the earlier SIMD blocker no longer applies). The `swift-tui-examples/AndroidGallery` Compose app currently packages and exercises `arm64-v8a` — see [VISION-GAP.md](VISION-GAP.md). |
 | `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` (PTY embedding) | macOS and Linux only. |
 | `SwiftUIHost` | macOS only; excluded from Linux at compile time. |
 

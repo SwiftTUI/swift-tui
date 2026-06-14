@@ -55,8 +55,12 @@ paste.
 - **Automated Android runtime gate.** `AndroidGallery` assembles locally and the
   Kotlin client logic now has JVM unit tests (`./gradlew testDebugUnitTest`,
   which run without the NDK), but emulator/device smoke is not in CI.
-- **`x86_64` Android.** The first supported target is `arm64-v8a`; `x86_64`
-  Android remains blocked by the vendored `swift-png` SIMD path.
+- **`x86_64` Android packaging.** The framework — including the vendored
+  `swift-png`/`JPEG` image path — cross-compiles for
+  `x86_64-unknown-linux-android28`; the earlier `swift-png` SIMD build blocker
+  no longer applies (the SIMD pixel path was replaced by a scalar
+  reimplementation). `arm64-v8a` is simply the only ABI the `AndroidGallery`
+  example currently packages and smoke-tests.
 
 ## Terminal-program embedding
 
