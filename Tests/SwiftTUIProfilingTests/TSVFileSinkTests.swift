@@ -38,6 +38,10 @@ struct TSVFileSinkTests {
       firstRow[headerColumns["runtime_dirty_plan_result"]!] == "formed"
     )
     #expect(
+      firstRow[headerColumns["runtime_selective_evaluation_disabled_reasons"]!]
+        == "pressed_changed,root_invalidated"
+    )
+    #expect(
       firstRow[headerColumns["runtime_publication_subtree_roots"]!] == "2"
     )
     #expect(
@@ -100,6 +104,10 @@ struct TSVFileSinkTests {
       invalidatedIdentityCount: 3,
       unmappedInvalidatedIdentityCount: 1,
       unmappedInvalidatedIdentitySample: [Identity(components: ["Root", "Missing"])],
+      selectiveEvaluationDisabledReasons: [
+        "pressed_changed",
+        "root_invalidated",
+      ],
       presentationPortalRootQueued: true,
       graphCheckpointBaselineNodeCount: 8,
       graphCheckpointPreparedNodeCount: 9,

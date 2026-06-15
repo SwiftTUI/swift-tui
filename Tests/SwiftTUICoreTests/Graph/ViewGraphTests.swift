@@ -574,7 +574,11 @@ struct ViewGraphTests {
     )
 
     let diagnostics = graph.disabledSelectiveEvaluationPlanDiagnostics(
-      invalidatedIdentities: [childIdentity, unknownIdentity]
+      invalidatedIdentities: [childIdentity, unknownIdentity],
+      selectiveEvaluationDisabledReasons: [
+        "pressed_changed",
+        "root_invalidated",
+      ]
     )
 
     #expect(diagnostics.result == "nil_selective_evaluation_disabled")
@@ -582,6 +586,12 @@ struct ViewGraphTests {
     #expect(diagnostics.invalidatedIdentityCount == 2)
     #expect(diagnostics.unmappedInvalidatedIdentityCount == 1)
     #expect(diagnostics.unmappedInvalidatedIdentitySample == [unknownIdentity])
+    #expect(
+      diagnostics.selectiveEvaluationDisabledReasons == [
+        "pressed_changed",
+        "root_invalidated",
+      ]
+    )
   }
 
   @Test("ViewNodeID is stable for live identities and reminted after removal")

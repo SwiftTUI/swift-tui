@@ -53,6 +53,7 @@ public struct FrameDiagnosticRecord: Sendable {
   package var runtimePublicationInvalidatedIdentityCount: Int = 0
   package var runtimePublicationUnmappedInvalidatedIdentityCount: Int = 0
   package var runtimePublicationUnmappedInvalidatedIdentitySample: [Identity] = []
+  package var runtimeSelectiveEvaluationDisabledReasons: [String] = []
   package var runtimePublicationPresentationPortalRootQueued: Bool?
   package var runtimePublicationGraphCheckpointBaselineNodeCount: Int?
   package var runtimePublicationGraphCheckpointPreparedNodeCount: Int?

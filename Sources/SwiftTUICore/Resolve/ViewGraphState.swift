@@ -119,19 +119,22 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
   package var invalidatedIdentityCount: Int
   package var unmappedInvalidatedIdentityCount: Int
   package var unmappedInvalidatedIdentitySample: [Identity]
+  package var selectiveEvaluationDisabledReasons: [String]
 
   package init(
     result: String,
     frontierRootCount: Int = 0,
     invalidatedIdentityCount: Int = 0,
     unmappedInvalidatedIdentityCount: Int = 0,
-    unmappedInvalidatedIdentitySample: [Identity] = []
+    unmappedInvalidatedIdentitySample: [Identity] = [],
+    selectiveEvaluationDisabledReasons: [String] = []
   ) {
     self.result = result
     self.frontierRootCount = frontierRootCount
     self.invalidatedIdentityCount = invalidatedIdentityCount
     self.unmappedInvalidatedIdentityCount = unmappedInvalidatedIdentityCount
     self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
+    self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
   }
 }
 

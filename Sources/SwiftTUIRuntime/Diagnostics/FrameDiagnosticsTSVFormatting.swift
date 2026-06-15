@@ -63,6 +63,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "runtime_gesture_state_bindings",
     "runtime_publication_mode",
     "runtime_dirty_plan_result",
+    "runtime_selective_evaluation_disabled_reasons",
     "runtime_publication_subtree_roots",
     "runtime_publication_restored_nodes",
     "runtime_publication_invalidated",
@@ -183,6 +184,8 @@ package enum FrameDiagnosticsTSVFormatting {
     let publicationUnmappedSample = record.runtimePublicationUnmappedInvalidatedIdentitySample
       .map(\.path)
       .joined(separator: ",")
+    let selectiveEvaluationDisabledReasons =
+      record.runtimeSelectiveEvaluationDisabledReasons.joined(separator: ",")
 
     return [
       String(record.frameNumber),
@@ -246,6 +249,9 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.runtimeGestureStateBindingCount),
       record.runtimePublicationMode,
       record.runtimeDirtyPlanResult,
+      selectiveEvaluationDisabledReasons.isEmpty
+        ? "-"
+        : sanitizeField(selectiveEvaluationDisabledReasons),
       String(record.runtimePublicationSubtreeRootCount),
       formatOptionalInt(record.runtimePublicationRestoredNodeCount),
       String(record.runtimePublicationInvalidatedIdentityCount),

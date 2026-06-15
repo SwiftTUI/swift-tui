@@ -22,6 +22,7 @@ struct FrameResolveStateTests {
 
     #expect(inputs.usesSelectiveEvaluation)
     #expect(!inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [])
   }
 
   @Test("runtime gate: root invalidation disables selective evaluation")
@@ -39,6 +40,7 @@ struct FrameResolveStateTests {
 
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(!inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.rootInvalidated])
   }
 
   @Test("runtime gate: forced root evaluation disables selective evaluation")
@@ -57,6 +59,7 @@ struct FrameResolveStateTests {
 
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.frameStateForceRoot])
   }
 
   @Test("runtime gate: context root evaluation request disables selective evaluation")
@@ -75,6 +78,7 @@ struct FrameResolveStateTests {
 
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.contextForceRoot])
   }
 
   @Test("runtime gate: focus change disables selective evaluation")
@@ -93,6 +97,7 @@ struct FrameResolveStateTests {
 
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.focusChanged])
   }
 
   @Test("runtime gate: pressed change disables selective evaluation")
@@ -111,6 +116,7 @@ struct FrameResolveStateTests {
 
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.pressedChanged])
   }
 
   @Test("runtime gate: proposal change disables selective evaluation")
@@ -128,6 +134,36 @@ struct FrameResolveStateTests {
 
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.proposalChanged])
+  }
+
+  @Test("runtime gate: disabled reasons preserve multiple blockers")
+  func disabledReasonsPreserveMultipleBlockers() {
+    let rootIdentity = testIdentity("Root")
+    let state = warmedSelectiveState(rootIdentity: rootIdentity)
+    state.forceRootEvaluation = true
+
+    let inputs = state.prepareInputs(
+      from: resolveContext(
+        rootIdentity: rootIdentity,
+        invalidatedIdentities: [rootIdentity],
+        pressedIdentity: testIdentity("Root", "Pressed"),
+        forceRootEvaluation: true
+      ),
+      proposal: ProposedSize(width: 120, height: 30)
+    )
+
+    #expect(!inputs.usesSelectiveEvaluation)
+    #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(
+      inputs.selectiveEvaluationDisabledReasons == [
+        .frameStateForceRoot,
+        .contextForceRoot,
+        .pressedChanged,
+        .proposalChanged,
+        .rootInvalidated,
+      ]
+    )
   }
 }
 

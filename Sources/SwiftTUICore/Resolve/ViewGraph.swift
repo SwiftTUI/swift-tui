@@ -917,13 +917,17 @@ package final class ViewGraph {
   }
 
   package func disabledSelectiveEvaluationPlanDiagnostics(
-    invalidatedIdentities: Set<Identity>
+    invalidatedIdentities: Set<Identity>,
+    selectiveEvaluationDisabledReasons: [String] = []
   ) -> DirtyEvaluationPlanDiagnostics {
     let unmappedIdentities = unmappedInvalidatedIdentities(invalidatedIdentities)
-    return dirtyPlanBaseDiagnostics(
-      invalidatedIdentities: invalidatedIdentities,
-      unmappedIdentities: unmappedIdentities
-    )("nil_selective_evaluation_disabled", 0)
+    return DirtyEvaluationPlanDiagnostics(
+      result: "nil_selective_evaluation_disabled",
+      invalidatedIdentityCount: invalidatedIdentities.count,
+      unmappedInvalidatedIdentityCount: unmappedIdentities.count,
+      unmappedInvalidatedIdentitySample: Array(unmappedIdentities.prefix(5)),
+      selectiveEvaluationDisabledReasons: selectiveEvaluationDisabledReasons
+    )
   }
 
   /// Whether any identities are dirty and need evaluation this frame.

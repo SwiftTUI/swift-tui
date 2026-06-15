@@ -217,6 +217,8 @@ package final class ViewGraphFrameDraft {
       dirtyPlanDiagnostics.unmappedInvalidatedIdentityCount
     publicationDiagnostics.unmappedInvalidatedIdentitySample =
       dirtyPlanDiagnostics.unmappedInvalidatedIdentitySample
+    publicationDiagnostics.selectiveEvaluationDisabledReasons =
+      dirtyPlanDiagnostics.selectiveEvaluationDisabledReasons
   }
 
   private var publicationModeName: String {

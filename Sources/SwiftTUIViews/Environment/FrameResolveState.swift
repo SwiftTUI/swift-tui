@@ -45,6 +45,21 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   }
 }
 
+/// Runtime gate that prevented selective dirty evaluation for a frame.
+package enum SelectiveEvaluationDisabledReason: String, Sendable {
+  case selectiveEvaluationNotEnabled = "selective_evaluation_not_enabled"
+  case frameStateForceRoot = "frame_state_force_root"
+  case contextForceRoot = "context_force_root"
+  case focusChanged = "focus_changed"
+  case pressedChanged = "pressed_changed"
+  case proposalChanged = "proposal_changed"
+  case rootInvalidated = "root_invalidated"
+
+  package var diagnosticName: String {
+    rawValue
+  }
+}
+
 /// Value-owned inputs for one resolve pass.
 ///
 /// Stored evaluator closures can outlive the frame where they were first
@@ -62,6 +77,7 @@ package struct FrameResolveInputs {
   package var proposal: ProposedSize
   package var usesSelectiveEvaluation: Bool
   package var environmentRequiresRootEvaluation: Bool
+  package var selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason]
   /// Retained-reuse suppression for reuse-unsafe identities this frame.
   ///
   /// The run loop sets this alongside `forceRootEvaluation` on frames where
@@ -81,6 +97,7 @@ package struct FrameResolveInputs {
     proposal: ProposedSize,
     usesSelectiveEvaluation: Bool,
     environmentRequiresRootEvaluation: Bool,
+    selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason] = [],
     retainedReuseSuppressionScope: RetainedReuseSuppressionScope = .none
   ) {
     self.invalidatedIdentities = invalidatedIdentities
@@ -92,6 +109,7 @@ package struct FrameResolveInputs {
     self.proposal = proposal
     self.usesSelectiveEvaluation = usesSelectiveEvaluation
     self.environmentRequiresRootEvaluation = environmentRequiresRootEvaluation
+    self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
     self.retainedReuseSuppressionScope = retainedReuseSuppressionScope
   }
 }
@@ -126,6 +144,7 @@ extension FrameResolveInputBox {
       package var proposal: ProposedSize
       package var usesSelectiveEvaluation: Bool
       package var environmentRequiresRootEvaluation: Bool
+      package var selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason]
       package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     }
 
@@ -152,6 +171,7 @@ extension FrameResolveInputBox {
           proposal: $0.proposal,
           usesSelectiveEvaluation: $0.usesSelectiveEvaluation,
           environmentRequiresRootEvaluation: $0.environmentRequiresRootEvaluation,
+          selectiveEvaluationDisabledReasons: $0.selectiveEvaluationDisabledReasons,
           retainedReuseSuppressionScope: $0.retainedReuseSuppressionScope
         )
       }
@@ -188,12 +208,18 @@ package final class FrameResolveState {
   ) -> FrameResolveInputs {
     let newFocused = context.environmentValues.focusedIdentity
     let newPressed = context.environmentValues.pressedIdentity
+    let frameStateForceRoot = forceRootEvaluation
+    let contextForceRoot = context.forceRootEvaluation
+    let focusChanged = newFocused != previousFocusedIdentity
+    let pressedChanged = newPressed != previousPressedIdentity
+    let proposalChanged = proposal != previousProposal
+    let rootInvalidated = context.invalidatedIdentities.contains(context.identity)
     let environmentRequiresRootEvaluation =
-      forceRootEvaluation
-      || context.forceRootEvaluation
-      || newFocused != previousFocusedIdentity
-      || newPressed != previousPressedIdentity
-      || proposal != previousProposal
+      frameStateForceRoot
+      || contextForceRoot
+      || focusChanged
+      || pressedChanged
+      || proposalChanged
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed
     previousProposal = proposal
@@ -204,7 +230,30 @@ package final class FrameResolveState {
     let usesSelectiveEvaluation =
       selectiveEvaluationEnabled
       && !environmentRequiresRootEvaluation
-      && !context.invalidatedIdentities.contains(context.identity)
+      && !rootInvalidated
+
+    var disabledReasons: [SelectiveEvaluationDisabledReason] = []
+    if !selectiveEvaluationEnabled {
+      disabledReasons.append(.selectiveEvaluationNotEnabled)
+    }
+    if frameStateForceRoot {
+      disabledReasons.append(.frameStateForceRoot)
+    }
+    if contextForceRoot {
+      disabledReasons.append(.contextForceRoot)
+    }
+    if focusChanged {
+      disabledReasons.append(.focusChanged)
+    }
+    if pressedChanged {
+      disabledReasons.append(.pressedChanged)
+    }
+    if proposalChanged {
+      disabledReasons.append(.proposalChanged)
+    }
+    if rootInvalidated {
+      disabledReasons.append(.rootInvalidated)
+    }
 
     return FrameResolveInputs(
       invalidatedIdentities: context.invalidatedIdentities,
@@ -216,6 +265,7 @@ package final class FrameResolveState {
       proposal: proposal,
       usesSelectiveEvaluation: usesSelectiveEvaluation,
       environmentRequiresRootEvaluation: environmentRequiresRootEvaluation,
+      selectiveEvaluationDisabledReasons: usesSelectiveEvaluation ? [] : disabledReasons,
       retainedReuseSuppressionScope: suppressionScope
     )
   }

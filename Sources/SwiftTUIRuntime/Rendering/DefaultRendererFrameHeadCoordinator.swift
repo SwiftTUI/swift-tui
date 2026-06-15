@@ -254,6 +254,13 @@ struct DefaultRendererFrameHeadCoordinator {
       frameState.selectiveEvaluationEnabled
       && !resolveInputs.environmentRequiresRootEvaluation
       && !translatedIdentities.contains(contentRootIdentity)
+    if resolveInputs.usesSelectiveEvaluation {
+      resolveInputs.selectiveEvaluationDisabledReasons = []
+    } else if !translatedIdentities.contains(contentRootIdentity) {
+      resolveInputs.selectiveEvaluationDisabledReasons.removeAll {
+        $0 == .rootInvalidated
+      }
+    }
   }
 
   private func activePresentationOverlayEntryIdentities(
@@ -360,7 +367,9 @@ struct DefaultRendererFrameHeadCoordinator {
           dirtyEvaluation = (
             nil,
             viewGraph.disabledSelectiveEvaluationPlanDiagnostics(
-              invalidatedIdentities: resolveInputs.invalidatedIdentities
+              invalidatedIdentities: resolveInputs.invalidatedIdentities,
+              selectiveEvaluationDisabledReasons: resolveInputs
+                .selectiveEvaluationDisabledReasons.map(\.diagnosticName)
             )
           )
         }
