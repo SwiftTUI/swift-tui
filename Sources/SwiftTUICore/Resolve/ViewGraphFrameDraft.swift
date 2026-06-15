@@ -154,13 +154,14 @@ package final class ViewGraphFrameDraft {
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live
-      // registry already holds the last committed (canonical) state, so there is
-      // nothing to do: re-publishing would be redundant O(tree) work AND would
-      // append duplicates into the order-sensitive focus lists (which are not
-      // reset on this path). Skipping leaves the registry byte-identical to a
-      // full rebuild.
+      // registry usually already holds the last committed (canonical) state.
+      // Still refresh the low-volume effect registries from all live nodes:
+      // one-shot/fresh caller registries may be empty even when the graph is
+      // unchanged, and preference/lifecycle/task effects need matching live
+      // handlers. Keep high-volume and order-sensitive registries untouched so
+      // unchanged commits do not duplicate focus candidates or handlers.
       restoredNodeCount = 0
-      break
+      viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
     case .all:
       if let delta = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame(),
         !viewGraph.runtimeRegistrationDeltaRequiresFullPublication(delta)
@@ -177,8 +178,8 @@ package final class ViewGraphFrameDraft {
             into: liveRegistrations
           )
           liveRegistrations.normalizeScopedRestoreOrder()
-          viewGraph.republishAllTaskRegistrations(into: liveRegistrations)
         }
+        viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
       } else {
         if publicationDiagnosticsEnabled {
           restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
@@ -206,10 +207,12 @@ package final class ViewGraphFrameDraft {
       liveRegistrations.normalizeScopedRestoreOrder()
       // The scoped restore above walks frontier-root ViewNode subtrees, which
       // cannot reach capture-hosted island nodes (deferred tab bodies, portal
-      // content) that resolved this frame outside any frontier root. Autonomous
-      // tasks on such nodes must still reach the live registry or they never
-      // start, so republish the (infrequent) task registry from all live nodes.
-      viewGraph.republishAllTaskRegistrations(into: liveRegistrations)
+      // content, lazy viewport entries) that resolved this frame outside any
+      // frontier root, and reused stable subtrees are intentionally not walked.
+      // Low-volume side-effect handlers on such nodes must still reach the
+      // live registries or runtime commit/observation effects cannot invoke
+      // them.
+      viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
     }
     viewGraph.recordCommittedRuntimeRegistrationFingerprint()
     didCommit = true

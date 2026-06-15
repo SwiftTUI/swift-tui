@@ -21,7 +21,7 @@ import Testing
 /// every minimal shape tried here (plain `TabView`, intermediate-`@State`,
 /// toolbar-wrapped) keeps the body children-reachable, so the scoped restore
 /// finds the task and the test passes with or without the framework fix
-/// (`ViewGraph.republishAllTaskRegistrations`). The fix-isolating regression
+/// (`ViewGraph.republishAllEffectRegistrations`). The fix-isolating regression
 /// home is the examples repo's gallery gravity-loop tests, which reproduce the
 /// seam and now pass with the fix; the fix mechanism itself was confirmed in the
 /// gallery under instrumentation. This test still earns its place: it fails if

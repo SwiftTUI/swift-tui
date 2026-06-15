@@ -85,6 +85,35 @@ struct LayoutAndRenderingPipelineTests {
     #expect(artifacts.rasterSurface.lines.first == "Tope")
   }
 
+  @Test("Spacer inside ZStack is layout-neutral while greedy children stretch")
+  func zStackSpacerIsLayoutNeutralWhileGreedyChildrenStretch() throws {
+    let spacerSurface = DefaultRenderer().render(
+      zStackSizingProbe {
+        Spacer()
+        Text("[X]")
+      },
+      context: .init(identity: testIdentity("ZStackSpacerProbe")),
+      proposal: .init(width: 80, height: 10)
+    ).rasterSurface
+    let greedySurface = DefaultRenderer().render(
+      zStackSizingProbe {
+        Rectangle().fill(Color.blue)
+        Text("[X]")
+      },
+      context: .init(identity: testIdentity("ZStackGreedyProbe")),
+      proposal: .init(width: 80, height: 10)
+    ).rasterSurface
+
+    let spacerWidth = try #require(firstPaintedRowWidth(in: spacerSurface))
+    let greedyWidth = try #require(firstPaintedRowWidth(in: greedySurface))
+    let spacerTextRow = try #require(spacerSurface.lines.firstIndex { $0.contains("[X]") })
+    let greedyTextRow = try #require(greedySurface.lines.firstIndex { $0.contains("[X]") })
+
+    #expect(spacerWidth <= 10)
+    #expect(greedyWidth > spacerWidth + 20)
+    #expect(spacerTextRow == greedyTextRow)
+  }
+
   @Test("clipped interaction regions are reduced to the visible clip bounds")
   func clippedInteractionRegionsRespectVisibleBounds() throws {
     let artifacts = DefaultRenderer().render(
@@ -166,10 +195,11 @@ struct LayoutAndRenderingPipelineTests {
     #expect(counters.appearCount == 0)
     #expect(counters.disappearCount == 0)
     #expect(counters.taskCount == 0)
-    #expect(artifacts.commitPlan.lifecycle.map(\.identity) == [
-      testIdentity("Root"),
-      testIdentity("Root"),
-    ])
+    #expect(
+      artifacts.commitPlan.lifecycle.map(\.identity) == [
+        testIdentity("Root"),
+        testIdentity("Root"),
+      ])
     #expect(
       artifacts.commitPlan.lifecycle.map(\.operation) == [
         .appear(handlerIDs: ["Root#appear[0]"]),
@@ -222,4 +252,38 @@ struct LayoutAndRenderingPipelineTests {
 
     #expect(counters.changeCount == 1)
   }
+}
+
+@MainActor
+@ViewBuilder
+private func zStackSizingProbe<Content: View>(
+  @ViewBuilder content: () -> Content
+) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    ZStack(alignment: .topLeading) {
+      content()
+    }
+    .border(.separator)
+  }
+  .padding(1)
+}
+
+private func firstPaintedRowWidth(
+  in surface: RasterSurface
+) -> Int? {
+  for row in surface.cells {
+    guard let first = row.firstIndex(where: isPaintedCell),
+      let last = row.lastIndex(where: isPaintedCell)
+    else {
+      continue
+    }
+    return last - first + 1
+  }
+  return nil
+}
+
+private func isPaintedCell(
+  _ cell: RasterCell
+) -> Bool {
+  cell.character != " " || cell.style != nil
 }

@@ -956,10 +956,10 @@ package final class ViewNode {
     registrations.restore(from: registeredHandlers)
   }
 
-  package func restoreOwnTaskRegistrations(
+  package func restoreOwnEffectRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
-    registrations.restoreTasks(from: registeredHandlers)
+    registrations.restoreEffectRegistrations(from: registeredHandlers)
   }
 
   private func restoreRuntimeRegistrations(

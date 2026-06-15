@@ -43,6 +43,34 @@ struct PresentationContinuityTests {
     #expect(shownArtifacts.resolvedTree.descendant(withText: "Alert body") != nil)
   }
 
+  @Test("alert activation preserves base content placement")
+  func alertActivationPreservesBaseContentPlacement() throws {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("AlertAnchorRoot")
+    let proposal = ProposedSize(width: .finite(120), height: .finite(20))
+
+    let hiddenArtifacts = renderer.render(
+      alertAnchorRoot(isPresented: false),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    let shownArtifacts = renderer.render(
+      alertAnchorRoot(isPresented: true),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let hiddenBounds = try #require(
+      textBounds("[FIRST CELL]", in: hiddenArtifacts.placedTree)
+    )
+    let shownBounds = try #require(
+      textBounds("[FIRST CELL]", in: shownArtifacts.placedTree)
+    )
+
+    #expect(shownBounds == hiddenBounds)
+    #expect(shownArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Alert title"))
+  }
+
   @Test("sheet activation keeps the displayed base identity stable")
   func sheetActivationKeepsDisplayedBaseIdentityStable() throws {
     let renderer = DefaultRenderer()
@@ -190,6 +218,31 @@ struct PresentationContinuityTests {
 private let continuityProposal = ProposedSize(width: .finite(40), height: .finite(10))
 
 @MainActor
+private func alertAnchorRoot(
+  isPresented: Bool
+) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    Text("Alert anchor stable")
+    Text("[FIRST CELL]")
+    ForEach(0..<5, id: \.self) { index in
+      Text("body row \(index)")
+    }
+    Button("show alert") {}
+  }
+  .padding(1)
+  .alert(
+    "Alert title",
+    isPresented: .constant(isPresented),
+    actions: {
+      Text("OK")
+    },
+    message: {
+      Text("Alert body")
+    }
+  )
+}
+
+@MainActor
 private func alertContinuityRoot(
   isPresented: Bool
 ) -> some View {
@@ -312,6 +365,23 @@ private func isTaskCancel(
     return true
   }
   return false
+}
+
+private func textBounds(
+  _ text: String,
+  in node: PlacedNode
+) -> CellRect? {
+  if case .text(let rendered) = node.drawPayload, rendered == text {
+    return node.bounds
+  }
+
+  for child in node.children {
+    if let match = textBounds(text, in: child) {
+      return match
+    }
+  }
+
+  return nil
 }
 
 extension ResolvedNode {
