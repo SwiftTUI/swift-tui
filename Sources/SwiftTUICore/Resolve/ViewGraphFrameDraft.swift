@@ -125,11 +125,30 @@ package final class ViewGraphFrameDraft {
       restoredNodeCount = 0
       break
     case .all:
-      if publicationDiagnosticsEnabled {
-        restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
+      if let delta = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame(),
+        !viewGraph.runtimeRegistrationDeltaRequiresFullPublication(delta)
+      {
+        if publicationDiagnosticsEnabled {
+          restoredNodeCount = viewGraph.runtimeRegistrationSubtreeNodeCount(
+            rootedAt: delta.restorationRoots
+          )
+        }
+        if !delta.isEmpty {
+          liveRegistrations.removeSubtrees(rootedAt: delta.removalRoots)
+          viewGraph.restoreRuntimeRegistrationSubtrees(
+            rootedAt: delta.restorationRoots,
+            into: liveRegistrations
+          )
+          liveRegistrations.normalizeScopedRestoreOrder()
+          viewGraph.republishAllTaskRegistrations(into: liveRegistrations)
+        }
+      } else {
+        if publicationDiagnosticsEnabled {
+          restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
+        }
+        liveRegistrations.resetAll()
+        viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
       }
-      liveRegistrations.resetAll()
-      viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     case .subtrees(let roots):
       // The reset is scoped to `roots`; scope the restore to match instead of
       // re-publishing the whole tree. Untouched subtrees' registrations stay in
@@ -155,6 +174,7 @@ package final class ViewGraphFrameDraft {
       // start, so republish the (infrequent) task registry from all live nodes.
       viewGraph.republishAllTaskRegistrations(into: liveRegistrations)
     }
+    viewGraph.recordCommittedRuntimeRegistrationFingerprint()
     didCommit = true
     var diagnostics = liveRegistrations.diagnostics()
     if publicationDiagnosticsEnabled {

@@ -81,6 +81,7 @@ package final class ViewNode {
 
   private let dependencyTracker: DependencyTracker
   private var registrationCaptureDepth: Int
+  private var runtimeRegistrationMutationGeneration: UInt64
   private var evaluationDepth: Int
   private var hasCommittedPresence: Bool
   private var suppressesStructuralLifecycle: Bool
@@ -117,6 +118,7 @@ package final class ViewNode {
     pendingChangeHandlerIDs = []
     dependencyTracker = .init()
     registrationCaptureDepth = 0
+    runtimeRegistrationMutationGeneration = 0
     evaluationDepth = 0
     hasCommittedPresence = false
     suppressesStructuralLifecycle = false
@@ -659,6 +661,7 @@ package final class ViewNode {
   package func beginRegistrationCapture() {
     if registrationCaptureDepth == 0 {
       registeredHandlers.reset()
+      recordRuntimeRegistrationMutation()
     }
     registrationCaptureDepth += 1
   }
@@ -672,6 +675,7 @@ package final class ViewNode {
     handler: @escaping LocalActionRegistry.Handler,
     followUpInvalidationIdentity: Identity?
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordAction(
       identity: identity,
       handler: handler,
@@ -685,6 +689,7 @@ package final class ViewNode {
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordAction(
       identity: identity,
       handler: handler,
@@ -697,6 +702,7 @@ package final class ViewNode {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.Handler
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordKeyHandler(
       identity: identity,
       handler: handler
@@ -707,6 +713,7 @@ package final class ViewNode {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordKeyPressHandler(
       identity: identity,
       handler: handler
@@ -717,6 +724,7 @@ package final class ViewNode {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.PasteHandler
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordPasteHandler(
       identity: identity,
       handler: handler
@@ -727,6 +735,7 @@ package final class ViewNode {
     identity: Identity,
     handler: @escaping LocalTerminationRegistry.Handler
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordTerminationHandler(
       identity: identity,
       handler: handler
@@ -737,6 +746,7 @@ package final class ViewNode {
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordPointerHandler(
       routeID: routeID,
       handler: handler
@@ -747,6 +757,7 @@ package final class ViewNode {
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordPointerHoverHandler(
       routeID: routeID,
       handler: handler
@@ -757,6 +768,7 @@ package final class ViewNode {
     identity: Identity,
     recognizer: AnyGestureRecognizer
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordGesture(
       identity: identity,
       recognizer: recognizer
@@ -773,6 +785,7 @@ package final class ViewNode {
     identity: Identity,
     binding: AnyGestureStateBinding
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordGestureStateBinding(
       identity: identity,
       binding: binding
@@ -782,36 +795,42 @@ package final class ViewNode {
   package func recordDefaultFocus(
     _ registration: DefaultFocusScopeRegistrationSnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordDefaultFocus(registration)
   }
 
   package func recordDefaultFocus(
     _ registration: DefaultFocusCandidateRegistrationSnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordDefaultFocus(registration)
   }
 
   package func recordFocusBindingRegistration(
     _ registration: FocusBindingRegistrationSnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordFocusBinding(registration)
   }
 
   package func recordFocusedValuesRegistration(
     _ registration: FocusedValuesRegistrationSnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordFocusedValues(registration)
   }
 
   package func recordScrollPositionRegistration(
     _ registration: ScrollPositionRegistrationSnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordScrollPosition(registration)
   }
 
   package func recordLifecycleAppearRegistration(
     _ registration: LifecycleHandlerRegistration
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordLifecycleAppear(
       registration
     )
@@ -820,6 +839,7 @@ package final class ViewNode {
   package func recordLifecycleDisappearRegistration(
     _ registration: LifecycleHandlerRegistration
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordLifecycleDisappear(
       registration
     )
@@ -828,6 +848,7 @@ package final class ViewNode {
   package func recordLifecycleChangeRegistration(
     _ registration: LifecycleHandlerRegistration
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordLifecycleChange(
       registration
     )
@@ -837,6 +858,7 @@ package final class ViewNode {
     identity: Identity,
     registration: TaskRegistration
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordTask(
       identity: identity,
       registration: registration
@@ -846,19 +868,40 @@ package final class ViewNode {
   package func recordPreferenceObservationRegistration(
     _ registration: PreferenceObservationRegistrationSnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordPreferenceObservation(registration)
   }
 
   package func recordCommandRegistration(
     _ registration: CommandRegistrySnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordCommand(registration)
   }
 
   package func recordDropDestinationRegistration(
     _ registration: DropDestinationRegistrySnapshot
   ) {
+    recordRuntimeRegistrationMutation()
     registeredHandlers.recordDropDestination(registration)
+  }
+
+  private func recordRuntimeRegistrationMutation() {
+    runtimeRegistrationMutationGeneration &+= 1
+  }
+
+  package func runtimeRegistrationFingerprintEntry()
+    -> RuntimeRegistrationNodeFingerprint?
+  {
+    guard registeredHandlers.hasRuntimeRegistrations else {
+      return nil
+    }
+    return RuntimeRegistrationNodeFingerprint(
+      viewNodeID: viewNodeID,
+      subtreeRoot: identity,
+      resolvedIdentity: resolvedIdentity,
+      mutationGeneration: runtimeRegistrationMutationGeneration
+    )
   }
 
   package func restoreRuntimeRegistrations(
@@ -1073,6 +1116,7 @@ extension ViewNode {
     package var pendingChangeHandlerIDs: [String]
     package var dependencyTracker: DependencyTracker.Checkpoint
     package var registrationCaptureDepth: Int
+    package var runtimeRegistrationMutationGeneration: UInt64
     package var evaluationDepth: Int
     package var hasCommittedPresence: Bool
     package var suppressesStructuralLifecycle: Bool
@@ -1108,6 +1152,7 @@ extension ViewNode {
       pendingChangeHandlerIDs: pendingChangeHandlerIDs,
       dependencyTracker: dependencyTracker.makeCheckpoint(),
       registrationCaptureDepth: registrationCaptureDepth,
+      runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
@@ -1146,6 +1191,7 @@ extension ViewNode {
     pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
     dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)
     registrationCaptureDepth = checkpoint.registrationCaptureDepth
+    runtimeRegistrationMutationGeneration = checkpoint.runtimeRegistrationMutationGeneration
     evaluationDepth = checkpoint.evaluationDepth
     hasCommittedPresence = checkpoint.hasCommittedPresence
     suppressesStructuralLifecycle = checkpoint.suppressesStructuralLifecycle
@@ -1187,6 +1233,7 @@ extension ViewNode {
       pendingChangeHandlerIDs: pendingChangeHandlerIDs,
       dependencyTracker: dependencyTracker.currentDependencies,
       registrationCaptureDepth: registrationCaptureDepth,
+      runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,

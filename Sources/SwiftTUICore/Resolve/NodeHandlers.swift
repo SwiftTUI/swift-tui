@@ -93,6 +93,27 @@ package struct NodeHandlers {
     self = .init()
   }
 
+  package var hasRuntimeRegistrations: Bool {
+    !actionRegistrations.isEmpty
+      || !keyHandlerRegistrations.isEmpty
+      || !keyPressHandlerRegistrations.isEmpty
+      || !pasteHandlerRegistrations.isEmpty
+      || !terminationHandlerRegistrations.isEmpty
+      || !pointerHandlerRegistrations.isEmpty
+      || !pointerHoverHandlerRegistrations.isEmpty
+      || !gestureRegistrations.isEmpty
+      || !gestureStateRegistrations.isEmpty
+      || defaultFocusRegistrations != DefaultFocusRegistrationSnapshot()
+      || !focusBindingRegistrations.isEmpty
+      || !focusedValuesRegistrations.isEmpty
+      || !scrollPositionRegistrations.isEmpty
+      || !lifecycleRegistrations.isEmpty
+      || !taskRegistrations.isEmpty
+      || !preferenceObservationRegistrations.isEmpty
+      || !commandRegistrations.isEmpty
+      || !dropDestinationRegistrations.isEmpty
+  }
+
   package mutating func recordAction(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,

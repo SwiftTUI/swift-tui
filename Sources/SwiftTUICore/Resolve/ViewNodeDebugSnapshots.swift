@@ -53,6 +53,7 @@ extension ViewNode {
     package var pendingChangeHandlerIDs: [String]
     package var dependencyTracker: DependencySet
     package var registrationCaptureDepth: Int
+    package var runtimeRegistrationMutationGeneration: UInt64
     package var evaluationDepth: Int
     package var hasCommittedPresence: Bool
     package var suppressesStructuralLifecycle: Bool

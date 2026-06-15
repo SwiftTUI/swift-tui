@@ -222,6 +222,117 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(candidates.map(\.identity) == [aIdentity, bIdentity])
   }
 
+  @Test(".all publication skips restore when registration fingerprint is unchanged")
+  func allPublicationSkipsRestoreWhenRegistrationFingerprintIsUnchanged() {
+    let rootIdentity = testIdentity("Root")
+    let aIdentity = testIdentity("Root", "A")
+    let bIdentity = testIdentity("Root", "B")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    seedTwoFocusableSiblings(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      aIdentity: aIdentity,
+      bIdentity: bIdentity,
+      namespace: namespace
+    )
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let initialDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    let initialDiagnostics = initialDraft.commitRuntimeRegistrations(from: graph)
+    #expect(initialDiagnostics.publication.publicationMode == "all")
+    #expect(initialDiagnostics.publication.restoredNodeCount == 3)
+
+    let secondDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    secondDraft.recordDirtyEvaluationPlan(nil)
+    let secondDiagnostics = secondDraft.commitRuntimeRegistrations(from: graph)
+
+    #expect(secondDiagnostics.publication.publicationMode == "all")
+    #expect(secondDiagnostics.publication.restoredNodeCount == 0)
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+  }
+
+  @Test(".all publication scopes restore to changed registration subtrees")
+  func allPublicationScopesRestoreToChangedRegistrationSubtrees() {
+    let rootIdentity = testIdentity("Root")
+    let aIdentity = testIdentity("Root", "A")
+    let bIdentity = testIdentity("Root", "B")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    seedTwoFocusableSiblings(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      aIdentity: aIdentity,
+      bIdentity: bIdentity,
+      namespace: namespace
+    )
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let initialDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    _ = initialDraft.commitRuntimeRegistrations(from: graph)
+
+    graph.beginFrame()
+    let aNode = graph.beginEvaluation(identity: aIdentity, invalidator: nil)
+    recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
+    graph.finishEvaluation(
+      aNode,
+      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let rootFrameDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    rootFrameDraft.recordDirtyEvaluationPlan(nil)
+    let diagnostics = rootFrameDraft.commitRuntimeRegistrations(from: graph)
+
+    #expect(diagnostics.publication.publicationMode == "all")
+    #expect(diagnostics.publication.restoredNodeCount == 1)
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+    let candidates = liveRegistrations.defaultFocusRegistry?.snapshot().candidates ?? []
+    #expect(candidates.map(\.identity) == [aIdentity, bIdentity])
+  }
+
   @Test("structured lifecycle teardown preserves path-colliding sibling component")
   func structuredLifecycleTeardownPreservesPathCollidingSiblingComponent() {
     let preservedIdentity = Identity(components: ["Root", "A/B"])

@@ -36,6 +36,7 @@ extension ViewGraph {
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
+      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(
         nodesByNodeID
       )
@@ -78,6 +79,8 @@ extension ViewGraph {
     currentFrameID = checkpoint.currentFrameID
     liveNodeIDs = checkpoint.liveNodeIDs
     resolvedNodeReuseCache = checkpoint.resolvedNodeReuseCache
+    committedRuntimeRegistrationFingerprint =
+      checkpoint.committedRuntimeRegistrationFingerprint
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
@@ -129,6 +132,8 @@ package final class ViewGraph {
   private var currentFrameID: UInt64
   private var liveNodeIDs: Set<ViewNodeID>
   private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
+  private var committedRuntimeRegistrationFingerprint:
+    RuntimeRegistrationGraphFingerprint?
 
   private var nodesByIdentity: [Identity: ViewNode] {
     Dictionary(
@@ -305,6 +310,7 @@ package final class ViewGraph {
     currentFrameID = 0
     liveNodeIDs = []
     resolvedNodeReuseCache = [:]
+    committedRuntimeRegistrationFingerprint = nil
   }
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
@@ -345,7 +351,8 @@ package final class ViewGraph {
       observableDependents: debugObjectDependencySnapshot(observableDependents),
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
-      resolvedNodeReuseCache: resolvedNodeReuseCache
+      resolvedNodeReuseCache: resolvedNodeReuseCache,
+      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint
     )
   }
 
@@ -1631,6 +1638,48 @@ package final class ViewGraph {
 
   package var runtimeRegistrationLiveNodeCount: Int {
     liveNodeIDs.count
+  }
+
+  package func runtimeRegistrationPublicationDeltaForCurrentFrame()
+    -> RuntimeRegistrationPublicationDelta?
+  {
+    let current = currentRuntimeRegistrationFingerprint()
+    guard let committedRuntimeRegistrationFingerprint else {
+      return nil
+    }
+    return committedRuntimeRegistrationFingerprint.publicationDelta(to: current)
+  }
+
+  package func recordCommittedRuntimeRegistrationFingerprint() {
+    committedRuntimeRegistrationFingerprint = currentRuntimeRegistrationFingerprint()
+  }
+
+  package func runtimeRegistrationDeltaRequiresFullPublication(
+    _ delta: RuntimeRegistrationPublicationDelta
+  ) -> Bool {
+    guard let root else {
+      return true
+    }
+    return delta.removalRoots.contains { changedRoot in
+      changedRoot == root.identity || changedRoot == root.resolvedIdentity
+    }
+  }
+
+  private func currentRuntimeRegistrationFingerprint()
+    -> RuntimeRegistrationGraphFingerprint
+  {
+    RuntimeRegistrationGraphFingerprint(
+      entriesByNodeID: Dictionary(
+        uniqueKeysWithValues: liveNodeIDs.compactMap { viewNodeID in
+          guard let entry = nodesByNodeID[viewNodeID]?
+            .runtimeRegistrationFingerprintEntry()
+          else {
+            return nil
+          }
+          return (viewNodeID, entry)
+        }
+      )
+    )
   }
 
   /// Scoped counterpart to ``restoreCurrentFrameRuntimeRegistrations``: restores

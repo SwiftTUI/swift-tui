@@ -41,6 +41,8 @@ extension ViewGraph {
     package var liveNodeIDs: Set<ViewNodeID>
     package var resolvedNodeReuseCache:
       [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
+    package var committedRuntimeRegistrationFingerprint:
+      RuntimeRegistrationGraphFingerprint?
 
     package var invalidatedIdentities: Set<Identity> {
       identities(for: invalidatedNodeIDs)
