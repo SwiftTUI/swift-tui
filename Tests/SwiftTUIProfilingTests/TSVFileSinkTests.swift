@@ -68,6 +68,21 @@ struct TSVFileSinkTests {
       ] == "3"
     )
     #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_strategy"]!] == "full_shadow_delta"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_delta_checkpoint_nodes"]!] == "2"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_delta_checkpoint_created_nodes"]!] == "1"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_delta_checkpoint_removed_nodes"]!] == "0"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_delta_checkpoint_epoch_delta"]!] == "5"
+    )
+    #expect(
       firstRow[headerColumns["runtime_non_graph_checkpoints"]!] == "1"
     )
     for row in lines.dropFirst() {
@@ -117,6 +132,11 @@ struct TSVFileSinkTests {
       graphCheckpointBaselineNodeCount: 8,
       graphCheckpointPreparedNodeCount: 9,
       graphCheckpointDirtySubtreeCandidateNodeCount: 3,
+      graphCheckpointStrategy: "full_shadow_delta",
+      graphDeltaCheckpointNodeCount: 2,
+      graphDeltaCheckpointCreatedNodeCount: 1,
+      graphDeltaCheckpointRemovedNodeCount: 0,
+      graphDeltaCheckpointEpochDelta: 5,
       nonGraphCheckpointPresent: true
     )
     return .committed(

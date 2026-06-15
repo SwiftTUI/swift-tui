@@ -79,6 +79,7 @@ extension ViewGraph {
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
     package var committedRuntimeRegistrationFingerprint:
       RuntimeRegistrationGraphFingerprint?
+    package var checkpointMutationEpoch: UInt64
     package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   }
 

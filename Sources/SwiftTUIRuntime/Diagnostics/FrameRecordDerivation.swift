@@ -152,6 +152,16 @@ package enum FrameRecordDerivation {
       publication.graphCheckpointPreparedNodeCount
     record.runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount =
       publication.graphCheckpointDirtySubtreeCandidateNodeCount
+    record.runtimePublicationGraphCheckpointStrategy =
+      publication.graphCheckpointStrategy
+    record.runtimePublicationGraphDeltaCheckpointNodeCount =
+      publication.graphDeltaCheckpointNodeCount
+    record.runtimePublicationGraphDeltaCheckpointCreatedNodeCount =
+      publication.graphDeltaCheckpointCreatedNodeCount
+    record.runtimePublicationGraphDeltaCheckpointRemovedNodeCount =
+      publication.graphDeltaCheckpointRemovedNodeCount
+    record.runtimePublicationGraphDeltaCheckpointEpochDelta =
+      publication.graphDeltaCheckpointEpochDelta
     record.runtimePublicationNonGraphCheckpointPresent =
       publication.nonGraphCheckpointPresent
     return record

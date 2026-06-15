@@ -82,6 +82,7 @@ package final class ViewNode {
   private let dependencyTracker: DependencyTracker
   private var registrationCaptureDepth: Int
   private var runtimeRegistrationMutationGeneration: UInt64
+  private var checkpointMutationGeneration: UInt64
   private var evaluationDepth: Int
   private var hasCommittedPresence: Bool
   private var suppressesStructuralLifecycle: Bool
@@ -119,6 +120,7 @@ package final class ViewNode {
     dependencyTracker = .init()
     registrationCaptureDepth = 0
     runtimeRegistrationMutationGeneration = 0
+    checkpointMutationGeneration = 0
     evaluationDepth = 0
     hasCommittedPresence = false
     suppressesStructuralLifecycle = false
@@ -127,6 +129,10 @@ package final class ViewNode {
     preparedFrameID = 0
     visitedFrameID = 0
     evaluator = nil
+  }
+
+  package func recordCheckpointMutation() {
+    checkpointMutationGeneration &+= 1
   }
 
   package convenience init(
@@ -145,6 +151,7 @@ package final class ViewNode {
       return
     }
 
+    recordCheckpointMutation()
     wasPresentAtFrameStart = hasCommittedPresence
     wasVisitedThisFrame = false
     previousChildrenIdentities = children.map(\.identity)
@@ -162,6 +169,7 @@ package final class ViewNode {
     suppressesStructuralLifecycle: Bool = false
   ) {
     prepareForFrame(frameID)
+    recordCheckpointMutation()
     self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     if evaluationDepth == 0 {
       self.invalidator = invalidator
@@ -182,6 +190,7 @@ package final class ViewNode {
     invalidator: (any Invalidating)?
   ) {
     prepareForFrame(frameID)
+    recordCheckpointMutation()
     self.invalidator = invalidator
     wasVisitedThisFrame = true
     visitedFrameID = frameID
@@ -191,6 +200,7 @@ package final class ViewNode {
   package func finishEvaluation(
     accessedStateSlots: Int
   ) -> Bool {
+    recordCheckpointMutation()
     bodyStateSlotCount = max(bodyStateSlotCount ?? 0, accessedStateSlots)
     evaluationDepth = max(0, evaluationDepth - 1)
     guard evaluationDepth == 0 else {
@@ -211,6 +221,7 @@ package final class ViewNode {
     ordinal: Int,
     seed: @autoclosure () -> Value
   ) -> Value {
+    recordCheckpointMutation()
     var slot = stateSlots[ordinal] ?? .init()
     slot.initializeIfNeeded(with: seed())
     stateSlots[ordinal] = slot
@@ -246,6 +257,7 @@ package final class ViewNode {
   package func recordStateReadDependency(
     _ key: StateSlotKey
   ) {
+    recordCheckpointMutation()
     dependencyTracker.recordStateRead(key)
   }
 
@@ -254,6 +266,7 @@ package final class ViewNode {
     value: Value,
     invalidationIdentity: Identity? = nil
   ) {
+    recordCheckpointMutation()
     var slot = stateSlots[ordinal] ?? .init()
     let didChange = slot.set(value)
     stateSlots[ordinal] = slot
@@ -317,6 +330,7 @@ package final class ViewNode {
     ordinal: Int,
     value: Value
   ) {
+    recordCheckpointMutation()
     var slot = stateSlots[ordinal] ?? .init()
     _ = slot.set(value)
     stateSlots[ordinal] = slot
@@ -332,15 +346,18 @@ package final class ViewNode {
     ordinal: Int,
     slot: AnyStateSlot
   ) {
+    recordCheckpointMutation()
     stateSlots[ordinal] = slot
   }
 
   package func resetStateSlots() {
+    recordCheckpointMutation()
     stateSlots.removeAll(keepingCapacity: false)
   }
 
   package func markDirty() {
     let wasDirty = isDirty
+    recordCheckpointMutation()
     isDirty = true
     if !wasDirty {
       invalidateCachedSnapshotUpward()
@@ -350,6 +367,7 @@ package final class ViewNode {
   package func setEvaluator(
     _ evaluator: @escaping @MainActor () -> Void
   ) {
+    recordCheckpointMutation()
     self.evaluator = evaluator
   }
 
@@ -368,12 +386,14 @@ package final class ViewNode {
   package func recordEnvironmentRead(
     _ key: ObjectIdentifier
   ) {
+    recordCheckpointMutation()
     dependencyTracker.recordEnvironmentRead(key)
   }
 
   package func recordObservableRead(
     _ key: ObjectIdentifier
   ) {
+    recordCheckpointMutation()
     dependencyTracker.recordObservableRead(key)
   }
 
@@ -385,10 +405,12 @@ package final class ViewNode {
   package func setLifecycleState(
     _ lifecycleState: NodeLifecycleState
   ) {
+    recordCheckpointMutation()
     self.lifecycleState = lifecycleState
   }
 
   package func claimChangeModifierOrdinal() -> Int {
+    recordCheckpointMutation()
     defer {
       nextChangeModifierOrdinal += 1
     }
@@ -396,6 +418,7 @@ package final class ViewNode {
   }
 
   package func claimNavigationDestinationModifierOrdinal() -> Int {
+    recordCheckpointMutation()
     defer {
       nextNavigationDestinationModifierOrdinal += 1
     }
@@ -408,6 +431,7 @@ package final class ViewNode {
     guard !pendingChangeHandlerIDs.contains(handlerID) else {
       return
     }
+    recordCheckpointMutation()
     pendingChangeHandlerIDs.append(handlerID)
   }
 
@@ -415,6 +439,7 @@ package final class ViewNode {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    recordCheckpointMutation()
     refreshChildResolvedMetadata(
       from: resolved.children,
       children: children
@@ -440,6 +465,7 @@ package final class ViewNode {
     let newChildrenByIdentity = Set(children.map(\.identity))
     for child in self.children
     where !newChildrenByIdentity.contains(child.identity) && child.parent === self {
+      child.recordCheckpointMutation()
       child.parent = nil
     }
 
@@ -451,6 +477,7 @@ package final class ViewNode {
       guard child !== self else {
         continue
       }
+      child.recordCheckpointMutation()
       child.parent = self
     }
     invalidateAncestorCachedSnapshots()
@@ -459,6 +486,7 @@ package final class ViewNode {
   package func applyRetainedSnapshot(
     _ snapshot: ResolvedNode
   ) {
+    recordCheckpointMutation()
     var snapshot = snapshot
     snapshot.viewNodeID = viewNodeID
     snapshot.recomputeSubtreeRuntimeNodeIDsStamped()
@@ -483,6 +511,7 @@ package final class ViewNode {
   package func refreshResolvedMetadata(
     from resolved: ResolvedNode
   ) {
+    recordCheckpointMutation()
     committed.structuralPath = resolved.structuralPath
     committed.structuralEdgeRole = resolved.structuralEdgeRole
     committed.entityIdentity = resolved.entityIdentity
@@ -659,6 +688,7 @@ package final class ViewNode {
   }
 
   package func beginRegistrationCapture() {
+    recordCheckpointMutation()
     if registrationCaptureDepth == 0 {
       registeredHandlers.reset()
       recordRuntimeRegistrationMutation()
@@ -667,6 +697,7 @@ package final class ViewNode {
   }
 
   package func endRegistrationCapture() {
+    recordCheckpointMutation()
     registrationCaptureDepth = max(0, registrationCaptureDepth - 1)
   }
 
@@ -887,6 +918,7 @@ package final class ViewNode {
   }
 
   private func recordRuntimeRegistrationMutation() {
+    recordCheckpointMutation()
     runtimeRegistrationMutationGeneration &+= 1
   }
 
@@ -1017,6 +1049,7 @@ package final class ViewNode {
       guard visited.insert(nodeID).inserted else {
         return
       }
+      node.recordCheckpointMutation()
       if crossedIslandSeam {
         node.hasStaleIslandDescendant = true
       } else {
@@ -1081,12 +1114,14 @@ package final class ViewNode {
   package func setCommittedPresence(
     _ hasCommittedPresence: Bool
   ) {
+    recordCheckpointMutation()
     self.hasCommittedPresence = hasCommittedPresence
   }
 
   package func setSuppressesStructuralLifecycle(
     _ suppressesStructuralLifecycle: Bool
   ) {
+    recordCheckpointMutation()
     self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
   }
 }
@@ -1117,6 +1152,7 @@ extension ViewNode {
     package var dependencyTracker: DependencyTracker.Checkpoint
     package var registrationCaptureDepth: Int
     package var runtimeRegistrationMutationGeneration: UInt64
+    package var checkpointMutationGeneration: UInt64
     package var evaluationDepth: Int
     package var hasCommittedPresence: Bool
     package var suppressesStructuralLifecycle: Bool
@@ -1153,6 +1189,7 @@ extension ViewNode {
       dependencyTracker: dependencyTracker.makeCheckpoint(),
       registrationCaptureDepth: registrationCaptureDepth,
       runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,
+      checkpointMutationGeneration: checkpointMutationGeneration,
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
@@ -1192,6 +1229,7 @@ extension ViewNode {
     dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)
     registrationCaptureDepth = checkpoint.registrationCaptureDepth
     runtimeRegistrationMutationGeneration = checkpoint.runtimeRegistrationMutationGeneration
+    checkpointMutationGeneration = checkpoint.checkpointMutationGeneration
     evaluationDepth = checkpoint.evaluationDepth
     hasCommittedPresence = checkpoint.hasCommittedPresence
     suppressesStructuralLifecycle = checkpoint.suppressesStructuralLifecycle
@@ -1234,6 +1272,7 @@ extension ViewNode {
       dependencyTracker: dependencyTracker.currentDependencies,
       registrationCaptureDepth: registrationCaptureDepth,
       runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,
+      checkpointMutationGeneration: checkpointMutationGeneration,
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,

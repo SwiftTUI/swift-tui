@@ -58,6 +58,11 @@ public struct FrameDiagnosticRecord: Sendable {
   package var runtimePublicationGraphCheckpointBaselineNodeCount: Int?
   package var runtimePublicationGraphCheckpointPreparedNodeCount: Int?
   package var runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount: Int?
+  package var runtimePublicationGraphCheckpointStrategy: String?
+  package var runtimePublicationGraphDeltaCheckpointNodeCount: Int?
+  package var runtimePublicationGraphDeltaCheckpointCreatedNodeCount: Int?
+  package var runtimePublicationGraphDeltaCheckpointRemovedNodeCount: Int?
+  package var runtimePublicationGraphDeltaCheckpointEpochDelta: UInt64?
   package var runtimePublicationNonGraphCheckpointPresent: Bool?
   public var runtimeIssues: [RuntimeIssue]
   public var staleFramePolicy: String

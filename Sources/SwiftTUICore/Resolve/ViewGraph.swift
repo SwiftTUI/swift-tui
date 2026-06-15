@@ -37,6 +37,7 @@ extension ViewGraph {
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
       committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
+      checkpointMutationEpoch: checkpointMutationEpoch,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(
         nodesByNodeID
       )
@@ -81,6 +82,7 @@ extension ViewGraph {
     resolvedNodeReuseCache = checkpoint.resolvedNodeReuseCache
     committedRuntimeRegistrationFingerprint =
       checkpoint.committedRuntimeRegistrationFingerprint
+    checkpointMutationEpoch = checkpoint.checkpointMutationEpoch
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
@@ -134,6 +136,7 @@ package final class ViewGraph {
   private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
   private var committedRuntimeRegistrationFingerprint:
     RuntimeRegistrationGraphFingerprint?
+  private var checkpointMutationEpoch: UInt64
 
   private var nodesByIdentity: [Identity: ViewNode] {
     Dictionary(
@@ -144,6 +147,10 @@ package final class ViewGraph {
         return (identity, node)
       }
     )
+  }
+
+  private func recordCheckpointGraphMutation() {
+    checkpointMutationEpoch &+= 1
   }
 
   private func nodeIfExists(
@@ -205,6 +212,7 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    recordCheckpointGraphMutation()
     let previousStructuralPath = node.committed.structuralPath
     let previousResolvedIdentity = node.resolvedIdentity
     node.apply(
@@ -311,6 +319,7 @@ package final class ViewGraph {
     liveNodeIDs = []
     resolvedNodeReuseCache = [:]
     committedRuntimeRegistrationFingerprint = nil
+    checkpointMutationEpoch = 0
   }
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
@@ -352,7 +361,8 @@ package final class ViewGraph {
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
-      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint
+      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
+      checkpointMutationEpoch: checkpointMutationEpoch
     )
   }
 
@@ -620,6 +630,7 @@ package final class ViewGraph {
   /// instead of falling back to full root re-evaluation.  Only identities
   /// with existing graph nodes are queued.
   package func invalidateAndQueueDirty(_ identities: Set<Identity>) {
+    recordCheckpointGraphMutation()
     ViewGraphInvalidationPlanner.invalidateAndQueueDirty(
       nodeIDsForInvalidation(identities),
       invalidatedNodeIDs: &invalidatedNodeIDs,
@@ -631,6 +642,7 @@ package final class ViewGraph {
   package func queueDirty(
     _ identities: Set<Identity>
   ) {
+    recordCheckpointGraphMutation()
     ViewGraphInvalidationPlanner.queueDirty(
       nodeIDsForInvalidation(identities),
       graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
@@ -641,6 +653,7 @@ package final class ViewGraph {
   package func queueDirtyForStateChange(
     _ key: StateSlotKey
   ) {
+    recordCheckpointGraphMutation()
     stateMutationKeys.insert(key)
     stateMutationNodeIDsByKey[key, default: []].insert(key.owner)
     ViewGraphInvalidationPlanner.queueDirty(
@@ -701,6 +714,7 @@ package final class ViewGraph {
   package func applyStateMutationOverlay(
     _ overlay: StateMutationOverlay
   ) {
+    recordCheckpointGraphMutation()
     for (key, slot) in overlay.stateSlots {
       let node = nodeIfExists(for: key.key.owner)
       guard let node else {
@@ -724,6 +738,7 @@ package final class ViewGraph {
     guard let viewNodeID = viewNodeID(for: identity) else {
       return
     }
+    recordCheckpointGraphMutation()
     ViewGraphInvalidationPlanner.queueDirty(
       ViewGraphInvalidationPlanner.observationChangeDirtyNodeIDs(
         observedBy: viewNodeID,
@@ -750,6 +765,7 @@ package final class ViewGraph {
       return
     }
 
+    recordCheckpointGraphMutation()
     invalidatedNodeIDs.formUnion(dirtyNodeIDs)
     ViewGraphInvalidationPlanner.queueDirty(
       dirtyNodeIDs,
@@ -770,6 +786,7 @@ package final class ViewGraph {
     rootIdentity: Identity,
     _ evaluate: @escaping @MainActor () -> Void
   ) {
+    recordCheckpointGraphMutation()
     evaluationRootIdentity = rootIdentity
     rootEvaluator = evaluate
   }
@@ -791,6 +808,7 @@ package final class ViewGraph {
     else {
       return
     }
+    recordCheckpointGraphMutation()
     if let previousOwner = lifecycleEvaluationOwnersByNodeID[targetNodeID],
       previousOwner != ownerNodeID
     {
@@ -828,6 +846,7 @@ package final class ViewGraph {
       return slot.label
     }
 
+    recordCheckpointGraphMutation()
     nextTaskDescriptorIdentityToken &+= 1
     let label = "id:\(nextTaskDescriptorIdentityToken)"
     taskDescriptorNodeSlots[viewNodeID] = TaskDescriptorIdentitySlot(
@@ -966,6 +985,7 @@ package final class ViewGraph {
     // Diagnostic: flush the just-finished frame's reuse-denial histogram before
     // starting the next one (inert unless SWIFTTUI_REUSE_TRACE is set).
     ReuseDenialTrace.dumpAndReset(frameID: currentFrameID)
+    recordCheckpointGraphMutation()
     currentFrameID &+= 1
     frameOrder.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
@@ -987,6 +1007,7 @@ package final class ViewGraph {
       for: identity,
       entityIdentity: entityIdentity
     )
+    recordCheckpointGraphMutation()
     node.prepareForFrame(currentFrameID)
     if !node.wasVisitedThisFrame {
       frameOrder.append(node.viewNodeID)
@@ -1022,8 +1043,10 @@ package final class ViewGraph {
     if let existingEntityIdentity,
       existingEntityIdentity != entityIdentity
     {
+      recordCheckpointGraphMutation()
       node.resetStateSlots()
     }
+    recordCheckpointGraphMutation()
     entityRoutingTable.bind(entityIdentity, to: node.viewNodeID)
   }
 
@@ -1033,6 +1056,7 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     accessedStateSlots: Int
   ) -> ResolvedNode? {
+    recordCheckpointGraphMutation()
     let previousDependencies = node.dependencies
     let previousResolvedIdentity = node.resolvedIdentity
     guard node.finishEvaluation(accessedStateSlots: accessedStateSlots) else {
@@ -1126,6 +1150,7 @@ package final class ViewGraph {
       return
     }
 
+    recordCheckpointGraphMutation()
     var resolved = node.snapshot()
     resolved.children = children
     let childNodes = children.map(nodeForResolvedNode)
@@ -1148,6 +1173,7 @@ package final class ViewGraph {
       return
     }
 
+    recordCheckpointGraphMutation()
     var resolved = node.snapshot()
     resolved.children = children
     applyStructuralChildDiff(
@@ -1165,7 +1191,10 @@ package final class ViewGraph {
     } else {
       node = nodeIfExists(for: resolved.identity)
     }
-    node?.refreshResolvedMetadata(from: resolved)
+    if let node {
+      recordCheckpointGraphMutation()
+      node.refreshResolvedMetadata(from: resolved)
+    }
   }
 
   private func resolvedPreservingLayoutDependentChildren(
@@ -1210,6 +1239,7 @@ package final class ViewGraph {
   package func pruneDetachedIdentitySubtree(
     rootedAt identity: Identity
   ) {
+    recordCheckpointGraphMutation()
     let staleNodes = nodesByNodeID.values
       .filter { node in
         node.prepareForFrame(currentFrameID)
@@ -1237,6 +1267,7 @@ package final class ViewGraph {
     invalidator: (any Invalidating)?,
     retained: Bool = false
   ) {
+    recordCheckpointGraphMutation()
     let node = nodeForResolvedNode(subtree)
     node.prepareForFrame(currentFrameID)
 
@@ -1494,6 +1525,7 @@ package final class ViewGraph {
   package func finalizeFrame(
     rootIdentity: Identity
   ) -> [LifecycleEvent] {
+    recordCheckpointGraphMutation()
     guard let root else {
       self.root = nodeIfExists(for: rootIdentity)
       return []
@@ -1530,6 +1562,7 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
+    recordCheckpointGraphMutation()
     root = nodeIfExists(for: rootIdentity)
     let activeEntities = entityIdentities(in: resolved)
     prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
@@ -1578,6 +1611,7 @@ package final class ViewGraph {
     guard let root = nodeIfExists(for: rootIdentity) else {
       fatalError("View graph has no node for root identity \(rootIdentity).")
     }
+    recordCheckpointGraphMutation()
     self.root = root
     return root.snapshot()
   }
@@ -1651,6 +1685,7 @@ package final class ViewGraph {
   }
 
   package func recordCommittedRuntimeRegistrationFingerprint() {
+    recordCheckpointGraphMutation()
     committedRuntimeRegistrationFingerprint = currentRuntimeRegistrationFingerprint()
   }
 
@@ -1762,6 +1797,7 @@ package final class ViewGraph {
     else {
       return
     }
+    recordCheckpointGraphMutation()
     guard let targets = lifecycleEvaluationTargetsByOwner[ownerNodeID] else {
       return
     }
@@ -1792,6 +1828,7 @@ package final class ViewGraph {
     task: TaskDescriptor,
     isStructural: Bool
   ) {
+    recordCheckpointGraphMutation()
     ViewGraphLifecycleEventCollector.appendTaskCancelEvent(
       viewNodeID: viewNodeID(for: identity),
       identity: identity,
@@ -1807,6 +1844,7 @@ package final class ViewGraph {
     identity: Identity,
     task: TaskDescriptor
   ) {
+    recordCheckpointGraphMutation()
     ViewGraphLifecycleEventCollector.appendTaskStartEvent(
       viewNodeID: viewNodeID(for: identity),
       identity: identity,
@@ -1877,11 +1915,13 @@ package final class ViewGraph {
       let routedNodeID = entityRoutingTable.route(entityIdentity)
     {
       if let routedNode = nodeIfExists(for: routedNodeID) {
+        recordCheckpointGraphMutation()
         nodeIDByIdentity[identity] = routedNodeID
         identityByNodeID[routedNodeID] = identity
         entityRoutingTable.bind(entityIdentity, to: routedNodeID)
         return routedNode
       }
+      recordCheckpointGraphMutation()
       entityRoutingTable.release(routedNodeID)
     }
 
@@ -1891,6 +1931,7 @@ package final class ViewGraph {
           existing.committed.entityIdentity
           ?? entityRoutingTable.entityByNodeID[existing.viewNodeID]
         if existingEntityIdentity == entityIdentity {
+          recordCheckpointGraphMutation()
           entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
           return existing
         }
@@ -1910,6 +1951,7 @@ package final class ViewGraph {
           if existingEntityIdentity != nil {
             removeSubtree(rootedAt: existing)
           } else {
+            recordCheckpointGraphMutation()
             entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
             return existing
           }
@@ -1919,6 +1961,7 @@ package final class ViewGraph {
       }
     }
 
+    recordCheckpointGraphMutation()
     nextViewNodeIDRawValue &+= 1
     let viewNodeID = ViewNodeID(rawValue: nextViewNodeIDRawValue)
     let node = ViewNode(
@@ -1942,6 +1985,7 @@ package final class ViewGraph {
     guard let entityIdentity = resolved.entityIdentity else {
       return
     }
+    recordCheckpointGraphMutation()
     entityRoutingTable.bind(entityIdentity, to: viewNodeID)
   }
 
@@ -1964,6 +2008,7 @@ package final class ViewGraph {
   private func releaseInactiveEntityRoutes(
     activeEntities: Set<EntityIdentity>
   ) {
+    recordCheckpointGraphMutation()
     entityRoutingTable.releaseEntities(notIn: activeEntities)
     entityRoutingTable.releaseNodes(notIn: liveNodeIDs)
   }
@@ -1980,6 +2025,7 @@ package final class ViewGraph {
   private func prunePendingEntityRoutedRemovals(
     activeEntities: Set<EntityIdentity>
   ) {
+    recordCheckpointGraphMutation()
     let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
     pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
     for viewNodeID in pendingNodeIDs {
@@ -2023,6 +2069,7 @@ package final class ViewGraph {
         continue
       }
       if shouldDeferEntityRoutedRemoval(of: removedNode) {
+        recordCheckpointGraphMutation()
         pendingEntityRoutedRemovalNodeIDs.insert(removedNode.viewNodeID)
         continue
       }
@@ -2044,6 +2091,7 @@ package final class ViewGraph {
       return
     }
 
+    recordCheckpointGraphMutation()
     node.prepareForFrame(currentFrameID)
     let snapshot = committedSnapshot ?? node.committed
     removeResolvedNodeReuseCaches(rootedAt: node.identity)
@@ -2100,6 +2148,7 @@ package final class ViewGraph {
 
     node.setLifecycleState(.disappearing)
     node.setCommittedPresence(false)
+    node.recordCheckpointMutation()
     node.parent = nil
     removeDependencyEdges(for: node)
     liveNodeIDs.remove(node.viewNodeID)
@@ -2184,6 +2233,7 @@ package final class ViewGraph {
     for node: ViewNode,
     previous: DependencySet
   ) {
+    recordCheckpointGraphMutation()
     ViewGraphDependencyIndex.reindex(
       viewNodeID: node.viewNodeID,
       previous: previous,
@@ -2197,6 +2247,7 @@ package final class ViewGraph {
   private func removeDependencyEdges(
     for node: ViewNode
   ) {
+    recordCheckpointGraphMutation()
     ViewGraphDependencyIndex.remove(
       viewNodeID: node.viewNodeID,
       dependencies: node.dependencies,

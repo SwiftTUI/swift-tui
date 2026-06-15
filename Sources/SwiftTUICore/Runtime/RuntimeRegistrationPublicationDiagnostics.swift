@@ -23,6 +23,11 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var graphCheckpointBaselineNodeCount: Int?
   package var graphCheckpointPreparedNodeCount: Int?
   package var graphCheckpointDirtySubtreeCandidateNodeCount: Int?
+  package var graphCheckpointStrategy: String?
+  package var graphDeltaCheckpointNodeCount: Int?
+  package var graphDeltaCheckpointCreatedNodeCount: Int?
+  package var graphDeltaCheckpointRemovedNodeCount: Int?
+  package var graphDeltaCheckpointEpochDelta: UInt64?
   package var nonGraphCheckpointPresent: Bool?
 
   package init(
@@ -38,6 +43,11 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     graphCheckpointBaselineNodeCount: Int? = nil,
     graphCheckpointPreparedNodeCount: Int? = nil,
     graphCheckpointDirtySubtreeCandidateNodeCount: Int? = nil,
+    graphCheckpointStrategy: String? = nil,
+    graphDeltaCheckpointNodeCount: Int? = nil,
+    graphDeltaCheckpointCreatedNodeCount: Int? = nil,
+    graphDeltaCheckpointRemovedNodeCount: Int? = nil,
+    graphDeltaCheckpointEpochDelta: UInt64? = nil,
     nonGraphCheckpointPresent: Bool? = nil
   ) {
     self.publicationMode = publicationMode
@@ -53,6 +63,11 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.graphCheckpointPreparedNodeCount = graphCheckpointPreparedNodeCount
     self.graphCheckpointDirtySubtreeCandidateNodeCount =
       graphCheckpointDirtySubtreeCandidateNodeCount
+    self.graphCheckpointStrategy = graphCheckpointStrategy
+    self.graphDeltaCheckpointNodeCount = graphDeltaCheckpointNodeCount
+    self.graphDeltaCheckpointCreatedNodeCount = graphDeltaCheckpointCreatedNodeCount
+    self.graphDeltaCheckpointRemovedNodeCount = graphDeltaCheckpointRemovedNodeCount
+    self.graphDeltaCheckpointEpochDelta = graphDeltaCheckpointEpochDelta
     self.nonGraphCheckpointPresent = nonGraphCheckpointPresent
   }
 }

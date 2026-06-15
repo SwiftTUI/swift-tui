@@ -15,6 +15,7 @@ package final class ViewGraphFrameDraft {
   private let liveRegistrations: RuntimeRegistrationSet
   private let checkpoint: ViewGraph.Checkpoint?
   private var preparedCheckpoint: ViewGraph.Checkpoint?
+  private var deltaCheckpointShadow: ViewGraphDeltaCheckpointShadow?
   private var dirtyEvaluationPlan: DirtyEvaluationPlan?
   private(set) package var runtimeRegistrationPublication: RuntimeRegistrationPublication =
     .unchanged
@@ -32,6 +33,12 @@ package final class ViewGraphFrameDraft {
     self.liveRegistrations = liveRegistrations
     self.checkpoint = checkpoint
     self.publicationDiagnosticsEnabled = publicationDiagnosticsEnabled
+    deltaCheckpointShadow =
+      if publicationDiagnosticsEnabled {
+        checkpoint.map { ViewGraphDeltaCheckpointShadow(baseline: $0) }
+      } else {
+        nil
+      }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointBaselineNodeCount = checkpoint?.nodesByNodeID.count
       publicationDiagnostics.nonGraphCheckpointPresent = checkpoint != nil
@@ -72,12 +79,30 @@ package final class ViewGraphFrameDraft {
       return
     }
     preparedCheckpoint = viewGraph.makeCheckpoint()
+    if let preparedCheckpoint {
+      deltaCheckpointShadow?.recordPreparedCheckpoint(preparedCheckpoint)
+    }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointPreparedNodeCount =
         preparedCheckpoint?.nodesByNodeID.count
       publicationDiagnostics.graphCheckpointDirtySubtreeCandidateNodeCount =
         graphCheckpointDirtySubtreeCandidateNodeCount(in: viewGraph)
+      if let deltaSummary = deltaCheckpointShadow?.summary {
+        publicationDiagnostics.graphCheckpointStrategy = "full_shadow_delta"
+        publicationDiagnostics.graphDeltaCheckpointNodeCount =
+          deltaSummary.touchedNodeCount
+        publicationDiagnostics.graphDeltaCheckpointCreatedNodeCount =
+          deltaSummary.createdNodeCount
+        publicationDiagnostics.graphDeltaCheckpointRemovedNodeCount =
+          deltaSummary.removedNodeCount
+        publicationDiagnostics.graphDeltaCheckpointEpochDelta =
+          deltaSummary.graphMutationEpochDelta
+      }
     }
+  }
+
+  package var debugDeltaCheckpointSummary: ViewGraphDeltaCheckpointSummary? {
+    deltaCheckpointShadow?.summary
   }
 
   package func materializePreparedState(

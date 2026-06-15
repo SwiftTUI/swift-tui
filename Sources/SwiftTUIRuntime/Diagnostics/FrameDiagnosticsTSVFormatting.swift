@@ -73,6 +73,11 @@ package enum FrameDiagnosticsTSVFormatting {
     "runtime_graph_checkpoint_baseline_nodes",
     "runtime_graph_checkpoint_prepared_nodes",
     "runtime_graph_checkpoint_dirty_subtree_candidate_nodes",
+    "runtime_graph_checkpoint_strategy",
+    "runtime_graph_delta_checkpoint_nodes",
+    "runtime_graph_delta_checkpoint_created_nodes",
+    "runtime_graph_delta_checkpoint_removed_nodes",
+    "runtime_graph_delta_checkpoint_epoch_delta",
     "runtime_non_graph_checkpoints",
     "runtime_issue_count",
     "runtime_issues",
@@ -264,6 +269,11 @@ package enum FrameDiagnosticsTSVFormatting {
       formatOptionalInt(
         record.runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount
       ),
+      record.runtimePublicationGraphCheckpointStrategy ?? "-",
+      formatOptionalInt(record.runtimePublicationGraphDeltaCheckpointNodeCount),
+      formatOptionalInt(record.runtimePublicationGraphDeltaCheckpointCreatedNodeCount),
+      formatOptionalInt(record.runtimePublicationGraphDeltaCheckpointRemovedNodeCount),
+      record.runtimePublicationGraphDeltaCheckpointEpochDelta.map(String.init) ?? "-",
       formatOptionalBool(record.runtimePublicationNonGraphCheckpointPresent),
       String(record.runtimeIssues.count),
       formatRuntimeIssues(record.runtimeIssues),
