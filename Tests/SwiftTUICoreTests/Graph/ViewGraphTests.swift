@@ -250,7 +250,8 @@ struct ViewGraphTests {
     )
     let bodyIdentity = entryIdentity.child("body")
     let staleFlattenedIdentity = Identity(
-      components: bodyIdentity
+      components:
+        bodyIdentity
         .child("StaleResolvedLeaf")
         .path
         .split(separator: "/")
@@ -321,8 +322,16 @@ struct ViewGraphTests {
     #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [unknownBodyDescendant])
   }
 
-  @Test("presentation entry under live portal root maps to portal root when host is absent")
-  func presentationEntryUnderLivePortalRootMapsToPortalRootWhenHostIsAbsent() {
+  @Test("presentation entry under live portal root stays unmapped when the overlay host is absent")
+  func presentationEntryUnderLivePortalRootStaysUnmappedWhenHostIsAbsent() {
+    // Regression guard for the sheet-settle cone: an overlay-entry invalidation
+    // whose overlay host is not yet materialized must NOT fall back to the
+    // portal root. The portal root is the graph root and an ancestor of the
+    // content, so mapping onto it swept the entire disjoint background into the
+    // reuse-conflict cone. It now stays unmapped (a `.all` fallback, which is
+    // already the case on these force-root frames), leaving the background
+    // reuse-eligible; `installPresentationPortalEvaluator` re-resolves the
+    // portal root regardless.
     let graph = ViewGraph()
     let portalRootIdentity = testPresentationPortalRootIdentity()
     let staleEntryDescendant = testPresentationPortalBodyIdentity(
@@ -343,7 +352,7 @@ struct ViewGraphTests {
       portalRootIdentity: portalRootIdentity
     )
 
-    #expect(translated == [portalRootIdentity])
+    #expect(translated == [staleEntryDescendant])
 
     graph.beginFrame()
     graph.invalidateAndQueueDirty(translated)
@@ -351,9 +360,9 @@ struct ViewGraphTests {
       invalidatedIdentities: translated
     )
 
-    #expect(result.plan?.frontierIdentities == [portalRootIdentity])
-    #expect(result.diagnostics.result == "formed")
-    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 0)
+    #expect(result.plan == nil)
+    #expect(result.diagnostics.result == "nil_unmapped_invalidated_identity")
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
   }
 
   @Test("inactive presentation entry under live overlay host maps to overlay host")
@@ -1524,7 +1533,7 @@ private func testPresentationPortalBodyIdentity(
     portalRootIdentity: portalRootIdentity,
     entryID: entryID
   )
-    .child("body")
+  .child("body")
 }
 
 private func testPresentationPortalEntryIdentity(

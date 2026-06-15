@@ -642,11 +642,14 @@ package final class ViewGraph {
     {
       return overlayHostIdentity
     }
-    if identityPath.hasPrefix("\(overlayHostIdentity.path)/entry:"),
-      nodeIfExists(for: portalRootIdentity) != nil
-    {
-      return portalRootIdentity
-    }
+    // Do NOT fall back to the portal root for an unmapped overlay-entry
+    // identity. The portal root is the graph root and an ancestor of the
+    // content, so mapping an overlay-entry invalidation onto it sweeps the
+    // entire disjoint background into the reuse-conflict cone — the dominant
+    // sheet open/close-settle residual. Leaving it unmapped keeps the
+    // identity disjoint from the background, and `installPresentationPortalEvaluator`
+    // already force-queues the portal root for re-resolution whenever the
+    // invalidation set is non-empty, so the overlay still composes.
     return nil
   }
 
