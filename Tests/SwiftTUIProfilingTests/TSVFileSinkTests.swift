@@ -83,6 +83,20 @@ struct TSVFileSinkTests {
       firstRow[headerColumns["runtime_graph_delta_checkpoint_epoch_delta"]!] == "5"
     )
     #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_restore_strategy"]!]
+        == "delta_node"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_restore_fallback_reason"]!]
+        == "current_checkpoint_mismatch"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_delta_restore_count"]!] == "2"
+    )
+    #expect(
+      firstRow[headerColumns["runtime_graph_checkpoint_fallback_restore_count"]!] == "1"
+    )
+    #expect(
       firstRow[headerColumns["runtime_non_graph_checkpoints"]!] == "1"
     )
     for row in lines.dropFirst() {
@@ -137,6 +151,10 @@ struct TSVFileSinkTests {
       graphDeltaCheckpointCreatedNodeCount: 1,
       graphDeltaCheckpointRemovedNodeCount: 0,
       graphDeltaCheckpointEpochDelta: 5,
+      graphCheckpointRestoreStrategy: "delta_node",
+      graphCheckpointRestoreFallbackReason: "current_checkpoint_mismatch",
+      graphCheckpointDeltaRestoreCount: 2,
+      graphCheckpointFallbackRestoreCount: 1,
       nonGraphCheckpointPresent: true
     )
     return .committed(

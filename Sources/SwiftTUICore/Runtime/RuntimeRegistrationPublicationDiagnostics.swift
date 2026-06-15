@@ -28,6 +28,10 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var graphDeltaCheckpointCreatedNodeCount: Int?
   package var graphDeltaCheckpointRemovedNodeCount: Int?
   package var graphDeltaCheckpointEpochDelta: UInt64?
+  package var graphCheckpointRestoreStrategy: String?
+  package var graphCheckpointRestoreFallbackReason: String?
+  package var graphCheckpointDeltaRestoreCount: Int
+  package var graphCheckpointFallbackRestoreCount: Int
   package var nonGraphCheckpointPresent: Bool?
 
   package init(
@@ -48,6 +52,10 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     graphDeltaCheckpointCreatedNodeCount: Int? = nil,
     graphDeltaCheckpointRemovedNodeCount: Int? = nil,
     graphDeltaCheckpointEpochDelta: UInt64? = nil,
+    graphCheckpointRestoreStrategy: String? = nil,
+    graphCheckpointRestoreFallbackReason: String? = nil,
+    graphCheckpointDeltaRestoreCount: Int = 0,
+    graphCheckpointFallbackRestoreCount: Int = 0,
     nonGraphCheckpointPresent: Bool? = nil
   ) {
     self.publicationMode = publicationMode
@@ -68,6 +76,10 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.graphDeltaCheckpointCreatedNodeCount = graphDeltaCheckpointCreatedNodeCount
     self.graphDeltaCheckpointRemovedNodeCount = graphDeltaCheckpointRemovedNodeCount
     self.graphDeltaCheckpointEpochDelta = graphDeltaCheckpointEpochDelta
+    self.graphCheckpointRestoreStrategy = graphCheckpointRestoreStrategy
+    self.graphCheckpointRestoreFallbackReason = graphCheckpointRestoreFallbackReason
+    self.graphCheckpointDeltaRestoreCount = graphCheckpointDeltaRestoreCount
+    self.graphCheckpointFallbackRestoreCount = graphCheckpointFallbackRestoreCount
     self.nonGraphCheckpointPresent = nonGraphCheckpointPresent
   }
 }

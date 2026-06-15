@@ -38,6 +38,7 @@ extension ViewNode {
     package var parentIdentity: Identity?
     package var committed: ResolvedNode
     package var isCommittedSnapshotFresh: Bool
+    package var hasStaleIslandDescendant: Bool
     package var children: [Identity]
     package var stateSlots: [StateSlotSnapshot]
     package var dependencies: DependencySet

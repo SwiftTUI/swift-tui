@@ -63,6 +63,10 @@ public struct FrameDiagnosticRecord: Sendable {
   package var runtimePublicationGraphDeltaCheckpointCreatedNodeCount: Int?
   package var runtimePublicationGraphDeltaCheckpointRemovedNodeCount: Int?
   package var runtimePublicationGraphDeltaCheckpointEpochDelta: UInt64?
+  package var runtimePublicationGraphCheckpointRestoreStrategy: String?
+  package var runtimePublicationGraphCheckpointRestoreFallbackReason: String?
+  package var runtimePublicationGraphCheckpointDeltaRestoreCount: Int = 0
+  package var runtimePublicationGraphCheckpointFallbackRestoreCount: Int = 0
   package var runtimePublicationNonGraphCheckpointPresent: Bool?
   public var runtimeIssues: [RuntimeIssue]
   public var staleFramePolicy: String
@@ -164,6 +168,8 @@ extension FrameDiagnosticRecord {
     runtimePointerHoverHandlerCount = 0
     runtimeGestureRecognizerCount = 0
     runtimeGestureStateBindingCount = 0
+    runtimePublicationGraphCheckpointDeltaRestoreCount = 0
+    runtimePublicationGraphCheckpointFallbackRestoreCount = 0
     runtimeIssues = []
     staleFramePolicy = "-"
     tailJobState = "-"

@@ -135,6 +135,10 @@ package final class ViewNode {
     checkpointMutationGeneration &+= 1
   }
 
+  package var currentCheckpointMutationGeneration: UInt64 {
+    checkpointMutationGeneration
+  }
+
   package convenience init(
     identity: Identity
   ) {
@@ -1251,6 +1255,7 @@ extension ViewNode {
       parentIdentity: parent?.identity,
       committed: committed,
       isCommittedSnapshotFresh: isCommittedSnapshotFresh,
+      hasStaleIslandDescendant: hasStaleIslandDescendant,
       children: children.map(\.identity),
       stateSlots: stateSlots.map { ordinal, slot in
         DebugTotalStateSnapshot.StateSlotSnapshot(

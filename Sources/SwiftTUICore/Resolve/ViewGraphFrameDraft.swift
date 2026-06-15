@@ -17,10 +17,14 @@ package final class ViewGraphFrameDraft {
   private var preparedCheckpoint: ViewGraph.Checkpoint?
   private var deltaCheckpointShadow: ViewGraphDeltaCheckpointShadow?
   private var dirtyEvaluationPlan: DirtyEvaluationPlan?
+  private(set) package var debugLastDeltaCheckpointRestoreResult:
+    ViewGraphDeltaCheckpointShadow.RestoreResult?
   private(set) package var runtimeRegistrationPublication: RuntimeRegistrationPublication =
     .unchanged
   private let publicationDiagnosticsEnabled: Bool
   private var publicationDiagnostics = RuntimeRegistrationPublicationDiagnostics()
+  private var graphCheckpointDeltaRestoreCount = 0
+  private var graphCheckpointFallbackRestoreCount = 0
   private var didCommit = false
   private var didDiscard = false
 
@@ -33,12 +37,7 @@ package final class ViewGraphFrameDraft {
     self.liveRegistrations = liveRegistrations
     self.checkpoint = checkpoint
     self.publicationDiagnosticsEnabled = publicationDiagnosticsEnabled
-    deltaCheckpointShadow =
-      if publicationDiagnosticsEnabled {
-        checkpoint.map { ViewGraphDeltaCheckpointShadow(baseline: $0) }
-      } else {
-        nil
-      }
+    deltaCheckpointShadow = checkpoint.map { ViewGraphDeltaCheckpointShadow(baseline: $0) }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointBaselineNodeCount = checkpoint?.nodesByNodeID.count
       publicationDiagnostics.nonGraphCheckpointPresent = checkpoint != nil
@@ -79,8 +78,13 @@ package final class ViewGraphFrameDraft {
       return
     }
     preparedCheckpoint = viewGraph.makeCheckpoint()
-    if let preparedCheckpoint {
-      deltaCheckpointShadow?.recordPreparedCheckpoint(preparedCheckpoint)
+    if let preparedCheckpoint,
+      let checkpoint
+    {
+      deltaCheckpointShadow?.recordPreparedCheckpoint(
+        preparedCheckpoint,
+        baseline: checkpoint
+      )
     }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointPreparedNodeCount =
@@ -113,12 +117,12 @@ package final class ViewGraphFrameDraft {
     guard let preparedCheckpoint else {
       return
     }
-    let stateMutations =
-      preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
-    viewGraph.restoreCheckpoint(preparedCheckpoint)
-    if let stateMutations {
-      viewGraph.applyStateMutationOverlay(stateMutations)
-    }
+    restoreGraphState(
+      .prepared,
+      targetCheckpoint: preparedCheckpoint,
+      in: viewGraph,
+      preservingCurrentStateMutations: preservingCurrentStateMutations
+    )
   }
 
   package func restoreBaselineState(
@@ -129,12 +133,12 @@ package final class ViewGraphFrameDraft {
     guard let checkpoint else {
       return
     }
-    let stateMutations =
-      preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
-    viewGraph.restoreCheckpoint(checkpoint)
-    if let stateMutations {
-      viewGraph.applyStateMutationOverlay(stateMutations)
-    }
+    restoreGraphState(
+      .baseline,
+      targetCheckpoint: checkpoint,
+      in: viewGraph,
+      preservingCurrentStateMutations: preservingCurrentStateMutations
+    )
   }
 
   @discardableResult
@@ -210,6 +214,10 @@ package final class ViewGraphFrameDraft {
       publicationDiagnostics.publicationMode = publicationModeName
       publicationDiagnostics.subtreeRootCount = publicationSubtreeRootCount
       publicationDiagnostics.restoredNodeCount = restoredNodeCount
+      publicationDiagnostics.graphCheckpointDeltaRestoreCount =
+        graphCheckpointDeltaRestoreCount
+      publicationDiagnostics.graphCheckpointFallbackRestoreCount =
+        graphCheckpointFallbackRestoreCount
       diagnostics.publication = publicationDiagnostics
     }
     return diagnostics
@@ -286,6 +294,81 @@ package final class ViewGraphFrameDraft {
       dirtyPlanDiagnostics.unmappedInvalidatedIdentitySample
     publicationDiagnostics.selectiveEvaluationDisabledReasons =
       dirtyPlanDiagnostics.selectiveEvaluationDisabledReasons
+  }
+
+  private func restoreGraphState(
+    _ target: ViewGraphDeltaCheckpointShadow.RestoreTarget,
+    targetCheckpoint: ViewGraph.Checkpoint,
+    in viewGraph: ViewGraph,
+    preservingCurrentStateMutations: Bool
+  ) {
+    let stateMutations =
+      preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
+    let result = restoreGraphCheckpoint(
+      target,
+      targetCheckpoint: targetCheckpoint,
+      in: viewGraph
+    )
+    recordDeltaRestoreResult(result)
+    if let stateMutations {
+      viewGraph.applyStateMutationOverlay(stateMutations)
+    }
+  }
+
+  private func restoreGraphCheckpoint(
+    _ target: ViewGraphDeltaCheckpointShadow.RestoreTarget,
+    targetCheckpoint: ViewGraph.Checkpoint,
+    in viewGraph: ViewGraph
+  ) -> ViewGraphDeltaCheckpointShadow.RestoreResult {
+    guard let checkpoint else {
+      viewGraph.restoreCheckpoint(targetCheckpoint)
+      return .full(target: target, reason: .missingPreparedCheckpoint)
+    }
+
+    let plan = deltaCheckpointShadow?.restorePlan(
+      target: target,
+      in: viewGraph,
+      baseline: checkpoint,
+      prepared: preparedCheckpoint
+    ) ?? .full(target: target, reason: .missingPreparedCheckpoint)
+
+    switch plan {
+    case .full(_, let reason):
+      viewGraph.restoreCheckpoint(targetCheckpoint)
+      return .full(target: target, reason: reason)
+    case .delta(_, let nodeCheckpoints):
+      viewGraph.restoreCheckpoint(targetCheckpoint, nodeCheckpoints: nodeCheckpoints)
+      #if DEBUG
+      let deltaSnapshot = viewGraph.debugTotalStateSnapshot()
+      viewGraph.restoreCheckpoint(targetCheckpoint)
+      guard deltaSnapshot == viewGraph.debugTotalStateSnapshot() else {
+        return .full(target: target, reason: .debugOracleMismatch)
+      }
+      #endif
+      return .delta(target: target)
+    }
+  }
+
+  private func recordDeltaRestoreResult(
+    _ result: ViewGraphDeltaCheckpointShadow.RestoreResult
+  ) {
+    debugLastDeltaCheckpointRestoreResult = result
+    switch result {
+    case .delta:
+      graphCheckpointDeltaRestoreCount += 1
+    case .full:
+      graphCheckpointFallbackRestoreCount += 1
+    }
+
+    guard publicationDiagnosticsEnabled else {
+      return
+    }
+    publicationDiagnostics.graphCheckpointRestoreStrategy = result.strategyName
+    publicationDiagnostics.graphCheckpointRestoreFallbackReason = result.fallbackReasonName
+    publicationDiagnostics.graphCheckpointDeltaRestoreCount =
+      graphCheckpointDeltaRestoreCount
+    publicationDiagnostics.graphCheckpointFallbackRestoreCount =
+      graphCheckpointFallbackRestoreCount
   }
 
   private var publicationModeName: String {

@@ -162,6 +162,14 @@ package enum FrameRecordDerivation {
       publication.graphDeltaCheckpointRemovedNodeCount
     record.runtimePublicationGraphDeltaCheckpointEpochDelta =
       publication.graphDeltaCheckpointEpochDelta
+    record.runtimePublicationGraphCheckpointRestoreStrategy =
+      publication.graphCheckpointRestoreStrategy
+    record.runtimePublicationGraphCheckpointRestoreFallbackReason =
+      publication.graphCheckpointRestoreFallbackReason
+    record.runtimePublicationGraphCheckpointDeltaRestoreCount =
+      publication.graphCheckpointDeltaRestoreCount
+    record.runtimePublicationGraphCheckpointFallbackRestoreCount =
+      publication.graphCheckpointFallbackRestoreCount
     record.runtimePublicationNonGraphCheckpointPresent =
       publication.nonGraphCheckpointPresent
     return record

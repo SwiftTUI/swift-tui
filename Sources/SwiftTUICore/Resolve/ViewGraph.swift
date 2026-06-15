@@ -71,7 +71,8 @@ extension ViewGraph {
     stateMutationNodeIDsByKey = checkpoint.stateMutationNodeIDsByKey
     lifecycleEvaluationOwnersByNodeID = checkpoint.lifecycleEvaluationOwnersByNodeID
     lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
-    lifecycleEvaluationTargetsRecordedByOwner = checkpoint.lifecycleEvaluationTargetsRecordedByOwner
+    lifecycleEvaluationTargetsRecordedByOwner =
+      checkpoint.lifecycleEvaluationTargetsRecordedByOwner
     taskDescriptorNodeSlots = checkpoint.taskDescriptorNodeSlots
     nextTaskDescriptorIdentityToken = checkpoint.nextTaskDescriptorIdentityToken
     stateSlotDependents = checkpoint.stateSlotDependents
@@ -88,6 +89,77 @@ extension ViewGraph {
       checkpoint.nodeCheckpoints,
       nodesByNodeID: checkpoint.nodesByNodeID
     )
+  }
+
+  package func restoreCheckpoint(
+    _ checkpoint: Checkpoint,
+    nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
+  ) {
+    restoreCheckpointGraphFields(checkpoint)
+
+    ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
+      nodeCheckpoints,
+      nodesByNodeID: checkpoint.nodesByNodeID
+    )
+  }
+
+  package func checkpointMutationStateMatches(_ checkpoint: Checkpoint) -> Bool {
+    guard checkpointMutationEpoch == checkpoint.checkpointMutationEpoch,
+      Set(nodesByNodeID.keys) == Set(checkpoint.nodeCheckpoints.keys)
+    else {
+      return false
+    }
+
+    for (viewNodeID, nodeCheckpoint) in checkpoint.nodeCheckpoints {
+      guard
+        nodesByNodeID[viewNodeID]?.currentCheckpointMutationGeneration
+          == nodeCheckpoint.checkpointMutationGeneration
+      else {
+        return false
+      }
+    }
+    return true
+  }
+
+  private func restoreCheckpointGraphFields(_ checkpoint: Checkpoint) {
+    root = checkpoint.root
+    nodesByNodeID = checkpoint.nodesByNodeID
+    nodeIDByIdentity = checkpoint.nodeIDByIdentity
+    identityByNodeID = checkpoint.identityByNodeID
+    nodeIDsByStructuralPath = checkpoint.nodeIDsByStructuralPath
+    entityRoutingTable = checkpoint.entityRoutingTable
+    nextViewNodeIDRawValue = checkpoint.nextViewNodeIDRawValue
+    rootEvaluator = checkpoint.rootEvaluator
+    evaluationRootIdentity = checkpoint.evaluationRootIdentity
+    viewportLifecycleNodesByKey = checkpoint.viewportLifecycleNodesByKey
+    viewportLifecycleOrder = checkpoint.viewportLifecycleOrder
+    frameOrder = checkpoint.frameOrder
+    stableTaskCancelEvents = checkpoint.stableTaskCancelEvents
+    stableTaskStartEvents = checkpoint.stableTaskStartEvents
+    structuralAppearEvents = checkpoint.structuralAppearEvents
+    structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
+    structuralDisappearEvents = checkpoint.structuralDisappearEvents
+    pendingEntityRoutedRemovalNodeIDs = checkpoint.pendingEntityRoutedRemovalNodeIDs
+    requiresRootEvaluation = checkpoint.requiresRootEvaluation
+    invalidatedNodeIDs = checkpoint.invalidatedNodeIDs
+    graphLocalDirtyNodeIDs = checkpoint.graphLocalDirtyNodeIDs
+    latestLifecycleEvents = checkpoint.latestLifecycleEvents
+    stateMutationKeys = checkpoint.stateMutationKeys
+    stateMutationNodeIDsByKey = checkpoint.stateMutationNodeIDsByKey
+    lifecycleEvaluationOwnersByNodeID = checkpoint.lifecycleEvaluationOwnersByNodeID
+    lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
+    lifecycleEvaluationTargetsRecordedByOwner = checkpoint.lifecycleEvaluationTargetsRecordedByOwner
+    taskDescriptorNodeSlots = checkpoint.taskDescriptorNodeSlots
+    nextTaskDescriptorIdentityToken = checkpoint.nextTaskDescriptorIdentityToken
+    stateSlotDependents = checkpoint.stateSlotDependents
+    environmentDependents = checkpoint.environmentDependents
+    observableDependents = checkpoint.observableDependents
+    currentFrameID = checkpoint.currentFrameID
+    liveNodeIDs = checkpoint.liveNodeIDs
+    resolvedNodeReuseCache = checkpoint.resolvedNodeReuseCache
+    committedRuntimeRegistrationFingerprint =
+      checkpoint.committedRuntimeRegistrationFingerprint
+    checkpointMutationEpoch = checkpoint.checkpointMutationEpoch
   }
 }
 
