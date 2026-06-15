@@ -63,6 +63,11 @@ struct TSVFileSinkTests {
       firstRow[headerColumns["runtime_graph_checkpoint_prepared_nodes"]!] == "9"
     )
     #expect(
+      firstRow[
+        headerColumns["runtime_graph_checkpoint_dirty_subtree_candidate_nodes"]!
+      ] == "3"
+    )
+    #expect(
       firstRow[headerColumns["runtime_non_graph_checkpoints"]!] == "1"
     )
     for row in lines.dropFirst() {
@@ -111,6 +116,7 @@ struct TSVFileSinkTests {
       presentationPortalRootQueued: true,
       graphCheckpointBaselineNodeCount: 8,
       graphCheckpointPreparedNodeCount: 9,
+      graphCheckpointDirtySubtreeCandidateNodeCount: 3,
       nonGraphCheckpointPresent: true
     )
     return .committed(

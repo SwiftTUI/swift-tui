@@ -15,6 +15,7 @@ package final class ViewGraphFrameDraft {
   private let liveRegistrations: RuntimeRegistrationSet
   private let checkpoint: ViewGraph.Checkpoint?
   private var preparedCheckpoint: ViewGraph.Checkpoint?
+  private var dirtyEvaluationPlan: DirtyEvaluationPlan?
   private(set) package var runtimeRegistrationPublication: RuntimeRegistrationPublication =
     .unchanged
   private let publicationDiagnosticsEnabled: Bool
@@ -42,6 +43,7 @@ package final class ViewGraphFrameDraft {
     diagnostics dirtyPlanDiagnostics: DirtyEvaluationPlanDiagnostics? = nil
   ) {
     precondition(!didCommit && !didDiscard)
+    dirtyEvaluationPlan = plan
     if let plan {
       recordSubtreePublication(rootedAt: plan.frontierIdentities)
     } else {
@@ -73,6 +75,8 @@ package final class ViewGraphFrameDraft {
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointPreparedNodeCount =
         preparedCheckpoint?.nodesByNodeID.count
+      publicationDiagnostics.graphCheckpointDirtySubtreeCandidateNodeCount =
+        graphCheckpointDirtySubtreeCandidateNodeCount(in: viewGraph)
     }
   }
 
@@ -219,6 +223,24 @@ package final class ViewGraphFrameDraft {
       runtimeRegistrationPublication = .subtrees(existing + roots)
     case .all:
       break
+    }
+  }
+
+  private func graphCheckpointDirtySubtreeCandidateNodeCount(
+    in viewGraph: ViewGraph
+  ) -> Int? {
+    switch runtimeRegistrationPublication {
+    case .unchanged:
+      return 0
+    case .subtrees:
+      guard let dirtyEvaluationPlan else {
+        return nil
+      }
+      return viewGraph.runtimeRegistrationSubtreeNodeCount(
+        rootedAt: dirtyEvaluationPlan.frontierIdentities
+      )
+    case .all:
+      return nil
     }
   }
 

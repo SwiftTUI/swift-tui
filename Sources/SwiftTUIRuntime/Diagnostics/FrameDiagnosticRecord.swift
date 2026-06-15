@@ -57,6 +57,7 @@ public struct FrameDiagnosticRecord: Sendable {
   package var runtimePublicationPresentationPortalRootQueued: Bool?
   package var runtimePublicationGraphCheckpointBaselineNodeCount: Int?
   package var runtimePublicationGraphCheckpointPreparedNodeCount: Int?
+  package var runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount: Int?
   package var runtimePublicationNonGraphCheckpointPresent: Bool?
   public var runtimeIssues: [RuntimeIssue]
   public var staleFramePolicy: String

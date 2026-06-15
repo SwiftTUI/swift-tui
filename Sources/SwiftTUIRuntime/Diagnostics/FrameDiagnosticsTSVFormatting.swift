@@ -72,6 +72,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "runtime_publication_portal_root_queued",
     "runtime_graph_checkpoint_baseline_nodes",
     "runtime_graph_checkpoint_prepared_nodes",
+    "runtime_graph_checkpoint_dirty_subtree_candidate_nodes",
     "runtime_non_graph_checkpoints",
     "runtime_issue_count",
     "runtime_issues",
@@ -260,6 +261,9 @@ package enum FrameDiagnosticsTSVFormatting {
       formatOptionalBool(record.runtimePublicationPresentationPortalRootQueued),
       formatOptionalInt(record.runtimePublicationGraphCheckpointBaselineNodeCount),
       formatOptionalInt(record.runtimePublicationGraphCheckpointPreparedNodeCount),
+      formatOptionalInt(
+        record.runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount
+      ),
       formatOptionalBool(record.runtimePublicationNonGraphCheckpointPresent),
       String(record.runtimeIssues.count),
       formatRuntimeIssues(record.runtimeIssues),

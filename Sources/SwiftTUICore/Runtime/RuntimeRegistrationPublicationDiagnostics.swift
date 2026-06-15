@@ -22,6 +22,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var presentationPortalRootQueued: Bool?
   package var graphCheckpointBaselineNodeCount: Int?
   package var graphCheckpointPreparedNodeCount: Int?
+  package var graphCheckpointDirtySubtreeCandidateNodeCount: Int?
   package var nonGraphCheckpointPresent: Bool?
 
   package init(
@@ -36,6 +37,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     presentationPortalRootQueued: Bool? = nil,
     graphCheckpointBaselineNodeCount: Int? = nil,
     graphCheckpointPreparedNodeCount: Int? = nil,
+    graphCheckpointDirtySubtreeCandidateNodeCount: Int? = nil,
     nonGraphCheckpointPresent: Bool? = nil
   ) {
     self.publicationMode = publicationMode
@@ -49,6 +51,8 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.presentationPortalRootQueued = presentationPortalRootQueued
     self.graphCheckpointBaselineNodeCount = graphCheckpointBaselineNodeCount
     self.graphCheckpointPreparedNodeCount = graphCheckpointPreparedNodeCount
+    self.graphCheckpointDirtySubtreeCandidateNodeCount =
+      graphCheckpointDirtySubtreeCandidateNodeCount
     self.nonGraphCheckpointPresent = nonGraphCheckpointPresent
   }
 }

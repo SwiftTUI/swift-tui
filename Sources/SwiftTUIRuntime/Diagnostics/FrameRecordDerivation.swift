@@ -150,6 +150,8 @@ package enum FrameRecordDerivation {
       publication.graphCheckpointBaselineNodeCount
     record.runtimePublicationGraphCheckpointPreparedNodeCount =
       publication.graphCheckpointPreparedNodeCount
+    record.runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount =
+      publication.graphCheckpointDirtySubtreeCandidateNodeCount
     record.runtimePublicationNonGraphCheckpointPresent =
       publication.nonGraphCheckpointPresent
     return record

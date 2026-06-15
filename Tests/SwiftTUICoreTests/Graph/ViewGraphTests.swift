@@ -1198,6 +1198,7 @@ struct ViewGraphTests {
       dirtyEvaluation.plan,
       diagnostics: dirtyEvaluation.diagnostics
     )
+    graphDraft.recordPreparedCheckpoint(from: graph)
 
     let diagnostics = graphDraft.commitRuntimeRegistrations(from: graph)
 
@@ -1208,6 +1209,10 @@ struct ViewGraphTests {
     #expect(diagnostics.publication.invalidatedIdentityCount == 1)
     #expect(diagnostics.publication.unmappedInvalidatedIdentityCount == 0)
     #expect(diagnostics.publication.graphCheckpointBaselineNodeCount == 2)
+    #expect(diagnostics.publication.graphCheckpointPreparedNodeCount == 2)
+    #expect(
+      diagnostics.publication.graphCheckpointDirtySubtreeCandidateNodeCount == 1
+    )
   }
 
   @Test("view graph frame draft discard restores graph without live registry mutation")
