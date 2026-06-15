@@ -216,10 +216,21 @@ struct DefaultRendererFrameHeadCoordinator {
       from: resolveContext,
       proposal: proposal
     )
+    let rawInvalidatedIdentities = resolveInputs.invalidatedIdentities
     translatePresentationPortalInvalidations(
       in: &resolveInputs,
       contentRootIdentity: resolveContext.identity,
       portalRootIdentity: presentationPortalIdentity(for: resolveContext.identity)
+    )
+    // Diagnostic (inert unless SWIFTTUI_INVAL_TRACE): decompose how this frame's
+    // invalidation set was assembled — raw scheduler set vs portal-translation
+    // rewrite vs the force-root decision — to pin what injects an ancestor of a
+    // reused subtree (e.g. the content root) on a presentation open/close.
+    InvalidationSourceTrace.recordFrame(
+      raw: rawInvalidatedIdentities,
+      translated: resolveInputs.invalidatedIdentities,
+      usesSelectiveEvaluation: resolveInputs.usesSelectiveEvaluation,
+      disabledReasons: resolveInputs.selectiveEvaluationDisabledReasons.map(\.rawValue)
     )
     frameInputs.store(resolveInputs)
     resolveContext.frameInputs = frameInputs
