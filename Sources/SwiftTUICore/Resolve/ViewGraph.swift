@@ -103,17 +103,30 @@ extension ViewGraph {
     )
   }
 
+  package func checkpointMutationStateSnapshot() -> CheckpointMutationState {
+    CheckpointMutationState(
+      checkpointMutationEpoch: checkpointMutationEpoch,
+      nodeMutationGenerations: nodesByNodeID.mapValues {
+        $0.currentCheckpointMutationGeneration
+      }
+    )
+  }
+
   package func checkpointMutationStateMatches(_ checkpoint: Checkpoint) -> Bool {
-    guard checkpointMutationEpoch == checkpoint.checkpointMutationEpoch,
-      Set(nodesByNodeID.keys) == Set(checkpoint.nodeCheckpoints.keys)
+    checkpointMutationStateMatches(CheckpointMutationState(checkpoint: checkpoint))
+  }
+
+  package func checkpointMutationStateMatches(_ state: CheckpointMutationState) -> Bool {
+    guard checkpointMutationEpoch == state.checkpointMutationEpoch,
+      Set(nodesByNodeID.keys) == Set(state.nodeMutationGenerations.keys)
     else {
       return false
     }
 
-    for (viewNodeID, nodeCheckpoint) in checkpoint.nodeCheckpoints {
+    for (viewNodeID, expectedGeneration) in state.nodeMutationGenerations {
       guard
         nodesByNodeID[viewNodeID]?.currentCheckpointMutationGeneration
-          == nodeCheckpoint.checkpointMutationGeneration
+          == expectedGeneration
       else {
         return false
       }
@@ -206,8 +219,7 @@ package final class ViewGraph {
   private var currentFrameID: UInt64
   private var liveNodeIDs: Set<ViewNodeID>
   private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
-  private var committedRuntimeRegistrationFingerprint:
-    RuntimeRegistrationGraphFingerprint?
+  private var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
   private var checkpointMutationEpoch: UInt64
 
   private var nodesByIdentity: [Identity: ViewNode] {
@@ -591,10 +603,12 @@ package final class ViewGraph {
     ) {
       var candidate = identity.parent
       while let current = candidate {
-        guard isPresentationOverlayEntryIdentity(
-          current,
-          portalRootIdentity: portalRootIdentity
-        ) else {
+        guard
+          isPresentationOverlayEntryIdentity(
+            current,
+            portalRootIdentity: portalRootIdentity
+          )
+        else {
           break
         }
         if nodeIfExists(for: current) != nil {
@@ -786,6 +800,9 @@ package final class ViewGraph {
   package func applyStateMutationOverlay(
     _ overlay: StateMutationOverlay
   ) {
+    guard !overlay.isEmpty else {
+      return
+    }
     recordCheckpointGraphMutation()
     for (key, slot) in overlay.stateSlots {
       let node = nodeIfExists(for: key.key.owner)
@@ -1778,8 +1795,9 @@ package final class ViewGraph {
     RuntimeRegistrationGraphFingerprint(
       entriesByNodeID: Dictionary(
         uniqueKeysWithValues: liveNodeIDs.compactMap { viewNodeID in
-          guard let entry = nodesByNodeID[viewNodeID]?
-            .runtimeRegistrationFingerprintEntry()
+          guard
+            let entry = nodesByNodeID[viewNodeID]?
+              .runtimeRegistrationFingerprintEntry()
           else {
             return nil
           }

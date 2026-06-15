@@ -77,10 +77,31 @@ extension ViewGraph {
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
-    package var committedRuntimeRegistrationFingerprint:
-      RuntimeRegistrationGraphFingerprint?
+    package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
     package var checkpointMutationEpoch: UInt64
     package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
+  }
+
+  package struct CheckpointMutationState: Equatable, Sendable {
+    package var checkpointMutationEpoch: UInt64
+    package var nodeMutationGenerations: [ViewNodeID: UInt64]
+
+    package init(
+      checkpointMutationEpoch: UInt64,
+      nodeMutationGenerations: [ViewNodeID: UInt64]
+    ) {
+      self.checkpointMutationEpoch = checkpointMutationEpoch
+      self.nodeMutationGenerations = nodeMutationGenerations
+    }
+
+    package init(checkpoint: Checkpoint) {
+      self.init(
+        checkpointMutationEpoch: checkpoint.checkpointMutationEpoch,
+        nodeMutationGenerations: checkpoint.nodeCheckpoints.mapValues {
+          $0.checkpointMutationGeneration
+        }
+      )
+    }
   }
 
   package struct StateMutationOverlay {
@@ -90,6 +111,12 @@ extension ViewGraph {
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var stateMutationKeys: Set<StateSlotKey>
     package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
+
+    package var isEmpty: Bool {
+      stateSlots.isEmpty && !requiresRootEvaluation && invalidatedNodeIDs.isEmpty
+        && graphLocalDirtyNodeIDs.isEmpty && stateMutationKeys.isEmpty
+        && stateMutationNodeIDsByKey.isEmpty
+    }
   }
 }
 

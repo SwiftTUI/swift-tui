@@ -16,6 +16,7 @@ package final class ViewGraphFrameDraft {
   private let checkpoint: ViewGraph.Checkpoint?
   private var preparedCheckpoint: ViewGraph.Checkpoint?
   private var deltaCheckpointShadow: ViewGraphDeltaCheckpointShadow?
+  private var currentDeltaSourceState: ViewGraph.CheckpointMutationState?
   private var dirtyEvaluationPlan: DirtyEvaluationPlan?
   private(set) package var debugLastDeltaCheckpointRestoreResult:
     ViewGraphDeltaCheckpointShadow.RestoreResult?
@@ -84,6 +85,9 @@ package final class ViewGraphFrameDraft {
       deltaCheckpointShadow?.recordPreparedCheckpoint(
         preparedCheckpoint,
         baseline: checkpoint
+      )
+      currentDeltaSourceState = ViewGraph.CheckpointMutationState(
+        checkpoint: preparedCheckpoint
       )
     }
     if publicationDiagnosticsEnabled {
@@ -310,8 +314,11 @@ package final class ViewGraphFrameDraft {
       in: viewGraph
     )
     recordDeltaRestoreResult(result)
-    if let stateMutations {
+    if let stateMutations, !stateMutations.isEmpty {
       viewGraph.applyStateMutationOverlay(stateMutations)
+    }
+    if checkpoint != nil {
+      currentDeltaSourceState = viewGraph.checkpointMutationStateSnapshot()
     }
   }
 
@@ -325,12 +332,14 @@ package final class ViewGraphFrameDraft {
       return .full(target: target, reason: .missingPreparedCheckpoint)
     }
 
-    let plan = deltaCheckpointShadow?.restorePlan(
-      target: target,
-      in: viewGraph,
-      baseline: checkpoint,
-      prepared: preparedCheckpoint
-    ) ?? .full(target: target, reason: .missingPreparedCheckpoint)
+    let plan =
+      deltaCheckpointShadow?.restorePlan(
+        target: target,
+        in: viewGraph,
+        baseline: checkpoint,
+        prepared: preparedCheckpoint,
+        currentSourceState: currentDeltaSourceState
+      ) ?? .full(target: target, reason: .missingPreparedCheckpoint)
 
     switch plan {
     case .full(_, let reason):
@@ -339,11 +348,11 @@ package final class ViewGraphFrameDraft {
     case .delta(_, let nodeCheckpoints):
       viewGraph.restoreCheckpoint(targetCheckpoint, nodeCheckpoints: nodeCheckpoints)
       #if DEBUG
-      let deltaSnapshot = viewGraph.debugTotalStateSnapshot()
-      viewGraph.restoreCheckpoint(targetCheckpoint)
-      guard deltaSnapshot == viewGraph.debugTotalStateSnapshot() else {
-        return .full(target: target, reason: .debugOracleMismatch)
-      }
+        let deltaSnapshot = viewGraph.debugTotalStateSnapshot()
+        viewGraph.restoreCheckpoint(targetCheckpoint)
+        guard deltaSnapshot == viewGraph.debugTotalStateSnapshot() else {
+          return .full(target: target, reason: .debugOracleMismatch)
+        }
       #endif
       return .delta(target: target)
     }

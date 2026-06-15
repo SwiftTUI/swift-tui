@@ -9,6 +9,7 @@ package struct ViewGraphDeltaCheckpointShadow {
     case missingPreparedCheckpoint = "missing_prepared_checkpoint"
     case currentCheckpointMismatch = "current_checkpoint_mismatch"
     case incompleteTouchedCheckpoints = "incomplete_touched_checkpoints"
+    case deltaNodeBudgetExceeded = "delta_node_budget_exceeded"
     case debugOracleMismatch = "debug_oracle_mismatch"
   }
 
@@ -50,6 +51,9 @@ package struct ViewGraphDeltaCheckpointShadow {
   private(set) package var graphMutationEpochDelta: UInt64?
   private(set) package var baselineTouchedNodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   private(set) package var preparedTouchedNodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
+
+  private static let deltaBudgetMinimumNodeCount = 32
+  private static let maximumDeltaTouchedNodeRatio = 0.70
 
   package init(baseline checkpoint: ViewGraph.Checkpoint) {
     baselineGraphMutationEpoch = checkpoint.checkpointMutationEpoch
@@ -103,28 +107,41 @@ package struct ViewGraphDeltaCheckpointShadow {
     target: RestoreTarget,
     in viewGraph: ViewGraph,
     baseline: ViewGraph.Checkpoint,
-    prepared: ViewGraph.Checkpoint?
+    prepared: ViewGraph.Checkpoint?,
+    currentSourceState: ViewGraph.CheckpointMutationState?
   ) -> RestorePlan {
     guard let prepared else {
       return .full(target: target, reason: .missingPreparedCheckpoint)
     }
 
     let sourceCheckpoint: ViewGraph.Checkpoint
+    let targetCheckpoint: ViewGraph.Checkpoint
     let requiredNodeIDs: Set<ViewNodeID>
     let nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
 
     switch target {
     case .baseline:
       sourceCheckpoint = prepared
+      targetCheckpoint = baseline
       requiredNodeIDs = touchedNodeIDs.subtracting(createdNodeIDs)
       nodeCheckpoints = baselineTouchedNodeCheckpoints
     case .prepared:
       sourceCheckpoint = baseline
+      targetCheckpoint = prepared
       requiredNodeIDs = touchedNodeIDs.subtracting(removedNodeIDs)
       nodeCheckpoints = preparedTouchedNodeCheckpoints
     }
 
-    guard viewGraph.checkpointMutationStateMatches(sourceCheckpoint) else {
+    if Self.exceedsDeltaNodeBudget(
+      deltaNodeCount: requiredNodeIDs.count,
+      fullNodeCount: targetCheckpoint.nodeCheckpoints.count
+    ) {
+      return .full(target: target, reason: .deltaNodeBudgetExceeded)
+    }
+
+    let expectedSourceState =
+      currentSourceState ?? ViewGraph.CheckpointMutationState(checkpoint: sourceCheckpoint)
+    guard viewGraph.checkpointMutationStateMatches(expectedSourceState) else {
       return .full(target: target, reason: .currentCheckpointMismatch)
     }
 
@@ -136,6 +153,16 @@ package struct ViewGraphDeltaCheckpointShadow {
       target: target,
       nodeCheckpoints: nodeCheckpoints.filter { requiredNodeIDs.contains($0.key) }
     )
+  }
+
+  private static func exceedsDeltaNodeBudget(
+    deltaNodeCount: Int,
+    fullNodeCount: Int
+  ) -> Bool {
+    guard fullNodeCount >= deltaBudgetMinimumNodeCount else {
+      return false
+    }
+    return Double(deltaNodeCount) / Double(fullNodeCount) > maximumDeltaTouchedNodeRatio
   }
 
   package var summary: ViewGraphDeltaCheckpointSummary {

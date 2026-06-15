@@ -137,6 +137,121 @@ struct ViewGraphDeltaCheckpointShadowTests {
     )
   }
 
+  @Test("guarded delta survives materialize suspend cycles with preserved dirty overlay")
+  func guardedDeltaSurvivesMaterializeSuspendCyclesWithPreservedDirtyOverlay() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    let siblingIdentity = testIdentity("Root", "Sibling")
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: childIdentity, kind: .view("Child")),
+          ResolvedNode(identity: siblingIdentity, kind: .view("Sibling")),
+        ]
+      )
+    )
+    graph.queueDirty([siblingIdentity])
+
+    let baseline = graph.debugTotalStateSnapshot()
+    let draft = makeDraft(graph)
+
+    updateNode(
+      graph,
+      identity: childIdentity,
+      kind: .view("ChildUpdated")
+    )
+    draft.recordPreparedCheckpoint(from: graph)
+
+    draft.restoreBaselineState(in: graph)
+    #expect(graph.debugTotalStateSnapshot() == baseline)
+    #expect(
+      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .baseline)
+    )
+
+    draft.materializePreparedState(
+      in: graph,
+      preservingCurrentStateMutations: true
+    )
+    #expect(
+      graph.debugTotalStateSnapshot().graphLocalDirtyIdentities.contains(
+        siblingIdentity
+      )
+    )
+    #expect(
+      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .prepared)
+    )
+
+    draft.restoreBaselineState(
+      in: graph,
+      preservingCurrentStateMutations: true
+    )
+    #expect(
+      graph.debugTotalStateSnapshot().graphLocalDirtyIdentities.contains(
+        siblingIdentity
+      )
+    )
+    #expect(
+      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .baseline)
+    )
+
+    draft.materializePreparedState(
+      in: graph,
+      preservingCurrentStateMutations: true
+    )
+    #expect(
+      graph.debugTotalStateSnapshot().graphLocalDirtyIdentities.contains(
+        siblingIdentity
+      )
+    )
+    #expect(
+      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .prepared)
+    )
+  }
+
+  @Test("large near-full delta restore uses budget fallback")
+  func largeNearFullDeltaRestoreUsesBudgetFallback() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentities = (0..<40).map { index in
+      testIdentity("Root", "Child\(index)")
+    }
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: childIdentities.map {
+          ResolvedNode(identity: $0, kind: .view("Child"))
+        }
+      )
+    )
+
+    let baseline = graph.debugTotalStateSnapshot()
+    let draft = makeDraft(graph)
+
+    updateNode(
+      graph,
+      identity: rootIdentity,
+      kind: .root,
+      children: []
+    )
+    draft.recordPreparedCheckpoint(from: graph)
+
+    draft.restoreBaselineState(in: graph)
+    #expect(graph.debugTotalStateSnapshot() == baseline)
+    #expect(
+      draft.debugLastDeltaCheckpointRestoreResult
+        == .full(
+          target: .baseline,
+          reason: .deltaNodeBudgetExceeded
+        )
+    )
+  }
+
   @Test("delta restore falls back when current graph no longer matches source checkpoint")
   func deltaRestoreFallsBackWhenCurrentGraphNoLongerMatchesSourceCheckpoint() {
     let graph = ViewGraph()
@@ -169,10 +284,11 @@ struct ViewGraphDeltaCheckpointShadowTests {
     draft.materializePreparedState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == prepared)
     #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .full(
-        target: .prepared,
-        reason: .currentCheckpointMismatch
-      )
+      draft.debugLastDeltaCheckpointRestoreResult
+        == .full(
+          target: .prepared,
+          reason: .currentCheckpointMismatch
+        )
     )
 
     let diagnostics = draft.commitRuntimeRegistrations(from: graph)
