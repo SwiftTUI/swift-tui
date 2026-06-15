@@ -39,6 +39,20 @@ combines terminal-native and localhost-browser launch in one executable;
 `--web` selects the WebHost path. The `SwiftTUI` convenience product includes
 that combined runner by default.
 
+### Where host code lives
+
+Every host's Swift side lives in this package under `Platforms/` — `SwiftUIHost`,
+`SwiftTUIWASI`/`SwiftTUIWebHost`, and `SwiftTUIAndroidHost` are all SwiftPM
+targets. Hosts are partitioned across repositories by **distribution contract**,
+not by host. A host consumed purely through SwiftPM stays here: `SwiftUIHost` is
+SwiftPM-only (Apple-SDK-gated, excluded from Linux at compile time), so it has no
+separate repo. A host that *also* ships through another ecosystem's package
+manager keeps that half in a dedicated sibling repo — `SwiftTUI/swift-tui-web`
+(Bun/npm) and `SwiftTUI/swift-tui-android` (Gradle/Maven AAR + plugin) — coupled
+back to this package only through tagged releases or released artifacts. The
+sibling repos exist to keep a foreign package manager out of this SwiftPM
+package, not to give each backend its own home.
+
 ## The host-frame contract
 
 Hosts do not see the pipeline. They see a committed frame through a small set
