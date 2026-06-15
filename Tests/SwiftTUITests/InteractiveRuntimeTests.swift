@@ -1043,6 +1043,71 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("post-action follow-up is skipped when the dispatched action already invalidated")
+  func postActionFollowUpSkippedWhenActionAlreadyInvalidated() {
+    let recorder = RunLoopInvalidationRecorder()
+    let rootIdentity = testIdentity("PostActionProbe")
+    let ownerIdentity = rootIdentity.child("Owner[0]")
+    let actionIdentity = ownerIdentity.child("Button[0]")
+    let readerIdentity = ownerIdentity.child("Reader[0]")
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: RecordingTerminalHost(),
+      inputReader: ScriptedInputReader(events: [] as [KeyPress]),
+      signalReader: EmptySignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { _, _, _ in .ignored },
+      viewBuilder: { state, _ in
+        RunLoopInvalidationProbeRoot(state: state, recorder: recorder)
+      }
+    )
+    runLoop.localActionRegistry.register(
+      identity: actionIdentity,
+      handler: { true },
+      followUpInvalidationIdentity: ownerIdentity
+    )
+
+    let originalReaderAttribution = ReaderAttributionConfiguration.isEnabled
+    defer { ReaderAttributionConfiguration.isEnabled = originalReaderAttribution }
+
+    // Reader-attributed: an action whose dispatch already requested an
+    // invalidation (its `@State` write) skips the redundant owner-scope
+    // follow-up, sparing the owner's disjoint descendants.
+    ReaderAttributionConfiguration.isEnabled = true
+    let beforeInvalidating = runLoop.schedulerPendingInvalidations()
+    runLoop.scheduler.requestInvalidation(of: [readerIdentity])
+    runLoop.recordFollowUpInvalidation(
+      for: actionIdentity,
+      schedulerInvalidationsBeforeDispatch: beforeInvalidating
+    )
+    #expect(!runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
+
+    // Backstop: an action that requested nothing keeps the owner follow-up.
+    runLoop.postActionInvalidationIdentities.removeAll()
+    let beforeQuiet = runLoop.schedulerPendingInvalidations()
+    runLoop.recordFollowUpInvalidation(
+      for: actionIdentity,
+      schedulerInvalidationsBeforeDispatch: beforeQuiet
+    )
+    #expect(runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
+
+    // Reader attribution off: byte-identical legacy — always insert the
+    // follow-up, even when the dispatch invalidated.
+    ReaderAttributionConfiguration.isEnabled = false
+    runLoop.postActionInvalidationIdentities.removeAll()
+    let beforeLegacy = runLoop.schedulerPendingInvalidations()
+    runLoop.scheduler.requestInvalidation(of: [actionIdentity])
+    runLoop.recordFollowUpInvalidation(
+      for: actionIdentity,
+      schedulerInvalidationsBeforeDispatch: beforeLegacy
+    )
+    #expect(runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
+  }
+
+  @MainActor
   @Test("standalone Link opens its destination on keyboard activation")
   func standaloneLinkOpensDestinationOnKeyboardActivation() async throws {
     let terminal = RecordingTerminalHost(

@@ -60,8 +60,44 @@ extension RunLoop {
       return
     }
 
+    InvalidationSourceTrace.note("post-action", postActionInvalidationIdentities)
     scheduler.requestInvalidation(of: postActionInvalidationIdentities)
     postActionInvalidationIdentities.removeAll(keepingCapacity: true)
+  }
+
+  /// The scheduler's coalesced invalidation identities right now — used to tell
+  /// whether a just-dispatched action requested an invalidation of its own.
+  func schedulerPendingInvalidations() -> Set<Identity> {
+    (scheduler as? FrameScheduler)?.pendingInvalidatedIdentities ?? []
+  }
+
+  /// Records a control action's coarse follow-up invalidation — but skips it
+  /// when the action already requested a (reader-attributed) invalidation, so a
+  /// redundant owner-scope sweep does not re-resolve a disjoint subtree.
+  ///
+  /// The follow-up identity is the action's dynamic-property-scope owner; under
+  /// reader attribution that owner is frequently an *ancestor* of a large reused
+  /// subtree (a sheet/palette background), and the action's `@State` write has
+  /// already invalidated the precise readers (or the owner itself, via the
+  /// no-reader fallback). So the follow-up is redundant whenever the dispatch
+  /// invalidated anything; it is kept only as a backstop for actions with
+  /// untracked side effects (which request nothing). Reader-attribution-off is
+  /// byte-identical (the follow-up is always inserted).
+  func recordFollowUpInvalidation(
+    for actionIdentity: Identity,
+    schedulerInvalidationsBeforeDispatch before: Set<Identity>
+  ) {
+    guard let identity = localActionRegistry.followUpInvalidationIdentity(for: actionIdentity)
+    else {
+      return
+    }
+    let actionRequestedInvalidation =
+      ReaderAttributionConfiguration.isEnabled
+      && schedulerPendingInvalidations() != before
+    guard !actionRequestedInvalidation else {
+      return
+    }
+    postActionInvalidationIdentities.insert(identity)
   }
 
   func requestNextAnimationFrameIfNeeded(

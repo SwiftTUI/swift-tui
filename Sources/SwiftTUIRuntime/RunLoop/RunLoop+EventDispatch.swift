@@ -163,11 +163,13 @@ extension RunLoop {
     case KeyPress(.return, modifiers: []), KeyPress(.space, modifiers: []):
       setPressedIdentity(focusedIdentity, transient: true)
       if let focusedIdentity {
+        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
         let handled = localActionRegistry.dispatch(identity: focusedIdentity)
-        if handled,
-          let identity = localActionRegistry.followUpInvalidationIdentity(for: focusedIdentity)
-        {
-          postActionInvalidationIdentities.insert(identity)
+        if handled {
+          recordFollowUpInvalidation(
+            for: focusedIdentity,
+            schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          )
         }
       }
       return nil

@@ -51,6 +51,16 @@ package enum InvalidationSourceTrace {
     DiagnosticTraceSink.emit(line, toFileAt: outputFilePath)
   }
 
+  /// Caller attribution: synchronously emits a labeled source line
+  /// (`[INVAL-SRC] <source>={…}`) for an invalidation request, so the subsystem
+  /// that injected a given identity can be identified by correlating with the
+  /// `[INVAL-TRACE]` frame line that follows. Inert unless the trace is on.
+  package static func note(_ source: StaticString, _ identities: Set<Identity>) {
+    guard isEnabled, !identities.isEmpty else { return }
+    let line = "[INVAL-SRC] \(source)={\(joined(identities))}\n"
+    DiagnosticTraceSink.emit(line, toFileAt: outputFilePath)
+  }
+
   /// Resets the sequence counter (test seam).
   package static func reset() {
     sequence = 0

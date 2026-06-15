@@ -126,6 +126,14 @@ public final class FrameScheduler: FrameScheduling {
 
   public init() {}
 
+  /// The invalidation identities coalesced since the last `consumeReadyFrame`.
+  /// Read by the run loop to tell whether an action it just dispatched already
+  /// requested a (reader-attributed) invalidation, so a redundant coarse
+  /// post-action follow-up can be skipped.
+  package var pendingInvalidatedIdentities: Set<Identity> {
+    invalidatedIdentities
+  }
+
   public func requestInput() {
     pendingCauses.insert(.input)
     pendingIntentRequestCount += 1

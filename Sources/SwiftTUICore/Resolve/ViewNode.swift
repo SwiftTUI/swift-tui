@@ -281,6 +281,7 @@ package final class ViewNode {
         for: key,
         explicit: invalidationIdentity
       )
+      InvalidationSourceTrace.note("state-write", invalidationIdentities)
       let animationRequest = AnimationContextStorage.currentRequest
       let batchID = AnimationContextStorage.currentBatchID
       if animationRequest != .inherit || batchID != nil,

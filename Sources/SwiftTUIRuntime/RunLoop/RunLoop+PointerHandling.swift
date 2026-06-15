@@ -180,11 +180,13 @@ extension RunLoop {
       ?? focusIdentity(for: region.identity)
 
     if let focusedIdentity {
+      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
       let handled = localActionRegistry.dispatch(identity: focusedIdentity)
-      if handled,
-        let identity = localActionRegistry.followUpInvalidationIdentity(for: focusedIdentity)
-      {
-        postActionInvalidationIdentities.insert(identity)
+      if handled {
+        recordFollowUpInvalidation(
+          for: focusedIdentity,
+          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        )
       }
     }
   }
