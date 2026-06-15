@@ -212,13 +212,61 @@ struct DefaultRendererFrameHeadCoordinator {
     in resolveContext: inout ResolveContext,
     proposal: ProposedSize
   ) -> FrameResolveInputs {
-    let resolveInputs = frameState.prepareInputs(
+    var resolveInputs = frameState.prepareInputs(
       from: resolveContext,
       proposal: proposal
+    )
+    translatePresentationPortalInvalidations(
+      in: &resolveInputs,
+      contentRootIdentity: resolveContext.identity,
+      portalRootIdentity: presentationPortalIdentity(for: resolveContext.identity)
     )
     frameInputs.store(resolveInputs)
     resolveContext.frameInputs = frameInputs
     return resolveInputs
+  }
+
+  private func translatePresentationPortalInvalidations(
+    in resolveInputs: inout FrameResolveInputs,
+    contentRootIdentity: Identity,
+    portalRootIdentity: Identity
+  ) {
+    guard !resolveInputs.invalidatedIdentities.isEmpty else {
+      return
+    }
+
+    let translatedIdentities = viewGraph.translatePresentationPortalInvalidations(
+      resolveInputs.invalidatedIdentities,
+      portalRootIdentity: portalRootIdentity,
+      activeOverlayEntryIdentities: activePresentationOverlayEntryIdentities(
+        portalRootIdentity: portalRootIdentity
+      )
+    )
+    guard translatedIdentities != resolveInputs.invalidatedIdentities else {
+      return
+    }
+
+    resolveInputs.invalidatedIdentities = translatedIdentities
+    resolveInputs.invalidationSummary = .init(
+      invalidatedIdentities: translatedIdentities
+    )
+    resolveInputs.usesSelectiveEvaluation =
+      frameState.selectiveEvaluationEnabled
+      && !resolveInputs.environmentRequiresRootEvaluation
+      && !translatedIdentities.contains(contentRootIdentity)
+  }
+
+  private func activePresentationOverlayEntryIdentities(
+    portalRootIdentity: Identity
+  ) -> Set<Identity> {
+    Set(
+      presentationPortalState.overlayEntries().map { entry in
+        portalRootIdentity
+          .child("PortalHost")
+          .child("overlays")
+          .child("entry:\(entry.id)")
+      }
+    )
   }
 
   private func beginGraphEvaluation(
@@ -303,10 +351,19 @@ struct DefaultRendererFrameHeadCoordinator {
           diagnostics: DirtyEvaluationPlanDiagnostics?
         )
       if RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled {
-        let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
-          invalidatedIdentities: resolveInputs.invalidatedIdentities
-        )
-        dirtyEvaluation = (evaluation.plan, evaluation.diagnostics)
+        if canUseSelectiveEvaluation {
+          let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+            invalidatedIdentities: resolveInputs.invalidatedIdentities
+          )
+          dirtyEvaluation = (evaluation.plan, evaluation.diagnostics)
+        } else {
+          dirtyEvaluation = (
+            nil,
+            viewGraph.disabledSelectiveEvaluationPlanDiagnostics(
+              invalidatedIdentities: resolveInputs.invalidatedIdentities
+            )
+          )
+        }
       } else {
         dirtyEvaluation = (viewGraph.selectiveDirtyEvaluationPlan(), nil)
       }

@@ -469,6 +469,145 @@ package final class ViewGraph {
     nodeIfExists(for: identity) != nil
   }
 
+  package func translatePresentationPortalInvalidations(
+    _ identities: Set<Identity>,
+    portalRootIdentity: Identity,
+    activeOverlayEntryIdentities: Set<Identity> = []
+  ) -> Set<Identity> {
+    let activeEntryIdentities = activeOverlayEntryIdentities.union(
+      presentationOverlayEntryIdentities(portalRootIdentity: portalRootIdentity)
+    )
+    return Set(
+      identities.map { identity in
+        guard nodeIfExists(for: identity) == nil else {
+          return identity
+        }
+        return presentationPortalInvalidationTarget(
+          for: identity,
+          portalRootIdentity: portalRootIdentity,
+          activeOverlayEntryIdentities: activeEntryIdentities
+        ) ?? identity
+      }
+    )
+  }
+
+  private func presentationPortalInvalidationTarget(
+    for identity: Identity,
+    portalRootIdentity: Identity,
+    activeOverlayEntryIdentities: Set<Identity>
+  ) -> Identity? {
+    if isPresentationOverlayEntryIdentity(
+      identity,
+      portalRootIdentity: portalRootIdentity
+    ) {
+      var candidate = identity.parent
+      while let current = candidate {
+        guard isPresentationOverlayEntryIdentity(
+          current,
+          portalRootIdentity: portalRootIdentity
+        ) else {
+          break
+        }
+        if nodeIfExists(for: current) != nil {
+          return current
+        }
+        candidate = current.parent
+      }
+    }
+
+    let identityPath = identity.path
+    let overlayHostIdentity = presentationOverlayHostIdentity(
+      portalRootIdentity: portalRootIdentity
+    )
+    for entryIdentity in activeOverlayEntryIdentities.sorted() {
+      let entryPath = entryIdentity.path
+      guard identityPath == entryPath || identityPath.hasPrefix("\(entryPath)/") else {
+        continue
+      }
+      for target in [
+        entryIdentity.child("body"),
+        entryIdentity,
+        overlayHostIdentity,
+      ] {
+        if nodeIfExists(for: target) != nil {
+          return target
+        }
+      }
+    }
+    if identityPath.hasPrefix("\(overlayHostIdentity.path)/entry:"),
+      nodeIfExists(for: overlayHostIdentity) != nil
+    {
+      return overlayHostIdentity
+    }
+    if identityPath.hasPrefix("\(overlayHostIdentity.path)/entry:"),
+      nodeIfExists(for: portalRootIdentity) != nil
+    {
+      return portalRootIdentity
+    }
+    return nil
+  }
+
+  private func isPresentationOverlayEntryIdentity(
+    _ identity: Identity,
+    portalRootIdentity: Identity
+  ) -> Bool {
+    guard identity.isDescendant(of: portalRootIdentity) else {
+      return false
+    }
+
+    let suffix = Array(
+      identity.components.dropFirst(portalRootIdentity.components.count)
+    )
+    guard suffix.count >= 3 else {
+      return false
+    }
+
+    return suffix[0] == "PortalHost"
+      && suffix[1] == "overlays"
+      && suffix[2].hasPrefix("entry:")
+  }
+
+  private func presentationOverlayHostIdentity(
+    portalRootIdentity: Identity
+  ) -> Identity {
+    portalRootIdentity
+      .child("PortalHost")
+      .child("overlays")
+  }
+
+  private func presentationOverlayEntryIdentities(
+    portalRootIdentity: Identity
+  ) -> Set<Identity> {
+    Set(
+      nodeIDByIdentity.keys.filter {
+        isPresentationOverlayEntryRootIdentity(
+          $0,
+          portalRootIdentity: portalRootIdentity
+        )
+      }
+    )
+  }
+
+  private func isPresentationOverlayEntryRootIdentity(
+    _ identity: Identity,
+    portalRootIdentity: Identity
+  ) -> Bool {
+    guard identity.isDescendant(of: portalRootIdentity) else {
+      return false
+    }
+
+    let suffix = Array(
+      identity.components.dropFirst(portalRootIdentity.components.count)
+    )
+    guard suffix.count == 3 else {
+      return false
+    }
+
+    return suffix[0] == "PortalHost"
+      && suffix[1] == "overlays"
+      && suffix[2].hasPrefix("entry:")
+  }
+
   /// Invalidates identities AND queues them as graph-local dirty so that
   /// `selectiveDirtyEvaluationPlan()` can include them in the dirty frontier
   /// instead of falling back to full root re-evaluation.  Only identities
@@ -775,6 +914,16 @@ package final class ViewGraph {
       invalidatedIdentities: invalidatedIdentities,
       unmappedIdentities: unmappedIdentities
     )("unchanged_no_dirty_work", 0)
+  }
+
+  package func disabledSelectiveEvaluationPlanDiagnostics(
+    invalidatedIdentities: Set<Identity>
+  ) -> DirtyEvaluationPlanDiagnostics {
+    let unmappedIdentities = unmappedInvalidatedIdentities(invalidatedIdentities)
+    return dirtyPlanBaseDiagnostics(
+      invalidatedIdentities: invalidatedIdentities,
+      unmappedIdentities: unmappedIdentities
+    )("nil_selective_evaluation_disabled", 0)
   }
 
   /// Whether any identities are dirty and need evaluation this frame.

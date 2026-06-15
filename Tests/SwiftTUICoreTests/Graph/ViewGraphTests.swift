@@ -205,6 +205,324 @@ struct ViewGraphTests {
     #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [removedIdentity])
   }
 
+  @Test("presentation portal descendant invalidation maps to existing overlay subtree")
+  func presentationPortalInvalidationMapsToExistingOverlaySubtree() {
+    let graph = ViewGraph()
+    let portalRootIdentity = testPresentationPortalRootIdentity()
+    let bodyIdentity = testPresentationPortalBodyIdentity(
+      portalRootIdentity: portalRootIdentity
+    )
+    let staleBodyDescendant = bodyIdentity.child("StaleResolvedLeaf")
+
+    seedPortalGraph(
+      graph: graph,
+      portalRootIdentity: portalRootIdentity,
+      bodyIdentity: bodyIdentity
+    )
+    graph.setEvaluator(for: bodyIdentity) {}
+
+    let translated = graph.translatePresentationPortalInvalidations(
+      [staleBodyDescendant],
+      portalRootIdentity: portalRootIdentity
+    )
+
+    #expect(translated == [bodyIdentity])
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty(translated)
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: translated
+    )
+
+    #expect(result.plan?.frontierIdentities == [bodyIdentity])
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.invalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 0)
+  }
+
+  @Test("active presentation portal entry maps slash-flattened stale identity")
+  func activePresentationPortalEntryMapsSlashFlattenedStaleIdentity() {
+    let graph = ViewGraph()
+    let portalRootIdentity = testPresentationPortalRootIdentity()
+    let entryIdentity = testPresentationPortalEntryIdentity(
+      portalRootIdentity: portalRootIdentity,
+      entryID: "sheet/source:Root/Layout[0]#sheet"
+    )
+    let bodyIdentity = entryIdentity.child("body")
+    let staleFlattenedIdentity = Identity(
+      components: bodyIdentity
+        .child("StaleResolvedLeaf")
+        .path
+        .split(separator: "/")
+        .map(String.init)
+    )
+
+    seedPortalGraph(
+      graph: graph,
+      portalRootIdentity: portalRootIdentity,
+      bodyIdentity: bodyIdentity
+    )
+    graph.setEvaluator(for: bodyIdentity) {}
+
+    let translated = graph.translatePresentationPortalInvalidations(
+      [staleFlattenedIdentity],
+      portalRootIdentity: portalRootIdentity
+    )
+
+    #expect(translated == [bodyIdentity])
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty(translated)
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: translated
+    )
+
+    #expect(result.plan?.frontierIdentities == [bodyIdentity])
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 0)
+  }
+
+  @Test("unknown presentation-like invalidation remains unmapped")
+  func unknownPresentationLikeInvalidationRemainsUnmapped() {
+    let graph = ViewGraph()
+    let portalRootIdentity = testPresentationPortalRootIdentity()
+    let inactivePortalRootIdentity = Identity(
+      components: ["__TerminalUIPortalHost", "InactiveRoot"]
+    )
+    let unknownBodyDescendant = testPresentationPortalBodyIdentity(
+      portalRootIdentity: inactivePortalRootIdentity,
+      entryID: "missing-sheet"
+    ).child("StaleResolvedLeaf")
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: portalRootIdentity,
+        kind: .view("PresentationPortalRoot")
+      )
+    )
+
+    let translated = graph.translatePresentationPortalInvalidations(
+      [unknownBodyDescendant],
+      portalRootIdentity: portalRootIdentity
+    )
+
+    #expect(translated == [unknownBodyDescendant])
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty(translated)
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: translated
+    )
+
+    #expect(result.plan == nil)
+    #expect(result.diagnostics.result == "nil_unmapped_invalidated_identity")
+    #expect(result.diagnostics.invalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [unknownBodyDescendant])
+  }
+
+  @Test("presentation entry under live portal root maps to portal root when host is absent")
+  func presentationEntryUnderLivePortalRootMapsToPortalRootWhenHostIsAbsent() {
+    let graph = ViewGraph()
+    let portalRootIdentity = testPresentationPortalRootIdentity()
+    let staleEntryDescendant = testPresentationPortalBodyIdentity(
+      portalRootIdentity: portalRootIdentity,
+      entryID: "missing-sheet"
+    ).child("StaleResolvedLeaf")
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: portalRootIdentity,
+        kind: .view("PresentationPortalRoot")
+      )
+    )
+    graph.setEvaluator(for: portalRootIdentity) {}
+
+    let translated = graph.translatePresentationPortalInvalidations(
+      [staleEntryDescendant],
+      portalRootIdentity: portalRootIdentity
+    )
+
+    #expect(translated == [portalRootIdentity])
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty(translated)
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: translated
+    )
+
+    #expect(result.plan?.frontierIdentities == [portalRootIdentity])
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 0)
+  }
+
+  @Test("inactive presentation entry under live overlay host maps to overlay host")
+  func inactivePresentationEntryUnderLiveOverlayHostMapsToOverlayHost() {
+    let graph = ViewGraph()
+    let portalRootIdentity = testPresentationPortalRootIdentity()
+    let bodyIdentity = testPresentationPortalBodyIdentity(
+      portalRootIdentity: portalRootIdentity
+    )
+    let overlayHostIdentity = testPresentationOverlayHostIdentity(
+      portalRootIdentity: portalRootIdentity
+    )
+    let staleMissingEntryDescendant = testPresentationPortalBodyIdentity(
+      portalRootIdentity: portalRootIdentity,
+      entryID: "missing-sheet"
+    ).child("StaleResolvedLeaf")
+
+    seedPortalGraph(
+      graph: graph,
+      portalRootIdentity: portalRootIdentity,
+      bodyIdentity: bodyIdentity
+    )
+    graph.setEvaluator(for: overlayHostIdentity) {}
+
+    let translated = graph.translatePresentationPortalInvalidations(
+      [staleMissingEntryDescendant],
+      portalRootIdentity: portalRootIdentity
+    )
+
+    #expect(translated == [overlayHostIdentity])
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty(translated)
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: translated
+    )
+
+    #expect(result.plan?.frontierIdentities == [overlayHostIdentity])
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 0)
+  }
+
+  @Test("mapped presentation portal invalidation commits scoped runtime registrations")
+  func mappedPresentationPortalInvalidationCommitsScopedRuntimeRegistrations() {
+    let graph = ViewGraph()
+    let portalRootIdentity = testPresentationPortalRootIdentity()
+    let bodyIdentity = testPresentationPortalBodyIdentity(
+      portalRootIdentity: portalRootIdentity
+    )
+    let staleBodyDescendant = bodyIdentity.child("StaleResolvedLeaf")
+    let binding = KeyBinding(key: .character("p"), modifiers: .ctrl)
+    let namespace = MatchedGeometryNamespace(0)
+    let originalCommandCounter = RegistrationCounter()
+    let updatedCommandCounter = RegistrationCounter()
+    let actionCounter = RegistrationCounter()
+    let lifecycleCounter = RegistrationCounter()
+
+    seedPortalRegistrationGraph(
+      graph: graph,
+      portalRootIdentity: portalRootIdentity,
+      bodyIdentity: bodyIdentity,
+      binding: binding,
+      commandDescription: "Original",
+      commandCounter: originalCommandCounter,
+      actionCounter: actionCounter,
+      lifecycleCounter: lifecycleCounter,
+      namespace: namespace
+    )
+    let resolved = graph.snapshot(rootIdentity: portalRootIdentity)
+    _ = graph.finalizeFrame(
+      rootIdentity: portalRootIdentity,
+      resolved: resolved,
+      placed: nil
+    )
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: graph.makeCheckpoint(),
+      publicationDiagnosticsEnabled: true
+    )
+    graph.setEvaluator(for: bodyIdentity) {
+      let bodyNode = graph.beginEvaluation(identity: bodyIdentity, invalidator: nil)
+      recordPortalRuntimeRegistrations(
+        on: bodyNode,
+        identity: bodyIdentity,
+        binding: binding,
+        commandDescription: "Updated",
+        commandCounter: updatedCommandCounter,
+        actionCounter: actionCounter,
+        lifecycleCounter: lifecycleCounter,
+        namespace: namespace
+      )
+      graph.finishEvaluation(
+        bodyNode,
+        resolved: ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody")),
+        accessedStateSlots: 0
+      )
+    }
+
+    graph.beginFrame()
+    let translated = graph.translatePresentationPortalInvalidations(
+      [staleBodyDescendant],
+      portalRootIdentity: portalRootIdentity
+    )
+    graph.invalidateAndQueueDirty(translated)
+    let dirtyEvaluation = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: translated
+    )
+    graphDraft.recordDirtyEvaluationPlan(
+      dirtyEvaluation.plan,
+      diagnostics: dirtyEvaluation.diagnostics
+    )
+    #expect(graph.evaluateDirtyNodes(using: dirtyEvaluation.plan))
+    let scopedResolved = graph.snapshot(rootIdentity: portalRootIdentity)
+    _ = graph.finalizeFrame(
+      rootIdentity: portalRootIdentity,
+      resolved: scopedResolved,
+      placed: nil
+    )
+
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: graph)
+
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+    #expect(diagnostics.publication.dirtyPlanResult == "formed")
+    #expect(diagnostics.publication.subtreeRootCount == 1)
+    #expect(diagnostics.publication.invalidatedIdentityCount == 1)
+    #expect(diagnostics.publication.unmappedInvalidatedIdentityCount == 0)
+    #expect(liveRegistrations.actionRegistry?.hasHandler(identity: bodyIdentity) == true)
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot().candidates.map(\.identity)
+        == [bodyIdentity]
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == [bodyIdentity]
+    )
+    #expect(
+      Set(
+        liveRegistrations.lifecycleRegistry?
+          .snapshot()
+          .appearRegistrations
+          .values
+          .map(\.identity) ?? []
+      ) == [bodyIdentity]
+    )
+    #expect(
+      liveRegistrations.taskRegistry?.registration(for: bodyIdentity)?.descriptor
+        == testPortalTaskDescriptor(for: bodyIdentity)
+    )
+    #expect(
+      liveRegistrations.commandRegistry?
+        .keyCommand(at: bodyIdentity, matching: binding)?
+        .description == "Updated"
+    )
+    #expect(
+      liveRegistrations.commandRegistry?.dispatch(
+        key: binding,
+        along: [portalRootIdentity, bodyIdentity]
+      ) == true
+    )
+    #expect(liveRegistrations.actionRegistry?.dispatch(identity: bodyIdentity) == true)
+    #expect(updatedCommandCounter.count == 1)
+    #expect(originalCommandCounter.count == 0)
+    #expect(actionCounter.count == 1)
+    #expect(lifecycleCounter.count == 0)
+  }
+
   @Test(
     "characterization: mapped invalidation without graph-local dirt falls back to root evaluation")
   func mappedInvalidationWithoutDirtyCauseFallsBackToRootEvaluation() {
@@ -236,6 +554,34 @@ struct ViewGraphTests {
     #expect(graph.evaluateDirtyNodes() == false)
     #expect(rootEvaluations == 1)
     #expect(childEvaluations == 0)
+  }
+
+  @Test("disabled selective evaluation diagnostics keep invalidation samples")
+  func disabledSelectiveEvaluationDiagnosticsKeepInvalidationSamples() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    let unknownIdentity = testIdentity("Detached", "Child")
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+        ]
+      )
+    )
+
+    let diagnostics = graph.disabledSelectiveEvaluationPlanDiagnostics(
+      invalidatedIdentities: [childIdentity, unknownIdentity]
+    )
+
+    #expect(diagnostics.result == "nil_selective_evaluation_disabled")
+    #expect(diagnostics.frontierRootCount == 0)
+    #expect(diagnostics.invalidatedIdentityCount == 2)
+    #expect(diagnostics.unmappedInvalidatedIdentityCount == 1)
+    #expect(diagnostics.unmappedInvalidatedIdentitySample == [unknownIdentity])
   }
 
   @Test("ViewNodeID is stable for live identities and reminted after removal")
@@ -1149,6 +1495,245 @@ private func seedCommandGraph(
     accessedStateSlots: 0
   )
   _ = graph.snapshot(rootIdentity: rootIdentity)
+}
+
+private func testPresentationPortalRootIdentity() -> Identity {
+  Identity(components: ["__TerminalUIPortalHost", "Root"])
+}
+
+private func testPresentationPortalBodyIdentity(
+  portalRootIdentity: Identity,
+  entryID: String = "sheet"
+) -> Identity {
+  testPresentationPortalEntryIdentity(
+    portalRootIdentity: portalRootIdentity,
+    entryID: entryID
+  )
+    .child("body")
+}
+
+private func testPresentationPortalEntryIdentity(
+  portalRootIdentity: Identity,
+  entryID: String = "sheet"
+) -> Identity {
+  testPresentationOverlayHostIdentity(portalRootIdentity: portalRootIdentity)
+    .child("entry:\(entryID)")
+}
+
+private func testPresentationOverlayHostIdentity(
+  portalRootIdentity: Identity
+) -> Identity {
+  portalRootIdentity
+    .child("PortalHost")
+    .child("overlays")
+}
+
+@MainActor
+private func seedPortalGraph(
+  graph: ViewGraph,
+  portalRootIdentity: Identity,
+  bodyIdentity: Identity
+) {
+  let hostIdentity = portalRootIdentity.child("PortalHost")
+  let overlaysIdentity = hostIdentity.child("overlays")
+  let entryIdentity = bodyIdentity.parent!
+
+  graph.beginFrame()
+  let rootNode = graph.beginEvaluation(identity: portalRootIdentity, invalidator: nil)
+  let hostNode = graph.beginEvaluation(identity: hostIdentity, invalidator: nil)
+  let overlaysNode = graph.beginEvaluation(identity: overlaysIdentity, invalidator: nil)
+  let entryNode = graph.beginEvaluation(identity: entryIdentity, invalidator: nil)
+  let bodyNode = graph.beginEvaluation(identity: bodyIdentity, invalidator: nil)
+  graph.finishEvaluation(
+    bodyNode,
+    resolved: ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody")),
+    accessedStateSlots: 0
+  )
+  graph.finishEvaluation(
+    entryNode,
+    resolved: ResolvedNode(
+      identity: entryIdentity,
+      kind: .view("Sheet"),
+      children: [
+        ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+      ]
+    ),
+    accessedStateSlots: 0
+  )
+  graph.finishEvaluation(
+    overlaysNode,
+    resolved: ResolvedNode(
+      identity: overlaysIdentity,
+      kind: .view("OverlayStackOverlays"),
+      children: [
+        ResolvedNode(
+          identity: entryIdentity,
+          kind: .view("Sheet"),
+          children: [
+            ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+          ]
+        )
+      ]
+    ),
+    accessedStateSlots: 0
+  )
+  graph.finishEvaluation(
+    hostNode,
+    resolved: ResolvedNode(
+      identity: hostIdentity,
+      kind: .view("PortalHost"),
+      children: [
+        ResolvedNode(
+          identity: overlaysIdentity,
+          kind: .view("OverlayStackOverlays"),
+          children: [
+            ResolvedNode(
+              identity: entryIdentity,
+              kind: .view("Sheet"),
+              children: [
+                ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+              ]
+            )
+          ]
+        )
+      ]
+    ),
+    accessedStateSlots: 0
+  )
+  graph.finishEvaluation(
+    rootNode,
+    resolved: ResolvedNode(
+      identity: portalRootIdentity,
+      kind: .view("PresentationPortalRoot"),
+      children: [
+        ResolvedNode(
+          identity: hostIdentity,
+          kind: .view("PortalHost"),
+          children: [
+            ResolvedNode(
+              identity: overlaysIdentity,
+              kind: .view("OverlayStackOverlays"),
+              children: [
+                ResolvedNode(
+                  identity: entryIdentity,
+                  kind: .view("Sheet"),
+                  children: [
+                    ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+                  ]
+                )
+              ]
+            )
+          ]
+        )
+      ]
+    ),
+    accessedStateSlots: 0
+  )
+  _ = graph.snapshot(rootIdentity: portalRootIdentity)
+}
+
+@MainActor
+private func seedPortalRegistrationGraph(
+  graph: ViewGraph,
+  portalRootIdentity: Identity,
+  bodyIdentity: Identity,
+  binding: KeyBinding,
+  commandDescription: String,
+  commandCounter: RegistrationCounter,
+  actionCounter: RegistrationCounter,
+  lifecycleCounter: RegistrationCounter,
+  namespace: MatchedGeometryNamespace
+) {
+  seedPortalGraph(
+    graph: graph,
+    portalRootIdentity: portalRootIdentity,
+    bodyIdentity: bodyIdentity
+  )
+  let bodyNode = graph.nodeForIdentity(bodyIdentity)!
+  recordPortalRuntimeRegistrations(
+    on: bodyNode,
+    identity: bodyIdentity,
+    binding: binding,
+    commandDescription: commandDescription,
+    commandCounter: commandCounter,
+    actionCounter: actionCounter,
+    lifecycleCounter: lifecycleCounter,
+    namespace: namespace
+  )
+}
+
+@MainActor
+private func recordPortalRuntimeRegistrations(
+  on node: ViewNode,
+  identity: Identity,
+  binding: KeyBinding,
+  commandDescription: String,
+  commandCounter: RegistrationCounter,
+  actionCounter: RegistrationCounter,
+  lifecycleCounter: RegistrationCounter,
+  namespace: MatchedGeometryNamespace
+) {
+  node.beginRegistrationCapture()
+  defer {
+    node.endRegistrationCapture()
+  }
+
+  node.recordActionRegistration(
+    identity: identity,
+    handler: {
+      actionCounter.increment()
+      return true
+    },
+    followUpInvalidationIdentity: nil
+  )
+  node.recordDefaultFocus(
+    DefaultFocusCandidateRegistrationSnapshot(namespace: namespace, identity: identity)
+  )
+  node.recordFocusBindingRegistration(
+    FocusBindingRegistrationSnapshot(
+      identity: identity,
+      bindingKey: FocusBindingKey(
+        ownerNodeID: node.viewNodeID,
+        suffix: .stateSlot(ordinal: 0)
+      ),
+      bindingID: "binding-\(identity.path)",
+      hasPendingRequest: false,
+      isSelected: false,
+      applyRuntimeFocus: { _ in false }
+    )
+  )
+  node.recordLifecycleAppearRegistration(
+    LifecycleHandlerRegistration(
+      identity: identity,
+      key: LifecycleHandlerKey(
+        ownerNodeID: node.viewNodeID,
+        suffix: .appear(ordinal: 0)
+      )
+    ) {
+      lifecycleCounter.increment()
+    }
+  )
+  node.recordTaskRegistration(
+    identity: identity,
+    registration: TaskRegistration(
+      descriptor: testPortalTaskDescriptor(for: identity),
+      operation: {}
+    )
+  )
+  node.recordCommandRegistration(
+    commandSnapshot(
+      identity: identity,
+      binding: binding,
+      description: commandDescription,
+      counter: commandCounter
+    )
+  )
+}
+
+private func testPortalTaskDescriptor(
+  for identity: Identity
+) -> TaskDescriptor {
+  TaskDescriptor(id: "task-\(identity.path)", priority: .medium)
 }
 
 @MainActor
