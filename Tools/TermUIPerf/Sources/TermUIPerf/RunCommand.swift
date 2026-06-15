@@ -23,6 +23,7 @@ public enum RunCommand {
     }
 
     let artifactRoot = URL(fileURLWithPath: config.artifactsRoot, isDirectory: true)
+    PerfScenarioRunner.configureReuseTraceArtifact(at: artifactRoot)
     var perIteration: [PerfScenarioRunResult] = []
     var aggregates: [PerfAggregateSummary] = []
 

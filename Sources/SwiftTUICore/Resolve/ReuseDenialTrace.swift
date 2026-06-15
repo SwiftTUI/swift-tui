@@ -23,7 +23,21 @@
 package enum ReuseDenialTrace {
   package static let environmentVariableName = "SWIFTTUI_REUSE_TRACE"
 
+  /// Optional file sink. When `SWIFTTUI_REUSE_TRACE_FILE` names a writable path,
+  /// each `[REUSE-TRACE]` line is appended there instead of stderr. The trace is
+  /// otherwise stderr-only, where it is easily lost among build/runtime output
+  /// (this is why it was previously misread as silent on the release perf path).
+  /// A file sink makes the diagnostic a durable, run-correlated artifact.
+  /// `nil` keeps the historical stderr behavior. Settable for tests.
+  package static let fileEnvironmentVariableName = "SWIFTTUI_REUSE_TRACE_FILE"
+
   package static var isEnabled: Bool = environmentDefault()
+
+  /// Resolved once on first emit. When set, trace lines append to this path
+  /// (created if missing); when `nil`, they go to stderr.
+  package static var outputFilePath: String? = environmentValue(
+    named: fileEnvironmentVariableName
+  )
 
   package private(set) static var reasonCounts: [String: Int] = [:]
   package private(set) static var environmentKeyDiffCounts: [String: Int] = [:]
@@ -74,9 +88,59 @@ package enum ReuseDenialTrace {
       line += " | invalidated: " + invalidatedIdentityPaths.sorted().joined(separator: ",")
     }
     line += "\n"
-    writeToStandardError(line)
+    emit(line)
     reset()
   }
+
+  /// Routes a trace line to the configured file sink when one is set and
+  /// writable, otherwise to stderr (the historical behavior).
+  private static func emit(_ message: String) {
+    #if !canImport(WASILibc)
+      if let path = outputFilePath, !path.isEmpty, appendToFile(message, at: path) {
+        return
+      }
+    #endif
+    writeToStandardError(message)
+  }
+
+  #if !canImport(WASILibc)
+    /// Appends `message` to `path` (opening it `O_CREAT | O_APPEND` each call so
+    /// `outputFilePath` stays dynamic and no descriptor is leaked). Returns
+    /// `false` on any open/write failure so the caller can fall back to stderr.
+    /// WASI's capability model makes path-based `open` a no-op, so the file sink
+    /// is compiled out there (see `Standard.File`).
+    private static func appendToFile(_ message: String, at path: String) -> Bool {
+      let descriptor = unsafe path.withCString { pathPointer in
+        unsafe open(pathPointer, O_WRONLY | O_CREAT | O_APPEND, 0o644)
+      }
+      guard descriptor >= 0 else {
+        return false
+      }
+      defer { _ = close(descriptor) }
+      var message = message
+      return message.withUTF8 { buffer in
+        guard let base = buffer.baseAddress, buffer.count > 0 else {
+          return true
+        }
+        var offset = 0
+        while offset < buffer.count {
+          let written = unsafe write(
+            descriptor,
+            base.advanced(by: offset),
+            buffer.count - offset
+          )
+          if written > 0 {
+            offset += written
+          } else if written == -1, errno == EINTR {
+            continue
+          } else {
+            return false
+          }
+        }
+        return true
+      }
+    }
+  #endif
 
   private static func writeToStandardError(_ message: String) {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android)

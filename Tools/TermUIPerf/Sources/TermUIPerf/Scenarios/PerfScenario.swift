@@ -539,4 +539,27 @@ public enum PerfScenarioRunner {
       throw PerfScenarioError.environmentUnavailable
     #endif
   }
+
+  /// When the reuse-denial trace (`SWIFTTUI_REUSE_TRACE`) is armed, default its
+  /// file sink (`SWIFTTUI_REUSE_TRACE_FILE`) to `reuse-trace.log` under the
+  /// artifacts root so the diagnostic is captured as a run artifact instead of
+  /// scrolling past on stderr (where it was previously misread as silent). An
+  /// explicit operator override of the file path is respected.
+  static func configureReuseTraceArtifact(at artifactRoot: URL) {
+    guard let raw = environmentValue("SWIFTTUI_REUSE_TRACE"),
+      !raw.isEmpty,
+      raw != "0"
+    else {
+      return
+    }
+    if let existing = environmentValue("SWIFTTUI_REUSE_TRACE_FILE"), !existing.isEmpty {
+      return
+    }
+    try? FileManager.default.createDirectory(
+      at: artifactRoot,
+      withIntermediateDirectories: true
+    )
+    let path = artifactRoot.appendingPathComponent("reuse-trace.log").path
+    try? setEnvironmentValue(path, for: "SWIFTTUI_REUSE_TRACE_FILE")
+  }
 }
