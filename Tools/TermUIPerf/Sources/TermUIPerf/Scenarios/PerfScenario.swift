@@ -150,6 +150,7 @@ public enum PerfScenarioRegistry {
       SyntheticRepeatForeverScenario(),
       SyntheticShimmerScenario(),
       SyntheticNarrowInvalidationScenario(),
+      SyntheticObservableFanoutScenario(),
       SheetOpenLatencyScenario(),
     ] + additionalScenarios
   }
