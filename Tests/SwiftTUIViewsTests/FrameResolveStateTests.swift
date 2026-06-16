@@ -100,6 +100,49 @@ struct FrameResolveStateTests {
     #expect(inputs.selectiveEvaluationDisabledReasons == [.focusChanged])
   }
 
+  @Test("runtime gate: finite suppression scope covers focus change")
+  func finiteSuppressionScopeCoversFocusChange() {
+    let rootIdentity = testIdentity("Root")
+    let focusedIdentity = testIdentity("Root", "Focusable")
+    let state = warmedSelectiveState(rootIdentity: rootIdentity)
+    state.retainedReuseSuppressionScope = .init(identities: [focusedIdentity])
+
+    let inputs = state.prepareInputs(
+      from: resolveContext(
+        rootIdentity: rootIdentity,
+        invalidatedIdentities: [testIdentity("Root", "Child")],
+        focusedIdentity: focusedIdentity
+      ),
+      proposal: baselineProposal
+    )
+
+    #expect(inputs.usesSelectiveEvaluation)
+    #expect(!inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [])
+    #expect(inputs.retainedReuseSuppressionScope.identities == [focusedIdentity])
+  }
+
+  @Test("runtime gate: full suppression scope keeps focus change root-forced")
+  func fullSuppressionScopeKeepsFocusChangeRootForced() {
+    let rootIdentity = testIdentity("Root")
+    let state = warmedSelectiveState(rootIdentity: rootIdentity)
+    state.retainedReuseSuppressionScope = .all
+
+    let inputs = state.prepareInputs(
+      from: resolveContext(
+        rootIdentity: rootIdentity,
+        invalidatedIdentities: [testIdentity("Root", "Child")],
+        focusedIdentity: testIdentity("Root", "Focusable")
+      ),
+      proposal: baselineProposal
+    )
+
+    #expect(!inputs.usesSelectiveEvaluation)
+    #expect(inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [.focusChanged])
+    #expect(inputs.retainedReuseSuppressionScope.suppressesAll)
+  }
+
   @Test("runtime gate: pressed change disables selective evaluation")
   func pressedChangeDisablesSelectiveEvaluation() {
     let rootIdentity = testIdentity("Root")
@@ -117,6 +160,28 @@ struct FrameResolveStateTests {
     #expect(!inputs.usesSelectiveEvaluation)
     #expect(inputs.environmentRequiresRootEvaluation)
     #expect(inputs.selectiveEvaluationDisabledReasons == [.pressedChanged])
+  }
+
+  @Test("runtime gate: finite suppression scope covers pressed change")
+  func finiteSuppressionScopeCoversPressedChange() {
+    let rootIdentity = testIdentity("Root")
+    let pressedIdentity = testIdentity("Root", "Pressed")
+    let state = warmedSelectiveState(rootIdentity: rootIdentity)
+    state.retainedReuseSuppressionScope = .init(identities: [pressedIdentity])
+
+    let inputs = state.prepareInputs(
+      from: resolveContext(
+        rootIdentity: rootIdentity,
+        invalidatedIdentities: [testIdentity("Root", "Child")],
+        pressedIdentity: pressedIdentity
+      ),
+      proposal: baselineProposal
+    )
+
+    #expect(inputs.usesSelectiveEvaluation)
+    #expect(!inputs.environmentRequiresRootEvaluation)
+    #expect(inputs.selectiveEvaluationDisabledReasons == [])
+    #expect(inputs.retainedReuseSuppressionScope.identities == [pressedIdentity])
   }
 
   @Test("runtime gate: proposal change disables selective evaluation")

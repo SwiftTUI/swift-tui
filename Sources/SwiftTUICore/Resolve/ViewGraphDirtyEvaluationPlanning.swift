@@ -16,8 +16,7 @@ enum ViewGraphDirtyEvaluationPlanner {
     input: ViewGraphDirtyEvaluationPlanningInput
   ) -> ViewGraphDirtyEvaluationTargetPlan? {
     guard input.hasRoot,
-      !input.graphLocalDirtyNodeIDs.isEmpty,
-      !input.invalidatedNodeIDs.isEmpty
+      !input.graphLocalDirtyNodeIDs.isEmpty
     else {
       return nil
     }
