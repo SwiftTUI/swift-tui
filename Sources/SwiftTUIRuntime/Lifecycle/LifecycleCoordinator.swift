@@ -34,6 +34,10 @@ package final class LifecycleCoordinator {
     taskRunner.activeTaskDescriptors
   }
 
+  package var activeTaskCount: Int {
+    taskRunner.activeTaskCount
+  }
+
   private func apply(
     _ entry: LifecycleCommitEntry,
     currentLifecycleRegistry: LocalLifecycleRegistry,

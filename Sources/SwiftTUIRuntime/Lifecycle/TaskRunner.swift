@@ -19,6 +19,22 @@ final class TaskRunner {
   ) {
     cancel(viewNodeID: viewNodeID)
 
+    // A node's viewNodeID can churn — a fresh id for the *same* identity on
+    // re-evaluation (e.g. a `TimelineView` re-attaching its `.task` each tick).
+    // Since active tasks are keyed by viewNodeID, the old id's task is left
+    // running, and the lifecycle diff can miss the transient disappearance — so
+    // it orphans: re-rendering forever and surviving the view's removal (the
+    // persistent slowdown after leaving an animated tab). Cancel any active
+    // task for this identity on a now-stale viewNodeID. There is one task per
+    // viewNodeID, so a same-identity entry under a different id is always a
+    // stale duplicate of this logical `.task`.
+    let staleViewNodeIDs = activeTasks.compactMap { entry in
+      entry.key != viewNodeID && entry.value.identity == identity ? entry.key : nil
+    }
+    for staleViewNodeID in staleViewNodeIDs {
+      cancel(viewNodeID: staleViewNodeID)
+    }
+
     nextGeneration += 1
     let generation = nextGeneration
     let descriptor = registration.descriptor
@@ -63,6 +79,13 @@ final class TaskRunner {
       activeTasks.values.map { ($0.identity, $0.descriptor) },
       uniquingKeysWith: { _, latest in latest }
     )
+  }
+
+  /// Raw count of live task handles (keyed by `viewNodeID`). Used by tests to
+  /// detect tasks that should have been cancelled — e.g. a tab's `.task`s that
+  /// must stop when the tab is dismissed behind a capture-host seam.
+  package var activeTaskCount: Int {
+    activeTasks.count
   }
 
   private func finish(
