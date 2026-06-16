@@ -726,8 +726,9 @@ public struct DefaultRenderer {
   }
 
   /// Suppresses retained reuse for a scoped set of identities on the next
-  /// render. Finite scopes are queued as graph-local dirty work during frame
-  /// head preparation; identity-agnostic scopes still require root evaluation.
+  /// render. Finite focus/press scopes may be queued as graph-local dirty work
+  /// during frame head preparation; animation and identity-agnostic safety
+  /// scopes may still be paired with root evaluation by the run loop.
   @MainActor
   package func suppressRetainedReuseForNextFrame(
     _ scope: RetainedReuseSuppressionScope
