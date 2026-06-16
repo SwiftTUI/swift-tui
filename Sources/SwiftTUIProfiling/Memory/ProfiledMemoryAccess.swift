@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Coordination-only: an on-demand occupancy read for out-of-package perf
 /// tooling (TermUIPerf). The collector, registry, and snapshot types are all

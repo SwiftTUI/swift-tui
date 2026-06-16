@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 /// A zero-size, layout-inert sibling leaf that is the **sole reader** of a
 /// presentation's `isPresented` binding.
