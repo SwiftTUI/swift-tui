@@ -201,40 +201,19 @@ struct TimelineViewTests {
 
   @Test("timelineTickPlan sleeps until a future instant")
   func tickPlanSleepsForFutureInstant() {
-    #expect(
-      timelineTickPlan(delay: .milliseconds(50), gridInterval: .milliseconds(50))
-        == .sleep(.milliseconds(50))
-    )
+    #expect(timelineTickPlan(delay: .milliseconds(50)) == .sleep(.milliseconds(50)))
+    #expect(timelineTickPlan(delay: .seconds(1)) == .sleep(.seconds(1)))
   }
 
-  @Test("timelineTickPlan emits when due or behind by less than a tick")
-  func tickPlanEmitsWhenDueOrSlightlyBehind() {
-    // Exactly due.
-    #expect(timelineTickPlan(delay: .zero, gridInterval: .milliseconds(50)) == .emit)
-    // Behind by under one tick — recoverable wake jitter, render normally.
-    #expect(timelineTickPlan(delay: .milliseconds(-10), gridInterval: .milliseconds(50)) == .emit)
-    // Behind by exactly one tick is still not "more than" a tick.
-    #expect(timelineTickPlan(delay: .milliseconds(-50), gridInterval: .milliseconds(50)) == .emit)
-  }
-
-  @Test("timelineTickPlan re-anchors when behind by more than a full tick")
-  func tickPlanReanchorsWhenBehindByMoreThanATick() {
-    // A slow frame pushed the fixed grid more than a tick into the past; the
-    // loop must drop the backlog and re-anchor rather than replay it flat-out
-    // (the progress-tab animation storm).
-    #expect(
-      timelineTickPlan(delay: .milliseconds(-60), gridInterval: .milliseconds(50)) == .reanchor
-    )
-    #expect(
-      timelineTickPlan(delay: .seconds(-5), gridInterval: .milliseconds(50)) == .reanchor
-    )
-  }
-
-  @Test("timelineTickPlan never re-anchors without a grid interval")
-  func tickPlanEmitsWithoutGridInterval() {
-    // Paused / single-shot schedules have no interval — there is no backlog to
-    // drop, so however far behind, just render.
-    #expect(timelineTickPlan(delay: .seconds(-5), gridInterval: nil) == .emit)
-    #expect(timelineTickPlan(delay: .milliseconds(-1), gridInterval: nil) == .emit)
+  @Test("timelineTickPlan renders-now-and-re-anchors as soon as it is behind")
+  func tickPlanReanchorsWhenBehind() {
+    // The moment the next instant is due or past — any lag at all — render now
+    // and re-anchor, so the loop always suspends before the next write. Never
+    // emit a backlogged instant without first suspending (that is the burst
+    // that lets a frame whose cost exceeds the interval spiral into a storm).
+    #expect(timelineTickPlan(delay: .zero) == .renderNowAndReanchor)
+    #expect(timelineTickPlan(delay: .milliseconds(-1)) == .renderNowAndReanchor)
+    #expect(timelineTickPlan(delay: .milliseconds(-60)) == .renderNowAndReanchor)
+    #expect(timelineTickPlan(delay: .seconds(-5)) == .renderNowAndReanchor)
   }
 }
