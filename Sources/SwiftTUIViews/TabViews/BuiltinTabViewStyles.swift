@@ -483,8 +483,7 @@ private struct LiteralTabsOverflowMenuView: View {
       if let overflow = configuration.presentation.overflowMenu,
         let backgroundStyle = overflow.backgroundStyle
       {
-        RoundedRectangle(cornerRadius: overflow.cornerRadius)
-          .inset(by: overflow.borderInset)
+        Rectangle()
           .fill(backgroundStyle)
       }
     }
@@ -492,8 +491,13 @@ private struct LiteralTabsOverflowMenuView: View {
       if let overflow = configuration.presentation.overflowMenu,
         let borderStyle = overflow.borderStyle
       {
-        RoundedRectangle(cornerRadius: overflow.cornerRadius)
-          .strokeBorder(borderStyle)
+        if let backgroundStyle = overflow.backgroundStyle {
+          RoundedRectangle(cornerRadius: overflow.cornerRadius)
+            .strokeBorder(borderStyle, background: backgroundStyle)
+        } else {
+          RoundedRectangle(cornerRadius: overflow.cornerRadius)
+            .strokeBorder(borderStyle)
+        }
       }
     }
     .fixedSize(horizontal: true, vertical: true)

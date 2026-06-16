@@ -858,6 +858,67 @@ struct TabViewSurfaceTests {
     #expect(surface.lines.joined(separator: "\n").contains("Long Hidden Tab"))
   }
 
+  @Test("literal tab overflow menu masks content underneath its rounded corners")
+  func literalTabOverflowMenuMasksContentUnderRoundedCorners() throws {
+    final class SelectionBox {
+      var value = "one"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+    let renderer = DefaultRenderer()
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = CellSize(width: 24, height: 8)
+
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues
+    )
+    context.localPointerHandlerRegistry = pointerRegistry
+
+    _ = renderer.render(
+      longOverflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    )
+
+    let triggerRouteID = primaryRouteID(
+      for: testIdentity("Tabs").child(.named("TabOverflowTrigger"))
+    )
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: triggerRouteID,
+        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+      )
+    )
+
+    let surface = renderer.render(
+      longOverflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    ).rasterSurface
+    let hiddenLabelBounds = try #require(boundsOfText("Long Hidden Tab", in: surface))
+    let triggerBounds = try #require(boundsOfText("▴", in: surface))
+    let menuTopY = hiddenLabelBounds.origin.y - 1
+    let menuLeadingX = hiddenLabelBounds.origin.x - 3
+    let menuTrailingX = triggerBounds.maxX + 1
+    #expect(surface.cells.indices.contains(menuTopY))
+    let topRow = surface.cells[menuTopY]
+    #expect(topRow.indices.contains(menuLeadingX))
+    #expect(topRow.indices.contains(menuTrailingX))
+    let topLeadingCell = topRow[menuLeadingX]
+    let topTrailingCell = topRow[menuTrailingX]
+
+    #expect(topLeadingCell.character == "╭")
+    #expect(topLeadingCell.style?.backgroundColor != nil)
+    #expect(topTrailingCell.character == "╮")
+    #expect(topTrailingCell.style?.backgroundColor != nil)
+  }
+
   @Test("literal tab overflow menu stays onscreen for gallery-width tabs")
   func literalTabOverflowMenuStaysOnscreenForGalleryWidthTabs() throws {
     final class SelectionBox {
