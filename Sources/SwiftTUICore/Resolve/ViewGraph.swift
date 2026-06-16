@@ -1811,18 +1811,66 @@ package final class ViewGraph {
   }
 
   /// Scoped counterpart to ``restoreCurrentFrameRuntimeRegistrations``: restores
-  /// runtime registrations for ONLY the live subtrees rooted at `roots`, walking
-  /// each root's ViewNode subtree (O(subtree)) instead of the full live-identity
-  /// set. Used on `.subtrees` publication frames, where the preceding
+  /// runtime registrations for ONLY the live subtrees rooted at `roots`. Used on
+  /// `.subtrees` (and scoped `.all`) publication frames, where the preceding
   /// `removeSubtrees(rootedAt:)` cleared exactly these subtrees and untouched
   /// subtrees' registrations remain valid in place — so re-publishing the whole
   /// tree (the former behavior) is redundant O(tree) work.
+  ///
+  /// The restore is a **union** of two coverages:
+  ///
+  /// 1. Each root's live ViewNode subtree (the original behavior). This reaches
+  ///    nodes through the live tree — including registrations whose effective
+  ///    scope identity was re-rooted away from `roots` (e.g. `.keyCommand`
+  ///    scopes) — and keeps the scoped restore byte-identical to a full rebuild
+  ///    when no seam is present.
+  /// 2. Plus live nodes selected by **identity prefix** that the ViewNode walk
+  ///    cannot reach across capture-host island seams (deferred tab bodies,
+  ///    presentation-portal content, `.id`-re-rooted subtrees, lazy viewport
+  ///    entries). `removeSubtrees(rootedAt:)` clears those by identity prefix,
+  ///    so without this a seam-hosted node's registrations — e.g. a lazy tab's
+  ///    button action handler — were removed but never restored, leaving the
+  ///    control dead until the next full publication.
   package func restoreRuntimeRegistrationSubtrees(
     rootedAt roots: [Identity],
     into registrations: RuntimeRegistrationSet
   ) {
+    guard !roots.isEmpty else {
+      return
+    }
+    var nodeIDs: Set<ViewNodeID> = []
     for root in roots {
-      nodeIfExists(for: root)?.restoreRuntimeRegistrations(into: registrations)
+      guard let node = nodeIfExists(for: root) else {
+        continue
+      }
+      collectRuntimeRegistrationSubtreeNodeIDs(node, into: &nodeIDs)
+    }
+    for nodeID in liveNodeIDs where !nodeIDs.contains(nodeID) {
+      guard let identity = nodesByNodeID[nodeID]?.identity else {
+        continue
+      }
+      if roots.contains(where: { root in
+        identity == root || identity.isDescendant(of: root)
+      }) {
+        nodeIDs.insert(nodeID)
+      }
+    }
+    ViewGraphRuntimeRegistrationRestorer.restoreLiveIdentities(
+      nodeIDs,
+      into: registrations,
+      nodesByNodeID: nodesByNodeID
+    )
+  }
+
+  private func collectRuntimeRegistrationSubtreeNodeIDs(
+    _ node: ViewNode,
+    into nodeIDs: inout Set<ViewNodeID>
+  ) {
+    guard nodeIDs.insert(node.viewNodeID).inserted else {
+      return
+    }
+    for child in node.children {
+      collectRuntimeRegistrationSubtreeNodeIDs(child, into: &nodeIDs)
     }
   }
 
