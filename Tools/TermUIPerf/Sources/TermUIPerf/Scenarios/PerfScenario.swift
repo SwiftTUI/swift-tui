@@ -152,6 +152,9 @@ public enum PerfScenarioRegistry {
       SyntheticNarrowInvalidationScenario(),
       SyntheticObservableFanoutScenario(),
       SheetOpenLatencyScenario(),
+      GalleryTabSwitchScenario(),
+      FileBrowserSelectionScenario(),
+      TextInputEditingScenario(),
     ] + additionalScenarios
   }
 

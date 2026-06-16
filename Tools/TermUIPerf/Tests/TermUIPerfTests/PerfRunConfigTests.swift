@@ -83,7 +83,7 @@ struct PerfRunConfigTests {
 
     #expect(
       error?.description
-        == "unknown scenario 'missing-scenario'. Known scenarios: example-app-shell-workflow, gallery-animation-click, layout-scroll-burst, sheet-open-latency, synthetic-continuous-animation, synthetic-narrow-invalidation, synthetic-observable-fanout, synthetic-offscreen-phase-animator, synthetic-text-shimmer."
+        == "unknown scenario 'missing-scenario'. Known scenarios: example-app-shell-workflow, file-browser-selection, gallery-animation-click, gallery-tab-switch, layout-scroll-burst, sheet-open-latency, synthetic-continuous-animation, synthetic-narrow-invalidation, synthetic-observable-fanout, synthetic-offscreen-phase-animator, synthetic-text-shimmer, text-input-editing."
     )
   }
 
