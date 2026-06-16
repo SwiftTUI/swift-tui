@@ -196,4 +196,45 @@ struct TimelineViewTests {
     #expect(Duration.milliseconds(2500).totalSeconds == 2.5)
     #expect(Duration.zero.totalSeconds == 0.0)
   }
+
+  // MARK: - Tick plan (lag recovery)
+
+  @Test("timelineTickPlan sleeps until a future instant")
+  func tickPlanSleepsForFutureInstant() {
+    #expect(
+      timelineTickPlan(delay: .milliseconds(50), gridInterval: .milliseconds(50))
+        == .sleep(.milliseconds(50))
+    )
+  }
+
+  @Test("timelineTickPlan emits when due or behind by less than a tick")
+  func tickPlanEmitsWhenDueOrSlightlyBehind() {
+    // Exactly due.
+    #expect(timelineTickPlan(delay: .zero, gridInterval: .milliseconds(50)) == .emit)
+    // Behind by under one tick — recoverable wake jitter, render normally.
+    #expect(timelineTickPlan(delay: .milliseconds(-10), gridInterval: .milliseconds(50)) == .emit)
+    // Behind by exactly one tick is still not "more than" a tick.
+    #expect(timelineTickPlan(delay: .milliseconds(-50), gridInterval: .milliseconds(50)) == .emit)
+  }
+
+  @Test("timelineTickPlan re-anchors when behind by more than a full tick")
+  func tickPlanReanchorsWhenBehindByMoreThanATick() {
+    // A slow frame pushed the fixed grid more than a tick into the past; the
+    // loop must drop the backlog and re-anchor rather than replay it flat-out
+    // (the progress-tab animation storm).
+    #expect(
+      timelineTickPlan(delay: .milliseconds(-60), gridInterval: .milliseconds(50)) == .reanchor
+    )
+    #expect(
+      timelineTickPlan(delay: .seconds(-5), gridInterval: .milliseconds(50)) == .reanchor
+    )
+  }
+
+  @Test("timelineTickPlan never re-anchors without a grid interval")
+  func tickPlanEmitsWithoutGridInterval() {
+    // Paused / single-shot schedules have no interval — there is no backlog to
+    // drop, so however far behind, just render.
+    #expect(timelineTickPlan(delay: .seconds(-5), gridInterval: nil) == .emit)
+    #expect(timelineTickPlan(delay: .milliseconds(-1), gridInterval: nil) == .emit)
+  }
 }

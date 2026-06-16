@@ -241,6 +241,40 @@ extension TimelineSchedule where Self == AnimationTimelineSchedule {
   }
 }
 
+// MARK: - Tick plan (lag recovery)
+
+/// What a ``TimelineView`` run loop should do for the next scheduled instant,
+/// given how far ahead/behind wall-clock it is. Extracted as a pure function so
+/// the lag-recovery threshold is unit-testable without driving the async loop.
+package enum TimelineTickPlan: Equatable, Sendable {
+  /// The instant is in the future: sleep this long, then render it.
+  case sleep(Duration)
+  /// The instant is due (or barely past, within one tick): render it now.
+  case emit
+  /// The grid has fallen behind by more than a full tick: drop the backlog and
+  /// re-anchor the schedule to now, so the loop suspends again instead of
+  /// replaying every missed instant flat-out (a frame storm that never
+  /// recovers under MainActor contention).
+  case reanchor
+}
+
+/// Decides the next ``TimelineView`` tick action from the delay until the next
+/// scheduled instant (`> 0` future, `<= 0` due/past) and the schedule's grid
+/// interval (`nil` for paused/single-shot schedules, where lag recovery is
+/// skipped). See ``TimelineTickPlan``.
+package func timelineTickPlan(
+  delay: Duration,
+  gridInterval: Duration?
+) -> TimelineTickPlan {
+  if delay > .zero {
+    return .sleep(delay)
+  }
+  if let gridInterval, gridInterval > .zero, delay < .zero - gridInterval {
+    return .reanchor
+  }
+  return .emit
+}
+
 // MARK: - TimelineView
 
 /// The per-tick context handed to a ``TimelineView``'s content
@@ -348,16 +382,55 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
       schedule
       .entries(from: .now(), mode: mode)
       .makeIterator()
+    // The grid interval, used to distinguish recoverable wake jitter (fell
+    // behind by less than a tick) from a genuinely slow frame (fell behind by
+    // a whole tick or more). `nil` for paused/single-shot schedules.
+    let gridInterval = Self.gridInterval(of: schedule, mode: mode)
     while !Task.isCancelled {
       guard let next = iterator.next() else { return }
       let delay = MonotonicInstant.now().duration(to: next)
-      if delay > .zero {
-        try? await Task.sleep(for: delay)
+      switch timelineTickPlan(delay: delay, gridInterval: gridInterval) {
+      case .sleep(let interval):
+        try? await Task.sleep(for: interval)
+      case .reanchor:
+        // The fixed schedule grid has fallen behind wall-clock by more than a
+        // full tick — a frame (or its terminal write) took longer than the
+        // animation interval. Every remaining grid instant is now in the past,
+        // so without intervention the loop would set `currentInstant` and
+        // re-resolve back-to-back with no suspension: a frame storm that never
+        // recovers, because each re-render keeps the grid behind. Drop the
+        // missed instants and re-anchor the grid to now, so the next instant is
+        // in the future and the loop suspends again (capping the cadence at the
+        // achievable frame rate instead of busy-spinning).
+        iterator = schedule.entries(from: .now(), mode: mode).makeIterator()
+        // Discard the immediate re-anchored "now" entry so the next iteration
+        // resumes at `now + interval` (a future instant that the loop sleeps
+        // until) rather than re-detecting lag on a zero delay.
+        _ = iterator.next()
+        continue
+      case .emit:
+        break
       }
       guard !Task.isCancelled else { return }
       currentInstant = next
       hasAdvanced = true
     }
+  }
+
+  /// The spacing between a schedule's first two emitted instants, used to set
+  /// the lag-recovery threshold in ``run(mode:)``. Returns `nil` when the
+  /// schedule emits fewer than two instants (paused/single-shot) or a
+  /// non-positive interval, in which case lag recovery is skipped.
+  private static func gridInterval(
+    of schedule: Schedule,
+    mode: TimelineScheduleMode
+  ) -> Duration? {
+    var probe = schedule.entries(from: .now(), mode: mode).makeIterator()
+    guard let first = probe.next(), let second = probe.next() else {
+      return nil
+    }
+    let interval = first.duration(to: second)
+    return interval > .zero ? interval : nil
   }
 
   /// Stable identity for the `.task(id:)` so changing the schedule
