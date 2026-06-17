@@ -80,13 +80,21 @@ package enum MemoValueComparator {
       return .blocked(.anyView)
     }
 
-    // A non-Equatable, non-class value with no children and no struct/enum
-    // display style is almost certainly a function/closure value (or an opaque
-    // leaf): there is nothing to compare. Treat as blocked.
+    // Enums need case-aware comparison: the generic field-wise descent below
+    // ignores child *labels*, but for an enum the single child's label IS the
+    // case name — so `.loaded(x)` and `.failed(x)` would otherwise false-equal.
+    // (`Equatable` enums never reach here; they take the fast path in `compare`.)
+    if lhsMirror.displayStyle == .enum {
+      return compareEnumCase(lhsMirror, rhsMirror)
+    }
+
+    // A non-Equatable, non-class, non-enum value with no children is either a
+    // genuinely empty value type (struct / tuple — a single inhabitant, so two
+    // instances are equivalent) or an opaque/function leaf there is nothing to
+    // compare (treat as blocked).
     if lhsMirror.children.isEmpty {
       switch lhsMirror.displayStyle {
-      case .struct, .enum, .tuple:
-        // A genuinely empty value type — two instances are equivalent.
+      case .struct, .tuple:
         return .equal
       case .none:
         return .blocked(.closure)
@@ -118,6 +126,44 @@ package enum MemoValueComparator {
       case .blocked(let reason):
         // Remember the block but keep scanning: a later field may prove the
         // value actually changed, which is the stronger signal.
+        result = .blocked(reason)
+      }
+    }
+    return result
+  }
+
+  /// Case-aware comparison for a non-`Equatable` enum. `Mirror` reflects a
+  /// payload case as a single child whose `label` is the case name and whose
+  /// `value` is the associated value (grouped into a tuple when there are
+  /// several); a no-payload case reflects to zero children.
+  ///
+  /// - Different child *arity* ⇒ different case (e.g. `.loading` vs `.loaded(x)`).
+  /// - Both empty ⇒ two no-payload cases with no recoverable discriminator
+  ///   (`Mirror` does not expose a no-payload case's name). We cannot tell
+  ///   `.collapsed` from `.expanded`, so deny reuse — conservative and sound.
+  ///   Authors regain precision by making the enum `Equatable` (fast path).
+  /// - Matching arity with payload ⇒ compare the case-name labels, then recurse
+  ///   on the associated value(s).
+  private static func compareEnumCase(_ lhsMirror: Mirror, _ rhsMirror: Mirror) -> MemoComparison {
+    let lhsChildren = Array(lhsMirror.children)
+    let rhsChildren = Array(rhsMirror.children)
+    guard lhsChildren.count == rhsChildren.count else {
+      return .changed
+    }
+    guard !lhsChildren.isEmpty else {
+      return .changed
+    }
+    var result: MemoComparison = .equal
+    for (lhsChild, rhsChild) in zip(lhsChildren, rhsChildren) {
+      guard lhsChild.label == rhsChild.label else {
+        return .changed
+      }
+      switch compare(lhsChild.value, rhsChild.value) {
+      case .equal:
+        continue
+      case .changed:
+        return .changed
+      case .blocked(let reason):
         result = .blocked(reason)
       }
     }

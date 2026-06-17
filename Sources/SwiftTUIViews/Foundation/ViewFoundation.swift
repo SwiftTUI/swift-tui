@@ -298,6 +298,33 @@ func resolveView<V: View>(
     return structurallyStamped
   }
 
+  // Memoized-body reuse (gated by SWIFTTUI_MEMO_REUSE, default off): Layer A
+  // above rejected this node, but if it is only a structural descendant of an
+  // invalidated ancestor whose own view value is structurally unchanged (and it
+  // has no recorded dependencies and passes every non-dirty reuse guard), the
+  // body re-run is redundant — reuse the committed subtree via the same path as
+  // Layer A. Behind the same focus/press suppression gate.
+  if MemoReuseConfiguration.isEnabled,
+    !context.effectiveSuppressesRetainedReuse(at: context.identity),
+    let reused = context.viewGraph?.memoizedReusableSnapshot(
+      for: context.identity,
+      viewValue: view,
+      environment: context.environment,
+      transaction: context.transaction,
+      invalidatedIdentities: context.effectiveInvalidatedIdentities,
+      invalidator: context.invalidationProxy?.invalidator
+    )
+  {
+    context.viewGraph?.restoreRuntimeRegistrations(
+      for: reused,
+      into: context.runtimeRegistrations
+    )
+    context.recordResolvedReuse(count: reused.subtreeNodeCount)
+    var structurallyStamped = reused
+    structurallyStamped.structuralPath = context.structuralPath
+    return structurallyStamped
+  }
+
   // Diagnostic (inert unless SWIFTTUI_REUSE_TRACE): this node is being recomputed
   // rather than reused — record why, to find what re-resolves the background on
   // sheet/palette open.
@@ -395,11 +422,23 @@ func resolveView<V: View>(
     if let memoObservation {
       finishMemoObservation(memoObservation, newResolved: resolved)
     }
-    if MemoSkipTrace.isEnabled {
-      graphNode?.memoDiagnosticViewValue = view
-    }
   #endif
+  if shouldCaptureMemoViewValue() {
+    graphNode?.memoViewValue = view
+  }
   return resolved
+}
+
+/// Whether to stash the resolved view value for next-frame memo comparison:
+/// always when the memo-reuse gate is enabled, and (DEBUG) when the memo
+/// diagnostics trace is armed.
+@MainActor
+func shouldCaptureMemoViewValue() -> Bool {
+  if MemoReuseConfiguration.isEnabled { return true }
+  #if DEBUG
+    if MemoSkipTrace.isEnabled { return true }
+  #endif
+  return false
 }
 
 #if DEBUG
@@ -429,7 +468,7 @@ func resolveView<V: View>(
     // A self-invalidated node must re-run; only nodes reached under a re-run
     // ancestor are memoization candidates.
     guard !context.effectiveInvalidatedIdentities.contains(context.identity),
-      let prior = graphNode.memoDiagnosticViewValue
+      let prior = graphNode.memoViewValue
     else { return nil }
     switch MemoValueComparator.compare(prior, view) {
     case .blocked(let reason):

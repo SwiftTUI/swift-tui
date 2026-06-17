@@ -608,31 +608,47 @@ package final class ViewNode {
     #endif
   }
 
-  #if DEBUG
-    /// Stage-0 memoization diagnostics only: the view value this node was last
-    /// resolved with, kept to compare against the next frame's value via
-    /// ``MemoValueComparator``. Never consulted by behavior; populated only when
-    /// ``MemoSkipTrace`` is enabled. Not checkpointed — a diagnostic best-effort
-    /// (a stale value across an aborted frame only perturbs the histogram).
-    package var memoDiagnosticViewValue: Any?
+  /// The view value this node was last resolved with, kept to compare against
+  /// the next frame's value via ``MemoValueComparator`` for memoized-body reuse.
+  /// Populated only when ``MemoReuseConfiguration`` is enabled (or, in DEBUG,
+  /// the ``MemoSkipTrace`` diagnostics); `nil` otherwise, so it costs nothing
+  /// when the feature is off. Checkpointed so an aborted frame does not leave a
+  /// stale value that would mis-compare on the next frame.
+  package var memoViewValue: Any?
 
-    /// Whether this node would pass the retained-reuse guards *except* for the
-    /// dirty / invalidation-intersection veto — i.e. the conjuncts that make a
-    /// memoized skip safe (island freshness, reuse support, environment, and
-    /// transaction equivalence). Used only to classify recomputed nodes for the
-    /// memo diagnostics.
-    package func canMemoReuse(
-      environment: EnvironmentSnapshot,
-      transaction: TransactionSnapshot
-    ) -> Bool {
-      wasPresentAtFrameStart
-        && isCommittedSnapshotFresh
-        && !hasStaleIslandDescendant
-        && committed.supportsRetainedReuse
-        && committed.environmentSnapshot == environment
-        && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
-    }
-  #endif
+  /// Whether this node would pass the retained-reuse guards *except* for the
+  /// dirty / invalidation-intersection veto — the conjuncts that make a memoized
+  /// skip safe (present, snapshot-fresh, island-fresh, reuse support, equal
+  /// environment, reuse-equivalent transaction). ANDed with view-value equality
+  /// and a deps-clean check by the memo gate.
+  package func canMemoReuse(
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot
+  ) -> Bool {
+    wasPresentAtFrameStart
+      && isCommittedSnapshotFresh
+      && !hasStaleIslandDescendant
+      && committed.supportsRetainedReuse
+      && committed.environmentSnapshot == environment
+      && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
+  }
+
+  /// Whether the node recorded no `@State`/`@Observable`/`@Environment` reads
+  /// when it was last resolved — the conservative memo-reuse subset whose output
+  /// is a pure function of its view value and environment.
+  ///
+  /// This indexes only *explicitly attributed* reads. An `@Observable` model read
+  /// directly (not via a `Bindable` projection) is tracked by
+  /// `withObservationTracking`, not recorded here — so it can report `true` while
+  /// still depending on observable state. That case is covered by the `!isDirty`
+  /// conjunct the memo gate ANDs alongside this one (an observable mutation dirties
+  /// the node before the next frame). Any future memo path MUST keep that `!isDirty`
+  /// co-guard; this property alone is not a complete dependency oracle.
+  package var hasNoRecordedDependencies: Bool {
+    dependencies.stateSlotReads.isEmpty
+      && dependencies.observableReads.isEmpty
+      && dependencies.environmentReads.isEmpty
+  }
 
   package func canReuse(
     frameID: UInt64,
@@ -1202,6 +1218,7 @@ extension ViewNode {
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
     package var evaluator: (@MainActor () -> Void)?
+    package var memoViewValue: Any?
   }
 
   package func makeCheckpoint() -> Checkpoint {
@@ -1238,7 +1255,8 @@ extension ViewNode {
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
-      evaluator: evaluator
+      evaluator: evaluator,
+      memoViewValue: memoViewValue
     )
   }
 
@@ -1280,6 +1298,7 @@ extension ViewNode {
     preparedFrameID = checkpoint.preparedFrameID
     visitedFrameID = checkpoint.visitedFrameID
     evaluator = checkpoint.evaluator
+    memoViewValue = checkpoint.memoViewValue
   }
 }
 

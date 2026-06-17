@@ -35,11 +35,7 @@ struct ViewGraphCheckpointTotalityTests {
       typeName: "ViewNode",
       relativePath: "Sources/SwiftTUICore/Resolve/ViewNode.swift"
     ).filter { field in
-      // `identity` is immutable; `memoDiagnosticViewValue` is DEBUG-only
-      // best-effort memoization diagnostics state that is intentionally not
-      // checkpointed (a stale value across an aborted frame only perturbs the
-      // histogram, never behavior — see MemoSkipTrace).
-      field != "identity" && field != "memoDiagnosticViewValue"
+      field != "identity"
     }
     let viewNodeCheckpointFields = try parsedStoredVarNames(
       typeKind: "struct",

@@ -10,25 +10,6 @@ import Testing
 struct ResolveReuseAncestorInvalidationTests {
   @Test("captured binding hazard: ancestor invalidation recomputes binding-driven descendants")
   func ancestorInvalidationRecomputesBindingDrivenDescendants() {
-    let renderer = DefaultRenderer(
-      layoutEngine: .init(cache: MeasurementCache())
-    )
-    let rootIdentity = testIdentity("Root")
-    final class SelectionBox: Sendable {
-      private let valueStorage = LockedBox("Overview")
-
-      var value: String {
-        get { valueStorage.value }
-        set { valueStorage.value = newValue }
-      }
-    }
-    let box = SelectionBox()
-
-    let selection = Binding<String>(
-      get: { box.value },
-      set: { box.value = $0 }
-    )
-
     struct BindingDrivenRoot: View {
       let selection: Binding<String>
 
@@ -40,33 +21,68 @@ struct ResolveReuseAncestorInvalidationTests {
       }
     }
 
-    _ = renderer.render(
-      BindingDrivenRoot(selection: selection),
-      context: .init(identity: rootIdentity)
-    )
-    box.value = "Styling"
-
-    let updated = renderer.render(
-      BindingDrivenRoot(selection: selection),
-      context: .init(
-        identity: rootIdentity,
-        invalidatedIdentities: [rootIdentity]
+    // One two-frame render under whichever gate setting is active: frame one
+    // seeds "Overview", then the external box flips to "Styling" and the root
+    // is invalidated for frame two (returned).
+    func renderFrames() -> FrameArtifacts {
+      let renderer = DefaultRenderer(
+        layoutEngine: .init(cache: MeasurementCache())
       )
-    )
+      let rootIdentity = testIdentity("Root")
+      final class SelectionBox: Sendable {
+        private let valueStorage = LockedBox("Overview")
 
-    let rendered = updated.rasterSurface.lines.joined(separator: "\n")
-    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
-    #expect(rendered.contains("Styling"))
-    #expect(!rendered.contains("Overview"))
+        var value: String {
+          get { valueStorage.value }
+          set { valueStorage.value = newValue }
+        }
+      }
+      let box = SelectionBox()
+      let selection = Binding<String>(
+        get: { box.value },
+        set: { box.value = $0 }
+      )
+
+      _ = renderer.render(
+        BindingDrivenRoot(selection: selection),
+        context: .init(identity: rootIdentity)
+      )
+      box.value = "Styling"
+
+      return renderer.render(
+        BindingDrivenRoot(selection: selection),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [rootIdentity]
+        )
+      )
+    }
+
+    // Soundness invariant — gate-independent: the binding-driven Text must
+    // reflect the new external value, never the stale one. The memo gate sees
+    // that Text's view value change ("Overview" → "Styling") and refuses to
+    // reuse it, so this holds whether the gate is on or off.
+    for gate in [false, true] {
+      let updated = withMemoReuse(gate) { renderFrames() }
+      let rendered = updated.rasterSurface.lines.joined(separator: "\n")
+      #expect(rendered.contains("Styling"))
+      #expect(!rendered.contains("Overview"))
+    }
+
+    // Default (gate off): ancestor invalidation conservatively recomputes the
+    // whole reached subtree — no descendant reuse.
+    let gateOff = withMemoReuse(false) { renderFrames() }
+    #expect(gateOff.diagnostics.work.resolvedNodesReused == 0)
+
+    // Gate on: the stable `Text("Header")` (no recorded deps, unchanged view
+    // value) is memo-reused despite its ancestor being invalidated, while the
+    // changed binding-driven Text still recomputes (asserted above).
+    let gateOn = withMemoReuse(true) { renderFrames() }
+    #expect(gateOn.diagnostics.work.resolvedNodesReused > 0)
   }
 
-  @Test("ancestor invalidation blocks clean descendant reuse")
-  func ancestorInvalidationBlocksCleanDescendantReuse() {
-    let renderer = DefaultRenderer(
-      layoutEngine: .init(cache: MeasurementCache())
-    )
-    let rootIdentity = testIdentity("Root")
-
+  @Test("ancestor invalidation: clean descendant reuse is gated by the memo flag")
+  func ancestorInvalidationCleanDescendantReuseIsGated() {
     struct StableRoot: View {
       var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -76,21 +92,45 @@ struct ResolveReuseAncestorInvalidationTests {
       }
     }
 
-    _ = renderer.render(
-      StableRoot(),
-      context: .init(identity: rootIdentity)
-    )
-
-    let updated = renderer.render(
-      StableRoot(),
-      context: .init(
-        identity: rootIdentity,
-        invalidatedIdentities: [rootIdentity]
+    func renderFrames() -> FrameArtifacts {
+      let renderer = DefaultRenderer(
+        layoutEngine: .init(cache: MeasurementCache())
       )
-    )
+      let rootIdentity = testIdentity("Root")
 
-    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
-    #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
+      _ = renderer.render(
+        StableRoot(),
+        context: .init(identity: rootIdentity)
+      )
+
+      return renderer.render(
+        StableRoot(),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [rootIdentity]
+        )
+      )
+    }
+
+    // The rendered output is identical in both modes — reuse is a pure
+    // optimization, never a behavior change.
+    for gate in [false, true] {
+      let updated = withMemoReuse(gate) { renderFrames() }
+      let rendered = updated.rasterSurface.lines.joined(separator: "\n")
+      #expect(rendered.contains("Stable"))
+      #expect(rendered.contains("AlsoStable"))
+    }
+
+    // Default (gate off): the invalidated ancestor forces its entire reached
+    // subtree to recompute — no descendant reuse.
+    let gateOff = withMemoReuse(false) { renderFrames() }
+    #expect(gateOff.diagnostics.work.resolvedNodesReused == 0)
+    #expect(gateOff.diagnostics.work.resolvedNodesComputed > 0)
+
+    // Gate on: the stable, dependency-free descendants are memo-reused even
+    // though their ancestor was invalidated.
+    let gateOn = withMemoReuse(true) { renderFrames() }
+    #expect(gateOn.diagnostics.work.resolvedNodesReused > 0)
   }
 
   @Test("ancestor invalidation recomputes List row labels derived from root state")
@@ -311,4 +351,20 @@ struct ResolveReuseAncestorInvalidationTests {
     )
     #expect(!dependencies.contains(buttonID))
   }
+}
+
+/// Runs `body` with the memoized-body reuse gate forced to `enabled`, restoring
+/// the previous setting afterward. Makes these tests deterministic regardless
+/// of the ambient `SWIFTTUI_MEMO_REUSE` environment — the A/B measurement run
+/// sets that variable process-wide, which would otherwise flip the gate-off
+/// assertions.
+@MainActor
+private func withMemoReuse<Result>(
+  _ enabled: Bool,
+  _ body: () -> Result
+) -> Result {
+  let previous = MemoReuseConfiguration.isEnabled
+  MemoReuseConfiguration.isEnabled = enabled
+  defer { MemoReuseConfiguration.isEnabled = previous }
+  return body()
 }

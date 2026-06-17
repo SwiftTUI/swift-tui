@@ -1602,6 +1602,60 @@ package final class ViewGraph {
     return snapshot
   }
 
+  /// Memoized-body reuse: the accept-branch the design centers on. Fires for a
+  /// node that ``reusableSnapshot`` rejected *only* because it is a structural
+  /// descendant of an invalidated ancestor (its own content is fresh) — when its
+  /// freshly-presented view value is structurally equal to the value it was last
+  /// resolved with, it has no recorded dependencies (the conservative safe
+  /// subset), and it passes every non-dirty retained-reuse guard. Routes through
+  /// the identical `snapshot()` + `recordReusedSubtree(retained:)` acceptance
+  /// path as ``reusableSnapshot``, so all registration/lifecycle/island plumbing
+  /// is preserved. Gated by ``MemoReuseConfiguration``; the caller also gates on
+  /// the focus/press retained-reuse suppression scope (as for ``reusableSnapshot``).
+  package func memoizedReusableSnapshot(
+    for identity: Identity,
+    viewValue: Any,
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot,
+    invalidatedIdentities: Set<Identity>,
+    invalidator: (any Invalidating)?
+  ) -> ResolvedNode? {
+    guard let node = nodeIfExists(for: identity) else {
+      return nil
+    }
+    // No prior view value (first resolve, or feature was off last frame) ⇒
+    // nothing to compare against.
+    guard let priorViewValue = node.memoViewValue else {
+      return nil
+    }
+    node.prepareForFrame(currentFrameID)
+    guard
+      !node.isDirty,
+      !node.wasVisitedThisFrame,
+      // A self-invalidated node must re-run; only nodes reached under a re-run
+      // ancestor are memoization candidates.
+      !invalidatedIdentities.contains(identity),
+      node.canMemoReuse(environment: environment, transaction: transaction),
+      // Conservative safe subset: no recorded dependencies, so the body output
+      // is a pure function of the (equal) view value and (equal) environment —
+      // it does not rely on reader-attribution completeness. With-reads nodes
+      // are deferred to a later stage.
+      node.hasNoRecordedDependencies
+    else {
+      return nil
+    }
+    guard MemoValueComparator.compare(priorViewValue, viewValue) == .equal else {
+      return nil
+    }
+    let snapshot = node.snapshot()
+    recordReusedSubtree(
+      snapshot,
+      invalidator: invalidator,
+      retained: true
+    )
+    return snapshot
+  }
+
   @discardableResult
   package func applySnapshot(
     _ resolved: ResolvedNode,
