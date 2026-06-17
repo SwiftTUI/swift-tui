@@ -728,35 +728,6 @@ package final class ViewGraph {
     )
   }
 
-  /// Invalidates existing graph nodes at or below `identities` and queues them
-  /// as graph-local dirty work without treating a missing authored identity as
-  /// a root-evaluation requirement.
-  ///
-  /// Finite retained-reuse suppression scopes often name an authored identity
-  /// whose concrete reader node is a descendant. Root forcing used to make that
-  /// descendant reachable. The dirty-frontier path instead queues the existing
-  /// exact/descendant nodes and lets evaluator-target planning choose the
-  /// nearest reachable roots.
-  package func invalidateAndQueueDirtyDescendants(of identities: Set<Identity>) {
-    let viewNodeIDs = Set(
-      identityByNodeID.compactMap { viewNodeID, identity in
-        identities.contains { target in
-          identity == target || identity.isDescendant(of: target)
-        } ? viewNodeID : nil
-      }
-    )
-    guard !viewNodeIDs.isEmpty else {
-      return
-    }
-    recordCheckpointGraphMutation()
-    ViewGraphInvalidationPlanner.invalidateAndQueueDirty(
-      viewNodeIDs,
-      invalidatedNodeIDs: &invalidatedNodeIDs,
-      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
-      nodesByNodeID: nodesByNodeID
-    )
-  }
-
   package func queueDirty(
     _ identities: Set<Identity>
   ) {
@@ -1004,6 +975,9 @@ package final class ViewGraph {
     }
     guard !invalidatedNodeIDs.isEmpty || !graphLocalDirtyNodeIDs.isEmpty else {
       return (nil, baseDiagnostics("nil_no_dirty_work", 0))
+    }
+    guard !invalidatedNodeIDs.isEmpty else {
+      return (nil, baseDiagnostics("nil_no_invalidated_nodes", 0))
     }
     guard !graphLocalDirtyNodeIDs.isEmpty else {
       return (nil, baseDiagnostics("nil_no_graph_local_dirty_nodes", 0))

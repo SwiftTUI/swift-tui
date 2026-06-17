@@ -40,13 +40,15 @@ extension RunLoop {
       let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
       var artifacts: FrameArtifacts?
       while true {
-        if convergence.rerenderedForFocusSync || retainedReuseSuppressionScope.suppressesAll {
+        if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
           renderer.forceRootEvaluation()
         }
         if !retainedReuseSuppressionScope.isEmpty {
-          // Finite reuse-unsafe scopes are queued as graph-local dirty work by
-          // the frame head. Identity-agnostic scopes and focus-sync rerenders
-          // remain root-forced because there is no narrower target to name.
+          // Reuse-unsafe identities: forcing root evaluation only makes the
+          // walk *reach* every node — each reached node still independently
+          // chooses reuse — so suppress the fast path for the affected scope.
+          // Focus-sync rerenders still keep reuse to carry first-pass
+          // measurement/scroll state across the convergence loop.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let renderedArtifacts = renderer.render(
@@ -260,13 +262,15 @@ extension RunLoop {
       // (`applyAcquiredFrame`) are shared with the synchronous driver.
       let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
       convergenceLoop: while true {
-        if convergence.rerenderedForFocusSync || retainedReuseSuppressionScope.suppressesAll {
+        if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
           renderer.forceRootEvaluation()
         }
         if !retainedReuseSuppressionScope.isEmpty {
-          // Finite reuse-unsafe scopes are queued as graph-local dirty work by
-          // the frame head. Identity-agnostic scopes and focus-sync rerenders
-          // remain root-forced because there is no narrower target to name.
+          // Reuse-unsafe identities: forcing root evaluation only makes the
+          // walk *reach* every node — each reached node still independently
+          // chooses reuse — so suppress the fast path for the affected scope.
+          // Focus-sync rerenders still keep reuse to carry first-pass
+          // measurement/scroll state across the convergence loop.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let acquired = await acquireFrameArtifactsAsync(

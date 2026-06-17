@@ -74,7 +74,6 @@ package struct FrameResolveInputs {
   package var environment: EnvironmentSnapshot
   package var focusedValues: FocusedValues
   package var transaction: TransactionSnapshot
-  package var resolveWorkTracker: ResolveWorkTracker?
   package var proposal: ProposedSize
   package var usesSelectiveEvaluation: Bool
   package var environmentRequiresRootEvaluation: Bool
@@ -95,7 +94,6 @@ package struct FrameResolveInputs {
     environment: EnvironmentSnapshot,
     focusedValues: FocusedValues,
     transaction: TransactionSnapshot,
-    resolveWorkTracker: ResolveWorkTracker?,
     proposal: ProposedSize,
     usesSelectiveEvaluation: Bool,
     environmentRequiresRootEvaluation: Bool,
@@ -108,7 +106,6 @@ package struct FrameResolveInputs {
     self.environment = environment
     self.focusedValues = focusedValues
     self.transaction = transaction
-    self.resolveWorkTracker = resolveWorkTracker
     self.proposal = proposal
     self.usesSelectiveEvaluation = usesSelectiveEvaluation
     self.environmentRequiresRootEvaluation = environmentRequiresRootEvaluation
@@ -217,21 +214,17 @@ package final class FrameResolveState {
     let pressedChanged = newPressed != previousPressedIdentity
     let proposalChanged = proposal != previousProposal
     let rootInvalidated = context.invalidatedIdentities.contains(context.identity)
-    let suppressionScope = retainedReuseSuppressionScope
-    let finiteSuppressionCoversFocusPress =
-      !suppressionScope.isEmpty && !suppressionScope.suppressesAll
-    let focusChangeRequiresRoot = focusChanged && !finiteSuppressionCoversFocusPress
-    let pressedChangeRequiresRoot = pressedChanged && !finiteSuppressionCoversFocusPress
     let environmentRequiresRootEvaluation =
       frameStateForceRoot
       || contextForceRoot
-      || focusChangeRequiresRoot
-      || pressedChangeRequiresRoot
+      || focusChanged
+      || pressedChanged
       || proposalChanged
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed
     previousProposal = proposal
     forceRootEvaluation = false
+    let suppressionScope = retainedReuseSuppressionScope
     retainedReuseSuppressionScope = .none
 
     let usesSelectiveEvaluation =
@@ -249,10 +242,10 @@ package final class FrameResolveState {
     if contextForceRoot {
       disabledReasons.append(.contextForceRoot)
     }
-    if focusChangeRequiresRoot {
+    if focusChanged {
       disabledReasons.append(.focusChanged)
     }
-    if pressedChangeRequiresRoot {
+    if pressedChanged {
       disabledReasons.append(.pressedChanged)
     }
     if proposalChanged {
@@ -269,7 +262,6 @@ package final class FrameResolveState {
       environment: context.environment,
       focusedValues: context.focusedValues,
       transaction: context.transaction,
-      resolveWorkTracker: context.resolveWorkTracker,
       proposal: proposal,
       usesSelectiveEvaluation: usesSelectiveEvaluation,
       environmentRequiresRootEvaluation: environmentRequiresRootEvaluation,
