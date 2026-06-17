@@ -408,6 +408,9 @@ func resolveView<V: View>(
   /// oracle can compare it against the freshly recomputed output.
   struct MemoComputationObservation {
     let priorCommitted: ResolvedNode
+    /// Whether the node had recorded dynamic reads last frame — distinguishes a
+    /// dependency-closable unsound mismatch from a comparator false-equal.
+    let hadReads: Bool
   }
 
   /// Classifies a recomputed node: records it as `computed`, and — if it was
@@ -441,7 +444,15 @@ func resolveView<V: View>(
           transaction: context.transaction
         )
       else { return nil }
-      return MemoComputationObservation(priorCommitted: graphNode.committed)
+      let deps = graphNode.dependencies
+      let hadReads =
+        !deps.stateSlotReads.isEmpty
+        || !deps.observableReads.isEmpty
+        || !deps.environmentReads.isEmpty
+      return MemoComputationObservation(
+        priorCommitted: graphNode.committed,
+        hadReads: hadReads
+      )
     }
   }
 
@@ -450,10 +461,16 @@ func resolveView<V: View>(
     _ observation: MemoComputationObservation,
     newResolved: ResolvedNode
   ) {
-    if observation.priorCommitted == newResolved {
+    // Sound oracle: would reusing the committed node be observably identical
+    // under retained-reuse semantics (structuralPath re-stamped, transaction by
+    // reuse-equivalence)? Strict `==` over-counts re-stampable identity fields.
+    if newResolved.memoReuseEquivalent(to: observation.priorCommitted) {
       MemoSkipTrace.recordAddressableSkip()
     } else {
-      MemoSkipTrace.recordUnsoundSkip()
+      MemoSkipTrace.recordUnsoundSkip(hadReads: observation.hadReads)
+      if let field = newResolved.memoFirstDifferingField(from: observation.priorCommitted) {
+        MemoSkipTrace.recordUnsoundField(field)
+      }
     }
   }
 #endif

@@ -45,9 +45,23 @@ package enum MemoSkipTrace {
   package private(set) static var computed = 0
   package private(set) static var addressableMemoSkip = 0
   package private(set) static var unsoundSkip = 0
+  /// Unsound candidates split by why: with recorded reads (the dependency-value
+  /// snapshot will reclassify these as correct re-runs) vs none (a comparator
+  /// false-equal — a real bug to fix, not closed by the dependency gate).
+  package private(set) static var unsoundWithReads = 0
+  package private(set) static var unsoundNoReads = 0
   package private(set) static var blockedClosure = 0
   package private(set) static var blockedAnyView = 0
   package private(set) static var blockedExistential = 0
+  /// Which `ResolvedNode` field first differed on an unsound mismatch — tells us
+  /// whether the `no_reads` class is real content (comparator false-equal) or
+  /// per-resolve identity bookkeeping (over-strict oracle).
+  package private(set) static var unsoundFieldCounts: [String: Int] = [:]
+
+  package static func recordUnsoundField(_ field: String) {
+    guard isEnabled else { return }
+    unsoundFieldCounts[field, default: 0] += 1
+  }
 
   package static func recordComputed() {
     guard isEnabled else { return }
@@ -59,9 +73,17 @@ package enum MemoSkipTrace {
     addressableMemoSkip += 1
   }
 
-  package static func recordUnsoundSkip() {
+  /// Records an unsound candidate (view value looked equal but the recomputed
+  /// output differed). `hadReads` distinguishes the dependency-closable class
+  /// from a comparator false-equal.
+  package static func recordUnsoundSkip(hadReads: Bool) {
     guard isEnabled else { return }
     unsoundSkip += 1
+    if hadReads {
+      unsoundWithReads += 1
+    } else {
+      unsoundNoReads += 1
+    }
   }
 
   package static func recordBlocked(_ reason: MemoBlockReason) {
@@ -77,9 +99,12 @@ package enum MemoSkipTrace {
     computed = 0
     addressableMemoSkip = 0
     unsoundSkip = 0
+    unsoundWithReads = 0
+    unsoundNoReads = 0
     blockedClosure = 0
     blockedAnyView = 0
     blockedExistential = 0
+    unsoundFieldCounts.removeAll(keepingCapacity: true)
   }
 
   package static func dumpAndReset(frameID: UInt64) {
@@ -92,9 +117,17 @@ package enum MemoSkipTrace {
     line += " computed=\(computed)"
     line += " addressable_memo_skip=\(addressableMemoSkip)"
     line += " unsound_skip=\(unsoundSkip)"
+    line += " (with_reads=\(unsoundWithReads) no_reads=\(unsoundNoReads))"
     line += " blocked=\(blockedTotal)"
     line += " (closure=\(blockedClosure) anyview=\(blockedAnyView)"
-    line += " existential=\(blockedExistential))\n"
+    line += " existential=\(blockedExistential))"
+    if !unsoundFieldCounts.isEmpty {
+      line += " | unsound-fields:"
+      for (field, count) in unsoundFieldCounts.sorted(by: { $0.value > $1.value }) {
+        line += " \(field)=\(count)"
+      }
+    }
+    line += "\n"
     emit(line)
     reset()
   }
