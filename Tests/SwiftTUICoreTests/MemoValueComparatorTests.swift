@@ -55,6 +55,39 @@ struct MemoValueComparatorTests {
 
   private struct EmptyStruct {}
 
+  // MARK: - Production path: compareEquatable (Equatable-only; the gate's path)
+
+  @Test("compareEquatable: Equatable values compare by ==; non-Equatable returns nil (skip)")
+  func compareEquatableProductionPath() {
+    // Equatable -> .equal / .changed via ==
+    #expect(MemoValueComparator.compareEquatable(1, 1) == .equal)
+    #expect(MemoValueComparator.compareEquatable(1, 2) == .changed)
+    #expect(
+      MemoValueComparator.compareEquatable(
+        EquatableStruct(x: 5, label: "a"),
+        EquatableStruct(x: 5, label: "a")
+      ) == .equal)
+    #expect(
+      MemoValueComparator.compareEquatable(
+        EquatableStruct(x: 5, label: "a"),
+        EquatableStruct(x: 6, label: "a")
+      ) == .changed)
+    #expect(
+      MemoValueComparator.compareEquatable(EquatableState.loaded(1), EquatableState.loaded(1))
+        == .equal)
+    #expect(
+      MemoValueComparator.compareEquatable(EquatableState.loaded(1), EquatableState.loaded(2))
+        == .changed)
+    // Non-Equatable -> nil (the gate skips it; framework containers land here).
+    #expect(
+      MemoValueComparator.compareEquatable(PlainStruct(a: 1, b: "x"), PlainStruct(a: 1, b: "x"))
+        == nil)
+    // Type mismatch -> .changed (fail safe).
+    #expect(MemoValueComparator.compareEquatable(1, "1") == .changed)
+  }
+
+  // MARK: - DEBUG reflective comparator (shadow oracle); production never calls it
+
   @Test("Equatable values compare by ==")
   func equatableFastPath() {
     #expect(MemoValueComparator.compare(1, 1) == .equal)

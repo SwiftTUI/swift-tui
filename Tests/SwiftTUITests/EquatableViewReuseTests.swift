@@ -198,6 +198,173 @@ struct EquatableBoundaryReuseTests {
     #expect(!rendered.contains("FOCUSED:1"))
   }
 
+  /// P0 (eval task #16): the one-shot `DefaultRenderer.render()` path is NOT
+  /// focus/press-reuse-safe. A control (`Button`) reads `focusedIdentity` /
+  /// `pressedIdentity` *directly* off the environment (not via `@Environment`), so
+  /// it records NO dependency — unlike the `@Environment(\.isFocused)` reader in
+  /// `focusReadingEquatableBoundaryIsNotMemoReused`, which the gate DOES catch. So
+  /// an Equatable boundary wrapping such a control is memo-reused across a
+  /// focus/press change on the one-shot path (focus/press are excluded from the
+  /// reuse snapshot, and the run loop's suppression scope — which protects this in
+  /// interactive use — is not computed one-shot). This test PINS that documented
+  /// limitation; the live run loop is the focus/press-safe interactive path.
+  @Test(
+    "one-shot render() memo-reuses an Equatable boundary wrapping a focus-reading control across a focus change (documented limitation)"
+  )
+  func oneShotEquatableBoundaryReusesAcrossFocusChangeOfDirectReadingControl() {
+    struct ControlBoundary: View, Equatable {
+      let tag: Int  // constant across frames => == is focus/press-blind
+
+      var body: some View {
+        Button("press-me") {}
+      }
+    }
+
+    struct Root: View {
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          ControlBoundary(tag: 1)
+          Text("footer")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("Root")
+
+    func render(focused: Bool, invalidate: Bool) -> FrameArtifacts {
+      var environmentValues = EnvironmentValues()
+      environmentValues.focusedIdentity = focused ? rootIdentity : nil
+      return renderer.render(
+        Root(),
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environmentValues,
+          invalidatedIdentities: invalidate ? [rootIdentity] : []
+        )
+      )
+    }
+
+    _ = withMemoReuse(true) { render(focused: true, invalidate: false) }
+    let updated = withMemoReuse(true) { render(focused: false, invalidate: true) }
+
+    // The boundary subtree is reused even though focus changed — the gap. (If a
+    // future fix makes direct-reading controls record the focus/press dependency,
+    // this flips to recompute; update this test and the `render()` doc together.)
+    #expect(updated.diagnostics.work.resolvedNodesReused > 0)
+    #expect(updated.rasterSurface.lines.joined(separator: "\n").contains("press-me"))
+  }
+
+  @Test(
+    ".equatable() works inside a ForEach: rows render and memo-reuse across ancestor invalidation")
+  func equatableBoundaryInsideForEachReusesAndRenders() {
+    struct Row: View, Equatable {
+      let index: Int
+
+      var body: some View {
+        Text("row-\(index)")
+      }
+    }
+
+    struct ListRoot: View {
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text(dynamic)
+          ForEach(Array(0..<4), id: \.self) { index in
+            Row(index: index).equatable()
+          }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("Root")
+
+    func renderFrames() -> FrameArtifacts {
+      _ = renderer.render(ListRoot(dynamic: "v1"), context: .init(identity: rootIdentity))
+      return renderer.render(
+        ListRoot(dynamic: "v2"),
+        context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
+      )
+    }
+
+    let gateOn = withMemoReuse(true) { renderFrames() }
+    let gateOff = withMemoReuse(false) { renderFrames() }
+
+    // The `.equatable()` rows (each its own boundary node inside the ForEach)
+    // render correctly and are memo-reused under ancestor invalidation, while the
+    // changed header recomputes. Identity is stable enough that reuse fires.
+    let rendered = gateOn.rasterSurface.lines.joined(separator: "\n")
+    for index in 0..<4 {
+      #expect(rendered.contains("row-\(index)"))
+    }
+    #expect(rendered.contains("v2"))
+    #expect(gateOn.diagnostics.work.resolvedNodesReused > 0)
+    // Pure optimization: identical surface gate on vs off.
+    #expect(gateOn.rasterSurface.lines == gateOff.rasterSurface.lines)
+  }
+
+  /// P2 (eval task #16): a DEBUG diagnostic flags an *inert* opt-in — a view the
+  /// author conformed to `Equatable` (expecting memoization) that reads
+  /// `@State`/`@Observable`/focus, so the gate denies it and `.equatable()` is a
+  /// silent no-op. The #1 adoption trap.
+  @Test("DEBUG diagnostic flags an inert Equatable opt-in (reads @State -> never memo-reused)")
+  func inertEquatableOptInIsDiagnosed() {
+    struct InertChrome: View, Equatable {
+      let tag: Int
+      @State private var counter = 0
+
+      var body: some View {
+        // Reads @State -> records a dependency -> gate denies despite the
+        // Equatable conformance. The `==` is `@State`-blind (compares `tag`).
+        Text("inert:\(tag):\(counter)")
+      }
+
+      nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.tag == rhs.tag
+      }
+    }
+
+    struct Root: View {
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text(dynamic)
+          InertChrome(tag: 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("Root")
+
+    let priorEnabled = MemoSkipTrace.isEnabled
+    let priorFile = MemoSkipTrace.outputFilePath
+    MemoSkipTrace.isEnabled = true
+    // Route the per-frame trace dump to a file so it does not spam stderr.
+    MemoSkipTrace.outputFilePath = "/tmp/swifttui-inert-diagnostic-test.txt"
+    defer {
+      MemoSkipTrace.isEnabled = priorEnabled
+      MemoSkipTrace.outputFilePath = priorFile
+    }
+
+    _ = renderer.render(Root(dynamic: "v1"), context: .init(identity: rootIdentity))
+    // Frame 2 invalidates the root, reaching InertChrome (a descendant). Its
+    // value is `==` (tag unchanged) and it passes the reuse guards, but it reads
+    // @State -> the production gate denies it. The oracle records it as inert.
+    _ = renderer.render(
+      Root(dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
+    )
+
+    // `dumpAndReset` runs at the next frame's start, so after frame 2 the live
+    // counter still holds frame 2's count.
+    #expect(MemoSkipTrace.inertEquatableBoundary > 0)
+  }
+
   @Test("Equatable boundary recomputes when its content changes")
   func equatableBoundaryRecomputesOnContentChange() {
     // The chrome title changes between frames: the comparator sees Chrome's `==`

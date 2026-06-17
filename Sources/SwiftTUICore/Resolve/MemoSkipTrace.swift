@@ -53,6 +53,12 @@ package enum MemoSkipTrace {
   package private(set) static var blockedClosure = 0
   package private(set) static var blockedAnyView = 0
   package private(set) static var blockedExistential = 0
+  /// Adoption-trap counter: a view the author conformed to `Equatable` (opted
+  /// into memoization) that is value-equal and passes the non-dirty reuse guards
+  /// but is DENIED by the production gate because it reads `@State`/`@Observable`
+  /// or focus/press state — so the `.equatable()` is silently a no-op. The #1
+  /// adoption trap; surfacing it tells an author their opt-in is inert.
+  package private(set) static var inertEquatableBoundary = 0
   /// Which `ResolvedNode` field first differed on an unsound mismatch — tells us
   /// whether the `no_reads` class is real content (comparator false-equal) or
   /// per-resolve identity bookkeeping (over-strict oracle).
@@ -95,6 +101,11 @@ package enum MemoSkipTrace {
     }
   }
 
+  package static func recordInertEquatableBoundary() {
+    guard isEnabled else { return }
+    inertEquatableBoundary += 1
+  }
+
   package static func reset() {
     computed = 0
     addressableMemoSkip = 0
@@ -104,6 +115,7 @@ package enum MemoSkipTrace {
     blockedClosure = 0
     blockedAnyView = 0
     blockedExistential = 0
+    inertEquatableBoundary = 0
     unsoundFieldCounts.removeAll(keepingCapacity: true)
   }
 
@@ -121,6 +133,7 @@ package enum MemoSkipTrace {
     line += " blocked=\(blockedTotal)"
     line += " (closure=\(blockedClosure) anyview=\(blockedAnyView)"
     line += " existential=\(blockedExistential))"
+    line += " inert_equatable=\(inertEquatableBoundary)"
     if !unsoundFieldCounts.isEmpty {
       line += " | unsound-fields:"
       for (field, count) in unsoundFieldCounts.sorted(by: { $0.value > $1.value }) {

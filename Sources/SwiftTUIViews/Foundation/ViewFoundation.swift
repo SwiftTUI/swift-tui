@@ -500,6 +500,17 @@ func shouldCaptureMemoViewValue<V: View>(_ view: V) -> Bool {
         !deps.stateSlotReads.isEmpty
         || !deps.observableReads.isEmpty
         || !deps.environmentReads.isEmpty
+      // Adoption-trap diagnostic: the author conformed this view to `Equatable`
+      // (opted into memoization) and it is value-equal + reuse-guarded, but the
+      // production gate will DENY it because it reads `@State`/`@Observable` or
+      // focus/press — so the `.equatable()` is silently a no-op. Flag it.
+      if view is any Equatable,
+        !graphNode.hasNoMemoUncoveredDependencies(
+          uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys
+        )
+      {
+        MemoSkipTrace.recordInertEquatableBoundary()
+      }
       return MemoComputationObservation(
         priorCommitted: graphNode.committed,
         hadReads: hadReads

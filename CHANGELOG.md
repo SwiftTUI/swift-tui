@@ -8,6 +8,22 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- Documented that `DefaultRenderer.render(_:)` is a one-shot snapshot/preview
+  entry point and is **not** focus/press-reuse-safe across successive calls
+  (focus/press state is excluded from the reuse snapshot and protected by the
+  run loop's suppression scope, which the one-shot path does not compute) — drive
+  interactive rendering through the run loop. Clarified the `EquatableView`
+  documentation: it wraps an already-`Equatable` `Content` and relocates the
+  reuse boundary onto its own node; prefer conforming the boundary view to
+  `Equatable` directly unless a distinct boundary node is needed.
+- Added a DEBUG memoization diagnostic (`SWIFTTUI_MEMO_TRACE` → `inert_equatable`)
+  that flags an `Equatable` / `.equatable()` boundary which is never memo-reused
+  because it reads `@State`/`@Observable`/focus state — surfacing a silently inert
+  opt-in. The reflective comparator path is now DEBUG-only (the production gate is
+  `Equatable`-only); no public API change.
+
 ## [0.0.21] - 2026-06-17
 
 ### Added

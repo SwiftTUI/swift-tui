@@ -161,6 +161,18 @@ public struct DefaultRenderer {
   // `DefaultRenderer+TestingHooks.swift`.
 
   /// Renders `root` into complete frame artifacts.
+  ///
+  /// This is a one-shot snapshot/preview entry point. It is **not focus/press
+  /// reuse-safe across successive calls on the same renderer**: focus and press
+  /// state are runtime side-fields excluded from the reuse-equality snapshot, and
+  /// their correctness under memoized-body reuse depends on the run loop's
+  /// retained-reuse suppression scope, which the one-shot path does not compute.
+  /// So an `Equatable`/``SwiftUICore/View/equatable()`` boundary wrapping a
+  /// focus/press-reading control can serve a stale pressed/focused visual across
+  /// one-shot frames where focus/press changed and an ancestor was invalidated.
+  /// For interactive rendering, drive frames through the run loop
+  /// (`TerminalRunner`/host integration), which suppresses reuse of focus/press
+  /// cones; use `render(_:)` for snapshots, previews, and tests.
   @MainActor
   public func render<V: View>(
     _ root: V,
@@ -474,8 +486,9 @@ public struct DefaultRenderer {
     elisionCauses: Set<WakeCause>,
     elisionAnimationRequest: AnimationRequest
   ) -> Bool {
-    guard let redrawIdentities =
-      animationController.preFrameHeadOffscreenPropertyAnimationRedrawIdentities
+    guard
+      let redrawIdentities =
+        animationController.preFrameHeadOffscreenPropertyAnimationRedrawIdentities
     else {
       return false
     }

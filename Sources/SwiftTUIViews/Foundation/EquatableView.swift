@@ -6,12 +6,18 @@ package import SwiftTUICore
 ///
 /// SwiftTUI's memoized-body reuse reuses a node's committed subtree when its view
 /// value is unchanged and it recorded no `@State`/`@Observable` reads. The gate
-/// is **`Equatable`-only**: a view participates only by conforming to `Equatable`
-/// (directly or through this wrapper). ``EquatableView`` is the explicit opt-in
-/// for a subtree whose root composite is not itself `Equatable` — it delegates
-/// `==` to `Content` and reuses the whole subtree on a match, *including any
-/// `ForEach`/`Button` closures inside*, which are descendants of the reused
-/// boundary and never compared.
+/// is **`Equatable`-only**: a view participates only by conforming to `Equatable`.
+/// ``EquatableView`` is the `.equatable()` opt-in: it wraps an *already-`Equatable`*
+/// `Content` (the `Content: Equatable` bound is required) and relocates the reuse
+/// boundary onto its own node, so the wrapped subtree can be a boundary even where
+/// the enclosing view is not `Equatable`. On a match it reuses the whole subtree —
+/// *including any `ForEach`/`Button` closures inside*, which are descendants of the
+/// reused boundary and never compared.
+///
+/// Prefer conforming the boundary view to `Equatable` *directly* unless you
+/// specifically need this distinct boundary node — a plain `struct …: View,
+/// Equatable` already participates in the gate with no wrapper, and avoids the
+/// extra node and the `ForEach`/conditional identity shift noted below.
 ///
 /// Two ways to opt in, with different safety models:
 ///
