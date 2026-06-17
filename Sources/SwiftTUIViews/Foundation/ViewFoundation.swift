@@ -323,6 +323,12 @@ func resolveView<V: View>(
     }
   }
   context.recordResolvedComputation()
+  #if DEBUG
+    // Stage-0 memoization diagnostics (inert unless SWIFTTUI_MEMO_TRACE): would
+    // this recomputed node have been memoizable? Captured before the body runs,
+    // while `graphNode.committed` still holds the prior frame's output.
+    let memoObservation = beginMemoObservation(view, graphNode: graphNode, context: context)
+  #endif
   let erased: Any = view
   var accessedStateSlots = 0
   var resolved = ViewUpdateGuard.withViewUpdate {
@@ -382,8 +388,75 @@ func resolveView<V: View>(
     }
   }
   resolved.structuralPath = context.structuralPath
+  #if DEBUG
+    // Shadow oracle: a would-skip node's freshly recomputed output must equal
+    // the prior committed output; a mismatch is the soundness alarm. Then stash
+    // this frame's view value for next frame's comparison.
+    if let memoObservation {
+      finishMemoObservation(memoObservation, newResolved: resolved)
+    }
+    if MemoSkipTrace.isEnabled {
+      graphNode?.memoDiagnosticViewValue = view
+    }
+  #endif
   return resolved
 }
+
+#if DEBUG
+  /// Token carrying the prior committed output of a recomputed node that the
+  /// Stage-0 diagnostics classified as a memoization candidate, so the shadow
+  /// oracle can compare it against the freshly recomputed output.
+  struct MemoComputationObservation {
+    let priorCommitted: ResolvedNode
+  }
+
+  /// Classifies a recomputed node: records it as `computed`, and — if it was
+  /// reached under a re-run ancestor (not itself the invalidation target), its
+  /// view value is structurally equal to the committed value, and it passes the
+  /// non-dirty reuse guards — returns a token for the shadow oracle. Records
+  /// blocked-field reasons (closure / AnyView / existential) along the way.
+  @MainActor
+  func beginMemoObservation<V: View>(
+    _ view: V,
+    graphNode: SwiftTUICore.ViewNode?,
+    context: ResolveContext
+  ) -> MemoComputationObservation? {
+    guard MemoSkipTrace.isEnabled, let graphNode else { return nil }
+    MemoSkipTrace.recordComputed()
+    // A self-invalidated node must re-run; only nodes reached under a re-run
+    // ancestor are memoization candidates.
+    guard !context.effectiveInvalidatedIdentities.contains(context.identity),
+      let prior = graphNode.memoDiagnosticViewValue
+    else { return nil }
+    switch MemoValueComparator.compare(prior, view) {
+    case .blocked(let reason):
+      MemoSkipTrace.recordBlocked(reason)
+      return nil
+    case .changed:
+      return nil
+    case .equal:
+      guard
+        graphNode.canMemoReuse(
+          environment: context.environment,
+          transaction: context.transaction
+        )
+      else { return nil }
+      return MemoComputationObservation(priorCommitted: graphNode.committed)
+    }
+  }
+
+  @MainActor
+  func finishMemoObservation(
+    _ observation: MemoComputationObservation,
+    newResolved: ResolvedNode
+  ) {
+    if observation.priorCommitted == newResolved {
+      MemoSkipTrace.recordAddressableSkip()
+    } else {
+      MemoSkipTrace.recordUnsoundSkip()
+    }
+  }
+#endif
 
 @MainActor
 private func rebasedAuthoringContext(

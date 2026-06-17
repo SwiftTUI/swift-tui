@@ -608,6 +608,32 @@ package final class ViewNode {
     #endif
   }
 
+  #if DEBUG
+    /// Stage-0 memoization diagnostics only: the view value this node was last
+    /// resolved with, kept to compare against the next frame's value via
+    /// ``MemoValueComparator``. Never consulted by behavior; populated only when
+    /// ``MemoSkipTrace`` is enabled. Not checkpointed — a diagnostic best-effort
+    /// (a stale value across an aborted frame only perturbs the histogram).
+    package var memoDiagnosticViewValue: Any?
+
+    /// Whether this node would pass the retained-reuse guards *except* for the
+    /// dirty / invalidation-intersection veto — i.e. the conjuncts that make a
+    /// memoized skip safe (island freshness, reuse support, environment, and
+    /// transaction equivalence). Used only to classify recomputed nodes for the
+    /// memo diagnostics.
+    package func canMemoReuse(
+      environment: EnvironmentSnapshot,
+      transaction: TransactionSnapshot
+    ) -> Bool {
+      wasPresentAtFrameStart
+        && isCommittedSnapshotFresh
+        && !hasStaleIslandDescendant
+        && committed.supportsRetainedReuse
+        && committed.environmentSnapshot == environment
+        && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
+    }
+  #endif
+
   package func canReuse(
     frameID: UInt64,
     environment: EnvironmentSnapshot,

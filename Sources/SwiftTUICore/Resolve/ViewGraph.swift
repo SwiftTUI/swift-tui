@@ -1077,6 +1077,11 @@ package final class ViewGraph {
     // Diagnostic: flush the just-finished frame's reuse-denial histogram before
     // starting the next one (inert unless SWIFTTUI_REUSE_TRACE is set).
     ReuseDenialTrace.dumpAndReset(frameID: currentFrameID)
+    #if DEBUG
+      // Diagnostic: flush the just-finished frame's memoization histogram
+      // (inert unless SWIFTTUI_MEMO_TRACE is set).
+      MemoSkipTrace.dumpAndReset(frameID: currentFrameID)
+    #endif
     recordCheckpointGraphMutation()
     currentFrameID &+= 1
     frameOrder.removeAll(keepingCapacity: true)
