@@ -954,6 +954,16 @@ package final class ViewNode {
   package func restoreOwnRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
+    // Handler-less nodes (the bulk of a reused layout/text subtree) restore
+    // nothing, so skip the per-registry `restore(from:)` work — which allocates
+    // a Set + a filtered pointer-handler copy and touches ~18 registries — when
+    // there is provably nothing to restore. `hasRuntimeRegistrations` is the
+    // exact disjunction of the families `restore(from:)` reads, so this is a
+    // behavior-preserving no-op skip (mirrors the guard at
+    // `runtimeRegistrationFingerprintEntry()`).
+    guard registeredHandlers.hasRuntimeRegistrations else {
+      return
+    }
     registrations.restore(from: registeredHandlers)
   }
 
