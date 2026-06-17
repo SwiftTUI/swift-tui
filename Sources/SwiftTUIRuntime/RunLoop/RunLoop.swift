@@ -174,7 +174,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   ) {
     self.init(
       rootIdentity: rootIdentity,
-      renderer: DefaultRenderer(),
+      renderer: DefaultRenderer(
+        semanticExtractor: SemanticExtractor(
+          extractsAccessibilityWarnings: runtimeConfiguration.output != .tui
+        )
+      ),
       presentationSurface: presentationSurface,
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
@@ -536,7 +540,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   ) {
     self.init(
       rootIdentity: rootIdentity,
-      renderer: DefaultRenderer(),
+      renderer: DefaultRenderer(
+        semanticExtractor: SemanticExtractor(
+          extractsAccessibilityWarnings: RuntimeConfiguration.default.output != .tui
+        )
+      ),
       presentationSurface: presentationSurface,
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,

@@ -1,7 +1,16 @@
 /// Extracts focus, interaction, action, selection, and scroll routing from a
 /// placed tree.
 public struct SemanticExtractor: Sendable {
-  public init() {}
+  /// Whether to run the `accessibilityWarnings` full-tree walk. Its output is
+  /// consumed ONLY by the accessibility/JSON renderers (`.accessible`/`.json`
+  /// output modes); no focus/scroll/routing/TUI consumer reads it. Default
+  /// `true` preserves behavior; the runtime passes `false` for the common
+  /// terminal (`.tui`) path so the walk becomes dead work it can skip.
+  private let extractsAccessibilityWarnings: Bool
+
+  public init(extractsAccessibilityWarnings: Bool = true) {
+    self.extractsAccessibilityWarnings = extractsAccessibilityWarnings
+  }
 
   /// Extracts semantic routing data from `placed`.
   ///
@@ -152,7 +161,8 @@ public struct SemanticExtractor: Sendable {
       from: placed,
       focusRegions: focusRegions
     )
-    let accessibilityWarnings = accessibilityWarnings(from: placed)
+    let accessibilityWarnings =
+      extractsAccessibilityWarnings ? accessibilityWarnings(from: placed) : []
 
     return SemanticSnapshot(
       interactionRegions: interactionRegions,

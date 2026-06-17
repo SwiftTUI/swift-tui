@@ -226,6 +226,32 @@ struct AccessibilityNodeExtractionTests {
       ])
   }
 
+  @Test("extractsAccessibilityWarnings:false suppresses warnings but is otherwise a no-op")
+  func accessibilityWarningGateSuppressesWarningsOnly() {
+    let imageID = testIdentity("Image")
+    let placed = placedNode(
+      identity: imageID,
+      semanticMetadata: .init(
+        accessibilityRole: .image,
+        accessibilityVisualContent: .init(kind: "Image")
+      )
+    )
+
+    let onSnapshot = SemanticExtractor(extractsAccessibilityWarnings: true).extract(from: placed)
+    let offSnapshot = SemanticExtractor(extractsAccessibilityWarnings: false).extract(from: placed)
+
+    // Gate off: warnings suppressed (the dead-on-no-AT walk is skipped)...
+    #expect(!onSnapshot.accessibilityWarnings.isEmpty)
+    #expect(offSnapshot.accessibilityWarnings.isEmpty)
+    // ...but every other field is byte-identical — the gate is a pure no-op on
+    // the consumed (focus/scroll/accessibility-node) fields.
+    #expect(offSnapshot.accessibilityNodes == onSnapshot.accessibilityNodes)
+    #expect(offSnapshot.focusRegions == onSnapshot.focusRegions)
+    #expect(offSnapshot.scrollRoutes == onSnapshot.scrollRoutes)
+    #expect(offSnapshot.scrollTargets == onSnapshot.scrollTargets)
+    #expect(offSnapshot.interactionRegions == onSnapshot.interactionRegions)
+  }
+
   @Test("Labeled visual content emits an image node without a warning")
   func labeledVisualContentEmitsImageNode() throws {
     let canvasID = testIdentity("Canvas")
