@@ -59,9 +59,7 @@ struct ResolveReuseAncestorInvalidationTests {
     }
 
     // Soundness invariant — gate-independent: the binding-driven Text must
-    // reflect the new external value, never the stale one. The memo gate sees
-    // that Text's view value change ("Overview" → "Styling") and refuses to
-    // reuse it, so this holds whether the gate is on or off.
+    // reflect the new external value, never the stale one.
     for gate in [false, true] {
       let updated = withMemoReuse(gate) { renderFrames() }
       let rendered = updated.rasterSurface.lines.joined(separator: "\n")
@@ -69,20 +67,18 @@ struct ResolveReuseAncestorInvalidationTests {
       #expect(!rendered.contains("Overview"))
     }
 
-    // Default (gate off): ancestor invalidation conservatively recomputes the
-    // whole reached subtree — no descendant reuse.
-    let gateOff = withMemoReuse(false) { renderFrames() }
-    #expect(gateOff.diagnostics.work.resolvedNodesReused == 0)
-
-    // Gate on: the stable `Text("Header")` (no recorded deps, unchanged view
-    // value) is memo-reused despite its ancestor being invalidated, while the
-    // changed binding-driven Text still recomputes (asserted above).
-    let gateOn = withMemoReuse(true) { renderFrames() }
-    #expect(gateOn.diagnostics.work.resolvedNodesReused > 0)
+    // The memo gate is `Equatable`-only: these are bare `Text`/`VStack` views
+    // (not `Equatable`), so nothing in this tree is a memo candidate — no
+    // descendant is reused, gate on or off. (Opting in via `.equatable()` / an
+    // `Equatable` boundary is covered by `EquatableBoundaryReuseTests`.)
+    for gate in [false, true] {
+      let updated = withMemoReuse(gate) { renderFrames() }
+      #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    }
   }
 
-  @Test("ancestor invalidation: clean descendant reuse is gated by the memo flag")
-  func ancestorInvalidationCleanDescendantReuseIsGated() {
+  @Test("non-Equatable clean descendant is not memo-reused (the gate is Equatable-only)")
+  func ancestorInvalidationCleanDescendantIsNotMemoReused() {
     struct StableRoot: View {
       var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -112,25 +108,18 @@ struct ResolveReuseAncestorInvalidationTests {
       )
     }
 
-    // The rendered output is identical in both modes — reuse is a pure
-    // optimization, never a behavior change.
+    // A bare, unchanged `Text`/`VStack` subtree under an invalidated ancestor is
+    // NOT `Equatable`, so it is not a memo candidate: it recomputes whether the
+    // gate is on or off (only an `Equatable`/`.equatable()` boundary opts in).
+    // The render is identical regardless.
     for gate in [false, true] {
       let updated = withMemoReuse(gate) { renderFrames() }
       let rendered = updated.rasterSurface.lines.joined(separator: "\n")
       #expect(rendered.contains("Stable"))
       #expect(rendered.contains("AlsoStable"))
+      #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+      #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
     }
-
-    // Default (gate off): the invalidated ancestor forces its entire reached
-    // subtree to recompute — no descendant reuse.
-    let gateOff = withMemoReuse(false) { renderFrames() }
-    #expect(gateOff.diagnostics.work.resolvedNodesReused == 0)
-    #expect(gateOff.diagnostics.work.resolvedNodesComputed > 0)
-
-    // Gate on: the stable, dependency-free descendants are memo-reused even
-    // though their ancestor was invalidated.
-    let gateOn = withMemoReuse(true) { renderFrames() }
-    #expect(gateOn.diagnostics.work.resolvedNodesReused > 0)
   }
 
   @Test("ancestor invalidation recomputes List row labels derived from root state")
@@ -351,20 +340,4 @@ struct ResolveReuseAncestorInvalidationTests {
     )
     #expect(!dependencies.contains(buttonID))
   }
-}
-
-/// Runs `body` with the memoized-body reuse gate forced to `enabled`, restoring
-/// the previous setting afterward. Makes these tests deterministic regardless
-/// of the ambient `SWIFTTUI_MEMO_REUSE` environment — the A/B measurement run
-/// sets that variable process-wide, which would otherwise flip the gate-off
-/// assertions.
-@MainActor
-private func withMemoReuse<Result>(
-  _ enabled: Bool,
-  _ body: () -> Result
-) -> Result {
-  let previous = MemoReuseConfiguration.isEnabled
-  MemoReuseConfiguration.isEnabled = enabled
-  defer { MemoReuseConfiguration.isEnabled = previous }
-  return body()
 }

@@ -8,6 +8,24 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- **`EquatableView` and `View.equatable()`** (SwiftUI parity). Wrapping a
+  read-free boundary view (or conforming it to `Equatable`) lets the renderer
+  reuse its whole committed subtree via a single `==` when the value is
+  unchanged, instead of re-evaluating it under an invalidated ancestor. `==` is
+  a correctness contract — see the `EquatableView` docs.
+
+### Changed
+
+- **Memoized-body reuse is on by default.** When a node reached under an
+  invalidated ancestor is `Equatable`-equal to its previous value, reads no
+  `@State`/`@Observable`/focus state, and passes the retained-reuse guards, its
+  committed subtree is reused instead of recomputed. The gate is `Equatable`-only
+  (a true opt-in): inert on views that do not conform to `Equatable` (measured
+  within noise on non-opt-in trees), a large `resolve` win on those that do. Set
+  `SWIFTTUI_MEMO_REUSE=0` to disable.
+
 ## [0.0.19] - 2026-06-10
 
 Lockstep release across the SwiftTUI org. Headline: a first preview of the

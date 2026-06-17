@@ -2,6 +2,7 @@ import Testing
 
 @testable import SwiftTUICore
 
+@MainActor
 @Suite
 struct MemoValueComparatorTests {
   private struct EquatableStruct: Equatable {

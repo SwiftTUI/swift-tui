@@ -32,6 +32,11 @@ package enum MemoBlockReason: String, Equatable, Sendable {
   case existential
 }
 
+// `@MainActor`: comparison runs only during resolve (main actor), and this lets
+// the `Equatable` fast path call a `@MainActor`-isolated `==` — which views need,
+// since a view value's stored content is itself main-actor-isolated (e.g.
+// ``EquatableView``'s `content`). The reflective path is unaffected.
+@MainActor
 package enum MemoValueComparator {
   /// Compares two view values that are expected to be the same concrete type.
   package static func compare(_ lhs: Any, _ rhs: Any) -> MemoComparison {
@@ -59,9 +64,39 @@ package enum MemoValueComparator {
     return compareStructurally(lhs, rhs)
   }
 
+  /// `Equatable`-only comparison for the production memo gate: returns
+  /// `.equal`/`.changed` for an `Equatable` value via its `==`, and `nil` for a
+  /// non-`Equatable` value — signalling the gate to *skip* the node rather than
+  /// pay the reflective ``compareStructurally`` cost.
+  ///
+  /// The A/B evidence (doc 003) is decisive: applying reflection to every
+  /// framework container (`VStack`/`HStack`/`ForEach` — none `Equatable`) costs
+  /// more than the body re-evaluation it saves on trees that have no high author
+  /// boundary to short-circuit, so the reflective path regresses `resolve_ms`.
+  /// Gating on `Equatable` makes memoization a true opt-in: only views the author
+  /// conformed to `Equatable` (directly or via ``EquatableView``) participate, and
+  /// comparing them is a single cheap `==`. The full reflective ``compare(_:_:)``
+  /// remains for the DEBUG shadow oracle and diagnostics.
+  package static func compareEquatable(_ lhs: Any, _ rhs: Any) -> MemoComparison? {
+    guard type(of: lhs) == type(of: rhs) else {
+      return .changed
+    }
+    guard let equatable = lhs as? any Equatable else {
+      return nil
+    }
+    return openEquatable(equatable, rhs) ? .equal : .changed
+  }
+
   /// The implicit-existential-opening trampoline (Swift 5.7+): binds `T` to the
   /// existential's concrete type so the `==` is type-safe. Mirrors
   /// `StateSlot.makeEquatableComparatorImpl`.
+  ///
+  /// May dispatch to a `@MainActor`-isolated `==` (e.g. ``EquatableView``'s,
+  /// whose `content` is a main-actor `View` value). Because the conformance is
+  /// laundered through `Any`, strict concurrency cannot prove the caller's
+  /// isolation here — which is why the whole comparator is `@MainActor`. Do NOT
+  /// make this (or `compare`/`compareEquatable`) callable from a nonisolated
+  /// context.
   private static func openEquatable(_ lhs: any Equatable, _ rhs: Any) -> Bool {
     func compare<T: Equatable>(_ l: T) -> Bool {
       guard let r = rhs as? T else { return false }

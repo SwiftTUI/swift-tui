@@ -634,8 +634,8 @@ package final class ViewNode {
   }
 
   /// Whether the node recorded no `@State`/`@Observable`/`@Environment` reads
-  /// when it was last resolved — the conservative memo-reuse subset whose output
-  /// is a pure function of its view value and environment.
+  /// when it was last resolved — the strictest memo-reuse subset whose output is
+  /// a pure function of its view value and environment.
   ///
   /// This indexes only *explicitly attributed* reads. An `@Observable` model read
   /// directly (not via a `Bindable` projection) is tracked by
@@ -648,6 +648,39 @@ package final class ViewNode {
     dependencies.stateSlotReads.isEmpty
       && dependencies.observableReads.isEmpty
       && dependencies.environmentReads.isEmpty
+  }
+
+  /// Whether the node's recorded dependencies are all *covered by the memo
+  /// gate's other conjuncts* — i.e. it recorded no `@State` slot reads, no
+  /// `@Observable` reads, and no `@Environment` read of an *uncovered* key.
+  ///
+  /// `@Environment` reads of keys carried by `environmentSnapshot` ARE allowed:
+  /// the gate's `committed.environmentSnapshot == environment` conjunct (in
+  /// ``canMemoReuse(environment:transaction:)``) already verifies the whole
+  /// snapshot is unchanged, so those reads necessarily return the same value.
+  /// This widens reuse to the layout containers (`VStack`/`HStack`/…) that read
+  /// layout environment — exactly the boundaries where reusing a whole subtree
+  /// pays.
+  ///
+  /// `uncoveredEnvironmentKeys` names the environment keys deliberately *excluded*
+  /// from `environmentSnapshot` equality — the focus/press runtime side-fields
+  /// (`focusedIdentity`/`pressedIdentity`), which change every focus move and
+  /// would otherwise env-mismatch the whole tree. A read of one is NOT verified
+  /// by the snapshot, so it disqualifies the node: focus/press correctness is
+  /// enforced by the run loop's retained-reuse suppression scope, which the gate
+  /// sits behind in the live path but which the one-shot renderer does not
+  /// compute — so a focus reader must never be memo-reused on view-value +
+  /// snapshot equality alone.
+  ///
+  /// `@State` slot reads and `@Observable` reads stay excluded outright: neither
+  /// is covered by the environment snapshot. (`!isDirty` catches an observable
+  /// mutation, but state-value equality is not yet checked — a further widening.)
+  package func hasNoMemoUncoveredDependencies(
+    uncoveredEnvironmentKeys: Set<ObjectIdentifier>
+  ) -> Bool {
+    dependencies.stateSlotReads.isEmpty
+      && dependencies.observableReads.isEmpty
+      && dependencies.environmentReads.isDisjoint(with: uncoveredEnvironmentKeys)
   }
 
   package func canReuse(

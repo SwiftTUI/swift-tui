@@ -1618,6 +1618,7 @@ package final class ViewGraph {
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot,
     invalidatedIdentities: Set<Identity>,
+    uncoveredEnvironmentKeys: Set<ObjectIdentifier>,
     invalidator: (any Invalidating)?
   ) -> ResolvedNode? {
     guard let node = nodeIfExists(for: identity) else {
@@ -1636,15 +1637,22 @@ package final class ViewGraph {
       // ancestor are memoization candidates.
       !invalidatedIdentities.contains(identity),
       node.canMemoReuse(environment: environment, transaction: transaction),
-      // Conservative safe subset: no recorded dependencies, so the body output
-      // is a pure function of the (equal) view value and (equal) environment —
-      // it does not rely on reader-attribution completeness. With-reads nodes
-      // are deferred to a later stage.
-      node.hasNoRecordedDependencies
+      // The reuse-safe dependency subset: no `@State`/`@Observable` reads, and no
+      // `@Environment` read of a key excluded from the snapshot (focus/press).
+      // Snapshot-covered environment reads are already verified by
+      // `canMemoReuse`'s `environmentSnapshot ==`, so layout containers qualify —
+      // the boundaries where whole-subtree reuse pays. State-value, observable,
+      // and focus/press equality are deferred / enforced elsewhere.
+      node.hasNoMemoUncoveredDependencies(uncoveredEnvironmentKeys: uncoveredEnvironmentKeys)
     else {
       return nil
     }
-    guard MemoValueComparator.compare(priorViewValue, viewValue) == .equal else {
+    // `Equatable`-only: a non-`Equatable` value (every framework container) is
+    // skipped rather than reflected over — the reflective path costs more than
+    // the body re-run it saves on trees without a high author boundary. Author
+    // opt-in (a view conforming to `Equatable`, or wrapped in `EquatableView`) is
+    // what makes a node a memo candidate.
+    guard MemoValueComparator.compareEquatable(priorViewValue, viewValue) == .equal else {
       return nil
     }
     let snapshot = node.snapshot()

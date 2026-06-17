@@ -91,6 +91,7 @@ classifications:
     - SwiftTUIViews.EnvironmentKey
     - SwiftTUIViews.EnvironmentReader
     - SwiftTUIViews.EnvironmentValues
+    - SwiftTUIViews.EquatableView
     - SwiftTUIViews.FocusedBinding
     - SwiftTUIViews.FocusedValue
     - SwiftTUIViews.FocusedValueKey

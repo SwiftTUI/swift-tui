@@ -167,6 +167,14 @@ commit`) that decides what runs on the main actor versus a frame-tail worker.
 The full developer-facing mechanics are in
 [`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
 
+`resolve` reuses unchanged work two ways. **Retained reuse** skips a subtree
+disjoint from the frame's invalidation. **Memoized-body reuse** (on by default)
+additionally skips a subtree reached *under* an invalidated ancestor when its
+view value is `Equatable`-equal to last frame's, it read no
+`@State`/`@Observable`/focus state, and it passes the retained-reuse guards —
+the `EquatableView` / `View.equatable()` opt-in. It is `Equatable`-only, so it is
+inert on views that do not opt in; set `SWIFTTUI_MEMO_REUSE=0` to disable it.
+
 ## The layout model
 
 Layout is SwiftUI-shaped: a recursive size negotiation, not a constraint

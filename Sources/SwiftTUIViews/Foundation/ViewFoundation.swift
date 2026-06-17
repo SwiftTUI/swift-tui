@@ -312,6 +312,11 @@ func resolveView<V: View>(
       environment: context.environment,
       transaction: context.transaction,
       invalidatedIdentities: context.effectiveInvalidatedIdentities,
+      // Focus/press env keys are excluded from `environmentSnapshot` equality
+      // (they change every focus move), so a node reading them is not verified by
+      // the gate's snapshot conjunct — keep such readers memo-ineligible on every
+      // render path (the run loop's suppression scope is not computed one-shot).
+      uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys,
       invalidator: context.invalidationProxy?.invalidator
     )
   {
@@ -423,21 +428,28 @@ func resolveView<V: View>(
       finishMemoObservation(memoObservation, newResolved: resolved)
     }
   #endif
-  if shouldCaptureMemoViewValue() {
+  if shouldCaptureMemoViewValue(view) {
     graphNode?.memoViewValue = view
   }
   return resolved
 }
 
-/// Whether to stash the resolved view value for next-frame memo comparison:
-/// always when the memo-reuse gate is enabled, and (DEBUG) when the memo
-/// diagnostics trace is armed.
+/// Whether to stash the resolved view value for next-frame memo comparison.
+///
+/// The production gate (``MemoReuseConfiguration``) is `Equatable`-only, so a
+/// non-`Equatable` value would only make the gate run its guards before
+/// skipping. Capture solely `Equatable` values, so a non-`Equatable` node leaves
+/// `memoViewValue` nil and the gate bails at its first guard — keeping the gate
+/// near-free on trees that do not opt into memoization.
+///
+/// The DEBUG shadow oracle (``MemoSkipTrace``) measures the *full* reflective
+/// addressable population, so it captures every value, `Equatable` or not.
 @MainActor
-func shouldCaptureMemoViewValue() -> Bool {
-  if MemoReuseConfiguration.isEnabled { return true }
+func shouldCaptureMemoViewValue<V: View>(_ view: V) -> Bool {
   #if DEBUG
     if MemoSkipTrace.isEnabled { return true }
   #endif
+  if MemoReuseConfiguration.isEnabled { return view is any Equatable }
   return false
 }
 

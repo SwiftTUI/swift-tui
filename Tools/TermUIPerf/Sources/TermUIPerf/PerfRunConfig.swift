@@ -82,6 +82,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case galleryTabSwitch = "gallery-tab-switch"
   case fileBrowserSelection = "file-browser-selection"
   case textInputEditing = "text-input-editing"
+  case memoEquatableBoundary = "memo-equatable-boundary"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()

@@ -3882,6 +3882,9 @@ SwiftTUIViews.EnvironmentValues.terminalSize
 SwiftTUIViews.EnvironmentValues.textFieldStyle
 SwiftTUIViews.EnvironmentValues.tintStyle
 SwiftTUIViews.EnvironmentWritingModifier
+SwiftTUIViews.EquatableView
+SwiftTUIViews.EquatableView.==(_:_:)
+SwiftTUIViews.EquatableView.init(content:)
 SwiftTUIViews.ExclusiveGesture
 SwiftTUIViews.ExclusiveGesture.Body
 SwiftTUIViews.ExclusiveGesture.Value
@@ -4802,6 +4805,7 @@ SwiftTUIViews.View.defaultFocus(_:_:)
 SwiftTUIViews.View.defaultFocus(_:_:)
 SwiftTUIViews.View.disabled(_:)
 SwiftTUIViews.View.environment(_:_:)
+SwiftTUIViews.View.equatable()
 SwiftTUIViews.View.erasedToAnyView
 SwiftTUIViews.View.fixedSize()
 SwiftTUIViews.View.fixedSize(horizontal:vertical:)
