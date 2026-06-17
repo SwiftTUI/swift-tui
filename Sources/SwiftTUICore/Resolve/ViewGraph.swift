@@ -1767,18 +1767,26 @@ package final class ViewGraph {
   }
 
   package func runtimeRegistrationPublicationDeltaForCurrentFrame()
-    -> RuntimeRegistrationPublicationDelta?
+    -> (delta: RuntimeRegistrationPublicationDelta, current: RuntimeRegistrationGraphFingerprint)?
   {
     let current = currentRuntimeRegistrationFingerprint()
     guard let committedRuntimeRegistrationFingerprint else {
       return nil
     }
-    return committedRuntimeRegistrationFingerprint.publicationDelta(to: current)
+    return (committedRuntimeRegistrationFingerprint.publicationDelta(to: current), current)
   }
 
-  package func recordCommittedRuntimeRegistrationFingerprint() {
+  /// Records the committed fingerprint. The `.all` commit branch already builds
+  /// the current fingerprint to compute its publication delta; pass it back here
+  /// to avoid rebuilding the full O(liveNodeIDs) fingerprint a second time on the
+  /// same frame. The `.all` ops between delta and record mutate only the live
+  /// registration set, never the fingerprint's node sources, so the precomputed
+  /// value is byte-identical to a rebuild. Other branches pass `nil` and rebuild.
+  package func recordCommittedRuntimeRegistrationFingerprint(
+    _ precomputed: RuntimeRegistrationGraphFingerprint? = nil
+  ) {
     recordCheckpointGraphMutation()
-    committedRuntimeRegistrationFingerprint = currentRuntimeRegistrationFingerprint()
+    committedRuntimeRegistrationFingerprint = precomputed ?? currentRuntimeRegistrationFingerprint()
   }
 
   package func runtimeRegistrationDeltaRequiresFullPublication(

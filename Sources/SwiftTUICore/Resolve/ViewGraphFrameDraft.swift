@@ -151,6 +151,11 @@ package final class ViewGraphFrameDraft {
   ) -> RuntimeRegistrationDiagnostics {
     precondition(!didCommit && !didDiscard)
     var restoredNodeCount: Int?
+    // On `.all` frames the publication-delta check below already builds the
+    // current fingerprint; reuse it for the commit record instead of rebuilding
+    // the full O(liveNodeIDs) fingerprint a second time. Other branches leave
+    // this nil and the record call rebuilds.
+    var committedFingerprint: RuntimeRegistrationGraphFingerprint?
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live
@@ -163,7 +168,9 @@ package final class ViewGraphFrameDraft {
       restoredNodeCount = 0
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
     case .all:
-      if let delta = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame(),
+      let publication = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame()
+      committedFingerprint = publication?.current
+      if let delta = publication?.delta,
         !viewGraph.runtimeRegistrationDeltaRequiresFullPublication(delta)
       {
         if publicationDiagnosticsEnabled {
@@ -214,7 +221,7 @@ package final class ViewGraphFrameDraft {
       // them.
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
     }
-    viewGraph.recordCommittedRuntimeRegistrationFingerprint()
+    viewGraph.recordCommittedRuntimeRegistrationFingerprint(committedFingerprint)
     didCommit = true
     var diagnostics = liveRegistrations.diagnostics()
     if publicationDiagnosticsEnabled {
