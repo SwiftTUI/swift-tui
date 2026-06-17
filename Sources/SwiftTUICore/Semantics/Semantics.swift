@@ -8,7 +8,14 @@ public struct SemanticExtractor: Sendable {
   /// terminal (`.tui`) path so the walk becomes dead work it can skip.
   private let extractsAccessibilityWarnings: Bool
 
-  public init(extractsAccessibilityWarnings: Bool = true) {
+  public init() {
+    self.init(extractsAccessibilityWarnings: true)
+  }
+
+  /// Package initializer that lets the runtime disable the accessibility-warnings
+  /// walk for non-accessibility output. Kept `package` so the optimization flag
+  /// stays off the public API surface (the public `init()` is unchanged).
+  package init(extractsAccessibilityWarnings: Bool) {
     self.extractsAccessibilityWarnings = extractsAccessibilityWarnings
   }
 
