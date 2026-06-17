@@ -1,6 +1,6 @@
 module(
     name = "swift_tui",
-    version = "0.0.20",
+    version = "0.0.21",
 )
 
 bazel_dep(name = "rules_shell", version = "0.6.1")

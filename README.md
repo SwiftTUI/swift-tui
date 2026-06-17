@@ -4,7 +4,7 @@
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI-1E90FF)
-![Status](https://img.shields.io/badge/status-0.0.20%20alpha-DAA520)
+![Status](https://img.shields.io/badge/status-0.0.21%20alpha-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
@@ -62,7 +62,7 @@ current alpha with `.upToNextMinor` so a minor release cannot break your build:
 ```swift
 .package(
   url: "https://github.com/SwiftTUI/swift-tui",
-  .upToNextMinor(from: "0.0.20")
+  .upToNextMinor(from: "0.0.21")
 )
 ```
 
@@ -90,7 +90,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/SwiftTUI/swift-tui",
-      .upToNextMinor(from: "0.0.20")
+      .upToNextMinor(from: "0.0.21")
     )
   ],
   targets: [
@@ -203,13 +203,13 @@ npm install @swifttui/web @swifttui/build
 ```
 
 They are also attached to each
-[`swift-tui-web` GitHub release](https://github.com/SwiftTUI/swift-tui-web/releases/tag/0.0.20)
+[`swift-tui-web` GitHub release](https://github.com/SwiftTUI/swift-tui-web/releases/tag/0.0.21)
 as npm-compatible tarballs, if you prefer to pin a specific release asset:
 
 ```bash
 npm install \
-  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.20/swifttui-web-0.0.20.tgz \
-  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.20/swifttui-build-0.0.20.tgz
+  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.21/swifttui-web-0.0.21.tgz \
+  https://github.com/SwiftTUI/swift-tui-web/releases/download/0.0.21/swifttui-build-0.0.21.tgz
 ```
 
 Compile your SwiftTUI `App` to WASI with the `swifttui-web` CLI — it drives the
@@ -334,7 +334,7 @@ has not been observed in normal single-app use, but is disclosed here for
 transparency — if you hit it, a reproduction on the issue would help.
 
 The sibling `swift-tui-web`, `swift-tui-examples`, and `swift-tui-site` repos
-are public pre-release repositories as well. Each has its own `0.0.20` tag, and
+are public pre-release repositories as well. Each has its own `0.0.21` tag, and
 cross-repo defaults use public release tags or release artifacts rather than
 requiring sibling source checkouts.
 

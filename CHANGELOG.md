@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.0.21] - 2026-06-17
+
 ### Added
 
 - **`EquatableView` and `View.equatable()`** (SwiftUI parity). Wrapping a
