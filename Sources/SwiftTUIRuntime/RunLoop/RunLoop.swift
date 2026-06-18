@@ -823,7 +823,42 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       }
     }
 
-    let eventPump = makeEventPump()
+    #if os(Android)
+      let directPumpState = AndroidDirectRunLoopPumpState<EventPump>()
+      let directWake: (@Sendable () -> Void)? =
+        renderMode == .sync
+        ? { @Sendable [weak self, directPumpState] in
+          MainActor.assumeIsolated {
+            guard let self,
+              let eventPump = directPumpState.eventPump,
+              directPumpState.exitReason == nil,
+              directPumpState.error == nil,
+              !directPumpState.isProcessing
+            else {
+              return
+            }
+
+            directPumpState.isProcessing = true
+            defer {
+              directPumpState.isProcessing = false
+            }
+
+            do {
+              directPumpState.exitReason = try self.processPendingEventsSynchronously(
+                from: eventPump,
+                renderedFrames: &directPumpState.renderedFrames
+              )
+            } catch {
+              directPumpState.error = error
+            }
+          }
+        }
+        : nil
+      let eventPump = makeEventPump(directWake: directWake)
+      directPumpState.eventPump = eventPump
+    #else
+      let eventPump = makeEventPump()
+    #endif
     defer {
       eventPump.cancel()
     }
@@ -831,7 +866,17 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
 
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
-    try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+    #if os(Android)
+      if renderMode == .sync {
+        try renderPendingFrames(renderedFrames: &renderedFrames)
+        directPumpState.renderedFrames = renderedFrames
+      } else {
+        try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+        directPumpState.renderedFrames = renderedFrames
+      }
+    #else
+      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+    #endif
 
     // After the initial render establishes the view tree and evaluator
     // closures, enable selective dirty evaluation for subsequent frames.
@@ -855,6 +900,19 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     }
 
     while await iterator.next() != nil {
+      #if os(Android)
+        if let error = directPumpState.error {
+          throw error
+        }
+        if let exitReason = directPumpState.exitReason {
+          return RunLoopResult(
+            finalState: stateContainer.state,
+            renderedFrames: directPumpState.renderedFrames,
+            exitReason: exitReason
+          )
+        }
+        renderedFrames = directPumpState.renderedFrames
+      #endif
       let pendingEvents = await drainPendingEvents(from: eventPump)
       guard !pendingEvents.isEmpty else {
         if scheduler.hasPendingFrame(at: .now()) {
@@ -869,6 +927,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
             )
           }
         }
+        #if os(Android)
+          directPumpState.renderedFrames = renderedFrames
+        #endif
         if let nextWake = scheduler.nextWakeInstant(after: .now()),
           nextWake > .now()
         {
@@ -939,6 +1000,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
           exitReason: exitReason
         )
       }
+      #if os(Android)
+        directPumpState.renderedFrames = renderedFrames
+      #endif
       if let nextWake = scheduler.nextWakeInstant(after: .now()),
         nextWake > .now()
       {
@@ -967,6 +1031,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   }
 
 }
+
+#if os(Android)
+  private final class AndroidDirectRunLoopPumpState<Pump>: @unchecked Sendable {
+    var eventPump: Pump?
+    var renderedFrames = 0
+    var isProcessing = false
+    var exitReason: RunLoopExitReason?
+    var error: (any Error)?
+  }
+#endif
 
 private final class KeyboardInputAdapter: TerminalInputReading {
   private let inputReader: any InputReading

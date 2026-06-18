@@ -1,4 +1,5 @@
 import Foundation
+@_spi(Testing) import SwiftTUICore
 import SwiftTUIAndroidHost
 @_spi(Runners) import SwiftTUIRuntime
 import Testing
@@ -55,6 +56,43 @@ func android_host_abi_start_publishes_first_frame_bytes() async throws {
   #expect(snapshot.rows.joined(separator: "\n").contains("Android"))
 
   swift_tui_android_stop(handle)
+}
+
+@MainActor
+@Test
+func android_host_sgr_mouse_tap_activates_tab_view_selection() async throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTabTestApp())
+  defer {
+    host.stop()
+  }
+
+  host.start()
+  host.resize(
+    columns: 80,
+    rows: 24,
+    cellPixelWidth: 9,
+    cellPixelHeight: 18
+  )
+
+  let initial = try await waitForAndroidHostFrame(on: host.surface) { frame in
+    rasterText(in: frame).contains("LOGO pane")
+  }
+  let counterRegion = try #require(
+    initial.semantics.interactionRegions.first { region in
+      region.identity.path.contains("TabItem[1]")
+    },
+    "expected Counter tab interaction region; semantics:\n\(SnapshotRenderer().semanticSnapshot(initial.semantics))"
+  )
+  let tapCell = CellPoint(
+    x: counterRegion.rect.origin.x + max(0, counterRegion.rect.size.width / 2),
+    y: counterRegion.rect.origin.y
+  )
+
+  host.sendInput(sgrPrimaryTapBytes(at: tapCell))
+
+  _ = try await waitForAndroidHostFrame(on: host.surface) { frame in
+    frame.sequence > initial.sequence && rasterText(in: frame).contains("COUNTER pane")
+  }
 }
 
 @MainActor
@@ -162,6 +200,65 @@ private struct AndroidHostTestApp: App {
       Text("Android")
     }
   }
+}
+
+private struct AndroidHostTabTestApp: App {
+  var body: some Scene {
+    WindowGroup("Android Tabs") {
+      AndroidHostTabTestView()
+    }
+  }
+}
+
+private struct AndroidHostTabTestView: View {
+  @State private var selection = "logo"
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("Logo", value: "logo") {
+        Text("LOGO pane")
+      }
+
+      Tab("Counter", value: "counter") {
+        Text("COUNTER pane")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+private enum AndroidHostFrameTimeout: Error {
+  case timedOut
+}
+
+private func waitForAndroidHostFrame(
+  on surface: HostedRasterSurface,
+  timeoutNanoseconds: UInt64 = 1_000_000_000,
+  matching predicate: @escaping @Sendable (SemanticHostFrame) -> Bool
+) async throws -> SemanticHostFrame {
+  try await withThrowingTaskGroup(of: SemanticHostFrame.self) { group in
+    group.addTask {
+      await surface.waitForFrame(matching: predicate)
+    }
+    group.addTask {
+      try await Task.sleep(nanoseconds: timeoutNanoseconds)
+      throw AndroidHostFrameTimeout.timedOut
+    }
+
+    let frame = try await group.next() ?? {
+      throw AndroidHostFrameTimeout.timedOut
+    }()
+    group.cancelAll()
+    return frame
+  }
+}
+
+private func sgrPrimaryTapBytes(
+  at cell: CellPoint
+) -> [UInt8] {
+  let column = cell.x + 1
+  let row = cell.y + 1
+  return Array("\u{1B}[<0;\(column);\(row)M\u{1B}[<0;\(column);\(row)m".utf8)
 }
 
 private func rasterText(

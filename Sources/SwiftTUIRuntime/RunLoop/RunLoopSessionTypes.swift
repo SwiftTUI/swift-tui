@@ -62,6 +62,7 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   private struct State: Sendable {
     var continuation: AsyncStream<String>.Continuation?
     var continuationGeneration: UInt64 = 0
+    var directHandler: (@Sendable (String) -> Void)?
   }
 
   private let state = Mutex(State())
@@ -88,8 +89,12 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   }
 
   public func send(_ signalName: String) {
-    state.withLock { state in
-      let continuation = state.continuation
+    let (continuation, directHandler) = state.withLock { state in
+      (state.continuation, state.directHandler)
+    }
+    if let directHandler {
+      directHandler(signalName)
+    } else {
       continuation?.yield(signalName)
     }
   }
@@ -98,9 +103,24 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     let continuation = state.withLock { state in
       let continuation = state.continuation
       state.continuation = nil
+      state.directHandler = nil
       return continuation
     }
     continuation?.finish()
+  }
+
+  package func installDirectHandler(
+    _ handler: @escaping @Sendable (String) -> Void
+  ) {
+    state.withLock { state in
+      state.directHandler = handler
+    }
+  }
+
+  package func clearDirectHandler() {
+    state.withLock { state in
+      state.directHandler = nil
+    }
   }
 }
 

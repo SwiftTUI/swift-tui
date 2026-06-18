@@ -1,3 +1,6 @@
+#if os(Android)
+  @_spi(MainActorUtilities) import _Concurrency
+#endif
 import SwiftTUICore
 
 extension RunLoop {
@@ -9,14 +12,14 @@ extension RunLoop {
     var scheduleDeadlineWake: @Sendable (Duration) -> Void
   }
 
-  package func makeEventPump() -> EventPump {
-    let inputEvents = terminalInputReader.inputEvents()
-    let signalEvents =
-      signalReader?.events()
-      ?? AsyncStream { continuation in
-        continuation.finish()
-      }
+  package func makeEventPump(
+    directWake: (@Sendable () -> Void)? = nil
+  ) -> EventPump {
     let wakeNotifyingScheduler = scheduler as? any WakeNotifyingFrameScheduling
+    #if os(Android)
+      let directInputReader = terminalInputReader as? InjectedTerminalInputReader
+      let directSignalReader = signalReader as? InProcessSignalReader
+    #endif
 
     let completion = EventPumpCompletion(remainingStreams: 2)
     let buffer = EventPumpBuffer()
@@ -28,24 +31,85 @@ extension RunLoop {
     let stream = AsyncStream<Void> { continuation in
       deadlineState.setContinuation(continuation)
 
-      inputTask = Task {
-        for await event in inputEvents {
-          renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
-          if buffer.enqueue(.input(event)) {
-            continuation.yield()
+      #if os(Android)
+        if let directInputReader {
+          let pendingEvents = directInputReader.installDirectHandler { event in
+            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+            if buffer.enqueue(.input(event)) {
+              directWake?()
+              continuation.yield()
+            }
+          }
+          for event in pendingEvents {
+            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+            if buffer.enqueue(.input(event)) {
+              directWake?()
+              continuation.yield()
+            }
+          }
+        } else {
+          let inputEvents = terminalInputReader.inputEvents()
+          inputTask = Task.immediate { @MainActor in
+            for await event in inputEvents {
+              renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+              if buffer.enqueue(.input(event)) {
+                continuation.yield()
+              }
+            }
+            completion.streamFinished(continuation)
           }
         }
-        completion.streamFinished(continuation)
-      }
+      #else
+        let inputEvents = terminalInputReader.inputEvents()
+        inputTask = Task {
+          for await event in inputEvents {
+            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+            if buffer.enqueue(.input(event)) {
+              continuation.yield()
+            }
+          }
+          completion.streamFinished(continuation)
+        }
+      #endif
 
-      signalTask = Task {
-        for await signalName in signalEvents {
-          if buffer.enqueue(.signal(signalName)) {
-            continuation.yield()
+      #if os(Android)
+        if let directSignalReader {
+          directSignalReader.installDirectHandler { signalName in
+            if buffer.enqueue(.signal(signalName)) {
+              directWake?()
+              continuation.yield()
+            }
+          }
+        } else {
+          let signalEvents =
+            signalReader?.events()
+            ?? AsyncStream { continuation in
+              continuation.finish()
+            }
+          signalTask = Task.immediate { @MainActor in
+            for await signalName in signalEvents {
+              if buffer.enqueue(.signal(signalName)) {
+                continuation.yield()
+              }
+            }
+            completion.streamFinished(continuation)
           }
         }
-        completion.streamFinished(continuation)
-      }
+      #else
+        let signalEvents =
+          signalReader?.events()
+          ?? AsyncStream { continuation in
+            continuation.finish()
+          }
+        signalTask = Task {
+          for await signalName in signalEvents {
+            if buffer.enqueue(.signal(signalName)) {
+              continuation.yield()
+            }
+          }
+          completion.streamFinished(continuation)
+        }
+      #endif
 
       wakeNotifyingScheduler?.setWakeHandler {
         continuation.yield()
@@ -67,6 +131,10 @@ extension RunLoop {
       cancel: {
         inputTask?.cancel()
         signalTask?.cancel()
+        #if os(Android)
+          directInputReader?.clearDirectHandler()
+          directSignalReader?.clearDirectHandler()
+        #endif
         deadlineState.cancel()
         wakeNotifyingScheduler?.setWakeHandler(nil)
       },
@@ -119,6 +187,58 @@ extension RunLoop {
       events: events,
       coalescedEventBatches: coalescedEventBatches
     )
+  }
+
+  package func processPendingEventsSynchronously(
+    from eventPump: EventPump,
+    renderedFrames: inout Int
+  ) throws -> RunLoopExitReason? {
+    let pendingEvents = eventPump.drainEvents()
+    guard !pendingEvents.isEmpty else {
+      try renderPendingFrames(renderedFrames: &renderedFrames)
+      return nil
+    }
+
+    let renderEventDrain = drainPendingRenderEvents(
+      from: eventPump,
+      initialEvents: pendingEvents
+    )
+    progressProbe?.record(
+      .eventDrain,
+      frameNumber: renderedFrames + 1,
+      eventCount: renderEventDrain.events.count,
+      coalescedEventBatches: renderEventDrain.coalescedEventBatches
+    )
+    pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
+
+    var handledNonExitEvent = false
+    for event in renderEventDrain.events {
+      let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
+      if let exitReason = handle(event) {
+        let shouldFlushBeforeExit =
+          handledNonExitEvent
+          || (hadReadyFrameBeforeEvent
+            && {
+              if case .signal = exitReason {
+                return true
+              }
+              return false
+            }())
+        if shouldFlushBeforeExit {
+          try renderPendingFrames(renderedFrames: &renderedFrames)
+        }
+        if terminationDisposition(for: exitReason) == .cancel {
+          scheduler.requestInvalidation(of: [rootIdentity])
+          handledNonExitEvent = true
+          continue
+        }
+        return exitReason
+      }
+      handledNonExitEvent = true
+    }
+
+    try renderPendingFrames(renderedFrames: &renderedFrames)
+    return nil
   }
 
 }

@@ -15,6 +15,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     var pendingMouseEvents: [InputEvent] = []
     var activeMouseFlushToken: UInt64?
     var nextMouseFlushToken: UInt64 = 0
+    var directHandler: (@Sendable (InputEvent) -> Void)?
     var finished = false
   }
 
@@ -35,30 +36,45 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   package func send(
     _ bytes: [UInt8]
   ) {
-    let (messages, bufferedEvents, continuation):
+    let (messages, bufferedEvents, continuation, directHandler):
       (
         [TerminalControlMessage],
         [InputEvent],
-        AsyncStream<InputEvent>.Continuation?
+        AsyncStream<InputEvent>.Continuation?,
+        (@Sendable (InputEvent) -> Void)?
       ) = state.withLock { state in
         guard !state.finished else {
           return (
             [],
             [],
+            nil,
             nil
           )
         }
 
         let filtered = state.controlParser.feed(bytes)
         let events = state.parser.feed(filtered.payload)
-        if state.continuation == nil {
+        let directHandler = state.directHandler
+        if directHandler == nil && state.continuation == nil {
           state.pendingEvents.append(contentsOf: events)
         }
-        return (filtered.messages, events, state.continuation)
+        return (
+          filtered.messages,
+          events,
+          directHandler == nil ? state.continuation : nil,
+          directHandler
+        )
       }
 
     for message in messages {
       controlHandler(message)
+    }
+
+    if let directHandler {
+      for event in bufferedEvents {
+        directHandler(event)
+      }
+      return
     }
 
     guard continuation != nil else {
@@ -73,17 +89,33 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   package func send(
     _ event: InputEvent
   ) {
-    let continuation = state.withLock { state in
+    let (continuation, directHandler):
+      (
+        AsyncStream<InputEvent>.Continuation?,
+        (@Sendable (InputEvent) -> Void)?
+      ) = state.withLock { state in
       guard !state.finished else {
-        return nil as AsyncStream<InputEvent>.Continuation?
+        return (
+          nil as AsyncStream<InputEvent>.Continuation?,
+          nil as (@Sendable (InputEvent) -> Void)?
+        )
+      }
+
+      if let directHandler = state.directHandler {
+        return (nil, directHandler)
       }
 
       guard let continuation = state.continuation else {
         state.pendingEvents.append(event)
-        return nil
+        return (nil, nil)
       }
 
-      return continuation
+      return (continuation, nil)
+    }
+
+    if let directHandler {
+      directHandler(event)
+      return
     }
 
     guard continuation != nil else {
@@ -91,6 +123,23 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     }
 
     yieldInjectedEvent(event)
+  }
+
+  package func installDirectHandler(
+    _ handler: @escaping @Sendable (InputEvent) -> Void
+  ) -> [InputEvent] {
+    state.withLock { state in
+      state.directHandler = handler
+      let pendingEvents = state.pendingEvents
+      state.pendingEvents.removeAll(keepingCapacity: true)
+      return pendingEvents
+    }
+  }
+
+  package func clearDirectHandler() {
+    state.withLock { state in
+      state.directHandler = nil
+    }
   }
 
   package func send(
@@ -118,6 +167,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
         state.finished = true
         let continuation = state.continuation
         state.continuation = nil
+        state.directHandler = nil
         let pendingMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
         state.pendingMouseEvents.removeAll(keepingCapacity: true)
         state.activeMouseFlushToken = nil
