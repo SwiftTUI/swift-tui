@@ -1033,7 +1033,12 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
 }
 
 #if os(Android)
-  private final class AndroidDirectRunLoopPumpState<Pump>: @unchecked Sendable {
+  // Main-actor-confined: every access is inside the run loop (`@MainActor`) or
+  // the `directWake` closure's `MainActor.assumeIsolated` block. `@MainActor`
+  // isolation makes it `Sendable` for capture in the `@Sendable` wake closure
+  // without an `@unchecked` escape hatch.
+  @MainActor
+  private final class AndroidDirectRunLoopPumpState<Pump> {
     var eventPump: Pump?
     var renderedFrames = 0
     var isProcessing = false

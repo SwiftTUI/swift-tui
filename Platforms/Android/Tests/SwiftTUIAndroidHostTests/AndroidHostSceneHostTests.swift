@@ -74,7 +74,7 @@ func android_host_sgr_mouse_tap_activates_tab_view_selection() async throws {
     cellPixelHeight: 18
   )
 
-  let initial = try await waitForAndroidHostFrame(on: host.surface) { frame in
+  let initial = await host.surface.waitForFrame { frame in
     rasterText(in: frame).contains("LOGO pane")
   }
   let counterRegion = try #require(
@@ -90,7 +90,7 @@ func android_host_sgr_mouse_tap_activates_tab_view_selection() async throws {
 
   host.sendInput(sgrPrimaryTapBytes(at: tapCell))
 
-  _ = try await waitForAndroidHostFrame(on: host.surface) { frame in
+  _ = await host.surface.waitForFrame { frame in
     frame.sequence > initial.sequence && rasterText(in: frame).contains("COUNTER pane")
   }
 }
@@ -255,32 +255,6 @@ private struct AndroidHostTabTestView: View {
       }
     }
     .tabViewStyle(.literalTabs)
-  }
-}
-
-private enum AndroidHostFrameTimeout: Error {
-  case timedOut
-}
-
-private func waitForAndroidHostFrame(
-  on surface: HostedRasterSurface,
-  timeoutNanoseconds: UInt64 = 1_000_000_000,
-  matching predicate: @escaping @Sendable (SemanticHostFrame) -> Bool
-) async throws -> SemanticHostFrame {
-  try await withThrowingTaskGroup(of: SemanticHostFrame.self) { group in
-    group.addTask {
-      await surface.waitForFrame(matching: predicate)
-    }
-    group.addTask {
-      try await Task.sleep(nanoseconds: timeoutNanoseconds)
-      throw AndroidHostFrameTimeout.timedOut
-    }
-
-    let frame = try await group.next() ?? {
-      throw AndroidHostFrameTimeout.timedOut
-    }()
-    group.cancelAll()
-    return frame
   }
 }
 
