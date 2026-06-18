@@ -187,8 +187,9 @@ Platform-specific execution and embedding are root-package products:
 
 - **Runners** — `SwiftTUICLI` (`TerminalRunner`), `SwiftTUIWASI` (`WASIRunner`),
   `SwiftTUIWebHost` (`WebHostRunner`), `SwiftTUIWebHostCLI` (`WebHostCLIRunner`).
-- **Hosts** — `SwiftUIHost` (macOS-only) retains `HostedSceneSession` values
-  inside a SwiftUI shell.
+- **Hosts** — The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI
+  view on macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+  https://github.com/SwiftTUI/swift-tui-swiftui
 - **Embedding** — `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`, and
   `SwiftTUIPTYPrimitives`.
 

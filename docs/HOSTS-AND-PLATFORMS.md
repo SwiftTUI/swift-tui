@@ -3,9 +3,14 @@
 The render pipeline
 ([DocC source](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md))
 produces a committed frame. A **host** presents that frame. The same authored app
-can run under five different hosts; the pipeline above them is identical.
+can run under four different in-package hosts; the pipeline above them is identical.
 
-## The five execution modes
+The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
+macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+https://github.com/SwiftTUI/swift-tui-swiftui — it adopts the same
+`HostedSceneSession` / raster-surface contracts described below.
+
+## The four execution modes
 
 ```mermaid
 flowchart TD
@@ -15,13 +20,11 @@ flowchart TD
 
     runtime --> term["Terminal-native<br/>SwiftTUICLI · TerminalHost"]
     runtime --> wasi["WASI / browser<br/>SwiftTUIWASI · canvas"]
-    runtime --> host["Host-managed Apple<br/>SwiftUIHost · raster surface"]
     runtime --> androidHost["Host-managed Android<br/>SwiftTUIAndroidHost · Compose canvas"]
     runtime --> web["Localhost WebHost<br/>SwiftTUIWebHost · FlyingFox"]
 
     term --> termOut["Terminal text + ANSI"]
     wasi --> wasiOut["Browser canvas"]
-    host --> hostOut["SwiftUI raster view"]
     androidHost --> androidOut["Android Canvas + semantics overlay"]
     web --> webOut["Browser over WebSocket"]
 ```
@@ -30,7 +33,6 @@ flowchart TD
 | --- | --- | --- | --- |
 | Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI; raster output drawn onto a canvas via the `web-surface` transport. |
-| Host-managed Apple | `SwiftUIHost` | A `SwiftUI` view inside an app | Retains `HostedSceneSession` values and draws a `HostedRasterSurface`. macOS-only. |
 | Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains `HostedSceneSession` values behind a JNI/C ABI, serializes `SemanticHostFrame` snapshots, and draws styled cells/images plus a semantics overlay in Compose. `arm64-v8a` only. |
 | Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` v2 protocol. |
 
@@ -41,16 +43,16 @@ that combined runner by default.
 
 ### Where host code lives
 
-Every host's Swift side lives in this package under `Platforms/` — `SwiftUIHost`,
-`SwiftTUIWASI`/`SwiftTUIWebHost`, and `SwiftTUIAndroidHost` are all SwiftPM
-targets. Hosts are partitioned across repositories by **distribution contract**,
-not by host. A host consumed purely through SwiftPM stays here: `SwiftUIHost` is
-SwiftPM-only (Apple-SDK-gated, excluded from Linux at compile time), so it has no
-separate repo. A host that *also* ships through another ecosystem's package
-manager keeps that half in a dedicated sibling repo — `SwiftTUI/swift-tui-web`
-(Bun/npm) and `SwiftTUI/swift-tui-android` (Gradle/Maven AAR + plugin) — coupled
-back to this package only through tagged releases or released artifacts. The
-sibling repos exist to keep a foreign package manager out of this SwiftPM
+In-package host code lives under `Platforms/` — `SwiftTUIWASI`/`SwiftTUIWebHost`
+and `SwiftTUIAndroidHost` are SwiftPM targets here. Hosts are partitioned across
+repositories by **distribution contract**, not by host. A host that ships through
+another ecosystem's package manager keeps that half in a dedicated sibling repo —
+`SwiftTUI/swift-tui-web` (Bun/npm) and `SwiftTUI/swift-tui-android` (Gradle/Maven
+AAR + plugin) — coupled back to this package only through tagged releases or
+released artifacts. The native SwiftUI host similarly lives in its own sibling
+`SwiftTUI/swift-tui-swiftui` package
+(https://github.com/SwiftTUI/swift-tui-swiftui). The sibling repos exist to keep
+foreign package managers and Apple-SDK-gated surfaces out of this core SwiftPM
 package, not to give each backend its own home.
 
 ## The host-frame contract
@@ -73,7 +75,6 @@ of focused contracts.
 | Terminal-native | `TerminalHost` uses damage to limit row/span diffing and terminal byte emission. |
 | WASI / browser | `WebSurfaceTransport` serializes damage into the web-surface frame; the browser canvas clears and redraws dirty rects only. |
 | Localhost WebHost | `WebSocketSurfaceTransport` serializes the same web-surface damage over WebSocket. |
-| Host-managed SwiftUI | `HostedRasterSurface` carries damage through `SemanticHostFrame`; `NativeTerminalSurfaceView` invalidates only dirty native rects. |
 | Host-managed Android | `SwiftTUIAndroidHost` serializes damage rows/ranges into the Android frame snapshot; the Compose renderer keeps a retained bitmap and repaints only the damaged rows when a frame's damage is contiguous, falling back to a full repaint otherwise (size change, full-repaint flag, images present, or a skipped sequence). |
 
 ```mermaid
@@ -103,10 +104,10 @@ optional `PresentationDamage`.
 
 `RunLoop` derives this host-facing value from the frontend's presented raster
 history instead of forwarding private retained-layout invalidation or stale
-renderer artifact damage. Terminal, WASI/browser, localhost WebHost, and
-host-managed SwiftUI paths must not reinterpret retained-layout invalidation as
-frontend damage. If stale cells appear after this contract is satisfied, the
-bug belongs to that frontend's damage consumer.
+renderer artifact damage. Terminal, WASI/browser, and localhost WebHost paths
+must not reinterpret retained-layout invalidation as frontend damage. If stale
+cells appear after this contract is satisfied, the bug belongs to that
+frontend's damage consumer.
 
 ## The terminal host
 
@@ -146,7 +147,6 @@ flowchart LR
 | WASI / browser | Supported through `SwiftTUIWASI` and the `SwiftTUI/swift-tui-web` browser packages. |
 | Android host / cross-compilation | `SwiftTUIAndroidHost` cross-compiles for both `aarch64-unknown-linux-android28` and `x86_64-unknown-linux-android28` (the vendored `swift-png`/`JPEG` image path builds for x86_64; the earlier SIMD blocker no longer applies). The reusable Compose host + JNI shim ship as the published `sh.swifttui:android-host` AAR (with the `sh.swifttui.android` Gradle plugin) from `SwiftTUI/swift-tui-android`; consumer apps depend on the tagged `SwiftTUIAndroidHost` SwiftPM product over HTTPS and let the plugin cross-build their Swift host. The `swift-tui-examples/AndroidGallery` Compose app packages and exercises `arm64-v8a` — see [VISION-GAP.md](VISION-GAP.md). |
 | `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` (PTY embedding) | macOS and Linux only. |
-| `SwiftUIHost` | macOS only; excluded from Linux at compile time. |
 
 The package declares `macOS 15` and `iOS 18` platforms unless the build sets
 `DISABLE_EXPLICIT_PLATFORMS=1` (Linux CI does, to skip the Apple platform

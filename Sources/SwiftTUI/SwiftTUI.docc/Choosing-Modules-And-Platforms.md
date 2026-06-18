@@ -40,7 +40,6 @@ sibling root-package products directly.
 | Browser deployment from a WASI build | `SwiftTUIWASI` app plus `@swifttui/web` tooling | `import SwiftTUIWASI` in the app |
 | Localhost browser app from a native binary | `SwiftTUIWebHost` | `import SwiftTUIWebHost` |
 | One binary that supports terminal launch and `--web` | `SwiftTUIWebHostCLI` | `import SwiftTUIWebHostCLI` |
-| Native SwiftUI host on Apple platforms | `SwiftUIHost` | `import SwiftUIHost` |
 | Embedded terminal program panes | `SwiftTUITerminal` | `import SwiftTUITerminal` |
 | Tabbed/split terminal workspaces | `SwiftTUITerminalWorkspace` | `import SwiftTUITerminalWorkspace` |
 | Charts and compact metrics | `SwiftTUICharts` | `import SwiftTUICharts` |
@@ -136,9 +135,11 @@ struct HostedApp: App {
 }
 ```
 
-`SwiftUIHost` uses this shape for native SwiftUI embedding. `@swifttui/web`
-uses the same authored scene model with a `SwiftTUIWASI` build and the
-browser-side `web-surface` runtime.
+The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
+macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+https://github.com/SwiftTUI/swift-tui-swiftui — it uses this shape for native
+SwiftUI embedding. `@swifttui/web` uses the same authored scene model with a
+`SwiftTUIWASI` build and the browser-side `web-surface` runtime.
 
 ### Terminal Program Embedding
 

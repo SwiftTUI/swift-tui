@@ -15,6 +15,5 @@ builder:
         - SwiftTUIWASI
         - SwiftTUIWebHost
         - SwiftTUIWebHostCLI
-        - SwiftUIHost
         - SwiftTUIAnimatedImage
         - SwiftTUICharts

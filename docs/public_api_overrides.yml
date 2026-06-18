@@ -797,7 +797,6 @@ module_defaults:
   SwiftTUIWASI: canonical
   SwiftTUIWebHost: canonical
   SwiftTUIWebHostCLI: canonical
-  SwiftUIHost: canonical
   SwiftTUIAndroidHost: canonical
   SwiftTUIPTYCPrimitives: package-only-seam
 

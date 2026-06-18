@@ -23,7 +23,6 @@ cat >"$expected_file" <<'EOF'
 linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
 linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
 macos|macOS repo gate|macOS|-|macos-26|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-ios|iOS package build|iOS|generic|macos-26|xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build
 EOF
 
 cat >"$results_dir/linux-amd64.result" <<'EOF'
@@ -46,11 +45,8 @@ cat >"$golden_file" <<'EOF'
 | Linux repo gate | Linux | amd64 | ubuntu-24.04 | success | 14m 0s | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
 | Linux repo gate | Linux | arm64 | ubuntu-24.04-arm | failure | 1m 5s | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
 | macOS repo gate | macOS | - | macos-26 | success | - | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
-| iOS package build | iOS | generic | macos-26 | missing | - | `xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build` |
 
-Overall result: failure (2 success, 1 failure, 1 missing)
-
-Missing result artifacts mean the lane did not publish a status record before the summary job ran.
+Overall result: failure (2 success, 1 failure)
 EOF
 
 "$repo_root/Scripts/render_ci_test_matrix_summary.sh" \

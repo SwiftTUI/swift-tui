@@ -17,11 +17,6 @@ on:
         required: false
         default: false
         type: boolean
-      run_ios:
-        description: Run the generic iOS package build
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -295,80 +290,6 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  ios-build:
-    name: iOS package build
-    runs-on: macos-26
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ios }}
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Record lane start
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf 'LANE_STARTED_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
-
-      - name: Select Xcode with Swift 6.3 support
-        shell: bash
-        run: |
-          set -euo pipefail
-          for xcode in \
-            /Applications/Xcode_26.4.1.app \
-            /Applications/Xcode_26.4.app \
-            /Applications/Xcode_26.3.app \
-            /Applications/Xcode_26.5.app \
-            /Applications/Xcode_26.5_beta_2.app
-          do
-            if [[ -d "$xcode" ]]; then
-              developer_dir="$xcode/Contents/Developer"
-              echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
-              DEVELOPER_DIR="$developer_dir" xcodebuild -version
-              DEVELOPER_DIR="$developer_dir" xcrun swift --version
-              exit 0
-            fi
-          done
-
-          echo "No Xcode installation with Swift 6.3 support was found." >&2
-          ls -1 /Applications/Xcode*.app >&2 || true
-          exit 1
-
-      - name: Build SwiftUI host for generic iOS
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -scheme SwiftUIHost \
-            -destination 'generic/platform=iOS' \
-            -skipPackagePluginValidation \
-            build
-
-      - name: Record lane result
-        if: always()
-        shell: bash
-        env:
-          LANE_ID: ios
-          LANE_RESULT: ${{ job.status }}
-        run: |
-          set -euo pipefail
-          mkdir -p .ci-results
-          duration="-"
-          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
-            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
-          fi
-          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
-
-      - name: Upload lane result
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ci-test-result-ios
-          path: .ci-results/ios.result
-          if-no-files-found: error
-          retention-days: 1
-
   ci-summary:
     name: CI test matrix summary
     runs-on: ubuntu-24.04
@@ -376,7 +297,6 @@ jobs:
       - linux-gate
       - linux-gate-required
       - macos-gate
-      - ios-build
     if: always()
     timeout-minutes: 5
 
@@ -400,7 +320,6 @@ jobs:
         env:
           RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' && inputs.run_arm64 }}
           RUN_MACOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
-          RUN_IOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ios }}
         run: |
           set -euo pipefail
           mkdir -p .ci-results
@@ -416,11 +335,6 @@ jobs:
           if [ "$RUN_MACOS" = "true" ]; then
             cat >> "$expected_file" <<'EOF'
           macos|macOS repo gate|macOS|-|macos-26|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-          EOF
-          fi
-          if [ "$RUN_IOS" = "true" ]; then
-            cat >> "$expected_file" <<'EOF'
-          ios|iOS package build|iOS|generic|macos-26|xcodebuild -scheme SwiftUIHost -destination generic/platform=iOS -skipPackagePluginValidation build
           EOF
           fi
           Scripts/render_ci_test_matrix_summary.sh \

@@ -137,14 +137,6 @@ start_load() {
 
 should_skip_candidate() {
   candidate=$1
-  host_os=$(uname -s)
-  if [ "$host_os" = "Linux" ]; then
-    case "$candidate" in
-    HostedSurfaceRegressionTests | SwiftUIHostAccessibilityTests)
-      return 0
-      ;;
-    esac
-  fi
   return 1
 }
 
@@ -196,20 +188,6 @@ run_candidate \
   "runtime test support" \
   "Scripts/repeat_async_flake_registry.sh" \
   "swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests"
-
-run_candidate \
-  "HostedSurfaceRegressionTests" \
-  "runtime/host integration with async dependencies" \
-  "host test support" \
-  "Scripts/repeat_async_flake_registry.sh" \
-  "swiftly run swift test --filter SwiftUIHostTests.HostedSurfaceRegressionTests"
-
-run_candidate \
-  "SwiftUIHostAccessibilityTests" \
-  "runtime/host integration with async dependencies" \
-  "host test support" \
-  "Scripts/repeat_async_flake_registry.sh" \
-  "swiftly run swift test --filter SwiftUIHostTests.SwiftUIHostAccessibilityTests"
 
 run_candidate \
   "RenderDiffTests" \

@@ -33,10 +33,12 @@ Scene declarations such as ``App`` and ``WindowGroup`` also live here. The
 release-facing `SwiftTUI` product re-exports this module through
 `SwiftTUIWebHostCLI` and includes animated GIF/image support for one-import
 apps. Other platform integrations compose with this module directly:
-`SwiftTUICLI`, `SwiftTUIWASI`, `SwiftUIHost`, `SwiftTUIWebHost`, and
-`SwiftTUIWebHostCLI`. Browser deployment uses the `@swifttui/web` package in
-the sibling `SwiftTUI/swift-tui-web` repository to consume a `SwiftTUIWASI`
-build.
+`SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and `SwiftTUIWebHostCLI`.
+Browser deployment uses the `@swifttui/web` package in the sibling
+`SwiftTUI/swift-tui-web` repository to consume a `SwiftTUIWASI` build. The
+native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
+macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+https://github.com/SwiftTUI/swift-tui-swiftui
 
 Pointer input policy types such as `TerminalMouseInputResolution`,
 `TerminalMouseInputTrustPolicy`, and `TerminalMouseInputCompatibilityMatrix`

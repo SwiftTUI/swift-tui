@@ -1,9 +1,12 @@
 import SwiftTUICore
 
-package struct BlendedImageEncodedPayload: Equatable, Sendable {
-  package var id: String
-  package var bytes: [UInt8]
-  package var pixelSize: PixelSize
+// Host-integration SPI: the native SwiftUI host (`swift-tui-swiftui`) composites
+// image blend modes against this compositor when drawing a `HostedRasterSurface`.
+// Exposed via `@_spi(Runners)` so it stays out of the canonical public surface.
+@_spi(Runners) public struct BlendedImageEncodedPayload: Equatable, Sendable {
+  @_spi(Runners) public var id: String
+  @_spi(Runners) public var bytes: [UInt8]
+  @_spi(Runners) public var pixelSize: PixelSize
 
   package init(
     id: String,
@@ -61,7 +64,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   }
 }
 
-package final class ImageBlendCompositor: Sendable {
+@_spi(Runners) public final class ImageBlendCompositor: Sendable {
   private struct PresentationAttachment: Sendable {
     var identity: Identity
     var bounds: CellRect
@@ -294,7 +297,7 @@ package final class ImageBlendCompositor: Sendable {
   private let storage: OSAllocatedUnfairLock<Storage>
   private let memoryMetricToken: MemoryMetricRegistry.Token
 
-  package convenience init() {
+  @_spi(Runners) public convenience init() {
     self.init(repository: ImageAssetRepository())
   }
 
@@ -418,7 +421,7 @@ package final class ImageBlendCompositor: Sendable {
     return variant
   }
 
-  package func encodedPNGPayload(
+  @_spi(Runners) public func encodedPNGPayload(
     for attachment: RasterImageAttachment,
     fallbackBackground: Color
   ) -> BlendedImageEncodedPayload? {

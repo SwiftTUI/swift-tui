@@ -184,7 +184,6 @@ Runs the exhaustive checked-in repo verification surface:
   - focused SwiftTUIWASI / WASISurfaceBridge tests
   - focused SwiftTUIWebHost tests
   - focused SwiftTUIAndroidHost tests
-  - focused SwiftUIHost tests on Apple platforms
   - Tools/TermUIPerf tests
 
 The script also checks required environment dependencies up front:
@@ -194,7 +193,6 @@ The script also checks required environment dependencies up front:
 
 On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
-  - skips focused SwiftUIHost tests because the target is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 
@@ -711,7 +709,7 @@ require_command bun
 validate_timeout_configuration
 
 if [ "$is_linux" -eq 1 ]; then
-  echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."
+  echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 for repo package resolution."
 fi
 
 swift_version_command=$(swift_command_text --version)
@@ -871,17 +869,6 @@ run_function_step \
   "Run PNG tests" \
   "$(swift_command_text test --filter PNGTests)" \
   run_swift test --filter PNGTests
-
-if [ "$is_linux" -eq 1 ]; then
-  skip_step \
-    "Run SwiftUIHost tests" \
-    "SwiftUIHost is only available on Apple platforms"
-else
-  run_function_step \
-    "Run SwiftUIHost tests" \
-    "$(swift_command_text test --filter SwiftUIHostTests)" \
-    run_swift test --filter SwiftUIHostTests
-fi
 
 if [ "${STUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
   skip_step \

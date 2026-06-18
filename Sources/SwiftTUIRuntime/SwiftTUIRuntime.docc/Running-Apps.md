@@ -103,9 +103,11 @@ let a host product build `SceneManifest` values, retain one or more
 values so host shells receive producer sequence, raster output, semantics,
 focus, and raster damage as one committed frame.
 
-`SwiftUIHost` uses that path to embed SwiftTUI scenes inside a SwiftUI
-app on Apple platforms. `@swifttui/web` uses the same authored scene model for
-browser hosting on top of a `SwiftTUIWASI` build.
+The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
+macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+https://github.com/SwiftTUI/swift-tui-swiftui — it uses that path to embed
+SwiftTUI scenes inside a SwiftUI app. `@swifttui/web` uses the same authored
+scene model for browser hosting on top of a `SwiftTUIWASI` build.
 
 `SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
 `WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`

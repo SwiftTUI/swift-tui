@@ -31,7 +31,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWASI` | 3 | 8 |
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
-| `SwiftUIHost` | 7 | 62 |
 | `SwiftTUIAndroidHost` | 30 | 168 |
 | `SwiftTUICore` | 280 | 2193 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
@@ -531,18 +530,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 - `App` — extension — 2 members
 - `WebHostCLIRunner` — enum — 4 members
-
-## SwiftUIHost
-
-### Canonical surface (7)
-
-- `SwiftUIHostAppState` — class — 9 members
-- `SwiftUIHostAppView` — struct — 2 members
-- `SwiftUIHostCursorStyle` — enum — 4 members
-- `SwiftUIHostSceneDescriptor` — struct — 4 members
-- `SwiftUIHostSceneHost` — class — 17 members
-- `SwiftUIHostTerminalPalette` — struct — 8 members
-- `SwiftUIHostTerminalStyle` — struct — 11 members
 
 ## SwiftTUIAndroidHost
 

@@ -17,8 +17,10 @@ while a host owns an external presentation environment or embedding lifecycle.
 - **WASI runner** — import `SwiftTUIWASI` for WebAssembly execution and manifest generation. Use when you ship the app as a wasm module to a browser or sandbox host.
 - **Host product** — retain ``HostedSceneSession`` values with explicit
   presentation surfaces such as ``HostedRasterSurface`` inside another app's
-  lifecycle. `SwiftUIHost` does this for native SwiftUI on Apple platforms;
-  `@swifttui/web` does it for browser hosting on top of a WASI build.
+  lifecycle. `@swifttui/web` does this for browser hosting on top of a WASI
+  build. The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view
+  on macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+  https://github.com/SwiftTUI/swift-tui-swiftui
 - **WebHost runner and browser host** — import `SwiftTUIWebHost` for web-only
   localhost-browser launch, or use `SwiftTUIWebHostCLI` directly when one
   executable should support both terminal-native and `--web` launch without the

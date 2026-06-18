@@ -65,12 +65,6 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "PNG",
 ]
 
-#if os(Linux)
-  let includeSwiftUIHost = false
-#else
-  let includeSwiftUIHost = true
-#endif
-
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
   .SwiftSetting]
 {
@@ -107,11 +101,6 @@ let packageProducts: [Product] =
     // the shared poll-free signals instead of timeout-based waiting.
     .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
   ]
-  + (includeSwiftUIHost
-    ? [
-      .library(name: "SwiftUIHost", targets: ["SwiftUIHost"])
-    ]
-    : [])
 
 let package = Package(
   name: "swift-tui",
@@ -567,29 +556,4 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
   ]
-    + (includeSwiftUIHost
-      ? [
-        .target(
-          name: "SwiftUIHost",
-          dependencies: [
-            "SwiftTUIRuntime"
-          ],
-          path: "Platforms/SwiftUI/Sources/SwiftUIHost",
-          resources: [
-            .process("Resources")
-          ],
-          swiftSettings: swiftSettings()
-        ),
-        .testTarget(
-          name: "SwiftUIHostTests",
-          dependencies: [
-            "SwiftTUI",
-            "SwiftTUITestSupport",
-            "SwiftUIHost",
-          ],
-          path: "Platforms/SwiftUI/Tests/SwiftUIHostTests",
-          swiftSettings: swiftSettings()
-        ),
-      ]
-      : [])
 )

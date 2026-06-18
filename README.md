@@ -259,7 +259,6 @@ Author once; pick the product that matches how you ship.
 | `SwiftTUIRuntime` | Composing a custom runner or host on the platform-neutral runtime |
 | `SwiftTUICLI` / `SwiftTUIWASI` | You need an explicit terminal or WASI runner product |
 | `SwiftTUIWebHost` / `SwiftTUIWebHostCLI` | Composing localhost browser hosting without the full `SwiftTUI` convenience product |
-| `SwiftUIHost` | Embedding SwiftTUI scenes inside a host-managed SwiftUI surface (Apple platforms) |
 | `SwiftTUITerminal` / `SwiftTUITerminalWorkspace` | Embedding terminal child processes or building split-pane workspaces |
 | `SwiftTUIAnimatedImage` | Composing animated-image support without the full `SwiftTUI` convenience product |
 | `SwiftTUICharts` | You need charting/graph views |
@@ -289,7 +288,7 @@ run mode.
 | [gitviz](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gitviz) | Non-interactive `SwiftTUICharts` command suite over git history | `swiftly run swift run --package-path ../swift-tui-examples/gitviz gitviz dashboard --path .` |
 | [gifcat](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifcat) | Terminal-native animated GIF playback | `swiftly run swift run --package-path ../swift-tui-examples/gifcat gifcat nyan.gif` |
 | [gifeditor](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifeditor) | Full terminal GIF editor: canvas, layers, timeline, import/export | `swiftly run swift run --package-path ../swift-tui-examples/gifeditor gifeditor` |
-| [SwiftUIExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via `SwiftUIHost` | Open `../swift-tui-examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
+| [SwiftUIExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via the [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) host package | Open `../swift-tui-examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
 | [WebHostExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebHostExample) | Smallest `SwiftTUI` convenience app with terminal and `--web` launch | `swiftly run swift run --package-path ../swift-tui-examples/WebHostExample WebHostExample --web` |
 | [WebExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebExample) | Static browser/WASI deployment with `@swifttui/web` + `@swifttui/build` | `bun --cwd ../swift-tui-examples/WebExample dev` |
 

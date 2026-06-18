@@ -59,7 +59,6 @@ struct PackageGraphIsolationTests {
       "SwiftTUIWebHost",
       "SwiftTUIWASI",
       "WASISurfaceBridge",
-      "SwiftUIHost",
       "SwiftTUITerminal",
       "SwiftTUITerminalWorkspace",
     ] {

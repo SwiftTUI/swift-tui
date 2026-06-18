@@ -1,5 +1,7 @@
 import Foundation
-public import SwiftTUIRuntime
+// `ImageBlendCompositor` is host-integration infrastructure exposed via the
+// `Runners` SPI (shared with the SwiftUI/WASI hosts).
+@_spi(Runners) public import SwiftTUIRuntime
 
 public struct AndroidHostColorSnapshot: Codable, Equatable, Sendable {
   public var hex: String

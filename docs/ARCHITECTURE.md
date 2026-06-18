@@ -60,7 +60,6 @@ flowchart TD
     SwiftTUIWebHostCLI --> SwiftTUIWebHost
     SwiftTUIWebHostCLI --> SwiftTUICLI
     SwiftTUIWebHostCLI --> SwiftTUIArguments
-    SwiftUIHost["SwiftUIHost<br/>(macOS only)"] --> SwiftTUIRuntime
     SwiftTUITerminal --> SwiftTUIRuntime
     SwiftTUITerminalWorkspace --> SwiftTUITerminal
     SwiftTUICharts --> SwiftTUIViews
@@ -114,9 +113,9 @@ directory holds their sources but contains no nested Swift packages.
 - **Runners** — `SwiftTUICLI` (`TerminalRunner`), `SwiftTUIWASI` (`WASIRunner`),
   `SwiftTUIWebHost` (`WebHostRunner`), `SwiftTUIWebHostCLI` (`WebHostCLIRunner`),
   and `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).
-- **Hosts** — `SwiftUIHost` retains `HostedSceneSession` values inside a SwiftUI
-  app. It depends on `SwiftTUIRuntime` directly and is **macOS-only**
-  (`#if os(Linux)` excludes it).
+- **Hosts** — The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI
+  view on macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
+  https://github.com/SwiftTUI/swift-tui-swiftui
 - **Terminal-program embedding** — `SwiftTUITerminal` (`TerminalView`,
   `TerminalSession`, `TerminalProcessSession`), `SwiftTUITerminalWorkspace`
   (tabbed/split-pane workspace surfaces), and `SwiftTUIPTYPrimitives` (pty
