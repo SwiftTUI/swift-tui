@@ -194,6 +194,37 @@ func android_host_abi_copies_pending_clipboard_text() throws {
   #expect(swift_tui_android_copy_clipboard_text(handle, nil, 0) == 0)
 }
 
+@MainActor
+@Test
+func android_host_tick_abi_is_safe_and_does_not_disturb_frames() async throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+  let handle = AndroidHostHandleRegistry.register(host)
+  defer {
+    swift_tui_android_destroy(handle)
+  }
+
+  // The executor-drive ABIs back the Android main-actor pump (which resumes
+  // `.task` loops and animation on a platform with no OS run loop). They must
+  // always be safe to call: installing the executor and ticking an unknown
+  // handle never crash, and `diag` is non-negative. Off-Android the tick is a
+  // no-op; on Android it returns the count of drained main-actor jobs.
+  swift_tui_android_install_executor()
+  #expect(swift_tui_android_tick(0) == 0)
+  #expect(swift_tui_android_diag() >= 0)
+
+  swift_tui_android_start(handle)
+
+  // Interleaving a tick must not disturb normal frame production.
+  _ = swift_tui_android_tick(handle)
+  let frame = await host.surface.waitForFrame { frame in
+    rasterText(in: frame).contains("Android")
+  }
+  #expect(frame.sequence == 0)
+  #expect(swift_tui_android_tick(handle) >= 0)
+
+  swift_tui_android_stop(handle)
+}
+
 private struct AndroidHostTestApp: App {
   var body: some Scene {
     WindowGroup("Android Test") {

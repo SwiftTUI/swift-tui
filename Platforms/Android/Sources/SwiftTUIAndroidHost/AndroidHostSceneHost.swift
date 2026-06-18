@@ -280,6 +280,22 @@ public final class AndroidHostSceneHost {
     session.stop()
   }
 
+  /// Drives the Swift main-actor executor for one host frame, resuming any
+  /// `@MainActor` continuations that became ready since the last tick (the run
+  /// loop's own `await`, autonomous `.task` bodies, animation deadline wakes).
+  /// The Android host has no OS run loop to drain the main-actor queue, so the
+  /// render poll loop calls this each frame. See ``AndroidMainExecutorPump``.
+  /// Returns a diagnostic status code (mirrored into the JNI bridge log).
+  @MainActor
+  @discardableResult
+  public func tick() -> Int32 {
+    #if os(Android)
+      return AndroidMainExecutorPump.drainReadyJobs()
+    #else
+      return 0
+    #endif
+  }
+
   @MainActor
   public func resize(
     columns: Int,

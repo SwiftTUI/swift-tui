@@ -129,6 +129,7 @@ SwiftTUIAndroidHost.AndroidHostSceneHost.start()
 SwiftTUIAndroidHost.AndroidHostSceneHost.stop()
 SwiftTUIAndroidHost.AndroidHostSceneHost.surface
 SwiftTUIAndroidHost.AndroidHostSceneHost.surfaceSize
+SwiftTUIAndroidHost.AndroidHostSceneHost.tick()
 SwiftTUIAndroidHost.AndroidHostStyle
 SwiftTUIAndroidHost.AndroidHostStyle.default
 SwiftTUIAndroidHost.AndroidHostStyle.init(renderStyle:initialSurfaceSize:)
@@ -162,10 +163,13 @@ SwiftTUIAndroidHost.AndroidHostTextStyleSnapshot.underlineStyle
 SwiftTUIAndroidHost.swift_tui_android_copy_clipboard_text(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_copy_latest_frame(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_destroy(_:)
+SwiftTUIAndroidHost.swift_tui_android_diag()
+SwiftTUIAndroidHost.swift_tui_android_install_executor()
 SwiftTUIAndroidHost.swift_tui_android_resize(_:_:_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_send_input(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_start(_:)
 SwiftTUIAndroidHost.swift_tui_android_stop(_:)
+SwiftTUIAndroidHost.swift_tui_android_tick(_:)
 SwiftTUIAnimatedImage.AnimatedGIF
 SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)
 SwiftTUIAnimatedImage.AnimatedGIF.decode(data:)
