@@ -4,11 +4,6 @@ import SwiftTUIViews
 @MainActor
 /// Drives an interactive terminal session for a state-backed view tree.
 public final class RunLoop<State: Equatable & Sendable, Content: View> {
-  package enum RuntimeEvent {
-    case input(InputEvent)
-    case signal(String)
-  }
-
   package let rootIdentity: Identity
   package let renderer: DefaultRenderer
   package let presentationSurface: any PresentationSurfaceMetricsProvider
