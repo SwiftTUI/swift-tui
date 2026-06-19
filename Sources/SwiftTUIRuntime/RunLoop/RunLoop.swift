@@ -56,6 +56,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var armedPointerRouteID: RouteID?
   package var armedPointerRouteUsesPointerHandler = false
   package var capturedPointerRouteID: RouteID?
+  /// Where the active press began, tracked while a route is armed/captured so a
+  /// drag that exceeds the scroll-takeover threshold can be measured. Set on
+  /// `.down` and cleared on `.up`.
+  package var dragStartLocation: PointerLocation?
   package var hoveredPointerRouteID: RouteID?
   package var terminalPointerHoverEnabled = false
   package var postActionInvalidationIdentities: Set<Identity> = []

@@ -2112,6 +2112,216 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("Drag past threshold on a control inside a ScrollView pans instead of activating it")
+  func dragThresholdTransfersControlGestureToScroll() async throws {
+    final class Box {
+      var taps = 0
+      var position = ScrollPosition.zero
+    }
+
+    let terminalSize = CellSize(width: 20, height: 8)
+    let rootIdentity = testIdentity("TakeoverFixture")
+    let buttonIdentity = testIdentity("TakeoverFixture", "Button")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          // Header rows push the button below the viewport top so an upward
+          // drag has both threshold room and downward scroll headroom.
+          Text("Header A")
+          Text("Header B")
+          Button("Tap") { box.taps += 1 }
+            .id(buttonIdentity)
+          ForEach(0..<15) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(testIdentity("TakeoverFixture", "Scroll"))
+      .frame(width: 10, height: 5, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: testIdentity("TakeoverFixture", "Scroll"),
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+    let buttonRect = try #require(
+      renderedInteractionRect(
+        for: primaryRouteID(for: buttonIdentity),
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+    let column = Double(buttonRect.origin.x + buttonRect.size.width / 2)
+    let press = Point(x: column, y: Double(buttonRect.origin.y + buttonRect.size.height / 2))
+    let top = Point(x: column, y: Double(scrollRect.origin.y))
+
+    // Press on the button, then drag up past the threshold: the scroll view
+    // takes over and pans the content down. The button must not fire. (The run
+    // loop coalesces the drag burst, so this single stroke must both cross the
+    // threshold and carry the pan.)
+    let dragResult = try await runTerminalInputHarness(
+      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      events: [
+        .mouse(.init(kind: .down(.primary), location: press)),
+        .mouse(.init(kind: .dragged(.primary), location: top)),
+        .mouse(.init(kind: .up(.primary), location: top)),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { makeView() }
+    )
+    #expect(dragResult.exitReason == .inputEnded)
+    #expect(box.taps == 0)
+    #expect(box.position.y > 0)
+  }
+
+  @MainActor
+  @Test("Tap within threshold on a control inside a ScrollView still activates it")
+  func tapWithinThresholdActivatesControlInScroll() async throws {
+    final class Box {
+      var taps = 0
+      var position = ScrollPosition.zero
+    }
+
+    let terminalSize = CellSize(width: 20, height: 8)
+    let rootIdentity = testIdentity("TapInScrollFixture")
+    let buttonIdentity = testIdentity("TapInScrollFixture", "Button")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Tap") { box.taps += 1 }
+            .id(buttonIdentity)
+          ForEach(0..<15) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(testIdentity("TapInScrollFixture", "Scroll"))
+      .frame(width: 10, height: 5, alignment: .topLeading)
+    }
+
+    let buttonRect = try #require(
+      renderedInteractionRect(
+        for: primaryRouteID(for: buttonIdentity),
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+    let press = Point(
+      CellPoint(
+        x: buttonRect.origin.x + buttonRect.size.width / 2,
+        y: buttonRect.origin.y + buttonRect.size.height / 2
+      )
+    )
+
+    // A press and release on the button with no movement activates it.
+    let tapResult = try await runTerminalInputHarness(
+      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      events: [
+        .mouse(.init(kind: .down(.primary), location: press)),
+        .mouse(.init(kind: .up(.primary), location: press)),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { makeView() }
+    )
+    #expect(tapResult.exitReason == .inputEnded)
+    #expect(box.taps == 1)
+    #expect(box.position.y == 0)
+  }
+
+  @MainActor
+  @Test("ScrollView body pan tracks sub-cell drags with half-cell rounding")
+  func scrollViewBodyPanTracksSubCellDrag() async throws {
+    final class Box {
+      var position = ScrollPosition.zero
+    }
+
+    let terminalSize = CellSize(width: 20, height: 8)
+    let rootIdentity = testIdentity("SubCellPanFixture")
+    let box = Box()
+    let view =
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Sub \(index)")
+          }
+        }
+      }
+      .id(testIdentity("SubCellPanFixture", "Scroll"))
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: testIdentity("SubCellPanFixture", "Scroll"),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    func subCell(x: Double, y: Double) -> PointerLocation {
+      .subCell(
+        location: Point(x: x, y: y),
+        source: .nativePixels,
+        metrics: .init(width: 10, height: 20, source: .reported)
+      )
+    }
+    let baseX = Double(scrollRect.origin.x + scrollRect.size.width / 2)
+    let startY = Double(scrollRect.origin.y + scrollRect.size.height - 1)
+
+    // Drag the finger up by only 0.4 cells: the fractional delta rounds to 0,
+    // so the content does not scroll yet (the old cell-floor logic would have
+    // jumped a full row at the cell boundary).
+    let smallDrag = try await runTerminalInputHarness(
+      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      events: [
+        .mouse(.init(kind: .down(.primary), location: subCell(x: baseX, y: startY))),
+        .mouse(.init(kind: .dragged(.primary), location: subCell(x: baseX, y: startY - 0.4))),
+        .mouse(.init(kind: .up(.primary), location: subCell(x: baseX, y: startY - 0.4))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+    #expect(smallDrag.exitReason == .inputEnded)
+    #expect(box.position.y == 0)
+
+    // Drag up by 0.6 cells from the top: rounds to 1, scrolling one row.
+    box.position = .zero
+    let bigDrag = try await runTerminalInputHarness(
+      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      events: [
+        .mouse(.init(kind: .down(.primary), location: subCell(x: baseX, y: startY))),
+        .mouse(.init(kind: .dragged(.primary), location: subCell(x: baseX, y: startY - 0.6))),
+        .mouse(.init(kind: .up(.primary), location: subCell(x: baseX, y: startY - 0.6))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+    #expect(bigDrag.exitReason == .inputEnded)
+    #expect(box.position.y == 1)
+  }
+
+  @MainActor
   @Test("ScrollView without an explicit position binding manages pointer scrolling with LazyVStack")
   func scrollViewWithoutExplicitPositionHandlesPointerScrollingWithLazyVStack() async throws {
     let terminalSize = CellSize(width: 20, height: 8)

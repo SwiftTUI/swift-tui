@@ -53,9 +53,14 @@ extension RunLoop {
       armedPointerRouteID = nil
       armedPointerRouteUsesPointerHandler = false
       capturedPointerRouteID = nil
+      dragStartLocation = nil
       setPressedIdentity(nil, transient: false)
       return
     }
+
+    // Remember where the press began so a later drag can measure whether it
+    // crossed the scroll-takeover threshold (see attemptDragThresholdTransfer…).
+    dragStartLocation = location
 
     let pointerEvent = LocalPointerEvent(
       kind: .down(.primary),
@@ -122,6 +127,7 @@ extension RunLoop {
       capturedPointerRouteID = nil
       armedPointerRouteID = nil
       armedPointerRouteUsesPointerHandler = false
+      dragStartLocation = nil
       setPressedIdentity(nil, transient: false)
     }
 
@@ -230,6 +236,13 @@ extension RunLoop {
     timestamp: MonotonicInstant = .now()
   ) {
     guard button == .primary else {
+      return
+    }
+
+    // A drag that begins on an inner control but travels far enough along a
+    // scrollable ancestor's axis hands the gesture to that scroll view (the
+    // control is cancelled and never activates), matching SwiftUI.
+    if attemptDragThresholdTransferToAncestorScroll(at: location, timestamp: timestamp) {
       return
     }
 

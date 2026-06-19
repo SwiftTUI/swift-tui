@@ -165,7 +165,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             }
             return withImperativeAuthoringContext(authoringContext) {
               panBinding.wrappedValue = ScrollPanAnchor(
-                startCell: event.location.cell,
+                startLocation: event.location.location,
                 startOffset: binding.wrappedValue
               )
               return true
@@ -177,15 +177,21 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             }
             return withImperativeAuthoringContext(authoringContext) {
               let current = binding.wrappedValue
+              let location = event.location.location
               var next = anchor.startOffset
-              // Content follows the finger: dragging down (cell.y increases)
+              // Content follows the finger: dragging down (location.y increases)
               // reveals content above (offset decreases). This is the natural
-              // touch convention, opposite the wheel's `.scrolled` mapping.
+              // touch convention, opposite the wheel's `.scrolled` mapping. The
+              // fractional delta is rounded so sub-cell drags track smoothly.
               if scrollAxes.contains(.horizontal) {
-                next.x = anchor.startOffset.x - (event.location.cell.x - anchor.startCell.x)
+                next.x = Int(
+                  (Double(anchor.startOffset.x) - (location.x - anchor.startLocation.x)).rounded()
+                )
               }
               if scrollAxes.contains(.vertical) {
-                next.y = anchor.startOffset.y - (event.location.cell.y - anchor.startCell.y)
+                next.y = Int(
+                  (Double(anchor.startOffset.y) - (location.y - anchor.startLocation.y)).rounded()
+                )
               }
               if let ctx = event.scrollContext {
                 next = clampedScrollOffset(next, in: ctx)

@@ -3,12 +3,18 @@ import SwiftTUICore
 /// The fixed reference point captured when a drag-to-pan gesture begins.
 ///
 /// Each subsequent `.dragged` event recomputes the offset from this anchor
-/// (`startOffset` plus the cell delta from `startCell`) rather than accumulating
-/// per-event deltas. Anchoring keeps panning robust against dropped pointer
-/// events and re-clamps cleanly at the content edges. Stored in `@State` so it
-/// survives the re-resolve each scroll mutation triggers.
+/// (`startOffset` plus the fractional cell delta from `startLocation`) rather
+/// than accumulating per-event deltas. Anchoring keeps panning robust against
+/// dropped pointer events and re-clamps cleanly at the content edges. Stored in
+/// `@State` so it survives the re-resolve each scroll mutation triggers.
+///
+/// `startLocation` is the continuous (sub-cell) pointer location, so panning
+/// tracks the finger smoothly on sub-cell-precision hosts (iOS/native): the
+/// rounded fractional delta crosses a cell boundary near the half-cell point
+/// rather than only at whole-cell boundaries. On cell-only hosts the location
+/// is the cell center, so deltas stay integer and behavior is unchanged.
 struct ScrollPanAnchor: Equatable, Sendable {
-  var startCell: CellPoint
+  var startLocation: Point
   var startOffset: ScrollPosition
 }
 
