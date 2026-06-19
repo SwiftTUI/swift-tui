@@ -139,6 +139,16 @@ final class DragGestureRecognizer: GestureRecognizer {
           pointer: event.location
         )
       ]
+      if minimumDistance <= 0 {
+        phase = .began
+        lastValue = makeValue(
+          now: event.timestamp,
+          location: location,
+          start: location,
+          startTime: event.timestamp,
+          pointer: event.location
+        )
+      }
       return .handled
     case .dragged(.primary):
       guard let start = startLocation, let t0 = startTime else { return .ignored }

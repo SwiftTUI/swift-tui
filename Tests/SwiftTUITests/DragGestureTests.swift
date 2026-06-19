@@ -47,6 +47,21 @@ struct DragGestureTests {
     #expect(v.pointer.location == Point(x: 5, y: 3))
   }
 
+  @Test("zero-distance DragGesture begins on primary down")
+  func zeroDistanceDragBeginsOnDown() throws {
+    let rec = DragGesture()._makeRecognizer(context: ctx())
+
+    _ = rec.handle(event: event(.down(.primary), at: Point(x: 2, y: 1)))
+    let value: DragGesture.Value? = rec.currentValue()
+    let v = try #require(value)
+
+    #expect(rec.phase == .began)
+    #expect(v.startLocation == Point(x: 2, y: 1))
+    #expect(v.location == Point(x: 2, y: 1))
+    #expect(v.translation == .zero)
+    #expect(v.velocity == .zero)
+  }
+
   @Test("DragGesture ends on .up")
   func endsOnUp() {
     let rec = DragGesture()._makeRecognizer(context: ctx())
