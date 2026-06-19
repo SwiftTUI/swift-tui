@@ -60,12 +60,16 @@ extension RunLoop {
   }
 
   /// Returns the snapshot with each scroll route's `contentOffset` populated
-  /// from the live scroll-position registry, so the web-host transport can
-  /// publish scroll-extent metadata for scroll-chaining. Returns the snapshot
-  /// unchanged when it has no scrollable regions. Only applied on the
-  /// `SemanticHostFrame` (web-host) presentation path; the stored/committed
+  /// from the live scroll-position registry, so every `SemanticHostFrame` host
+  /// (web, Android, native SwiftUI) can publish per-region scroll-extent
+  /// metadata: viewport rect, live offset, and content size. Hosts use it for
+  /// scroll-chaining (web) and may use it for native nested-scroll routing.
+  /// Returns the snapshot unchanged when it has no scrollable regions. Applied
+  /// only on the `SemanticHostFrame` presentation path; the stored/committed
   /// snapshot is left untouched so frame-reuse equality is unaffected. See
-  /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
+  /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` and
+  /// `docs/plans/2026-06-19-001-cross-host-scrolling-plan.md` in the
+  /// coordination root.
   private func semanticSnapshotWithScrollOffsets(
     _ snapshot: SemanticSnapshot
   ) -> SemanticSnapshot {

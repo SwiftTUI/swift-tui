@@ -2018,6 +2018,100 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("ScrollView body drag pans the content so it follows the pointer")
+  func scrollViewBodyDragPansContent() async throws {
+    let terminalSize = CellSize(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("BodyPanFixture")
+    let view =
+      ScrollView(.vertical) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Pan \(index)")
+          }
+        }
+      }
+      .id(testIdentity("BodyPanFixture", "Scroll"))
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: testIdentity("BodyPanFixture", "Scroll"),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    // Press on the scroll body, then drag the finger upward (bottom → top).
+    // Direct manipulation: dragging up pushes content up, revealing later rows.
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: bottomPoint(of: scrollRect))),
+        .mouse(.init(kind: .dragged(.primary), location: topPoint(of: scrollRect))),
+        .mouse(.init(kind: .up(.primary), location: topPoint(of: scrollRect))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(firstFrame.contains("Pan 0"))
+    // A 4-cell upward drag scrolls the viewport down by 4 rows, so the top rows
+    // scroll out of view and later rows appear.
+    #expect(!lastFrame.contains("Pan 0"))
+    #expect(lastFrame.contains("Pan 4"))
+  }
+
+  @MainActor
+  @Test("ScrollView body tap without movement does not scroll")
+  func scrollViewBodyTapWithoutMovementDoesNotScroll() async throws {
+    let terminalSize = CellSize(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("BodyPanTapFixture")
+    let view =
+      ScrollView(.vertical) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Tap \(index)")
+          }
+        }
+      }
+      .id(testIdentity("BodyPanTapFixture", "Scroll"))
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: testIdentity("BodyPanTapFixture", "Scroll"),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    // A press and release at the same location must not move the content.
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: centerPoint(of: scrollRect))),
+        .mouse(.init(kind: .up(.primary), location: centerPoint(of: scrollRect))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("Tap 0"))
+    #expect(!lastFrame.contains("Tap 5"))
+  }
+
+  @MainActor
   @Test("ScrollView without an explicit position binding manages pointer scrolling with LazyVStack")
   func scrollViewWithoutExplicitPositionHandlesPointerScrollingWithLazyVStack() async throws {
     let terminalSize = CellSize(width: 20, height: 8)

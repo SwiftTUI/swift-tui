@@ -159,6 +159,41 @@ public struct AndroidHostPixelSizeSnapshot: Codable, Equatable, Sendable {
   }
 }
 
+public struct AndroidHostCellSizeSnapshot: Codable, Equatable, Sendable {
+  public var width: Int
+  public var height: Int
+
+  public init(
+    _ size: CellSize
+  ) {
+    width = size.width
+    height = size.height
+  }
+}
+
+/// A scrollable region's extent for the Android host: the viewport rect, the
+/// current clamped scroll offset, and the total content size, all in cells.
+///
+/// Mirrors the web host's `scrollRegions` wire shape so both surfaces forward
+/// the same scroll-existence metadata. The host can derive per-direction
+/// headroom (`min(max(0, offset), max(0, content - viewport))`) to route a pan
+/// to the inner region or chain it to an outer native scroll view.
+public struct AndroidHostScrollRegionSnapshot: Codable, Equatable, Sendable {
+  public var id: String
+  public var rect: AndroidHostCellRectSnapshot
+  public var offset: AndroidHostCellPointSnapshot
+  public var content: AndroidHostCellSizeSnapshot
+
+  public init(
+    _ route: ScrollRoute
+  ) {
+    id = route.identity.path
+    rect = AndroidHostCellRectSnapshot(route.viewportRect)
+    offset = AndroidHostCellPointSnapshot(route.contentOffset)
+    content = AndroidHostCellSizeSnapshot(route.contentBounds.size)
+  }
+}
+
 public struct AndroidHostImageAttachmentSnapshot: Codable, Equatable, Sendable {
   public var id: String
   public var bounds: AndroidHostCellRectSnapshot
@@ -310,6 +345,10 @@ public struct AndroidHostFrameSnapshot: Codable, Equatable, Sendable {
   public var focusPresentation: AndroidHostFocusPresentationSnapshot
   public var accessibilityNodes: [AndroidHostAccessibilityNodeSnapshot]
   public var accessibilityAnnouncements: [AndroidHostAccessibilityAnnouncementSnapshot]
+  /// Scroll-existence metadata for each scrollable region on screen. Omitted
+  /// (nil) when the frame has no scrollable regions, so frames without scroll
+  /// content keep their existing wire shape.
+  public var scrollRegions: [AndroidHostScrollRegionSnapshot]?
   public var dirtyRows: [Int]
   public var textDamageRows: [AndroidHostTextDamageRowSnapshot]
   public var requiresFullTextRepaint: Bool
@@ -330,6 +369,7 @@ public struct AndroidHostFrameSnapshot: Codable, Equatable, Sendable {
     focusPresentation: AndroidHostFocusPresentationSnapshot,
     accessibilityNodes: [AndroidHostAccessibilityNodeSnapshot],
     accessibilityAnnouncements: [AndroidHostAccessibilityAnnouncementSnapshot],
+    scrollRegions: [AndroidHostScrollRegionSnapshot]? = nil,
     dirtyRows: [Int],
     textDamageRows: [AndroidHostTextDamageRowSnapshot],
     requiresFullTextRepaint: Bool,
@@ -349,6 +389,7 @@ public struct AndroidHostFrameSnapshot: Codable, Equatable, Sendable {
     self.focusPresentation = focusPresentation
     self.accessibilityNodes = accessibilityNodes
     self.accessibilityAnnouncements = accessibilityAnnouncements
+    self.scrollRegions = scrollRegions
     self.dirtyRows = dirtyRows
     self.textDamageRows = textDamageRows
     self.requiresFullTextRepaint = requiresFullTextRepaint
@@ -386,6 +427,9 @@ public enum AndroidHostFrameEncoder {
       accessibilityAnnouncements: frame.semantics.accessibilityAnnouncements.map(
         AndroidHostAccessibilityAnnouncementSnapshot.init
       ),
+      scrollRegions: frame.semantics.scrollRoutes.isEmpty
+        ? nil
+        : frame.semantics.scrollRoutes.map(AndroidHostScrollRegionSnapshot.init),
       dirtyRows: damage?.dirtyRows.sorted() ?? [],
       textDamageRows: damage?.textRows.map(AndroidHostTextDamageRowSnapshot.init) ?? [],
       requiresFullTextRepaint: damage?.requiresFullTextRepaint ?? true,

@@ -81,6 +81,20 @@ struct HostedSceneSessionTests {
     }
   }
 
+  private struct ScrollSurfaceApp: App {
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        ScrollView(.vertical) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<20) { index in
+              Text("Row \(index)")
+            }
+          }
+        }
+      }
+    }
+  }
+
   @Test("hosted scene session rerenders when the hosted raster surface refreshes")
   func hostedSceneSessionRerendersOnSurfaceRefresh() async throws {
     let recorder = SurfaceRecorder()
@@ -131,6 +145,45 @@ struct HostedSceneSessionTests {
     let exitReason = try await task.value
 
     #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+  }
+
+  @Test("hosted scene session forwards live scroll-region offsets in semantic frames")
+  func hostedSceneSessionForwardsScrollOffsets() async throws {
+    // This is the path the native SwiftUI and Android hosts consume: the
+    // SemanticHostFrame delivered to `onFrame` must carry each scroll region's
+    // live offset (enriched from the scroll-position registry), so those hosts
+    // can route nested scrolling the way the web host already does.
+    let recorder = SemanticFrameRecorder()
+    let session = try HostedSceneSession(
+      for: ScrollSurfaceApp(),
+      sceneID: WindowIdentifier("primary"),
+      surface: hostedSurface(semanticRecorder: recorder)
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    await recorder.updates.wait { recorder.latestSnapshot?.scrollRoutes.isEmpty == false }
+    let route = try #require(recorder.latestSnapshot?.scrollRoutes.first)
+    #expect(route.contentOffset == .zero)
+
+    let viewport = route.viewportRect
+    let center = Point(
+      CellPoint(
+        x: viewport.origin.x + max(0, viewport.size.width / 2),
+        y: viewport.origin.y + max(0, viewport.size.height / 2)
+      )
+    )
+    session.send(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 2), location: center)))
+
+    await recorder.updates.wait {
+      (recorder.latestSnapshot?.scrollRoutes.first?.contentOffset.y ?? 0) == 2
+    }
+    #expect(recorder.latestSnapshot?.scrollRoutes.first?.contentOffset.y == 2)
+
+    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
+    _ = try await task.value
   }
 
   @Test("hosted raster surface forwards focused text clipboard writes")

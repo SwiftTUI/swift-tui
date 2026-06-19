@@ -120,4 +120,46 @@ func android_host_frame_encoder_writes_versioned_host_frame_snapshot() throws {
     )
   ])
   #expect(snapshot.requiresFullTextRepaint == false)
+  // A frame with no scrollable regions omits scrollRegions entirely.
+  #expect(snapshot.scrollRegions == nil)
+}
+
+@Test
+func android_host_frame_encoder_serializes_scroll_regions() throws {
+  let scrollIdentity = Identity(components: ["root", "list"])
+  let frame = SemanticHostFrame(
+    sequence: 7,
+    raster: RasterSurface(
+      size: CellSize(width: 4, height: 2),
+      lines: ["ab", "cd"],
+      styleRuns: [],
+      imageAttachments: []
+    ),
+    semantics: SemanticSnapshot(
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: CellRect(origin: CellPoint(x: 0, y: 0), size: CellSize(width: 4, height: 2)),
+          contentBounds: CellRect(origin: CellPoint(x: 0, y: 0), size: CellSize(width: 4, height: 10)),
+          contentOffset: CellPoint(x: 0, y: 3)
+        )
+      ]
+    ),
+    focusedIdentity: nil,
+    rasterDamage: nil,
+    preferredLayoutSize: nil
+  )
+
+  let bytes = try AndroidHostFrameEncoder.encode(frame)
+  let snapshot = try JSONDecoder().decode(AndroidHostFrameSnapshot.self, from: Data(bytes))
+
+  let regions = try #require(snapshot.scrollRegions)
+  #expect(regions.count == 1)
+  let region = try #require(regions.first)
+  #expect(region.id == "root/list")
+  #expect(region.rect == AndroidHostCellRectSnapshot(
+    CellRect(origin: CellPoint(x: 0, y: 0), size: CellSize(width: 4, height: 2))
+  ))
+  #expect(region.offset == AndroidHostCellPointSnapshot(CellPoint(x: 0, y: 3)))
+  #expect(region.content == AndroidHostCellSizeSnapshot(CellSize(width: 4, height: 10)))
 }

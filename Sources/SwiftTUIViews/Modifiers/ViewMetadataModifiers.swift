@@ -169,6 +169,11 @@ package func scrollViewMetadata(
     isFocusable: true,
     focusInteractions: .edit,
     participatesInPointerHitTesting: true,
+    // Capture the pointer on press so a drag that begins on scroll content
+    // routes its whole `.dragged`/`.up` stream to the scroll view for
+    // direct-manipulation panning. The body handler only claims the `.down`
+    // while the content overflows, so non-scrollable presses still bubble.
+    captureOnPress: true,
     scrollRole: .scrollView,
     accessibilityRole: accessibilityRole
   )

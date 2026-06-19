@@ -1,5 +1,44 @@
 import SwiftTUICore
 
+/// The fixed reference point captured when a drag-to-pan gesture begins.
+///
+/// Each subsequent `.dragged` event recomputes the offset from this anchor
+/// (`startOffset` plus the cell delta from `startCell`) rather than accumulating
+/// per-event deltas. Anchoring keeps panning robust against dropped pointer
+/// events and re-clamps cleanly at the content edges. Stored in `@State` so it
+/// survives the re-resolve each scroll mutation triggers.
+struct ScrollPanAnchor: Equatable, Sendable {
+  var startCell: CellPoint
+  var startOffset: ScrollPosition
+}
+
+extension LocalPointerScrollContext {
+  /// Maximum horizontal scroll offset (clamped to non-negative).
+  var maxScrollX: Int {
+    max(0, contentBounds.size.width - viewportRect.size.width)
+  }
+
+  /// Maximum vertical scroll offset (clamped to non-negative).
+  var maxScrollY: Int {
+    max(0, contentBounds.size.height - viewportRect.size.height)
+  }
+}
+
+/// Clamps a scroll offset to `[0, maxScroll]` per axis for the given context.
+///
+/// Mirrors the clamp used by `LocalScrollPositionRegistry` and `ScrollViewLayout`
+/// (`min(max(0, requested), max(0, content - viewport))`) so wheel, drag-pan,
+/// imperative scrolling, and layout all agree on the scrollable range.
+func clampedScrollOffset(
+  _ offset: ScrollPosition,
+  in context: LocalPointerScrollContext
+) -> ScrollPosition {
+  ScrollPosition(
+    x: min(max(0, offset.x), context.maxScrollX),
+    y: min(max(0, offset.y), context.maxScrollY)
+  )
+}
+
 extension ScrollView {
   func effectiveIndicatorVisibility(
     environment: ScrollIndicatorVisibility

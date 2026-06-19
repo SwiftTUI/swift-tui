@@ -5,6 +5,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   public var axes: Axis.Set
   public var showsIndicators: Bool
   @State private var internalPosition = ScrollPosition.zero
+  @State private var panAnchor: ScrollPanAnchor?
   private var explicitPosition: Binding<ScrollPosition>?
   private let contentAuthoringScope: AuthoringContext?
   private let interactionAuthoringScope: AuthoringContext?
@@ -112,40 +113,103 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         )
 
         let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+        let scrollAxes = axes
+        let panBinding = $panAnchor
         context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
-          guard case .scrolled(let deltaX, let deltaY) = event.kind else {
+          switch event.kind {
+          case .scrolled(let deltaX, let deltaY):
+            return withImperativeAuthoringContext(authoringContext) {
+              let current = binding.wrappedValue
+              var next = current
+              var changed = false
+              if scrollAxes.contains(.horizontal), deltaX != 0 {
+                next.scrollBy(x: deltaX)
+                changed = true
+              }
+              if scrollAxes.contains(.vertical), deltaY != 0 {
+                next.scrollBy(y: deltaY)
+                changed = true
+              }
+
+              guard changed else {
+                return false
+              }
+
+              if let ctx = event.scrollContext {
+                next = clampedScrollOffset(next, in: ctx)
+              }
+
+              guard next != current else {
+                return false
+              }
+
+              binding.wrappedValue = next
+              return true
+            }
+
+          // Direct-manipulation panning: a touch/pointer drag that starts on the
+          // scroll view's own content (not on an inner control) pans the content
+          // so it follows the finger. This is the same gesture path iOS and
+          // Android already forward as `.dragged`, so panning lights up on every
+          // host once the body captures the drag stream. The body only claims
+          // the press while content actually overflows, so non-scrollable drags
+          // still bubble to a parent scroll view or gesture.
+          case .down(.primary):
+            guard let ctx = event.scrollContext else {
+              return false
+            }
+            let canPanX = scrollAxes.contains(.horizontal) && ctx.maxScrollX > 0
+            let canPanY = scrollAxes.contains(.vertical) && ctx.maxScrollY > 0
+            guard canPanX || canPanY else {
+              return false
+            }
+            return withImperativeAuthoringContext(authoringContext) {
+              panBinding.wrappedValue = ScrollPanAnchor(
+                startCell: event.location.cell,
+                startOffset: binding.wrappedValue
+              )
+              return true
+            }
+
+          case .dragged(.primary):
+            guard let anchor = panBinding.wrappedValue else {
+              return false
+            }
+            return withImperativeAuthoringContext(authoringContext) {
+              let current = binding.wrappedValue
+              var next = anchor.startOffset
+              // Content follows the finger: dragging down (cell.y increases)
+              // reveals content above (offset decreases). This is the natural
+              // touch convention, opposite the wheel's `.scrolled` mapping.
+              if scrollAxes.contains(.horizontal) {
+                next.x = anchor.startOffset.x - (event.location.cell.x - anchor.startCell.x)
+              }
+              if scrollAxes.contains(.vertical) {
+                next.y = anchor.startOffset.y - (event.location.cell.y - anchor.startCell.y)
+              }
+              if let ctx = event.scrollContext {
+                next = clampedScrollOffset(next, in: ctx)
+              } else {
+                next.x = max(0, next.x)
+                next.y = max(0, next.y)
+              }
+              if next != current {
+                binding.wrappedValue = next
+              }
+              return true
+            }
+
+          case .up(.primary):
+            guard panBinding.wrappedValue != nil else {
+              return false
+            }
+            return withImperativeAuthoringContext(authoringContext) {
+              panBinding.wrappedValue = nil
+              return true
+            }
+
+          default:
             return false
-          }
-          return withImperativeAuthoringContext(authoringContext) {
-            let current = binding.wrappedValue
-            var next = current
-            var changed = false
-            if axes.contains(.horizontal), deltaX != 0 {
-              next.scrollBy(x: deltaX)
-              changed = true
-            }
-            if axes.contains(.vertical), deltaY != 0 {
-              next.scrollBy(y: deltaY)
-              changed = true
-            }
-
-            guard changed else {
-              return false
-            }
-
-            if let ctx = event.scrollContext {
-              let maxX = max(0, ctx.contentBounds.size.width - ctx.viewportRect.size.width)
-              let maxY = max(0, ctx.contentBounds.size.height - ctx.viewportRect.size.height)
-              next.x = min(max(0, next.x), maxX)
-              next.y = min(max(0, next.y), maxY)
-            }
-
-            guard next != current else {
-              return false
-            }
-
-            binding.wrappedValue = next
-            return true
           }
         }
 
