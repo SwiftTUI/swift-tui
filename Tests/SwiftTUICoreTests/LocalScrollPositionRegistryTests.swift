@@ -133,6 +133,108 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 0, y: 2))
   }
 
+  /// Regression for "wheel scroll stalls partway down, must click to continue":
+  /// once a control is focused, focus-reveal must NOT re-assert itself every
+  /// frame and drag the offset back when the user scrolls that control out of
+  /// view. It is a one-shot response to a focus/cursor change.
+  @Test("focus-reveal does not fight a user scroll that moves the focused control out of view")
+  func focusRevealDoesNotFightUserScroll() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let focusedIdentity = testIdentity("Scroll", "Content", "Button")
+    var offset = ScrollOffset.zero
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+
+    let viewport = CellRect(origin: .zero, size: .init(width: 10, height: 4))
+    // The focused control lives at content row 1. Its on-screen rect is
+    // `contentRow - offset.y`; the route's content origin shifts by `-offset.y`.
+    func syncFocused(contentRow: Int) -> Bool {
+      registry.sync(
+        focusedIdentity: focusedIdentity,
+        focusRegions: [
+          FocusRegion(
+            identity: focusedIdentity,
+            rect: .init(
+              origin: .init(x: 0, y: contentRow - offset.y),
+              size: .init(width: 4, height: 1))
+          )
+        ],
+        scrollRoutes: [
+          ScrollRoute(
+            identity: scrollIdentity,
+            viewportRect: viewport,
+            contentBounds: .init(
+              origin: .init(x: 0, y: -offset.y), size: .init(width: 10, height: 20)))
+        ]
+      )
+    }
+
+    // First sync: the focused control (content row 1) is already visible at
+    // offset 0, so no scroll — but the reveal anchor is now recorded.
+    #expect(!syncFocused(contentRow: 1))
+    #expect(offset == .zero)
+
+    // The user wheels down past the focused control (offset jumps to 5; the
+    // control is now four rows above the viewport top).
+    offset = ScrollOffset(x: 0, y: 5)
+    let changed = syncFocused(contentRow: 1)
+
+    // The fix: reveal must leave the user's offset alone instead of yanking the
+    // focused control back into view.
+    #expect(!changed)
+    #expect(offset == ScrollOffset(x: 0, y: 5))
+  }
+
+  /// The other half of the contract: reveal must still fire when focus moves to
+  /// a *different* control that is off-screen.
+  @Test("focus-reveal still fires when focus changes to a new off-screen control")
+  func focusRevealStillFiresOnFocusChange() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let firstButton = testIdentity("Scroll", "Content", "ButtonA")
+    let secondButton = testIdentity("Scroll", "Content", "ButtonB")
+    var offset = ScrollOffset(x: 0, y: 5)
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    let viewport = CellRect(origin: .zero, size: .init(width: 10, height: 4))
+    let route = ScrollRoute(
+      identity: scrollIdentity,
+      viewportRect: viewport,
+      contentBounds: .init(origin: .init(x: 0, y: -5), size: .init(width: 10, height: 20)))
+
+    // Focus ButtonA (visible) — records its anchor, no scroll.
+    _ = registry.sync(
+      focusedIdentity: firstButton,
+      focusRegions: [
+        FocusRegion(
+          identity: firstButton,
+          rect: .init(origin: .init(x: 0, y: 1), size: .init(width: 4, height: 1)))
+      ],
+      scrollRoutes: [route]
+    )
+    #expect(offset == ScrollOffset(x: 0, y: 5))
+
+    // Focus moves to ButtonB, which sits two rows above the viewport top.
+    let changed = registry.sync(
+      focusedIdentity: secondButton,
+      focusRegions: [
+        FocusRegion(
+          identity: secondButton,
+          rect: .init(origin: .init(x: 0, y: -2), size: .init(width: 4, height: 1)))
+      ],
+      scrollRoutes: [route]
+    )
+    #expect(changed)
+    #expect(offset == ScrollOffset(x: 0, y: 3))
+  }
+
   @Test("scrollTo target below viewport uses the minimum reveal delta")
   func scrollToTargetBelowViewportUsesMinimumRevealDelta() {
     let registry = LocalScrollPositionRegistry()

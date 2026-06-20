@@ -34,6 +34,19 @@ package final class LocalScrollPositionRegistry: Equatable {
   private var registrations: [Identity: ScrollPositionRegistrationSnapshot] = [:]
   private var latestScrollRoutes: [ScrollRoute] = []
   private var latestScrollTargets: [ScrollTarget] = []
+  /// What each scroll route last auto-revealed (focused element + text cursor),
+  /// keyed by the route identity. Lets `sync` fire focus-reveal only when focus
+  /// (or a focused text cursor) *changes*, not as a standing per-frame constraint
+  /// that would fight user-initiated wheel/drag scrolling.
+  ///
+  /// This is interaction session state, deliberately decoupled from the
+  /// registration lifecycle: the run loop churns `reset()` (full republication)
+  /// and `removeSubtrees()` (scoped republication) on essentially every frame to
+  /// re-publish the offset closures, so this map must NOT be cleared by either —
+  /// doing so re-fires focus-reveal every frame and reintroduces the stall. It
+  /// is bounded by the number of distinct scroll-route identities the session
+  /// ever shows and is released with the registry.
+  private var lastRevealAnchors: [Identity: ScrollRevealAnchor] = [:]
 
   package init() {}
 
@@ -230,23 +243,52 @@ package final class LocalScrollPositionRegistry: Equatable {
       return false
     }
 
-    let focusedCursorRect =
+    let focusedCursorAnchor =
       accessibilityNodes
       .first(where: { $0.identity == focusedIdentity })?
       .cursorAnchor
-      .map {
-        CellRect(
-          origin: $0,
-          size: CellSize(width: 1, height: 1)
-        )
-      }
+    let focusedCursorRect = focusedCursorAnchor.map {
+      CellRect(
+        origin: $0,
+        size: CellSize(width: 1, height: 1)
+      )
+    }
     let revealRect = focusedCursorRect ?? focusedRegion.rect
+
+    // Focus-reveal must be a one-shot response to a focus/cursor *change*, not a
+    // standing constraint re-applied on every frame. Without this gate, once a
+    // focused control is scrolled to the viewport edge, the next frame's reveal
+    // scrolls it back into view, pinning user-initiated wheel/drag scrolling at
+    // the focused control's position (the "scroll stalls partway, click a
+    // surface to continue" bug).
+    //
+    // An ANCESTOR scroll view reveals a focused descendant only when focus
+    // *moves* — matching SwiftUI, where typing or scrolling never re-asserts the
+    // outer scroll. A DESCENDANT scroll (a text editor's own internal scroll,
+    // INSIDE the focused input) instead follows the text cursor as it advances.
+    // The gate key reflects exactly that: identity-only for ancestor routes,
+    // identity + cursor for the descendant text-scroll. Note the control's rect
+    // position is unusable as a signal — an off-screen focused control reports a
+    // rect clamped to the viewport, and `cursorAnchor` for a non-text node is
+    // just its (scrolling) position; both "change" as the user scrolls.
 
     for route in scrollRoutes.reversed()
     where route.identity.isAncestor(of: focusedIdentity)
       || (focusedCursorRect != nil && route.identity.isDescendant(of: focusedIdentity))
     {
       guard let registration = registrations[route.identity] else {
+        continue
+      }
+
+      let followsCursor =
+        focusedCursorRect != nil && route.identity.isDescendant(of: focusedIdentity)
+      let revealKey = ScrollRevealAnchor(
+        focusedIdentity: focusedIdentity,
+        cursorAnchor: followsCursor ? focusedCursorAnchor : nil
+      )
+      let isFreshReveal = lastRevealAnchors[route.identity] != revealKey
+      lastRevealAnchors[route.identity] = revealKey
+      guard isFreshReveal else {
         continue
       }
 
@@ -271,6 +313,13 @@ package final class LocalScrollPositionRegistry: Equatable {
     registrations.removeAll(keepingCapacity: true)
     latestScrollRoutes.removeAll(keepingCapacity: true)
     latestScrollTargets.removeAll(keepingCapacity: true)
+    // `reset()` is the run loop's per-frame full registration republication, not
+    // a teardown — the same scroll routes are re-registered immediately after.
+    // `lastRevealAnchors` is focus-reveal interaction state that must SURVIVE
+    // republication (otherwise focus-reveal re-fires every full-publication frame
+    // and fights user scrolling again), so it is intentionally left untouched
+    // here (and likewise in `removeSubtrees`, which the run loop also drives
+    // every frame for scoped republication).
   }
 
   package func removeSubtrees(
@@ -442,4 +491,13 @@ private func identityMatchesAnySubtreeRoot(
   roots.contains { root in
     identity == root || identity.isDescendant(of: root)
   }
+}
+
+/// Identifies what a scroll route last auto-revealed: the focused element and,
+/// for a focused text input, its cursor anchor. `sync` re-reveals only when this
+/// changes (focus moved, or a text cursor advanced) — never merely because the
+/// user scrolled the still-focused control out of view. See `sync`.
+private struct ScrollRevealAnchor: Equatable {
+  var focusedIdentity: Identity
+  var cursorAnchor: CellPoint?
 }
