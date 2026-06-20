@@ -158,6 +158,19 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             guard let ctx = event.scrollContext else {
               return false
             }
+            // Only claim a press that landed directly on the scroll body, not
+            // one that bubbled up from an inner control. A direct body hit
+            // carries the viewport as its `targetRect`; a press on an inner
+            // button/slider carries that control's (smaller) rect. Without this
+            // guard the body claims the `.down`/`.up` stream of every press over
+            // overflowing content — shadowing the inner control's activation, so
+            // taps on buttons inside a scroll view never fire. A drag that
+            // begins on an inner control is still handed to the scroll view by
+            // the run loop's drag-threshold takeover, which re-dispatches a
+            // synthetic body `.down` whose `targetRect` is the viewport.
+            guard event.targetRect == ctx.viewportRect else {
+              return false
+            }
             let canPanX = scrollAxes.contains(.horizontal) && ctx.maxScrollX > 0
             let canPanY = scrollAxes.contains(.vertical) && ctx.maxScrollY > 0
             guard canPanX || canPanY else {
