@@ -60,6 +60,11 @@ extension RunLoop {
       ownerNodeID: scrollRoute.viewNodeID
     )
     capturedPointerRouteID = scrollRouteID
+    // Seed the pan-velocity sampler for the handed-off pan so a quick flick after
+    // takeover can fling. The two synthetic events below share `timestamp`
+    // (Δt = 0), which the sampler ignores; real drags afterward add timed samples.
+    scrollPanVelocitySampler.reset(location: dragStartLocation.location, time: timestamp)
+    scrollPanVelocitySampler.record(location: location.location, time: timestamp)
     let scrollContext = LocalPointerScrollContext(
       viewportRect: scrollRoute.viewportRect,
       contentBounds: scrollRoute.contentBounds

@@ -55,6 +55,15 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// drag that exceeds the scroll-takeover threshold can be measured. Set on
   /// `.down` and cleared on `.up`.
   package var dragStartLocation: PointerLocation?
+  /// Run-loop-owned scroll momentum (fling) physics. Ticked on the animation
+  /// deadline cadence and fed integer offset deltas into
+  /// `localScrollPositionRegistry`; momentum is physics, not an animation tween,
+  /// so it deliberately does not route through the animation controller. See
+  /// `RunLoop+ScrollMomentum.swift`.
+  package let scrollMomentum = ScrollMomentumController()
+  /// Samples the captured scroll-pan pointer stream so a release at `.up` can
+  /// seed a fling from a coalescing-robust trailing-window velocity estimate.
+  package var scrollPanVelocitySampler = PointerVelocitySampler()
   package var hoveredPointerRouteID: RouteID?
   package var terminalPointerHoverEnabled = false
   package var postActionInvalidationIdentities: Set<Identity> = []

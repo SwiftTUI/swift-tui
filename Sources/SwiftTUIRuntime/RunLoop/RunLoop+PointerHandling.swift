@@ -62,6 +62,12 @@ extension RunLoop {
     // crossed the scroll-takeover threshold (see attemptDragThresholdTransfer…).
     dragStartLocation = location
 
+    // A fresh press inside a flinging scroll view stops the fling (touch-to-stop),
+    // and seeds the pan-velocity sampler so a drag that becomes a pan can measure
+    // its release velocity from the press origin onward.
+    cancelScrollMomentum(containing: hitTarget.region.identity)
+    scrollPanVelocitySampler.reset(location: location.location, time: timestamp)
+
     let pointerEvent = LocalPointerEvent(
       kind: .down(.primary),
       location: location,
@@ -145,6 +151,14 @@ extension RunLoop {
           namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
           timestamp: timestamp
         )
+      )
+      // A captured *scroll* pan that releases with velocity flings; the `defer`
+      // above then tears down the capture state but the fling lives on in the
+      // run-loop-owned momentum controller, keyed by the route identity.
+      beginScrollMomentumOnReleaseIfNeeded(
+        routeIdentity: region.identity,
+        releaseLocation: location,
+        timestamp: timestamp
       )
       return
     }
@@ -249,6 +263,10 @@ extension RunLoop {
     if let capturedPointerRouteID,
       let region = interactionRegion(routeID: capturedPointerRouteID)
     {
+      // Sample the captured pan so a release can estimate fling velocity. Cheap
+      // and harmless for non-scroll captured routes (consumed only at a scroll
+      // route's `.up`).
+      recordScrollPanSample(location: location, timestamp: timestamp)
       _ = dispatchPointerEvent(
         preferredRouteID: capturedPointerRouteID,
         identity: region.identity,
@@ -276,6 +294,9 @@ extension RunLoop {
     // Scroll events should not move keyboard focus — the scroll target
     // is resolved independently via scrollTarget(at:).
     if let scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
+      // A wheel notch is an explicit reposition: cancel any fling on that route
+      // so the discrete scroll wins instead of fighting the decay.
+      cancelScrollMomentum(containing: scrollRoute.identity)
       let routeID = primaryRouteID(
         for: scrollRoute.identity,
         ownerNodeID: scrollRoute.viewNodeID

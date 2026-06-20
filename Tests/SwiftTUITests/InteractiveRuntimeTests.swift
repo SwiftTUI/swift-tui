@@ -2068,6 +2068,238 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("A ScrollView body flick keeps gliding (momentum) after release, then settles")
+  func scrollViewBodyFlickHasMomentum() throws {
+    final class Box { var position = ScrollPosition.zero }
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("FlingFixture")
+    let scrollID = testIdentity("FlingFixture", "Scroll")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID,
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualClock(t0)
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      clock: clock,
+      viewBuilder: makeView
+    )
+
+    var frames = 0
+    let bottom = bottomPoint(of: scrollRect)
+    let top = topPoint(of: scrollRect)
+    // A fast upward flick: press at the bottom, drag to the top within ~24 ms,
+    // release. The drag itself pans; the release seeds the fling.
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tDrag = t0.advanced(by: .milliseconds(16))
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tUp = t0.advanced(by: .milliseconds(24))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+
+    let offsetAtRelease = box.position.y
+    #expect(offsetAtRelease > 0)  // the drag itself panned the content down
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)  // and a fling was armed
+
+    // Drive the decay deterministically by stepping the frame-readiness clock at
+    // the 33 ms tick cadence — no sleeps, no async loop.
+    clock.now = tUp
+    var step = 0
+    while runLoop.scrollMomentum.hasActiveMomentum, step < 600 {
+      clock.now = clock.now.advanced(by: .milliseconds(33))
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+      step += 1
+    }
+
+    let settled = box.position.y
+    #expect(settled > offsetAtRelease)  // momentum carried it well past the release
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)  // then it settled
+    #expect(settled < 195)  // never overshot the content extent (maxScrollY = 194)
+
+    // A settled fling does not drift further.
+    clock.now = clock.now.advanced(by: .milliseconds(33))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(box.position.y == settled)
+  }
+
+  @MainActor
+  @Test("Reduced motion releases a pan at the drag position with no fling")
+  func scrollViewFlickSuppressedUnderReducedMotion() throws {
+    final class Box { var position = ScrollPosition.zero }
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("FlingReducedFixture")
+    let scrollID = testIdentity("FlingReducedFixture", "Scroll")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID,
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualClock(t0)
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      motion: .reduced,
+      clock: clock,
+      viewBuilder: makeView
+    )
+
+    var frames = 0
+    let bottom = bottomPoint(of: scrollRect)
+    let top = topPoint(of: scrollRect)
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tDrag = t0.advanced(by: .milliseconds(16))
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tUp = t0.advanced(by: .milliseconds(24))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+
+    let offsetAtRelease = box.position.y
+    #expect(offsetAtRelease > 0)  // the drag still pans under reduced motion
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)  // but no fling is armed
+
+    // Stepping the clock changes nothing — there is no momentum to decay.
+    clock.now = tUp
+    for _ in 0..<20 {
+      clock.now = clock.now.advanced(by: .milliseconds(33))
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+    }
+    #expect(box.position.y == offsetAtRelease)
+  }
+
+  @MainActor
+  @Test("A fresh press during a fling stops it where it is (touch-to-stop)")
+  func scrollViewFlickStoppedByPress() throws {
+    final class Box { var position = ScrollPosition.zero }
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("FlingStopFixture")
+    let scrollID = testIdentity("FlingStopFixture", "Scroll")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID,
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualClock(t0)
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      clock: clock,
+      viewBuilder: makeView
+    )
+
+    var frames = 0
+    let bottom = bottomPoint(of: scrollRect)
+    let top = topPoint(of: scrollRect)
+    let center = centerPoint(of: scrollRect)
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tDrag = t0.advanced(by: .milliseconds(16))
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tUp = t0.advanced(by: .milliseconds(24))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+
+    // Let it glide for a few frames.
+    clock.now = tUp
+    for _ in 0..<3 {
+      clock.now = clock.now.advanced(by: .milliseconds(33))
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+    }
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+    let offsetWhenPressed = box.position.y
+
+    // A fresh press inside the scroll view stops the fling immediately.
+    let tPress = clock.now.advanced(by: .milliseconds(16))
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: center, timestamp: tPress))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)
+
+    // No further drift after the stop.
+    for _ in 0..<10 {
+      clock.now = clock.now.advanced(by: .milliseconds(33))
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+    }
+    #expect(box.position.y == offsetWhenPressed)
+  }
+
+  @MainActor
   @Test("ScrollView body tap without movement does not scroll")
   func scrollViewBodyTapWithoutMovementDoesNotScroll() async throws {
     let terminalSize = CellSize(width: 20, height: 8)
@@ -5249,6 +5481,63 @@ private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
       unsafe lhsBytes.elementsEqual(rhsBytes)
     }
   }
+}
+
+/// A mutable virtual clock for deterministic momentum tests. The run loop's
+/// `frameReadinessClock` reads `now`, which the test steps by the 33 ms tick
+/// cadence so a fling decays in virtual time with no sleeps and no async loop.
+@MainActor
+private final class VirtualClock {
+  var now: MonotonicInstant
+  init(_ now: MonotonicInstant) {
+    self.now = now
+  }
+}
+
+/// Builds and mounts a `RunLoop` for momentum tests, wiring its frame-readiness
+/// clock to `clock` so deadline-driven decay frames can be stepped determinist-
+/// ically. Returns the live run loop; the caller injects pointer events via
+/// `handle(.input(.mouse(…)))` (stamping `timestamp` for deterministic velocity)
+/// and drives frames with the synchronous `renderPendingFrames`.
+@MainActor
+private func mountedMomentumRunLoop<V: View>(
+  terminalSize: CellSize,
+  rootIdentity: Identity,
+  motion: RuntimeConfiguration.MotionMode = .normal,
+  clock: VirtualClock,
+  viewBuilder: @escaping () -> V
+) throws -> SwiftTUIRuntime.RunLoop<Int, V> {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalSize = terminalSize
+
+  let runLoop = RunLoop(
+    rootIdentity: rootIdentity,
+    presentationSurface: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+    terminalInputReader: ScriptedTerminalInputReader(events: []),
+    signalReader: EmptySignalReader(),
+    scheduler: FrameScheduler(),
+    stateContainer: StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    ),
+    focusTracker: FocusTracker(
+      invalidationIdentities: [rootIdentity]
+    ),
+    environmentValues: environmentValues,
+    runtimeConfiguration: RuntimeConfiguration(motion: motion),
+    proposal: .init(width: terminalSize.width, height: terminalSize.height),
+    viewBuilder: ScopedMapper { _ in
+      viewBuilder()
+    }
+  )
+  runLoop.frameReadinessClock = { [clock] in clock.now }
+
+  // Mount the tree synchronously (mirrors RunLoop.run()'s pre-loop bootstrap).
+  runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+  var frames = 0
+  try runLoop.renderPendingFrames(renderedFrames: &frames)
+  runLoop.renderer.enableSelectiveEvaluation()
+  return runLoop
 }
 
 @MainActor

@@ -33,6 +33,7 @@ extension RunLoop {
         coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches
       )
       drainGestureDeadlinesIfNeeded(for: scheduledFrame)
+      advanceScrollMomentumIfNeeded(for: scheduledFrame)
       var convergence = FocusSyncConvergenceState()
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
@@ -249,6 +250,7 @@ extension RunLoop {
         coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches
       )
       drainGestureDeadlinesIfNeeded(for: scheduledFrame)
+      advanceScrollMomentumIfNeeded(for: scheduledFrame)
       var convergence = FocusSyncConvergenceState()
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
