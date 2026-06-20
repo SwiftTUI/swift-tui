@@ -189,9 +189,38 @@ package final class AnimationController: Sendable {
   }
 
   fileprivate func publishCommittedState(
-    from draftController: AnimationController
+    from draftController: AnimationController,
+    preservingConcurrentRegistrationsSince baseline: Checkpoint
   ) {
+    // A `withAnimation(_:) { … } completion:` invoked by an ASYNC task — e.g. a
+    // `PhaseAnimator` loop's `advance`, which awaits each phase's completion —
+    // registers its completion closure (and the animation box) on THIS *live*
+    // controller, between frames, because the task is not running inside a frame
+    // resolve. When that registration lands while an earlier frame's tail is
+    // still in flight, that frame's draft was snapshotted from live BEFORE the
+    // registration, so the full `restore` below would clobber it — permanently
+    // orphaning the completion (its `await` never resumes; the loop stalls). The
+    // large gallery tree makes in-flight frames common, which is why the bug
+    // reproduces there and not in small trees.
+    //
+    // Carry forward every completion / animation-box registration the live
+    // controller has gained since the draft's baseline. The draft never observed
+    // them (it predates them), so it neither references nor fired them; they are
+    // pending registrations that must survive the publish.
+    let concurrentCompletions = completionClosures.filter {
+      baseline.completionClosures[$0.key] == nil
+    }
+    let concurrentRegisteredAnimations = registeredAnimations.filter {
+      baseline.registeredAnimations[$0.key] == nil
+    }
     restore(draftController.makeCheckpoint())
+    for (batchID, closure) in concurrentCompletions where completionClosures[batchID] == nil {
+      completionClosures[batchID] = closure
+    }
+    for (box, animation) in concurrentRegisteredAnimations
+    where registeredAnimations[box] == nil {
+      registeredAnimations[box] = animation
+    }
   }
 
   /// Stores a snapshot of the placed tree at the end of the frame so
@@ -452,6 +481,32 @@ package final class AnimationController: Sendable {
         "pendingEmptyBatches": pendingEmptyBatchCompletions.count,
       ]
     )
+  }
+
+  /// Whether the *live* controller still holds animation work that needs another
+  /// frame to drain (active animations / removals) or to fire a pending
+  /// `withAnimation` completion. Used to keep the run loop's animation pump alive
+  /// across SKIPPED async frames: a cancelled-before-start / dropped-completed
+  /// frame abandons its draft without committing, so — unlike the committed and
+  /// elided paths — it never reschedules the next deadline. If the skipped frame
+  /// was the one draining an animation, the live controller keeps that animation
+  /// active but no deadline is armed, the run loop idles, and the deferred
+  /// completion (e.g. a `PhaseAnimator` loop's per-phase completion) never fires
+  /// until an unrelated event happens to wake the loop.
+  package var requiresContinuedAnimationFrames: Bool {
+    !activeAnimations.isEmpty
+      || !completionClosures.isEmpty
+      || !pendingEmptyBatchCompletions.isEmpty
+      || !deferredFrameHeadCompletions.isEmpty
+      || !removingNodes.isEmpty
+      || !transitionsByNodeID.isEmpty
+      || !previousTransitionsByNodeID.isEmpty
+      || !pendingTransitionsByNodeID.isEmpty
+  }
+
+  /// The animation tick cadence (matches the run loop's 33 ms frame interval).
+  package var animationFrameInterval: Duration {
+    frameInterval
   }
 
   package var frameDropEligibilityBlockers: Set<FrameDropEligibility.Blocker> {
@@ -1460,7 +1515,10 @@ package final class AnimationFrameDraft {
   package func commit() {
     precondition(!didCommit && !didDiscard)
     let completions = controller.finishFrameHeadTransaction(transactionCheckpoint)
-    liveController.publishCommittedState(from: controller)
+    liveController.publishCommittedState(
+      from: controller,
+      preservingConcurrentRegistrationsSince: transactionCheckpoint
+    )
     didCommit = true
     for completion in completions {
       completion()

@@ -288,6 +288,13 @@ extension RunLoop {
           // Tail job was cancelled-before-start or dropped-completed; the
           // acquisition step already reported issues, carried lifecycle
           // forward, and logged the tail. Abandon this frame.
+          //
+          // A skipped frame never commits, so — unlike the committed and elided
+          // paths — it does not reschedule the animation deadline. If it was the
+          // frame draining an active animation, the live controller still holds
+          // that animation but nothing is armed to re-drain it; keep the pump
+          // alive so its deferred withAnimation completion still fires.
+          requestNextAnimationFrameAfterSkippedFrameIfNeeded()
           continue frameLoop
         case .elided:
           // Off-screen elision fired: `commitElidedFrame` (inside the gate

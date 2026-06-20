@@ -176,6 +176,26 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     }
 
     let completionGate = OneShotContinuationGate()
+
+    // Completion-driven advance is the normal path. But a `withAnimation`
+    // completion can be dropped by the frame pipeline: a completion deferred
+    // during a frame-head transaction is lost when that frame is discarded /
+    // superseded / off-screen-elided (frequent behind a capture-host seam such
+    // as the gallery's lazy tab + scroll viewport), which would deadlock this
+    // loop on the very first phase. Arm a fallback that advances after the
+    // animation's own duration so the cycle can never stall waiting on a missed
+    // completion. The gate is one-shot, so whichever signal arrives first wins
+    // and the other is a no-op; the fallback is cancelled as soon as `advance`
+    // returns, so the fast (completion-driven) path stays the steady state.
+    let fallbackDelay = animation?.totalDuration.map { $0 + .milliseconds(120) }
+    let fallbackTask: Task<Void, Never>? = fallbackDelay.map { delay in
+      Task { @MainActor in
+        try? await Task.sleep(for: delay)
+        completionGate.resume()
+      }
+    }
+    defer { fallbackTask?.cancel() }
+
     await withTaskCancellationHandler {
       await withCheckedContinuation {
         (continuation: CheckedContinuation<Void, Never>) in
