@@ -5,6 +5,10 @@ import Synchronization
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
+#elseif canImport(Musl)
+  import Musl
 #endif
 
 /// Env-gated frame-pipeline trace sink.
@@ -27,31 +31,42 @@ import Synchronization
 /// (drop-eligibility blockers), and free-form `extra`. A `ZEROART` row is a
 /// frame that produced no pixels — the prime suspect for a momentary blank.
 @_spi(Runners) public final class EnvFrameTraceSink: FrameDiagnosticSink {
-  private let descriptor: Mutex<Int32>
+  #if !canImport(WASILibc)
+    private let descriptor: Mutex<Int32>
+  #endif
   private let seq = Mutex(0)
 
-  private init?(path: String) {
-    let fd = unsafe path.withCString { pathPointer in
-      unsafe open(pathPointer, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+  #if !canImport(WASILibc)
+    private init?(path: String) {
+      let fd = unsafe path.withCString { pathPointer in
+        unsafe open(pathPointer, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+      }
+      guard fd >= 0 else { return nil }
+      descriptor = Mutex(fd)
+      writeLine(
+        "seq\tkind\tframe\tcauses\ttail\tanim(active/pending)\tfocusRerenders\tdrop\tblockers\textra"
+      )
     }
-    guard fd >= 0 else { return nil }
-    descriptor = Mutex(fd)
-    writeLine(
-      "seq\tkind\tframe\tcauses\ttail\tanim(active/pending)\tfocusRerenders\tdrop\tblockers\textra"
-    )
-  }
+  #endif
 
   /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty,
   /// writable path; otherwise `nil`. Safe to call on every session build.
+  ///
+  /// WASI has no path-based file sink — its capability model makes
+  /// arbitrary-path `open` a no-op — so this always returns `nil` there.
   public static func fromEnvironment() -> EnvFrameTraceSink? {
-    guard let raw = unsafe getenv("SWIFTTUI_FRAME_TRACE") else {
+    #if canImport(WASILibc)
       return nil
-    }
-    let path = unsafe String(cString: raw)
-    guard !path.isEmpty else {
-      return nil
-    }
-    return EnvFrameTraceSink(path: path)
+    #else
+      guard let raw = unsafe getenv("SWIFTTUI_FRAME_TRACE") else {
+        return nil
+      }
+      let path = unsafe String(cString: raw)
+      guard !path.isEmpty else {
+        return nil
+      }
+      return EnvFrameTraceSink(path: path)
+    #endif
   }
 
   @MainActor
@@ -108,24 +123,26 @@ import Synchronization
   }
 
   private func writeLine(_ line: String) {
-    descriptor.withLock { fd in
-      var message = line + "\n"
-      message.withUTF8 { buffer in
-        guard let base = buffer.baseAddress, buffer.count > 0 else {
-          return
-        }
-        var offset = 0
-        while offset < buffer.count {
-          let written = unsafe write(fd, base.advanced(by: offset), buffer.count - offset)
-          if written > 0 {
-            offset += written
-          } else if written == -1, errno == EINTR {
-            continue
-          } else {
+    #if !canImport(WASILibc)
+      descriptor.withLock { fd in
+        var message = line + "\n"
+        message.withUTF8 { buffer in
+          guard let base = buffer.baseAddress, buffer.count > 0 else {
             return
+          }
+          var offset = 0
+          while offset < buffer.count {
+            let written = unsafe write(fd, base.advanced(by: offset), buffer.count - offset)
+            if written > 0 {
+              offset += written
+            } else if written == -1, errno == EINTR {
+              continue
+            } else {
+              return
+            }
           }
         }
       }
-    }
+    #endif
   }
 }
