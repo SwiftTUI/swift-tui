@@ -27,12 +27,15 @@ import Synchronization
 /// (drop-eligibility blockers), and free-form `extra`. A `ZEROART` row is a
 /// frame that produced no pixels — the prime suspect for a momentary blank.
 @_spi(Runners) public final class EnvFrameTraceSink: FrameDiagnosticSink {
-  private let file: Mutex<UnsafeMutablePointer<FILE>?>
+  private let descriptor: Mutex<Int32>
   private let seq = Mutex(0)
 
   private init?(path: String) {
-    guard let handle = fopen(path, "w") else { return nil }
-    file = Mutex(handle)
+    let fd = unsafe path.withCString { pathPointer in
+      unsafe open(pathPointer, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+    }
+    guard fd >= 0 else { return nil }
+    descriptor = Mutex(fd)
     writeLine(
       "seq\tkind\tframe\tcauses\ttail\tanim(active/pending)\tfocusRerenders\tdrop\tblockers\textra"
     )
@@ -41,10 +44,10 @@ import Synchronization
   /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty,
   /// writable path; otherwise `nil`. Safe to call on every session build.
   public static func fromEnvironment() -> EnvFrameTraceSink? {
-    guard let raw = getenv("SWIFTTUI_FRAME_TRACE") else {
+    guard let raw = unsafe getenv("SWIFTTUI_FRAME_TRACE") else {
       return nil
     }
-    let path = String(cString: raw)
+    let path = unsafe String(cString: raw)
     guard !path.isEmpty else {
       return nil
     }
@@ -105,12 +108,24 @@ import Synchronization
   }
 
   private func writeLine(_ line: String) {
-    file.withLock { handle in
-      guard let handle else {
-        return
+    descriptor.withLock { fd in
+      var message = line + "\n"
+      message.withUTF8 { buffer in
+        guard let base = buffer.baseAddress, buffer.count > 0 else {
+          return
+        }
+        var offset = 0
+        while offset < buffer.count {
+          let written = unsafe write(fd, base.advanced(by: offset), buffer.count - offset)
+          if written > 0 {
+            offset += written
+          } else if written == -1, errno == EINTR {
+            continue
+          } else {
+            return
+          }
+        }
       }
-      (line + "\n").withCString { _ = fputs($0, handle) }
-      _ = fflush(handle)
     }
   }
 }
