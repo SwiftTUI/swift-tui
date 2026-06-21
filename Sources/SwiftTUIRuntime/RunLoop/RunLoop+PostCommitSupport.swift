@@ -155,6 +155,21 @@ extension RunLoop {
       return
     }
     let now = MonotonicInstant.now()
-    scheduler.requestDeadline(now.advanced(by: animationController.animationFrameInterval))
+    let nextTick = now.advanced(by: animationController.animationFrameInterval)
+    // This re-arm exists ONLY to stop the run loop from idling with un-drained
+    // animation work (the PhaseAnimator-stall case). When the skip was caused by
+    // a newer render intent — an invalidation / input already queued, or a sooner
+    // deadline already armed — the frame loop's next `consumeReadyFrame` will
+    // drive that work itself, so an extra animation deadline is redundant. During
+    // a transition burst (e.g. switching away from a still-animating tab, whose
+    // teardown keeps invalidating), re-arming on every superseded frame compounds
+    // those redundant deadlines into a cancel-cascade: paced no-op/elided frames
+    // that keep the loop hot and delay the new tab's first real paint (the "slow,
+    // momentarily blank tab switch"). Only re-arm when nothing is already due
+    // within the next tick, so the pump still can't stall but no longer spins.
+    guard !scheduler.hasPendingFrame(at: nextTick) else {
+      return
+    }
+    scheduler.requestDeadline(nextTick)
   }
 }

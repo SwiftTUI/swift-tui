@@ -1,0 +1,116 @@
+import SwiftTUICore
+import Synchronization
+
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
+
+/// Env-gated frame-pipeline trace sink.
+///
+/// When `SWIFTTUI_FRAME_TRACE=<path>` is set in the environment, the runtime
+/// installs this sink (see `SceneSession`) and appends one tab-separated line
+/// per committed, dropped/cancelled, or elided frame to `<path>`. It is a
+/// low-overhead way to capture *what the frame pipeline actually did* during an
+/// interaction — e.g. a tab switch that feels slow or flashes blank — in a real
+/// terminal, where timing races that never appear under deterministic test
+/// drivers do surface.
+///
+/// Diagnostic-only and entirely opt-in: with the env var unset nothing is
+/// installed and the per-frame emit stays a single nil branch.
+///
+/// Columns: `seq`, `kind` (COMMIT / ZEROART / ELIDE), `frame`, `causes`
+/// (scheduler wake causes), `tail` (frame-tail job state), `anim`
+/// (active-animation-count / has-pending-work), `focusRerenders` (focus-sync
+/// convergence passes), `drop` (completed-frame drop decision), `blockers`
+/// (drop-eligibility blockers), and free-form `extra`. A `ZEROART` row is a
+/// frame that produced no pixels — the prime suspect for a momentary blank.
+@_spi(Runners) public final class EnvFrameTraceSink: FrameDiagnosticSink {
+  private let file: Mutex<UnsafeMutablePointer<FILE>?>
+  private let seq = Mutex(0)
+
+  private init?(path: String) {
+    guard let handle = fopen(path, "w") else { return nil }
+    file = Mutex(handle)
+    writeLine(
+      "seq\tkind\tframe\tcauses\ttail\tanim(active/pending)\tfocusRerenders\tdrop\tblockers\textra"
+    )
+  }
+
+  /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty,
+  /// writable path; otherwise `nil`. Safe to call on every session build.
+  public static func fromEnvironment() -> EnvFrameTraceSink? {
+    guard let raw = getenv("SWIFTTUI_FRAME_TRACE") else {
+      return nil
+    }
+    let path = String(cString: raw)
+    guard !path.isEmpty else {
+      return nil
+    }
+    return EnvFrameTraceSink(path: path)
+  }
+
+  @MainActor
+  public func record(_ sample: RuntimeFrameSample) {
+    let n = seq.withLock { value -> Int in
+      value += 1
+      return value
+    }
+    switch sample {
+    case .committed(let s):
+      writeLine(
+        row(
+          seq: n, kind: "COMMIT", frame: s.frameNumber, causes: s.scheduledFrame.causes,
+          tail: s.tailJobState.rawValue,
+          animActive: s.animationControllerActiveAnimationCount,
+          animPending: s.animationControllerHasPendingWork,
+          focusRerenders: "\(s.focusSyncRerenders)",
+          drop: s.completedFrameDropDecision?.action.rawValue ?? "-",
+          blockers: s.dropEligibilityBlockers.map(\.rawValue),
+          extra: "present=\(s.presentationDuration)"))
+    case .zeroArtifact(let s):
+      writeLine(
+        row(
+          seq: n, kind: "ZEROART", frame: s.frameNumber, causes: s.scheduledFrame.causes,
+          tail: s.tailJobState,
+          animActive: s.animationControllerActiveAnimationCount,
+          animPending: s.animationControllerHasPendingWork,
+          focusRerenders: "-",
+          drop: s.dropDecision,
+          blockers: s.dropEligibilityBlockers.map(\.rawValue),
+          extra:
+            "policy=\(s.staleFramePolicy);cancel=\(s.tailCancelReason);recon=\(s.dropReconciliationMode)"
+        ))
+    case .elided(let s):
+      writeLine(
+        row(
+          seq: n, kind: "ELIDE", frame: s.frameNumber, causes: s.scheduledFrame.causes,
+          tail: "-",
+          animActive: s.animationControllerActiveAnimationCount,
+          animPending: s.animationControllerHasPendingWork,
+          focusRerenders: "-", drop: "-", blockers: [], extra: "-"))
+    }
+  }
+
+  private func row(
+    seq: Int, kind: String, frame: Int, causes: Set<WakeCause>, tail: String,
+    animActive: Int, animPending: Bool, focusRerenders: String, drop: String,
+    blockers: [String], extra: String
+  ) -> String {
+    let causeText = causes.map(\.rawValue).sorted().joined(separator: "+")
+    let blockerText = blockers.sorted().joined(separator: ",")
+    return
+      "\(seq)\t\(kind)\t\(frame)\t\(causeText.isEmpty ? "-" : causeText)\t\(tail)\t\(animActive)/\(animPending)\t\(focusRerenders)\t\(drop)\t\(blockerText.isEmpty ? "-" : blockerText)\t\(extra)"
+  }
+
+  private func writeLine(_ line: String) {
+    file.withLock { handle in
+      guard let handle else {
+        return
+      }
+      (line + "\n").withCString { _ = fputs($0, handle) }
+      _ = fflush(handle)
+    }
+  }
+}

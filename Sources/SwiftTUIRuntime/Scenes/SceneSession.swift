@@ -285,6 +285,11 @@ import SwiftTUIViews
       // A profiled build installs a sink via `.profiling()`; it supersedes the
       // legacy per-session logger.
       runLoop.frameSink = frameSink
+    } else if let traceSink = EnvFrameTraceSink.fromEnvironment() {
+      // Opt-in diagnostic: `SWIFTTUI_FRAME_TRACE=<path>` traces the frame
+      // pipeline to a file for reproducing timing-sensitive interaction bugs
+      // (e.g. a slow / momentarily blank tab switch) in a real terminal.
+      runLoop.frameSink = traceSink
     }
     runLoop.runtimeIssueSink = resources.runtimeIssueSink
     runLoop.progressProbe = resources.progressProbe

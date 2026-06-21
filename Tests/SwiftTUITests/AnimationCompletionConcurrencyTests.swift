@@ -40,6 +40,39 @@ struct AnimationCompletionConcurrencyTests {
     )
   }
 
+  @Test(
+    "An orphaned withAnimation completion (nothing left to fire it) does not keep the pump alive")
+  func orphanedCompletionDoesNotKeepPumpAlive() {
+    let controller = AnimationController()
+
+    // A `withAnimation … completion:` whose carrier animation has since been
+    // removed — e.g. the owning subtree was torn down when its tab was switched
+    // away. The completion closure lingers on the live controller, but with no
+    // active animation (its batch ref never reached zero via `releaseBatch`), no
+    // empty-batch deadline, and no deferred frame-head completion, NOTHING can
+    // ever fire it.
+    controller.registerCompletion(batchID: AnimationBatchID(99), closure: {})
+    #expect(
+      controller.debugStateSnapshot().completionClosureBatchIDs.contains(AnimationBatchID(99)))
+
+    // The animation pump must NOT stay alive for an unfireable completion.
+    // Before the fix, the run loop re-armed the animation deadline on this state
+    // forever: every tick elided the off-screen removed subtree (painting
+    // nothing) and elision skips the resolve-time prune that would drop the
+    // completion — a self-sustaining off-screen elision storm that pegged the
+    // CPU and stalled the next tab's first paint (the "slow / momentarily blank
+    // tab switch" regression).
+    #expect(
+      controller.requiresContinuedAnimationFrames == false,
+      """
+      An orphaned withAnimation completion — no active animation, empty-batch \
+      deadline, or frame-head completion can fire it — must not keep the \
+      animation pump re-arming. Doing so spins an off-screen elision storm after \
+      switching away from an animating tab.
+      """
+    )
+  }
+
   @Test("A completion the in-flight frame already knew about still drains normally")
   func baselineCompletionStillCommits() {
     let controller = AnimationController()

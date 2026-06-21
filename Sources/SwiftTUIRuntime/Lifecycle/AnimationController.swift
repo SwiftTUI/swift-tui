@@ -486,22 +486,40 @@ package final class AnimationController: Sendable {
   /// Whether the *live* controller still holds animation work that needs another
   /// frame to drain (active animations / removals) or to fire a pending
   /// `withAnimation` completion. Used to keep the run loop's animation pump alive
-  /// across SKIPPED async frames: a cancelled-before-start / dropped-completed
-  /// frame abandons its draft without committing, so — unlike the committed and
-  /// elided paths — it never reschedules the next deadline. If the skipped frame
-  /// was the one draining an animation, the live controller keeps that animation
-  /// active but no deadline is armed, the run loop idles, and the deferred
-  /// completion (e.g. a `PhaseAnimator` loop's per-phase completion) never fires
-  /// until an unrelated event happens to wake the loop.
+  /// across SKIPPED / elided async frames: a cancelled-before-start /
+  /// dropped-completed frame abandons its draft without committing, so — unlike
+  /// the committed path — it never reschedules the next deadline. If the skipped
+  /// frame was the one draining an animation, the live controller keeps that
+  /// animation active but no deadline is armed, the run loop idles, and the
+  /// deferred completion (e.g. a `PhaseAnimator` loop's per-phase completion)
+  /// never fires until an unrelated event wakes the loop.
   package var requiresContinuedAnimationFrames: Bool {
-    !activeAnimations.isEmpty
-      || !completionClosures.isEmpty
+    if !activeAnimations.isEmpty
       || !pendingEmptyBatchCompletions.isEmpty
       || !deferredFrameHeadCompletions.isEmpty
       || !removingNodes.isEmpty
       || !transitionsByNodeID.isEmpty
       || !previousTransitionsByNodeID.isEmpty
       || !pendingTransitionsByNodeID.isEmpty
+    {
+      return true
+    }
+    // Reaching here, every mechanism that could FIRE a `withAnimation`
+    // completion is empty: `releaseBatch` needs an active animation to count its
+    // batch refcount down to zero, and the empty-batch / frame-head completion
+    // paths are likewise empty. So any `completionClosures` still registered are
+    // ORPHANED — their carrier animation was removed (e.g. the owning subtree was
+    // torn down when its tab was switched away) without the batch refcount
+    // reaching zero, so nothing will ever fire them. Keeping the pump alive for
+    // them spun forever: each deadline tick elides the off-screen removed subtree
+    // (no pixels), and elision skips the resolve-time prune that would release
+    // the batch — a self-sustaining off-screen elision storm that pegs the CPU
+    // and stalls the new tab's first paint (the "slow / momentarily blank tab
+    // switch"). The orphaned closure's awaiter is already resolved (its owning
+    // `.task` was cancelled with the tab), so the loop must quiesce here; the
+    // closure is never fired (doing so would double-resume a finished
+    // continuation) — it is dropped by the next resolve-time prune.
+    return false
   }
 
   /// The animation tick cadence (matches the run loop's 33 ms frame interval).
