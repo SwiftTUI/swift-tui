@@ -63,6 +63,16 @@ internal source-layout context lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE
   not leave stale invariants behind.
 - New files should belong to one subsystem; keep the source layout in
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) aligned with file moves.
+- New files that touch C stdio/POSIX (`open`/`write`/`getenv`/`FILE`, …) must
+  stay **WASI-safe and strict-memory-safety clean**: import every libc
+  (`Darwin`/`Glibc`/`Android`/`Musl`), compile the path-based POSIX surface out
+  under `#if !canImport(WASILibc)` (model on `DiagnosticTraceSink` /
+  `TerminalPOSIXController`), and mark each unsafe call `unsafe`. The Linux Repo
+  Gate does **not** compile wasm32-wasi, so a WASI-only break ships green and
+  only surfaces in the `swift-tui-examples` / `swift-tui-site` gates after a tag
+  is cut (hit at 0.0.19, again at 0.0.26 via `EnvFrameTraceSink`). Cross-build
+  before tagging: `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm
+  --target SwiftTUIRuntime`.
 - Treat fixture changes as evidence, not housekeeping — see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#rendered-text-fixtures).
 - For runtime state bugs, distinguish transient flicker from true state loss.
