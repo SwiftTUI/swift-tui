@@ -3935,8 +3935,8 @@ struct SwiftUISurfaceTests {
 
     #expect(visibleArtifacts.resolvedTree.semanticMetadata.accessibilityRole == nil)
     #expect(visibleArtifacts.semanticSnapshot.scrollRoutes.count == 1)
-    #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("▼"))
-    #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("▼"))
+    #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("█"))
+    #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("█"))
     #expect(hiddenArtifacts.rasterSurface.lines.prefix(2) == ["One ", "Two "])
   }
 
@@ -3982,8 +3982,8 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(topThumbColumn == ["█", "█", "█", "┃", "▼"])
-    #expect(bottomThumbColumn == ["▲", "┃", "█", "█", "█"])
+    #expect(topThumbColumn == ["█", "█", "█", "┃", "┃"])
+    #expect(bottomThumbColumn == ["┃", "┃", "█", "█", "█"])
   }
 
   @Test("ScrollView indicator keeps a usable thumb size for large content")
@@ -4008,7 +4008,7 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(thumbColumn == ["█", "█", "█", "┃", "┃", "▼"])
+    #expect(thumbColumn == ["█", "█", "┃", "┃", "┃", "┃"])
   }
 
   @Test("ScrollView indicator focus highlights only the indicator")

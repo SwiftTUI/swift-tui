@@ -236,47 +236,16 @@ extension DrawExtractor {
     style: TextStyle
   ) -> [DrawCommand] {
     let bounds = metrics.rect
-    let maxOffset = metrics.maxOffset
 
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return []
     }
 
     let x = bounds.origin.x + bounds.size.width - 1
-    if bounds.size.height == 1 {
-      let glyph = compactIndicatorGlyph(
-        offset: offset,
-        maxOffset: maxOffset,
-        backward: "▲",
-        forward: "▼"
-      )
-      return singleCellIndicatorCommand(x: x, y: bounds.origin.y, glyph: glyph, style: style)
-    }
-
-    var commands = singleCellIndicatorCommand(
-      x: x,
-      y: bounds.origin.y,
-      glyph: offset > 0 ? "▲" : "█",
-      style: style
-    )
-    commands.append(
-      contentsOf: singleCellIndicatorCommand(
-        x: x,
-        y: bounds.origin.y + bounds.size.height - 1,
-        glyph: offset < maxOffset ? "▼" : "█",
-        style: style
-      )
-    )
-
-    guard bounds.size.height > 2 else {
-      return commands
-    }
-
-    let trackStart = bounds.origin.y + 1
-    let trackLength = bounds.size.height - 2
     let thumbRange = metrics.thumbRange(for: offset)
 
-    for y in trackStart..<(trackStart + trackLength) {
+    var commands: [DrawCommand] = []
+    for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
       commands.append(
         contentsOf: singleCellIndicatorCommand(
           x: x,
@@ -295,47 +264,16 @@ extension DrawExtractor {
     style: TextStyle
   ) -> [DrawCommand] {
     let bounds = metrics.rect
-    let maxOffset = metrics.maxOffset
     let trackWidth = bounds.size.width
     guard trackWidth > 0, bounds.size.height > 0 else {
       return []
     }
 
     let y = bounds.origin.y + bounds.size.height - 1
-    if trackWidth == 1 {
-      let glyph = compactIndicatorGlyph(
-        offset: offset,
-        maxOffset: maxOffset,
-        backward: "◀",
-        forward: "▶"
-      )
-      return singleCellIndicatorCommand(x: bounds.origin.x, y: y, glyph: glyph, style: style)
-    }
-
-    var commands = singleCellIndicatorCommand(
-      x: bounds.origin.x,
-      y: y,
-      glyph: offset > 0 ? "◀" : "█",
-      style: style
-    )
-    commands.append(
-      contentsOf: singleCellIndicatorCommand(
-        x: bounds.origin.x + trackWidth - 1,
-        y: y,
-        glyph: offset < maxOffset ? "▶" : "█",
-        style: style
-      )
-    )
-
-    guard trackWidth > 2 else {
-      return commands
-    }
-
-    let trackStart = bounds.origin.x + 1
-    let trackLength = trackWidth - 2
     let thumbRange = metrics.thumbRange(for: offset)
 
-    for x in trackStart..<(trackStart + trackLength) {
+    var commands: [DrawCommand] = []
+    for x in bounds.origin.x..<(bounds.origin.x + trackWidth) {
       commands.append(
         contentsOf: singleCellIndicatorCommand(
           x: x,
@@ -368,24 +306,6 @@ extension DrawExtractor {
         wrappingStrategy: .wordBoundary
       )
     ]
-  }
-
-  private func compactIndicatorGlyph(
-    offset: Int,
-    maxOffset: Int,
-    backward: String,
-    forward: String
-  ) -> String {
-    if maxOffset <= 0 {
-      return " "
-    }
-    if offset <= 0 {
-      return forward
-    }
-    if offset >= maxOffset {
-      return backward
-    }
-    return "█"
   }
 
 }

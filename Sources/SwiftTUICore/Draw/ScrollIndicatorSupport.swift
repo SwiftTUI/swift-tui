@@ -121,8 +121,8 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
   }
 
   private var thumbTrackRange: Range<Int> {
-    let start = axisOrigin + (axisLength > 2 ? 1 : 0)
-    let end = axisOrigin + axisLength - (axisLength > 2 ? 1 : 0)
+    let start = axisOrigin
+    let end = axisOrigin + axisLength
     return start..<max(start, end)
   }
 

@@ -19,7 +19,7 @@ struct ScrollIndicatorSupportTests {
       metrics.targetOffset(
         for: precisePointer(at: .init(x: 27.5, y: 14.5)),
         currentOffset: 0
-      ) == 11
+      ) == 10
     )
   }
 
@@ -38,7 +38,7 @@ struct ScrollIndicatorSupportTests {
       metrics.targetOffset(
         for: .cellFallback(.init(x: 7, y: 4)),
         currentOffset: 0
-      ) == 10
+      ) == 9
     )
   }
 
@@ -82,7 +82,7 @@ struct ScrollIndicatorSupportTests {
       metrics.targetOffset(
         for: precisePointer(at: .init(x: 14.5, y: 9.5)),
         currentOffset: 0
-      ) == 11
+      ) == 10
     )
   }
 }

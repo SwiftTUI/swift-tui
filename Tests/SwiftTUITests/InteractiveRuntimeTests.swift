@@ -710,7 +710,7 @@ struct InteractiveRuntimeTests {
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity).contains(
         InteractiveDemoIdentity.selectionModePicker))
-    #expect(surface.contains("▼"))
+    #expect(surface.contains("█"))
     #expect(surface.contains("12_"))
   }
 
