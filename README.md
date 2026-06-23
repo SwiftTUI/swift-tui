@@ -276,22 +276,6 @@ The maintained examples live in the sibling
 repository — the fastest way to find a sample for a given product surface or
 run mode.
 
-| Example | Demonstrates | Run |
-| --- | --- | --- |
-| [minimal](https://github.com/SwiftTUI/swift-tui-examples/tree/main/minimal) | Lowest-level snapshot rendering | `swiftly run swift run --package-path ../swift-tui-examples/minimal minimal` |
-| [argparse](https://github.com/SwiftTUI/swift-tui-examples/tree/main/argparse) | `SwiftTUICommand`, consumer + framework flags, completions | `swiftly run swift run --package-path ../swift-tui-examples/argparse argparse-demo --help` |
-| [gallery](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gallery) | Component workbench: tabs, controls, input, images, charts, animation | `swiftly run swift run --package-path ../swift-tui-examples/gallery gallery-demo` |
-| [layouts](https://github.com/SwiftTUI/swift-tui-examples/tree/main/layouts) | Layout catalog: stacks, frames, geometry, scrolling, overlays, shapes | `swiftly run swift run --package-path ../swift-tui-examples/layouts layouts-demo` |
-| [LayoutsSwiftUI](https://github.com/SwiftTUI/swift-tui-examples/tree/main/LayoutsSwiftUI) | Native SwiftUI layout catalog beside the embedded SwiftTUI one | `swiftly run swift run --package-path ../swift-tui-examples/LayoutsSwiftUI layouts-swiftui-demo` |
-| [file-previewer](https://github.com/SwiftTUI/swift-tui-examples/tree/main/file-previewer) | Miller-column browser with embedded terminal previews | `swiftly run swift run --package-path ../swift-tui-examples/file-previewer FilePreviewerApp` |
-| [terminal-workspace](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace) | Zellij-style tabs, split panes, command palette, persisted layout | `swiftly run swift run --package-path ../swift-tui-examples/terminal-workspace terminal-workspace` |
-| [gitviz](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gitviz) | Non-interactive `SwiftTUICharts` command suite over git history | `swiftly run swift run --package-path ../swift-tui-examples/gitviz gitviz dashboard --path .` |
-| [gifcat](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifcat) | Terminal-native animated GIF playback | `swiftly run swift run --package-path ../swift-tui-examples/gifcat gifcat nyan.gif` |
-| [gifeditor](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifeditor) | Full terminal GIF editor: canvas, layers, timeline, import/export | `swiftly run swift run --package-path ../swift-tui-examples/gifeditor gifeditor` |
-| [SwiftUIExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/SwiftUIExample) | Native Apple app embedding SwiftTUI scenes via the [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) host package | Open `../swift-tui-examples/SwiftUIExample/SwiftUIExample.xcodeproj` |
-| [WebHostExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebHostExample) | Smallest `SwiftTUI` convenience app with terminal and `--web` launch | `swiftly run swift run --package-path ../swift-tui-examples/WebHostExample WebHostExample --web` |
-| [WebExample](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebExample) | Static browser/WASI deployment with `@swifttui/web` + `@swifttui/build` | `bun --cwd ../swift-tui-examples/WebExample dev` |
-
 ## Documentation
 
 Live API reference: <https://swifttui.sh/docs/documentation/>
@@ -312,30 +296,6 @@ Build the combined DocC archive locally with:
 ```bash
 Scripts/build_docc_archive.sh
 ```
-
-## Project status
-
-SwiftTUI is pre-1.0. The `0.x` line is usable for real terminal interfaces, but
-minor releases may still make source-breaking API adjustments while the public
-surface is being proven — keep your dependency pinned with `.upToNextMinor`. It
-is currently an alpha, single-maintainer, AI-assisted project. See
-[docs/VISION-GAP.md](docs/VISION-GAP.md) for where the code differs from intent
-and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the release policy.
-
-**Known issues.** A non-deterministic memory-corruption crash (`SIGSEGV` /
-`SIGBUS` on the main thread) has been observed in the async-render path under
-heavy concurrent test-suite load, tracked as
-[`#12`](https://github.com/SwiftTUI/swift-tui/issues/12) and documented in
-[docs/KNOWN-TEST-FLAKES.md](docs/KNOWN-TEST-FLAKES.md). It is load- and
-timing-sensitive, not reproducible on demand, and clean under both
-AddressSanitizer and ThreadSanitizer; the mechanism is not yet identified. It
-has not been observed in normal single-app use, but is disclosed here for
-transparency — if you hit it, a reproduction on the issue would help.
-
-The sibling `swift-tui-web`, `swift-tui-examples`, and `swift-tui-site` repos
-are public pre-release repositories as well. Each has its own `0.0.27` tag, and
-cross-repo defaults use public release tags or release artifacts rather than
-requiring sibling source checkouts.
 
 ## Contributing
 
