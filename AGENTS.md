@@ -134,8 +134,9 @@ Full policy in [docs/PUBLIC-API.md](docs/PUBLIC-API.md#anyview-policy).
   `Synchronization` primitives.
 - **main-thread-usage** — forbids bare `Thread.isMainThread` without
   justification.
-- **no-ai-coauthors** — rejects commit messages with `Co-authored-by:` trailers
-  whose entry matches common AI model names or AI-bot email identities.
+- **no-ai-coauthors** — uses
+  `https://github.com/GoodHatsLLC/no-ai-coauthors` to reject commit messages
+  with AI attribution trailers.
 
 ## Tests
 

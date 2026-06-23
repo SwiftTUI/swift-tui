@@ -5,17 +5,15 @@
 default_install_hook_types = ["pre-commit", "commit-msg"]
 
 [[repos]]
+repo = "https://github.com/GoodHatsLLC/no-ai-coauthors"
+rev = "1.0.0"
+hooks = [
+  { id = "no-ai-coauthors" },
+]
+
+[[repos]]
 repo = "local"
 hooks = [
-  {
-    id = "no-ai-coauthors",
-    name = "forbid AI model Co-authored-by trailers",
-    entry = "./Scripts/check_commit_message_policy.sh",
-    language = "system",
-    stages = ["commit-msg"],
-    always_run = true,
-    pass_filenames = true
-  },
   {
     id = "swift-format",
     name = "run swift-format format",
