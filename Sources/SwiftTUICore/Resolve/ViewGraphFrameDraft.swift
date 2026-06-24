@@ -40,7 +40,8 @@ package final class ViewGraphFrameDraft {
     self.publicationDiagnosticsEnabled = publicationDiagnosticsEnabled
     deltaCheckpointShadow = checkpoint.map { ViewGraphDeltaCheckpointShadow(baseline: $0) }
     if publicationDiagnosticsEnabled {
-      publicationDiagnostics.graphCheckpointBaselineNodeCount = checkpoint?.nodesByNodeID.count
+      publicationDiagnostics.graphCheckpointBaselineNodeCount =
+        checkpoint?.index.nodesByNodeID.count
       publicationDiagnostics.nonGraphCheckpointPresent = checkpoint != nil
     }
   }
@@ -92,7 +93,7 @@ package final class ViewGraphFrameDraft {
     }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointPreparedNodeCount =
-        preparedCheckpoint?.nodesByNodeID.count
+        preparedCheckpoint?.index.nodesByNodeID.count
       publicationDiagnostics.graphCheckpointDirtySubtreeCandidateNodeCount =
         graphCheckpointDirtySubtreeCandidateNodeCount(in: viewGraph)
       if let deltaSummary = deltaCheckpointShadow?.summary {

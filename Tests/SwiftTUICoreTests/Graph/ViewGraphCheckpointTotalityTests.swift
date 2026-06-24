@@ -3,17 +3,48 @@ import Testing
 
 @testable import SwiftTUICore
 
+// The mutable graph state lives in the value-typed field groups declared in
+// ViewGraphFieldGroups.swift. ViewGraph and ViewGraph.Checkpoint each store one
+// instance of every group (plus `root`, and `nodeCheckpoints` on the
+// checkpoint), so the canonical covered-field set is the union of every group's
+// fields. DebugTotalStateSnapshot stays flat, mirroring those same field names.
+private let viewGraphFieldGroupNames = [
+  "GraphIndex",
+  "RootEvaluation",
+  "ViewportLifecycleState",
+  "LifecycleEventBuffers",
+  "DirtyState",
+  "LifecycleEvaluationOwnership",
+  "TaskDescriptorState",
+  "DependencyIndex",
+  "FrameCommitState",
+]
+
+private func parsedFieldGroupMemberNames() throws -> [String] {
+  try viewGraphFieldGroupNames.flatMap { groupName in
+    try parsedStoredVarNames(
+      typeKind: "struct",
+      typeName: groupName,
+      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphFieldGroups.swift"
+    )
+  }
+}
+
 @MainActor
 @Suite("ViewGraph checkpoint totality")
 struct ViewGraphCheckpointTotalityTests {
   @Test("ViewGraph and ViewNode mutable fields are checkpoint-covered")
   func mutableFieldsAreCheckpointCovered() throws {
-    let viewGraphFields = try parsedStoredVarNames(
+    // ViewGraph and its checkpoint store the field groups by value; the source
+    // parser sees the group property names (the per-field forwarding accessors
+    // are computed, so they are excluded). The flattened group fields are the
+    // canonical covered set.
+    let viewGraphGroupFields = try parsedStoredVarNames(
       typeKind: "class",
       typeName: "ViewGraph",
       relativePath: "Sources/SwiftTUICore/Resolve/ViewGraph.swift"
     )
-    let viewGraphCheckpointFields = try parsedStoredVarNames(
+    let viewGraphCheckpointGroupFields = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "Checkpoint",
       relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphState.swift"
@@ -23,12 +54,35 @@ struct ViewGraphCheckpointTotalityTests {
       typeName: "DebugTotalStateSnapshot",
       relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphDebugSnapshots.swift"
     )
+    let groupMemberFields = try parsedFieldGroupMemberNames()
 
-    #expect(Set(viewGraphFields).count == viewGraphFields.count)
-    #expect(Set(viewGraphCheckpointFields).count == viewGraphCheckpointFields.count)
+    #expect(Set(viewGraphGroupFields).count == viewGraphGroupFields.count)
+    #expect(Set(viewGraphCheckpointGroupFields).count == viewGraphCheckpointGroupFields.count)
     #expect(Set(viewGraphDebugFields).count == viewGraphDebugFields.count)
-    #expect(Set(viewGraphCheckpointFields) == Set(viewGraphFields + ["nodeCheckpoints"]))
-    #expect(Set(viewGraphDebugFields) == Set(viewGraphFields))
+    #expect(Set(groupMemberFields).count == groupMemberFields.count)
+
+    // ViewGraph stores exactly `root` plus one property per field group.
+    let groupPropertyNames: Set<String> = [
+      "index",
+      "rootEvaluation",
+      "viewportLifecycle",
+      "eventBuffers",
+      "dirtyState",
+      "lifecycleEvaluation",
+      "taskDescriptors",
+      "dependencyIndex",
+      "frameCommit",
+    ]
+    #expect(Set(viewGraphGroupFields) == groupPropertyNames.union(["root"]))
+    // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
+    #expect(
+      Set(viewGraphCheckpointGroupFields)
+        == groupPropertyNames.union(["root", "nodeCheckpoints"])
+    )
+    // Every per-field name across all groups, plus the standalone `root`, is
+    // mirrored by the flat debug snapshot — the checkpoint-totality contract
+    // for the debug-state guard.
+    #expect(Set(viewGraphDebugFields) == Set(groupMemberFields + ["root"]))
 
     let viewNodeFields = try parsedStoredVarNames(
       typeKind: "class",
@@ -50,26 +104,24 @@ struct ViewGraphCheckpointTotalityTests {
 
   @Test("checkpoint totality set-equality rejects any single missing map (guard has teeth)")
   func totalityGuardCatchesMissingField() throws {
-    let viewGraphFields = try parsedStoredVarNames(
-      typeKind: "class",
-      typeName: "ViewGraph",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraph.swift"
-    )
-    let checkpointFields = try parsedStoredVarNames(
+    // The canonical covered set is the flattened field-group members plus the
+    // standalone `root`; the flat debug snapshot must mirror it exactly.
+    let canonicalFields = try parsedFieldGroupMemberNames() + ["root"]
+    let debugFields = try parsedStoredVarNames(
       typeKind: "struct",
-      typeName: "Checkpoint",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphState.swift"
+      typeName: "DebugTotalStateSnapshot",
+      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphDebugSnapshots.swift"
     )
-    let expected = Set(viewGraphFields + ["nodeCheckpoints"])
+    let expected = Set(canonicalFields)
 
-    // Sanity: the real checkpoint field set is total (mirrors the positive test).
-    #expect(Set(checkpointFields) == expected)
+    // Sanity: the real debug field set is total (mirrors the positive test).
+    #expect(Set(debugFields) == expected)
     // Teeth: dropping any single covered field must break the equality the
     // positive guard asserts — proving a quietly-missed re-keyed map would fail
     // the totality gate rather than slip through (doc 006 Stage 5 Test #5).
-    #expect(!checkpointFields.isEmpty)
-    for omitted in checkpointFields {
-      let incomplete = Set(checkpointFields.filter { $0 != omitted })
+    #expect(!canonicalFields.isEmpty)
+    for omitted in canonicalFields {
+      let incomplete = Set(canonicalFields.filter { $0 != omitted })
       #expect(incomplete != expected)
     }
   }
