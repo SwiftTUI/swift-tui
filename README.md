@@ -4,7 +4,7 @@
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI%20%C2%B7%20Android-1E90FF)
-![Status](https://img.shields.io/badge/status-0.0.27%20pre--release-DAA520)
+![Status](https://img.shields.io/badge/status-0.1.0%20pre--release-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 > Run the live demo and read the API reference at **<https://swifttui.sh>**.
@@ -69,11 +69,11 @@ struct DemoApp: App {
 ```
 
 Add SwiftTUI to your `Package.swift`. While the package is pre-1.0, pin to the
-current pre-release with `.upToNextMinor` so a minor release cannot break your
+current beta with `.upToNextMinor` so a minor release cannot break your
 build, then depend on the batteries-included `SwiftTUI` product:
 
 ```swift
-.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.0.27"))
+.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.1.0"))
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui")
 ```
@@ -100,7 +100,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/SwiftTUI/swift-tui",
-      .upToNextMinor(from: "0.0.27")
+      .upToNextMinor(from: "0.1.0")
     )
   ],
   targets: [
