@@ -2,42 +2,15 @@ extension ViewGraph {
   package func makeCheckpoint() -> Checkpoint {
     return Checkpoint(
       root: root,
-      nodesByNodeID: nodesByNodeID,
-      nodeIDByIdentity: nodeIDByIdentity,
-      identityByNodeID: identityByNodeID,
-      nodeIDsByStructuralPath: nodeIDsByStructuralPath,
-      entityRoutingTable: entityRoutingTable,
-      nextViewNodeIDRawValue: nextViewNodeIDRawValue,
-      rootEvaluator: rootEvaluator,
-      evaluationRootIdentity: evaluationRootIdentity,
-      viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
-      viewportLifecycleOrder: viewportLifecycleOrder,
-      frameOrder: frameOrder,
-      stableTaskCancelEvents: stableTaskCancelEvents,
-      stableTaskStartEvents: stableTaskStartEvents,
-      structuralAppearEvents: structuralAppearEvents,
-      structuralTaskCancelEvents: structuralTaskCancelEvents,
-      structuralDisappearEvents: structuralDisappearEvents,
-      pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
-      requiresRootEvaluation: requiresRootEvaluation,
-      invalidatedNodeIDs: invalidatedNodeIDs,
-      graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
-      latestLifecycleEvents: latestLifecycleEvents,
-      stateMutationKeys: stateMutationKeys,
-      stateMutationNodeIDsByKey: stateMutationNodeIDsByKey,
-      lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
-      lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
-      lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
-      taskDescriptorNodeSlots: taskDescriptorNodeSlots,
-      nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
-      stateSlotDependents: stateSlotDependents,
-      environmentDependents: environmentDependents,
-      observableDependents: observableDependents,
-      currentFrameID: currentFrameID,
-      liveNodeIDs: liveNodeIDs,
-      resolvedNodeReuseCache: resolvedNodeReuseCache,
-      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
-      checkpointMutationEpoch: checkpointMutationEpoch,
+      index: index,
+      rootEvaluation: rootEvaluation,
+      viewportLifecycle: viewportLifecycle,
+      eventBuffers: eventBuffers,
+      dirtyState: dirtyState,
+      lifecycleEvaluation: lifecycleEvaluation,
+      taskDescriptors: taskDescriptors,
+      dependencyIndex: dependencyIndex,
+      frameCommit: frameCommit,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(
         nodesByNodeID
       )
@@ -49,7 +22,7 @@ extension ViewGraph {
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
-      nodesByNodeID: checkpoint.nodesByNodeID
+      nodesByNodeID: checkpoint.index.nodesByNodeID
     )
   }
 
@@ -61,7 +34,7 @@ extension ViewGraph {
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       nodeCheckpoints,
-      nodesByNodeID: checkpoint.nodesByNodeID
+      nodesByNodeID: checkpoint.index.nodesByNodeID
     )
   }
 
@@ -98,91 +71,186 @@ extension ViewGraph {
 
   private func restoreCheckpointGraphFields(_ checkpoint: Checkpoint) {
     root = checkpoint.root
-    nodesByNodeID = checkpoint.nodesByNodeID
-    nodeIDByIdentity = checkpoint.nodeIDByIdentity
-    identityByNodeID = checkpoint.identityByNodeID
-    nodeIDsByStructuralPath = checkpoint.nodeIDsByStructuralPath
-    entityRoutingTable = checkpoint.entityRoutingTable
-    nextViewNodeIDRawValue = checkpoint.nextViewNodeIDRawValue
-    rootEvaluator = checkpoint.rootEvaluator
-    evaluationRootIdentity = checkpoint.evaluationRootIdentity
-    viewportLifecycleNodesByKey = checkpoint.viewportLifecycleNodesByKey
-    viewportLifecycleOrder = checkpoint.viewportLifecycleOrder
-    frameOrder = checkpoint.frameOrder
-    stableTaskCancelEvents = checkpoint.stableTaskCancelEvents
-    stableTaskStartEvents = checkpoint.stableTaskStartEvents
-    structuralAppearEvents = checkpoint.structuralAppearEvents
-    structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
-    structuralDisappearEvents = checkpoint.structuralDisappearEvents
-    pendingEntityRoutedRemovalNodeIDs = checkpoint.pendingEntityRoutedRemovalNodeIDs
-    requiresRootEvaluation = checkpoint.requiresRootEvaluation
-    invalidatedNodeIDs = checkpoint.invalidatedNodeIDs
-    graphLocalDirtyNodeIDs = checkpoint.graphLocalDirtyNodeIDs
-    latestLifecycleEvents = checkpoint.latestLifecycleEvents
-    stateMutationKeys = checkpoint.stateMutationKeys
-    stateMutationNodeIDsByKey = checkpoint.stateMutationNodeIDsByKey
-    lifecycleEvaluationOwnersByNodeID = checkpoint.lifecycleEvaluationOwnersByNodeID
-    lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
-    lifecycleEvaluationTargetsRecordedByOwner = checkpoint.lifecycleEvaluationTargetsRecordedByOwner
-    taskDescriptorNodeSlots = checkpoint.taskDescriptorNodeSlots
-    nextTaskDescriptorIdentityToken = checkpoint.nextTaskDescriptorIdentityToken
-    stateSlotDependents = checkpoint.stateSlotDependents
-    environmentDependents = checkpoint.environmentDependents
-    observableDependents = checkpoint.observableDependents
-    currentFrameID = checkpoint.currentFrameID
-    liveNodeIDs = checkpoint.liveNodeIDs
-    resolvedNodeReuseCache = checkpoint.resolvedNodeReuseCache
-    committedRuntimeRegistrationFingerprint =
-      checkpoint.committedRuntimeRegistrationFingerprint
-    checkpointMutationEpoch = checkpoint.checkpointMutationEpoch
+    index = checkpoint.index
+    rootEvaluation = checkpoint.rootEvaluation
+    viewportLifecycle = checkpoint.viewportLifecycle
+    eventBuffers = checkpoint.eventBuffers
+    dirtyState = checkpoint.dirtyState
+    lifecycleEvaluation = checkpoint.lifecycleEvaluation
+    taskDescriptors = checkpoint.taskDescriptors
+    dependencyIndex = checkpoint.dependencyIndex
+    frameCommit = checkpoint.frameCommit
   }
 }
 
 @MainActor
 package final class ViewGraph {
   // CHECKPOINT TOTALITY CONTRACT (audit finding F4):
-  // Every mutable stored property declared below MUST appear in
+  // The mutable graph state is grouped into the value-typed field groups in
+  // ViewGraphFieldGroups.swift. Every field of every group MUST appear in
   // ViewGraph.Checkpoint and DebugTotalStateSnapshot. The source-level
-  // ViewGraphCheckpointTotalityTests guard fails when a new mutable field
-  // escapes checkpoint coverage.
+  // ViewGraphCheckpointTotalityTests guard fails when a new field escapes
+  // checkpoint coverage. makeCheckpoint/restoreCheckpoint move whole groups,
+  // so the groups carry the totality contract by construction.
   package private(set) var root: ViewNode?
 
-  private var nodesByNodeID: [ViewNodeID: ViewNode]
-  private var nodeIDByIdentity: [Identity: ViewNodeID]
-  private var identityByNodeID: [ViewNodeID: Identity]
-  private var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
-  private var entityRoutingTable: EntityRoutingTable
-  private var nextViewNodeIDRawValue: UInt64
-  private var rootEvaluator: (@MainActor () -> Void)?
-  private var evaluationRootIdentity: Identity?
-  private var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
-  private var viewportLifecycleOrder: [ViewportLifecycleKey]
-  private var frameOrder: [ViewNodeID]
-  private var stableTaskCancelEvents: [LifecycleEvent]
-  private var stableTaskStartEvents: [LifecycleEvent]
-  private var structuralAppearEvents: [LifecycleEvent]
-  private var structuralTaskCancelEvents: [LifecycleEvent]
-  private var structuralDisappearEvents: [LifecycleEvent]
-  private var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
-  private var requiresRootEvaluation: Bool
-  private var invalidatedNodeIDs: Set<ViewNodeID>
-  private var graphLocalDirtyNodeIDs: Set<ViewNodeID>
-  private var latestLifecycleEvents: [LifecycleEvent]
-  private var stateMutationKeys: Set<StateSlotKey>
-  private var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
-  private var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
-  private var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
-  private var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]
-  private var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot]
-  private var nextTaskDescriptorIdentityToken: UInt64
-  private var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
-  private var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>]
-  private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
-  private var currentFrameID: UInt64
-  private var liveNodeIDs: Set<ViewNodeID>
-  private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
-  private var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
-  private var checkpointMutationEpoch: UInt64
+  // Cohesive field groups (see ViewGraphFieldGroups.swift). Every original field
+  // is forwarded by a private computed accessor below, so reconciliation logic
+  // is unchanged while makeCheckpoint/restoreCheckpoint move whole groups.
+  private var index: GraphIndex
+  private var rootEvaluation: RootEvaluation
+  private var viewportLifecycle: ViewportLifecycleState
+  private var eventBuffers: LifecycleEventBuffers
+  private var dirtyState: DirtyState
+  private var lifecycleEvaluation: LifecycleEvaluationOwnership
+  private var taskDescriptors: TaskDescriptorState
+  private var dependencyIndex: DependencyIndex
+  private var frameCommit: FrameCommitState
+
+  private var nodesByNodeID: [ViewNodeID: ViewNode] {
+    get { index.nodesByNodeID }
+    set { index.nodesByNodeID = newValue }
+  }
+  private var nodeIDByIdentity: [Identity: ViewNodeID] {
+    get { index.nodeIDByIdentity }
+    set { index.nodeIDByIdentity = newValue }
+  }
+  private var identityByNodeID: [ViewNodeID: Identity] {
+    get { index.identityByNodeID }
+    set { index.identityByNodeID = newValue }
+  }
+  private var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] {
+    get { index.nodeIDsByStructuralPath }
+    set { index.nodeIDsByStructuralPath = newValue }
+  }
+  private var entityRoutingTable: EntityRoutingTable {
+    get { index.entityRoutingTable }
+    set { index.entityRoutingTable = newValue }
+  }
+  private var nextViewNodeIDRawValue: UInt64 {
+    get { index.nextViewNodeIDRawValue }
+    set { index.nextViewNodeIDRawValue = newValue }
+  }
+  private var rootEvaluator: (@MainActor () -> Void)? {
+    get { rootEvaluation.rootEvaluator }
+    set { rootEvaluation.rootEvaluator = newValue }
+  }
+  private var evaluationRootIdentity: Identity? {
+    get { rootEvaluation.evaluationRootIdentity }
+    set { rootEvaluation.evaluationRootIdentity = newValue }
+  }
+  private var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode] {
+    get { viewportLifecycle.viewportLifecycleNodesByKey }
+    set { viewportLifecycle.viewportLifecycleNodesByKey = newValue }
+  }
+  private var viewportLifecycleOrder: [ViewportLifecycleKey] {
+    get { viewportLifecycle.viewportLifecycleOrder }
+    set { viewportLifecycle.viewportLifecycleOrder = newValue }
+  }
+  private var frameOrder: [ViewNodeID] {
+    get { eventBuffers.frameOrder }
+    set { eventBuffers.frameOrder = newValue }
+  }
+  private var stableTaskCancelEvents: [LifecycleEvent] {
+    get { eventBuffers.stableTaskCancelEvents }
+    set { eventBuffers.stableTaskCancelEvents = newValue }
+  }
+  private var stableTaskStartEvents: [LifecycleEvent] {
+    get { eventBuffers.stableTaskStartEvents }
+    set { eventBuffers.stableTaskStartEvents = newValue }
+  }
+  private var structuralAppearEvents: [LifecycleEvent] {
+    get { eventBuffers.structuralAppearEvents }
+    set { eventBuffers.structuralAppearEvents = newValue }
+  }
+  private var structuralTaskCancelEvents: [LifecycleEvent] {
+    get { eventBuffers.structuralTaskCancelEvents }
+    set { eventBuffers.structuralTaskCancelEvents = newValue }
+  }
+  private var structuralDisappearEvents: [LifecycleEvent] {
+    get { eventBuffers.structuralDisappearEvents }
+    set { eventBuffers.structuralDisappearEvents = newValue }
+  }
+  private var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> {
+    get { eventBuffers.pendingEntityRoutedRemovalNodeIDs }
+    set { eventBuffers.pendingEntityRoutedRemovalNodeIDs = newValue }
+  }
+  private var latestLifecycleEvents: [LifecycleEvent] {
+    get { eventBuffers.latestLifecycleEvents }
+    set { eventBuffers.latestLifecycleEvents = newValue }
+  }
+  private var requiresRootEvaluation: Bool {
+    get { dirtyState.requiresRootEvaluation }
+    set { dirtyState.requiresRootEvaluation = newValue }
+  }
+  private var invalidatedNodeIDs: Set<ViewNodeID> {
+    get { dirtyState.invalidatedNodeIDs }
+    set { dirtyState.invalidatedNodeIDs = newValue }
+  }
+  private var graphLocalDirtyNodeIDs: Set<ViewNodeID> {
+    get { dirtyState.graphLocalDirtyNodeIDs }
+    set { dirtyState.graphLocalDirtyNodeIDs = newValue }
+  }
+  private var stateMutationKeys: Set<StateSlotKey> {
+    get { dirtyState.stateMutationKeys }
+    set { dirtyState.stateMutationKeys = newValue }
+  }
+  private var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>] {
+    get { dirtyState.stateMutationNodeIDsByKey }
+    set { dirtyState.stateMutationNodeIDsByKey = newValue }
+  }
+  private var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID] {
+    get { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID }
+    set { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID = newValue }
+  }
+  private var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>] {
+    get { lifecycleEvaluation.lifecycleEvaluationTargetsByOwner }
+    set { lifecycleEvaluation.lifecycleEvaluationTargetsByOwner = newValue }
+  }
+  private var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>] {
+    get { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner }
+    set { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner = newValue }
+  }
+  private var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot] {
+    get { taskDescriptors.taskDescriptorNodeSlots }
+    set { taskDescriptors.taskDescriptorNodeSlots = newValue }
+  }
+  private var nextTaskDescriptorIdentityToken: UInt64 {
+    get { taskDescriptors.nextTaskDescriptorIdentityToken }
+    set { taskDescriptors.nextTaskDescriptorIdentityToken = newValue }
+  }
+  private var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>] {
+    get { dependencyIndex.stateSlotDependents }
+    set { dependencyIndex.stateSlotDependents = newValue }
+  }
+  private var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] {
+    get { dependencyIndex.environmentDependents }
+    set { dependencyIndex.environmentDependents = newValue }
+  }
+  private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>] {
+    get { dependencyIndex.observableDependents }
+    set { dependencyIndex.observableDependents = newValue }
+  }
+  private var currentFrameID: UInt64 {
+    get { frameCommit.currentFrameID }
+    set { frameCommit.currentFrameID = newValue }
+  }
+  private var liveNodeIDs: Set<ViewNodeID> {
+    get { frameCommit.liveNodeIDs }
+    set { frameCommit.liveNodeIDs = newValue }
+  }
+  private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] {
+    get { frameCommit.resolvedNodeReuseCache }
+    set { frameCommit.resolvedNodeReuseCache = newValue }
+  }
+  private var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint? {
+    get { frameCommit.committedRuntimeRegistrationFingerprint }
+    set { frameCommit.committedRuntimeRegistrationFingerprint = newValue }
+  }
+  private var checkpointMutationEpoch: UInt64 {
+    get { frameCommit.checkpointMutationEpoch }
+    set { frameCommit.checkpointMutationEpoch = newValue }
+  }
 
   private func recordCheckpointGraphMutation() {
     checkpointMutationEpoch &+= 1
@@ -319,42 +387,15 @@ package final class ViewGraph {
   }
 
   package init() {
-    nodesByNodeID = [:]
-    nodeIDByIdentity = [:]
-    identityByNodeID = [:]
-    nodeIDsByStructuralPath = [:]
-    entityRoutingTable = .init()
-    nextViewNodeIDRawValue = 0
-    rootEvaluator = nil
-    evaluationRootIdentity = nil
-    viewportLifecycleNodesByKey = [:]
-    viewportLifecycleOrder = []
-    frameOrder = []
-    stableTaskCancelEvents = []
-    stableTaskStartEvents = []
-    structuralAppearEvents = []
-    structuralTaskCancelEvents = []
-    structuralDisappearEvents = []
-    pendingEntityRoutedRemovalNodeIDs = []
-    requiresRootEvaluation = false
-    invalidatedNodeIDs = []
-    graphLocalDirtyNodeIDs = []
-    latestLifecycleEvents = []
-    stateMutationKeys = []
-    stateMutationNodeIDsByKey = [:]
-    lifecycleEvaluationOwnersByNodeID = [:]
-    lifecycleEvaluationTargetsByOwner = [:]
-    lifecycleEvaluationTargetsRecordedByOwner = [:]
-    taskDescriptorNodeSlots = [:]
-    nextTaskDescriptorIdentityToken = 0
-    stateSlotDependents = [:]
-    environmentDependents = [:]
-    observableDependents = [:]
-    currentFrameID = 0
-    liveNodeIDs = []
-    resolvedNodeReuseCache = [:]
-    committedRuntimeRegistrationFingerprint = nil
-    checkpointMutationEpoch = 0
+    index = GraphIndex()
+    rootEvaluation = RootEvaluation()
+    viewportLifecycle = ViewportLifecycleState()
+    eventBuffers = LifecycleEventBuffers()
+    dirtyState = DirtyState()
+    lifecycleEvaluation = LifecycleEvaluationOwnership()
+    taskDescriptors = TaskDescriptorState()
+    dependencyIndex = DependencyIndex()
+    frameCommit = FrameCommitState()
   }
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {

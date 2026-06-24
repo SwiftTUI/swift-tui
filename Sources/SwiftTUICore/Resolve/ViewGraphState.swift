@@ -41,44 +41,21 @@ package struct ResolvedNodeReuseCacheEntry: Equatable, Sendable {
 }
 
 extension ViewGraph {
+  // The checkpoint mirrors ViewGraph's field groups (see
+  // ViewGraphFieldGroups.swift) one-for-one, so makeCheckpoint/restoreCheckpoint
+  // move whole groups instead of copying every field by hand. `root` and
+  // `nodeCheckpoints` are the only non-group members.
   package struct Checkpoint {
     package var root: ViewNode?
-    package var nodesByNodeID: [ViewNodeID: ViewNode]
-    package var nodeIDByIdentity: [Identity: ViewNodeID]
-    package var identityByNodeID: [ViewNodeID: Identity]
-    package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
-    package var entityRoutingTable: EntityRoutingTable
-    package var nextViewNodeIDRawValue: UInt64
-    package var rootEvaluator: (@MainActor () -> Void)?
-    package var evaluationRootIdentity: Identity?
-    package var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
-    package var viewportLifecycleOrder: [ViewportLifecycleKey]
-    package var frameOrder: [ViewNodeID]
-    package var stableTaskCancelEvents: [LifecycleEvent]
-    package var stableTaskStartEvents: [LifecycleEvent]
-    package var structuralAppearEvents: [LifecycleEvent]
-    package var structuralTaskCancelEvents: [LifecycleEvent]
-    package var structuralDisappearEvents: [LifecycleEvent]
-    package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
-    package var requiresRootEvaluation: Bool
-    package var invalidatedNodeIDs: Set<ViewNodeID>
-    package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
-    package var latestLifecycleEvents: [LifecycleEvent]
-    package var stateMutationKeys: Set<StateSlotKey>
-    package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
-    package var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
-    package var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
-    package var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]
-    package var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot]
-    package var nextTaskDescriptorIdentityToken: UInt64
-    package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
-    package var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>]
-    package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
-    package var currentFrameID: UInt64
-    package var liveNodeIDs: Set<ViewNodeID>
-    package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
-    package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
-    package var checkpointMutationEpoch: UInt64
+    package var index: GraphIndex
+    package var rootEvaluation: RootEvaluation
+    package var viewportLifecycle: ViewportLifecycleState
+    package var eventBuffers: LifecycleEventBuffers
+    package var dirtyState: DirtyState
+    package var lifecycleEvaluation: LifecycleEvaluationOwnership
+    package var taskDescriptors: TaskDescriptorState
+    package var dependencyIndex: DependencyIndex
+    package var frameCommit: FrameCommitState
     package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   }
 
@@ -96,7 +73,7 @@ extension ViewGraph {
 
     package init(checkpoint: Checkpoint) {
       self.init(
-        checkpointMutationEpoch: checkpoint.checkpointMutationEpoch,
+        checkpointMutationEpoch: checkpoint.frameCommit.checkpointMutationEpoch,
         nodeMutationGenerations: checkpoint.nodeCheckpoints.mapValues {
           $0.checkpointMutationGeneration
         }
