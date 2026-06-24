@@ -69,11 +69,14 @@ package func readTerminalInputChunk(
   from fileDescriptor: Int32,
   maxBytes: Int
 ) -> TerminalInputReadResult {
-  var buffer = Array(repeating: UInt8(0), count: maxBytes)
-  let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
+  var bytesRead = 0
+  let buffer = unsafe [UInt8](unsafeUninitializedCapacity: maxBytes) { buf, count in
+    bytesRead = unsafe platformRead(fileDescriptor, buf.baseAddress, maxBytes)
+    count = bytesRead > 0 ? bytesRead : 0
+  }
 
   if bytesRead > 0 {
-    return .bytes(Array(buffer.prefix(Int(bytesRead))))
+    return .bytes(buffer)
   }
 
   if bytesRead == 0 {

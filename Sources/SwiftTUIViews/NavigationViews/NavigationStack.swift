@@ -406,7 +406,7 @@ private func updateNavigationDestinationActivation(
 }
 
 private func navigationDestinationActivationStateSlot(_ modifierOrdinal: Int) -> Int {
-  -5_000_000 - modifierOrdinal
+  StateSlotOrdinals.navigationDestinationActivation(modifierOrdinal)
 }
 
 private func scopeDepth(

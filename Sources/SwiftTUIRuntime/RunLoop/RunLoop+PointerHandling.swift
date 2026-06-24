@@ -330,7 +330,8 @@ extension RunLoop {
           location: location,
           targetRect: hitTarget.region.rect,
           scrollContext: scrollContext(for: hitTarget.region.identity),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+          timestamp: timestamp
         )
       )
       if handled {

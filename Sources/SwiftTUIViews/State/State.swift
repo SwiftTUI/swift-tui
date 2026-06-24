@@ -28,6 +28,9 @@ package enum StateSlotOrdinals {
   private static let changeModifierBase = -1_000_000
   private static let defaultFocusBase = -2_000_000
   private static let valueAnimationOrdinal = -3_000_000
+  private static let tabFocusedIndexBase = -4_000_000
+  private static let tabOverflowMenuExpandedBase = -5_000_000
+  private static let navigationDestinationActivationBase = -6_000_000
 
   package static func authored(
     line: UInt,
@@ -50,6 +53,20 @@ package enum StateSlotOrdinals {
 
   package static var valueAnimation: Int {
     valueAnimationOrdinal
+  }
+
+  package static var tabFocusedIndex: Int {
+    tabFocusedIndexBase
+  }
+
+  package static var tabOverflowMenuExpanded: Int {
+    tabOverflowMenuExpandedBase
+  }
+
+  package static func navigationDestinationActivation(
+    _ ordinal: Int
+  ) -> Int {
+    navigationDestinationActivationBase - ordinal
   }
 }
 

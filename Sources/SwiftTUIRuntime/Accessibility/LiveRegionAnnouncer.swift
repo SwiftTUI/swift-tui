@@ -24,7 +24,8 @@ package struct LiveRegionAnnouncer: Equatable, Sendable {
   ) -> [LiveRegionAnnouncement] {
     let candidates = liveRegionCandidates(in: snapshot.accessibilityNodes)
     let currentLabelsByKey = Dictionary(
-      uniqueKeysWithValues: candidates.map { ($0.key, $0.label) }
+      candidates.map { ($0.key, $0.label) },
+      uniquingKeysWith: { _, last in last }
     )
     defer {
       previousLabelsByKey = currentLabelsByKey

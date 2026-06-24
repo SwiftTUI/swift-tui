@@ -115,6 +115,12 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     activeConnectionID += 1
     let connectionID = activeConnectionID
 
+    if let previous = outputContinuation {
+      previous.yield(.normalClose)
+      previous.finish()
+      outputContinuation = nil
+    }
+
     return AsyncStream { continuation in
       outputContinuation = continuation
       for message in pendingOutput {

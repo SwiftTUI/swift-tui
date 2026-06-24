@@ -21,7 +21,8 @@ public struct CellPixelMetrics: Equatable, Hashable, Sendable {
   /// Cell height divided by cell width. Conventionally ~2.0 for typical
   /// monospace fonts.
   public var aspectRatio: Double {
-    Double(height) / Double(width)
+    guard width > 0 else { return Self.estimated.aspectRatio }
+    return Double(height) / Double(width)
   }
 
   public enum Source: Equatable, Hashable, Sendable {

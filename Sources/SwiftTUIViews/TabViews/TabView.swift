@@ -189,17 +189,23 @@ extension TabView {
                 invalidationIdentity: context.identity
               )
             case KeyPress(.arrowUp, modifiers: []):
-              if moveStoredOverflowMenuFocus(
+              if expandFocusedOverflowMenuIfNeeded(
+                ownerNode: ownerNode,
+                selectedIndex: selectedIndex,
+                optionCount: options.count,
+                presentation: stylePresentation,
+                invalidationIdentity: context.identity
+              ) {
+                return true
+              }
+              return moveStoredOverflowMenuFocus(
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
                 optionCount: options.count,
                 delta: -1,
                 presentation: stylePresentation,
                 invalidationIdentity: context.identity
-              ) {
-                return true
-              }
-              return true
+              )
             case KeyPress(.tab, modifiers: []), KeyPress(.tab, modifiers: .shift):
               setStoredTabOverflowMenuExpanded(
                 false,
@@ -657,8 +663,8 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
   return setBoundSelection(selectionBinding, to: orderedTags[index])
 }
 
-private let tabFocusedIndexStateSlot = -4_000_001
-private let tabOverflowMenuExpandedStateSlot = -4_000_002
+private let tabFocusedIndexStateSlot = StateSlotOrdinals.tabFocusedIndex
+private let tabOverflowMenuExpandedStateSlot = StateSlotOrdinals.tabOverflowMenuExpanded
 
 @MainActor
 private func storedFocusedTabIndex(

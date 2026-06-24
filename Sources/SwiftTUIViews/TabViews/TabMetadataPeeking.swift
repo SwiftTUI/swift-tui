@@ -28,12 +28,8 @@ package struct PeekedTabChildMetadata {
   }
 
   package mutating func merge(_ other: PeekedTabChildMetadata) {
-    if let label = other.label, label != self.label {
-      self.label = self.label ?? label
-    }
-    if let tag = other.tag, tag != self.tag {
-      self.tag = self.tag ?? tag
-    }
+    if self.label == nil { self.label = other.label }
+    if self.tag == nil { self.tag = other.tag }
   }
 }
 

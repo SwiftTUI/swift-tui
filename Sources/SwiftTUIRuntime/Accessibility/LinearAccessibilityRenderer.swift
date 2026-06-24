@@ -24,7 +24,10 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
       return ""
     }
 
-    let nodesByIdentity = Dictionary(uniqueKeysWithValues: nodes.map { ($0.identity, $0) })
+    let nodesByIdentity = Dictionary(
+      nodes.map { ($0.identity, $0) },
+      uniquingKeysWith: { _, last in last }
+    )
     var lines: [String] = []
     lines.reserveCapacity(nodes.count + warnings.count)
 

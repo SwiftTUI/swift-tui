@@ -57,7 +57,7 @@ public struct Spinner: View {
         if accessibilityReduceMotion {
           Text(set.body.first ?? set.head)
         } else {
-          Text(set.body[iteration])
+          Text(set.body[safe: iteration] ?? set.body.first ?? set.head)
         }
       case .finished:
         Text(set.tail)
@@ -93,7 +93,7 @@ public struct Spinner: View {
       self.tail = tail
     }
 
-    nonisolated public var description: String { body.first! }
+    nonisolated public var description: String { body.first ?? head }
     public static let circleOrbit = Self("◡", "◟", "◜", "◠", "◝", "◞", tail: "○")
     public static let brailleRingFilled = Self("⣾", "⣷", "⣯", "⣟", "⡿", "⢿", "⣽", "⣻", tail: "⣿")
     public static let brailleBlockFill = Self("⠉", "⠛", "⠿", "⣿", tail: "⣿")

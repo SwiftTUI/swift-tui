@@ -6,6 +6,8 @@
   import Android
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import ucrt
 #endif
 
 package func powDouble(
@@ -20,6 +22,8 @@ package func powDouble(
     Android.pow(base, exponent)
   #elseif canImport(WASILibc)
     WASILibc.pow(base, exponent)
+  #elseif canImport(ucrt)
+    ucrt.pow(base, exponent)
   #else
     fatalError("powDouble is unavailable on this platform.")
   #endif

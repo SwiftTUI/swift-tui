@@ -158,9 +158,12 @@ private struct RouteContext: Sendable {
     _ request: HTTPRequest
   ) -> Bool {
     if let queryToken = request.query["token"] {
-      return queryToken == token.rawValue
+      return matchesToken(queryToken)
     }
-    return cookieToken(from: request) == token.rawValue
+    guard let cookie = cookieToken(from: request) else {
+      return false
+    }
+    return matchesToken(cookie)
   }
 
   func authorizedResponse(
@@ -171,10 +174,16 @@ private struct RouteContext: Sendable {
       return forbiddenResponse()
     }
     var response = response()
-    if request.query["token"] == token.rawValue {
+    if let queryToken = request.query["token"], matchesToken(queryToken) {
       response.headers[.setCookie] = cookieValue()
     }
     return response
+  }
+
+  private func matchesToken(
+    _ candidate: String
+  ) -> Bool {
+    constantTimeEquals(candidate, token.rawValue)
   }
 
   func cookieValue() -> String {
@@ -294,6 +303,24 @@ private func httpResponse(
     headers: [.contentType: contentType],
     body: body
   )
+}
+
+private func constantTimeEquals(
+  _ lhs: String,
+  _ rhs: String
+) -> Bool {
+  let lhsBytes = Array(lhs.utf8)
+  let rhsBytes = Array(rhs.utf8)
+  var difference = UInt8(lhsBytes.count == rhsBytes.count ? 0 : 1)
+  let count = max(lhsBytes.count, rhsBytes.count)
+  var index = 0
+  while index < count {
+    let lhsByte = index < lhsBytes.count ? lhsBytes[index] : 0
+    let rhsByte = index < rhsBytes.count ? rhsBytes[index] : 0
+    difference |= lhsByte ^ rhsByte
+    index += 1
+  }
+  return difference == 0
 }
 
 private func forbiddenResponse() -> HTTPResponse {

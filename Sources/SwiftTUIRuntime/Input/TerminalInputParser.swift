@@ -63,17 +63,20 @@ extension TerminalInputParser {
     }
 
     switch firstByte {
-    case 0x01...0x02, 0x04...0x08, 0x0B...0x0C, 0x0E...0x1A:
-      // Ctrl+A through Ctrl+Z (excluding 0x03=Ctrl+C, 0x09=Tab, 0x0A/0x0D=Return).
+    case 0x08, 0x7F:
+      // 0x08 (Ctrl+H) and 0x7F (DEL) both map to backspace. This must be
+      // matched before the Ctrl-letter range so 0x08 is not swallowed as Ctrl+H.
+      bufferedBytes.removeFirst()
+      return .key(KeyPress(.backspace))
+    case 0x01...0x02, 0x04...0x07, 0x0B...0x0C, 0x0E...0x1A:
+      // Ctrl+A through Ctrl+Z (excluding 0x03=Ctrl+C, 0x08=backspace,
+      // 0x09=Tab, 0x0A/0x0D=Return).
       bufferedBytes.removeFirst()
       let letter = Character(UnicodeScalar(Int(firstByte) + 0x60)!)
       return .key(KeyPress(.character(letter), modifiers: .ctrl))
     case 0x03:
       bufferedBytes.removeFirst()
       return .key(KeyPress(.character("c"), modifiers: .ctrl))
-    case 0x08, 0x7F:
-      bufferedBytes.removeFirst()
-      return .key(KeyPress(.backspace))
     case 0x09:
       bufferedBytes.removeFirst()
       return .key(KeyPress(.tab))

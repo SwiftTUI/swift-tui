@@ -45,45 +45,7 @@ extension ViewGraph {
   }
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
-    root = checkpoint.root
-    nodesByNodeID = checkpoint.nodesByNodeID
-    nodeIDByIdentity = checkpoint.nodeIDByIdentity
-    identityByNodeID = checkpoint.identityByNodeID
-    nodeIDsByStructuralPath = checkpoint.nodeIDsByStructuralPath
-    entityRoutingTable = checkpoint.entityRoutingTable
-    nextViewNodeIDRawValue = checkpoint.nextViewNodeIDRawValue
-    rootEvaluator = checkpoint.rootEvaluator
-    evaluationRootIdentity = checkpoint.evaluationRootIdentity
-    viewportLifecycleNodesByKey = checkpoint.viewportLifecycleNodesByKey
-    viewportLifecycleOrder = checkpoint.viewportLifecycleOrder
-    frameOrder = checkpoint.frameOrder
-    stableTaskCancelEvents = checkpoint.stableTaskCancelEvents
-    stableTaskStartEvents = checkpoint.stableTaskStartEvents
-    structuralAppearEvents = checkpoint.structuralAppearEvents
-    structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
-    structuralDisappearEvents = checkpoint.structuralDisappearEvents
-    pendingEntityRoutedRemovalNodeIDs = checkpoint.pendingEntityRoutedRemovalNodeIDs
-    requiresRootEvaluation = checkpoint.requiresRootEvaluation
-    invalidatedNodeIDs = checkpoint.invalidatedNodeIDs
-    graphLocalDirtyNodeIDs = checkpoint.graphLocalDirtyNodeIDs
-    latestLifecycleEvents = checkpoint.latestLifecycleEvents
-    stateMutationKeys = checkpoint.stateMutationKeys
-    stateMutationNodeIDsByKey = checkpoint.stateMutationNodeIDsByKey
-    lifecycleEvaluationOwnersByNodeID = checkpoint.lifecycleEvaluationOwnersByNodeID
-    lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
-    lifecycleEvaluationTargetsRecordedByOwner =
-      checkpoint.lifecycleEvaluationTargetsRecordedByOwner
-    taskDescriptorNodeSlots = checkpoint.taskDescriptorNodeSlots
-    nextTaskDescriptorIdentityToken = checkpoint.nextTaskDescriptorIdentityToken
-    stateSlotDependents = checkpoint.stateSlotDependents
-    environmentDependents = checkpoint.environmentDependents
-    observableDependents = checkpoint.observableDependents
-    currentFrameID = checkpoint.currentFrameID
-    liveNodeIDs = checkpoint.liveNodeIDs
-    resolvedNodeReuseCache = checkpoint.resolvedNodeReuseCache
-    committedRuntimeRegistrationFingerprint =
-      checkpoint.committedRuntimeRegistrationFingerprint
-    checkpointMutationEpoch = checkpoint.checkpointMutationEpoch
+    restoreCheckpointGraphFields(checkpoint)
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
@@ -221,17 +183,6 @@ package final class ViewGraph {
   private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
   private var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
   private var checkpointMutationEpoch: UInt64
-
-  private var nodesByIdentity: [Identity: ViewNode] {
-    Dictionary(
-      uniqueKeysWithValues: nodeIDByIdentity.compactMap { identity, viewNodeID in
-        guard let node = nodesByNodeID[viewNodeID] else {
-          return nil
-        }
-        return (identity, node)
-      }
-    )
-  }
 
   private func recordCheckpointGraphMutation() {
     checkpointMutationEpoch &+= 1

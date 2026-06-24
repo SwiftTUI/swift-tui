@@ -43,6 +43,20 @@ struct InputParserModifierTests {
     #expect(events == [.key(KeyPress(.character("d"), modifiers: .ctrl))])
   }
 
+  @Test("Backspace (0x08, Ctrl+H) emits backspace, not Ctrl+H")
+  func backspaceCtrlH() {
+    var parser = TerminalInputParser()
+    let events = parser.feed([0x08])
+    #expect(events == [.key(KeyPress(.backspace))])
+  }
+
+  @Test("DEL (0x7F) emits backspace")
+  func delBackspace() {
+    var parser = TerminalInputParser()
+    let events = parser.feed([0x7F])
+    #expect(events == [.key(KeyPress(.backspace))])
+  }
+
   @Test("Tab (0x09) emits tab without modifiers")
   func tab() {
     var parser = TerminalInputParser()

@@ -267,9 +267,6 @@ public struct Divider: PrimitiveView, ResolvableView {
   }
 }
 
-private func idealTextSize(for content: String) -> CellSize {
-  layoutText(for: content, width: Optional<Int>.none).size
-}
 @MainActor
 func resolveLeafNode(
   kindName: String,
