@@ -8,39 +8,90 @@ package import SwiftTUIViews
 /// and registered animation/completion closures used by frame ticks.
 @MainActor
 package final class AnimationController: Sendable {
-  private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
+  /// Snapshots and topology captured at the end of the previous frame.
+  private var previousFrame = PreviousFrameState()
+  /// `.transition()` registration maps (current / previous / pending).
+  private var transitions = TransitionRegistry()
+  /// `withAnimation` completion bookkeeping (closures + ref counts + stranded
+  /// drains).
+  private var batchCompletion = BatchCompletionState()
+  /// Frame-head transaction bookkeeping (open flag + deferred completions).
+  private var frameHead = FrameHeadTransactionState()
+
+  private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
+  private var registeredAnimations: [AnimationBox: Animation] = [:]
+  private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
+  package private(set) var lastTickResult: AnimationTickResult = .init()
+
+  // Computed accessors forwarding to the clustered sub-structs.  These keep the
+  // per-tick animation logic below reading and writing the original field names
+  // with identical value semantics, while the checkpoint/restore/reset triplet
+  // moves whole structs.
+
+  /// Animatable snapshots from the previous frame, keyed by identity.
+  private var previousSnapshots: [Identity: AnimatableSnapshot] {
+    get { previousFrame.snapshots }
+    set { previousFrame.snapshots = newValue }
+  }
   /// Full tree from the previous frame, retained so removals can capture
   /// their subtrees.
-  private var previousTreeRoot: ResolvedNode?
+  private var previousTreeRoot: ResolvedNode? {
+    get { previousFrame.treeRoot }
+    set { previousFrame.treeRoot = newValue }
+  }
   /// Previous frame's placed tree, captured at the end of each frame
   /// via ``capturePlacedTree(_:)``.  Used by removal detection to
   /// look up the disappearing identity's frozen bounds and inject
   /// the overlay at placed level instead of routing it back through
   /// measure/place.
-  private var previousPlacedRoot: PlacedNode?
+  private var previousPlacedRoot: PlacedNode? {
+    get { previousFrame.placedRoot }
+    set { previousFrame.placedRoot = newValue }
+  }
   /// Placed bounds for every matched-geometry key observed in the
   /// previous frame's placed tree.  Seeded by ``capturePlacedTree``
   /// and consulted by the next frame's match detection.
-  private var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect] = [:]
+  private var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect] {
+    get { previousFrame.matchedGeometryBounds }
+    set { previousFrame.matchedGeometryBounds = newValue }
+  }
   /// Which identity held each matched-geometry key in the previous
   /// frame.  A match fires when the current frame maps the same key
   /// to a *different* identity — regardless of whether either
   /// identity is newly inserted.
-  private var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity] = [:]
+  private var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity] {
+    get { previousFrame.matchedKeyIdentities }
+    set { previousFrame.matchedKeyIdentities = newValue }
+  }
   /// Parent identity, as walked from the previous frame's tree.
-  private var previousParentByIdentity: [Identity: Identity] = [:]
+  private var previousParentByIdentity: [Identity: Identity] {
+    get { previousFrame.parentByIdentity }
+    set { previousFrame.parentByIdentity = newValue }
+  }
   /// Child index within the previous parent's children list.
-  private var previousChildIndexByIdentity: [Identity: Int] = [:]
-  private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
-  private var registeredAnimations: [AnimationBox: Animation] = [:]
+  private var previousChildIndexByIdentity: [Identity: Int] {
+    get { previousFrame.childIndexByIdentity }
+    set { previousFrame.childIndexByIdentity = newValue }
+  }
+  private var previousIdentities: Set<Identity> {
+    get { previousFrame.identities }
+    set { previousFrame.identities = newValue }
+  }
+
   /// Completion closures registered by ``withAnimation`` overloads.
   /// The controller fires and removes the entry once every animation
   /// (and every removal overlay) tagged with the batch ID has drained.
-  private var completionClosures: [AnimationBatchID: @Sendable () -> Void] = [:]
+  private var completionClosures: [AnimationBatchID: @Sendable () -> Void] {
+    get { batchCompletion.completionClosures }
+    set { batchCompletion.completionClosures = newValue }
+  }
   /// Per-batch active-animation counts.  Incremented on enqueue;
   /// decremented when an animation completes or is superseded.  When
   /// a count hits zero, the matching completion closure fires.
-  private var batchRefCounts: [AnimationBatchID: Int] = [:]
+  private var batchRefCounts: [AnimationBatchID: Int] {
+    get { batchCompletion.batchRefCounts }
+    set { batchCompletion.batchRefCounts = newValue }
+  }
   /// Batches whose `withAnimation { ... } completion: { ... }` scope
   /// registered a completion closure but produced zero retained
   /// animations during their resolve pass — e.g. because the only
@@ -54,25 +105,54 @@ package final class AnimationController: Sendable {
   /// guarantee: every `withAnimation` completion eventually fires,
   /// even when the body changed nothing the controller can
   /// interpolate.
-  private var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant] = [:]
+  private var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant] {
+    get { batchCompletion.pendingEmptyBatchCompletions }
+    set { batchCompletion.pendingEmptyBatchCompletions = newValue }
+  }
+
   /// Registrations collected during the *current* frame's resolve pass.
   /// Used to look up transitions on INSERTION.
-  private var transitionsByNodeID: [ViewNodeID: AnyTransition] = [:]
-  private var transitionIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
+  private var transitionsByNodeID: [ViewNodeID: AnyTransition] {
+    get { transitions.byNodeID }
+    set { transitions.byNodeID = newValue }
+  }
+  private var transitionIdentitiesByNodeID: [ViewNodeID: Identity] {
+    get { transitions.identitiesByNodeID }
+    set { transitions.identitiesByNodeID = newValue }
+  }
   /// Registrations that were live at the end of the *previous* frame's
   /// resolve pass.  Used to look up transitions on REMOVAL, because the
   /// disappearing view's `.transition()` modifier is not evaluated in
   /// the current frame — its branch is gone.
-  private var previousTransitionsByNodeID: [ViewNodeID: AnyTransition] = [:]
-  private var previousTransitionIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
-  private var pendingTransitionsByNodeID: [ViewNodeID: AnyTransition] = [:]
-  private var pendingTransitionIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
-  private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
-  private var previousIdentities: Set<Identity> = []
-  package private(set) var lastTickResult: AnimationTickResult = .init()
-  private var isFrameHeadTransactionActive = false
-  private var deferredFrameHeadCompletions: [@Sendable () -> Void] = []
-  private var lastFrameHeadCompletionCount = 0
+  private var previousTransitionsByNodeID: [ViewNodeID: AnyTransition] {
+    get { transitions.previousByNodeID }
+    set { transitions.previousByNodeID = newValue }
+  }
+  private var previousTransitionIdentitiesByNodeID: [ViewNodeID: Identity] {
+    get { transitions.previousIdentitiesByNodeID }
+    set { transitions.previousIdentitiesByNodeID = newValue }
+  }
+  private var pendingTransitionsByNodeID: [ViewNodeID: AnyTransition] {
+    get { transitions.pendingByNodeID }
+    set { transitions.pendingByNodeID = newValue }
+  }
+  private var pendingTransitionIdentitiesByNodeID: [ViewNodeID: Identity] {
+    get { transitions.pendingIdentitiesByNodeID }
+    set { transitions.pendingIdentitiesByNodeID = newValue }
+  }
+
+  private var isFrameHeadTransactionActive: Bool {
+    get { frameHead.isActive }
+    set { frameHead.isActive = newValue }
+  }
+  private var deferredFrameHeadCompletions: [@Sendable () -> Void] {
+    get { frameHead.deferredCompletions }
+    set { frameHead.deferredCompletions = newValue }
+  }
+  private var lastFrameHeadCompletionCount: Int {
+    get { frameHead.lastCompletionCount }
+    set { frameHead.lastCompletionCount = newValue }
+  }
 
   /// Target frame interval during active animation (30 FPS).
   private let frameInterval: Duration = .milliseconds(33)
@@ -119,8 +199,8 @@ package final class AnimationController: Sendable {
     )
     let completions = deferredFrameHeadCompletions
     lastFrameHeadCompletionCount = completions.count
-    isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
-    deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
+    isFrameHeadTransactionActive = checkpoint.frameHead.isActive
+    deferredFrameHeadCompletions = checkpoint.frameHead.deferredCompletions
     return completions
   }
 
@@ -134,58 +214,26 @@ package final class AnimationController: Sendable {
 
   fileprivate func makeCheckpoint() -> Checkpoint {
     Checkpoint(
-      previousSnapshots: previousSnapshots,
-      previousTreeRoot: previousTreeRoot,
-      previousPlacedRoot: previousPlacedRoot,
-      previousMatchedGeometryBounds: previousMatchedGeometryBounds,
-      previousMatchedKeyIdentities: previousMatchedKeyIdentities,
-      previousParentByIdentity: previousParentByIdentity,
-      previousChildIndexByIdentity: previousChildIndexByIdentity,
+      previousFrame: previousFrame,
+      transitions: transitions,
+      batchCompletion: batchCompletion,
+      frameHead: frameHead,
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
-      completionClosures: completionClosures,
-      batchRefCounts: batchRefCounts,
-      pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
-      transitionsByNodeID: transitionsByNodeID,
-      transitionIdentitiesByNodeID: transitionIdentitiesByNodeID,
-      previousTransitionsByNodeID: previousTransitionsByNodeID,
-      previousTransitionIdentitiesByNodeID: previousTransitionIdentitiesByNodeID,
-      pendingTransitionsByNodeID: pendingTransitionsByNodeID,
-      pendingTransitionIdentitiesByNodeID: pendingTransitionIdentitiesByNodeID,
       removingNodes: removingNodes,
-      previousIdentities: previousIdentities,
-      lastTickResult: lastTickResult,
-      isFrameHeadTransactionActive: isFrameHeadTransactionActive,
-      deferredFrameHeadCompletions: deferredFrameHeadCompletions,
-      lastFrameHeadCompletionCount: lastFrameHeadCompletionCount
+      lastTickResult: lastTickResult
     )
   }
 
   private func restore(_ checkpoint: Checkpoint) {
-    previousSnapshots = checkpoint.previousSnapshots
-    previousTreeRoot = checkpoint.previousTreeRoot
-    previousPlacedRoot = checkpoint.previousPlacedRoot
-    previousMatchedGeometryBounds = checkpoint.previousMatchedGeometryBounds
-    previousMatchedKeyIdentities = checkpoint.previousMatchedKeyIdentities
-    previousParentByIdentity = checkpoint.previousParentByIdentity
-    previousChildIndexByIdentity = checkpoint.previousChildIndexByIdentity
+    previousFrame = checkpoint.previousFrame
+    transitions = checkpoint.transitions
+    batchCompletion = checkpoint.batchCompletion
+    frameHead = checkpoint.frameHead
     activeAnimations = checkpoint.activeAnimations
     registeredAnimations = checkpoint.registeredAnimations
-    completionClosures = checkpoint.completionClosures
-    batchRefCounts = checkpoint.batchRefCounts
-    pendingEmptyBatchCompletions = checkpoint.pendingEmptyBatchCompletions
-    transitionsByNodeID = checkpoint.transitionsByNodeID
-    transitionIdentitiesByNodeID = checkpoint.transitionIdentitiesByNodeID
-    previousTransitionsByNodeID = checkpoint.previousTransitionsByNodeID
-    previousTransitionIdentitiesByNodeID = checkpoint.previousTransitionIdentitiesByNodeID
-    pendingTransitionsByNodeID = checkpoint.pendingTransitionsByNodeID
-    pendingTransitionIdentitiesByNodeID = checkpoint.pendingTransitionIdentitiesByNodeID
     removingNodes = checkpoint.removingNodes
-    previousIdentities = checkpoint.previousIdentities
     lastTickResult = checkpoint.lastTickResult
-    isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
-    deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
-    lastFrameHeadCompletionCount = checkpoint.lastFrameHeadCompletionCount
   }
 
   fileprivate func publishCommittedState(
@@ -208,7 +256,7 @@ package final class AnimationController: Sendable {
     // them (it predates them), so it neither references nor fired them; they are
     // pending registrations that must survive the publish.
     let concurrentCompletions = completionClosures.filter {
-      baseline.completionClosures[$0.key] == nil
+      baseline.batchCompletion.completionClosures[$0.key] == nil
     }
     let concurrentRegisteredAnimations = registeredAnimations.filter {
       baseline.registeredAnimations[$0.key] == nil
@@ -1482,30 +1530,14 @@ package final class AnimationController: Sendable {
   /// the next tick after reset to try to re-inject a subtree from a
   /// previous-generation tree.
   package func reset() {
-    previousSnapshots.removeAll(keepingCapacity: true)
-    previousTreeRoot = nil
-    previousPlacedRoot = nil
-    previousParentByIdentity.removeAll(keepingCapacity: true)
-    previousChildIndexByIdentity.removeAll(keepingCapacity: true)
-    previousMatchedGeometryBounds.removeAll(keepingCapacity: true)
-    previousMatchedKeyIdentities.removeAll(keepingCapacity: true)
+    previousFrame.reset()
+    transitions.reset()
+    batchCompletion.reset()
+    frameHead.reset()
     activeAnimations.removeAll(keepingCapacity: true)
     registeredAnimations.removeAll(keepingCapacity: true)
-    completionClosures.removeAll(keepingCapacity: true)
-    batchRefCounts.removeAll(keepingCapacity: true)
-    pendingEmptyBatchCompletions.removeAll(keepingCapacity: true)
-    transitionsByNodeID.removeAll(keepingCapacity: true)
-    transitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
-    previousTransitionsByNodeID.removeAll(keepingCapacity: true)
-    previousTransitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
-    pendingTransitionsByNodeID.removeAll(keepingCapacity: true)
-    pendingTransitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
     removingNodes.removeAll(keepingCapacity: true)
-    previousIdentities.removeAll(keepingCapacity: true)
     lastTickResult = .init()
-    isFrameHeadTransactionActive = false
-    deferredFrameHeadCompletions.removeAll(keepingCapacity: true)
-    lastFrameHeadCompletionCount = 0
   }
 }
 

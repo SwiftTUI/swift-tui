@@ -2,31 +2,20 @@
 package import SwiftTUIViews
 
 extension AnimationController {
+  /// An opaque snapshot of the controller's mutable state.  Carries the four
+  /// clustered sub-structs plus the standalone animation/removal/tick fields.
+  /// ``AnimationController/makeCheckpoint()`` and ``restore(_:)`` move each
+  /// member with one whole-value assignment, so the memberwise structs carry
+  /// the checkpoint totality contract instead of a hand-listed field copy.
   package struct Checkpoint {
-    package var previousSnapshots: [Identity: AnimatableSnapshot]
-    package var previousTreeRoot: ResolvedNode?
-    package var previousPlacedRoot: PlacedNode?
-    package var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect]
-    package var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity]
-    package var previousParentByIdentity: [Identity: Identity]
-    package var previousChildIndexByIdentity: [Identity: Int]
+    package var previousFrame: PreviousFrameState
+    package var transitions: TransitionRegistry
+    package var batchCompletion: BatchCompletionState
+    package var frameHead: FrameHeadTransactionState
     package var activeAnimations: [AnimationKey: ActiveAnimation]
     package var registeredAnimations: [AnimationBox: Animation]
-    package var completionClosures: [AnimationBatchID: @Sendable () -> Void]
-    package var batchRefCounts: [AnimationBatchID: Int]
-    package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
-    package var transitionsByNodeID: [ViewNodeID: AnyTransition]
-    package var transitionIdentitiesByNodeID: [ViewNodeID: Identity]
-    package var previousTransitionsByNodeID: [ViewNodeID: AnyTransition]
-    package var previousTransitionIdentitiesByNodeID: [ViewNodeID: Identity]
-    package var pendingTransitionsByNodeID: [ViewNodeID: AnyTransition]
-    package var pendingTransitionIdentitiesByNodeID: [ViewNodeID: Identity]
     package var removingNodes: [ViewNodeID: RemovalEntry]
-    package var previousIdentities: Set<Identity>
     package var lastTickResult: AnimationTickResult
-    package var isFrameHeadTransactionActive: Bool
-    package var deferredFrameHeadCompletions: [@Sendable () -> Void]
-    package var lastFrameHeadCompletionCount: Int
   }
 
   package struct DebugStateSnapshot: Equatable {
