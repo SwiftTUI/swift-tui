@@ -39,31 +39,95 @@ public struct ResolveContext: Equatable, Sendable {
   }
   package var invalidationSummary: InvalidationSummary
   package var forceRootEvaluation: Bool
-  package var resolveWorkTracker: ResolveWorkTracker?
   package var localActionRegistry: LocalActionRegistry?
-  package var localGestureRegistry: LocalGestureRegistry?
-  package var localGestureStateRegistry: LocalGestureStateRegistry?
-  package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
-  package var localTerminationRegistry: LocalTerminationRegistry?
-  package var localDefaultFocusRegistry: LocalDefaultFocusRegistry?
-  package var localFocusBindingRegistry: LocalFocusBindingRegistry?
-  package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
-  package var localScrollPositionRegistry: LocalScrollPositionRegistry?
-  package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
-  package var commandRegistry: CommandRegistry?
-  package var dropDestinationRegistry: DropDestinationRegistry?
-  package var invalidationProxy: ResolveInvalidationProxy?
-  package var observationBridge: ObservationBridge?
-  package var viewGraph: ViewGraph?
-  package var imageAssetResolver: ImageAssetResolver?
-  package var frameInputs: FrameResolveInputBox?
-  package var suppressesStructuralLifecycle: Bool
-  /// Forwards deadline requests to the frame scheduler.
-  /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
-  package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
+
+  /// Runtime registries and lowering seams propagated unchanged from a parent
+  /// context to its `child` / `replacingIdentity` derivations. Grouping them in
+  /// one value type lets those builders copy the whole set with a single
+  /// memberwise assignment instead of restating each field, removing the
+  /// parallel-list drift hazard. Members are surfaced as computed forwarding
+  /// properties below so call sites continue to read `context.viewGraph`, etc.
+  package var propagated: PropagatedRegistries
+
+  package var resolveWorkTracker: ResolveWorkTracker? {
+    get { propagated.resolveWorkTracker }
+    set { propagated.resolveWorkTracker = newValue }
+  }
+  package var localGestureRegistry: LocalGestureRegistry? {
+    get { propagated.localGestureRegistry }
+    set { propagated.localGestureRegistry = newValue }
+  }
+  package var localGestureStateRegistry: LocalGestureStateRegistry? {
+    get { propagated.localGestureStateRegistry }
+    set { propagated.localGestureStateRegistry = newValue }
+  }
+  package var localPointerHandlerRegistry: LocalPointerHandlerRegistry? {
+    get { propagated.localPointerHandlerRegistry }
+    set { propagated.localPointerHandlerRegistry = newValue }
+  }
+  package var localTerminationRegistry: LocalTerminationRegistry? {
+    get { propagated.localTerminationRegistry }
+    set { propagated.localTerminationRegistry = newValue }
+  }
+  package var localDefaultFocusRegistry: LocalDefaultFocusRegistry? {
+    get { propagated.localDefaultFocusRegistry }
+    set { propagated.localDefaultFocusRegistry = newValue }
+  }
+  package var localFocusBindingRegistry: LocalFocusBindingRegistry? {
+    get { propagated.localFocusBindingRegistry }
+    set { propagated.localFocusBindingRegistry = newValue }
+  }
+  package var localFocusedValuesRegistry: LocalFocusedValuesRegistry? {
+    get { propagated.localFocusedValuesRegistry }
+    set { propagated.localFocusedValuesRegistry = newValue }
+  }
+  package var localScrollPositionRegistry: LocalScrollPositionRegistry? {
+    get { propagated.localScrollPositionRegistry }
+    set { propagated.localScrollPositionRegistry = newValue }
+  }
+  package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry? {
+    get { propagated.localPreferenceObservationRegistry }
+    set { propagated.localPreferenceObservationRegistry = newValue }
+  }
+  package var commandRegistry: CommandRegistry? {
+    get { propagated.commandRegistry }
+    set { propagated.commandRegistry = newValue }
+  }
+  package var dropDestinationRegistry: DropDestinationRegistry? {
+    get { propagated.dropDestinationRegistry }
+    set { propagated.dropDestinationRegistry = newValue }
+  }
+  package var invalidationProxy: ResolveInvalidationProxy? {
+    get { propagated.invalidationProxy }
+    set { propagated.invalidationProxy = newValue }
+  }
+  package var observationBridge: ObservationBridge? {
+    get { propagated.observationBridge }
+    set { propagated.observationBridge = newValue }
+  }
+  package var viewGraph: ViewGraph? {
+    get { propagated.viewGraph }
+    set { propagated.viewGraph = newValue }
+  }
+  package var imageAssetResolver: ImageAssetResolver? {
+    get { propagated.imageAssetResolver }
+    set { propagated.imageAssetResolver = newValue }
+  }
+  package var frameInputs: FrameResolveInputBox? {
+    get { propagated.frameInputs }
+    set { propagated.frameInputs = newValue }
+  }
+  package var suppressesStructuralLifecycle: Bool {
+    get { propagated.suppressesStructuralLifecycle }
+    set { propagated.suppressesStructuralLifecycle = newValue }
+  }
+  package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)? {
+    get { propagated.requestDeadline }
+    set { propagated.requestDeadline = newValue }
+  }
 
   @MainActor
   package var runtimeRegistrations: RuntimeRegistrationSet {
@@ -147,26 +211,8 @@ public struct ResolveContext: Equatable, Sendable {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
-    childContext.localTerminationRegistry = localTerminationRegistry
-    childContext.localGestureRegistry = localGestureRegistry
-    childContext.localGestureStateRegistry = localGestureStateRegistry
-    childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
-    childContext.localDefaultFocusRegistry = localDefaultFocusRegistry
-    childContext.localFocusBindingRegistry = localFocusBindingRegistry
-    childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
-    childContext.localScrollPositionRegistry = localScrollPositionRegistry
-    childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
-    childContext.commandRegistry = commandRegistry
-    childContext.dropDestinationRegistry = dropDestinationRegistry
-    childContext.invalidationProxy = invalidationProxy
-    childContext.observationBridge = observationBridge
-    childContext.viewGraph = viewGraph
-    childContext.resolveWorkTracker = resolveWorkTracker
+    childContext.propagated = propagated
     childContext.focusedValues = focusedValues
-    childContext.imageAssetResolver = imageAssetResolver
-    childContext.frameInputs = frameInputs
-    childContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
-    childContext.requestDeadline = requestDeadline
     return childContext
   }
 
@@ -194,26 +240,8 @@ public struct ResolveContext: Equatable, Sendable {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
-    replacedContext.localTerminationRegistry = localTerminationRegistry
-    replacedContext.localGestureRegistry = localGestureRegistry
-    replacedContext.localGestureStateRegistry = localGestureStateRegistry
-    replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry
-    replacedContext.localDefaultFocusRegistry = localDefaultFocusRegistry
-    replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
-    replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
-    replacedContext.localScrollPositionRegistry = localScrollPositionRegistry
-    replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
-    replacedContext.commandRegistry = commandRegistry
-    replacedContext.dropDestinationRegistry = dropDestinationRegistry
-    replacedContext.invalidationProxy = invalidationProxy
-    replacedContext.observationBridge = observationBridge
-    replacedContext.viewGraph = viewGraph
-    replacedContext.resolveWorkTracker = resolveWorkTracker
+    replacedContext.propagated = propagated
     replacedContext.focusedValues = focusedValues
-    replacedContext.imageAssetResolver = imageAssetResolver
-    replacedContext.frameInputs = frameInputs
-    replacedContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
-    replacedContext.requestDeadline = requestDeadline
     return replacedContext
   }
 
@@ -360,6 +388,77 @@ public struct ResolveContext: Equatable, Sendable {
 }
 
 extension ResolveContext {
+  /// The runtime registries and lowering seams that `child` / `replacingIdentity`
+  /// carry forward unchanged from a parent context. Holding them in one value
+  /// type lets those builders propagate the whole set with a single memberwise
+  /// copy; `ResolveContext` exposes each member as a forwarding property so call
+  /// sites continue to use the flat names.
+  package struct PropagatedRegistries: Sendable {
+    package var resolveWorkTracker: ResolveWorkTracker?
+    package var localGestureRegistry: LocalGestureRegistry?
+    package var localGestureStateRegistry: LocalGestureStateRegistry?
+    package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
+    package var localTerminationRegistry: LocalTerminationRegistry?
+    package var localDefaultFocusRegistry: LocalDefaultFocusRegistry?
+    package var localFocusBindingRegistry: LocalFocusBindingRegistry?
+    package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
+    package var localScrollPositionRegistry: LocalScrollPositionRegistry?
+    package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
+    package var commandRegistry: CommandRegistry?
+    package var dropDestinationRegistry: DropDestinationRegistry?
+    package var invalidationProxy: ResolveInvalidationProxy?
+    package var observationBridge: ObservationBridge?
+    package var viewGraph: ViewGraph?
+    package var imageAssetResolver: ImageAssetResolver?
+    package var frameInputs: FrameResolveInputBox?
+    package var suppressesStructuralLifecycle: Bool
+    /// Forwards deadline requests to the frame scheduler.
+    /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
+    package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
+
+    package init(
+      resolveWorkTracker: ResolveWorkTracker? = nil,
+      localGestureRegistry: LocalGestureRegistry? = nil,
+      localGestureStateRegistry: LocalGestureStateRegistry? = nil,
+      localPointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+      localTerminationRegistry: LocalTerminationRegistry? = nil,
+      localDefaultFocusRegistry: LocalDefaultFocusRegistry? = nil,
+      localFocusBindingRegistry: LocalFocusBindingRegistry? = nil,
+      localFocusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+      localScrollPositionRegistry: LocalScrollPositionRegistry? = nil,
+      localPreferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil,
+      commandRegistry: CommandRegistry? = nil,
+      dropDestinationRegistry: DropDestinationRegistry? = nil,
+      invalidationProxy: ResolveInvalidationProxy? = nil,
+      observationBridge: ObservationBridge? = nil,
+      viewGraph: ViewGraph? = nil,
+      imageAssetResolver: ImageAssetResolver? = nil,
+      frameInputs: FrameResolveInputBox? = nil,
+      suppressesStructuralLifecycle: Bool = false,
+      requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)? = nil
+    ) {
+      self.resolveWorkTracker = resolveWorkTracker
+      self.localGestureRegistry = localGestureRegistry
+      self.localGestureStateRegistry = localGestureStateRegistry
+      self.localPointerHandlerRegistry = localPointerHandlerRegistry
+      self.localTerminationRegistry = localTerminationRegistry
+      self.localDefaultFocusRegistry = localDefaultFocusRegistry
+      self.localFocusBindingRegistry = localFocusBindingRegistry
+      self.localFocusedValuesRegistry = localFocusedValuesRegistry
+      self.localScrollPositionRegistry = localScrollPositionRegistry
+      self.localPreferenceObservationRegistry = localPreferenceObservationRegistry
+      self.commandRegistry = commandRegistry
+      self.dropDestinationRegistry = dropDestinationRegistry
+      self.invalidationProxy = invalidationProxy
+      self.observationBridge = observationBridge
+      self.viewGraph = viewGraph
+      self.imageAssetResolver = imageAssetResolver
+      self.frameInputs = frameInputs
+      self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
+      self.requestDeadline = requestDeadline
+    }
+  }
+
   package init(
     identity: Identity = .init(components: [] as [IdentityComponent]),
     environment: EnvironmentSnapshot = .init(),
@@ -427,29 +526,14 @@ extension ResolveContext {
       invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)
     self.forceRootEvaluation = forceRootEvaluation
-    resolveWorkTracker = .init()
     self.localActionRegistry = localActionRegistry
-    self.localGestureRegistry = nil
-    self.localGestureStateRegistry = nil
-    self.localPointerHandlerRegistry = nil
-    localTerminationRegistry = nil
-    localDefaultFocusRegistry = nil
-    self.localFocusBindingRegistry = nil
-    self.localFocusedValuesRegistry = localFocusedValuesRegistry
-    localScrollPositionRegistry = nil
-    localPreferenceObservationRegistry = nil
     self.localKeyHandlerRegistry = localKeyHandlerRegistry
     self.localLifecycleRegistry = localLifecycleRegistry
     self.localTaskRegistry = localTaskRegistry
-    commandRegistry = nil
-    dropDestinationRegistry = nil
-    invalidationProxy = nil
-    observationBridge = nil
-    viewGraph = nil
-    imageAssetResolver = nil
-    frameInputs = nil
-    suppressesStructuralLifecycle = false
-    requestDeadline = nil
+    self.propagated = PropagatedRegistries(
+      resolveWorkTracker: .init(),
+      localFocusedValuesRegistry: localFocusedValuesRegistry
+    )
   }
 }
 

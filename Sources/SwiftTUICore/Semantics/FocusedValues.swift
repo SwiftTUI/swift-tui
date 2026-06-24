@@ -36,9 +36,11 @@ private struct TypedFocusedValueBox<Value: Sendable>: FocusedValueBox {
       return lhs == rhs
     }
 
-    // Non-equatable focused values still need stable "same shape" comparisons
-    // so focused bindings do not force spurious rerender loops.
-    return true
+    // Conservative fallback for non-Hashable focused values: we cannot prove the
+    // two values are equal, so we must assume they changed and report inequality.
+    // Returning true here would swallow real updates (a changed value would be
+    // seen as unchanged), so we return false to force an update instead.
+    return false
   }
 }
 

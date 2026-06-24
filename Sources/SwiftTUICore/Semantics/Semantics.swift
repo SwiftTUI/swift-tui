@@ -36,17 +36,13 @@ public struct SemanticExtractor: Sendable {
     walk(
       placed,
       hitTestOrder: &hitTestOrder,
-      preVisit: {
-        node,
-        scopePath,
-        sectionIdentity,
-        modalFocusScopePath,
-        clipRect,
-        order,
-        sealingParentOnChain,
-        interactionsDisabledOnChain,
-        nextHitTestOrder
-        in
+      preVisit: { node, context, order, nextHitTestOrder in
+        let scopePath = context.scopePath
+        let sectionIdentity = context.sectionIdentity
+        let modalFocusScopePath = context.modalFocusScopePath
+        let clipRect = context.clipRect
+        let sealingParentOnChain = context.sealingParentOnChain
+        let interactionsDisabledOnChain = context.interactionsDisabledOnChain
         let isEnabled = node.environmentSnapshot.style.isEnabled
         let interactionsEnabled =
           isEnabled
@@ -131,16 +127,13 @@ public struct SemanticExtractor: Sendable {
           )
         }
       },
-      postVisit: {
-        node,
-        scopePath,
-        sectionIdentity,
-        modalFocusScopePath,
-        clipRect,
-        sealingParentOnChain,
-        interactionsDisabledOnChain,
-        nextHitTestOrder
-        in
+      postVisit: { node, context, nextHitTestOrder in
+        let scopePath = context.scopePath
+        let sectionIdentity = context.sectionIdentity
+        let modalFocusScopePath = context.modalFocusScopePath
+        let clipRect = context.clipRect
+        let sealingParentOnChain = context.sealingParentOnChain
+        let interactionsDisabledOnChain = context.interactionsDisabledOnChain
         guard node.environmentSnapshot.style.isEnabled else {
           return
         }
@@ -195,17 +188,33 @@ public struct SemanticExtractor: Sendable {
 }
 
 extension SemanticExtractor {
+  /// The per-node traversal context threaded through the semantics walk.
+  ///
+  /// Bundles the routing state that each node inherits from its ancestors so
+  /// the visitor closures and recursive frames forward a single labeled value
+  /// instead of a long positional argument list. Child contexts are derived by
+  /// copying with modification, mirroring the original frame propagation.
+  struct VisitContext {
+    let scopePath: [Identity]
+    let sectionIdentity: Identity?
+    let modalFocusScopePath: [Identity]?
+    let clipRect: CellRect?
+    /// `true` when an ancestor on the current walk chain is marked
+    /// `sealsFocusDescendants`. Propagated to descendants so focus
+    /// region emission can skip them even though the sealing node
+    /// itself is emitted normally.
+    let sealingParentOnChain: Bool
+    let interactionsDisabledOnChain: Bool
+  }
+
   private func walk(
     _ node: PlacedNode,
     scopePath: [Identity] = [],
     sectionIdentity: Identity? = nil,
     clipRect: CellRect? = nil,
     hitTestOrder: inout Int,
-    preVisit:
-      (PlacedNode, [Identity], Identity?, [Identity]?, CellRect?, Int, Bool, Bool, inout Int) ->
-      Void,
-    postVisit: (PlacedNode, [Identity], Identity?, [Identity]?, CellRect?, Bool, Bool, inout Int) ->
-      Void
+    preVisit: (PlacedNode, VisitContext, Int, inout Int) -> Void,
+    postVisit: (PlacedNode, VisitContext, inout Int) -> Void
   ) {
     enum Phase {
       case enter
@@ -214,28 +223,21 @@ extension SemanticExtractor {
 
     struct Frame {
       let node: PlacedNode
-      let scopePath: [Identity]
-      let sectionIdentity: Identity?
-      let modalFocusScopePath: [Identity]?
-      let clipRect: CellRect?
-      /// `true` when an ancestor on the current walk chain is marked
-      /// `sealsFocusDescendants`. Propagated to descendants so focus
-      /// region emission can skip them even though the sealing node
-      /// itself is emitted normally.
-      let sealingParentOnChain: Bool
-      let interactionsDisabledOnChain: Bool
+      let context: VisitContext
       let phase: Phase
     }
 
     var stack: [Frame] = [
       Frame(
         node: node,
-        scopePath: scopePath,
-        sectionIdentity: sectionIdentity,
-        modalFocusScopePath: nil,
-        clipRect: clipRect,
-        sealingParentOnChain: false,
-        interactionsDisabledOnChain: false,
+        context: VisitContext(
+          scopePath: scopePath,
+          sectionIdentity: sectionIdentity,
+          modalFocusScopePath: nil,
+          clipRect: clipRect,
+          sealingParentOnChain: false,
+          interactionsDisabledOnChain: false
+        ),
         phase: .enter
       )
     ]
@@ -252,64 +254,61 @@ extension SemanticExtractor {
           frame.node.semanticMetadata.focusScopeIdentity ?? frame.node.identity
         let nodeScopePath =
           frame.node.semanticMetadata.focusScopeBoundary
-          ? frame.scopePath + [focusScopeIdentity]
-          : frame.scopePath
+          ? frame.context.scopePath + [focusScopeIdentity]
+          : frame.context.scopePath
         let nodeSectionIdentity =
           frame.node.semanticMetadata.focusSectionBoundary
           ? frame.node.identity
-          : frame.sectionIdentity
+          : frame.context.sectionIdentity
         let nodeModalFocusScopePath =
           isModalPresentationRole(frame.node.semanticMetadata.accessibilityRole)
           ? nodeScopePath
-          : frame.modalFocusScopePath
+          : frame.context.modalFocusScopePath
         let nodeClipRect = combinedClipRect(
-          inherited: frame.clipRect,
+          inherited: frame.context.clipRect,
           next: frame.node.clipBounds
+        )
+        let nodeContext = VisitContext(
+          scopePath: nodeScopePath,
+          sectionIdentity: nodeSectionIdentity,
+          modalFocusScopePath: nodeModalFocusScopePath,
+          clipRect: nodeClipRect,
+          sealingParentOnChain: frame.context.sealingParentOnChain,
+          interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
         )
         let nodeHitTestOrder = hitTestOrder
         hitTestOrder += 1
 
         preVisit(
           frame.node,
-          nodeScopePath,
-          nodeSectionIdentity,
-          nodeModalFocusScopePath,
-          nodeClipRect,
+          nodeContext,
           nodeHitTestOrder,
-          frame.sealingParentOnChain,
-          frame.interactionsDisabledOnChain,
           &hitTestOrder
         )
 
         stack.append(
           Frame(
             node: frame.node,
-            scopePath: nodeScopePath,
-            sectionIdentity: nodeSectionIdentity,
-            modalFocusScopePath: nodeModalFocusScopePath,
-            clipRect: nodeClipRect,
-            sealingParentOnChain: frame.sealingParentOnChain,
-            interactionsDisabledOnChain: frame.interactionsDisabledOnChain,
+            context: nodeContext,
             phase: .exit
           )
         )
 
-        let childSealingParentOnChain =
-          frame.sealingParentOnChain
-          || frame.node.semanticMetadata.sealsFocusDescendants
-        let childInteractionsDisabledOnChain =
-          frame.interactionsDisabledOnChain
-          || !frame.node.semanticMetadata.interactionAvailability.isEnabled
+        let childContext = VisitContext(
+          scopePath: nodeScopePath,
+          sectionIdentity: nodeSectionIdentity,
+          modalFocusScopePath: nodeModalFocusScopePath,
+          clipRect: nodeClipRect,
+          sealingParentOnChain: frame.context.sealingParentOnChain
+            || frame.node.semanticMetadata.sealsFocusDescendants,
+          interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
+            || !frame.node.semanticMetadata.interactionAvailability.isEnabled
+        )
         for child in frame.node.children.reversed() {
           stack.append(
             Frame(
               node: child,
-              scopePath: nodeScopePath,
-              sectionIdentity: nodeSectionIdentity,
-              modalFocusScopePath: nodeModalFocusScopePath,
-              clipRect: nodeClipRect,
-              sealingParentOnChain: childSealingParentOnChain,
-              interactionsDisabledOnChain: childInteractionsDisabledOnChain,
+              context: childContext,
               phase: .enter
             )
           )
@@ -317,12 +316,7 @@ extension SemanticExtractor {
       case .exit:
         postVisit(
           frame.node,
-          frame.scopePath,
-          frame.sectionIdentity,
-          frame.modalFocusScopePath,
-          frame.clipRect,
-          frame.sealingParentOnChain,
-          frame.interactionsDisabledOnChain,
+          frame.context,
           &hitTestOrder
         )
       }

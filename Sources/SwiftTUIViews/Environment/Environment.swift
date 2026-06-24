@@ -13,6 +13,14 @@ private protocol EnvironmentValueBox: Sendable {
   var valueTypeDescription: String { get }
 
   func value<Value>(as type: Value.Type) -> Value?
+
+  /// Change-detection equality between two boxed environment values.
+  ///
+  /// Compares the underlying typed values via `==` when `Value` is `Equatable`,
+  /// and otherwise falls back to the reflected ``snapshotValue`` string — the
+  /// historical comparison for every value — so non-`Equatable` keys keep their
+  /// prior conservative behavior.
+  func isEqual(to other: any EnvironmentValueBox) -> Bool
 }
 
 private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
@@ -28,6 +36,30 @@ private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
 
   func value<T>(as type: T.Type) -> T? {
     base as? T
+  }
+
+  func isEqual(to other: any EnvironmentValueBox) -> Bool {
+    // A box only ever shares a storage key with a box of the same `Value` type
+    // (the environment key fixes the value type), so extraction succeeds for
+    // matching keys. A type mismatch is treated as changed.
+    guard let otherBase = other.value(as: Value.self) else {
+      return false
+    }
+    if let equatable = base as? any Equatable {
+      return Self.areEqual(equatable, otherBase)
+    }
+    // Non-`Equatable`: preserve the historical reflected-string comparison.
+    return snapshotValue == other.snapshotValue
+  }
+
+  /// Opens the `any Equatable` existential to bind its concrete type so `==`
+  /// is type-safe. Mirrors `MemoValueComparator.openEquatable`.
+  private static func areEqual(_ lhs: any Equatable, _ rhs: Value) -> Bool {
+    func compare<T: Equatable>(_ l: T) -> Bool {
+      guard let r = rhs as? T else { return false }
+      return l == r
+    }
+    return compare(lhs)
   }
 }
 
@@ -131,7 +163,23 @@ public struct EnvironmentValues: Equatable, Sendable {
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.snapshotValues == rhs.snapshotValues
+    // Change detection compares the boxed typed values. `storage` keys are in
+    // exact 1:1 correspondence with the reflected `snapshotValues` keys (both
+    // are written together on every set and never removed), so requiring the
+    // same key set here matches the historical `snapshotValues == snapshotValues`
+    // key comparison. Per-key, `isEqual(to:)` uses typed `==` for `Equatable`
+    // values and the reflected-string fallback otherwise.
+    guard lhs.storage.count == rhs.storage.count else {
+      return false
+    }
+    for (identifier, lhsBox) in lhs.storage {
+      guard let rhsBox = rhs.storage[identifier],
+        lhsBox.isEqual(to: rhsBox)
+      else {
+        return false
+      }
+    }
+    return true
   }
 
   private func recordObservableEnvironmentRead<Value>(
