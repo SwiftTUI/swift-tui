@@ -14,6 +14,7 @@ DocC catalogs (see [API reference](#api-reference) below).
 ```mermaid
 flowchart TD
     README["README.md<br/>(this index)"]
+    GUIDE["CODEBASE-GUIDE.md<br/>onboarding: map + flows"]
     VISION["VISION.md<br/>what SwiftTUI is for"]
     GAP["VISION-GAP.md<br/>code vs. intent"]
     ARCH["ARCHITECTURE.md<br/>modules, products, layout"]
@@ -25,8 +26,11 @@ flowchart TD
     DEV["DEVELOPMENT.md<br/>build, test, release"]
     FLAKES["KNOWN-TEST-FLAKES.md<br/>known flaky tests"]
 
+    README --> GUIDE
     README --> VISION
     README --> ARCH
+    GUIDE --> ARCH
+    GUIDE --> PIPE
     README --> SPLIT
     README --> DEV
     VISION --> GAP
@@ -41,6 +45,7 @@ flowchart TD
 
 | Document | What it covers |
 | --- | --- |
+| [CODEBASE-GUIDE.md](CODEBASE-GUIDE.md) | **Start here for new engineers.** A horizontal map (the module graph and a "where does X live?" subsystem table) plus vertical end-to-end traces (the interaction→update loop, app bootstrap & run-loop lifecycle, and one app → five hosts). Complements the per-frame render-pipeline article rather than duplicating it. |
 | [VISION.md](VISION.md) | What SwiftTUI is for, its design principles, and what is deliberately in and out of scope. |
 | [VISION-GAP.md](VISION-GAP.md) | The concrete differences between the code at `HEAD` and the project's stated intent. The single gap register for the documentation. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, products, the dependency graph, source layout, layout model, and a glossary. The starting point for understanding the codebase. |
