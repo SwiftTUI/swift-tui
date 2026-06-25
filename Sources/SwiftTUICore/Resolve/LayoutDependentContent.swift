@@ -26,7 +26,7 @@ package enum LayoutDependentContentSizingPolicy: Equatable, Sendable {
   }
 }
 
-/// The geometry available when layout realizes a deferred content boundary.
+/// The geometry available when layout realizes a layout-realized content boundary.
 package struct LayoutRealizationContext: Equatable, Sendable {
   package var boundaryIdentity: Identity
   package var proposal: ProposedSize
@@ -121,7 +121,7 @@ package final class LayoutDependentContentHandle: Sendable {
   }
 }
 
-package struct LayoutDependentContentBoundary: Sendable {
+package struct LayoutRealizedContentBoundary: Sendable {
   package var identity: Identity
   package var sizingPolicy: LayoutDependentContentSizingPolicy
   package var safeAreaInsets: EdgeInsets
@@ -153,7 +153,7 @@ package struct LayoutDependentContentBoundary: Sendable {
   }
 }
 
-package typealias LayoutRealizedContentBoundary = LayoutDependentContentBoundary
+package typealias LayoutDependentContentBoundary = LayoutRealizedContentBoundary
 package typealias LayoutRealizationGeometry = LayoutRealizationContext
 
 extension ResolvedNode {
@@ -161,11 +161,11 @@ extension ResolvedNode {
     _ realizations: [Identity: [ResolvedNode]]
   ) -> ResolvedNode {
     var copy = self
-    if copy.layoutDependentContent != nil {
+    if copy.layoutRealizedContent != nil {
       copy.children = realizations[copy.identity] ?? []
       return copy
     }
-    guard copy.children.contains(where: { $0.containsLayoutDependentContent }) else {
+    guard copy.children.contains(where: { $0.containsLayoutRealizedContent }) else {
       return copy
     }
     copy.children = copy.children.map {
@@ -174,10 +174,10 @@ extension ResolvedNode {
     return copy
   }
 
-  private var containsLayoutDependentContent: Bool {
-    if layoutDependentContent != nil {
+  private var containsLayoutRealizedContent: Bool {
+    if layoutRealizedContent != nil {
       return true
     }
-    return children.contains { $0.containsLayoutDependentContent }
+    return children.contains { $0.containsLayoutRealizedContent }
   }
 }

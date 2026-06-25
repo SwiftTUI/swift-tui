@@ -75,7 +75,7 @@ final class FrameTailRenderer: Sendable {
     clock: ContinuousClock?,
     cancellationToken: FrameTailJobCancellationToken? = nil
   ) async -> FrameTailLayoutOutput? {
-    if containsLayoutDependentContent(input.resolved) {
+    if containsLayoutRealizedContent(input.resolved) {
       input.layoutPassContext.updateWorkMetrics {
         $0.layoutDependentMainActorFallbacks += 1
       }

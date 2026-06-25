@@ -1167,7 +1167,7 @@ package final class ViewGraph {
       return nil
     }
 
-    let resolved = resolvedPreservingLayoutDependentChildren(
+    let resolved = resolvedPreservingLayoutRealizedChildren(
       resolved,
       for: node
     )
@@ -1245,7 +1245,7 @@ package final class ViewGraph {
     return node.committed
   }
 
-  package func installLayoutDependentChildren(
+  package func installLayoutRealizedChildren(
     for identity: Identity,
     children: [ResolvedNode]
   ) {
@@ -1300,11 +1300,11 @@ package final class ViewGraph {
     }
   }
 
-  private func resolvedPreservingLayoutDependentChildren(
+  private func resolvedPreservingLayoutRealizedChildren(
     _ resolved: ResolvedNode,
     for node: ViewNode
   ) -> ResolvedNode {
-    guard resolved.layoutDependentContent != nil,
+    guard resolved.layoutRealizedContent != nil,
       resolved.children.isEmpty,
       !node.children.isEmpty
     else {

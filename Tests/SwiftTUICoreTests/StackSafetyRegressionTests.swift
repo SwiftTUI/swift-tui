@@ -318,11 +318,11 @@ struct StackSafetyRegressionTests {
   }
 
   @MainActor
-  @Test("layout-dependent placement measures realized children through layout engine")
-  func layoutDependentPlacementMeasuresRealizedChildrenThroughLayoutEngine() {
+  @Test("layout-realized placement measures realized children through layout engine")
+  func layoutRealizedPlacementMeasuresRealizedChildrenThroughLayoutEngine() {
     let engine = LayoutEngine()
-    let child = makeLayoutLeaf("layout-dependent-child", size: .init(width: 3, height: 1))
-    let resolved = makeLayoutDependentNode(children: [child])
+    let child = makeLayoutLeaf("layout-realized-child", size: .init(width: 3, height: 1))
+    let resolved = makeLayoutRealizedNode(children: [child])
 
     let measured = engine.measure(
       resolved,
@@ -886,10 +886,10 @@ private func makeDeepBranchingLayoutTree(depth: Int) -> ResolvedNode {
 }
 
 @MainActor
-private func makeLayoutDependentNode(children: [ResolvedNode]) -> ResolvedNode {
-  let identity = testIdentity("layout-dependent-root")
+private func makeLayoutRealizedNode(children: [ResolvedNode]) -> ResolvedNode {
+  let identity = testIdentity("layout-realized-root")
   let realizer = TestLayoutDependentContentRealizer(children: children)
-  let boundary = LayoutDependentContentBoundary(
+  let boundary = LayoutRealizedContentBoundary(
     identity: identity,
     sizingPolicy: .fillsProposal(unspecifiedIdeal: .init(width: 4, height: 2)),
     safeAreaInsets: .init(),
@@ -900,8 +900,8 @@ private func makeLayoutDependentNode(children: [ResolvedNode]) -> ResolvedNode {
   )
   return ResolvedNode(
     identity: identity,
-    kind: .view("LayoutDependent"),
-    layoutDependentContent: boundary
+    kind: .view("LayoutRealized"),
+    layoutRealizedContent: boundary
   )
 }
 

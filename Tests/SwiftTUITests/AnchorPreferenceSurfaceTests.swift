@@ -166,8 +166,8 @@ struct AnchorPreferenceSurfaceTests {
     )
   }
 
-  @Test("GeometryProxy frame resolves named spaces inside layout-dependent content")
-  func geometryProxyFrameResolvesNamesInsideLayoutDependentContent() {
+  @Test("GeometryProxy frame resolves named spaces inside layout-realized content")
+  func geometryProxyFrameResolvesNamesInsideLayoutRealizedContent() {
     let artifacts = DefaultRenderer().render(
       GeometryReader { _ in
         VStack(alignment: .leading, spacing: 0) {

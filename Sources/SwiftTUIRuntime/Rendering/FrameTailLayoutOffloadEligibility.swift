@@ -11,18 +11,18 @@ import SwiftTUICore
 //
 //  - custom layouts whose handle reports `canRunOnWorker == false`,
 //  - indexed child sources that cannot run on a worker,
-//  - layout-dependent content, which needs a prepared graph mid-layout.
+//  - layout-realized content, which needs a prepared graph mid-layout.
 //
 // Visibility note: the `contains*` scans are file-internal rather than
 // `private` so `renderLayoutAsync` in `FrameTailRenderer.swift` can reuse
-// `containsLayoutDependentContent` directly.
+// `containsLayoutRealizedContent` directly.
 extension FrameTailRenderer {
   func canOffloadLayout(
     _ input: FrameTailInput
   ) -> Bool {
     !containsMainActorOnlyCustomLayout(input.resolved)
       && !containsMainActorOnlyIndexedChildSource(input.resolved)
-      && !containsLayoutDependentContent(input.resolved)
+      && !containsLayoutRealizedContent(input.resolved)
   }
 
   func needsIndexedChildSourceWorkerSnapshot(
@@ -30,13 +30,13 @@ extension FrameTailRenderer {
   ) -> Bool {
     !containsMainActorOnlyCustomLayout(input.resolved)
       && containsMainActorOnlyIndexedChildSource(input.resolved)
-      && !containsLayoutDependentContent(input.resolved)
+      && !containsLayoutRealizedContent(input.resolved)
   }
 
   func needsPreparedGraphDuringLayout(
     _ input: FrameTailInput
   ) -> Bool {
-    containsLayoutDependentContent(input.resolved)
+    containsLayoutRealizedContent(input.resolved)
   }
 
   func containsMainActorOnlyCustomLayout(
@@ -71,17 +71,17 @@ extension FrameTailRenderer {
     return node.children.contains { containsMainActorOnlyIndexedChildSource($0) }
   }
 
-  func containsLayoutDependentContent(
+  func containsLayoutRealizedContent(
     _ node: ResolvedNode
   ) -> Bool {
-    if node.layoutDependentContent != nil {
+    if node.layoutRealizedContent != nil {
       return true
     }
     if let workerChildren = node.indexedChildSource?.workerResolvedChildren,
-      workerChildren.contains(where: containsLayoutDependentContent)
+      workerChildren.contains(where: containsLayoutRealizedContent)
     {
       return true
     }
-    return node.children.contains { containsLayoutDependentContent($0) }
+    return node.children.contains { containsLayoutRealizedContent($0) }
   }
 }

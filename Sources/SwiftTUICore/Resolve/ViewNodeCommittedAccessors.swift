@@ -20,8 +20,8 @@ extension ViewNode {
   package var environmentSnapshot: EnvironmentSnapshot { committed.environmentSnapshot }
   package var transactionSnapshot: TransactionSnapshot { committed.transactionSnapshot }
   package var layoutBehavior: LayoutBehavior { committed.layoutBehavior }
-  package var layoutDependentContent: LayoutDependentContentBoundary? {
-    committed.layoutDependentContent
+  package var layoutRealizedContent: LayoutRealizedContentBoundary? {
+    committed.layoutRealizedContent
   }
   package var layoutMetadata: LayoutMetadata { committed.layoutMetadata }
   package var drawMetadata: DrawMetadata { committed.drawMetadata }

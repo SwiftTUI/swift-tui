@@ -121,7 +121,7 @@ public struct ResolvedNode: Equatable, Sendable {
       recomputeSupportsRetainedReuse()
     }
   }
-  package var layoutDependentContent: LayoutDependentContentBoundary? {
+  package var layoutRealizedContent: LayoutRealizedContentBoundary? {
     didSet {
       recomputeSupportsRetainedReuse()
     }
@@ -182,7 +182,7 @@ public struct ResolvedNode: Equatable, Sendable {
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
     intrinsicSize: CellSize? = nil,
-    layoutDependentContent: LayoutDependentContentBoundary? = nil
+    layoutRealizedContent: LayoutRealizedContentBoundary? = nil
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
@@ -210,7 +210,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = nil
-    self.layoutDependentContent = layoutDependentContent
+    self.layoutRealizedContent = layoutRealizedContent
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
     customLayoutFallbackSummary = .init()
@@ -242,7 +242,7 @@ public struct ResolvedNode: Equatable, Sendable {
     drawPayload: DrawPayload = .none,
     intrinsicSize: CellSize? = nil,
     indexedChildSource: (any IndexedChildSource)? = nil,
-    layoutDependentContent: LayoutDependentContentBoundary? = nil
+    layoutRealizedContent: LayoutRealizedContentBoundary? = nil
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
@@ -267,7 +267,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = indexedChildSource
-    self.layoutDependentContent = layoutDependentContent
+    self.layoutRealizedContent = layoutRealizedContent
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
     customLayoutFallbackSummary = .init()
@@ -301,7 +301,7 @@ public struct ResolvedNode: Equatable, Sendable {
       layoutBehavior: layoutBehavior,
       children: children,
       structuralEdgeRole: structuralEdgeRole,
-      layoutDependentContent: layoutDependentContent
+      layoutRealizedContent: layoutRealizedContent
     )
   }
 
@@ -362,7 +362,7 @@ public struct ResolvedNode: Equatable, Sendable {
     layoutBehavior: LayoutBehavior,
     children: [ResolvedNode],
     structuralEdgeRole: StructuralEdgeRole,
-    layoutDependentContent: LayoutDependentContentBoundary?
+    layoutRealizedContent: LayoutRealizedContentBoundary?
   ) -> Bool {
     // A `.viewportBarrier` edge (Stage 4) marks a lazy/indexed source whose
     // placed children are a viewport-clipped subset — its interior is never
@@ -373,7 +373,7 @@ public struct ResolvedNode: Equatable, Sendable {
     if structuralEdgeRole == .viewportBarrier {
       return false
     }
-    if layoutDependentContent != nil {
+    if layoutRealizedContent != nil {
       return false
     }
 

@@ -7,7 +7,7 @@ extension LayoutEngine {
     proposal: ProposedSize,
     passContext: LayoutPassContext?
   ) -> CellSize {
-    if let boundary = resolved.layoutDependentContent {
+    if let boundary = resolved.layoutRealizedContent {
       return boundary.sizingPolicy.measuredSize(for: proposal)
     }
 

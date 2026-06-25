@@ -91,7 +91,7 @@ extension LayoutEngine {
     )
 
     let hasChildren =
-      if node.layoutDependentContent != nil {
+      if node.layoutRealizedContent != nil {
         true
       } else if let source = node.indexedChildSource {
         source.count > 0

@@ -610,8 +610,8 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
   }
 
-  @Test("layout-dependent content forces async layout onto the main actor")
-  func layoutDependentContentForcesAsyncLayoutOntoMainActor() async throws {
+  @Test("layout-realized content forces async layout onto the main actor")
+  func layoutRealizedContentForcesAsyncLayoutOntoMainActor() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
       GeometryReader { proxy in
         Text("geometry \(proxy.size.width)x\(proxy.size.height)")
@@ -628,7 +628,7 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
   }
 
-  @Test("layout-dependent async commits publish realized action registrations")
+  @Test("layout-realized async commits publish realized action registrations")
   func layoutDependentAsyncCommitsPublishRealizedActionRegistrations() async throws {
     let actionRegistry = LocalActionRegistry()
     var didTap = false

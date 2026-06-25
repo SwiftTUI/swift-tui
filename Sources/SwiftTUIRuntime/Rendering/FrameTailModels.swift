@@ -170,7 +170,7 @@ struct AsyncFrameTailDraftOutput {
   var layout: FrameTailLayoutOutput
   /// Effective tail output after overlay decoration, semantics, draw, and raster.
   var tail: FrameTailOutput
-  /// Resolved tree after late layout-dependent content reconciliation.
+  /// Resolved tree after late layout-realized content reconciliation.
   var resolved: ResolvedNode
   var runtimeIssues: [RuntimeIssue]
   var renderSuspensionDuration: Duration

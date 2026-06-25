@@ -331,7 +331,7 @@ extension LayoutEngine {
 
     localMetrics.measuredNodesComputed += 1
 
-    if let boundary = node.layoutDependentContent {
+    if let boundary = node.layoutRealizedContent {
       let measured = MeasuredNode(
         viewNodeID: node.viewNodeID,
         identity: node.identity,

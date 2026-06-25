@@ -6,7 +6,7 @@
 //
 //  - `safeAreaInset` — a base view inset by a sibling pinned to one edge,
 //  - `decoration` — siblings aligned against one designated primary child,
-//  - layout-dependent content — children realized only once their container's
+//  - layout-realized content — children realized only once their container's
 //    bounds are known.
 //
 // These are file-internal rather than `private` so the dispatcher can reach
@@ -182,8 +182,8 @@ extension LayoutEngine {
     }
   }
 
-  func layoutDependentPlacementRequests(
-    _ boundary: LayoutDependentContentBoundary,
+  func layoutRealizedPlacementRequests(
+    _ boundary: LayoutRealizedContentBoundary,
     measured: MeasuredNode,
     in bounds: CellRect,
     passContext: LayoutPassContext?

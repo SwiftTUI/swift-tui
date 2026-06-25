@@ -40,7 +40,7 @@ private enum LatePreferenceReconciliationStep {
 }
 
 /// Loop-bearing stage that reconciles preferences emitted by realized
-/// layout-dependent content before semantics, draw, raster, and commit.
+/// layout-realized content before semantics, draw, raster, and commit.
 struct LatePreferenceReconciliationStage {
   var policy: LatePreferenceReconciliationPolicy
 

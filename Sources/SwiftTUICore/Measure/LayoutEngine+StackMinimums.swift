@@ -48,7 +48,7 @@ extension LayoutEngine {
     var stack: [ResolvedNode] = [node]
 
     while let current = stack.popLast() {
-      if current.layoutDependentContent != nil {
+      if current.layoutRealizedContent != nil {
         return true
       }
 

@@ -56,7 +56,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("drawPayload", .draw),
     ("intrinsicSize", .measurement),
     ("indexedChildSource", .measurement),
-    ("layoutDependentContent", .measurement),
+    ("layoutRealizedContent", .measurement),
     ("preferenceValues", .derivedCache),
     ("subtreeNodeCount", .derivedCache),
     ("customLayoutFallbackSummary", .derivedCache),

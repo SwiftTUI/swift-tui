@@ -8,8 +8,8 @@ extension ResolvedNode {
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
-      && layoutDependentContent?.equivalenceSignature
-        == other.layoutDependentContent?.equivalenceSignature
+      && layoutRealizedContent?.equivalenceSignature
+        == other.layoutRealizedContent?.equivalenceSignature
       && drawPayload.isEquivalentForMeasurement(to: other.drawPayload)
       && intrinsicSize == other.intrinsicSize
       && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
@@ -33,8 +33,8 @@ extension ResolvedNode {
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
-      && layoutDependentContent?.equivalenceSignature
-        == other.layoutDependentContent?.equivalenceSignature
+      && layoutRealizedContent?.equivalenceSignature
+        == other.layoutRealizedContent?.equivalenceSignature
       && drawPayload == other.drawPayload
       && intrinsicSize == other.intrinsicSize
       && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
@@ -77,8 +77,8 @@ extension ResolvedNode {
       environmentSnapshot == other.environmentSnapshot,
       layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior),
       layoutMetadata == other.layoutMetadata,
-      layoutDependentContent?.equivalenceSignature
-        == other.layoutDependentContent?.equivalenceSignature,
+      layoutRealizedContent?.equivalenceSignature
+        == other.layoutRealizedContent?.equivalenceSignature,
       drawPayload == other.drawPayload,
       intrinsicSize == other.intrinsicSize,
       indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
@@ -160,8 +160,8 @@ extension ResolvedNode {
         transactionSnapshot.isReuseEquivalent(to: other.transactionSnapshot),
         layoutBehavior == other.layoutBehavior,
         layoutMetadata == other.layoutMetadata,
-        layoutDependentContent?.equivalenceSignature
-          == other.layoutDependentContent?.equivalenceSignature,
+        layoutRealizedContent?.equivalenceSignature
+          == other.layoutRealizedContent?.equivalenceSignature,
         drawMetadata == other.drawMetadata,
         drawEffects == other.drawEffects,
         surfaceComposition == other.surfaceComposition,
@@ -230,8 +230,8 @@ extension ResolvedNode {
       && lhs.transactionSnapshot == rhs.transactionSnapshot
       && lhs.layoutBehavior == rhs.layoutBehavior
       && lhs.layoutMetadata == rhs.layoutMetadata
-      && lhs.layoutDependentContent?.equivalenceSignature
-        == rhs.layoutDependentContent?.equivalenceSignature
+      && lhs.layoutRealizedContent?.equivalenceSignature
+        == rhs.layoutRealizedContent?.equivalenceSignature
       && lhs.drawMetadata == rhs.drawMetadata
       && lhs.drawEffects == rhs.drawEffects
       && lhs.surfaceComposition == rhs.surfaceComposition

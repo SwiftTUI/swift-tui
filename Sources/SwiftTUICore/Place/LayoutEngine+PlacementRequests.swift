@@ -6,8 +6,8 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    if let boundary = resolved.layoutDependentContent {
-      return layoutDependentPlacementRequests(
+    if let boundary = resolved.layoutRealizedContent {
+      return layoutRealizedPlacementRequests(
         boundary,
         measured: measured,
         in: bounds,

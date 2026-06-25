@@ -122,7 +122,7 @@ public struct GeometryReader<Content: View>: PrimitiveView, ResolvableView {
       context: context,
       authoringContext: authoringContext
     )
-    let boundary = LayoutDependentContentBoundary(
+    let boundary = LayoutRealizedContentBoundary(
       identity: context.identity,
       sizingPolicy: .fillsProposal(
         unspecifiedIdeal: CellSize(width: 10, height: 10)
@@ -139,7 +139,7 @@ public struct GeometryReader<Content: View>: PrimitiveView, ResolvableView {
         kind: .view("GeometryReader"),
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        layoutDependentContent: boundary
+        layoutRealizedContent: boundary
       )
     ]
   }
@@ -191,7 +191,7 @@ private final class GeometryReaderLayoutDependentContent<Content: View>:
       in: contentContext,
       authoringContextOverride: authoringContext
     )
-    context.viewGraph?.installLayoutDependentChildren(
+    context.viewGraph?.installLayoutRealizedChildren(
       for: realizationContext.boundaryIdentity,
       children: [resolved]
     )
