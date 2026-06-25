@@ -153,6 +153,9 @@ package struct LayoutDependentContentBoundary: Sendable {
   }
 }
 
+package typealias LayoutRealizedContentBoundary = LayoutDependentContentBoundary
+package typealias LayoutRealizationGeometry = LayoutRealizationContext
+
 extension ResolvedNode {
   package func applyingLayoutDependentRealizations(
     _ realizations: [Identity: [ResolvedNode]]

@@ -26,6 +26,52 @@ package struct PortalContentPayload: Sendable {
   }
 }
 
+package struct PortalAttachmentEdge: Sendable, Equatable {
+  package var portalEntryID: PortalEntryID
+  package var modalPolicy: PortalModalPolicy?
+  package var lifecycleActiveWhileHidden: Bool
+
+  package init(
+    portalEntryID: PortalEntryID,
+    modalPolicy: PortalModalPolicy? = nil,
+    lifecycleActiveWhileHidden: Bool = true
+  ) {
+    self.portalEntryID = portalEntryID
+    self.modalPolicy = modalPolicy
+    self.lifecycleActiveWhileHidden = lifecycleActiveWhileHidden
+  }
+}
+
+@MainActor
+package struct PortalAttachmentPayload: Sendable {
+  package var edge: PortalAttachmentEdge?
+  private var payload: PortalContentPayload
+
+  package init(
+    _ payload: PortalContentPayload,
+    edge: PortalAttachmentEdge? = nil
+  ) {
+    self.edge = edge
+    self.payload = payload
+  }
+
+  package init<V: View>(
+    authoringContext: AuthoringContext? = currentAuthoringContext(),
+    edge: PortalAttachmentEdge? = nil,
+    @ViewBuilder content: @escaping @MainActor () -> V
+  ) {
+    self.edge = edge
+    payload = PortalContentPayload(
+      authoringContext: authoringContext,
+      content: content
+    )
+  }
+
+  package func resolve(in context: ResolveContext) -> ResolvedNode {
+    payload.resolve(in: context)
+  }
+}
+
 @MainActor
 package struct PortalPayloadView: PrimitiveView, ResolvableView {
   package var payload: PortalContentPayload

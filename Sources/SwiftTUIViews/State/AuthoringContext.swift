@@ -149,6 +149,29 @@ package struct DeferredAuthoringContextSnapshot: Sendable {
   }
 }
 
+package struct CapturedSubviewScope: Sendable {
+  private let snapshot: DeferredAuthoringContextSnapshot?
+
+  @MainActor
+  package init(
+    from context: AuthoringContext? = currentAuthoringContext()
+  ) {
+    snapshot = DeferredAuthoringContextSnapshot(context)
+  }
+
+  @MainActor
+  package var authoringContext: AuthoringContext? {
+    snapshot?.authoringContext
+  }
+}
+
+@MainActor
+package func makeCapturedSubviewScope(
+  from context: AuthoringContext? = currentAuthoringContext()
+) -> CapturedSubviewScope {
+  CapturedSubviewScope(from: context)
+}
+
 @MainActor
 package func makeAuthoringContext(
   for context: ResolveContext,
