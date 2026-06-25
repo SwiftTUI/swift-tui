@@ -121,7 +121,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
   }
 }
 
-public struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveViewModifier {
+package struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveViewModifier {
   var isPresented: Binding<Bool>
   var menuContent: MenuContent
   var menuContentAuthoringContext: AuthoringContext?
