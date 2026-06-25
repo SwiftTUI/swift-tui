@@ -926,6 +926,72 @@ struct ViewGraphTests {
     #expect(unrelatedEvaluations == 0)
   }
 
+  @Test("key-path observable invalidation narrows to same-key-path peers")
+  func keyPathObservableInvalidationNarrowsToSameKeyPathPeers() {
+    let previous = ObservableKeyPathInvalidationConfiguration.isEnabled
+    ObservableKeyPathInvalidationConfiguration.isEnabled = true
+    defer { ObservableKeyPathInvalidationConfiguration.isEnabled = previous }
+
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let hotReaderA = testIdentity("Root", "HotA")
+    let hotReaderB = testIdentity("Root", "HotB")
+    let coldReader = testIdentity("Root", "Cold")
+    let model = DependencyKeyPathModel()
+    let modelID = ObjectIdentifier(model)
+    let hotKeyPath: AnyKeyPath = \DependencyKeyPathModel.hot
+    let coldKeyPath: AnyKeyPath = \DependencyKeyPathModel.cold
+
+    seedDependencyGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      childIdentities: [hotReaderA, hotReaderB, coldReader]
+    ) { identity, node in
+      switch identity {
+      case hotReaderA, hotReaderB:
+        node.recordObservableRead(modelID, keyPath: hotKeyPath)
+      case coldReader:
+        node.recordObservableRead(modelID, keyPath: coldKeyPath)
+      default:
+        break
+      }
+    }
+
+    var rootEvaluations = 0
+    var hotAEvaluations = 0
+    var hotBEvaluations = 0
+    var coldEvaluations = 0
+    graph.setRootEvaluator(rootIdentity: rootIdentity) {
+      rootEvaluations += 1
+    }
+    graph.setEvaluator(for: hotReaderA) {
+      hotAEvaluations += 1
+    }
+    graph.setEvaluator(for: hotReaderB) {
+      hotBEvaluations += 1
+    }
+    graph.setEvaluator(for: coldReader) {
+      coldEvaluations += 1
+    }
+
+    graph.beginFrame()
+    graph.invalidate([hotReaderA])
+    graph.queueDirtyForObservationChange(observedBy: hotReaderA)
+    let usedDirtyFrontier = graph.evaluateDirtyNodes()
+
+    #expect(usedDirtyFrontier)
+    #expect(rootEvaluations == 0)
+    // The firing `\.hot` reader re-resolves...
+    #expect(hotAEvaluations == 1)
+    // ...and so does a `\.hot` peer that did NOT fire — re-dirtied from the
+    // durable key-path index (this is what distinguishes key-path narrowing from
+    // precise firing, which would spare it).
+    #expect(hotBEvaluations == 1)
+    // ...but the `\.cold` peer is spared (the legacy object union would dirty
+    // it: coldEvaluations == 1).
+    #expect(coldEvaluations == 0)
+  }
+
   @Test("characterization: observable environment fan-out uses object tokens")
   func observableEnvironmentInvalidationUsesObjectTokensSeparateFromEnvironmentKeys() {
     let graph = ViewGraph()
@@ -1518,6 +1584,11 @@ private enum DependencyKeyA {}
 private enum DependencyKeyB {}
 
 private final class DependencyObservableBox {}
+
+private final class DependencyKeyPathModel {
+  var hot = 0
+  var cold = 0
+}
 
 @MainActor
 private final class RegistrationCounter {

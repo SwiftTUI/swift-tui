@@ -79,6 +79,10 @@ extension ViewGraph {
     package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>] = [:]
     package var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] = [:]
     package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>] = [:]
+    /// Property-grained reverse edges, maintained additively alongside
+    /// ``observableDependents``. Populated only when key-path invalidation is
+    /// enabled (see ``ObservableKeyPathInvalidationConfiguration``).
+    package var observableKeyPathDependents: [ObservableKeyPathKey: Set<ViewNodeID>] = [:]
   }
 
   /// Frame counter, the live-node working set, the resolved-node reuse cache,

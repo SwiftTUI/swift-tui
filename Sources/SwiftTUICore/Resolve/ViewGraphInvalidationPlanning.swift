@@ -52,7 +52,8 @@ enum ViewGraphInvalidationPlanner {
   static func observationChangeDirtyNodeIDs(
     observedBy viewNodeID: ViewNodeID,
     nodesByNodeID: [ViewNodeID: ViewNode],
-    observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
+    observableDependents: [ObjectIdentifier: Set<ViewNodeID>],
+    observableKeyPathDependents: [ObservableKeyPathKey: Set<ViewNodeID>]
   ) -> Set<ViewNodeID> {
     // Precise firing: the `withObservationTracking` onChange already fired for
     // exactly the node that read the mutated property, so the firing node alone
@@ -60,6 +61,20 @@ enum ViewGraphInvalidationPlanner {
     // write from dirtying `\.cold`/`\.rare` peers on the same object token.
     if PreciseObservationFiringConfiguration.isEnabled {
       return Set([viewNodeID])
+    }
+    // Key-path narrowing: keep the firing node and the co-readers that recorded
+    // one of its key paths, dropping different-key-path peers — but only when
+    // every co-reader is key-path-attributed (else fall back to the object
+    // union below, over-invalidate rather than miss).
+    if ObservableKeyPathInvalidationConfiguration.isEnabled,
+      let narrowed = ViewGraphDependencyIndex.keyPathNarrowedObservableDependents(
+        triggeredBy: viewNodeID,
+        nodesByNodeID: nodesByNodeID,
+        observableDependents: observableDependents,
+        observableKeyPathDependents: observableKeyPathDependents
+      )
+    {
+      return Set([viewNodeID]).union(narrowed)
     }
     return Set([viewNodeID]).union(
       ViewGraphDependencyIndex.observableDependents(

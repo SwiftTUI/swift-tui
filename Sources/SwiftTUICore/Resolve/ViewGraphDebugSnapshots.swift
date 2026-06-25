@@ -37,6 +37,7 @@ extension ViewGraph {
     package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
     package var environmentDependents: [ObjectDependencySnapshot]
     package var observableDependents: [ObjectDependencySnapshot]
+    package var observableKeyPathDependents: [ObjectDependencySnapshot]
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
     package var resolvedNodeReuseCache:
@@ -71,6 +72,19 @@ func debugObjectDependencySnapshot(
   dependencies.map { objectIdentifier, dependents in
     ViewGraph.ObjectDependencySnapshot(
       objectIdentifier: String(describing: objectIdentifier),
+      dependents: dependents
+    )
+  }.sorted { lhs, rhs in
+    lhs.objectIdentifier < rhs.objectIdentifier
+  }
+}
+
+func debugKeyPathDependencySnapshot(
+  _ dependencies: [ObservableKeyPathKey: Set<ViewNodeID>]
+) -> [ViewGraph.ObjectDependencySnapshot] {
+  dependencies.map { key, dependents in
+    ViewGraph.ObjectDependencySnapshot(
+      objectIdentifier: "\(key.object):\(key.keyPath)",
       dependents: dependents
     )
   }.sorted { lhs, rhs in

@@ -408,6 +408,21 @@ package final class ViewNode {
     dependencyTracker.recordObservableRead(key)
   }
 
+  /// Records an observable read *with* the key path that was read. Records the
+  /// bare object token too (additive), so the node stays discoverable in the
+  /// object-token index and a key-path miss always falls back to object
+  /// granularity. Used by the key-path holding seams (`@Bindable`).
+  package func recordObservableRead(
+    _ key: ObjectIdentifier,
+    keyPath: AnyKeyPath
+  ) {
+    recordCheckpointMutation()
+    dependencyTracker.recordObservableRead(key)
+    dependencyTracker.recordObservableKeyPathRead(
+      ObservableKeyPathKey(object: key, keyPath: keyPath)
+    )
+  }
+
   package func requestInvalidation() {
     ownerGraph?.queueDirty([identity])
     invalidator?.requestInvalidation(of: [identity])

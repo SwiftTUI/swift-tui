@@ -94,7 +94,17 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
     let model = wrappedValue
     // Register the observable property access while the enclosing body is
     // being built so writes map back into the existing invalidation pipeline.
-    ViewNodeContext.current?.recordObservableRead(ObjectIdentifier(model))
+    // When key-path invalidation is enabled, also record the read key path so
+    // the co-reader union can narrow to same-property readers; otherwise record
+    // only the object token (byte-identical to the legacy path).
+    if ObservableKeyPathInvalidationConfiguration.isEnabled {
+      ViewNodeContext.current?.recordObservableRead(
+        ObjectIdentifier(model),
+        keyPath: keyPath
+      )
+    } else {
+      ViewNodeContext.current?.recordObservableRead(ObjectIdentifier(model))
+    }
     _ = model[keyPath: keyPath]
     return Binding(
       mainActorGet: { model[keyPath: keyPath] },
