@@ -1541,10 +1541,10 @@ SwiftTUICore.LifecycleEvent
 SwiftTUICore.LifecycleMetadata
 SwiftTUICore.LifecycleMetadata.appearHandlerIDs
 SwiftTUICore.LifecycleMetadata.disappearHandlerIDs
-SwiftTUICore.LifecycleMetadata.init(appearHandlerIDs:disappearHandlerIDs:task:)
+SwiftTUICore.LifecycleMetadata.init(appearHandlerIDs:disappearHandlerIDs:tasks:)
 SwiftTUICore.LifecycleMetadata.isEmpty
 SwiftTUICore.LifecycleMetadata.merging(_:)
-SwiftTUICore.LifecycleMetadata.task
+SwiftTUICore.LifecycleMetadata.tasks
 SwiftTUICore.LifecycleOperation
 SwiftTUICore.LinearGradient
 SwiftTUICore.LinearGradient.AnimatableData

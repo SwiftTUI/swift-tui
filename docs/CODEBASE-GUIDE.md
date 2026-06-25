@@ -549,7 +549,7 @@ loud, accurate error.
 
 ```text
 @main App  (compiler binds the async entry point)
-  -> SwiftTUI.App.main() async                          [Sources/SwiftTUI/App.swift:29]
+  -> SwiftTUI.App.main() async                          [convenience App async entry]
   -> WebHostCLIRunner.run(Self.self)                     [Platforms/WebHost/Sources/SwiftTUIWebHostCLI/WebHostCLIRunner.swift:17]
   -> SwiftTUIOptions.parse(...).runtimeConfiguration()   (config.web != nil ? web : terminal)
   -> TerminalRunner.run(app, configuration:)            [Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift]
@@ -577,7 +577,7 @@ loud, accurate error.
 | Question | Start here |
 | --- | --- |
 | How does an app *become* a run loop? | `Sources/SwiftTUIRuntime/Scenes/SceneSession.swift:244` (`SceneSession.run` constructs `RunLoop`) |
-| What does `@main MyApp.main()` actually call? | `Sources/SwiftTUI/App.swift:29` (async) and `:59` (the `-> Never` trap shim) |
+| What does `@main MyApp.main()` actually call? | `SwiftTUI.App.main() async` and `Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUICommand.swift:113,141` (the synchronous-launch diagnostic path) |
 | Why does a bare `MyApp.main()` print usage and exit? | `Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUICommand.swift:113,141` (`synchronousLaunchDiagnosticMessage`, `failSynchronousLaunch`) |
 | Terminal vs WebHost routing? | `Platforms/WebHost/Sources/SwiftTUIWebHostCLI/WebHostCLIRunner.swift:51` (`configuration.web != nil`) |
 | Where is the host + input/signal readers built? | `Platforms/CLI/Sources/SwiftTUICLI/SceneRuntime.swift:47-89` |
@@ -954,7 +954,7 @@ A suggested first-week reading order, each tied to a section above:
    `ViewGraph.evaluateDirtyNodes` (`ViewGraph.swift:1048`) and watch the dirty frontier
    shrink to one node on a `@State` toggle.
 4. **Launch an app** under the CLI host and follow [§3c](#3c-app-bootstrap--run-loop-lifecycle)
-   from `Sources/SwiftTUI/App.swift:29` through `RunLoop.run()`. Try a bare
+   from `SwiftTUI.App.main() async` through `RunLoop.run()`. Try a bare
    `MyApp.main()` once to see the `-> Never` trap fire.
 5. **Run the same app under `--web`** and read [§3d](#3d-one-app-five-hosts) — confirm
    the wire frame is identical to the WASI bundle's. The build/test commands for all
