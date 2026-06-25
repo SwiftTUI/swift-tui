@@ -308,9 +308,9 @@ public struct State<Value> {
     let ordinal = box.currentOrdinal
     let retainedSeed =
       box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
-    // Deferred authoring snapshots keep the owner node ID but drop the
+    // Captured authoring snapshots keep the owner node ID but drop the
     // ViewNode reference. During a resolve pass, recover the live owner so
-    // deferred subtrees do not replace graph-backed state with seed storage.
+    // scoped subtrees do not replace graph-backed state with seed storage.
     let resolvedViewNode =
       context.viewNode
       ?? liveOwnerNode(

@@ -58,12 +58,12 @@ package protocol DeclaredChildrenView {
     into resolved: inout [ResolvedNode]
   )
 
-  func appendDeferredDeclaredChildren(
-    into children: inout [DeferredViewPayload]
+  func appendScopedDeclaredChildren(
+    into children: inout [ScopedContentPayload]
   )
 
   func appendPortalDeclaredChildren(
-    into children: inout [PortalContentPayload]
+    into children: inout [PortalAttachmentContentPayload]
   )
 
   /// Enumerates declared children without resolving them, invoking

@@ -116,7 +116,7 @@ public struct GeometryReader<Content: View>: PrimitiveView, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let authoringContext = makeDeferredAuthoringContext()
+    let authoringContext = makeLayoutRealizedAuthoringContext()
     let realizer = GeometryReaderLayoutDependentContent(
       content: content,
       context: context,

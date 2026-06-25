@@ -153,7 +153,6 @@ package struct LayoutRealizedContentBoundary: Sendable {
   }
 }
 
-package typealias LayoutDependentContentBoundary = LayoutRealizedContentBoundary
 package typealias LayoutRealizationGeometry = LayoutRealizationContext
 
 extension ResolvedNode {

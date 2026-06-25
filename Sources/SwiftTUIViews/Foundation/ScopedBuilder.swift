@@ -1,6 +1,6 @@
 package import SwiftTUICore
 
-/// A typed deferred view wrapper that preserves the original authoring scope.
+/// A typed scoped view wrapper that preserves the original authoring scope.
 package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
   private let output: Output
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
@@ -10,7 +10,7 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
     _ apply: @escaping @MainActor (ResolveContext) -> [ResolvedNode]
   ) -> @MainActor (ResolveContext) -> [ResolvedNode] {
     return { context in
-      // A deferred builder with no captured scope should resolve as a fresh
+      // A scoped builder with no captured scope should resolve as a fresh
       // authored subtree at its destination, not inherit whatever task-local
       // authoring context happened to be active in the parent wrapper.
       withAuthoringContext(authoringContext) {
@@ -60,11 +60,11 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
   }
 
   package var body: Never {
-    fatalError("ScopedBuilder is a typed deferred view wrapper.")
+    fatalError("ScopedBuilder is a typed scoped view wrapper.")
   }
 }
 
-/// A typed deferred mapper that captures and restores authored view scope.
+/// A typed mapper that captures and restores authored view scope.
 @MainActor
 package struct ScopedMapper<Input, Output: View> {
   private let authoringContext: AuthoringContext?

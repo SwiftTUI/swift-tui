@@ -175,12 +175,12 @@ extension View {
         actions: defaultPresentationActions(
           defaultDismissTitle: spec.descriptor.defaultDismissTitle,
           isPresented: isPresented,
-          dismissAuthoringContext: makeDeferredAuthoringContext()
+          dismissAuthoringContext: makePortalAttachmentAuthoringContext()
         ),
         message: EmptyView(),
-        actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -199,9 +199,9 @@ extension View {
         spec: alertPromptPresentationSpec(),
         actions: actions(),
         message: message(),
-        actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -220,12 +220,12 @@ extension View {
         actions: defaultPresentationActions(
           defaultDismissTitle: spec.descriptor.defaultDismissTitle,
           isPresented: isPresented,
-          dismissAuthoringContext: makeDeferredAuthoringContext()
+          dismissAuthoringContext: makePortalAttachmentAuthoringContext()
         ),
         message: EmptyView(),
-        actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -244,9 +244,9 @@ extension View {
         spec: confirmationDialogPromptPresentationSpec(),
         actions: actions(),
         message: message(),
-        actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -262,8 +262,8 @@ extension View {
         isPresented: isPresented,
         spec: sheetPromptPresentationSpec(),
         sheetContent: sheetContent(),
-        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -280,8 +280,8 @@ extension View {
         isPresented: isPresented,
         spec: sheetPromptPresentationSpec(),
         sheetContent: sheetContent(),
-        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }

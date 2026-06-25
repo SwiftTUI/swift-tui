@@ -71,12 +71,12 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
     }
   }
 
-  package func appendDeferredDeclaredChildren(
-    into children: inout [DeferredViewPayload]
+  package func appendScopedDeclaredChildren(
+    into children: inout [ScopedContentPayload]
   ) {
     switch storage {
     case .trueContent(let content):
-      appendDeferredDeclaredBuilderChildren(
+      appendScopedDeclaredBuilderChildren(
         from: content,
         into: &children
       )
@@ -84,7 +84,7 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
         return
       }
-      appendDeferredDeclaredBuilderChildren(
+      appendScopedDeclaredBuilderChildren(
         from: content,
         into: &children
       )
@@ -92,7 +92,7 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
   }
 
   package func appendPortalDeclaredChildren(
-    into children: inout [PortalContentPayload]
+    into children: inout [PortalAttachmentContentPayload]
   ) {
     switch storage {
     case .trueContent(let content):

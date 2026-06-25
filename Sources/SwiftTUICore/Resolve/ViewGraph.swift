@@ -1905,8 +1905,8 @@ package final class ViewGraph {
   ///    scopes) — and keeps the scoped restore byte-identical to a full rebuild
   ///    when no seam is present.
   /// 2. Plus live nodes selected by **identity prefix** that the ViewNode walk
-  ///    cannot reach across capture-host island seams (deferred tab bodies,
-  ///    presentation-portal content, `.id`-re-rooted subtrees, lazy viewport
+  ///    cannot reach across capture-host island seams (lazy tab bodies,
+  ///    presentation-portal attachments, `.id`-re-rooted subtrees, lazy viewport
   ///    entries). `removeSubtrees(rootedAt:)` clears those by identity prefix,
   ///    so without this a seam-hosted node's registrations — e.g. a lazy tab's
   ///    button action handler — were removed but never restored, leaving the
@@ -1975,7 +1975,7 @@ package final class ViewGraph {
   /// of the frame's runtime-registration publication scope. Scoped
   /// (`.subtrees`) publication restores registrations by walking each frontier
   /// root's ViewNode subtree, which cannot cross capture-host island seams
-  /// (deferred payloads, presentation-portal content, `.id`-re-rooted
+  /// (scoped content payloads, presentation-portal attachments, `.id`-re-rooted
   /// subtrees, lazy viewport entries) or intentionally reused stable subtrees.
   /// Lifecycle, task, and preference-observation effects for such nodes would
   /// otherwise reach the runtime without matching live registrations.

@@ -207,8 +207,8 @@ struct StateInvalidationDependencyTests {
     #expect(invalidated == [ownerIdentity])
   }
 
-  @Test("reader-attributed mode: deferred builder binding reads land on the descendant")
-  func deferredBuilderBindingReadsLandOnDescendant() {
+  @Test("reader-attributed mode: scoped builder binding reads land on the descendant")
+  func scopedBuilderBindingReadsLandOnDescendant() {
     let dependents = slotDependentIdentities(
       for: DeferredBindingOwnerProbe(),
       readerAttributed: true

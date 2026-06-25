@@ -99,8 +99,8 @@ extension Menu {
       BuiltinMenuPresentationModifier(
         isPresented: expansionBinding,
         menuContent: content,
-        menuContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        menuContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
 

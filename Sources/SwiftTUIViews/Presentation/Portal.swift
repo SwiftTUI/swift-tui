@@ -2,7 +2,7 @@ package import SwiftTUICore
 
 /// Destination-owned content payload for portal-hosted UI.
 @MainActor
-package struct PortalContentPayload: Sendable {
+package struct PortalAttachmentContentPayload: Sendable {
   private let resolveNodeClosure: @MainActor @Sendable (ResolveContext) -> ResolvedNode
 
   package init<V: View>(
@@ -45,10 +45,10 @@ package struct PortalAttachmentEdge: Sendable, Equatable {
 @MainActor
 package struct PortalAttachmentPayload: Sendable {
   package var edge: PortalAttachmentEdge?
-  private var payload: PortalContentPayload
+  private var payload: PortalAttachmentContentPayload
 
   package init(
-    _ payload: PortalContentPayload,
+    _ payload: PortalAttachmentContentPayload,
     edge: PortalAttachmentEdge? = nil
   ) {
     self.edge = edge
@@ -61,7 +61,7 @@ package struct PortalAttachmentPayload: Sendable {
     @ViewBuilder content: @escaping @MainActor () -> V
   ) {
     self.edge = edge
-    payload = PortalContentPayload(
+    payload = PortalAttachmentContentPayload(
       authoringContext: authoringContext,
       content: content
     )
@@ -92,12 +92,10 @@ package struct PortalAttachmentView: PrimitiveView, ResolvableView {
   }
 }
 
-package typealias PortalPayloadView = PortalAttachmentView
-
 @MainActor
 package func appendPortalDeclaredBuilderChildren<V: View>(
   from view: V,
-  into children: inout [PortalContentPayload]
+  into children: inout [PortalAttachmentContentPayload]
 ) {
   let erased: Any = view
   if let structural = erased as? any DeclaredChildrenView {
@@ -107,7 +105,7 @@ package func appendPortalDeclaredBuilderChildren<V: View>(
     return
   }
   children.append(
-    PortalContentPayload {
+    PortalAttachmentContentPayload {
       view
     }
   )
@@ -116,8 +114,8 @@ package func appendPortalDeclaredBuilderChildren<V: View>(
 @MainActor
 package func portalDeclaredBuilderChildren<V: View>(
   from view: V
-) -> [PortalContentPayload] {
-  var children: [PortalContentPayload] = []
+) -> [PortalAttachmentContentPayload] {
+  var children: [PortalAttachmentContentPayload] = []
   appendPortalDeclaredBuilderChildren(
     from: view,
     into: &children
@@ -131,7 +129,7 @@ package func appendPortalAttachmentDeclaredBuilderChildren<V: View>(
   edge: PortalAttachmentEdge?,
   into children: inout [PortalAttachmentPayload]
 ) {
-  var contentPayloads: [PortalContentPayload] = []
+  var contentPayloads: [PortalAttachmentContentPayload] = []
   appendPortalDeclaredBuilderChildren(
     from: view,
     into: &contentPayloads
@@ -201,8 +199,6 @@ package struct PortalAttachmentGroupView: PrimitiveView, ResolvableView {
     }
   }
 }
-
-package typealias PortalPayloadGroupView = PortalAttachmentGroupView
 
 @MainActor
 private func resolvePortalAttachmentGroupElements(

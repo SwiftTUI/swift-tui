@@ -278,8 +278,8 @@ extension ActionScope where Self: View {
         title: String(title),
         isPresented: isPresented,
         sheetContentBuilder: content,
-        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }

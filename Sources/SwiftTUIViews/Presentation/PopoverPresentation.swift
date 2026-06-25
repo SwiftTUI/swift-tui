@@ -17,8 +17,8 @@ extension View {
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         popoverContent: popoverContent(),
-        popoverContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        popoverContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -36,8 +36,8 @@ extension View {
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         popoverContent: popoverContent,
-        popoverContentAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        popoverContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -57,8 +57,8 @@ extension View {
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         action: action,
-        actionAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        actionAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }

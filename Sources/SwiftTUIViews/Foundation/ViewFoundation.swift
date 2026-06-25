@@ -159,30 +159,30 @@ package func enumerateDeclaredChildViews<V: View>(
 }
 
 @MainActor
-package func appendDeferredDeclaredBuilderChildren<V: View>(
+package func appendScopedDeclaredBuilderChildren<V: View>(
   from view: V,
-  into children: inout [DeferredViewPayload]
+  into children: inout [ScopedContentPayload]
 ) {
   let erased: Any = view
   if let structural = erased as? any DeclaredChildrenView {
-    structural.appendDeferredDeclaredChildren(
+    structural.appendScopedDeclaredChildren(
       into: &children
     )
     return
   }
   children.append(
-    DeferredViewPayload {
+    ScopedContentPayload {
       view
     }
   )
 }
 
 @MainActor
-package func deferredDeclaredBuilderChildren<V: View>(
+package func scopedDeclaredBuilderChildren<V: View>(
   from view: V
-) -> [DeferredViewPayload] {
-  var children: [DeferredViewPayload] = []
-  appendDeferredDeclaredBuilderChildren(
+) -> [ScopedContentPayload] {
+  var children: [ScopedContentPayload] = []
+  appendScopedDeclaredBuilderChildren(
     from: view,
     into: &children
   )
@@ -197,18 +197,18 @@ package func appendLazyDeclaredBuilderChildren<V: View>(
   lifecyclePolicy: LazySubviewLifecyclePolicy = .activeOnly,
   into children: inout [LazySubviewPayload]
 ) {
-  var deferredChildren: [DeferredViewPayload] = []
-  appendDeferredDeclaredBuilderChildren(
+  var scopedChildren: [ScopedContentPayload] = []
+  appendScopedDeclaredBuilderChildren(
     from: view,
-    into: &deferredChildren
+    into: &scopedChildren
   )
   children.append(
-    contentsOf: deferredChildren.map {
+    contentsOf: scopedChildren.map {
       LazySubviewPayload(
         debugName: debugName,
         origin: origin,
         lifecyclePolicy: lifecyclePolicy,
-        storage: .deferred($0)
+        storage: .scopedContent($0)
       )
     }
   )

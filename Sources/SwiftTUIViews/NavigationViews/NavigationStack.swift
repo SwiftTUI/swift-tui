@@ -82,8 +82,8 @@ extension View {
       BooleanNavigationDestinationModifier(
         isPresented: isPresented,
         destination: destination(),
-        destinationAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        destinationAuthoringContext: makeLazySubviewAuthoringContext(),
+        dismissAuthoringContext: makeLazySubviewAuthoringContext()
       )
     )
   }
@@ -97,8 +97,8 @@ extension View {
       ItemNavigationDestinationModifier(
         item: item,
         destination: destination,
-        destinationAuthoringContext: makeDeferredAuthoringContext(),
-        dismissAuthoringContext: makeDeferredAuthoringContext()
+        destinationAuthoringContext: makeLazySubviewAuthoringContext(),
+        dismissAuthoringContext: makeLazySubviewAuthoringContext()
       )
     )
   }
@@ -133,11 +133,11 @@ public struct BooleanNavigationDestinationModifier<Destination: View>: Primitive
       NavigationDestinationInstance(
         identity: declarationIdentity.child("Activation[\(ordinal)]"),
         payload: NavigationDestinationPayload(
-          navigationDestination: PortalContentPayload(authoringContext: destinationAuthoringContext) {
-            destination
-          },
+          navigationDestinationAuthoringContext: destinationAuthoringContext,
           declarationIdentity: declarationIdentity
-        ),
+        ) {
+          destination
+        },
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
@@ -201,11 +201,11 @@ where Item.ID: Sendable {
             .explicitID(currentItem.id)
             .child("Activation[\(activationOrdinal)]"),
           payload: NavigationDestinationPayload(
-            navigationDestination: PortalContentPayload(authoringContext: destinationAuthoringContext) {
-              destination(currentItem)
-            },
+            navigationDestinationAuthoringContext: destinationAuthoringContext,
             declarationIdentity: declarationIdentity
-          ),
+          ) {
+            destination(currentItem)
+          },
           dismiss: { [item, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
             withAuthoringContext(dismissAuthoringContext) {
               item.wrappedValue = nil

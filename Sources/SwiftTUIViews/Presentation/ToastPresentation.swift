@@ -254,7 +254,7 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
   var style: AnyToastStyle
   var duration: Double?
   var toastContent: ToastContent
-  var dismissAuthoringContext: AuthoringContext? = makeDeferredAuthoringContext()
+  var dismissAuthoringContext: AuthoringContext? = makePortalAttachmentAuthoringContext()
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,

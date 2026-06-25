@@ -40,11 +40,11 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
     }
   }
 
-  package func appendDeferredDeclaredChildren(
-    into children: inout [DeferredViewPayload]
+  package func appendScopedDeclaredChildren(
+    into children: inout [ScopedContentPayload]
   ) {
     for element in content {
-      appendDeferredDeclaredBuilderChildren(
+      appendScopedDeclaredBuilderChildren(
         from: element,
         into: &children
       )
@@ -52,7 +52,7 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
   }
 
   package func appendPortalDeclaredChildren(
-    into children: inout [PortalContentPayload]
+    into children: inout [PortalAttachmentContentPayload]
   ) {
     for element in content {
       appendPortalDeclaredBuilderChildren(

@@ -44,7 +44,7 @@ removed.
 That distinction matters because several runtime features intentionally resolve children lazily or out of line:
 
 - active-tab content in `TabView`
-- deferred view payloads captured for later evaluation
+- scoped content payloads captured for later evaluation
 - root-hoisted presentation overlays
 - wrapper-hosted and scene-hosted compositions that can re-resolve only part of the tree on a given frame
 

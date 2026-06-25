@@ -40,11 +40,11 @@ public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, Decl
     }
   }
 
-  package func appendDeferredDeclaredChildren(
-    into children: inout [DeferredViewPayload]
+  package func appendScopedDeclaredChildren(
+    into children: inout [ScopedContentPayload]
   ) {
     for child in repeat each value {
-      appendDeferredDeclaredBuilderChildren(
+      appendScopedDeclaredBuilderChildren(
         from: child,
         into: &children
       )
@@ -52,7 +52,7 @@ public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, Decl
   }
 
   package func appendPortalDeclaredChildren(
-    into children: inout [PortalContentPayload]
+    into children: inout [PortalAttachmentContentPayload]
   ) {
     for child in repeat each value {
       appendPortalDeclaredBuilderChildren(

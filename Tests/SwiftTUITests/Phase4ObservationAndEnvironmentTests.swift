@@ -905,8 +905,8 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
   }
 
-  @Test("WindowGroup stored content preserves deferred authoring scope")
-  func windowGroupStoredContentPreservesDeferredAuthoringScope() throws {
+  @Test("WindowGroup stored content preserves captured authoring scope")
+  func windowGroupStoredContentPreservesCapturedAuthoringScope() throws {
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
     let scopeIdentity = testIdentity("WindowGroupAuthoring")

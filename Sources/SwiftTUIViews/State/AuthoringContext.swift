@@ -111,7 +111,7 @@ package func stateStorageOwner(
   )
 }
 
-package struct DeferredAuthoringContextSnapshot: Sendable {
+package struct CapturedAuthoringContextSnapshot: Sendable {
   package let viewIdentity: Identity
   package let structuralIdentity: Identity
   package let structuralPath: StructuralPath
@@ -150,13 +150,13 @@ package struct DeferredAuthoringContextSnapshot: Sendable {
 }
 
 package struct CapturedSubviewScope: Sendable {
-  private let snapshot: DeferredAuthoringContextSnapshot?
+  private let snapshot: CapturedAuthoringContextSnapshot?
 
   @MainActor
   package init(
     from context: AuthoringContext? = currentAuthoringContext()
   ) {
-    snapshot = DeferredAuthoringContextSnapshot(context)
+    snapshot = CapturedAuthoringContextSnapshot(context)
   }
 
   @MainActor
@@ -211,10 +211,31 @@ package func dynamicPropertyAuthoringContext(
 }
 
 @MainActor
-package func makeDeferredAuthoringContext(
+package func makeCapturedAuthoringContext(
   from context: AuthoringContext? = currentAuthoringContext()
 ) -> AuthoringContext? {
-  DeferredAuthoringContextSnapshot(context)?.authoringContext
+  CapturedAuthoringContextSnapshot(context)?.authoringContext
+}
+
+@MainActor
+package func makePortalAttachmentAuthoringContext(
+  from context: AuthoringContext? = currentAuthoringContext()
+) -> AuthoringContext? {
+  makeCapturedAuthoringContext(from: context)
+}
+
+@MainActor
+package func makeLazySubviewAuthoringContext(
+  from context: AuthoringContext? = currentAuthoringContext()
+) -> AuthoringContext? {
+  makeCapturedAuthoringContext(from: context)
+}
+
+@MainActor
+package func makeLayoutRealizedAuthoringContext(
+  from context: AuthoringContext? = currentAuthoringContext()
+) -> AuthoringContext? {
+  makeCapturedAuthoringContext(from: context)
 }
 
 @MainActor

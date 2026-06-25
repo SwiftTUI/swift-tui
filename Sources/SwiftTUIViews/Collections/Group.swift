@@ -38,17 +38,17 @@ public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChild
     )
   }
 
-  package func appendDeferredDeclaredChildren(
-    into children: inout [DeferredViewPayload]
+  package func appendScopedDeclaredChildren(
+    into children: inout [ScopedContentPayload]
   ) {
-    appendDeferredDeclaredBuilderChildren(
+    appendScopedDeclaredBuilderChildren(
       from: content,
       into: &children
     )
   }
 
   package func appendPortalDeclaredChildren(
-    into children: inout [PortalContentPayload]
+    into children: inout [PortalAttachmentContentPayload]
   ) {
     appendPortalDeclaredBuilderChildren(
       from: content,

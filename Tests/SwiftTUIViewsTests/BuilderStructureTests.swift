@@ -19,31 +19,31 @@ struct BuilderStructureTests {
     #expect(resolved.children.map(resolvedNodeLabelText(from:)) == ["A", "B", "C", "D"])
   }
 
-  @Test("deferred declared builder children preserve nested builder output order")
-  func deferredDeclaredBuilderChildrenPreserveNestedBuilderOutputOrder() {
+  @Test("scoped declared builder children preserve nested builder output order")
+  func scopedDeclaredBuilderChildrenPreserveNestedBuilderOutputOrder() {
     let resolved = Resolver().resolve(
-      DeferredPayloadGroupView(
-        kindName: "DeferredProbe",
-        payloads: deferredDeclaredBuilderChildren(from: nestedBuilderProbe())
+      ScopedContentPayloadGroupView(
+        kindName: "ScopedProbe",
+        payloads: scopedDeclaredBuilderChildren(from: nestedBuilderProbe())
       ),
-      in: .init(identity: testIdentity("BuilderStructure", "DeferredTraversal"))
+      in: .init(identity: testIdentity("BuilderStructure", "ScopedTraversal"))
     )
 
-    #expect(resolved.kind == .view("DeferredProbe"))
+    #expect(resolved.kind == .view("ScopedProbe"))
     #expect(resolvedNodeLabelText(from: resolved) == "A B C D")
   }
 
-  @Test("deferred builder children preserve limited-availability output")
-  func deferredBuilderChildrenPreserveLimitedAvailabilityOutput() {
-    let children = deferredDeclaredBuilderChildren(
+  @Test("scoped builder children preserve limited-availability output")
+  func scopedBuilderChildrenPreserveLimitedAvailabilityOutput() {
+    let children = scopedDeclaredBuilderChildren(
       from: limitedAvailabilityBuilderProbe()
     )
     let resolved = Resolver().resolve(
-      DeferredPayloadGroupView(
-        kindName: "DeferredAvailabilityProbe",
+      ScopedContentPayloadGroupView(
+        kindName: "ScopedAvailabilityProbe",
         payloads: children
       ),
-      in: .init(identity: testIdentity("BuilderStructure", "DeferredAvailability"))
+      in: .init(identity: testIdentity("BuilderStructure", "ScopedAvailability"))
     )
 
     // The probe gates on `if #available(macOS 999, iOS 999, *)`. Apple

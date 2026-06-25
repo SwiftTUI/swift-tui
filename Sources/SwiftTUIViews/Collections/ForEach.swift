@@ -109,14 +109,14 @@ extension ForEach: DeclaredChildrenView {
     resolved.append(contentsOf: resolveElements(in: childContext))
   }
 
-  package func appendDeferredDeclaredChildren(
-    into children: inout [DeferredViewPayload]
+  package func appendScopedDeclaredChildren(
+    into children: inout [ScopedContentPayload]
   ) {
     for element in data {
       let view = withAuthoringContext(authoringScope) {
         content(element)
       }
-      appendDeferredDeclaredBuilderChildren(
+      appendScopedDeclaredBuilderChildren(
         from: view,
         into: &children
       )
@@ -124,7 +124,7 @@ extension ForEach: DeclaredChildrenView {
   }
 
   package func appendPortalDeclaredChildren(
-    into children: inout [PortalContentPayload]
+    into children: inout [PortalAttachmentContentPayload]
   ) {
     for element in data {
       let view = withAuthoringContext(authoringScope) {

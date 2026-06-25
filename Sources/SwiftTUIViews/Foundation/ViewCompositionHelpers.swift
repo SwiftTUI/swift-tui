@@ -1,20 +1,19 @@
 package import SwiftTUICore
 
-/// A deferred authored child payload that preserves authoring scope without
+/// A scoped authored child payload that preserves authoring scope without
 /// exposing `AnyView` as the transport type.
 @MainActor
-package struct DeferredViewPayload: Sendable {
+package struct ScopedContentPayload: Sendable {
   private let resolveElementsClosure: @MainActor @Sendable (ResolveContext) -> [ResolvedNode]
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),
     @ViewBuilder content: @escaping @MainActor () -> V
   ) {
-    // Deferred payloads are resolved in a different part of the tree (e.g.
-    // a presentation overlay). Preserve the original owner identity and
-    // ViewNode, but isolate future first-time ordinal claims from the
-    // capture-site tracker.
-    let authoringContext = makeDeferredAuthoringContext(from: authoringContext)
+    // Scoped payloads may resolve in a different part of the tree. Preserve
+    // the original owner identity and ViewNode, but isolate future first-time
+    // ordinal claims from the capture-site tracker.
+    let authoringContext = makeCapturedAuthoringContext(from: authoringContext)
     let builder = ScopedBuilder(
       authoringContext: authoringContext,
       content: content
@@ -38,9 +37,9 @@ package struct DeferredViewPayload: Sendable {
 
 @MainActor
 package struct CapturedSubviewPayload: Sendable {
-  fileprivate var payload: DeferredViewPayload
+  fileprivate var payload: ScopedContentPayload
 
-  package init(_ payload: DeferredViewPayload) {
+  package init(_ payload: ScopedContentPayload) {
     self.payload = payload
   }
 
@@ -48,7 +47,7 @@ package struct CapturedSubviewPayload: Sendable {
     authoringContext: AuthoringContext? = currentAuthoringContext(),
     @ViewBuilder content: @escaping @MainActor () -> V
   ) {
-    payload = DeferredViewPayload(
+    payload = ScopedContentPayload(
       authoringContext: authoringContext,
       content: content
     )
@@ -101,11 +100,11 @@ package struct CapturedSubviewGroupView: PrimitiveView, ResolvableView {
         )
       ]
     default:
-      let deferredPayloads = payloads.map(\.payload)
+      let scopedPayloads = payloads.map(\.payload)
       return [
-        resolveDeferredGroupElements(
+        resolveScopedContentGroupElements(
           kindName: kindName,
-          payloads: deferredPayloads,
+          payloads: scopedPayloads,
           in: context
         )
       ]
@@ -124,8 +123,8 @@ package enum LazySubviewLifecyclePolicy: Sendable, Equatable {
 
 @MainActor
 package enum LazySubviewPayloadStorage: Sendable {
-  case deferred(DeferredViewPayload)
-  case portal(PortalContentPayload)
+  case scopedContent(ScopedContentPayload)
+  case portal(PortalAttachmentContentPayload)
 }
 
 @MainActor
@@ -154,7 +153,7 @@ package struct LazySubviewPayload: Sendable {
   }
 
   package init(
-    tabBody payload: DeferredViewPayload,
+    tabBody payload: ScopedContentPayload,
     debugName: String = "TabBody",
     declarationIdentity: Identity? = nil,
     declarationStructuralPath: StructuralPath? = nil
@@ -164,12 +163,12 @@ package struct LazySubviewPayload: Sendable {
       origin: .tabBody,
       declarationIdentity: declarationIdentity,
       declarationStructuralPath: declarationStructuralPath,
-      storage: .deferred(payload)
+      storage: .scopedContent(payload)
     )
   }
 
   package init(
-    navigationDestination payload: PortalContentPayload,
+    navigationDestination payload: PortalAttachmentContentPayload,
     debugName: String = "NavigationDestination",
     declarationIdentity: Identity? = nil,
     declarationStructuralPath: StructuralPath? = nil
@@ -183,9 +182,27 @@ package struct LazySubviewPayload: Sendable {
     )
   }
 
+  package init<V: View>(
+    navigationDestinationAuthoringContext authoringContext: AuthoringContext?,
+    debugName: String = "NavigationDestination",
+    declarationIdentity: Identity? = nil,
+    declarationStructuralPath: StructuralPath? = nil,
+    @ViewBuilder content: @escaping @MainActor () -> V
+  ) {
+    self.init(
+      navigationDestination: PortalAttachmentContentPayload(
+        authoringContext: authoringContext,
+        content: content
+      ),
+      debugName: debugName,
+      declarationIdentity: declarationIdentity,
+      declarationStructuralPath: declarationStructuralPath
+    )
+  }
+
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     switch storage {
-    case .deferred(let payload):
+    case .scopedContent(let payload):
       return payload.resolve(in: context)
     case .portal(let payload):
       return payload.resolve(in: context)
@@ -194,7 +211,7 @@ package struct LazySubviewPayload: Sendable {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     switch storage {
-    case .deferred(let payload):
+    case .scopedContent(let payload):
       return payload.resolveElements(in: context)
     case .portal(let payload):
       return [payload.resolve(in: context)]
@@ -205,8 +222,8 @@ package struct LazySubviewPayload: Sendable {
 package typealias NavigationDestinationPayload = LazySubviewPayload
 
 @MainActor
-package struct DeferredPayloadView: PrimitiveView, ResolvableView {
-  package var payload: DeferredViewPayload
+package struct ScopedContentPayloadView: PrimitiveView, ResolvableView {
+  package var payload: ScopedContentPayload
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     payload.resolveElements(in: context)
@@ -214,9 +231,9 @@ package struct DeferredPayloadView: PrimitiveView, ResolvableView {
 }
 
 @MainActor
-package struct DeferredPayloadGroupView: PrimitiveView, ResolvableView {
+package struct ScopedContentPayloadGroupView: PrimitiveView, ResolvableView {
   package var kindName: String
-  package var payloads: [DeferredViewPayload]
+  package var payloads: [ScopedContentPayload]
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     switch payloads.count {
@@ -225,13 +242,13 @@ package struct DeferredPayloadGroupView: PrimitiveView, ResolvableView {
     case 1:
       return [
         resolveView(
-          DeferredPayloadView(payload: payloads[0]),
+          ScopedContentPayloadView(payload: payloads[0]),
           in: context
         )
       ]
     default:
       return [
-        resolveDeferredGroupElements(
+        resolveScopedContentGroupElements(
           kindName: kindName,
           payloads: payloads,
           in: context
@@ -242,9 +259,9 @@ package struct DeferredPayloadGroupView: PrimitiveView, ResolvableView {
 }
 
 @MainActor
-private func resolveDeferredGroupElements(
+private func resolveScopedContentGroupElements(
   kindName: String = "Group",
-  payloads: [DeferredViewPayload],
+  payloads: [ScopedContentPayload],
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
   drawMetadata: DrawMetadata = DrawMetadata(),
@@ -254,7 +271,7 @@ private func resolveDeferredGroupElements(
   context.recordResolvedComputation()
   let resolvedChildren = payloads.enumerated().map { index, payload in
     resolveView(
-      DeferredPayloadView(payload: payload),
+      ScopedContentPayloadView(payload: payload),
       in: context.indexedChild(
         kind: .init(rawValue: kindName),
         index: index

@@ -214,8 +214,8 @@ package final class ViewGraphFrameDraft {
       // identity order so the live registry is byte-identical to a full rebuild.
       liveRegistrations.normalizeScopedRestoreOrder()
       // The scoped restore above walks frontier-root ViewNode subtrees, which
-      // cannot reach capture-hosted island nodes (deferred tab bodies, portal
-      // content, lazy viewport entries) that resolved this frame outside any
+      // cannot reach capture-hosted island nodes (lazy tab bodies, portal
+      // attachments, lazy viewport entries) that resolved this frame outside any
       // frontier root, and reused stable subtrees are intentionally not walked.
       // Low-volume side-effect handlers on such nodes must still reach the
       // live registries or runtime commit/observation effects cannot invoke

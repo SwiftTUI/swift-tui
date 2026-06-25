@@ -7,7 +7,7 @@ package final class ViewNode {
   package weak var parent: ViewNode?
   /// The node whose body resolution evaluated this node, captured at
   /// outermost `beginEvaluation`. Bridges island seams in the upward
-  /// invalidation walks: capture-hosted content (deferred payloads, AnyView
+  /// invalidation walks: capture-hosted content (scoped content payloads, AnyView
   /// shells, `.id`-re-rooted subtrees) is reachable from its host only
   /// through body resolution, not `parent` links, so a dirty island could
   /// not reach its host spine and the spine was wrongly retained-reused
