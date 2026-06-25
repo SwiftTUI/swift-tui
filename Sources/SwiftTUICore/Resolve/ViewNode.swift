@@ -88,6 +88,7 @@ package final class ViewNode {
   private var suppressesStructuralLifecycle: Bool
   private var nextChangeModifierOrdinal: Int
   private var nextNavigationDestinationModifierOrdinal: Int
+  private var nextTaskModifierOrdinal: Int
   private var preparedFrameID: UInt64
   private var visitedFrameID: UInt64
   private var evaluator: (@MainActor () -> Void)?
@@ -126,6 +127,7 @@ package final class ViewNode {
     suppressesStructuralLifecycle = false
     nextChangeModifierOrdinal = 0
     nextNavigationDestinationModifierOrdinal = 0
+    nextTaskModifierOrdinal = 0
     preparedFrameID = 0
     visitedFrameID = 0
     evaluator = nil
@@ -164,6 +166,7 @@ package final class ViewNode {
     pendingChangeHandlerIDs.removeAll(keepingCapacity: true)
     nextChangeModifierOrdinal = 0
     nextNavigationDestinationModifierOrdinal = 0
+    nextTaskModifierOrdinal = 0
     preparedFrameID = frameID
   }
 
@@ -184,6 +187,9 @@ package final class ViewNode {
       visitedFrameID = frameID
       isDirty = false
       currentBodyStateSlotCount = 0
+      nextChangeModifierOrdinal = 0
+      nextNavigationDestinationModifierOrdinal = 0
+      nextTaskModifierOrdinal = 0
       _ = dependencyTracker.reset()
     }
     evaluationDepth += 1
@@ -428,6 +434,14 @@ package final class ViewNode {
       nextNavigationDestinationModifierOrdinal += 1
     }
     return nextNavigationDestinationModifierOrdinal
+  }
+
+  package func claimTaskModifierOrdinal() -> Int {
+    recordCheckpointMutation()
+    defer {
+      nextTaskModifierOrdinal += 1
+    }
+    return nextTaskModifierOrdinal
   }
 
   package func queueChangeHandler(
@@ -1248,6 +1262,7 @@ extension ViewNode {
     package var suppressesStructuralLifecycle: Bool
     package var nextChangeModifierOrdinal: Int
     package var nextNavigationDestinationModifierOrdinal: Int
+    package var nextTaskModifierOrdinal: Int
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
     package var evaluator: (@MainActor () -> Void)?
@@ -1286,6 +1301,7 @@ extension ViewNode {
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
+      nextTaskModifierOrdinal: nextTaskModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
       evaluator: evaluator,
@@ -1328,6 +1344,7 @@ extension ViewNode {
     nextChangeModifierOrdinal = checkpoint.nextChangeModifierOrdinal
     nextNavigationDestinationModifierOrdinal =
       checkpoint.nextNavigationDestinationModifierOrdinal
+    nextTaskModifierOrdinal = checkpoint.nextTaskModifierOrdinal
     preparedFrameID = checkpoint.preparedFrameID
     visitedFrameID = checkpoint.visitedFrameID
     evaluator = checkpoint.evaluator

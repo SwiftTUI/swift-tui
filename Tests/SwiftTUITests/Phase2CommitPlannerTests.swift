@@ -273,7 +273,7 @@ struct Phase2CommitPlannerTests {
               lifecycleMetadata: .init(
                 appearHandlerIDs: ["appear"],
                 disappearHandlerIDs: ["disappear"],
-                task: task
+                tasks: [task]
               )
             )
           ],
@@ -364,7 +364,7 @@ private func lifecycleNode(
     lifecycleMetadata: .init(
       appearHandlerIDs: appear,
       disappearHandlerIDs: disappear,
-      task: task
+      tasks: task.map { [$0] } ?? []
     )
   )
 }

@@ -63,7 +63,7 @@ func lifecycleNode(
     lifecycleMetadata: .init(
       appearHandlerIDs: appearHandlerIDs,
       disappearHandlerIDs: disappearHandlerIDs,
-      task: task
+      tasks: task.map { [$0] } ?? []
     )
   )
 }

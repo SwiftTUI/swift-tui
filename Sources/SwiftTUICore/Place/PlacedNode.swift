@@ -325,7 +325,7 @@ public struct PlacedNode: Equatable, Sendable {
             identity: node.identity,
             appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
             disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
-            task: node.lifecycleMetadata.task
+            tasks: node.lifecycleMetadata.tasks
           )
         )
       }

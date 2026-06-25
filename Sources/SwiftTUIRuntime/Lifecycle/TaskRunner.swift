@@ -2,6 +2,11 @@ import SwiftTUICore
 
 @MainActor
 final class TaskRunner {
+  private struct ActiveTaskKey: Hashable {
+    var viewNodeID: ViewNodeID
+    var descriptorID: String
+  }
+
   private struct ActiveTask {
     var identity: Identity
     var descriptor: TaskDescriptor
@@ -9,7 +14,7 @@ final class TaskRunner {
     var task: Task<Void, Never>
   }
 
-  private var activeTasks: [ViewNodeID: ActiveTask] = [:]
+  private var activeTasks: [ActiveTaskKey: ActiveTask] = [:]
   private var nextGeneration = 0
 
   func start(
@@ -17,33 +22,34 @@ final class TaskRunner {
     identity: Identity,
     registration: TaskRegistration
   ) {
-    cancel(viewNodeID: viewNodeID)
+    let descriptor = registration.descriptor
+    let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
+    cancel(viewNodeID: viewNodeID, matching: descriptor)
 
     // A node's viewNodeID can churn — a fresh id for the *same* identity on
     // re-evaluation (e.g. a `TimelineView` re-attaching its `.task` each tick).
-    // Since active tasks are keyed by viewNodeID, the old id's task is left
-    // running, and the lifecycle diff can miss the transient disappearance — so
-    // it orphans: re-rendering forever and surviving the view's removal (the
-    // persistent slowdown after leaving an animated tab). Cancel any active
-    // task for this identity on a now-stale viewNodeID. There is one task per
-    // viewNodeID, so a same-identity entry under a different id is always a
-    // stale duplicate of this logical `.task`.
-    let staleViewNodeIDs = activeTasks.compactMap { entry in
-      entry.key != viewNodeID && entry.value.identity == identity ? entry.key : nil
+    // Without this sweep, the old id's task is left running, and the lifecycle
+    // diff can miss the transient disappearance. Keep the sweep per descriptor
+    // so sibling task modifiers on the same identity do not cancel each other.
+    let staleKeys = activeTasks.compactMap { entry in
+      entry.key.viewNodeID != viewNodeID
+        && entry.value.identity == identity
+        && entry.value.descriptor.id == descriptor.id
+        ? entry.key
+        : nil
     }
-    for staleViewNodeID in staleViewNodeIDs {
-      cancel(viewNodeID: staleViewNodeID)
+    for staleKey in staleKeys {
+      cancel(key: staleKey)
     }
 
     nextGeneration += 1
     let generation = nextGeneration
-    let descriptor = registration.descriptor
     let task = Task(priority: taskPriority(for: descriptor.priority)) { [weak self] in
       await registration.run()
-      self?.finish(viewNodeID: viewNodeID, generation: generation)
+      self?.finish(key: key, generation: generation)
     }
 
-    activeTasks[viewNodeID] = ActiveTask(
+    activeTasks[key] = ActiveTask(
       identity: identity,
       descriptor: descriptor,
       generation: generation,
@@ -55,14 +61,25 @@ final class TaskRunner {
     viewNodeID: ViewNodeID,
     matching descriptor: TaskDescriptor? = nil
   ) {
-    guard let activeTask = activeTasks[viewNodeID] else {
-      return
+    let keys = activeTasks.compactMap { entry -> ActiveTaskKey? in
+      guard entry.key.viewNodeID == viewNodeID else {
+        return nil
+      }
+      guard descriptor == nil || descriptor == entry.value.descriptor else {
+        return nil
+      }
+      return entry.key
     }
-    guard descriptor == nil || descriptor == activeTask.descriptor else {
-      return
-    }
-    activeTasks.removeValue(forKey: viewNodeID)
 
+    for key in keys {
+      cancel(key: key)
+    }
+  }
+
+  private func cancel(key: ActiveTaskKey) {
+    guard let activeTask = activeTasks.removeValue(forKey: key) else {
+      return
+    }
     activeTask.task.cancel()
   }
 
@@ -74,28 +91,26 @@ final class TaskRunner {
     }
   }
 
-  package var activeTaskDescriptors: [Identity: TaskDescriptor] {
-    Dictionary(
-      activeTasks.values.map { ($0.identity, $0.descriptor) },
-      uniquingKeysWith: { _, latest in latest }
-    )
+  package var activeTaskDescriptors: [Identity: [TaskDescriptor]] {
+    activeTasks.values.reduce(into: [Identity: [TaskDescriptor]]()) { partial, task in
+      partial[task.identity, default: []].append(task.descriptor)
+    }
   }
 
-  /// Raw count of live task handles (keyed by `viewNodeID`). Used by tests to
-  /// detect tasks that should have been cancelled — e.g. a tab's `.task`s that
-  /// must stop when the tab is dismissed behind a capture-host seam.
+  /// Raw count of live task handles (keyed by `viewNodeID` plus task
+  /// descriptor). Used by tests to detect tasks that should have been cancelled.
   package var activeTaskCount: Int {
     activeTasks.count
   }
 
   private func finish(
-    viewNodeID: ViewNodeID,
+    key: ActiveTaskKey,
     generation: Int
   ) {
-    guard activeTasks[viewNodeID]?.generation == generation else {
+    guard activeTasks[key]?.generation == generation else {
       return
     }
-    activeTasks.removeValue(forKey: viewNodeID)
+    activeTasks.removeValue(forKey: key)
   }
 
   private func taskPriority(

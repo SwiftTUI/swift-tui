@@ -18,7 +18,7 @@ package final class TaskRegistration: Sendable {
 
 @MainActor
 package final class LocalTaskRegistry: Equatable {
-  private var registrations: [Identity: TaskRegistration] = [:]
+  private var registrations: [Identity: [TaskRegistration]] = [:]
   private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
@@ -34,7 +34,15 @@ package final class LocalTaskRegistry: Equatable {
     identity: Identity,
     registration: TaskRegistration
   ) {
-    registrations[identity] = registration
+    var identityRegistrations = registrations[identity] ?? []
+    if let index = identityRegistrations.firstIndex(where: {
+      $0.descriptor.id == registration.descriptor.id
+    }) {
+      identityRegistrations[index] = registration
+    } else {
+      identityRegistrations.append(registration)
+    }
+    registrations[identity] = identityRegistrations
     ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordTaskRegistration(
       identity: identity,
@@ -43,9 +51,16 @@ package final class LocalTaskRegistry: Equatable {
   }
 
   package func registration(
+    for identity: Identity,
+    descriptor: TaskDescriptor
+  ) -> TaskRegistration? {
+    registrations[identity]?.first { $0.descriptor == descriptor }
+  }
+
+  package func registration(
     for identity: Identity
   ) -> TaskRegistration? {
-    registrations[identity]
+    registrations[identity]?.first
   }
 
   package func reset() {
@@ -68,20 +83,20 @@ package final class LocalTaskRegistry: Equatable {
     }
   }
 
-  package func snapshot() -> [Identity: TaskRegistration] {
+  package func snapshot() -> [Identity: [TaskRegistration]] {
     registrations
   }
 
   package func restore(
-    _ snapshot: [Identity: TaskRegistration],
+    _ snapshot: [Identity: [TaskRegistration]],
     ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
     guard !snapshot.isEmpty else {
       return
     }
 
-    for (identity, registration) in snapshot {
-      registrations[identity] = registration
+    for (identity, identityRegistrations) in snapshot {
+      registrations[identity] = identityRegistrations
       self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
   }

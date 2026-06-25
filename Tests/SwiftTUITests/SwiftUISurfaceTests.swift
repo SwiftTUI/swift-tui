@@ -459,7 +459,7 @@ struct SwiftUISurfaceTests {
     #expect(counters.taskCount == 0)
     #expect(resolved.lifecycleMetadata.appearHandlerIDs == ["Root#appear[0]"])
     #expect(resolved.lifecycleMetadata.disappearHandlerIDs == ["Root#disappear[0]"])
-    #expect(resolved.lifecycleMetadata.task == .init(id: "Root#task", priority: .high))
+    #expect(resolved.lifecycleMetadata.tasks == [.init(id: "Root#task", priority: .high)])
     #expect(lifecycleRegistry.appearHandler(for: "Root#appear[0]") != nil)
     #expect(lifecycleRegistry.disappearHandler(for: "Root#disappear[0]") != nil)
 
@@ -662,11 +662,11 @@ struct SwiftUISurfaceTests {
     #expect(shown.lifecycleMetadata.appearHandlerIDs == ["Root/true/Group[0]#appear[0]"])
     #expect(hidden.lifecycleMetadata.appearHandlerIDs == ["Root/false/Group[0]#appear[0]"])
     #expect(
-      shown.lifecycleMetadata.task
-        == .init(id: "Root/true/Group[0]#task[id:Swift.String]", priority: .userInitiated))
+      shown.lifecycleMetadata.tasks
+        == [.init(id: "Root/true/Group[0]#task[id:Swift.String]", priority: .userInitiated)])
     #expect(
-      hidden.lifecycleMetadata.task
-        == .init(id: "Root/false/Group[0]#task[id:Swift.String]", priority: .userInitiated))
+      hidden.lifecycleMetadata.tasks
+        == [.init(id: "Root/false/Group[0]#task[id:Swift.String]", priority: .userInitiated)])
   }
 
   @Test(

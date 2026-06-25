@@ -19,7 +19,7 @@ struct ViewGraphTests {
           lifecycleMetadata: .init(
             appearHandlerIDs: ["appear-leaf"],
             disappearHandlerIDs: ["disappear-leaf"],
-            task: task
+            tasks: [task]
           )
         )
       ]
@@ -58,7 +58,7 @@ struct ViewGraphTests {
             lifecycleMetadata: .init(
               appearHandlerIDs: ["appear-leaf"],
               disappearHandlerIDs: ["disappear-leaf"],
-              task: task
+              tasks: [task]
             )
           )
         ]

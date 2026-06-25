@@ -170,7 +170,7 @@ struct ViewGraphCheckpointTotalityTests {
             kind: .view("Inserted"),
             lifecycleMetadata: .init(
               appearHandlerIDs: ["inserted-appear"],
-              task: .init(id: "inserted-task", priority: .medium)
+              tasks: [.init(id: "inserted-task", priority: .medium)]
             )
           ),
         ]

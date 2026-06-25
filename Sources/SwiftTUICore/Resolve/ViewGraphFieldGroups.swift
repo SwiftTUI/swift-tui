@@ -69,7 +69,7 @@ extension ViewGraph {
   /// Stable `.task(id:)` identity slots and the monotonically increasing token
   /// that mints fresh labels.
   package struct TaskDescriptorState {
-    package var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot] = [:]
+    package var taskDescriptorNodeSlots: [TaskDescriptorSlotKey: TaskDescriptorIdentitySlot] = [:]
     package var nextTaskDescriptorIdentityToken: UInt64 = 0
   }
 

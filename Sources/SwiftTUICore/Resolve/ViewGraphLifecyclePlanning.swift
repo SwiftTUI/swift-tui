@@ -128,7 +128,7 @@ enum ViewGraphLifecyclePlanner {
       guard let previousNode = nodesByKey.removeValue(forKey: key) else {
         continue
       }
-      if let task = previousNode.task {
+      for task in previousNode.tasks {
         taskCancels.append(
           .init(
             viewNodeID: previousNode.viewNodeID,
@@ -216,7 +216,7 @@ enum ViewGraphLifecyclePlanner {
         identity: node.identity,
         appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
         disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
-        task: node.lifecycleMetadata.task
+        tasks: node.lifecycleMetadata.tasks
       )
       let previousNode = viewportLifecycleNodesByKey[key]
       seenKeys.insert(key)
@@ -231,7 +231,9 @@ enum ViewGraphLifecyclePlanner {
           )
         )
       }
-      if previousNode?.task != currentNode.task, let task = previousNode?.task {
+      let previousTasks = previousNode?.tasks ?? []
+      let currentTasks = currentNode.tasks
+      for task in previousTasks where !currentTasks.contains(task) {
         taskCancels.append(
           .init(
             viewNodeID: currentNode.viewNodeID,
@@ -240,7 +242,7 @@ enum ViewGraphLifecyclePlanner {
           )
         )
       }
-      if previousNode?.task != currentNode.task, let task = currentNode.task {
+      for task in currentTasks where !previousTasks.contains(task) {
         taskStarts.append(
           .init(
             viewNodeID: currentNode.viewNodeID,

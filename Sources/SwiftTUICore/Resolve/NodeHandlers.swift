@@ -23,7 +23,7 @@ package struct NodeHandlers {
   package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
   package var scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot]
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
-  package var taskRegistrations: [Identity: TaskRegistration]
+  package var taskRegistrations: [Identity: [TaskRegistration]]
   package var taskRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
   package var commandRegistrations: CommandRegistrySnapshot
@@ -53,7 +53,7 @@ package struct NodeHandlers {
     focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
     scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
-    taskRegistrations: [Identity: TaskRegistration] = [:],
+    taskRegistrations: [Identity: [TaskRegistration]] = [:],
     taskRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = [],
     commandRegistrations: CommandRegistrySnapshot = .init(),
@@ -280,7 +280,15 @@ package struct NodeHandlers {
     registration: TaskRegistration
   ) {
     taskRegistrationOwners[identity] = .current(identity: identity)
-    taskRegistrations[identity] = registration
+    var identityRegistrations = taskRegistrations[identity] ?? []
+    if let index = identityRegistrations.firstIndex(where: {
+      $0.descriptor.id == registration.descriptor.id
+    }) {
+      identityRegistrations[index] = registration
+    } else {
+      identityRegistrations.append(registration)
+    }
+    taskRegistrations[identity] = identityRegistrations
   }
 
   package mutating func recordPreferenceObservation(

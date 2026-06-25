@@ -5140,7 +5140,7 @@ private struct LifecycleRuntimeProbe: PrimitiveView, ResolvableView {
     node.lifecycleMetadata = .init(
       appearHandlerIDs: [appearHandlerID],
       disappearHandlerIDs: [disappearHandlerID],
-      task: descriptor
+      tasks: [descriptor]
     )
     if focusable {
       node.semanticMetadata = node.semanticMetadata.merging(
@@ -5184,7 +5184,7 @@ private struct ScrollLifecycleRuntimeProbe: PrimitiveView, ResolvableView {
     node.lifecycleMetadata = .init(
       appearHandlerIDs: [appearHandlerID],
       disappearHandlerIDs: [disappearHandlerID],
-      task: descriptor
+      tasks: [descriptor]
     )
     return [node]
   }

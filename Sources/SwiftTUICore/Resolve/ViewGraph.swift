@@ -211,7 +211,7 @@ package final class ViewGraph {
     get { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner }
     set { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner = newValue }
   }
-  private var taskDescriptorNodeSlots: [ViewNodeID: TaskDescriptorIdentitySlot] {
+  private var taskDescriptorNodeSlots: [TaskDescriptorSlotKey: TaskDescriptorIdentitySlot] {
     get { taskDescriptors.taskDescriptorNodeSlots }
     set { taskDescriptors.taskDescriptorNodeSlots = newValue }
   }
@@ -429,7 +429,11 @@ package final class ViewGraph {
       lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
       lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
       lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
-      taskDescriptorNodeSlots: taskDescriptorNodeSlots.mapValues(\.label),
+      taskDescriptorNodeSlots: Dictionary(
+        uniqueKeysWithValues: taskDescriptorNodeSlots.map { key, slot in
+          ("\(key.node.rawValue)#\(key.ordinal)", slot.label)
+        }
+      ),
       nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
       stateSlotDependents: stateSlotDependents,
       environmentDependents: debugObjectDependencySnapshot(environmentDependents),
@@ -911,20 +915,24 @@ package final class ViewGraph {
 
   package func taskDescriptorIdentityLabel<ID: Equatable>(
     for identity: Identity,
+    ordinal: Int,
     value: ID
   ) -> String {
     let viewNodeID = nodeForIdentity(for: identity).viewNodeID
     return taskDescriptorIdentityLabel(
       for: viewNodeID,
+      ordinal: ordinal,
       value: value
     )
   }
 
   package func taskDescriptorIdentityLabel<ID: Equatable>(
     for viewNodeID: ViewNodeID,
+    ordinal: Int,
     value: ID
   ) -> String {
-    if let slot = taskDescriptorNodeSlots[viewNodeID],
+    let key = TaskDescriptorSlotKey(node: viewNodeID, ordinal: ordinal)
+    if let slot = taskDescriptorNodeSlots[key],
       slot.matches(value)
     {
       return slot.label
@@ -933,7 +941,7 @@ package final class ViewGraph {
     recordCheckpointGraphMutation()
     nextTaskDescriptorIdentityToken &+= 1
     let label = "id:\(nextTaskDescriptorIdentityToken)"
-    taskDescriptorNodeSlots[viewNodeID] = TaskDescriptorIdentitySlot(
+    taskDescriptorNodeSlots[key] = TaskDescriptorIdentitySlot(
       label: label,
       value: value
     )
@@ -1180,30 +1188,29 @@ package final class ViewGraph {
     let didChangeResolvedIdentity = previousResolvedIdentity != node.resolvedIdentity
 
     if node.wasPresentAtFrameStart {
-      if let previousTask = node.previousLifecycleMetadata.task,
-        previousTask != node.lifecycleMetadata.task,
-        emitsOwnLifecycleEvents
-      {
-        let removedTaskAcrossResolvedIdentityChange =
-          didChangeResolvedIdentity && node.lifecycleMetadata.task == nil
-        if !didChangeResolvedIdentity || removedTaskAcrossResolvedIdentityChange {
-          appendTaskCancelEvent(
-            identity: removedTaskAcrossResolvedIdentityChange
-              ? node.resolvedIdentity : previousResolvedIdentity,
-            task: previousTask,
-            isStructural: false
-          )
+      if emitsOwnLifecycleEvents {
+        let previousTasks = node.previousLifecycleMetadata.tasks
+        let currentTasks = node.lifecycleMetadata.tasks
+        let removedAllTasksAcrossResolvedIdentityChange =
+          didChangeResolvedIdentity && currentTasks.isEmpty
+        for previousTask in previousTasks where !currentTasks.contains(previousTask) {
+          if !didChangeResolvedIdentity || removedAllTasksAcrossResolvedIdentityChange {
+            appendTaskCancelEvent(
+              identity: removedAllTasksAcrossResolvedIdentityChange
+                ? node.resolvedIdentity : previousResolvedIdentity,
+              task: previousTask,
+              isStructural: false
+            )
+          }
         }
-      }
-      if let currentTask = node.lifecycleMetadata.task,
-        currentTask != node.previousLifecycleMetadata.task,
-        emitsOwnLifecycleEvents,
-        !didChangeResolvedIdentity
-      {
-        appendTaskStartEvent(
-          identity: node.resolvedIdentity,
-          task: currentTask
-        )
+        if !didChangeResolvedIdentity {
+          for currentTask in currentTasks where !previousTasks.contains(currentTask) {
+            appendTaskStartEvent(
+              identity: node.resolvedIdentity,
+              task: currentTask
+            )
+          }
+        }
       }
       node.setLifecycleState(.alive)
     } else {
@@ -1217,13 +1224,13 @@ package final class ViewGraph {
           )
         )
       }
-      if emitsOwnLifecycleEvents,
-        let task = node.lifecycleMetadata.task
-      {
-        appendTaskStartEvent(
-          identity: node.resolvedIdentity,
-          task: task
-        )
+      if emitsOwnLifecycleEvents {
+        for task in node.lifecycleMetadata.tasks {
+          appendTaskStartEvent(
+            identity: node.resolvedIdentity,
+            task: task
+          )
+        }
       }
       node.setLifecycleState(.appearing)
     }
@@ -1420,40 +1427,39 @@ package final class ViewGraph {
           )
         )
       }
-      if emitsOwnLifecycleEvents,
-        let task = node.lifecycleMetadata.task
-      {
-        appendTaskStartEvent(
-          identity: node.resolvedIdentity,
-          task: task
-        )
-      }
-      node.setLifecycleState(.appearing)
-    } else {
-      if let previousTask = node.previousLifecycleMetadata.task,
-        previousTask != node.lifecycleMetadata.task,
-        emitsOwnLifecycleEvents
-      {
-        let removedTaskAcrossResolvedIdentityChange =
-          didChangeResolvedIdentity && node.lifecycleMetadata.task == nil
-        if !didChangeResolvedIdentity || removedTaskAcrossResolvedIdentityChange {
-          appendTaskCancelEvent(
-            identity: removedTaskAcrossResolvedIdentityChange
-              ? node.resolvedIdentity : previousResolvedIdentity,
-            task: previousTask,
-            isStructural: false
+      if emitsOwnLifecycleEvents {
+        for task in node.lifecycleMetadata.tasks {
+          appendTaskStartEvent(
+            identity: node.resolvedIdentity,
+            task: task
           )
         }
       }
-      if let currentTask = node.lifecycleMetadata.task,
-        currentTask != node.previousLifecycleMetadata.task,
-        emitsOwnLifecycleEvents,
-        !didChangeResolvedIdentity
-      {
-        appendTaskStartEvent(
-          identity: node.resolvedIdentity,
-          task: currentTask
-        )
+      node.setLifecycleState(.appearing)
+    } else {
+      if emitsOwnLifecycleEvents {
+        let previousTasks = node.previousLifecycleMetadata.tasks
+        let currentTasks = node.lifecycleMetadata.tasks
+        let removedAllTasksAcrossResolvedIdentityChange =
+          didChangeResolvedIdentity && currentTasks.isEmpty
+        for previousTask in previousTasks where !currentTasks.contains(previousTask) {
+          if !didChangeResolvedIdentity || removedAllTasksAcrossResolvedIdentityChange {
+            appendTaskCancelEvent(
+              identity: removedAllTasksAcrossResolvedIdentityChange
+                ? node.resolvedIdentity : previousResolvedIdentity,
+              task: previousTask,
+              isStructural: false
+            )
+          }
+        }
+        if !didChangeResolvedIdentity {
+          for currentTask in currentTasks where !previousTasks.contains(currentTask) {
+            appendTaskStartEvent(
+              identity: node.resolvedIdentity,
+              task: currentTask
+            )
+          }
+        }
       }
       node.setLifecycleState(.alive)
     }
@@ -2331,14 +2337,14 @@ package final class ViewGraph {
 
     let emitsOwnLifecycleEvents = node.participatesInStructuralLifecycle
 
-    if emitsOwnLifecycleEvents,
-      let task = lifecycleMetadata.task
-    {
-      appendTaskCancelEvent(
-        identity: snapshot.identity,
-        task: task,
-        isStructural: true
-      )
+    if emitsOwnLifecycleEvents {
+      for task in lifecycleMetadata.tasks {
+        appendTaskCancelEvent(
+          identity: snapshot.identity,
+          task: task,
+          isStructural: true
+        )
+      }
     }
     if emitsOwnLifecycleEvents,
       !lifecycleMetadata.disappearHandlerIDs.isEmpty
@@ -2379,7 +2385,7 @@ package final class ViewGraph {
     if nodeIDsByStructuralPath[node.committed.structuralPath]?.isEmpty == true {
       nodeIDsByStructuralPath.removeValue(forKey: node.committed.structuralPath)
     }
-    taskDescriptorNodeSlots.removeValue(forKey: node.viewNodeID)
+    taskDescriptorNodeSlots = taskDescriptorNodeSlots.filter { $0.key.node != node.viewNodeID }
     if nodeIDByIdentity[node.identity] == node.viewNodeID {
       nodeIDByIdentity.removeValue(forKey: node.identity)
     }

@@ -32,7 +32,7 @@ extension ViewGraph {
     package var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
     package var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
     package var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]
-    package var taskDescriptorNodeSlots: [ViewNodeID: String]
+    package var taskDescriptorNodeSlots: [String: String]
     package var nextTaskDescriptorIdentityToken: UInt64
     package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
     package var environmentDependents: [ObjectDependencySnapshot]

@@ -199,20 +199,22 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
 }
 
 private struct TaskLifecycleDescriptorIdentity {
-  private let label: @MainActor (ResolveContext, Identity) -> String
+  private let label: @MainActor (ResolveContext, Identity, Int) -> String
 
   @MainActor
   init<ID: Equatable>(_ value: ID) {
-    label = { context, identity in
+    label = { context, identity, ordinal in
       if let viewGraph = context.viewGraph {
         if let viewNodeID = ViewNodeContext.current?.viewNodeID {
           return viewGraph.taskDescriptorIdentityLabel(
             for: viewNodeID,
+            ordinal: ordinal,
             value: value
           )
         }
         return viewGraph.taskDescriptorIdentityLabel(
           for: identity,
+          ordinal: ordinal,
           value: value
         )
       }
@@ -223,9 +225,10 @@ private struct TaskLifecycleDescriptorIdentity {
   @MainActor
   func descriptorLabel(
     in context: ResolveContext,
-    identity: Identity
+    identity: Identity,
+    ordinal: Int
   ) -> String {
-    label(context, identity)
+    label(context, identity, ordinal)
   }
 }
 
@@ -256,16 +259,24 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
       for: lifecycleIdentity,
       in: context
     )
+    let ownerNode = context.viewGraph?.nodeForIdentity(lifecycleIdentity)
+    let taskOrdinal = ownerNode?.claimTaskModifierOrdinal() ?? 0
     let descriptorIdentityLabel = descriptorIdentity?.descriptorLabel(
       in: context,
-      identity: lifecycleIdentity
+      identity: lifecycleIdentity,
+      ordinal: taskOrdinal
     )
-    let descriptor = TaskDescriptor(
-      id: descriptorIdentityLabel.map {
-        "\(lifecycleIdentity)#task[\($0)]"
-      } ?? "\(lifecycleIdentity)#task",
-      priority: priority
-    )
+    let descriptorID =
+      if let label = descriptorIdentityLabel {
+        taskOrdinal == 0
+          ? "\(lifecycleIdentity)#task[\(label)]"
+          : "\(lifecycleIdentity)#task[\(taskOrdinal):\(label)]"
+      } else {
+        taskOrdinal == 0
+          ? "\(lifecycleIdentity)#task"
+          : "\(lifecycleIdentity)#task[\(taskOrdinal)]"
+      }
+    let descriptor = TaskDescriptor(id: descriptorID, priority: priority)
     if let taskRegistry = context.localTaskRegistry {
       taskRegistry.register(
         identity: lifecycleIdentity,
@@ -280,7 +291,7 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
       )
     }
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
-      .init(task: descriptor)
+      .init(tasks: [descriptor])
     )
     return [node]
   }

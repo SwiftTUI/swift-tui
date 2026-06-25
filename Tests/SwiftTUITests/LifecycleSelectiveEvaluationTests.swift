@@ -36,7 +36,7 @@ struct LifecycleSelectiveEvaluationTests {
       id: "\(initialNode.identity)#task[id:1]",
       priority: .userInitiated
     )
-    #expect(initialNode.lifecycleMetadata.task == expectedTask)
+    #expect(initialNode.lifecycleMetadata.tasks == [expectedTask])
     #expect(taskRegistry.registration(for: initialNode.identity)?.descriptor == expectedTask)
 
     invalidator.clear()
@@ -62,7 +62,7 @@ struct LifecycleSelectiveEvaluationTests {
     )
 
     #expect(updatedNode.identity == initialNode.identity)
-    #expect(updatedNode.lifecycleMetadata.task == expectedTask)
+    #expect(updatedNode.lifecycleMetadata.tasks == [expectedTask])
     #expect(taskRegistry.registration(for: updatedNode.identity)?.descriptor == expectedTask)
     #expect(updatedArtifacts.commitPlan.lifecycle.isEmpty)
   }

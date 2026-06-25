@@ -3,7 +3,7 @@ package struct LifecycleStateNode: Equatable, Sendable {
   var identity: Identity
   var appearHandlerIDs: [String]
   var disappearHandlerIDs: [String]
-  var task: TaskDescriptor?
+  var tasks: [TaskDescriptor]
 }
 
 package enum ViewportLifecycleKey: Hashable, Sendable {
@@ -145,7 +145,18 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
   }
 }
 
-/// Retained `.task(id:)` comparison state for one lifecycle identity.
+/// Identifies one `.task`/`.task(id:)` modifier's comparison slot.
+package struct TaskDescriptorSlotKey: Hashable {
+  package let node: ViewNodeID
+  package let ordinal: Int
+
+  package init(node: ViewNodeID, ordinal: Int) {
+    self.node = node
+    self.ordinal = ordinal
+  }
+}
+
+/// Retained `.task(id:)` comparison state for one task-modifier slot.
 ///
 /// The slot lives on the main-actor view graph, so it can compare the authored
 /// `ID: Equatable` value without requiring `ID: Sendable` or deriving identity

@@ -30,7 +30,7 @@ package final class LifecycleCoordinator {
     previousLifecycleHandlers = .init()
   }
 
-  package var activeTaskDescriptors: [Identity: TaskDescriptor] {
+  package var activeTaskDescriptors: [Identity: [TaskDescriptor]] {
     taskRunner.activeTaskDescriptors
   }
 
@@ -57,8 +57,10 @@ package final class LifecycleCoordinator {
         currentLifecycleRegistry.changeHandler(for: handlerID)?()
       }
     case .taskStart(let descriptor):
-      guard let registration = currentTaskRegistry.registration(for: entry.identity),
-        registration.descriptor == descriptor,
+      guard let registration = currentTaskRegistry.registration(
+        for: entry.identity,
+        descriptor: descriptor
+      ),
         let viewNodeID = entry.viewNodeID
       else {
         return

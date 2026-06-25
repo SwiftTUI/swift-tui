@@ -989,9 +989,9 @@ struct RuntimeRegistrationRestoreScopingTests {
   }
 
   private func taskDescriptors(
-    _ registrations: [Identity: TaskRegistration]
-  ) -> [Identity: TaskDescriptor] {
-    registrations.mapValues(\.descriptor)
+    _ registrations: [Identity: [TaskRegistration]]
+  ) -> [Identity: [TaskDescriptor]] {
+    registrations.mapValues { $0.map(\.descriptor) }
   }
 
   private func preferenceHandlerIDs(
