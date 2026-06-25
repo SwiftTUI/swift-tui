@@ -132,9 +132,12 @@ public struct BooleanNavigationDestinationModifier<Destination: View>: Primitive
     let instance = activationOrdinal.map { ordinal in
       NavigationDestinationInstance(
         identity: declarationIdentity.child("Activation[\(ordinal)]"),
-        payload: PortalContentPayload(authoringContext: destinationAuthoringContext) {
-          destination
-        },
+        payload: NavigationDestinationPayload(
+          navigationDestination: PortalContentPayload(authoringContext: destinationAuthoringContext) {
+            destination
+          },
+          declarationIdentity: declarationIdentity
+        ),
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
@@ -197,9 +200,12 @@ where Item.ID: Sendable {
             .child("Item")
             .explicitID(currentItem.id)
             .child("Activation[\(activationOrdinal)]"),
-          payload: PortalContentPayload(authoringContext: destinationAuthoringContext) {
-            destination(currentItem)
-          },
+          payload: NavigationDestinationPayload(
+            navigationDestination: PortalContentPayload(authoringContext: destinationAuthoringContext) {
+              destination(currentItem)
+            },
+            declarationIdentity: declarationIdentity
+          ),
           dismiss: { [item, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
             withAuthoringContext(dismissAuthoringContext) {
               item.wrappedValue = nil

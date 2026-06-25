@@ -190,6 +190,49 @@ package func deferredDeclaredBuilderChildren<V: View>(
 }
 
 @MainActor
+package func appendLazyDeclaredBuilderChildren<V: View>(
+  from view: V,
+  debugName: String,
+  origin: LazySubviewPayloadOrigin = .tabBody,
+  lifecyclePolicy: LazySubviewLifecyclePolicy = .activeOnly,
+  into children: inout [LazySubviewPayload]
+) {
+  var deferredChildren: [DeferredViewPayload] = []
+  appendDeferredDeclaredBuilderChildren(
+    from: view,
+    into: &deferredChildren
+  )
+  children.append(
+    contentsOf: deferredChildren.map {
+      LazySubviewPayload(
+        debugName: debugName,
+        origin: origin,
+        lifecyclePolicy: lifecyclePolicy,
+        storage: .deferred($0)
+      )
+    }
+  )
+}
+
+@MainActor
+package func lazyDeclaredBuilderChildren<V: View>(
+  from view: V,
+  debugName: String,
+  origin: LazySubviewPayloadOrigin = .tabBody,
+  lifecyclePolicy: LazySubviewLifecyclePolicy = .activeOnly
+) -> [LazySubviewPayload] {
+  var children: [LazySubviewPayload] = []
+  appendLazyDeclaredBuilderChildren(
+    from: view,
+    debugName: debugName,
+    origin: origin,
+    lifecyclePolicy: lifecyclePolicy,
+    into: &children
+  )
+  return children
+}
+
+@MainActor
 package func resolveViewElements<V: View>(
   _ view: V,
   in context: ResolveContext

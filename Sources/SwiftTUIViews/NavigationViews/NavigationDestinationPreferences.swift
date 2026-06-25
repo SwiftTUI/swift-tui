@@ -61,12 +61,12 @@ package enum NavigationDestinationDeclarationPreferenceKey: PreferenceKey {
 @MainActor
 package struct NavigationDestinationInstance: Sendable {
   package var identity: Identity
-  package var payload: PortalContentPayload
+  package var payload: NavigationDestinationPayload
   package var dismiss: @MainActor @Sendable () -> Void
 
   package init(
     identity: Identity,
-    payload: PortalContentPayload,
+    payload: NavigationDestinationPayload,
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
     self.identity = identity

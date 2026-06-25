@@ -30,7 +30,7 @@ extension TabView {
   private struct TabOption: Sendable {
     var tag: SelectionTag
     var label: TabItemLabel
-    var contentPayload: DeferredViewPayload?
+    var contentPayload: LazySubviewPayload?
   }
 
   private func resolvedNode(
@@ -406,8 +406,11 @@ extension TabView {
     // selects them.
     var peekedEntries: [PeekedTabChildMetadata] = []
     var resolveClosures: [() -> ResolvedNode] = []
-    let declaredContentPayloads = deferredDeclaredBuilderChildren(from: content)
-    var contentPayloads: [DeferredViewPayload?] = []
+    let declaredContentPayloads = lazyDeclaredBuilderChildren(
+      from: content,
+      debugName: "TabBody"
+    )
+    var contentPayloads: [LazySubviewPayload?] = []
     var nextIndex = 0
     let childContext = context.child(component: .named("TabOptions"))
     enumerateDeclaredChildViews(

@@ -330,11 +330,11 @@ public struct TabViewStyleConfiguration: Sendable {
 public struct TabViewStyleBodyConfiguration: Sendable {
   public struct Content: PrimitiveView, ResolvableView, Sendable {
     package var activeContentIndex: Int?
-    package var payload: DeferredViewPayload?
+    package var payload: LazySubviewPayload?
 
     package init(
       activeContentIndex: Int?,
-      payload: DeferredViewPayload?
+      payload: LazySubviewPayload?
     ) {
       self.activeContentIndex = activeContentIndex
       self.payload = payload
@@ -348,9 +348,8 @@ public struct TabViewStyleBodyConfiguration: Sendable {
       }
 
       // Keep the style-owned content slot transparent while preserving the
-      // deferred payload boundary that owns active-tab lifecycle and state.
-      let child = resolveView(
-        DeferredPayloadView(payload: payload),
+      // lazy payload boundary that owns active-tab lifecycle and state.
+      let child = payload.resolve(
         in: context.indexedChild(
           kind: .init(rawValue: "TabContentPayload"),
           index: activeContentIndex ?? 0
