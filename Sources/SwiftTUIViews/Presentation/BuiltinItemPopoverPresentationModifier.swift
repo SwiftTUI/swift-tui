@@ -48,7 +48,11 @@ package struct BuiltinItemPopoverPresentationModifier<
         arrowEdge: arrowEdge,
         modalPolicy: .disablesBaseInteraction,
         contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
-          portalDeclaredBuilderChildren(from: popoverContent(currentItem))
+          portalAttachmentDeclaredBuilderChildren(
+            from: popoverContent(currentItem),
+            portalEntryID: portalEntryID,
+            modalPolicy: .disablesBaseInteraction
+          )
         },
         dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
@@ -137,7 +141,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         modalPolicy: tipActions.isEmpty ? .nonModal : .disablesBaseInteraction,
-        contentPayloads: portalDeclaredBuilderChildren(
+        contentPayloads: portalAttachmentDeclaredBuilderChildren(
           from: PopoverTipContent(
             title: tip.title,
             message: tip.message,
@@ -145,7 +149,9 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
             actions: tipActions,
             action: performAction,
             dismiss: dismiss
-          )
+          ),
+          portalEntryID: portalEntryID,
+          modalPolicy: tipActions.isEmpty ? .nonModal : .disablesBaseInteraction
         ),
         dismiss: dismiss
       )
@@ -270,6 +276,7 @@ private struct PopoverPlacementLayout: Layout {
   }
 }
 
+@MainActor
 func popoverPresentationItem(
   id: String,
   portalEntryID: PortalEntryID,
@@ -277,7 +284,7 @@ func popoverPresentationItem(
   attachmentAnchor: PopoverAttachmentAnchor,
   arrowEdge: Edge?,
   modalPolicy: PortalModalPolicy,
-  contentPayloads: [PortalContentPayload],
+  contentPayloads: [PortalAttachmentPayload],
   dismiss: @escaping @MainActor @Sendable () -> Void
 ) -> PopoverPresentationItem {
   let surfaceItem = PromptPresentationItem(

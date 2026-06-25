@@ -70,16 +70,29 @@ package struct PortalAttachmentPayload: Sendable {
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     payload.resolve(in: context)
   }
+
+  package func attachingEdgeIfMissing(
+    _ edge: PortalAttachmentEdge
+  ) -> PortalAttachmentPayload {
+    guard self.edge == nil else {
+      return self
+    }
+    var copy = self
+    copy.edge = edge
+    return copy
+  }
 }
 
 @MainActor
-package struct PortalPayloadView: PrimitiveView, ResolvableView {
-  package var payload: PortalContentPayload
+package struct PortalAttachmentView: PrimitiveView, ResolvableView {
+  package var payload: PortalAttachmentPayload
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [payload.resolve(in: context)]
   }
 }
+
+package typealias PortalPayloadView = PortalAttachmentView
 
 @MainActor
 package func appendPortalDeclaredBuilderChildren<V: View>(
@@ -113,9 +126,58 @@ package func portalDeclaredBuilderChildren<V: View>(
 }
 
 @MainActor
-package struct PortalPayloadGroupView: PrimitiveView, ResolvableView {
+package func appendPortalAttachmentDeclaredBuilderChildren<V: View>(
+  from view: V,
+  edge: PortalAttachmentEdge?,
+  into children: inout [PortalAttachmentPayload]
+) {
+  var contentPayloads: [PortalContentPayload] = []
+  appendPortalDeclaredBuilderChildren(
+    from: view,
+    into: &contentPayloads
+  )
+  children.append(
+    contentsOf: contentPayloads.map {
+      PortalAttachmentPayload($0, edge: edge)
+    }
+  )
+}
+
+@MainActor
+package func portalAttachmentDeclaredBuilderChildren<V: View>(
+  from view: V,
+  edge: PortalAttachmentEdge?
+) -> [PortalAttachmentPayload] {
+  var children: [PortalAttachmentPayload] = []
+  appendPortalAttachmentDeclaredBuilderChildren(
+    from: view,
+    edge: edge,
+    into: &children
+  )
+  return children
+}
+
+@MainActor
+package func portalAttachmentDeclaredBuilderChildren<V: View>(
+  from view: V,
+  portalEntryID: PortalEntryID,
+  modalPolicy: PortalModalPolicy? = nil,
+  lifecycleActiveWhileHidden: Bool = true
+) -> [PortalAttachmentPayload] {
+  portalAttachmentDeclaredBuilderChildren(
+    from: view,
+    edge: PortalAttachmentEdge(
+      portalEntryID: portalEntryID,
+      modalPolicy: modalPolicy,
+      lifecycleActiveWhileHidden: lifecycleActiveWhileHidden
+    )
+  )
+}
+
+@MainActor
+package struct PortalAttachmentGroupView: PrimitiveView, ResolvableView {
   package var kindName: String
-  package var payloads: [PortalContentPayload]
+  package var payloads: [PortalAttachmentPayload]
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     switch payloads.count {
@@ -124,13 +186,13 @@ package struct PortalPayloadGroupView: PrimitiveView, ResolvableView {
     case 1:
       return [
         resolveView(
-          PortalPayloadView(payload: payloads[0]),
+          PortalAttachmentView(payload: payloads[0]),
           in: context
         )
       ]
     default:
       return [
-        resolvePortalGroupElements(
+        resolvePortalAttachmentGroupElements(
           kindName: kindName,
           payloads: payloads,
           in: context
@@ -140,16 +202,18 @@ package struct PortalPayloadGroupView: PrimitiveView, ResolvableView {
   }
 }
 
+package typealias PortalPayloadGroupView = PortalAttachmentGroupView
+
 @MainActor
-private func resolvePortalGroupElements(
+private func resolvePortalAttachmentGroupElements(
   kindName: String = "Group",
-  payloads: [PortalContentPayload],
+  payloads: [PortalAttachmentPayload],
   in context: ResolveContext
 ) -> ResolvedNode {
   context.recordResolvedComputation()
   let resolvedChildren = payloads.enumerated().map { index, payload in
     resolveView(
-      PortalPayloadView(payload: payload),
+      PortalAttachmentView(payload: payload),
       in: context.indexedChild(
         kind: .init(rawValue: kindName),
         index: index

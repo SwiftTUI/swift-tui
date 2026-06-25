@@ -92,6 +92,28 @@ struct OverlayStackTests {
     #expect(ownerEdge.token == "sheet")
   }
 
+  @Test("portal attachment payloads carry source edge metadata")
+  func portalAttachmentPayloadsCarrySourceEdgeMetadata() throws {
+    let portalEntryID = PortalEntryID(
+      sourceIdentity: testIdentity("Scene", "Owner"),
+      sourceStructuralPath: StructuralPath(identity: testIdentity("Scene", "Owner")),
+      sourceEntityIdentity: EntityIdentity("owner"),
+      token: "popover"
+    )
+
+    let payloads = portalAttachmentDeclaredBuilderChildren(
+      from: Text("Attached"),
+      portalEntryID: portalEntryID,
+      modalPolicy: .nonModal,
+      lifecycleActiveWhileHidden: false
+    )
+    let edge = try #require(payloads.first?.edge)
+
+    #expect(edge.portalEntryID == portalEntryID)
+    #expect(edge.modalPolicy == .nonModal)
+    #expect(!edge.lifecycleActiveWhileHidden)
+  }
+
   private func overlayEntry(
     id: String,
     portalEntryID: PortalEntryID? = nil,
@@ -110,7 +132,7 @@ struct OverlayStackTests {
       modalPolicy: id == "top" ? .disablesBaseInteraction : .nonModal,
       acceptsEscape: true,
       dismiss: {},
-      payload: PortalContentPayload {
+      payload: PortalAttachmentPayload {
         Text(id)
       }
     )

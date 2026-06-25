@@ -215,7 +215,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         VStack(alignment: .leading, spacing: 0) {
           if !item.messagePayloads.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-              PortalPayloadGroupView(
+              PortalAttachmentGroupView(
                 kindName: "PresentationMessage",
                 payloads: item.messagePayloads
               )
@@ -238,7 +238,7 @@ package struct PromptPresentationSurface: View, ActionScope {
   private var contentBody: some View {
     ScrollView(.vertical) {
       VStack(alignment: .leading, spacing: 0) {
-        PortalPayloadGroupView(
+        PortalAttachmentGroupView(
           kindName: "PresentationContent",
           payloads: item.contentPayloads
         )
@@ -259,15 +259,15 @@ package struct PromptPresentationSurface: View, ActionScope {
   /// `scrollMaxHeight` from the descriptor is ignored intentionally so
   /// short menus don't reserve extra empty rows below their last item.
   ///
-  /// Iterates payloads via `ForEach` + per-item `PortalPayloadView`
-  /// rather than `PortalPayloadGroupView`. The group view returns a
+  /// Iterates payloads via `ForEach` + per-item `PortalAttachmentView`
+  /// rather than `PortalAttachmentGroupView`. The group view returns a
   /// single intrinsic-layout node when there are multiple payloads,
   /// which would let menu items overlap in one row. Iterating gives
   /// the VStack its own children to lay out vertically.
   private var menuContentBody: some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(item.contentPayloads.indices, id: \.self) { index in
-        PortalPayloadView(payload: item.contentPayloads[index])
+        PortalAttachmentView(payload: item.contentPayloads[index])
       }
     }
   }
@@ -275,7 +275,7 @@ package struct PromptPresentationSurface: View, ActionScope {
   private var presentationActions: some View {
     HStack(spacing: 1) {
       ForEach(item.actionPayloads.indices, id: \.self) { index in
-        PortalPayloadView(payload: item.actionPayloads[index])
+        PortalAttachmentView(payload: item.actionPayloads[index])
           .fixedSize()
       }
     }

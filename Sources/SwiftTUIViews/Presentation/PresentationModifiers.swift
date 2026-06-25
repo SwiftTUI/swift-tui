@@ -30,10 +30,16 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
         title: title,
         descriptor: spec.descriptor,
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
-          portalDeclaredBuilderChildren(from: actions)
+          portalAttachmentDeclaredBuilderChildren(
+            from: actions,
+            portalEntryID: portalEntryID
+          )
         },
         messagePayloads: withAuthoringContext(messageAuthoringContext) {
-          portalDeclaredBuilderChildren(from: message)
+          portalAttachmentDeclaredBuilderChildren(
+            from: message,
+            portalEntryID: portalEntryID
+          )
         },
         contentPayloads: [],
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
@@ -87,7 +93,10 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
-          portalDeclaredBuilderChildren(from: sheetContent)
+          portalAttachmentDeclaredBuilderChildren(
+            from: sheetContent,
+            portalEntryID: portalEntryID
+          )
         },
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
@@ -167,7 +176,10 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
-          portalDeclaredBuilderChildren(from: sheetContentBuilder(absorbed))
+          portalAttachmentDeclaredBuilderChildren(
+            from: sheetContentBuilder(absorbed),
+            portalEntryID: portalEntryID
+          )
         },
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {

@@ -455,11 +455,13 @@ private struct RenderTimePresentationMutationProbe: PrimitiveView, ResolvableVie
         ),
         title: "Illegal mutation",
         descriptor: spec.descriptor,
-        actionPayloads: portalDeclaredBuilderChildren(
-          from: Button("Dismiss") {}
+        actionPayloads: portalAttachmentDeclaredBuilderChildren(
+          from: Button("Dismiss") {},
+          edge: nil
         ),
-        messagePayloads: portalDeclaredBuilderChildren(
-          from: Text("Should never render.")
+        messagePayloads: portalAttachmentDeclaredBuilderChildren(
+          from: Text("Should never render."),
+          edge: nil
         ),
         contentPayloads: [],
         dismiss: {}

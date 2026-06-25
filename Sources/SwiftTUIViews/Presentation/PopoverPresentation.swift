@@ -102,7 +102,11 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
         arrowEdge: arrowEdge,
         modalPolicy: .disablesBaseInteraction,
         contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
-          portalDeclaredBuilderChildren(from: popoverContent)
+          portalAttachmentDeclaredBuilderChildren(
+            from: popoverContent,
+            portalEntryID: portalEntryID,
+            modalPolicy: .disablesBaseInteraction
+          )
         },
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {

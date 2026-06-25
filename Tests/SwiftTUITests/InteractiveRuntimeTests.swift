@@ -5460,11 +5460,13 @@ private struct ImperativeAlertPresentationHarnessView: View {
               id: "imperative-alert",
               title: "Imperative alert",
               descriptor: alertPromptPresentationSpec().descriptor,
-              actionPayloads: portalDeclaredBuilderChildren(
-                from: Button("Dismiss") {}
+              actionPayloads: portalAttachmentDeclaredBuilderChildren(
+                from: Button("Dismiss") {},
+                edge: nil
               ),
-              messagePayloads: portalDeclaredBuilderChildren(
-                from: Text("Presented after lifecycle commit.")
+              messagePayloads: portalAttachmentDeclaredBuilderChildren(
+                from: Text("Presented after lifecycle commit."),
+                edge: nil
               ),
               contentPayloads: [],
               dismiss: {}

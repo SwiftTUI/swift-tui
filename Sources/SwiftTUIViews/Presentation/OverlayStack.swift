@@ -8,7 +8,7 @@ package struct OverlayStackEntry: Sendable {
   package var modalPolicy: PortalModalPolicy
   package var acceptsEscape: Bool
   package var dismiss: (@MainActor @Sendable () -> Void)?
-  package var payload: PortalContentPayload
+  package var payload: PortalAttachmentPayload
 
   package init(
     id: String,
@@ -18,7 +18,7 @@ package struct OverlayStackEntry: Sendable {
     modalPolicy: PortalModalPolicy,
     acceptsEscape: Bool,
     dismiss: (@MainActor @Sendable () -> Void)?,
-    payload: PortalContentPayload
+    payload: PortalAttachmentPayload
   ) {
     self.id = id
     self.portalEntryID = portalEntryID

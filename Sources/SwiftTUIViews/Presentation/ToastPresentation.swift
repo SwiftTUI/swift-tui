@@ -271,7 +271,11 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     let item = ToastPresentationItem(
       id: portalEntryID.description,
       portalEntryID: portalEntryID,
-      contentPayloads: portalDeclaredBuilderChildren(from: toastContent),
+      contentPayloads: portalAttachmentDeclaredBuilderChildren(
+        from: toastContent,
+        portalEntryID: portalEntryID,
+        modalPolicy: .nonModal
+      ),
       presentation: style.presentation(for: ToastStyleConfiguration()),
       duration: duration,
       dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
@@ -333,7 +337,7 @@ private struct ToastPresentationView: View {
           .foregroundStyle(item.presentation.iconStyle)
       }
       VStack {
-        PortalPayloadGroupView(
+        PortalAttachmentGroupView(
           kindName: "ToastContent",
           payloads: item.contentPayloads
         )

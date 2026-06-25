@@ -110,7 +110,12 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
       modalPolicy: coordinator.modalPolicy(for: item),
       acceptsEscape: coordinator.dismissAction(for: item) != nil,
       dismiss: coordinator.dismissAction(for: item),
-      payload: PortalContentPayload {
+      payload: PortalAttachmentPayload(
+        edge: PortalAttachmentEdge(
+          portalEntryID: item.portalEntryID,
+          modalPolicy: coordinator.modalPolicy(for: item)
+        )
+      ) {
         coordinator.makeBody()
       }
     )

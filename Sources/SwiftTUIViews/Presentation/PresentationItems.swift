@@ -109,28 +109,31 @@ package struct PromptPresentationItem: PortalPresentationItem {
   package var portalEntryID: PortalEntryID
   package var title: String
   package var descriptor: PromptPresentationDescriptor
-  package var actionPayloads: [PortalContentPayload]
-  package var messagePayloads: [PortalContentPayload]
-  package var contentPayloads: [PortalContentPayload]
+  package var actionPayloads: [PortalAttachmentPayload]
+  package var messagePayloads: [PortalAttachmentPayload]
+  package var contentPayloads: [PortalAttachmentPayload]
   package var dismiss: @MainActor @Sendable () -> Void
 
+  @MainActor
   package init(
     id: String,
     portalEntryID: PortalEntryID? = nil,
     title: String,
     descriptor: PromptPresentationDescriptor,
-    actionPayloads: [PortalContentPayload],
-    messagePayloads: [PortalContentPayload],
-    contentPayloads: [PortalContentPayload],
+    actionPayloads: [PortalAttachmentPayload],
+    messagePayloads: [PortalAttachmentPayload],
+    contentPayloads: [PortalAttachmentPayload],
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
+    let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
+    let edge = PortalAttachmentEdge(portalEntryID: portalEntryID)
     self.id = id
-    self.portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
+    self.portalEntryID = portalEntryID
     self.title = title
     self.descriptor = descriptor
-    self.actionPayloads = actionPayloads
-    self.messagePayloads = messagePayloads
-    self.contentPayloads = contentPayloads
+    self.actionPayloads = actionPayloads.map { $0.attachingEdgeIfMissing(edge) }
+    self.messagePayloads = messagePayloads.map { $0.attachingEdgeIfMissing(edge) }
+    self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.dismiss = dismiss
   }
 }
@@ -166,22 +169,28 @@ package struct PopoverPresentationItem: PortalPresentationItem {
 package struct ToastPresentationItem: PortalPresentationItem {
   package var id: String
   package var portalEntryID: PortalEntryID
-  package var contentPayloads: [PortalContentPayload]
+  package var contentPayloads: [PortalAttachmentPayload]
   package var presentation: ToastStylePresentation
   package var duration: Double?
   package var dismiss: @MainActor @Sendable () -> Void
 
+  @MainActor
   package init(
     id: String,
     portalEntryID: PortalEntryID? = nil,
-    contentPayloads: [PortalContentPayload],
+    contentPayloads: [PortalAttachmentPayload],
     presentation: ToastStylePresentation,
     duration: Double?,
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
+    let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
+    let edge = PortalAttachmentEdge(
+      portalEntryID: portalEntryID,
+      modalPolicy: .nonModal
+    )
     self.id = id
-    self.portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
-    self.contentPayloads = contentPayloads
+    self.portalEntryID = portalEntryID
+    self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.presentation = presentation
     self.duration = duration
     self.dismiss = dismiss
