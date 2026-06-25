@@ -18,12 +18,12 @@ extension ViewModifier where Body == Never {
 @MainActor
 package struct ModifierContentInputs<Base: View> {
   package let base: Base
-  package let authoringContext: AuthoringContext?
+  package let authoringScope: CapturedSubviewScope?
 
   private func applyAuthoringContext<Result>(
     _ body: () -> Result
   ) -> Result {
-    withAuthoringContext(authoringContext) {
+    withAuthoringContext(authoringScope?.authoringContext) {
       body()
     }
   }
@@ -32,7 +32,7 @@ package struct ModifierContentInputs<Base: View> {
     in context: ResolveContext,
     _ body: () -> Result
   ) -> Result {
-    let rebased = authoringContext.map { scope in
+    let rebased = authoringScope?.authoringContext.map { scope in
       AuthoringContext(
         viewIdentity: context.identity,
         structuralIdentity: context.structuralPath.identityProjection,
@@ -92,11 +92,11 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Resolv
 
   package init<Base: View>(
     base: Base,
-    authoringContext: AuthoringContext?
+    authoringScope: CapturedSubviewScope?
   ) {
     let inputs = ModifierContentInputs(
       base: base,
-      authoringContext: authoringContext
+      authoringScope: authoringScope
     )
     resolveElementsClosure = { context in
       inputs.resolveElements(in: context)
@@ -115,13 +115,13 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Resolv
 public struct ModifiedContent<Content, Modifier> {
   public var content: Content
   public var modifier: Modifier
-  package var authoringContext: AuthoringContext?
+  package var authoringScope: CapturedSubviewScope
 
   @MainActor
   public init(content: Content, modifier: Modifier) {
     self.content = content
     self.modifier = modifier
-    authoringContext = makeDeferredAuthoringContext()
+    authoringScope = makeCapturedSubviewScope()
   }
 }
 
@@ -130,7 +130,7 @@ extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
     modifier.body(
       content: ViewModifierContent(
         base: content,
-        authoringContext: authoringContext
+        authoringScope: authoringScope
       )
     )
   }
@@ -149,7 +149,7 @@ extension ModifiedContent: ResolvableView where Content: View, Modifier: Primiti
     let authoringContext = dynamicPropertyAuthoringContext(for: context)
     let inputs = ModifierContentInputs(
       base: content,
-      authoringContext: self.authoringContext
+      authoringScope: authoringScope
     )
     return withAuthoringContext(authoringContext) {
       modifier.resolve(content: inputs, in: context)

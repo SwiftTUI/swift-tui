@@ -188,7 +188,7 @@ extension View {
         edge: edge,
         alignment: alignment,
         spacing: spacing,
-        insetAuthoringContext: makeDeferredAuthoringContext()
+        insetAuthoringScope: makeCapturedSubviewScope()
       )
     )
   }
@@ -237,7 +237,7 @@ extension View {
       OverlayModifier(
         overlay: content(),
         alignment: alignment,
-        overlayAuthoringContext: makeDeferredAuthoringContext()
+        overlayAuthoringScope: makeCapturedSubviewScope()
       )
     )
   }
@@ -250,7 +250,7 @@ extension View {
       BackgroundModifier(
         background: content(),
         alignment: alignment,
-        backgroundAuthoringContext: makeDeferredAuthoringContext()
+        backgroundAuthoringScope: makeCapturedSubviewScope()
       )
     )
   }

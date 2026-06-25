@@ -40,20 +40,20 @@ extension PickerStyle {
 
 public struct PickerStyleConfiguration: Sendable {
   public struct Label: View, Sendable {
-    package let payload: DeferredViewPayload
+    package let payload: CapturedSubviewPayload
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
       @ViewBuilder content: @escaping @MainActor () -> V
     ) {
-      payload = DeferredViewPayload(
+      payload = CapturedSubviewPayload(
         authoringContext: authoringContext,
         content: content
       )
     }
 
     public var body: some View {
-      DeferredPayloadView(payload: payload)
+      CapturedSubviewView(payload: payload)
     }
   }
 

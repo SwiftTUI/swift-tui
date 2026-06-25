@@ -7,7 +7,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   @State private var internalPosition = ScrollPosition.zero
   @State private var panAnchor: ScrollPanAnchor?
   private var explicitPosition: Binding<ScrollPosition>?
-  private let contentAuthoringScope: AuthoringContext?
+  private let contentAuthoringScope: CapturedSubviewScope
   private let interactionAuthoringScope: AuthoringContext?
   private var content: Content
   public var position: Binding<ScrollPosition> {
@@ -22,7 +22,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
     self.showsIndicators = showsIndicators
     explicitPosition = nil
     interactionAuthoringScope = currentAuthoringContext()
-    contentAuthoringScope = makeDeferredAuthoringContext()
+    contentAuthoringScope = makeCapturedSubviewScope()
     self.content = content()
   }
   public init(
@@ -35,7 +35,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
     self.showsIndicators = showsIndicators
     explicitPosition = position
     interactionAuthoringScope = currentAuthoringContext()
-    contentAuthoringScope = makeDeferredAuthoringContext()
+    contentAuthoringScope = makeCapturedSubviewScope()
     self.content = content()
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -144,7 +144,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           horizontalScrollIndicatorIdentity(for: context.identity)
         )
       }
-      let child = withAuthoringContext(contentAuthoringScope) {
+      let child = withAuthoringContext(contentAuthoringScope.authoringContext) {
         content.resolve(in: context.child(component: .named("ScrollContent")))
       }
       let indicatorFocusStyle =

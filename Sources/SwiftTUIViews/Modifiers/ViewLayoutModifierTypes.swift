@@ -103,20 +103,20 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
   package var edge: Edge
   package var alignment: Alignment
   package var spacing: Int
-  package var insetAuthoringContext: AuthoringContext?
+  package var insetAuthoringScope: CapturedSubviewScope
 
   package init(
     inset: Inset,
     edge: Edge,
     alignment: Alignment,
     spacing: Int,
-    insetAuthoringContext: AuthoringContext?
+    insetAuthoringScope: CapturedSubviewScope
   ) {
     self.inset = inset
     self.edge = edge
     self.alignment = alignment
     self.spacing = spacing
-    self.insetAuthoringContext = insetAuthoringContext
+    self.insetAuthoringScope = insetAuthoringScope
   }
 
   @inline(never)
@@ -130,7 +130,7 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
     )
     let insetNode = resolveStoredModifierView(
       inset,
-      authoringContext: insetAuthoringContext,
+      authoringScope: insetAuthoringScope,
       in: context.child(component: .named("inset"))
     )
     return [
@@ -333,16 +333,16 @@ public struct FlexibleFrameModifier: PrimitiveViewModifier {
 public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
   package var overlay: OverlayContent
   package var alignment: Alignment
-  package var overlayAuthoringContext: AuthoringContext?
+  package var overlayAuthoringScope: CapturedSubviewScope
 
   package init(
     overlay: OverlayContent,
     alignment: Alignment,
-    overlayAuthoringContext: AuthoringContext?
+    overlayAuthoringScope: CapturedSubviewScope
   ) {
     self.overlay = overlay
     self.alignment = alignment
-    self.overlayAuthoringContext = overlayAuthoringContext
+    self.overlayAuthoringScope = overlayAuthoringScope
   }
 
   package func resolve<Base: View>(
@@ -355,7 +355,7 @@ public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
     )
     let overlayNode = resolveStoredModifierView(
       overlay,
-      authoringContext: overlayAuthoringContext,
+      authoringScope: overlayAuthoringScope,
       in: context.child(component: .named("overlay"))
     )
     return [
@@ -384,10 +384,10 @@ private func resolveModifierContent<Base: View>(
 @MainActor
 private func resolveStoredModifierView<Content: View>(
   _ content: Content,
-  authoringContext: AuthoringContext?,
+  authoringScope: CapturedSubviewScope,
   in context: ResolveContext
 ) -> ResolvedNode {
-  withAuthoringContext(authoringContext) {
+  withAuthoringContext(authoringScope.authoringContext) {
     resolveView(content, in: context)
   }
 }
@@ -395,16 +395,16 @@ private func resolveStoredModifierView<Content: View>(
 public struct BackgroundModifier<BackgroundContent: View>: PrimitiveViewModifier {
   package var background: BackgroundContent
   package var alignment: Alignment
-  package var backgroundAuthoringContext: AuthoringContext?
+  package var backgroundAuthoringScope: CapturedSubviewScope
 
   package init(
     background: BackgroundContent,
     alignment: Alignment,
-    backgroundAuthoringContext: AuthoringContext?
+    backgroundAuthoringScope: CapturedSubviewScope
   ) {
     self.background = background
     self.alignment = alignment
-    self.backgroundAuthoringContext = backgroundAuthoringContext
+    self.backgroundAuthoringScope = backgroundAuthoringScope
   }
 
   package func resolve<Base: View>(
@@ -413,7 +413,7 @@ public struct BackgroundModifier<BackgroundContent: View>: PrimitiveViewModifier
   ) -> [ResolvedNode] {
     let backgroundNode = resolveStoredModifierView(
       background,
-      authoringContext: backgroundAuthoringContext,
+      authoringScope: backgroundAuthoringScope,
       in: context.child(component: .named("background"))
     )
     let baseNode = resolveModifierContent(
