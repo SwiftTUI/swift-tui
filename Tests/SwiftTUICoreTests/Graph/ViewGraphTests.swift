@@ -859,6 +859,73 @@ struct ViewGraphTests {
     #expect(unrelatedEvaluations == 0)
   }
 
+  @Test("precise observation firing spares same-object peer readers")
+  func preciseObservationFiringSparesPeerReaders() {
+    let previous = PreciseObservationFiringConfiguration.isEnabled
+    PreciseObservationFiringConfiguration.isEnabled = true
+    defer { PreciseObservationFiringConfiguration.isEnabled = previous }
+
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let triggeringIdentity = testIdentity("Root", "Triggering")
+    let peerIdentity = testIdentity("Root", "Peer")
+    let unrelatedIdentity = testIdentity("Root", "Unrelated")
+    let sharedObservable = DependencyObservableBox()
+    let unrelatedObservable = DependencyObservableBox()
+    let sharedObservableID = ObjectIdentifier(sharedObservable)
+    let unrelatedObservableID = ObjectIdentifier(unrelatedObservable)
+
+    seedDependencyGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      childIdentities: [triggeringIdentity, peerIdentity, unrelatedIdentity]
+    ) { identity, node in
+      switch identity {
+      case triggeringIdentity, peerIdentity:
+        node.recordObservableRead(sharedObservableID)
+      case unrelatedIdentity:
+        node.recordObservableRead(unrelatedObservableID)
+      default:
+        break
+      }
+    }
+
+    // Precondition: both readers share the object token, so the legacy union
+    // would dirty the peer too (see the characterization test above).
+    #expect(graph.observableDependentIdentities(for: sharedObservableID) == [triggeringIdentity, peerIdentity])
+
+    var rootEvaluations = 0
+    var triggeringEvaluations = 0
+    var peerEvaluations = 0
+    var unrelatedEvaluations = 0
+    graph.setRootEvaluator(rootIdentity: rootIdentity) {
+      rootEvaluations += 1
+    }
+    graph.setEvaluator(for: triggeringIdentity) {
+      triggeringEvaluations += 1
+    }
+    graph.setEvaluator(for: peerIdentity) {
+      peerEvaluations += 1
+    }
+    graph.setEvaluator(for: unrelatedIdentity) {
+      unrelatedEvaluations += 1
+    }
+
+    graph.beginFrame()
+    graph.invalidate([triggeringIdentity])
+    graph.queueDirtyForObservationChange(observedBy: triggeringIdentity)
+    let usedDirtyFrontier = graph.evaluateDirtyNodes()
+
+    #expect(usedDirtyFrontier)
+    #expect(rootEvaluations == 0)
+    // The genuine reader of the mutated property still re-resolves...
+    #expect(triggeringEvaluations == 1)
+    // ...but its same-object peer that read a *different* property is spared
+    // (legacy union would re-resolve it: peerEvaluations == 1).
+    #expect(peerEvaluations == 0)
+    #expect(unrelatedEvaluations == 0)
+  }
+
   @Test("characterization: observable environment fan-out uses object tokens")
   func observableEnvironmentInvalidationUsesObjectTokensSeparateFromEnvironmentKeys() {
     let graph = ViewGraph()

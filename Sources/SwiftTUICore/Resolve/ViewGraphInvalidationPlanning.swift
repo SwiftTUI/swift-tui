@@ -54,7 +54,14 @@ enum ViewGraphInvalidationPlanner {
     nodesByNodeID: [ViewNodeID: ViewNode],
     observableDependents: [ObjectIdentifier: Set<ViewNodeID>]
   ) -> Set<ViewNodeID> {
-    Set([viewNodeID]).union(
+    // Precise firing: the `withObservationTracking` onChange already fired for
+    // exactly the node that read the mutated property, so the firing node alone
+    // is the correct dirty set. Dropping the co-reader union stops a `\.hot`
+    // write from dirtying `\.cold`/`\.rare` peers on the same object token.
+    if PreciseObservationFiringConfiguration.isEnabled {
+      return Set([viewNodeID])
+    }
+    return Set([viewNodeID]).union(
       ViewGraphDependencyIndex.observableDependents(
         triggeredBy: viewNodeID,
         nodesByNodeID: nodesByNodeID,

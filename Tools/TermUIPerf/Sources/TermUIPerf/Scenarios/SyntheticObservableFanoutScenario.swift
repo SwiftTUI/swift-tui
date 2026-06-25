@@ -10,9 +10,17 @@ import Observation
 /// that expansion visible by mutating `hot` while many sibling readers observe
 /// `cold` or `rare` on the same model.
 ///
-/// The default `fanout` shape is the key-path indexing workload: after a hot
-/// mutation, future key-path-specific graph dependencies should recompute only
-/// hot readers while preserving unrelated-object isolation. The optional
+/// The default `fanout` shape reads each property as a **plain `body` read**
+/// (`model.hot`). Plain reads record no object token, so they already fire
+/// key-path precisely through Swift's Observation bridge and bypass SwiftTUI's
+/// object-token co-reader union entirely — this shape's recompute is therefore
+/// dominated by *structural* re-resolution of sibling cells, not observable
+/// fan-out. The `bindable-fanout` shape reads each property through a
+/// `@Bindable` projection (`$model.hot.wrappedValue`); the `@Bindable` subscript
+/// is one of the only two seams that record an object token, so these readers DO
+/// enter the co-reader union and a `hot` mutation expands to every `@Bindable`
+/// peer on the same model. That is the workload the object-token union narrowing
+/// (`SWIFTTUI_PRECISE_OBSERVATION_FIRING`) actually moves. The optional
 /// `large-body` shape is the sub-body memo workload: one view body reads the hot
 /// value and builds a large cold payload, so key-path fan-out alone cannot avoid
 /// the large body cost.
@@ -20,7 +28,8 @@ import Observation
 /// Knobs:
 ///   - `TERMUI_PERF_OBSERVABLE_ROWS` (default: 12)
 ///   - `TERMUI_PERF_OBSERVABLE_COLUMNS` (default: 4)
-///   - `TERMUI_PERF_OBSERVABLE_SHAPE=fanout|large-body` (default: fanout)
+///   - `TERMUI_PERF_OBSERVABLE_SHAPE=fanout|bindable-fanout|large-body`
+///     (default: fanout)
 public struct SyntheticObservableFanoutScenario: PerfScenario {
   public let name: PerfScenarioName = .syntheticObservableFanout
   public let defaultTerminalSize = PerfTerminalSize(columns: 100, rows: 44)
@@ -105,13 +114,14 @@ public struct SyntheticObservableFanoutScenario: PerfScenario {
   }
 
   private static func resolvedShape() -> PerfObservableFanoutShape {
-    environmentValue("TERMUI_PERF_OBSERVABLE_SHAPE") == PerfObservableFanoutShape.largeBody.rawValue
-      ? .largeBody : .fanout
+    PerfObservableFanoutShape(rawValue: environmentValue("TERMUI_PERF_OBSERVABLE_SHAPE") ?? "")
+      ?? .fanout
   }
 }
 
 private enum PerfObservableFanoutShape: String, Sendable {
   case fanout
+  case bindableFanout = "bindable-fanout"
   case largeBody = "large-body"
 }
 
@@ -136,6 +146,12 @@ private struct PerfObservableFanoutProbeView: View {
       switch shape {
       case .fanout:
         PerfObservableFanoutGrid(
+          model: model,
+          rowCount: rowCount,
+          columnCount: columnCount
+        )
+      case .bindableFanout:
+        PerfObservableBindableFanoutGrid(
           model: model,
           rowCount: rowCount,
           columnCount: columnCount
@@ -173,6 +189,65 @@ private struct PerfObservableFanoutGrid: View {
           }
         }
       }
+    }
+  }
+}
+
+/// `@Bindable` variant of ``PerfObservableFanoutGrid``. Cells read each property
+/// through the `@Bindable` subscript (`$model.hot.wrappedValue`), which records
+/// an object token via `recordObservableRead` and so enters SwiftTUI's
+/// object-token co-reader union — the path the precise-firing narrowing targets.
+private struct PerfObservableBindableFanoutGrid: View {
+  let model: PerfObservableFanoutModel
+  let rowCount: Int
+  let columnCount: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(Array(0..<rowCount), id: \.self) { row in
+        HStack(spacing: 1) {
+          ForEach(Array(0..<columnCount), id: \.self) { column in
+            PerfObservableBindableFanoutCell(
+              model: model,
+              row: row,
+              column: column,
+              property: PerfObservableFanoutProperty(
+                rawValue: (row * columnCount + column) % PerfObservableFanoutProperty.count
+              ) ?? .hot
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct PerfObservableBindableFanoutCell: View {
+  @Bindable var model: PerfObservableFanoutModel
+  let row: Int
+  let column: Int
+  let property: PerfObservableFanoutProperty
+
+  init(
+    model: PerfObservableFanoutModel,
+    row: Int,
+    column: Int,
+    property: PerfObservableFanoutProperty
+  ) {
+    _model = Bindable(model)
+    self.row = row
+    self.column = column
+    self.property = property
+  }
+
+  var body: some View {
+    switch property {
+    case .hot:
+      Text("r\(row)c\(column) hot \($model.hot.wrappedValue)")
+    case .cold:
+      Text("r\(row)c\(column) cold \($model.cold.wrappedValue)")
+    case .rare:
+      Text("r\(row)c\(column) rare \($model.rare.wrappedValue)")
     }
   }
 }
