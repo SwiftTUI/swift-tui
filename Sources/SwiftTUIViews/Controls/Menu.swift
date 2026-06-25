@@ -80,7 +80,7 @@ extension Menu {
       )
     }
 
-    // Wrap the trigger row with the prompt presentation modifier so the
+    // Wrap the trigger row with the menu presentation modifier so the
     // menu's expanded content rides the portal overlay infrastructure.
     // Routing the modifier through the view tree (rather
     // than imperatively attaching the preference inside this function)
@@ -96,12 +96,10 @@ extension Menu {
       chrome: chrome
     )
     let menuPresentation = triggerView.modifier(
-      BuiltinSheetPresentationModifier(
-        title: "",
+      BuiltinMenuPresentationModifier(
         isPresented: expansionBinding,
-        spec: menuPromptPresentationSpec(),
-        sheetContent: content,
-        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
+        menuContent: content,
+        menuContentAuthoringContext: makeDeferredAuthoringContext(),
         dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )

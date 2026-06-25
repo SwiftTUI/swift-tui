@@ -187,6 +187,8 @@ struct MenuSurfaceTests {
       withIdentity: testIdentity("MenuDivider")
     )
 
+    #expect(expandedArtifacts.resolvedTree.contains { $0.kind == .view("MenuPresentation") })
+    #expect(!expandedArtifacts.resolvedTree.contains { $0.kind == .view("SheetPresentation") })
     #expect(surface.contains("Open"))
     #expect(surface.contains("Save"))
     #expect(surface.contains("Item 1"))

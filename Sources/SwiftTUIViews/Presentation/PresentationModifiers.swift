@@ -121,6 +121,62 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
   }
 }
 
+public struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveViewModifier {
+  var isPresented: Binding<Bool>
+  var menuContent: MenuContent
+  var menuContentAuthoringContext: AuthoringContext?
+  var dismissAuthoringContext: AuthoringContext?
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let dismissInvalidator = context.invalidationProxy?.invalidator
+    let spec = menuPromptPresentationSpec()
+    return resolvePresentationModifier(
+      content: content,
+      isPresented: isPresented,
+      in: context
+    ) { background in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let item = PromptPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        title: "",
+        descriptor: spec.descriptor,
+        actionPayloads: [],
+        messagePayloads: [],
+        contentPayloads: withAuthoringContext(menuContentAuthoringContext) {
+          portalAttachmentDeclaredBuilderChildren(
+            from: menuContent,
+            portalEntryID: portalEntryID,
+            modalPolicy: .nonModal
+          )
+        },
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            isPresented.wrappedValue = false
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+        }
+      )
+
+      return .init(
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            spec.reconcile(
+              registry,
+              sourceIdentity,
+              item
+            )
+          }
+        ]
+      )
+    }
+  }
+}
+
 /// Sheet variant that absorbs `paletteCommand` contributions from the
 /// enclosing scope's subtree via `PaletteCommandsPreferenceKey` and
 /// passes the snapshot into the sheet content closure. Mirrors the
