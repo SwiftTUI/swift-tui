@@ -805,6 +805,16 @@ struct ViewGraphTests {
 
   @Test("characterization: observation fan-out uses object tokens")
   func observationInvalidationUsesDependencyIndices() {
+    // Pin the legacy object-token union: both narrowings are on by default.
+    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
+    let previousKeyPath = ObservableKeyPathInvalidationConfiguration.isEnabled
+    PreciseObservationFiringConfiguration.isEnabled = false
+    ObservableKeyPathInvalidationConfiguration.isEnabled = false
+    defer {
+      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
+      ObservableKeyPathInvalidationConfiguration.isEnabled = previousKeyPath
+    }
+
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let triggeringIdentity = testIdentity("Root", "Triggering")
@@ -928,9 +938,17 @@ struct ViewGraphTests {
 
   @Test("key-path observable invalidation narrows to same-key-path peers")
   func keyPathObservableInvalidationNarrowsToSameKeyPathPeers() {
+    // Exercise key-path narrowing specifically: precise firing (on by default)
+    // takes precedence and would spare even the same-key-path peer, so disable
+    // it here.
+    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
     let previous = ObservableKeyPathInvalidationConfiguration.isEnabled
+    PreciseObservationFiringConfiguration.isEnabled = false
     ObservableKeyPathInvalidationConfiguration.isEnabled = true
-    defer { ObservableKeyPathInvalidationConfiguration.isEnabled = previous }
+    defer {
+      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
+      ObservableKeyPathInvalidationConfiguration.isEnabled = previous
+    }
 
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
@@ -994,6 +1012,16 @@ struct ViewGraphTests {
 
   @Test("characterization: observable environment fan-out uses object tokens")
   func observableEnvironmentInvalidationUsesObjectTokensSeparateFromEnvironmentKeys() {
+    // Pin the legacy object-token union: both narrowings are on by default.
+    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
+    let previousKeyPath = ObservableKeyPathInvalidationConfiguration.isEnabled
+    PreciseObservationFiringConfiguration.isEnabled = false
+    ObservableKeyPathInvalidationConfiguration.isEnabled = false
+    defer {
+      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
+      ObservableKeyPathInvalidationConfiguration.isEnabled = previousKeyPath
+    }
+
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let triggeringIdentity = testIdentity("Root", "Triggering")

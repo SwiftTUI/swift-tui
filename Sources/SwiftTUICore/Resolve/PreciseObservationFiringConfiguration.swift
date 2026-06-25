@@ -10,8 +10,9 @@
   import WASILibc
 #endif
 
-/// Gate for **precise observation firing**. **Off by default**; set
-/// `SWIFTTUI_PRECISE_OBSERVATION_FIRING=1` to opt in.
+/// Gate for **precise observation firing**. **On by default**; set
+/// `SWIFTTUI_PRECISE_OBSERVATION_FIRING=0` to opt out (the legacy object-token
+/// co-reader union).
 ///
 /// Swift's `Observation` bridge is already key-path precise at the firing seam:
 /// a `withObservationTracking` `onChange` fires only for the view identities
@@ -47,16 +48,17 @@ package enum PreciseObservationFiringConfiguration {
   package static let environmentVariableName = "SWIFTTUI_PRECISE_OBSERVATION_FIRING"
 
   /// Whether observable change invalidation dirties only the precise firing
-  /// node rather than every co-reader of the same object token. Off by default;
-  /// `SWIFTTUI_PRECISE_OBSERVATION_FIRING=1` opts in. The run loop reads this
-  /// from the environment before the first render, and tests set it directly.
+  /// node rather than every co-reader of the same object token. On by default;
+  /// `SWIFTTUI_PRECISE_OBSERVATION_FIRING=0` (or empty) opts out. The run loop
+  /// reads this from the environment before the first render, and tests set it
+  /// directly.
   package static var isEnabled: Bool = environmentDefault()
 
   private static func environmentDefault() -> Bool {
     guard let rawValue = environmentValue(named: environmentVariableName) else {
-      // Default OFF: the legacy object-token co-reader union is the shipped
-      // behavior. An explicit truthy value is the opt-in.
-      return false
+      // Default ON: precise firing is the standard path. An explicit `=0`/empty
+      // value is the opt-out (legacy object-token co-reader union).
+      return true
     }
     return !rawValue.isEmpty && rawValue != "0"
   }

@@ -10,8 +10,13 @@
   import WASILibc
 #endif
 
-/// Gate for **key-path-grained observable invalidation**. **Off by default**;
-/// set `SWIFTTUI_OBSERVABLE_KEYPATH_INVALIDATION=1` to opt in.
+/// Gate for **key-path-grained observable invalidation**. **On by default**;
+/// set `SWIFTTUI_OBSERVABLE_KEYPATH_INVALIDATION=0` to opt out.
+///
+/// With both this and ``PreciseObservationFiringConfiguration`` on by default,
+/// precise firing is the effective behavior and this is the graceful fallback:
+/// disabling precise firing (`SWIFTTUI_PRECISE_OBSERVATION_FIRING=0`) drops to
+/// key-path narrowing rather than all the way back to the legacy object union.
 ///
 /// A *more conservative* narrowing than ``PreciseObservationFiringConfiguration``
 /// (which drops the co-reader union entirely). Instead of dirtying only the
@@ -42,14 +47,14 @@ package enum ObservableKeyPathInvalidationConfiguration {
   package static let environmentVariableName = "SWIFTTUI_OBSERVABLE_KEYPATH_INVALIDATION"
 
   /// Whether observable change invalidation narrows the co-reader union to
-  /// same-key-path readers. Off by default; `=1` opts in. The run loop reads
-  /// this from the environment before the first render, and tests set it
-  /// directly.
+  /// same-key-path readers. On by default; `=0` (or empty) opts out. The run
+  /// loop reads this from the environment before the first render, and tests set
+  /// it directly.
   package static var isEnabled: Bool = environmentDefault()
 
   private static func environmentDefault() -> Bool {
     guard let rawValue = environmentValue(named: environmentVariableName) else {
-      return false
+      return true
     }
     return !rawValue.isEmpty && rawValue != "0"
   }
