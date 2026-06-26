@@ -1,15 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
 /// Gate for **reader-attributed** `@State` read/write tracking. **On by
 /// default**; set `SWIFTTUI_READER_ATTRIBUTION=0` to opt out (the legacy path).
 ///
@@ -37,23 +25,5 @@ package enum ReaderAttributionConfiguration {
   /// owner. On by default; `SWIFTTUI_READER_ATTRIBUTION=0` (or empty) opts out.
   /// The run loop sets it from the environment before the first render, and
   /// tests set it directly.
-  package static var isEnabled: Bool = environmentDefault()
-
-  private static func environmentDefault() -> Bool {
-    guard let rawValue = environmentValue(named: environmentVariableName) else {
-      // Default ON: reader attribution is the standard path. An explicit
-      // `=0`/empty value is the opt-out escape hatch handled below.
-      return true
-    }
-    return !rawValue.isEmpty && rawValue != "0"
-  }
-
-  private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
-  }
+  package static var isEnabled: Bool = FeatureFlags.isEnabledByDefault(environmentVariableName)
 }

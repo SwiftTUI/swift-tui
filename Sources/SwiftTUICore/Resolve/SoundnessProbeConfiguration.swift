@@ -1,15 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
 /// Gates the **reconciliation soundness probe**: the framework's reuse/skip
 /// fast paths are guarded by oracles (stamp coherence, delta-checkpoint
 /// equality, …) that historically ran only under `#if DEBUG` — so the
@@ -74,7 +62,7 @@ package enum SoundnessProbeConfiguration {
   }
 
   private static func environmentDefault() -> Bool {
-    guard let rawValue = environmentValue(named: environmentVariableName) else {
+    guard let rawValue = FeatureFlags.environmentValue(named: environmentVariableName) else {
       #if DEBUG
         return true
       #else
@@ -85,7 +73,7 @@ package enum SoundnessProbeConfiguration {
   }
 
   private static func sampleDefault() -> Int {
-    guard let rawValue = environmentValue(named: sampleEnvironmentVariableName),
+    guard let rawValue = FeatureFlags.environmentValue(named: sampleEnvironmentVariableName),
       let parsed = Int(rawValue), parsed > 0
     else {
       #if DEBUG
@@ -95,14 +83,5 @@ package enum SoundnessProbeConfiguration {
       #endif
     }
     return parsed
-  }
-
-  private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
   }
 }

@@ -1,15 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
 /// Gate for **key-path-grained observable invalidation**. **On by default**;
 /// set `SWIFTTUI_OBSERVABLE_KEYPATH_INVALIDATION=0` to opt out.
 ///
@@ -50,21 +38,5 @@ package enum ObservableKeyPathInvalidationConfiguration {
   /// same-key-path readers. On by default; `=0` (or empty) opts out. The run
   /// loop reads this from the environment before the first render, and tests set
   /// it directly.
-  package static var isEnabled: Bool = environmentDefault()
-
-  private static func environmentDefault() -> Bool {
-    guard let rawValue = environmentValue(named: environmentVariableName) else {
-      return true
-    }
-    return !rawValue.isEmpty && rawValue != "0"
-  }
-
-  private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
-  }
+  package static var isEnabled: Bool = FeatureFlags.isEnabledByDefault(environmentVariableName)
 }
