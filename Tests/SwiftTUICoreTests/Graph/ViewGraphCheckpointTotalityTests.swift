@@ -184,6 +184,85 @@ struct ViewGraphCheckpointTotalityTests {
 
     #expect(graph.debugTotalStateSnapshot() == before)
   }
+
+  // The same parallel-field-mirror landmine that the checkpoint guard catches
+  // for ViewGraph also lurks in two other hand-maintained families. Generalize
+  // the source-level totality guard to them.
+
+  @Test("every PlacedNodeResolvedMetadata field is applied on the setter path")
+  func placedNodeMetadataFieldsAreAllApplied() throws {
+    // PlacedNode mirrors its metadata four ways. The getter (resolvedMetadata)
+    // is compiler-enforced (a missing init arg won't compile); the SETTER
+    // (applyResolvedMetadata) is not — drop a field there and that field silently
+    // stales after every metadata application (animation ticks reuse this path).
+    // Guard it: each metadata field must be read as `metadata.<field>`.
+    let path = "Sources/SwiftTUICore/Place/PlacedNode.swift"
+    let fields = try parsedStoredVarNames(
+      typeKind: "struct",
+      typeName: "PlacedNodeResolvedMetadata",
+      relativePath: path
+    )
+    #expect(fields.count >= 14)  // the metadata mirror is non-trivial
+    let source = try sourceText(relativePath: path)
+    for field in fields {
+      #expect(
+        source.contains("metadata.\(field)"),
+        "PlacedNodeResolvedMetadata.\(field) is never read as metadata.\(field): applyResolvedMetadata likely drops it, silently staling that field after metadata application."
+      )
+    }
+  }
+
+  @Test("every RuntimeRegistrationSet registry is wired into reset and removeSubtrees")
+  func registriesAreCoveredByLifecycleOperations() throws {
+    // The 15 Local*Registry members fan out across ~8 operation sites by hand;
+    // a registry added to the set but forgotten in resetAll/removeSubtrees leaks
+    // stale state across frames (a strand). resetAll and removeSubtrees must
+    // each touch every registry.
+    let registries = try parsedStoredVarNames(
+      typeKind: "struct",
+      typeName: "RuntimeRegistrationSet",
+      relativePath: "Sources/SwiftTUICore/Runtime/RuntimeRegistrationSet.swift"
+    )
+    .filter { $0.hasSuffix("Registry") }
+    #expect(registries.count >= 15)
+
+    let operations = try sourceText(
+      relativePath: "Sources/SwiftTUICore/Runtime/RuntimeRegistrationSet+Operations.swift"
+    )
+    for operation in ["resetAll", "removeSubtrees"] {
+      let body = functionBodyText(named: operation, in: operations)
+      #expect(!body.isEmpty, "could not locate RuntimeRegistrationSet.\(operation)(…)")
+      for registry in registries {
+        #expect(
+          body.contains(registry),
+          "\(registry) is not wired into RuntimeRegistrationSet.\(operation): a scoped restore would then diverge from a full rebuild for that family."
+        )
+      }
+    }
+  }
+}
+
+/// Returns the source text of the first `func <name>(` and its body (balanced
+/// braces), or "" if not found.
+private func functionBodyText(named name: String, in source: String) -> String {
+  let lines = source.components(separatedBy: .newlines)
+  guard let start = lines.firstIndex(where: { $0.contains("func \(name)(") }) else {
+    return ""
+  }
+  var depth = 0
+  var started = false
+  var collected: [String] = []
+  for line in lines[start...] {
+    collected.append(line)
+    if line.contains("{") {
+      started = true
+    }
+    depth += braceDelta(in: line)
+    if started && depth <= 0 {
+      break
+    }
+  }
+  return collected.joined(separator: "\n")
 }
 
 private func parsedStoredVarNames(
