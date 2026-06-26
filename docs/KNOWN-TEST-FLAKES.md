@@ -91,6 +91,18 @@ analysis has exhausted the named candidates; the honest next move (if/when #12 i
 re-prioritized) is *dynamic* — reproduce the SEGV under load with the `assumeIsolated`
 sites + eligibility scan annotated/under TSan — not another static repro harness.
 
+**Instrumentation update (2026-06-26).** A first increment of that "annotate the
+`assumeIsolated` sites" move has landed for one named suspect. The non-`Sendable`
+custom-layout proxy `LayoutProxyBox` now routes every entry point through
+`preconditionMainActor()` (an explicit `MainActor.preconditionIsolated`) **before**
+the `assumeIsolated` (`CustomLayoutErasure.swift`). So if that vector is ever reached
+off the frame-tail worker — contradicting the static "unreachable" judgment above —
+it crashes **deterministically with an attributable message naming the cause**,
+instead of a silent torn write that reads as anonymous corruption. It converts one
+suspect seam from "judged safe by static analysis" into "self-reporting if the
+analysis was wrong"; the remaining `assumeIsolated` sites are still un-instrumented.
+(Rationale: org-root `docs/proposals/2026-06-26-001-architecture-fragility-improvements-proposal.md`, opportunity #3.)
+
 *Separate, real-but-benign finding.* The one-shot commit path stores a live
 `@MainActor` source into retained state with no snapshot conversion
 (`commitOneShotFrame` → `storeCommittedFrame`). It is harmless today (off-main reuse
