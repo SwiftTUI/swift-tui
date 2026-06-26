@@ -255,20 +255,18 @@ package final class AnimationController: Sendable {
     // controller has gained since the draft's baseline. The draft never observed
     // them (it predates them), so it neither references nor fired them; they are
     // pending registrations that must survive the publish.
-    let concurrentCompletions = completionClosures.filter {
-      baseline.batchCompletion.completionClosures[$0.key] == nil
-    }
-    let concurrentRegisteredAnimations = registeredAnimations.filter {
-      baseline.registeredAnimations[$0.key] == nil
-    }
+    let concurrentCompletions = ConcurrentRegistrationCarry.sinceBaseline(
+      live: completionClosures,
+      baseline: baseline.batchCompletion.completionClosures
+    )
+    let concurrentRegisteredAnimations = ConcurrentRegistrationCarry.sinceBaseline(
+      live: registeredAnimations,
+      baseline: baseline.registeredAnimations
+    )
     restore(draftController.makeCheckpoint())
-    for (batchID, closure) in concurrentCompletions where completionClosures[batchID] == nil {
-      completionClosures[batchID] = closure
-    }
-    for (box, animation) in concurrentRegisteredAnimations
-    where registeredAnimations[box] == nil {
-      registeredAnimations[box] = animation
-    }
+    ConcurrentRegistrationCarry.reapply(
+      concurrentCompletions, into: &batchCompletion.completionClosures)
+    ConcurrentRegistrationCarry.reapply(concurrentRegisteredAnimations, into: &registeredAnimations)
   }
 
   /// Stores a snapshot of the placed tree at the end of the frame so
