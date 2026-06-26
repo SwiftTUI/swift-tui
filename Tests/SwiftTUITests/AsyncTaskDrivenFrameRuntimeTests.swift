@@ -11,23 +11,22 @@ import Testing
 struct AsyncTaskDrivenFrameRuntimeTests {
   @Test("lifecycle task state write presents a frame without further input")
   func lifecycleTaskStateWritePresentsFrameWithoutFurtherInput() async throws {
-    let terminal = AsyncTaskDrivenFrameRecordingHost(
+    let terminal = RecordingPresentationSurface(
       surfaceSize: .init(width: 32, height: 8)
     )
     let rootIdentity = testIdentity("AsyncTaskDrivenLifecycleRoot")
-    let inputReader = AsyncTaskDrivenFrameInputReader(
+    let inputReader = ScriptedAutonomousWakeInputReader(
       frameSignal: terminal.frameSignal,
       steps: [
         .awaitCondition {
           terminal.frames.contains { $0.contains("task ready") }
-        },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        }
       ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
       inputReader: inputReader,
-      signalReader: AsyncTaskDrivenFrameEmptySignalReader(),
+      signalReader: ImmediateFinishSignalReader(),
       stateContainer: StateContainer(
         initialState: 0,
         invalidationIdentities: [rootIdentity]
@@ -48,24 +47,23 @@ struct AsyncTaskDrivenFrameRuntimeTests {
 
   @Test("action-spawned task state write presents a frame after action returns")
   func actionSpawnedTaskStateWritePresentsFrameAfterActionReturns() async throws {
-    let terminal = AsyncTaskDrivenFrameRecordingHost(
+    let terminal = RecordingPresentationSurface(
       surfaceSize: .init(width: 32, height: 8)
     )
     let rootIdentity = testIdentity("AsyncTaskDrivenActionRoot")
-    let inputReader = AsyncTaskDrivenFrameInputReader(
+    let inputReader = ScriptedAutonomousWakeInputReader(
       frameSignal: terminal.frameSignal,
       steps: [
         .press(KeyPress(.return)),
         .awaitCondition {
           terminal.frames.contains { $0.contains("action ready") }
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
       ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
       inputReader: inputReader,
-      signalReader: AsyncTaskDrivenFrameEmptySignalReader(),
+      signalReader: ImmediateFinishSignalReader(),
       stateContainer: StateContainer(
         initialState: 0,
         invalidationIdentities: [rootIdentity]
@@ -114,99 +112,6 @@ private struct AsyncActionTaskFrameProbe: View {
   }
 }
 
-private final class AsyncTaskDrivenFrameRecordingHost: PresentationSurface {
-  let surfaceSize: CellSize
-  let capabilityProfile: TerminalCapabilityProfile
-  let appearance: TerminalAppearance
-  private(set) var frames: [String] = []
-
-  let frameSignal = MainActorConditionSignal()
-
-  init(
-    surfaceSize: CellSize,
-    capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
-    appearance: TerminalAppearance = .fallback
-  ) {
-    self.surfaceSize = surfaceSize
-    self.capabilityProfile = capabilityProfile
-    self.appearance = appearance
-  }
-
-  func enableRawMode() throws {}
-  func disableRawMode() throws {}
-  func clearScreen() throws {}
-  func moveCursor(to _: CellPoint) throws {}
-
-  @discardableResult
-  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    let rendered = TerminalSurfaceRenderer(
-      capabilityProfile: capabilityProfile
-    ).render(surface)
-    frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
-    notifyFrameObservers()
-    return TerminalPresentationMetrics.fullRepaint(
-      for: surface,
-      capabilityProfile: capabilityProfile
-    )
-  }
-
-  func write(_ output: String) throws {
-    frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
-    notifyFrameObservers()
-  }
-
-  private func notifyFrameObservers() {
-    let frameSignal = self.frameSignal
-    MainActor.assumeIsolated {
-      frameSignal.notify()
-    }
-  }
-}
-
-private enum AsyncTaskDrivenFrameInputStep {
-  case press(KeyPress)
-  case awaitCondition(predicate: @MainActor () -> Bool)
-}
-
-private final class AsyncTaskDrivenFrameInputReader: InputReading {
-  private let steps: [AsyncTaskDrivenFrameInputStep]
-  private let frameSignal: MainActorConditionSignal
-
-  init(
-    frameSignal: MainActorConditionSignal,
-    steps: [AsyncTaskDrivenFrameInputStep]
-  ) {
-    self.frameSignal = frameSignal
-    self.steps = steps
-  }
-
-  func events() -> AsyncStream<KeyPress> {
-    AsyncStream { continuation in
-      let steps = self.steps
-      let frameSignal = self.frameSignal
-      let task = Task { @MainActor in
-        for step in steps {
-          switch step {
-          case .press(let event):
-            continuation.yield(event)
-          case .awaitCondition(let predicate):
-            await frameSignal.wait(until: predicate)
-          }
-        }
-        continuation.finish()
-      }
-
-      continuation.onTermination = { _ in
-        task.cancel()
-      }
-    }
-  }
-}
-
-private final class AsyncTaskDrivenFrameEmptySignalReader: SignalReading {
-  func events() -> AsyncStream<String> {
-    AsyncStream { continuation in
-      continuation.finish()
-    }
-  }
-}
+// The recording surface, keep-open reader, and empty signal reader these tests
+// used now live in SwiftTUITestSupport (ScriptedAutonomousWakeHarness) — shared
+// with the terminal-input autonomous-wake test rather than duplicated per suite.
