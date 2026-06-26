@@ -255,6 +255,16 @@ package final class AnimationController: Sendable {
     // controller has gained since the draft's baseline. The draft never observed
     // them (it predates them), so it neither references nor fired them; they are
     // pending registrations that must survive the publish.
+    //
+    // Totality: these two collections are EXACTLY the state an async task can
+    // grow on the live controller between frames — the completion-closure and
+    // animation-box maps, written by `withAnimation`'s `AnimationCompletionSink`
+    // / `AnimationRegistrationSink`. Transitions are deliberately NOT carried:
+    // their sink (`TransitionRegistrationSink`, driven by the `.transition()`
+    // modifier) only fires during resolve, so they are frame-derived and already
+    // live in the draft. If a third async-writable sink is ever added, it must be
+    // carried here too (route it through `ConcurrentRegistrationCarry`), or it
+    // will be silently clobbered by the restore above.
     let concurrentCompletions = ConcurrentRegistrationCarry.sinceBaseline(
       live: completionClosures,
       baseline: baseline.batchCompletion.completionClosures

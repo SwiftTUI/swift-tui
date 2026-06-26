@@ -73,6 +73,38 @@ struct AnimationCompletionConcurrencyTests {
     )
   }
 
+  @Test(
+    "An animation-box registration on live while a frame draft is in flight survives the commit")
+  func concurrentAnimationRegistrationSurvivesDraftCommit() {
+    let controller = AnimationController()
+
+    // Frame N's head transaction begins: its draft snapshots live (no
+    // registrations yet).
+    let draft = controller.makeFrameDraft()
+
+    // The SAME async `withAnimation` that registers a completion also registers
+    // its animation box on the LIVE controller (the box is how the completion's
+    // batch is later matched to its animation). It is the second of the two
+    // collections an async task grows between frames, so it must survive the
+    // publish for the same reason — losing it strands the PhaseAnimator loop.
+    _ = controller.register(.linear(duration: .milliseconds(1_000_000)))
+    #expect(controller.debugStateSnapshot().registeredAnimationCount == 1)
+
+    // Frame N commits. A full restore from the draft (which predates the
+    // registration) would clobber the box; the carry-forward must preserve it.
+    draft.commit()
+
+    #expect(
+      controller.debugStateSnapshot().registeredAnimationCount == 1,
+      """
+      An animation-box registration made on the live controller during an \
+      in-flight frame must survive that frame's commit, exactly like its paired \
+      completion — both run through the same async withAnimation sink, so the \
+      carry-forward must cover both or the awaiting caller stalls.
+      """
+    )
+  }
+
   @Test("A completion the in-flight frame already knew about still drains normally")
   func baselineCompletionStillCommits() {
     let controller = AnimationController()
