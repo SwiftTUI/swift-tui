@@ -102,12 +102,36 @@ private func isPNGBytes(_ bytes: [UInt8]) -> Bool {
 }
 
 final class ImageAssetRepository: Sendable {
+  // Both caches live for the process (`sharedImageAssetRepository`), so without a
+  // bound a long session that views many distinct images grows them without
+  // limit (and leaks across tests sharing the singleton). Cap each by entry
+  // count with FIFO eviction — the working set of on-screen images is small, so
+  // a generous cap bounds memory without measurably hurting hit rate. (A
+  // generational LRU like ImageBlendCompositor's is a later refinement.)
+  private static let maxResolutions = 512
+  private static let maxDecodedImages = 256
+
   private struct Storage {
     var resolutions: [ImageLookupKey: ResolvedImageAsset] = [:]
+    var resolutionOrder: [ImageLookupKey] = []
     var decodedImages: [ImageAssetReference: DecodedImage] = [:]
+    var decodedOrder: [ImageAssetReference] = []
   }
 
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+
+  /// Evicts oldest-inserted entries until `map` is within `cap`. `order` holds
+  /// each live key exactly once (callers append only on first insert).
+  private static func evictToCap<Key: Hashable, Value>(
+    _ map: inout [Key: Value],
+    order: inout [Key],
+    cap: Int
+  ) {
+    while order.count > cap {
+      let victim = order.removeFirst()
+      map.removeValue(forKey: victim)
+    }
+  }
 
   func resolver() -> ImageAssetResolver {
     { [weak self] source, resourceRoots, cellPixelSize in
@@ -151,7 +175,15 @@ final class ImageAssetRepository: Sendable {
     )
 
     storage.withLockUnchecked { storage in
+      if storage.resolutions[lookupKey] == nil {
+        storage.resolutionOrder.append(lookupKey)
+      }
       storage.resolutions[lookupKey] = resolved
+      Self.evictToCap(
+        &storage.resolutions,
+        order: &storage.resolutionOrder,
+        cap: Self.maxResolutions
+      )
     }
     return resolved
   }
@@ -168,7 +200,15 @@ final class ImageAssetRepository: Sendable {
     }
 
     storage.withLockUnchecked { storage in
+      if storage.decodedImages[reference] == nil {
+        storage.decodedOrder.append(reference)
+      }
       storage.decodedImages[reference] = decoded
+      Self.evictToCap(
+        &storage.decodedImages,
+        order: &storage.decodedOrder,
+        cap: Self.maxDecodedImages
+      )
     }
     return decoded
   }

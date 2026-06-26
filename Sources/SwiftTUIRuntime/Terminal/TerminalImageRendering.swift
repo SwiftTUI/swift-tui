@@ -47,6 +47,11 @@ final class TerminalImageRenderer: Sendable {
   private let repository: ImageAssetRepository
   private let blendCompositor: ImageBlendCompositor
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+  // A TerminalImageRenderer is created per host, so a *permanent* metric
+  // registration made `providerCount` (itself the documented leak signal) climb
+  // per host. Hold the token instead, so the provider deregisters when this
+  // renderer is released.
+  private let metricToken: MemoryMetricRegistry.Token
 
   init(
     repository: ImageAssetRepository,
@@ -57,22 +62,35 @@ final class TerminalImageRenderer: Sendable {
       repository: repository,
       cachePolicy: blendCompositorCachePolicy
     )
-    MemoryMetricRegistry.shared.registerPermanent(
-      ClosureMemoryMetricProvider { [weak self] in
-        guard let self else {
-          return MemoryMetricSnapshot(name: "TerminalImageRenderer.payloads", count: 0)
+    // Capture the storage lock (already initialized) rather than `self`, so the
+    // provider does not form a self-capturing closure during init (and the
+    // registry holds no strong reference back to this renderer).
+    let storage = storage
+    metricToken = MemoryMetricRegistry.shared.register(
+      ClosureMemoryMetricProvider {
+        storage.withLockUnchecked { storage in
+          var approxBytes = 0
+          for payload in storage.kittyPayloads.values {
+            approxBytes += payload.encodedData.utf8.count
+          }
+          for payload in storage.sixelPayloads.values {
+            approxBytes += payload.utf8.count
+          }
+          for overlay in storage.fallbackOverlays.values {
+            approxBytes += overlay.size.width * overlay.size.height
+          }
+          return MemoryMetricSnapshot(
+            name: "TerminalImageRenderer.payloads",
+            count: storage.kittyPayloads.count + storage.sixelPayloads.count
+              + storage.fallbackOverlays.count,
+            approxBytes: approxBytes,
+            detail: [
+              "kitty": storage.kittyPayloads.count,
+              "sixel": storage.sixelPayloads.count,
+              "fallback": storage.fallbackOverlays.count,
+            ]
+          )
         }
-        let occupancy = self.occupancy()
-        return MemoryMetricSnapshot(
-          name: "TerminalImageRenderer.payloads",
-          count: occupancy.kitty + occupancy.sixel + occupancy.fallback,
-          approxBytes: occupancy.approxBytes,
-          detail: [
-            "kitty": occupancy.kitty,
-            "sixel": occupancy.sixel,
-            "fallback": occupancy.fallback,
-          ]
-        )
       }
     )
   }
