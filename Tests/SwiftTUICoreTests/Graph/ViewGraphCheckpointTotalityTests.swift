@@ -102,6 +102,34 @@ struct ViewGraphCheckpointTotalityTests {
     #expect(Set(viewNodeCheckpointFields) == Set(viewNodeFields))
   }
 
+  @Test("ViewNode FrameState group members are mirrored in the flat debug snapshot")
+  func viewNodeFrameStateGroupIsDebugSnapshotCovered() throws {
+    // FrameState (the first ViewNode field group, in ViewNodeFieldGroups.swift)
+    // is checkpointed and restored as a whole struct, so makeCheckpoint /
+    // restoreCheckpoint are compiler-enforced complete for its members. The flat
+    // debugTotalStateSnapshot is the one remaining hand-mirror of those members;
+    // guard that every FrameState field is read into the snapshot so a field
+    // added to the group cannot silently fall out of the debug-state contract.
+    let frameStateFields = try parsedStoredVarNames(
+      typeKind: "struct",
+      typeName: "FrameState",
+      relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
+    )
+    #expect(frameStateFields.count == 8)
+
+    let snapshotBody = functionBodyText(
+      named: "debugTotalStateSnapshot",
+      in: try sourceText(relativePath: "Sources/SwiftTUICore/Resolve/ViewNode.swift")
+    )
+    #expect(!snapshotBody.isEmpty, "could not locate ViewNode.debugTotalStateSnapshot()")
+    for field in frameStateFields {
+      #expect(
+        snapshotBody.contains(field),
+        "ViewNode.FrameState.\(field) is not read into debugTotalStateSnapshot — the flat debug mirror has drifted from the group."
+      )
+    }
+  }
+
   @Test("checkpoint totality set-equality rejects any single missing map (guard has teeth)")
   func totalityGuardCatchesMissingField() throws {
     // The canonical covered set is the flattened field-group members plus the

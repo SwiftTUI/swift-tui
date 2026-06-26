@@ -71,12 +71,36 @@ package final class ViewNode {
 
   package var isDirty: Bool
 
-  package var wasPresentAtFrameStart: Bool
-  package var wasVisitedThisFrame: Bool
-  package var previousChildrenIdentities: [Identity]
-  package var previousLifecycleMetadata: LifecycleMetadata
-  package var bodyStateSlotCount: Int?
-  package var currentBodyStateSlotCount: Int
+  /// Per-frame working set, grouped into a value sub-struct so checkpoint and
+  /// restore move it as a unit (see ``FrameState`` in ViewNodeFieldGroups.swift).
+  /// The eight fields below are computed forwarders preserving their original
+  /// names and visibility; the reconciler is unchanged.
+  private var frameState = FrameState()
+
+  package var wasPresentAtFrameStart: Bool {
+    get { frameState.wasPresentAtFrameStart }
+    set { frameState.wasPresentAtFrameStart = newValue }
+  }
+  package var wasVisitedThisFrame: Bool {
+    get { frameState.wasVisitedThisFrame }
+    set { frameState.wasVisitedThisFrame = newValue }
+  }
+  package var previousChildrenIdentities: [Identity] {
+    get { frameState.previousChildrenIdentities }
+    set { frameState.previousChildrenIdentities = newValue }
+  }
+  package var previousLifecycleMetadata: LifecycleMetadata {
+    get { frameState.previousLifecycleMetadata }
+    set { frameState.previousLifecycleMetadata = newValue }
+  }
+  package var bodyStateSlotCount: Int? {
+    get { frameState.bodyStateSlotCount }
+    set { frameState.bodyStateSlotCount = newValue }
+  }
+  package var currentBodyStateSlotCount: Int {
+    get { frameState.currentBodyStateSlotCount }
+    set { frameState.currentBodyStateSlotCount = newValue }
+  }
   package private(set) var pendingChangeHandlerIDs: [String]
 
   private let dependencyTracker: DependencyTracker
@@ -89,8 +113,14 @@ package final class ViewNode {
   private var nextChangeModifierOrdinal: Int
   private var nextNavigationDestinationModifierOrdinal: Int
   private var nextTaskModifierOrdinal: Int
-  private var preparedFrameID: UInt64
-  private var visitedFrameID: UInt64
+  private var preparedFrameID: UInt64 {
+    get { frameState.preparedFrameID }
+    set { frameState.preparedFrameID = newValue }
+  }
+  private var visitedFrameID: UInt64 {
+    get { frameState.visitedFrameID }
+    set { frameState.visitedFrameID = newValue }
+  }
   private var evaluator: (@MainActor () -> Void)?
 
   package init(
@@ -111,12 +141,10 @@ package final class ViewNode {
     lifecycleState = .alive
     registeredHandlers = .init()
     isDirty = true
-    wasPresentAtFrameStart = false
-    wasVisitedThisFrame = false
-    previousChildrenIdentities = []
-    previousLifecycleMetadata = .init()
-    bodyStateSlotCount = nil
-    currentBodyStateSlotCount = 0
+    // The frame-local working set initializes from `FrameState()`'s defaults
+    // (wasPresentAtFrameStart/wasVisitedThisFrame=false, previousChildrenIdentities=[],
+    // previousLifecycleMetadata=.init(), bodyStateSlotCount=nil,
+    // currentBodyStateSlotCount=0, preparedFrameID/visitedFrameID=0).
     pendingChangeHandlerIDs = []
     dependencyTracker = .init()
     registrationCaptureDepth = 0
@@ -128,8 +156,6 @@ package final class ViewNode {
     nextChangeModifierOrdinal = 0
     nextNavigationDestinationModifierOrdinal = 0
     nextTaskModifierOrdinal = 0
-    preparedFrameID = 0
-    visitedFrameID = 0
     evaluator = nil
   }
 
@@ -1290,12 +1316,7 @@ extension ViewNode {
     package var lifecycleState: NodeLifecycleState
     package var registeredHandlers: NodeHandlers
     package var isDirty: Bool
-    package var wasPresentAtFrameStart: Bool
-    package var wasVisitedThisFrame: Bool
-    package var previousChildrenIdentities: [Identity]
-    package var previousLifecycleMetadata: LifecycleMetadata
-    package var bodyStateSlotCount: Int?
-    package var currentBodyStateSlotCount: Int
+    package var frameState: FrameState
     package var pendingChangeHandlerIDs: [String]
     package var dependencyTracker: DependencyTracker.Checkpoint
     package var registrationCaptureDepth: Int
@@ -1307,8 +1328,6 @@ extension ViewNode {
     package var nextChangeModifierOrdinal: Int
     package var nextNavigationDestinationModifierOrdinal: Int
     package var nextTaskModifierOrdinal: Int
-    package var preparedFrameID: UInt64
-    package var visitedFrameID: UInt64
     package var evaluator: (@MainActor () -> Void)?
     package var memoViewValue: Any?
   }
@@ -1329,12 +1348,7 @@ extension ViewNode {
       lifecycleState: lifecycleState,
       registeredHandlers: registeredHandlers,
       isDirty: isDirty,
-      wasPresentAtFrameStart: wasPresentAtFrameStart,
-      wasVisitedThisFrame: wasVisitedThisFrame,
-      previousChildrenIdentities: previousChildrenIdentities,
-      previousLifecycleMetadata: previousLifecycleMetadata,
-      bodyStateSlotCount: bodyStateSlotCount,
-      currentBodyStateSlotCount: currentBodyStateSlotCount,
+      frameState: frameState,
       pendingChangeHandlerIDs: pendingChangeHandlerIDs,
       dependencyTracker: dependencyTracker.makeCheckpoint(),
       registrationCaptureDepth: registrationCaptureDepth,
@@ -1346,8 +1360,6 @@ extension ViewNode {
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
       nextTaskModifierOrdinal: nextTaskModifierOrdinal,
-      preparedFrameID: preparedFrameID,
-      visitedFrameID: visitedFrameID,
       evaluator: evaluator,
       memoViewValue: memoViewValue
     )
@@ -1371,12 +1383,7 @@ extension ViewNode {
     lifecycleState = checkpoint.lifecycleState
     registeredHandlers = checkpoint.registeredHandlers
     isDirty = checkpoint.isDirty
-    wasPresentAtFrameStart = checkpoint.wasPresentAtFrameStart
-    wasVisitedThisFrame = checkpoint.wasVisitedThisFrame
-    previousChildrenIdentities = checkpoint.previousChildrenIdentities
-    previousLifecycleMetadata = checkpoint.previousLifecycleMetadata
-    bodyStateSlotCount = checkpoint.bodyStateSlotCount
-    currentBodyStateSlotCount = checkpoint.currentBodyStateSlotCount
+    frameState = checkpoint.frameState
     pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
     dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)
     registrationCaptureDepth = checkpoint.registrationCaptureDepth
@@ -1389,8 +1396,6 @@ extension ViewNode {
     nextNavigationDestinationModifierOrdinal =
       checkpoint.nextNavigationDestinationModifierOrdinal
     nextTaskModifierOrdinal = checkpoint.nextTaskModifierOrdinal
-    preparedFrameID = checkpoint.preparedFrameID
-    visitedFrameID = checkpoint.visitedFrameID
     evaluator = checkpoint.evaluator
     memoViewValue = checkpoint.memoViewValue
   }
