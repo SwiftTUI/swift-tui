@@ -973,6 +973,28 @@ struct TabViewSurfaceTests {
     #expect(text.contains("Popovers"))
   }
 
+  @Test("literal tab body background does not hit the tab view root action")
+  func literalTabBodyBackgroundDoesNotHitTabViewRootAction() throws {
+    let artifacts = DefaultRenderer().render(
+      galleryLikeOverflowTabView(selection: .constant("popovers")),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 80, height: 24)
+    )
+    let tabsIdentity = testIdentity("Tabs")
+    let overflowTriggerIdentity = tabsIdentity.child(.named("TabOverflowTrigger"))
+    let backgroundPoint = PointerLocation.cellFallback(CellPoint(x: 2, y: 10))
+    let regionsAtBackground = artifacts.semanticSnapshot.interactionRegions
+      .filter { $0.contains(backgroundPoint) }
+
+    #expect(artifacts.semanticSnapshot.focusRegions.contains { $0.identity == tabsIdentity })
+    #expect(
+      artifacts.semanticSnapshot.interactionRegions.contains {
+        $0.identity == overflowTriggerIdentity && $0.rect.size.height == 3
+      })
+    #expect(!regionsAtBackground.contains { $0.identity == tabsIdentity })
+    #expect(!regionsAtBackground.contains { $0.identity == overflowTriggerIdentity })
+  }
+
   @Test("selected literal tab uses foreground chrome without filling its background")
   func selectedLiteralTabUsesForegroundChromeWithoutFill() throws {
     let artifacts = renderTabArtifacts(

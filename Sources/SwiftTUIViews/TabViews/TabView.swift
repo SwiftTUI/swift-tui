@@ -283,11 +283,7 @@ extension TabView {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        isFocusable: true,
-        focusInteractions: .activate,
-        accessibilityRole: .tabView
-      )
+      semanticMetadata: tabViewSemanticMetadata()
     )
   }
 
@@ -753,6 +749,19 @@ private func tabViewAvailableWidth(
     }
 
   return proposalWidth.map { min($0, environmentWidth) } ?? environmentWidth
+}
+
+private func tabViewSemanticMetadata() -> SemanticMetadata {
+  // The root action is keyboard-only. Built-in and custom tab styles expose
+  // pointer routes for tab labels and overflow controls; the root must not
+  // turn active-tab background clicks into tab activations.
+  .init(
+    isFocusable: true,
+    focusInteractions: .activate,
+    participatesInPointerHitTesting: true,
+    accessibilityRole: .tabView,
+    explicitInteractionRect: CellRect(origin: .zero, size: .zero)
+  )
 }
 
 // The tab metadata-peeking protocols and conformances live in
