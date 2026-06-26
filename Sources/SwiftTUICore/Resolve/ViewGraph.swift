@@ -1,6 +1,6 @@
 extension ViewGraph {
   package func makeCheckpoint() -> Checkpoint {
-    return Checkpoint(
+    GraphCheckpointStore.makeCheckpoint(
       root: root,
       index: index,
       rootEvaluation: rootEvaluation,
@@ -11,9 +11,7 @@ extension ViewGraph {
       taskDescriptors: taskDescriptors,
       dependencyIndex: dependencyIndex,
       frameCommit: frameCommit,
-      nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(
-        nodesByNodeID
-      )
+      nodesByNodeID: nodesByNodeID
     )
   }
 
@@ -39,11 +37,9 @@ extension ViewGraph {
   }
 
   package func checkpointMutationStateSnapshot() -> CheckpointMutationState {
-    CheckpointMutationState(
-      checkpointMutationEpoch: checkpointMutationEpoch,
-      nodeMutationGenerations: nodesByNodeID.mapValues {
-        $0.currentCheckpointMutationGeneration
-      }
+    GraphCheckpointStore.checkpointMutationStateSnapshot(
+      epoch: checkpointMutationEpoch,
+      nodesByNodeID: nodesByNodeID
     )
   }
 
@@ -52,21 +48,11 @@ extension ViewGraph {
   }
 
   package func checkpointMutationStateMatches(_ state: CheckpointMutationState) -> Bool {
-    guard checkpointMutationEpoch == state.checkpointMutationEpoch,
-      Set(nodesByNodeID.keys) == Set(state.nodeMutationGenerations.keys)
-    else {
-      return false
-    }
-
-    for (viewNodeID, expectedGeneration) in state.nodeMutationGenerations {
-      guard
-        nodesByNodeID[viewNodeID]?.currentCheckpointMutationGeneration
-          == expectedGeneration
-      else {
-        return false
-      }
-    }
-    return true
+    GraphCheckpointStore.checkpointMutationStateMatches(
+      epoch: checkpointMutationEpoch,
+      nodesByNodeID: nodesByNodeID,
+      against: state
+    )
   }
 
   private func restoreCheckpointGraphFields(_ checkpoint: Checkpoint) {
