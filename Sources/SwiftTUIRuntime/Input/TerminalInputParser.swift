@@ -138,6 +138,35 @@ extension TerminalInputParser {
       return parseSGRMouseSequence()
     }
 
+    // VT220 "tilde" function keys arrive as ESC [ <number> [;<modifier>] ~
+    // (Home/End/Insert/Delete/PageUp/PageDown and F-keys) and are 4+ bytes
+    // long. Detect the digit-led parameter run and, when it terminates in '~',
+    // consume the whole envelope as a unit. Without this the 3-byte
+    // fall-through below emits a bare Escape (which can dismiss a modal or pop
+    // navigation) and leaves the trailing '~' to be inserted as literal text.
+    if (0x30...0x39).contains(bufferedBytes[2]) {
+      var index = 2
+      while index < bufferedBytes.count, (0x30...0x3B).contains(bufferedBytes[index]) {
+        index += 1
+      }
+      guard index < bufferedBytes.count else {
+        return nil  // terminator not buffered yet — wait for more bytes
+      }
+      if bufferedBytes[index] == 0x7E {
+        let parameterBytes = Array(bufferedBytes[2..<index])
+        bufferedBytes.removeFirst(index + 1)
+        if let event = tildeKeyEvent(parameterBytes: parameterBytes) {
+          return event
+        }
+        // The envelope was consumed but maps to no KeyEvent (e.g. Delete).
+        // Keep draining the buffer instead of reporting end-of-input, so a
+        // following keystroke in the same chunk is not stranded.
+        return parseNextEvent()
+      }
+      // Letter-terminated parameterized sequence (e.g. ESC[1;5A): fall through
+      // to the existing modifier handling below.
+    }
+
     // CSI sequences with modifier parameters: ESC[1;{mod}{key}
     if bufferedBytes[2] == 0x31 {
       return parseCSIModifierSequence()
@@ -205,6 +234,35 @@ extension TerminalInputParser {
       return .key(KeyPress(.escape, modifiers: modifiers))
     }
 
+    return .key(KeyPress(key, modifiers: modifiers))
+  }
+
+  /// Maps an already-consumed VT220 tilde key envelope (`ESC [ n [;mod] ~`) to
+  /// an input event.
+  ///
+  /// Numbers with an existing ``KeyEvent`` representation (Home = 1 or 7,
+  /// End = 4 or 8) are mapped through, honoring any xterm modifier parameter.
+  /// The remainder (Insert = 2, Delete = 3, PageUp = 5, PageDown = 6, and the
+  /// function keys 11...24) currently have no ``KeyEvent`` case; they are
+  /// dropped rather than surfaced, which is correct precisely because the
+  /// previous fall-through corrupted input with a stray Escape plus a literal
+  /// '~'. Adding first-class cases for these is a separate public-API change.
+  private func tildeKeyEvent(parameterBytes: [UInt8]) -> InputEvent? {
+    let groups = parameterBytes.split(separator: 0x3B)  // ';'
+    guard let keyGroup = groups.first, let keyID = asciiInteger(from: keyGroup) else {
+      return nil
+    }
+    let modifiers: EventModifiers =
+      groups.count > 1 ? csiModifiers(from: Array(groups[1])) : []
+    let key: KeyEvent
+    switch keyID {
+    case 1, 7:
+      key = .home
+    case 4, 8:
+      key = .end
+    default:
+      return nil
+    }
     return .key(KeyPress(key, modifiers: modifiers))
   }
 
