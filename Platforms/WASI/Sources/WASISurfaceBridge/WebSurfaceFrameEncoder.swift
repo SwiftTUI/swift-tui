@@ -128,12 +128,15 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     knownImageIDs: inout Set<String>
   ) -> String {
-    encode(
-      frame.raster,
-      sequence: frame.sequence,
-      semanticSnapshot: frame.semantics,
-      focusedIdentity: frame.focusedIdentity,
-      damage: frame.rasterDamage,
+    // Decompose the frame through the shared host-content projection so the
+    // host-serialized field set lives in one place (see `HostFrameProjection`).
+    let projection = frame.hostProjection
+    return encode(
+      projection.raster,
+      sequence: projection.sequence,
+      semanticSnapshot: projection.semantics,
+      focusedIdentity: projection.focusedIdentity,
+      damage: projection.rasterDamage,
       fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     )
@@ -144,12 +147,13 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
-    encode(
-      frame.raster,
-      sequence: frame.sequence,
-      semanticSnapshot: frame.semantics,
-      focusedIdentity: frame.focusedIdentity,
-      damage: frame.rasterDamage,
+    let projection = frame.hostProjection
+    return encode(
+      projection.raster,
+      sequence: projection.sequence,
+      semanticSnapshot: projection.semantics,
+      focusedIdentity: projection.focusedIdentity,
+      damage: projection.rasterDamage,
       fallbackBackground: fallbackBackground,
       state: &state
     )

@@ -404,32 +404,37 @@ public enum AndroidHostFrameEncoder {
     for frame: SemanticHostFrame,
     style: AndroidHostStyle = .default
   ) -> AndroidHostFrameSnapshot {
-    let damage = frame.rasterDamage
-    let focusPresentation = frame.semantics.focusPresentation(for: frame.focusedIdentity)
+    // Read every frame/semantic value through the shared host-content
+    // projection; `style` stays separate (terminal appearance is host config,
+    // not frame content). Sourcing from the projection — rather than reaching
+    // into `frame`/`frame.semantics` directly — is what keeps the host-
+    // serialized field set enumerable in one place.
+    let projection = frame.hostProjection
+    let damage = projection.rasterDamage
     return AndroidHostFrameSnapshot(
-      sequence: frame.sequence,
-      gridWidth: frame.raster.size.width,
-      gridHeight: frame.raster.size.height,
-      preferredGridWidth: frame.preferredLayoutSize?.width,
-      preferredGridHeight: frame.preferredLayoutSize?.height,
+      sequence: projection.sequence,
+      gridWidth: projection.raster.size.width,
+      gridHeight: projection.raster.size.height,
+      preferredGridWidth: projection.preferredLayoutSize?.width,
+      preferredGridHeight: projection.preferredLayoutSize?.height,
       terminalStyle: AndroidHostTerminalStyleSnapshot(renderStyle: style.renderStyle),
-      rows: rows(from: frame.raster),
-      cells: cells(from: frame.raster),
+      rows: rows(from: projection.raster),
+      cells: cells(from: projection.raster),
       imageAttachments: imageAttachments(
-        from: frame.raster.imageAttachments,
+        from: projection.raster.imageAttachments,
         fallbackBackground: style.renderStyle.appearance.backgroundColor
       ),
-      focusedIdentity: frame.focusedIdentity?.path,
-      focusPresentation: AndroidHostFocusPresentationSnapshot(focusPresentation),
-      accessibilityNodes: frame.semantics.accessibilityNodes.map {
-        AndroidHostAccessibilityNodeSnapshot($0, focusedIdentity: frame.focusedIdentity)
+      focusedIdentity: projection.focusedIdentity?.path,
+      focusPresentation: AndroidHostFocusPresentationSnapshot(projection.focusPresentation),
+      accessibilityNodes: projection.accessibilityNodes.map {
+        AndroidHostAccessibilityNodeSnapshot($0, focusedIdentity: projection.focusedIdentity)
       },
-      accessibilityAnnouncements: frame.semantics.accessibilityAnnouncements.map(
+      accessibilityAnnouncements: projection.accessibilityAnnouncements.map(
         AndroidHostAccessibilityAnnouncementSnapshot.init
       ),
-      scrollRegions: frame.semantics.scrollRoutes.isEmpty
+      scrollRegions: projection.scrollRoutes.isEmpty
         ? nil
-        : frame.semantics.scrollRoutes.map(AndroidHostScrollRegionSnapshot.init),
+        : projection.scrollRoutes.map(AndroidHostScrollRegionSnapshot.init),
       dirtyRows: damage?.dirtyRows.sorted() ?? [],
       textDamageRows: damage?.textRows.map(AndroidHostTextDamageRowSnapshot.init) ?? [],
       requiresFullTextRepaint: damage?.requiresFullTextRepaint ?? true,
