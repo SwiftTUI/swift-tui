@@ -55,7 +55,10 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
     strategy == .fullRepaint
   }
 
-  static func fullRepaint(
+  // `package`: lets the shared test recording surface in SwiftTUITestSupport
+  // synthesize a presentation result without re-deriving write steps. Stays
+  // below `public` — not API surface, just same-package (test-support) reach.
+  package static func fullRepaint(
     for surface: RasterSurface,
     capabilityProfile: TerminalCapabilityProfile,
     origin: CellPoint = .zero

@@ -289,6 +289,15 @@ let package = Package(
     ),
     .target(
       name: "SwiftTUITestSupport",
+      dependencies: [
+        // Lets the shared poll-free harness (recording surface + keep-open
+        // input readers) drive a real RunLoop via the public/@_spi(Testing)
+        // runtime surface instead of each test target re-declaring private
+        // doubles. Runtime transitively pulls Core+Views; Core is named
+        // directly for its public IR types (RasterSurface, CellSize, KeyPress…).
+        "SwiftTUICore",
+        "SwiftTUIRuntime",
+      ],
       path: "Tests/Support",
       swiftSettings: swiftSettings()
     ),
