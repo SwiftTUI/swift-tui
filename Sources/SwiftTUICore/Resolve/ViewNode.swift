@@ -110,9 +110,18 @@ package final class ViewNode {
   private var evaluationDepth: Int
   private var hasCommittedPresence: Bool
   private var suppressesStructuralLifecycle: Bool
-  private var nextChangeModifierOrdinal: Int
-  private var nextNavigationDestinationModifierOrdinal: Int
-  private var nextTaskModifierOrdinal: Int
+  private var nextChangeModifierOrdinal: Int {
+    get { frameState.nextChangeModifierOrdinal }
+    set { frameState.nextChangeModifierOrdinal = newValue }
+  }
+  private var nextNavigationDestinationModifierOrdinal: Int {
+    get { frameState.nextNavigationDestinationModifierOrdinal }
+    set { frameState.nextNavigationDestinationModifierOrdinal = newValue }
+  }
+  private var nextTaskModifierOrdinal: Int {
+    get { frameState.nextTaskModifierOrdinal }
+    set { frameState.nextTaskModifierOrdinal = newValue }
+  }
   private var preparedFrameID: UInt64 {
     get { frameState.preparedFrameID }
     set { frameState.preparedFrameID = newValue }
@@ -153,9 +162,6 @@ package final class ViewNode {
     evaluationDepth = 0
     hasCommittedPresence = false
     suppressesStructuralLifecycle = false
-    nextChangeModifierOrdinal = 0
-    nextNavigationDestinationModifierOrdinal = 0
-    nextTaskModifierOrdinal = 0
     evaluator = nil
   }
 
@@ -1325,9 +1331,6 @@ extension ViewNode {
     package var evaluationDepth: Int
     package var hasCommittedPresence: Bool
     package var suppressesStructuralLifecycle: Bool
-    package var nextChangeModifierOrdinal: Int
-    package var nextNavigationDestinationModifierOrdinal: Int
-    package var nextTaskModifierOrdinal: Int
     package var evaluator: (@MainActor () -> Void)?
     package var memoViewValue: Any?
   }
@@ -1357,9 +1360,6 @@ extension ViewNode {
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
-      nextChangeModifierOrdinal: nextChangeModifierOrdinal,
-      nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
-      nextTaskModifierOrdinal: nextTaskModifierOrdinal,
       evaluator: evaluator,
       memoViewValue: memoViewValue
     )
@@ -1392,10 +1392,6 @@ extension ViewNode {
     evaluationDepth = checkpoint.evaluationDepth
     hasCommittedPresence = checkpoint.hasCommittedPresence
     suppressesStructuralLifecycle = checkpoint.suppressesStructuralLifecycle
-    nextChangeModifierOrdinal = checkpoint.nextChangeModifierOrdinal
-    nextNavigationDestinationModifierOrdinal =
-      checkpoint.nextNavigationDestinationModifierOrdinal
-    nextTaskModifierOrdinal = checkpoint.nextTaskModifierOrdinal
     evaluator = checkpoint.evaluator
     memoViewValue = checkpoint.memoViewValue
   }
@@ -1438,6 +1434,10 @@ extension ViewNode {
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
+      // nextTaskModifierOrdinal was checkpointed but historically omitted from
+      // this debug mirror; grouping it into FrameState surfaced the gap and the
+      // totality guard now requires it here.
+      nextTaskModifierOrdinal: nextTaskModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
       evaluatorInstalled: evaluator != nil

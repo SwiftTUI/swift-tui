@@ -115,7 +115,7 @@ struct ViewGraphCheckpointTotalityTests {
       typeName: "FrameState",
       relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
     )
-    #expect(frameStateFields.count == 8)
+    #expect(frameStateFields.count == 11)
 
     let snapshotBody = functionBodyText(
       named: "debugTotalStateSnapshot",

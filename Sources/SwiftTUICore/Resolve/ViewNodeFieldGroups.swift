@@ -33,5 +33,11 @@ extension ViewNode {
     package var currentBodyStateSlotCount: Int = 0
     package var preparedFrameID: UInt64 = 0
     package var visitedFrameID: UInt64 = 0
+    // Modifier-ordinal minting for the current body pass; reset alongside the
+    // counts above in prepareForFrame/beginEvaluation, so same frame-local
+    // lifecycle.
+    package var nextChangeModifierOrdinal: Int = 0
+    package var nextNavigationDestinationModifierOrdinal: Int = 0
+    package var nextTaskModifierOrdinal: Int = 0
   }
 }
