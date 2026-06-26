@@ -121,11 +121,20 @@ public struct Rasterizer: Sendable {
   /// distinction matters because dirty-rows is an incremental-repaint
   /// optimization, while the visibility check we gate animations on is
   /// a geometric predicate on the placed tree.
+  /// - Parameter verifyIncrementalRasterDamage: when `true`, verify the
+  ///   incremental surface against a fresh raster even if
+  ///   ``incrementalVerificationPolicy`` would trust the sound-damage result.
+  ///   The frame-tail coordinator passes the soundness probe's per-frame
+  ///   sampling decision (``SoundnessProbeConfiguration/isSampledFrame``) here,
+  ///   so the F13 oracle — historically DEBUG/env-only — also runs on a sampled
+  ///   fraction of release frames when the probe is opted in. Defaults to
+  ///   `false`, preserving the policy-only behavior for every other caller.
   package func rasterizeCollectingVisibleIdentities(
     _ draw: DrawNode,
     minimumSize: CellSize,
     previousSurface: RasterSurface?,
-    damage: PresentationDamage?
+    damage: PresentationDamage?,
+    verifyIncrementalRasterDamage: Bool = false
   ) -> RasterizationResult {
     let surfaceSize = rasterSurfaceSize(for: draw, minimumSize: minimumSize)
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
@@ -144,7 +153,8 @@ public struct Rasterizer: Sendable {
         draw,
         surfaceSize: surfaceSize,
         previousSurface: previousSurface,
-        soundDamage: soundDamage
+        soundDamage: soundDamage,
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage
       )
     }
 
@@ -204,7 +214,8 @@ public struct Rasterizer: Sendable {
     _ draw: DrawNode,
     surfaceSize: CellSize,
     previousSurface: RasterSurface,
-    soundDamage: SoundRasterDamage
+    soundDamage: SoundRasterDamage,
+    verifyIncrementalRasterDamage: Bool = false
   ) -> RasterizationResult {
     let damage = soundDamage.presentationDamage
     let dirtyRows = soundDamage.dirtyRows
@@ -250,10 +261,12 @@ public struct Rasterizer: Sendable {
         lhs.order < rhs.order
       }
     )
-    if incrementalVerificationPolicy == .verifySoundDamage {
+    if incrementalVerificationPolicy == .verifySoundDamage || verifyIncrementalRasterDamage {
       // F13: when damage suppresses painting, verify against a fresh raster
       // before returning the incremental surface. A mismatch means damage was
       // incomplete, so the fresh result must force a full presentation repaint.
+      // The `verifyIncrementalRasterDamage` path runs this same oracle on the
+      // soundness probe's sampled release frames, not just DEBUG/env-forced ones.
       if let freshFallback = freshRasterizationIfIncrementalMismatch(
         draw,
         surfaceSize: surfaceSize,

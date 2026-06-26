@@ -46,6 +46,7 @@ struct FrameTailInlineStageRenderer: Sendable {
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
+    verifyIncrementalRasterDamage: Bool,
     clock: ContinuousClock?,
     beforeOverlayApply: (@Sendable () -> Void)?,
     beforeRaster: (@Sendable () -> Void)?
@@ -87,6 +88,7 @@ struct FrameTailInlineStageRenderer: Sendable {
       input,
       draw: draw.draw,
       rasterReuseDamage: rasterReusePlan.damage,
+      verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
       clock: clock,
       beforeRaster: beforeRaster
     )
@@ -162,6 +164,7 @@ struct FrameTailInlineStageRenderer: Sendable {
     _ input: FrameTailInput,
     draw: DrawNode,
     rasterReuseDamage: PresentationDamage?,
+    verifyIncrementalRasterDamage: Bool,
     clock: ContinuousClock?,
     beforeRaster: (@Sendable () -> Void)?
   ) -> FrameTailRasterOutput {
@@ -172,7 +175,8 @@ struct FrameTailInlineStageRenderer: Sendable {
         draw,
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
         previousSurface: previousSurface,
-        damage: rasterReuseDamage
+        damage: rasterReuseDamage,
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage
       )
     }
     let finalPresentationDamage =

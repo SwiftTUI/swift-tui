@@ -115,6 +115,7 @@ final class FrameTailRenderer: Sendable {
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
+    verifyIncrementalRasterDamage: Bool,
     clock: ContinuousClock?
   ) -> FrameTailOutput {
     let result = workerExecutor.timedSync(clock: clock) {
@@ -123,6 +124,7 @@ final class FrameTailRenderer: Sendable {
         layout: layout,
         placed: placed,
         animationOverlaySnapshot: animationOverlaySnapshot,
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
         clock: clock,
         beforeOverlayApply: renderHooks.withLock { $0?.beforeOverlayApply },
         beforeRaster: renderHooks.withLock { $0?.beforeRaster }
@@ -144,6 +146,7 @@ final class FrameTailRenderer: Sendable {
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
+    verifyIncrementalRasterDamage: Bool,
     clock: ContinuousClock?
   ) async -> FrameTailOutput {
     let result = await workerExecutor.timedAsync(clock: clock) {
@@ -152,6 +155,7 @@ final class FrameTailRenderer: Sendable {
         layout: layout,
         placed: placed,
         animationOverlaySnapshot: animationOverlaySnapshot,
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
         clock: clock,
         beforeOverlayApply: self.renderHooks.withLock { $0?.beforeOverlayApply },
         beforeRaster: self.renderHooks.withLock { $0?.beforeRaster }
