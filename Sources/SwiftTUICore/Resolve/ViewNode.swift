@@ -104,12 +104,35 @@ package final class ViewNode {
   package private(set) var pendingChangeHandlerIDs: [String]
 
   private let dependencyTracker: DependencyTracker
-  private var registrationCaptureDepth: Int
-  private var runtimeRegistrationMutationGeneration: UInt64
-  private var checkpointMutationGeneration: UInt64
-  private var evaluationDepth: Int
-  private var hasCommittedPresence: Bool
-  private var suppressesStructuralLifecycle: Bool
+  /// Cross-frame internal bookkeeping, grouped so checkpoint/restore move it as
+  /// a unit (see ``EvaluationState`` in ViewNodeFieldGroups.swift). The six
+  /// fields below are computed forwarders preserving their original names.
+  private var evaluationState = EvaluationState()
+
+  private var registrationCaptureDepth: Int {
+    get { evaluationState.registrationCaptureDepth }
+    set { evaluationState.registrationCaptureDepth = newValue }
+  }
+  private var runtimeRegistrationMutationGeneration: UInt64 {
+    get { evaluationState.runtimeRegistrationMutationGeneration }
+    set { evaluationState.runtimeRegistrationMutationGeneration = newValue }
+  }
+  private var checkpointMutationGeneration: UInt64 {
+    get { evaluationState.checkpointMutationGeneration }
+    set { evaluationState.checkpointMutationGeneration = newValue }
+  }
+  private var evaluationDepth: Int {
+    get { evaluationState.evaluationDepth }
+    set { evaluationState.evaluationDepth = newValue }
+  }
+  private var hasCommittedPresence: Bool {
+    get { evaluationState.hasCommittedPresence }
+    set { evaluationState.hasCommittedPresence = newValue }
+  }
+  private var suppressesStructuralLifecycle: Bool {
+    get { evaluationState.suppressesStructuralLifecycle }
+    set { evaluationState.suppressesStructuralLifecycle = newValue }
+  }
   private var nextChangeModifierOrdinal: Int {
     get { frameState.nextChangeModifierOrdinal }
     set { frameState.nextChangeModifierOrdinal = newValue }
@@ -156,12 +179,10 @@ package final class ViewNode {
     // currentBodyStateSlotCount=0, preparedFrameID/visitedFrameID=0).
     pendingChangeHandlerIDs = []
     dependencyTracker = .init()
-    registrationCaptureDepth = 0
-    runtimeRegistrationMutationGeneration = 0
-    checkpointMutationGeneration = 0
-    evaluationDepth = 0
-    hasCommittedPresence = false
-    suppressesStructuralLifecycle = false
+    // registrationCaptureDepth/runtimeRegistrationMutationGeneration/
+    // checkpointMutationGeneration/evaluationDepth default to 0 and
+    // hasCommittedPresence/suppressesStructuralLifecycle to false via
+    // EvaluationState()'s defaults.
     evaluator = nil
   }
 
@@ -1325,14 +1346,16 @@ extension ViewNode {
     package var frameState: FrameState
     package var pendingChangeHandlerIDs: [String]
     package var dependencyTracker: DependencyTracker.Checkpoint
-    package var registrationCaptureDepth: Int
-    package var runtimeRegistrationMutationGeneration: UInt64
-    package var checkpointMutationGeneration: UInt64
-    package var evaluationDepth: Int
-    package var hasCommittedPresence: Bool
-    package var suppressesStructuralLifecycle: Bool
+    package var evaluationState: EvaluationState
     package var evaluator: (@MainActor () -> Void)?
     package var memoViewValue: Any?
+
+    /// Convenience read of the per-node checkpoint mutation generation, forwarded
+    /// from ``evaluationState`` so the delta-checkpoint shadow keeps reading it
+    /// directly off the checkpoint.
+    package var checkpointMutationGeneration: UInt64 {
+      evaluationState.checkpointMutationGeneration
+    }
   }
 
   package func makeCheckpoint() -> Checkpoint {
@@ -1354,12 +1377,7 @@ extension ViewNode {
       frameState: frameState,
       pendingChangeHandlerIDs: pendingChangeHandlerIDs,
       dependencyTracker: dependencyTracker.makeCheckpoint(),
-      registrationCaptureDepth: registrationCaptureDepth,
-      runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,
-      checkpointMutationGeneration: checkpointMutationGeneration,
-      evaluationDepth: evaluationDepth,
-      hasCommittedPresence: hasCommittedPresence,
-      suppressesStructuralLifecycle: suppressesStructuralLifecycle,
+      evaluationState: evaluationState,
       evaluator: evaluator,
       memoViewValue: memoViewValue
     )
@@ -1386,12 +1404,7 @@ extension ViewNode {
     frameState = checkpoint.frameState
     pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
     dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)
-    registrationCaptureDepth = checkpoint.registrationCaptureDepth
-    runtimeRegistrationMutationGeneration = checkpoint.runtimeRegistrationMutationGeneration
-    checkpointMutationGeneration = checkpoint.checkpointMutationGeneration
-    evaluationDepth = checkpoint.evaluationDepth
-    hasCommittedPresence = checkpoint.hasCommittedPresence
-    suppressesStructuralLifecycle = checkpoint.suppressesStructuralLifecycle
+    evaluationState = checkpoint.evaluationState
     evaluator = checkpoint.evaluator
     memoViewValue = checkpoint.memoViewValue
   }

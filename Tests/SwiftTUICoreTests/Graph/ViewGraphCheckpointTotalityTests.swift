@@ -102,30 +102,33 @@ struct ViewGraphCheckpointTotalityTests {
     #expect(Set(viewNodeCheckpointFields) == Set(viewNodeFields))
   }
 
-  @Test("ViewNode FrameState group members are mirrored in the flat debug snapshot")
-  func viewNodeFrameStateGroupIsDebugSnapshotCovered() throws {
-    // FrameState (the first ViewNode field group, in ViewNodeFieldGroups.swift)
-    // is checkpointed and restored as a whole struct, so makeCheckpoint /
-    // restoreCheckpoint are compiler-enforced complete for its members. The flat
+  @Test("ViewNode field-group members are all mirrored in the flat debug snapshot")
+  func viewNodeFieldGroupsAreDebugSnapshotCovered() throws {
+    // The ViewNode field groups (in ViewNodeFieldGroups.swift) are checkpointed
+    // and restored as whole structs, so makeCheckpoint / restoreCheckpoint are
+    // compiler-enforced complete for their members. The flat
     // debugTotalStateSnapshot is the one remaining hand-mirror of those members;
-    // guard that every FrameState field is read into the snapshot so a field
-    // added to the group cannot silently fall out of the debug-state contract.
-    let frameStateFields = try parsedStoredVarNames(
-      typeKind: "struct",
-      typeName: "FrameState",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
-    )
-    #expect(frameStateFields.count == 11)
+    // guard that every group field is read into the snapshot so a field added to
+    // a group cannot silently fall out of the debug-state contract.
+    let groupNames = ["FrameState", "EvaluationState"]
+    let groupMembers = try groupNames.flatMap { name in
+      try parsedStoredVarNames(
+        typeKind: "struct",
+        typeName: name,
+        relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
+      )
+    }
+    #expect(groupMembers.count == 17)  // 11 FrameState + 6 EvaluationState
 
     let snapshotBody = functionBodyText(
       named: "debugTotalStateSnapshot",
       in: try sourceText(relativePath: "Sources/SwiftTUICore/Resolve/ViewNode.swift")
     )
     #expect(!snapshotBody.isEmpty, "could not locate ViewNode.debugTotalStateSnapshot()")
-    for field in frameStateFields {
+    for field in groupMembers {
       #expect(
         snapshotBody.contains(field),
-        "ViewNode.FrameState.\(field) is not read into debugTotalStateSnapshot — the flat debug mirror has drifted from the group."
+        "ViewNode group field \(field) is not read into debugTotalStateSnapshot — the flat debug mirror has drifted from the groups."
       )
     }
   }
