@@ -12,8 +12,8 @@ extension AnimationController {
     package var transitions: TransitionRegistry
     package var batchCompletion: BatchCompletionState
     package var frameHead: FrameHeadTransactionState
+    package var completionLedger: CompletionLedger
     package var activeAnimations: [AnimationKey: ActiveAnimation]
-    package var registeredAnimations: [AnimationBox: Animation]
     package var removingNodes: [ViewNodeID: RemovalEntry]
     package var lastTickResult: AnimationTickResult
   }

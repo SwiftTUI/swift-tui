@@ -12,14 +12,16 @@ package final class AnimationController: Sendable {
   private var previousFrame = PreviousFrameState()
   /// `.transition()` registration maps (current / previous / pending).
   private var transitions = TransitionRegistry()
-  /// `withAnimation` completion bookkeeping (closures + ref counts + stranded
-  /// drains).
+  /// `withAnimation` batch ref-count bookkeeping (counts + empty-batch drains).
   private var batchCompletion = BatchCompletionState()
   /// Frame-head transaction bookkeeping (open flag + deferred completions).
   private var frameHead = FrameHeadTransactionState()
+  /// The async-writable registration set — completion closures + animation-box
+  /// registrations an async task can grow between frames; carried across an
+  /// in-flight publish as a unit. See ``CompletionLedger``.
+  private var completionLedger = CompletionLedger()
 
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
-  private var registeredAnimations: [AnimationBox: Animation] = [:]
   private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
   package private(set) var lastTickResult: AnimationTickResult = .init()
 
@@ -82,8 +84,15 @@ package final class AnimationController: Sendable {
   /// The controller fires and removes the entry once every animation
   /// (and every removal overlay) tagged with the batch ID has drained.
   private var completionClosures: [AnimationBatchID: @Sendable () -> Void] {
-    get { batchCompletion.completionClosures }
-    set { batchCompletion.completionClosures = newValue }
+    get { completionLedger.completionClosures }
+    set { completionLedger.completionClosures = newValue }
+  }
+  /// Animation boxes registered for the current frame. Forwarded to the
+  /// ``CompletionLedger`` so the per-tick logic reads the original name while the
+  /// async-writable set checkpoints and carries as a unit.
+  private var registeredAnimations: [AnimationBox: Animation] {
+    get { completionLedger.registeredAnimations }
+    set { completionLedger.registeredAnimations = newValue }
   }
   /// Per-batch active-animation counts.  Incremented on enqueue;
   /// decremented when an animation completes or is superseded.  When
@@ -218,8 +227,8 @@ package final class AnimationController: Sendable {
       transitions: transitions,
       batchCompletion: batchCompletion,
       frameHead: frameHead,
+      completionLedger: completionLedger,
       activeAnimations: activeAnimations,
-      registeredAnimations: registeredAnimations,
       removingNodes: removingNodes,
       lastTickResult: lastTickResult
     )
@@ -230,8 +239,8 @@ package final class AnimationController: Sendable {
     transitions = checkpoint.transitions
     batchCompletion = checkpoint.batchCompletion
     frameHead = checkpoint.frameHead
+    completionLedger = checkpoint.completionLedger
     activeAnimations = checkpoint.activeAnimations
-    registeredAnimations = checkpoint.registeredAnimations
     removingNodes = checkpoint.removingNodes
     lastTickResult = checkpoint.lastTickResult
   }
@@ -256,27 +265,18 @@ package final class AnimationController: Sendable {
     // them (it predates them), so it neither references nor fired them; they are
     // pending registrations that must survive the publish.
     //
-    // Totality: these two collections are EXACTLY the state an async task can
-    // grow on the live controller between frames — the completion-closure and
-    // animation-box maps, written by `withAnimation`'s `AnimationCompletionSink`
-    // / `AnimationRegistrationSink`. Transitions are deliberately NOT carried:
+    // Totality: the async-writable registration set is exactly `CompletionLedger`
+    // — the completion-closure and animation-box maps an async task grows between
+    // frames via `withAnimation`'s `AnimationCompletionSink` /
+    // `AnimationRegistrationSink`. Transitions are deliberately NOT in the ledger:
     // their sink (`TransitionRegistrationSink`, driven by the `.transition()`
     // modifier) only fires during resolve, so they are frame-derived and already
-    // live in the draft. If a third async-writable sink is ever added, it must be
-    // carried here too (route it through `ConcurrentRegistrationCarry`), or it
-    // will be silently clobbered by the restore above.
-    let concurrentCompletions = ConcurrentRegistrationCarry.sinceBaseline(
-      live: completionClosures,
-      baseline: baseline.batchCompletion.completionClosures
-    )
-    let concurrentRegisteredAnimations = ConcurrentRegistrationCarry.sinceBaseline(
-      live: registeredAnimations,
-      baseline: baseline.registeredAnimations
-    )
+    // live in the draft. Because the carry runs through the ledger's own
+    // `concurrentRegistrations(since:)` / `reapply(_:)`, a map added to the ledger
+    // is carried automatically — the publish can no longer silently drop one.
+    let carried = completionLedger.concurrentRegistrations(since: baseline.completionLedger)
     restore(draftController.makeCheckpoint())
-    ConcurrentRegistrationCarry.reapply(
-      concurrentCompletions, into: &batchCompletion.completionClosures)
-    ConcurrentRegistrationCarry.reapply(concurrentRegisteredAnimations, into: &registeredAnimations)
+    completionLedger.reapply(carried)
   }
 
   /// Stores a snapshot of the placed tree at the end of the frame so
@@ -1541,9 +1541,9 @@ package final class AnimationController: Sendable {
     previousFrame.reset()
     transitions.reset()
     batchCompletion.reset()
+    completionLedger.reset()
     frameHead.reset()
     activeAnimations.removeAll(keepingCapacity: true)
-    registeredAnimations.removeAll(keepingCapacity: true)
     removingNodes.removeAll(keepingCapacity: true)
     lastTickResult = .init()
   }
