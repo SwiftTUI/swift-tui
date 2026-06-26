@@ -64,4 +64,23 @@ extension ViewNode {
     package var isCommittedSnapshotFresh: Bool = false
     package var hasStaleIslandDescendant: Bool = false
   }
+
+  /// The node's retained per-node state that survives across frames: its `@State`
+  /// slots, recorded dependency edges, lifecycle phase, registered handlers, and
+  /// the pending change-handler IDs awaiting dispatch. These are small per-node
+  /// collections; like the analogous `ViewGraph` field groups they are reached
+  /// through plain get/set forwarders, so an in-place mutation copies only the
+  /// small per-node collection.
+  ///
+  /// `@MainActor`-isolated because `NodeHandlers` carries main-actor handler
+  /// closures (matching the enclosing `ViewNode`); the other groups stay
+  /// nonisolated.
+  @MainActor
+  package struct PersistentState {
+    package var stateSlots: [Int: AnyStateSlot] = [:]
+    package var dependencies: DependencySet = .init()
+    package var lifecycleState: NodeLifecycleState = .alive
+    package var registeredHandlers: NodeHandlers = .init()
+    package var pendingChangeHandlerIDs: [String] = []
+  }
 }

@@ -75,10 +75,28 @@ package final class ViewNode {
   }
 
   package private(set) var children: [ViewNode]
-  package private(set) var stateSlots: [Int: AnyStateSlot]
-  package private(set) var dependencies: DependencySet
-  package private(set) var lifecycleState: NodeLifecycleState
-  package private(set) var registeredHandlers: NodeHandlers
+
+  /// Retained per-node state, grouped so checkpoint/restore move it as a unit
+  /// (see ``PersistentState`` in ViewNodeFieldGroups.swift). The five fields are
+  /// computed forwarders preserving their names and `package private(set)`.
+  private var persistentState = PersistentState()
+
+  package private(set) var stateSlots: [Int: AnyStateSlot] {
+    get { persistentState.stateSlots }
+    set { persistentState.stateSlots = newValue }
+  }
+  package private(set) var dependencies: DependencySet {
+    get { persistentState.dependencies }
+    set { persistentState.dependencies = newValue }
+  }
+  package private(set) var lifecycleState: NodeLifecycleState {
+    get { persistentState.lifecycleState }
+    set { persistentState.lifecycleState = newValue }
+  }
+  package private(set) var registeredHandlers: NodeHandlers {
+    get { persistentState.registeredHandlers }
+    set { persistentState.registeredHandlers = newValue }
+  }
 
   package var isDirty: Bool {
     get { reuseState.isDirty }
@@ -115,7 +133,10 @@ package final class ViewNode {
     get { frameState.currentBodyStateSlotCount }
     set { frameState.currentBodyStateSlotCount = newValue }
   }
-  package private(set) var pendingChangeHandlerIDs: [String]
+  package private(set) var pendingChangeHandlerIDs: [String] {
+    get { persistentState.pendingChangeHandlerIDs }
+    set { persistentState.pendingChangeHandlerIDs = newValue }
+  }
 
   private let dependencyTracker: DependencyTracker
   /// Cross-frame internal bookkeeping, grouped so checkpoint/restore move it as
@@ -180,16 +201,11 @@ package final class ViewNode {
       kind: .view("EmptyView")
     )
     children = []
-    stateSlots = [:]
-    dependencies = .init()
-    lifecycleState = .alive
-    registeredHandlers = .init()
-    // ReuseState() defaults isDirty=true (and the freshness flags false).
-    // The frame-local working set initializes from `FrameState()`'s defaults
-    // (wasPresentAtFrameStart/wasVisitedThisFrame=false, previousChildrenIdentities=[],
-    // previousLifecycleMetadata=.init(), bodyStateSlotCount=nil,
-    // currentBodyStateSlotCount=0, preparedFrameID/visitedFrameID=0).
-    pendingChangeHandlerIDs = []
+    // PersistentState() defaults stateSlots=[:], dependencies=.init(),
+    // lifecycleState=.alive, registeredHandlers=.init(),
+    // pendingChangeHandlerIDs=[]; ReuseState() defaults isDirty=true (freshness
+    // flags false); FrameState() defaults the per-frame working set to its
+    // empty/zero values.
     dependencyTracker = .init()
     // registrationCaptureDepth/runtimeRegistrationMutationGeneration/
     // checkpointMutationGeneration/evaluationDepth default to 0 and
@@ -1349,12 +1365,8 @@ extension ViewNode {
     package var committed: ResolvedNode
     package var reuseState: ReuseState
     package var children: [ViewNode]
-    package var stateSlots: [Int: AnyStateSlot]
-    package var dependencies: DependencySet
-    package var lifecycleState: NodeLifecycleState
-    package var registeredHandlers: NodeHandlers
+    package var persistentState: PersistentState
     package var frameState: FrameState
-    package var pendingChangeHandlerIDs: [String]
     package var dependencyTracker: DependencyTracker.Checkpoint
     package var evaluationState: EvaluationState
     package var evaluator: (@MainActor () -> Void)?
@@ -1378,12 +1390,8 @@ extension ViewNode {
       committed: committed,
       reuseState: reuseState,
       children: children,
-      stateSlots: stateSlots,
-      dependencies: dependencies,
-      lifecycleState: lifecycleState,
-      registeredHandlers: registeredHandlers,
+      persistentState: persistentState,
       frameState: frameState,
-      pendingChangeHandlerIDs: pendingChangeHandlerIDs,
       dependencyTracker: dependencyTracker.makeCheckpoint(),
       evaluationState: evaluationState,
       evaluator: evaluator,
@@ -1403,12 +1411,8 @@ extension ViewNode {
     committed = checkpoint.committed
     reuseState = checkpoint.reuseState
     children = checkpoint.children
-    stateSlots = checkpoint.stateSlots
-    dependencies = checkpoint.dependencies
-    lifecycleState = checkpoint.lifecycleState
-    registeredHandlers = checkpoint.registeredHandlers
+    persistentState = checkpoint.persistentState
     frameState = checkpoint.frameState
-    pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
     dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)
     evaluationState = checkpoint.evaluationState
     evaluator = checkpoint.evaluator
