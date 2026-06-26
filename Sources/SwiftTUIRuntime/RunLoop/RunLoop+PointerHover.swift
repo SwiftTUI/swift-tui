@@ -76,13 +76,13 @@ extension RunLoop {
   package func updateArmedPointerState(
     at location: PointerLocation
   ) {
-    guard let armedPointerRouteID else {
+    guard let armedRouteID = pointerInteraction.armedRouteID else {
       return
     }
 
     let currentRouteID = hitTarget(at: location)?.region.routeID
-    if currentRouteID == armedPointerRouteID,
-      let region = interactionRegion(routeID: armedPointerRouteID)
+    if currentRouteID == armedRouteID,
+      let region = interactionRegion(routeID: armedRouteID)
     {
       setPressedIdentity(focusIdentity(for: region.identity), transient: false)
     } else {

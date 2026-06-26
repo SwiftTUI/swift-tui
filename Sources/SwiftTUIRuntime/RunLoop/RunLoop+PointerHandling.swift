@@ -30,7 +30,7 @@ extension RunLoop {
     switch mouseEvent.kind {
     case .moved:
       return localPointerHandlerRegistry.hasHoverSubscribers
-        || armedPointerRouteID != nil || capturedPointerRouteID != nil
+        || pointerInteraction.isRouting
     case .down, .up, .dragged:
       return true
     case .scrolled:
@@ -50,17 +50,14 @@ extension RunLoop {
     let hitTarget = hitTarget(at: location)
 
     guard let hitTarget else {
-      armedPointerRouteID = nil
-      armedPointerRouteUsesPointerHandler = false
-      capturedPointerRouteID = nil
-      dragStartLocation = nil
+      pointerInteraction.reset()
       setPressedIdentity(nil, transient: false)
       return
     }
 
     // Remember where the press began so a later drag can measure whether it
     // crossed the scroll-takeover threshold (see attemptDragThresholdTransfer…).
-    dragStartLocation = location
+    pointerInteraction.beginPress(at: location)
 
     // A fresh press inside a flinging scroll view stops the fling (touch-to-stop),
     // and seeds the pan-velocity sampler so a drag that becomes a pan can measure
@@ -90,33 +87,26 @@ extension RunLoop {
         _ = focusTracker.setFocus(to: focusIdentity)
       }
       if shouldCapturePointer(routeID: hitTarget.region.routeID) {
-        capturedPointerRouteID = hitTarget.region.routeID
-        armedPointerRouteID = nil
-        armedPointerRouteUsesPointerHandler = false
+        pointerInteraction.capture(hitTarget.region.routeID)
       } else {
-        capturedPointerRouteID = nil
         // Non-capturing gestures like TapGesture still need the rest of the
         // pressed interaction stream so they can observe drag cancellation and
         // the eventual release.
-        armedPointerRouteID = hitTarget.region.routeID
-        armedPointerRouteUsesPointerHandler = true
+        pointerInteraction.arm(hitTarget.region.routeID, usesPointerHandler: true)
       }
       setPressedIdentity(hitTarget.focusIdentity, transient: false)
       return
     }
 
-    capturedPointerRouteID = nil
     if let focusIdentity = hitTarget.focusIdentity,
       shouldClickFocus(focusIdentity, at: location)
     {
       _ = focusTracker.setFocus(to: focusIdentity)
-      armedPointerRouteID = hitTarget.region.routeID
-      armedPointerRouteUsesPointerHandler = false
+      pointerInteraction.arm(hitTarget.region.routeID, usesPointerHandler: false)
       setPressedIdentity(focusIdentity, transient: false)
       return
     }
-    armedPointerRouteID = nil
-    armedPointerRouteUsesPointerHandler = false
+    pointerInteraction.clearRouting()
     setPressedIdentity(nil, transient: false)
   }
 
@@ -130,18 +120,15 @@ extension RunLoop {
     }
 
     defer {
-      capturedPointerRouteID = nil
-      armedPointerRouteID = nil
-      armedPointerRouteUsesPointerHandler = false
-      dragStartLocation = nil
+      pointerInteraction.reset()
       setPressedIdentity(nil, transient: false)
     }
 
-    if let capturedPointerRouteID,
-      let region = interactionRegion(routeID: capturedPointerRouteID)
+    if let capturedRouteID = pointerInteraction.capturedRouteID,
+      let region = interactionRegion(routeID: capturedRouteID)
     {
       _ = dispatchPointerEvent(
-        preferredRouteID: capturedPointerRouteID,
+        preferredRouteID: capturedRouteID,
         identity: region.identity,
         event: .init(
           kind: .up(.primary),
@@ -163,17 +150,17 @@ extension RunLoop {
       return
     }
 
-    guard let armedPointerRouteID else {
+    guard let armedRouteID = pointerInteraction.armedRouteID else {
       return
     }
 
     let hitTarget = hitTarget(at: location)
-    guard let region = interactionRegion(routeID: armedPointerRouteID) else {
+    guard let region = interactionRegion(routeID: armedRouteID) else {
       return
     }
 
     let pointerHandled = dispatchPointerEvent(
-      preferredRouteID: armedPointerRouteID,
+      preferredRouteID: armedRouteID,
       identity: region.identity,
       event: .init(
         kind: .up(.primary),
@@ -187,11 +174,11 @@ extension RunLoop {
     if pointerHandled {
       return
     }
-    if armedPointerRouteUsesPointerHandler {
+    if pointerInteraction.armedRouteUsesPointerHandler {
       return
     }
 
-    guard hitTarget?.region.routeID == armedPointerRouteID else {
+    guard hitTarget?.region.routeID == armedRouteID else {
       return
     }
 
@@ -220,15 +207,15 @@ extension RunLoop {
   ) {
     updatePointerHover(at: location)
 
-    guard armedPointerRouteID != nil else {
+    guard pointerInteraction.armedRouteID != nil else {
       return
     }
-    if armedPointerRouteUsesPointerHandler,
-      let armedPointerRouteID,
-      let region = interactionRegion(routeID: armedPointerRouteID)
+    if pointerInteraction.armedRouteUsesPointerHandler,
+      let armedRouteID = pointerInteraction.armedRouteID,
+      let region = interactionRegion(routeID: armedRouteID)
     {
       let handled = dispatchPointerEvent(
-        preferredRouteID: armedPointerRouteID,
+        preferredRouteID: armedRouteID,
         identity: region.identity,
         event: .init(
           kind: .dragged(.primary),
@@ -263,15 +250,15 @@ extension RunLoop {
       return
     }
 
-    if let capturedPointerRouteID,
-      let region = interactionRegion(routeID: capturedPointerRouteID)
+    if let capturedRouteID = pointerInteraction.capturedRouteID,
+      let region = interactionRegion(routeID: capturedRouteID)
     {
       // Sample the captured pan so a release can estimate fling velocity. Cheap
       // and harmless for non-scroll captured routes (consumed only at a scroll
       // route's `.up`).
       recordScrollPanSample(location: location, timestamp: timestamp)
       _ = dispatchPointerEvent(
-        preferredRouteID: capturedPointerRouteID,
+        preferredRouteID: capturedRouteID,
         identity: region.identity,
         event: .init(
           kind: .dragged(.primary),

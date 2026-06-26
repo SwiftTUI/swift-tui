@@ -20,9 +20,9 @@ extension RunLoop {
     at location: PointerLocation,
     timestamp: MonotonicInstant
   ) -> Bool {
-    guard capturedPointerRouteID == nil,
-      armedPointerRouteID != nil,
-      let dragStartLocation
+    guard pointerInteraction.capturedRouteID == nil,
+      pointerInteraction.armedRouteID != nil,
+      let dragStartLocation = pointerInteraction.dragStartLocation
     else {
       return false
     }
@@ -45,21 +45,19 @@ extension RunLoop {
       return false
     }
 
-    // Cancel the armed control: it must not activate when the gesture ends.
+    // Cancel the armed control (it must not activate when the gesture ends) and
+    // capture the scroll view instead, anchoring the pan at the *press origin*
+    // and replaying the drag to the current location. Anchoring at the origin
+    // (not the takeover point) keeps the full drag distance — important because
+    // the run loop coalesces drag bursts, so a fast drag arrives as one event
+    // whose whole delta must pan rather than be swallowed as a deadzone. The
+    // `capture(_:)` transition clears the armed route as it takes the capture.
     setPressedIdentity(nil, transient: false)
-    armedPointerRouteID = nil
-    armedPointerRouteUsesPointerHandler = false
-
-    // Capture the scroll view, anchoring the pan at the *press origin* and
-    // replaying the drag to the current location. Anchoring at the origin (not
-    // the takeover point) keeps the full drag distance — important because the
-    // run loop coalesces drag bursts, so a fast drag arrives as one event whose
-    // whole delta must pan rather than be swallowed as a deadzone.
     let scrollRouteID = primaryRouteID(
       for: scrollRoute.identity,
       ownerNodeID: scrollRoute.viewNodeID
     )
-    capturedPointerRouteID = scrollRouteID
+    pointerInteraction.capture(scrollRouteID)
     // Seed the pan-velocity sampler for the handed-off pan so a quick flick after
     // takeover can fling. The two synthetic events below share `timestamp`
     // (Δt = 0), which the sampler ignores; real drags afterward add timed samples.

@@ -66,12 +66,10 @@ extension RunLoop {
     // Release pointer capture if the captured region disappeared from
     // the rendered tree (e.g. a view with an active gesture was removed
     // mid-interaction).
-    if let capturedID = capturedPointerRouteID,
+    if let capturedID = pointerInteraction.capturedRouteID,
       interactionRegion(routeID: capturedID) == nil
     {
-      capturedPointerRouteID = nil
-      armedPointerRouteID = nil
-      armedPointerRouteUsesPointerHandler = false
+      pointerInteraction.clearRouting()
     }
     if let hoveredPointerRouteID,
       interactionRegion(routeID: hoveredPointerRouteID) == nil

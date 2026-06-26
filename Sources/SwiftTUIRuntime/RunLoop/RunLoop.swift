@@ -48,13 +48,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []
   package var pressedIdentity: Identity?
   package var transientPressedIdentity: Identity?
-  package var armedPointerRouteID: RouteID?
-  package var armedPointerRouteUsesPointerHandler = false
-  package var capturedPointerRouteID: RouteID?
-  /// Where the active press began, tracked while a route is armed/captured so a
-  /// drag that exceeds the scroll-takeover threshold can be measured. Set on
-  /// `.down` and cleared on `.up`.
-  package var dragStartLocation: PointerLocation?
+  /// Pointer-routing state — the armed/captured route, the custom-handler flag,
+  /// and the press origin — owned as one value so every reset moves the whole
+  /// tuple coherently and a missed field can't mis-route the next gesture. See
+  /// ``PointerInteractionState``.
+  package var pointerInteraction = PointerInteractionState()
   /// Run-loop-owned scroll momentum (fling) physics. Ticked on the animation
   /// deadline cadence and fed integer offset deltas into
   /// `localScrollPositionRegistry`; momentum is physics, not an animation tween,
