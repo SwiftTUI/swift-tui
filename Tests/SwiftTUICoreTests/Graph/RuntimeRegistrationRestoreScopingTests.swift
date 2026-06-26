@@ -403,6 +403,88 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
   }
 
+  // MARK: - Generative property: scoped restore == full rebuild over a shape space
+
+  /// Generative reconciliation harness. The hand-written tests above pin one
+  /// fixed two-sibling shape with sibling A invalidated; the dropped-handler
+  /// "strand" class instead hides at *some* sibling count / *some* invalidated
+  /// position. This deterministically enumerates a `(siblingCount, changedIndex)`
+  /// product and asserts the universal property — a scoped `.subtrees` restore
+  /// must equal a full rebuild across all 15 registry families
+  /// (``assertBroadRegistriesMatch``) — for every shape. No RNG: the shapes are
+  /// enumerated, so a failure is reproducible by its `SeamShape` argument.
+  ///
+  /// Next extensions (Group/ForEach splice intermediaries, portal/overlay and
+  /// lazy-tab hosts) plug into the same seed → scoped-restore → assert spine.
+  @Test(
+    "scoped restore equals full rebuild across all registries for generated shapes",
+    arguments: RuntimeRegistrationRestoreScopingTests.generatedSeamShapes
+  )
+  func scopedRestoreEqualsFullRebuildAcrossGeneratedShapes(_ shape: SeamShape) {
+    let rootIdentity = testIdentity("Root")
+    let namespace = MatchedGeometryNamespace(0)
+    let probe = RuntimeRegistrationProbeSink()
+
+    let siblings = (0..<shape.siblingCount).map { index in
+      SeamSibling(
+        identity: testIdentity("Root", "S\(index)"),
+        label: "S\(index)",
+        marker: "s\(index)-0"
+      )
+    }
+
+    let graph = ViewGraph()
+    seedBroadRegistrationSiblings(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      siblings: siblings,
+      namespace: namespace,
+      probe: probe
+    )
+
+    // Frame 1: full publish into the live registry — the canonical order.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let initialDraft = ViewGraphFrameDraft(liveRegistrations: liveRegistrations, checkpoint: nil)
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    _ = initialDraft.commitRuntimeRegistrations(from: graph)
+
+    // Frame 2: narrowly re-evaluate ONLY the changed sibling → scoped restore.
+    let changed = siblings[shape.changedIndex]
+    graph.beginFrame()
+    let changedNode = graph.beginEvaluation(identity: changed.identity, invalidator: nil)
+    recordBroadRegistrations(
+      on: changedNode,
+      identity: changed.identity,
+      marker: "\(changed.marker)-1",
+      namespace: namespace,
+      probe: probe
+    )
+    graph.finishEvaluation(
+      changedNode,
+      resolved: ResolvedNode(identity: changed.identity, kind: .view(changed.label)),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let rootFrameDraft = ViewGraphFrameDraft(liveRegistrations: liveRegistrations, checkpoint: nil)
+    rootFrameDraft.recordDirtyEvaluationPlan(nil)
+    _ = rootFrameDraft.commitRuntimeRegistrations(from: graph)
+
+    // Oracle: a full rebuild of the same committed graph.
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    assertBroadRegistriesMatch(
+      liveRegistrations,
+      fullRebuild,
+      identities: siblings.map(\.identity),
+      changedIdentity: changed.identity,
+      namespace: namespace,
+      probe: probe
+    )
+  }
+
   @Test("structured lifecycle teardown preserves path-colliding sibling component")
   func structuredLifecycleTeardownPreservesPathCollidingSiblingComponent() {
     let preservedIdentity = Identity(components: ["Root", "A/B"])
@@ -618,6 +700,73 @@ struct RuntimeRegistrationRestoreScopingTests {
           ResolvedNode(identity: aIdentity, kind: .view("A")),
           ResolvedNode(identity: bIdentity, kind: .view("B")),
         ]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+  }
+
+  /// A generated tree shape: `siblingCount` broadly-registered siblings under
+  /// the root, with the sibling at `changedIndex` invalidated on frame 2.
+  struct SeamShape: CustomStringConvertible, Sendable {
+    let siblingCount: Int
+    let changedIndex: Int
+    var description: String { "siblings=\(siblingCount),changed=\(changedIndex)" }
+  }
+
+  private struct SeamSibling {
+    let identity: Identity
+    let label: String
+    let marker: String
+  }
+
+  /// Deterministic enumeration of the shape space: every `(count, changedIndex)`
+  /// pair for 2…4 siblings (9 shapes). Enumerated, not random, so a failure is
+  /// reproducible by its argument.
+  nonisolated static let generatedSeamShapes: [SeamShape] = {
+    var shapes: [SeamShape] = []
+    for siblingCount in 2...4 {
+      for changedIndex in 0..<siblingCount {
+        shapes.append(SeamShape(siblingCount: siblingCount, changedIndex: changedIndex))
+      }
+    }
+    return shapes
+  }()
+
+  /// N-sibling generalization of ``seedTwoBroadRegistrationSiblings``: seeds each
+  /// sibling with the full broad registration set under the root, then commits
+  /// frame 1.
+  private func seedBroadRegistrationSiblings(
+    graph: ViewGraph,
+    rootIdentity: Identity,
+    siblings: [SeamSibling],
+    namespace: MatchedGeometryNamespace,
+    probe: RuntimeRegistrationProbeSink
+  ) {
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    for sibling in siblings {
+      let node = graph.beginEvaluation(identity: sibling.identity, invalidator: nil)
+      recordBroadRegistrations(
+        on: node,
+        identity: sibling.identity,
+        marker: sibling.marker,
+        namespace: namespace,
+        probe: probe
+      )
+      graph.finishEvaluation(
+        node,
+        resolved: ResolvedNode(identity: sibling.identity, kind: .view(sibling.label)),
+        accessedStateSlots: 0
+      )
+    }
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: siblings.map { ResolvedNode(identity: $0.identity, kind: .view($0.label)) }
       ),
       accessedStateSlots: 0
     )
@@ -879,7 +1028,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
     #expect(
       live.defaultFocusRegistry?.snapshot().candidates.map(\.namespace)
-        == [namespace, namespace]
+        == Array(repeating: namespace, count: identities.count)
     )
 
     for identity in identities {
@@ -887,7 +1036,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         live.focusedValuesRegistry?
           .focusedValues(for: identity)[RuntimeRegistrationFocusedValueKey.self]
           == fullRebuild.focusedValuesRegistry?
-            .focusedValues(for: identity)[RuntimeRegistrationFocusedValueKey.self]
+          .focusedValues(for: identity)[RuntimeRegistrationFocusedValueKey.self]
       )
     }
     #expect(
@@ -973,9 +1122,10 @@ struct RuntimeRegistrationRestoreScopingTests {
   private func scrollOffsets(
     _ registrations: [ScrollPositionRegistrationSnapshot]
   ) -> [Identity: ScrollOffset] {
-    Dictionary(uniqueKeysWithValues: registrations.map { registration in
-      (registration.identity, registration.currentOffset())
-    })
+    Dictionary(
+      uniqueKeysWithValues: registrations.map { registration in
+        (registration.identity, registration.currentOffset())
+      })
   }
 
   private func lifecycleHandlerIDs(
