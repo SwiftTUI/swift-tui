@@ -584,7 +584,17 @@ package final class ViewNode {
     // (reuse-host guard work tracks it); the debug assertion below trips
     // loudly if any such value reaches a skip.
     if resolved.subtreeRuntimeNodeIDsStamped, resolved.viewNodeID == viewNodeID {
-      assertResolvedStampsCoherent(resolved, children: children)
+      #if DEBUG
+        assertResolvedStampsCoherent(resolved, children: children)
+      #else
+        // Release: run the same read-only oracle only on sampled frames when the
+        // soundness probe is opted in. Off by default → a single Bool read.
+        if SoundnessProbeConfiguration.isSampledFrame,
+          let violation = resolvedStampsCoherenceViolation(resolved, children: children)
+        {
+          SoundnessProbeConfiguration.recordStampCoherenceViolation(violation)
+        }
+      #endif
       return resolved
     }
     var resolved = resolved
@@ -620,21 +630,40 @@ package final class ViewNode {
     children: [ViewNode]
   ) {
     #if DEBUG
-      assert(
-        resolved.viewNodeID == viewNodeID,
-        "stamp skip: value stamp \(String(describing: resolved.viewNodeID)) "
-          + "diverges from live node \(viewNodeID) at \(identity)"
-      )
-      guard resolved.children.count == children.count else {
-        return
-      }
-      for (childResolved, childNode) in zip(resolved.children, children) {
-        childNode.assertResolvedStampsCoherent(
-          childResolved,
-          children: childNode.children
-        )
+      if let violation = resolvedStampsCoherenceViolation(resolved, children: children) {
+        assertionFailure(violation)
       }
     #endif
+  }
+
+  /// Read-only stamp-coherence check shared by the DEBUG assertion and the
+  /// release-sampled soundness probe (``SoundnessProbeConfiguration``). Returns
+  /// a divergence description, or `nil` when the skipped subtree's stamps match
+  /// what the full restamping walk would write. Tolerates count mismatch (Group
+  /// splices / capture-host injections) by stopping descent — exactly like the
+  /// full walk withdraws its completeness claim — so it never false-positives on
+  /// an intentionally unverified seam.
+  package func resolvedStampsCoherenceViolation(
+    _ resolved: ResolvedNode,
+    children: [ViewNode]
+  ) -> String? {
+    guard resolved.viewNodeID == viewNodeID else {
+      return
+        "stamp skip: value stamp \(String(describing: resolved.viewNodeID)) "
+        + "diverges from live node \(viewNodeID) at \(identity)"
+    }
+    guard resolved.children.count == children.count else {
+      return nil
+    }
+    for (childResolved, childNode) in zip(resolved.children, children) {
+      if let violation = childNode.resolvedStampsCoherenceViolation(
+        childResolved,
+        children: childNode.children
+      ) {
+        return violation
+      }
+    }
+    return nil
   }
 
   /// The view value this node was last resolved with, kept to compare against

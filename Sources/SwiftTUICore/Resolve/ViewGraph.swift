@@ -1091,6 +1091,9 @@ package final class ViewGraph {
     #endif
     recordCheckpointGraphMutation()
     currentFrameID &+= 1
+    // Latch this frame's reconciliation-soundness sampling decision from the
+    // monotonic frame counter (no clock/RNG). Cheap when the probe is off.
+    SoundnessProbeConfiguration.beginFrame(frameID: currentFrameID)
     frameOrder.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
     stableTaskStartEvents.removeAll(keepingCapacity: true)

@@ -359,14 +359,43 @@ package final class ViewGraphFrameDraft {
     case .delta(_, let nodeCheckpoints):
       viewGraph.restoreCheckpoint(targetCheckpoint, nodeCheckpoints: nodeCheckpoints)
       #if DEBUG
-        let deltaSnapshot = viewGraph.debugTotalStateSnapshot()
-        viewGraph.restoreCheckpoint(targetCheckpoint)
-        guard deltaSnapshot == viewGraph.debugTotalStateSnapshot() else {
+        if !deltaRestoreMatchesFullRestore(targetCheckpoint: targetCheckpoint, in: viewGraph) {
+          return .full(target: target, reason: .debugOracleMismatch)
+        }
+      #else
+        // Release: verify the scoped delta restore equals a full restore only on
+        // sampled frames when the soundness probe is opted in. Off by default →
+        // the delta fast path is unchanged (no extra full restore / 2x snapshot).
+        if SoundnessProbeConfiguration.isSampledFrame,
+          !deltaRestoreMatchesFullRestore(targetCheckpoint: targetCheckpoint, in: viewGraph)
+        {
+          SoundnessProbeConfiguration.recordDeltaCheckpointViolation(
+            "delta restore diverged from full restore for target \(target)"
+          )
           return .full(target: target, reason: .debugOracleMismatch)
         }
       #endif
       return .delta(target: target)
     }
+  }
+
+  /// Soundness oracle for the scoped delta-checkpoint restore: a delta restore
+  /// must leave the graph byte-equal to a full restore. The caller has just
+  /// applied the delta restore; this snapshots that state, performs a full
+  /// restore, and reports whether the two snapshots matched.
+  ///
+  /// It is sound to mutate the graph into the full-restored state here: on a
+  /// match the delta- and full-restored states are equal, and on a mismatch the
+  /// caller downgrades to `.full` anyway — so the graph is always left in the
+  /// state the returned result describes. Do not "optimize" the second restore
+  /// away or a returned `.delta` would no longer match the graph state.
+  private func deltaRestoreMatchesFullRestore(
+    targetCheckpoint: ViewGraph.Checkpoint,
+    in viewGraph: ViewGraph
+  ) -> Bool {
+    let deltaSnapshot = viewGraph.debugTotalStateSnapshot()
+    viewGraph.restoreCheckpoint(targetCheckpoint)
+    return deltaSnapshot == viewGraph.debugTotalStateSnapshot()
   }
 
   private func recordDeltaRestoreResult(
