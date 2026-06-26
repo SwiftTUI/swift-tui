@@ -282,6 +282,226 @@ struct AppRuntimeTests {
   }
 
   @MainActor
+  @Test("activating a sheet button dismisses the active sheet")
+  func activatingSheetButtonDismissesActiveSheet() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 44, height: 12))
+    let rootIdentity = testIdentity("SheetButtonDismissalRoot")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 44, height: 12),
+      viewBuilder: { _, _ in
+        SheetButtonDismissalWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    _ = try render()
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let openedFrame = try render()
+    #expect(openedFrame.contains("Sheet action body"))
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
+    _ = try render()
+    let focusedSheetAction = try #require(focusTracker.currentFocusIdentity)
+    #expect(
+      runLoop.activationIdentity(for: focusedSheetAction) != nil,
+      "Focused sheet action has no activation handler: \(focusedSheetAction)"
+    )
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let lastFrame = try render()
+
+    #expect(!lastFrame.contains("Sheet action body"))
+    #expect(lastFrame.contains("Close count 1"))
+  }
+
+  @MainActor
+  @Test("activating a confirmation-dialog action dismisses the active dialog")
+  func activatingConfirmationDialogActionDismissesActiveDialog() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 52, height: 12))
+    let rootIdentity = testIdentity("ConfirmationButtonDismissalRoot")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 52, height: 12),
+      viewBuilder: { _, _ in
+        ConfirmationDialogButtonDismissalWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    _ = try render()
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let openedFrame = try render()
+    #expect(openedFrame.contains("Reset presentation state?"))
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
+    _ = try render()
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
+    _ = try render()
+    let focusedDialogAction = try #require(focusTracker.currentFocusIdentity)
+    #expect(
+      runLoop.activationIdentity(for: focusedDialogAction) != nil,
+      "Focused confirmation-dialog action has no activation handler: \(focusedDialogAction)"
+    )
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let lastFrame = try render()
+
+    #expect(!lastFrame.contains("Reset presentation state?"))
+    #expect(lastFrame.contains("Dialog actions 1"))
+  }
+
+  @MainActor
+  @Test("clicking a sheet button dismisses the active sheet")
+  func clickingSheetButtonDismissesActiveSheet() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 44, height: 12))
+    let rootIdentity = testIdentity("SheetButtonClickDismissalRoot")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 44, height: 12),
+      viewBuilder: { _, _ in
+        SheetButtonDismissalWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    _ = try render()
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let openedFrame = try render()
+    #expect(openedFrame.contains("Sheet action body"))
+
+    let closePoint = try #require(terminal.centerOfText("Close", chooseLast: true))
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: closePoint)))
+      ) == nil
+    )
+    _ = try render()
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: closePoint)))
+      ) == nil
+    )
+    let lastFrame = try render()
+
+    #expect(!lastFrame.contains("Sheet action body"))
+    #expect(lastFrame.contains("Close count 1"))
+  }
+
+  @MainActor
+  @Test("clicking a confirmation-dialog action dismisses the active dialog")
+  func clickingConfirmationDialogActionDismissesActiveDialog() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 52, height: 12))
+    let rootIdentity = testIdentity("ConfirmationButtonClickDismissalRoot")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 52, height: 12),
+      viewBuilder: { _, _ in
+        ConfirmationDialogButtonDismissalWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    _ = try render()
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let openedFrame = try render()
+    #expect(openedFrame.contains("Reset presentation state?"))
+
+    let resetPoint = try #require(terminal.centerOfText("Reset", chooseLast: true))
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: resetPoint)))
+      ) == nil
+    )
+    _ = try render()
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: resetPoint)))
+      ) == nil
+    )
+    let lastFrame = try render()
+
+    #expect(!lastFrame.contains("Reset presentation state?"))
+    #expect(lastFrame.contains("Dialog actions 1"))
+  }
+
+  @MainActor
   @Test("dismissing a sheet restores focus to the previously focused base control")
   func dismissingSheetRestoresFocusToThePreviouslyFocusedBaseControl() async throws {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 72, height: 14))
@@ -796,6 +1016,56 @@ private struct SheetPresentationWindow: View {
   }
 }
 
+private struct SheetButtonDismissalWindow: View {
+  @State private var isSheetPresented = false
+  @State private var closeCount = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Close count \(closeCount)")
+      Button("Present") {
+        isSheetPresented = true
+      }
+    }
+    .sheet("Inspector", isPresented: $isSheetPresented) {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Sheet action body")
+        Button("Close") {
+          closeCount += 1
+          isSheetPresented = false
+        }
+      }
+    }
+  }
+}
+
+private struct ConfirmationDialogButtonDismissalWindow: View {
+  @State private var isDialogPresented = false
+  @State private var actionCount = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Dialog actions \(actionCount)")
+      Button("Confirm") {
+        isDialogPresented = true
+      }
+    }
+    .confirmationDialog(
+      "Reset presentation state?",
+      isPresented: $isDialogPresented,
+      actions: {
+        Button("Reset") {
+          actionCount += 1
+          isDialogPresented = false
+        }
+      },
+      message: {
+        Text("Confirmation dialogs sit near the invoking surface.")
+      }
+    )
+  }
+}
+
 private struct SheetFocusRestorationWindow: View {
   @State private var isSheetPresented = false
   @State private var draft = ""
@@ -1190,6 +1460,33 @@ private final class RecordingTerminalHost: PresentationSurface {
   func write(_ output: String) throws {
     frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
     notifyFrameObservers()
+  }
+
+  func centerOfText(_ target: String, chooseLast: Bool = false) -> Point? {
+    guard let surface = lastPresentedSurface else {
+      return nil
+    }
+
+    if chooseLast {
+      for row in surface.lines.indices.reversed() {
+        let line = surface.lines[row]
+        guard let range = line.range(of: target, options: .backwards) else {
+          continue
+        }
+        let column = line.distance(from: line.startIndex, to: range.lowerBound)
+        return Point(CellPoint(x: column + target.count / 2, y: row))
+      }
+      return nil
+    }
+
+    for (row, line) in surface.lines.enumerated() {
+      guard let range = line.range(of: target) else {
+        continue
+      }
+      let column = line.distance(from: line.startIndex, to: range.lowerBound)
+      return Point(CellPoint(x: column + target.count / 2, y: row))
+    }
+    return nil
   }
 
   /// The run loop only ever presents on the MainActor; `assumeIsolated`

@@ -67,6 +67,9 @@ extension RunLoop {
     }
 
     let focusedIdentity = focusTracker.currentFocusIdentity
+    let focusedActivationIdentity = focusedIdentity.flatMap {
+      activationIdentity(for: $0)
+    }
     let focusedInteractions =
       focusedIdentity.flatMap { identity in
         latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })
@@ -135,9 +138,13 @@ extension RunLoop {
         return nil
       case let keyPress where keyPress.modifiers.isEmpty:
         switch keyPress.key {
-        case .arrowLeft, .arrowRight, .arrowUp, .arrowDown, .return, .space,
+        case .arrowLeft, .arrowRight, .arrowUp, .arrowDown,
           .character, .escape, .backspace, .home, .end:
           return nil
+        case .return, .space:
+          if focusedActivationIdentity == nil {
+            return nil
+          }
         case .tab:
           return nil
         }
@@ -177,12 +184,12 @@ extension RunLoop {
       return nil
     case KeyPress(.return, modifiers: []), KeyPress(.space, modifiers: []):
       setPressedIdentity(focusedIdentity, transient: true)
-      if let focusedIdentity {
+      if let actionIdentity = focusedActivationIdentity {
         let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-        let handled = localActionRegistry.dispatch(identity: focusedIdentity)
+        let handled = localActionRegistry.dispatch(identity: actionIdentity)
         if handled {
           recordFollowUpInvalidation(
-            for: focusedIdentity,
+            for: actionIdentity,
             schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
           )
         }

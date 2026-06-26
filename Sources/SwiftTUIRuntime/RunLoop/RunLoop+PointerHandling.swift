@@ -198,13 +198,16 @@ extension RunLoop {
     let focusedIdentity =
       hitTarget?.focusIdentity
       ?? focusIdentity(for: region.identity)
+    let actionIdentity =
+      hitTarget.flatMap { containingActivationIdentity(for: $0.region.identity) }
+      ?? focusedIdentity.flatMap { activationIdentity(for: $0) }
 
-    if let focusedIdentity {
+    if let actionIdentity {
       let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-      let handled = localActionRegistry.dispatch(identity: focusedIdentity)
+      let handled = localActionRegistry.dispatch(identity: actionIdentity)
       if handled {
         recordFollowUpInvalidation(
-          for: focusedIdentity,
+          for: actionIdentity,
           schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
         )
       }

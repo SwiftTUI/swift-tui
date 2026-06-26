@@ -173,7 +173,46 @@ extension RunLoop {
   package func isActivationIdentity(
     _ identity: Identity
   ) -> Bool {
-    localActionRegistry.hasHandler(identity: identity)
+    activationIdentity(for: identity) != nil
+  }
+
+  package func activationIdentity(
+    for identity: Identity
+  ) -> Identity? {
+    if let containingIdentity = containingActivationIdentity(for: identity) {
+      return containingIdentity
+    }
+
+    return localActionRegistry.snapshot().keys
+      .filter { candidate in
+        candidate.isDescendant(of: identity)
+      }
+      .min { lhs, rhs in
+        let lhsDepth = identityDepth(lhs)
+        let rhsDepth = identityDepth(rhs)
+        if lhsDepth != rhsDepth {
+          return lhsDepth < rhsDepth
+        }
+        return lhs < rhs
+      }
+  }
+
+  package func containingActivationIdentity(
+    for identity: Identity
+  ) -> Identity? {
+    var current: Identity? = identity
+    while let candidate = current {
+      if localActionRegistry.hasHandler(identity: candidate) {
+        return candidate
+      }
+      assertNoInfiniteIdentityLoop(candidate)
+      current = candidate.parent
+    }
+    return nil
+  }
+
+  private func identityDepth(_ identity: Identity) -> Int {
+    identity.description.filter { $0 == "/" }.count
   }
 
   package func shouldCapturePointer(
