@@ -250,16 +250,13 @@ package final class ViewGraph {
   private func nodeIfExists(
     for identity: Identity
   ) -> ViewNode? {
-    guard let viewNodeID = nodeIDByIdentity[identity] else {
-      return nil
-    }
-    return nodesByNodeID[viewNodeID]
+    GraphNodeIndexQuery.node(for: identity, in: index)
   }
 
   private func nodeIfExists(
     for viewNodeID: ViewNodeID
   ) -> ViewNode? {
-    nodesByNodeID[viewNodeID]
+    GraphNodeIndexQuery.node(for: viewNodeID, in: index)
   }
 
   private func nodeForResolvedNode(
@@ -276,29 +273,25 @@ package final class ViewGraph {
   private func nodeIDsForResolvedNode(
     _ resolved: ResolvedNode
   ) -> Set<ViewNodeID> {
-    var viewNodeIDs = nodeIDsByStructuralPath[resolved.structuralPath] ?? []
-    if let viewNodeID = resolved.viewNodeID {
-      viewNodeIDs.insert(viewNodeID)
-    }
-    return viewNodeIDs
+    GraphNodeIndexQuery.nodeIDs(forResolvedNode: resolved, in: index)
   }
 
   private func viewNodeID(
     for identity: Identity
   ) -> ViewNodeID? {
-    nodeIDByIdentity[identity]
+    GraphNodeIndexQuery.viewNodeID(for: identity, in: index)
   }
 
   private func identities(
     for viewNodeIDs: Set<ViewNodeID>
   ) -> Set<Identity> {
-    Set(viewNodeIDs.compactMap { identityByNodeID[$0] })
+    GraphNodeIndexQuery.identities(for: viewNodeIDs, in: index)
   }
 
   private func nodeIDs(
     for identities: Set<Identity>
   ) -> Set<ViewNodeID> {
-    Set(identities.compactMap { nodeIDByIdentity[$0] })
+    GraphNodeIndexQuery.nodeIDs(for: identities, in: index)
   }
 
   private func applyResolvedNode(
