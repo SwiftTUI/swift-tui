@@ -502,6 +502,76 @@ struct AppRuntimeTests {
   }
 
   @MainActor
+  @Test("gallery-like presentation tab sheet and confirmation actions stay clickable")
+  func galleryLikePresentationTabSheetAndConfirmationActionsStayClickable() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 80, height: 24))
+    let rootIdentity = testIdentity("GalleryLikePresentationLabActionClick")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        GalleryLikePresentationLabWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    func click(_ point: Point) throws -> String {
+      #expect(
+        runLoop.handle(
+          RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: point)))
+        ) == nil
+      )
+      _ = try render()
+      #expect(
+        runLoop.handle(
+          RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: point)))
+        ) == nil
+      )
+      return try render()
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    let initialFrame = try render()
+    #expect(initialFrame.contains("Presentation Lab"))
+    #expect(initialFrame.contains("Last event: No presentation opened yet"))
+
+    let sheetPoint = try #require(terminal.centerOfText("Sheet"))
+    let sheetFrame = try click(sheetPoint)
+    #expect(sheetFrame.contains("Sheet content"))
+
+    let closePoint = try #require(terminal.centerOfText("Close"))
+    let closedFrame = try click(closePoint)
+    #expect(!closedFrame.contains("Sheet content"))
+    #expect(closedFrame.contains("Last event: Sheet closed"))
+
+    let confirmPoint = try #require(terminal.centerOfText("Confirm"))
+    let dialogFrame = try click(confirmPoint)
+    #expect(dialogFrame.contains("Reset presentation state?"))
+
+    let resetPoint = try #require(terminal.centerOfText("Reset", chooseLast: true))
+    let resetFrame = try click(resetPoint)
+    #expect(!resetFrame.contains("Reset presentation state?"))
+    #expect(resetFrame.contains("Last event: Confirmation reset"))
+  }
+
+  @MainActor
   @Test("dismissing a sheet restores focus to the previously focused base control")
   func dismissingSheetRestoresFocusToThePreviouslyFocusedBaseControl() async throws {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 72, height: 14))
@@ -1063,6 +1133,79 @@ private struct ConfirmationDialogButtonDismissalWindow: View {
         Text("Confirmation dialogs sit near the invoking surface.")
       }
     )
+  }
+}
+
+private struct GalleryLikePresentationLabWindow: View {
+  @State private var selection = "presentation"
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("Counter", value: "counter") {
+        Text("Counter content")
+      }
+
+      Tab("Presentation Lab", value: "presentation") {
+        GalleryLikePresentationLabTab()
+      }
+
+      Tab("Pointer Lab", value: "pointer-lab") {
+        Text("Pointer Lab content")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+private struct GalleryLikePresentationLabTab: View {
+  @State private var showConfirmation = false
+  @State private var showSheet = false
+  @State private var lastEvent = "No presentation opened yet"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Presentation Lab")
+      Divider()
+      ControlGroup("Modals") {
+        Button("Confirm") {
+          showConfirmation = true
+        }
+        Button("Sheet") {
+          showSheet = true
+        }
+      }
+      Text("Last event: \(lastEvent)")
+      Spacer(minLength: 0)
+    }
+    .padding(2)
+    .confirmationDialog(
+      "Reset presentation state?",
+      isPresented: $showConfirmation,
+      actions: {
+        Button("Reset", role: .destructive) {
+          lastEvent = "Confirmation reset"
+          showConfirmation = false
+        }
+        Button("Cancel") {
+          showConfirmation = false
+        }
+      },
+      message: {
+        Text("Confirmation dialogs sit near the invoking surface.")
+      }
+    )
+    .sheet("Presentation Sheet", isPresented: $showSheet) {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Sheet content")
+        Text("Sheets can host arbitrary SwiftTUI views.")
+        Button("Close") {
+          lastEvent = "Sheet closed"
+          showSheet = false
+        }
+      }
+      .padding(1)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
