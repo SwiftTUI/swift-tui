@@ -565,6 +565,82 @@ struct TerminalGraphicsProtocolTests {
     #expect(transmittedKittyImages.count == 3)
   }
 
+  /// Drives `variantCount` distinct blended kitty variants through `renderer`
+  /// (each a unique payload-cache key) and returns the resulting kitty payload
+  /// occupancy. Shared by the bounded-payload-cache tests below.
+  private func renderDistinctKittyVariants(
+    _ variantCount: Int,
+    through renderer: TerminalImageRenderer
+  ) throws -> Int {
+    let graphicsCapabilities = TerminalGraphicsCapabilities(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty,
+      cellPixelSize: .init(width: 1, height: 1)
+    )
+    let pngBytes = try makePNGBytes(
+      width: 1,
+      height: 1,
+      pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]
+    )
+    var transmittedKittyImages: Set<UInt32> = []
+
+    for index in 0..<variantCount {
+      let write = renderer.graphicsWriteSteps(
+        for: [
+          blendedRasterImageAttachment(
+            pngBytes: pngBytes,
+            background: .blue,
+            signature: UInt64(index + 1)
+          )
+        ],
+        capabilityProfile: .trueColor,
+        graphicsCapabilities: graphicsCapabilities,
+        fallbackBackground: .black,
+        transmittedKittyImages: &transmittedKittyImages
+      ).joined()
+      // Each distinct variant must build and transmit a fresh payload.
+      #expect(write.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    }
+
+    return renderer.occupancy().kitty
+  }
+
+  @Test("Renderer payload cache evicts least-recently-used variants past the entry cap")
+  func rendererPayloadCacheEvictsPastEntryCap() throws {
+    let renderer = TerminalImageRenderer(
+      repository: ImageAssetRepository(),
+      payloadCachePolicy: TerminalImageRendererCachePolicy(
+        maxEntriesPerKind: 2,
+        maxApproxBytesPerKind: Int.max
+      )
+    )
+    // Three distinct variants were transmitted, but the bounded kitty payload
+    // cache retains at most `maxEntriesPerKind` (2) — the oldest was evicted.
+    #expect(try renderDistinctKittyVariants(3, through: renderer) == 2)
+  }
+
+  @Test("Renderer payload byte budget caps each kind to the freshest entry")
+  func rendererPayloadByteBudgetCapsToFreshestEntry() throws {
+    let renderer = TerminalImageRenderer(
+      repository: ImageAssetRepository(),
+      payloadCachePolicy: TerminalImageRendererCachePolicy(
+        maxEntriesPerKind: Int.max,
+        maxApproxBytesPerKind: 0
+      )
+    )
+    // Every stored payload exceeds the zero-byte budget, so each store evicts
+    // all but the just-written (protected) entry — never zero.
+    #expect(try renderDistinctKittyVariants(3, through: renderer) == 1)
+  }
+
+  @Test("Default renderer payload policy retains every variant for a small workload")
+  func defaultRendererPayloadPolicyRetainsSmallWorkload() throws {
+    // The gate-safe guarantee: under the default policy a handful of variants
+    // sit far below the budget, so nothing evicts and behavior is unchanged.
+    let renderer = TerminalImageRenderer(repository: ImageAssetRepository())
+    #expect(try renderDistinctKittyVariants(3, through: renderer) == 3)
+  }
+
   @Test(
     "terminal host emits Kitty RGBA payloads (f=32 with s/v) for non-PNG inputs"
   )

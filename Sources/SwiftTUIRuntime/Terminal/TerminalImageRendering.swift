@@ -37,15 +37,122 @@ extension TerminalImageVariantKey: Hashable {
   }
 }
 
+/// Cap policy for ``TerminalImageRenderer``'s per-kind payload caches. Mirrors
+/// ``ImageBlendCompositorCachePolicy``: the renderer's kitty/sixel/fallback
+/// caches, keyed by ``TerminalImageVariantKey``, would otherwise gain one entry
+/// per distinct image variant for the life of the host and never release it, so
+/// each kind is bounded by an entry count and an approximate-byte budget,
+/// evicting least-recently-used entries first.
+package struct TerminalImageRendererCachePolicy: Sendable, Equatable {
+  package static let `default` = TerminalImageRendererCachePolicy(
+    maxEntriesPerKind: 256,
+    maxApproxBytesPerKind: 16 * 1024 * 1024
+  )
+
+  package var maxEntriesPerKind: Int
+  package var maxApproxBytesPerKind: Int
+
+  package init(
+    maxEntriesPerKind: Int,
+    maxApproxBytesPerKind: Int
+  ) {
+    self.maxEntriesPerKind = max(1, maxEntriesPerKind)
+    self.maxApproxBytesPerKind = max(0, maxApproxBytesPerKind)
+  }
+}
+
+/// A single-kind LRU + byte-budget cache keyed by ``TerminalImageVariantKey``.
+/// Each entry remembers the approximate byte cost supplied at store time plus
+/// the access generation it was last touched on;
+/// ``store(_:approxBytes:for:policy:)`` evicts the lowest-generation entries
+/// (never the key just written) until the kind is back within `policy`. A
+/// stateless mirror of the eviction logic already proven in
+/// ``ImageBlendCompositor``.
+private struct BoundedVariantCache<Value> {
+  private struct Entry {
+    var value: Value
+    var approxBytes: Int
+    var lastAccessGeneration: Int
+  }
+
+  private var entries: [TerminalImageVariantKey: Entry] = [:]
+  private var accessGeneration = 0
+  private(set) var evictionCount = 0
+
+  var count: Int {
+    entries.count
+  }
+
+  var approxBytes: Int {
+    entries.values.reduce(0) { $0 + $1.approxBytes }
+  }
+
+  mutating func lookup(
+    _ key: TerminalImageVariantKey
+  ) -> Value? {
+    guard var entry = entries[key] else {
+      return nil
+    }
+    accessGeneration += 1
+    entry.lastAccessGeneration = accessGeneration
+    entries[key] = entry
+    return entry.value
+  }
+
+  mutating func store(
+    _ value: Value,
+    approxBytes: Int,
+    for key: TerminalImageVariantKey,
+    policy: TerminalImageRendererCachePolicy
+  ) {
+    accessGeneration += 1
+    entries[key] = Entry(
+      value: value,
+      approxBytes: max(0, approxBytes),
+      lastAccessGeneration: accessGeneration
+    )
+    evictIfNeeded(policy: policy, protecting: key)
+  }
+
+  private mutating func evictIfNeeded(
+    policy: TerminalImageRendererCachePolicy,
+    protecting protectedKey: TerminalImageVariantKey
+  ) {
+    while violates(policy), let key = oldestEvictableKey(protecting: protectedKey) {
+      entries.removeValue(forKey: key)
+      evictionCount += 1
+    }
+  }
+
+  private func violates(
+    _ policy: TerminalImageRendererCachePolicy
+  ) -> Bool {
+    entries.count > policy.maxEntriesPerKind
+      || approxBytes > policy.maxApproxBytesPerKind
+  }
+
+  private func oldestEvictableKey(
+    protecting protectedKey: TerminalImageVariantKey
+  ) -> TerminalImageVariantKey? {
+    entries
+      .filter { key, _ in key != protectedKey }
+      .min { lhs, rhs in
+        lhs.value.lastAccessGeneration < rhs.value.lastAccessGeneration
+      }?
+      .key
+  }
+}
+
 final class TerminalImageRenderer: Sendable {
   private struct Storage {
-    var kittyPayloads: [TerminalImageVariantKey: KittyPayload] = [:]
-    var sixelPayloads: [TerminalImageVariantKey: String] = [:]
-    var fallbackOverlays: [TerminalImageVariantKey: RasterImageOverlay] = [:]
+    var kittyPayloads = BoundedVariantCache<KittyPayload>()
+    var sixelPayloads = BoundedVariantCache<String>()
+    var fallbackOverlays = BoundedVariantCache<RasterImageOverlay>()
   }
 
   private let repository: ImageAssetRepository
   private let blendCompositor: ImageBlendCompositor
+  private let cachePolicy: TerminalImageRendererCachePolicy
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
   // A TerminalImageRenderer is created per host, so a *permanent* metric
   // registration made `providerCount` (itself the documented leak signal) climb
@@ -55,13 +162,15 @@ final class TerminalImageRenderer: Sendable {
 
   init(
     repository: ImageAssetRepository,
-    blendCompositorCachePolicy: ImageBlendCompositorCachePolicy = .default
+    blendCompositorCachePolicy: ImageBlendCompositorCachePolicy = .default,
+    payloadCachePolicy: TerminalImageRendererCachePolicy = .default
   ) {
     self.repository = repository
     blendCompositor = ImageBlendCompositor(
       repository: repository,
       cachePolicy: blendCompositorCachePolicy
     )
+    cachePolicy = payloadCachePolicy
     // Capture the storage lock (already initialized) rather than `self`, so the
     // provider does not form a self-capturing closure during init (and the
     // registry holds no strong reference back to this renderer).
@@ -69,25 +178,20 @@ final class TerminalImageRenderer: Sendable {
     metricToken = MemoryMetricRegistry.shared.register(
       ClosureMemoryMetricProvider {
         storage.withLockUnchecked { storage in
-          var approxBytes = 0
-          for payload in storage.kittyPayloads.values {
-            approxBytes += payload.encodedData.utf8.count
-          }
-          for payload in storage.sixelPayloads.values {
-            approxBytes += payload.utf8.count
-          }
-          for overlay in storage.fallbackOverlays.values {
-            approxBytes += overlay.size.width * overlay.size.height
-          }
-          return MemoryMetricSnapshot(
+          MemoryMetricSnapshot(
             name: "TerminalImageRenderer.payloads",
             count: storage.kittyPayloads.count + storage.sixelPayloads.count
               + storage.fallbackOverlays.count,
-            approxBytes: approxBytes,
+            approxBytes: storage.kittyPayloads.approxBytes
+              + storage.sixelPayloads.approxBytes
+              + storage.fallbackOverlays.approxBytes,
             detail: [
               "kitty": storage.kittyPayloads.count,
               "sixel": storage.sixelPayloads.count,
               "fallback": storage.fallbackOverlays.count,
+              "evictions": storage.kittyPayloads.evictionCount
+                + storage.sixelPayloads.evictionCount
+                + storage.fallbackOverlays.evictionCount,
             ]
           )
         }
@@ -101,21 +205,13 @@ final class TerminalImageRenderer: Sendable {
 
   func occupancy() -> (kitty: Int, sixel: Int, fallback: Int, approxBytes: Int) {
     storage.withLockUnchecked { storage in
-      var approxBytes = 0
-      for payload in storage.kittyPayloads.values {
-        approxBytes += payload.encodedData.utf8.count
-      }
-      for payload in storage.sixelPayloads.values {
-        approxBytes += payload.utf8.count
-      }
-      for overlay in storage.fallbackOverlays.values {
-        approxBytes += overlay.size.width * overlay.size.height
-      }
-      return (
+      (
         storage.kittyPayloads.count,
         storage.sixelPayloads.count,
         storage.fallbackOverlays.count,
-        approxBytes
+        storage.kittyPayloads.approxBytes
+          + storage.sixelPayloads.approxBytes
+          + storage.fallbackOverlays.approxBytes
       )
     }
   }
@@ -344,7 +440,7 @@ final class TerminalImageRenderer: Sendable {
       paletteSize: paletteSize
     )
 
-    if let cached = storage.withLockUnchecked({ $0.fallbackOverlays[key] }) {
+    if let cached = storage.withLockUnchecked({ $0.fallbackOverlays.lookup(key) }) {
       return cached
     }
 
@@ -359,7 +455,12 @@ final class TerminalImageRenderer: Sendable {
     }
 
     storage.withLockUnchecked { storage in
-      storage.fallbackOverlays[key] = overlay
+      storage.fallbackOverlays.store(
+        overlay,
+        approxBytes: overlay.size.width * overlay.size.height,
+        for: key,
+        policy: cachePolicy
+      )
     }
     return overlay
   }
@@ -381,7 +482,7 @@ final class TerminalImageRenderer: Sendable {
       paletteSize: 0
     )
 
-    if let cached = storage.withLockUnchecked({ $0.kittyPayloads[key] }) {
+    if let cached = storage.withLockUnchecked({ $0.kittyPayloads.lookup(key) }) {
       return cached
     }
 
@@ -390,7 +491,12 @@ final class TerminalImageRenderer: Sendable {
     }
 
     storage.withLockUnchecked { storage in
-      storage.kittyPayloads[key] = payload
+      storage.kittyPayloads.store(
+        payload,
+        approxBytes: payload.encodedData.utf8.count,
+        for: key,
+        policy: cachePolicy
+      )
     }
     return payload
   }
@@ -419,7 +525,7 @@ final class TerminalImageRenderer: Sendable {
       paletteSize: paletteBudget
     )
 
-    if let cached = storage.withLockUnchecked({ $0.sixelPayloads[key] }) {
+    if let cached = storage.withLockUnchecked({ $0.sixelPayloads.lookup(key) }) {
       return cached
     }
 
@@ -434,7 +540,12 @@ final class TerminalImageRenderer: Sendable {
     }
 
     storage.withLockUnchecked { storage in
-      storage.sixelPayloads[key] = payload
+      storage.sixelPayloads.store(
+        payload,
+        approxBytes: payload.utf8.count,
+        for: key,
+        policy: cachePolicy
+      )
     }
     return payload
   }
