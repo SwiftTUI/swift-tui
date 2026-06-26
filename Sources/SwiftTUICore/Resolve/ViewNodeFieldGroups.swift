@@ -54,4 +54,14 @@ extension ViewNode {
     package var hasCommittedPresence: Bool = false
     package var suppressesStructuralLifecycle: Bool = false
   }
+
+  /// Reuse/freshness gating consumed by the reconciler's skip fast-paths:
+  /// whether the node needs re-evaluation, whether its committed-children
+  /// snapshot still reflects the live descendants, and whether an island-seam
+  /// descendant was dirtied (which denies retained reuse).
+  package struct ReuseState {
+    package var isDirty: Bool = true
+    package var isCommittedSnapshotFresh: Bool = false
+    package var hasStaleIslandDescendant: Bool = false
+  }
 }

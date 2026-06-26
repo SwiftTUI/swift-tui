@@ -19,6 +19,11 @@ package final class ViewNode {
   /// vanished host degrades to the old walk-stops-here behavior.
   package private(set) weak var evaluationHost: ViewNode?
 
+  /// Reuse/freshness gating, grouped so checkpoint/restore move it as a unit
+  /// (see ``ReuseState`` in ViewNodeFieldGroups.swift). The three flags below
+  /// are computed forwarders preserving their names and visibility.
+  private var reuseState = ReuseState()
+
   /// Set when a node behind an island seam below this node was dirtied or
   /// re-applied; consumed only by `canReuse`, so retained reuse cannot skip
   /// the body re-resolve that re-captures the island content by value.
@@ -27,7 +32,10 @@ package final class ViewNode {
   /// separate from `isCommittedSnapshotFresh` deliberately: freshness
   /// drives `snapshot()`'s rebuild-from-live-children, which cannot span an
   /// island seam — clearing it above a seam truncates the rebuilt tree.
-  package private(set) var hasStaleIslandDescendant: Bool
+  package private(set) var hasStaleIslandDescendant: Bool {
+    get { reuseState.hasStaleIslandDescendant }
+    set { reuseState.hasStaleIslandDescendant = newValue }
+  }
 
   /// The most-recently-committed `ResolvedNode` for this node.
   ///
@@ -61,7 +69,10 @@ package final class ViewNode {
   /// Also doubles as the "have I been committed at least once" flag —
   /// `init` leaves it `false` until the first `apply`, so `canReuse`
   /// correctly refuses to reuse an untouched node.
-  private var isCommittedSnapshotFresh: Bool
+  private var isCommittedSnapshotFresh: Bool {
+    get { reuseState.isCommittedSnapshotFresh }
+    set { reuseState.isCommittedSnapshotFresh = newValue }
+  }
 
   package private(set) var children: [ViewNode]
   package private(set) var stateSlots: [Int: AnyStateSlot]
@@ -69,7 +80,10 @@ package final class ViewNode {
   package private(set) var lifecycleState: NodeLifecycleState
   package private(set) var registeredHandlers: NodeHandlers
 
-  package var isDirty: Bool
+  package var isDirty: Bool {
+    get { reuseState.isDirty }
+    set { reuseState.isDirty = newValue }
+  }
 
   /// Per-frame working set, grouped into a value sub-struct so checkpoint and
   /// restore move it as a unit (see ``FrameState`` in ViewNodeFieldGroups.swift).
@@ -165,14 +179,12 @@ package final class ViewNode {
       identity: identity,
       kind: .view("EmptyView")
     )
-    isCommittedSnapshotFresh = false
-    hasStaleIslandDescendant = false
     children = []
     stateSlots = [:]
     dependencies = .init()
     lifecycleState = .alive
     registeredHandlers = .init()
-    isDirty = true
+    // ReuseState() defaults isDirty=true (and the freshness flags false).
     // The frame-local working set initializes from `FrameState()`'s defaults
     // (wasPresentAtFrameStart/wasVisitedThisFrame=false, previousChildrenIdentities=[],
     // previousLifecycleMetadata=.init(), bodyStateSlotCount=nil,
@@ -1335,14 +1347,12 @@ extension ViewNode {
     package var parent: ViewNode?
     package var evaluationHost: ViewNode?
     package var committed: ResolvedNode
-    package var isCommittedSnapshotFresh: Bool
-    package var hasStaleIslandDescendant: Bool
+    package var reuseState: ReuseState
     package var children: [ViewNode]
     package var stateSlots: [Int: AnyStateSlot]
     package var dependencies: DependencySet
     package var lifecycleState: NodeLifecycleState
     package var registeredHandlers: NodeHandlers
-    package var isDirty: Bool
     package var frameState: FrameState
     package var pendingChangeHandlerIDs: [String]
     package var dependencyTracker: DependencyTracker.Checkpoint
@@ -1366,14 +1376,12 @@ extension ViewNode {
       parent: parent,
       evaluationHost: evaluationHost,
       committed: committed,
-      isCommittedSnapshotFresh: isCommittedSnapshotFresh,
-      hasStaleIslandDescendant: hasStaleIslandDescendant,
+      reuseState: reuseState,
       children: children,
       stateSlots: stateSlots,
       dependencies: dependencies,
       lifecycleState: lifecycleState,
       registeredHandlers: registeredHandlers,
-      isDirty: isDirty,
       frameState: frameState,
       pendingChangeHandlerIDs: pendingChangeHandlerIDs,
       dependencyTracker: dependencyTracker.makeCheckpoint(),
@@ -1393,14 +1401,12 @@ extension ViewNode {
     parent = checkpoint.parent
     evaluationHost = checkpoint.evaluationHost
     committed = checkpoint.committed
-    isCommittedSnapshotFresh = checkpoint.isCommittedSnapshotFresh
-    hasStaleIslandDescendant = checkpoint.hasStaleIslandDescendant
+    reuseState = checkpoint.reuseState
     children = checkpoint.children
     stateSlots = checkpoint.stateSlots
     dependencies = checkpoint.dependencies
     lifecycleState = checkpoint.lifecycleState
     registeredHandlers = checkpoint.registeredHandlers
-    isDirty = checkpoint.isDirty
     frameState = checkpoint.frameState
     pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
     dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)

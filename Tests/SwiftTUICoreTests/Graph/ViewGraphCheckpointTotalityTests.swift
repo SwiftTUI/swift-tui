@@ -110,7 +110,7 @@ struct ViewGraphCheckpointTotalityTests {
     // debugTotalStateSnapshot is the one remaining hand-mirror of those members;
     // guard that every group field is read into the snapshot so a field added to
     // a group cannot silently fall out of the debug-state contract.
-    let groupNames = ["FrameState", "EvaluationState"]
+    let groupNames = ["FrameState", "EvaluationState", "ReuseState"]
     let groupMembers = try groupNames.flatMap { name in
       try parsedStoredVarNames(
         typeKind: "struct",
@@ -118,7 +118,7 @@ struct ViewGraphCheckpointTotalityTests {
         relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
       )
     }
-    #expect(groupMembers.count == 17)  // 11 FrameState + 6 EvaluationState
+    #expect(groupMembers.count == 20)  // 11 FrameState + 6 EvaluationState + 3 ReuseState
 
     let snapshotBody = functionBodyText(
       named: "debugTotalStateSnapshot",
