@@ -10,7 +10,7 @@ extension View {
 }
 
 @MainActor
-public struct PointerHoverModifier: PrimitiveViewModifier {
+public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
   let action: @MainActor @Sendable (HoverPhase) -> Void
 
   package func resolve<Content: View>(

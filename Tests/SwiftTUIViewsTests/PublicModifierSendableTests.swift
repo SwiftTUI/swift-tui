@@ -8,11 +8,12 @@ import Testing
 // `requireSendable` takes only the metatype, so dropping the conformance from
 // any listed modifier fails this file's *compilation* — no instance needed.
 //
-// Modifier groups deliberately excluded (and why they are not yet here): the
-// generic-over-`View`-content modifiers (overlay/background/presentation/sheet,
-// etc.) would need a conditional `where Content: Sendable` the host `View`s do
-// not satisfy; the lifecycle/preference modifiers store non-`@Sendable`
-// closures. Those are the "reference escape" cases #22 sets aside.
+// Modifier groups deliberately excluded (and why): the generic-over-`View`-
+// content modifiers (overlay/background/presentation/sheet, etc.) would need a
+// conditional `where Content: Sendable` the host `View`s do not satisfy; the
+// lifecycle/preference modifiers store non-`@Sendable` closures; the focus
+// *binding* modifiers store a `FocusState.Binding` (a reference into mutable
+// focus state). Those are the "reference escape" cases #22 sets aside.
 private func requireSendable<T: Sendable>(_: T.Type) {}
 
 @Suite("Public modifier Sendable baseline")
@@ -39,5 +40,22 @@ struct PublicModifierSendableTests {
     requireSendable(DrawMetadataModifier.self)
     requireSendable(DrawEffectModifier.self)
     requireSendable(SemanticMetadataModifier.self)
+  }
+
+  @Test("animation, focus, and gesture value modifiers are Sendable")
+  func animationFocusGestureModifiersAreSendable() {
+    requireSendable(TransactionModifier.self)
+    requireSendable(PreferredDefaultFocusModifier.self)
+    requireSendable(DefaultFocusScopeModifier.self)
+    requireSendable(PointerHoverModifier.self)
+    requireSendable(ContentShapeModifier.self)
+    requireSendable(NamedCoordinateSpaceModifier.self)
+  }
+
+  @Test("generic value modifiers with Sendable-bounded parameters are Sendable")
+  func genericValueModifiersAreSendable() {
+    requireSendable(IDModifier<Int>.self)
+    requireSendable(TagValueModifier<Int>.self)
+    requireSendable(ValueAnimationModifier<Int>.self)
   }
 }

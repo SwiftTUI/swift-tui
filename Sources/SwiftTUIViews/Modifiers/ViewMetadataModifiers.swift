@@ -189,7 +189,7 @@ package func focusStructureMetadata(
   )
 }
 
-public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier {
+public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier, Sendable {
   package var id: ID
 
   package init(id: ID) {

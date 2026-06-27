@@ -98,7 +98,7 @@ public struct Transaction: Sendable {
 
 // MARK: - ValueAnimationModifier
 
-public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveViewModifier {
+public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveViewModifier, Sendable {
   package var animation: Animation?
   package var value: Value
 
@@ -166,7 +166,7 @@ enum ValueAnimationModifierSlot {
 
 // MARK: - TransactionModifier
 
-public struct TransactionModifier: PrimitiveViewModifier {
+public struct TransactionModifier: PrimitiveViewModifier, Sendable {
   package var transform: @Sendable (inout Transaction) -> Void
 
   package init(

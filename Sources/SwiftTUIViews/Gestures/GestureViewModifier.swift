@@ -135,7 +135,7 @@ extension View {
 }
 
 @MainActor
-public struct ContentShapeModifier: PrimitiveViewModifier {
+public struct ContentShapeModifier: PrimitiveViewModifier, Sendable {
   let explicitRect: CellRect?
   let explicitPath: Path?
 
@@ -171,7 +171,7 @@ public struct ContentShapeModifier: PrimitiveViewModifier {
 }
 
 @MainActor
-public struct NamedCoordinateSpaceModifier: PrimitiveViewModifier {
+public struct NamedCoordinateSpaceModifier: PrimitiveViewModifier, Sendable {
   let name: String
 
   package func resolve<Content: View>(

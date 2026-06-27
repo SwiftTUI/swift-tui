@@ -46,7 +46,7 @@ extension View {
   }
 }
 
-public struct PreferredDefaultFocusModifier: PrimitiveViewModifier {
+public struct PreferredDefaultFocusModifier: PrimitiveViewModifier, Sendable {
   var prefersDefaultFocus: Bool
   var namespace: Namespace.ID
 
@@ -65,7 +65,7 @@ public struct PreferredDefaultFocusModifier: PrimitiveViewModifier {
   }
 }
 
-public struct DefaultFocusScopeModifier: PrimitiveViewModifier {
+public struct DefaultFocusScopeModifier: PrimitiveViewModifier, Sendable {
   var namespace: Namespace.ID
 
   package func resolve<Base: View>(
