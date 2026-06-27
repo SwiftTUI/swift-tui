@@ -139,82 +139,80 @@ extension ResolvedNode {
 }
 
 extension ResolvedNode {
-  #if DEBUG
-    /// Stage-1 memo oracle: whether reusing `self` in place of `other` would be
-    /// observably identical *under the semantics the real retained-reuse path
-    /// guarantees* — i.e. ignoring `structuralPath` (re-stamped on reuse, see
-    /// ViewFoundation reuse return) and comparing `transactionSnapshot` by
-    /// `isReuseEquivalent` (the gate's check) rather than strict `==`. Every
-    /// other field must match exactly, recursing into children. This is the
-    /// sound oracle for memoization, vs the stricter `==` used elsewhere.
-    package func memoReuseEquivalent(to other: ResolvedNode) -> Bool {
-      guard
-        identity == other.identity,
-        structuralEdgeRole == other.structuralEdgeRole,
-        entityIdentity == other.entityIdentity,
-        entityStructuralPath == other.entityStructuralPath,
-        declarationOwnerEdge == other.declarationOwnerEdge,
-        kind == other.kind,
-        Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator),
-        environmentSnapshot == other.environmentSnapshot,
-        transactionSnapshot.isReuseEquivalent(to: other.transactionSnapshot),
-        layoutBehavior == other.layoutBehavior,
-        layoutMetadata == other.layoutMetadata,
-        layoutRealizedContent?.equivalenceSignature
-          == other.layoutRealizedContent?.equivalenceSignature,
-        drawMetadata == other.drawMetadata,
-        drawEffects == other.drawEffects,
-        surfaceComposition == other.surfaceComposition,
-        semanticMetadata == other.semanticMetadata,
-        lifecycleMetadata == other.lifecycleMetadata,
-        drawPayload == other.drawPayload,
-        intrinsicSize == other.intrinsicSize,
-        indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
-        preferenceValues == other.preferenceValues,
-        supportsRetainedReuse == other.supportsRetainedReuse,
-        children.count == other.children.count
-      else { return false }
-      for (l, r) in zip(children, other.children) where !l.memoReuseEquivalent(to: r) {
-        return false
-      }
-      return true
+  /// Stage-1 memo oracle: whether reusing `self` in place of `other` would be
+  /// observably identical *under the semantics the real retained-reuse path
+  /// guarantees* — i.e. ignoring `structuralPath` (re-stamped on reuse, see
+  /// ViewFoundation reuse return) and comparing `transactionSnapshot` by
+  /// `isReuseEquivalent` (the gate's check) rather than strict `==`. Every
+  /// other field must match exactly, recursing into children. This is the
+  /// sound oracle for memoization, vs the stricter `==` used elsewhere.
+  package func memoReuseEquivalent(to other: ResolvedNode) -> Bool {
+    guard
+      identity == other.identity,
+      structuralEdgeRole == other.structuralEdgeRole,
+      entityIdentity == other.entityIdentity,
+      entityStructuralPath == other.entityStructuralPath,
+      declarationOwnerEdge == other.declarationOwnerEdge,
+      kind == other.kind,
+      Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator),
+      environmentSnapshot == other.environmentSnapshot,
+      transactionSnapshot.isReuseEquivalent(to: other.transactionSnapshot),
+      layoutBehavior == other.layoutBehavior,
+      layoutMetadata == other.layoutMetadata,
+      layoutRealizedContent?.equivalenceSignature
+        == other.layoutRealizedContent?.equivalenceSignature,
+      drawMetadata == other.drawMetadata,
+      drawEffects == other.drawEffects,
+      surfaceComposition == other.surfaceComposition,
+      semanticMetadata == other.semanticMetadata,
+      lifecycleMetadata == other.lifecycleMetadata,
+      drawPayload == other.drawPayload,
+      intrinsicSize == other.intrinsicSize,
+      indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
+      preferenceValues == other.preferenceValues,
+      supportsRetainedReuse == other.supportsRetainedReuse,
+      children.count == other.children.count
+    else { return false }
+    for (l, r) in zip(children, other.children) where !l.memoReuseEquivalent(to: r) {
+      return false
     }
+    return true
+  }
 
-    /// Stage-1 memo diagnostics: returns the first field that differs under
-    /// `==` (or nil if equal), to characterize the `no_reads` unsound class —
-    /// whether the mismatch is real content (`drawPayload`/`kind`/`children`/…,
-    /// a comparator false-equal) or per-resolve identity bookkeeping
-    /// (`entityIdentity`/`structuralPath`/…, an over-strict oracle field).
-    package func memoFirstDifferingField(from other: ResolvedNode) -> String? {
-      if identity != other.identity { return "identity" }
-      if structuralPath != other.structuralPath { return "structuralPath" }
-      if structuralEdgeRole != other.structuralEdgeRole { return "structuralEdgeRole" }
-      if entityIdentity != other.entityIdentity { return "entityIdentity" }
-      if entityStructuralPath != other.entityStructuralPath { return "entityStructuralPath" }
-      if declarationOwnerEdge != other.declarationOwnerEdge { return "declarationOwnerEdge" }
-      if kind != other.kind { return "kind" }
-      if children.count != other.children.count { return "children.count" }
-      for (l, r) in zip(children, other.children) {
-        if let childField = l.memoFirstDifferingField(from: r) {
-          return "child.\(childField)"
-        }
+  /// Stage-1 memo diagnostics: returns the first field that differs under
+  /// `==` (or nil if equal), to characterize the `no_reads` unsound class —
+  /// whether the mismatch is real content (`drawPayload`/`kind`/`children`/…,
+  /// a comparator false-equal) or per-resolve identity bookkeeping
+  /// (`entityIdentity`/`structuralPath`/…, an over-strict oracle field).
+  package func memoFirstDifferingField(from other: ResolvedNode) -> String? {
+    if identity != other.identity { return "identity" }
+    if structuralPath != other.structuralPath { return "structuralPath" }
+    if structuralEdgeRole != other.structuralEdgeRole { return "structuralEdgeRole" }
+    if entityIdentity != other.entityIdentity { return "entityIdentity" }
+    if entityStructuralPath != other.entityStructuralPath { return "entityStructuralPath" }
+    if declarationOwnerEdge != other.declarationOwnerEdge { return "declarationOwnerEdge" }
+    if kind != other.kind { return "kind" }
+    if children.count != other.children.count { return "children.count" }
+    for (l, r) in zip(children, other.children) {
+      if let childField = l.memoFirstDifferingField(from: r) {
+        return "child.\(childField)"
       }
-      if environmentSnapshot != other.environmentSnapshot { return "environmentSnapshot" }
-      if transactionSnapshot != other.transactionSnapshot { return "transactionSnapshot" }
-      if layoutBehavior != other.layoutBehavior { return "layoutBehavior" }
-      if layoutMetadata != other.layoutMetadata { return "layoutMetadata" }
-      if drawMetadata != other.drawMetadata { return "drawMetadata" }
-      if drawEffects != other.drawEffects { return "drawEffects" }
-      if surfaceComposition != other.surfaceComposition { return "surfaceComposition" }
-      if semanticMetadata != other.semanticMetadata { return "semanticMetadata" }
-      if lifecycleMetadata != other.lifecycleMetadata { return "lifecycleMetadata" }
-      if drawPayload != other.drawPayload { return "drawPayload" }
-      if intrinsicSize != other.intrinsicSize { return "intrinsicSize" }
-      if preferenceValues != other.preferenceValues { return "preferenceValues" }
-      if supportsRetainedReuse != other.supportsRetainedReuse { return "supportsRetainedReuse" }
-      return self == other ? nil : "other"
     }
-  #endif
+    if environmentSnapshot != other.environmentSnapshot { return "environmentSnapshot" }
+    if transactionSnapshot != other.transactionSnapshot { return "transactionSnapshot" }
+    if layoutBehavior != other.layoutBehavior { return "layoutBehavior" }
+    if layoutMetadata != other.layoutMetadata { return "layoutMetadata" }
+    if drawMetadata != other.drawMetadata { return "drawMetadata" }
+    if drawEffects != other.drawEffects { return "drawEffects" }
+    if surfaceComposition != other.surfaceComposition { return "surfaceComposition" }
+    if semanticMetadata != other.semanticMetadata { return "semanticMetadata" }
+    if lifecycleMetadata != other.lifecycleMetadata { return "lifecycleMetadata" }
+    if drawPayload != other.drawPayload { return "drawPayload" }
+    if intrinsicSize != other.intrinsicSize { return "intrinsicSize" }
+    if preferenceValues != other.preferenceValues { return "preferenceValues" }
+    if supportsRetainedReuse != other.supportsRetainedReuse { return "supportsRetainedReuse" }
+    return self == other ? nil : "other"
+  }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.identity == rhs.identity

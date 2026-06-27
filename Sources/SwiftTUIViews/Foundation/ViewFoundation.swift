@@ -395,12 +395,11 @@ func resolveView<V: View>(
     }
   }
   context.recordResolvedComputation()
-  #if DEBUG
-    // Stage-0 memoization diagnostics (inert unless SWIFTTUI_MEMO_TRACE): would
-    // this recomputed node have been memoizable? Captured before the body runs,
-    // while `graphNode.committed` still holds the prior frame's output.
-    let memoObservation = beginMemoObservation(view, graphNode: graphNode, context: context)
-  #endif
+  // Memoization diagnostics: would this recomputed node have been memoizable?
+  // Captured before the body runs, while `graphNode.committed` still holds the
+  // prior frame's output. In release this is sampled and opt-in via
+  // `SWIFTTUI_MEMO_TRACE`; when unsampled it is a single Bool guard.
+  let memoObservation = beginMemoObservation(view, graphNode: graphNode, context: context)
   let erased: Any = view
   var accessedStateSlots = 0
   var resolved = ViewUpdateGuard.withViewUpdate {
@@ -460,14 +459,12 @@ func resolveView<V: View>(
     }
   }
   resolved.structuralPath = context.structuralPath
-  #if DEBUG
-    // Shadow oracle: a would-skip node's freshly recomputed output must equal
-    // the prior committed output; a mismatch is the soundness alarm. Then stash
-    // this frame's view value for next frame's comparison.
-    if let memoObservation {
-      finishMemoObservation(memoObservation, newResolved: resolved)
-    }
-  #endif
+  // Shadow oracle: a would-skip node's freshly recomputed output must equal
+  // the prior committed output; a mismatch is the soundness alarm. Then stash
+  // this frame's view value for next frame's comparison.
+  if let memoObservation {
+    finishMemoObservation(memoObservation, newResolved: resolved)
+  }
   if shouldCaptureMemoViewValue(view) {
     graphNode?.memoViewValue = view
   }
@@ -482,100 +479,97 @@ func resolveView<V: View>(
 /// `memoViewValue` nil and the gate bails at its first guard — keeping the gate
 /// near-free on trees that do not opt into memoization.
 ///
-/// The DEBUG shadow oracle (``MemoSkipTrace``) measures the *full* reflective
-/// addressable population, so it captures every value, `Equatable` or not.
+/// The memo shadow oracle (``MemoSkipTrace``) measures the *full* reflective
+/// addressable population on sampled frames, so it captures every value,
+/// `Equatable` or not.
 @MainActor
 func shouldCaptureMemoViewValue<V: View>(_ view: V) -> Bool {
-  #if DEBUG
-    if MemoSkipTrace.isEnabled { return true }
-  #endif
+  if MemoSkipTrace.shouldObserve { return true }
   if MemoReuseConfiguration.isEnabled { return view is any Equatable }
   return false
 }
 
-#if DEBUG
-  /// Token carrying the prior committed output of a recomputed node that the
-  /// Stage-0 diagnostics classified as a memoization candidate, so the shadow
-  /// oracle can compare it against the freshly recomputed output.
-  struct MemoComputationObservation {
-    let priorCommitted: ResolvedNode
-    /// Whether the node had recorded dynamic reads last frame — distinguishes a
-    /// dependency-closable unsound mismatch from a comparator false-equal.
-    let hadReads: Bool
-  }
+/// Token carrying the prior committed output of a recomputed node that the memo
+/// diagnostics classified as a memoization candidate, so the shadow oracle can
+/// compare it against the freshly recomputed output.
+struct MemoComputationObservation {
+  let priorCommitted: ResolvedNode
+  /// Whether the node had recorded dynamic reads last frame — distinguishes a
+  /// dependency-closable unsound mismatch from a comparator false-equal.
+  let hadReads: Bool
+}
 
-  /// Classifies a recomputed node: records it as `computed`, and — if it was
-  /// reached under a re-run ancestor (not itself the invalidation target), its
-  /// view value is structurally equal to the committed value, and it passes the
-  /// non-dirty reuse guards — returns a token for the shadow oracle. Records
-  /// blocked-field reasons (closure / AnyView / existential) along the way.
-  @MainActor
-  func beginMemoObservation<V: View>(
-    _ view: V,
-    graphNode: SwiftTUICore.ViewNode?,
-    context: ResolveContext
-  ) -> MemoComputationObservation? {
-    guard MemoSkipTrace.isEnabled, let graphNode else { return nil }
-    MemoSkipTrace.recordComputed()
-    // A self-invalidated node must re-run; only nodes reached under a re-run
-    // ancestor are memoization candidates.
-    guard !context.effectiveInvalidatedIdentities.contains(context.identity),
-      let prior = graphNode.memoViewValue
-    else { return nil }
-    switch MemoValueComparator.compare(prior, view) {
-    case .blocked(let reason):
-      MemoSkipTrace.recordBlocked(reason)
-      return nil
-    case .changed:
-      return nil
-    case .equal:
-      guard
-        graphNode.canMemoReuse(
-          environment: context.environment,
-          transaction: context.transaction
-        )
-      else { return nil }
-      let deps = graphNode.dependencies
-      let hadReads =
-        !deps.stateSlotReads.isEmpty
-        || !deps.observableReads.isEmpty
-        || !deps.environmentReads.isEmpty
-      // Adoption-trap diagnostic: the author conformed this view to `Equatable`
-      // (opted into memoization) and it is value-equal + reuse-guarded, but the
-      // production gate will DENY it because it reads `@State`/`@Observable` or
-      // focus/press — so the `.equatable()` is silently a no-op. Flag it.
-      if view is any Equatable,
-        !graphNode.hasNoMemoUncoveredDependencies(
-          uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys
-        )
-      {
-        MemoSkipTrace.recordInertEquatableBoundary()
-      }
-      return MemoComputationObservation(
-        priorCommitted: graphNode.committed,
-        hadReads: hadReads
+/// Classifies a recomputed node: records it as `computed`, and — if it was
+/// reached under a re-run ancestor (not itself the invalidation target), its
+/// view value is structurally equal to the committed value, and it passes the
+/// non-dirty reuse guards — returns a token for the shadow oracle. Records
+/// blocked-field reasons (closure / AnyView / existential) along the way.
+@MainActor
+func beginMemoObservation<V: View>(
+  _ view: V,
+  graphNode: SwiftTUICore.ViewNode?,
+  context: ResolveContext
+) -> MemoComputationObservation? {
+  guard MemoSkipTrace.shouldObserve, let graphNode else { return nil }
+  MemoSkipTrace.recordComputed()
+  // A self-invalidated node must re-run; only nodes reached under a re-run
+  // ancestor are memoization candidates.
+  guard !context.effectiveInvalidatedIdentities.contains(context.identity),
+    let prior = graphNode.memoViewValue
+  else { return nil }
+  switch MemoValueComparator.compare(prior, view) {
+  case .blocked(let reason):
+    MemoSkipTrace.recordBlocked(reason)
+    return nil
+  case .changed:
+    return nil
+  case .equal:
+    guard
+      graphNode.canMemoReuse(
+        environment: context.environment,
+        transaction: context.transaction
       )
+    else { return nil }
+    let deps = graphNode.dependencies
+    let hadReads =
+      !deps.stateSlotReads.isEmpty
+      || !deps.observableReads.isEmpty
+      || !deps.environmentReads.isEmpty
+    // Adoption-trap diagnostic: the author conformed this view to `Equatable`
+    // (opted into memoization) and it is value-equal + reuse-guarded, but the
+    // production gate will DENY it because it reads `@State`/`@Observable` or
+    // focus/press — so the `.equatable()` is silently a no-op. Flag it.
+    if view is any Equatable,
+      !graphNode.hasNoMemoUncoveredDependencies(
+        uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys
+      )
+    {
+      MemoSkipTrace.recordInertEquatableBoundary()
     }
+    return MemoComputationObservation(
+      priorCommitted: graphNode.committed,
+      hadReads: hadReads
+    )
   }
+}
 
-  @MainActor
-  func finishMemoObservation(
-    _ observation: MemoComputationObservation,
-    newResolved: ResolvedNode
-  ) {
-    // Sound oracle: would reusing the committed node be observably identical
-    // under retained-reuse semantics (structuralPath re-stamped, transaction by
-    // reuse-equivalence)? Strict `==` over-counts re-stampable identity fields.
-    if newResolved.memoReuseEquivalent(to: observation.priorCommitted) {
-      MemoSkipTrace.recordAddressableSkip()
-    } else {
-      MemoSkipTrace.recordUnsoundSkip(hadReads: observation.hadReads)
-      if let field = newResolved.memoFirstDifferingField(from: observation.priorCommitted) {
-        MemoSkipTrace.recordUnsoundField(field)
-      }
+@MainActor
+func finishMemoObservation(
+  _ observation: MemoComputationObservation,
+  newResolved: ResolvedNode
+) {
+  // Sound oracle: would reusing the committed node be observably identical
+  // under retained-reuse semantics (structuralPath re-stamped, transaction by
+  // reuse-equivalence)? Strict `==` over-counts re-stampable identity fields.
+  if newResolved.memoReuseEquivalent(to: observation.priorCommitted) {
+    MemoSkipTrace.recordAddressableSkip()
+  } else {
+    MemoSkipTrace.recordUnsoundSkip(hadReads: observation.hadReads)
+    if let field = newResolved.memoFirstDifferingField(from: observation.priorCommitted) {
+      MemoSkipTrace.recordUnsoundField(field)
     }
   }
-#endif
+}
 
 @MainActor
 private func rebasedAuthoringContext(

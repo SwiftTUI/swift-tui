@@ -1063,13 +1063,12 @@ package final class ViewGraph {
     // Diagnostic: flush the just-finished frame's reuse-denial histogram before
     // starting the next one (inert unless SWIFTTUI_REUSE_TRACE is set).
     ReuseDenialTrace.dumpAndReset(frameID: currentFrameID)
-    #if DEBUG
-      // Diagnostic: flush the just-finished frame's memoization histogram
-      // (inert unless SWIFTTUI_MEMO_TRACE is set).
-      MemoSkipTrace.dumpAndReset(frameID: currentFrameID)
-    #endif
+    // Diagnostic: flush the just-finished frame's memoization histogram.
+    // In release this is opt-in and sampled by `MemoSkipTrace.beginFrame`.
+    MemoSkipTrace.dumpAndReset(frameID: currentFrameID)
     recordCheckpointGraphMutation()
     currentFrameID &+= 1
+    MemoSkipTrace.beginFrame(frameID: currentFrameID)
     // Latch this frame's reconciliation-soundness sampling decision from the
     // monotonic frame counter (no clock/RNG). Cheap when the probe is off.
     SoundnessProbeConfiguration.beginFrame(frameID: currentFrameID)

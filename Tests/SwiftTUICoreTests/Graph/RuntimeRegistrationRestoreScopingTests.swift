@@ -408,17 +408,19 @@ struct RuntimeRegistrationRestoreScopingTests {
   /// Generative reconciliation harness. The hand-written tests above pin one
   /// fixed two-sibling shape with sibling A invalidated; the dropped-handler
   /// "strand" class instead hides at *some* sibling count / *some* invalidated
-  /// position, and often behind a framework seam. This deterministically
-  /// enumerates a `(kind, siblingCount, changedIndex)` product and asserts the
-  /// universal property — a scoped `.subtrees`/diffed `.all` restore must equal a
-  /// full rebuild across all 15 registry families
+  /// position, behind *some* framework seam, and on *some* publication path. This
+  /// deterministically enumerates a `(kind, siblingCount, changedIndex,
+  /// publication)` product and asserts the universal property — a scoped
+  /// `.subtrees`/diffed `.all` restore must equal a full rebuild across all 15
+  /// registry families
   /// (``assertBroadRegistriesMatch``) — for every shape. No RNG: the shapes are
-  /// enumerated, so a failure is reproducible by its `SeamShape` argument.
+  /// enumerated, so a failure is reproducible by its `SeamCase` argument.
   @Test(
-    "scoped restore equals full rebuild across all registries for generated shapes",
-    arguments: RuntimeRegistrationRestoreScopingTests.generatedSeamShapes
+    "scoped restore equals full rebuild across all registries for generated seam cases",
+    arguments: RuntimeRegistrationRestoreScopingTests.generatedSeamCases
   )
-  func scopedRestoreEqualsFullRebuildAcrossGeneratedShapes(_ shape: SeamShape) {
+  func scopedRestoreEqualsFullRebuildAcrossGeneratedSeamCases(_ seamCase: SeamCase) {
+    let shape = seamCase.shape
     let rootIdentity = testIdentity("Root")
     let namespace = MatchedGeometryNamespace(0)
     let probe = RuntimeRegistrationProbeSink()
@@ -441,7 +443,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     initialDraft.recordDirtyEvaluationPlan(nil)
     _ = initialDraft.commitRuntimeRegistrations(from: graph)
 
-    // Frame 2: narrowly re-evaluate ONLY the changed sibling → scoped restore.
+    // Frame 2: narrowly re-evaluate ONLY the changed sibling -> scoped restore.
     let changed = siblings[shape.changedIndex]
     graph.beginFrame()
     reEvaluateBroadRegistrationSibling(
@@ -454,8 +456,15 @@ struct RuntimeRegistrationRestoreScopingTests {
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
     _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
 
-    let rootFrameDraft = ViewGraphFrameDraft(liveRegistrations: liveRegistrations, checkpoint: nil)
-    rootFrameDraft.recordDirtyEvaluationPlan(nil)
+    let rootFrameDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    seamCase.publication.record(
+      on: rootFrameDraft,
+      graph: graph,
+      changedIdentity: changed.identity
+    )
     _ = rootFrameDraft.commitRuntimeRegistrations(from: graph)
 
     // Oracle: a full rebuild of the same committed graph.
@@ -727,6 +736,42 @@ struct RuntimeRegistrationRestoreScopingTests {
     }
   }
 
+  struct SeamCase: CustomStringConvertible, Sendable {
+    let shape: SeamShape
+    let publication: SeamPublication
+
+    var description: String {
+      "\(shape),publication=\(publication)"
+    }
+  }
+
+  enum SeamPublication: String, CaseIterable, CustomStringConvertible, Sendable {
+    case diffedAll
+    case subtreeFrontier
+
+    var description: String { rawValue }
+
+    @MainActor
+    func record(
+      on draft: ViewGraphFrameDraft,
+      graph: ViewGraph,
+      changedIdentity: Identity
+    ) {
+      switch self {
+      case .diffedAll:
+        draft.recordDirtyEvaluationPlan(nil)
+      case .subtreeFrontier:
+        let changedNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[changedIdentity]!
+        draft.recordDirtyEvaluationPlan(
+          .init(
+            frontierNodeIDs: [changedNodeID],
+            frontierIdentities: [changedIdentity]
+          )
+        )
+      }
+    }
+  }
+
   enum SeamKind: String, CaseIterable, CustomStringConvertible, Sendable {
     case flat
     case groupSplice
@@ -734,6 +779,9 @@ struct RuntimeRegistrationRestoreScopingTests {
     case portalIsland
     case overlayIsland
     case lazyTabIsland
+    case sheetCapturedIsland
+    case lazyViewportIsland
+    case identityRerootIsland
 
     var description: String { rawValue }
 
@@ -743,7 +791,8 @@ struct RuntimeRegistrationRestoreScopingTests {
         "GroupSplice"
       case .forEachSplice:
         "ForEachSplice"
-      case .flat, .portalIsland, .overlayIsland, .lazyTabIsland:
+      case .flat, .portalIsland, .overlayIsland, .lazyTabIsland, .sheetCapturedIsland,
+        .lazyViewportIsland, .identityRerootIsland:
         nil
       }
     }
@@ -756,6 +805,12 @@ struct RuntimeRegistrationRestoreScopingTests {
         "OverlayIsland"
       case .lazyTabIsland:
         "LazyTabIsland"
+      case .sheetCapturedIsland:
+        "SheetCapturedIsland"
+      case .lazyViewportIsland:
+        "LazyViewportIsland"
+      case .identityRerootIsland:
+        "IdentityRerootIsland"
       case .flat, .groupSplice, .forEachSplice:
         nil
       }
@@ -773,24 +828,30 @@ struct RuntimeRegistrationRestoreScopingTests {
   }
 
   /// Deterministic enumeration of the shape space: every
-  /// `(kind, count, changedIndex)` tuple for 2…4 siblings. Enumerated, not
-  /// random, so a failure is reproducible by its argument.
-  nonisolated static let generatedSeamShapes: [SeamShape] = {
-    var shapes: [SeamShape] = []
+  /// `(kind, count, changedIndex, publication)` tuple for 2...4 siblings.
+  /// Enumerated, not random, so a failure is reproducible by its argument.
+  nonisolated static let generatedSeamCases: [SeamCase] = {
+    var cases: [SeamCase] = []
     for kind in SeamKind.allCases {
       for siblingCount in 2...4 {
         for changedIndex in 0..<siblingCount {
-          shapes.append(
-            SeamShape(
-              kind: kind,
-              siblingCount: siblingCount,
-              changedIndex: changedIndex
-            )
+          let shape = SeamShape(
+            kind: kind,
+            siblingCount: siblingCount,
+            changedIndex: changedIndex
           )
+          for publication in SeamPublication.allCases {
+            cases.append(
+              SeamCase(
+                shape: shape,
+                publication: publication
+              )
+            )
+          }
         }
       }
     }
-    return shapes
+    return cases
   }()
 
   /// N-sibling generalization of ``seedTwoBroadRegistrationSiblings``: seeds

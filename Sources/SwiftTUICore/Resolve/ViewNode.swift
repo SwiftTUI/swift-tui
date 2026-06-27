@@ -749,10 +749,10 @@ package final class ViewNode {
 
   /// The view value this node was last resolved with, kept to compare against
   /// the next frame's value via ``MemoValueComparator`` for memoized-body reuse.
-  /// Populated only when ``MemoReuseConfiguration`` is enabled (or, in DEBUG,
-  /// the ``MemoSkipTrace`` diagnostics); `nil` otherwise, so it costs nothing
-  /// when the feature is off. Checkpointed so an aborted frame does not leave a
-  /// stale value that would mis-compare on the next frame.
+  /// Populated only when ``MemoReuseConfiguration`` is enabled (or the sampled
+  /// ``MemoSkipTrace`` diagnostics are observing this frame); `nil` otherwise,
+  /// so it costs nothing when both features are off. Checkpointed so an aborted
+  /// frame does not leave a stale value that would mis-compare on the next frame.
   package var memoViewValue: Any?
 
   /// Whether this node would pass the retained-reuse guards *except* for the

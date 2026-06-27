@@ -306,11 +306,11 @@ struct EquatableBoundaryReuseTests {
     #expect(gateOn.rasterSurface.lines == gateOff.rasterSurface.lines)
   }
 
-  /// P2 (eval task #16): a DEBUG diagnostic flags an *inert* opt-in — a view the
-  /// author conformed to `Equatable` (expecting memoization) that reads
+  /// P2 (eval task #16): the memo diagnostic flags an *inert* opt-in — a view
+  /// the author conformed to `Equatable` (expecting memoization) that reads
   /// `@State`/`@Observable`/focus, so the gate denies it and `.equatable()` is a
   /// silent no-op. The #1 adoption trap.
-  @Test("DEBUG diagnostic flags an inert Equatable opt-in (reads @State -> never memo-reused)")
+  @Test("memo diagnostic flags an inert Equatable opt-in (reads @State -> never memo-reused)")
   func inertEquatableOptInIsDiagnosed() {
     struct InertChrome: View, Equatable {
       let tag: Int
@@ -341,14 +341,16 @@ struct EquatableBoundaryReuseTests {
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("Root")
 
-    let priorEnabled = MemoSkipTrace.isEnabled
-    let priorFile = MemoSkipTrace.outputFilePath
+    let prior = MemoTraceState.capture()
     MemoSkipTrace.isEnabled = true
+    MemoSkipTrace.sampleEveryNFrames = 1
+    MemoSkipTrace.isSampledFrame = false
+    MemoSkipTrace.reset()
     // Route the per-frame trace dump to a file so it does not spam stderr.
     MemoSkipTrace.outputFilePath = "/tmp/swifttui-inert-diagnostic-test.txt"
+    MemoSkipTrace.emitsTraceLines = true
     defer {
-      MemoSkipTrace.isEnabled = priorEnabled
-      MemoSkipTrace.outputFilePath = priorFile
+      prior.restore()
     }
 
     _ = renderer.render(Root(dynamic: "v1"), context: .init(identity: rootIdentity))
@@ -365,6 +367,47 @@ struct EquatableBoundaryReuseTests {
     #expect(MemoSkipTrace.inertEquatableBoundary > 0)
   }
 
+  @Test("memo diagnostic observes sampled frames only")
+  func memoDiagnosticObservesSampledFramesOnly() {
+    struct Root: View {
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Chrome(title: "fixed")
+          Text(dynamic)
+        }
+      }
+    }
+
+    func renderTwoFrames() {
+      let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+      let rootIdentity = testIdentity("Root")
+      _ = renderer.render(Root(dynamic: "v1"), context: .init(identity: rootIdentity))
+      _ = renderer.render(
+        Root(dynamic: "v2"),
+        context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
+      )
+    }
+
+    let prior = MemoTraceState.capture()
+    defer { prior.restore() }
+
+    MemoSkipTrace.isEnabled = true
+    MemoSkipTrace.sampleEveryNFrames = 100
+    MemoSkipTrace.isSampledFrame = false
+    MemoSkipTrace.emitsTraceLines = false
+    MemoSkipTrace.reset()
+    renderTwoFrames()
+    #expect(MemoSkipTrace.computed == 0)
+
+    MemoSkipTrace.sampleEveryNFrames = 1
+    MemoSkipTrace.isSampledFrame = false
+    MemoSkipTrace.reset()
+    renderTwoFrames()
+    #expect(MemoSkipTrace.computed > 0)
+  }
+
   @Test("Equatable boundary recomputes when its content changes")
   func equatableBoundaryRecomputesOnContentChange() {
     // The chrome title changes between frames: the comparator sees Chrome's `==`
@@ -378,6 +421,35 @@ struct EquatableBoundaryReuseTests {
       #expect(rendered.contains("Chrome:new"))
       #expect(!rendered.contains("Chrome:old"))
       #expect(rendered.contains("v2"))
+    }
+  }
+
+  private struct MemoTraceState {
+    let isEnabled: Bool
+    let sampleEveryNFrames: Int
+    let isSampledFrame: Bool
+    let outputFilePath: String?
+    let emitsTraceLines: Bool
+
+    @MainActor
+    static func capture() -> Self {
+      Self(
+        isEnabled: MemoSkipTrace.isEnabled,
+        sampleEveryNFrames: MemoSkipTrace.sampleEveryNFrames,
+        isSampledFrame: MemoSkipTrace.isSampledFrame,
+        outputFilePath: MemoSkipTrace.outputFilePath,
+        emitsTraceLines: MemoSkipTrace.emitsTraceLines
+      )
+    }
+
+    @MainActor
+    func restore() {
+      MemoSkipTrace.isEnabled = isEnabled
+      MemoSkipTrace.sampleEveryNFrames = sampleEveryNFrames
+      MemoSkipTrace.isSampledFrame = isSampledFrame
+      MemoSkipTrace.outputFilePath = outputFilePath
+      MemoSkipTrace.emitsTraceLines = emitsTraceLines
+      MemoSkipTrace.reset()
     }
   }
 }
