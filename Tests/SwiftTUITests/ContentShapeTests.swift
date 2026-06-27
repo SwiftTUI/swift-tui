@@ -130,27 +130,35 @@ struct ContentShapeTests {
     path.addLine(to: Point(x: 0, y: 2))
     path.close()
 
-    func render<V: View>(_ view: V) -> InteractionRegion {
-      let artifacts = DefaultRenderer().render(
-        VStack(alignment: .leading, spacing: 0) {
-          Spacer().frame(height: 1)
-          HStack(spacing: 0) {
-            Spacer().frame(width: 3)
-            view
-          }
-        },
-        context: ctx,
-        proposal: .init(width: 20, height: 6)
-      )
-      return artifacts.semanticSnapshot.interactionRegions.first!
-    }
+    let rectArtifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Spacer().frame(height: 1)
+        HStack(spacing: 0) {
+          Spacer().frame(width: 3)
+          Text("XXXX")
+            .contentShape(rect)
+            .gesture(TapGesture().onEnded {})
+        }
+      },
+      context: ctx,
+      proposal: .init(width: 20, height: 6)
+    )
+    let pathArtifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Spacer().frame(height: 1)
+        HStack(spacing: 0) {
+          Spacer().frame(width: 3)
+          Text("XXXX")
+            .contentShape(path)
+            .gesture(TapGesture().onEnded {})
+        }
+      },
+      context: ctx,
+      proposal: .init(width: 20, height: 6)
+    )
 
-    let rectRegion = render(
-      Text("XXXX").contentShape(rect).gesture(TapGesture().onEnded {})
-    )
-    let pathRegion = render(
-      Text("XXXX").contentShape(path).gesture(TapGesture().onEnded {})
-    )
+    let rectRegion = rectArtifacts.semanticSnapshot.interactionRegions.first!
+    let pathRegion = pathArtifacts.semanticSnapshot.interactionRegions.first!
 
     #expect(rectRegion.rect == pathRegion.rect)
   }
