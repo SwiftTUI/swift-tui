@@ -98,7 +98,7 @@ public struct Transaction: Sendable {
 
 // MARK: - ValueAnimationModifier
 
-public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveViewModifier, Sendable {
+public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveViewModifier, Sendable, Equatable {
   package var animation: Animation?
   package var value: Value
 

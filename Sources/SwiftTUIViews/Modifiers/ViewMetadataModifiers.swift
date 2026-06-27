@@ -189,7 +189,7 @@ package func focusStructureMetadata(
   )
 }
 
-public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier, Sendable {
+public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier, Sendable, Equatable {
   package var id: ID
 
   package init(id: ID) {
@@ -228,7 +228,7 @@ extension IDModifier: EntityRouteProvidingModifier {
   }
 }
 
-package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable {
+package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var identity: Identity
 
   package func resolve<Base: View>(
@@ -310,7 +310,7 @@ public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct DrawMetadataModifier: PrimitiveViewModifier, Sendable {
+public struct DrawMetadataModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var metadata: DrawMetadata
 
   package func resolve<Base: View>(
@@ -323,7 +323,7 @@ public struct DrawMetadataModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-package struct DrawEffectModifier: PrimitiveViewModifier, Sendable {
+package struct DrawEffectModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var effect: DrawEffect
 
   package func resolve<Base: View>(
@@ -351,7 +351,7 @@ extension DrawMetadataModifier: TransitionEffectProvidingModifier {
   }
 }
 
-public struct SemanticMetadataModifier: PrimitiveViewModifier, Sendable {
+public struct SemanticMetadataModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var metadata: SemanticMetadata
 
   package func resolve<Base: View>(

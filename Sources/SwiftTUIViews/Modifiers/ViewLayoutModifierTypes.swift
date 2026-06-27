@@ -12,7 +12,7 @@ package import SwiftTUICore
 // resolution helpers travel with the structs that call them, keeping their
 // file-scoped `private` access intact.
 
-public struct PaddingModifier: PrimitiveViewModifier, Sendable {
+public struct PaddingModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var insets: EdgeInsets
 
   @inline(never)
@@ -37,7 +37,7 @@ public struct PaddingModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct SafeAreaPaddingModifier: PrimitiveViewModifier, Sendable {
+public struct SafeAreaPaddingModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var edges: Edge.Set
   package var additional: Int
 
@@ -70,7 +70,7 @@ public struct SafeAreaPaddingModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct IgnoreSafeAreaModifier: PrimitiveViewModifier, Sendable {
+public struct IgnoreSafeAreaModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var edges: Edge.Set
 
   @inline(never)
@@ -154,7 +154,7 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
 /// Wrapper that installs a ``LayoutBehavior/border`` on its child so the
 /// layout engine reserves frame space for the border glyphs and the
 /// rasterizer paints them into the reserved cells.
-public struct BorderModifier: PrimitiveViewModifier, Sendable {
+public struct BorderModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var set: BorderSet
   package var placement: StrokeStyle.Placement
   package var foreground: BorderEdgeStyle?
@@ -193,7 +193,7 @@ public struct BorderModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct FrameModifier: PrimitiveViewModifier, Sendable {
+public struct FrameModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var width: Int?
   package var height: Int?
   package var alignment: Alignment
@@ -220,7 +220,7 @@ public struct FrameModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct OffsetModifier: PrimitiveViewModifier, Sendable {
+public struct OffsetModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var x: Int
   package var y: Int
 
@@ -253,7 +253,7 @@ extension OffsetModifier: TransitionEffectProvidingModifier {
   }
 }
 
-public struct PositionModifier: PrimitiveViewModifier, Sendable {
+public struct PositionModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var x: Int
   package var y: Int
 
@@ -279,7 +279,7 @@ public struct PositionModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct MatchedGeometryModifier: PrimitiveViewModifier, Sendable {
+public struct MatchedGeometryModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var config: MatchedGeometryConfig
 
   package func resolve<Base: View>(
@@ -295,7 +295,7 @@ public struct MatchedGeometryModifier: PrimitiveViewModifier, Sendable {
   }
 }
 
-public struct FlexibleFrameModifier: PrimitiveViewModifier, Sendable {
+public struct FlexibleFrameModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var minWidth: ProposedDimension?
   package var idealWidth: ProposedDimension?
   package var maxWidth: ProposedDimension?

@@ -344,7 +344,7 @@ extension View {
   }
 }
 
-public struct TagValueModifier<Value: Hashable & Sendable>: PrimitiveViewModifier, Sendable {
+public struct TagValueModifier<Value: Hashable & Sendable>: PrimitiveViewModifier, Sendable, Equatable {
   package var tag: Value
   package var includeOptional: Bool
 
