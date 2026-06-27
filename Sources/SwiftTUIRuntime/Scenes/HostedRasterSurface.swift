@@ -77,8 +77,13 @@ public final class HostedRasterSurface:
         }
       }
     case .assumedMainActor:
+      // The host explicitly promises frames arrive on the main actor (vs the
+      // `.asynchronousMainActor` Task hop). A bare `assumeIsolated` would not
+      // verify that promise in release, so a host that violates it would corrupt
+      // silently; route through the checked helper so a breach is a loud,
+      // attributable crash instead.
       frameHandler = { frame in
-        MainActor.assumeIsolated {
+        withCheckedMainActorAccess("HostedRasterSurface.assumedMainActorFrame") {
           onFrame(frame)
         }
       }

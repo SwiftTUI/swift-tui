@@ -63,6 +63,11 @@ package final class ObservationBridge: Equatable {
     return withObservationTracking {
       apply()
     } onChange: {
+      // Bare `assumeIsolated` here, *not* `withCheckedMainActorAccess`: the
+      // observation `onChange` fires on the observable's mutation context, which
+      // is not guaranteed to be the main actor, so a release-time precondition
+      // could trap a valid off-main mutation. This is not a frame-tail-worker
+      // bridge, so the #21 release guard deliberately does not apply.
       MainActor.assumeIsolated {
         self.recordChange(identity: identity, pass: pass)
       }
