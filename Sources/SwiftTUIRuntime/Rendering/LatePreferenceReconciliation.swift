@@ -150,6 +150,15 @@ struct LatePreferenceReconciliationStage {
     let reconciliation = reconcileLatePreferenceConsumers(in: realized)
     let runtimeIssues = layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
 
+    if reconciliation.requiresRelayout {
+      return .needsRelayout(
+        relayoutInput(
+          basedOn: input,
+          resolved: reconciliation.resolved
+        )
+      )
+    }
+
     if let workerSnapshot = reconciliation.resolved.layoutRealizationWorkerSnapshot(
       using: realizations
     ) {
@@ -157,28 +166,19 @@ struct LatePreferenceReconciliationStage {
         basedOn: input,
         resolved: workerSnapshot
       )
-      if reconciliation.requiresRelayout || shouldRelayoutLayoutRealizationSnapshot(nextInput) {
+      if shouldRelayoutLayoutRealizationSnapshot(nextInput) {
         return .needsRelayout(nextInput)
       }
     }
 
-    guard reconciliation.requiresRelayout else {
-      var finalInput = input
-      finalInput.resolved = reconciliation.resolved
-      return .finished(
-        ReconciledFrameTailLayout(
-          input: finalInput,
-          layout: layout,
-          resolved: reconciliation.resolved,
-          runtimeIssues: runtimeIssues
-        )
-      )
-    }
-
-    return .needsRelayout(
-      relayoutInput(
-        basedOn: input,
-        resolved: reconciliation.resolved
+    var finalInput = input
+    finalInput.resolved = reconciliation.resolved
+    return .finished(
+      ReconciledFrameTailLayout(
+        input: finalInput,
+        layout: layout,
+        resolved: reconciliation.resolved,
+        runtimeIssues: runtimeIssues
       )
     )
   }
