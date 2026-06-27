@@ -510,7 +510,7 @@ struct AsyncFrameTailRenderingTests {
           && row["first_geometry_anchor_resolution_miss"] == "LoggedMissingAnchor"
           && row["geometry_missing_named_coordinate_spaces"] == "1"
           && row["first_geometry_missing_named_coordinate_space"] == "missing-space"
-          && row["geometry_duplicate_named_coordinate_spaces"] == "1"
+          && row["geometry_duplicate_named_coordinate_spaces"] == "2"
           && row["first_geometry_duplicate_named_coordinate_space"] == "board"
           && row["layout_dependent_realizations"] == "1"
           && row["layout_dependent_cache_hits"] == "0"
@@ -610,8 +610,8 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
   }
 
-  @Test("layout-realized content forces async layout onto the main actor")
-  func layoutRealizedContentForcesAsyncLayoutOntoMainActor() async throws {
+  @Test("layout-realized content relayouts worker-safe snapshots on the frame-tail worker")
+  func layoutRealizedContentRelayoutsWorkerSafeSnapshotOnFrameTailWorker() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
       GeometryReader { proxy in
         Text("geometry \(proxy.size.width)x\(proxy.size.height)")
@@ -623,9 +623,32 @@ struct AsyncFrameTailRenderingTests {
     let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
     #expect(artifacts.diagnostics.work.layoutDependentMainActorFallbacks == 1)
-    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
+  }
+
+  @Test("layout-realized content keeps main-actor-only realized layouts inline")
+  func layoutRealizedContentWithMainActorCustomLayoutStaysInline() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      GeometryReader { _ in
+        AsyncFrameTailCustomLayout {
+          Text("geometry custom")
+        }
+      },
+      context: .init(identity: testIdentity("AsyncGeometryCustomLayoutRoot")),
+      proposal: .init(width: 24, height: 5)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
+    #expect(artifacts.diagnostics.work.layoutDependentMainActorFallbacks == 1)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 1)
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(raster.contains("geometry custom"))
   }
 
   @Test("layout-realized async commits publish realized action registrations")

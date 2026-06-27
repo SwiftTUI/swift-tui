@@ -146,4 +146,18 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
     self.geometryResolutionDiagnostics = geometryResolutionDiagnostics
   }
+
+  package mutating func merge(_ other: Self) {
+    measuredNodesComputed += other.measuredNodesComputed
+    measuredNodesReused += other.measuredNodesReused
+    placedNodesComputed += other.placedNodesComputed
+    placedNodesReused += other.placedNodesReused
+    placedFrameTableEntriesReused += other.placedFrameTableEntriesReused
+    measurementWorkStackSteps += other.measurementWorkStackSteps
+    placementWorkStackSteps += other.placementWorkStackSteps
+    layoutDependentRealizations += other.layoutDependentRealizations
+    layoutDependentRealizationCacheHits += other.layoutDependentRealizationCacheHits
+    layoutDependentMainActorFallbacks += other.layoutDependentMainActorFallbacks
+    geometryResolutionDiagnostics.merge(other.geometryResolutionDiagnostics)
+  }
 }

@@ -74,22 +74,47 @@ struct LatePreferenceReconciliationStage {
   @MainActor
   func runAsync(
     initialInput: FrameTailInput,
+    shouldRelayoutLayoutRealizationSnapshot: (FrameTailInput) -> Bool = { _ in false },
     renderLayout: (FrameTailInput) async -> AsyncFrameTailLayoutPass
   ) async -> AsyncLatePreferenceReconciliationOutput {
     var input = initialInput
     var totalSuspensionDuration = Duration.zero
+    var layoutPassCount = 0
+    var accumulatedLayoutWork = LayoutWorkMetrics()
+
+    func recordLayoutWork(_ layout: FrameTailLayoutOutput) {
+      layoutPassCount += 1
+      accumulatedLayoutWork.merge(layout.layoutWork)
+    }
+
+    func applyingAccumulatedLayoutWork(
+      to reconciled: ReconciledFrameTailLayout
+    ) -> ReconciledFrameTailLayout {
+      guard layoutPassCount > 1 else {
+        return reconciled
+      }
+      var reconciled = reconciled
+      reconciled.layout.layoutWork = accumulatedLayoutWork
+      return reconciled
+    }
+
     var layoutPass = await renderLayout(input)
     totalSuspensionDuration += layoutPass.suspensionDuration
     guard var layout = layoutPass.layout else {
       return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
     }
+    recordLayoutWork(layout)
 
     let budget = policy.relayoutPassBudget(for: initialInput)
     for _ in 0..<budget {
-      switch reconciliationStep(input: input, layout: layout) {
+      switch reconciliationStep(
+        input: input,
+        layout: layout,
+        shouldRelayoutLayoutRealizationSnapshot: shouldRelayoutLayoutRealizationSnapshot
+      ) {
       case .finished(let reconciled):
         return .init(
-          layout: reconciled,
+          layout: applyingAccumulatedLayoutWork(to: reconciled),
           suspensionDuration: totalSuspensionDuration
         )
       case .needsRelayout(let nextInput):
@@ -100,6 +125,7 @@ struct LatePreferenceReconciliationStage {
           return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
         }
         layout = nextLayout
+        recordLayoutWork(layout)
       }
     }
 
@@ -116,13 +142,25 @@ struct LatePreferenceReconciliationStage {
   @MainActor
   private func reconciliationStep(
     input: FrameTailInput,
-    layout: FrameTailLayoutOutput
+    layout: FrameTailLayoutOutput,
+    shouldRelayoutLayoutRealizationSnapshot: (FrameTailInput) -> Bool = { _ in false }
   ) -> LatePreferenceReconciliationStep {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
-      input.layoutPassContext.layoutDependentRealizationsByIdentity
-    )
+    let realizations = input.layoutPassContext.layoutDependentRealizationsByIdentity
+    let realized = input.resolved.applyingLayoutDependentRealizations(realizations)
     let reconciliation = reconcileLatePreferenceConsumers(in: realized)
     let runtimeIssues = layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
+
+    if let workerSnapshot = reconciliation.resolved.layoutRealizationWorkerSnapshot(
+      using: realizations
+    ) {
+      let nextInput = relayoutInput(
+        basedOn: input,
+        resolved: workerSnapshot
+      )
+      if reconciliation.requiresRelayout || shouldRelayoutLayoutRealizationSnapshot(nextInput) {
+        return .needsRelayout(nextInput)
+      }
+    }
 
     guard reconciliation.requiresRelayout else {
       var finalInput = input

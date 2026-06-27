@@ -173,10 +173,64 @@ extension ResolvedNode {
     return copy
   }
 
+  package func layoutRealizationWorkerSnapshot(
+    using realizations: [Identity: [ResolvedNode]]
+  ) -> ResolvedNode? {
+    let snapshot = layoutRealizationWorkerSnapshotResult(using: realizations)
+    return snapshot.changed ? snapshot.node : nil
+  }
+
+  private func layoutRealizationWorkerSnapshotResult(
+    using realizations: [Identity: [ResolvedNode]]
+  ) -> (node: ResolvedNode, changed: Bool) {
+    var copy = self
+
+    if let boundary = copy.layoutRealizedContent,
+      let realizedChildren = realizations[copy.identity],
+      realizedChildren.count == 1
+    {
+      let snapshotChildren = realizedChildren.map {
+        $0.layoutRealizationWorkerSnapshotResult(using: realizations).node
+      }
+      copy.layoutRealizedContent = nil
+      copy.layoutBehavior = boundary.sizingPolicy.workerSnapshotLayoutBehavior
+      copy.children = snapshotChildren
+      return (copy, true)
+    }
+
+    var changed = false
+    let snapshotChildren = copy.children.map { child in
+      let snapshot = child.layoutRealizationWorkerSnapshotResult(using: realizations)
+      changed = changed || snapshot.changed
+      return snapshot.node
+    }
+    if changed {
+      copy.children = snapshotChildren
+    }
+    return (copy, changed)
+  }
+
   private var containsLayoutRealizedContent: Bool {
     if layoutRealizedContent != nil {
       return true
     }
     return children.contains { $0.containsLayoutRealizedContent }
+  }
+}
+
+extension LayoutDependentContentSizingPolicy {
+  fileprivate var workerSnapshotLayoutBehavior: LayoutBehavior {
+    switch self {
+    case .fillsProposal(let unspecifiedIdeal):
+      return .flexibleFrame(
+        minWidth: nil,
+        idealWidth: .finite(unspecifiedIdeal.width),
+        maxWidth: .infinity,
+        minHeight: nil,
+        idealHeight: .finite(unspecifiedIdeal.height),
+        maxHeight: .infinity,
+        alignment: .topLeading
+      )
+    }
   }
 }

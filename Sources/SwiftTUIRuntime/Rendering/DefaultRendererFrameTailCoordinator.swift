@@ -283,7 +283,12 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
   ) async -> AsyncLatePreferenceReconciliationOutput {
     await LatePreferenceReconciliationStage(
       policy: latePreferenceReconciliationPolicy
-    ).runAsync(initialInput: initialInput) { input in
+    ).runAsync(
+      initialInput: initialInput,
+      shouldRelayoutLayoutRealizationSnapshot: { input in
+        frameTailRenderer.canOffloadLayout(input)
+      }
+    ) { input in
       await renderFrameTailLayoutAsync(
         input,
         clock: clock,

@@ -118,6 +118,21 @@ package struct GeometryResolutionDiagnostics: Equatable, Sendable {
     self.duplicateNamedCoordinateSpaceCount = duplicateNamedCoordinateSpaceCount
     self.firstDuplicateNamedCoordinateSpaceName = firstDuplicateNamedCoordinateSpaceName
   }
+
+  package mutating func merge(_ other: Self) {
+    anchorResolutionMissCount += other.anchorResolutionMissCount
+    if firstAnchorResolutionMissIdentity == nil {
+      firstAnchorResolutionMissIdentity = other.firstAnchorResolutionMissIdentity
+    }
+    missingNamedCoordinateSpaceCount += other.missingNamedCoordinateSpaceCount
+    if firstMissingNamedCoordinateSpaceName == nil {
+      firstMissingNamedCoordinateSpaceName = other.firstMissingNamedCoordinateSpaceName
+    }
+    duplicateNamedCoordinateSpaceCount += other.duplicateNamedCoordinateSpaceCount
+    if firstDuplicateNamedCoordinateSpaceName == nil {
+      firstDuplicateNamedCoordinateSpaceName = other.firstDuplicateNamedCoordinateSpaceName
+    }
+  }
 }
 
 package final class GeometryResolutionDiagnosticsRecorder: Sendable {
