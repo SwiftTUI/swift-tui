@@ -138,10 +138,10 @@ public struct FrameDiagnosticRuntime: Equatable, Sendable {
 }
 
 public struct FrameDiagnosticDrop: Equatable, Sendable {
-  public var eligibilityBlockers: Set<FrameDropEligibility.Blocker>
+  public var eligibilityBlockers: Set<FrameDropBlocker>
 
   public init(
-    eligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
+    eligibilityBlockers: Set<FrameDropBlocker> = []
   ) {
     self.eligibilityBlockers = eligibilityBlockers
   }

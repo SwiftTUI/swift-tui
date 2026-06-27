@@ -20,7 +20,7 @@ public struct TaskDescriptor: Equatable, Sendable {
 }
 
 /// A lifecycle operation emitted during commit planning.
-public enum LifecycleCommitOperation: Equatable, Sendable {
+package enum LifecycleCommitOperation: Equatable, Sendable {
   case appear(handlerIDs: [String])
   case disappear(handlerIDs: [String])
   case change(handlerIDs: [String])
@@ -44,12 +44,12 @@ public enum LifecycleCommitOperation: Equatable, Sendable {
 }
 
 /// A single lifecycle operation emitted for one identity.
-public struct LifecycleCommitEntry: Equatable, Sendable {
+package struct LifecycleCommitEntry: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
-  public var identity: Identity
-  public var operation: LifecycleCommitOperation
+  package var identity: Identity
+  package var operation: LifecycleCommitOperation
 
-  public init(
+  package init(
     identity: Identity,
     operation: LifecycleCommitOperation
   ) {
@@ -70,10 +70,10 @@ public struct LifecycleCommitEntry: Equatable, Sendable {
 }
 
 /// Records a handler that must be installed for the committed frame.
-public struct HandlerInstallation: Equatable, Sendable {
-  public var handlerID: RouteID
+package struct HandlerInstallation: Equatable, Sendable {
+  package var handlerID: RouteID
 
-  public init(handlerID: RouteID) {
+  package init(handlerID: RouteID) {
     self.handlerID = handlerID
   }
 }
@@ -94,13 +94,13 @@ package enum CommitEffectCategory: CaseIterable, Sendable {
 /// handler-installation work that the runtime must apply in order. The semantic
 /// snapshot is carried for runtime consumers; lifecycle and handler entries are
 /// the commit-owned side-effect plan.
-public struct CommitPlan: Equatable, Sendable {
-  public var transaction: TransactionSnapshot
-  public var semanticSnapshot: SemanticSnapshot
-  public var lifecycle: [LifecycleCommitEntry]
-  public var handlerInstallations: [HandlerInstallation]
+package struct CommitPlan: Equatable, Sendable {
+  package var transaction: TransactionSnapshot
+  package var semanticSnapshot: SemanticSnapshot
+  package var lifecycle: [LifecycleCommitEntry]
+  package var handlerInstallations: [HandlerInstallation]
 
-  public init(
+  package init(
     transaction: TransactionSnapshot = .init(),
     semanticSnapshot: SemanticSnapshot = .init(),
     lifecycle: [LifecycleCommitEntry] = [],

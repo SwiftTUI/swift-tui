@@ -14,7 +14,7 @@ private func brailleDotCount(_ cell: RasterCell) -> Int {
   return Int(scalar - 0x2800).nonzeroBitCount
 }
 
-private func litCellCount(_ artifacts: FrameArtifacts) -> Int {
+private func litCellCount(_ artifacts: RenderSnapshot) -> Int {
   var count = 0
   for row in artifacts.rasterSurface.cells {
     for cell in row where brailleDotCount(cell) > 0 {
@@ -63,7 +63,7 @@ struct PathFrameReactivityTests {
   @Test("the path fills proportionally to its frame (frame-relative)")
   func proportionalToFrame() {
     // A unit square fills its whole frame; the lit cell count tracks the area.
-    let square = { (w: Int, h: Int) -> FrameArtifacts in
+    let square = { (w: Int, h: Int) -> RenderSnapshot in
       DefaultRenderer().render(
         CustomSquare().fill(Color.white).frame(width: w, height: h),
         context: .init(identity: testIdentity("Square\(w)x\(h)"))

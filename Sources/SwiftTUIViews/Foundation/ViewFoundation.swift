@@ -1,15 +1,12 @@
-public import SwiftTUICore
+package import SwiftTUICore
 
 /// Resolves authored views into resolved render trees.
-///
-/// This is the lowest public entry point for inspecting the authored view tree
-/// before layout, semantics, draw extraction, and rasterization occur.
-public struct Resolver {
-  public init() {}
+package struct Resolver {
+  package init() {}
 
   /// Resolves `root` in the supplied context.
   @MainActor
-  public func resolve<V: View>(
+  package func resolve<V: View>(
     _ root: V,
     in context: ResolveContext = .init()
   ) -> ResolvedNode {

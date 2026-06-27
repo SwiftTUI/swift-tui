@@ -31,7 +31,7 @@ private func brailleDotIsLit(_ cell: RasterCell, x: Int, y: Int) -> Bool {
 /// Counts the number of cells in a single row that hold a non-blank
 /// Braille glyph (i.e. at least one subpixel dot lit).
 private func litBrailleCellsInRow(
-  _ artifacts: FrameArtifacts,
+  _ artifacts: RenderSnapshot,
   row: Int
 ) -> Int {
   guard row >= 0, row < artifacts.rasterSurface.cells.count else {

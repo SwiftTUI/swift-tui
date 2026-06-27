@@ -638,7 +638,7 @@ private final class AnyViewRecordingInvalidator: Invalidating {
 
 private func lifecycleOperations(
   for identity: Identity,
-  in artifacts: FrameArtifacts
+  in artifacts: RenderSnapshot
 ) -> [LifecycleCommitOperation] {
   artifacts.commitPlan.lifecycle
     .filter { $0.identity == identity }
@@ -647,7 +647,7 @@ private func lifecycleOperations(
 
 private func focusIdentity(
   containing marker: String,
-  in artifacts: FrameArtifacts
+  in artifacts: RenderSnapshot
 ) -> Identity? {
   artifacts.semanticSnapshot.focusRegions.first {
     $0.identity.path.contains(marker)

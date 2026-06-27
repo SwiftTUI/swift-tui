@@ -46,7 +46,7 @@ struct EquatableBoundaryReuseTests {
     dynamic1: String,
     chrome2: String,
     dynamic2: String
-  ) -> FrameArtifacts {
+  ) -> RenderSnapshot {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
@@ -68,7 +68,7 @@ struct EquatableBoundaryReuseTests {
 
   @Test("Equatable boundary reuses its subtree when unchanged (gate on)")
   func equatableBoundaryReusesUnchangedSubtree() {
-    func assertCorrectRender(_ frame: FrameArtifacts) {
+    func assertCorrectRender(_ frame: RenderSnapshot) {
       let rendered = frame.rasterSurface.lines.joined(separator: "\n")
       #expect(rendered.contains("Chrome:fixed"))
       #expect(rendered.contains("Static"))
@@ -119,7 +119,7 @@ struct EquatableBoundaryReuseTests {
 
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("Root")
-    let updated = withMemoReuse(true) { () -> FrameArtifacts in
+    let updated = withMemoReuse(true) { () -> RenderSnapshot in
       _ = renderer.render(
         WrappedRoot(title: "fixed", dynamic: "v1"),
         context: .init(identity: rootIdentity)
@@ -171,7 +171,7 @@ struct EquatableBoundaryReuseTests {
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("Root")
 
-    func render(focused: Bool, invalidate: Bool) -> FrameArtifacts {
+    func render(focused: Bool, invalidate: Bool) -> RenderSnapshot {
       var environmentValues = EnvironmentValues()
       environmentValues.focusedIdentity = focused ? rootIdentity : nil
       return renderer.render(
@@ -232,7 +232,7 @@ struct EquatableBoundaryReuseTests {
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("Root")
 
-    func render(focused: Bool, invalidate: Bool) -> FrameArtifacts {
+    func render(focused: Bool, invalidate: Bool) -> RenderSnapshot {
       var environmentValues = EnvironmentValues()
       environmentValues.focusedIdentity = focused ? rootIdentity : nil
       return renderer.render(
@@ -282,7 +282,7 @@ struct EquatableBoundaryReuseTests {
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("Root")
 
-    func renderFrames() -> FrameArtifacts {
+    func renderFrames() -> RenderSnapshot {
       _ = renderer.render(ListRoot(dynamic: "v1"), context: .init(identity: rootIdentity))
       return renderer.render(
         ListRoot(dynamic: "v2"),

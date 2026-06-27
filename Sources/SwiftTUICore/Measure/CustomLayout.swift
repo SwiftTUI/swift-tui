@@ -1,4 +1,4 @@
-public protocol CustomLayoutProxy: AnyObject, Sendable {
+package protocol CustomLayoutProxy: AnyObject, Sendable {
   var debugName: String { get }
 
   func measureContainer(
@@ -22,7 +22,7 @@ public protocol CustomLayoutProxy: AnyObject, Sendable {
 }
 
 extension CustomLayoutProxy {
-  public func measureChildren(
+  package func measureChildren(
     engine: LayoutEngine,
     node: ResolvedNode,
     proposal: ProposedSize
@@ -180,8 +180,8 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
 }
 
 /// Reference wrapper used to carry a custom layout through the pipeline.
-public final class CustomLayoutHandle: Sendable {
-  public let proxy: any CustomLayoutProxy
+package final class CustomLayoutHandle: Sendable {
+  package let proxy: any CustomLayoutProxy
   package let workerProxy: (any WorkerCustomLayoutProxy)?
   package let measurementReuseSignature: String?
   package let placementReuseSignature: String?
@@ -195,7 +195,7 @@ public final class CustomLayoutHandle: Sendable {
       @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, LayoutPassContext?) -> Int?
     )?
 
-  public init(
+  package init(
     _ proxy: some CustomLayoutProxy,
     measurementReuseSignature: String? = nil,
     placementReuseSignature: String? = nil
@@ -231,7 +231,7 @@ public final class CustomLayoutHandle: Sendable {
     self.stackMinimumMainSizeHandler = stackMinimumMainSizeHandler
   }
 
-  public var debugName: String {
+  package var debugName: String {
     if let workerProxy {
       return workerProxy.debugName
     }
@@ -357,7 +357,7 @@ public final class CustomLayoutHandle: Sendable {
 }
 
 extension CustomLayoutHandle: Equatable {
-  public static func == (lhs: CustomLayoutHandle, rhs: CustomLayoutHandle) -> Bool {
+  package static func == (lhs: CustomLayoutHandle, rhs: CustomLayoutHandle) -> Bool {
     lhs === rhs
   }
 }

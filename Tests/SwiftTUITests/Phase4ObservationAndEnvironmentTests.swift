@@ -1150,7 +1150,7 @@ struct Phase4ObservationAndEnvironmentTests {
 
 @MainActor
 private struct WindowGroupAuthoringScopeSelection {
-  let artifacts: FrameArtifacts
+  let artifacts: RenderSnapshot
 }
 
 @MainActor

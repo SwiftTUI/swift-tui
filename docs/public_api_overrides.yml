@@ -129,7 +129,6 @@ classifications:
     - SwiftTUIViews.ProgressView
     - SwiftTUIViews.Rectangle
     - SwiftTUIViews.ResetFocusAction
-    - SwiftTUIViews.Resolver
     - SwiftTUIViews.RoundedRectangle
     - SwiftTUIViews.ScrollView
     - SwiftTUIViews.ScrollViewProxy
@@ -190,6 +189,7 @@ classifications:
     - SwiftTUI.PresentationSurfaceMetricsProvider
     - SwiftTUI.PresentationMetrics
     - SwiftTUI.RasterPresentationSurface
+    - SwiftTUIRuntime.RenderSnapshot
     - SwiftTUI.SemanticHostFrame
     - SwiftTUI.SemanticHostFrameCapabilities
     - SwiftTUI.SignalReading
@@ -490,7 +490,6 @@ classifications:
     - SwiftTUICore.CellPoint
     - SwiftTUICore.CellRect
     - SwiftTUICore.CellSize
-    - SwiftTUICore.ChildAllocation
     - SwiftTUICore.ChromaticAdaptationMethod
     - SwiftTUICore.Chromaticity
     - SwiftTUICore.CollectionContainerChromePresentation
@@ -499,19 +498,12 @@ classifications:
     - SwiftTUICore.ColorError
     - SwiftTUICore.ColorResolutionError
     - SwiftTUICore.ColorSchemeContrast
-    - SwiftTUICore.CommitPlan
-    - SwiftTUICore.CommitPlanner
     - SwiftTUICore.CompositingSpace
-    - SwiftTUICore.ContainerAllocationSnapshot
     - SwiftTUICore.ContainerChrome
     - SwiftTUICore.ControlChrome
     - SwiftTUICore.ControlProminence
-    - SwiftTUICore.CustomLayoutHandle
-    - SwiftTUICore.CustomLayoutProxy
     - SwiftTUICore.DeltaEMethod
     - SwiftTUICore.DrawCommand
-    - SwiftTUICore.DrawExtractor
-    - SwiftTUICore.DrawNode
     - SwiftTUICore.DropContext
     - SwiftTUICore.DroppedPath
     - SwiftTUICore.Edge
@@ -528,7 +520,6 @@ classifications:
     - SwiftTUICore.FocusTracker
     - SwiftTUICore.ForeignGrid
     - SwiftTUICore.ForeignSurfacePayload
-    - SwiftTUICore.FrameArtifacts
     - SwiftTUICore.FrameContext
     - SwiftTUICore.FrameDiagnosticCounts
     - SwiftTUICore.FrameDiagnosticDrop
@@ -538,7 +529,7 @@ classifications:
     - SwiftTUICore.FrameDiagnosticTiming
     - SwiftTUICore.FrameDiagnosticWork
     - SwiftTUICore.FrameDiagnostics
-    - SwiftTUICore.FrameDropEligibility
+    - SwiftTUICore.FrameDropBlocker
     - SwiftTUICore.FrameHeadTimings
     - SwiftTUICore.FrameMainActorTimings
     - SwiftTUICore.FramePhaseTimings
@@ -553,7 +544,6 @@ classifications:
     - SwiftTUICore.Gradient
     - SwiftTUICore.GridSample
     - SwiftTUICore.GridSize
-    - SwiftTUICore.HandlerInstallation
     - SwiftTUICore.HexFormat
     - SwiftTUICore.HexLetterCase
     - SwiftTUICore.HorizontalAlignment
@@ -572,17 +562,10 @@ classifications:
     - SwiftTUICore.KeyPress
     - SwiftTUICore.KeyPressResult
     - SwiftTUICore.LabColor
-    - SwiftTUICore.LayoutBehavior
-    - SwiftTUICore.LayoutEngine
     - "SwiftTUICore.layoutText(for:options:)"
     - "SwiftTUICore.layoutText(for:width:lineLimit:truncationMode:wrappingStrategy:)"
-    - SwiftTUICore.LazyStackAllocationSnapshot
     - SwiftTUICore.LChColor
-    - SwiftTUICore.LifecycleCommitEntry
-    - SwiftTUICore.LifecycleCommitOperation
-    - SwiftTUICore.LifecycleEvent
     - SwiftTUICore.LifecycleMetadata
-    - SwiftTUICore.LifecycleOperation
     - SwiftTUICore.LinearGradient
     - SwiftTUICore.LinkDestination
     - SwiftTUICore.ListChromeScope
@@ -593,8 +576,6 @@ classifications:
     - SwiftTUICore.MatchedGeometryKey
     - SwiftTUICore.MatchedGeometryNamespace
     - SwiftTUICore.Matrix3x3
-    - SwiftTUICore.MeasuredNode
-    - SwiftTUICore.MeasurementCache
     - SwiftTUICore.MeasurementCacheMetrics
     - SwiftTUICore.MixingMethod
     - SwiftTUICore.MonotonicInstant
@@ -609,7 +590,6 @@ classifications:
     - SwiftTUICore.Phase
     - SwiftTUICore.PixelPoint
     - SwiftTUICore.PixelSize
-    - SwiftTUICore.PlacedNode
     - SwiftTUICore.Point
     - SwiftTUICore.PointerInputCapabilities
     - SwiftTUICore.PointerLocation
@@ -630,14 +610,12 @@ classifications:
     - SwiftTUICore.RasterImageBackdropCell
     - SwiftTUICore.RasterImageAttachment
     - SwiftTUICore.RasterImageCompositing
-    - SwiftTUICore.Rasterizer
     - SwiftTUICore.RasterStyleRun
     - SwiftTUICore.RasterSurface
     - SwiftTUICore.Rect
     - SwiftTUICore.ReferenceWhite
     - SwiftTUICore.RenderGeneration
     - SwiftTUICore.ResolvedImageAsset
-    - SwiftTUICore.ResolvedNode
     - SwiftTUICore.ResolvedTextStyle
     - "SwiftTUICore.resolveStyleColorResult(style:theme:appearance:depthLimit:)"
     - SwiftTUICore.RGBColorProfile
@@ -657,9 +635,7 @@ classifications:
     - SwiftTUICore.SectionRole
     - SwiftTUICore.SelectionRoute
     - SwiftTUICore.SelectionTag
-    - SwiftTUICore.SemanticExtractor
     - SwiftTUICore.SemanticMetadata
-    - SwiftTUICore.SemanticRole
     - SwiftTUICore.SemanticShapeStyle
     - SwiftTUICore.SemanticSnapshot
     - SwiftTUICore.SemanticStyleRole
@@ -669,7 +645,6 @@ classifications:
     - SwiftTUICore.ShapePayload
     - SwiftTUICore.ShapeStyle
     - SwiftTUICore.Size
-    - SwiftTUICore.SnapshotRenderer
     - SwiftTUICore.Spacing
     - SwiftTUICore.StateContainer
     - SwiftTUICore.StrokeStyle
@@ -755,6 +730,33 @@ classifications:
     # Compatibility-shim types that were retired. If any of these reappears
     # in the source, the --check run fails.
     - SwiftTUI.FrameDiagnosticsLogger
+    - SwiftTUIViews.Resolver
+    - SwiftTUICore.ChildAllocation
+    - SwiftTUICore.CommitPlan
+    - SwiftTUICore.CommitPlanner
+    - SwiftTUICore.ContainerAllocationSnapshot
+    - SwiftTUICore.CustomLayoutHandle
+    - SwiftTUICore.CustomLayoutProxy
+    - SwiftTUICore.DrawExtractor
+    - SwiftTUICore.DrawNode
+    - SwiftTUICore.FrameArtifacts
+    - SwiftTUICore.FrameDropEligibility
+    - SwiftTUICore.HandlerInstallation
+    - SwiftTUICore.LayoutBehavior
+    - SwiftTUICore.LayoutEngine
+    - SwiftTUICore.LazyStackAllocationSnapshot
+    - SwiftTUICore.LifecycleCommitEntry
+    - SwiftTUICore.LifecycleCommitOperation
+    - SwiftTUICore.LifecycleEvent
+    - SwiftTUICore.LifecycleOperation
+    - SwiftTUICore.MeasuredNode
+    - SwiftTUICore.MeasurementCache
+    - SwiftTUICore.PlacedNode
+    - SwiftTUICore.Rasterizer
+    - SwiftTUICore.ResolvedNode
+    - SwiftTUICore.SemanticExtractor
+    - SwiftTUICore.SemanticRole
+    - SwiftTUICore.SnapshotRenderer
     - SwiftTUIViews.HotkeyBinding
     - SwiftTUIViews.HotkeyRegistrationSnapshot
     - SwiftTUIViews.HotkeyRegistry

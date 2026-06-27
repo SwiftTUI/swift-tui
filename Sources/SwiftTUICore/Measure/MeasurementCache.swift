@@ -2,7 +2,7 @@ import DequeModule
 import Synchronization
 
 /// A retained cache of measured subtrees keyed by runtime node id and proposal.
-public final class MeasurementCache: Sendable {
+package final class MeasurementCache: Sendable {
   private struct CachedMeasurement: Sendable {
     let resolved: ResolvedNode
     let node: MeasuredNode
@@ -36,15 +36,15 @@ public final class MeasurementCache: Sendable {
   private let storage: Mutex<Storage> = .init(.init())
 
   /// Creates an empty measurement cache.
-  public init() {}
+  package init() {}
 
   /// The number of cached entries.
-  public var count: Int {
+  package var count: Int {
     storage.withLock { $0.entryCount }
   }
 
   /// Snapshot metrics describing cache usage.
-  public var metrics: MeasurementCacheMetrics {
+  package var metrics: MeasurementCacheMetrics {
     storage.withLock { storage in
       MeasurementCacheMetrics(
         generation: storage.epochGeneration,
@@ -60,7 +60,7 @@ public final class MeasurementCache: Sendable {
 
   /// Returns a cached measurement for `resolved` and `proposal` when the
   /// structural inputs still match.
-  public func lookup(
+  package func lookup(
     resolved: ResolvedNode,
     proposal: ProposedSize
   ) -> MeasuredNode? {
@@ -111,7 +111,7 @@ public final class MeasurementCache: Sendable {
   }
 
   /// Stores `node` as the cached measurement for `resolved`.
-  public func store(
+  package func store(
     _ node: MeasuredNode,
     for resolved: ResolvedNode
   ) {
@@ -156,7 +156,7 @@ public final class MeasurementCache: Sendable {
   }
 
   /// Clears the cache and advances its generation counter.
-  public func reset() {
+  package func reset() {
     storage.withLock { storage in
       storage.epochGeneration += 1
       storage.accessGeneration = 0

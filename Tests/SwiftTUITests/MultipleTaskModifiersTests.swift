@@ -8,7 +8,7 @@ import Testing
 @Suite("Multiple task modifiers per view node")
 struct MultipleTaskModifiersTests {
   private func render(_ view: some View) -> (
-    artifacts: FrameArtifacts,
+    artifacts: RenderSnapshot,
     lifecycleRegistry: LocalLifecycleRegistry,
     taskRegistry: LocalTaskRegistry
   ) {
@@ -26,7 +26,7 @@ struct MultipleTaskModifiersTests {
     return (artifacts, lifecycleRegistry, taskRegistry)
   }
 
-  private func startedDescriptors(_ artifacts: FrameArtifacts) -> [TaskDescriptor] {
+  private func startedDescriptors(_ artifacts: RenderSnapshot) -> [TaskDescriptor] {
     artifacts.commitPlan.lifecycle.compactMap { entry in
       if case .taskStart(let descriptor) = entry.operation {
         return descriptor

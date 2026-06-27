@@ -278,22 +278,22 @@ extension DrawCommand {
 /// Geometry and resolved metadata are read from the current placed tree and
 /// projected here; `DrawNode` is not a retained layout or semantic source of
 /// truth.
-public struct DrawNode: Equatable, Sendable {
+package struct DrawNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
-  public var identity: Identity
-  public var environmentSnapshot: EnvironmentSnapshot
-  public var bounds: CellRect
-  public var clipBounds: CellRect?
+  package var identity: Identity
+  package var environmentSnapshot: EnvironmentSnapshot
+  package var bounds: CellRect
+  package var clipBounds: CellRect?
   package var metadata: DrawMetadata
   package var drawEffects: DrawEffects
-  public var commands: [DrawCommand]
+  package var commands: [DrawCommand]
   /// Commands that must paint **after** this node's children have been
   /// fully painted.  Used by features that overdraw their children, such
   /// as inset-placement borders whose edge glyphs occupy the outermost
   /// cells of the child's frame and must therefore win the paint order
   /// against the child's own content.  Most nodes leave this empty.
-  public var postCommands: [DrawCommand]
-  public var children: [DrawNode] {
+  package var postCommands: [DrawCommand]
+  package var children: [DrawNode] {
     didSet {
       recomputeSubtreeNodeCount()
     }

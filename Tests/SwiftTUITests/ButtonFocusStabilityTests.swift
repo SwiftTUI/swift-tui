@@ -26,7 +26,7 @@ struct ButtonFocusStabilityTests {
     let size = CellSize(width: 20, height: 3)
     let rootIdentity = testIdentity("PlainButtonFocus")
 
-    func render(focus: Identity?) -> FrameArtifacts {
+    func render(focus: Identity?) -> RenderSnapshot {
       var env = EnvironmentValues()
       env.terminalSize = size
       env.focusedIdentity = focus

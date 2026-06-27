@@ -150,17 +150,17 @@ convenience product.
 
 ## Important Data Products
 
-- `ResolvedNode`: resolved structure plus merged environment and metadata
-- `MeasuredNode`: size decisions under a proposal, including child measurements
-- `PlacedNode`: final geometry, content bounds, and semantic role
-- `SemanticSnapshot`: focus, interaction, action, selection, and scroll routing
+- `RenderSnapshot`: public one-shot renderer output containing committed raster,
+  semantics, presentation damage, and diagnostics.
+- `RasterSurface`: final cell grid plus style runs.
+- `SemanticSnapshot`: focus, interaction, action, selection, and scroll routing.
 - `SemanticHostFrame`: committed host handoff containing raster output,
-  semantics, focused identity, optional raster damage, and a producer sequence
-- `DrawNode`: draw commands for text, shapes, rules, lists, tables, and indicators
-- `RasterSurface`: final cell grid plus style runs
-- `CommitPlan`: runtime-facing semantic, lifecycle, and handler work
-- `FrameArtifacts`: the full current-frame inspection bundle plus diagnostics.
-  Prefer phase-specific products or `SemanticHostFrame` for host contracts.
+  semantics, focused identity, optional raster damage, and a producer sequence.
+- `FrameDiagnostics`: public frame counts, work metrics, timing, runtime, and
+  drop diagnostics.
+- Package-only phase IR: `ResolvedNode`, `MeasuredNode`, `PlacedNode`,
+  `DrawNode`, `CommitPlan`, and `FrameArtifacts`. These keep the implementation
+  explicit without becoming host or app contracts.
 
 ## Styling And Presentation
 

@@ -15,7 +15,10 @@ The `SwiftTUICore` module owns the parts of the system that should stay independ
 - frame diagnostics and snapshot support
 
 If `SwiftTUIViews` is the authoring layer and `SwiftTUIRuntime` is the runtime
-layer, `SwiftTUICore` is the engine in between them.
+layer, `SwiftTUICore` is the engine in between them. Its intermediate phase IR is
+package-only; public callers usually reach committed output through
+`SwiftTUIRuntime.RenderSnapshot`, ``RasterSurface``, ``SemanticSnapshot``, and
+diagnostics types.
 
 ## Design Boundary
 
@@ -24,17 +27,20 @@ layer, `SwiftTUICore` is the engine in between them.
 That means this module can be reused for:
 
 - snapshot rendering
-- tests that inspect resolved, measured, placed, semantic, draw, or raster products
-- alternate presentation experiments that still consume the same frame artifacts
+- package tests that inspect resolved, measured, placed, semantic, draw, or
+  raster products
+- alternate presentation experiments that still consume committed public
+  snapshot or host contracts
 
 ## Topics
 
-### Pipeline Products
+### Public Pipeline Contracts
 
-- ``FrameArtifacts``
 - ``FrameContext``
-- ``CommitPlan``
 - ``FrameDiagnostics``
+- ``FrameDropBlocker``
+- ``SemanticSnapshot``
+- ``RasterSurface``
 
 ### Geometry And Pointer Metadata
 
@@ -51,14 +57,6 @@ That means this module can be reused for:
 - ``CellPixelMetrics``
 - ``PointerLocation``
 - ``PointerInputCapabilities``
-
-### Execution Components
-
-- ``LayoutEngine``
-- ``SemanticExtractor``
-- ``DrawExtractor``
-- ``Rasterizer``
-- ``CommitPlanner``
 
 ### Guides
 

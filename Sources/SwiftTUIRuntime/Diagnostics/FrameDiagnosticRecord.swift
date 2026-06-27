@@ -75,7 +75,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var cancelledRenderCount: Int
   public var newestDesiredAtTailStart: UInt64?
   public var newestDesiredAtTailResult: UInt64?
-  public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
+  public var dropEligibilityBlockers: Set<FrameDropBlocker>
   public var dropDecision: String
   public var dropGeneration: UInt64?
   public var newestDesiredAtDrop: UInt64?

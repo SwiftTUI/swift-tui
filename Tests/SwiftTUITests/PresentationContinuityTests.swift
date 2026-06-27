@@ -324,7 +324,7 @@ private func baseLifecycleRoot(
 
 private func lifecycleOperations(
   for identity: Identity,
-  in artifacts: FrameArtifacts
+  in artifacts: RenderSnapshot
 ) -> [LifecycleCommitOperation] {
   artifacts.commitPlan.lifecycle
     .filter { $0.identity == identity }

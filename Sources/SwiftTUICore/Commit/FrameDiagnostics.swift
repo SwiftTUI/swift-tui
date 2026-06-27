@@ -17,7 +17,7 @@ private struct FrameDiagnosticSummary: Equatable, Sendable {
   var work: FrameDiagnosticWork
 }
 
-public struct FrameDiagnostics: Sendable {
+public struct FrameDiagnostics: Equatable, Sendable {
   public var input: FrameDiagnosticInput
   private var diagnosticSummary: FrameDiagnosticSummary
   private let debugSummaryID: UInt64
@@ -89,6 +89,16 @@ public struct FrameDiagnostics: Sendable {
 }
 
 extension FrameDiagnostics {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.input == rhs.input
+      && lhs.diagnosticSummary == rhs.diagnosticSummary
+      && lhs.presentation == rhs.presentation
+      && lhs.timing == rhs.timing
+      && lhs.runtime == rhs.runtime
+      && lhs.drop == rhs.drop
+      && lhs.geometryResolutionDiagnostics == rhs.geometryResolutionDiagnostics
+  }
+
   private static func nextDebugSummaryID() -> UInt64 {
     FrameDiagnosticsSummaryComputationCounter.nextID.wrappingAdd(1, ordering: .relaxed).newValue
   }
@@ -137,7 +147,7 @@ extension FrameDiagnostics {
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil,
     runtimeIssues: [RuntimeIssue] = [],
-    dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
+    dropEligibilityBlockers: Set<FrameDropBlocker> = []
   ) -> Self {
     let customLayoutFallback = resolved.customLayoutFallbackSummary
     return Self(

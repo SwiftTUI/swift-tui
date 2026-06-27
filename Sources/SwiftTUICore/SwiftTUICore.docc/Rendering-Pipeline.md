@@ -8,11 +8,11 @@ Every SwiftTUI frame product moves through the same ordered phase products:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-`SwiftTUICore` owns those products after authored `SwiftTUIViews` values have
-been lowered and before `SwiftTUIRuntime` presents the result to a terminal,
-browser, or host-managed surface. The runtime may schedule measure, place,
-semantics, draw, and raster as a fused frame-tail performance node, but the
-products retain distinct ownership and diagnostics.
+`SwiftTUICore` owns those package-only products after authored `SwiftTUIViews`
+values have been lowered and before `SwiftTUIRuntime` presents the result to a
+terminal, browser, or host-managed surface. The runtime may schedule measure,
+place, semantics, draw, and raster as a fused frame-tail performance node, but
+the products retain distinct ownership and diagnostics.
 
 This article describes the product model. For runtime scheduling, cancellation,
 host handoff, and diagnostics, see the Runtime Render Pipeline article in the
@@ -31,10 +31,11 @@ The runtime stages are scheduling boundaries, not new frame products.
 `semantics`, `draw`, and `raster` usually run in the fused frame tail. `commit`
 publishes the resulting frame products plus lifecycle and handler effects.
 
-The direct `DefaultRenderer.render` snapshot path and the interactive run-loop
-path both produce ``FrameArtifacts``. The interactive path adds invalidation
-coalescing, frame-tail cancellation, completed-frame disposition, host-facing
-presentation damage, and presentation to a concrete surface.
+The direct `DefaultRenderer.render` snapshot path exposes a public
+`RenderSnapshot`; package internals and the interactive run-loop path use
+`FrameArtifacts`. The interactive path adds invalidation coalescing, frame-tail
+cancellation, completed-frame disposition, host-facing presentation damage, and
+presentation to a concrete surface.
 
 ## Phase Roles
 
@@ -118,8 +119,9 @@ The runtime re-derives host-facing damage against the last frame actually
 presented to that host. Renderer-private raster reuse hints are never a
 frontend contract.
 
-## Related Symbols
+## Public Contracts
 
-- ``FrameArtifacts``
 - ``FrameDiagnostics``
-- ``CommitPlan``
+- ``FrameDropBlocker``
+- ``SemanticSnapshot``
+- ``RasterSurface``

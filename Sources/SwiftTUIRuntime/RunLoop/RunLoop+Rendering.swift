@@ -52,7 +52,7 @@ extension RunLoop {
           // measurement/scroll state across the convergence loop.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
-        let renderedArtifacts = renderer.render(
+        let renderedArtifacts = renderer.renderArtifacts(
           viewBuilder(
             (
               state: currentState,

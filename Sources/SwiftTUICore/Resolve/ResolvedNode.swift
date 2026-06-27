@@ -9,14 +9,14 @@
 /// mirror subsets of this data, but every retained reuse path must refresh those
 /// mirrors from the current `ResolvedNode` before semantics, draw, lifecycle, or
 /// animation code observes them.
-public struct ResolvedNode: Equatable, Sendable {
+package struct ResolvedNode: Equatable, Sendable {
   /// Runtime graph node this value was committed for, stamped by
   /// `ViewNode` applies.  Coupled to `subtreeRuntimeNodeIDsStamped`: writers
   /// that stamp this field outside the `ViewNode` apply walk must call
   /// `recomputeSubtreeRuntimeNodeIDsStamped()` afterwards or the derived
   /// flag goes stale-false and silently disables the stamping fast path.
   package var viewNodeID: ViewNodeID?
-  public var identity: Identity
+  package var identity: Identity
   package var structuralPath: StructuralPath
   package var structuralEdgeRole: StructuralEdgeRole
   package var entityIdentity: EntityIdentity?
@@ -45,7 +45,7 @@ public struct ResolvedNode: Equatable, Sendable {
   /// every frame.  All external writes must go through the public
   /// ``children`` setter, which keeps the derived state correct.
   package var _storedChildren: [ResolvedNode]
-  public var children: [ResolvedNode] {
+  package var children: [ResolvedNode] {
     get { _storedChildren }
     set {
       _storedChildren = newValue
@@ -70,8 +70,8 @@ public struct ResolvedNode: Equatable, Sendable {
   package mutating func setChildrenPreservingDerivedState(_ newChildren: [ResolvedNode]) {
     _storedChildren = newChildren
   }
-  public var environmentSnapshot: EnvironmentSnapshot
-  public var transactionSnapshot: TransactionSnapshot
+  package var environmentSnapshot: EnvironmentSnapshot
+  package var transactionSnapshot: TransactionSnapshot
   /// Backing storage for ``layoutBehavior``.  Direct access is
   /// package-scoped so animation tick frames can overwrite the
   /// layout behavior with an interpolated copy without paying for
@@ -79,7 +79,7 @@ public struct ResolvedNode: Equatable, Sendable {
   /// no-op for animation tick frames that only change numeric
   /// dimensions within the same layout variant.
   package var _storedLayoutBehavior: LayoutBehavior
-  public var layoutBehavior: LayoutBehavior {
+  package var layoutBehavior: LayoutBehavior {
     get { _storedLayoutBehavior }
     set {
       _storedLayoutBehavior = newValue
@@ -106,10 +106,10 @@ public struct ResolvedNode: Equatable, Sendable {
   package var _boxedDrawMetadata: Boxed<DrawMetadata>
   package var drawEffects: DrawEffects
   package var surfaceComposition: SurfaceCompositionMetadata
-  public var semanticMetadata: SemanticMetadata
-  public var lifecycleMetadata: LifecycleMetadata
-  @_spi(Testing) public var drawPayload: DrawPayload
-  public var intrinsicSize: CellSize?
+  package var semanticMetadata: SemanticMetadata
+  package var lifecycleMetadata: LifecycleMetadata
+  package var drawPayload: DrawPayload
+  package var intrinsicSize: CellSize?
   package var indexedChildSource: (any IndexedChildSource)? {
     didSet {
       if indexedChildSource != nil, structuralEdgeRole == .normal {
@@ -129,7 +129,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
   package private(set) var customLayoutFallbackSummary: CustomLayoutFallbackSummary
-  public var supportsRetainedReuse: Bool
+  package var supportsRetainedReuse: Bool
   /// Derived cache: `true` when this node and every descendant in
   /// `_storedChildren` carry a non-nil `viewNodeID`.  `ViewNode`'s runtime-ID
   /// stamping walk early-returns on fully stamped subtree values, which keeps
@@ -150,7 +150,7 @@ public struct ResolvedNode: Equatable, Sendable {
   /// the swap as a single view moving from the previous frame's
   /// placed bounds to the new frame's placed bounds and animates
   /// the translation under `withAnimation`.
-  public var matchedGeometry: MatchedGeometryConfig? = nil
+  package var matchedGeometry: MatchedGeometryConfig? = nil
   /// Marks the node (and transitively any node that inherits this
   /// flag via the layout engine) as a non-semantic visual overlay.
   /// The animation controller sets this on every node in a removal
@@ -162,7 +162,7 @@ public struct ResolvedNode: Equatable, Sendable {
   /// coordinator, and interaction hit testing.  Anything sitting on
   /// the "is the committed tree still the authoritative source for
   /// routing?" axis must filter transient nodes out.
-  public var isTransient: Bool = false
+  package var isTransient: Bool = false
 
   package init(
     viewNodeID: ViewNodeID? = nil,

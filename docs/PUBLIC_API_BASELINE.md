@@ -18,9 +18,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 531 |
+| `SwiftTUIRuntime` | 61 | 532 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 271 | 1443 |
+| `SwiftTUIViews` | 270 | 1440 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUICharts` | 29 | 206 |
 | `SwiftTUIArguments` | 4 | 46 |
@@ -32,7 +32,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 32 | 181 |
-| `SwiftTUICore` | 280 | 2195 |
+| `SwiftTUICore` | 255 | 2011 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -43,14 +43,14 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIRuntime
 
-### Canonical surface (60)
+### Canonical surface (61)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
 - `AppLaunchError` — enum — 2 members
 - `ClipboardWritingPresentationSurface` — protocol — 1 member
 - `ConditionalScene` — struct — 5 members
-- `DefaultRenderer` — struct — 9 members
+- `DefaultRenderer` — struct — 3 members
 - `EmptyScene` — struct — 3 members
 - `ExitKeyBindings` — struct — 5 members
 - `FileOpenError` — enum — 2 members
@@ -76,6 +76,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `PresentationSurface` — protocol — 5 members
 - `PresentationSurfaceMetricsProvider` — protocol — 9 members
 - `RasterPresentationSurface` — protocol — 1 member
+- `RenderSnapshot` — struct — 6 members
 - `RunLoop` — class — 11 members
 - `RunLoopExitReason` — enum — 3 members
 - `RunLoopResult` — struct — 4 members
@@ -122,7 +123,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (271)
+### Canonical surface (270)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -307,7 +308,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Rectangle` — struct — 2 members
 - `ResetFocusAction` — struct — 5 members
 - `ResolveContext` — struct — 9 members
-- `Resolver` — struct — 2 members
 - `RoundedBorderTextFieldStyle` — struct — 3 members
 - `RoundedOutlineStyle` — struct — 4 members
 - `RoundedRectangle` — struct — 3 members
@@ -574,7 +574,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (279)
+### Canonical surface (254)
 
 - `AccessibilityAnnouncement` — struct — 3 members
 - `AccessibilityNode` — struct — 10 members
@@ -617,7 +617,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `CellPoint` — struct — 4 members
 - `CellRect` — struct — 11 members
 - `CellSize` — struct — 4 members
-- `ChildAllocation` — struct — 3 members
 - `ChromaticAdaptationMethod` — enum — 3 members
 - `Chromaticity` — struct — 4 members
 - `CollectionContainerChromePresentation` — struct — 7 members
@@ -626,20 +625,13 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ColorError` — enum — 7 members
 - `ColorResolutionError` — enum — 3 members
 - `ColorSchemeContrast` — enum — 3 members
-- `CommitPlan` — struct — 5 members
-- `CommitPlanner` — struct — 2 members
 - `CompositingSpace` — enum — 5 members
-- `ContainerAllocationSnapshot` — struct — 4 members
 - `ContainerChrome` — struct — 3 members
 - `ControlChrome` — struct — 8 members
 - `ControlProminence` — enum — 2 members
-- `CustomLayoutHandle` — class — 4 members
-- `CustomLayoutProxy` — protocol — 5 members
 - `DeltaEMethod` — enum — 5 members
 - `Double` — extension — 3 members
 - `DrawCommand` — enum — 14 members
-- `DrawExtractor` — struct — 2 members
-- `DrawNode` — struct — 7 members
 - `DropContext` — struct — 4 members
 - `DroppedPath` — struct — 6 members
 - `Edge` — enum — 16 members
@@ -656,17 +648,16 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FocusTracker` — class — 10 members
 - `ForeignGrid` — struct — 4 members
 - `ForeignSurfacePayload` — protocol — 1 member
-- `FrameArtifacts` — struct — 11 members
 - `FrameContext` — struct — 7 members
 - `FrameDiagnosticCounts` — struct — 9 members
 - `FrameDiagnosticDrop` — struct — 2 members
 - `FrameDiagnosticInput` — struct — 3 members
 - `FrameDiagnosticPresentation` — struct — 2 members
 - `FrameDiagnosticRuntime` — struct — 3 members
-- `FrameDiagnostics` — struct — 8 members
+- `FrameDiagnostics` — struct — 9 members
 - `FrameDiagnosticTiming` — struct — 6 members
 - `FrameDiagnosticWork` — struct — 14 members
-- `FrameDropEligibility` — struct — 41 members
+- `FrameDropBlocker` — enum — 23 members
 - `FrameHeadTimings` — struct — 7 members
 - `FrameMainActorTimings` — struct — 3 members
 - `FramePhaseTimings` — struct — 9 members
@@ -681,7 +672,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Gradient` — struct — 11 members
 - `GridSample` — struct — 4 members
 - `GridSize` — struct — 4 members
-- `HandlerInstallation` — struct — 2 members
 - `HexFormat` — enum — 7 members
 - `HexLetterCase` — enum — 3 members
 - `HorizontalAlignment` — struct — 7 members
@@ -701,17 +691,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `KeyPress` — struct — 3 members
 - `KeyPressResult` — enum — 2 members
 - `LabColor` — struct — 6 members
-- `LayoutBehavior` — enum — 16 members
-- `LayoutEngine` — struct — 6 members
 - `layoutText(for:options:)` — func
 - `layoutText(for:width:lineLimit:truncationMode:wrappingStrategy:)` — func
-- `LazyStackAllocationSnapshot` — struct — 7 members
 - `LChColor` — struct — 6 members
-- `LifecycleCommitEntry` — struct — 3 members
-- `LifecycleCommitOperation` — enum — 5 members
-- `LifecycleEvent` — typealias
 - `LifecycleMetadata` — struct — 6 members
-- `LifecycleOperation` — typealias
 - `LinearGradient` — struct — 9 members
 - `LinkDestination` — struct — 6 members
 - `ListChromeScope` — enum — 2 members
@@ -722,8 +705,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `MatchedGeometryKey` — struct — 4 members
 - `MatchedGeometryNamespace` — struct — 3 members
 - `Matrix3x3` — struct — 16 members
-- `MeasuredNode` — struct — 6 members
-- `MeasurementCache` — class — 6 members
 - `MeasurementCacheMetrics` — struct — 8 members
 - `MixingMethod` — enum — 7 members
 - `MonotonicInstant` — struct — 7 members
@@ -738,7 +719,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Phase` — enum — 8 members
 - `PixelPoint` — struct — 4 members
 - `PixelSize` — struct — 4 members
-- `PlacedNode` — struct — 14 members
 - `Point` — struct — 8 members
 - `PointerInputCapabilities` — struct — 6 members
 - `PointerLocation` — struct — 6 members
@@ -759,14 +739,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RasterImageBackdrop` — struct — 3 members
 - `RasterImageBackdropCell` — struct — 6 members
 - `RasterImageCompositing` — struct — 6 members
-- `Rasterizer` — struct — 2 members
 - `RasterStyleRun` — struct — 6 members
 - `RasterSurface` — struct — 10 members
 - `Rect` — struct — 9 members
 - `ReferenceWhite` — struct — 12 members
 - `RenderGeneration` — struct — 4 members
 - `ResolvedImageAsset` — struct — 5 members
-- `ResolvedNode` — struct — 14 members
 - `ResolvedTextStyle` — struct — 11 members
 - `resolveStyleColorResult(style:theme:appearance:depthLimit:)` — func
 - `RGBColorProfile` — struct — 18 members
@@ -786,9 +764,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SectionRole` — enum — 5 members
 - `SelectionRoute` — struct — 3 members
 - `SelectionTag` — struct — 3 members
-- `SemanticExtractor` — struct — 2 members
 - `SemanticMetadata` — struct — 19 members
-- `SemanticRole` — enum — 6 members
 - `SemanticShapeStyle` — struct — 3 members
 - `SemanticSnapshot` — struct — 10 members
 - `SemanticStyleRole` — enum — 15 members
@@ -798,7 +774,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ShapePayload` — struct — 4 members
 - `ShapeStyle` — protocol — 35 members
 - `Size` — struct — 4 members
-- `SnapshotRenderer` — struct — 10 members
 - `Spacing` — struct — 4 members
 - `StateContainer` — class — 6 members
 - `StrokeStyle` — struct — 16 members

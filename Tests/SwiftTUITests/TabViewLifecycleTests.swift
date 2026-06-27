@@ -80,7 +80,7 @@ struct TabViewLifecycleTests {
     let probe = LifecycleProbe()
 
     @MainActor
-    func renderWithSelection(_ tag: String) -> FrameArtifacts {
+    func renderWithSelection(_ tag: String) -> RenderSnapshot {
       let lifecycleRegistry = LocalLifecycleRegistry()
       let taskRegistry = LocalTaskRegistry()
       let artifacts = DefaultRenderer().render(

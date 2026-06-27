@@ -1,5 +1,5 @@
 /// Semantic role assigned to a placed node for extraction and rendering.
-public enum SemanticRole: String, Equatable, Sendable {
+package enum SemanticRole: String, Equatable, Sendable {
   case generic
   case container
   case control
@@ -92,27 +92,27 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
 /// placement, and subtree counts. The resolved-derived fields are projections
 /// refreshed through `PlacedNodeResolvedMetadata`; they are not independent
 /// sources of resolved truth.
-public struct PlacedNode: Equatable, Sendable {
+package struct PlacedNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
-  public var identity: Identity
+  package var identity: Identity
   package var kind: NodeKind
-  public var environmentSnapshot: EnvironmentSnapshot
-  public var bounds: CellRect
-  public var contentBounds: CellRect
-  public var clipBounds: CellRect?
-  public var zIndex: Double
-  public var children: [PlacedNode] {
+  package var environmentSnapshot: EnvironmentSnapshot
+  package var bounds: CellRect
+  package var contentBounds: CellRect
+  package var clipBounds: CellRect?
+  package var zIndex: Double
+  package var children: [PlacedNode] {
     didSet {
       recomputeSubtreeNodeCount()
     }
   }
-  public var semanticRole: SemanticRole
+  package var semanticRole: SemanticRole
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
   package var drawEffects: DrawEffects
   package var surfaceComposition: SurfaceCompositionMetadata
   private var _semanticMetadata: Boxed<SemanticMetadata>?
-  public var semanticMetadata: SemanticMetadata {
+  package var semanticMetadata: SemanticMetadata {
     get { _semanticMetadata?.value ?? SemanticMetadata() }
     set {
       if newValue == SemanticMetadata() {
@@ -133,8 +133,8 @@ public struct PlacedNode: Equatable, Sendable {
       yield &_semanticMetadata!.value
     }
   }
-  public var lifecycleMetadata: LifecycleMetadata
-  @_spi(Testing) public var drawPayload: DrawPayload
+  package var lifecycleMetadata: LifecycleMetadata
+  package var drawPayload: DrawPayload
   /// Mirror of ``ResolvedNode/layoutBehavior`` for cases that need to
   /// flow through to the draw extractor / rasterizer (currently just
   /// `LayoutBehavior.border(...)`).
@@ -146,7 +146,7 @@ public struct PlacedNode: Equatable, Sendable {
   /// then overflow the thread stack. `nil` is the common case: only
   /// border wrappers actually populate this field.
   package var _boxedLayoutBehavior: Boxed<LayoutBehavior>?
-  public var layoutBehavior: LayoutBehavior {
+  package var layoutBehavior: LayoutBehavior {
     get { _boxedLayoutBehavior?.value ?? .intrinsic }
     set {
       if case .intrinsic = newValue {
@@ -162,12 +162,12 @@ public struct PlacedNode: Equatable, Sendable {
   /// measure and place by the layout engine, and filtered out by the
   /// semantic extractor and every other consumer whose state must
   /// track only the committed tree.
-  public var isTransient: Bool = false
+  package var isTransient: Bool = false
   /// Mirror of ``ResolvedNode/matchedGeometry``.  Propagated from
   /// the resolved tree by the layout engine so the animation
   /// controller can compute matched-geometry bounds during
   /// capture+diff.
-  public var matchedGeometry: MatchedGeometryConfig?
+  package var matchedGeometry: MatchedGeometryConfig?
   package var resolvedMetadata: PlacedNodeResolvedMetadata {
     get {
       PlacedNodeResolvedMetadata(
@@ -338,7 +338,7 @@ public struct PlacedNode: Equatable, Sendable {
 }
 
 extension PlacedNode {
-  public static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.identity == rhs.identity
       && lhs.kind == rhs.kind
       && lhs.environmentSnapshot == rhs.environmentSnapshot

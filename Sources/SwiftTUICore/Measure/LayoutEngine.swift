@@ -1,13 +1,13 @@
-public struct LayoutEngine: Sendable {
-  public let cache: MeasurementCache?
+package struct LayoutEngine: Sendable {
+  package let cache: MeasurementCache?
 
   /// Creates a layout engine with an optional retained measurement cache.
-  public init(cache: MeasurementCache? = nil) {
+  package init(cache: MeasurementCache? = nil) {
     self.cache = cache
   }
 
   /// Measures a resolved tree under `proposal`.
-  public func measure(
+  package func measure(
     _ resolved: ResolvedNode,
     proposal: ProposedSize = .unspecified
   ) -> MeasuredNode {
@@ -32,7 +32,7 @@ public struct LayoutEngine: Sendable {
   }
 
   /// Places a measured tree at `origin`.
-  public func place(
+  package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
     origin: CellPoint = .zero
@@ -47,7 +47,7 @@ public struct LayoutEngine: Sendable {
   }
 
   /// Places a measured tree inside `bounds`.
-  public func place(
+  package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
     in bounds: CellRect
@@ -109,7 +109,7 @@ public struct LayoutEngine: Sendable {
     )
   }
 
-  public func dimensions(
+  package func dimensions(
     of resolved: ResolvedNode,
     proposal: ProposedSize = .unspecified
   ) -> ViewDimensions {

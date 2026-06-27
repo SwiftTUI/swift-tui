@@ -17,13 +17,13 @@
 /// - Advisory visibility signals: ``drawnIdentities``.
 /// - Side-effect plan: ``commitPlan``.
 /// - Diagnostics: ``diagnostics``.
-public struct FrameArtifacts: Equatable, Sendable {
-  public var resolvedTree: ResolvedNode
-  public var measuredTree: MeasuredNode
-  public var placedTree: PlacedNode
-  public var semanticSnapshot: SemanticSnapshot
-  public var drawTree: DrawNode
-  public var rasterSurface: RasterSurface
+package struct FrameArtifacts: Equatable, Sendable {
+  package var resolvedTree: ResolvedNode
+  package var measuredTree: MeasuredNode
+  package var placedTree: PlacedNode
+  package var semanticSnapshot: SemanticSnapshot
+  package var drawTree: DrawNode
+  package var rasterSurface: RasterSurface
   /// Optional artifact-level raster damage for this renderer commit.
   ///
   /// A non-`nil` value must describe the actual changed raster rows/ranges
@@ -34,7 +34,7 @@ public struct FrameArtifacts: Equatable, Sendable {
   /// async artifacts cannot leak retained renderer history to frontends.
   /// Private retained-layout reuse hints must not be exposed through this field
   /// unless they have been proven to cover the actual renderer-surface diff.
-  public var presentationDamage: PresentationDamage?
+  package var presentationDamage: PresentationDamage?
   /// Identities whose ``DrawNode`` had a non-empty visible rect after
   /// all ancestor clip bounds were applied during rasterization.
   ///
@@ -50,11 +50,11 @@ public struct FrameArtifacts: Equatable, Sendable {
   /// fall outside ``presentationDamage`` for this particular frame is
   /// still recorded here.
   package var drawnIdentities: Set<Identity>
-  public var commitPlan: CommitPlan
-  public var diagnostics: FrameDiagnostics
+  package var commitPlan: CommitPlan
+  package var diagnostics: FrameDiagnostics
 
   /// Creates a full frame artifact bundle.
-  public init(
+  package init(
     resolvedTree: ResolvedNode,
     measuredTree: MeasuredNode,
     placedTree: PlacedNode,
@@ -102,7 +102,7 @@ public struct FrameArtifacts: Equatable, Sendable {
 }
 
 extension FrameArtifacts {
-  public static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.resolvedTree == rhs.resolvedTree
       && lhs.measuredTree == rhs.measuredTree
       && lhs.placedTree == rhs.placedTree

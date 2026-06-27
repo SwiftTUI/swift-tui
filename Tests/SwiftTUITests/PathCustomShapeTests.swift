@@ -16,7 +16,7 @@ private func brailleDotCount(_ cell: RasterCell) -> Int {
   return Int(scalar - 0x2800).nonzeroBitCount
 }
 
-private func litCellCount(_ artifacts: FrameArtifacts) -> Int {
+private func litCellCount(_ artifacts: RenderSnapshot) -> Int {
   var count = 0
   for row in artifacts.rasterSurface.cells {
     for cell in row where brailleDotCount(cell) > 0 {

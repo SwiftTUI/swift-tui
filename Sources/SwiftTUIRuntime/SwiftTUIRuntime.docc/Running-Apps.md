@@ -6,12 +6,12 @@
 
 Choose the level that matches your app:
 
-- use ``DefaultRenderer`` when you need frame artifacts or textual previews
+- use ``DefaultRenderer`` when you need a committed render snapshot or textual previews
 - use ``RunLoop`` when you want full control over state, focus, input handling, and terminal hosting
 - use ``SceneManifest`` and ``HostedSceneSession`` when you want a host product
   to retain scenes on top of the shared runtime
 
-`App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting runtime or pipeline artifacts to whichever layer you need next.
+`App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting snapshot or runtime object to whichever layer you need next.
 
 ## `DefaultRenderer`
 
@@ -19,8 +19,8 @@ Choose the level that matches your app:
 
 It gives you:
 
-- resolved, measured, placed, semantic, draw, and raster products
-- a `CommitPlan`
+- a public `RenderSnapshot`
+- a `RasterSurface` plus `SemanticSnapshot`
 - diagnostics about computed versus reused work, worker timing, and main-actor
   blocked versus suspended render time
 

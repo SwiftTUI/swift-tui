@@ -1,5 +1,5 @@
 /// The layout strategy applied to a resolved node.
-public enum LayoutBehavior: Sendable {
+package enum LayoutBehavior: Sendable {
   case intrinsic
   case stack(
     axis: Axis,
@@ -70,7 +70,7 @@ public enum LayoutBehavior: Sendable {
 }
 
 extension LayoutBehavior: Equatable {
-  public static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     switch (lhs, rhs) {
     case (.intrinsic, .intrinsic):
       return true

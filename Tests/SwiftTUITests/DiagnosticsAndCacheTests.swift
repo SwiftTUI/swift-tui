@@ -1049,7 +1049,7 @@ struct DiagnosticsAndCacheTests {
       Text("Hi")
       Text("Go").focusable()
     }
-    let artifacts = DefaultRenderer().render(
+    let artifacts = DefaultRenderer().renderArtifacts(
       root,
       context: .init(
         identity: testIdentity("Root"),

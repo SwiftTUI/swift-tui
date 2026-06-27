@@ -42,8 +42,8 @@ The canonical public surface is the API ordinary app code uses first:
   and the canonical identity/layout/styling/presentation modifiers.
 - Runtime integration in `SwiftTUIRuntime`: `DefaultRenderer`, `RunLoop`,
   `RuntimeConfiguration`, `App`, `Scene`, `WindowGroup`, the scene builder
-  artifacts, `HostedSceneSession`, `HostedRasterSurface`, `SemanticHostFrame`,
-  and the `PresentationSurface` roles.
+  artifacts, `RenderSnapshot`, `HostedSceneSession`, `HostedRasterSurface`,
+  `SemanticHostFrame`, and the `PresentationSurface` roles.
 - The default animated-image surface from `SwiftTUIAnimatedImage`, plus the
   explicit `SwiftTUICharts` charting product.
 
@@ -57,8 +57,9 @@ concurrency checker.
 
 - `View`, `Scene`, and `App` are `@MainActor` authoring protocols, and
   `View.body` is `@ViewBuilder` and `@MainActor`.
-- APIs that evaluate authored `body` trees — `Resolver.resolve(...)` and
-  `DefaultRenderer.render(...)` — are `@MainActor`.
+- Public APIs that evaluate authored `body` trees — `DefaultRenderer.render(...)`
+  and `DefaultRenderer.renderAsync(...)` — are `@MainActor`. The lower
+  `Resolver.resolve(...)` entry point is package-only.
 - Callback-bearing APIs follow the model: `Binding.init(get:set:)` takes
   explicitly `@MainActor` closures; `.task(...)` uses actor-inheriting
   closures; button actions and `.onChange` callbacks stay `@MainActor`.
@@ -159,7 +160,10 @@ It does not include `SwiftTUICharts`; charting/graph views remain explicit.
 `SwiftTUIRuntime` is the platform-neutral runtime import for host products and
 custom launchers that do not want the convenience product.
 `SwiftTUICore` is target-level pipeline infrastructure, re-exported through
-`SwiftTUIRuntime` rather than published as its own product.
+`SwiftTUIRuntime` rather than published as its own product. Public host code
+should consume `RenderSnapshot`, `RasterSurface`, `SemanticSnapshot`, and
+`SemanticHostFrame`; resolved/measured/placed/draw/commit phase IR stays
+package-only.
 
 ### `SwiftTUIProfiling`
 
@@ -217,6 +221,12 @@ These migration-era APIs are no longer public:
   canonical API and remains part of the public surface.
 - The old public styling shims — `EnvironmentValues.theme` and the string-based
   `foregroundStyle`/`backgroundStyle`/`borderStyle` helpers.
+- Render-pipeline implementation IR — `Resolver`, `ResolvedNode`,
+  `MeasuredNode`, `PlacedNode`, `DrawNode`, `FrameArtifacts`, `CommitPlan`,
+  `CommitPlanner`, `LayoutEngine`, `SemanticExtractor`, `DrawExtractor`,
+  `Rasterizer`, `SnapshotRenderer`, and `FrameDropEligibility`. The public
+  one-shot renderer result is `RenderSnapshot`; public diagnostics use
+  `FrameDropBlocker` for completed-frame drop blocker vocabulary.
 
 ## Package-Only Transitional Seams
 
@@ -225,6 +235,8 @@ are not part of the public API story and should not shape app authoring:
 
 - `PrimitiveView` and `ResolvableView` — internal lowering protocols.
 - `ViewNode` — internal runtime plumbing.
+- Render phase products and engines — package-only implementation detail behind
+  `DefaultRenderer` and `RunLoop`.
 - The local runtime registries and lifecycle replay helpers used by `RunLoop`.
 - `PrimitiveViewModifier` and `ModifierContentInputs` — primitive
   modifier-lowering hooks.

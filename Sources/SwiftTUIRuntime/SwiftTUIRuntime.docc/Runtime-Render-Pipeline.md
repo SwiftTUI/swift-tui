@@ -13,14 +13,17 @@ SwiftTUI has two overlapping pipeline views:
   session:
   `head -> animationInjection -> latePreferenceReconciliation -> fusedFrameTail -> commit`.
 
-`SwiftTUICore` owns the phase-product types. `SwiftTUIRuntime` owns the run
-loop, renderer orchestration, frame-tail scheduling, cancellation, frame-drop
-policy, commit side effects, diagnostics, and presentation to a host surface.
+`SwiftTUICore` owns the package-only phase-product types. `SwiftTUIRuntime`
+owns the run loop, renderer orchestration, frame-tail scheduling, cancellation,
+frame-drop policy, commit side effects, diagnostics, and presentation to a host
+surface.
 
 The direct ``DefaultRenderer`` snapshot path and the interactive ``RunLoop``
-path both produce `FrameArtifacts`. The interactive path adds invalidation
-coalescing, frame-tail cancellation, completed-frame drop policy, host-facing
-damage derivation, and presentation to a concrete surface.
+path compute the same phase work. The public one-shot path returns
+``RenderSnapshot``; package and run-loop paths keep `FrameArtifacts` as their
+internal committed bundle. The interactive path adds invalidation coalescing,
+frame-tail cancellation, completed-frame drop policy, host-facing damage
+derivation, and presentation to a concrete surface.
 
 For the phase-product reference, see the Rendering Pipeline article in
 `SwiftTUICore`.
@@ -52,11 +55,12 @@ The one-shot snapshot path skips the run loop and presentation surface:
 ```text
 DefaultRenderer.render(root, proposal:)
   -> RuntimeRenderPipeline.renderOneShot(...)
-  -> FrameArtifacts
+  -> RenderSnapshot
 ```
 
-One-shot rendering computes the same phase products, but it does not own input,
-signals, invalidation scheduling, async tail cancellation, or host presentation.
+One-shot rendering computes the same phase products, but it exposes only the
+public committed snapshot. It does not own input, signals, invalidation
+scheduling, async tail cancellation, or host presentation.
 
 ## Code Map
 
@@ -91,10 +95,14 @@ interactive run loop's rendering workhorse. It owns:
 
 The renderer exposes three execution strategies over the same stage order:
 
-- `render(...)`: one-shot, synchronous, returns `FrameArtifacts`.
-- `renderAsync(...)`: asynchronous frame tail, non-cancellable.
+- `render(...)`: one-shot, synchronous, returns ``RenderSnapshot``.
+- `renderAsync(...)`: asynchronous frame tail, non-cancellable, returns
+  ``RenderSnapshot``.
 - `renderAsyncCancellable(...)`: asynchronous frame tail with queued-tail
   cancellation and completed-frame disposition policy.
+
+Package internals use `renderArtifacts(...)` and `renderArtifactsAsync(...)`
+when tests or runtime code intentionally inspect phase IR.
 
 The run loop calls eliding variants so animation-deadline frames that cannot
 affect the drawn surface can commit animation state without running the frame
@@ -164,7 +172,7 @@ Commit turns a completed draft into a committed frame candidate. It packages
 lifecycle events, semantic handlers, runtime registrations, transaction effects,
 retained frame-tail state, and diagnostics. A completed candidate can be:
 
-- committed and returned as `FrameArtifacts`;
+- committed as package `FrameArtifacts`;
 - dropped by completed-frame policy;
 - cancelled before its tail starts;
 - elided when an animation-deadline frame has no visible drawn effect.
@@ -187,9 +195,10 @@ The runtime stages preserve the same typed product order documented by
 | raster | `RasterSurface` | Paint draw commands into styled terminal cells, image attachments, and a package-level ordered presentation-layer sidecar. |
 | commit | `CommitPlan` | Package lifecycle, handler installation, semantic snapshot, and transaction work. |
 
-All seven products are gathered on `FrameArtifacts` for inspection and retained
-reuse. Hosts should consume committed host contracts such as
-``SemanticHostFrame`` instead of reaching into renderer-private retained state.
+All seven products are gathered on package-only `FrameArtifacts` for inspection
+and retained reuse. Public snapshot callers get ``RenderSnapshot``; hosts should
+consume committed host contracts such as ``SemanticHostFrame`` instead of
+reaching into renderer-private retained state.
 
 ## Isolation And Scheduling
 

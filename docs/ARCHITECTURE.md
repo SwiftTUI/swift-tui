@@ -158,8 +158,11 @@ repository; they are demos and regression coverage, not published products.
 
 A frame is built by running an authored view tree through **seven typed
 phases** — `resolve → measure → place → semantics → draw → raster → commit` —
-each producing a distinct value type (`ResolvedNode`, `MeasuredNode`,
+each producing a distinct package-owned product (`ResolvedNode`, `MeasuredNode`,
 `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`, `CommitPlan`).
+The public one-shot renderer returns a `RenderSnapshot`, which exposes the
+committed raster, semantic snapshot, presentation damage, and diagnostics while
+keeping intermediate phase IR package-only.
 The runtime drives those phases through a small **stage pipeline**
 (`head → animationInjection → latePreferenceReconciliation → fusedFrameTail →
 commit`) that decides what runs on the main actor versus a frame-tail worker.
@@ -207,19 +210,22 @@ above them is identical. See [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 
 The package builds in Swift 6 language mode with `.defaultIsolation(.none)` —
 isolation is stated explicitly, never inferred. `View`, `Scene`, and `App` are
-`@MainActor` authoring protocols, and APIs that evaluate authored `body` trees
-(`Resolver.resolve`, `DefaultRenderer.render`) are `@MainActor`. The heavy
-middle of the pipeline runs off the main actor on a frame-tail worker; the
-boundaries are spelled out in
+`@MainActor` authoring protocols, and the public APIs that evaluate authored
+`body` trees (`DefaultRenderer.render` and `DefaultRenderer.renderAsync`) are
+`@MainActor`. The package-only `Resolver.resolve` entry point is also
+`@MainActor`. The heavy middle of the pipeline runs off the main actor on a
+frame-tail worker; the boundaries are spelled out in
 [`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md). The repo
 forbids `@unchecked Sendable` and `nonisolated(unsafe)`; shared mutable state
 uses honest isolation or `Synchronization` primitives.
 
 ## Glossary
 
-- **Phase product** — the typed value a pipeline phase emits (`ResolvedNode`,
-  `MeasuredNode`, `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`,
-  `CommitPlan`). All seven are gathered on `FrameArtifacts`.
+- **Phase product** — the package-only typed value a pipeline phase emits
+  (`ResolvedNode`, `MeasuredNode`, `PlacedNode`, `SemanticSnapshot`, `DrawNode`,
+  `RasterSurface`, `CommitPlan`). All seven are gathered on package-only
+  `FrameArtifacts`; public snapshot and host code consumes `RenderSnapshot`,
+  `RasterSurface`, `SemanticSnapshot`, or `SemanticHostFrame`.
 - **Resolve** — turning an authored `View` tree into a `ResolvedNode` graph
   with the resolved identity projection, structural position, entity identity,
   and state owner attached.

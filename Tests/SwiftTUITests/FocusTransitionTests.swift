@@ -37,7 +37,7 @@ struct FocusTransitionTests {
 
   private func renderArtifacts(
     focusedIdentity: Identity? = nil
-  ) -> FrameArtifacts {
+  ) -> RenderSnapshot {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = focusedIdentity
     return DefaultRenderer().render(

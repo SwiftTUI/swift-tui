@@ -24,7 +24,7 @@ struct ResolveReuseAncestorInvalidationTests {
     // One two-frame render under whichever gate setting is active: frame one
     // seeds "Overview", then the external box flips to "Styling" and the root
     // is invalidated for frame two (returned).
-    func renderFrames() -> FrameArtifacts {
+    func renderFrames() -> RenderSnapshot {
       let renderer = DefaultRenderer(
         layoutEngine: .init(cache: MeasurementCache())
       )
@@ -88,7 +88,7 @@ struct ResolveReuseAncestorInvalidationTests {
       }
     }
 
-    func renderFrames() -> FrameArtifacts {
+    func renderFrames() -> RenderSnapshot {
       let renderer = DefaultRenderer(
         layoutEngine: .init(cache: MeasurementCache())
       )

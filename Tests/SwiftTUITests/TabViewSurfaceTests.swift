@@ -27,7 +27,7 @@ struct TabViewSurfaceTests {
     style: AnyTabViewStyle = .automatic,
     focused: Bool = false,
     selection: String = "home"
-  ) -> FrameArtifacts {
+  ) -> RenderSnapshot {
     var environmentValues = EnvironmentValues()
     if focused {
       environmentValues.focusedIdentity = testIdentity("Tabs")
@@ -199,7 +199,7 @@ struct TabViewSurfaceTests {
     focused: Bool = false,
     terminalWidth: Int = 24,
     proposalWidth: Int = 24
-  ) -> FrameArtifacts {
+  ) -> RenderSnapshot {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalSize = CellSize(width: terminalWidth, height: 8)
     if focused {

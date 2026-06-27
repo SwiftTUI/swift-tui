@@ -158,7 +158,7 @@ struct ActorIsolationSurfaceTests {
 private struct ActorIsolationSceneSelection {
   let identifier: WindowIdentifier
   let rootIdentity: Identity
-  let artifacts: FrameArtifacts
+  let artifacts: RenderSnapshot
 }
 
 @MainActor

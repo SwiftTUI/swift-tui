@@ -1,9 +1,9 @@
 /// Produces a runtime-facing commit plan from resolved structure and semantics.
-public struct CommitPlanner {
-  public init() {}
+package struct CommitPlanner {
+  package init() {}
 
   /// Plans lifecycle and handler-installation work for a frame.
-  public func plan(
+  package func plan(
     resolved: ResolvedNode,
     placed: PlacedNode? = nil,
     semantics: SemanticSnapshot,

@@ -21,7 +21,7 @@ private func brailleDotCount(_ cell: RasterCell) -> Int {
 
 /// Counts total cells across the entire raster surface that hold at
 /// least one lit Braille dot.
-private func totalLitBrailleCells(_ artifacts: FrameArtifacts) -> Int {
+private func totalLitBrailleCells(_ artifacts: RenderSnapshot) -> Int {
   var count = 0
   for row in artifacts.rasterSurface.cells {
     for cell in row where brailleDotCount(cell) > 0 {
@@ -34,7 +34,7 @@ private func totalLitBrailleCells(_ artifacts: FrameArtifacts) -> Int {
 /// Counts lit Braille cells in a single named row, guarding against
 /// out-of-range indices.
 private func litBrailleCellsInRow(
-  _ artifacts: FrameArtifacts,
+  _ artifacts: RenderSnapshot,
   row: Int
 ) -> Int {
   guard row >= 0, row < artifacts.rasterSurface.cells.count else {
@@ -51,7 +51,7 @@ private func renderShape<V: View>(
   frameWidth: Int,
   frameHeight: Int,
   metrics: CellPixelMetrics
-) -> FrameArtifacts {
+) -> RenderSnapshot {
   var env = EnvironmentValues()
   // Give the renderer a canvas larger than the frame so the shape has
   // room; padding of 4 cells on each axis is sufficient.

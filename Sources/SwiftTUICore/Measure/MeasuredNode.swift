@@ -1,20 +1,20 @@
-public struct ChildAllocation: Equatable, Sendable {
-  public var identity: Identity
-  public var size: CellSize
+package struct ChildAllocation: Equatable, Sendable {
+  package var identity: Identity
+  package var size: CellSize
 
-  public init(identity: Identity, size: CellSize) {
+  package init(identity: Identity, size: CellSize) {
     self.identity = identity
     self.size = size
   }
 }
 
 /// Container-specific placement information captured during measure.
-public struct ContainerAllocationSnapshot: Equatable, Sendable {
-  public var childSizes: [ChildAllocation]
-  public var selectedChildIndex: Int?
-  public var lazyStack: LazyStackAllocationSnapshot?
+package struct ContainerAllocationSnapshot: Equatable, Sendable {
+  package var childSizes: [ChildAllocation]
+  package var selectedChildIndex: Int?
+  package var lazyStack: LazyStackAllocationSnapshot?
 
-  public init(
+  package init(
     childSizes: [ChildAllocation] = [],
     selectedChildIndex: Int? = nil,
     lazyStack: LazyStackAllocationSnapshot? = nil
@@ -26,15 +26,15 @@ public struct ContainerAllocationSnapshot: Equatable, Sendable {
 }
 
 /// Allocation state captured for lazy stacks.
-public struct LazyStackAllocationSnapshot: Equatable, Sendable {
-  public var axis: Axis
-  public var childMainOffsets: [Int]
-  public var childMainLengths: [Int]
-  public var contentMainLength: Int
-  public var crossLeading: Int
-  public var crossTrailing: Int
+package struct LazyStackAllocationSnapshot: Equatable, Sendable {
+  package var axis: Axis
+  package var childMainOffsets: [Int]
+  package var childMainLengths: [Int]
+  package var contentMainLength: Int
+  package var crossLeading: Int
+  package var crossTrailing: Int
 
-  public init(
+  package init(
     axis: Axis,
     childMainOffsets: [Int] = [],
     childMainLengths: [Int] = [],
@@ -60,17 +60,17 @@ package typealias LazyStackViewportContext = ScrollViewportContext
 /// container-allocation snapshots used by placement. `identity` is carried from
 /// resolve only to correlate retained cache entries and child placement; this
 /// type does not carry resolved metadata forward to later phases.
-public struct MeasuredNode: Equatable, Sendable {
+package struct MeasuredNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
-  public var identity: Identity
-  public var proposal: ProposedSize
-  public var measuredSize: CellSize
-  public var childMeasurements: [MeasuredNode] {
+  package var identity: Identity
+  package var proposal: ProposedSize
+  package var measuredSize: CellSize
+  package var childMeasurements: [MeasuredNode] {
     didSet {
       recomputeSubtreeNodeCount()
     }
   }
-  public var containerAllocationSnapshot: ContainerAllocationSnapshot?
+  package var containerAllocationSnapshot: ContainerAllocationSnapshot?
   package private(set) var subtreeNodeCount: Int
 
   package init(
@@ -91,7 +91,7 @@ public struct MeasuredNode: Equatable, Sendable {
     recomputeSubtreeNodeCount()
   }
 
-  public init(
+  package init(
     identity: Identity,
     proposal: ProposedSize,
     measuredSize: CellSize,

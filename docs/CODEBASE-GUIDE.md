@@ -291,14 +291,16 @@ live `ViewGraph`/`@State` mutable state.
   boundary (`DefaultRenderer.render*` / `ViewGraph.evaluateDirtyNodes`) and resumes
   at focus convergence after commit. It never re-traces the phase products.
 - [3d, five hosts](#3d-one-app-five-hosts) begins at `commit`: it consumes the
-  committed `FrameArtifacts` and the `SemanticHostFrame`/`RasterSurface` contract,
-  and never reaches up into renderer-private tail state.
+  public `RenderSnapshot`/`RasterSurface`/`SemanticHostFrame` contracts and never
+  reaches up into renderer-private tail state.
 
-**Key types.** `ResolvedNode` → `MeasuredNode` → `PlacedNode` → `SemanticSnapshot` →
-`DrawNode` → `RasterSurface` → `CommitPlan`, all under `Sources/SwiftTUICore/`
-(`Resolve/`, `Measure/`, `Place/`, `Semantics/`, `Draw/`, `Raster/`, `Commit/`); the
-orchestration lives in `Sources/SwiftTUIRuntime/Rendering/`. `FrameArtifacts` gathers
-all seven products as the committed bundle hosts consume.
+**Key types.** Package IR flows `ResolvedNode` → `MeasuredNode` → `PlacedNode` →
+`SemanticSnapshot` → `DrawNode` → `RasterSurface` → `CommitPlan`, all under
+`Sources/SwiftTUICore/` (`Resolve/`, `Measure/`, `Place/`, `Semantics/`, `Draw/`,
+`Raster/`, `Commit/`); the orchestration lives in
+`Sources/SwiftTUIRuntime/Rendering/`. `FrameArtifacts` gathers all seven products as
+the package-only committed bundle; public one-shot callers see `RenderSnapshot`, and
+hosts consume `RasterSurface`/`SemanticHostFrame`.
 
 **Invariant to carry into the other flows.** Hosts consume committed contracts, never
 renderer-private state; reuse hints (e.g. rasterizer surface reuse) must not leak
@@ -790,7 +792,8 @@ above the boundary is shared; everything below is a per-host adapter.
 ```text
 App.body  ->  RunLoop (one per host, identical engine)
            ->  phase products (3a): resolve -> measure -> place -> semantics -> draw -> raster -> commit
-           ->  FrameArtifacts (committed)            === COMMITTED-FRAME BOUNDARY ===
+           ->  FrameArtifacts (package committed)    === COMMITTED-FRAME BOUNDARY ===
+           ->  RenderSnapshot / host contracts       === PUBLIC-HOST BOUNDARY ===
            ->  RunLoop.presentCommittedFrame(artifacts, damage:)
                  -> SemanticHostFrame  ───────────┬──> WebSurfaceTransport      (WASI: stdout FD)
                                                   ├──> WebSocketSurfaceTransport (WebHost: WebSocket)

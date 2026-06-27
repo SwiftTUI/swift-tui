@@ -1,9 +1,9 @@
 /// Lowers placed nodes into draw commands.
-public struct DrawExtractor: Sendable {
-  public init() {}
+package struct DrawExtractor: Sendable {
+  package init() {}
 
   /// Extracts a draw tree from a placed tree.
-  public func extract(from placed: borrowing PlacedNode) -> DrawNode {
+  package func extract(from placed: borrowing PlacedNode) -> DrawNode {
     extractIteratively(from: placed, retained: nil)
   }
 

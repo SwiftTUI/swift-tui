@@ -5,18 +5,18 @@
 /// Renders authored terminal views through the full frame pipeline.
 ///
 /// `DefaultRenderer` is the public one-shot entry point for turning a `View`
-/// into `FrameArtifacts` for previews, snapshot tests, diagnostics, or custom
-/// presentation.
+/// into a committed-frame `RenderSnapshot` for previews, snapshot tests,
+/// diagnostics, or custom presentation.
 public struct DefaultRenderer {
   private static let latePreferenceReconciliationPolicy =
     LatePreferenceReconciliationPolicy.toolbarHostRuntimeBound
 
-  public let resolver: Resolver
-  public let layoutEngine: LayoutEngine
-  public let semanticExtractor: SemanticExtractor
-  public let drawExtractor: DrawExtractor
-  public let rasterizer: Rasterizer
-  public let commitPlanner: CommitPlanner
+  package let resolver: Resolver
+  package let layoutEngine: LayoutEngine
+  package let semanticExtractor: SemanticExtractor
+  package let drawExtractor: DrawExtractor
+  package let rasterizer: Rasterizer
+  package let commitPlanner: CommitPlanner
   private let imageRepository: ImageAssetRepository
   let viewGraph: ViewGraph
   private let frameState: FrameResolveState
@@ -60,9 +60,22 @@ public struct DefaultRenderer {
     )
   }
 
+  /// Creates a renderer with default pipeline components.
+  @MainActor
+  public init() {
+    self.init(
+      resolver: .init(),
+      layoutEngine: .init(cache: MeasurementCache()),
+      semanticExtractor: .init(),
+      drawExtractor: .init(),
+      rasterizer: .init(),
+      commitPlanner: .init()
+    )
+  }
+
   /// Creates a renderer with the supplied pipeline components.
   @MainActor
-  public init(
+  package init(
     resolver: Resolver = .init(),
     layoutEngine: LayoutEngine = .init(cache: MeasurementCache()),
     semanticExtractor: SemanticExtractor = .init(),
@@ -160,7 +173,7 @@ public struct DefaultRenderer {
   // Test-only pipeline-stage hooks live in
   // `DefaultRenderer+TestingHooks.swift`.
 
-  /// Renders `root` into complete frame artifacts.
+  /// Renders `root` into a committed frame snapshot.
   ///
   /// This is a one-shot snapshot/preview entry point. It is **not focus/press
   /// reuse-safe across successive calls on the same renderer**: focus and press
@@ -175,6 +188,21 @@ public struct DefaultRenderer {
   /// cones; use `render(_:)` for snapshots, previews, and tests.
   @MainActor
   public func render<V: View>(
+    _ root: V,
+    context: ResolveContext = .init(),
+    proposal: ProposedSize = .unspecified
+  ) -> RenderSnapshot {
+    renderArtifacts(
+      root,
+      context: context,
+      proposal: proposal
+    ).renderSnapshot
+  }
+
+  /// Renders `root` into complete frame artifacts for package tests and runtime
+  /// internals that intentionally inspect phase IR.
+  @MainActor
+  package func renderArtifacts<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
     proposal: ProposedSize = .unspecified
@@ -195,10 +223,25 @@ public struct DefaultRenderer {
     }
   }
 
-  /// Renders `root` into complete frame artifacts, suspending while the
+  /// Renders `root` into a committed frame snapshot, suspending while the
   /// frame-tail worker computes the Sendable semantics, draw, and raster phases.
   @MainActor
   public func renderAsync<V: View>(
+    _ root: V,
+    context: ResolveContext = .init(),
+    proposal: ProposedSize = .unspecified
+  ) async -> RenderSnapshot {
+    await renderArtifactsAsync(
+      root,
+      context: context,
+      proposal: proposal
+    ).renderSnapshot
+  }
+
+  /// Renders `root` into complete frame artifacts for package tests and runtime
+  /// internals that intentionally inspect phase IR.
+  @MainActor
+  package func renderArtifactsAsync<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
     proposal: ProposedSize = .unspecified

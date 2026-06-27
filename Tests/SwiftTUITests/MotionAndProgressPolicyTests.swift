@@ -313,7 +313,7 @@ private func renderArtifacts<V: View>(
   environmentValues: EnvironmentValues = .init(),
   taskRegistry: LocalTaskRegistry? = nil,
   identity: Identity
-) -> FrameArtifacts {
+) -> RenderSnapshot {
   DefaultRenderer().render(
     view,
     context: ResolveContext(

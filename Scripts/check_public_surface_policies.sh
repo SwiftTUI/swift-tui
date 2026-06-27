@@ -80,15 +80,59 @@ if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?
   fail "App.body must stay @SceneBuilder and @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
+if ! rg -U -n -P --quiet -- 'package struct Resolver\s*\{' \
   Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
-  fail "Resolver.resolve must stay @MainActor."
+  fail "Resolver must stay package-only."
+fi
+
+if rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
+  Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
+  fail "Resolver.resolve must not be public; render phase IR stays package-only."
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
   Sources/SwiftTUIRuntime/SwiftTUI.swift; then
   fail "DefaultRenderer.render must stay @MainActor."
 fi
+
+if ! rg -U -n -P --quiet -- 'public struct RenderSnapshot\s*:\s*Equatable,\s*Sendable\s*\{' \
+  Sources/SwiftTUIRuntime/Rendering/RenderSnapshot.swift; then
+  fail "RenderSnapshot must stay the public committed-frame renderer product."
+fi
+
+while IFS= read -r pattern; do
+  [ -z "$pattern" ] && continue
+  if rg -n -P --quiet -- "$pattern" Sources Platforms; then
+    fail "Render phase IR must stay package-only; unexpected public declaration matched: $pattern"
+  fi
+done <<'EOF'
+public\s+struct\s+ChildAllocation\b
+public\s+struct\s+CommitPlan\b
+public\s+struct\s+CommitPlanner\b
+public\s+struct\s+ContainerAllocationSnapshot\b
+public\s+final\s+class\s+CustomLayoutHandle\b
+public\s+protocol\s+CustomLayoutProxy\b
+public\s+struct\s+DrawExtractor\b
+public\s+struct\s+DrawNode\b
+public\s+struct\s+FrameArtifacts\b
+public\s+struct\s+FrameDropEligibility\b
+public\s+struct\s+HandlerInstallation\b
+public\s+enum\s+LayoutBehavior\b
+public\s+struct\s+LayoutEngine\b
+public\s+struct\s+LazyStackAllocationSnapshot\b
+public\s+struct\s+LifecycleCommitEntry\b
+public\s+enum\s+LifecycleCommitOperation\b
+public\s+typealias\s+LifecycleEvent\b
+public\s+typealias\s+LifecycleOperation\b
+public\s+struct\s+MeasuredNode\b
+public\s+final\s+class\s+MeasurementCache\b
+public\s+struct\s+PlacedNode\b
+public\s+struct\s+Rasterizer\b
+public\s+struct\s+ResolvedNode\b
+public\s+struct\s+SemanticExtractor\b
+public\s+enum\s+SemanticRole\b
+public\s+struct\s+SnapshotRenderer\b
+EOF
 
 if ! rg -U -n -P --quiet -- 'public init\s*\(\s*get: @escaping @MainActor @Sendable \(\) -> Value,\s*set: @escaping @MainActor @Sendable \(Value\) -> Void' \
   Sources/SwiftTUIViews/Foundation/ViewBaseTypes.swift; then

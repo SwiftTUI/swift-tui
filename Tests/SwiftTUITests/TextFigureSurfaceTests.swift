@@ -190,7 +190,7 @@ struct TextFigureSurfaceTests {
   private func render<V: View>(
     _ view: V,
     proposal: ProposedSize = .unspecified
-  ) -> FrameArtifacts {
+  ) -> RenderSnapshot {
     DefaultRenderer().render(
       view,
       context: .init(identity: testIdentity("Root")),
@@ -206,7 +206,7 @@ struct TextFigureSurfaceTests {
   }
 
   private func foregroundColors(
-    in artifacts: FrameArtifacts
+    in artifacts: RenderSnapshot
   ) -> [Color] {
     artifacts.rasterSurface.styleRuns.compactMap(\.style.foregroundColor)
   }

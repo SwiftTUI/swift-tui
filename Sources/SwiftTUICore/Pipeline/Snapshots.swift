@@ -1,20 +1,20 @@
 /// Renders internal frame artifacts into readable text fixtures.
-public struct SnapshotRenderer {
-  public init() {}
+package struct SnapshotRenderer {
+  package init() {}
 
-  public func resolvedTree(_ node: ResolvedNode) -> String {
+  package func resolvedTree(_ node: ResolvedNode) -> String {
     renderResolved(node, depth: 0).joined(separator: "\n")
   }
 
-  public func measuredTree(_ node: MeasuredNode) -> String {
+  package func measuredTree(_ node: MeasuredNode) -> String {
     renderMeasured(node, depth: 0).joined(separator: "\n")
   }
 
-  public func placedTree(_ node: PlacedNode) -> String {
+  package func placedTree(_ node: PlacedNode) -> String {
     renderPlaced(node, depth: 0).joined(separator: "\n")
   }
 
-  public func semanticSnapshot(_ snapshot: SemanticSnapshot) -> String {
+  package func semanticSnapshot(_ snapshot: SemanticSnapshot) -> String {
     var lines: [String] = []
     lines.append("interactionRegions: \(snapshot.interactionRegions.count)")
     for region in snapshot.interactionRegions {
@@ -44,11 +44,11 @@ public struct SnapshotRenderer {
     return lines.joined(separator: "\n")
   }
 
-  public func drawTree(_ node: DrawNode) -> String {
+  package func drawTree(_ node: DrawNode) -> String {
     renderDraw(node, depth: 0).joined(separator: "\n")
   }
 
-  public func rasterSurface(_ surface: RasterSurface) -> String {
+  package func rasterSurface(_ surface: RasterSurface) -> String {
     let header = "size=\(surface.size.width)x\(surface.size.height)"
     var lines = [header]
     if !surface.styleRuns.isEmpty {
@@ -70,7 +70,7 @@ public struct SnapshotRenderer {
     return (lines + surface.lines.map { "  \($0)" }).joined(separator: "\n")
   }
 
-  public func frameArtifacts(_ artifacts: FrameArtifacts) -> String {
+  package func frameArtifacts(_ artifacts: FrameArtifacts) -> String {
     [
       "[Resolved]",
       resolvedTree(artifacts.resolvedTree),

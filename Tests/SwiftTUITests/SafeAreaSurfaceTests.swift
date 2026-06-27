@@ -185,7 +185,7 @@ struct SafeAreaSurfaceTests {
     _ view: V,
     terminalSize: CellSize,
     safeAreaInsets: EdgeInsets
-  ) -> FrameArtifacts {
+  ) -> RenderSnapshot {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalSize = terminalSize
     environmentValues.safeAreaInsets = safeAreaInsets

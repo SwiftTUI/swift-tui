@@ -11,7 +11,7 @@
 #endif
 
 /// Converts draw commands into a terminal cell surface.
-public struct Rasterizer: Sendable {
+package struct Rasterizer: Sendable {
   internal static let emptyCompositingStyle = ResolvedTextStyle()
 
   package enum IncrementalRasterVerificationPolicy: Sendable {
@@ -67,7 +67,7 @@ public struct Rasterizer: Sendable {
     }
   }
 
-  public init() {
+  package init() {
     self.init(
       incrementalVerificationPolicy: Self.defaultIncrementalVerificationPolicy()
     )
@@ -80,7 +80,7 @@ public struct Rasterizer: Sendable {
   }
 
   /// Rasterizes a draw tree into a ``RasterSurface``.
-  public func rasterize(_ draw: DrawNode) -> RasterSurface {
+  package func rasterize(_ draw: DrawNode) -> RasterSurface {
     rasterize(draw, minimumSize: .zero)
   }
 
