@@ -129,10 +129,18 @@ extension ResolvedTextStyle {
 
   public func tinted(with overlay: Color) -> ResolvedTextStyle {
     let amount = overlay.alpha
-    let opaque = Color(red: overlay.red, green: overlay.green, blue: overlay.blue)
+    guard amount > 0 else {
+      return self
+    }
+    let opaque = Color(
+      red: overlay.red,
+      green: overlay.green,
+      blue: overlay.blue,
+      profile: overlay.profile
+    )
     return .init(
       foregroundColor: foregroundColor.map { $0.mixed(with: opaque, amount: amount) },
-      backgroundColor: (backgroundColor ?? Color.black).mixed(with: opaque, amount: amount),
+      backgroundColor: backgroundColor.map { $0.mixed(with: opaque, amount: amount) } ?? overlay,
       emphasis: emphasis,
       underlineStyle: underlineStyle,
       strikethroughStyle: strikethroughStyle,

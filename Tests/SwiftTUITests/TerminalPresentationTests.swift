@@ -261,6 +261,90 @@ struct TerminalPresentationTests {
     #expect(rendered == "\u{001B}[38;2;86;182;194;48;2;17;34;51mHi\u{001B}[0m")
   }
 
+  @Test("renderer leaves outermost alpha backgrounds unflattened without terminal background")
+  func rendererLeavesOutermostAlphaBackgroundsUnflattenedWithoutTerminalBackground() {
+    let rendered = TerminalSurfaceRenderer(
+      capabilityProfile: .trueColor
+    ).render(
+      RasterSurface(
+        size: .init(width: 1, height: 1),
+        cells: [
+          [
+            RasterCell(
+              character: " ",
+              style: .init(backgroundColor: Color.black.opacity(0.1))
+            )
+          ]
+        ]
+      )
+    )
+
+    #expect(rendered == "\u{001B}[48;2;0;0;0m \u{001B}[0m")
+  }
+
+  @Test("renderer composites outermost alpha backgrounds over terminal background")
+  func rendererCompositesOutermostAlphaBackgroundsOverTerminalBackground() {
+    let terminalBackground = hexColor("#F8F7F6")
+    let expectedBackground =
+      terminalBackground
+      .mixed(with: .black, amount: 0.1)
+      .withAlpha(1)
+
+    let rendered = TerminalSurfaceRenderer(
+      capabilityProfile: .trueColor,
+      terminalBackgroundColor: terminalBackground
+    ).render(
+      RasterSurface(
+        size: .init(width: 1, height: 1),
+        cells: [
+          [
+            RasterCell(
+              character: " ",
+              style: .init(backgroundColor: Color.black.opacity(0.1))
+            )
+          ]
+        ]
+      )
+    )
+
+    #expect(rendered == "\(trueColorBackgroundSequence(for: expectedBackground)) \u{001B}[0m")
+  }
+
+  @Test("presentation planner composites incremental alpha backgrounds over terminal background")
+  func presentationPlannerCompositesIncrementalAlphaBackgroundsOverTerminalBackground() {
+    let terminalBackground = hexColor("#F8F7F6")
+    let expectedBackground =
+      terminalBackground
+      .mixed(with: .black, amount: 0.1)
+      .withAlpha(1)
+    let previousSurface = RasterSurface(size: .init(width: 1, height: 1), lines: [" "])
+    let currentSurface = RasterSurface(
+      size: .init(width: 1, height: 1),
+      cells: [
+        [
+          RasterCell(
+            character: " ",
+            style: .init(backgroundColor: Color.black.opacity(0.1))
+          )
+        ]
+      ]
+    )
+
+    let plan = TerminalPresentationPlanner(
+      capabilityProfile: .trueColor,
+      terminalBackgroundColor: terminalBackground
+    ).plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.rowBatches.first?.renderedBatch
+        == "\(trueColorBackgroundSequence(for: expectedBackground)) \u{001B}[0m"
+    )
+  }
+
   @Test("renderer sanitizes terminal control characters in unicode mode")
   func rendererSanitizesControlCharactersInUnicodeMode() {
     let rendered = TerminalSurfaceRenderer(
@@ -1429,6 +1513,18 @@ private func readAllBytes(
     }
     throw TerminalHostError.failedToWrite(errno: errno)
   }
+}
+
+private func trueColorBackgroundSequence(
+  for color: Color
+) -> String {
+  "\u{001B}[48;2;\(terminalColorByte(color.red));\(terminalColorByte(color.green));\(terminalColorByte(color.blue))m"
+}
+
+private func terminalColorByte(
+  _ value: Double
+) -> Int {
+  Int(value * 255)
 }
 
 private final class FallbackPresentationHost: PresentationSurface {

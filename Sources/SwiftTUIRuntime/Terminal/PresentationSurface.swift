@@ -314,7 +314,8 @@ extension PresentationSurface {
     let origin = CellPoint.zero
     let writeSteps = fullRepaintWriteSteps(
       for: surface,
-      capabilityProfile: capabilityProfile
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: appearance.backgroundColor
     )
     let metrics = TerminalPresentationMetrics(
       bytesWritten: fullRepaintBytesWritten(

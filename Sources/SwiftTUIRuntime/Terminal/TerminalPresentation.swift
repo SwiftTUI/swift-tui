@@ -9,12 +9,24 @@ import SwiftTUICore
 /// sequences into the output stream.
 public struct TerminalSurfaceRenderer {
   public let capabilityProfile: TerminalCapabilityProfile
+  let terminalBackgroundColor: Color?
 
   /// Creates a renderer for the supplied capability profile.
   public init(
     capabilityProfile: TerminalCapabilityProfile
   ) {
+    self.init(
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: nil
+    )
+  }
+
+  init(
+    capabilityProfile: TerminalCapabilityProfile,
+    terminalBackgroundColor: Color?
+  ) {
     self.capabilityProfile = capabilityProfile
+    self.terminalBackgroundColor = terminalBackgroundColor
   }
 
   /// Renders a full raster surface into terminal text.
@@ -84,7 +96,10 @@ public struct TerminalSurfaceRenderer {
 
 extension TerminalSurfaceRenderer {
   private var damageRenderer: TerminalSurfaceDamageRenderer {
-    TerminalSurfaceDamageRenderer(capabilityProfile: capabilityProfile)
+    TerminalSurfaceDamageRenderer(
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: terminalBackgroundColor
+    )
   }
 
   private func renderCells(
@@ -123,7 +138,10 @@ extension TerminalSurfaceRenderer {
     let cellCount = max(0, end - start)
     var result = ""
     result.reserveCapacity(cellCount * 3)
-    let textRenderer = TerminalCellTextRenderer(capabilityProfile: capabilityProfile)
+    let textRenderer = TerminalCellTextRenderer(
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: terminalBackgroundColor
+    )
     var state = TerminalCellTextRenderer.RenderState()
     let renderedWidth = textRenderer.appendRenderedCells(
       in: row,

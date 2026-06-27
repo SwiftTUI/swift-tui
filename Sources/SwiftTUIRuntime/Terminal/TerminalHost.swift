@@ -394,7 +394,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       )
       let plan = TerminalPresentationPlanner(
         capabilityProfile: capabilityProfile,
-        graphicsCapabilities: graphicsCapabilities
+        graphicsCapabilities: graphicsCapabilities,
+        terminalBackgroundColor: appearance.backgroundColor
       ).plan(
         previousSurface: presentationSession.previousSurface,
         currentSurface: preparedSurface,
@@ -406,7 +407,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         capabilityProfile: capabilityProfile,
         usesTerminalEditOperations: usesTerminalEditOperations,
         imageRenderer: imageRenderer,
-        fallbackBackground: appearance.backgroundColor
+        fallbackBackground: appearance.backgroundColor,
+        terminalBackgroundColor: appearance.backgroundColor
       ).build(
         for: preparedSurface,
         plan: plan,
@@ -727,10 +729,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
 
 func fullRepaintWriteSteps(
   for surface: RasterSurface,
-  capabilityProfile: TerminalCapabilityProfile
+  capabilityProfile: TerminalCapabilityProfile,
+  terminalBackgroundColor: Color? = nil
 ) -> [String] {
   let renderer = TerminalSurfaceRenderer(
-    capabilityProfile: capabilityProfile
+    capabilityProfile: capabilityProfile,
+    terminalBackgroundColor: terminalBackgroundColor
   )
   var writeSteps: [String] = []
 
@@ -755,11 +759,13 @@ func fullRepaintWriteSteps(
 func fullRepaintOutput(
   for surface: RasterSurface,
   capabilityProfile: TerminalCapabilityProfile,
-  origin: CellPoint = .zero
+  origin: CellPoint = .zero,
+  terminalBackgroundColor: Color? = nil
 ) -> String {
   let writeSteps = fullRepaintWriteSteps(
     for: surface,
-    capabilityProfile: capabilityProfile
+    capabilityProfile: capabilityProfile,
+    terminalBackgroundColor: terminalBackgroundColor
   )
   var output = ""
   output.reserveCapacity(

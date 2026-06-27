@@ -112,13 +112,16 @@ struct TerminalPresentationPlan: Sendable {
 struct TerminalPresentationPlanner {
   let capabilityProfile: TerminalCapabilityProfile
   let graphicsCapabilities: TerminalGraphicsCapabilities
+  let terminalBackgroundColor: Color?
 
   init(
     capabilityProfile: TerminalCapabilityProfile,
-    graphicsCapabilities: TerminalGraphicsCapabilities = .none
+    graphicsCapabilities: TerminalGraphicsCapabilities = .none,
+    terminalBackgroundColor: Color? = nil
   ) {
     self.capabilityProfile = capabilityProfile
     self.graphicsCapabilities = graphicsCapabilities
+    self.terminalBackgroundColor = terminalBackgroundColor
   }
 
   func plan(
@@ -146,7 +149,8 @@ struct TerminalPresentationPlanner {
     }
 
     let renderer = TerminalSurfaceRenderer(
-      capabilityProfile: capabilityProfile
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: terminalBackgroundColor
     )
 
     let rowCount = max(

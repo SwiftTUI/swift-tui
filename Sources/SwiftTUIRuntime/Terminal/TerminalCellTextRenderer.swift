@@ -9,6 +9,7 @@ struct TerminalCellTextRenderer {
   }
 
   var capabilityProfile: TerminalCapabilityProfile
+  var terminalBackgroundColor: Color? = nil
 
   @discardableResult
   func appendRenderedCells(
@@ -68,6 +69,8 @@ struct TerminalCellTextRenderer {
     state: inout RenderState,
     into result: inout String
   ) {
+    let terminalStyle = style.map(styleResolvedForTerminal)
+
     if hyperlink != state.activeHyperlink {
       if state.activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
         result += closeHyperlinkSequence()
@@ -78,18 +81,67 @@ struct TerminalCellTextRenderer {
       state.activeHyperlink = hyperlink
     }
 
-    if style != state.activeStyle {
+    if terminalStyle != state.activeStyle {
       if state.activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
         result += "\u{001B}[0m"
       }
-      if let style,
+      if let terminalStyle,
         capabilityProfile.emitsStyleEscapeSequences,
-        let sequence = styleSequence(for: style)
+        let sequence = styleSequence(for: terminalStyle)
       {
         result += sequence
       }
-      state.activeStyle = style
+      state.activeStyle = terminalStyle
     }
+  }
+
+  private func styleResolvedForTerminal(
+    _ style: ResolvedTextStyle
+  ) -> ResolvedTextStyle {
+    guard let terminalBackgroundColor else {
+      return style
+    }
+
+    let backgroundColor = style.backgroundColor.map {
+      colorResolvedForTerminal($0, over: terminalBackgroundColor)
+    }
+    let foregroundBackdrop = backgroundColor ?? terminalBackgroundColor
+    let underlineStyle = style.underlineStyle.map { underlineStyle in
+      TextLineStyle(
+        pattern: underlineStyle.pattern,
+        color: underlineStyle.color.map {
+          colorResolvedForTerminal($0, over: foregroundBackdrop)
+        }
+      )
+    }
+
+    return ResolvedTextStyle(
+      foregroundColor: style.foregroundColor.map {
+        colorResolvedForTerminal($0, over: foregroundBackdrop)
+      },
+      backgroundColor: backgroundColor,
+      emphasis: style.emphasis,
+      underlineStyle: underlineStyle,
+      strikethroughStyle: style.strikethroughStyle,
+      opacity: style.opacity
+    )
+  }
+
+  private func colorResolvedForTerminal(
+    _ color: Color,
+    over backdrop: Color
+  ) -> Color {
+    guard color.alpha < 1 else {
+      return color
+    }
+
+    let opaqueSource = Color(
+      red: color.red,
+      green: color.green,
+      blue: color.blue,
+      profile: color.profile
+    )
+    return backdrop.mixed(with: opaqueSource, amount: color.alpha).withAlpha(1)
   }
 
   private func renderedCharacter(

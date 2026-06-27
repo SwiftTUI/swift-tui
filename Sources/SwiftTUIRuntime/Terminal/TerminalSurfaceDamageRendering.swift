@@ -2,6 +2,7 @@ import SwiftTUICore
 
 struct TerminalSurfaceDamageRenderer: Sendable {
   let capabilityProfile: TerminalCapabilityProfile
+  let terminalBackgroundColor: Color?
 
   func renderRowBatch(
     row: Int,
@@ -24,7 +25,10 @@ struct TerminalSurfaceDamageRenderer: Sendable {
         partial + max(0, span.upperBound - span.lowerBound) * 3
       }
     )
-    let textRenderer = TerminalCellTextRenderer(capabilityProfile: capabilityProfile)
+    let textRenderer = TerminalCellTextRenderer(
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: terminalBackgroundColor
+    )
     var state = TerminalCellTextRenderer.RenderState()
     var cursorColumn = firstSpan.lowerBound
     var spanUpdates: [TerminalPresentationPlan.SpanUpdate] = []

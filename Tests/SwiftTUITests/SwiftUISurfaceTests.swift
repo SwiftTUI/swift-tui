@@ -1360,6 +1360,23 @@ struct SwiftUISurfaceTests {
         ))
   }
 
+  @Test("translucent view backgrounds preserve alpha for terminal presentation")
+  @MainActor
+  func translucentViewBackgroundsPreserveAlphaForTerminalPresentation() {
+    let background = Color.black.opacity(0.1)
+
+    let artifacts = DefaultRenderer().render(
+      Text("path")
+        .background(background),
+      context: .init(identity: testIdentity("TranslucentTextBackground"))
+    )
+
+    #expect(artifacts.rasterSurface.lines == ["path"])
+    for cell in artifacts.rasterSurface.cells[0] {
+      expectSurfaceColor(cell.style?.backgroundColor, equals: background)
+    }
+  }
+
   @Test("rounded border overlays clip background fills to the rounded interior")
   @MainActor
   func roundedBorderOverlayClipsBackgroundFillsToRoundedInterior() {

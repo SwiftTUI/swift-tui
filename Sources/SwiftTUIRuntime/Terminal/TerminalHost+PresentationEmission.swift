@@ -6,6 +6,7 @@ import SwiftTUICore
     var usesTerminalEditOperations: Bool
     var imageRenderer: TerminalImageRenderer
     var fallbackBackground: Color
+    var terminalBackgroundColor: Color?
 
     func build(
       for preparedSurface: RasterSurface,
@@ -59,7 +60,8 @@ import SwiftTUICore
 
       let writeSteps = fullRepaintWriteSteps(
         for: preparedSurface,
-        capabilityProfile: capabilityProfile
+        capabilityProfile: capabilityProfile,
+        terminalBackgroundColor: terminalBackgroundColor
       )
       for writeStep in writeSteps {
         emission.append(writeStep)
