@@ -77,7 +77,7 @@ enum DiagnosticTraceSink {
       }
     #elseif canImport(WASILibc) || canImport(ucrt)
       unsafe message.withCString { cMessage in
-        _ = fputs(cMessage, stderr)
+        _ = unsafe fputs(cMessage, stderr)
       }
     #endif
   }
