@@ -228,7 +228,7 @@ extension IDModifier: EntityRouteProvidingModifier {
   }
 }
 
-package struct ExactIdentityModifier: PrimitiveViewModifier {
+package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable {
   package var identity: Identity
 
   package func resolve<Base: View>(
@@ -243,7 +243,7 @@ package struct ExactIdentityModifier: PrimitiveViewModifier {
   }
 }
 
-package struct LayoutMetadataModifier: PrimitiveViewModifier {
+package struct LayoutMetadataModifier: PrimitiveViewModifier, Sendable {
   package var metadata: LayoutMetadata
 
   package func resolve<Base: View>(
@@ -274,7 +274,7 @@ public struct LayoutValueModifier<Key: LayoutValueKey>: PrimitiveViewModifier {
   }
 }
 
-public struct HorizontalAlignmentGuideModifier: PrimitiveViewModifier {
+public struct HorizontalAlignmentGuideModifier: PrimitiveViewModifier, Sendable {
   var alignment: HorizontalAlignment
   var computeValue: @Sendable (ViewDimensions) -> Int
 
@@ -292,7 +292,7 @@ public struct HorizontalAlignmentGuideModifier: PrimitiveViewModifier {
   }
 }
 
-public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier {
+public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier, Sendable {
   var alignment: VerticalAlignment
   var computeValue: @Sendable (ViewDimensions) -> Int
 
@@ -310,7 +310,7 @@ public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier {
   }
 }
 
-public struct DrawMetadataModifier: PrimitiveViewModifier {
+public struct DrawMetadataModifier: PrimitiveViewModifier, Sendable {
   package var metadata: DrawMetadata
 
   package func resolve<Base: View>(
@@ -323,7 +323,7 @@ public struct DrawMetadataModifier: PrimitiveViewModifier {
   }
 }
 
-package struct DrawEffectModifier: PrimitiveViewModifier {
+package struct DrawEffectModifier: PrimitiveViewModifier, Sendable {
   package var effect: DrawEffect
 
   package func resolve<Base: View>(
@@ -351,7 +351,7 @@ extension DrawMetadataModifier: TransitionEffectProvidingModifier {
   }
 }
 
-public struct SemanticMetadataModifier: PrimitiveViewModifier {
+public struct SemanticMetadataModifier: PrimitiveViewModifier, Sendable {
   package var metadata: SemanticMetadata
 
   package func resolve<Base: View>(
