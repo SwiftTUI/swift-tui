@@ -134,13 +134,13 @@ func android_host_surfaces_clipboard_write_and_drains_once() throws {
   let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
 
   // No copy requested yet.
-  #expect(host.copyPendingClipboardText(to: nil, capacity: 0) == 0)
+  #expect((unsafe host.copyPendingClipboardText(to: nil, capacity: 0)) == 0)
 
   // The running app asks the host to place text on the clipboard.
   _ = try host.surface.writeClipboard("hello clipboard")
 
   let expected = Array("hello clipboard".utf8)
-  let required = host.copyPendingClipboardText(to: nil, capacity: 0)
+  let required = unsafe host.copyPendingClipboardText(to: nil, capacity: 0)
   #expect(required == expected.count)
 
   var bytes = [UInt8](repeating: 0, count: required)
@@ -151,7 +151,7 @@ func android_host_surfaces_clipboard_write_and_drains_once() throws {
   #expect(bytes == expected)
 
   // Drained: a second copy delivers nothing until the next write.
-  #expect(host.copyPendingClipboardText(to: nil, capacity: 0) == 0)
+  #expect((unsafe host.copyPendingClipboardText(to: nil, capacity: 0)) == 0)
 }
 
 @MainActor
@@ -167,7 +167,7 @@ func android_host_clipboard_size_query_does_not_drain() throws {
     unsafe host.copyPendingClipboardText(to: buffer.baseAddress, capacity: 1)
   }
   #expect(stillNeeded == expected.count)
-  #expect(host.copyPendingClipboardText(to: nil, capacity: 0) == expected.count)
+  #expect((unsafe host.copyPendingClipboardText(to: nil, capacity: 0)) == expected.count)
 }
 
 @MainActor

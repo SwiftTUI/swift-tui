@@ -1,5 +1,4 @@
 @_spi(Testing) package import SwiftTUICore
-package import SwiftTUIViews
 
 extension AnimationController {
   /// An opaque snapshot of the controller's mutable state.  Carries the four

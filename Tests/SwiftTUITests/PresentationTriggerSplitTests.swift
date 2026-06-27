@@ -122,7 +122,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("legacy: invalidating the owner re-resolves the background (no reuse)")
   func invalidatingOwnerReResolvesBackground() throws {
-    try withReaderAttribution(true) {
+    withReaderAttribution(true) {
       let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
       let rootIdentity = testIdentity("ReuseRoot")
 
@@ -148,7 +148,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("flag off: no trigger leaf is introduced (legacy single-node structure)")
   func flagOffKeepsLegacyStructure() throws {
-    try withReaderAttribution(false) {
+    withReaderAttribution(false) {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(
         sheetTriggerRoot(isPresented: true),
@@ -221,7 +221,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("item popover: the trigger leaf owns the item read and the overlay presents")
   func itemPopoverTriggerLeafPresentsOverlay() throws {
-    try withReaderAttribution(true) {
+    withReaderAttribution(true) {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(
         itemPopoverTriggerRoot(item: PopoverProbeItem(id: "alpha")),
@@ -245,7 +245,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("popover flag off: no trigger leaf, legacy structure presents")
   func popoverFlagOffKeepsLegacyStructure() throws {
-    try withReaderAttribution(false) {
+    withReaderAttribution(false) {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(
         popoverTriggerRoot(isPresented: true),

@@ -1,4 +1,4 @@
-public import SwiftTUICore
+package import SwiftTUICore
 
 package struct BuiltinItemPopoverPresentationModifier<
   Item: Identifiable & Sendable,

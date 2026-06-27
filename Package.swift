@@ -77,6 +77,7 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
     .enableUpcomingFeature("InternalImportsByDefault"),
     .enableUpcomingFeature("MemberImportVisibility"),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .treatAllWarnings(as: .error),
   ] + settings
 }
 

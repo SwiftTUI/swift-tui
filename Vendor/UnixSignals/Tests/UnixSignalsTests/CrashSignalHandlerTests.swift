@@ -118,7 +118,7 @@
     @Test func previousHandlersRestoredOnUninstall() {
       var customAction = sigaction()
       #if canImport(Darwin)
-        customAction.__sigaction_u.__sa_handler = { _ in }
+        unsafe customAction.__sigaction_u.__sa_handler = { _ in }
       #elseif canImport(Glibc) || canImport(Musl) || canImport(Android)
         customAction.__sigaction_handler = .init(sa_handler: { _ in })
       #endif

@@ -42,6 +42,7 @@ struct MemoryMetricRegistryTests {
     var token: MemoryMetricRegistry.Token? = registry.register(
       StubProvider(value: .init(name: "Cache.entries", count: 1))
     )
+    #expect(token != nil)
     #expect(registry.providerCount == 1)
 
     token = nil
@@ -56,6 +57,7 @@ struct MemoryMetricRegistryTests {
     var drop: MemoryMetricRegistry.Token? = registry.register(
       StubProvider(value: .init(name: "B", count: 2))
     )
+    #expect(drop != nil)
     #expect(registry.providerCount == 2)
 
     drop = nil
