@@ -107,7 +107,7 @@ package final class LayoutDependentContentHandle: Sendable {
   }
 
   package var debugName: String {
-    MainActor.assumeIsolated {
+    withCheckedMainActorAccess("LayoutDependentContentHandle.debugName") {
       realizer.debugName
     }
   }
@@ -115,7 +115,7 @@ package final class LayoutDependentContentHandle: Sendable {
   package func realize(
     in context: LayoutRealizationContext
   ) -> [ResolvedNode] {
-    MainActor.assumeIsolated {
+    withCheckedMainActorAccess("LayoutDependentContentHandle.realize(in:)") {
       realizer.realize(in: context)
     }
   }

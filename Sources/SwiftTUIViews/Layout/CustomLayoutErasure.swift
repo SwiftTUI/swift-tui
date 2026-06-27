@@ -299,20 +299,12 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
   // layouts, a bare `assumeIsolated` could (under the runtime's legacy executor
   // mode) proceed off-main and race the unsynchronized `cachedStates` — the
   // suspected mechanism behind the sanitizer-invisible run-loop SIGSEGV flake
-  // (#1). Guarding every entry point with `preconditionMainActor()` before the
-  // `assumeIsolated` turns that into a loud, attributable crash — in release
-  // builds too — instead of silent memory corruption that gets misattributed to
-  // the "known flake".
-  nonisolated private func preconditionMainActor() {
-    MainActor.preconditionIsolated(
-      "LayoutProxyBox ran off the main actor — a non-Sendable custom layout was "
-        + "offloaded to the frame-tail layout worker (see FrameTailLayoutOffloadEligibility)."
-    )
-  }
-
+  // (#1). Every entry point therefore bridges through `withCheckedMainActorAccess`,
+  // whose `preconditionIsolated` turns that into a loud, attributable crash — in
+  // release builds too — instead of silent memory corruption misattributed to the
+  // "known flake".
   nonisolated var debugName: String {
-    preconditionMainActor()
-    return MainActor.assumeIsolated { box.debugName }
+    withCheckedMainActorAccess("LayoutProxyBox.debugName") { box.debugName }
   }
 
   private func ensureCache(
@@ -359,8 +351,7 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
     proposal: ProposedSize,
     passContext: LayoutPassContext?
   ) -> CellSize {
-    preconditionMainActor()
-    return MainActor.assumeIsolated {
+    withCheckedMainActorAccess("LayoutProxyBox.measureContainer") {
       let subviews = node.children.map { child in
         LayoutSubview(
           child: child,
@@ -390,8 +381,7 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
     axis: SwiftTUICore.Axis,
     passContext _: LayoutPassContext?
   ) -> Int? {
-    preconditionMainActor()
-    return MainActor.assumeIsolated {
+    withCheckedMainActorAccess("LayoutProxyBox.stackMinimumMainSize") {
       box.stackMinimumMainSize(axis: axis, idealSize: idealMeasurement.measuredSize)
     }
   }
@@ -402,8 +392,7 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
     measured: MeasuredNode,
     in bounds: CellRect
   ) -> [PlacedNode] {
-    preconditionMainActor()
-    return MainActor.assumeIsolated {
+    withCheckedMainActorAccess("LayoutProxyBox.placeSubviews") {
       placeSubviews(
         engine: engine,
         node: node,
@@ -421,8 +410,7 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
     in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
-    preconditionMainActor()
-    return MainActor.assumeIsolated {
+    withCheckedMainActorAccess("LayoutProxyBox.placeSubviews") {
       let placementRecorder = LayoutSubviewPlacementRecorder()
       let subviews = node.children.map { child in
         LayoutSubview(

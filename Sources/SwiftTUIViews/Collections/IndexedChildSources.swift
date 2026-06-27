@@ -46,19 +46,21 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   }
 
   nonisolated package var count: Int {
-    MainActor.assumeIsolated { countStorage }
+    withCheckedMainActorAccess("IndexedChildSource.count") { countStorage }
   }
 
   nonisolated package var identityRoot: Identity {
-    MainActor.assumeIsolated { identityRootStorage }
+    withCheckedMainActorAccess("IndexedChildSource.identityRoot") { identityRootStorage }
   }
 
   nonisolated package var measurementSignature: String {
-    MainActor.assumeIsolated { measurementSignatureStorage }
+    withCheckedMainActorAccess("IndexedChildSource.measurementSignature") {
+      measurementSignatureStorage
+    }
   }
 
   nonisolated package func child(at index: Int) -> ResolvedNode {
-    MainActor.assumeIsolated {
+    withCheckedMainActorAccess("IndexedChildSource.child(at:)") {
       if let cached = cache[index] {
         return cached
       }
