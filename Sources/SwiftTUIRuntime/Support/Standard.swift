@@ -21,7 +21,7 @@ import Synchronization
 // stdout/stderr surfaces (`Standard.Out` / `Standard.Error`) stay
 // available because writing to fds 1 and 2 works fine.
 #if !canImport(WASILibc)
-  public enum FileOpenError: Swift.Error, Sendable, CustomStringConvertible {
+  public enum FileOpenError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
     case failed(path: String, errno: CInt)
 
     public var description: String {

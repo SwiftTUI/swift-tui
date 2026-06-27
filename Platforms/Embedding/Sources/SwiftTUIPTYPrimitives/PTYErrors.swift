@@ -1,4 +1,4 @@
-public enum PTYError: Error, CustomStringConvertible, Sendable {
+public enum PTYError: Error, Equatable, Sendable, CustomStringConvertible {
   case allocationFailed(errno: Int32)
   case slavePathUnavailable
   case spawnFailed(errno: Int32)

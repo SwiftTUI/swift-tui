@@ -12,7 +12,7 @@ import Synchronization
 #endif
 
 /// Errors thrown while configuring or writing to a terminal-backed host.
-public enum TerminalHostError: Error {
+public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertible {
   case notATTY(fileDescriptor: Int32)
   case failedToReadAttributes(errno: Int32)
   case failedToSetAttributes(errno: Int32)
@@ -20,6 +20,25 @@ public enum TerminalHostError: Error {
   case failedToReadFileStatusFlags(errno: Int32)
   case failedToSetFileStatusFlags(errno: Int32)
   case failedToWrite(errno: Int32)
+
+  public var description: String {
+    switch self {
+    case .notATTY(let fileDescriptor):
+      "file descriptor \(fileDescriptor) is not a TTY."
+    case .failedToReadAttributes(let errno):
+      "failed to read terminal attributes (errno \(errno))."
+    case .failedToSetAttributes(let errno):
+      "failed to set terminal attributes (errno \(errno))."
+    case .failedToReadWindowSize(let errno):
+      "failed to read terminal window size (errno \(errno))."
+    case .failedToReadFileStatusFlags(let errno):
+      "failed to read file status flags (errno \(errno))."
+    case .failedToSetFileStatusFlags(let errno):
+      "failed to set file status flags (errno \(errno))."
+    case .failedToWrite(let errno):
+      "failed to write to the terminal (errno \(errno))."
+    }
+  }
 }
 
 #if !canImport(WASILibc)

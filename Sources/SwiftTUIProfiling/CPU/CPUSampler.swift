@@ -72,7 +72,7 @@ public struct CPUSample: Sendable, Equatable {
 }
 
 /// Why a CPU reading could not be taken.
-public enum CPUSamplerError: Error, Equatable, CustomStringConvertible {
+public enum CPUSamplerError: Error, Equatable, Sendable, CustomStringConvertible {
   /// Process CPU sampling is not supported on this platform (e.g. WASI).
   case unavailable
   /// The underlying `getrusage` call failed with this `errno`.

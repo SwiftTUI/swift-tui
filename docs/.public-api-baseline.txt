@@ -943,12 +943,14 @@ SwiftTUICore.Color.xyz()
 SwiftTUICore.Color.xyz(adaptedTo:method:)
 SwiftTUICore.ColorError
 SwiftTUICore.ColorError.conversionFailure(_:)
+SwiftTUICore.ColorError.description
 SwiftTUICore.ColorError.invalidChromaticity(_:)
 SwiftTUICore.ColorError.invalidHexString(_:)
 SwiftTUICore.ColorError.invalidProfile(_:)
 SwiftTUICore.ColorError.nonFiniteComponent(_:)
 SwiftTUICore.ColorError.unsupportedHexFormat(_:)
 SwiftTUICore.ColorResolutionError
+SwiftTUICore.ColorResolutionError.description
 SwiftTUICore.ColorResolutionError.emptyGradient
 SwiftTUICore.ColorResolutionError.recursionLimitExceeded(limit:style:)
 SwiftTUICore.ColorSchemeContrast
@@ -3222,6 +3224,7 @@ SwiftTUIRuntime.TerminalHost.theme
 SwiftTUIRuntime.TerminalHost.write(_:)
 SwiftTUIRuntime.TerminalHost.writeClipboard(_:)
 SwiftTUIRuntime.TerminalHostError
+SwiftTUIRuntime.TerminalHostError.description
 SwiftTUIRuntime.TerminalHostError.failedToReadAttributes(errno:)
 SwiftTUIRuntime.TerminalHostError.failedToReadFileStatusFlags(errno:)
 SwiftTUIRuntime.TerminalHostError.failedToReadWindowSize(errno:)

@@ -94,13 +94,30 @@ internal enum _PrismNumeric {
 
 // MARK: - Errors
 
-public enum ColorError: Error, Sendable, Equatable {
+public enum ColorError: Error, Equatable, Sendable, CustomStringConvertible {
   case invalidHexString(String)
   case unsupportedHexFormat(String)
   case nonFiniteComponent(String)
   case invalidChromaticity(String)
   case invalidProfile(String)
   case conversionFailure(String)
+
+  public var description: String {
+    switch self {
+    case .invalidHexString(let value):
+      "invalid hex color string: \(value)"
+    case .unsupportedHexFormat(let value):
+      "unsupported hex color format: \(value)"
+    case .nonFiniteComponent(let value):
+      "non-finite color component: \(value)"
+    case .invalidChromaticity(let value):
+      "invalid chromaticity: \(value)"
+    case .invalidProfile(let value):
+      "invalid color profile: \(value)"
+    case .conversionFailure(let value):
+      "color conversion failed: \(value)"
+    }
+  }
 }
 
 // MARK: - Core math primitives

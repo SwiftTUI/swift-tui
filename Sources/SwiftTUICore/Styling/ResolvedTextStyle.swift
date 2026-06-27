@@ -160,9 +160,18 @@ extension ResolvedTextStyle {
 }
 
 /// Errors thrown while resolving semantic or gradient-based colors.
-public enum ColorResolutionError: Equatable, Error, Sendable {
+public enum ColorResolutionError: Error, Equatable, Sendable, CustomStringConvertible {
   case recursionLimitExceeded(limit: Int, style: AnyShapeStyle)
   case emptyGradient
+
+  public var description: String {
+    switch self {
+    case .recursionLimitExceeded(let limit, _):
+      "shape-style color resolution exceeded the recursion limit of \(limit)."
+    case .emptyGradient:
+      "cannot resolve a color from an empty gradient."
+    }
+  }
 }
 
 public func resolveStyleColorResult(
