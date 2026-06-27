@@ -408,14 +408,12 @@ struct RuntimeRegistrationRestoreScopingTests {
   /// Generative reconciliation harness. The hand-written tests above pin one
   /// fixed two-sibling shape with sibling A invalidated; the dropped-handler
   /// "strand" class instead hides at *some* sibling count / *some* invalidated
-  /// position. This deterministically enumerates a `(siblingCount, changedIndex)`
-  /// product and asserts the universal property — a scoped `.subtrees` restore
-  /// must equal a full rebuild across all 15 registry families
+  /// position, and often behind a framework seam. This deterministically
+  /// enumerates a `(kind, siblingCount, changedIndex)` product and asserts the
+  /// universal property — a scoped `.subtrees`/diffed `.all` restore must equal a
+  /// full rebuild across all 15 registry families
   /// (``assertBroadRegistriesMatch``) — for every shape. No RNG: the shapes are
   /// enumerated, so a failure is reproducible by its `SeamShape` argument.
-  ///
-  /// Next extensions (Group/ForEach splice intermediaries, portal/overlay and
-  /// lazy-tab hosts) plug into the same seed → scoped-restore → assert spine.
   @Test(
     "scoped restore equals full rebuild across all registries for generated shapes",
     arguments: RuntimeRegistrationRestoreScopingTests.generatedSeamShapes
@@ -425,18 +423,13 @@ struct RuntimeRegistrationRestoreScopingTests {
     let namespace = MatchedGeometryNamespace(0)
     let probe = RuntimeRegistrationProbeSink()
 
-    let siblings = (0..<shape.siblingCount).map { index in
-      SeamSibling(
-        identity: testIdentity("Root", "S\(index)"),
-        label: "S\(index)",
-        marker: "s\(index)-0"
-      )
-    }
+    let siblings = shape.siblings(rootIdentity: rootIdentity)
 
     let graph = ViewGraph()
-    seedBroadRegistrationSiblings(
+    seedBroadRegistrationShape(
       graph: graph,
       rootIdentity: rootIdentity,
+      shape: shape,
       siblings: siblings,
       namespace: namespace,
       probe: probe
@@ -451,18 +444,12 @@ struct RuntimeRegistrationRestoreScopingTests {
     // Frame 2: narrowly re-evaluate ONLY the changed sibling → scoped restore.
     let changed = siblings[shape.changedIndex]
     graph.beginFrame()
-    let changedNode = graph.beginEvaluation(identity: changed.identity, invalidator: nil)
-    recordBroadRegistrations(
-      on: changedNode,
-      identity: changed.identity,
-      marker: "\(changed.marker)-1",
+    reEvaluateBroadRegistrationSibling(
+      changed,
+      in: graph,
+      shape: shape,
       namespace: namespace,
       probe: probe
-    )
-    graph.finishEvaluation(
-      changedNode,
-      resolved: ResolvedNode(identity: changed.identity, kind: .view(changed.label)),
-      accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
     _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
@@ -478,7 +465,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     assertBroadRegistriesMatch(
       liveRegistrations,
       fullRebuild,
-      identities: siblings.map(\.identity),
+      identities: shape.registrationIdentities(for: siblings),
       changedIdentity: changed.identity,
       namespace: namespace,
       probe: probe
@@ -707,71 +694,234 @@ struct RuntimeRegistrationRestoreScopingTests {
     _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
   }
 
-  /// A generated tree shape: `siblingCount` broadly-registered siblings under
-  /// the root, with the sibling at `changedIndex` invalidated on frame 2.
+  /// A generated tree shape: `siblingCount` broadly-registered siblings, an
+  /// optional framework seam around/under them, and the sibling at
+  /// `changedIndex` invalidated on frame 2.
   struct SeamShape: CustomStringConvertible, Sendable {
+    let kind: SeamKind
     let siblingCount: Int
     let changedIndex: Int
-    var description: String { "siblings=\(siblingCount),changed=\(changedIndex)" }
+
+    var description: String {
+      "\(kind),siblings=\(siblingCount),changed=\(changedIndex)"
+    }
+
+    func siblings(rootIdentity: Identity) -> [SeamSibling] {
+      (0..<siblingCount).map { index in
+        SeamSibling(
+          identity: rootIdentity.child("S\(index)"),
+          label: "S\(index)",
+          marker: "s\(index)-0"
+        )
+      }
+    }
+
+    func registrationIdentities(for siblings: [SeamSibling]) -> [Identity] {
+      siblings.flatMap { sibling in
+        var identities = [sibling.identity]
+        if let islandIdentity = kind.islandIdentity(for: sibling) {
+          identities.append(islandIdentity)
+        }
+        return identities
+      }
+    }
   }
 
-  private struct SeamSibling {
+  enum SeamKind: String, CaseIterable, CustomStringConvertible, Sendable {
+    case flat
+    case groupSplice
+    case forEachSplice
+    case portalIsland
+    case overlayIsland
+    case lazyTabIsland
+
+    var description: String { rawValue }
+
+    var wrapperLabel: String? {
+      switch self {
+      case .groupSplice:
+        "GroupSplice"
+      case .forEachSplice:
+        "ForEachSplice"
+      case .flat, .portalIsland, .overlayIsland, .lazyTabIsland:
+        nil
+      }
+    }
+
+    var islandLabel: String? {
+      switch self {
+      case .portalIsland:
+        "PortalIsland"
+      case .overlayIsland:
+        "OverlayIsland"
+      case .lazyTabIsland:
+        "LazyTabIsland"
+      case .flat, .groupSplice, .forEachSplice:
+        nil
+      }
+    }
+
+    func islandIdentity(for sibling: SeamSibling) -> Identity? {
+      islandLabel.map { sibling.identity.child($0) }
+    }
+  }
+
+  struct SeamSibling {
     let identity: Identity
     let label: String
     let marker: String
   }
 
-  /// Deterministic enumeration of the shape space: every `(count, changedIndex)`
-  /// pair for 2…4 siblings (9 shapes). Enumerated, not random, so a failure is
-  /// reproducible by its argument.
+  /// Deterministic enumeration of the shape space: every
+  /// `(kind, count, changedIndex)` tuple for 2…4 siblings. Enumerated, not
+  /// random, so a failure is reproducible by its argument.
   nonisolated static let generatedSeamShapes: [SeamShape] = {
     var shapes: [SeamShape] = []
-    for siblingCount in 2...4 {
-      for changedIndex in 0..<siblingCount {
-        shapes.append(SeamShape(siblingCount: siblingCount, changedIndex: changedIndex))
+    for kind in SeamKind.allCases {
+      for siblingCount in 2...4 {
+        for changedIndex in 0..<siblingCount {
+          shapes.append(
+            SeamShape(
+              kind: kind,
+              siblingCount: siblingCount,
+              changedIndex: changedIndex
+            )
+          )
+        }
       }
     }
     return shapes
   }()
 
-  /// N-sibling generalization of ``seedTwoBroadRegistrationSiblings``: seeds each
-  /// sibling with the full broad registration set under the root, then commits
-  /// frame 1.
-  private func seedBroadRegistrationSiblings(
+  /// N-sibling generalization of ``seedTwoBroadRegistrationSiblings``: seeds
+  /// each sibling with the full broad registration set under the root, optionally
+  /// wraps it in structural splices or emits live capture-island descendants,
+  /// then commits frame 1.
+  private func seedBroadRegistrationShape(
     graph: ViewGraph,
     rootIdentity: Identity,
+    shape: SeamShape,
     siblings: [SeamSibling],
     namespace: MatchedGeometryNamespace,
     probe: RuntimeRegistrationProbeSink
   ) {
     graph.beginFrame()
     let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+
     for sibling in siblings {
-      let node = graph.beginEvaluation(identity: sibling.identity, invalidator: nil)
-      recordBroadRegistrations(
-        on: node,
+      seedBroadRegistrationNode(
         identity: sibling.identity,
+        label: sibling.label,
         marker: sibling.marker,
+        in: graph,
         namespace: namespace,
         probe: probe
       )
-      graph.finishEvaluation(
-        node,
-        resolved: ResolvedNode(identity: sibling.identity, kind: .view(sibling.label)),
-        accessedStateSlots: 0
+    }
+
+    for sibling in siblings {
+      guard let islandIdentity = shape.kind.islandIdentity(for: sibling),
+        let islandLabel = shape.kind.islandLabel
+      else {
+        continue
+      }
+      seedBroadRegistrationNode(
+        identity: islandIdentity,
+        label: islandLabel,
+        marker: "\(sibling.marker)-\(islandLabel)-0",
+        in: graph,
+        namespace: namespace,
+        probe: probe
       )
     }
+
+    let siblingResolvedNodes = siblings.map {
+      ResolvedNode(identity: $0.identity, kind: .view($0.label))
+    }
+    let rootChildren: [ResolvedNode]
+    if let wrapperLabel = shape.kind.wrapperLabel {
+      let wrapperIdentity = rootIdentity.child(wrapperLabel)
+      let wrapperNode = graph.beginEvaluation(identity: wrapperIdentity, invalidator: nil)
+      graph.finishEvaluation(
+        wrapperNode,
+        resolved: ResolvedNode(
+          identity: wrapperIdentity,
+          kind: .view(wrapperLabel),
+          children: siblingResolvedNodes
+        ),
+        accessedStateSlots: 0
+      )
+      rootChildren = [
+        ResolvedNode(
+          identity: wrapperIdentity,
+          kind: .view(wrapperLabel),
+          children: siblingResolvedNodes
+        )
+      ]
+    } else {
+      rootChildren = siblingResolvedNodes
+    }
+
     graph.finishEvaluation(
       rootNode,
-      resolved: ResolvedNode(
-        identity: rootIdentity,
-        kind: .root,
-        children: siblings.map { ResolvedNode(identity: $0.identity, kind: .view($0.label)) }
-      ),
+      resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: rootChildren),
       accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
     _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+  }
+
+  private func seedBroadRegistrationNode(
+    identity: Identity,
+    label: String,
+    marker: String,
+    in graph: ViewGraph,
+    namespace: MatchedGeometryNamespace,
+    probe: RuntimeRegistrationProbeSink
+  ) {
+    let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+    recordBroadRegistrations(
+      on: node,
+      identity: identity,
+      marker: marker,
+      namespace: namespace,
+      probe: probe
+    )
+    graph.finishEvaluation(
+      node,
+      resolved: ResolvedNode(identity: identity, kind: .view(label)),
+      accessedStateSlots: 0
+    )
+  }
+
+  private func reEvaluateBroadRegistrationSibling(
+    _ sibling: SeamSibling,
+    in graph: ViewGraph,
+    shape: SeamShape,
+    namespace: MatchedGeometryNamespace,
+    probe: RuntimeRegistrationProbeSink
+  ) {
+    seedBroadRegistrationNode(
+      identity: sibling.identity,
+      label: sibling.label,
+      marker: "\(sibling.marker)-1",
+      in: graph,
+      namespace: namespace,
+      probe: probe
+    )
+    guard let islandIdentity = shape.kind.islandIdentity(for: sibling),
+      let islandLabel = shape.kind.islandLabel
+    else {
+      return
+    }
+    seedBroadRegistrationNode(
+      identity: islandIdentity,
+      label: islandLabel,
+      marker: "\(sibling.marker)-\(islandLabel)-1",
+      in: graph,
+      namespace: namespace,
+      probe: probe
+    )
   }
 
   @MainActor
