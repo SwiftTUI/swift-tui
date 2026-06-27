@@ -115,21 +115,34 @@ public struct LayoutSubview {
 public typealias LayoutSubviews = [LayoutSubview]
 /// A custom layout algorithm.
 public protocol Layout {
+  /// Scratch state for one measure/place layout pass.
+  ///
+  /// SwiftTUI shares this cache between ``sizeThatFits(proposal:subviews:cache:)``
+  /// and ``placeSubviews(in:proposal:subviews:cache:)`` for the same container
+  /// identity and proposal in a single pass. The cache is discarded after
+  /// placement, so custom layouts must not rely on it persisting across frames,
+  /// proposals, or structural changes.
   associatedtype Cache = Void
 
+  /// Creates the pass-local scratch cache for this layout.
   func makeCache(subviews: LayoutSubviews) -> Cache
 
+  /// Refreshes a pass-local cache before measurement or placement.
   func updateCache(
     _ cache: inout Cache,
     subviews: LayoutSubviews
   )
 
+  /// Returns this layout's measured size and may write data needed later in
+  /// ``placeSubviews(in:proposal:subviews:cache:)`` to `cache`.
   func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: LayoutSubviews,
     cache: inout Cache
   ) -> LayoutSize
 
+  /// Places this layout's subviews using the same pass-local cache produced for
+  /// measurement when measurement and placement happen in the same pass.
   func placeSubviews(
     in bounds: LayoutRect,
     proposal: ProposedViewSize,

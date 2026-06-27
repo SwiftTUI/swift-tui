@@ -733,6 +733,40 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
   }
 
+  @Test("public SendableLayout cache is pass-local across async layout passes")
+  func publicSendableLayoutCacheIsPassLocalAcrossAsyncLayoutPasses() async throws {
+    let rootIdentity = testIdentity("AsyncSendableLayoutPassLocalCacheRoot")
+    let recorder = AsyncFrameTailSendableLayoutRecorder()
+    let renderer = DefaultRenderer()
+
+    @MainActor
+    func root(_ text: String) -> some View {
+      AsyncFrameTailSendableLayout(recorder: recorder) {
+        Text(text)
+      }
+    }
+
+    _ = await renderer.renderAsync(
+      root("A"),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 32, height: 6)
+    )
+    var layoutState = recorder.state
+    #expect(layoutState.makeCacheCount == 1)
+    #expect(layoutState.measuredCache == 1)
+    #expect(layoutState.placedCache == 1)
+
+    _ = await renderer.renderAsync(
+      root("AB"),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 32, height: 6)
+    )
+    layoutState = recorder.state
+    #expect(layoutState.makeCacheCount == 2)
+    #expect(layoutState.measuredCache == 2)
+    #expect(layoutState.placedCache == 2)
+  }
+
   @Test("public SendableLayout reads dimensions and alignment guides on the worker")
   func publicSendableLayoutReadsDimensionsAndAlignmentGuidesOnWorker() async throws {
     let rootIdentity = testIdentity("AsyncSendableGuideLayoutRoot")

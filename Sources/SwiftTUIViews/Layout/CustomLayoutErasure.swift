@@ -201,6 +201,8 @@ final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLayoutProx
       cache: &cache
     )
     storeCache(cache, for: node, proposal: measured.proposal)
+    // `Layout.Cache` is pass-local: retain measurement mutations through
+    // placement, then drop every proposal entry for this container identity.
     discardCachedStates(for: node.identity)
 
     return node.children.map { child in
@@ -433,6 +435,8 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
         cache: &cache
       )
       cachedStates[cacheKey] = cache
+      // `Layout.Cache` is pass-local: retain measurement mutations through
+      // placement, then drop every proposal entry for this container identity.
       discardCachedStates(for: node.identity)
 
       return node.children.map { child in

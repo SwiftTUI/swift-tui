@@ -6514,6 +6514,39 @@ struct SwiftUISurfaceTests {
     #expect(counter.lastPlacedCache == 1)
   }
 
+  @Test("custom Layout cache is pass-local across repeated layout passes")
+  func customLayoutCacheIsPassLocalAcrossRepeatedLayoutPasses() {
+    let counter = LayoutCacheCounter()
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("CustomLayoutPassLocalCacheRoot")
+
+    @MainActor
+    func root(_ text: String) -> some View {
+      CacheTrackingLayout(counter: counter) {
+        Text(text)
+      }
+    }
+
+    _ = renderer.render(
+      root("A"),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 12, height: 2)
+    )
+    #expect(counter.makeCalls == 1)
+    #expect(counter.lastMeasuredCache == 1)
+    #expect(counter.lastPlacedCache == 1)
+
+    _ = renderer.render(
+      root("AB"),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 12, height: 2)
+    )
+
+    #expect(counter.makeCalls == 2)
+    #expect(counter.lastMeasuredCache == 2)
+    #expect(counter.lastPlacedCache == 2)
+  }
+
   @Test("shared AnyLayout instances keep cache scoped to each container")
   func sharedAnyLayoutInstancesKeepCacheScopedPerContainer() {
     let recorder = SharedLayoutCacheRecorder()
