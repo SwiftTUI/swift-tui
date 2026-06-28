@@ -37,6 +37,13 @@ The core container and control surface is already broad enough for many dashboar
 
 Use built-in containers first. Reach for custom ``Layout`` only when the authored structure genuinely has a reusable layout rule that stacks and frames cannot express clearly.
 
+Custom ``Layout`` cache values are pass-local scratch state. SwiftTUI shares
+``Layout/Cache`` between measurement and placement for one layout pass, then
+drops it after placement. The cache is recreated when a later pass runs because
+the proposal, child structure, binding-driven content, or another input changed.
+Store state that must survive across frames in a model, ``State``, or another
+owned value outside the layout cache.
+
 ## Type Erasure
 
 Prefer typed `@ViewBuilder` composition, `some View` helpers, and generic

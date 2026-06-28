@@ -203,7 +203,7 @@ final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLayoutProx
     storeCache(cache, for: node, proposal: measured.proposal)
     // `Layout.Cache` is pass-local: retain measurement mutations through
     // placement, then drop every proposal entry for this container identity.
-    discardCachedStates(for: node.identity)
+    discardPassLocalCacheStates(for: node.identity)
 
     return node.children.map { child in
       let placement =
@@ -252,6 +252,9 @@ final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLayoutProx
     proposal: ProposedSize,
     subviews: LayoutSubviews
   ) -> L.Cache {
+    // This map only bridges measurement to placement inside the current pass.
+    // Placement discards all entries for the identity, so arbitrary author cache
+    // values do not persist across frames, proposals, or structural changes.
     let key = CacheKey(identity: node.identity, proposal: proposal)
     var cache = state.withLock { state in
       state.cachedStates[key] ?? layout.makeCache(subviews: subviews)
@@ -271,7 +274,7 @@ final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLayoutProx
     }
   }
 
-  private func discardCachedStates(
+  private func discardPassLocalCacheStates(
     for identity: Identity
   ) {
     state.withLock { state in
@@ -314,6 +317,9 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
     proposal: ProposedSize,
     subviews: [LayoutSubview]
   ) -> Any {
+    // This map only bridges measurement to placement inside the current pass.
+    // Placement discards all entries for the identity, so arbitrary author cache
+    // values do not persist across frames, proposals, or structural changes.
     let key = CacheKey(identity: node.identity, proposal: proposal)
 
     if var existing = cachedStates[key] {
@@ -328,7 +334,7 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
     return fresh
   }
 
-  private func discardCachedStates(
+  private func discardPassLocalCacheStates(
     for identity: Identity
   ) {
     cachedStates = cachedStates.filter { $0.key.identity != identity }
@@ -437,7 +443,7 @@ final class LayoutProxyBox: LayoutPassContextCustomLayoutProxy {
       cachedStates[cacheKey] = cache
       // `Layout.Cache` is pass-local: retain measurement mutations through
       // placement, then drop every proposal entry for this container identity.
-      discardCachedStates(for: node.identity)
+      discardPassLocalCacheStates(for: node.identity)
 
       return node.children.map { child in
         let placement =

@@ -713,7 +713,8 @@ struct SwiftUISurfaceTests {
       ]
     )
     #expect(shownArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
-    #expect(updatedTaskArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
+    #expect(
+      updatedTaskArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
       updatedTaskArtifacts.commitPlan.lifecycle.map(\.operation) == [
         .taskCancel(
@@ -6542,6 +6543,92 @@ struct SwiftUISurfaceTests {
       proposal: .init(width: 12, height: 2)
     )
 
+    #expect(counter.makeCalls == 2)
+    #expect(counter.lastMeasuredCache == 2)
+    #expect(counter.lastPlacedCache == 2)
+  }
+
+  @Test("custom Layout cache is recreated after proposal and structure changes")
+  func customLayoutCacheIsRecreatedAfterProposalAndStructureChanges() {
+    let counter = LayoutCacheCounter()
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("CustomLayoutProposalStructureCacheRoot")
+
+    @MainActor
+    func root(includeSecond: Bool) -> some View {
+      CacheTrackingLayout(counter: counter) {
+        Text("A")
+        if includeSecond {
+          Text("B")
+        }
+      }
+    }
+
+    _ = renderer.render(
+      root(includeSecond: false),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 12, height: 2)
+    )
+    #expect(counter.makeCalls == 1)
+    #expect(counter.lastMeasuredCache == 1)
+    #expect(counter.lastPlacedCache == 1)
+
+    _ = renderer.render(
+      root(includeSecond: false),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 8, height: 2)
+    )
+    #expect(counter.makeCalls == 2)
+    #expect(counter.lastMeasuredCache == 2)
+    #expect(counter.lastPlacedCache == 2)
+
+    _ = renderer.render(
+      root(includeSecond: true),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 8, height: 2)
+    )
+    #expect(counter.makeCalls == 3)
+    #expect(counter.lastMeasuredCache == 3)
+    #expect(counter.lastPlacedCache == 3)
+  }
+
+  @Test("custom Layout cache is recreated after binding-driven invalidation")
+  func customLayoutCacheIsRecreatedAfterBindingDrivenInvalidation() {
+    final class LabelBox {
+      var value = "A"
+    }
+
+    let counter = LayoutCacheCounter()
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("CustomLayoutBindingInvalidationCacheRoot")
+    let box = LabelBox()
+    let label = Binding(
+      get: { box.value },
+      set: { box.value = $0 }
+    )
+
+    @MainActor
+    func root() -> some View {
+      CacheTrackingLayout(counter: counter) {
+        Text(label.wrappedValue)
+      }
+    }
+
+    _ = renderer.render(
+      root(),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 12, height: 2)
+    )
+    #expect(counter.makeCalls == 1)
+    #expect(counter.lastMeasuredCache == 1)
+    #expect(counter.lastPlacedCache == 1)
+
+    box.value = "AB"
+    _ = renderer.render(
+      root(),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 12, height: 2)
+    )
     #expect(counter.makeCalls == 2)
     #expect(counter.lastMeasuredCache == 2)
     #expect(counter.lastPlacedCache == 2)

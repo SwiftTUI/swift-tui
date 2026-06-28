@@ -121,7 +121,9 @@ public protocol Layout {
   /// and ``placeSubviews(in:proposal:subviews:cache:)`` for the same container
   /// identity and proposal in a single pass. The cache is discarded after
   /// placement, so custom layouts must not rely on it persisting across frames,
-  /// proposals, or structural changes.
+  /// proposals, structural changes, or binding-driven invalidations. SwiftTUI
+  /// intentionally does not expose a cross-frame cache reuse hook; store durable
+  /// layout state outside `Cache`.
   associatedtype Cache = Void
 
   /// Creates the pass-local scratch cache for this layout.
