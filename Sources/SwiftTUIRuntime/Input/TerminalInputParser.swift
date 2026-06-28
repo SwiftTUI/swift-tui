@@ -450,7 +450,19 @@ extension TerminalInputParser {
       guard (0x30...0x39).contains(byte) else {
         return nil
       }
-      value = (value * 10) + Int(byte - 0x30)
+      // Overflow-safe accumulation. A malformed or adversarial sequence with an
+      // absurdly long numeric parameter must not trap the process: the previous
+      // checked `value * 10 + digit` arithmetic crashed on overflow (SIGILL).
+      // On overflow we drop the whole sequence by returning nil, which every
+      // caller already handles. This is especially load-bearing on wasm32
+      // (WebHost), where Int is 32-bit and overflows after ~10 digits of
+      // attacker-controlled input.
+      let (scaled, mulOverflow) = value.multipliedReportingOverflow(by: 10)
+      let (sum, addOverflow) = scaled.addingReportingOverflow(Int(byte - 0x30))
+      guard !mulOverflow, !addOverflow else {
+        return nil
+      }
+      value = sum
     }
     return value
   }
