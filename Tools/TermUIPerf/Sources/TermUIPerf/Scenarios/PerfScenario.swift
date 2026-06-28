@@ -156,6 +156,7 @@ public enum PerfScenarioRegistry {
       FileBrowserSelectionScenario(),
       TextInputEditingScenario(),
       MemoEquatableBoundaryScenario(),
+      CanvasPartialReuseScenario(),
     ] + additionalScenarios
   }
 
