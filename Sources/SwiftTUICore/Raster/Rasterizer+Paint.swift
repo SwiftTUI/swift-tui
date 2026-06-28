@@ -153,12 +153,19 @@ extension Rasterizer {
         }
 
         if let dirtyRowRange = nodeContext.dirtyRowRange {
-          let nodeTop = max(0, visibility.bounds.origin.y)
-          let nodeBottom = nodeTop + max(0, visibility.bounds.size.height)
-          // O(1) range-overlap check: skip subtree when its row span
-          // is entirely outside the dirty-row range.
-          if nodeBottom > nodeTop,
-            nodeBottom <= dirtyRowRange.min || nodeTop > dirtyRowRange.max
+          // O(1) range-overlap check on the SUBTREE's absolute painted-row span,
+          // not this node's own bounds. `.offset`/`.position` bake their
+          // translation into the child's absolute bounds while the wrapper keeps
+          // its slot, so a node's own rows can sit entirely outside the dirty band
+          // while a translated descendant's rows are squarely inside it. Culling
+          // on `visibility.bounds` here skipped that descendant, so cleared rows
+          // stayed stale. `subtreeBounds` is a superset of the actual painted rows,
+          // so a non-overlap is sound to skip; for contained layouts it equals the
+          // node's bounds and the cull is unchanged.
+          let subtreeTop = max(0, node.subtreeBounds.origin.y)
+          let subtreeBottom = subtreeTop + max(0, node.subtreeBounds.size.height)
+          if subtreeBottom > subtreeTop,
+            subtreeBottom <= dirtyRowRange.min || subtreeTop > dirtyRowRange.max
           {
             continue
           }

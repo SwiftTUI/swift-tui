@@ -140,4 +140,25 @@ public struct CellRect: Equatable, Hashable, Sendable {
       size: .init(width: maxX - minX, height: maxY - minY)
     )
   }
+
+  /// The bounding box enclosing `self` and `other`, treating an empty rect as no
+  /// contribution (so `zero.union(r) == r`). Used internally to aggregate a
+  /// subtree's absolute paint extent; `package` so it stays off the public API
+  /// surface.
+  package func union(_ other: CellRect) -> CellRect {
+    if isEmpty {
+      return other
+    }
+    if other.isEmpty {
+      return self
+    }
+    let minX = min(origin.x, other.origin.x)
+    let minY = min(origin.y, other.origin.y)
+    let maxX = max(self.maxX, other.maxX)
+    let maxY = max(self.maxY, other.maxY)
+    return CellRect(
+      origin: .init(x: minX, y: minY),
+      size: .init(width: maxX - minX, height: maxY - minY)
+    )
+  }
 }

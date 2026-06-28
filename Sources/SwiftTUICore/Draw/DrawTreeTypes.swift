@@ -295,10 +295,19 @@ package struct DrawNode: Equatable, Sendable {
   package var postCommands: [DrawCommand]
   package var children: [DrawNode] {
     didSet {
-      recomputeSubtreeNodeCount()
+      recomputeSubtreeAggregates()
     }
   }
   package private(set) var subtreeNodeCount: Int
+  /// The absolute union of this node's `bounds` and every descendant's
+  /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
+  /// *child's* absolute bounds (the wrapper keeps its own slot), so a node's own
+  /// `bounds` is not a sound basis for the incremental-repaint row cull: a
+  /// translated descendant can paint rows far outside its ancestor's slot. The
+  /// cull must test this subtree extent instead. For normally-contained layouts
+  /// children sit within the parent, so `subtreeBounds == bounds` and the cull is
+  /// unchanged.
+  package private(set) var subtreeBounds: CellRect
 
   package init(
     viewNodeID: ViewNodeID? = nil,
@@ -323,10 +332,18 @@ package struct DrawNode: Equatable, Sendable {
     self.postCommands = postCommands
     self.children = children
     subtreeNodeCount = 1
-    recomputeSubtreeNodeCount()
+    subtreeBounds = bounds
+    recomputeSubtreeAggregates()
   }
 
-  private mutating func recomputeSubtreeNodeCount() {
-    subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
+  private mutating func recomputeSubtreeAggregates() {
+    var count = 1
+    var extent = bounds
+    for child in children {
+      count += child.subtreeNodeCount
+      extent = extent.union(child.subtreeBounds)
+    }
+    subtreeNodeCount = count
+    subtreeBounds = extent
   }
 }
