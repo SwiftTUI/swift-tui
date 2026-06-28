@@ -102,18 +102,36 @@ public protocol FrameScheduling: Invalidating {
 }
 
 /// Coalesces invalidations, input, signals, and deadlines into frame work.
-public final class FrameScheduler: FrameScheduling {
-  private var pendingCauses: Set<WakeCause> = []
-  private var invalidatedIdentities: Set<Identity> = []
-  private var signalNames: Set<String> = []
-  private var externalReasons: Set<String> = []
-  private var nextDeadline: MonotonicInstant?
-  private var pendingAnimationRequest: AnimationRequest = .inherit
-  private var pendingAnimationBatchID: AnimationBatchID?
-  /// Tally of `request*` calls received since the last
-  /// `consumeReadyFrame`.  Drained into the produced `ScheduledFrame`
-  /// for cancellation-pressure diagnostics; reset to 0 on consume.
-  private var pendingIntentRequestCount: Int = 0
+///
+/// `FrameScheduler` is `Sendable` and genuinely thread-safe: its coalescing
+/// state lives behind a lock so any thread may request a wake. This matters
+/// because the `Invalidating`/`FrameScheduling` contract is `public` and
+/// `nonisolated`, and at least one caller — the Observation `onChange` bridge —
+/// can fire from an off-main mutation context. The previous design left the
+/// coalescing sets lock-free and safe only "by convention" (every caller on the
+/// main actor), which raced the run loop's `consumeReadyFrame` when that
+/// convention was broken.
+public final class FrameScheduler: FrameScheduling, Sendable {
+  /// The coalescing state mutated by every `request*` call and drained by
+  /// `consumeReadyFrame`. Held behind `coalescingLock` so requests from any
+  /// thread cannot race the main-actor run loop.
+  private struct CoalescingState {
+    var pendingCauses: Set<WakeCause> = []
+    var invalidatedIdentities: Set<Identity> = []
+    var signalNames: Set<String> = []
+    var externalReasons: Set<String> = []
+    var nextDeadline: MonotonicInstant?
+    var pendingAnimationRequest: AnimationRequest = .inherit
+    var pendingAnimationBatchID: AnimationBatchID?
+    /// Tally of `request*` calls received since the last `consumeReadyFrame`.
+    /// Drained into the produced `ScheduledFrame` for cancellation-pressure
+    /// diagnostics; reset to 0 on consume.
+    var pendingIntentRequestCount: Int = 0
+  }
+
+  private let coalescingLock = OSAllocatedUnfairLock<CoalescingState>(
+    uncheckedState: CoalescingState()
+  )
   private let wakeHandlerLock = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(uncheckedState: nil)
   private struct PendingFrameRequestWaiters {
     var nextID: UInt64 = 0
@@ -131,114 +149,132 @@ public final class FrameScheduler: FrameScheduling {
   /// requested a (reader-attributed) invalidation, so a redundant coarse
   /// post-action follow-up can be skipped.
   package var pendingInvalidatedIdentities: Set<Identity> {
-    invalidatedIdentities
+    coalescingLock.withLock { $0.invalidatedIdentities }
   }
 
   public func requestInput() {
-    pendingCauses.insert(.input)
-    pendingIntentRequestCount += 1
+    coalescingLock.withLock { state in
+      state.pendingCauses.insert(.input)
+      state.pendingIntentRequestCount += 1
+    }
     notifyPendingFrameRequestWaiters()
   }
 
   public func requestInvalidation(of identities: Set<Identity>) {
-    pendingCauses.insert(.invalidation)
-    invalidatedIdentities.formUnion(identities)
-    pendingIntentRequestCount += 1
+    coalescingLock.withLock { state in
+      state.pendingCauses.insert(.invalidation)
+      state.invalidatedIdentities.formUnion(identities)
+      state.pendingIntentRequestCount += 1
+    }
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
   public func requestSignal(named name: String) {
-    pendingCauses.insert(.signal)
-    signalNames.insert(name)
-    pendingIntentRequestCount += 1
+    coalescingLock.withLock { state in
+      state.pendingCauses.insert(.signal)
+      state.signalNames.insert(name)
+      state.pendingIntentRequestCount += 1
+    }
     notifyPendingFrameRequestWaiters()
   }
 
   public func requestExternalWake(reason: String) {
-    pendingCauses.insert(.external)
-    externalReasons.insert(reason)
-    pendingIntentRequestCount += 1
+    coalescingLock.withLock { state in
+      state.pendingCauses.insert(.external)
+      state.externalReasons.insert(reason)
+      state.pendingIntentRequestCount += 1
+    }
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
   public func requestDeadline(_ deadline: MonotonicInstant) {
-    if let existing = nextDeadline {
-      nextDeadline = min(existing, deadline)
-    } else {
-      nextDeadline = deadline
+    coalescingLock.withLock { state in
+      if let existing = state.nextDeadline {
+        state.nextDeadline = min(existing, deadline)
+      } else {
+        state.nextDeadline = deadline
+      }
+      state.pendingIntentRequestCount += 1
     }
-    pendingIntentRequestCount += 1
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
   public func hasPendingFrame(at now: MonotonicInstant = .now()) -> Bool {
-    !pendingCauses.isEmpty || (nextDeadline.map { $0 <= now } ?? false)
+    coalescingLock.withLock { state in
+      !state.pendingCauses.isEmpty || (state.nextDeadline.map { $0 <= now } ?? false)
+    }
   }
 
   public func nextWakeInstant(
     after now: MonotonicInstant = .now()
   ) -> MonotonicInstant? {
-    if !pendingCauses.isEmpty {
-      return now
-    }
+    coalescingLock.withLock { state in
+      if !state.pendingCauses.isEmpty {
+        return now
+      }
 
-    guard let nextDeadline else {
-      return nil
+      guard let nextDeadline = state.nextDeadline else {
+        return nil
+      }
+      return nextDeadline <= now ? now : nextDeadline
     }
-    return nextDeadline <= now ? now : nextDeadline
   }
 
   public func consumeReadyFrame(
     at now: MonotonicInstant = .now()
   ) -> ScheduledFrame? {
-    let deadlineDue = nextDeadline.map { $0 <= now } ?? false
-    guard !pendingCauses.isEmpty || deadlineDue else {
-      return nil
+    coalescingLock.withLock { state in
+      let deadlineDue = state.nextDeadline.map { $0 <= now } ?? false
+      guard !state.pendingCauses.isEmpty || deadlineDue else {
+        return nil
+      }
+
+      var causes = state.pendingCauses
+      if deadlineDue {
+        causes.insert(.deadline)
+      }
+
+      let scheduled = ScheduledFrame(
+        causes: causes,
+        invalidatedIdentities: state.invalidatedIdentities,
+        signalNames: state.signalNames.sorted(),
+        externalReasons: state.externalReasons.sorted(),
+        triggeredDeadline: deadlineDue ? state.nextDeadline : nil,
+        nextDeadline: deadlineDue ? nil : state.nextDeadline,
+        animationRequest: state.pendingAnimationRequest,
+        animationBatchID: state.pendingAnimationBatchID,
+        intentRequestCount: state.pendingIntentRequestCount
+      )
+
+      state.pendingCauses.removeAll(keepingCapacity: true)
+      state.invalidatedIdentities.removeAll(keepingCapacity: true)
+      state.signalNames.removeAll(keepingCapacity: true)
+      state.externalReasons.removeAll(keepingCapacity: true)
+      state.pendingAnimationRequest = .inherit
+      state.pendingAnimationBatchID = nil
+      state.pendingIntentRequestCount = 0
+      if deadlineDue {
+        state.nextDeadline = nil
+      }
+
+      return scheduled
     }
-
-    var causes = pendingCauses
-    if deadlineDue {
-      causes.insert(.deadline)
-    }
-
-    let scheduled = ScheduledFrame(
-      causes: causes,
-      invalidatedIdentities: invalidatedIdentities,
-      signalNames: signalNames.sorted(),
-      externalReasons: externalReasons.sorted(),
-      triggeredDeadline: deadlineDue ? nextDeadline : nil,
-      nextDeadline: deadlineDue ? nil : nextDeadline,
-      animationRequest: pendingAnimationRequest,
-      animationBatchID: pendingAnimationBatchID,
-      intentRequestCount: pendingIntentRequestCount
-    )
-
-    pendingCauses.removeAll(keepingCapacity: true)
-    invalidatedIdentities.removeAll(keepingCapacity: true)
-    signalNames.removeAll(keepingCapacity: true)
-    externalReasons.removeAll(keepingCapacity: true)
-    pendingAnimationRequest = .inherit
-    pendingAnimationBatchID = nil
-    pendingIntentRequestCount = 0
-    if deadlineDue {
-      nextDeadline = nil
-    }
-
-    return scheduled
   }
 
   public func reset() {
-    pendingCauses.removeAll(keepingCapacity: true)
-    invalidatedIdentities.removeAll(keepingCapacity: true)
-    signalNames.removeAll(keepingCapacity: true)
-    externalReasons.removeAll(keepingCapacity: true)
-    pendingAnimationRequest = .inherit
-    pendingAnimationBatchID = nil
-    pendingIntentRequestCount = 0
-    nextDeadline = nil
+    coalescingLock.withLock { state in
+      state.pendingCauses.removeAll(keepingCapacity: true)
+      state.invalidatedIdentities.removeAll(keepingCapacity: true)
+      state.signalNames.removeAll(keepingCapacity: true)
+      state.externalReasons.removeAll(keepingCapacity: true)
+      state.pendingAnimationRequest = .inherit
+      state.pendingAnimationBatchID = nil
+      state.pendingIntentRequestCount = 0
+      state.nextDeadline = nil
+    }
   }
 
   private func notifyPendingFrameRequestWaiters() {
@@ -347,18 +383,20 @@ extension FrameScheduler: AnimationAwareInvalidating {
     animation: AnimationRequest,
     batchID: AnimationBatchID?
   ) {
-    pendingCauses.insert(.invalidation)
-    invalidatedIdentities.formUnion(identities)
-    pendingIntentRequestCount += 1
-    // Coalescing rule: latest explicit request wins; `.inherit` never
-    // overrides an explicit pending request.  Batch ID coalesces the
-    // same way — latest wins, a nil batch ID never overrides an
-    // explicit one.
-    if animation != .inherit {
-      pendingAnimationRequest = animation
-    }
-    if let batchID {
-      pendingAnimationBatchID = batchID
+    coalescingLock.withLock { state in
+      state.pendingCauses.insert(.invalidation)
+      state.invalidatedIdentities.formUnion(identities)
+      state.pendingIntentRequestCount += 1
+      // Coalescing rule: latest explicit request wins; `.inherit` never
+      // overrides an explicit pending request.  Batch ID coalesces the
+      // same way — latest wins, a nil batch ID never overrides an
+      // explicit one.
+      if animation != .inherit {
+        state.pendingAnimationRequest = animation
+      }
+      if let batchID {
+        state.pendingAnimationBatchID = batchID
+      }
     }
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
@@ -376,16 +414,18 @@ extension FrameScheduler: CancelledFrameIntentReplaying {
       return
     }
 
-    pendingCauses.insert(.invalidation)
-    invalidatedIdentities.formUnion(frame.invalidatedIdentities)
-    pendingIntentRequestCount += 1
-    // Replay preserves the cancelled frame's one-shot animation intent only
-    // when no newer explicit animation is already queued.
-    if pendingAnimationRequest == .inherit, frame.animationRequest != .inherit {
-      pendingAnimationRequest = frame.animationRequest
-    }
-    if pendingAnimationBatchID == nil {
-      pendingAnimationBatchID = frame.animationBatchID
+    coalescingLock.withLock { state in
+      state.pendingCauses.insert(.invalidation)
+      state.invalidatedIdentities.formUnion(frame.invalidatedIdentities)
+      state.pendingIntentRequestCount += 1
+      // Replay preserves the cancelled frame's one-shot animation intent only
+      // when no newer explicit animation is already queued.
+      if state.pendingAnimationRequest == .inherit, frame.animationRequest != .inherit {
+        state.pendingAnimationRequest = frame.animationRequest
+      }
+      if state.pendingAnimationBatchID == nil {
+        state.pendingAnimationBatchID = frame.animationBatchID
+      }
     }
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()

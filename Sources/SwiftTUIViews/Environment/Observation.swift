@@ -63,12 +63,19 @@ package final class ObservationBridge: Equatable {
     return withObservationTracking {
       apply()
     } onChange: {
-      // Bare `assumeIsolated` here, *not* `withCheckedMainActorAccess`: the
-      // observation `onChange` fires on the observable's mutation context, which
-      // is not guaranteed to be the main actor, so a release-time precondition
-      // could trap a valid off-main mutation. This is not a frame-tail-worker
-      // bridge, so the #21 release guard deliberately does not apply.
-      MainActor.assumeIsolated {
+      // `onChange` fires synchronously on whatever executor mutates the observed
+      // property, which is NOT guaranteed to be the main actor. `recordChange`
+      // touches MainActor-isolated state (`observedPasses`, the `@MainActor`
+      // `ViewGraph`) and the run loop's scheduler, so it must run on the main
+      // actor. A *bare* `MainActor.assumeIsolated` only checks isolation in debug
+      // builds, so an off-main mutation previously proceeded and raced the run
+      // loop in release (silent heap corruption — the #1 SIGSEGV class that
+      // `CheckedMainActorAccess` documents). Routing through the release-checked
+      // bridge turns that into a loud, attributable crash: the contract is that
+      // `@Observable` state observed by the view tree is mutated on the main
+      // actor. (`FrameScheduler` is independently thread-safe now, so a future
+      // off-main wake path can be supported without reintroducing this race.)
+      withCheckedMainActorAccess("ObservationBridge.recordChange") {
         self.recordChange(identity: identity, pass: pass)
       }
     }
