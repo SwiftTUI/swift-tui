@@ -131,23 +131,28 @@ package enum ViewGraphDependencyIndex {
     environmentDependents: [ObjectIdentifier: Set<ViewNodeID>],
     identityByNodeID: [ViewNodeID: Identity]
   ) -> Set<ViewNodeID> {
-    changedKeys.reduce(into: Set<Identity>()) { partial, key in
-      let dependents = (environmentDependents[key] ?? [])
-        .compactMap { identityByNodeID[$0] }
+    // Keep the precise reader `ViewNodeID`s end to end. `Identity` is needed only
+    // to scope readers to the changed subtree(s), resolved here via the forward
+    // O(1) `identityByNodeID` lookup. The previous implementation mapped each
+    // reader to its `Identity` and then tried to recover a node with a
+    // nondeterministic `identityByNodeID.first(where:)` reverse scan; under
+    // identity aliasing (duplicate `.id`, unstable `ForEach` ids) that scan could
+    // return an aliased sibling and silently drop the genuine `@Environment`
+    // reader — leaving it on stale environment until a full re-resolve — and also
+    // collapsed two aliased readers into one. Filtering the original IDs in place
+    // is both O(1) per dependent and aliasing-correct (every genuine reader is
+    // kept).
+    changedKeys.reduce(into: Set<ViewNodeID>()) { partial, key in
       partial.formUnion(
-        dependents.filter { dependent in
-          roots.contains { root in
-            dependent == root || dependent.isDescendant(of: root)
+        (environmentDependents[key] ?? []).filter { viewNodeID in
+          guard let identity = identityByNodeID[viewNodeID] else {
+            return false
+          }
+          return roots.contains { root in
+            identity == root || identity.isDescendant(of: root)
           }
         }
       )
-    }.reduce(into: Set<ViewNodeID>()) { partial, identity in
-      guard
-        let viewNodeID = identityByNodeID.first(where: { $0.value == identity })?.key
-      else {
-        return
-      }
-      partial.insert(viewNodeID)
     }
   }
 
