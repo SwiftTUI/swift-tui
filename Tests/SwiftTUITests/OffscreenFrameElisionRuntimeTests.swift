@@ -177,8 +177,8 @@ struct OffscreenFrameElisionRuntimeTests {
         == extractionSemantics)
   }
 
-  @Test("retained phase products skip unsafe type-erased draw payloads")
-  func retainedPhaseProductsSkipUnsafeTypeErasedDrawPayloads() {
+  @Test("an unsafe type-erased draw payload does not starve retained reuse of clean siblings")
+  func unsafeTypeErasedPayloadDoesNotStarveCleanSiblingReuse() {
     struct Dots: CanvasDrawing, Equatable {
       func draw(into context: inout CanvasContext) {
         context.setSample(GridSample(x: 0, y: 0))
@@ -186,26 +186,52 @@ struct OffscreenFrameElisionRuntimeTests {
     }
 
     let retainedState = FrameTailRetainedState()
-    let identity = testIdentity("Root")
-    let baseline = PlacedNode(
-      identity: identity,
-      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
-      drawPayload: .canvas(.init(drawing: Dots()))
+    let root = testIdentity("CanvasSibling", "Root")
+    let canvasID = testIdentity("CanvasSibling", "Canvas")
+    let cleanID = testIdentity("CanvasSibling", "Clean")
+    let placed = PlacedNode(
+      identity: root,
+      bounds: .init(origin: .zero, size: .init(width: 8, height: 2)),
+      children: [
+        PlacedNode(
+          identity: canvasID,
+          bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
+          drawPayload: .canvas(.init(drawing: Dots()))
+        ),
+        PlacedNode(
+          identity: cleanID,
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 8, height: 1)),
+          drawPayload: .text("clean")
+        ),
+      ]
     )
     let artifacts = makeStoredArtifacts(
-      identity: identity,
-      placed: baseline,
+      identity: root,
+      placed: placed,
       semantics: .init(),
-      draw: DrawNode(identity: identity, bounds: baseline.bounds)
+      draw: DrawExtractor().extract(from: placed)
     )
-
     retainedState.storeCommittedFrame(
       artifacts,
-      baselinePlacedTree: baseline,
-      proposal: .unspecified
+      baselinePlacedTree: placed,
+      proposal: .init(width: .finite(8), height: .finite(2))
     )
 
-    #expect(retainedState.input(invalidatedIdentities: []).previousPhaseProducts == nil)
+    let retained = retainedState.input(invalidatedIdentities: [])
+    // The unsupported canvas no longer discards the whole frame's phase products
+    // (it previously zeroed them, starving reuse tree-wide); they are retained
+    // with a nil whole-tree signature so the per-subtree partial path can run.
+    #expect(retained.previousPhaseProducts != nil)
+    #expect(retained.previousPhaseProducts?.signature == nil)
+
+    let proof = retained.phaseExtractionProof(
+      for: .init(width: .finite(8), height: .finite(2)),
+      placed: placed,
+      animationOverlaySnapshot: .init()
+    )
+    // The clean text sibling is reusable; the unsupported canvas never is.
+    #expect(proof.canReuseSubtree(rootedAt: cleanID))
+    #expect(!proof.canReuseSubtree(rootedAt: canvasID))
   }
 
   @Test("retained phase proof identifies clean sibling subtrees")

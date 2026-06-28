@@ -94,12 +94,18 @@ final class FrameTailRetainedState: Sendable {
   ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
-    let effectiveSignature = RetainedPhaseExtractionSignature.make(
-      from: artifacts.placedTree
-    )
-    let baselineSignature = RetainedPhaseExtractionSignature.make(
-      from: baselinePlacedTree
-    )
+    // Phase products are reusable next frame only when this frame's committed
+    // (effective) tree equals the pre-overlay baseline — i.e. no animation
+    // overlay decorated the tree. Comparing the trees directly is the
+    // overlay-empty proxy: it allocates nothing and short-circuits on the first
+    // difference, replacing the previous *two* full `RetainedPhaseExtractionSignature`
+    // builds (one per tree) and their compare with a single comparison plus, only
+    // when reusable, one build. The stored signature is OPTIONAL: a tree with an
+    // unsupported node (`.canvas`/custom layout) yields `nil`, which previously
+    // discarded the products entirely — disabling reuse tree-wide. Keeping the
+    // products with a `nil` signature disables only the whole-tree fast path; the
+    // per-subtree partial-reuse path still reuses every supported subtree.
+    let effectiveMatchesBaseline = artifacts.placedTree == baselinePlacedTree
     state.withLock { state in
       state.previousFrameIndex = .init(
         patching: state.previousFrameIndex,
@@ -111,12 +117,10 @@ final class FrameTailRetainedState: Sendable {
         placedRoot: artifacts.placedTree
       )
       state.previousPhaseProducts =
-        if let effectiveSignature,
-          effectiveSignature == baselineSignature
-        {
+        if effectiveMatchesBaseline {
           RetainedFrameTailPhaseProducts(
             proposal: proposal,
-            signature: effectiveSignature,
+            signature: RetainedPhaseExtractionSignature.make(from: artifacts.placedTree),
             semantics: artifacts.semanticSnapshot.retainedExtractionProduct,
             draw: artifacts.drawTree,
             drawByNodeID: Self.drawIndex(artifacts.drawTree)

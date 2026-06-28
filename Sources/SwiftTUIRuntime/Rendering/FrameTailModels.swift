@@ -27,8 +27,9 @@ struct FrameTailRetainedInput {
     else {
       return .none
     }
-    if let currentSignature = RetainedPhaseExtractionSignature.make(from: placed),
-      previous.signature == currentSignature
+    if let previousSignature = previous.signature,
+      let currentSignature = RetainedPhaseExtractionSignature.make(from: placed),
+      previousSignature == currentSignature
     {
       return .wholeTreeIdentical
     }
@@ -75,7 +76,13 @@ struct FrameTailRetainedInput {
 
 struct RetainedFrameTailPhaseProducts: Sendable {
   var proposal: ProposedSize
-  var signature: RetainedPhaseExtractionSignature
+  /// The whole-tree extraction signature, or `nil` when the committed tree
+  /// contained a node that does not support retained phase extraction
+  /// (`.canvas`/`.foreignSurface`/custom layout). A `nil` signature disables
+  /// only the `.wholeTreeIdentical` fast path; the per-subtree partial-reuse
+  /// path (`collectReusablePhaseSubtrees`) still reuses the supported subtrees
+  /// instead of the whole tree being re-extracted from scratch.
+  var signature: RetainedPhaseExtractionSignature?
   var semantics: SemanticSnapshot
   var draw: DrawNode
   var drawByNodeID: [ViewNodeID: DrawNode]
