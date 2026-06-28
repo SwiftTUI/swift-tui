@@ -33,12 +33,13 @@
 /// access.
 @MainActor
 package enum PreciseObservationFiringConfiguration {
-  package static let environmentVariableName = "SWIFTTUI_PRECISE_OBSERVATION_FIRING"
+  package static let environmentVariableName =
+    FeatureGate.preciseObservationFiring.environmentVariableName
 
   /// Whether observable change invalidation dirties only the precise firing
   /// node rather than every co-reader of the same object token. On by default;
   /// `SWIFTTUI_PRECISE_OBSERVATION_FIRING=0` (or empty) opts out. The run loop
   /// reads this from the environment before the first render, and tests set it
   /// directly.
-  package static var isEnabled: Bool = FeatureFlags.isEnabledByDefault(environmentVariableName)
+  package static var isEnabled: Bool = FeatureGate.preciseObservationFiring.initialIsEnabled()
 }

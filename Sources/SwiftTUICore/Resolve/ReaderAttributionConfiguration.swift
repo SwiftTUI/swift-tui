@@ -19,11 +19,11 @@
 /// Test-settable; defaults from `SWIFTTUI_READER_ATTRIBUTION` at first access.
 @MainActor
 package enum ReaderAttributionConfiguration {
-  package static let environmentVariableName = "SWIFTTUI_READER_ATTRIBUTION"
+  package static let environmentVariableName = FeatureGate.readerAttribution.environmentVariableName
 
   /// Whether reads attribute to the evaluating reader rather than the slot
   /// owner. On by default; `SWIFTTUI_READER_ATTRIBUTION=0` (or empty) opts out.
   /// The run loop sets it from the environment before the first render, and
   /// tests set it directly.
-  package static var isEnabled: Bool = FeatureFlags.isEnabledByDefault(environmentVariableName)
+  package static var isEnabled: Bool = FeatureGate.readerAttribution.initialIsEnabled()
 }

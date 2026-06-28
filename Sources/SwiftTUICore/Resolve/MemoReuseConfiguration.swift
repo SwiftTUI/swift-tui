@@ -10,7 +10,7 @@
 /// ``ReaderAttributionConfiguration``.
 @MainActor
 package enum MemoReuseConfiguration {
-  package static let environmentVariableName = "SWIFTTUI_MEMO_REUSE"
+  package static let environmentVariableName = FeatureGate.memoReuse.environmentVariableName
 
-  package static var isEnabled: Bool = FeatureFlags.isEnabledByDefault(environmentVariableName)
+  package static var isEnabled: Bool = FeatureGate.memoReuse.initialIsEnabled()
 }

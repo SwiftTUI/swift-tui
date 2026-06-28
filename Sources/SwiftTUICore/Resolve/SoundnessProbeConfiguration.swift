@@ -19,7 +19,7 @@
 /// no allocation, no oracle work. Mirrors ``MemoReuseConfiguration``.
 @MainActor
 package enum SoundnessProbeConfiguration {
-  package static let environmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE"
+  package static let environmentVariableName = FeatureGate.soundnessProbe.environmentVariableName
   package static let sampleEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_SAMPLE"
 
   /// Whether the probe is active at all. Off in release by default; on under
@@ -62,14 +62,7 @@ package enum SoundnessProbeConfiguration {
   }
 
   private static func environmentDefault() -> Bool {
-    guard let rawValue = FeatureFlags.environmentValue(named: environmentVariableName) else {
-      #if DEBUG
-        return true
-      #else
-        return false
-      #endif
-    }
-    return !rawValue.isEmpty && rawValue != "0"
+    FeatureGate.soundnessProbe.initialIsEnabled()
   }
 
   private static func sampleDefault() -> Int {

@@ -32,11 +32,12 @@
 /// first access.
 @MainActor
 package enum ObservableKeyPathInvalidationConfiguration {
-  package static let environmentVariableName = "SWIFTTUI_OBSERVABLE_KEYPATH_INVALIDATION"
+  package static let environmentVariableName =
+    FeatureGate.observableKeyPathInvalidation.environmentVariableName
 
   /// Whether observable change invalidation narrows the co-reader union to
   /// same-key-path readers. On by default; `=0` (or empty) opts out. The run
   /// loop reads this from the environment before the first render, and tests set
   /// it directly.
-  package static var isEnabled: Bool = FeatureFlags.isEnabledByDefault(environmentVariableName)
+  package static var isEnabled: Bool = FeatureGate.observableKeyPathInvalidation.initialIsEnabled()
 }
