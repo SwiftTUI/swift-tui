@@ -52,7 +52,7 @@ extension RunLoop {
     // scope is on the focus chain.
     if !keyPress.modifiers.isEmpty {
       let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
-      if commandRegistry.dispatch(key: binding, along: currentFocusScopePath()) {
+      if commandRegistry.dispatch(key: binding, along: commandDispatchScopePath()) {
         scheduler.requestInvalidation(of: [rootIdentity])
         return nil
       }
@@ -304,5 +304,23 @@ extension RunLoop {
     return latestSemanticSnapshot.focusRegions
       .first(where: { $0.identity == focusedIdentity })?
       .scopePath ?? []
+  }
+
+  /// Scope path along which a key command dispatches.
+  ///
+  /// Prefers the focused region's chain — when focus exists, the focused leaf's
+  /// `scopePath` already extends through every ancestor command host (each
+  /// `Panel` is a scope boundary), so it is the complete, correct walk. When
+  /// nothing is focused, falls back to the **active/visible context**
+  /// (`activeCommandScopePath`): the deepest visible hosting region's scope
+  /// chain. This lets a command-host region (e.g. a bare `Panel` with no
+  /// focusable child) fire its commands without being a focus target —
+  /// activation by visible context, not by focusing the host.
+  package func commandDispatchScopePath() -> [Identity] {
+    let focusPath = currentFocusScopePath()
+    if !focusPath.isEmpty {
+      return focusPath
+    }
+    return latestSemanticSnapshot.activeCommandScopePath
   }
 }

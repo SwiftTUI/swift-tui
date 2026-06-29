@@ -91,11 +91,18 @@ struct PanelTests {
     #expect(resolved.semanticMetadata.focusScopeBoundary == true)
   }
 
-  @Test("Panel is focusable")
-  func panelIsFocusable() {
-    let panel = Panel(id: "editor") { EmptyView() }
-    let resolved = resolveForTest(panel)
-    #expect(resolved.semanticMetadata.isFocusable == true)
+  @Test("An open Panel is a focus scope but not a focus target")
+  func openPanelIsNotAFocusTarget() {
+    // Phase 2 (active/visible-context activation): an open (Role-A hosting) Panel
+    // hoists commands/chrome and remains a focus *scope* (see
+    // `panelMarksFocusScopeBoundary`), but Tab passes through it — it emits no
+    // focus region of its own. A bare host yields zero regions; a host wrapping a
+    // focusable leaf yields exactly one region (the leaf, not the Panel).
+    let bareHost = Panel(id: "editor") { Text("inner") }
+    #expect(extractFocusRegionsForTest(bareHost).isEmpty)
+
+    let hostWithLeaf = Panel(id: "editor") { Text("inner").focusable(true) }
+    #expect(extractFocusRegionsForTest(hostWithLeaf).count == 1)
   }
 
   @Test(".panel() produces stable AnyID across re-resolves at the same source location")

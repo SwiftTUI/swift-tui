@@ -282,6 +282,13 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var accessibilityNodes: [AccessibilityNode]
   public var accessibilityAnnouncements: [AccessibilityAnnouncement]
   package var accessibilityWarnings: [AccessibilityWarning]
+  /// Scope chain of the deepest visible command/chrome-hosting region (an open
+  /// `Panel`), ordered shallowest-first and including each host's own scope
+  /// identity. This is the **active/visible context** for key-command dispatch
+  /// when nothing is focused: a hosting region is not a focus target, so its
+  /// commands resolve along this chain instead of the focus chain. Empty when no
+  /// hosting region is visible. See the focus-model reassessment proposal.
+  package var activeCommandScopePath: [Identity]
 
   public init(
     interactionRegions: [InteractionRegion] = [],
@@ -303,6 +310,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.accessibilityNodes = accessibilityNodes
     self.accessibilityAnnouncements = accessibilityAnnouncements
     self.accessibilityWarnings = []
+    self.activeCommandScopePath = []
   }
 
   package init(
@@ -315,7 +323,8 @@ public struct SemanticSnapshot: Equatable, Sendable {
     namedCoordinateSpaces: [String: CellRect] = [:],
     accessibilityNodes: [AccessibilityNode] = [],
     accessibilityAnnouncements: [AccessibilityAnnouncement] = [],
-    accessibilityWarnings: [AccessibilityWarning]
+    accessibilityWarnings: [AccessibilityWarning],
+    activeCommandScopePath: [Identity] = []
   ) {
     self.interactionRegions = interactionRegions
     self.focusRegions = focusRegions
@@ -327,5 +336,6 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.accessibilityNodes = accessibilityNodes
     self.accessibilityAnnouncements = accessibilityAnnouncements
     self.accessibilityWarnings = accessibilityWarnings
+    self.activeCommandScopePath = activeCommandScopePath
   }
 }

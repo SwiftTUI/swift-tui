@@ -22,13 +22,21 @@ package struct FocusSyncRerenderBudget: Equatable, Sendable {
   /// participate in focus/scroll synchronization. Each rerender must be
   /// justified by a visible sync candidate, plus one final pass to confirm the
   /// synchronized tree.
+  ///
+  /// The floor counts at least one candidate even when the tree exposes none:
+  /// settling focus state is itself a transition that needs a pass. A frame
+  /// whose tree has no focus regions, scroll routes, scroll targets, or
+  /// accessibility nodes can still legitimately need one rerender — e.g. a route
+  /// change to a command-host region with no focusable leaf must clear the now
+  /// stale focus and confirm the empty tree. Without the floor that clear would
+  /// exceed a zero-rerender budget and fail to converge.
   package static func derived(from semanticSnapshot: SemanticSnapshot) -> Self {
     let syncCandidateCount =
       semanticSnapshot.focusRegions.count
       + semanticSnapshot.scrollRoutes.count
       + semanticSnapshot.scrollTargets.count
       + semanticSnapshot.accessibilityNodes.count
-    return Self(maximumRerenders: max(1, syncCandidateCount + 1))
+    return Self(maximumRerenders: max(1, syncCandidateCount) + 1)
   }
 
   package mutating func expandIfNeeded(for semanticSnapshot: SemanticSnapshot) {

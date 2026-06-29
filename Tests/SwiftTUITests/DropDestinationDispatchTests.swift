@@ -216,11 +216,11 @@ struct DropDestinationDispatchTests {
 
 /// Moves focus to the region with the deepest `scopePath` in the
 /// current semantic snapshot. The tests above declare a focusable leaf
-/// (`Text("body").focusable(true)`) nested inside one or two Panels,
-/// but Panels are *also* focusable — and they appear first in the
-/// focus region list (outermost first). `FocusTracker` auto-adopts
-/// the first region, so without this helper focus lands on the
-/// outermost Panel and the inner drop destination is never reached.
+/// (`Text("body").focusable(true)`) nested inside one or two Panels.
+/// Since Phase 2 a hosting `Panel` is no longer a focus target, so the
+/// leaf is the only focusable region and its `scopePath` carries the
+/// enclosing Panel scopes — this helper targets it explicitly so the
+/// drop dispatch resolves along that chain regardless of auto-adoption.
 @MainActor
 private func focusLeafmostFocusable<State, V: View>(
   in runLoop: RunLoop<State, V>

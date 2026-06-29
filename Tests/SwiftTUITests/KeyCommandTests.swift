@@ -289,7 +289,12 @@ struct KeyCommandDispatchTests {
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     #expect(latestSurfaceText(for: runLoop).contains("detail"))
-    #expect(!runLoop.currentFocusScopePath().isEmpty)
+    // Phase 2: a bare command-host Panel is no longer a focus target, so focus
+    // clears after the route change (no focusable leaf in the detail subtree).
+    // The Ctrl+B command must still fire — via the active/visible-context scope
+    // chain, not the focus chain.
+    #expect(runLoop.currentFocusScopePath().isEmpty)
+    #expect(!runLoop.latestSemanticSnapshot.activeCommandScopePath.isEmpty)
 
     _ = runLoop.handle(.input(.key(.character("b"), modifiers: .ctrl)))
     renderedFrames = 0

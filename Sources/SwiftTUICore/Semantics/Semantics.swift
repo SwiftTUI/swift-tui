@@ -28,10 +28,15 @@ package struct SemanticExtractor: Sendable {
   package func extract(from placed: PlacedNode) -> SemanticSnapshot {
     var interactionRegions: [InteractionRegion] = []
     var focusRegions: [FocusRegion] = []
-    // Identities of transparent focus containers (open `Panel`s) — focus targets
-    // only as a fallback when they hold no focusable descendant. See the post-walk
-    // pruning below.
+    // Identities of command/chrome-hosting regions (open `Panel`s). They are
+    // focus *scopes* but never focus *targets*: every region they emit is pruned
+    // after the walk (see below), so Tab lands on item leaves, not the host.
     var transparentFocusContainerIDs: Set<Identity> = []
+    // Scope chain of the deepest visible hosting region — the active/visible
+    // context for key-command dispatch when nothing is focused. Updated in
+    // pre-order, so the last-entered host at the greatest depth wins (the
+    // frontmost-ish visible host). See `SemanticSnapshot.activeCommandScopePath`.
+    var activeCommandScopePath: [Identity] = []
     var scrollRoutes: [ScrollRoute] = []
     var selectionRoutes: [SelectionRoute] = []
     var namedCoordinateSpaces: [String: CellRect] = [:]
@@ -75,13 +80,19 @@ package struct SemanticExtractor: Sendable {
               modalFocusScopePath: modalFocusScopePath
             )
           )
-          // An open `Panel` is a focus *container*: it yields the focus target to
-          // a focusable descendant when one exists (pruned after the walk). A
-          // `.sealed` Panel is the deliberate stop and keeps its own target.
+          // An open `Panel` is a command/chrome host, not a focus target: its
+          // emitted region is pruned after the walk so Tab passes through to the
+          // item leaves. A `.sealed` Panel is the deliberate stop and keeps its
+          // own target. The host's scope chain (`scopePath` already includes its
+          // own scope identity, since a `Panel` is a `focusScopeBoundary`) feeds
+          // the active/visible context used for command dispatch without focus.
           if case .view("Panel") = node.kind,
             !node.semanticMetadata.sealsFocusDescendants
           {
             transparentFocusContainerIDs.insert(node.identity)
+            if scopePath.count >= activeCommandScopePath.count {
+              activeCommandScopePath = scopePath
+            }
           }
         }
 
@@ -168,28 +179,16 @@ package struct SemanticExtractor: Sendable {
       }
     )
 
-    // A transparent focus container (an open `Panel`) is a focus *target* only
-    // as a fallback — when it has no focusable descendant. If a focusable
-    // descendant exists in its scope, Tab reaches that leaf directly rather than
-    // stopping on the container, matching SwiftUI (containers guide focus order;
-    // only leaves are focused). This is scoped to transparent containers, not all
-    // scope boundaries: intentional container targets (e.g. List rows) stay
-    // focusable, and a `.sealed` Panel keeps its region (its descendants are
-    // suppressed, so it has none) as does a bare open `Panel` hosting only a key
-    // command (nothing else can hold focus). Only scope boundaries push their
-    // identity onto descendants' `scopePath`, so a container whose identity is an
-    // ancestor scope of another focusable region has a focusable descendant.
+    // A command/chrome-hosting region (an open `Panel`) is never a focus target.
+    // Drop every region it emitted so Tab lands on item leaves in reading order,
+    // matching SwiftUI (containers guide focus order; only leaves are focused).
+    // This is scoped to hosting containers, not all scope boundaries: intentional
+    // item targets (e.g. List rows) stay focusable, and a `.sealed` Panel keeps
+    // its region (the deliberate focus stop). A bare host with no focusable child
+    // is no longer focusable either — its commands fire via the active/visible
+    // context (`activeCommandScopePath`), not by focusing the host.
     if !transparentFocusContainerIDs.isEmpty {
-      var scopesWithFocusableDescendant: Set<Identity> = []
-      for region in focusRegions {
-        for ancestorScope in region.scopePath where ancestorScope != region.identity {
-          scopesWithFocusableDescendant.insert(ancestorScope)
-        }
-      }
-      focusRegions.removeAll { region in
-        transparentFocusContainerIDs.contains(region.identity)
-          && scopesWithFocusableDescendant.contains(region.identity)
-      }
+      focusRegions.removeAll { transparentFocusContainerIDs.contains($0.identity) }
     }
 
     let scrollTargets = scrollTargets(from: placed)
@@ -208,7 +207,8 @@ package struct SemanticExtractor: Sendable {
       selectionRoutes: selectionRoutes,
       namedCoordinateSpaces: namedCoordinateSpaces,
       accessibilityNodes: accessibilityNodes,
-      accessibilityWarnings: accessibilityWarnings
+      accessibilityWarnings: accessibilityWarnings,
+      activeCommandScopePath: activeCommandScopePath
     )
   }
 
