@@ -8,12 +8,16 @@ import Testing
 @MainActor
 @Suite
 struct FocusContextRuntimeTests {
-  // Bug #3 drilldown ("hitting Tab does not appear to do anything"): one Tab from
-  // the tab strip should advance focus to the first editable field, but it lands
-  // on the `TabContentPayload` container instead. Recorded as a known issue so it
-  // documents the defect without reddening the shared gate; when focus traversal
-  // is fixed, `withKnownIssue` fails ("known issue was not recorded"), prompting
-  // its removal.
+  // Bug #3 facet 1 ("hitting Tab does not appear to do anything"): one Tab from
+  // the tab strip should advance focus to the first editable field, but it stops
+  // on the `Panel` wrapping the tab body. `Panel` is an `ActionScope` ("a focus
+  // region that owns commands") and is an unconditional focus *target* so its
+  // commands can activate even with no focusable descendant — which makes Tab
+  // land on a container, diverging from SwiftUI (Tab lands on leaves). This is a
+  // design issue (Panel conflates command-owning scope with focus target), not a
+  // surgical bug; tracked in docs/proposals/2026-06-29-001-focus-model-reassessment.md.
+  // Recorded as a known issue so it documents the divergence without reddening the
+  // gate; flips to a failure when focus traversal is redesigned.
   @Test("Tab traversal in a TabView-hosted focus context reaches the first editable field")
   func focusContextTabTraversalReachesFirstEditableField() throws {
     let harness = FocusContextRuntimeHarness()
@@ -23,7 +27,7 @@ struct FocusContextRuntimeTests {
 
     harness.handleTabWithoutRendering()
     withKnownIssue(
-      "bug #3: one Tab lands focus on the TabContentPayload container, not the first field"
+      "bug #3 facet 1: one Tab lands focus on the Panel scope, not the first field (see focus-model-reassessment proposal)"
     ) {
       #expect(harness.focusedIdentity == FocusContextRuntimeIDs.firstTitle)
     }
