@@ -248,7 +248,11 @@ struct KeyCommandDispatchTests {
       runLoop.latestSemanticSnapshot.focusRegions.map(\.identity).first {
         $0.description.contains("ListRow[0]")
       })
-    #expect(runLoop.focusTracker.setFocus(to: rowIdentity))
+    // Focus the row before activating. Hosting-region Panels are no longer focus
+    // targets, so focus already rests on the row (the first focusable leaf) and
+    // setFocus is a no-op; assert the row is focused rather than that focus moved.
+    runLoop.focusTracker.setFocus(to: rowIdentity)
+    #expect(runLoop.focusTracker.currentFocusIdentity == rowIdentity)
 
     _ = runLoop.handle(.input(.key(.return)))
     var renderedFrames = 0
@@ -275,7 +279,11 @@ struct KeyCommandDispatchTests {
       runLoop.latestSemanticSnapshot.focusRegions.map(\.identity).first {
         $0.description.contains("ListRow[0]")
       })
-    #expect(runLoop.focusTracker.setFocus(to: rowIdentity))
+    // Focus the row before activating. Hosting-region Panels are no longer focus
+    // targets, so focus already rests on the row (the first focusable leaf) and
+    // setFocus is a no-op; assert the row is focused rather than that focus moved.
+    runLoop.focusTracker.setFocus(to: rowIdentity)
+    #expect(runLoop.focusTracker.currentFocusIdentity == rowIdentity)
 
     _ = runLoop.handle(.input(.key(.return)))
     var renderedFrames = 0

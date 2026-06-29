@@ -9,15 +9,13 @@ import Testing
 @Suite
 struct FocusContextRuntimeTests {
   // Bug #3 facet 1 ("hitting Tab does not appear to do anything"): one Tab from
-  // the tab strip should advance focus to the first editable field, but it stops
-  // on the `Panel` wrapping the tab body. `Panel` is an `ActionScope` ("a focus
-  // region that owns commands") and is an unconditional focus *target* so its
-  // commands can activate even with no focusable descendant — which makes Tab
-  // land on a container, diverging from SwiftUI (Tab lands on leaves). This is a
-  // design issue (Panel conflates command-owning scope with focus target), not a
-  // surgical bug; tracked in docs/proposals/2026-06-29-001-focus-model-reassessment.md.
-  // Recorded as a known issue so it documents the divergence without reddening the
-  // gate; flips to a failure when focus traversal is redesigned.
+  // the tab strip advances focus to the first editable field. Previously it
+  // stopped on the `Panel` wrapping the tab body — `Panel` is an `ActionScope`
+  // ("a focus region that owns commands") that was an unconditional focus target.
+  // Phase 1 of the focus-model redesign makes a hosting-region `Panel` a focus
+  // target only as a fallback (when it has no focusable descendant), so a Panel
+  // with focusable content is transparent and Tab reaches the leaf directly,
+  // matching SwiftUI. See docs/proposals/2026-06-29-001-focus-model-reassessment.md.
   @Test("Tab traversal in a TabView-hosted focus context reaches the first editable field")
   func focusContextTabTraversalReachesFirstEditableField() throws {
     let harness = FocusContextRuntimeHarness()
@@ -26,11 +24,7 @@ struct FocusContextRuntimeTests {
     #expect(harness.focusedIdentity == FocusContextRuntimeIDs.tabs)
 
     harness.handleTabWithoutRendering()
-    withKnownIssue(
-      "bug #3 facet 1: one Tab lands focus on the Panel scope, not the first field (see focus-model-reassessment proposal)"
-    ) {
-      #expect(harness.focusedIdentity == FocusContextRuntimeIDs.firstTitle)
-    }
+    #expect(harness.focusedIdentity == FocusContextRuntimeIDs.firstTitle)
   }
 
   @Test("Repeated Tab cycles across a focus context remain converged")

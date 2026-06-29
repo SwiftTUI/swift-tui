@@ -28,6 +28,10 @@ package struct SemanticExtractor: Sendable {
   package func extract(from placed: PlacedNode) -> SemanticSnapshot {
     var interactionRegions: [InteractionRegion] = []
     var focusRegions: [FocusRegion] = []
+    // Identities of transparent focus containers (open `Panel`s) — focus targets
+    // only as a fallback when they hold no focusable descendant. See the post-walk
+    // pruning below.
+    var transparentFocusContainerIDs: Set<Identity> = []
     var scrollRoutes: [ScrollRoute] = []
     var selectionRoutes: [SelectionRoute] = []
     var namedCoordinateSpaces: [String: CellRect] = [:]
@@ -71,6 +75,14 @@ package struct SemanticExtractor: Sendable {
               modalFocusScopePath: modalFocusScopePath
             )
           )
+          // An open `Panel` is a focus *container*: it yields the focus target to
+          // a focusable descendant when one exists (pruned after the walk). A
+          // `.sealed` Panel is the deliberate stop and keeps its own target.
+          if case .view("Panel") = node.kind,
+            !node.semanticMetadata.sealsFocusDescendants
+          {
+            transparentFocusContainerIDs.insert(node.identity)
+          }
         }
 
         if interactionsEnabled
@@ -155,6 +167,30 @@ package struct SemanticExtractor: Sendable {
         }
       }
     )
+
+    // A transparent focus container (an open `Panel`) is a focus *target* only
+    // as a fallback — when it has no focusable descendant. If a focusable
+    // descendant exists in its scope, Tab reaches that leaf directly rather than
+    // stopping on the container, matching SwiftUI (containers guide focus order;
+    // only leaves are focused). This is scoped to transparent containers, not all
+    // scope boundaries: intentional container targets (e.g. List rows) stay
+    // focusable, and a `.sealed` Panel keeps its region (its descendants are
+    // suppressed, so it has none) as does a bare open `Panel` hosting only a key
+    // command (nothing else can hold focus). Only scope boundaries push their
+    // identity onto descendants' `scopePath`, so a container whose identity is an
+    // ancestor scope of another focusable region has a focusable descendant.
+    if !transparentFocusContainerIDs.isEmpty {
+      var scopesWithFocusableDescendant: Set<Identity> = []
+      for region in focusRegions {
+        for ancestorScope in region.scopePath where ancestorScope != region.identity {
+          scopesWithFocusableDescendant.insert(ancestorScope)
+        }
+      }
+      focusRegions.removeAll { region in
+        transparentFocusContainerIDs.contains(region.identity)
+          && scopesWithFocusableDescendant.contains(region.identity)
+      }
+    }
 
     let scrollTargets = scrollTargets(from: placed)
     let accessibilityNodes = accessibilityNodes(
