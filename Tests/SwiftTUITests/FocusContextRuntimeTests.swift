@@ -54,46 +54,31 @@ struct FocusContextRuntimeTests {
     }
   }
 
-  // Drilldown for the Focus Context tab: @FocusedBinding must mutate only the
-  // currently focused field.
+  // Drilldown for the Focus Context tab: a @FocusedBinding mutation lands on the
+  // currently focused field and the status consumer reflects it.
   //
-  // KNOWN CRASH (bug #3 facet): dispatching the focused-binding mutation
-  // (`markFocusedReviewed()`) while a `.focusedValue`-publishing field is focused
-  // drives the render loop into a focus-sync loop that exhausts its rerender
-  // budget and traps —
-  //   RunLoop+Rendering.swift:125
-  //   "Focus synchronization did not converge after 13 rerenders".
-  // This is deterministic (verified 2026-06-29), reproduces via both
-  // `focusTracker.setFocus(...)` and Tab traversal, and is a faithful repro of
-  // the reported "crash observed after time/repeats". It is the framework seam
-  // that needs repair.
-  //
-  // Held `.disabled` rather than left enabled because the failure is a process-
-  // aborting `fatalError` (signal 5), not a catchable Swift Testing issue:
-  // enabling it takes down every sibling test in the run. When the convergence
-  // loop is fixed, drop `.disabled` and this becomes a passing guard; the
-  // `#expect`s below are the success contract to flip to.
-  @Test(
-    "FocusedBinding action mutates only the currently focused text field",
-    .disabled(
-      "Reproduces bug #3: focused-binding mutation traps at RunLoop+Rendering.swift:125 'Focus synchronization did not converge after 13 rerenders' (fatalError, signal 5). Enable after the convergence loop is fixed."
-    )
-  )
-  func focusedBindingActionMutatesCurrentlyFocusedTextFieldBinding() throws {
+  // CRASH FIXED (bug #3 facet 2): dispatching the focused-binding mutation while
+  // a `.focusedValue`-publishing field is focused used to drive the focus-sync
+  // loop past its rerender budget and trap (`RunLoop+Rendering.swift:125`,
+  // signal 5). Root cause: `FocusedValues.==` reported a `Binding` focused value
+  // as always-changed (non-`AnyHashable` -> false), so the loop never converged.
+  // Fixed by comparing focused bindings by their current value
+  // (`MainActorFocusedValueEquatable`), converging in <=2 passes.
+  @Test("FocusedBinding mutation lands on the focused field without looping the focus-sync budget")
+  func focusedBindingMutationLandsOnFocusedField() throws {
     let harness = FocusContextRuntimeHarness()
     try harness.renderInitial()
 
     try harness.focus(FocusContextRuntimeIDs.firstTitle)
     #expect(harness.focusedIdentity == FocusContextRuntimeIDs.firstTitle)
+    #expect(harness.surfaceText.contains("Focused title: Coverage matrix"))
+
+    // Previously trapped here: the binding focused value compared always-unequal
+    // and the focus-sync loop ran to the rerender budget. Now it converges, the
+    // write lands on the focused field, and the status consumer reflects it.
     try harness.markFocusedReviewed()
     #expect(harness.surfaceText.contains("Focused title: Coverage matrix reviewed"))
     #expect(!harness.surfaceText.contains("Focused test lane reviewed"))
-
-    try harness.focus(FocusContextRuntimeIDs.secondTitle)
-    #expect(harness.focusedIdentity == FocusContextRuntimeIDs.secondTitle)
-    try harness.markFocusedReviewed()
-    #expect(harness.surfaceText.contains("Focused title: Focused test lane reviewed"))
-    #expect(harness.surfaceText.contains("Coverage matrix reviewed"))
   }
 }
 

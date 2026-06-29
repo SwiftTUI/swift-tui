@@ -102,7 +102,10 @@ extension RunLoop {
       for: focusTracker.currentFocusIdentity,
       in: renderedArtifacts.resolvedTree
     )
-    let focusedValuesChanged = resolvedFocusedValues != currentFocusedValues
+    // Main-actor semantic comparison: a focused `Binding` is compared by its
+    // current value, not identity (it has none across renders), so a stable
+    // focused binding converges this loop instead of comparing unequal forever.
+    let focusedValuesChanged = !resolvedFocusedValues.focusSyncEquals(currentFocusedValues)
     if focusedValuesChanged {
       currentFocusedValues = resolvedFocusedValues
     }
