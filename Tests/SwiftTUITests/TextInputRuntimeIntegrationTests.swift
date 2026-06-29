@@ -118,6 +118,42 @@ struct TextInputRuntimeIntegrationTests {
     #expect(box.setCount == 1)
   }
 
+  @Test("TextField Tab moves focus instead of inserting a tab character")
+  func textFieldTabMovesFocusInsteadOfInsertingTab() throws {
+    let first = PasteTextBox()
+    let second = PasteTextBox()
+    first.value = "first"
+    second.value = "second"
+    let runLoop = makeTextInputRunLoop {
+      TabTraversalTextFieldFixture(first: first, second: second)
+    }
+
+    try renderInitial(runLoop.runLoop)
+    _ = runLoop.runLoop.focusTracker.setFocus(to: testIdentity("TabTraversalTextField", "First"))
+    try renderPending(runLoop.runLoop)
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.tab)) == nil)
+    try renderPending(runLoop.runLoop)
+
+    #expect(first.value == "first")
+    #expect(second.value == "second")
+    #expect(!first.value.contains("\t"))
+    #expect(!second.value.contains("\t"))
+    #expect(
+      runLoop.runLoop.focusTracker.currentFocusIdentity
+        == testIdentity("TabTraversalTextField", "Second")
+    )
+
+    #expect(runLoop.runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift)) == nil)
+    try renderPending(runLoop.runLoop)
+    #expect(
+      runLoop.runLoop.focusTracker.currentFocusIdentity
+        == testIdentity("TabTraversalTextField", "First")
+    )
+    #expect(!first.value.contains("\t"))
+    #expect(!second.value.contains("\t"))
+  }
+
   @Test("SecureField paste dispatch writes once and keeps the pasted value masked")
   func secureFieldPasteDispatchWritesOnceAndKeepsValueMasked() throws {
     let box = PasteTextBox()
@@ -381,6 +417,23 @@ private struct PasteTextFieldFixture: View {
     TextField("Name", text: box.binding())
       .id(testIdentity("PasteTextField"))
       .textFieldStyle(.plain)
+  }
+}
+
+@MainActor
+private struct TabTraversalTextFieldFixture: View {
+  let first: PasteTextBox
+  let second: PasteTextBox
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      TextField("First", text: first.binding())
+        .id(testIdentity("TabTraversalTextField", "First"))
+        .textFieldStyle(.plain)
+      TextField("Second", text: second.binding())
+        .id(testIdentity("TabTraversalTextField", "Second"))
+        .textFieldStyle(.plain)
+    }
   }
 }
 

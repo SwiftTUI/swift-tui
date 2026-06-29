@@ -162,6 +162,46 @@ struct TabViewLifecycleTests {
     #expect(taskStarts.isEmpty)
   }
 
+  @Test("Switching away from a geometry-backed active tab schedules its task cancellation")
+  func switchingAwayFromActiveOnlyTabSchedulesTaskCancel() throws {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("LogoLikeTabTaskCancel")
+    let taskRegistry = LocalTaskRegistry()
+    let proposal = ProposedSize(width: .finite(40), height: .finite(8))
+
+    let initial = renderer.render(
+      LogoLikeTabLifecycleProbe(selection: "logo"),
+      context: .init(
+        identity: rootIdentity,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: proposal
+    )
+
+    let starts = taskStarts(in: initial.commitPlan.lifecycle)
+    #expect(starts.count == 1)
+    let start = try #require(starts.first)
+
+    let switched = renderer.render(
+      LogoLikeTabLifecycleProbe(selection: "static"),
+      context: .init(
+        identity: rootIdentity,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: proposal
+    )
+
+    let cancels = taskCancels(in: switched.commitPlan.lifecycle)
+    #expect(cancels.count == 1)
+    let cancel = try #require(cancels.first)
+    #expect(cancel.descriptor == start.descriptor)
+    #expect(cancel.entry.identity == start.entry.identity)
+    #expect(cancel.entry.viewNodeID != nil)
+    #expect(taskStarts(in: switched.commitPlan.lifecycle).isEmpty)
+  }
+
   @Test(
     "TabView peeks label and tag metadata from plain modifier chains without resolving inactive children"
   )
@@ -269,5 +309,57 @@ private struct LabelStateTabRoot: View {
 
   var body: some View {
     Text("label \(label)")
+  }
+}
+
+private struct LogoLikeTabLifecycleProbe: View {
+  let selection: String
+
+  var body: some View {
+    TabView(selection: .constant(selection)) {
+      Tab("Logo", value: "logo") {
+        GeometryReader { proxy in
+          Text("logo \(proxy.size.width)x\(proxy.size.height)")
+            .task(
+              id: LogoLikeBoundsID(
+                width: proxy.size.width,
+                height: proxy.size.height
+              )
+            ) {}
+        }
+      }
+
+      Tab("Static", value: "static") {
+        Text("static tab")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+private struct LogoLikeBoundsID: Equatable, Sendable {
+  var width: Int
+  var height: Int
+}
+
+private func taskStarts(
+  in entries: [LifecycleCommitEntry]
+) -> [(entry: LifecycleCommitEntry, descriptor: TaskDescriptor)] {
+  entries.compactMap { entry in
+    if case .taskStart(let descriptor) = entry.operation {
+      return (entry, descriptor)
+    }
+    return nil
+  }
+}
+
+private func taskCancels(
+  in entries: [LifecycleCommitEntry]
+) -> [(entry: LifecycleCommitEntry, descriptor: TaskDescriptor)] {
+  entries.compactMap { entry in
+    if case .taskCancel(let descriptor) = entry.operation {
+      return (entry, descriptor)
+    }
+    return nil
   }
 }
