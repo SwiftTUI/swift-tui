@@ -28,15 +28,13 @@ package struct SemanticExtractor: Sendable {
   package func extract(from placed: PlacedNode) -> SemanticSnapshot {
     var interactionRegions: [InteractionRegion] = []
     var focusRegions: [FocusRegion] = []
-    // Identities of command/chrome-hosting regions (open `Panel`s). They are
-    // focus *scopes* but never focus *targets*: every region they emit is pruned
-    // after the walk (see below), so Tab lands on item leaves, not the host.
-    var transparentFocusContainerIDs: Set<Identity> = []
-    // Scope chain of the deepest visible hosting region — the active/visible
-    // context for key-command dispatch when nothing is focused. Updated in
-    // pre-order, so the last-entered host at the greatest depth wins (the
-    // frontmost-ish visible host). See `SemanticSnapshot.activeCommandScopePath`.
-    var activeCommandScopePath: [Identity] = []
+    // Scope chains of the command/chrome-hosting regions (Role A: `Panel`,
+    // `NavigationStack`, …) visible this frame. A host is a focus *scope* but
+    // never a focus *target* — it does not participate in top-level focus, so it
+    // emits no focus region at all (nothing to prune). Each path includes the
+    // host's own scope identity (a host is a `focusScopeBoundary`). After the
+    // walk these resolve to `SemanticSnapshot.activeCommandScopePath`.
+    var commandHostScopePaths: [[Identity]] = []
     var scrollRoutes: [ScrollRoute] = []
     var selectionRoutes: [SelectionRoute] = []
     var namedCoordinateSpaces: [String: CellRect] = [:]
@@ -69,6 +67,16 @@ package struct SemanticExtractor: Sendable {
           namedCoordinateSpaces[name] = node.bounds
         }
 
+        // A command/chrome host (Role A) is a focus scope but not a focus
+        // target — it does not participate in top-level focus, so it never
+        // reaches the focus-region emission below. Record its scope chain
+        // separately for the active/visible context. Its descendants stay
+        // reachable unless it also seals (a `.sealed` Panel), which the walk's
+        // `sealingParentOnChain` already enforces.
+        if node.semanticMetadata.isCommandHost, interactionsEnabled, !sealingParentOnChain {
+          commandHostScopePaths.append(scopePath)
+        }
+
         if participatesInTopLevelFocus, interactionsEnabled, hitsAllowed, !sealingParentOnChain {
           focusRegions.append(
             FocusRegion(
@@ -80,20 +88,6 @@ package struct SemanticExtractor: Sendable {
               modalFocusScopePath: modalFocusScopePath
             )
           )
-          // An open `Panel` is a command/chrome host, not a focus target: its
-          // emitted region is pruned after the walk so Tab passes through to the
-          // item leaves. A `.sealed` Panel is the deliberate stop and keeps its
-          // own target. The host's scope chain (`scopePath` already includes its
-          // own scope identity, since a `Panel` is a `focusScopeBoundary`) feeds
-          // the active/visible context used for command dispatch without focus.
-          if case .view("Panel") = node.kind,
-            !node.semanticMetadata.sealsFocusDescendants
-          {
-            transparentFocusContainerIDs.insert(node.identity)
-            if scopePath.count >= activeCommandScopePath.count {
-              activeCommandScopePath = scopePath
-            }
-          }
         }
 
         if interactionsEnabled
@@ -179,17 +173,7 @@ package struct SemanticExtractor: Sendable {
       }
     )
 
-    // A command/chrome-hosting region (an open `Panel`) is never a focus target.
-    // Drop every region it emitted so Tab lands on item leaves in reading order,
-    // matching SwiftUI (containers guide focus order; only leaves are focused).
-    // This is scoped to hosting containers, not all scope boundaries: intentional
-    // item targets (e.g. List rows) stay focusable, and a `.sealed` Panel keeps
-    // its region (the deliberate focus stop). A bare host with no focusable child
-    // is no longer focusable either — its commands fire via the active/visible
-    // context (`activeCommandScopePath`), not by focusing the host.
-    if !transparentFocusContainerIDs.isEmpty {
-      focusRegions.removeAll { transparentFocusContainerIDs.contains($0.identity) }
-    }
+    let activeCommandScopePath = resolveActiveCommandScopePath(from: commandHostScopePaths)
 
     let scrollTargets = scrollTargets(from: placed)
     let accessibilityNodes = accessibilityNodes(
@@ -220,6 +204,30 @@ package struct SemanticExtractor: Sendable {
       return input.previousSnapshot
     }
     return extract(from: placed)
+  }
+
+  /// Resolves the active/visible-context scope chain from the command hosts
+  /// visible this frame. SwiftUI-faithful (the "M2" rule): with no focus, a key
+  /// command activates by visible context only when that context is
+  /// unambiguous.
+  ///
+  /// Returns the deepest host's scope chain **iff** every visible host lies on
+  /// that single nested chain (each is an ancestor — a prefix — of the deepest),
+  /// so the hosts are totally ordered by nesting. If two hosts diverge (a split
+  /// or multi-pane layout with no shared deepest descendant), the active context
+  /// is ambiguous and resolves to empty: a key command then fires nothing, and
+  /// the app is expected to set focus to disambiguate. A single host — or a
+  /// straight nested stack of them — always resolves. Each path already includes
+  /// its host's own scope identity, so dispatch walks the full host chain
+  /// shallowest-first.
+  private func resolveActiveCommandScopePath(
+    from hostScopePaths: [[Identity]]
+  ) -> [Identity] {
+    guard let deepest = hostScopePaths.max(by: { $0.count < $1.count }) else {
+      return []
+    }
+    let allOnSingleChain = hostScopePaths.allSatisfy { deepest.starts(with: $0) }
+    return allOnSingleChain ? deepest : []
   }
 }
 

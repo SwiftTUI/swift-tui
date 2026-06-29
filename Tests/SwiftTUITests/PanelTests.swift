@@ -105,6 +105,49 @@ struct PanelTests {
     #expect(extractFocusRegionsForTest(hostWithLeaf).count == 1)
   }
 
+  @Test("An open Panel is not classified as a control (host, not interactive leaf)")
+  func openPanelIsNotAControl() {
+    // The chosen abstraction: a Panel is a transparent command-hosting region,
+    // not a control. Because it no longer participates in top-level focus, its
+    // placed `semanticRole` is no longer `.control` (a control is a focus/hit
+    // target leaf). A transparent intrinsic wrapper resolves to `.generic`; a
+    // Panel carrying a structural layout would resolve to `.container` — either
+    // way, never `.control`. That `.control` classification was the old
+    // focus-coupling artifact this redesign removes.
+    let artifacts = DefaultRenderer().render(
+      Panel(id: "editor") { Text("inner").focusable(true) },
+      context: .init(identity: testIdentity("panel-role-root")),
+      proposal: .init(width: 20, height: 5)
+    )
+    let panel = findPlacedPanelNode(in: artifacts.placedTree)
+    #expect(panel != nil)
+    #expect(panel?.semanticRole != .control)
+  }
+
+  @Test("Active command context resolves only for an unambiguous host chain (M2)")
+  func activeCommandContextRequiresUnambiguousChain() {
+    // M2 (SwiftUI-faithful): with no focus, a command activates by visible
+    // context only when that context is unambiguous. Two divergent sibling hosts
+    // → ambiguous → empty (a command then fires nothing without focus). A single
+    // nested chain resolves to the deepest host.
+    let siblings = DefaultRenderer().render(
+      VStack {
+        Panel(id: "left") { Text("l") }
+        Panel(id: "right") { Text("r") }
+      },
+      context: .init(identity: testIdentity("siblings-root")),
+      proposal: .init(width: 20, height: 5)
+    )
+    #expect(siblings.semanticSnapshot.activeCommandScopePath.isEmpty)
+
+    let nested = DefaultRenderer().render(
+      Panel(id: "outer") { Panel(id: "inner") { Text("x") } },
+      context: .init(identity: testIdentity("nested-root")),
+      proposal: .init(width: 20, height: 5)
+    )
+    #expect(!nested.semanticSnapshot.activeCommandScopePath.isEmpty)
+  }
+
   @Test(".panel() produces stable AnyID across re-resolves at the same source location")
   func panelPseudonymousIDIsStable() {
     // Drive a full resolve pass twice over the same view hierarchy
@@ -154,19 +197,19 @@ struct PanelTests {
     #expect(panel1?.identity == panel2?.identity)
   }
 
-  @Test(".focusContainment(.sealed) prevents descendant focus regions from being reachable")
+  @Test(".focusContainment(.sealed) blocks descent and is itself not a focus target")
   func sealedPanelBlocksDescendantFocus() {
-    // A sealed Panel containing a focusable leaf should, after
-    // semantic extraction, produce exactly one focus region — the
-    // Panel's own. Descendant focusables inside a sealed panel do not
-    // appear in the focus region list.
+    // A sealed Panel containing a focusable leaf produces ZERO focus regions: a
+    // Panel is a command host, not a focus target (it emits no region of its
+    // own), and `.sealed` suppresses the descendant focusable too. A sealed
+    // subtree therefore contributes no focus targets at all.
     let sealedPanel = Panel(id: "outer") {
       Text("inner").focusable(true)
     }
     .focusContainment(.sealed)
 
     let regions = extractFocusRegionsForTest(sealedPanel)
-    #expect(regions.count == 1)
+    #expect(regions.isEmpty)
   }
 
   @Test(
@@ -177,15 +220,16 @@ struct PanelTests {
     // payload whose runs are tagged with a `linkIdentifier`. The
     // semantic extractor's rich-text path (`appendRichTextSemantics`)
     // emits one focus region per distinct link identifier. Inside a
-    // sealed Panel those descendant focus regions must be suppressed
-    // — only the Panel's own focus region may remain.
+    // sealed Panel those descendant link focus regions must be suppressed, and
+    // the Panel itself is a command host (not a focus target), so no focus
+    // region remains.
     let sealedPanel = Panel(id: "outer") {
       Text("see \(Link("docs", destination: "https://example.com")) now")
     }
     .focusContainment(.sealed)
 
     let regions = extractFocusRegionsForTest(sealedPanel)
-    #expect(regions.count == 1)
+    #expect(regions.isEmpty)
   }
 
   @Test(".panel() inside ForEach assigns distinct, per-iteration-stable identities")
@@ -222,10 +266,10 @@ struct PanelTests {
 
   @Test(".focusContainment(.sealed) suppresses descendant focus regions from list children")
   func sealedPanelBlocksListDescendantFocusRegions() {
-    // A sealed Panel containing a List with focusable row content
-    // should still yield a single focus region (the Panel). The List
-    // itself and any focusable row content live under a sealed
-    // ancestor and must not contribute focus regions.
+    // A sealed Panel containing a List with focusable row content yields ZERO
+    // focus regions: the List and its row content live under a sealed ancestor
+    // and are suppressed, and the Panel itself is a command host, not a focus
+    // target.
     let sealedPanel = Panel(id: "outer") {
       List(selection: .constant(0)) {
         Text("row 0").focusable(true).tag(0)
@@ -235,7 +279,7 @@ struct PanelTests {
     .focusContainment(.sealed)
 
     let regions = extractFocusRegionsForTest(sealedPanel)
-    #expect(regions.count == 1)
+    #expect(regions.isEmpty)
   }
 }
 
@@ -280,6 +324,20 @@ private struct ForEachPanelProbe: View {
 @MainActor
 private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
   var stack: [ResolvedNode] = [root]
+  while let node = stack.popLast() {
+    if case .view(let name) = node.kind, name == "Panel" {
+      return node
+    }
+    stack.append(contentsOf: node.children)
+  }
+  return nil
+}
+
+/// Traverses the placed tree to find the `PlacedNode` produced by a `Panel`,
+/// so a test can inspect its derived `semanticRole`.
+@MainActor
+private func findPlacedPanelNode(in root: PlacedNode) -> PlacedNode? {
+  var stack: [PlacedNode] = [root]
   while let node = stack.popLast() {
     if case .view(let name) = node.kind, name == "Panel" {
       return node

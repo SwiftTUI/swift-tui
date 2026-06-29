@@ -33,10 +33,11 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
       in: context
     )
 
+    // A NavigationStack is a command host (Role A): a focus scope, not a focus
+    // target. Tab passes through to the focusable item leaves of the visible
+    // destination; the stack itself is never a Tab stop.
     var metadata = focusStructureMetadata(scopeBoundary: true)
-    if !resolution.visibleNode.hasFocusableDescendant {
-      metadata.isFocusable = true
-    }
+    metadata.isCommandHost = true
 
     var stackNode = ResolvedNode(
       identity: context.identity,
@@ -314,10 +315,10 @@ private struct NavigationDestinationSurface: PrimitiveView, ActionScope, Resolva
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let payloadNode = instance.payload.resolve(in: context.child(component: .named("Content")))
+    // A pushed navigation destination is a command host (Role A): a focus scope,
+    // not a focus target. Tab passes through to the destination's item leaves.
     var metadata = focusStructureMetadata(scopeBoundary: true)
-    if !payloadNode.hasFocusableDescendant {
-      metadata.isFocusable = true
-    }
+    metadata.isCommandHost = true
 
     return [
       ResolvedNode(
@@ -420,13 +421,4 @@ private func scopeDepth(
   in scopePath: [Identity]
 ) -> Int {
   scopePath.firstIndex(of: identity) ?? -1
-}
-
-extension ResolvedNode {
-  fileprivate var hasFocusableDescendant: Bool {
-    if semanticMetadata.focusParticipation == .included {
-      return true
-    }
-    return children.contains { $0.hasFocusableDescendant }
-  }
 }

@@ -16,9 +16,12 @@ public enum FocusContainment: Sendable {
 /// responsibility via standard modifiers (`.border`, `.background`,
 /// `.padding`, etc.).
 ///
-/// A Panel is focusable and participates in the focus topology. When a
-/// Panel enters the focus chain, the Panel itself is focused first —
-/// descendants are reached via Tab or explicit focus requests.
+/// A Panel is a command/chrome-hosting *container*, not a control: it is a
+/// focus *scope* (so commands and focused values resolve along its chain) but
+/// **not** a focus *target*. Tab passes through it to the focusable item leaves
+/// inside; the Panel itself is never focused. Its commands activate by the
+/// active/visible context — never by focusing the container — matching how
+/// SwiftUI hoists toolbar/commands to system regions without focusing a view.
 ///
 /// Pair with `.keyCommand(...)`, `.paletteCommand(...)`, or
 /// `.focusContainment(_:)` to configure.
@@ -50,8 +53,12 @@ public struct Panel<ID: Hashable & Sendable, Content: View>: PrimitiveView, Acti
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let childNode = content.resolve(in: context.child(component: .named("content")))
+    // A Panel is a command host (Role A): a focus scope, not a focus target.
+    // It hoists commands/chrome and bounds a scope, but does not participate in
+    // top-level focus, so Tab passes through to item leaves. `.sealed` adds a
+    // hard stop that suppresses descendant focus too.
     var metadata = focusStructureMetadata(scopeBoundary: true)
-    metadata.isFocusable = true
+    metadata.isCommandHost = true
     if containment == .sealed {
       metadata.sealsFocusDescendants = true
     }

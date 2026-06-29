@@ -80,6 +80,22 @@ public struct SemanticMetadata: Equatable, Sendable {
     set { setFlag(Self.sealsFocusDescendantsFlag, to: newValue) }
   }
 
+  /// Whether this node is a command/chrome-hosting region (the Role-A
+  /// view-controller analogue: `Panel`, `NavigationStack`, …).
+  ///
+  /// A command host hoists toolbar / palette / key commands to top-level
+  /// regions and is a focus *scope* (`focusScopeBoundary`), but it is **not**
+  /// a focus *target*: it does not participate in top-level focus, so Tab
+  /// passes through it to item leaves and it classifies structurally as a
+  /// container, not a control. Its commands activate by the active/visible
+  /// context (or, when a descendant is focused, the focus chain), never by
+  /// focusing the host. Orthogonal to `isFocusable`/focus participation; it
+  /// marks the hosting *capability* only.
+  package var isCommandHost: Bool {
+    get { flag(Self.isCommandHostFlag) }
+    set { setFlag(Self.isCommandHostFlag, to: newValue) }
+  }
+
   public var participatesInPointerHitTesting: Bool {
     get { flag(Self.participatesInPointerHitTestingFlag) }
     set { setFlag(Self.participatesInPointerHitTestingFlag, to: newValue) }
@@ -184,6 +200,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     focusScopeIdentity: Identity? = nil,
     focusSectionBoundary: Bool = false,
     sealsFocusDescendants: Bool = false,
+    isCommandHost: Bool = false,
     focusInteractions: FocusInteractions = .automatic,
     participatesInPointerHitTesting: Bool = false,
     captureOnPress: Bool = false,
@@ -210,6 +227,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       focusScopeBoundary: focusScopeBoundary,
       focusSectionBoundary: focusSectionBoundary,
       sealsFocusDescendants: sealsFocusDescendants,
+      isCommandHost: isCommandHost,
       participatesInPointerHitTesting: participatesInPointerHitTesting,
       captureOnPress: captureOnPress,
       allowsHitTesting: allowsHitTesting,
@@ -241,6 +259,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       focusScopeIdentity: other.focusScopeIdentity ?? focusScopeIdentity,
       focusSectionBoundary: other.focusSectionBoundary || focusSectionBoundary,
       sealsFocusDescendants: other.sealsFocusDescendants || sealsFocusDescendants,
+      isCommandHost: other.isCommandHost || isCommandHost,
       focusInteractions: other.focusInteractions == .automatic
         ? focusInteractions
         : other.focusInteractions,
@@ -280,6 +299,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   private static let captureOnPressFlag: UInt16 = 1 << 6
   private static let allowsHitTestingFlag: UInt16 = 1 << 7
   private static let accessibilityHiddenFlag: UInt16 = 1 << 8
+  private static let isCommandHostFlag: UInt16 = 1 << 9
 
   private func flag(_ bit: UInt16) -> Bool {
     flags & bit != 0
@@ -301,6 +321,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     focusScopeBoundary: Bool,
     focusSectionBoundary: Bool,
     sealsFocusDescendants: Bool,
+    isCommandHost: Bool,
     participatesInPointerHitTesting: Bool,
     captureOnPress: Bool,
     allowsHitTesting: Bool,
@@ -321,6 +342,9 @@ public struct SemanticMetadata: Equatable, Sendable {
     }
     if sealsFocusDescendants {
       flags |= sealsFocusDescendantsFlag
+    }
+    if isCommandHost {
+      flags |= isCommandHostFlag
     }
     if participatesInPointerHitTesting {
       flags |= participatesInPointerHitTestingFlag

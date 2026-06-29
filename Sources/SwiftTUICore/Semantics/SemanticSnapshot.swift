@@ -282,12 +282,19 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var accessibilityNodes: [AccessibilityNode]
   public var accessibilityAnnouncements: [AccessibilityAnnouncement]
   package var accessibilityWarnings: [AccessibilityWarning]
-  /// Scope chain of the deepest visible command/chrome-hosting region (an open
-  /// `Panel`), ordered shallowest-first and including each host's own scope
-  /// identity. This is the **active/visible context** for key-command dispatch
-  /// when nothing is focused: a hosting region is not a focus target, so its
-  /// commands resolve along this chain instead of the focus chain. Empty when no
-  /// hosting region is visible. See the focus-model reassessment proposal.
+  /// Scope chain of the **active/visible context** — the unambiguous chain of
+  /// command/chrome-hosting regions (`Panel`, `NavigationStack`, …) visible this
+  /// frame, ordered shallowest-first and including each host's own scope
+  /// identity. Used for key-command dispatch when nothing is focused: a host is
+  /// a focus *scope* but not a focus *target*, so its commands resolve along this
+  /// chain instead of the focus chain.
+  ///
+  /// Resolves to the deepest host chain only when every visible host lies on that
+  /// single nested chain (the hosts are totally ordered by nesting). When two
+  /// hosts diverge — a split or multi-pane layout — the active context is
+  /// ambiguous and this is empty, so a command fires nothing without focus and
+  /// the app sets focus to disambiguate. Also empty when no host is visible. See
+  /// the focus-model reassessment proposal.
   package var activeCommandScopePath: [Identity]
 
   public init(
