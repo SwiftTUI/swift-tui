@@ -1,15 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(WASILibc)
-  import WASILibc
-#elseif canImport(ucrt)
-  import ucrt
-#endif
-
 /// Converts draw commands into a terminal cell surface.
 package struct Rasterizer: Sendable {
   internal static let emptyCompositingStyle = ResolvedTextStyle()
@@ -306,14 +294,10 @@ package struct Rasterizer: Sendable {
   private static func defaultIncrementalVerificationPolicy()
     -> IncrementalRasterVerificationPolicy
   {
-    if environmentFlagIsEnabled(
-      environmentValue(named: "SWIFTTUI_RASTER_VERIFY_INCREMENTAL")
-    ) {
+    if FeatureGate.rasterVerifyIncremental.initialIsEnabled() {
       return .verifySoundDamage
     }
-    if environmentFlagIsEnabled(
-      environmentValue(named: "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE")
-    ) {
+    if FeatureGate.rasterTrustSoundDamage.initialIsEnabled() {
       return .trustSoundDamage
     }
 
@@ -322,26 +306,5 @@ package struct Rasterizer: Sendable {
     #else
       return .trustSoundDamage
     #endif
-  }
-
-  private static func environmentFlagIsEnabled(_ value: String?) -> Bool {
-    guard let value else {
-      return false
-    }
-    switch value.lowercased() {
-    case "1", "true", "yes", "on":
-      return true
-    default:
-      return false
-    }
-  }
-
-  private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
   }
 }

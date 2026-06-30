@@ -1,17 +1,5 @@
 import SwiftTUICore
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
 /// Computes a conservative private raster reuse hint for a frame tail.
 ///
 /// The returned damage may be passed to the rasterizer so it can reuse clean
@@ -200,7 +188,7 @@ enum FrameTailPresentationDamageResolver {
   /// the incremental surface is byte-identical (catching any under-reported
   /// damage).
   private static let overlayIncrementalDamageEnabled: Bool =
-    environmentFlagIsEnabled(environmentValue(named: "SWIFTTUI_OVERLAY_INCREMENTAL_DAMAGE"))
+    FeatureGate.overlayIncrementalDamage.initialIsEnabled()
 
   /// Roles emitted *only* by the presentation overlay machinery
   /// (`OverlayStack` / `PresentationPortalRoot`). No background view produces
@@ -343,26 +331,6 @@ enum FrameTailPresentationDamageResolver {
     }
   }
 
-  private static func environmentFlagIsEnabled(_ value: String?) -> Bool {
-    guard let value else {
-      return false
-    }
-    switch value.lowercased() {
-    case "1", "true", "yes", "on":
-      return true
-    default:
-      return false
-    }
-  }
-
-  private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
-  }
 }
 
 struct FrameTailRasterReusePlan: Sendable {

@@ -13,11 +13,20 @@
 /// The known process-level performance/soundness feature gates.
 package enum FeatureGate: CaseIterable, Sendable {
   case soundnessProbe
+  case overlayIncrementalDamage
+  case rasterVerifyIncremental
+  case rasterTrustSoundDamage
 
   package var environmentVariableName: String {
     switch self {
     case .soundnessProbe:
       "SWIFTTUI_SOUNDNESS_PROBE"
+    case .overlayIncrementalDamage:
+      "SWIFTTUI_OVERLAY_INCREMENTAL_DAMAGE"
+    case .rasterVerifyIncremental:
+      "SWIFTTUI_RASTER_VERIFY_INCREMENTAL"
+    case .rasterTrustSoundDamage:
+      "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE"
     }
   }
 
@@ -29,6 +38,11 @@ package enum FeatureGate: CaseIterable, Sendable {
       #else
         false
       #endif
+    case .overlayIncrementalDamage, .rasterVerifyIncremental, .rasterTrustSoundDamage:
+      // Opt-in behavior/verification toggles: absent ⇒ off, leaving the default
+      // build (and, for the raster pair, the `#if DEBUG` policy fallback at their
+      // resolution sites) in effect.
+      false
     }
   }
 
