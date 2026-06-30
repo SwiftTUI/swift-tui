@@ -1,5 +1,5 @@
-/// Gate for **single-pass focus-sync convergence**. **Off by default**; set
-/// `SWIFTTUI_SINGLE_PASS_FOCUS=1` to opt in.
+/// Gate for **single-pass focus-sync convergence**. **On by default**; set
+/// `SWIFTTUI_SINGLE_PASS_FOCUS=0` to opt back into the legacy loop.
 ///
 /// Legacy behavior (gate off) reconciles focus by re-rendering: each frame runs
 /// a `render → processFocusSyncIteration → if changed, force a whole-tree
@@ -30,9 +30,9 @@ package enum SinglePassFocusConvergenceConfiguration {
     FeatureGate.singlePassFocusConvergence.environmentVariableName
 
   /// Whether focus-sync converges in a single pass with one-frame-lag reader
-  /// invalidation rather than the render-until-fixpoint loop. Off by default;
-  /// `SWIFTTUI_SINGLE_PASS_FOCUS=1` opts in. The run loop sets it from the
-  /// environment before the first render, and tests set it directly.
+  /// invalidation rather than the render-until-fixpoint loop. On by default;
+  /// `SWIFTTUI_SINGLE_PASS_FOCUS=0` opts back into the legacy loop. The run loop
+  /// sets it from the environment before the first render, and tests set it directly.
   package static var isEnabled: Bool =
     FeatureGate.singlePassFocusConvergence.initialIsEnabled()
 }
