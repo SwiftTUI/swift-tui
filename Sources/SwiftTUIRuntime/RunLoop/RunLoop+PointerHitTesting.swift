@@ -211,6 +211,48 @@ extension RunLoop {
     return nil
   }
 
+  /// Pointer-safe activation resolution. Like `activationIdentity(for:)` but the
+  /// descendant fallback is constrained to handlers whose interaction region
+  /// actually contains `location`. A pointer click must only activate a control
+  /// it is physically over — the unconstrained descendant walk would otherwise
+  /// reach *down* into a focused scope (e.g. an open sheet) and dispatch its sole
+  /// handler when the click landed on suppressed background chrome, dismissing
+  /// the overlay from an outside click (root `TODO.md`: "Presentation Lab
+  /// overlays are sometimes unclosable; the background remains interactive").
+  /// Keyboard activation keeps using the location-free `activationIdentity(for:)`
+  /// because Enter/Space legitimately activates the focused scope's action.
+  package func activationIdentity(
+    for identity: Identity,
+    underPointerAt location: PointerLocation
+  ) -> Identity? {
+    if let containingIdentity = containingActivationIdentity(for: identity) {
+      return containingIdentity
+    }
+
+    return localActionRegistry.snapshot().keys
+      .filter { candidate in
+        candidate.isDescendant(of: identity)
+          && handlerRegion(candidate, contains: location)
+      }
+      .min { lhs, rhs in
+        let lhsDepth = identityDepth(lhs)
+        let rhsDepth = identityDepth(rhs)
+        if lhsDepth != rhsDepth {
+          return lhsDepth < rhsDepth
+        }
+        return lhs < rhs
+      }
+  }
+
+  private func handlerRegion(
+    _ identity: Identity,
+    contains location: PointerLocation
+  ) -> Bool {
+    latestSemanticSnapshot.interactionRegions.contains { region in
+      region.identity == identity && region.contains(location)
+    }
+  }
+
   private func identityDepth(_ identity: Identity) -> Int {
     identity.description.filter { $0 == "/" }.count
   }

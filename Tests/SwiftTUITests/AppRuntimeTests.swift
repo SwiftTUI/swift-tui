@@ -571,6 +571,103 @@ struct AppRuntimeTests {
     #expect(resetFrame.contains("Last event: Confirmation reset"))
   }
 
+  /// Direct framework reduction of the gallery "Presentation Lab overlays are
+  /// sometimes unclosable; in that state the background remains interactive"
+  /// bug (root `TODO.md`). Unlike
+  /// `PresentationRouteSuppressionTests` (a bare `@State` fixture that passes),
+  /// this drives the sheet behind the `TabView(.literalTabs)` shell — the seam
+  /// the gallery integration oracle reproduces — and clicks the *background*
+  /// trigger while the sheet is open. That suppressed-background-click step is
+  /// what the existing gallery-like test never exercises.
+  @Test("a sheet behind the TabView shell suppresses the background trigger and stays closable")
+  func galleryLikePresentationTabSuppressesBackgroundClickWhileSheetOpen() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 80, height: 24))
+    let rootIdentity = testIdentity("GalleryLikePresentationLabBackgroundSuppression")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        GalleryLikePresentationLabWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    func click(_ point: Point) throws -> String {
+      #expect(
+        runLoop.handle(
+          RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: point)))
+        ) == nil
+      )
+      _ = try render()
+      #expect(
+        runLoop.handle(
+          RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: point)))
+        ) == nil
+      )
+      return try render()
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    let initialFrame = try render()
+    #expect(initialFrame.contains("Presentation Lab"))
+
+    // Record the background "Confirm" trigger BEFORE any overlay is up.
+    let confirmPoint = try #require(terminal.centerOfText("Confirm"))
+    let sheetPoint = try #require(terminal.centerOfText("Sheet"))
+
+    let opened = try click(sheetPoint)
+    #expect(opened.contains("Sheet content"), "sheet did not open; frame:\n\(opened)")
+
+    // Click the recorded background "Confirm" location while the sheet is open.
+    // Correct behavior: the sheet disables base interaction, so the confirmation
+    // dialog does NOT open and the sheet stays up. The reported bug lets the
+    // background fire and/or drops the sheet.
+    let afterBackgroundClick = try click(confirmPoint)
+    #expect(
+      !afterBackgroundClick.contains("Reset presentation state?"),
+      "background Confirm trigger fired while the sheet was open; frame:\n\(afterBackgroundClick)"
+    )
+    #expect(
+      afterBackgroundClick.contains("Sheet content"),
+      "the sheet must stay open after a suppressed background click; frame:\n\(afterBackgroundClick)"
+    )
+
+    // The sheet's own Close control must dismiss it ("unclosable" guard).
+    let closePoint = try #require(
+      terminal.centerOfText("Close"),
+      "the sheet Close control went missing; frame:\n\(afterBackgroundClick)"
+    )
+    let closed = try click(closePoint)
+    #expect(
+      !closed.contains("Sheet content"),
+      "the sheet was un-closable via its own Close control; frame:\n\(closed)"
+    )
+
+    // Background routing is live again after dismissal.
+    let afterReopen = try click(confirmPoint)
+    #expect(
+      afterReopen.contains("Reset presentation state?"),
+      "background routing was not restored after the sheet closed; frame:\n\(afterReopen)"
+    )
+  }
+
   @MainActor
   @Test("dismissing a sheet restores focus to the previously focused base control")
   func dismissingSheetRestoresFocusToThePreviouslyFocusedBaseControl() async throws {

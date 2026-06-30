@@ -103,6 +103,63 @@ struct PresentationRouteSuppressionTests {
       "base routing must be restored after Escape dismissal; frame:\n\(afterBase)"
     )
   }
+
+  /// The same suppression contract, but with the routing content hosted inside a
+  /// `TabView(.literalTabs)` — the gallery "Presentation Lab" seam. This is the
+  /// configuration that actually reproduced the root-`TODO.md` unclosable-overlay
+  /// bug: behind the shell a suppressed background click was mis-routed into the
+  /// overlay's own dismiss handler (pointer-activation reached *down* into the
+  /// focused modal scope), so the overlay vanished from an outside click. The
+  /// bare-fixture variant above passes even on the buggy build, which is why this
+  /// shell variant is the durable framework guard the coverage report asked for.
+  @Test(
+    "An open modal behind the TabView shell suppresses base pointer routes until dismissed",
+    arguments: ModalRoutingKind.allCases
+  )
+  func modalBehindTabShellSuppressesBaseClicksUntilDismissed(kind: ModalRoutingKind) throws {
+    let harness = try ModalRoutingHarness(kind: kind, behindTabShell: true)
+
+    let basePoint = try #require(
+      harness.point(forText: "Base Action"),
+      "base button must be locatable before the modal opens"
+    )
+
+    let opened = try harness.clickText("Open Modal")
+    #expect(
+      opened.contains(kind.contentMarker),
+      "expected the \(kind) modal to open behind the tab shell; frame:\n\(opened)"
+    )
+
+    // Click the recorded base location while the modal is open. The buggy build
+    // mis-routed this suppressed background click into the overlay's own handler
+    // and dismissed the overlay; correct behavior leaves it up. A modal can fully
+    // cover the base content, so "did the base fire" is checked after dismissal
+    // (from state) rather than read from the covered frame.
+    let afterBaseClick = try harness.click(basePoint)
+    #expect(
+      afterBaseClick.contains(kind.contentMarker),
+      "the \(kind) modal must stay open after a suppressed background click; frame:\n\(afterBaseClick)"
+    )
+
+    // The overlay's own dismiss control still closes it ("unclosable" guard).
+    let dismissed = try harness.clickText(kind.dismissLabel, chooseLast: true)
+    #expect(
+      !dismissed.contains(kind.contentMarker),
+      "the \(kind) modal must dismiss via its own control behind the shell; frame:\n\(dismissed)"
+    )
+    // The suppressed background click must not have advanced the base counter —
+    // now visible again with the overlay gone.
+    #expect(
+      dismissed.contains("Base fired: 0"),
+      "base action must not fire while the \(kind) modal is open; frame:\n\(dismissed)"
+    )
+
+    let afterReopen = try harness.click(basePoint)
+    #expect(
+      afterReopen.contains("Base fired: 1"),
+      "base routing must be restored after the \(kind) modal is dismissed; frame:\n\(afterReopen)"
+    )
+  }
 }
 
 enum ModalRoutingKind: CaseIterable, CustomStringConvertible, Sendable {
@@ -133,10 +190,35 @@ enum ModalRoutingKind: CaseIterable, CustomStringConvertible, Sendable {
 @MainActor
 private struct ModalRoutingFixture: View {
   let kind: ModalRoutingKind
+  /// When true, the routing content lives inside a `TabView(.literalTabs)` —
+  /// the gallery "Presentation Lab" composition seam. A modal opened behind that
+  /// shell leaves a broad active focus/interaction region under the backdrop;
+  /// regressions in pointer-activation locality then mis-route a suppressed
+  /// background click into the overlay's own handler (dismissing it from an
+  /// outside click). The bare-base variant cannot reproduce that — its
+  /// background hit-test returns no target at all.
+  var behindTabShell = false
   @State private var baseFires = 0
   @State private var isPresented = false
+  @State private var tabSelection = "routing"
 
   var body: some View {
+    if behindTabShell {
+      TabView(selection: $tabSelection) {
+        Tab("Sibling", value: "sibling") {
+          Text("Sibling tab content")
+        }
+        Tab("Routing", value: "routing") {
+          routingContent
+        }
+      }
+      .tabViewStyle(.literalTabs)
+    } else {
+      routingContent
+    }
+  }
+
+  @ViewBuilder private var routingContent: some View {
     let base = VStack(alignment: .leading, spacing: 1) {
       Text("Base fired: \(baseFires)")
       Button("Base Action") { baseFires += 1 }
@@ -177,11 +259,15 @@ private final class ModalRoutingHarness {
   private let scheduler: FrameScheduler
   private var renderedFrames = 0
 
-  init(kind: ModalRoutingKind) throws {
+  init(kind: ModalRoutingKind, behindTabShell: Bool = false) throws {
     self.kind = kind
     let size = CellSize(width: 60, height: 16)
     let terminal = ModalRoutingRecordingHost(surfaceSize: size)
-    let rootIdentity = testIdentity("ModalRouting", kind.description)
+    let rootIdentity = testIdentity(
+      "ModalRouting",
+      kind.description,
+      behindTabShell ? "tabShell" : "bare"
+    )
     let scheduler = FrameScheduler()
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let runLoop = RunLoop(
@@ -193,7 +279,7 @@ private final class ModalRoutingHarness {
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: focusTracker,
       proposal: .init(width: size.width, height: size.height),
-      viewBuilder: { _, _ in ModalRoutingFixture(kind: kind) }
+      viewBuilder: { _, _ in ModalRoutingFixture(kind: kind, behindTabShell: behindTabShell) }
     )
     focusTracker.invalidator = scheduler
     self.terminal = terminal

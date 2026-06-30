@@ -187,7 +187,7 @@ extension RunLoop {
       ?? focusIdentity(for: region.identity)
     let actionIdentity =
       hitTarget.flatMap { containingActivationIdentity(for: $0.region.identity) }
-      ?? focusedIdentity.flatMap { activationIdentity(for: $0) }
+      ?? focusedIdentity.flatMap { activationIdentity(for: $0, underPointerAt: location) }
 
     if let actionIdentity {
       let invalidationsBeforeDispatch = schedulerPendingInvalidations()
