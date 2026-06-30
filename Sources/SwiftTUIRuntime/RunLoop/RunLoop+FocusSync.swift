@@ -12,6 +12,12 @@ extension RunLoop {
     var focusBindingChanged = false
     var focusedValuesChanged = false
     var scrollPositionChanged = false
+    /// Single-pass mode only: whether the one deterministic eager re-render that
+    /// applies a focus-location change to the committed frame has already run
+    /// this frame. Caps eager location application at a single extra pass (no
+    /// budget) — focus location cannot oscillate, so one pass suffices; any
+    /// residual change after it lags to the next frame.
+    var didEagerFocusLocationRerender = false
     var lifecycleCarryForward: [LifecycleCommitEntry] = []
 
     var rerenderCount: Int {
@@ -84,8 +90,17 @@ extension RunLoop {
     let shouldApplyDefaultFocus =
       focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
       || (nextModalFocusScopePath != nil && nextModalFocusScopePath != previousModalFocusScopePath)
+    let hadFocusBeforeRegionUpdate = focusTracker.currentFocusIdentity != nil
     let focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
+    // Initial focus auto-adoption (nil → a control) is deliberately *not* flagged
+    // as a change by `updateRegions` (it avoids forcing a second frame in the
+    // legacy loop). It is still a focus-location establishment: in single-pass
+    // mode the focused subtree it adopts may publish focused values, so the
+    // committed frame must reflect it. Treat the nil → focused transition as a
+    // location change for the eager re-render below.
+    let focusJustEstablished =
+      !hadFocusBeforeRegionUpdate && focusTracker.currentFocusIdentity != nil
     let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
       allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
     )
@@ -132,6 +147,38 @@ extension RunLoop {
         renderedArtifacts.commitPlan.lifecycle,
         into: &convergence.lifecycleCarryForward
       )
+
+      if SinglePassFocusConvergenceConfiguration.isEnabled {
+        // Single-pass convergence, split by node kind (no budget):
+        //
+        // Focus *location* (focus moved / a focus request applied / a `@FocusState`
+        // flip / scroll-to-reveal) is not a feedback edge — it is determined by the
+        // event plus the rendered regions, then applied, and cannot oscillate. Apply
+        // it eagerly with exactly **one** extra render so the committed frame shows
+        // the correct focus. `currentFocusedValues` was updated just above, so the
+        // focused values ride along on that same re-render. Capped at one pass by
+        // `didEagerFocusLocationRerender`; any residual change after it lags a frame.
+        let focusLocationChanged =
+          focusChanged || focusJustEstablished || appliedFocusRequest
+          || appliedDefaultFocusRequest || focusStateChanged || scrollPositionChanged
+        if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
+          convergence.didEagerFocusLocationRerender = true
+          convergence.rerenderedForFocusSync = true
+          return .rerender
+        }
+
+        // A *pure* focused-value change (the focused subtree republished without
+        // focus moving) is the genuine output→input feedback edge. Do not loop on
+        // it: it lags one frame via reader invalidation. `@FocusedValue` readers
+        // have no self-invalidation yet, so nudge them (a root invalidation; precise
+        // focused-value reader attribution is the follow-on refinement). The frame
+        // commits with last frame's values and the change lands next frame.
+        if focusedValuesChanged {
+          scheduler.requestInvalidation(of: [rootIdentity])
+        }
+        return .converged
+      }
+
       convergence.rerenderedForFocusSync = true
       if !convergence.recordRerender(for: renderedArtifacts.semanticSnapshot) {
         convergence.budgetExceeded = true
