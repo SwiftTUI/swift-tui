@@ -4,10 +4,46 @@ private enum FocusedValuesKey: EnvironmentKey {
   static let defaultValue = FocusedValues()
 }
 
+/// Synthetic dependency token for `@FocusedValue`/`@FocusedBinding` reads.
+///
+/// Decoupled from the value-carrying ``FocusedValuesKey`` for the same reason
+/// `FocusedIdentityKey` is decoupled from `_focusedIdentity`: this key is never
+/// written into the environment and never read by framework plumbing, so the
+/// reverse dependency index for it contains *only* genuine focused-value readers.
+/// (Recording against `FocusedValuesKey` instead would attribute every node,
+/// because `ResolveContext.init` reads `environmentValues.focusedValues` per node.)
+private enum FocusedValuesDependencyKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
 extension EnvironmentValues {
   package var focusedValues: FocusedValues {
     get { self[FocusedValuesKey.self] }
     set { self[FocusedValuesKey.self] = newValue }
+  }
+
+  /// The environment dependency key a `@FocusedValue`/`@FocusedBinding` reader
+  /// records so a pure focused-value change can invalidate exactly those readers
+  /// (precise, reuse-safe one-frame-lag propagation) instead of the whole tree.
+  /// The run loop resolves readers through this key in
+  /// `RunLoop.processFocusSyncIteration`'s single-pass branch.
+  package static var focusedValuesDependencyKeys: Set<ObjectIdentifier> {
+    [ObjectIdentifier(FocusedValuesDependencyKey.self)]
+  }
+
+  /// Attributes a focused-value read to the evaluating reader node.
+  ///
+  /// `@FocusedValue`/`@FocusedBinding` read the cached `AuthoringContext.focusedValues`
+  /// field rather than going through the `EnvironmentValues` subscript, so the read
+  /// is otherwise invisible to reader attribution. Recording the synthetic
+  /// ``FocusedValuesDependencyKey`` here — mirroring the `recordEnvironmentRead`
+  /// the real subscript performs — lets a focused-value change find and invalidate
+  /// precisely the readers. The dependency index persists across reuse, so a reader
+  /// reused since its last resolve stays discoverable (never left stale).
+  @MainActor
+  package static func recordFocusedValuesDependencyRead() {
+    ViewNodeContext.current?.recordEnvironmentRead(
+      ObjectIdentifier(FocusedValuesDependencyKey.self))
   }
 }
 
@@ -25,7 +61,8 @@ public struct FocusedValue<Value: Sendable> {
   }
 
   public var wrappedValue: Value? {
-    currentAuthoringContext()?.focusedValues[keyPath: keyPath]
+    EnvironmentValues.recordFocusedValuesDependencyRead()
+    return currentAuthoringContext()?.focusedValues[keyPath: keyPath]
   }
 }
 
@@ -43,7 +80,8 @@ public struct FocusedBinding<Value: Sendable> {
   }
 
   private var currentBinding: Binding<Value>? {
-    currentAuthoringContext()?.focusedValues[keyPath: keyPath]
+    EnvironmentValues.recordFocusedValuesDependencyRead()
+    return currentAuthoringContext()?.focusedValues[keyPath: keyPath]
   }
 
   public var wrappedValue: Value? {

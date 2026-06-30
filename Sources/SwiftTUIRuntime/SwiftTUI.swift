@@ -804,6 +804,17 @@ public struct DefaultRenderer {
     )
   }
 
+  /// Identities of the `@FocusedValue`/`@FocusedBinding` readers, derived from the
+  /// focused-value reader attribution recorded during resolve. Single-pass
+  /// focus-sync invalidates exactly these on a pure focused-value change so the
+  /// readers re-resolve next frame while sibling subtrees stay reused.
+  @MainActor
+  package func focusedValuesDependentIdentities() -> Set<Identity> {
+    viewGraph.environmentDependentIdentities(
+      for: EnvironmentValues.focusedValuesDependencyKeys
+    )
+  }
+
   @MainActor
   package func liveIdentitySnapshot() -> Set<Identity> {
     viewGraph.liveIdentitySnapshot()

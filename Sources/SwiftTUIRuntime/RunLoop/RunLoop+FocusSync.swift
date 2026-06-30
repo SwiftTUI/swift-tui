@@ -169,12 +169,19 @@ extension RunLoop {
 
         // A *pure* focused-value change (the focused subtree republished without
         // focus moving) is the genuine output→input feedback edge. Do not loop on
-        // it: it lags one frame via reader invalidation. `@FocusedValue` readers
-        // have no self-invalidation yet, so nudge them (a root invalidation; precise
-        // focused-value reader attribution is the follow-on refinement). The frame
-        // commits with last frame's values and the change lands next frame.
+        // it: it lags one frame via reader invalidation. Invalidate exactly the
+        // `@FocusedValue`/`@FocusedBinding` readers — found via the reader
+        // attribution recorded during resolve — rather than the whole tree. The
+        // readers re-resolve next frame (selective evaluation) and read the
+        // just-updated `currentFocusedValues`, while sibling subtrees stay reused.
+        // The dependency index persists across reuse, so a reader reused since its
+        // last resolve is still found and never left stale. An empty set means
+        // nothing reads the focused value, so there is nothing to invalidate.
         if focusedValuesChanged {
-          scheduler.requestInvalidation(of: [rootIdentity])
+          let focusedValueReaders = renderer.focusedValuesDependentIdentities()
+          if !focusedValueReaders.isEmpty {
+            scheduler.requestInvalidation(of: focusedValueReaders)
+          }
         }
         return .converged
       }
