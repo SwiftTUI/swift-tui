@@ -16,10 +16,6 @@ package final class DependencyTracker {
     currentDependencies.observableReads.insert(id)
   }
 
-  package func recordObservableKeyPathRead(_ key: ObservableKeyPathKey) {
-    currentDependencies.observableKeyPathReads.insert(key)
-  }
-
   package func reset() -> DependencySet {
     defer {
       currentDependencies = .init()

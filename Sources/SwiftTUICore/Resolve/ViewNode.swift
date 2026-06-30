@@ -318,15 +318,14 @@ package final class ViewNode {
     stateSlots[ordinal] = slot
 
     let readKey = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
-    if ReaderAttributionConfiguration.isEnabled,
-      let reader = ViewNodeContext.current
-    {
+    if let reader = ViewNodeContext.current {
       // Reader-attributed: the dependency belongs to the node actually
       // evaluating this read (which may be a descendant consuming a projected
       // binding), not the slot owner. A genuine self-read records on self
       // (reader == self == owner), exactly as before.
       reader.recordStateReadDependency(readKey)
     } else {
+      // No evaluating reader in scope (a read outside resolve): record on self.
       dependencyTracker.recordStateRead(readKey)
     }
 
@@ -385,29 +384,21 @@ package final class ViewNode {
     }
   }
 
-  /// The identities to invalidate for a state-slot write.
-  ///
-  /// Legacy (reader attribution off): a single owner identity — the explicit
-  /// override when provided, else this node's identity — so the owner's whole
-  /// subtree re-resolves. This is the write-side mirror of the always-dirty-owner
-  /// term in ``ViewGraphInvalidationPlanner/stateChangeDirtyNodeIDs(for:stateSlotDependents:)``.
-  ///
-  /// Reader-attributed (flag on): the genuine readers recorded for this slot, so
-  /// a disjoint subtree (such as a sheet/palette background that only *projects*
-  /// the binding) is spared — completing the read-side attribution in
-  /// ``stateSlot(ordinal:seed:)``. Without this, the owner identity is still
-  /// invalidated and `conflictsWithInvalidation` blocks the whole background as
-  /// an ancestor, defeating reader attribution on open. Falls back to the owner
-  /// identity when no readers were recorded (deferred / conditional reads) so a
-  /// change is never dropped.
+  /// The identities to invalidate for a state-slot write: the genuine readers
+  /// recorded for this slot, so a disjoint subtree (such as a sheet/palette
+  /// background that only *projects* the binding) is spared — completing the
+  /// read-side attribution in ``stateSlot(ordinal:seed:)``. Without this, the
+  /// owner identity would be invalidated and `conflictsWithInvalidation` would
+  /// block the whole background as an ancestor, defeating reader attribution on
+  /// open. Falls back to the owner identity when no readers were recorded
+  /// (deferred / conditional reads, or no owning graph) so a change is never
+  /// dropped.
   private func stateChangeInvalidationIdentities(
     for key: StateSlotKey,
     explicit: Identity?
   ) -> Set<Identity> {
     let ownerIdentity = explicit ?? identity
-    guard ReaderAttributionConfiguration.isEnabled,
-      let ownerGraph
-    else {
+    guard let ownerGraph else {
       return [ownerIdentity]
     }
     let readers = ownerGraph.stateDependentIdentities(for: key)
@@ -487,21 +478,6 @@ package final class ViewNode {
   ) {
     recordCheckpointMutation()
     dependencyTracker.recordObservableRead(key)
-  }
-
-  /// Records an observable read *with* the key path that was read. Records the
-  /// bare object token too (additive), so the node stays discoverable in the
-  /// object-token index and a key-path miss always falls back to object
-  /// granularity. Used by the key-path holding seams (`@Bindable`).
-  package func recordObservableRead(
-    _ key: ObjectIdentifier,
-    keyPath: AnyKeyPath
-  ) {
-    recordCheckpointMutation()
-    dependencyTracker.recordObservableRead(key)
-    dependencyTracker.recordObservableKeyPathRead(
-      ObservableKeyPathKey(object: key, keyPath: keyPath)
-    )
   }
 
   package func requestInvalidation() {

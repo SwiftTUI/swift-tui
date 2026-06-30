@@ -4,7 +4,6 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite(.serialized)
 struct BindingDependencyModelTests {
   @Test("binding projection without a wrappedValue read records no state dependency")
   func bindingProjectionWithoutReadRecordsNoStateDependency() {
@@ -37,10 +36,6 @@ struct BindingDependencyModelTests {
   private func resolveSnapshot<V: View>(
     _ view: V
   ) -> ViewGraph.DebugTotalStateSnapshot {
-    let previous = ReaderAttributionConfiguration.isEnabled
-    ReaderAttributionConfiguration.isEnabled = true
-    defer { ReaderAttributionConfiguration.isEnabled = previous }
-
     let graph = ViewGraph()
     graph.beginFrame()
     var context = ResolveContext(

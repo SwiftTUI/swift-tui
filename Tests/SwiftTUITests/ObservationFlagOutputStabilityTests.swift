@@ -6,38 +6,6 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-private struct ObservationOutputFlagCombination: Sendable, CustomStringConvertible {
-  var precise: Bool
-  var keyPath: Bool
-  var readerAttribution: Bool
-  var memoReuse: Bool
-
-  var description: String {
-    "precise=\(precise) keyPath=\(keyPath) reader=\(readerAttribution) memo=\(memoReuse)"
-  }
-}
-
-private let allObservationOutputFlagCombinations: [ObservationOutputFlagCombination] = {
-  var combinations: [ObservationOutputFlagCombination] = []
-  for precise in [false, true] {
-    for keyPath in [false, true] {
-      for readerAttribution in [false, true] {
-        for memoReuse in [false, true] {
-          combinations.append(
-            ObservationOutputFlagCombination(
-              precise: precise,
-              keyPath: keyPath,
-              readerAttribution: readerAttribution,
-              memoReuse: memoReuse
-            )
-          )
-        }
-      }
-    }
-  }
-  return combinations
-}()
-
 private final class ObservationFlagOutputModel: Observable, Sendable {
   private let registrar = ObservationRegistrar()
   private let hotStorage = Mutex(0)
@@ -74,59 +42,33 @@ private struct ObservationFlagOutputProbe: View, Equatable {
   }
 }
 
+/// Renders an `@Bindable` reader, mutates the observed property, and asserts the
+/// committed output tracks the change. Locks the end-to-end correctness of the
+/// (now unconditional) precise-firing + memo-reuse invalidation path: an
+/// `Equatable` probe that reads a mutated observable property must still
+/// re-render to the new value rather than being memo-reused stale.
 @MainActor
-@Suite(.serialized)
 struct ObservationFlagOutputStabilityTests {
-  private func withFlags<R>(
-    _ combination: ObservationOutputFlagCombination,
-    _ body: () throws -> R
-  ) rethrows -> R {
-    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
-    let previousKeyPath = ObservableKeyPathInvalidationConfiguration.isEnabled
-    let previousReader = ReaderAttributionConfiguration.isEnabled
-    let previousMemo = MemoReuseConfiguration.isEnabled
-    PreciseObservationFiringConfiguration.isEnabled = combination.precise
-    ObservableKeyPathInvalidationConfiguration.isEnabled = combination.keyPath
-    ReaderAttributionConfiguration.isEnabled = combination.readerAttribution
-    MemoReuseConfiguration.isEnabled = combination.memoReuse
-    defer {
-      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
-      ObservableKeyPathInvalidationConfiguration.isEnabled = previousKeyPath
-      ReaderAttributionConfiguration.isEnabled = previousReader
-      MemoReuseConfiguration.isEnabled = previousMemo
-    }
-    return try body()
-  }
-
-  @Test(
-    "observation flag combinations keep rendered output stable",
-    arguments: allObservationOutputFlagCombinations
-  )
-  private func combinationsKeepRenderedOutputStable(
-    _ combination: ObservationOutputFlagCombination
-  ) {
+  @Test("an observable mutation updates committed output")
+  func observableMutationUpdatesOutput() {
     let renderer = DefaultRenderer()
     let model = ObservationFlagOutputModel()
     let rootIdentity = testIdentity("ObservationFlagOutputRoot")
 
-    let initialLines = withFlags(combination) {
-      renderer.render(
-        ObservationFlagOutputProbe(model: model),
-        context: .init(identity: rootIdentity),
-        proposal: .init(width: 16, height: 2)
-      ).rasterSurface.lines
-    }
+    let initialLines = renderer.render(
+      ObservationFlagOutputProbe(model: model),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 16, height: 2)
+    ).rasterSurface.lines
 
     model.hot = 1
-    let updatedLines = withFlags(combination) {
-      renderer.render(
-        ObservationFlagOutputProbe(model: model),
-        context: .init(identity: rootIdentity),
-        proposal: .init(width: 16, height: 2)
-      ).rasterSurface.lines
-    }
+    let updatedLines = renderer.render(
+      ObservationFlagOutputProbe(model: model),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 16, height: 2)
+    ).rasterSurface.lines
 
-    #expect(initialLines == ["hot=0", "stable"], "initial output drifted under \(combination)")
-    #expect(updatedLines == ["hot=1", "stable"], "updated output drifted under \(combination)")
+    #expect(initialLines == ["hot=0", "stable"], "initial output drifted")
+    #expect(updatedLines == ["hot=1", "stable"], "updated output drifted")
   }
 }

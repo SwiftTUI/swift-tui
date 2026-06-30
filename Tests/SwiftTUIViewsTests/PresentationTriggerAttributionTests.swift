@@ -7,10 +7,7 @@ import Testing
 /// presenting view (an ancestor of the background) and onto the zero-size
 /// sibling trigger leaf. This is the precondition for the background being a
 /// disjoint sibling of the dirty node when `isPresented` toggles.
-///
-/// Serialized because it flips the process-level reader-attribution flag.
 @MainActor
-@Suite(.serialized)
 struct PresentationTriggerAttributionTests {
   /// Owns `@State`, projects it into `.sheet`, and never reads `wrappedValue` in
   /// its own body. The static sibling keeps the owner from collapsing onto a
@@ -29,11 +26,7 @@ struct PresentationTriggerAttributionTests {
     }
   }
 
-  private func dependentIdentities(readerAttributed: Bool) -> [String] {
-    let previous = ReaderAttributionConfiguration.isEnabled
-    ReaderAttributionConfiguration.isEnabled = readerAttributed
-    defer { ReaderAttributionConfiguration.isEnabled = previous }
-
+  private func dependentIdentities() -> [String] {
     let graph = ViewGraph()
     graph.beginFrame()
     var context = ResolveContext(
@@ -56,21 +49,12 @@ struct PresentationTriggerAttributionTests {
     return identities.sorted()
   }
 
-  @Test("reader-attributed: the isPresented dependency lands on the trigger leaf")
+  @Test("the isPresented dependency lands on the trigger leaf")
   func dependencyLandsOnTriggerLeaf() {
-    let dependents = dependentIdentities(readerAttributed: true)
+    let dependents = dependentIdentities()
     // Every dependent of the `@State` slot is a trigger leaf — neither the owner
     // (`Root`) nor the background ("background" Text).
     #expect(!dependents.isEmpty)
     #expect(dependents.allSatisfy { $0.hasSuffix("__presentationTrigger") })
-  }
-
-  @Test("legacy: the isPresented dependency lands on the presenting-view subtree")
-  func legacyDependencyLandsOnOwnerSubtree() {
-    let dependents = dependentIdentities(readerAttributed: false)
-    #expect(!dependents.isEmpty)
-    // No trigger leaf exists in legacy mode; the dependency sits on the owner /
-    // background root instead.
-    #expect(dependents.allSatisfy { !$0.hasSuffix("__presentationTrigger") })
   }
 }

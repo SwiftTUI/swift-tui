@@ -803,78 +803,8 @@ struct ViewGraphTests {
     #expect(unrelatedEvaluations == 0)
   }
 
-  @Test("characterization: observation fan-out uses object tokens")
-  func observationInvalidationUsesDependencyIndices() {
-    // Pin the legacy object-token union: both narrowings are on by default.
-    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
-    let previousKeyPath = ObservableKeyPathInvalidationConfiguration.isEnabled
-    PreciseObservationFiringConfiguration.isEnabled = false
-    ObservableKeyPathInvalidationConfiguration.isEnabled = false
-    defer {
-      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
-      ObservableKeyPathInvalidationConfiguration.isEnabled = previousKeyPath
-    }
-
-    let graph = ViewGraph()
-    let rootIdentity = testIdentity("Root")
-    let triggeringIdentity = testIdentity("Root", "Triggering")
-    let peerIdentity = testIdentity("Root", "Peer")
-    let unrelatedIdentity = testIdentity("Root", "Unrelated")
-    let sharedObservable = DependencyObservableBox()
-    let unrelatedObservable = DependencyObservableBox()
-    let sharedObservableID = ObjectIdentifier(sharedObservable)
-    let unrelatedObservableID = ObjectIdentifier(unrelatedObservable)
-
-    seedDependencyGraph(
-      graph: graph,
-      rootIdentity: rootIdentity,
-      childIdentities: [triggeringIdentity, peerIdentity, unrelatedIdentity]
-    ) { identity, node in
-      switch identity {
-      case triggeringIdentity, peerIdentity:
-        node.recordObservableRead(sharedObservableID)
-      case unrelatedIdentity:
-        node.recordObservableRead(unrelatedObservableID)
-      default:
-        break
-      }
-    }
-
-    var rootEvaluations = 0
-    var triggeringEvaluations = 0
-    var peerEvaluations = 0
-    var unrelatedEvaluations = 0
-    graph.setRootEvaluator(rootIdentity: rootIdentity) {
-      rootEvaluations += 1
-    }
-    graph.setEvaluator(for: triggeringIdentity) {
-      triggeringEvaluations += 1
-    }
-    graph.setEvaluator(for: peerIdentity) {
-      peerEvaluations += 1
-    }
-    graph.setEvaluator(for: unrelatedIdentity) {
-      unrelatedEvaluations += 1
-    }
-
-    graph.beginFrame()
-    graph.invalidate([triggeringIdentity])
-    graph.queueDirtyForObservationChange(observedBy: triggeringIdentity)
-    let usedDirtyFrontier = graph.evaluateDirtyNodes()
-
-    #expect(usedDirtyFrontier)
-    #expect(rootEvaluations == 0)
-    #expect(triggeringEvaluations == 1)
-    #expect(peerEvaluations == 1)
-    #expect(unrelatedEvaluations == 0)
-  }
-
   @Test("precise observation firing spares same-object peer readers")
   func preciseObservationFiringSparesPeerReaders() {
-    let previous = PreciseObservationFiringConfiguration.isEnabled
-    PreciseObservationFiringConfiguration.isEnabled = true
-    defer { PreciseObservationFiringConfiguration.isEnabled = previous }
-
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let triggeringIdentity = testIdentity("Root", "Triggering")
@@ -900,9 +830,13 @@ struct ViewGraphTests {
       }
     }
 
-    // Precondition: both readers share the object token, so the legacy union
-    // would dirty the peer too (see the characterization test above).
-    #expect(graph.observableDependentIdentities(for: sharedObservableID) == [triggeringIdentity, peerIdentity])
+    // Precondition: both readers share the object token (a legacy object-token
+    // union would have dirtied the peer too); precise firing dirties only the
+    // node whose tracking pass read the mutated property.
+    #expect(
+      graph.observableDependentIdentities(for: sharedObservableID) == [
+        triggeringIdentity, peerIdentity,
+      ])
 
     var rootEvaluations = 0
     var triggeringEvaluations = 0
@@ -936,92 +870,8 @@ struct ViewGraphTests {
     #expect(unrelatedEvaluations == 0)
   }
 
-  @Test("key-path observable invalidation narrows to same-key-path peers")
-  func keyPathObservableInvalidationNarrowsToSameKeyPathPeers() {
-    // Exercise key-path narrowing specifically: precise firing (on by default)
-    // takes precedence and would spare even the same-key-path peer, so disable
-    // it here.
-    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
-    let previous = ObservableKeyPathInvalidationConfiguration.isEnabled
-    PreciseObservationFiringConfiguration.isEnabled = false
-    ObservableKeyPathInvalidationConfiguration.isEnabled = true
-    defer {
-      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
-      ObservableKeyPathInvalidationConfiguration.isEnabled = previous
-    }
-
-    let graph = ViewGraph()
-    let rootIdentity = testIdentity("Root")
-    let hotReaderA = testIdentity("Root", "HotA")
-    let hotReaderB = testIdentity("Root", "HotB")
-    let coldReader = testIdentity("Root", "Cold")
-    let model = DependencyKeyPathModel()
-    let modelID = ObjectIdentifier(model)
-    let hotKeyPath: AnyKeyPath = \DependencyKeyPathModel.hot
-    let coldKeyPath: AnyKeyPath = \DependencyKeyPathModel.cold
-
-    seedDependencyGraph(
-      graph: graph,
-      rootIdentity: rootIdentity,
-      childIdentities: [hotReaderA, hotReaderB, coldReader]
-    ) { identity, node in
-      switch identity {
-      case hotReaderA, hotReaderB:
-        node.recordObservableRead(modelID, keyPath: hotKeyPath)
-      case coldReader:
-        node.recordObservableRead(modelID, keyPath: coldKeyPath)
-      default:
-        break
-      }
-    }
-
-    var rootEvaluations = 0
-    var hotAEvaluations = 0
-    var hotBEvaluations = 0
-    var coldEvaluations = 0
-    graph.setRootEvaluator(rootIdentity: rootIdentity) {
-      rootEvaluations += 1
-    }
-    graph.setEvaluator(for: hotReaderA) {
-      hotAEvaluations += 1
-    }
-    graph.setEvaluator(for: hotReaderB) {
-      hotBEvaluations += 1
-    }
-    graph.setEvaluator(for: coldReader) {
-      coldEvaluations += 1
-    }
-
-    graph.beginFrame()
-    graph.invalidate([hotReaderA])
-    graph.queueDirtyForObservationChange(observedBy: hotReaderA)
-    let usedDirtyFrontier = graph.evaluateDirtyNodes()
-
-    #expect(usedDirtyFrontier)
-    #expect(rootEvaluations == 0)
-    // The firing `\.hot` reader re-resolves...
-    #expect(hotAEvaluations == 1)
-    // ...and so does a `\.hot` peer that did NOT fire — re-dirtied from the
-    // durable key-path index (this is what distinguishes key-path narrowing from
-    // precise firing, which would spare it).
-    #expect(hotBEvaluations == 1)
-    // ...but the `\.cold` peer is spared (the legacy object union would dirty
-    // it: coldEvaluations == 1).
-    #expect(coldEvaluations == 0)
-  }
-
-  @Test("characterization: observable environment fan-out uses object tokens")
+  @Test("observable and environment fan-out use separate reverse indices")
   func observableEnvironmentInvalidationUsesObjectTokensSeparateFromEnvironmentKeys() {
-    // Pin the legacy object-token union: both narrowings are on by default.
-    let previousPrecise = PreciseObservationFiringConfiguration.isEnabled
-    let previousKeyPath = ObservableKeyPathInvalidationConfiguration.isEnabled
-    PreciseObservationFiringConfiguration.isEnabled = false
-    ObservableKeyPathInvalidationConfiguration.isEnabled = false
-    defer {
-      PreciseObservationFiringConfiguration.isEnabled = previousPrecise
-      ObservableKeyPathInvalidationConfiguration.isEnabled = previousKeyPath
-    }
-
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let triggeringIdentity = testIdentity("Root", "Triggering")
@@ -1088,7 +938,9 @@ struct ViewGraphTests {
     #expect(usedDirtyFrontier)
     #expect(rootEvaluations == 0)
     #expect(triggeringEvaluations == 1)
-    #expect(peerEvaluations == 1)
+    // Precise firing dirties only the triggering reader; the same-object peer is
+    // spared, and the environment-key index is a separate axis untouched here.
+    #expect(peerEvaluations == 0)
     #expect(unrelatedEvaluations == 0)
   }
 
@@ -1612,11 +1464,6 @@ private enum DependencyKeyA {}
 private enum DependencyKeyB {}
 
 private final class DependencyObservableBox {}
-
-private final class DependencyKeyPathModel {
-  var hot = 0
-  var cold = 0
-}
 
 @MainActor
 private final class RegistrationCounter {

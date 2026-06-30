@@ -338,14 +338,14 @@ func resolveView<V: View>(
     return structurallyStamped
   }
 
-  // Memoized-body reuse (gated by SWIFTTUI_MEMO_REUSE, default off): Layer A
-  // above rejected this node, but if it is only a structural descendant of an
-  // invalidated ancestor whose own view value is structurally unchanged (and it
-  // has no recorded dependencies and passes every non-dirty reuse guard), the
-  // body re-run is redundant — reuse the committed subtree via the same path as
-  // Layer A. Behind the same focus/press suppression gate.
-  if MemoReuseConfiguration.isEnabled,
-    !context.effectiveSuppressesRetainedReuse(at: context.identity),
+  // Memoized-body reuse: Layer A above rejected this node, but if it is only a
+  // structural descendant of an invalidated ancestor whose own view value is
+  // structurally unchanged (and it has no recorded dependencies and passes every
+  // non-dirty reuse guard), the body re-run is redundant — reuse the committed
+  // subtree via the same path as Layer A. Behind the same focus/press
+  // suppression gate. `Equatable`-only, so it is inert on trees that do not opt
+  // in (a non-`Equatable` view leaves `memoViewValue` nil and bails immediately).
+  if !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.memoizedReusableSnapshot(
       for: context.identity,
       viewValue: view,
@@ -485,8 +485,7 @@ func resolveView<V: View>(
 @MainActor
 func shouldCaptureMemoViewValue<V: View>(_ view: V) -> Bool {
   if MemoSkipTrace.shouldObserve { return true }
-  if MemoReuseConfiguration.isEnabled { return view is any Equatable }
-  return false
+  return view is any Equatable
 }
 
 /// Token carrying the prior committed output of a recomputed node that the memo

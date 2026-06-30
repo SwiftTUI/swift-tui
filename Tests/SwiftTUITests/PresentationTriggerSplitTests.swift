@@ -5,31 +5,16 @@ import Testing
 @testable import SwiftTUIViews
 
 /// Validates "Lever B" of the sheet-open re-architecture: the
-/// ``PresentationTriggerLeaf`` split. Under reader-attribution, a presentation
-/// modifier resolves its background at a `base` child and emits the
-/// `isPresented` read from a zero-size sibling trigger leaf, so the background
-/// is a disjoint sibling of the trigger (neither ancestor nor descendant) and
-/// can be reused when `isPresented` toggles. With the flag off the structure is
-/// unchanged — the background carries the declaration directly, with no wrapper
-/// and no trigger leaf.
-///
-/// Serialized because it flips the process-level reader-attribution flag.
+/// ``PresentationTriggerLeaf`` split. A presentation modifier resolves its
+/// background at a `base` child and emits the `isPresented` read from a zero-size
+/// sibling trigger leaf, so the background is a disjoint sibling of the trigger
+/// (neither ancestor nor descendant) and can be reused when `isPresented`
+/// toggles (reader-attributed `@State` invalidation, now unconditional).
 @MainActor
-@Suite(.serialized)
 struct PresentationTriggerSplitTests {
-  private func withReaderAttribution<Result>(
-    _ enabled: Bool,
-    _ body: () throws -> Result
-  ) rethrows -> Result {
-    let previous = ReaderAttributionConfiguration.isEnabled
-    ReaderAttributionConfiguration.isEnabled = enabled
-    defer { ReaderAttributionConfiguration.isEnabled = previous }
-    return try body()
-  }
-
-  @Test("reader-attributed: the trigger leaf is a disjoint sibling of the background")
+  @Test("the trigger leaf is a disjoint sibling of the background")
   func triggerLeafIsDisjointSiblingOfBackground() throws {
-    try withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(
         sheetTriggerRoot(isPresented: true),
@@ -57,7 +42,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("reader-attributed: the background identity is stable across open/close")
   func backgroundIdentityStableAcrossToggle() throws {
-    try withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer()
       let rootIdentity = testIdentity("Root")
 
@@ -87,7 +72,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("reader-attributed: invalidating only the trigger leaf spares the background")
   func invalidatingTriggerSparesBackground() throws {
-    try withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
       let rootIdentity = testIdentity("ReuseRoot")
 
@@ -120,9 +105,9 @@ struct PresentationTriggerSplitTests {
     }
   }
 
-  @Test("legacy: invalidating the owner re-resolves the background (no reuse)")
+  @Test("invalidating the owner re-resolves the background (the cost Lever B avoids)")
   func invalidatingOwnerReResolvesBackground() throws {
-    withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
       let rootIdentity = testIdentity("ReuseRoot")
 
@@ -131,9 +116,9 @@ struct PresentationTriggerSplitTests {
         context: .init(identity: rootIdentity),
         proposal: triggerProposal
       )
-      // Owner-anchored invalidation (the legacy attribution) dirties the root,
-      // an ancestor of the background — so the background cannot be reused. This
-      // is the cost Lever B removes by moving the read to the sibling trigger.
+      // Owner-anchored invalidation dirties the root, an ancestor of the
+      // background — so the background cannot be reused. This is the cost Lever B
+      // removes by moving the `isPresented` read to the sibling trigger leaf.
       let opened = renderer.render(
         reuseProbe(isPresented: true),
         context: .init(
@@ -146,28 +131,11 @@ struct PresentationTriggerSplitTests {
     }
   }
 
-  @Test("flag off: no trigger leaf is introduced (legacy single-node structure)")
-  func flagOffKeepsLegacyStructure() throws {
-    withReaderAttribution(false) {
-      let renderer = DefaultRenderer()
-      let artifacts = renderer.render(
-        sheetTriggerRoot(isPresented: true),
-        context: .init(identity: testIdentity("Root")),
-        proposal: triggerProposal
-      )
-
-      #expect(artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger")) == nil)
-      // The legacy path still presents the sheet.
-      #expect(artifacts.resolvedTree.descendant(withText: "Base probe") != nil)
-      #expect(artifacts.resolvedTree.descendant(withText: "Sheet body") != nil)
-    }
-  }
-
   // MARK: - Popover trigger split (the same Lever B pattern, popover modifiers)
 
   @Test("popover: the trigger leaf is a disjoint sibling of the background")
   func popoverTriggerLeafIsDisjointSiblingOfBackground() throws {
-    try withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(
         popoverTriggerRoot(isPresented: true),
@@ -191,7 +159,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("popover: invalidating only the trigger leaf spares the background")
   func popoverInvalidatingTriggerSparesBackground() throws {
-    try withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
       let rootIdentity = testIdentity("PopoverReuseRoot")
 
@@ -221,7 +189,7 @@ struct PresentationTriggerSplitTests {
 
   @Test("item popover: the trigger leaf owns the item read and the overlay presents")
   func itemPopoverTriggerLeafPresentsOverlay() throws {
-    withReaderAttribution(true) {
+    do {
       let renderer = DefaultRenderer()
       let artifacts = renderer.render(
         itemPopoverTriggerRoot(item: PopoverProbeItem(id: "alpha")),
@@ -240,22 +208,6 @@ struct PresentationTriggerSplitTests {
         proposal: triggerProposal
       )
       #expect(dismissed.resolvedTree.descendant(withText: "Item alpha") == nil)
-    }
-  }
-
-  @Test("popover flag off: no trigger leaf, legacy structure presents")
-  func popoverFlagOffKeepsLegacyStructure() throws {
-    withReaderAttribution(false) {
-      let renderer = DefaultRenderer()
-      let artifacts = renderer.render(
-        popoverTriggerRoot(isPresented: true),
-        context: .init(identity: testIdentity("Root")),
-        proposal: triggerProposal
-      )
-
-      #expect(artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger")) == nil)
-      #expect(artifacts.resolvedTree.descendant(withText: "Base probe") != nil)
-      #expect(artifacts.resolvedTree.descendant(withText: "Popover body") != nil)
     }
   }
 }

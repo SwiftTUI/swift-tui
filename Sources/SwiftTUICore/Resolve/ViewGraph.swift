@@ -218,10 +218,6 @@ package final class ViewGraph {
     set { dependencyIndex.observableDependents = newValue }
   }
 
-  private var observableKeyPathDependents: [ObservableKeyPathKey: Set<ViewNodeID>] {
-    get { dependencyIndex.observableKeyPathDependents }
-    set { dependencyIndex.observableKeyPathDependents = newValue }
-  }
   private var currentFrameID: UInt64 {
     get { frameCommit.currentFrameID }
     set { frameCommit.currentFrameID = newValue }
@@ -422,7 +418,6 @@ package final class ViewGraph {
       stateSlotDependents: stateSlotDependents,
       environmentDependents: debugObjectDependencySnapshot(environmentDependents),
       observableDependents: debugObjectDependencySnapshot(observableDependents),
-      observableKeyPathDependents: debugKeyPathDependencySnapshot(observableKeyPathDependents),
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
@@ -814,10 +809,7 @@ package final class ViewGraph {
     recordCheckpointGraphMutation()
     ViewGraphInvalidationPlanner.queueDirty(
       ViewGraphInvalidationPlanner.observationChangeDirtyNodeIDs(
-        observedBy: viewNodeID,
-        nodesByNodeID: nodesByNodeID,
-        observableDependents: observableDependents,
-        observableKeyPathDependents: observableKeyPathDependents
+        observedBy: viewNodeID
       ),
       graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
       nodesByNodeID: nodesByNodeID
@@ -2441,8 +2433,7 @@ package final class ViewGraph {
       current: node.dependencies,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents,
-      observableKeyPathDependents: &observableKeyPathDependents
+      observableDependents: &observableDependents
     )
   }
 
@@ -2455,8 +2446,7 @@ package final class ViewGraph {
       dependencies: node.dependencies,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents,
-      observableKeyPathDependents: &observableKeyPathDependents
+      observableDependents: &observableDependents
     )
   }
 

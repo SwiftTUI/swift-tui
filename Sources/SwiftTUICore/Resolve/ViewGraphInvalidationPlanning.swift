@@ -38,51 +38,25 @@ enum ViewGraphInvalidationPlanner {
     for key: StateSlotKey,
     stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
   ) -> Set<ViewNodeID> {
-    var result = stateSlotDependents[key] ?? []
-    // Legacy: always dirty the owner (defense-in-depth for deferred / conditional
-    // reads). Reader-attributed mode dirties only genuine readers — a
-    // projection-only owner is recorded as no reader and is therefore spared,
-    // which is what takes sheet/palette open from O(background) to O(overlay).
-    if !ReaderAttributionConfiguration.isEnabled {
-      result.insert(key.owner)
-    }
-    return result
+    // Reader-attributed: dirty only the genuine readers — a projection-only owner
+    // is recorded as no reader and is therefore spared, which is what takes
+    // sheet/palette open from O(background) to O(overlay). The write side
+    // (`ViewNode.stateChangeInvalidationIdentities`) falls back to the owner when
+    // no readers were recorded (deferred / conditional reads), so a change is
+    // never dropped.
+    stateSlotDependents[key] ?? []
   }
 
   static func observationChangeDirtyNodeIDs(
-    observedBy viewNodeID: ViewNodeID,
-    nodesByNodeID: [ViewNodeID: ViewNode],
-    observableDependents: [ObjectIdentifier: Set<ViewNodeID>],
-    observableKeyPathDependents: [ObservableKeyPathKey: Set<ViewNodeID>]
+    observedBy viewNodeID: ViewNodeID
   ) -> Set<ViewNodeID> {
     // Precise firing: the `withObservationTracking` onChange already fired for
     // exactly the node that read the mutated property, so the firing node alone
     // is the correct dirty set. Dropping the co-reader union stops a `\.hot`
-    // write from dirtying `\.cold`/`\.rare` peers on the same object token.
-    if PreciseObservationFiringConfiguration.isEnabled {
-      return Set([viewNodeID])
-    }
-    // Key-path narrowing: keep the firing node and the co-readers that recorded
-    // one of its key paths, dropping different-key-path peers — but only when
-    // every co-reader is key-path-attributed (else fall back to the object
-    // union below, over-invalidate rather than miss).
-    if ObservableKeyPathInvalidationConfiguration.isEnabled,
-      let narrowed = ViewGraphDependencyIndex.keyPathNarrowedObservableDependents(
-        triggeredBy: viewNodeID,
-        nodesByNodeID: nodesByNodeID,
-        observableDependents: observableDependents,
-        observableKeyPathDependents: observableKeyPathDependents
-      )
-    {
-      return Set([viewNodeID]).union(narrowed)
-    }
-    return Set([viewNodeID]).union(
-      ViewGraphDependencyIndex.observableDependents(
-        triggeredBy: viewNodeID,
-        nodesByNodeID: nodesByNodeID,
-        observableDependents: observableDependents
-      )
-    )
+    // write from dirtying `\.cold`/`\.rare` peers on the same object token. A node
+    // that records an object token cannot be memo-reused, so it always re-resolves
+    // and re-arms its tracking — it cannot go deaf.
+    Set([viewNodeID])
   }
 
   static func environmentReaderDirtyNodeIDs(

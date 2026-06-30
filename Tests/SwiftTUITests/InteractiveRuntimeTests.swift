@@ -1070,13 +1070,9 @@ struct InteractiveRuntimeTests {
       followUpInvalidationIdentity: ownerIdentity
     )
 
-    let originalReaderAttribution = ReaderAttributionConfiguration.isEnabled
-    defer { ReaderAttributionConfiguration.isEnabled = originalReaderAttribution }
-
-    // Reader-attributed: an action whose dispatch already requested an
-    // invalidation (its `@State` write) skips the redundant owner-scope
-    // follow-up, sparing the owner's disjoint descendants.
-    ReaderAttributionConfiguration.isEnabled = true
+    // An action whose dispatch already requested an invalidation (its `@State`
+    // write) skips the redundant owner-scope follow-up, sparing the owner's
+    // disjoint descendants.
     let beforeInvalidating = runLoop.schedulerPendingInvalidations()
     runLoop.scheduler.requestInvalidation(of: [readerIdentity])
     runLoop.recordFollowUpInvalidation(
@@ -1091,18 +1087,6 @@ struct InteractiveRuntimeTests {
     runLoop.recordFollowUpInvalidation(
       for: actionIdentity,
       schedulerInvalidationsBeforeDispatch: beforeQuiet
-    )
-    #expect(runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
-
-    // Reader attribution off: byte-identical legacy — always insert the
-    // follow-up, even when the dispatch invalidated.
-    ReaderAttributionConfiguration.isEnabled = false
-    runLoop.postActionInvalidationIdentities.removeAll()
-    let beforeLegacy = runLoop.schedulerPendingInvalidations()
-    runLoop.scheduler.requestInvalidation(of: [actionIdentity])
-    runLoop.recordFollowUpInvalidation(
-      for: actionIdentity,
-      schedulerInvalidationsBeforeDispatch: beforeLegacy
     )
     #expect(runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
   }

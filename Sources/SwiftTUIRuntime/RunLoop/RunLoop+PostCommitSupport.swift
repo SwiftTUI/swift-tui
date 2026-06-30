@@ -91,9 +91,7 @@ extension RunLoop {
     else {
       return
     }
-    let actionRequestedInvalidation =
-      ReaderAttributionConfiguration.isEnabled
-      && schedulerPendingInvalidations() != before
+    let actionRequestedInvalidation = schedulerPendingInvalidations() != before
     guard !actionRequestedInvalidation else {
       return
     }

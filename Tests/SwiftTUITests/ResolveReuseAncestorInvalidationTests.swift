@@ -58,23 +58,18 @@ struct ResolveReuseAncestorInvalidationTests {
       )
     }
 
-    // Soundness invariant — gate-independent: the binding-driven Text must
-    // reflect the new external value, never the stale one.
-    for gate in [false, true] {
-      let updated = withMemoReuse(gate) { renderFrames() }
-      let rendered = updated.rasterSurface.lines.joined(separator: "\n")
-      #expect(rendered.contains("Styling"))
-      #expect(!rendered.contains("Overview"))
-    }
+    // Soundness invariant: the binding-driven Text must reflect the new external
+    // value, never the stale one.
+    let updated = renderFrames()
+    let rendered = updated.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("Styling"))
+    #expect(!rendered.contains("Overview"))
 
-    // The memo gate is `Equatable`-only: these are bare `Text`/`VStack` views
-    // (not `Equatable`), so nothing in this tree is a memo candidate — no
-    // descendant is reused, gate on or off. (Opting in via `.equatable()` / an
-    // `Equatable` boundary is covered by `EquatableBoundaryReuseTests`.)
-    for gate in [false, true] {
-      let updated = withMemoReuse(gate) { renderFrames() }
-      #expect(updated.diagnostics.work.resolvedNodesReused == 0)
-    }
+    // Memo reuse is `Equatable`-only: these are bare `Text`/`VStack` views (not
+    // `Equatable`), so nothing in this tree is a memo candidate — no descendant
+    // is reused. (Opting in via `.equatable()` / an `Equatable` boundary is
+    // covered by `EquatableBoundaryReuseTests`.)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
   }
 
   @Test("non-Equatable clean descendant is not memo-reused (the gate is Equatable-only)")
@@ -109,17 +104,14 @@ struct ResolveReuseAncestorInvalidationTests {
     }
 
     // A bare, unchanged `Text`/`VStack` subtree under an invalidated ancestor is
-    // NOT `Equatable`, so it is not a memo candidate: it recomputes whether the
-    // gate is on or off (only an `Equatable`/`.equatable()` boundary opts in).
-    // The render is identical regardless.
-    for gate in [false, true] {
-      let updated = withMemoReuse(gate) { renderFrames() }
-      let rendered = updated.rasterSurface.lines.joined(separator: "\n")
-      #expect(rendered.contains("Stable"))
-      #expect(rendered.contains("AlsoStable"))
-      #expect(updated.diagnostics.work.resolvedNodesReused == 0)
-      #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
-    }
+    // NOT `Equatable`, so it is not a memo candidate: it recomputes (only an
+    // `Equatable`/`.equatable()` boundary opts in).
+    let updated = renderFrames()
+    let rendered = updated.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("Stable"))
+    #expect(rendered.contains("AlsoStable"))
+    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
   }
 
   @Test("ancestor invalidation recomputes List row labels derived from root state")

@@ -195,7 +195,8 @@ struct DependencyModelTests {
       environmentValues: environmentValues
     )
 
-    #expect(dependencies.environmentReads.contains(ObjectIdentifier(DependencyObservableModelKey.self)))
+    #expect(
+      dependencies.environmentReads.contains(ObjectIdentifier(DependencyObservableModelKey.self)))
     #expect(
       dependencies.observableReads == [
         ObjectIdentifier(model)
@@ -270,31 +271,6 @@ struct DependencyModelTests {
     #expect(nameDependencies.observableReads == expected)
     #expect(ageDependencies.observableReads == expected)
     #expect(collectionDependencies.observableReads == expected)
-  }
-
-  @Test("key-path mode: @Bindable records distinct key paths per property")
-  func bindableRecordsDistinctKeyPathsUnderKeyPathMode() throws {
-    let previous = ObservableKeyPathInvalidationConfiguration.isEnabled
-    ObservableKeyPathInvalidationConfiguration.isEnabled = true
-    defer { ObservableKeyPathInvalidationConfiguration.isEnabled = previous }
-
-    let model = DependencyObservableModel()
-    let nameDependencies = try resolveDependencies(
-      ObservableDependencyProbe(model: model, property: .name)
-    )
-    let ageDependencies = try resolveDependencies(
-      ObservableDependencyProbe(model: model, property: .age)
-    )
-
-    // The object token is still recorded (additive fallback)...
-    let expected = Set([ObjectIdentifier(model)])
-    #expect(nameDependencies.observableReads == expected)
-    #expect(ageDependencies.observableReads == expected)
-    // ...but the key-path axis now distinguishes properties that the object
-    // token alone collapses together (contrast the characterization above).
-    #expect(!nameDependencies.observableKeyPathReads.isEmpty)
-    #expect(!ageDependencies.observableKeyPathReads.isEmpty)
-    #expect(nameDependencies.observableKeyPathReads != ageDependencies.observableKeyPathReads)
   }
 }
 

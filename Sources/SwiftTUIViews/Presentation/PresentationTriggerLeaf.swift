@@ -51,26 +51,19 @@ struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
   }
 }
 
-/// Shared resolve path for the builtin presentation modifiers, gated on
-/// reader-attribution.
+/// Shared resolve path for the builtin presentation modifiers.
 ///
-/// - When ``ReaderAttributionConfiguration/isEnabled`` is **off** (opt-out via
-///   `SWIFTTUI_READER_ATTRIBUTION=0`; the flag is on by default), this is
-///   byte-identical to the pre-Lever-B behavior: resolve the background at
-///   `context.identity`, read the activation state there, and merge the
-///   declaration onto it.
-/// - When **on** (default), resolve the background at a `base` child so a
-///   zero-size ``PresentationTriggerLeaf`` sibling can own the activation
-///   read. A wrapper pins `context.identity` and parents
-///   `[background, trigger]` as disjoint siblings, so toggling the
-///   presentation state spares the background.
+/// Resolves the background at a `base` child so a zero-size
+/// ``PresentationTriggerLeaf`` sibling can own the activation read. A wrapper
+/// pins `context.identity` and parents `[background, trigger]` as disjoint
+/// siblings, so toggling the presentation state dirties only the trigger leaf
+/// (reader-attributed) and spares the background.
 ///
-/// `prepareBackground` runs on the resolved background in both paths (e.g. the
-/// palette sheet absorbs and clears `PaletteCommandsPreferenceKey`). The
-/// `declaration` closure builds the coordinator declaration lazily from the
-/// resolved background; in the reader-attributed path it is invoked only when
-/// the trigger leaf observes an active presentation, preserving the original
-/// "build the presentation item only while presented" laziness.
+/// `prepareBackground` runs on the resolved background (e.g. the palette sheet
+/// absorbs and clears `PaletteCommandsPreferenceKey`). The `declaration` closure
+/// builds the coordinator declaration lazily from the resolved background; it is
+/// invoked only when the trigger leaf observes an active presentation,
+/// preserving the "build the presentation item only while presented" laziness.
 @MainActor
 func resolvePresentationModifier<Base: View>(
   content: ModifierContentInputs<Base>,
@@ -105,19 +98,6 @@ func resolvePresentationModifier<Base: View>(
     @escaping @MainActor (_ background: ResolvedNode) ->
     PresentationCoordinatorDeclarationPreferenceValue
 ) -> [ResolvedNode] {
-  guard ReaderAttributionConfiguration.isEnabled else {
-    var node = content.resolve(in: context)
-    prepareBackground(&node)
-    guard isActive() else {
-      return [node]
-    }
-    node.preferenceValues.merge(
-      PresentationCoordinatorDeclarationPreferenceKey.self,
-      value: declaration(node)
-    )
-    return [node]
-  }
-
   var background = content.resolve(in: context.child(component: .named("base")))
   prepareBackground(&background)
   let resolvedBackground = background

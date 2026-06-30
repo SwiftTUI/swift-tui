@@ -278,14 +278,9 @@ public struct State<Value> {
         location,
         for: storageOwner
       )
-      // Legacy attribution eagerly reads here, so even a bare `$binding`
-      // projection records a read on the owner (and re-resolves its whole
-      // subtree on change). Reader-attributed mode skips the eager read:
-      // projecting a binding records nothing; only a genuine `wrappedValue`
-      // read records, attributed to its actual reader.
-      if !ReaderAttributionConfiguration.isEnabled {
-        _ = location.getValue()
-      }
+      // Reader-attributed: projecting a `$binding` records nothing here; only a
+      // genuine `wrappedValue` read records, attributed to its actual reader. So
+      // a bare projection no longer re-resolves the owner's whole subtree.
       return location
     }
 

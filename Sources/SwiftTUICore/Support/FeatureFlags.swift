@@ -12,22 +12,10 @@
 
 /// The known process-level performance/soundness feature gates.
 package enum FeatureGate: CaseIterable, Sendable {
-  case memoReuse
-  case observableKeyPathInvalidation
-  case preciseObservationFiring
-  case readerAttribution
   case soundnessProbe
 
   package var environmentVariableName: String {
     switch self {
-    case .memoReuse:
-      "SWIFTTUI_MEMO_REUSE"
-    case .observableKeyPathInvalidation:
-      "SWIFTTUI_OBSERVABLE_KEYPATH_INVALIDATION"
-    case .preciseObservationFiring:
-      "SWIFTTUI_PRECISE_OBSERVATION_FIRING"
-    case .readerAttribution:
-      "SWIFTTUI_READER_ATTRIBUTION"
     case .soundnessProbe:
       "SWIFTTUI_SOUNDNESS_PROBE"
     }
@@ -35,9 +23,6 @@ package enum FeatureGate: CaseIterable, Sendable {
 
   package var defaultIsEnabled: Bool {
     switch self {
-    case .memoReuse, .observableKeyPathInvalidation, .preciseObservationFiring,
-      .readerAttribution:
-      true
     case .soundnessProbe:
       #if DEBUG
         true

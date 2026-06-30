@@ -66,41 +66,21 @@ struct EquatableBoundaryReuseTests {
     )
   }
 
-  @Test("Equatable boundary reuses its subtree when unchanged (gate on)")
+  @Test("Equatable boundary reuses its subtree when unchanged")
   func equatableBoundaryReusesUnchangedSubtree() {
-    func assertCorrectRender(_ frame: RenderSnapshot) {
-      let rendered = frame.rasterSurface.lines.joined(separator: "\n")
-      #expect(rendered.contains("Chrome:fixed"))
-      #expect(rendered.contains("Static"))
-      #expect(rendered.contains("v2"))
-      #expect(!rendered.contains("v1"))
-    }
+    let frame = renderFrames(
+      chrome1: "fixed", dynamic1: "v1", chrome2: "fixed", dynamic2: "v2")
 
-    let gateOff = withMemoReuse(false) {
-      renderFrames(chrome1: "fixed", dynamic1: "v1", chrome2: "fixed", dynamic2: "v2")
-    }
-    assertCorrectRender(gateOff)
-    // Default (off): the invalidated ancestor recomputes its whole reached
-    // subtree — no descendant reuse.
-    #expect(gateOff.diagnostics.work.resolvedNodesReused == 0)
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("Chrome:fixed"))
+    #expect(rendered.contains("Static"))
+    #expect(rendered.contains("v2"))
+    #expect(!rendered.contains("v1"))
 
-    let gateOn = withMemoReuse(true) {
-      renderFrames(chrome1: "fixed", dynamic1: "v1", chrome2: "fixed", dynamic2: "v2")
-    }
-    assertCorrectRender(gateOn)
-    // On: the `Chrome` boundary's WHOLE subtree is reused via one comparison (its
+    // The `Chrome` boundary's WHOLE subtree is reused via one comparison (its
     // node plus the VStack and both Texts) — not just the leaves — while the
-    // changed dynamic Text still recomputes. So reuse covers more than one node
-    // AND the recomputed-node count drops below the gate-off baseline (the
-    // boundary subtree moved from computed to reused — the env-dep widening).
-    #expect(gateOn.diagnostics.work.resolvedNodesReused > 1)
-    #expect(
-      gateOn.diagnostics.work.resolvedNodesComputed
-        < gateOff.diagnostics.work.resolvedNodesComputed
-    )
-
-    // Reuse is a pure optimization: identical surface in both modes.
-    #expect(gateOn.rasterSurface.lines == gateOff.rasterSurface.lines)
+    // changed dynamic Text still recomputes. So reuse covers more than one node.
+    #expect(frame.diagnostics.work.resolvedNodesReused > 1)
   }
 
   @Test("EquatableView (.equatable()) opt-in reuses its subtree via the isolated ==")
@@ -119,16 +99,14 @@ struct EquatableBoundaryReuseTests {
 
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("Root")
-    let updated = withMemoReuse(true) { () -> RenderSnapshot in
-      _ = renderer.render(
-        WrappedRoot(title: "fixed", dynamic: "v1"),
-        context: .init(identity: rootIdentity)
-      )
-      return renderer.render(
-        WrappedRoot(title: "fixed", dynamic: "v2"),
-        context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
-      )
-    }
+    _ = renderer.render(
+      WrappedRoot(title: "fixed", dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let updated = renderer.render(
+      WrappedRoot(title: "fixed", dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
+    )
 
     let rendered = updated.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("Chrome:fixed"))
@@ -184,7 +162,7 @@ struct EquatableBoundaryReuseTests {
       )
     }
 
-    let focusedFrame = withMemoReuse(true) { render(focused: true, invalidate: false) }
+    let focusedFrame = render(focused: true, invalidate: false)
     #expect(focusedFrame.rasterSurface.lines.joined(separator: "\n").contains("FOCUSED:1"))
 
     // Focus drops and the root is invalidated. `FocusChrome` is a descendant of
@@ -192,7 +170,7 @@ struct EquatableBoundaryReuseTests {
     // (tag unchanged), and the reuse snapshot omits focus state — so only the
     // focus-key dependency exclusion keeps it out of the memo set. The render
     // must reflect the lost focus.
-    let blurredFrame = withMemoReuse(true) { render(focused: false, invalidate: true) }
+    let blurredFrame = render(focused: false, invalidate: true)
     let rendered = blurredFrame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("BLURRED:1"))
     #expect(!rendered.contains("FOCUSED:1"))
@@ -245,8 +223,8 @@ struct EquatableBoundaryReuseTests {
       )
     }
 
-    _ = withMemoReuse(true) { render(focused: true, invalidate: false) }
-    let updated = withMemoReuse(true) { render(focused: false, invalidate: true) }
+    _ = render(focused: true, invalidate: false)
+    let updated = render(focused: false, invalidate: true)
 
     // The boundary subtree is reused even though focus changed — the gap. (If a
     // future fix makes direct-reading controls record the focus/press dependency,
@@ -290,20 +268,17 @@ struct EquatableBoundaryReuseTests {
       )
     }
 
-    let gateOn = withMemoReuse(true) { renderFrames() }
-    let gateOff = withMemoReuse(false) { renderFrames() }
+    let updated = renderFrames()
 
     // The `.equatable()` rows (each its own boundary node inside the ForEach)
     // render correctly and are memo-reused under ancestor invalidation, while the
     // changed header recomputes. Identity is stable enough that reuse fires.
-    let rendered = gateOn.rasterSurface.lines.joined(separator: "\n")
+    let rendered = updated.rasterSurface.lines.joined(separator: "\n")
     for index in 0..<4 {
       #expect(rendered.contains("row-\(index)"))
     }
     #expect(rendered.contains("v2"))
-    #expect(gateOn.diagnostics.work.resolvedNodesReused > 0)
-    // Pure optimization: identical surface gate on vs off.
-    #expect(gateOn.rasterSurface.lines == gateOff.rasterSurface.lines)
+    #expect(updated.diagnostics.work.resolvedNodesReused > 0)
   }
 
   /// P2 (eval task #16): the memo diagnostic flags an *inert* opt-in — a view
@@ -413,15 +388,11 @@ struct EquatableBoundaryReuseTests {
     // The chrome title changes between frames: the comparator sees Chrome's `==`
     // report a change and the boundary recomputes — never serves the stale
     // subtree.
-    for gate in [false, true] {
-      let frame = withMemoReuse(gate) {
-        renderFrames(chrome1: "old", dynamic1: "v1", chrome2: "new", dynamic2: "v2")
-      }
-      let rendered = frame.rasterSurface.lines.joined(separator: "\n")
-      #expect(rendered.contains("Chrome:new"))
-      #expect(!rendered.contains("Chrome:old"))
-      #expect(rendered.contains("v2"))
-    }
+    let frame = renderFrames(chrome1: "old", dynamic1: "v1", chrome2: "new", dynamic2: "v2")
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("Chrome:new"))
+    #expect(!rendered.contains("Chrome:old"))
+    #expect(rendered.contains("v2"))
   }
 
   private struct MemoTraceState {

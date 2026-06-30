@@ -84,17 +84,15 @@ extension RunLoop {
         keyPress: keyPress
       )
       // The handler's own `@State` writes already invalidate the precise
-      // readers under reader attribution, so the coarse root sweep is redundant
+      // readers (reader attribution), so the coarse root sweep is redundant
       // whenever the dispatch invalidated anything — and a full-tree re-resolve
       // on every key is expensive (e.g. re-running a presenting view's whole
       // body for each character typed into a focused TextField). Mirror the
       // control-action path (`recordFollowUpInvalidation`): keep the root sweep
       // only as the backstop for handlers with untracked side effects, which
-      // schedule nothing. Reader-attribution-off stays byte-identical (the
-      // sweep is always issued).
+      // schedule nothing.
       let handlerRequestedInvalidation =
-        ReaderAttributionConfiguration.isEnabled
-        && schedulerPendingInvalidations() != invalidationsBeforeDispatch
+        schedulerPendingInvalidations() != invalidationsBeforeDispatch
       if !handlerRequestedInvalidation {
         scheduler.requestInvalidation(of: [rootIdentity])
       }
