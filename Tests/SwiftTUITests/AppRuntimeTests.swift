@@ -763,19 +763,6 @@ struct AppRuntimeTests {
     #expect(lastFrame.contains("Focus: OptionalFocusWindow/SecondField"))
   }
 
-  @Test("focus synchronization rerender budget trips after the configured limit")
-  func focusSynchronizationRerenderBudgetTripsAtTheConfiguredLimit() {
-    var budget = FocusSyncRerenderBudget(maximumRerenders: 3)
-    let recordRerender = {
-      budget.recordRerender()
-    }
-
-    #expect(recordRerender())
-    #expect(recordRerender())
-    #expect(!recordRerender())
-    #expect(budget.rerenderCount == 3)
-  }
-
   @MainActor
   @Test("FocusedValue reads the value published by the currently focused control")
   func focusedValueTracksFocusedControl() async throws {

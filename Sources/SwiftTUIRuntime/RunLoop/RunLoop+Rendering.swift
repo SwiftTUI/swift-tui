@@ -68,9 +68,8 @@ extension RunLoop {
         )
         switch outcome {
         case .rerender:
-          if convergence.budgetExceeded {
-            break
-          }
+          // The single eager focus-location re-render (capped by
+          // `didEagerFocusLocationRerender`) — loop once more, then converge.
           continue
         case .converged:
           break
@@ -120,12 +119,6 @@ extension RunLoop {
     )
     appendPendingAccessibilityAnnouncements(to: &artifacts)
     latestSemanticSnapshot = artifacts.semanticSnapshot
-    if convergence.budgetExceeded {
-      let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
-      assertionFailure(
-        "Focus synchronization did not converge after \(convergence.rerenderCount) rerenders for frame causes \(causes). The rerender budget was derived from the frame semantic graph."
-      )
-    }
 
     let focusPresentation = artifacts.semanticSnapshot.focusPresentation(
       for: focusTracker.currentFocusIdentity
@@ -342,9 +335,8 @@ extension RunLoop {
           )
           switch outcome {
           case .rerender:
-            if convergence.budgetExceeded {
-              break convergenceLoop
-            }
+            // The single eager focus-location re-render (capped by
+            // `didEagerFocusLocationRerender`) — loop once more, then converge.
             continue convergenceLoop
           case .converged:
             break convergenceLoop

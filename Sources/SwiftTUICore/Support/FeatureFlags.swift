@@ -16,7 +16,6 @@ package enum FeatureGate: CaseIterable, Sendable {
   case observableKeyPathInvalidation
   case preciseObservationFiring
   case readerAttribution
-  case singlePassFocusConvergence
   case soundnessProbe
 
   package var environmentVariableName: String {
@@ -29,8 +28,6 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_PRECISE_OBSERVATION_FIRING"
     case .readerAttribution:
       "SWIFTTUI_READER_ATTRIBUTION"
-    case .singlePassFocusConvergence:
-      "SWIFTTUI_SINGLE_PASS_FOCUS"
     case .soundnessProbe:
       "SWIFTTUI_SOUNDNESS_PROBE"
     }
@@ -39,13 +36,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   package var defaultIsEnabled: Bool {
     switch self {
     case .memoReuse, .observableKeyPathInvalidation, .preciseObservationFiring,
-      .readerAttribution, .singlePassFocusConvergence:
-      // `singlePassFocusConvergence` is on by default: the focus-sync convergence
-      // rewrite (render-until-fixpoint loop → single-pass, one-frame-lag dependency
-      // invalidation with precise focused-value reader attribution) is proven at
-      // parity under AddressSanitizer and gallery-verified for real focus
-      // interactions. `SWIFTTUI_SINGLE_PASS_FOCUS=0` opts back into the legacy loop.
-      // See `SinglePassFocusConvergenceConfiguration`.
+      .readerAttribution:
       true
     case .soundnessProbe:
       #if DEBUG

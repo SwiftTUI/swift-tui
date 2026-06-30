@@ -2,45 +2,40 @@ import SwiftTUICore
 import SwiftTUIViews
 
 extension RunLoop {
-  /// Accumulated focus/scroll convergence state threaded through the
-  /// focus-sync rerender loop and into the shared post-acquisition body.
+  /// Accumulated focus/scroll convergence state threaded through single-pass
+  /// focus-sync (the at-most-one eager re-render) and into the shared
+  /// post-acquisition body.
   package struct FocusSyncConvergenceState {
     var rerenderedForFocusSync = false
-    var budget: FocusSyncRerenderBudget?
-    var budgetExceeded = false
     var focusGraphChanged = false
     var focusBindingChanged = false
     var focusedValuesChanged = false
     var scrollPositionChanged = false
-    /// Single-pass mode only: whether the one deterministic eager re-render that
-    /// applies a focus-location change to the committed frame has already run
-    /// this frame. Caps eager location application at a single extra pass (no
-    /// budget) — focus location cannot oscillate, so one pass suffices; any
-    /// residual change after it lags to the next frame.
+    /// Whether the one deterministic eager re-render that applies a focus-location
+    /// change to the committed frame has already run this frame. Caps eager
+    /// location application at a single extra pass — focus location cannot
+    /// oscillate, so one pass suffices; any residual change after it lags to the
+    /// next frame. This single-pass cap is the convergence guarantee (there is no
+    /// loop and no budget to exhaust).
     var didEagerFocusLocationRerender = false
     var lifecycleCarryForward: [LifecycleCommitEntry] = []
 
+    /// Focus-sync eager re-renders this frame (0 or 1). Surfaced as the
+    /// `focusSyncRerenders` frame diagnostic.
     var rerenderCount: Int {
-      budget?.rerenderCount ?? 0
-    }
-
-    mutating func recordRerender(for semanticSnapshot: SemanticSnapshot) -> Bool {
-      if budget == nil {
-        budget = .derived(from: semanticSnapshot)
-      } else {
-        budget?.expandIfNeeded(for: semanticSnapshot)
-      }
-      return budget?.recordRerender() ?? false
+      didEagerFocusLocationRerender ? 1 : 0
     }
   }
 
-  /// Result of processing one rendered tree inside the focus-sync loop:
-  /// whether the runtime must rerender to converge, and (when it must not)
-  /// the final artifacts to commit.
+  /// Result of processing one rendered tree in single-pass focus-sync: whether
+  /// the runtime must run the one eager focus-location re-render, or (when it
+  /// must not) commit the rendered tree as-is.
   package enum FocusSyncIterationOutcome {
-    /// The rendered tree changed focus/scroll state — rerender to converge.
+    /// A focus-location change needs the single eager re-render to land on the
+    /// committed frame.
     case rerender
-    /// The rendered tree is converged; commit it.
+    /// Nothing further to render this frame; commit it. (A pure focused-value
+    /// change schedules precise reader invalidation for the next frame.)
     case converged
   }
 
@@ -53,12 +48,11 @@ extension RunLoop {
     }
   }
 
-  /// Shared per-iteration body of the focus-sync convergence loop. Applies
-  /// the side effects that must run for every rendered tree (snapshot
-  /// publication, gesture pruning, pointer-hover mode, pointer-capture
-  /// release, focus/scroll/focused-value sync) and folds the resulting
-  /// change flags into `convergence`. Returns whether the runtime must
-  /// rerender to converge.
+  /// Shared body of single-pass focus-sync. Applies the side effects that must
+  /// run for every rendered tree (snapshot publication, gesture pruning,
+  /// pointer-hover mode, pointer-capture release, focus/scroll/focused-value
+  /// sync) and folds the resulting change flags into `convergence`. Returns
+  /// whether the runtime must run the one eager focus-location re-render.
   package func processFocusSyncIteration(
     _ renderedArtifacts: FrameArtifacts,
     convergence: inout FocusSyncConvergenceState
@@ -148,49 +142,42 @@ extension RunLoop {
         into: &convergence.lifecycleCarryForward
       )
 
-      if SinglePassFocusConvergenceConfiguration.isEnabled {
-        // Single-pass convergence, split by node kind (no budget):
-        //
-        // Focus *location* (focus moved / a focus request applied / a `@FocusState`
-        // flip / scroll-to-reveal) is not a feedback edge — it is determined by the
-        // event plus the rendered regions, then applied, and cannot oscillate. Apply
-        // it eagerly with exactly **one** extra render so the committed frame shows
-        // the correct focus. `currentFocusedValues` was updated just above, so the
-        // focused values ride along on that same re-render. Capped at one pass by
-        // `didEagerFocusLocationRerender`; any residual change after it lags a frame.
-        let focusLocationChanged =
-          focusChanged || focusJustEstablished || appliedFocusRequest
-          || appliedDefaultFocusRequest || focusStateChanged || scrollPositionChanged
-        if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
-          convergence.didEagerFocusLocationRerender = true
-          convergence.rerenderedForFocusSync = true
-          return .rerender
-        }
-
-        // A *pure* focused-value change (the focused subtree republished without
-        // focus moving) is the genuine output→input feedback edge. Do not loop on
-        // it: it lags one frame via reader invalidation. Invalidate exactly the
-        // `@FocusedValue`/`@FocusedBinding` readers — found via the reader
-        // attribution recorded during resolve — rather than the whole tree. The
-        // readers re-resolve next frame (selective evaluation) and read the
-        // just-updated `currentFocusedValues`, while sibling subtrees stay reused.
-        // The dependency index persists across reuse, so a reader reused since its
-        // last resolve is still found and never left stale. An empty set means
-        // nothing reads the focused value, so there is nothing to invalidate.
-        if focusedValuesChanged {
-          let focusedValueReaders = renderer.focusedValuesDependentIdentities()
-          if !focusedValueReaders.isEmpty {
-            scheduler.requestInvalidation(of: focusedValueReaders)
-          }
-        }
-        return .converged
+      // Single-pass convergence, split by node kind — no loop, no budget.
+      //
+      // Focus *location* (focus moved / a focus request applied / a `@FocusState`
+      // flip / scroll-to-reveal) is not a feedback edge — it is determined by the
+      // event plus the rendered regions, then applied, and cannot oscillate. Apply
+      // it eagerly with exactly **one** extra render so the committed frame shows
+      // the correct focus. `currentFocusedValues` was updated just above, so the
+      // focused values ride along on that same re-render. Capped at one pass by
+      // `didEagerFocusLocationRerender` (the termination guarantee); any residual
+      // change after it lags a frame.
+      let focusLocationChanged =
+        focusChanged || focusJustEstablished || appliedFocusRequest
+        || appliedDefaultFocusRequest || focusStateChanged || scrollPositionChanged
+      if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
+        convergence.didEagerFocusLocationRerender = true
+        convergence.rerenderedForFocusSync = true
+        return .rerender
       }
 
-      convergence.rerenderedForFocusSync = true
-      if !convergence.recordRerender(for: renderedArtifacts.semanticSnapshot) {
-        convergence.budgetExceeded = true
+      // A *pure* focused-value change (the focused subtree republished without
+      // focus moving) is the genuine output→input feedback edge. Do not loop on
+      // it: it lags one frame via reader invalidation. Invalidate exactly the
+      // `@FocusedValue`/`@FocusedBinding` readers — found via the reader
+      // attribution recorded during resolve — rather than the whole tree. The
+      // readers re-resolve next frame (selective evaluation) and read the
+      // just-updated `currentFocusedValues`, while sibling subtrees stay reused.
+      // The dependency index persists across reuse, so a reader reused since its
+      // last resolve is still found and never left stale. An empty set means
+      // nothing reads the focused value, so there is nothing to invalidate.
+      if focusedValuesChanged {
+        let focusedValueReaders = renderer.focusedValuesDependentIdentities()
+        if !focusedValueReaders.isEmpty {
+          scheduler.requestInvalidation(of: focusedValueReaders)
+        }
       }
-      return .rerender
+      return .converged
     }
     return .converged
   }
