@@ -487,6 +487,52 @@ struct FrameworkStressTests {
     }
   }
 
+  @Test("key press handlers stay paired and bounded under focus owner churn")
+  func keyPressHandlersStayPairedAndBoundedUnderFocusOwnerChurn() throws {
+    // Hypothesis: multiple focused key handlers on a recreated owner should
+    // stay attached to the live focus target without retaining handlers from
+    // previous identities.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("KeyPressHandlerChurnStressRoot"),
+      size: .init(width: 62, height: 8)
+    ) {
+      KeyPressHandlerChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.keyPressHandlerCount == 2)
+    #expect(harness.focusRegionCount == 2)
+
+    var expectedKTotal = 0
+    var expectedLTotal = 0
+    var maxKeyPressHandlers = harness.keyPressHandlerCount
+    var maxFocusRegions = harness.focusRegionCount
+
+    for generation in 0..<20 {
+      _ = try harness.clickText("Key Target \(generation)")
+
+      expectedKTotal += generation + 1
+      var frame = try harness.pressKey(KeyPress(.character("k")))
+      #expect(frame.contains("key totals k \(expectedKTotal) l \(expectedLTotal)"))
+
+      expectedLTotal += generation + 1
+      frame = try harness.pressKey(KeyPress(.character("l")))
+      #expect(frame.contains("key totals k \(expectedKTotal) l \(expectedLTotal)"))
+
+      frame = try harness.clickText("Replace Key Owner")
+      #expect(frame.contains("key owner generation \(generation + 1)"))
+
+      maxKeyPressHandlers = max(maxKeyPressHandlers, harness.keyPressHandlerCount)
+      maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+
+      #expect(harness.keyPressHandlerCount == 2)
+      #expect(harness.focusRegionCount == 2)
+    }
+
+    #expect(maxKeyPressHandlers == 2)
+    #expect(maxFocusRegions == 2)
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -1103,6 +1149,48 @@ private struct ScrollFocusRevealPruningStressFixture: View {
   }
 }
 
+private struct KeyPressHandlerChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var kTotal = 0
+  @State private var lTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Key Owner") { generation += 1 }
+      Text("key owner generation \(generation)")
+      Text("key totals k \(kTotal) l \(lTotal)")
+      KeyPressHandlerChurnOwner(
+        generation: generation,
+        onK: { kTotal += generation + 1 },
+        onL: { lTotal += generation + 1 }
+      )
+      .id("key-owner-\(generation)")
+    }
+    .frame(width: 62, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct KeyPressHandlerChurnOwner: View {
+  let generation: Int
+  let onK: @MainActor () -> Void
+  let onL: @MainActor () -> Void
+
+  var body: some View {
+    Text("Key Target \(generation)")
+      .focusable()
+      .onKeyPress(.character("k")) { _ in
+        onK()
+        return .handled
+      }
+      .onKeyPress(.character("l")) { _ in
+        onL()
+        return .handled
+      }
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -1219,6 +1307,14 @@ private final class StressRuntimeHarness<Content: View> {
 
   var preferenceObservationRegistrationCount: Int {
     runLoop.localPreferenceObservationRegistry.snapshot().count
+  }
+
+  var keyPressHandlerCount: Int {
+    runLoop.localKeyHandlerRegistry.snapshotKeyPressHandlers().values.reduce(0) {
+      count,
+      handlers in
+      count + handlers.count
+    }
   }
 
   var scrollPositionRegistrationCount: Int {
