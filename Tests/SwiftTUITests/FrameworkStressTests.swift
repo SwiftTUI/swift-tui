@@ -389,6 +389,53 @@ struct FrameworkStressTests {
     #expect(maxActions == 3)
   }
 
+  @Test("multiple preference observers stay paired under owner churn")
+  func multiplePreferenceObserversStayPairedUnderOwnerChurn() throws {
+    // Hypothesis: two preference observers on the same resolved owner should
+    // keep distinct registrations and both observe every changed generation as
+    // the owner is repeatedly recreated.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PreferenceObserverChurnStressRoot"),
+      size: .init(width: 66, height: 8)
+    ) {
+      PreferenceObserverChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.preferenceObservationRegistrationCount == 2)
+
+    var expectedTotal = 0
+    var maxPreferenceObservers = harness.preferenceObservationRegistrationCount
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+
+    for generation in 1...24 {
+      expectedTotal += generation
+
+      let frame = try harness.clickText("Advance Preference Owner")
+      #expect(frame.contains("preference generation \(generation)"))
+      #expect(frame.contains("first \(expectedTotal) second \(expectedTotal)"))
+      #expect(harness.preferenceObservationRegistrationCount == 2)
+
+      maxPreferenceObservers = max(
+        maxPreferenceObservers,
+        harness.preferenceObservationRegistrationCount
+      )
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+    }
+
+    #expect(maxPreferenceObservers == 2)
+    #expect(
+      maxLifecycleRegistrations <= 2,
+      """
+      Preference owner churn must retire stale lifecycle handlers; \
+      max=\(maxLifecycleRegistrations)
+      """
+    )
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -935,6 +982,54 @@ private struct FocusOwnerReplacementOwner: View {
   }
 }
 
+private enum PreferenceObserverStressKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+private struct PreferenceObserverChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var firstTotal = 0
+  @State private var secondTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Preference Owner") { generation += 1 }
+      Text("preference generation \(generation)")
+      Text("preference totals first \(firstTotal) second \(secondTotal)")
+      PreferenceObserverChurnOwner(
+        generation: generation,
+        onFirst: { firstTotal += $0 },
+        onSecond: { secondTotal += $0 }
+      )
+      .id("preference-owner-\(generation)")
+    }
+    .frame(width: 66, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct PreferenceObserverChurnOwner: View {
+  let generation: Int
+  let onFirst: @MainActor (Int) -> Void
+  let onSecond: @MainActor (Int) -> Void
+
+  var body: some View {
+    Text("Preference Source \(generation)")
+      .preference(key: PreferenceObserverStressKey.self, value: generation)
+      .onPreferenceChange(PreferenceObserverStressKey.self) { value in
+        onFirst(value)
+      }
+      .onPreferenceChange(PreferenceObserverStressKey.self) { value in
+        onSecond(value)
+      }
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -1047,6 +1142,10 @@ private final class StressRuntimeHarness<Content: View> {
 
   var focusRegionCount: Int {
     runLoop.focusTracker.focusRegions.count
+  }
+
+  var preferenceObservationRegistrationCount: Int {
+    runLoop.localPreferenceObservationRegistry.snapshot().count
   }
 
   func shutdown() {
