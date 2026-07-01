@@ -158,9 +158,22 @@ extension ModifiedContent: ResolvableView where Content: View, Modifier: Primiti
 }
 
 extension ModifiedContent: EntityRouteProvidingView
-where Content: View, Modifier: EntityRouteProvidingModifier {
+where Content: View, Modifier: ViewModifier {
   package func resolveEntityRouteIdentity(in context: ResolveContext) -> EntityIdentity? {
-    modifier.resolveEntityRouteIdentity(in: context)
+    // A `.id(_:)` sets the identity of the *entire* modified view up to that
+    // point, so modifiers applied outside it (e.g. `.task`, `.onAppear`) belong
+    // to the same entity and must resolve their view node through the same
+    // entity route. When this wrapper's own modifier does not provide the route,
+    // forward the one carried by the wrapped content so the outer wrappers bind
+    // to the entity node in the same render as an `.id` rebind instead of the
+    // departing structural-slot node.
+    if let entityModifier = modifier as? any EntityRouteProvidingModifier {
+      return entityModifier.resolveEntityRouteIdentity(in: context)
+    }
+    if let entityContent = content as? any EntityRouteProvidingView {
+      return entityContent.resolveEntityRouteIdentity(in: context)
+    }
+    return nil
   }
 }
 

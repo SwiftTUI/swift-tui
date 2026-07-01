@@ -884,40 +884,21 @@ struct FrameworkStressTests {
     #expect(harness.activeTaskCount == 2)
     #expect(harness.activeTaskDescriptorCount == 2)
 
-    withKnownIssue(
-      """
-      Under an `.id(_:)` entity-identity rebind at a fixed structural slot, task \
-      cancellation and (re)start split across two committed frames instead of \
-      converging in one. The churn render tears down the departing entity node \
-      (cancelling its descriptors -> count 0) while the replacement entity node \
-      commits with an empty `lifecycleMetadata.tasks`; the freshly authored \
-      descriptors only materialize on that node — under a fresh per-view-node \
-      descriptor token — one render later, so a scripted click that observes \
-      immediately after the cancel always sees 0. Remove this known-issue \
-      wrapper once the replacement entity node adopts its `.task` descriptors in \
-      the same render as the churn (activeTaskCount / activeTaskDescriptorCount \
-      remain 2 after each Cycle Multi Tasks click).
-      """
-    ) {
-      var maxActiveTasks = harness.activeTaskCount
-      var maxTaskDescriptors = harness.activeTaskDescriptorCount
+    var maxActiveTasks = harness.activeTaskCount
+    var maxTaskDescriptors = harness.activeTaskDescriptorCount
 
-      for generation in 1...36 {
-        let frame = try harness.clickText("Cycle Multi Tasks")
-        maxActiveTasks = max(maxActiveTasks, harness.activeTaskCount)
-        maxTaskDescriptors = max(maxTaskDescriptors, harness.activeTaskDescriptorCount)
+    for generation in 1...36 {
+      let frame = try harness.clickText("Cycle Multi Tasks")
+      maxActiveTasks = max(maxActiveTasks, harness.activeTaskCount)
+      maxTaskDescriptors = max(maxTaskDescriptors, harness.activeTaskDescriptorCount)
 
-        #expect(frame.contains("multi-task generation \(generation)"))
-        if harness.activeTaskCount != 2 || harness.activeTaskDescriptorCount != 2 {
-          #expect(harness.activeTaskCount == 2)
-          #expect(harness.activeTaskDescriptorCount == 2)
-          return
-        }
-      }
-
-      #expect(maxActiveTasks == 2)
-      #expect(maxTaskDescriptors == 2)
+      #expect(frame.contains("multi-task generation \(generation)"))
+      #expect(harness.activeTaskCount == 2)
+      #expect(harness.activeTaskDescriptorCount == 2)
     }
+
+    #expect(maxActiveTasks == 2)
+    #expect(maxTaskDescriptors == 2)
 
     harness.shutdown()
     #expect(harness.activeTaskCount == 0)
