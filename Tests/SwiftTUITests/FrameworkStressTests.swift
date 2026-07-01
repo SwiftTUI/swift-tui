@@ -750,6 +750,67 @@ struct FrameworkStressTests {
     #expect(maxDescendantIdentityCount == initialDescendantIdentityCount)
   }
 
+  @Test("focused binding dispatch targets the live owner under identity churn")
+  func focusedBindingDispatchTargetsTheLiveOwnerUnderIdentityChurn() throws {
+    // Hypothesis: a @FocusedBinding reader above a recreated focused-value
+    // publisher should retarget to the currently focused live owner, not retain
+    // a binding into a prior owner whose identity has been torn down.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FocusedBindingChurnStressRoot"),
+      size: .init(width: 82, height: 10)
+    ) {
+      FocusedBindingChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.focusedValueRegistrationCount == 2)
+
+    var expectedFocusedValue = 0
+    var maxFocusedValueRegistrations = harness.focusedValueRegistrationCount
+    var maxFocusRegions = harness.focusRegionCount
+
+    withKnownIssue(
+      """
+      Focused binding dispatch retargets the live binding, but focused-value \
+      publisher registrations whose identities churn under the owner are not \
+      pruned. The registry grows by two registrations per rebuild; remove this \
+      known issue when focusedValueRegistrationCount stays at 2 across the loop.
+      """
+    ) {
+      for generation in 0..<24 {
+        _ = try harness.clickText("Focused Binding First \(generation)")
+        expectedFocusedValue += generation + 1
+
+        var frame = try harness.pressKey(KeyPress(.character("i"), modifiers: .ctrl))
+        #expect(
+          frame.contains(
+            "focused binding generation \(generation) value \(expectedFocusedValue)"
+          )
+        )
+
+        frame = try harness.clickText("Rebuild Focused Binding Owner")
+        #expect(frame.contains("focused binding generation \(generation + 1)"))
+        #expect(frame.contains("Focused Binding First \(generation + 1)"))
+        #expect(frame.contains("Focused Binding Second \(generation + 1)"))
+
+        maxFocusedValueRegistrations = max(
+          maxFocusedValueRegistrations,
+          harness.focusedValueRegistrationCount
+        )
+        maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+
+        if harness.focusedValueRegistrationCount != 2 {
+          #expect(harness.focusedValueRegistrationCount == 2)
+          return
+        }
+        #expect(harness.focusRegionCount == 3)
+      }
+
+      #expect(maxFocusedValueRegistrations == 2)
+    }
+    #expect(maxFocusRegions == 3)
+  }
+
   @Test("key commands stay scoped and bounded under inner panel identity churn")
   func keyCommandsStayScopedAndBoundedUnderInnerPanelIdentityChurn() throws {
     // Hypothesis: action-scope command registrations should remove stale inner
@@ -1697,6 +1758,67 @@ private struct FocusedValueDescendantChurnOwner: View {
       Text("Focused Descendant \(generation)")
         .id(testIdentity("FocusedValueDescendantChurn", "descendant", "\(generation)"))
         .focusable()
+    }
+  }
+}
+
+private enum FocusedBindingChurnKey: FocusedValueKey {
+  typealias Value = Binding<Int>
+}
+
+extension FocusedValues {
+  fileprivate var focusedBindingChurnValue: Binding<Int>? {
+    get { self[FocusedBindingChurnKey.self] }
+    set { self[FocusedBindingChurnKey.self] = newValue }
+  }
+}
+
+private struct FocusedBindingChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var first = 0
+  @State private var second = 100
+  @FocusedBinding(\.focusedBindingChurnValue) private var focusedNumber
+
+  var body: some View {
+    Panel(id: testIdentity("FocusedBindingChurn", "panel")) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(
+          """
+          focused binding generation \(generation) value \
+          \(focusedNumber.map(String.init) ?? "none")
+          """
+        )
+        Button("Rebuild Focused Binding Owner") { generation += 1 }
+        FocusedBindingChurnOwner(
+          generation: generation,
+          first: $first,
+          second: $second
+        )
+        .id(testIdentity("FocusedBindingChurn", "owner", "\(generation)"))
+      }
+    }
+    .keyCommand("Increment focused binding", key: .character("i"), modifiers: .ctrl) {
+      if let focusedNumber {
+        self.focusedNumber = focusedNumber + generation + 1
+      }
+    }
+    .frame(width: 82, height: 10, alignment: .topLeading)
+  }
+}
+
+private struct FocusedBindingChurnOwner: View {
+  let generation: Int
+  @Binding var first: Int
+  @Binding var second: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Focused Binding First \(generation) \(first)") {}
+        .id(testIdentity("FocusedBindingChurn", "first", "\(generation)"))
+        .focusedValue(\.focusedBindingChurnValue, $first)
+      Button("Focused Binding Second \(generation) \(second)") {}
+        .id(testIdentity("FocusedBindingChurn", "second", "\(generation)"))
+        .focusedValue(\.focusedBindingChurnValue, $second)
     }
   }
 }
