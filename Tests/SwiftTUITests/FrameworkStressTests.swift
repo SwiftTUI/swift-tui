@@ -569,6 +569,46 @@ struct FrameworkStressTests {
     #expect(maxLifecycleRegistrations == 4)
   }
 
+  @Test("onChange handlers stay paired across value churn and owner recreation")
+  func onChangeHandlersStayPairedAcrossValueChurnAndOwnerRecreation() throws {
+    // Hypothesis: stacked lifecycle-change handlers should fire once per value
+    // change and leave no stale live change registrations after each commit.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ChangeHandlerChurnStressRoot"),
+      size: .init(width: 86, height: 8)
+    ) {
+      ChangeHandlerChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.lifecycleRegistrationCount == 0)
+
+    var expectedTotal = 0
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+
+    for iteration in 1...24 {
+      expectedTotal += iteration
+
+      var frame = try harness.clickText("Bump Change Value")
+      #expect(
+        frame.contains(
+          "change generation \(iteration - 1) value \(iteration) first \(expectedTotal) second \(expectedTotal)"
+        )
+      )
+
+      frame = try harness.clickText("Recreate Change Owner")
+      #expect(frame.contains("change generation \(iteration) value \(iteration)"))
+
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+      #expect(harness.lifecycleRegistrationCount == 0)
+    }
+
+    #expect(maxLifecycleRegistrations == 0)
+  }
+
   @Test("scroll focus reveal anchors are pruned when scroll owners are recreated")
   func scrollFocusRevealAnchorsArePrunedWhenScrollOwnersAreRecreated() throws {
     // Hypothesis: focus-reveal state is interaction state for the live scroll
@@ -1507,6 +1547,51 @@ private struct LifecycleHandlerChurnOwner: View {
       .onAppear { onSecondAppear(generation) }
       .onDisappear { onFirstDisappear(generation) }
       .onDisappear { onSecondDisappear(generation) }
+  }
+}
+
+private struct ChangeHandlerChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var value = 0
+  @State private var firstTotal = 0
+  @State private var secondTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Bump Change Value") { value += 1 }
+      Button("Recreate Change Owner") { generation += 1 }
+      Text(
+        """
+        change generation \(generation) value \(value) first \(firstTotal) \
+        second \(secondTotal)
+        """
+      )
+      ChangeHandlerChurnOwner(
+        generation: generation,
+        value: value,
+        onFirst: { firstTotal += $0 },
+        onSecond: { secondTotal += $0 }
+      )
+      .id("change-owner-\(generation)")
+    }
+    .frame(width: 86, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct ChangeHandlerChurnOwner: View {
+  let generation: Int
+  let value: Int
+  let onFirst: @MainActor (Int) -> Void
+  let onSecond: @MainActor (Int) -> Void
+
+  var body: some View {
+    Text("Change Owner \(generation) value \(value)")
+      .onChange(of: value) { _, newValue in
+        onFirst(newValue)
+      }
+      .onChange(of: value) { _, newValue in
+        onSecond(newValue)
+      }
   }
 }
 
