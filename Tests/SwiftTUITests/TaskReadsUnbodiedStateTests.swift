@@ -26,6 +26,14 @@ import Testing
 /// Both probes below must now freeze the held drag — the body-read variant and
 /// the body-never-reads variant alike — so neither the fix nor a regression of
 /// it can drift unnoticed.
+///
+/// Harness note (fixed flake #4 in docs/KNOWN-TEST-FLAKES.md): the two variants
+/// run CONCURRENTLY, so all probe bookkeeping lives in a per-run
+/// `ProbeGrabState` instance — a shared singleton let one variant read the
+/// other's grab values under CI load. The grab offset is captured live inside
+/// the gesture closure, never scraped from a presented frame: the tick loop
+/// advances on wall-clock sleeps while frame presentation can coalesce, so no
+/// frame bearing the exact grab tick is guaranteed to exist.
 @MainActor
 @Suite("Task observes gesture-written @State")
 struct TaskReadsUnbodiedStateTests {
@@ -70,7 +78,7 @@ private struct HeldProbeResult {
 
 @MainActor
 private func runHeldProbe(bodyReadsFlag: Bool) async throws -> HeldProbeResult {
-  ProbeGrabState.shared.reset()
+  let grabState = ProbeGrabState()
   let terminal = RecordingPresentationSurface(surfaceSize: .init(width: 44, height: 6))
   let rootIdentity = testIdentity("TaskReadsUnbodiedStateRoot-\(bodyReadsFlag)")
 
@@ -80,7 +88,7 @@ private func runHeldProbe(bodyReadsFlag: Bool) async throws -> HeldProbeResult {
       .awaitCondition { (latestTick(terminal.frames) ?? 0) >= 3 },
       .event(.mouse(.init(kind: .down(.primary), location: Point(x: 4, y: 1)))),
       .awaitCondition {
-        guard let grab = ProbeGrabState.shared.grabbedTick else { return false }
+        guard let grab = grabState.grabbedTick else { return false }
         return (latestTick(terminal.frames) ?? 0) >= grab + 8
       },
     ])
@@ -93,16 +101,13 @@ private func runHeldProbe(bodyReadsFlag: Bool) async throws -> HeldProbeResult {
     stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
     focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
     proposal: .init(width: 44, height: 6),
-    viewBuilder: { _, _ in HeldProbe(bodyReadsFlag: bodyReadsFlag) }
+    viewBuilder: { _, _ in HeldProbe(bodyReadsFlag: bodyReadsFlag, grabState: grabState) }
   )
   _ = try await runLoop.run()
 
-  // The offset captured on the frame whose tick equals the grab tick.
-  let grabbedTick = try #require(ProbeGrabState.shared.grabbedTick)
-  let grabFrame = try #require(
-    terminal.frames.first { frameTick($0) == grabbedTick && frameOffset($0) != nil }
-  )
-  let offsetAtGrab = try #require(frameOffset(grabFrame))
+  // The grab offset was captured live inside the gesture closure — the value
+  // the frozen loop must hold for the rest of the run.
+  let offsetAtGrab = try #require(grabState.offsetAtGrab)
   let lastFrame = try #require(terminal.frames.last)
   let finalOffset = try #require(frameOffset(lastFrame))
   let finalTick = try #require(frameTick(lastFrame))
@@ -110,11 +115,13 @@ private func runHeldProbe(bodyReadsFlag: Bool) async throws -> HeldProbeResult {
     offsetAtGrab: offsetAtGrab, finalOffset: finalOffset, finalTick: finalTick)
 }
 
+/// Per-run grab bookkeeping. One instance per `runHeldProbe` call: the two
+/// suite variants run concurrently, so any shared instance would let one
+/// variant's grab clobber the other's (the pre-fix flake #4 mechanism).
 @MainActor
-final class ProbeGrabState {
-  static let shared = ProbeGrabState()
+private final class ProbeGrabState {
   var grabbedTick: Int?
-  func reset() { grabbedTick = nil }
+  var offsetAtGrab: Int?
 }
 
 @MainActor
@@ -128,6 +135,7 @@ private func latestTick(_ frames: [String]) -> Int? {
 /// `isDragging` during resolve — the only difference between the two probes.
 private struct HeldProbe: View {
   let bodyReadsFlag: Bool
+  let grabState: ProbeGrabState
   @State private var tick = 0
   @State private var offset = 0
   @State private var isDragging = false
@@ -143,8 +151,14 @@ private struct HeldProbe: View {
       .gesture(
         DragGesture()
           .onChanged { _ in
-            if !isDragging { isDragging = true }
-            ProbeGrabState.shared.grabbedTick = tick
+            if !isDragging {
+              isDragging = true
+              // Record the grab state once, live: the closure's reads go
+              // through the same imperative access path as its writes, so
+              // these are the values the frozen loop must hold.
+              grabState.grabbedTick = tick
+              grabState.offsetAtGrab = offset
+            }
           }
           .onEnded { _ in isDragging = false }
       )

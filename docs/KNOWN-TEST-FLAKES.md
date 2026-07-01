@@ -201,6 +201,56 @@ test still drives its deadline ticks through the ASYNC `renderPendingFramesAsync
 **Verification.** **0/12 green under 28-process CPU saturation against the full
 `SwiftTUITests` suite** — the identical harness reproduced the pre-fix flake 8/8.
 
+### 4. `TaskReadsUnbodiedStateTests` — cross-variant probe-singleton clobber (+ exact-tick frame scrape) — FIXED 2026-07-01
+
+**Tests.** `TaskReadsUnbodiedStateTests` (in
+`Tests/SwiftTUITests/TaskReadsUnbodiedStateTests.swift`) → both `@Test` variants,
+failing in the shared `runHeldProbe` helper at the
+`terminal.frames.first { frameTick($0) == grabbedTick && frameOffset($0) != nil }`
+`#require` (was line 102:23).
+
+**Was.** Two compounding harness defects; no framework bug (the imperative
+`@State` write/preservation path traced clean under instrumentation — every
+same-graph write survived suspend/materialize/discard cycles via the
+`stateMutationKeys` overlay).
+
+1. **Shared probe singleton across concurrent variants.** The two `@Test`
+   variants run CONCURRENTLY (Swift Testing default), interleaving on the
+   MainActor, and both wrote grab bookkeeping to a shared `ProbeGrabState.shared`
+   — each `runHeldProbe` also `reset()` it. Under CI-load interleaving, variant A
+   could scrape its OWN terminal for variant B's `grabbedTick` (a tick A's
+   terminal may never present) → `#require` nil. Diagnosed via an instrumented
+   saturated soak whose "impossible" traces (a re-armed gesture one tick after a
+   visible write; frames diverging from closure reads) turned out to be two
+   interleaved run loops sharing one singleton and one stdout.
+2. **Exact-tick frame scrape.** The helper read the grab-instant offset from the
+   presented frame whose tick text equaled the grab tick, but the probe's `.task`
+   loop advances `tick` on wall-clock 5 ms sleeps while frame presentation is
+   CPU-bound — under load, presented frames skip ticks, so that exact frame may
+   not exist even with per-run state.
+
+Failed 5 of 8 completed Linux Repo Gate runs between `a210b7be` (the commit
+introducing the suite) and `678cc78e` (runs 28484815303, 28538005691,
+28540077189, 28545771222, 28548367581); interleaved commits passed, confirming
+nondeterminism. Locally reproduced only as the mechanism-2/mechanism-1 hybrid
+(3/25 under 28-process CPU saturation) after the scrape was replaced — the pure
+CI signature needs slow-runner frame starvation.
+
+**Fix.** (1) One `ProbeGrabState` INSTANCE per `runHeldProbe` call, passed into
+the probe view — no cross-variant state at all. (2) Capture `offsetAtGrab` live
+inside the gesture's `.onChanged` closure alongside `grabbedTick`, never from an
+exact-tick frame; `offset` cannot advance after `isDragging` flips, so the
+captured value is exactly what the frozen loop must hold. The regression signal
+the suite pins (`finalOffset == offsetAtGrab`) is unchanged.
+
+**Verification.** Structural: no shared state exists between the variants and
+the failing `#require` no longer exists; every remaining `#require` is
+guaranteed by the input script's completion conditions (the reader only reaches
+EOF after the grab values are recorded and frames render past grab + 8). Soak:
+0 failures across 35 saturated (28-process CPU load) + 10 isolated runs
+post-fix; the pre-fix harness reproduced the cross-variant failure 3/25 under
+the identical load.
+
 ---
 
 ## Triage checklist
