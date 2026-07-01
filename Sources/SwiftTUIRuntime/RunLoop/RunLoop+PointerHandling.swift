@@ -155,7 +155,19 @@ extension RunLoop {
     }
 
     let hitTarget = hitTarget(at: location)
-    guard let region = interactionRegion(routeID: armedRouteID) else {
+    // The armed route's region may have re-minted between press and release: an
+    // owner `.id` churn (or any interaction that forces a re-resolve on the
+    // mid-press frame) rebuilds the control's chrome with a fresh `ViewNodeID`,
+    // so the region's `RouteID.ownerNodeID` changes while its stable identity and
+    // kind do not. An exact match then fails and the release is dropped — a click
+    // whose press/release straddle a churn stops dispatching. Fall back to an
+    // owner-agnostic match (nil `ownerNodeID` is a wildcard in `RouteID.==`) so
+    // the release still pairs with the same logical control. The action itself is
+    // registered at the control's stable identity, so dispatch below is unaffected.
+    guard
+      let region = interactionRegion(routeID: armedRouteID)
+        ?? interactionRegion(routeID: armedRouteID.ownerAgnostic)
+    else {
       return
     }
 
@@ -178,7 +190,12 @@ extension RunLoop {
       return
     }
 
-    guard hitTarget?.region.routeID == armedRouteID else {
+    // Same owner-agnostic tolerance as the region lookup above: the release must
+    // still be over the armed control, but a mid-press re-mint changes only the
+    // hit region's `ownerNodeID`, not its identity, so compare owner-agnostically.
+    guard let upRouteID = hitTarget?.region.routeID,
+      upRouteID == armedRouteID || upRouteID == armedRouteID.ownerAgnostic
+    else {
       return
     }
 

@@ -213,6 +213,14 @@ public struct RouteID: Hashable, Sendable, CustomStringConvertible {
     "\(identity.path)#\(kind)"
   }
 
+  /// A copy scoped to identity + kind only, with no owning node. Because a `nil`
+  /// `ownerNodeID` matches any occupant in `==`, this pairs with a route whose
+  /// node re-minted (e.g. a control's chrome rebuilt under owner `.id` churn)
+  /// while its identity stayed stable.
+  package var ownerAgnostic: RouteID {
+    RouteID(identity: identity, kind: kind)
+  }
+
   public static func == (lhs: RouteID, rhs: RouteID) -> Bool {
     guard lhs.identity == rhs.identity, lhs.kind == rhs.kind else {
       return false

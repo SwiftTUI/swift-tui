@@ -2370,40 +2370,11 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
 
   private func expectedFrameKnownIssueDescription(generation: Int) -> String? {
     switch self {
-    case .anyViewButtonActionRebinds:
-      guard generation > 0 else { return nil }
-      // Residual after the reuse/churn fix: Button's ButtonStyle chrome resolves
-      // several nodes at one structural identity (`…/ButtonBody/false` +
-      // background/base/overlay), and the fresh post-churn ButtonBody root is not
-      // marked visited, so it is pruned and the control's pointer route re-mints —
-      // the run-loop click's press/release then straddle two route identities and
-      // no action dispatches. Needs the multi-node-at-one-identity reconciliation
-      // seam, not the reuse seam this pass fixed.
-      return "AnyView-wrapped Button actions keep the first owner closure after churn"
-    case .panelButtonActionRebinds:
-      guard generation > 0 else { return nil }
-      // Same multi-node ButtonBody reconciliation residual as
-      // `anyViewButtonActionRebinds`, hosted under a `Panel` scope.
-      return "Panel-hosted Button actions keep the first owner closure after churn"
     case .anyViewTextEditorPasteRebinds:
       guard generation > 0 else { return nil }
       return "AnyView-wrapped TextEditor paste handling targets stale binding state after churn"
     case .stackedKeyPressTextRebinds:
       return "Stacked key-press modifiers only dispatch one live handler in the churn loop"
-    case .preferenceObserverRebinds:
-      guard generation > 0 else { return nil }
-      return "Preference observer dispatch keeps the first observed value after owner churn"
-    case .onChangeHandlerRebinds:
-      guard generation > 0 else { return nil }
-      // `onChange` detection itself is fixed (generation 0 asserts for real):
-      // the observing node's previous-value baseline now lives on the persistent
-      // view graph keyed by the *stable* identity, so it survives the node's
-      // first resolve and `.id`-churn re-minting. The residual is upstream — the
-      // "Change Signal" `Button`'s action stops dispatching after owner churn
-      // (the same multi-node ButtonBody / pointer-route re-mint seam as
-      // `anyViewButtonActionRebinds`), so `intValue` never advances past
-      // generation 0 and there is no change for `onChange` to observe.
-      return "Change Signal button stops dispatching after churn, so onChange sees no change"
     default:
       return nil
     }
