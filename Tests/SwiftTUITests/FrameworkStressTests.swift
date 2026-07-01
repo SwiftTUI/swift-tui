@@ -332,6 +332,60 @@ struct FrameworkStressTests {
     #expect(maxGestureStateBindings == 1)
   }
 
+  @Test("pointer hover handlers stay live and bounded under owner churn")
+  func pointerHoverHandlersStayLiveAndBoundedUnderOwnerChurn() throws {
+    // Hypothesis: hover-only pointer handlers should be pruned with the owner
+    // that authored them, and dispatch should use the current generation's
+    // closure after a route identity replacement.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PointerHoverHandlerChurnStressRoot"),
+      size: .init(width: 78, height: 8)
+    ) {
+      PointerHoverHandlerChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.pointerHoverHandlerCount == 1)
+
+    var expectedEntered = 0
+    var expectedMoved = 0
+    var expectedExited = 0
+    var maxHoverHandlers = harness.pointerHoverHandlerCount
+
+    for generation in 0..<24 {
+      let hoverPoint = try #require(harness.point(forText: "Hover Pad \(generation)"))
+      expectedEntered += generation + 1
+      var frame = try harness.movePointer(to: hoverPoint)
+      if generation == 0 {
+        withKnownIssue("Hover state mutations do not currently schedule a rendered frame") {
+          #expect(
+            frame.contains(
+              """
+              hover generation \(generation) entered \(expectedEntered) \
+              moved \(expectedMoved) exited \(expectedExited)
+              """
+            ),
+            "hover enter state mutation should render the current generation; frame:\n\(frame)"
+          )
+        }
+      }
+
+      expectedMoved += generation + 1
+      frame = try harness.movePointer(to: Point(x: hoverPoint.x + 1, y: hoverPoint.y))
+
+      expectedExited += generation + 1
+      frame = try harness.movePointer(to: Point(x: 77, y: 7))
+
+      frame = try harness.clickText("Rebuild Hover Owner")
+      #expect(frame.contains("hover generation \(generation + 1)"))
+
+      maxHoverHandlers = max(maxHoverHandlers, harness.pointerHoverHandlerCount)
+      #expect(harness.pointerHoverHandlerCount == 1)
+    }
+
+    #expect(maxHoverHandlers == 1)
+  }
+
   @Test("navigation destinations are pruned when their source subtree is recreated")
   func navigationDestinationsArePrunedWhenTheirSourceSubtreeIsRecreated() throws {
     // Hypothesis: replacing the source owner while a destination is active must
@@ -1398,6 +1452,58 @@ private struct GestureBranchReplacementPad: View {
   }
 }
 
+private struct PointerHoverHandlerChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var enteredTotal = 0
+  @State private var movedTotal = 0
+  @State private var exitedTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Hover Owner") { generation += 1 }
+      Text(
+        """
+        hover generation \(generation) entered \(enteredTotal) moved \(movedTotal) \
+        exited \(exitedTotal)
+        """
+      )
+      PointerHoverHandlerChurnOwner(
+        generation: generation,
+        onEntered: { enteredTotal += $0 + 1 },
+        onMoved: { movedTotal += $0 + 1 },
+        onExited: { exitedTotal += $0 + 1 }
+      )
+      .id(testIdentity("PointerHoverHandlerChurn", "owner", "\(generation)"))
+    }
+    .frame(width: 78, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct PointerHoverHandlerChurnOwner: View {
+  let generation: Int
+  let onEntered: @MainActor (Int) -> Void
+  let onMoved: @MainActor (Int) -> Void
+  let onExited: @MainActor (Int) -> Void
+
+  var body: some View {
+    Text("Hover Pad \(generation)")
+      .id(testIdentity("PointerHoverHandlerChurn", "pad", "\(generation)"))
+      .frame(width: 24, height: 1, alignment: .leading)
+      .onPointerHover { phase in
+        switch phase {
+        case .entered:
+          onEntered(generation)
+        case .moved:
+          onMoved(generation)
+        case .exited:
+          onExited(generation)
+        }
+      }
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
 private struct NavigationSourcePruningStressFixture: View {
   @State private var sourceVersion = 0
 
@@ -2004,6 +2110,10 @@ private final class StressRuntimeHarness<Content: View> {
     runLoop.localPointerHandlerRegistry.snapshot().count
   }
 
+  var pointerHoverHandlerCount: Int {
+    runLoop.localPointerHandlerRegistry.snapshotHover().count
+  }
+
   var gestureRecognizerCount: Int {
     runLoop.localGestureRegistry.snapshot().count
   }
@@ -2183,6 +2293,11 @@ private final class StressRuntimeHarness<Content: View> {
     _ = try sendMouse(.down(.primary), at: start)
     _ = try sendMouse(.dragged(.primary), at: end)
     return try sendMouse(.up(.primary), at: end)
+  }
+
+  @discardableResult
+  func movePointer(to point: Point) throws -> String {
+    try sendMouse(.moved, at: point)
   }
 
   @discardableResult
