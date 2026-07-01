@@ -533,6 +533,50 @@ struct FrameworkStressTests {
     #expect(maxFocusRegions == 2)
   }
 
+  @Test("focused value descendant identities stay bounded under child identity churn")
+  func focusedValueDescendantIdentitiesStayBoundedUnderChildIdentityChurn() throws {
+    // Hypothesis: a stable focused-value publisher wrapping a recreated child
+    // should replace its descendant identity set with the current subtree,
+    // rather than retaining descendant identities from prior child owners.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FocusedValueDescendantChurnStressRoot"),
+      size: .init(width: 70, height: 8)
+    ) {
+      FocusedValueDescendantChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.focusedValueRegistrationCount == 1)
+    let initialDescendantIdentityCount = harness.focusedValueDescendantIdentityCount
+
+    var maxFocusedValueRegistrations = harness.focusedValueRegistrationCount
+    var maxDescendantIdentityCount = harness.focusedValueDescendantIdentityCount
+
+    for generation in 1...24 {
+      let frame = try harness.clickText("Advance Focused Descendant")
+      #expect(frame.contains("focused value generation \(generation)"))
+      #expect(frame.contains("Focused Descendant \(generation)"))
+
+      maxFocusedValueRegistrations = max(
+        maxFocusedValueRegistrations,
+        harness.focusedValueRegistrationCount
+      )
+      maxDescendantIdentityCount = max(
+        maxDescendantIdentityCount,
+        harness.focusedValueDescendantIdentityCount
+      )
+
+      #expect(harness.focusedValueRegistrationCount == 1)
+      if harness.focusedValueDescendantIdentityCount > initialDescendantIdentityCount {
+        #expect(harness.focusedValueDescendantIdentityCount == initialDescendantIdentityCount)
+        return
+      }
+    }
+
+    #expect(maxFocusedValueRegistrations == 1)
+    #expect(maxDescendantIdentityCount == initialDescendantIdentityCount)
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -1191,6 +1235,48 @@ private struct KeyPressHandlerChurnOwner: View {
   }
 }
 
+private enum FocusedValueDescendantChurnKey: FocusedValueKey {
+  typealias Value = String
+}
+
+extension FocusedValues {
+  fileprivate var focusedValueDescendantChurnValue: String? {
+    get { self[FocusedValueDescendantChurnKey.self] }
+    set { self[FocusedValueDescendantChurnKey.self] = newValue }
+  }
+}
+
+private struct FocusedValueDescendantChurnStressFixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Focused Descendant") { generation += 1 }
+      Text("focused value generation \(generation)")
+      FocusedValueDescendantChurnOwner(generation: generation)
+        .id(testIdentity("FocusedValueDescendantChurn", "owner"))
+        .focusedValue(
+          \.focusedValueDescendantChurnValue,
+          "focused value \(generation)"
+        )
+    }
+    .frame(width: 70, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct FocusedValueDescendantChurnOwner: View {
+  let generation: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Focused Value Owner")
+      Text("Focused Descendant \(generation)")
+        .id(testIdentity("FocusedValueDescendantChurn", "descendant", "\(generation)"))
+        .focusable()
+    }
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -1314,6 +1400,16 @@ private final class StressRuntimeHarness<Content: View> {
       count,
       handlers in
       count + handlers.count
+    }
+  }
+
+  var focusedValueRegistrationCount: Int {
+    runLoop.localFocusedValuesRegistry.snapshot().count
+  }
+
+  var focusedValueDescendantIdentityCount: Int {
+    runLoop.localFocusedValuesRegistry.snapshot().reduce(0) { count, registration in
+      count + registration.descendantIdentities.count
     }
   }
 
