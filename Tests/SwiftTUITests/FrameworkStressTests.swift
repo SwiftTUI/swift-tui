@@ -656,6 +656,47 @@ struct FrameworkStressTests {
     #expect(maxFocusRegions == 2)
   }
 
+  @Test("drop destinations stay scoped and bounded under inner panel identity churn")
+  func dropDestinationsStayScopedAndBoundedUnderInnerPanelIdentityChurn() throws {
+    // Hypothesis: action-scope drop destinations should prune stale inner panel
+    // scopes while leafmost-first dispatch continues to favor the focused live
+    // inner scope.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DropDestinationScopeChurnStressRoot"),
+      size: .init(width: 72, height: 10)
+    ) {
+      DropDestinationScopeChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.dropDestinationRegistrationCount == 2)
+
+    var expectedInnerTotal = 0
+    var maxDropDestinations = harness.dropDestinationRegistrationCount
+    var maxFocusRegions = harness.focusRegionCount
+
+    for generation in 0..<24 {
+      _ = try harness.clickText("Drop Focus \(generation)")
+      expectedInnerTotal += generation + 1
+
+      var frame = try harness.drop(paths: [DroppedPath("/tmp/drop-\(generation)")])
+      #expect(
+        frame.contains("drop generation \(generation) outer 0 inner \(expectedInnerTotal)"))
+
+      frame = try harness.clickText("Rebuild Drop Scope")
+      #expect(frame.contains("drop generation \(generation + 1)"))
+
+      maxDropDestinations = max(maxDropDestinations, harness.dropDestinationRegistrationCount)
+      maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+
+      #expect(harness.dropDestinationRegistrationCount == 2)
+      #expect(harness.focusRegionCount == 2)
+    }
+
+    #expect(maxDropDestinations == 2)
+    #expect(maxFocusRegions == 2)
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -1420,6 +1461,34 @@ private struct KeyCommandScopeChurnStressFixture: View {
   }
 }
 
+private struct DropDestinationScopeChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var outerTotal = 0
+  @State private var innerTotal = 0
+
+  var body: some View {
+    Panel(id: testIdentity("DropDestinationScopeChurn", "outer")) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("drop generation \(generation) outer \(outerTotal) inner \(innerTotal)")
+        Button("Rebuild Drop Scope") { generation += 1 }
+        Panel(id: testIdentity("DropDestinationScopeChurn", "inner", "\(generation)")) {
+          Text("Drop Focus \(generation)")
+            .focusable()
+        }
+        .dropDestination { paths in
+          innerTotal += paths.count * (generation + 1)
+          return true
+        }
+      }
+    }
+    .dropDestination { paths in
+      outerTotal += paths.count * (generation + 1)
+      return true
+    }
+    .frame(width: 72, height: 10, alignment: .topLeading)
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -1573,6 +1642,10 @@ private final class StressRuntimeHarness<Content: View> {
     }
   }
 
+  var dropDestinationRegistrationCount: Int {
+    runLoop.dropDestinationRegistry.snapshot().handlersByScope.count
+  }
+
   var scrollPositionRegistrationCount: Int {
     runLoop.localScrollPositionRegistry.snapshot().count
   }
@@ -1632,6 +1705,16 @@ private final class StressRuntimeHarness<Content: View> {
   @discardableResult
   func pressKey(_ keyPress: KeyPress) throws -> String {
     #expect(runLoop.handleKeyPress(keyPress) == nil)
+    return try render()
+  }
+
+  @discardableResult
+  func drop(paths: [DroppedPath], context: DropContext = .init()) throws -> String {
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(.drop(paths: paths, context: context))
+      ) == nil
+    )
     return try render()
   }
 
