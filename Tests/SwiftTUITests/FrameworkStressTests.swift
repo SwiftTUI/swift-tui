@@ -3571,20 +3571,9 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
 
   private func expectedFrameKnownIssueDescription(generation: Int) -> String? {
     switch self {
-    case .nestedAnyViewButtonRebinds:
-      guard generation > 0 else { return nil }
-      return "Nested AnyView Button action dispatch loses the live owner after identity churn"
-    case .nestedPanelButtonRebinds:
-      guard generation > 0 else { return nil }
-      return "Nested Panel Button action dispatch loses the live owner after identity churn"
     case .nestedAnyViewSecureFieldPasteRebinds:
       guard generation > 0 else { return nil }
       return "Nested AnyView SecureField paste handling targets stale binding state after churn"
-    case .preferenceObserverNestedPanelRebinds:
-      guard generation > 0 else { return nil }
-      return "Panel-hosted preference observer dispatch keeps the first observed value after churn"
-    case .onChangeNestedPanelRebinds:
-      return "Panel-hosted onChange handlers do not fire through the churn path"
     default:
       return nil
     }
