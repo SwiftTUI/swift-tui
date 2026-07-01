@@ -474,6 +474,52 @@ struct FrameworkStressTests {
     )
   }
 
+  @Test("termination handlers stay paired and bounded under owner churn")
+  func terminationHandlersStayPairedAndBoundedUnderOwnerChurn() throws {
+    // Hypothesis: stacked termination handlers should stay attached to the live
+    // owner only, and handler-driven state updates should schedule a renderable
+    // frame even when dispatch starts outside the normal input event path.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TerminationHandlerChurnStressRoot"),
+      size: .init(width: 72, height: 8)
+    ) {
+      TerminationHandlerChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.terminationHandlerCount == 2)
+
+    var expectedTotal = 0
+    var maxTerminationHandlers = harness.terminationHandlerCount
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+
+    for generation in 0..<24 {
+      expectedTotal += generation + 1
+
+      let result = try harness.requestTermination(.signal("SIGTERM"))
+      #expect(result.disposition == .allow)
+      #expect(
+        result.frame.contains(
+          "termination generation \(generation) first \(expectedTotal) second \(expectedTotal)"
+        )
+      )
+
+      let frame = try harness.clickText("Advance Termination Owner")
+      #expect(frame.contains("termination generation \(generation + 1)"))
+
+      maxTerminationHandlers = max(maxTerminationHandlers, harness.terminationHandlerCount)
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+
+      #expect(harness.terminationHandlerCount == 2)
+    }
+
+    #expect(maxTerminationHandlers == 2)
+    #expect(maxLifecycleRegistrations <= 2)
+  }
+
   @Test("scroll focus reveal anchors are pruned when scroll owners are recreated")
   func scrollFocusRevealAnchorsArePrunedWhenScrollOwnersAreRecreated() throws {
     // Hypothesis: focus-reveal state is interaction state for the live scroll
@@ -1329,6 +1375,46 @@ private struct PreferenceObserverChurnOwner: View {
   }
 }
 
+private struct TerminationHandlerChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var firstTotal = 0
+  @State private var secondTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Termination Owner") { generation += 1 }
+      Text("termination generation \(generation) first \(firstTotal) second \(secondTotal)")
+      TerminationHandlerChurnOwner(
+        generation: generation,
+        onFirst: { firstTotal += generation + 1 },
+        onSecond: { secondTotal += generation + 1 }
+      )
+      .id("termination-owner-\(generation)")
+    }
+    .frame(width: 72, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct TerminationHandlerChurnOwner: View {
+  let generation: Int
+  let onFirst: @MainActor () -> Void
+  let onSecond: @MainActor () -> Void
+
+  var body: some View {
+    Text("Termination Owner \(generation)")
+      .onTerminationRequest { _ in
+        onFirst()
+        return .allow
+      }
+      .onTerminationRequest { _ in
+        onSecond()
+        return .allow
+      }
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
 private struct ScrollFocusRevealPruningStressFixture: View {
   @State private var generation = 0
 
@@ -1616,6 +1702,14 @@ private final class StressRuntimeHarness<Content: View> {
     runLoop.localPreferenceObservationRegistry.snapshot().count
   }
 
+  var terminationHandlerCount: Int {
+    runLoop.localTerminationRegistry.snapshot().values.reduce(0) {
+      count,
+      handlers in
+      count + handlers.count
+    }
+  }
+
   var keyPressHandlerCount: Int {
     runLoop.localKeyHandlerRegistry.snapshotKeyPressHandlers().values.reduce(0) {
       count,
@@ -1706,6 +1800,14 @@ private final class StressRuntimeHarness<Content: View> {
   func pressKey(_ keyPress: KeyPress) throws -> String {
     #expect(runLoop.handleKeyPress(keyPress) == nil)
     return try render()
+  }
+
+  @discardableResult
+  func requestTermination(
+    _ exitReason: RunLoopExitReason
+  ) throws -> (disposition: TerminationDisposition, frame: String) {
+    let disposition = runLoop.terminationDisposition(for: exitReason)
+    return (disposition, try render())
   }
 
   @discardableResult
