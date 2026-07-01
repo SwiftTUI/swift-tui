@@ -693,6 +693,47 @@ struct FrameworkStressTests {
     #expect(maxFocusRegions == 2)
   }
 
+  @Test("text input paste handlers stay live and bounded under owner churn")
+  func textInputPasteHandlersStayLiveAndBoundedUnderOwnerChurn() throws {
+    // Hypothesis: a text input with a stable identity inside a recreated owner
+    // should replace its paste handler instead of stacking stale handlers, and
+    // paste dispatch should keep writing through the live owner binding.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextInputPasteHandlerChurnStressRoot"),
+      size: .init(width: 70, height: 8)
+    ) {
+      TextInputPasteHandlerChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.pasteHandlerCount == 1)
+
+    var maxPasteHandlers = harness.pasteHandlerCount
+    var maxFocusRegions = harness.focusRegionCount
+
+    for generation in 0..<24 {
+      _ = try harness.focus(TextInputPasteHandlerChurnStressFixture.fieldIdentity)
+
+      let payload = "paste-\(generation)"
+      var frame = try harness.paste(payload)
+      #expect(
+        frame.contains("text input generation \(generation) value \(payload)")
+      )
+
+      frame = try harness.clickText("Rebuild Text Input")
+      #expect(frame.contains("text input generation \(generation + 1) value empty"))
+
+      maxPasteHandlers = max(maxPasteHandlers, harness.pasteHandlerCount)
+      maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+
+      #expect(harness.pasteHandlerCount == 1)
+      #expect(harness.focusRegionCount == 2)
+    }
+
+    #expect(maxPasteHandlers == 1)
+    #expect(maxFocusRegions == 2)
+  }
+
   @Test("focused value descendant identities stay bounded under child identity churn")
   func focusedValueDescendantIdentitiesStayBoundedUnderChildIdentityChurn() throws {
     // Hypothesis: a stable focused-value publisher wrapping a recreated child
@@ -1682,6 +1723,39 @@ private struct KeyPressHandlerChurnOwner: View {
   }
 }
 
+private struct TextInputPasteHandlerChurnStressFixture: View {
+  static let fieldIdentity = testIdentity("TextInputPasteHandlerChurn", "field")
+
+  @State private var generation = 0
+  @State private var text = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Text Input") {
+        generation += 1
+        text = ""
+      }
+      Text("text input generation \(generation) value \(text.isEmpty ? "empty" : text)")
+      TextInputPasteHandlerChurnOwner(generation: generation, text: $text)
+        .id(testIdentity("TextInputPasteHandlerChurn", "owner", "\(generation)"))
+    }
+    .frame(width: 70, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct TextInputPasteHandlerChurnOwner: View {
+  let generation: Int
+  @Binding var text: String
+
+  var body: some View {
+    TextField("Paste Target \(generation)", text: $text)
+      .id(TextInputPasteHandlerChurnStressFixture.fieldIdentity)
+      .textFieldStyle(.plain)
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
 private enum FocusedValueDescendantChurnKey: FocusedValueKey {
   typealias Value = String
 }
@@ -1982,6 +2056,14 @@ private final class StressRuntimeHarness<Content: View> {
     }
   }
 
+  var pasteHandlerCount: Int {
+    runLoop.localKeyHandlerRegistry.snapshotPasteHandlers().values.reduce(0) {
+      count,
+      handlers in
+      count + handlers.count
+    }
+  }
+
   var focusedValueRegistrationCount: Int {
     runLoop.localFocusedValuesRegistry.snapshot().count
   }
@@ -2063,6 +2145,18 @@ private final class StressRuntimeHarness<Content: View> {
   @discardableResult
   func pressKey(_ keyPress: KeyPress) throws -> String {
     #expect(runLoop.handleKeyPress(keyPress) == nil)
+    return try render()
+  }
+
+  @discardableResult
+  func paste(_ content: String) throws -> String {
+    runLoop.handlePaste(PasteEvent(content: content))
+    return try render()
+  }
+
+  @discardableResult
+  func focus(_ identity: Identity) throws -> String {
+    #expect(runLoop.focusTracker.setFocus(to: identity))
     return try render()
   }
 
