@@ -255,6 +255,15 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
       !identity.isAncestor(of: slotNode.resolvedIdentity)
     {
       routedContext.withinChurnedSubtree = true
+      // The churned slot stays positionally `.matched` through the structural
+      // child diff (`ChildDescriptor.==` never compares `identity`), so the
+      // displaced old generation is never structurally removed. Record its
+      // departed resolved identity so `finalizeFrame` prunes the abandoned
+      // nodes — and with them their runtime registrations, tasks, and
+      // lifecycle handlers — on this same frame.
+      context.viewGraph?.recordChurnedSubtreeDeparture(
+        previousResolvedIdentity: slotNode.resolvedIdentity
+      )
     }
     return [
       content.resolveOwned(in: routedContext)

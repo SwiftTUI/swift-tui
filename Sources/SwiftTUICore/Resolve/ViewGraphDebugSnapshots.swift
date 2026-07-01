@@ -23,6 +23,7 @@ extension ViewGraph {
     package var structuralTaskCancelEvents: [LifecycleEvent]
     package var structuralDisappearEvents: [LifecycleEvent]
     package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
+    package var churnedSubtreeDepartedIdentities: Set<Identity>
     package var requiresRootEvaluation: Bool
     package var invalidatedNodeIDs: Set<ViewNodeID>
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>

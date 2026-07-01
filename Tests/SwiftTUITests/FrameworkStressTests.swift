@@ -2394,9 +2394,10 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
     case .hoverWithTapGestureKeepsBothBounded:
       "Combining pointer hover and tap gesture leaves duplicate hover registrations"
     case .anyViewTextEditorPasteRebinds:
-      "AnyView-wrapped TextEditor focus regions accumulate across owner churn"
-    case .preferenceObserverRebinds:
-      "Preference observer registrations accumulate across expansion owner churn"
+      // Bounded (max 4), not an accumulation: TextEditor's inner scroll
+      // content and its transient scroll indicator each emit their own focus
+      // region alongside the control's, exceeding the single-stop expectation.
+      "TextEditor emits extra focus regions for its inner scroll content and indicator"
     default:
       nil
     }
@@ -3586,17 +3587,10 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
   private var maxRegistrationKnownIssueDescription: String? {
     switch self {
     case .panelTextEditorPasteRebinds:
-      "Panel-hosted TextEditor focus regions accumulate across owner churn"
-    case .tapGestureInsidePanelRebinds:
-      "Panel-hosted tap gesture registrations accumulate across owner churn"
-    case .hoverNestedPanelBounded:
-      "Panel-hosted hover registrations accumulate across owner churn"
-    case .preferenceObserverNestedPanelRebinds:
-      "Panel-hosted preference observer registrations accumulate across owner churn"
-    case .taskIDNestedPanelBounded:
-      "Panel-hosted task descriptors accumulate across owner identity churn"
-    case .sheetSourceNestedPanelPrunesOverlay:
-      "Panel-hosted sheet source actions accumulate across owner churn"
+      // Bounded (max 4), not an accumulation: TextEditor's inner scroll
+      // content and its transient scroll indicator each emit their own focus
+      // region alongside the control's, exceeding the single-stop expectation.
+      "TextEditor emits extra focus regions for its inner scroll content and indicator"
     default:
       nil
     }

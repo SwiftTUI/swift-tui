@@ -161,6 +161,10 @@ package final class ViewGraph {
     get { eventBuffers.pendingEntityRoutedRemovalNodeIDs }
     set { eventBuffers.pendingEntityRoutedRemovalNodeIDs = newValue }
   }
+  private var churnedSubtreeDepartedIdentities: Set<Identity> {
+    get { eventBuffers.churnedSubtreeDepartedIdentities }
+    set { eventBuffers.churnedSubtreeDepartedIdentities = newValue }
+  }
   private var latestLifecycleEvents: [LifecycleEvent] {
     get { eventBuffers.latestLifecycleEvents }
     set { eventBuffers.latestLifecycleEvents = newValue }
@@ -462,6 +466,7 @@ package final class ViewGraph {
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
       pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
+      churnedSubtreeDepartedIdentities: churnedSubtreeDepartedIdentities,
       requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
@@ -1134,6 +1139,7 @@ package final class ViewGraph {
     structuralTaskCancelEvents.removeAll(keepingCapacity: true)
     structuralDisappearEvents.removeAll(keepingCapacity: true)
     pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
+    churnedSubtreeDepartedIdentities.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
   }
 
@@ -1766,6 +1772,7 @@ package final class ViewGraph {
     root = nodeIfExists(for: rootIdentity)
     let activeEntities = entityIdentities(in: resolved)
     prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    pruneChurnedSubtreeOrphans()
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
@@ -2303,6 +2310,72 @@ package final class ViewGraph {
     }
   }
 
+  /// Records that an explicit-`.id` slot re-rooted away from
+  /// `previousResolvedIdentity` this frame (owner `.id` churn). Node allocation
+  /// is keyed by identity, so the churned slot minted a fresh subtree at the new
+  /// identity, but child removal-diffing is positional (`ChildDescriptor.==`
+  /// ignores `identity`), so the slot stays `.matched` and the displaced old
+  /// generation is never handed to `removeSubtree` — it would otherwise stay in
+  /// `liveNodeIDs` forever, re-publishing its runtime registrations on every
+  /// rebuild. `finalizeFrame` consumes these prefixes via
+  /// ``pruneChurnedSubtreeOrphans()``.
+  package func recordChurnedSubtreeDeparture(
+    previousResolvedIdentity: Identity
+  ) {
+    recordCheckpointGraphMutation()
+    churnedSubtreeDepartedIdentities.insert(previousResolvedIdentity)
+  }
+
+  /// Tears down the still-live nodes displaced by this frame's explicit-`.id`
+  /// churns: every live node under a departed identity prefix that the frame's
+  /// walk did not visit. Runs post-walk (from `finalizeFrame`, before the
+  /// lifecycle-event plan and registration publication), where
+  /// `visitedThisFrame` is authoritative for the churned scope — reuse is
+  /// suppressed inside churned subtrees (`ResolveContext.withinChurnedSubtree`),
+  /// so every node genuinely belonging to the arriving generation was visited.
+  /// The removal spares visited nodes wherever the teardown walk reaches them:
+  /// a stable-`.id` descendant re-rooted out of the departing generation (e.g.
+  /// a control the arriving subtree re-adopted at its own identity) is reachable
+  /// through the departed generation's committed snapshots and identity lookups,
+  /// but is live now and must keep its registrations and pointer routes.
+  private func pruneChurnedSubtreeOrphans() {
+    guard !churnedSubtreeDepartedIdentities.isEmpty else {
+      return
+    }
+    recordCheckpointGraphMutation()
+    let departedPrefixes = churnedSubtreeDepartedIdentities
+    churnedSubtreeDepartedIdentities.removeAll(keepingCapacity: true)
+
+    var orphans: [ViewNode] = []
+    for nodeID in liveNodeIDs {
+      guard let node = nodesByNodeID[nodeID],
+        node.viewNodeID != root?.viewNodeID,
+        !node.visitedThisFrame(currentFrameID)
+      else {
+        continue
+      }
+      let isDeparted = departedPrefixes.contains { prefix in
+        node.identity == prefix || node.identity.isDescendant(of: prefix)
+          || node.resolvedIdentity == prefix || node.resolvedIdentity.isDescendant(of: prefix)
+      }
+      if isDeparted {
+        orphans.append(node)
+      }
+    }
+    guard !orphans.isEmpty else {
+      return
+    }
+    orphans.sort { lhs, rhs in
+      if lhs.identity == rhs.identity {
+        return lhs.viewNodeID < rhs.viewNodeID
+      }
+      return lhs.identity < rhs.identity
+    }
+    for orphan in orphans {
+      removeSubtree(rootedAt: orphan, sparingVisitedNodes: true)
+    }
+  }
+
   private func applyStructuralChildDiff(
     for node: ViewNode,
     resolved: ResolvedNode
@@ -2340,11 +2413,25 @@ package final class ViewGraph {
 
   private func removeSubtree(
     rootedAt node: ViewNode,
-    committedSnapshot: ResolvedNode? = nil
+    committedSnapshot: ResolvedNode? = nil,
+    sparingVisitedNodes: Bool = false
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
       current === node
     else {
+      return
+    }
+
+    // Churn-orphan pruning tears down a generation the frame's walk provably
+    // abandoned, so anything it reaches that WAS visited this frame belongs to
+    // the arriving tree (a re-adopted stable-`.id` control, a reused chrome
+    // node found through an identity lookup) — leave it, and its subtree,
+    // alone. Only the post-walk pruner passes `true`; structural removal keeps
+    // the narrower parent-detached keep-guard below, because it legitimately
+    // removes visited nodes (e.g. a pruned navigation destination).
+    if sparingVisitedNodes,
+      node.visitedThisFrame(currentFrameID)
+    {
       return
     }
 
@@ -2383,11 +2470,11 @@ package final class ViewGraph {
     }
     if snapshot.children.isEmpty {
       for child in node.children {
-        removeSubtree(rootedAt: child)
+        removeSubtree(rootedAt: child, sparingVisitedNodes: sparingVisitedNodes)
       }
     } else {
       for child in snapshot.children {
-        removeResolvedSubtree(child)
+        removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes)
       }
     }
 
@@ -2474,7 +2561,8 @@ package final class ViewGraph {
   }
 
   private func removeResolvedSubtree(
-    _ resolved: ResolvedNode
+    _ resolved: ResolvedNode,
+    sparingVisitedNodes: Bool = false
   ) {
     let nodes = nodeIDsForResolvedNode(resolved)
       .compactMap { nodeIfExists(for: $0) }
@@ -2488,7 +2576,8 @@ package final class ViewGraph {
       for node in nodes {
         removeSubtree(
           rootedAt: node,
-          committedSnapshot: resolved
+          committedSnapshot: resolved,
+          sparingVisitedNodes: sparingVisitedNodes
         )
       }
       return
@@ -2497,13 +2586,14 @@ package final class ViewGraph {
     if let node = nodeIfExists(for: resolved.identity) {
       removeSubtree(
         rootedAt: node,
-        committedSnapshot: resolved
+        committedSnapshot: resolved,
+        sparingVisitedNodes: sparingVisitedNodes
       )
       return
     }
 
     for child in resolved.children {
-      removeResolvedSubtree(child)
+      removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes)
     }
   }
 

@@ -45,6 +45,12 @@ extension ViewGraph {
     package var structuralTaskCancelEvents: [LifecycleEvent] = []
     package var structuralDisappearEvents: [LifecycleEvent] = []
     package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> = []
+    // Old resolved identities departed by an explicit-`.id` churn this frame
+    // (`ExactIdentityModifier` re-rooted the slot to a different identity).
+    // `finalizeFrame` prunes the still-live, unvisited nodes left under these
+    // prefixes — the churned slot stays positionally `.matched`, so the
+    // structural child diff never removes the displaced generation.
+    package var churnedSubtreeDepartedIdentities: Set<Identity> = []
     package var latestLifecycleEvents: [LifecycleEvent] = []
   }
 
