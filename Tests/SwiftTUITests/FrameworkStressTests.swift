@@ -185,6 +185,44 @@ struct FrameworkStressTests {
     )
   }
 
+  @Test("modal focus restoration stack drains when modal owners are recreated")
+  func modalFocusRestorationStackDrainsWhenModalOwnersAreRecreated() throws {
+    // Hypothesis: replacing a focused modal's source owner should tear down
+    // both the overlay and the focus restoration record for that modal scope.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ModalFocusRestorationStackStressRoot"),
+      size: .init(width: 66, height: 12)
+    ) {
+      ModalFocusRestorationStackStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.focusModalRestorationStackCount == 0)
+
+    var maxRestorationStackCount = harness.focusModalRestorationStackCount
+
+    for generation in 0..<20 {
+      _ = try harness.clickText("Base Focus \(generation)")
+      var frame = try harness.clickText("Open Modal Owner")
+      #expect(frame.contains("Modal body \(generation)"))
+      #expect(harness.focusModalRestorationStackCount == 1)
+
+      _ = try harness.clickText("Modal Focus \(generation)", chooseLast: true)
+      frame = try harness.clickText("Replace Modal Owner", chooseLast: true)
+      #expect(frame.contains("modal owner generation \(generation + 1)"))
+      #expect(!frame.contains("Modal body"))
+
+      maxRestorationStackCount = max(
+        maxRestorationStackCount,
+        harness.focusModalRestorationStackCount
+      )
+
+      #expect(harness.focusModalRestorationStackCount == 0)
+    }
+
+    #expect(maxRestorationStackCount <= 1)
+  }
+
   @Test("collection identity churn keeps row actions and tasks bounded")
   func collectionIdentityChurnKeepsRowActionsAndTasksBounded() throws {
     let harness = try StressRuntimeHarness(
@@ -943,6 +981,44 @@ private struct DeferredSourcePruningOwner: View {
   }
 }
 
+private struct ModalFocusRestorationStackStressFixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("modal owner generation \(generation)")
+      ModalFocusRestorationStackOwner(generation: generation) {
+        generation += 1
+      }
+      .id("modal-focus-owner-\(generation)")
+    }
+    .frame(width: 66, height: 12, alignment: .topLeading)
+  }
+}
+
+private struct ModalFocusRestorationStackOwner: View {
+  let generation: Int
+  let replaceOwner: @MainActor () -> Void
+
+  @State private var isPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Base Focus \(generation)") {}
+      Button("Open Modal Owner") { isPresented = true }
+    }
+    .sheet("Modal Focus Sheet", isPresented: $isPresented) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Modal body \(generation)")
+        Button("Modal Focus \(generation)") {}
+        Button("Replace Modal Owner") { replaceOwner() }
+      }
+      .onAppear {}
+      .onDisappear {}
+    }
+  }
+}
+
 private struct CollectionIdentityChurnStressFixture: View {
   static let rowCount = 6
 
@@ -1389,6 +1465,15 @@ private final class StressRuntimeHarness<Content: View> {
 
   var focusRegionCount: Int {
     runLoop.focusTracker.focusRegions.count
+  }
+
+  var focusModalRestorationStackCount: Int {
+    let mirror = Mirror(reflecting: runLoop.focusTracker)
+    guard let child = mirror.children.first(where: { $0.label == "modalRestorationStack" })
+    else {
+      return -1
+    }
+    return Mirror(reflecting: child.value).children.count
   }
 
   var preferenceObservationRegistrationCount: Int {
