@@ -520,6 +520,55 @@ struct FrameworkStressTests {
     #expect(maxLifecycleRegistrations <= 2)
   }
 
+  @Test("lifecycle handlers stay paired across teardown and recreation")
+  func lifecycleHandlersStayPairedAcrossTeardownAndRecreation() throws {
+    // Hypothesis: stacked appear/disappear handlers on a recreated owner should
+    // each fire exactly once per owner generation while the live registrations
+    // stay bounded to the current owner.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("LifecycleHandlerChurnStressRoot"),
+      size: .init(width: 82, height: 8)
+    ) {
+      LifecycleHandlerChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    var expectedAppearTotal = 1
+    var expectedDisappearTotal = 0
+    #expect(
+      harness.frame.contains(
+        "lifecycle generation 0 appear first 1 second 1 disappear first 0 second 0"
+      )
+    )
+    #expect(harness.lifecycleRegistrationCount == 4)
+
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+
+    for generation in 1...24 {
+      expectedDisappearTotal += generation
+      expectedAppearTotal += generation + 1
+
+      let frame = try harness.clickText("Advance Lifecycle Owner")
+      #expect(
+        frame.contains(
+          """
+          lifecycle generation \(generation) appear first \(expectedAppearTotal) \
+          second \(expectedAppearTotal) disappear first \(expectedDisappearTotal) \
+          second \(expectedDisappearTotal)
+          """
+        )
+      )
+
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+      #expect(harness.lifecycleRegistrationCount == 4)
+    }
+
+    #expect(maxLifecycleRegistrations == 4)
+  }
+
   @Test("scroll focus reveal anchors are pruned when scroll owners are recreated")
   func scrollFocusRevealAnchorsArePrunedWhenScrollOwnersAreRecreated() throws {
     // Hypothesis: focus-reveal state is interaction state for the live scroll
@@ -1412,6 +1461,52 @@ private struct TerminationHandlerChurnOwner: View {
       }
       .onAppear {}
       .onDisappear {}
+  }
+}
+
+private struct LifecycleHandlerChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var firstAppearTotal = 0
+  @State private var secondAppearTotal = 0
+  @State private var firstDisappearTotal = 0
+  @State private var secondDisappearTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Lifecycle Owner") { generation += 1 }
+      Text(
+        """
+        lifecycle generation \(generation) appear first \(firstAppearTotal) \
+        second \(secondAppearTotal) disappear first \(firstDisappearTotal) \
+        second \(secondDisappearTotal)
+        """
+      )
+      LifecycleHandlerChurnOwner(
+        generation: generation,
+        onFirstAppear: { firstAppearTotal += $0 + 1 },
+        onSecondAppear: { secondAppearTotal += $0 + 1 },
+        onFirstDisappear: { firstDisappearTotal += $0 + 1 },
+        onSecondDisappear: { secondDisappearTotal += $0 + 1 }
+      )
+      .id("lifecycle-owner-\(generation)")
+    }
+    .frame(width: 82, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct LifecycleHandlerChurnOwner: View {
+  let generation: Int
+  let onFirstAppear: @MainActor (Int) -> Void
+  let onSecondAppear: @MainActor (Int) -> Void
+  let onFirstDisappear: @MainActor (Int) -> Void
+  let onSecondDisappear: @MainActor (Int) -> Void
+
+  var body: some View {
+    Text("Lifecycle Owner \(generation)")
+      .onAppear { onFirstAppear(generation) }
+      .onAppear { onSecondAppear(generation) }
+      .onDisappear { onFirstDisappear(generation) }
+      .onDisappear { onSecondDisappear(generation) }
   }
 }
 
