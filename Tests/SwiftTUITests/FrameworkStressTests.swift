@@ -357,17 +357,15 @@ struct FrameworkStressTests {
       expectedEntered += generation + 1
       var frame = try harness.movePointer(to: hoverPoint)
       if generation == 0 {
-        withKnownIssue("Hover state mutations do not currently schedule a rendered frame") {
-          #expect(
-            frame.contains(
-              """
-              hover generation \(generation) entered \(expectedEntered) \
-              moved \(expectedMoved) exited \(expectedExited)
-              """
-            ),
-            "hover enter state mutation should render the current generation; frame:\n\(frame)"
-          )
-        }
+        #expect(
+          frame.contains(
+            """
+            hover generation \(generation) entered \(expectedEntered) \
+            moved \(expectedMoved) exited \(expectedExited)
+            """
+          ),
+          "hover enter state mutation should render the current generation; frame:\n\(frame)"
+        )
       }
 
       expectedMoved += generation + 1
@@ -2409,8 +2407,6 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
     case .tapGestureAnyViewRebinds:
       guard generation > 0 else { return nil }
       return "AnyView-wrapped tap gestures keep the first owner closure after churn"
-    case .tapGestureCountTwoRebinds:
-      return "Count-two tap gestures do not fire in the run-loop churn path"
     case .preferenceObserverRebinds:
       guard generation > 0 else { return nil }
       return "Preference observer dispatch keeps the first observed value after owner churn"
@@ -2422,18 +2418,11 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
   }
 
   private var expectedRegistrationKnownIssueDescription: String? {
-    switch self {
-    case .disabledAncestorKeyPressSkipsHandlers:
-      "Disabled key-press views still register key-press handlers"
-    default:
-      nil
-    }
+    nil
   }
 
   private var maxRegistrationKnownIssueDescription: String? {
     switch self {
-    case .disabledAncestorKeyPressSkipsHandlers:
-      "Disabled key-press views still register key-press handlers"
     case .hoverWithTapGestureKeepsBothBounded:
       "Combining pointer hover and tap gesture leaves duplicate hover registrations"
     case .anyViewTextEditorPasteRebinds:

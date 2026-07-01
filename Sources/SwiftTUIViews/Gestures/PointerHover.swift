@@ -5,13 +5,27 @@ extension View {
   public func onPointerHover(
     _ action: @escaping @MainActor @Sendable (HoverPhase) -> Void
   ) -> some View {
-    modifier(PointerHoverModifier(action: action))
+    modifier(
+      PointerHoverModifier(
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
+        action: action
+      )
+    )
   }
 }
 
 @MainActor
 public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: @MainActor @Sendable (HoverPhase) -> Void
+
+  package init(
+    authoringContext: ImperativeAuthoringContextSnapshot? = nil,
+    action: @escaping @MainActor @Sendable (HoverPhase) -> Void
+  ) {
+    self.authoringContext = authoringContext
+    self.action = action
+  }
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,
@@ -19,9 +33,18 @@ public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     let routeID = runtimePrimaryRouteID(for: node.identity)
+    // Restore the imperative authoring scope when dispatching, matching
+    // `Button`/`onKeyPress`: without it a `@State` mutation inside the hover
+    // handler is not attributed to an owner node, so it never schedules a frame
+    // and the hover-driven state change is not rendered.
+    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
     context.localPointerHandlerRegistry?.registerHover(
       routeID: routeID,
-      handler: action
+      handler: { phase in
+        withImperativeAuthoringContext(dynamicPropertyScope) {
+          action(phase)
+        }
+      }
     )
     node.semanticMetadata = node.semanticMetadata.merging(
       SemanticMetadata(

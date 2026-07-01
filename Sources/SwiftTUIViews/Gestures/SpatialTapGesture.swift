@@ -68,8 +68,11 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
     self.coordinateSpace = coordinateSpace
   }
 
+  // `completedTaps > 0` keeps a partial multi-tap sequence active between taps
+  // (after `.up` clears `pressStart`), so a re-resolve between taps does not
+  // reset the count and drop a `count > 1` gesture. See `TapGesture`.
   var isActive: Bool {
-    pressStart != nil && !phase.isTerminal
+    (pressStart != nil || completedTaps > 0) && !phase.isTerminal
   }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {

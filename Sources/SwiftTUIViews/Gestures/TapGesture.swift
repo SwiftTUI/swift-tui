@@ -51,8 +51,14 @@ final class TapGestureRecognizer: GestureRecognizer {
   /// A `.down` event sets `pressStart` but `phase` stays `.possible`
   /// until `requiredCount` taps complete — override so the registry
   /// preserves the recognizer across re-resolves during the press.
+  ///
+  /// `completedTaps > 0` keeps a partial multi-tap sequence (e.g. the first
+  /// tap of a `count: 2` gesture) active *between* taps, when `pressStart` has
+  /// been cleared by the preceding `.up`. Without it a re-resolve between the
+  /// two taps tears the recognizer down and resets `completedTaps`, so the
+  /// second tap starts from zero and the gesture never fires.
   var isActive: Bool {
-    pressStart != nil && !phase.isTerminal
+    (pressStart != nil || completedTaps > 0) && !phase.isTerminal
   }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {

@@ -91,6 +91,14 @@ public struct KeyPressModifier: PrimitiveViewModifier, Sendable {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
+    // A disabled ancestor must suppress key-press handling, matching how
+    // `Button`/`Toggle` skip action registration when `isEnabled` is false.
+    // Without this guard a `.disabled(true)` subtree still registers focused
+    // key-press handlers, so the key would dispatch to a view the user cannot
+    // interact with.
+    guard context.environmentValues.isEnabled else {
+      return [node]
+    }
     let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
     context.localKeyHandlerRegistry?.register(
       identity: node.identity,
