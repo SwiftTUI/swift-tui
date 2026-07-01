@@ -342,6 +342,53 @@ struct FrameworkStressTests {
     )
   }
 
+  @Test("focus owner replacement keeps focus registries bounded")
+  func focusOwnerReplacementKeepsFocusRegistriesBounded() throws {
+    // Hypothesis: replacing a subtree that owns @FocusState bindings and
+    // namespace default-focus registrations must not accumulate stale focus
+    // entries from prior owners.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FocusOwnerReplacementStressRoot"),
+      size: .init(width: 62, height: 10)
+    ) {
+      FocusOwnerReplacementStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.focusBindingRegistrationCount == 2)
+    #expect(harness.defaultFocusRegistrationCount == 2)
+    #expect(harness.focusRegionCount == 3)
+
+    var maxFocusBindings = harness.focusBindingRegistrationCount
+    var maxDefaultFocusRegistrations = harness.defaultFocusRegistrationCount
+    var maxFocusRegions = harness.focusRegionCount
+    var maxActions = harness.actionRegistrationCount
+
+    for generation in 1...24 {
+      let frame = try harness.clickText("Replace Focus Owner")
+      #expect(frame.contains("focus owner generation \(generation)"))
+      #expect(frame.contains("Primary Focus \(generation)"))
+      #expect(frame.contains("Preferred Focus \(generation)"))
+
+      maxFocusBindings = max(maxFocusBindings, harness.focusBindingRegistrationCount)
+      maxDefaultFocusRegistrations = max(
+        maxDefaultFocusRegistrations,
+        harness.defaultFocusRegistrationCount
+      )
+      maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+      maxActions = max(maxActions, harness.actionRegistrationCount)
+
+      #expect(harness.focusBindingRegistrationCount == 2)
+      #expect(harness.defaultFocusRegistrationCount == 2)
+      #expect(harness.focusRegionCount == 3)
+    }
+
+    #expect(maxFocusBindings == 2)
+    #expect(maxDefaultFocusRegistrations == 2)
+    #expect(maxFocusRegions == 3)
+    #expect(maxActions == 3)
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -847,6 +894,47 @@ private struct NavigationSourcePruningOwner: View {
   }
 }
 
+private enum FocusOwnerReplacementField: Hashable {
+  case primary
+  case preferred
+}
+
+private struct FocusOwnerReplacementStressFixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Focus Owner") { generation += 1 }
+      Text("focus owner generation \(generation)")
+      FocusOwnerReplacementOwner(generation: generation)
+        .id("focus-owner-\(generation)")
+    }
+    .frame(width: 62, height: 10, alignment: .topLeading)
+  }
+}
+
+private struct FocusOwnerReplacementOwner: View {
+  @Namespace private var namespace
+  @FocusState private var focusedField: FocusOwnerReplacementField?
+
+  let generation: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Primary Focus \(generation)") {}
+        .id(testIdentity("FocusOwnerReplacement", "\(generation)", "primary"))
+        .focused($focusedField, equals: .primary)
+      Button("Preferred Focus \(generation)") {}
+        .id(testIdentity("FocusOwnerReplacement", "\(generation)", "preferred"))
+        .focused($focusedField, equals: .preferred)
+        .prefersDefaultFocus(in: namespace)
+    }
+    .focusScope(namespace)
+    .onAppear {}
+    .onDisappear {}
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -946,6 +1034,19 @@ private final class StressRuntimeHarness<Content: View> {
     runLoop.localGestureStateRegistry.snapshot().values.reduce(0) { count, bindings in
       count + bindings.count
     }
+  }
+
+  var defaultFocusRegistrationCount: Int {
+    let snapshot = runLoop.localDefaultFocusRegistry.snapshot()
+    return snapshot.scopes.count + snapshot.candidates.count
+  }
+
+  var focusBindingRegistrationCount: Int {
+    runLoop.localFocusBindingRegistry.snapshot().count
+  }
+
+  var focusRegionCount: Int {
+    runLoop.focusTracker.focusRegions.count
   }
 
   func shutdown() {
