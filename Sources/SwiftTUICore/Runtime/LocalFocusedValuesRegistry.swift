@@ -121,6 +121,34 @@ package final class LocalFocusedValuesRegistry: Equatable {
     }
   }
 
+  /// Drops registrations whose publisher identity is absent from the committed
+  /// tree.
+  ///
+  /// `removeSubtrees` prunes by identity-prefix against the re-evaluated
+  /// frontier roots, but the scoped restore re-adds registrations via a
+  /// structural view-node walk. A publisher whose identity is detached from the
+  /// frontier (an exact `.id(_:)` that churns per rebuild) is therefore missed
+  /// by removal yet re-appended by restore, so the registry grows unbounded.
+  /// This end-of-frame prune closes that gap by intersecting against the freshly
+  /// rendered tree — the authoritative live-publisher set, independent of
+  /// publication mode. Gated on a non-empty registry so the common
+  /// no-focused-values path never walks the tree.
+  package func pruneToTreeIdentities(
+    in resolvedTree: ResolvedNode
+  ) {
+    guard !registrations.isEmpty else {
+      return
+    }
+
+    var liveIdentities: Set<Identity> = []
+    for identity in resolvedTree.collectIdentities() {
+      liveIdentities.insert(identity)
+    }
+    registrations.removeAll { registration in
+      !liveIdentities.contains(registration.identity)
+    }
+  }
+
   package func snapshot() -> [FocusedValuesRegistrationSnapshot] {
     registrations
   }

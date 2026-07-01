@@ -628,36 +628,23 @@ struct FrameworkStressTests {
     var maxScrollRegistrations = harness.scrollPositionRegistrationCount
     var maxRevealAnchors = harness.scrollRevealAnchorCount
 
-    withKnownIssue(
-      """
-      The live scroll registration is correctly replaced, but the scroll \
-      focus-reveal anchor cache retains the dead route identity after the first \
-      ScrollView owner recreation. This pins the independent cleanup failure; \
-      remove the known-issue wrapper when scrollRevealAnchorCount remains <= 1 \
-      across the replacement loop.
-      """
-    ) {
-      for generation in 1...24 {
-        let frame = try harness.clickText("Replace Scroll Owner")
-        #expect(frame.contains("scroll owner generation \(generation)"))
-        #expect(frame.contains("Scroll Replace \(generation)"))
+    for generation in 1...24 {
+      let frame = try harness.clickText("Replace Scroll Owner")
+      #expect(frame.contains("scroll owner generation \(generation)"))
+      #expect(frame.contains("Scroll Replace \(generation)"))
 
-        maxScrollRegistrations = max(
-          maxScrollRegistrations,
-          harness.scrollPositionRegistrationCount
-        )
-        maxRevealAnchors = max(maxRevealAnchors, harness.scrollRevealAnchorCount)
+      maxScrollRegistrations = max(
+        maxScrollRegistrations,
+        harness.scrollPositionRegistrationCount
+      )
+      maxRevealAnchors = max(maxRevealAnchors, harness.scrollRevealAnchorCount)
 
-        #expect(harness.scrollPositionRegistrationCount == 1)
-        if harness.scrollRevealAnchorCount > 1 {
-          #expect(harness.scrollRevealAnchorCount <= 1)
-          return
-        }
-      }
-
-      #expect(maxScrollRegistrations == 1)
-      #expect(maxRevealAnchors <= 1)
+      #expect(harness.scrollPositionRegistrationCount == 1)
+      #expect(harness.scrollRevealAnchorCount <= 1)
     }
+
+    #expect(maxScrollRegistrations == 1)
+    #expect(maxRevealAnchors <= 1)
   }
 
   @Test("key press handlers stay paired and bounded under focus owner churn")
@@ -769,45 +756,33 @@ struct FrameworkStressTests {
     var maxFocusedValueRegistrations = harness.focusedValueRegistrationCount
     var maxFocusRegions = harness.focusRegionCount
 
-    withKnownIssue(
-      """
-      Focused binding dispatch retargets the live binding, but focused-value \
-      publisher registrations whose identities churn under the owner are not \
-      pruned. The registry grows by two registrations per rebuild; remove this \
-      known issue when focusedValueRegistrationCount stays at 2 across the loop.
-      """
-    ) {
-      for generation in 0..<24 {
-        _ = try harness.clickText("Focused Binding First \(generation)")
-        expectedFocusedValue += generation + 1
+    for generation in 0..<24 {
+      _ = try harness.clickText("Focused Binding First \(generation)")
+      expectedFocusedValue += generation + 1
 
-        var frame = try harness.pressKey(KeyPress(.character("i"), modifiers: .ctrl))
-        #expect(
-          frame.contains(
-            "focused binding generation \(generation) value \(expectedFocusedValue)"
-          )
+      var frame = try harness.pressKey(KeyPress(.character("i"), modifiers: .ctrl))
+      #expect(
+        frame.contains(
+          "focused binding generation \(generation) value \(expectedFocusedValue)"
         )
+      )
 
-        frame = try harness.clickText("Rebuild Focused Binding Owner")
-        #expect(frame.contains("focused binding generation \(generation + 1)"))
-        #expect(frame.contains("Focused Binding First \(generation + 1)"))
-        #expect(frame.contains("Focused Binding Second \(generation + 1)"))
+      frame = try harness.clickText("Rebuild Focused Binding Owner")
+      #expect(frame.contains("focused binding generation \(generation + 1)"))
+      #expect(frame.contains("Focused Binding First \(generation + 1)"))
+      #expect(frame.contains("Focused Binding Second \(generation + 1)"))
 
-        maxFocusedValueRegistrations = max(
-          maxFocusedValueRegistrations,
-          harness.focusedValueRegistrationCount
-        )
-        maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+      maxFocusedValueRegistrations = max(
+        maxFocusedValueRegistrations,
+        harness.focusedValueRegistrationCount
+      )
+      maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
 
-        if harness.focusedValueRegistrationCount != 2 {
-          #expect(harness.focusedValueRegistrationCount == 2)
-          return
-        }
-        #expect(harness.focusRegionCount == 3)
-      }
-
-      #expect(maxFocusedValueRegistrations == 2)
+      #expect(harness.focusedValueRegistrationCount == 2)
+      #expect(harness.focusRegionCount == 3)
     }
+
+    #expect(maxFocusedValueRegistrations == 2)
     #expect(maxFocusRegions == 3)
   }
 
@@ -911,11 +886,17 @@ struct FrameworkStressTests {
 
     withKnownIssue(
       """
-      Initial render starts both tasks, but after the first button-driven \
-      generation/identity churn the runtime cancels them and does not start the \
-      new pair. This pins the failure while keeping the stress path in the \
-      regular suite; remove the known-issue wrapper when activeTaskCount and \
-      activeTaskDescriptorCount remain 2 after each Cycle Multi Tasks click.
+      Under an `.id(_:)` entity-identity rebind at a fixed structural slot, task \
+      cancellation and (re)start split across two committed frames instead of \
+      converging in one. The churn render tears down the departing entity node \
+      (cancelling its descriptors -> count 0) while the replacement entity node \
+      commits with an empty `lifecycleMetadata.tasks`; the freshly authored \
+      descriptors only materialize on that node — under a fresh per-view-node \
+      descriptor token — one render later, so a scripted click that observes \
+      immediately after the cancel always sees 0. Remove this known-issue \
+      wrapper once the replacement entity node adopts its `.task` descriptors in \
+      the same render as the churn (activeTaskCount / activeTaskDescriptorCount \
+      remain 2 after each Cycle Multi Tasks click).
       """
     ) {
       var maxActiveTasks = harness.activeTaskCount

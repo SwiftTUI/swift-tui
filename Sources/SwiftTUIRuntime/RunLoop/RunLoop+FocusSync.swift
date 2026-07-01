@@ -61,6 +61,15 @@ extension RunLoop {
     runtimeRegistrations.pruneOrphanedGestures(
       keeping: renderer.liveNodeIDSnapshot()
     )
+    // Drop focused-value registrations whose publisher identity is no longer in
+    // the committed tree. Scoped commits re-add publishers via a structural walk
+    // but prune by identity-prefix, so a publisher whose identity churns and is
+    // detached from the re-evaluated frontier (an exact `.id(_:)` rebind) would
+    // otherwise accumulate a stale registration per rebuild. The freshly
+    // rendered tree is the authoritative live-publisher set, independent of
+    // publication mode. Gated on a non-empty registry so the common
+    // no-focused-values path pays nothing.
+    localFocusedValuesRegistry.pruneToTreeIdentities(in: renderedArtifacts.resolvedTree)
     try updateTerminalPointerHoverModeIfNeeded()
 
     // Release pointer capture if the captured region disappeared from

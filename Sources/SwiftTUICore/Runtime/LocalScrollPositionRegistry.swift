@@ -237,6 +237,18 @@ package final class LocalScrollPositionRegistry: Equatable {
       scrollTargets: scrollTargets
     )
 
+    // Drop reveal anchors whose scroll route is no longer live. `sync` receives
+    // the frame's full route set, so a route absent here has had its owning
+    // ScrollView torn down (e.g. recreated under a new `.id`), leaving a dead
+    // route identity cached. Unlike `reset()`/`removeSubtrees()` — which the run
+    // loop drives every frame for republication and so must NOT touch this map —
+    // `scrollRoutes` reflects genuine liveness, so a still-present route keeps
+    // its anchor and a still-focused control does not re-fire focus-reveal.
+    if !lastRevealAnchors.isEmpty {
+      let liveRouteIdentities = Set(scrollRoutes.map(\.identity))
+      lastRevealAnchors = lastRevealAnchors.filter { liveRouteIdentities.contains($0.key) }
+    }
+
     guard let focusedIdentity,
       let focusedRegion = focusRegions.first(where: { $0.identity == focusedIdentity })
     else {
