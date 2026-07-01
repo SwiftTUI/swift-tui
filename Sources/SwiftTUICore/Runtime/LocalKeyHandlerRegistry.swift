@@ -51,9 +51,33 @@ package final class LocalKeyHandlerRegistry: Equatable {
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
   package typealias PasteHandler = @MainActor (String) -> Bool
 
+  /// One identity's handlers can be contributed by SEVERAL live nodes: stacked
+  /// modifiers register at the same resolved identity while each level captures
+  /// on its own evaluation node. The registry therefore buckets handlers per
+  /// contributing owner instead of holding one flat list per identity — a
+  /// per-node restore replaces only that node's bucket, so restoring node A
+  /// cannot wipe node B's stacked sibling handler, and repeated restores of one
+  /// node stay idempotent.
+  private struct ContributedHandlers<H> {
+    var byOwner: [RuntimeRegistrationOwnerKey: [H]] = [:]
+
+    var flattened: [H] {
+      // Descending owner order (nil owners last) mirrors in-frame registration
+      // order: inner modifier levels resolve — and register — before outer
+      // levels, and their evaluation nodes are allocated after them.
+      byOwner
+        .sorted { lhs, rhs in lhs.key > rhs.key }
+        .flatMap(\.value)
+    }
+
+    var isEmpty: Bool {
+      byOwner.isEmpty
+    }
+  }
+
   private var handlers: [Identity: Handler] = [:]
-  private var keyPressHandlers: [Identity: [KeyPressHandler]] = [:]
-  private var pasteHandlers: [Identity: [PasteHandler]] = [:]
+  private var keyPressHandlers: [Identity: ContributedHandlers<KeyPressHandler>] = [:]
+  private var pasteHandlers: [Identity: ContributedHandlers<PasteHandler>] = [:]
   private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
@@ -80,8 +104,11 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     keyPressHandler: @escaping KeyPressHandler
   ) {
-    keyPressHandlers[identity, default: []].append(keyPressHandler)
-    ownersByIdentity[identity] = .current(identity: identity)
+    let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
+    keyPressHandlers[identity, default: .init()]
+      .byOwner[owner, default: []]
+      .append(keyPressHandler)
+    ownersByIdentity[identity] = owner
     ViewNodeContext.current?.recordKeyPressHandlerRegistration(
       identity: identity,
       handler: keyPressHandler
@@ -92,8 +119,11 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     pasteHandler: @escaping PasteHandler
   ) {
-    pasteHandlers[identity, default: []].append(pasteHandler)
-    ownersByIdentity[identity] = .current(identity: identity)
+    let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
+    pasteHandlers[identity, default: .init()]
+      .byOwner[owner, default: []]
+      .append(pasteHandler)
+    ownersByIdentity[identity] = owner
     ViewNodeContext.current?.recordPasteHandlerRegistration(
       identity: identity,
       handler: pasteHandler
@@ -113,8 +143,8 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     keyPress: KeyPress
   ) -> Bool {
-    if let handlers = keyPressHandlers[identity] {
-      for handler in handlers.reversed() {
+    if let contributions = keyPressHandlers[identity] {
+      for handler in contributions.flattened.reversed() {
         if handler(keyPress) {
           return true
         }
@@ -128,11 +158,11 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     content: String
   ) -> Bool {
-    guard let handlers = pasteHandlers[identity] else {
+    guard let contributions = pasteHandlers[identity] else {
       return false
     }
 
-    for handler in handlers.reversed() {
+    for handler in contributions.flattened.reversed() {
       if handler(content) {
         return true
       }
@@ -169,13 +199,25 @@ package final class LocalKeyHandlerRegistry: Equatable {
     for identity in handlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
       handlers.removeValue(forKey: identity)
     }
-    for identity in keyPressHandlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
-      keyPressHandlers.removeValue(forKey: identity)
-    }
-    for identity in pasteHandlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
-      pasteHandlers.removeValue(forKey: identity)
-    }
+    removeContributionSubtrees(from: &keyPressHandlers, roots: roots)
+    removeContributionSubtrees(from: &pasteHandlers, roots: roots)
     pruneOwnerMap()
+  }
+
+  private func removeContributionSubtrees<H>(
+    from contributions: inout [Identity: ContributedHandlers<H>],
+    roots: [Identity]
+  ) {
+    for (identity, contribution) in contributions {
+      let remaining = contribution.byOwner.filter { owner, _ in
+        !owner.matchesAnySubtreeRoot(roots)
+      }
+      if remaining.isEmpty {
+        contributions.removeValue(forKey: identity)
+      } else if remaining.count != contribution.byOwner.count {
+        contributions[identity]?.byOwner = remaining
+      }
+    }
   }
 
   package func snapshot() -> [Identity: Handler] {
@@ -183,11 +225,11 @@ package final class LocalKeyHandlerRegistry: Equatable {
   }
 
   package func snapshotKeyPressHandlers() -> [Identity: [KeyPressHandler]] {
-    keyPressHandlers
+    keyPressHandlers.mapValues(\.flattened)
   }
 
   package func snapshotPasteHandlers() -> [Identity: [PasteHandler]] {
-    pasteHandlers
+    pasteHandlers.mapValues(\.flattened)
   }
 
   package func restore(
@@ -213,8 +255,9 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
 
     for (identity, handlers) in snapshot {
-      keyPressHandlers[identity] = handlers
-      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
+      let owner = ownersByIdentity[identity] ?? .init(identity: identity)
+      keyPressHandlers[identity, default: .init()].byOwner[owner] = handlers
+      self.ownersByIdentity[identity] = owner
     }
   }
 
@@ -227,8 +270,9 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
 
     for (identity, handlers) in snapshot {
-      pasteHandlers[identity] = handlers
-      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
+      let owner = ownersByIdentity[identity] ?? .init(identity: identity)
+      pasteHandlers[identity, default: .init()].byOwner[owner] = handlers
+      self.ownersByIdentity[identity] = owner
     }
   }
 

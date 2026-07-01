@@ -80,6 +80,15 @@ package final class LocalPointerHandlerRegistry: Equatable {
   private var hoverHandlers: [RouteID: HoverHandler] = [:]
   private var handlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
   private var hoverHandlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  // Recency (the contributing node's visited-frame stamp) per hover route.
+  // A hover registration can be re-captured on a DIFFERENT node when the
+  // slot's evaluation topology changes between frames (stacked modifier levels
+  // collapse onto one node on re-resolve); the abandoned node keeps a live,
+  // never-re-captured copy under the same identity with a different
+  // `ownerNodeID`. On insert, a fresher registration for the same
+  // owner-agnostic route evicts the stale one so the registry holds one entry
+  // per logical hover handler.
+  private var hoverHandlerRecencies: [RouteID: UInt64] = [:]
 
   package init() {}
 
@@ -107,12 +116,46 @@ package final class LocalPointerHandlerRegistry: Equatable {
     routeID: RouteID,
     handler: @escaping HoverHandler
   ) {
-    hoverHandlers[routeID] = handler
-    hoverHandlerOwners[routeID] = .current(identity: routeID.identity)
+    insertHoverHandler(
+      routeID: routeID,
+      handler: handler,
+      owner: .current(identity: routeID.identity),
+      recency: ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
+    )
     ViewNodeContext.current?.recordPointerHoverHandlerRegistration(
       routeID: routeID,
       handler: handler
     )
+  }
+
+  /// Inserts a hover handler, evicting any stale same-owner-agnostic entry: an
+  /// entry for the same identity+kind whose contributing node has a strictly
+  /// older visited stamp is an abandoned level's shadowed copy, not a distinct
+  /// stacked handler. A strictly fresher existing entry wins instead (the
+  /// incoming one is the shadowed copy being re-restored). Equal recency keeps
+  /// both — genuinely stacked same-frame registrations stay distinct per owner.
+  private func insertHoverHandler(
+    routeID: RouteID,
+    handler: @escaping HoverHandler,
+    owner: RuntimeRegistrationOwnerKey,
+    recency: UInt64
+  ) {
+    let collidingRoutes = hoverHandlers.keys.filter { existing in
+      existing == routeID.ownerAgnostic && existing != routeID
+    }
+    for existing in collidingRoutes {
+      let existingRecency = hoverHandlerRecencies[existing] ?? 0
+      if existingRecency < recency {
+        hoverHandlers.removeValue(forKey: existing)
+        hoverHandlerOwners.removeValue(forKey: existing)
+        hoverHandlerRecencies.removeValue(forKey: existing)
+      } else if existingRecency > recency {
+        return
+      }
+    }
+    hoverHandlers[routeID] = handler
+    hoverHandlerOwners[routeID] = owner
+    hoverHandlerRecencies[routeID] = recency
   }
 
   package func hasHandler(
@@ -143,7 +186,18 @@ package final class LocalPointerHandlerRegistry: Equatable {
     routeID: RouteID,
     phase: HoverPhase
   ) {
-    hoverHandlers[routeID]?(phase)
+    if let handler = hoverHandlers[routeID] {
+      handler(phase)
+      return
+    }
+    // The caller's route may carry a stale `ownerNodeID` (a hover exit paired
+    // against a route captured before the hovered node re-minted). The stale
+    // registry entry that used to satisfy that exact match is evicted on
+    // re-registration now, so fall back to the same owner-agnostic pairing the
+    // pointer release path uses.
+    hoverHandlers.first { existing, _ in
+      existing == routeID.ownerAgnostic
+    }?.value(phase)
   }
 
   package func reset() {
@@ -151,6 +205,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     hoverHandlers.removeAll(keepingCapacity: true)
     handlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
+    hoverHandlerRecencies.removeAll(keepingCapacity: true)
   }
 
   package func reset(
@@ -167,6 +222,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }
     hoverHandlers.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
+    hoverHandlerRecencies.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -190,6 +246,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }) {
       hoverHandlers.removeValue(forKey: routeID)
       hoverHandlerOwners.removeValue(forKey: routeID)
+      hoverHandlerRecencies.removeValue(forKey: routeID)
     }
   }
 
@@ -217,15 +274,20 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func restoreHover(
     _ snapshot: [RouteID: HoverHandler],
-    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:],
+    recency: UInt64 = 0
   ) {
     guard !snapshot.isEmpty else {
       return
     }
 
     for (routeID, handler) in snapshot {
-      hoverHandlers[routeID] = handler
-      hoverHandlerOwners[routeID] = ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
+      insertHoverHandler(
+        routeID: routeID,
+        handler: handler,
+        owner: ownersByRouteID[routeID] ?? .init(identity: routeID.identity),
+        recency: recency
+      )
     }
   }
 }

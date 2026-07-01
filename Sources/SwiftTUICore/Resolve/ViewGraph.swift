@@ -1970,11 +1970,21 @@ package final class ViewGraph {
       collectRuntimeRegistrationSubtreeNodeIDs(node, into: &nodeIDs)
     }
     for nodeID in liveNodeIDs where !nodeIDs.contains(nodeID) {
-      guard let identity = nodesByNodeID[nodeID]?.identity else {
+      guard let node = nodesByNodeID[nodeID] else {
         continue
       }
+      // Match the node's resolved identity as well as its structural identity:
+      // stacked modifier levels at one `.id`-replaced identity keep their
+      // registrations on sibling evaluation nodes whose STRUCTURAL identities
+      // sit outside the frontier root even when the root covers the resolved
+      // identity they registered under. The scoped reset removed those
+      // registrations by identity prefix, so missing such a sibling here would
+      // drop its stacked handler until the next full publication.
+      let identity = node.identity
+      let resolvedIdentity = node.resolvedIdentity
       if roots.contains(where: { root in
         identity == root || identity.isDescendant(of: root)
+          || resolvedIdentity == root || resolvedIdentity.isDescendant(of: root)
       }) {
         nodeIDs.insert(nodeID)
       }
@@ -2404,9 +2414,18 @@ package final class ViewGraph {
         continue
       }
 
+      // The removed child itself is authoritatively departed (positionally
+      // diffed out and not retained), but its committed snapshot may descend —
+      // via identity and node lookups — into nodes the arriving tree already
+      // re-adopted this frame (a stable-`.id` control re-rooted out of a
+      // churned `AnyView` payload resolves to the SAME identities as the
+      // departing generation's committed children). Spare visited nodes in the
+      // descent so tearing down the departed child cannot dismantle the live
+      // replacement's subtree and drop its runtime registrations.
       removeSubtree(
         rootedAt: removedNode,
-        committedSnapshot: removal.committedSnapshot
+        committedSnapshot: removal.committedSnapshot,
+        sparingVisitedNodes: true
       )
     }
   }
@@ -2414,7 +2433,8 @@ package final class ViewGraph {
   private func removeSubtree(
     rootedAt node: ViewNode,
     committedSnapshot: ResolvedNode? = nil,
-    sparingVisitedNodes: Bool = false
+    sparingVisitedNodes: Bool = false,
+    isSubtreeDescent: Bool = false
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
       current === node
@@ -2422,14 +2442,18 @@ package final class ViewGraph {
       return
     }
 
-    // Churn-orphan pruning tears down a generation the frame's walk provably
-    // abandoned, so anything it reaches that WAS visited this frame belongs to
-    // the arriving tree (a re-adopted stable-`.id` control, a reused chrome
-    // node found through an identity lookup) — leave it, and its subtree,
-    // alone. Only the post-walk pruner passes `true`; structural removal keeps
-    // the narrower parent-detached keep-guard below, because it legitimately
-    // removes visited nodes (e.g. a pruned navigation destination).
+    // A departed-subtree teardown (an explicitly diffed-out child, a churn
+    // orphan) removes a root the caller has already judged gone, but the walk
+    // DOWN from that root goes through committed snapshots and identity/node
+    // lookups that can land on nodes the arriving tree re-adopted this frame
+    // (a stable-`.id` control re-rooted out of the departing generation, a
+    // reused chrome node). A visited node reached by DESCENT therefore belongs
+    // to the live tree — leave it, and its subtree, alone. The explicit root
+    // is still removed unconditionally, and callers that do not opt in keep
+    // the narrower parent-detached keep-guard below (some removals — e.g. a
+    // pruned navigation destination — legitimately tear down visited roots).
     if sparingVisitedNodes,
+      isSubtreeDescent,
       node.visitedThisFrame(currentFrameID)
     {
       return
@@ -2470,7 +2494,11 @@ package final class ViewGraph {
     }
     if snapshot.children.isEmpty {
       for child in node.children {
-        removeSubtree(rootedAt: child, sparingVisitedNodes: sparingVisitedNodes)
+        removeSubtree(
+          rootedAt: child,
+          sparingVisitedNodes: sparingVisitedNodes,
+          isSubtreeDescent: true
+        )
       }
     } else {
       for child in snapshot.children {
@@ -2577,7 +2605,8 @@ package final class ViewGraph {
         removeSubtree(
           rootedAt: node,
           committedSnapshot: resolved,
-          sparingVisitedNodes: sparingVisitedNodes
+          sparingVisitedNodes: sparingVisitedNodes,
+          isSubtreeDescent: true
         )
       }
       return
@@ -2587,7 +2616,8 @@ package final class ViewGraph {
       removeSubtree(
         rootedAt: node,
         committedSnapshot: resolved,
-        sparingVisitedNodes: sparingVisitedNodes
+        sparingVisitedNodes: sparingVisitedNodes,
+        isSubtreeDescent: true
       )
       return
     }

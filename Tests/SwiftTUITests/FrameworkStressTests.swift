@@ -2374,15 +2374,7 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
   }
 
   private func expectedFrameKnownIssueDescription(generation: Int) -> String? {
-    switch self {
-    case .anyViewTextEditorPasteRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped TextEditor paste handling targets stale binding state after churn"
-    case .stackedKeyPressTextRebinds:
-      return "Stacked key-press modifiers only dispatch one live handler in the churn loop"
-    default:
-      return nil
-    }
+    nil
   }
 
   private var expectedRegistrationKnownIssueDescription: String? {
@@ -2390,17 +2382,7 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
   }
 
   private var maxRegistrationKnownIssueDescription: String? {
-    switch self {
-    case .hoverWithTapGestureKeepsBothBounded:
-      "Combining pointer hover and tap gesture leaves duplicate hover registrations"
-    case .anyViewTextEditorPasteRebinds:
-      // Bounded (max 4), not an accumulation: TextEditor's inner scroll
-      // content and its transient scroll indicator each emit their own focus
-      // region alongside the control's, exceeding the single-stop expectation.
-      "TextEditor emits extra focus regions for its inner scroll content and indicator"
-    default:
-      nil
-    }
+    nil
   }
 
   private var iterationCount: Int {
@@ -3571,13 +3553,7 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
   }
 
   private func expectedFrameKnownIssueDescription(generation: Int) -> String? {
-    switch self {
-    case .nestedAnyViewSecureFieldPasteRebinds:
-      guard generation > 0 else { return nil }
-      return "Nested AnyView SecureField paste handling targets stale binding state after churn"
-    default:
-      return nil
-    }
+    nil
   }
 
   private var expectedRegistrationKnownIssueDescription: String? {
@@ -3585,15 +3561,7 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
   }
 
   private var maxRegistrationKnownIssueDescription: String? {
-    switch self {
-    case .panelTextEditorPasteRebinds:
-      // Bounded (max 4), not an accumulation: TextEditor's inner scroll
-      // content and its transient scroll indicator each emit their own focus
-      // region alongside the control's, exceeding the single-stop expectation.
-      "TextEditor emits extra focus regions for its inner scroll content and indicator"
-    default:
-      nil
-    }
+    nil
   }
 
   private var iterationCount: Int {
@@ -4783,6 +4751,7 @@ private final class StressRuntimeHarness<Content: View> {
     )
     return try render()
   }
+
 }
 
 private final class StressRecordingHost: PresentationSurface {

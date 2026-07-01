@@ -1154,7 +1154,12 @@ package final class ViewNode {
     guard registeredHandlers.hasRuntimeRegistrations else {
       return
     }
-    registrations.restore(from: registeredHandlers)
+    // `visitedFrameID` is the restore's recency. Two live nodes can hold
+    // captured hover registrations for the same owner-agnostic route when an
+    // evaluation-topology change re-captures the handler on a different node:
+    // the abandoned node keeps a shadowed copy but is never re-visited, so the
+    // hover registry uses this stamp to let the fresher capture evict it.
+    registrations.restore(from: registeredHandlers, recency: visitedFrameID)
   }
 
   package func restoreOwnEffectRegistrations(
@@ -1314,6 +1319,14 @@ package final class ViewNode {
   ) -> Bool {
     prepareForFrame(frameID)
     return visitedFrameID == frameID
+  }
+
+  /// The visited-frame stamp used as a registration's recency: the hover
+  /// registry uses it to let a re-captured handler evict a never-re-visited
+  /// node's stale, shadowed copy of the same owner-agnostic route. See
+  /// `restoreOwnRuntimeRegistrations`.
+  package var runtimeRegistrationRecency: UInt64 {
+    visitedFrameID
   }
 
   package func setCommittedPresence(

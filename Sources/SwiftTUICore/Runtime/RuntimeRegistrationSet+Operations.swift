@@ -88,7 +88,8 @@ extension RuntimeRegistrationSet {
   }
 
   package func restore(
-    from handlers: NodeHandlers
+    from handlers: NodeHandlers,
+    recency: UInt64 = 0
   ) {
     let activeGestureIdentities = gestureRegistry?.activeIdentitySnapshot() ?? []
     let pointerHandlerRegistrations =
@@ -122,7 +123,8 @@ extension RuntimeRegistrationSet {
     )
     pointerHandlerRegistry?.restoreHover(
       handlers.pointerHoverHandlerRegistrations,
-      ownersByRouteID: handlers.pointerHoverHandlerRegistrationOwners
+      ownersByRouteID: handlers.pointerHoverHandlerRegistrationOwners,
+      recency: recency
     )
     gestureRegistry?.restore(
       handlers.gestureRegistrations,
