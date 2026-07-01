@@ -1586,9 +1586,7 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
       let rebuilt = try harness.clickText("Rebuild Discovery")
       #expect(rebuilt.contains("case \(rawValue) generation \(generation + 1)"))
       if self == .stableButtonActionRebinds {
-        withKnownIssue("Stable Button labels remain stale after owner identity churn") {
-          #expect(rebuilt.contains("Probe Button \(generation + 1)"))
-        }
+        #expect(rebuilt.contains("Probe Button \(generation + 1)"))
       }
     }
 
@@ -2374,39 +2372,24 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
     switch self {
     case .anyViewButtonActionRebinds:
       guard generation > 0 else { return nil }
+      // Residual after the reuse/churn fix: Button's ButtonStyle chrome resolves
+      // several nodes at one structural identity (`…/ButtonBody/false` +
+      // background/base/overlay), and the fresh post-churn ButtonBody root is not
+      // marked visited, so it is pruned and the control's pointer route re-mints —
+      // the run-loop click's press/release then straddle two route identities and
+      // no action dispatches. Needs the multi-node-at-one-identity reconciliation
+      // seam, not the reuse seam this pass fixed.
       return "AnyView-wrapped Button actions keep the first owner closure after churn"
     case .panelButtonActionRebinds:
       guard generation > 0 else { return nil }
+      // Same multi-node ButtonBody reconciliation residual as
+      // `anyViewButtonActionRebinds`, hosted under a `Panel` scope.
       return "Panel-hosted Button actions keep the first owner closure after churn"
-    case .anyViewToggleRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped Toggle actions keep stale binding state after churn"
-    case .anyViewDisclosureRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped DisclosureGroup actions keep stale binding state after churn"
-    case .anyViewTextFieldKeyRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped TextField key handling targets stale binding state after churn"
-    case .anyViewSecureFieldPasteRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped SecureField paste handling targets stale binding state after churn"
     case .anyViewTextEditorPasteRebinds:
       guard generation > 0 else { return nil }
       return "AnyView-wrapped TextEditor paste handling targets stale binding state after churn"
-    case .anyViewStepperKeyRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped Stepper key handling targets stale binding state after churn"
-    case .anyViewSliderKeyRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped Slider key handling targets stale binding state after churn"
-    case .anyViewPickerKeyRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped Picker key handling targets stale selection state after churn"
     case .stackedKeyPressTextRebinds:
       return "Stacked key-press modifiers only dispatch one live handler in the churn loop"
-    case .tapGestureAnyViewRebinds:
-      guard generation > 0 else { return nil }
-      return "AnyView-wrapped tap gestures keep the first owner closure after churn"
     case .preferenceObserverRebinds:
       guard generation > 0 else { return nil }
       return "Preference observer dispatch keeps the first observed value after owner churn"

@@ -2288,6 +2288,27 @@ package final class ViewGraph {
       return
     }
 
+    // A node reached while tearing down a *departing* subtree (e.g. an owner
+    // whose `.id` churned) may itself be a re-rooted stable-`.id` descendant
+    // (a control under an `AnyView`/captured-subview scope) that the *arriving*
+    // subtree already re-resolved this frame at its re-rooted identity. Because
+    // its identity is re-rooted, it has no live parent link (`parent == nil`) —
+    // the same property the retained-reuse decision observes — so it only appears
+    // here through the departing owner's committed children, yet its runtime node
+    // is genuinely live now. Dropping it would mint a fresh node next frame,
+    // churning its route/registration identity and breaking same-node
+    // interactions (a click whose press/release straddle the churn stops
+    // dispatching). Keep it when it was visited this frame and is parent-detached;
+    // a genuinely departing node either was not visited (pruned normally) or is
+    // still parented under the surviving tree (e.g. an entity-routed owner being
+    // replaced), so its lifecycle/registrations are retired as before.
+    if node.parent == nil,
+      node.viewNodeID != root?.viewNodeID,
+      node.visitedThisFrame(currentFrameID)
+    {
+      return
+    }
+
     recordCheckpointGraphMutation()
     node.prepareForFrame(currentFrameID)
     let snapshot = committedSnapshot ?? node.committed

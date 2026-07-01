@@ -235,10 +235,29 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    [
-      content.resolveOwned(
-        in: context.replacingIdentity(with: identity)
-      )
+    var routedContext = context.replacingIdentity(with: identity)
+    // Identity churn: the structural slot at this position resolved to a
+    // *different* explicit identity last frame (e.g. `.id("owner-\(gen)")` with a
+    // bumped generation). The committed reuse-containment checks key on
+    // identity/structural ancestry, but this modifier (and `AnyView`,
+    // captured-subview scopes below it) re-roots that ancestry, so a stable-`.id`
+    // descendant escapes the owner's invalidation and is served its stale
+    // first-generation snapshot. Mark the subtree so reuse is suppressed and
+    // every positional descendant re-resolves with the fresh view value; the flag
+    // rides `child` / `replacingIdentity` derivations, surviving each re-rooting
+    // layer. Node `@State` slots persist across the recompute (they are keyed by
+    // the descendant's own stable identity), so only closures/bindings/labels are
+    // refreshed — not runtime state the framework deliberately keeps.
+    if !routedContext.withinChurnedSubtree,
+      let slotNode = ViewNodeContext.current,
+      slotNode.wasPresentAtFrameStart,
+      slotNode.resolvedIdentity != slotNode.identity,
+      !identity.isAncestor(of: slotNode.resolvedIdentity)
+    {
+      routedContext.withinChurnedSubtree = true
+    }
+    return [
+      content.resolveOwned(in: routedContext)
     ]
   }
 }

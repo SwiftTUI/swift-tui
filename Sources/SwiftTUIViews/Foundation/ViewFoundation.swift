@@ -312,7 +312,8 @@ func resolveView<V: View>(
   // root evaluation only makes the walk *reach* every node — each reached node
   // still independently chooses reuse here — so affected nodes additionally
   // skip this fast path.
-  if !context.effectiveSuppressesRetainedReuse(at: context.identity),
+  if !context.withinChurnedSubtree,
+    !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.reusableSnapshot(
       for: context.identity,
       invalidatedIdentities: context.effectiveInvalidatedIdentities,
@@ -345,7 +346,8 @@ func resolveView<V: View>(
   // subtree via the same path as Layer A. Behind the same focus/press
   // suppression gate. `Equatable`-only, so it is inert on trees that do not opt
   // in (a non-`Equatable` view leaves `memoViewValue` nil and bails immediately).
-  if !context.effectiveSuppressesRetainedReuse(at: context.identity),
+  if !context.withinChurnedSubtree,
+    !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.memoizedReusableSnapshot(
       for: context.identity,
       viewValue: view,

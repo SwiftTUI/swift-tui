@@ -124,6 +124,10 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.suppressesStructuralLifecycle }
     set { propagated.suppressesStructuralLifecycle = newValue }
   }
+  package var withinChurnedSubtree: Bool {
+    get { propagated.withinChurnedSubtree }
+    set { propagated.withinChurnedSubtree = newValue }
+  }
   package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)? {
     get { propagated.requestDeadline }
     set { propagated.requestDeadline = newValue }
@@ -412,6 +416,17 @@ extension ResolveContext {
     package var imageAssetResolver: ImageAssetResolver?
     package var frameInputs: FrameResolveInputBox?
     package var suppressesStructuralLifecycle: Bool
+    /// True while resolving inside a subtree whose owning `.id(_:)` re-rooted its
+    /// resolved identity this frame (an identity churn). Set by
+    /// ``ExactIdentityModifier`` at the churn point and inherited by every
+    /// derived (`child` / `replacingIdentity`) context, so it rides the resolve
+    /// tree downward regardless of how many identity/structural re-rooting layers
+    /// (`.id`, `AnyView`, captured-subview scopes) sit between the churned owner
+    /// and a descendant. Reuse (retained + memo) is suppressed for such
+    /// descendants so they re-resolve fresh — the committed reuse-containment
+    /// checks key on identity/structural ancestry, which a re-rooted descendant
+    /// escapes.
+    package var withinChurnedSubtree: Bool
     /// Forwards deadline requests to the frame scheduler.
     /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
     package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
@@ -435,6 +450,7 @@ extension ResolveContext {
       imageAssetResolver: ImageAssetResolver? = nil,
       frameInputs: FrameResolveInputBox? = nil,
       suppressesStructuralLifecycle: Bool = false,
+      withinChurnedSubtree: Bool = false,
       requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)? = nil
     ) {
       self.resolveWorkTracker = resolveWorkTracker
@@ -455,6 +471,7 @@ extension ResolveContext {
       self.imageAssetResolver = imageAssetResolver
       self.frameInputs = frameInputs
       self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
+      self.withinChurnedSubtree = withinChurnedSubtree
       self.requestDeadline = requestDeadline
     }
   }
