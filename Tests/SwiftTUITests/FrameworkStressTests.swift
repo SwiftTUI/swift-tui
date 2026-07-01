@@ -436,6 +436,57 @@ struct FrameworkStressTests {
     )
   }
 
+  @Test("scroll focus reveal anchors are pruned when scroll owners are recreated")
+  func scrollFocusRevealAnchorsArePrunedWhenScrollOwnersAreRecreated() throws {
+    // Hypothesis: focus-reveal state is interaction state for the live scroll
+    // route and should not retain route identities after the owning ScrollView
+    // has been torn down and recreated.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ScrollFocusRevealPruningStressRoot"),
+      size: .init(width: 54, height: 8)
+    ) {
+      ScrollFocusRevealPruningStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.scrollPositionRegistrationCount == 1)
+    #expect(harness.scrollRevealAnchorCount <= 1)
+
+    var maxScrollRegistrations = harness.scrollPositionRegistrationCount
+    var maxRevealAnchors = harness.scrollRevealAnchorCount
+
+    withKnownIssue(
+      """
+      The live scroll registration is correctly replaced, but the scroll \
+      focus-reveal anchor cache retains the dead route identity after the first \
+      ScrollView owner recreation. This pins the independent cleanup failure; \
+      remove the known-issue wrapper when scrollRevealAnchorCount remains <= 1 \
+      across the replacement loop.
+      """
+    ) {
+      for generation in 1...24 {
+        let frame = try harness.clickText("Replace Scroll Owner")
+        #expect(frame.contains("scroll owner generation \(generation)"))
+        #expect(frame.contains("Scroll Replace \(generation)"))
+
+        maxScrollRegistrations = max(
+          maxScrollRegistrations,
+          harness.scrollPositionRegistrationCount
+        )
+        maxRevealAnchors = max(maxRevealAnchors, harness.scrollRevealAnchorCount)
+
+        #expect(harness.scrollPositionRegistrationCount == 1)
+        if harness.scrollRevealAnchorCount > 1 {
+          #expect(harness.scrollRevealAnchorCount <= 1)
+          return
+        }
+      }
+
+      #expect(maxScrollRegistrations == 1)
+      #expect(maxRevealAnchors <= 1)
+    }
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -1030,6 +1081,28 @@ private struct PreferenceObserverChurnOwner: View {
   }
 }
 
+private struct ScrollFocusRevealPruningStressFixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("scroll owner generation \(generation)")
+      ScrollView(.vertical, showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Replace Scroll Owner") { generation += 1 }
+          Text("Scroll Replace \(generation)")
+          ForEach(0..<18, id: \.self) { row in
+            Text("scroll row \(generation).\(row)")
+          }
+        }
+      }
+      .id("scroll-owner-\(generation)")
+      .frame(width: 54, height: 6, alignment: .topLeading)
+    }
+    .frame(width: 54, height: 8, alignment: .topLeading)
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -1146,6 +1219,19 @@ private final class StressRuntimeHarness<Content: View> {
 
   var preferenceObservationRegistrationCount: Int {
     runLoop.localPreferenceObservationRegistry.snapshot().count
+  }
+
+  var scrollPositionRegistrationCount: Int {
+    runLoop.localScrollPositionRegistry.snapshot().count
+  }
+
+  var scrollRevealAnchorCount: Int {
+    let mirror = Mirror(reflecting: runLoop.localScrollPositionRegistry)
+    guard let child = mirror.children.first(where: { $0.label == "lastRevealAnchors" })
+    else {
+      return -1
+    }
+    return Mirror(reflecting: child.value).children.count
   }
 
   func shutdown() {
