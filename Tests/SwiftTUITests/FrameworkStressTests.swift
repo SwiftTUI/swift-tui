@@ -394,6 +394,11 @@ struct FrameworkStressTests {
     try expansionCase.run()
   }
 
+  @Test("directed additional stress case", arguments: FrameworkStressAdditionalCase.allCases)
+  func directedAdditionalStressCase(_ additionalCase: FrameworkStressAdditionalCase) throws {
+    try additionalCase.run()
+  }
+
   @Test("navigation destinations are pruned when their source subtree is recreated")
   func navigationDestinationsArePrunedWhenTheirSourceSubtreeIsRecreated() throws {
     // Hypothesis: replacing the source owner while a destination is active must
@@ -3210,6 +3215,773 @@ private struct FrameworkStressExpansionOwner: View {
             await Task.yield()
           }
         }
+    }
+  }
+}
+
+enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertible,
+  Sendable
+{
+  case nestedAnyViewButtonRebinds
+  case nestedPanelButtonRebinds
+  case conditionalAnyViewToggleRebinds
+  case nestedPanelTextFieldKeyRebinds
+  case nestedAnyViewSecureFieldPasteRebinds
+  case panelTextEditorPasteRebinds
+  case forEachStepperKeyRebinds
+  case conditionalSliderKeyRebinds
+  case forEachPickerKeyRebinds
+  case nestedFocusScopeDefaultRebinds
+  case focusedValueInsidePanelRebinds
+  case keyPressNestedPanelRebinds
+  case disabledKeyPressNestedNoLeak
+  case nestedKeyCommandInnerRebindsAgain
+  case nestedDropFalseBubblesToOuter
+  case tapGestureInsidePanelRebinds
+  case dragGestureNestedAnyViewRebinds
+  case hoverNestedPanelBounded
+  case hoverTapNestedAnyViewBounded
+  case verticalScrollNestedPanelRebinds
+  case disabledNestedScrollViewSkipsHandlers
+  case preferenceObserverNestedPanelRebinds
+  case onChangeNestedPanelRebinds
+  case taskIDNestedPanelBounded
+  case sheetSourceNestedPanelPrunesOverlay
+
+  var description: String { rawValue }
+
+  @MainActor
+  func run() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FrameworkStressAdditional", rawValue, "root"),
+      size: .init(width: 110, height: 16)
+    ) {
+      FrameworkStressAdditionalFixture(additionalCase: self)
+    }
+    defer { harness.shutdown() }
+
+    var expectedTotal = 0
+    var maxCounts = FrameworkStressExpansionRegistryCounts(harness)
+
+    for generation in 0..<iterationCount {
+      let frame = try exercise(harness: harness, generation: generation)
+      expectedTotal = expectedTotalAfterExercise(
+        generation: generation,
+        previous: expectedTotal
+      )
+      if let knownIssue = expectedFrameKnownIssueDescription(generation: generation) {
+        withKnownIssue(Comment(stringLiteral: knownIssue)) {
+          assertExpectedFrame(frame, generation: generation, expectedTotal: expectedTotal)
+        }
+      } else {
+        assertExpectedFrame(frame, generation: generation, expectedTotal: expectedTotal)
+      }
+
+      if let knownIssue = expectedRegistrationKnownIssueDescription {
+        withKnownIssue(Comment(stringLiteral: knownIssue)) {
+          assertExpectedRegistrations(harness)
+        }
+      } else {
+        assertExpectedRegistrations(harness)
+      }
+
+      maxCounts.observe(harness)
+
+      let rebuilt = try harness.clickText("Rebuild Additional")
+      #expect(rebuilt.contains("additional \(rawValue) generation \(generation + 1)"))
+      maxCounts.observe(harness)
+    }
+
+    if let knownIssue = maxRegistrationKnownIssueDescription {
+      withKnownIssue(Comment(stringLiteral: knownIssue)) {
+        assertMaxRegistrations(maxCounts)
+      }
+    } else {
+      assertMaxRegistrations(maxCounts)
+    }
+  }
+
+  @MainActor
+  private func exercise(
+    harness: StressRuntimeHarness<FrameworkStressAdditionalFixture>,
+    generation: Int
+  ) throws -> String {
+    switch self {
+    case .nestedAnyViewButtonRebinds:
+      return try harness.clickText("Nested AnyView Button")
+
+    case .nestedPanelButtonRebinds:
+      return try harness.clickText("Nested Panel Button")
+
+    case .conditionalAnyViewToggleRebinds:
+      return try harness.clickText("Conditional AnyView Toggle")
+
+    case .nestedPanelTextFieldKeyRebinds:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.character("x")))
+
+    case .nestedAnyViewSecureFieldPasteRebinds:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.controlIdentity)
+      return try harness.paste("secret-\(generation)")
+
+    case .panelTextEditorPasteRebinds:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.controlIdentity)
+      return try harness.paste("line-\(generation)\nnext")
+
+    case .forEachStepperKeyRebinds,
+      .conditionalSliderKeyRebinds:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowRight))
+
+    case .forEachPickerKeyRebinds:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowDown))
+
+    case .nestedFocusScopeDefaultRebinds:
+      return harness.frame
+
+    case .focusedValueInsidePanelRebinds:
+      return try harness.focus(FrameworkStressAdditionalFixture.focusIdentity)
+
+    case .keyPressNestedPanelRebinds:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.focusIdentity)
+      return try harness.pressKey(KeyPress(.character("k")))
+
+    case .disabledKeyPressNestedNoLeak:
+      return try harness.pressKey(KeyPress(.character("k")))
+
+    case .nestedKeyCommandInnerRebindsAgain:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.focusIdentity)
+      return try harness.pressKey(KeyPress(.character("i"), modifiers: .ctrl))
+
+    case .nestedDropFalseBubblesToOuter:
+      _ = try harness.focus(FrameworkStressAdditionalFixture.focusIdentity)
+      return try harness.drop(paths: [DroppedPath("/tmp/additional-\(generation)")])
+
+    case .tapGestureInsidePanelRebinds:
+      return try harness.clickText("Panel Tap")
+
+    case .dragGestureNestedAnyViewRebinds:
+      let start = try #require(harness.point(forText: "Nested AnyView Drag"))
+      return try harness.drag(from: start, to: Point(x: start.x + 5, y: start.y))
+
+    case .hoverNestedPanelBounded:
+      let point = try #require(harness.point(forText: "Nested Panel Hover"))
+      _ = try harness.movePointer(to: point)
+      return try harness.movePointer(to: Point(x: 109, y: 15))
+
+    case .hoverTapNestedAnyViewBounded:
+      let point = try #require(harness.point(forText: "Nested Hover Tap"))
+      _ = try harness.movePointer(to: point)
+      return try harness.click(point)
+
+    case .verticalScrollNestedPanelRebinds:
+      let point = try #require(harness.point(forText: "Additional VScroll.0"))
+      return try harness.scrollPointer(at: point, deltaY: 1)
+
+    case .disabledNestedScrollViewSkipsHandlers:
+      return harness.frame
+
+    case .preferenceObserverNestedPanelRebinds:
+      return try harness.clickText("Additional Preference Signal")
+
+    case .onChangeNestedPanelRebinds:
+      return try harness.clickText("Additional Change Signal")
+
+    case .taskIDNestedPanelBounded:
+      return harness.frame
+
+    case .sheetSourceNestedPanelPrunesOverlay:
+      var frame = try harness.clickText("Open Additional Sheet")
+      #expect(frame.contains("Additional sheet body \(generation)"))
+      frame = try harness.clickText("Replace Sheet Source", chooseLast: true)
+      #expect(!frame.contains("Additional sheet body"))
+      return frame
+    }
+  }
+
+  private func expectedTotalAfterExercise(
+    generation: Int,
+    previous: Int
+  ) -> Int {
+    switch self {
+    case .nestedAnyViewButtonRebinds,
+      .nestedPanelButtonRebinds,
+      .keyPressNestedPanelRebinds,
+      .nestedKeyCommandInnerRebindsAgain,
+      .nestedDropFalseBubblesToOuter,
+      .tapGestureInsidePanelRebinds,
+      .dragGestureNestedAnyViewRebinds,
+      .hoverTapNestedAnyViewBounded,
+      .preferenceObserverNestedPanelRebinds,
+      .onChangeNestedPanelRebinds:
+      previous + generation + 1
+    default:
+      previous
+    }
+  }
+
+  private func assertExpectedFrame(
+    _ frame: String,
+    generation: Int,
+    expectedTotal: Int
+  ) {
+    #expect(frame.contains("additional \(rawValue) generation \(generation)"))
+    #expect(frame.contains("total \(expectedTotal)"))
+
+    switch self {
+    case .conditionalAnyViewToggleRebinds:
+      #expect(frame.contains("flag true"))
+    case .nestedPanelTextFieldKeyRebinds:
+      #expect(frame.contains("text x"))
+    case .nestedAnyViewSecureFieldPasteRebinds:
+      #expect(frame.contains("text secret-\(generation)"))
+    case .panelTextEditorPasteRebinds:
+      #expect(frame.contains("text line-\(generation)|next"))
+    case .forEachStepperKeyRebinds,
+      .conditionalSliderKeyRebinds:
+      #expect(frame.contains("int 1"))
+    case .forEachPickerKeyRebinds:
+      #expect(frame.contains("selection b"))
+    case .sheetSourceNestedPanelPrunesOverlay:
+      #expect(frame.contains("sheet generation \(generation)"))
+    default:
+      break
+    }
+  }
+
+  @MainActor
+  private func assertExpectedRegistrations(
+    _ harness: StressRuntimeHarness<FrameworkStressAdditionalFixture>
+  ) {
+    switch self {
+    case .disabledKeyPressNestedNoLeak:
+      #expect(harness.keyPressHandlerCount == 0)
+    case .disabledNestedScrollViewSkipsHandlers:
+      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.pointerHandlerCount == 0)
+      #expect(harness.scrollPositionRegistrationCount == 0)
+    case .focusedValueInsidePanelRebinds:
+      #expect(harness.focusedValueRegistrationCount == 1)
+      #expect(harness.focusRegionCount == 2)
+    default:
+      break
+    }
+  }
+
+  private func assertMaxRegistrations(
+    _ counts: FrameworkStressExpansionRegistryCounts
+  ) {
+    switch self {
+    case .nestedAnyViewButtonRebinds,
+      .nestedPanelButtonRebinds,
+      .conditionalAnyViewToggleRebinds:
+      #expect(counts.actions <= 2)
+
+    case .nestedPanelTextFieldKeyRebinds,
+      .nestedAnyViewSecureFieldPasteRebinds:
+      #expect(counts.keyHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.pasteHandlers <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .panelTextEditorPasteRebinds:
+      #expect(counts.keyHandlers <= 4)
+      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.pasteHandlers <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .forEachStepperKeyRebinds:
+      #expect(counts.keyHandlers <= 1)
+      #expect(counts.pointerHandlers <= 6)
+      #expect(counts.focusRegions <= 2)
+
+    case .conditionalSliderKeyRebinds:
+      #expect(counts.keyHandlers <= 1)
+      #expect(counts.pointerHandlers <= 5)
+      #expect(counts.focusRegions <= 2)
+
+    case .forEachPickerKeyRebinds:
+      #expect(counts.keyHandlers <= 1)
+      #expect(counts.pointerHandlers <= 8)
+      #expect(counts.focusRegions <= 2)
+
+    case .nestedFocusScopeDefaultRebinds:
+      #expect(counts.defaultFocusRegistrations <= 2)
+      #expect(counts.focusRegions <= 2)
+
+    case .focusedValueInsidePanelRebinds:
+      #expect(counts.focusRegions <= 2)
+
+    case .keyPressNestedPanelRebinds:
+      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .disabledKeyPressNestedNoLeak:
+      #expect(counts.keyPressHandlers == 0)
+
+    case .nestedKeyCommandInnerRebindsAgain:
+      #expect(counts.keyCommands <= 2)
+      #expect(counts.focusRegions <= 2)
+
+    case .nestedDropFalseBubblesToOuter:
+      #expect(counts.dropDestinations <= 2)
+      #expect(counts.focusRegions <= 2)
+
+    case .tapGestureInsidePanelRebinds,
+      .dragGestureNestedAnyViewRebinds:
+      #expect(counts.gestureRecognizers <= 1)
+      #expect(counts.pointerHandlers <= 1)
+
+    case .hoverNestedPanelBounded:
+      #expect(counts.pointerHoverHandlers <= 1)
+
+    case .hoverTapNestedAnyViewBounded:
+      #expect(counts.pointerHoverHandlers <= 1)
+      #expect(counts.gestureRecognizers <= 1)
+      #expect(counts.pointerHandlers <= 1)
+
+    case .verticalScrollNestedPanelRebinds:
+      #expect(counts.keyHandlers <= 3)
+      #expect(counts.pointerHandlers <= 3)
+      #expect(counts.scrollPositions <= 1)
+
+    case .disabledNestedScrollViewSkipsHandlers:
+      #expect(counts.keyHandlers == 0)
+      #expect(counts.pointerHandlers == 0)
+      #expect(counts.scrollPositions == 0)
+
+    case .preferenceObserverNestedPanelRebinds:
+      #expect(counts.preferenceObservers <= 1)
+      #expect(counts.actions <= 2)
+
+    case .onChangeNestedPanelRebinds:
+      #expect(counts.lifecycleRegistrations <= 1)
+      #expect(counts.actions <= 2)
+
+    case .taskIDNestedPanelBounded:
+      #expect(counts.activeTasks <= 1)
+      #expect(counts.taskDescriptors <= 1)
+
+    case .sheetSourceNestedPanelPrunesOverlay:
+      #expect(counts.actions <= 2)
+      #expect(counts.lifecycleRegistrations <= 4)
+    }
+  }
+
+  private func expectedFrameKnownIssueDescription(generation: Int) -> String? {
+    switch self {
+    case .nestedAnyViewButtonRebinds:
+      guard generation > 0 else { return nil }
+      return "Nested AnyView Button action dispatch loses the live owner after identity churn"
+    case .nestedPanelButtonRebinds:
+      guard generation > 0 else { return nil }
+      return "Nested Panel Button action dispatch loses the live owner after identity churn"
+    case .nestedAnyViewSecureFieldPasteRebinds:
+      guard generation > 0 else { return nil }
+      return "Nested AnyView SecureField paste handling targets stale binding state after churn"
+    case .preferenceObserverNestedPanelRebinds:
+      guard generation > 0 else { return nil }
+      return "Panel-hosted preference observer dispatch keeps the first observed value after churn"
+    case .onChangeNestedPanelRebinds:
+      return "Panel-hosted onChange handlers do not fire through the churn path"
+    default:
+      return nil
+    }
+  }
+
+  private var expectedRegistrationKnownIssueDescription: String? {
+    nil
+  }
+
+  private var maxRegistrationKnownIssueDescription: String? {
+    switch self {
+    case .panelTextEditorPasteRebinds:
+      "Panel-hosted TextEditor focus regions accumulate across owner churn"
+    case .tapGestureInsidePanelRebinds:
+      "Panel-hosted tap gesture registrations accumulate across owner churn"
+    case .hoverNestedPanelBounded:
+      "Panel-hosted hover registrations accumulate across owner churn"
+    case .preferenceObserverNestedPanelRebinds:
+      "Panel-hosted preference observer registrations accumulate across owner churn"
+    case .taskIDNestedPanelBounded:
+      "Panel-hosted task descriptors accumulate across owner identity churn"
+    case .sheetSourceNestedPanelPrunesOverlay:
+      "Panel-hosted sheet source actions accumulate across owner churn"
+    default:
+      nil
+    }
+  }
+
+  private var iterationCount: Int {
+    switch self {
+    case .taskIDNestedPanelBounded:
+      8
+    default:
+      5
+    }
+  }
+}
+
+private enum FrameworkStressAdditionalFocusField: Hashable {
+  case target
+}
+
+private enum FrameworkStressAdditionalPreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+private enum FrameworkStressAdditionalFocusedValueKey: FocusedValueKey {
+  typealias Value = String
+}
+
+extension FocusedValues {
+  fileprivate var frameworkStressAdditionalValue: String? {
+    get { self[FrameworkStressAdditionalFocusedValueKey.self] }
+    set { self[FrameworkStressAdditionalFocusedValueKey.self] = newValue }
+  }
+}
+
+private struct FrameworkStressAdditionalTaskID: Equatable, Sendable {
+  var generation: Int
+}
+
+private struct FrameworkStressAdditionalFixture: View {
+  static let controlIdentity = testIdentity("FrameworkStressAdditional", "control")
+  static let focusIdentity = testIdentity("FrameworkStressAdditional", "focus")
+  static let scopeIdentity = testIdentity("FrameworkStressAdditional", "scope")
+  static let nestedScopeIdentity = testIdentity("FrameworkStressAdditional", "nested")
+
+  let additionalCase: FrameworkStressAdditionalCase
+
+  @State private var generation = 0
+  @State private var total = 0
+  @State private var flag = false
+  @State private var intValue = 0
+  @State private var textValue = ""
+  @State private var selection = "a"
+  @State private var sheetPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Additional") {
+        generation += 1
+        flag = false
+        intValue = 0
+        textValue = ""
+        selection = "a"
+        sheetPresented = false
+      }
+      Text(
+        """
+        additional \(additionalCase.rawValue) generation \(generation) total \(total) \
+        flag \(flag) int \(intValue) text \(displayText) selection \(selection)
+        """
+      )
+      FrameworkStressAdditionalOwner(
+        additionalCase: additionalCase,
+        generation: generation,
+        total: $total,
+        flag: $flag,
+        intValue: $intValue,
+        textValue: $textValue,
+        selection: $selection,
+        sheetPresented: $sheetPresented
+      )
+      .id(testIdentity("FrameworkStressAdditional", "owner", "\(generation)"))
+    }
+    .frame(width: 110, height: 16, alignment: .topLeading)
+  }
+
+  private var displayText: String {
+    textValue.isEmpty ? "empty" : textValue.replacingOccurrences(of: "\n", with: "|")
+  }
+}
+
+private struct FrameworkStressAdditionalOwner: View {
+  let additionalCase: FrameworkStressAdditionalCase
+  let generation: Int
+  @Binding var total: Int
+  @Binding var flag: Bool
+  @Binding var intValue: Int
+  @Binding var textValue: String
+  @Binding var selection: String
+  @Binding var sheetPresented: Bool
+
+  @Namespace private var namespace
+  @FocusState private var focusedField: FrameworkStressAdditionalFocusField?
+
+  var body: some View {
+    switch additionalCase {
+    case .nestedAnyViewButtonRebinds:
+      AnyView(
+        AnyView(
+          Button("Nested AnyView Button") { total += generation + 1 }
+            .id(FrameworkStressAdditionalFixture.controlIdentity)
+        )
+      )
+
+    case .nestedPanelButtonRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Panel(id: FrameworkStressAdditionalFixture.nestedScopeIdentity) {
+          Button("Nested Panel Button") { total += generation + 1 }
+            .id(FrameworkStressAdditionalFixture.controlIdentity)
+        }
+      }
+
+    case .conditionalAnyViewToggleRebinds:
+      if generation.isMultiple(of: 2) {
+        AnyView(
+          Toggle("Conditional AnyView Toggle", isOn: $flag)
+            .id(FrameworkStressAdditionalFixture.controlIdentity)
+        )
+      } else {
+        AnyView(
+          Toggle("Conditional AnyView Toggle", isOn: $flag)
+            .id(FrameworkStressAdditionalFixture.controlIdentity)
+        )
+      }
+
+    case .nestedPanelTextFieldKeyRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        TextField("Nested Panel TextField", text: $textValue)
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+          .textFieldStyle(.plain)
+      }
+
+    case .nestedAnyViewSecureFieldPasteRebinds:
+      AnyView(
+        Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+          SecureField("Nested AnyView SecureField", text: $textValue)
+            .id(FrameworkStressAdditionalFixture.controlIdentity)
+            .textFieldStyle(.plain)
+        }
+      )
+
+    case .panelTextEditorPasteRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        TextEditor(text: $textValue)
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+          .frame(width: 30, height: 3, alignment: .leading)
+      }
+
+    case .forEachStepperKeyRebinds:
+      ForEach(0..<1, id: \.self) { _ in
+        Stepper("ForEach Stepper", value: $intValue, in: 0...999)
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+      }
+
+    case .conditionalSliderKeyRebinds:
+      if generation.isMultiple(of: 2) {
+        Slider("Conditional Slider", value: $intValue, in: 0...999)
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+      } else {
+        Slider("Conditional Slider", value: $intValue, in: 0...999)
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+      }
+
+    case .forEachPickerKeyRebinds:
+      ForEach(0..<1, id: \.self) { _ in
+        Picker("ForEach Picker", selection: $selection) {
+          Text("Option A").tag("a")
+          Text("Option B").tag("b")
+          Text("Option C").tag("c")
+        }
+        .id(FrameworkStressAdditionalFixture.controlIdentity)
+      }
+
+    case .nestedFocusScopeDefaultRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Additional Default Focus")
+          .id(FrameworkStressAdditionalFixture.focusIdentity)
+          .focusable()
+          .focused($focusedField, equals: .target)
+          .prefersDefaultFocus(in: namespace)
+      }
+      .focusScope(namespace)
+
+    case .focusedValueInsidePanelRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Additional Focused Value")
+          .id(FrameworkStressAdditionalFixture.focusIdentity)
+          .focusable()
+          .focusedValue(
+            \.frameworkStressAdditionalValue,
+            "additional focused \(generation)"
+          )
+      }
+
+    case .keyPressNestedPanelRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Nested Panel Key Press")
+          .id(FrameworkStressAdditionalFixture.focusIdentity)
+          .focusable()
+          .onKeyPress(.character("k")) { _ in
+            total += generation + 1
+            return .handled
+          }
+      }
+
+    case .disabledKeyPressNestedNoLeak:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Disabled Nested Key Press")
+          .id(FrameworkStressAdditionalFixture.focusIdentity)
+          .focusable()
+          .onKeyPress(.character("k")) { _ in
+            total += generation + 1
+            return .handled
+          }
+      }
+      .disabled(true)
+
+    case .nestedKeyCommandInnerRebindsAgain:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Panel(id: FrameworkStressAdditionalFixture.nestedScopeIdentity) {
+          Text("Additional Command Focus")
+            .id(FrameworkStressAdditionalFixture.focusIdentity)
+            .focusable()
+        }
+        .keyCommand("Additional Inner", key: .character("i"), modifiers: .ctrl) {
+          total += generation + 1
+        }
+      }
+      .keyCommand("Additional Outer", key: .character("o"), modifiers: .ctrl) {}
+
+    case .nestedDropFalseBubblesToOuter:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Panel(id: FrameworkStressAdditionalFixture.nestedScopeIdentity) {
+          Text("Additional Drop Focus")
+            .id(FrameworkStressAdditionalFixture.focusIdentity)
+            .focusable()
+        }
+        .dropDestination { _ in false }
+      }
+      .dropDestination { paths in
+        total += paths.count * (generation + 1)
+        return true
+      }
+
+    case .tapGestureInsidePanelRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Panel Tap")
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+          .frame(width: 24, height: 1, alignment: .leading)
+          .onTapGesture { total += generation + 1 }
+      }
+
+    case .dragGestureNestedAnyViewRebinds:
+      AnyView(
+        Text("Nested AnyView Drag")
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+          .frame(width: 30, height: 1, alignment: .leading)
+          .gesture(
+            DragGesture()
+              .onEnded { _ in total += generation + 1 }
+          )
+      )
+
+    case .hoverNestedPanelBounded:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Nested Panel Hover")
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+          .frame(width: 26, height: 1, alignment: .leading)
+          .onPointerHover { _ in }
+      }
+
+    case .hoverTapNestedAnyViewBounded:
+      AnyView(
+        Text("Nested Hover Tap")
+          .id(FrameworkStressAdditionalFixture.controlIdentity)
+          .frame(width: 26, height: 1, alignment: .leading)
+          .onPointerHover { _ in }
+          .onTapGesture { total += generation + 1 }
+      )
+
+    case .verticalScrollNestedPanelRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        ScrollView(.vertical, showsIndicators: true) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<10, id: \.self) { row in
+              Text("Additional VScroll.\(row)")
+            }
+          }
+        }
+        .id(FrameworkStressAdditionalFixture.controlIdentity)
+        .frame(width: 34, height: 4, alignment: .topLeading)
+      }
+
+    case .disabledNestedScrollViewSkipsHandlers:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        ScrollView(.vertical, showsIndicators: true) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<10, id: \.self) { row in
+              Text("Disabled Additional VScroll.\(row)")
+            }
+          }
+        }
+        .id(FrameworkStressAdditionalFixture.controlIdentity)
+        .frame(width: 34, height: 4, alignment: .topLeading)
+      }
+      .disabled(true)
+
+    case .preferenceObserverNestedPanelRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Additional Preference Signal") { intValue = generation + 1 }
+            .id(testIdentity("FrameworkStressAdditional", "preferenceSignal"))
+          Text("Additional Preference Source \(intValue)")
+            .id(testIdentity("FrameworkStressAdditional", "preferenceSource"))
+            .preference(key: FrameworkStressAdditionalPreferenceKey.self, value: intValue)
+            .onPreferenceChange(FrameworkStressAdditionalPreferenceKey.self) { value in
+              total += value
+            }
+        }
+      }
+
+    case .onChangeNestedPanelRebinds:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Additional Change Signal") { intValue = generation + 1 }
+            .id(testIdentity("FrameworkStressAdditional", "changeSignal"))
+          Text("Additional Change Source \(intValue)")
+            .id(testIdentity("FrameworkStressAdditional", "changeSource"))
+            .onChange(of: intValue) { _, newValue in
+              total += newValue
+            }
+        }
+      }
+
+    case .taskIDNestedPanelBounded:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        Text("Additional Task Owner")
+          .task(id: FrameworkStressAdditionalTaskID(generation: generation)) {
+            while !Task.isCancelled {
+              await Task.yield()
+            }
+          }
+      }
+
+    case .sheetSourceNestedPanelPrunesOverlay:
+      Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("sheet generation \(generation)")
+          Button("Open Additional Sheet") { sheetPresented = true }
+            .sheet("Additional Sheet", isPresented: $sheetPresented) {
+              VStack(alignment: .leading, spacing: 0) {
+                Text("Additional sheet body \(generation)")
+                Button("Replace Sheet Source") {
+                  sheetPresented = false
+                }
+              }
+              .onAppear {}
+              .onDisappear {}
+            }
+        }
+      }
     }
   }
 }
