@@ -11,6 +11,19 @@ package enum ViewportLifecycleKey: Hashable, Sendable {
   case identity(Identity)
 }
 
+/// Key for `onChange`'s cross-frame previous-value memory: the observing node's
+/// *stable* `Identity` (survives `.id`-churn re-minting) plus a per-node modifier
+/// ordinal so multiple `onChange` modifiers on one node do not collide.
+package struct ChangeObservationValueKey: Hashable, Sendable {
+  package var identity: Identity
+  package var ordinal: Int
+
+  package init(identity: Identity, ordinal: Int) {
+    self.identity = identity
+    self.ordinal = ordinal
+  }
+}
+
 package struct ResolvedNodeReuseCacheKey: Hashable, Sendable {
   package var namespace: String
   package var owner: Identity

@@ -40,6 +40,7 @@ extension ViewGraph {
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
+    package var changeObservationValues: [ChangeObservationValueKey: String]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
     package var checkpointMutationEpoch: UInt64
 

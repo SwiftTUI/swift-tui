@@ -2394,7 +2394,16 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
       guard generation > 0 else { return nil }
       return "Preference observer dispatch keeps the first observed value after owner churn"
     case .onChangeHandlerRebinds:
-      return "onChange handlers do not fire through the expansion churn path"
+      guard generation > 0 else { return nil }
+      // `onChange` detection itself is fixed (generation 0 asserts for real):
+      // the observing node's previous-value baseline now lives on the persistent
+      // view graph keyed by the *stable* identity, so it survives the node's
+      // first resolve and `.id`-churn re-minting. The residual is upstream — the
+      // "Change Signal" `Button`'s action stops dispatching after owner churn
+      // (the same multi-node ButtonBody / pointer-route re-mint seam as
+      // `anyViewButtonActionRebinds`), so `intValue` never advances past
+      // generation 0 and there is no change for `onChange` to observe.
+      return "Change Signal button stops dispatching after churn, so onChange sees no change"
     default:
       return nil
     }

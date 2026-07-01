@@ -82,12 +82,20 @@ extension ViewGraph {
   }
 
   /// Frame counter, the live-node working set, the resolved-node reuse cache,
-  /// the committed runtime-registration fingerprint, and the checkpoint epoch.
+  /// `onChange`'s cross-frame previous-value memory, the committed
+  /// runtime-registration fingerprint, and the checkpoint epoch.
   package struct FrameCommitState {
     package var currentFrameID: UInt64 = 0
     package var liveNodeIDs: Set<ViewNodeID> = []
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] =
       [:]
+    // `onChange` previous-value memory, keyed by the observing node's *stable*
+    // identity so it survives `.id`-churn re-minting of that node (a fresh
+    // `ViewNode` with empty state slots) and is present before the node first
+    // lands in the identity index. Persists across frames (not cleared by
+    // `beginFrame`); `finalizeFrame` prunes entries whose identity no longer has
+    // a live node. See `ChangeLifecycleModifier`.
+    package var changeObservationValues: [ChangeObservationValueKey: AnyStateSlot] = [:]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
     package var checkpointMutationEpoch: UInt64 = 0
   }

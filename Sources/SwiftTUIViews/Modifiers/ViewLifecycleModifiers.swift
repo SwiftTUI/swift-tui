@@ -153,16 +153,42 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
   ) -> [ResolvedNode] {
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let node = content.resolve(in: context)
-    let ownerNode = context.viewGraph?.nodeForIdentity(node.identity)
+    let viewGraph = context.viewGraph
+    let ownerNode = viewGraph?.nodeForIdentity(node.identity)
     let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
-    let stateSlotOrdinal = StateSlotOrdinals.changeModifier(modifierOrdinal)
-    let hadPreviousValue = ownerNode?.hasStateSlot(ordinal: stateSlotOrdinal) == true
-    let previousValue = ownerNode.map { ownerNode in
-      ownerNode.stateSlot(
-        ordinal: stateSlotOrdinal,
-        seed: value
+
+    // `onChange`'s previous-value memory must survive `.id`-churn re-minting of
+    // the observing node (a fresh `ViewNode` with empty state slots) and be
+    // available on the node's very first resolve (before it lands in the graph's
+    // identity index). A per-node state slot satisfies neither — the first
+    // observation is swallowed and every post-churn change reads as "first". The
+    // view graph is the persistent, cross-frame home; its change-observation
+    // store keys by the *stable* identity, so it survives both. Fall back to the
+    // per-node slot only when no graph is threaded (a resolve-only path where the
+    // change handler could not be dispatched anyway).
+    let hadPreviousValue: Bool
+    let previousValue: Value?
+    if let viewGraph {
+      hadPreviousValue = viewGraph.hasChangeObservationValue(
+        identity: node.identity,
+        ordinal: modifierOrdinal
       )
+      previousValue = viewGraph.changeObservationValue(
+        identity: node.identity,
+        ordinal: modifierOrdinal,
+        as: Value.self
+      )
+    } else {
+      let stateSlotOrdinal = StateSlotOrdinals.changeModifier(modifierOrdinal)
+      hadPreviousValue = ownerNode?.hasStateSlot(ordinal: stateSlotOrdinal) == true
+      previousValue = ownerNode.map { ownerNode in
+        ownerNode.stateSlot(
+          ordinal: stateSlotOrdinal,
+          seed: value
+        )
+      }
     }
+
     let shouldTrigger =
       if hadPreviousValue {
         previousValue.map { $0 != value } ?? false
@@ -170,9 +196,15 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
         initial
       }
 
-    if let ownerNode {
+    if let viewGraph {
+      viewGraph.recordChangeObservationValue(
+        value,
+        identity: node.identity,
+        ordinal: modifierOrdinal
+      )
+    } else if let ownerNode {
       ownerNode.setStateSlotSilently(
-        ordinal: stateSlotOrdinal,
+        ordinal: StateSlotOrdinals.changeModifier(modifierOrdinal),
         value: value
       )
     }

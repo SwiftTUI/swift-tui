@@ -230,6 +230,10 @@ package final class ViewGraph {
     get { frameCommit.resolvedNodeReuseCache }
     set { frameCommit.resolvedNodeReuseCache = newValue }
   }
+  private var changeObservationValues: [ChangeObservationValueKey: AnyStateSlot] {
+    get { frameCommit.changeObservationValues }
+    set { frameCommit.changeObservationValues = newValue }
+  }
   private var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint? {
     get { frameCommit.committedRuntimeRegistrationFingerprint }
     set { frameCommit.committedRuntimeRegistrationFingerprint = newValue }
@@ -241,6 +245,60 @@ package final class ViewGraph {
 
   private func recordCheckpointGraphMutation() {
     checkpointMutationEpoch &+= 1
+  }
+
+  /// Whether a previous `onChange` value has been recorded for this
+  /// `(identity, ordinal)` — i.e. "this is not the first observation," a signal
+  /// that survives node re-minting because it is keyed by the stable identity.
+  package func hasChangeObservationValue(
+    identity: Identity,
+    ordinal: Int
+  ) -> Bool {
+    changeObservationValues[.init(identity: identity, ordinal: ordinal)] != nil
+  }
+
+  /// The previously-observed `onChange` value for this `(identity, ordinal)`, or
+  /// `nil` if none is recorded (or a stored value of a different type).
+  package func changeObservationValue<Value>(
+    identity: Identity,
+    ordinal: Int,
+    as type: Value.Type
+  ) -> Value? {
+    guard let slot = changeObservationValues[.init(identity: identity, ordinal: ordinal)],
+      slot.stores(Value.self)
+    else {
+      return nil
+    }
+    return slot.value(as: Value.self)
+  }
+
+  /// Records the latest observed `onChange` value for this `(identity, ordinal)`
+  /// so the next resolve can detect a transition. Persists across frames and
+  /// across `.id`-churn re-minting; pruned by `finalizeFrame` once the identity
+  /// no longer has a live node.
+  package func recordChangeObservationValue<Value>(
+    _ value: Value,
+    identity: Identity,
+    ordinal: Int
+  ) {
+    recordCheckpointGraphMutation()
+    changeObservationValues[.init(identity: identity, ordinal: ordinal)] = AnyStateSlot(value)
+  }
+
+  /// Drops `onChange` previous-value entries whose identity no longer has a live
+  /// node. A node re-minted this frame (owner `.id` churn) is re-created at the
+  /// same identity before finalize, so it stays live and its baseline survives;
+  /// only genuinely-departed identities are pruned. Keeps the store bounded
+  /// without coupling to per-node teardown (which the churn re-mint goes
+  /// through).
+  private func pruneDepartedChangeObservationValues() {
+    guard !changeObservationValues.isEmpty else {
+      return
+    }
+    recordCheckpointGraphMutation()
+    changeObservationValues = changeObservationValues.filter { key, _ in
+      nodeIDByIdentity[key.identity] != nil
+    }
   }
 
   private func nodeIfExists(
@@ -425,6 +483,7 @@ package final class ViewGraph {
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
+      changeObservationValues: changeObservationValues.mapValues { $0.storedTypeDescription },
       committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
       checkpointMutationEpoch: checkpointMutationEpoch
     )
@@ -1731,6 +1790,7 @@ package final class ViewGraph {
     releaseInactiveEntityRoutes(
       activeEntities: activeEntities
     )
+    pruneDepartedChangeObservationValues()
     requiresRootEvaluation = false
     invalidatedNodeIDs.removeAll(keepingCapacity: true)
     graphLocalDirtyNodeIDs.removeAll(keepingCapacity: true)
