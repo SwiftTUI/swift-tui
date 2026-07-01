@@ -391,6 +391,11 @@ struct FrameworkStressTests {
     try discoveryCase.run()
   }
 
+  @Test("directed stress expansion case", arguments: FrameworkStressExpansionCase.allCases)
+  func directedStressExpansionCase(_ expansionCase: FrameworkStressExpansionCase) throws {
+    try expansionCase.run()
+  }
+
   @Test("navigation destinations are pruned when their source subtree is recreated")
   func navigationDestinationsArePrunedWhenTheirSourceSubtreeIsRecreated() throws {
     // Hypothesis: replacing the source owner while a destination is active must
@@ -2043,6 +2048,1220 @@ private struct FrameworkStressDiscoveryOwner: View {
   }
 }
 
+enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible,
+  Sendable
+{
+  case anyViewButtonActionRebinds
+  case panelButtonActionRebinds
+  case conditionalButtonActionRebinds
+  case forEachButtonActionRebinds
+  case disabledAncestorButtonSkipsAction
+  case anyViewToggleRebinds
+  case panelToggleRebinds
+  case disabledAncestorToggleSkipsAction
+  case anyViewDisclosureRebinds
+  case disabledAncestorDisclosureSkipsAction
+  case anyViewTextFieldKeyRebinds
+  case panelTextFieldKeyRebinds
+  case disabledAncestorTextFieldSkipsHandlers
+  case anyViewSecureFieldPasteRebinds
+  case disabledAncestorSecureFieldSkipsPaste
+  case anyViewTextEditorPasteRebinds
+  case disabledAncestorTextEditorSkipsPaste
+  case anyViewStepperKeyRebinds
+  case disabledAncestorStepperSkipsHandlers
+  case anyViewSliderKeyRebinds
+  case disabledAncestorSliderSkipsHandlers
+  case anyViewPickerKeyRebinds
+  case disabledAncestorPickerSkipsHandlers
+  case focusableTextRegionRebinds
+  case focusScopeDefaultCandidateRebinds
+  case nestedFocusScopeRegionRebinds
+  case keyPressTextRebinds
+  case stackedKeyPressTextRebinds
+  case disabledAncestorKeyPressSkipsHandlers
+  case tapGestureAnyViewRebinds
+  case tapGestureCountTwoRebinds
+  case disabledAncestorTapGestureDoesNotDispatch
+  case dragGestureOnEndedRebinds
+  case dragGestureOnChangedRebinds
+  case disabledAncestorDragGestureDoesNotDispatch
+  case hoverHandlerCountRebinds
+  case hoverWithTapGestureKeepsBothBounded
+  case verticalScrollViewHandlersRebind
+  case horizontalScrollViewHandlersRebind
+  case disabledAncestorScrollViewSkipsHandlers
+  case keyCommandPanelRebinds
+  case nestedKeyCommandInnerRebinds
+  case dropDestinationPanelRebinds
+  case nestedDropDestinationInnerRebinds
+  case dropDestinationFalseBubblesRebinds
+  case preferenceObserverRebinds
+  case lifecycleHandlerRebinds
+  case onChangeHandlerRebinds
+  case terminationHandlerRebinds
+  case taskIDRebinds
+
+  var description: String { rawValue }
+
+  @MainActor
+  func run() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FrameworkStressExpansion", rawValue, "root"),
+      size: .init(width: 100, height: 14)
+    ) {
+      FrameworkStressExpansionFixture(expansionCase: self)
+    }
+    defer { harness.shutdown() }
+
+    var expectedTotal = self == .lifecycleHandlerRebinds ? 1 : 0
+    var maxCounts = FrameworkStressExpansionRegistryCounts(harness)
+
+    for generation in 0..<iterationCount {
+      let frame = try exercise(harness: harness, generation: generation)
+      expectedTotal = expectedTotalAfterExercise(
+        generation: generation,
+        previous: expectedTotal
+      )
+      if let knownIssue = expectedFrameKnownIssueDescription(generation: generation) {
+        withKnownIssue(Comment(stringLiteral: knownIssue)) {
+          assertExpectedFrame(
+            frame,
+            generation: generation,
+            expectedTotal: expectedTotal
+          )
+        }
+      } else {
+        assertExpectedFrame(
+          frame,
+          generation: generation,
+          expectedTotal: expectedTotal
+        )
+      }
+      if let knownIssue = expectedRegistrationKnownIssueDescription {
+        withKnownIssue(Comment(stringLiteral: knownIssue)) {
+          assertExpectedRegistrations(harness)
+        }
+      } else {
+        assertExpectedRegistrations(harness)
+      }
+      maxCounts.observe(harness)
+
+      let rebuilt = try harness.clickText("Rebuild Expansion")
+      #expect(rebuilt.contains("expansion \(rawValue) generation \(generation + 1)"))
+      maxCounts.observe(harness)
+    }
+
+    if let knownIssue = maxRegistrationKnownIssueDescription {
+      withKnownIssue(Comment(stringLiteral: knownIssue)) {
+        assertMaxRegistrations(maxCounts)
+      }
+    } else {
+      assertMaxRegistrations(maxCounts)
+    }
+  }
+
+  @MainActor
+  private func exercise(
+    harness: StressRuntimeHarness<FrameworkStressExpansionFixture>,
+    generation: Int
+  ) throws -> String {
+    switch self {
+    case .anyViewButtonActionRebinds:
+      return try harness.clickText("AnyView Button")
+
+    case .panelButtonActionRebinds:
+      return try harness.clickText("Panel Button")
+
+    case .conditionalButtonActionRebinds:
+      return try harness.clickText("Conditional Button")
+
+    case .forEachButtonActionRebinds:
+      return try harness.clickText("ForEach Button")
+
+    case .disabledAncestorButtonSkipsAction:
+      return try harness.clickText("Disabled Ancestor Button")
+
+    case .anyViewToggleRebinds:
+      return try harness.clickText("AnyView Toggle")
+
+    case .panelToggleRebinds:
+      return try harness.clickText("Panel Toggle")
+
+    case .disabledAncestorToggleSkipsAction:
+      return try harness.clickText("Disabled Ancestor Toggle")
+
+    case .anyViewDisclosureRebinds:
+      return try harness.clickText("AnyView Disclosure")
+
+    case .disabledAncestorDisclosureSkipsAction:
+      return try harness.clickText("Disabled Ancestor Disclosure")
+
+    case .anyViewTextFieldKeyRebinds,
+      .panelTextFieldKeyRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.character("x")))
+
+    case .disabledAncestorTextFieldSkipsHandlers:
+      return harness.frame
+
+    case .anyViewSecureFieldPasteRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.controlIdentity)
+      return try harness.paste("secret-\(generation)")
+
+    case .disabledAncestorSecureFieldSkipsPaste:
+      return harness.frame
+
+    case .anyViewTextEditorPasteRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.controlIdentity)
+      return try harness.paste("line-\(generation)\nnext")
+
+    case .disabledAncestorTextEditorSkipsPaste:
+      return harness.frame
+
+    case .anyViewStepperKeyRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowRight))
+
+    case .disabledAncestorStepperSkipsHandlers:
+      return harness.frame
+
+    case .anyViewSliderKeyRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowRight))
+
+    case .disabledAncestorSliderSkipsHandlers:
+      return harness.frame
+
+    case .anyViewPickerKeyRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowDown))
+
+    case .disabledAncestorPickerSkipsHandlers:
+      return harness.frame
+
+    case .focusableTextRegionRebinds,
+      .nestedFocusScopeRegionRebinds:
+      return try harness.focus(FrameworkStressExpansionFixture.focusIdentity)
+
+    case .focusScopeDefaultCandidateRebinds:
+      return harness.frame
+
+    case .keyPressTextRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.focusIdentity)
+      return try harness.pressKey(KeyPress(.character("k")))
+
+    case .stackedKeyPressTextRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.focusIdentity)
+      _ = try harness.pressKey(KeyPress(.character("k")))
+      return try harness.pressKey(KeyPress(.character("l")))
+
+    case .disabledAncestorKeyPressSkipsHandlers:
+      return harness.frame
+
+    case .tapGestureAnyViewRebinds:
+      return try harness.clickText("AnyView Tap")
+
+    case .tapGestureCountTwoRebinds:
+      _ = try harness.clickText("Double Tap")
+      return try harness.clickText("Double Tap")
+
+    case .disabledAncestorTapGestureDoesNotDispatch:
+      return try harness.clickText("Disabled Tap")
+
+    case .dragGestureOnEndedRebinds:
+      let start = try #require(harness.point(forText: "Drag Ended"))
+      return try harness.drag(from: start, to: Point(x: start.x + 4, y: start.y))
+
+    case .dragGestureOnChangedRebinds:
+      let start = try #require(harness.point(forText: "Drag Changed"))
+      return try harness.drag(from: start, to: Point(x: start.x + 4, y: start.y))
+
+    case .disabledAncestorDragGestureDoesNotDispatch:
+      let start = try #require(harness.point(forText: "Disabled Drag"))
+      return try harness.drag(from: start, to: Point(x: start.x + 4, y: start.y))
+
+    case .hoverHandlerCountRebinds:
+      let point = try #require(harness.point(forText: "Hover Count"))
+      _ = try harness.movePointer(to: point)
+      return try harness.movePointer(to: Point(x: 99, y: 13))
+
+    case .hoverWithTapGestureKeepsBothBounded:
+      let point = try #require(harness.point(forText: "Hover Tap"))
+      _ = try harness.movePointer(to: point)
+      return try harness.click(point)
+
+    case .verticalScrollViewHandlersRebind:
+      let point = try #require(harness.point(forText: "VScroll.0"))
+      return try harness.scrollPointer(at: point, deltaY: 1)
+
+    case .horizontalScrollViewHandlersRebind:
+      let point = try #require(harness.point(forText: "HScroll.0"))
+      return try harness.scrollPointer(at: point, deltaX: 1, deltaY: 0)
+
+    case .disabledAncestorScrollViewSkipsHandlers:
+      return harness.frame
+
+    case .keyCommandPanelRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.focusIdentity)
+      return try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    case .nestedKeyCommandInnerRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.focusIdentity)
+      return try harness.pressKey(KeyPress(.character("i"), modifiers: .ctrl))
+
+    case .dropDestinationPanelRebinds,
+      .nestedDropDestinationInnerRebinds,
+      .dropDestinationFalseBubblesRebinds:
+      _ = try harness.focus(FrameworkStressExpansionFixture.focusIdentity)
+      return try harness.drop(paths: [DroppedPath("/tmp/expansion-\(generation)")])
+
+    case .preferenceObserverRebinds:
+      return try harness.clickText("Preference Signal")
+
+    case .lifecycleHandlerRebinds:
+      return harness.frame
+
+    case .onChangeHandlerRebinds:
+      return try harness.clickText("Change Signal")
+
+    case .terminationHandlerRebinds:
+      let result = try harness.requestTermination(.signal("SIGTERM"))
+      #expect(result.disposition == .allow)
+      return result.frame
+
+    case .taskIDRebinds:
+      #expect(harness.activeTaskCount == 1)
+      #expect(harness.activeTaskDescriptorCount == 1)
+      return harness.frame
+    }
+  }
+
+  private func expectedTotalAfterExercise(
+    generation: Int,
+    previous: Int
+  ) -> Int {
+    switch self {
+    case .anyViewButtonActionRebinds,
+      .panelButtonActionRebinds,
+      .conditionalButtonActionRebinds,
+      .forEachButtonActionRebinds,
+      .keyPressTextRebinds,
+      .tapGestureAnyViewRebinds,
+      .tapGestureCountTwoRebinds,
+      .dragGestureOnEndedRebinds,
+      .hoverWithTapGestureKeepsBothBounded,
+      .keyCommandPanelRebinds,
+      .nestedKeyCommandInnerRebinds,
+      .dropDestinationPanelRebinds,
+      .nestedDropDestinationInnerRebinds,
+      .dropDestinationFalseBubblesRebinds,
+      .preferenceObserverRebinds,
+      .onChangeHandlerRebinds,
+      .terminationHandlerRebinds:
+      previous + generation + 1
+
+    case .stackedKeyPressTextRebinds:
+      previous + (generation + 1) * 2
+
+    case .dragGestureOnChangedRebinds:
+      previous + (generation + 1) * 3
+
+    default:
+      previous
+    }
+  }
+
+  private func expectedFrameKnownIssueDescription(generation: Int) -> String? {
+    switch self {
+    case .anyViewButtonActionRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped Button actions keep the first owner closure after churn"
+    case .panelButtonActionRebinds:
+      guard generation > 0 else { return nil }
+      return "Panel-hosted Button actions keep the first owner closure after churn"
+    case .anyViewToggleRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped Toggle actions keep stale binding state after churn"
+    case .anyViewDisclosureRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped DisclosureGroup actions keep stale binding state after churn"
+    case .anyViewTextFieldKeyRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped TextField key handling targets stale binding state after churn"
+    case .anyViewSecureFieldPasteRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped SecureField paste handling targets stale binding state after churn"
+    case .anyViewTextEditorPasteRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped TextEditor paste handling targets stale binding state after churn"
+    case .anyViewStepperKeyRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped Stepper key handling targets stale binding state after churn"
+    case .anyViewSliderKeyRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped Slider key handling targets stale binding state after churn"
+    case .anyViewPickerKeyRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped Picker key handling targets stale selection state after churn"
+    case .stackedKeyPressTextRebinds:
+      return "Stacked key-press modifiers only dispatch one live handler in the churn loop"
+    case .tapGestureAnyViewRebinds:
+      guard generation > 0 else { return nil }
+      return "AnyView-wrapped tap gestures keep the first owner closure after churn"
+    case .tapGestureCountTwoRebinds:
+      return "Count-two tap gestures do not fire in the run-loop churn path"
+    case .preferenceObserverRebinds:
+      guard generation > 0 else { return nil }
+      return "Preference observer dispatch keeps the first observed value after owner churn"
+    case .onChangeHandlerRebinds:
+      return "onChange handlers do not fire through the expansion churn path"
+    default:
+      return nil
+    }
+  }
+
+  private var expectedRegistrationKnownIssueDescription: String? {
+    switch self {
+    case .disabledAncestorKeyPressSkipsHandlers:
+      "Disabled key-press views still register key-press handlers"
+    default:
+      nil
+    }
+  }
+
+  private var maxRegistrationKnownIssueDescription: String? {
+    switch self {
+    case .disabledAncestorKeyPressSkipsHandlers:
+      "Disabled key-press views still register key-press handlers"
+    case .hoverWithTapGestureKeepsBothBounded:
+      "Combining pointer hover and tap gesture leaves duplicate hover registrations"
+    case .anyViewTextEditorPasteRebinds:
+      "AnyView-wrapped TextEditor focus regions accumulate across owner churn"
+    case .preferenceObserverRebinds:
+      "Preference observer registrations accumulate across expansion owner churn"
+    default:
+      nil
+    }
+  }
+
+  private var iterationCount: Int {
+    switch self {
+    case .taskIDRebinds:
+      8
+    default:
+      5
+    }
+  }
+
+  private func assertExpectedFrame(
+    _ frame: String,
+    generation: Int,
+    expectedTotal: Int
+  ) {
+    #expect(frame.contains("expansion \(rawValue) generation \(generation)"))
+
+    if self != .lifecycleHandlerRebinds {
+      #expect(frame.contains("total \(expectedTotal)"))
+    }
+
+    switch self {
+    case .anyViewToggleRebinds,
+      .panelToggleRebinds,
+      .anyViewDisclosureRebinds:
+      #expect(frame.contains("flag true"))
+
+    case .disabledAncestorToggleSkipsAction,
+      .disabledAncestorDisclosureSkipsAction:
+      #expect(frame.contains("flag false"))
+
+    case .anyViewTextFieldKeyRebinds,
+      .panelTextFieldKeyRebinds:
+      #expect(frame.contains("text x"))
+
+    case .anyViewSecureFieldPasteRebinds:
+      #expect(frame.contains("text secret-\(generation)"))
+
+    case .anyViewTextEditorPasteRebinds:
+      #expect(frame.contains("text line-\(generation)|next"))
+
+    case .anyViewStepperKeyRebinds,
+      .anyViewSliderKeyRebinds:
+      #expect(frame.contains("int 1"))
+
+    case .anyViewPickerKeyRebinds:
+      #expect(frame.contains("selection b"))
+
+    case .disabledAncestorTextFieldSkipsHandlers,
+      .disabledAncestorSecureFieldSkipsPaste,
+      .disabledAncestorTextEditorSkipsPaste:
+      #expect(frame.contains("text empty"))
+
+    case .disabledAncestorStepperSkipsHandlers,
+      .disabledAncestorSliderSkipsHandlers:
+      #expect(frame.contains("int 0"))
+
+    case .disabledAncestorPickerSkipsHandlers:
+      #expect(frame.contains("selection a"))
+
+    default:
+      break
+    }
+
+    if self == .anyViewDisclosureRebinds {
+      #expect(frame.contains("Expansion Disclosure Body"))
+    }
+  }
+
+  @MainActor
+  private func assertExpectedRegistrations(
+    _ harness: StressRuntimeHarness<FrameworkStressExpansionFixture>
+  ) {
+    switch self {
+    case .disabledAncestorButtonSkipsAction,
+      .disabledAncestorToggleSkipsAction,
+      .disabledAncestorDisclosureSkipsAction:
+      #expect(harness.actionRegistrationCount == 1)
+
+    case .disabledAncestorTextFieldSkipsHandlers,
+      .disabledAncestorSecureFieldSkipsPaste,
+      .disabledAncestorTextEditorSkipsPaste:
+      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
+      #expect(harness.pasteHandlerCount == 0)
+
+    case .disabledAncestorStepperSkipsHandlers,
+      .disabledAncestorSliderSkipsHandlers,
+      .disabledAncestorPickerSkipsHandlers,
+      .disabledAncestorScrollViewSkipsHandlers:
+      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.pointerHandlerCount == 0)
+
+    case .disabledAncestorKeyPressSkipsHandlers:
+      #expect(harness.keyPressHandlerCount == 0)
+
+    case .taskIDRebinds:
+      #expect(harness.activeTaskCount == 1)
+      #expect(harness.activeTaskDescriptorCount == 1)
+
+    default:
+      break
+    }
+  }
+
+  private func assertMaxRegistrations(
+    _ counts: FrameworkStressExpansionRegistryCounts
+  ) {
+    switch self {
+    case .anyViewButtonActionRebinds,
+      .panelButtonActionRebinds,
+      .conditionalButtonActionRebinds,
+      .forEachButtonActionRebinds,
+      .anyViewToggleRebinds,
+      .panelToggleRebinds,
+      .anyViewDisclosureRebinds:
+      #expect(counts.actions <= 2)
+
+    case .disabledAncestorButtonSkipsAction,
+      .disabledAncestorToggleSkipsAction,
+      .disabledAncestorDisclosureSkipsAction:
+      #expect(counts.actions == 1)
+
+    case .anyViewTextFieldKeyRebinds,
+      .panelTextFieldKeyRebinds,
+      .anyViewSecureFieldPasteRebinds:
+      #expect(counts.keyHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.pasteHandlers <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .anyViewTextEditorPasteRebinds:
+      #expect(counts.keyHandlers <= 4)
+      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.pasteHandlers <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .disabledAncestorTextFieldSkipsHandlers,
+      .disabledAncestorSecureFieldSkipsPaste,
+      .disabledAncestorTextEditorSkipsPaste:
+      #expect(counts.keyHandlers == 0)
+      #expect(counts.keyPressHandlers == 0)
+      #expect(counts.pasteHandlers == 0)
+
+    case .anyViewStepperKeyRebinds,
+      .anyViewSliderKeyRebinds,
+      .anyViewPickerKeyRebinds:
+      #expect(counts.keyHandlers <= 1)
+      #expect(counts.pointerHandlers <= 5)
+
+    case .disabledAncestorStepperSkipsHandlers,
+      .disabledAncestorSliderSkipsHandlers,
+      .disabledAncestorPickerSkipsHandlers:
+      #expect(counts.keyHandlers == 0)
+      #expect(counts.pointerHandlers == 0)
+
+    case .focusableTextRegionRebinds,
+      .nestedFocusScopeRegionRebinds:
+      #expect(counts.focusRegions <= 2)
+
+    case .focusScopeDefaultCandidateRebinds:
+      #expect(counts.focusRegions <= 2)
+      #expect(counts.defaultFocusRegistrations <= 2)
+
+    case .keyPressTextRebinds:
+      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .stackedKeyPressTextRebinds:
+      #expect(counts.keyPressHandlers <= 2)
+      #expect(counts.focusRegions <= 2)
+
+    case .disabledAncestorKeyPressSkipsHandlers:
+      #expect(counts.keyPressHandlers == 0)
+
+    case .tapGestureAnyViewRebinds,
+      .tapGestureCountTwoRebinds,
+      .disabledAncestorTapGestureDoesNotDispatch:
+      #expect(counts.gestureRecognizers <= 1)
+      #expect(counts.pointerHandlers <= 1)
+
+    case .dragGestureOnEndedRebinds,
+      .dragGestureOnChangedRebinds,
+      .disabledAncestorDragGestureDoesNotDispatch:
+      #expect(counts.gestureRecognizers <= 1)
+      #expect(counts.pointerHandlers <= 1)
+
+    case .hoverHandlerCountRebinds:
+      #expect(counts.pointerHoverHandlers <= 1)
+
+    case .hoverWithTapGestureKeepsBothBounded:
+      #expect(counts.pointerHoverHandlers <= 1)
+      #expect(counts.gestureRecognizers <= 1)
+      #expect(counts.pointerHandlers <= 1)
+
+    case .verticalScrollViewHandlersRebind,
+      .horizontalScrollViewHandlersRebind:
+      #expect(counts.keyHandlers <= 3)
+      #expect(counts.pointerHandlers <= 3)
+      #expect(counts.scrollPositions <= 1)
+
+    case .disabledAncestorScrollViewSkipsHandlers:
+      #expect(counts.keyHandlers == 0)
+      #expect(counts.pointerHandlers == 0)
+      #expect(counts.scrollPositions == 0)
+
+    case .keyCommandPanelRebinds:
+      #expect(counts.keyCommands <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .nestedKeyCommandInnerRebinds:
+      #expect(counts.keyCommands <= 2)
+      #expect(counts.focusRegions <= 2)
+
+    case .dropDestinationPanelRebinds:
+      #expect(counts.dropDestinations <= 1)
+      #expect(counts.focusRegions <= 2)
+
+    case .nestedDropDestinationInnerRebinds,
+      .dropDestinationFalseBubblesRebinds:
+      #expect(counts.dropDestinations <= 2)
+      #expect(counts.focusRegions <= 2)
+
+    case .preferenceObserverRebinds:
+      #expect(counts.preferenceObservers <= 1)
+      #expect(counts.actions <= 2)
+
+    case .lifecycleHandlerRebinds:
+      #expect(counts.lifecycleRegistrations <= 2)
+
+    case .onChangeHandlerRebinds:
+      #expect(counts.lifecycleRegistrations <= 1)
+      #expect(counts.actions <= 2)
+
+    case .terminationHandlerRebinds:
+      #expect(counts.terminationHandlers <= 1)
+
+    case .taskIDRebinds:
+      #expect(counts.activeTasks <= 1)
+      #expect(counts.taskDescriptors <= 1)
+    }
+  }
+}
+
+private struct FrameworkStressExpansionRegistryCounts {
+  var actions: Int
+  var keyHandlers: Int
+  var keyPressHandlers: Int
+  var pasteHandlers: Int
+  var pointerHandlers: Int
+  var pointerHoverHandlers: Int
+  var gestureRecognizers: Int
+  var keyCommands: Int
+  var dropDestinations: Int
+  var focusRegions: Int
+  var defaultFocusRegistrations: Int
+  var preferenceObservers: Int
+  var lifecycleRegistrations: Int
+  var terminationHandlers: Int
+  var activeTasks: Int
+  var taskDescriptors: Int
+  var scrollPositions: Int
+
+  @MainActor
+  init<Content: View>(_ harness: StressRuntimeHarness<Content>) {
+    actions = harness.actionRegistrationCount
+    keyHandlers = harness.keyHandlerCount
+    keyPressHandlers = harness.keyPressHandlerCount
+    pasteHandlers = harness.pasteHandlerCount
+    pointerHandlers = harness.pointerHandlerCount
+    pointerHoverHandlers = harness.pointerHoverHandlerCount
+    gestureRecognizers = harness.gestureRecognizerCount
+    keyCommands = harness.keyCommandRegistrationCount
+    dropDestinations = harness.dropDestinationRegistrationCount
+    focusRegions = harness.focusRegionCount
+    defaultFocusRegistrations = harness.defaultFocusRegistrationCount
+    preferenceObservers = harness.preferenceObservationRegistrationCount
+    lifecycleRegistrations = harness.lifecycleRegistrationCount
+    terminationHandlers = harness.terminationHandlerCount
+    activeTasks = harness.activeTaskCount
+    taskDescriptors = harness.activeTaskDescriptorCount
+    scrollPositions = harness.scrollPositionRegistrationCount
+  }
+
+  @MainActor
+  mutating func observe<Content: View>(_ harness: StressRuntimeHarness<Content>) {
+    let current = FrameworkStressExpansionRegistryCounts(harness)
+    actions = max(actions, current.actions)
+    keyHandlers = max(keyHandlers, current.keyHandlers)
+    keyPressHandlers = max(keyPressHandlers, current.keyPressHandlers)
+    pasteHandlers = max(pasteHandlers, current.pasteHandlers)
+    pointerHandlers = max(pointerHandlers, current.pointerHandlers)
+    pointerHoverHandlers = max(pointerHoverHandlers, current.pointerHoverHandlers)
+    gestureRecognizers = max(gestureRecognizers, current.gestureRecognizers)
+    keyCommands = max(keyCommands, current.keyCommands)
+    dropDestinations = max(dropDestinations, current.dropDestinations)
+    focusRegions = max(focusRegions, current.focusRegions)
+    defaultFocusRegistrations = max(
+      defaultFocusRegistrations,
+      current.defaultFocusRegistrations
+    )
+    preferenceObservers = max(preferenceObservers, current.preferenceObservers)
+    lifecycleRegistrations = max(lifecycleRegistrations, current.lifecycleRegistrations)
+    terminationHandlers = max(terminationHandlers, current.terminationHandlers)
+    activeTasks = max(activeTasks, current.activeTasks)
+    taskDescriptors = max(taskDescriptors, current.taskDescriptors)
+    scrollPositions = max(scrollPositions, current.scrollPositions)
+  }
+}
+
+private enum FrameworkStressExpansionFocusField: Hashable {
+  case target
+}
+
+private enum FrameworkStressExpansionPreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+private struct FrameworkStressExpansionTaskID: Equatable, Sendable {
+  var generation: Int
+}
+
+private struct FrameworkStressExpansionFixture: View {
+  static let controlIdentity = testIdentity("FrameworkStressExpansion", "control")
+  static let focusIdentity = testIdentity("FrameworkStressExpansion", "focus")
+  static let scopeIdentity = testIdentity("FrameworkStressExpansion", "scope")
+  static let nestedScopeIdentity = testIdentity("FrameworkStressExpansion", "nested")
+
+  let expansionCase: FrameworkStressExpansionCase
+
+  @State private var generation = 0
+  @State private var total = 0
+  @State private var flag = false
+  @State private var intValue = 0
+  @State private var textValue = ""
+  @State private var selection = "a"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Expansion") {
+        generation += 1
+        flag = false
+        intValue = 0
+        textValue = ""
+        selection = "a"
+      }
+      Text(
+        """
+        expansion \(expansionCase.rawValue) generation \(generation) total \(total) \
+        flag \(flag) int \(intValue) text \(displayText) selection \(selection)
+        """
+      )
+      FrameworkStressExpansionOwner(
+        expansionCase: expansionCase,
+        generation: generation,
+        total: $total,
+        flag: $flag,
+        intValue: $intValue,
+        textValue: $textValue,
+        selection: $selection
+      )
+      .id(testIdentity("FrameworkStressExpansion", "owner", "\(generation)"))
+    }
+    .frame(width: 100, height: 14, alignment: .topLeading)
+  }
+
+  private var displayText: String {
+    textValue.isEmpty ? "empty" : textValue.replacingOccurrences(of: "\n", with: "|")
+  }
+}
+
+private struct FrameworkStressExpansionOwner: View {
+  let expansionCase: FrameworkStressExpansionCase
+  let generation: Int
+  @Binding var total: Int
+  @Binding var flag: Bool
+  @Binding var intValue: Int
+  @Binding var textValue: String
+  @Binding var selection: String
+
+  @Namespace private var namespace
+  @FocusState private var focusedField: FrameworkStressExpansionFocusField?
+
+  var body: some View {
+    switch expansionCase {
+    case .anyViewButtonActionRebinds:
+      AnyView(
+        Button("AnyView Button") { total += generation + 1 }
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      )
+
+    case .panelButtonActionRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Button("Panel Button") { total += generation + 1 }
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+
+    case .conditionalButtonActionRebinds:
+      if generation.isMultiple(of: 2) {
+        Button("Conditional Button") { total += generation + 1 }
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      } else {
+        Button("Conditional Button") { total += generation + 1 }
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+
+    case .forEachButtonActionRebinds:
+      ForEach(0..<1, id: \.self) { _ in
+        Button("ForEach Button") { total += generation + 1 }
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+
+    case .disabledAncestorButtonSkipsAction:
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Disabled Ancestor Button") { total += generation + 1 }
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+      .disabled(true)
+
+    case .anyViewToggleRebinds:
+      AnyView(
+        Toggle("AnyView Toggle", isOn: $flag)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      )
+
+    case .panelToggleRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Toggle("Panel Toggle", isOn: $flag)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+
+    case .disabledAncestorToggleSkipsAction:
+      VStack(alignment: .leading, spacing: 0) {
+        Toggle("Disabled Ancestor Toggle", isOn: $flag)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+      .disabled(true)
+
+    case .anyViewDisclosureRebinds:
+      AnyView(
+        DisclosureGroup("AnyView Disclosure", isExpanded: $flag) {
+          Text("Expansion Disclosure Body")
+        }
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+      )
+
+    case .disabledAncestorDisclosureSkipsAction:
+      VStack(alignment: .leading, spacing: 0) {
+        DisclosureGroup("Disabled Ancestor Disclosure", isExpanded: $flag) {
+          Text("Disabled Disclosure Body")
+        }
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+      .disabled(true)
+
+    case .anyViewTextFieldKeyRebinds:
+      AnyView(
+        TextField("AnyView TextField", text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .textFieldStyle(.plain)
+      )
+
+    case .panelTextFieldKeyRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        TextField("Panel TextField", text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .textFieldStyle(.plain)
+      }
+
+    case .disabledAncestorTextFieldSkipsHandlers:
+      VStack(alignment: .leading, spacing: 0) {
+        TextField("Disabled Ancestor TextField", text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .textFieldStyle(.plain)
+      }
+      .disabled(true)
+
+    case .anyViewSecureFieldPasteRebinds:
+      AnyView(
+        SecureField("AnyView SecureField", text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .textFieldStyle(.plain)
+      )
+
+    case .disabledAncestorSecureFieldSkipsPaste:
+      VStack(alignment: .leading, spacing: 0) {
+        SecureField("Disabled Ancestor SecureField", text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .textFieldStyle(.plain)
+      }
+      .disabled(true)
+
+    case .anyViewTextEditorPasteRebinds:
+      AnyView(
+        TextEditor(text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .frame(width: 28, height: 3, alignment: .leading)
+      )
+
+    case .disabledAncestorTextEditorSkipsPaste:
+      VStack(alignment: .leading, spacing: 0) {
+        TextEditor(text: $textValue)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .frame(width: 28, height: 3, alignment: .leading)
+      }
+      .disabled(true)
+
+    case .anyViewStepperKeyRebinds:
+      AnyView(
+        Stepper("AnyView Stepper", value: $intValue, in: 0...999)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      )
+
+    case .disabledAncestorStepperSkipsHandlers:
+      VStack(alignment: .leading, spacing: 0) {
+        Stepper("Disabled Ancestor Stepper", value: $intValue, in: 0...999)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+      .disabled(true)
+
+    case .anyViewSliderKeyRebinds:
+      AnyView(
+        Slider("AnyView Slider", value: $intValue, in: 0...999)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      )
+
+    case .disabledAncestorSliderSkipsHandlers:
+      VStack(alignment: .leading, spacing: 0) {
+        Slider("Disabled Ancestor Slider", value: $intValue, in: 0...999)
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+      .disabled(true)
+
+    case .anyViewPickerKeyRebinds:
+      AnyView(
+        Picker("AnyView Picker", selection: $selection) {
+          Text("Option A").tag("a")
+          Text("Option B").tag("b")
+          Text("Option C").tag("c")
+        }
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+      )
+
+    case .disabledAncestorPickerSkipsHandlers:
+      VStack(alignment: .leading, spacing: 0) {
+        Picker("Disabled Ancestor Picker", selection: $selection) {
+          Text("Option A").tag("a")
+          Text("Option B").tag("b")
+        }
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+      }
+      .disabled(true)
+
+    case .focusableTextRegionRebinds:
+      Text("Focusable Expansion Target")
+        .id(FrameworkStressExpansionFixture.focusIdentity)
+        .focusable()
+
+    case .focusScopeDefaultCandidateRebinds:
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Default Focus Expansion Target")
+          .id(FrameworkStressExpansionFixture.focusIdentity)
+          .focusable()
+          .focused($focusedField, equals: .target)
+          .prefersDefaultFocus(in: namespace)
+      }
+      .focusScope(namespace)
+
+    case .nestedFocusScopeRegionRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Panel(id: FrameworkStressExpansionFixture.nestedScopeIdentity) {
+          Text("Nested Focus Expansion Target")
+            .id(FrameworkStressExpansionFixture.focusIdentity)
+            .focusable()
+        }
+      }
+
+    case .keyPressTextRebinds:
+      Text("Key Press Expansion Target")
+        .id(FrameworkStressExpansionFixture.focusIdentity)
+        .focusable()
+        .onKeyPress(.character("k")) { _ in
+          total += generation + 1
+          return .handled
+        }
+
+    case .stackedKeyPressTextRebinds:
+      Text("Stacked Key Press Expansion Target")
+        .id(FrameworkStressExpansionFixture.focusIdentity)
+        .focusable()
+        .onKeyPress(.character("k")) { _ in
+          total += generation + 1
+          return .handled
+        }
+        .onKeyPress(.character("l")) { _ in
+          total += generation + 1
+          return .handled
+        }
+
+    case .disabledAncestorKeyPressSkipsHandlers:
+      Text("Disabled Key Press Expansion Target")
+        .id(FrameworkStressExpansionFixture.focusIdentity)
+        .focusable()
+        .onKeyPress(.character("k")) { _ in
+          total += generation + 1
+          return .handled
+        }
+        .disabled(true)
+
+    case .tapGestureAnyViewRebinds:
+      AnyView(
+        Text("AnyView Tap")
+          .id(FrameworkStressExpansionFixture.controlIdentity)
+          .frame(width: 24, height: 1, alignment: .leading)
+          .onTapGesture { total += generation + 1 }
+      )
+
+    case .tapGestureCountTwoRebinds:
+      Text("Double Tap")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .onTapGesture(count: 2) { total += generation + 1 }
+
+    case .disabledAncestorTapGestureDoesNotDispatch:
+      Text("Disabled Tap")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .onTapGesture { total += generation + 1 }
+        .disabled(true)
+
+    case .dragGestureOnEndedRebinds:
+      Text("Drag Ended")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture()
+            .onEnded { _ in total += generation + 1 }
+        )
+
+    case .dragGestureOnChangedRebinds:
+      Text("Drag Changed")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture()
+            .onChanged { _ in total += generation + 1 }
+        )
+
+    case .disabledAncestorDragGestureDoesNotDispatch:
+      Text("Disabled Drag")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture()
+            .onEnded { _ in total += generation + 1 }
+        )
+        .disabled(true)
+
+    case .hoverHandlerCountRebinds:
+      Text("Hover Count")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .onPointerHover { _ in }
+
+    case .hoverWithTapGestureKeepsBothBounded:
+      Text("Hover Tap")
+        .id(FrameworkStressExpansionFixture.controlIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .onPointerHover { _ in }
+        .onTapGesture { total += generation + 1 }
+
+    case .verticalScrollViewHandlersRebind:
+      ScrollView(.vertical, showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10, id: \.self) { row in
+            Text("VScroll.\(row)")
+          }
+        }
+      }
+      .id(FrameworkStressExpansionFixture.controlIdentity)
+      .frame(width: 32, height: 4, alignment: .topLeading)
+
+    case .horizontalScrollViewHandlersRebind:
+      ScrollView(.horizontal, showsIndicators: true) {
+        HStack(spacing: 1) {
+          ForEach(0..<10, id: \.self) { column in
+            Text("HScroll.\(column)")
+          }
+        }
+      }
+      .id(FrameworkStressExpansionFixture.controlIdentity)
+      .frame(width: 32, height: 3, alignment: .topLeading)
+
+    case .disabledAncestorScrollViewSkipsHandlers:
+      ScrollView(.vertical, showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10, id: \.self) { row in
+            Text("Disabled VScroll.\(row)")
+          }
+        }
+      }
+      .id(FrameworkStressExpansionFixture.controlIdentity)
+      .frame(width: 32, height: 4, alignment: .topLeading)
+      .disabled(true)
+
+    case .keyCommandPanelRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Text("Key Command Expansion Target")
+          .id(FrameworkStressExpansionFixture.focusIdentity)
+          .focusable()
+      }
+      .keyCommand("Expansion Save", key: .character("s"), modifiers: .ctrl) {
+        total += generation + 1
+      }
+
+    case .nestedKeyCommandInnerRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Panel(id: FrameworkStressExpansionFixture.nestedScopeIdentity) {
+          Text("Nested Key Command Expansion Target")
+            .id(FrameworkStressExpansionFixture.focusIdentity)
+            .focusable()
+        }
+        .keyCommand("Expansion Inner", key: .character("i"), modifiers: .ctrl) {
+          total += generation + 1
+        }
+      }
+      .keyCommand("Expansion Outer", key: .character("o"), modifiers: .ctrl) {}
+
+    case .dropDestinationPanelRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Text("Drop Expansion Target")
+          .id(FrameworkStressExpansionFixture.focusIdentity)
+          .focusable()
+      }
+      .dropDestination { paths in
+        total += paths.count * (generation + 1)
+        return true
+      }
+
+    case .nestedDropDestinationInnerRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Panel(id: FrameworkStressExpansionFixture.nestedScopeIdentity) {
+          Text("Nested Drop Expansion Target")
+            .id(FrameworkStressExpansionFixture.focusIdentity)
+            .focusable()
+        }
+        .dropDestination { paths in
+          total += paths.count * (generation + 1)
+          return true
+        }
+      }
+      .dropDestination { _ in true }
+
+    case .dropDestinationFalseBubblesRebinds:
+      Panel(id: FrameworkStressExpansionFixture.scopeIdentity) {
+        Panel(id: FrameworkStressExpansionFixture.nestedScopeIdentity) {
+          Text("Bubbling Drop Expansion Target")
+            .id(FrameworkStressExpansionFixture.focusIdentity)
+            .focusable()
+        }
+        .dropDestination { _ in false }
+      }
+      .dropDestination { paths in
+        total += paths.count * (generation + 1)
+        return true
+      }
+
+    case .preferenceObserverRebinds:
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Preference Signal") { intValue = generation + 1 }
+          .id(testIdentity("FrameworkStressExpansion", "preferenceSignal"))
+        Text("Preference Source \(intValue)")
+          .id(testIdentity("FrameworkStressExpansion", "preferenceSource"))
+          .preference(key: FrameworkStressExpansionPreferenceKey.self, value: intValue)
+          .onPreferenceChange(FrameworkStressExpansionPreferenceKey.self) { value in
+            total += value
+          }
+      }
+
+    case .lifecycleHandlerRebinds:
+      Text("Lifecycle Expansion Owner")
+        .id(testIdentity("FrameworkStressExpansion", "lifecycleOwner"))
+        .onAppear { total += generation + 1 }
+        .onDisappear {}
+
+    case .onChangeHandlerRebinds:
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Change Signal") { intValue = generation + 1 }
+          .id(testIdentity("FrameworkStressExpansion", "changeSignal"))
+        Text("Change Source \(intValue)")
+          .id(testIdentity("FrameworkStressExpansion", "changeSource"))
+          .onChange(of: intValue) { _, newValue in
+            total += newValue
+          }
+      }
+
+    case .terminationHandlerRebinds:
+      Text("Termination Expansion Owner")
+        .onTerminationRequest { _ in
+          total += generation + 1
+          return .allow
+        }
+
+    case .taskIDRebinds:
+      Text("Task Expansion Owner")
+        .task(id: FrameworkStressExpansionTaskID(generation: generation)) {
+          while !Task.isCancelled {
+            await Task.yield()
+          }
+        }
+    }
+  }
+}
+
 private struct NavigationSourcePruningStressFixture: View {
   @State private var sourceVersion = 0
 
@@ -2844,8 +4063,8 @@ private final class StressRuntimeHarness<Content: View> {
   }
 
   @discardableResult
-  func scrollPointer(at point: Point, deltaY: Int) throws -> String {
-    try sendMouse(.scrolled(deltaX: 0, deltaY: deltaY), at: point)
+  func scrollPointer(at point: Point, deltaX: Int = 0, deltaY: Int) throws -> String {
+    try sendMouse(.scrolled(deltaX: deltaX, deltaY: deltaY), at: point)
   }
 
   @discardableResult
