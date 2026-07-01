@@ -615,6 +615,47 @@ struct FrameworkStressTests {
     #expect(maxDescendantIdentityCount == initialDescendantIdentityCount)
   }
 
+  @Test("key commands stay scoped and bounded under inner panel identity churn")
+  func keyCommandsStayScopedAndBoundedUnderInnerPanelIdentityChurn() throws {
+    // Hypothesis: action-scope command registrations should remove stale inner
+    // panel scopes while preserving shallowest-wins dispatch through the live
+    // focus path.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("KeyCommandScopeChurnStressRoot"),
+      size: .init(width: 72, height: 10)
+    ) {
+      KeyCommandScopeChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.keyCommandRegistrationCount == 2)
+
+    var expectedOuterTotal = 0
+    var maxKeyCommands = harness.keyCommandRegistrationCount
+    var maxFocusRegions = harness.focusRegionCount
+
+    for generation in 0..<24 {
+      _ = try harness.clickText("Command Focus \(generation)")
+      expectedOuterTotal += generation + 1
+
+      var frame = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+      #expect(
+        frame.contains("command generation \(generation) outer \(expectedOuterTotal) inner 0"))
+
+      frame = try harness.clickText("Rebuild Command Scope")
+      #expect(frame.contains("command generation \(generation + 1)"))
+
+      maxKeyCommands = max(maxKeyCommands, harness.keyCommandRegistrationCount)
+      maxFocusRegions = max(maxFocusRegions, harness.focusRegionCount)
+
+      #expect(harness.keyCommandRegistrationCount == 2)
+      #expect(harness.focusRegionCount == 2)
+    }
+
+    #expect(maxKeyCommands == 2)
+    #expect(maxFocusRegions == 2)
+  }
+
   @Test("multiple task modifiers stay paired and bounded under identity churn")
   func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
     // Hypothesis: repeated identity and descriptor churn on a node with two
@@ -1353,6 +1394,32 @@ private struct FocusedValueDescendantChurnOwner: View {
   }
 }
 
+private struct KeyCommandScopeChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var outerTotal = 0
+  @State private var innerTotal = 0
+
+  var body: some View {
+    Panel(id: testIdentity("KeyCommandScopeChurn", "outer")) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("command generation \(generation) outer \(outerTotal) inner \(innerTotal)")
+        Button("Rebuild Command Scope") { generation += 1 }
+        Panel(id: testIdentity("KeyCommandScopeChurn", "inner", "\(generation)")) {
+          Text("Command Focus \(generation)")
+            .focusable()
+        }
+        .keyCommand("Inner save", key: .character("s"), modifiers: .ctrl) {
+          innerTotal += generation + 1
+        }
+      }
+    }
+    .keyCommand("Outer save", key: .character("s"), modifiers: .ctrl) {
+      outerTotal += generation + 1
+    }
+    .frame(width: 72, height: 10, alignment: .topLeading)
+  }
+}
+
 private struct MultipleTaskModifierStressFixture: View {
   @State private var generation = 0
 
@@ -1495,6 +1562,14 @@ private final class StressRuntimeHarness<Content: View> {
   var focusedValueDescendantIdentityCount: Int {
     runLoop.localFocusedValuesRegistry.snapshot().reduce(0) { count, registration in
       count + registration.descendantIdentities.count
+    }
+  }
+
+  var keyCommandRegistrationCount: Int {
+    runLoop.commandRegistry.snapshot().keyCommandsByScope.values.reduce(0) {
+      count,
+      commands in
+      count + commands.count
     }
   }
 
