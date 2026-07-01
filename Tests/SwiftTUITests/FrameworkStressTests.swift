@@ -144,6 +144,252 @@ struct FrameworkStressTests {
       #expect(!frame.contains("Beta action view"))
     }
   }
+
+  @Test("deferred presentation sources prune overlays when their owner is recreated")
+  func deferredPresentationSourcesPruneOverlaysWhenTheirOwnerIsRecreated() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DeferredSourcePruningStressRoot"),
+      size: .init(width: 64, height: 16)
+    ) {
+      DeferredSourcePruningStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    var sourceVersion = 0
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+
+    for iteration in 1...15 {
+      let surface = DeferredSourcePruningSurface(iteration: iteration)
+      var frame = try harness.clickText(surface.openLabel)
+      #expect(frame.contains(surface.bodyText))
+
+      frame = try harness.clickText("Replace Source", chooseLast: true)
+      sourceVersion += 1
+      #expect(frame.contains("Owner version \(sourceVersion)"))
+      #expect(!frame.contains("Sheet body"))
+      #expect(!frame.contains("Alert body"))
+      #expect(!frame.contains("Popover body"))
+
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+    }
+
+    #expect(
+      maxLifecycleRegistrations <= 24,
+      """
+      Presentation owner churn must prune stale overlay lifecycle handlers; \
+      max=\(maxLifecycleRegistrations)
+      """
+    )
+  }
+
+  @Test("collection identity churn keeps row actions and tasks bounded")
+  func collectionIdentityChurnKeepsRowActionsAndTasksBounded() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("CollectionIdentityChurnStressRoot"),
+      size: .init(width: 48, height: 14)
+    ) {
+      CollectionIdentityChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.activeTaskCount == CollectionIdentityChurnStressFixture.rowCount)
+    #expect(
+      harness.activeTaskDescriptorCount == CollectionIdentityChurnStressFixture.rowCount)
+
+    var expectedTotal = 0
+    var maxActionRegistrations = harness.actionRegistrationCount
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+    var maxActiveTasks = harness.activeTaskCount
+
+    for epoch in 0..<20 {
+      let firstRowID = CollectionIdentityChurnStressFixture.firstRowID(for: epoch)
+      expectedTotal += firstRowID
+
+      var frame = try harness.clickText("Row \(firstRowID)")
+      #expect(frame.contains("epoch \(epoch) total \(expectedTotal)"))
+      #expect(harness.activeTaskCount == CollectionIdentityChurnStressFixture.rowCount)
+      #expect(
+        harness.activeTaskDescriptorCount == CollectionIdentityChurnStressFixture.rowCount)
+
+      frame = try harness.clickText("Rebuild Rows")
+      #expect(frame.contains("epoch \(epoch + 1) total \(expectedTotal)"))
+      #expect(harness.activeTaskCount == CollectionIdentityChurnStressFixture.rowCount)
+      #expect(
+        harness.activeTaskDescriptorCount == CollectionIdentityChurnStressFixture.rowCount)
+
+      maxActionRegistrations = max(maxActionRegistrations, harness.actionRegistrationCount)
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+      maxActiveTasks = max(maxActiveTasks, harness.activeTaskCount)
+    }
+
+    #expect(maxActiveTasks == CollectionIdentityChurnStressFixture.rowCount)
+    #expect(
+      maxActionRegistrations <= CollectionIdentityChurnStressFixture.rowCount + 1,
+      """
+      Row action registrations should stay bounded by the visible rows plus \
+      the rebuild action; max=\(maxActionRegistrations)
+      """
+    )
+    #expect(
+      maxLifecycleRegistrations <= CollectionIdentityChurnStressFixture.rowCount * 2,
+      """
+      Row lifecycle registrations should stay bounded by the visible rows; \
+      max=\(maxLifecycleRegistrations)
+      """
+    )
+  }
+
+  @Test("gesture branch replacement keeps recognizers and gesture state bounded")
+  func gestureBranchReplacementKeepsRecognizersAndGestureStateBounded() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureBranchReplacementStressRoot"),
+      size: .init(width: 52, height: 10)
+    ) {
+      GestureBranchReplacementStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.pointerHandlerCount == 1)
+    #expect(harness.gestureRecognizerCount == 1)
+    #expect(harness.gestureStateBindingCount == 1)
+
+    var expectedTotal = 0
+    var maxPointerHandlers = harness.pointerHandlerCount
+    var maxGestureRecognizers = harness.gestureRecognizerCount
+    var maxGestureStateBindings = harness.gestureStateBindingCount
+
+    for iteration in 1...16 {
+      let start = try #require(harness.point(forText: "Drag Pad"))
+      expectedTotal += 4
+      var frame = try harness.drag(
+        from: start,
+        to: Point(x: start.x + 4, y: start.y)
+      )
+      #expect(frame.contains("total \(expectedTotal)"))
+
+      frame = try harness.clickText("Swap Gesture Branch")
+      #expect(frame.contains("gesture version \(iteration) total \(expectedTotal)"))
+      #expect(frame.contains("Drag Pad \(iteration.isMultiple(of: 2) ? "A" : "B")"))
+
+      maxPointerHandlers = max(maxPointerHandlers, harness.pointerHandlerCount)
+      maxGestureRecognizers = max(maxGestureRecognizers, harness.gestureRecognizerCount)
+      maxGestureStateBindings = max(
+        maxGestureStateBindings,
+        harness.gestureStateBindingCount
+      )
+
+      #expect(harness.pointerHandlerCount == 1)
+      #expect(harness.gestureRecognizerCount == 1)
+      #expect(harness.gestureStateBindingCount == 1)
+    }
+
+    #expect(maxPointerHandlers == 1)
+    #expect(maxGestureRecognizers == 1)
+    #expect(maxGestureStateBindings == 1)
+  }
+
+  @Test("navigation destinations are pruned when their source subtree is recreated")
+  func navigationDestinationsArePrunedWhenTheirSourceSubtreeIsRecreated() throws {
+    // Hypothesis: replacing the source owner while a destination is active must
+    // retire the destination and its Escape pop action instead of carrying stale
+    // navigation state into the new owner.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NavigationSourcePruningStressRoot"),
+      size: .init(width: 58, height: 12)
+    ) {
+      NavigationSourcePruningStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    var sourceVersion = 0
+    var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
+
+    for iteration in 1...12 {
+      var frame = try harness.clickText("Show Detail")
+      #expect(frame.contains("Detail body v\(sourceVersion)"))
+
+      frame = try harness.clickText("Replace Navigation Source")
+      sourceVersion += 1
+      #expect(frame.contains("Nav owner \(sourceVersion)"))
+      #expect(!frame.contains("Detail body"))
+
+      frame = try harness.pressKey(KeyPress(.escape))
+      #expect(frame.contains("Nav owner \(sourceVersion)"))
+      #expect(!frame.contains("Detail body"))
+
+      maxLifecycleRegistrations = max(
+        maxLifecycleRegistrations,
+        harness.lifecycleRegistrationCount
+      )
+      #expect(
+        frame.contains("Nav epoch \(iteration + 1)"),
+        "replacement loop should advance monotonically without stale navigation"
+      )
+    }
+
+    #expect(
+      maxLifecycleRegistrations <= 16,
+      """
+      Navigation source churn must not accumulate destination lifecycle \
+      handlers; max=\(maxLifecycleRegistrations)
+      """
+    )
+  }
+
+  @Test("multiple task modifiers stay paired and bounded under identity churn")
+  func multipleTaskModifiersStayPairedAndBoundedUnderIdentityChurn() throws {
+    // Hypothesis: repeated identity and descriptor churn on a node with two
+    // tasks must preserve both authored task descriptors while cancelling old
+    // generations promptly.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MultipleTaskModifierStressRoot"),
+      size: .init(width: 54, height: 8)
+    ) {
+      MultipleTaskModifierStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.activeTaskCount == 2)
+    #expect(harness.activeTaskDescriptorCount == 2)
+
+    withKnownIssue(
+      """
+      Initial render starts both tasks, but after the first button-driven \
+      generation/identity churn the runtime cancels them and does not start the \
+      new pair. This pins the failure while keeping the stress path in the \
+      regular suite; remove the known-issue wrapper when activeTaskCount and \
+      activeTaskDescriptorCount remain 2 after each Cycle Multi Tasks click.
+      """
+    ) {
+      var maxActiveTasks = harness.activeTaskCount
+      var maxTaskDescriptors = harness.activeTaskDescriptorCount
+
+      for generation in 1...36 {
+        let frame = try harness.clickText("Cycle Multi Tasks")
+        maxActiveTasks = max(maxActiveTasks, harness.activeTaskCount)
+        maxTaskDescriptors = max(maxTaskDescriptors, harness.activeTaskDescriptorCount)
+
+        #expect(frame.contains("multi-task generation \(generation)"))
+        if harness.activeTaskCount != 2 || harness.activeTaskDescriptorCount != 2 {
+          #expect(harness.activeTaskCount == 2)
+          #expect(harness.activeTaskDescriptorCount == 2)
+          return
+        }
+      }
+
+      #expect(maxActiveTasks == 2)
+      #expect(maxTaskDescriptors == 2)
+    }
+
+    harness.shutdown()
+    #expect(harness.activeTaskCount == 0)
+  }
 }
 
 private struct MixedDeferredStressFixture: View {
@@ -371,6 +617,264 @@ private struct LazyTabCounterPane: View {
   }
 }
 
+private enum DeferredSourcePruningSurface {
+  case sheet
+  case alert
+  case popover
+
+  init(iteration: Int) {
+    switch iteration % 3 {
+    case 1: self = .sheet
+    case 2: self = .alert
+    default: self = .popover
+    }
+  }
+
+  var openLabel: String {
+    switch self {
+    case .sheet: "Open Sheet Source"
+    case .alert: "Open Alert Source"
+    case .popover: "Open Popover Source"
+    }
+  }
+
+  var bodyText: String {
+    switch self {
+    case .sheet: "Sheet body"
+    case .alert: "Alert body"
+    case .popover: "Popover body"
+    }
+  }
+}
+
+private struct DeferredSourcePruningStressFixture: View {
+  @State private var sourceVersion = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Source root version \(sourceVersion)")
+      DeferredSourcePruningOwner(version: sourceVersion) {
+        sourceVersion += 1
+      }
+      .id("source-\(sourceVersion)")
+    }
+    .frame(width: 64, height: 16, alignment: .topLeading)
+  }
+}
+
+private struct DeferredSourcePruningOwner: View {
+  let version: Int
+  let replaceSource: @MainActor () -> Void
+
+  @State private var sheetPresented = false
+  @State private var alertPresented = false
+  @State private var popoverPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Owner version \(version)")
+        .onAppear {}
+        .onDisappear {}
+      Button("Open Sheet Source") { sheetPresented = true }
+      Button("Open Alert Source") { alertPresented = true }
+      Button("Open Popover Source") { popoverPresented = true }
+    }
+    .sheet("Source Sheet", isPresented: $sheetPresented) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Sheet body v\(version)")
+        Button("Replace Source") { replaceSource() }
+      }
+      .onAppear {}
+      .onDisappear {}
+    }
+    .alert(
+      "Source Alert",
+      isPresented: $alertPresented,
+      actions: {
+        Button("Replace Source") { replaceSource() }
+      },
+      message: {
+        Text("Alert body v\(version)")
+      }
+    )
+    .popover(isPresented: $popoverPresented, arrowEdge: .trailing) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Popover body v\(version)")
+        Button("Replace Source") { replaceSource() }
+      }
+      .onAppear {}
+      .onDisappear {}
+    }
+  }
+}
+
+private struct CollectionIdentityChurnStressFixture: View {
+  static let rowCount = 6
+
+  static func firstRowID(for epoch: Int) -> Int {
+    epoch * 100 + 1
+  }
+
+  @State private var epoch = 0
+  @State private var total = 0
+
+  private var rowIDs: [Int] {
+    (0..<Self.rowCount).map { Self.firstRowID(for: epoch) + $0 }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Rows") { epoch += 1 }
+      Text("epoch \(epoch) total \(total)")
+
+      ForEach(rowIDs, id: \.self) { id in
+        CollectionIdentityChurnRow(id: id) {
+          total += id
+        }
+      }
+    }
+    .frame(width: 48, height: 14, alignment: .topLeading)
+  }
+}
+
+private struct CollectionIdentityChurnRow: View {
+  let id: Int
+  let increment: @MainActor () -> Void
+
+  var body: some View {
+    Button("Row \(id)") { increment() }
+      .onAppear {}
+      .onDisappear {}
+      .task(id: CollectionIdentityChurnTaskID(rowID: id)) {
+        while !Task.isCancelled {
+          await Task.yield()
+        }
+      }
+  }
+}
+
+private struct CollectionIdentityChurnTaskID: Equatable, Sendable {
+  var rowID: Int
+}
+
+private struct GestureBranchReplacementStressFixture: View {
+  @State private var version = 0
+  @State private var total = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Swap Gesture Branch") { version += 1 }
+      Text("gesture version \(version) total \(total)")
+
+      if version.isMultiple(of: 2) {
+        GestureBranchReplacementPad(label: "A", version: version) { value in
+          total += Int(value.translation.dx.rounded())
+        }
+        .id("gesture-pad-\(version)")
+      } else {
+        GestureBranchReplacementPad(label: "B", version: version) { value in
+          total += Int(value.translation.dx.rounded())
+        }
+        .id("gesture-pad-\(version)")
+      }
+    }
+    .frame(width: 52, height: 10, alignment: .topLeading)
+  }
+}
+
+private struct GestureBranchReplacementPad: View {
+  let label: String
+  let version: Int
+  let onEnded: @MainActor (DragGesture.Value) -> Void
+
+  @GestureState private var dragOffset = Vector(dx: 0, dy: 0)
+
+  var body: some View {
+    Text("Drag Pad \(label) \(version) offset \(Int(dragOffset.dx.rounded()))")
+      .frame(width: 32, height: 1, alignment: .leading)
+      .gesture(
+        DragGesture()
+          .updating($dragOffset) { value, state, _ in
+            state = value.translation
+          }
+          .onEnded { value in
+            onEnded(value)
+          }
+      )
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
+private struct NavigationSourcePruningStressFixture: View {
+  @State private var sourceVersion = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Nav epoch \(sourceVersion + 1)")
+      NavigationSourcePruningOwner(version: sourceVersion) {
+        sourceVersion += 1
+      }
+      .id("navigation-source-\(sourceVersion)")
+    }
+    .frame(width: 58, height: 12, alignment: .topLeading)
+  }
+}
+
+private struct NavigationSourcePruningOwner: View {
+  let version: Int
+  let replaceSource: @MainActor () -> Void
+
+  @State private var detailPresented = false
+
+  var body: some View {
+    NavigationStack(id: "navigation-source-pruning-\(version)") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Nav owner \(version)")
+          .onAppear {}
+          .onDisappear {}
+        Button("Show Detail") { detailPresented = true }
+      }
+      .navigationDestination(isPresented: $detailPresented) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Detail body v\(version)")
+          Button("Replace Navigation Source") { replaceSource() }
+        }
+        .onAppear {}
+        .onDisappear {}
+      }
+    }
+  }
+}
+
+private struct MultipleTaskModifierStressFixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Cycle Multi Tasks") { generation += 1 }
+      Text("multi-task generation \(generation)")
+        .id("multi-task-\(generation % 7)")
+        .task(id: MultipleTaskModifierStressID(slot: "first", generation: generation)) {
+          while !Task.isCancelled {
+            await Task.yield()
+          }
+        }
+        .task(id: MultipleTaskModifierStressID(slot: "second", generation: generation)) {
+          while !Task.isCancelled {
+            await Task.yield()
+          }
+        }
+    }
+    .frame(width: 54, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct MultipleTaskModifierStressID: Equatable, Sendable {
+  var slot: String
+  var generation: Int
+}
+
 @MainActor
 private final class StressRuntimeHarness<Content: View> {
   private let terminal: StressRecordingHost
@@ -426,6 +930,24 @@ private final class StressRuntimeHarness<Content: View> {
       + snapshot.changeHandlers.count
   }
 
+  var actionRegistrationCount: Int {
+    runLoop.localActionRegistry.snapshot().count
+  }
+
+  var pointerHandlerCount: Int {
+    runLoop.localPointerHandlerRegistry.snapshot().count
+  }
+
+  var gestureRecognizerCount: Int {
+    runLoop.localGestureRegistry.snapshot().count
+  }
+
+  var gestureStateBindingCount: Int {
+    runLoop.localGestureStateRegistry.snapshot().values.reduce(0) { count, bindings in
+      count + bindings.count
+    }
+  }
+
   func shutdown() {
     guard !didShutdown else {
       return
@@ -464,6 +986,29 @@ private final class StressRuntimeHarness<Content: View> {
     #expect(
       runLoop.handle(
         RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: point)))
+      ) == nil
+    )
+    return try render()
+  }
+
+  @discardableResult
+  func pressKey(_ keyPress: KeyPress) throws -> String {
+    #expect(runLoop.handleKeyPress(keyPress) == nil)
+    return try render()
+  }
+
+  @discardableResult
+  func drag(from start: Point, to end: Point) throws -> String {
+    _ = try sendMouse(.down(.primary), at: start)
+    _ = try sendMouse(.dragged(.primary), at: end)
+    return try sendMouse(.up(.primary), at: end)
+  }
+
+  @discardableResult
+  private func sendMouse(_ kind: MouseEvent.Kind, at point: Point) throws -> String {
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: kind, location: point)))
       ) == nil
     )
     return try render()
