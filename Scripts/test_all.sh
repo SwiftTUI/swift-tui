@@ -483,7 +483,8 @@ run_swift() {
 run_swift_runtime_tests_without_isolated_async_suites() {
   run_swift test "$@" \
     --skip AsyncLifecycleGenerationTests \
-    --skip AsyncFrameTailRenderingTests
+    --skip AsyncFrameTailRenderingTests \
+    --skip TaskReadsUnbodiedStateTests
 }
 
 require_command() {
@@ -784,8 +785,13 @@ run_function_step \
   run_swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 
 run_function_step \
+  "Run SwiftTUI task-state observation tests" \
+  "$(swift_command_text test --filter SwiftTUITests.TaskReadsUnbodiedStateTests)" \
+  run_swift test --filter SwiftTUITests.TaskReadsUnbodiedStateTests
+
+run_function_step \
   "Run SwiftTUI runtime tests" \
-  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests)" \
+  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests)" \
   run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
 
 run_function_step \

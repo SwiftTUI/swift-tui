@@ -293,6 +293,23 @@ public struct State<Value> {
     {
       return location
     }
+
+    // Outside a resolve pass with no remembered location: the body never read
+    // this property during resolve, so no box was ever taught to reach the
+    // graph slot. Recover the live owner node from the captured graph scope so
+    // imperative reads and writes (a `.task` loop, a gesture callback) land on
+    // the graph-backed slot instead of a stale per-box seed. Remembered so a
+    // later imperative access on this same box short-circuits here.
+    if let location = makeImperativeLocation(
+      for: context,
+      storageOwner: storageOwner
+    ) {
+      box.remember(
+        location,
+        for: storageOwner
+      )
+      return location
+    }
     return nil
   }
 
@@ -300,9 +317,6 @@ public struct State<Value> {
     for context: AuthoringContext,
     storageOwner: StateStorageOwner
   ) -> DynamicStateLocation<Value> {
-    let ordinal = box.currentOrdinal
-    let retainedSeed =
-      box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
     // Captured authoring snapshots keep the owner node ID but drop the
     // ViewNode reference. During a resolve pass, recover the live owner so
     // scoped subtrees do not replace graph-backed state with seed storage.
@@ -314,37 +328,10 @@ public struct State<Value> {
       )
 
     if let viewNode = resolvedViewNode {
-      return DynamicStateLocation(
-        getValue: { [weak viewNode, weak box] in
-          guard let viewNode else {
-            if let retainedValue = box?.retainedValue(for: storageOwner) {
-              return retainedValue
-            }
-            return retainedSeed
-          }
-          let liveViewNode =
-            viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
-          return liveViewNode.stateSlot(
-            ordinal: ordinal,
-            seed: retainedSeed
-          )
-        },
-        setValue: { [weak viewNode, weak box] newValue in
-          if let viewNode {
-            let liveViewNode =
-              viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
-            liveViewNode.setStateSlot(
-              ordinal: ordinal,
-              value: newValue,
-              invalidationIdentity: context.viewIdentity
-            )
-            box?.updateSeedValue(newValue)
-            box?.storeRetainedValue(newValue, for: storageOwner)
-          } else {
-            box?.updateSeedValue(newValue)
-            box?.storeRetainedValue(newValue, for: storageOwner)
-          }
-        }
+      return graphSlotLocation(
+        viewNode: viewNode,
+        storageOwner: storageOwner,
+        invalidationIdentity: context.viewIdentity
       )
     }
 
@@ -356,22 +343,110 @@ public struct State<Value> {
     )
   }
 
+  /// Builds a graph-backed location for an imperative access (a `.task` loop, a
+  /// gesture callback) that ran outside any resolve pass. Returns `nil` when the
+  /// captured scope's graph is gone or the owner node cannot be found, so the
+  /// caller falls back to the per-box seed exactly as it did before — the
+  /// graph-scoped fallback never substitutes a different live graph's state.
+  private func makeImperativeLocation(
+    for context: AuthoringContext,
+    storageOwner: StateStorageOwner
+  ) -> DynamicStateLocation<Value>? {
+    guard
+      let viewNode = liveOwnerNode(
+        ownerNodeID: context.ownerNodeID,
+        stateGraphScope: context.stateGraphScope
+      )
+    else {
+      return nil
+    }
+    return graphSlotLocation(
+      viewNode: viewNode,
+      storageOwner: storageOwner,
+      invalidationIdentity: context.viewIdentity
+    )
+  }
+
+  /// A location that reads and writes the graph slot owned by `viewNode`. The
+  /// closures re-resolve the live node from its graph on every access, so a
+  /// location built once stays valid across reuse, and degrade to the retained
+  /// value (then the seed) if the node is gone.
+  private func graphSlotLocation(
+    viewNode: SwiftTUICore.ViewNode,
+    storageOwner: StateStorageOwner,
+    invalidationIdentity: Identity
+  ) -> DynamicStateLocation<Value> {
+    let ordinal = box.currentOrdinal
+    let retainedSeed =
+      box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
+    return DynamicStateLocation(
+      getValue: { [weak viewNode, weak box] in
+        guard let viewNode else {
+          if let retainedValue = box?.retainedValue(for: storageOwner) {
+            return retainedValue
+          }
+          return retainedSeed
+        }
+        let liveViewNode =
+          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+        return liveViewNode.stateSlot(
+          ordinal: ordinal,
+          seed: retainedSeed
+        )
+      },
+      setValue: { [weak viewNode, weak box] newValue in
+        if let viewNode {
+          let liveViewNode =
+            viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+          liveViewNode.setStateSlot(
+            ordinal: ordinal,
+            value: newValue,
+            invalidationIdentity: invalidationIdentity
+          )
+          box?.updateSeedValue(newValue)
+          box?.storeRetainedValue(newValue, for: storageOwner)
+        } else {
+          box?.updateSeedValue(newValue)
+          box?.storeRetainedValue(newValue, for: storageOwner)
+        }
+      }
+    )
+  }
+
   private func liveOwnerNode(
     ownerNodeID: ViewNodeID?,
     stateGraphScope: StateGraphScopeID?
   ) -> SwiftTUICore.ViewNode? {
+    guard let ownerNodeID else {
+      return nil
+    }
+
+    // During a resolve pass the enclosing graph is the source of truth; require
+    // the captured scope to match it so a scoped subtree never reaches into a
+    // different graph than the one resolving it. (Unchanged from the original
+    // resolve-time behavior: no enclosing graph means no node.)
+    if ViewNodeContext.current != nil {
+      guard let currentGraph = ViewNodeContext.current?.ownerGraph else {
+        return nil
+      }
+      if let stateGraphScope,
+        stateGraphScope != StateGraphScopeID(currentGraph)
+      {
+        return nil
+      }
+      return currentGraph.nodeForViewNodeID(ownerNodeID)
+    }
+
+    // Outside a resolve pass (imperative callbacks, `.task` loops): recover the
+    // live graph from the captured scope. Weak in the registry, so a retired
+    // graph yields nil and the read falls back to the seed.
     guard
-      let ownerNodeID,
-      let currentGraph = ViewNodeContext.current?.ownerGraph
+      let stateGraphScope,
+      let scopedGraph = LiveViewGraphRegistry.graph(for: stateGraphScope)
     else {
       return nil
     }
-    if let stateGraphScope,
-      stateGraphScope != StateGraphScopeID(currentGraph)
-    {
-      return nil
-    }
-    return currentGraph.nodeForViewNodeID(ownerNodeID)
+    return scopedGraph.nodeForViewNodeID(ownerNodeID)
   }
 }
 

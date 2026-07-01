@@ -376,6 +376,10 @@ package final class ViewGraph {
     taskDescriptors = TaskDescriptorState()
     dependencyIndex = DependencyIndex()
     frameCommit = FrameCommitState()
+    // Make this graph recoverable from its scope identity so `@State` reads and
+    // writes that fire outside a resolve pass (tasks, gestures, imperative
+    // actions) can reach the live owner node — see `LiveViewGraphRegistry`.
+    LiveViewGraphRegistry.register(self)
   }
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
