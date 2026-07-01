@@ -386,6 +386,11 @@ struct FrameworkStressTests {
     #expect(maxHoverHandlers == 1)
   }
 
+  @Test("directed stress discovery case", arguments: FrameworkStressDiscoveryCase.allCases)
+  func directedStressDiscoveryCase(_ discoveryCase: FrameworkStressDiscoveryCase) throws {
+    try discoveryCase.run()
+  }
+
   @Test("navigation destinations are pruned when their source subtree is recreated")
   func navigationDestinationsArePrunedWhenTheirSourceSubtreeIsRecreated() throws {
     // Hypothesis: replacing the source owner while a destination is active must
@@ -1504,6 +1509,540 @@ private struct PointerHoverHandlerChurnOwner: View {
   }
 }
 
+enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible,
+  Sendable
+{
+  case stableButtonActionRebinds
+  case disabledButtonSkipsActionRegistration
+  case stableToggleActionRebinds
+  case disabledToggleSkipsActionRegistration
+  case stableDisclosureActionRebinds
+  case disabledDisclosureSkipsActionRegistration
+  case textFieldKeyHandlerRebinds
+  case disabledTextFieldSkipsInputHandlers
+  case secureFieldPasteHandlerRebinds
+  case textEditorPasteHandlerRebinds
+  case stepperKeyHandlerRebinds
+  case disabledStepperSkipsInputHandlers
+  case sliderKeyHandlerRebinds
+  case pickerKeyHandlerRebinds
+  case scrollViewHandlersStayBounded
+  case disabledScrollViewSkipsPointerHandlers
+  case tapGestureRecognizerRebinds
+  case dragGestureRecognizerRebinds
+  case keyCommandScopeRebinds
+  case dropDestinationScopeRebinds
+
+  var description: String { rawValue }
+
+  @MainActor
+  func run() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FrameworkStressDiscovery", rawValue, "root"),
+      size: .init(width: 90, height: 12)
+    ) {
+      FrameworkStressDiscoveryFixture(discoveryCase: self)
+    }
+    defer { harness.shutdown() }
+
+    var expectedTotal = 0
+    var maxActions = harness.actionRegistrationCount
+    var maxKeyHandlers = harness.keyHandlerCount
+    var maxKeyPressHandlers = harness.keyPressHandlerCount
+    var maxPasteHandlers = harness.pasteHandlerCount
+    var maxPointerHandlers = harness.pointerHandlerCount
+    var maxGestureRecognizers = harness.gestureRecognizerCount
+    var maxKeyCommands = harness.keyCommandRegistrationCount
+    var maxDropDestinations = harness.dropDestinationRegistrationCount
+
+    for generation in 0..<iterationCount {
+      let frame = try exercise(harness: harness, generation: generation)
+      expectedTotal = expectedTotalAfterExercise(
+        generation: generation,
+        previous: expectedTotal
+      )
+      assertExpectedFrame(
+        frame,
+        generation: generation,
+        expectedTotal: expectedTotal
+      )
+      assertExpectedRegistrations(harness)
+
+      maxActions = max(maxActions, harness.actionRegistrationCount)
+      maxKeyHandlers = max(maxKeyHandlers, harness.keyHandlerCount)
+      maxKeyPressHandlers = max(maxKeyPressHandlers, harness.keyPressHandlerCount)
+      maxPasteHandlers = max(maxPasteHandlers, harness.pasteHandlerCount)
+      maxPointerHandlers = max(maxPointerHandlers, harness.pointerHandlerCount)
+      maxGestureRecognizers = max(maxGestureRecognizers, harness.gestureRecognizerCount)
+      maxKeyCommands = max(maxKeyCommands, harness.keyCommandRegistrationCount)
+      maxDropDestinations = max(
+        maxDropDestinations,
+        harness.dropDestinationRegistrationCount
+      )
+
+      let rebuilt = try harness.clickText("Rebuild Discovery")
+      #expect(rebuilt.contains("case \(rawValue) generation \(generation + 1)"))
+      if self == .stableButtonActionRebinds {
+        withKnownIssue("Stable Button labels remain stale after owner identity churn") {
+          #expect(rebuilt.contains("Probe Button \(generation + 1)"))
+        }
+      }
+    }
+
+    assertMaxRegistrations(
+      actions: maxActions,
+      keyHandlers: maxKeyHandlers,
+      keyPressHandlers: maxKeyPressHandlers,
+      pasteHandlers: maxPasteHandlers,
+      pointerHandlers: maxPointerHandlers,
+      gestureRecognizers: maxGestureRecognizers,
+      keyCommands: maxKeyCommands,
+      dropDestinations: maxDropDestinations
+    )
+  }
+
+  @MainActor
+  private func exercise(
+    harness: StressRuntimeHarness<FrameworkStressDiscoveryFixture>,
+    generation: Int
+  ) throws -> String {
+    switch self {
+    case .stableButtonActionRebinds:
+      return try harness.clickText("Probe Button \(generation)")
+
+    case .disabledButtonSkipsActionRegistration:
+      return harness.frame
+
+    case .stableToggleActionRebinds:
+      return try harness.clickText("Probe Toggle \(generation)")
+
+    case .disabledToggleSkipsActionRegistration:
+      return harness.frame
+
+    case .stableDisclosureActionRebinds:
+      return try harness.clickText("Probe Disclosure \(generation)")
+
+    case .disabledDisclosureSkipsActionRegistration:
+      return harness.frame
+
+    case .textFieldKeyHandlerRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.character("x")))
+
+    case .disabledTextFieldSkipsInputHandlers:
+      return harness.frame
+
+    case .secureFieldPasteHandlerRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.controlIdentity)
+      return try harness.paste("secret-\(generation)")
+
+    case .textEditorPasteHandlerRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.controlIdentity)
+      return try harness.paste("line-\(generation)\nnext")
+
+    case .stepperKeyHandlerRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowRight))
+
+    case .disabledStepperSkipsInputHandlers:
+      return harness.frame
+
+    case .sliderKeyHandlerRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowRight))
+
+    case .pickerKeyHandlerRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.controlIdentity)
+      return try harness.pressKey(KeyPress(.arrowDown))
+
+    case .scrollViewHandlersStayBounded:
+      let point = try #require(harness.point(forText: "Scroll Row \(generation).1"))
+      return try harness.scrollPointer(at: point, deltaY: 1)
+
+    case .disabledScrollViewSkipsPointerHandlers:
+      return harness.frame
+
+    case .tapGestureRecognizerRebinds:
+      return try harness.clickText("Tap Gesture \(generation)")
+
+    case .dragGestureRecognizerRebinds:
+      let start = try #require(harness.point(forText: "Drag Gesture \(generation)"))
+      return try harness.drag(from: start, to: Point(x: start.x + 4, y: start.y))
+
+    case .keyCommandScopeRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.focusIdentity)
+      return try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    case .dropDestinationScopeRebinds:
+      _ = try harness.focus(FrameworkStressDiscoveryFixture.focusIdentity)
+      return try harness.drop(paths: [DroppedPath("/tmp/discovery-\(generation)")])
+    }
+  }
+
+  private func expectedTotalAfterExercise(
+    generation: Int,
+    previous: Int
+  ) -> Int {
+    switch self {
+    case .stableButtonActionRebinds,
+      .tapGestureRecognizerRebinds,
+      .dragGestureRecognizerRebinds,
+      .keyCommandScopeRebinds,
+      .dropDestinationScopeRebinds:
+      previous + generation + 1
+    default:
+      previous
+    }
+  }
+
+  private var iterationCount: Int {
+    switch self {
+    case .stableButtonActionRebinds:
+      1
+    default:
+      8
+    }
+  }
+
+  private func assertExpectedFrame(
+    _ frame: String,
+    generation: Int,
+    expectedTotal: Int
+  ) {
+    #expect(frame.contains("case \(rawValue) generation \(generation)"))
+
+    switch self {
+    case .stableButtonActionRebinds,
+      .tapGestureRecognizerRebinds,
+      .dragGestureRecognizerRebinds,
+      .keyCommandScopeRebinds,
+      .dropDestinationScopeRebinds:
+      #expect(frame.contains("total \(expectedTotal)"))
+
+    case .disabledButtonSkipsActionRegistration,
+      .disabledToggleSkipsActionRegistration,
+      .disabledDisclosureSkipsActionRegistration,
+      .disabledTextFieldSkipsInputHandlers,
+      .disabledStepperSkipsInputHandlers,
+      .disabledScrollViewSkipsPointerHandlers:
+      #expect(frame.contains("total 0"))
+
+    case .stableToggleActionRebinds:
+      #expect(frame.contains("flag true"))
+
+    case .stableDisclosureActionRebinds:
+      #expect(frame.contains("flag true"))
+      #expect(frame.contains("Disclosure body \(generation)"))
+
+    case .textFieldKeyHandlerRebinds:
+      #expect(frame.contains("text x"))
+
+    case .secureFieldPasteHandlerRebinds:
+      #expect(frame.contains("text secret-\(generation)"))
+      #expect(!frame.contains("secret-\(generation)  "))
+
+    case .textEditorPasteHandlerRebinds:
+      #expect(frame.contains("text line-\(generation)|next"))
+
+    case .stepperKeyHandlerRebinds,
+      .sliderKeyHandlerRebinds:
+      #expect(frame.contains("int 1"))
+
+    case .pickerKeyHandlerRebinds:
+      #expect(frame.contains("selection b"))
+
+    case .scrollViewHandlersStayBounded:
+      #expect(frame.contains("Scroll Row \(generation)."))
+    }
+  }
+
+  @MainActor
+  private func assertExpectedRegistrations(
+    _ harness: StressRuntimeHarness<FrameworkStressDiscoveryFixture>
+  ) {
+    switch self {
+    case .disabledButtonSkipsActionRegistration,
+      .disabledToggleSkipsActionRegistration,
+      .disabledDisclosureSkipsActionRegistration:
+      #expect(harness.actionRegistrationCount == 1)
+
+    case .disabledTextFieldSkipsInputHandlers:
+      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
+      #expect(harness.pasteHandlerCount == 0)
+
+    case .disabledStepperSkipsInputHandlers:
+      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.pointerHandlerCount == 0)
+
+    case .disabledScrollViewSkipsPointerHandlers:
+      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.pointerHandlerCount == 0)
+
+    default:
+      break
+    }
+  }
+
+  private func assertMaxRegistrations(
+    actions: Int,
+    keyHandlers: Int,
+    keyPressHandlers: Int,
+    pasteHandlers: Int,
+    pointerHandlers: Int,
+    gestureRecognizers: Int,
+    keyCommands: Int,
+    dropDestinations: Int
+  ) {
+    switch self {
+    case .stableButtonActionRebinds,
+      .stableToggleActionRebinds,
+      .stableDisclosureActionRebinds:
+      #expect(actions <= 2)
+
+    case .disabledButtonSkipsActionRegistration,
+      .disabledToggleSkipsActionRegistration,
+      .disabledDisclosureSkipsActionRegistration:
+      #expect(actions == 1)
+
+    case .textFieldKeyHandlerRebinds,
+      .secureFieldPasteHandlerRebinds,
+      .textEditorPasteHandlerRebinds:
+      #expect(keyHandlers <= (self == .textEditorPasteHandlerRebinds ? 4 : 1))
+      #expect(keyPressHandlers <= 1)
+      #expect(pasteHandlers <= 1)
+
+    case .disabledTextFieldSkipsInputHandlers:
+      #expect(keyHandlers == 0)
+      #expect(keyPressHandlers == 0)
+      #expect(pasteHandlers == 0)
+
+    case .stepperKeyHandlerRebinds,
+      .sliderKeyHandlerRebinds,
+      .pickerKeyHandlerRebinds:
+      #expect(keyHandlers <= 1)
+      #expect(pointerHandlers <= 5)
+
+    case .disabledStepperSkipsInputHandlers:
+      #expect(keyHandlers == 0)
+      #expect(pointerHandlers == 0)
+
+    case .scrollViewHandlersStayBounded:
+      #expect(keyHandlers <= 3)
+      #expect(pointerHandlers <= 3)
+
+    case .disabledScrollViewSkipsPointerHandlers:
+      #expect(keyHandlers == 0)
+      #expect(pointerHandlers == 0)
+
+    case .tapGestureRecognizerRebinds,
+      .dragGestureRecognizerRebinds:
+      #expect(gestureRecognizers <= 1)
+      #expect(pointerHandlers <= 1)
+
+    case .keyCommandScopeRebinds:
+      #expect(keyCommands <= 1)
+
+    case .dropDestinationScopeRebinds:
+      #expect(dropDestinations <= 1)
+    }
+  }
+}
+
+private struct FrameworkStressDiscoveryFixture: View {
+  static let controlIdentity = testIdentity("FrameworkStressDiscovery", "control")
+  static let focusIdentity = testIdentity("FrameworkStressDiscovery", "focus")
+  static let scopeIdentity = testIdentity("FrameworkStressDiscovery", "scope")
+
+  let discoveryCase: FrameworkStressDiscoveryCase
+
+  @State private var generation = 0
+  @State private var total = 0
+  @State private var flag = false
+  @State private var intValue = 0
+  @State private var textValue = ""
+  @State private var selection = "a"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Discovery") {
+        generation += 1
+        flag = false
+        intValue = 0
+        textValue = ""
+        selection = "a"
+      }
+      Text(
+        """
+        case \(discoveryCase.rawValue) generation \(generation) total \(total) \
+        flag \(flag) int \(intValue) text \(displayText) selection \(selection)
+        """
+      )
+      FrameworkStressDiscoveryOwner(
+        discoveryCase: discoveryCase,
+        generation: generation,
+        total: $total,
+        flag: $flag,
+        intValue: $intValue,
+        textValue: $textValue,
+        selection: $selection
+      )
+      .id(testIdentity("FrameworkStressDiscovery", "owner", "\(generation)"))
+    }
+    .frame(width: 90, height: 12, alignment: .topLeading)
+  }
+
+  private var displayText: String {
+    textValue.isEmpty ? "empty" : textValue.replacingOccurrences(of: "\n", with: "|")
+  }
+}
+
+private struct FrameworkStressDiscoveryOwner: View {
+  let discoveryCase: FrameworkStressDiscoveryCase
+  let generation: Int
+  @Binding var total: Int
+  @Binding var flag: Bool
+  @Binding var intValue: Int
+  @Binding var textValue: String
+  @Binding var selection: String
+
+  var body: some View {
+    switch discoveryCase {
+    case .stableButtonActionRebinds:
+      Button("Probe Button \(generation)") { total += generation + 1 }
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+
+    case .disabledButtonSkipsActionRegistration:
+      Button("Disabled Button \(generation)") { total += generation + 1 }
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .disabled(true)
+
+    case .stableToggleActionRebinds:
+      Toggle("Probe Toggle \(generation)", isOn: $flag)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+
+    case .disabledToggleSkipsActionRegistration:
+      Toggle("Disabled Toggle \(generation)", isOn: $flag)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .disabled(true)
+
+    case .stableDisclosureActionRebinds:
+      DisclosureGroup("Probe Disclosure \(generation)", isExpanded: $flag) {
+        Text("Disclosure body \(generation)")
+      }
+      .id(FrameworkStressDiscoveryFixture.controlIdentity)
+
+    case .disabledDisclosureSkipsActionRegistration:
+      DisclosureGroup("Disabled Disclosure \(generation)", isExpanded: $flag) {
+        Text("Disabled disclosure body \(generation)")
+      }
+      .id(FrameworkStressDiscoveryFixture.controlIdentity)
+      .disabled(true)
+
+    case .textFieldKeyHandlerRebinds:
+      TextField("Probe TextField \(generation)", text: $textValue)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .textFieldStyle(.plain)
+
+    case .disabledTextFieldSkipsInputHandlers:
+      TextField("Disabled TextField \(generation)", text: $textValue)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .textFieldStyle(.plain)
+        .disabled(true)
+
+    case .secureFieldPasteHandlerRebinds:
+      SecureField("Probe SecureField \(generation)", text: $textValue)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .textFieldStyle(.plain)
+
+    case .textEditorPasteHandlerRebinds:
+      TextEditor(text: $textValue)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .frame(width: 24, height: 3, alignment: .leading)
+
+    case .stepperKeyHandlerRebinds:
+      Stepper("Probe Stepper \(generation)", value: $intValue, in: 0...999)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+
+    case .disabledStepperSkipsInputHandlers:
+      Stepper("Disabled Stepper \(generation)", value: $intValue, in: 0...999)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .disabled(true)
+
+    case .sliderKeyHandlerRebinds:
+      Slider("Probe Slider \(generation)", value: $intValue, in: 0...999)
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+
+    case .pickerKeyHandlerRebinds:
+      Picker("Probe Picker \(generation)", selection: $selection) {
+        Text("Option A").tag("a")
+        Text("Option B").tag("b")
+        Text("Option C").tag("c")
+      }
+      .id(FrameworkStressDiscoveryFixture.controlIdentity)
+
+    case .scrollViewHandlersStayBounded:
+      ScrollView(.vertical, showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10, id: \.self) { row in
+            Text("Scroll Row \(generation).\(row)")
+          }
+        }
+      }
+      .id(FrameworkStressDiscoveryFixture.controlIdentity)
+      .frame(width: 36, height: 4, alignment: .topLeading)
+
+    case .disabledScrollViewSkipsPointerHandlers:
+      ScrollView(.vertical, showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10, id: \.self) { row in
+            Text("Disabled Scroll Row \(generation).\(row)")
+          }
+        }
+      }
+      .id(FrameworkStressDiscoveryFixture.controlIdentity)
+      .frame(width: 36, height: 4, alignment: .topLeading)
+      .disabled(true)
+
+    case .tapGestureRecognizerRebinds:
+      Text("Tap Gesture \(generation)")
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .frame(width: 30, height: 1, alignment: .leading)
+        .onTapGesture { total += generation + 1 }
+
+    case .dragGestureRecognizerRebinds:
+      Text("Drag Gesture \(generation)")
+        .id(FrameworkStressDiscoveryFixture.controlIdentity)
+        .frame(width: 30, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture()
+            .onEnded { _ in total += generation + 1 }
+        )
+
+    case .keyCommandScopeRebinds:
+      Panel(id: FrameworkStressDiscoveryFixture.scopeIdentity) {
+        Text("Key Command Focus \(generation)")
+          .id(FrameworkStressDiscoveryFixture.focusIdentity)
+          .focusable()
+      }
+      .keyCommand("Discovery Save", key: .character("s"), modifiers: .ctrl) {
+        total += generation + 1
+      }
+
+    case .dropDestinationScopeRebinds:
+      Panel(id: FrameworkStressDiscoveryFixture.scopeIdentity) {
+        Text("Drop Destination Focus \(generation)")
+          .id(FrameworkStressDiscoveryFixture.focusIdentity)
+          .focusable()
+      }
+      .dropDestination { paths in
+        total += paths.count * (generation + 1)
+        return true
+      }
+    }
+  }
+}
+
 private struct NavigationSourcePruningStressFixture: View {
   @State private var sourceVersion = 0
 
@@ -2106,6 +2645,10 @@ private final class StressRuntimeHarness<Content: View> {
     runLoop.localActionRegistry.snapshot().count
   }
 
+  var keyHandlerCount: Int {
+    runLoop.localKeyHandlerRegistry.snapshot().count
+  }
+
   var pointerHandlerCount: Int {
     runLoop.localPointerHandlerRegistry.snapshot().count
   }
@@ -2298,6 +2841,11 @@ private final class StressRuntimeHarness<Content: View> {
   @discardableResult
   func movePointer(to point: Point) throws -> String {
     try sendMouse(.moved, at: point)
+  }
+
+  @discardableResult
+  func scrollPointer(at point: Point, deltaY: Int) throws -> String {
+    try sendMouse(.scrolled(deltaX: 0, deltaY: deltaY), at: point)
   }
 
   @discardableResult
