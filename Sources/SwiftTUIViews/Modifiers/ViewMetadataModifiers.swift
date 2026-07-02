@@ -260,10 +260,18 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
     //   so the rebinding predicate can never fire; `nodeForIdentity` already
     //   recorded the departure and tore the occupant down at the claim.
     if !routedContext.withinChurnedSubtree, let slotNode {
+      // Continuity guard: when this modifier's entity already routes to the
+      // slot node, the slot is this chain's steady home — the resolved
+      // identity re-rooted because a *deeper* `.id` re-rooted it (a stable
+      // `.id(control)` collapsed inside `.id(owner)`), not because a different
+      // identity moved into this slot. A deeper churn fires its own predicate
+      // at its own level; re-firing here would record a false departure and
+      // suppress reuse on every frame of the steady state.
       let rebindChurn =
         slotNode.wasPresentAtFrameStart
         && slotNode.resolvedIdentity != slotNode.identity
         && !identity.isAncestor(of: slotNode.resolvedIdentity)
+        && context.viewGraph?.entityRouteIsBound(entityIdentity, to: slotNode) != true
       if rebindChurn {
         routedContext.withinChurnedSubtree = true
         context.viewGraph?.recordChurnedSubtreeDeparture(

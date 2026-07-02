@@ -165,6 +165,10 @@ package final class ViewGraph {
     get { eventBuffers.churnedSubtreeDepartedIdentities }
     set { eventBuffers.churnedSubtreeDepartedIdentities = newValue }
   }
+  private var absorbedShadowedNodeIDs: Set<ViewNodeID> {
+    get { eventBuffers.absorbedShadowedNodeIDs }
+    set { eventBuffers.absorbedShadowedNodeIDs = newValue }
+  }
   private var latestLifecycleEvents: [LifecycleEvent] {
     get { eventBuffers.latestLifecycleEvents }
     set { eventBuffers.latestLifecycleEvents = newValue }
@@ -386,6 +390,17 @@ package final class ViewGraph {
       nodeIDByIdentity.removeValue(forKey: previousResolvedIdentity)
     }
     nodeIDByIdentity[node.identity] = node.viewNodeID
+    // A re-rooted resolved identity that overwrites another node's index entry
+    // shadows that node: if it stays parentless and un-routed through this
+    // frame's walk, nothing can ever reach it again (a chain collapse absorbed
+    // its output — see `pruneAbsorbedShadowedNodes`). Record the candidate;
+    // the finalize barrier decides.
+    if node.resolvedIdentity != node.identity,
+      let shadowedNodeID = nodeIDByIdentity[node.resolvedIdentity],
+      shadowedNodeID != node.viewNodeID
+    {
+      absorbedShadowedNodeIDs.insert(shadowedNodeID)
+    }
     nodeIDByIdentity[node.resolvedIdentity] = node.viewNodeID
     identityByNodeID[node.viewNodeID] = node.resolvedIdentity
   }
@@ -467,6 +482,7 @@ package final class ViewGraph {
       structuralDisappearEvents: structuralDisappearEvents,
       pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       churnedSubtreeDepartedIdentities: churnedSubtreeDepartedIdentities,
+      absorbedShadowedNodeIDs: absorbedShadowedNodeIDs,
       requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
@@ -1140,6 +1156,7 @@ package final class ViewGraph {
     structuralDisappearEvents.removeAll(keepingCapacity: true)
     pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
     churnedSubtreeDepartedIdentities.removeAll(keepingCapacity: true)
+    absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
   }
 
@@ -1195,6 +1212,20 @@ package final class ViewGraph {
       return false
     }
     return node.isEvaluating && node.identity != identity
+  }
+
+  /// Whether `entityIdentity` currently routes to `node`. The explicit-`.id`
+  /// churn predicate uses this as a continuity signal: a slot whose resolved
+  /// identity re-rooted away from its structural identity is NOT churning when
+  /// the arriving modifier's entity already lives on this very node — that is
+  /// the steady state of a collapsed chain whose deeper `.id` re-rooted the
+  /// resolved identity (`.id(stable)` inside `.id(owner)`); treating it as
+  /// churn re-records a departure and suppresses reuse on every frame.
+  package func entityRouteIsBound(
+    _ entityIdentity: EntityIdentity,
+    to node: ViewNode
+  ) -> Bool {
+    entityRoutingTable.route(entityIdentity) == node.viewNodeID
   }
 
   package func prepareEntityRoutedOwner(
@@ -1374,6 +1405,53 @@ package final class ViewGraph {
     var preserved = resolved
     preserved.children = node.children.map { $0.snapshot() }
     return preserved
+  }
+
+  /// Reclaims nodes stranded by a transparent chain collapse this frame. A
+  /// composite resolving through an identity-extending but node-less layer (a
+  /// conditional branch) mints its own node during a cold resolve;
+  /// `normalizeResolvedElements(count == 1)` then returns its output directly
+  /// and the enclosing chain level's apply absorbs it — the inner node is
+  /// never wired as a graph child, its identity index entry is overwritten by
+  /// the absorber's reindex (`reindexIdentity` records that shadowing here),
+  /// and no structural diff, entity release, or committed-snapshot descent can
+  /// reach it again. Warm resolves land on the absorber via the identity
+  /// index, so the stranded mint is exclusively a cold-resolve artifact.
+  ///
+  /// The reclaim is deferred to the finalize barrier because a shadowing alone
+  /// does not prove abandonment mid-resolve: a duplicate-occurrence sibling
+  /// (G13) legitimately overwrites the shared identity entry while the earlier
+  /// occurrence is still awaiting its parent's apply. By the barrier, every
+  /// live node reached by the frame's walk is parented (`ViewNode.apply` wires
+  /// parent links) or is an entity's routed home — a shadowed, same-frame,
+  /// parentless, non-routed node is unreachable by construction.
+  private func pruneAbsorbedShadowedNodes() {
+    guard !absorbedShadowedNodeIDs.isEmpty else {
+      return
+    }
+    recordCheckpointGraphMutation()
+    let candidates = absorbedShadowedNodeIDs
+    absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
+    for nodeID in candidates.sorted() {
+      guard let node = nodeIfExists(for: nodeID),
+        node.viewNodeID != root?.viewNodeID,
+        !node.wasPresentAtFrameStart,
+        node.parent == nil
+      else {
+        continue
+      }
+      // An entity's live home is never reclaimed here: adoption and the
+      // outermost-claim rule move entity homes through `nodeForIdentity`, and
+      // a routed node reached by shadowing (a re-rooted stable-`.id` control
+      // is parent-detached by design) is still the entity's binding — its
+      // lifetime belongs to the entity lifecycle (release/pending-removal).
+      if let entityIdentity = entityRoutingTable.entityByNodeID[nodeID],
+        entityRoutingTable.route(entityIdentity) == nodeID
+      {
+        continue
+      }
+      removeSubtree(rootedAt: node, sparingVisitedNodes: true)
+    }
   }
 
   private func pruneDetachedResolvedRootIfNeeded(
@@ -1799,6 +1877,7 @@ package final class ViewGraph {
     prunePendingEntityRoutedRemovals(
       activeEntities: entityIdentities(in: resolved)
     )
+    pruneAbsorbedShadowedNodes()
     pruneChurnedSubtreeOrphans()
     return frameLifecycleEventPlan(
       resolved: resolved,
@@ -1815,6 +1894,7 @@ package final class ViewGraph {
     root = nodeIfExists(for: rootIdentity)
     let activeEntities = entityIdentities(in: resolved)
     prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    pruneAbsorbedShadowedNodes()
     pruneChurnedSubtreeOrphans()
 
     for viewNodeID in frameOrder {
@@ -1836,7 +1916,11 @@ package final class ViewGraph {
     viewportLifecycleNodesByKey = lifecyclePlan.viewportLifecycleNodesByKey
     viewportLifecycleOrder = lifecyclePlan.viewportLifecycleOrder
 
-    liveNodeIDs.formUnion(frameOrder)
+    // A node visited this frame can be gone by commit (a mid-resolve
+    // displacement eviction of an already-visited occupant, a reclaimed
+    // shadowed mint) — carrying its ID into `liveNodeIDs` would strand a dead
+    // entry there forever.
+    liveNodeIDs.formUnion(frameOrder.filter { nodesByNodeID[$0] != nil })
     releaseInactiveEntityRoutes(
       activeEntities: activeEntities
     )
@@ -2612,9 +2696,20 @@ package final class ViewGraph {
     // a genuinely departing node either was not visited (pruned normally) or is
     // still parented under the surviving tree (e.g. an entity-routed owner being
     // replaced), so its lifecycle/registrations are retired as before.
+    // …unless nothing can reach the node anymore: a live re-rooted node owns
+    // its identity index entry (its apply reindexed it) or is an entity's
+    // routed home, and the arriving tree finds it through one of those. A
+    // visited, parent-detached node with neither is a stranded same-frame
+    // mint whose output a chain collapse absorbed (`pruneAbsorbedShadowedNodes`)
+    // — keeping it would leak it beyond every teardown path's reach.
     if node.parent == nil,
       node.viewNodeID != root?.viewNodeID,
-      node.visitedThisFrame(currentFrameID)
+      node.visitedThisFrame(currentFrameID),
+      nodeIDByIdentity[node.identity] == node.viewNodeID
+        || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
+        || entityRoutingTable.entityByNodeID[node.viewNodeID].map({ entity in
+          entityRoutingTable.route(entity) == node.viewNodeID
+        }) ?? false
     {
       return
     }
@@ -2661,6 +2756,24 @@ package final class ViewGraph {
     } else {
       for child in snapshot.children {
         removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
+      }
+      // A chain collapse can absorb an interior node's output as the
+      // absorber's own resolved value: the committed value tree then names
+      // the interior's identity with the absorber's stamp, so the value
+      // descent above re-enters the absorber and never reaches the interior
+      // node itself (its structural-path and identity index entries were
+      // rewritten by the same collapse). The interior stays reachable only
+      // as a live child — descend whatever is still parented here that the
+      // value descent did not cover. A child the arriving tree re-adopted
+      // was re-parented by its apply and is skipped; a child already reached
+      // through the values is a no-op via the walk's entered-set.
+      for child in node.children where child.parent === node {
+        removeSubtree(
+          rootedAt: child,
+          sparingVisitedNodes: sparingVisitedNodes,
+          isSubtreeDescent: true,
+          walk: walk
+        )
       }
     }
 

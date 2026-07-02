@@ -51,6 +51,12 @@ extension ViewGraph {
     // prefixes — the churned slot stays positionally `.matched`, so the
     // structural child diff never removes the displaced generation.
     package var churnedSubtreeDepartedIdentities: Set<Identity> = []
+    // Nodes whose identity index entry was overwritten by another node's
+    // re-rooted resolved identity this frame (a transparent chain collapse
+    // absorbed their output). The finalize barrier reclaims the ones that end
+    // the frame parentless and un-routed — nothing can reach them again. See
+    // `pruneAbsorbedShadowedNodes`.
+    package var absorbedShadowedNodeIDs: Set<ViewNodeID> = []
     package var latestLifecycleEvents: [LifecycleEvent] = []
   }
 
