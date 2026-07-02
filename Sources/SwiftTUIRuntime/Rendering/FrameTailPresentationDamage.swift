@@ -75,10 +75,16 @@ enum FrameTailPresentationDamageResolver {
         return .init(damage: nil, barriers: [.unstableCleanSiblingBounds])
       }
 
-      if let previousBounds = previousPath.last?.bounds {
+      // Damage the invalidated node's *subtree* extent, not its own slot:
+      // `.offset`/`.position` bake their translation into the child's absolute
+      // bounds, so the rows the subtree actually paints (previously and now)
+      // can lie entirely outside the wrapper's own bounds. Producing only the
+      // slot rows shipped as a release-only ghost trail under
+      // `.trustSoundDamage` (F07); DEBUG's verify policy silently repaired it.
+      if let previousBounds = previousPath.last?.subtreeBounds {
         textRows(for: previousBounds, into: &textRowRanges)
       }
-      if let currentBounds = currentPath.last?.bounds {
+      if let currentBounds = currentPath.last?.subtreeBounds {
         textRows(for: currentBounds, into: &textRowRanges)
       }
     }
@@ -263,11 +269,13 @@ enum FrameTailPresentationDamageResolver {
     var currentPlacedByIdentity: [Identity: PlacedNode] = [:]
     indexPlacedNodes(placed, into: &currentPlacedByIdentity)
     for identity in directlyInvalidated {
+      // Subtree extent, not own slot — same offset/position translation
+      // reasoning as the stable-topology path above (F07).
       if let current = currentPlacedByIdentity[identity] {
-        addRows(current.bounds, into: &dirtyRows)
+        addRows(current.subtreeBounds, into: &dirtyRows)
       }
       if let previous = previousFrameIndex.placedNode(for: identity) {
-        addRows(previous.bounds, into: &dirtyRows)
+        addRows(previous.subtreeBounds, into: &dirtyRows)
       }
     }
 

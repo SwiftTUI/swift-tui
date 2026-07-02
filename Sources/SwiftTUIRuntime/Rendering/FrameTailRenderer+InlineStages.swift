@@ -112,6 +112,7 @@ struct FrameTailInlineStageRenderer: Sendable {
       raster: raster.surface,
       drawnIdentities: raster.drawnIdentities,
       presentationDamage: raster.presentationDamage,
+      incrementalMismatch: raster.incrementalMismatch,
       diagnostics: diagnostics,
       workerCompletedAt: nil
     )
@@ -189,6 +190,7 @@ struct FrameTailInlineStageRenderer: Sendable {
       surface: rasterized.surface,
       drawnIdentities: rasterized.visibleIdentities,
       presentationDamage: finalPresentationDamage,
+      incrementalMismatch: rasterized.incrementalMismatch,
       duration: duration
     )
   }

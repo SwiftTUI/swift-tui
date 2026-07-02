@@ -150,6 +150,7 @@ struct FrameTailRasterOutput {
   var surface: RasterSurface
   var drawnIdentities: Set<Identity>
   var presentationDamage: PresentationDamage?
+  var incrementalMismatch: Rasterizer.IncrementalRasterMismatch?
   var duration: Duration
 }
 
@@ -166,6 +167,11 @@ struct FrameTailOutput {
   var raster: RasterSurface
   var drawnIdentities: Set<Identity>
   var presentationDamage: PresentationDamage?
+  /// Non-nil when the incremental-repaint verification oracle caught (and
+  /// repaired) an incomplete-damage mismatch this frame. The main-actor frame
+  /// coordinator records it on the soundness probe — the tail itself may run
+  /// off-main.
+  var incrementalMismatch: Rasterizer.IncrementalRasterMismatch?
   var diagnostics: FrameTailDiagnostics
   var workerCompletedAt: ContinuousClock.Instant?
 }

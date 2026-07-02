@@ -7,10 +7,10 @@
 /// frames in release builds** (and on every frame under DEBUG/tests), turning a
 /// whole class of "found by hand in the gallery" bugs into "caught at the seam".
 ///
-/// - Default **off** in release; `SWIFTTUI_SOUNDNESS_PROBE=1` opts in (e.g. a CI
-///   soak lane). Default **on** under DEBUG/tests.
+/// - Default **on** in every configuration (F34); `SWIFTTUI_SOUNDNESS_PROBE=0`
+///   opts out.
 /// - `SWIFTTUI_SOUNDNESS_PROBE_SAMPLE=N` runs the oracles on 1-in-`N` frames
-///   (default 64 in release, 1 — every frame — under DEBUG/tests). Sampling is
+///   (default 256 in release, 1 — every frame — under DEBUG/tests). Sampling is
 ///   driven by ``ViewGraph``'s monotonic frame counter, never a clock/RNG, so it
 ///   stays deterministic and replayable.
 ///
@@ -39,6 +39,9 @@ package enum SoundnessProbeConfiguration {
   /// runtime layer and cannot reach the issue sink directly).
   package static var stampCoherenceViolationCount = 0
   package static var deltaCheckpointViolationCount = 0
+  package static var rasterDamageMismatchCount = 0
+  package static var teardownCoherenceViolationCount = 0
+  package static var registrationPublicationViolationCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -54,11 +57,68 @@ package enum SoundnessProbeConfiguration {
   package static func recordStampCoherenceViolation(_ detail: @autoclosure () -> String) {
     stampCoherenceViolationCount += 1
     lastViolationDetail = detail()
+    emitTrace("stamp-coherence")
   }
 
   package static func recordDeltaCheckpointViolation(_ detail: @autoclosure () -> String) {
     deltaCheckpointViolationCount += 1
     lastViolationDetail = detail()
+    emitTrace("delta-checkpoint")
+  }
+
+  /// Records one caught incremental-raster mismatch (the F13 oracle repaired a
+  /// surface whose proven damage was incomplete). The rasterizer itself may run
+  /// on the frame-tail worker where this `@MainActor` state is unreachable, so
+  /// the mismatch rides ``Rasterizer/RasterizationResult`` back to the frame
+  /// coordinator, which records it here.
+  package static func recordRasterDamageMismatch(_ detail: @autoclosure () -> String) {
+    rasterDamageMismatchCount += 1
+    lastViolationDetail = detail()
+    emitTrace("raster-damage")
+  }
+
+  /// Records one caught teardown-coherence violation from the post-finalize
+  /// oracle (F04): the committed tree referenced a removed node, or a live
+  /// node was reachable from no committed anchor. The subtractive paths had
+  /// no oracle at all before this — the churn sweep's demonstrated failure
+  /// mode (removing live re-adopted nodes) was invisible to everything but
+  /// fixture-enumerated stress shapes.
+  package static func recordTeardownCoherenceViolation(_ detail: @autoclosure () -> String) {
+    teardownCoherenceViolationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("teardown-coherence")
+  }
+
+  /// Records one caught registration-publication divergence (F04): after a
+  /// scoped restore, the live registries did not match a scratch full
+  /// rebuild of the current frame's registrations.
+  package static func recordRegistrationPublicationViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    registrationPublicationViolationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("registration-publication")
+  }
+
+  /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per
+  /// recorded violation (to `SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE`, else
+  /// stderr). Counters alone are invisible outside the test process; a CI
+  /// soak lane needs the violations in its log.
+  package static let traceEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_TRACE"
+  package static let traceFileEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE"
+  package static var isTraceEnabled: Bool =
+    FeatureFlags.environmentValue(named: traceEnvironmentVariableName).map {
+      $0 != "0" && !$0.isEmpty
+    } ?? false
+
+  private static func emitTrace(_ kind: String) {
+    guard isTraceEnabled else {
+      return
+    }
+    DiagnosticTraceSink.emit(
+      "[SOUNDNESS] \(kind): \(lastViolationDetail ?? "")\n",
+      toFileAt: FeatureFlags.environmentValue(named: traceFileEnvironmentVariableName)
+    )
   }
 
   private static func environmentDefault() -> Bool {
@@ -72,7 +132,11 @@ package enum SoundnessProbeConfiguration {
       #if DEBUG
         return 1
       #else
-        return 64
+        // 1-in-256 now that the probe defaults ON in release (F34): rare
+        // enough that oracle frames vanish in steady-state profiles, frequent
+        // enough that a persistent unsoundness surfaces within seconds at
+        // interactive frame rates.
+        return 256
       #endif
     }
     return parsed

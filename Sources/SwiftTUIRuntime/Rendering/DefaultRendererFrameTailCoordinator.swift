@@ -61,7 +61,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       draft: draft,
       layout: layout
     )
-    return frameTailRenderer.renderRaster(
+    let tail = frameTailRenderer.renderRaster(
       reconciledTailLayout.input,
       layout: layout,
       placed: placed,
@@ -71,6 +71,27 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       // unreadable. Off in release by default → false → policy-only behavior.
       verifyIncrementalRasterDamage: SoundnessProbeConfiguration.isSampledFrame,
       clock: draft.clock
+    )
+    recordIncrementalRasterMismatchIfCaught(tail.incrementalMismatch)
+    return tail
+  }
+
+  /// F06: the incremental-vs-fresh oracle historically repaired mismatches in
+  /// silence, so incomplete-damage producer bugs shipped as release-only
+  /// corruption while every DEBUG run self-healed. This is the first main-actor
+  /// point after the (possibly off-main) raster tail returns — record every
+  /// caught mismatch on the probe's counters here.
+  @MainActor
+  private func recordIncrementalRasterMismatchIfCaught(
+    _ mismatch: Rasterizer.IncrementalRasterMismatch?
+  ) {
+    guard let mismatch else {
+      return
+    }
+    SoundnessProbeConfiguration.recordRasterDamageMismatch(
+      mismatch.mismatchedRows.isEmpty
+        ? "incremental raster mismatch: non-cell surface state diverged from fresh raster"
+        : "incremental raster mismatch: rows \(mismatch.mismatchedRows) diverged from fresh raster"
     )
   }
 
@@ -228,6 +249,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       clock: draft.clock
     )
     suspensionHooks?.onEnd?()
+    recordIncrementalRasterMismatchIfCaught(tail.incrementalMismatch)
     let rasterSuspensionDuration =
       if let rasterSuspensionStart, let clock = draft.clock {
         rasterSuspensionStart.duration(to: clock.now)

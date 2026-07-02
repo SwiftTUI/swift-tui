@@ -10,8 +10,28 @@ package struct Rasterizer: Sendable {
   package typealias RasterizationResult = (
     surface: RasterSurface,
     visibleIdentities: Set<Identity>,
-    presentationDamage: PresentationDamage?
+    presentationDamage: PresentationDamage?,
+    incrementalMismatch: IncrementalRasterMismatch?
   )
+
+  /// Evidence from the incremental-repaint verification oracle (F13): the
+  /// incremental surface diverged from a fresh rasterization, meaning the
+  /// presentation damage the runtime proved sound was incomplete. Historically
+  /// the oracle repaired this in silence, so incomplete-damage producer bugs
+  /// shipped as release-only corruption while every DEBUG run self-healed.
+  /// Carried on ``RasterizationResult`` because the rasterizer may run on the
+  /// frame-tail worker, where the probe's `@MainActor` counters are
+  /// unreachable; the main-actor frame coordinator records it on return.
+  package struct IncrementalRasterMismatch: Sendable, Equatable {
+    /// Rows whose cells differ between the incremental and fresh surfaces.
+    /// Empty when only non-cell surface state (image attachments or
+    /// presentation layers) diverged.
+    package var mismatchedRows: [Int]
+
+    package init(mismatchedRows: [Int]) {
+      self.mismatchedRows = mismatchedRows
+    }
+  }
 
   internal enum ResolvedShapeColorMode {
     case constant(Color?)
@@ -126,7 +146,7 @@ package struct Rasterizer: Sendable {
   ) -> RasterizationResult {
     let surfaceSize = rasterSurfaceSize(for: draw, minimumSize: minimumSize)
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
-      return (RasterSurface(), [], nil)
+      return (RasterSurface(), [], nil, nil)
     }
 
     if let previousSurface,
@@ -194,6 +214,7 @@ package struct Rasterizer: Sendable {
         presentationLayers: presentationRecorder.layers
       ),
       visibleIdentities,
+      nil,
       nil
     )
   }
@@ -271,7 +292,8 @@ package struct Rasterizer: Sendable {
         from: damage,
         previousSurface: previousSurface,
         currentSurface: surface
-      )
+      ),
+      nil
     )
   }
 
@@ -280,7 +302,7 @@ package struct Rasterizer: Sendable {
     surfaceSize: CellSize,
     incrementalSurface: RasterSurface
   ) -> RasterizationResult? {
-    let fresh = rasterizeFreshCollectingVisibleIdentities(
+    var fresh = rasterizeFreshCollectingVisibleIdentities(
       draw,
       surfaceSize: surfaceSize
     )
@@ -288,6 +310,12 @@ package struct Rasterizer: Sendable {
       return nil
     }
 
+    fresh.incrementalMismatch = IncrementalRasterMismatch(
+      mismatchedRows: fresh.surface.cells.indices.filter { row in
+        row >= incrementalSurface.cells.count
+          || fresh.surface.cells[row] != incrementalSurface.cells[row]
+      }
+    )
     return fresh
   }
 

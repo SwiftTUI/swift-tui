@@ -844,6 +844,25 @@ run_function_step \
   "$(swift_command_text test --filter SwiftTUIAndroidHostTests)" \
   run_swift test --filter SwiftTUIAndroidHostTests
 
+# The fixtures are deliberately not build-order dependencies of the test
+# target (an executable dependency's `main` hijacks the release test runner's
+# entry point — see Package.swift), so build them explicitly before the suite
+# that launches them from disk.
+build_entry_point_launch_fixtures() {
+  for fixture in \
+    EntryPointFixtureAtMain \
+    EntryPointFixtureBare \
+    EntryPointFixtureCLIBare \
+    EntryPointFixtureWebHostCLIBare; do
+    run_swift build --target "$fixture"
+  done
+}
+
+run_function_step \
+  "Build entry-point launch fixtures" \
+  "$(swift_command_text build --target 'EntryPointFixture{AtMain,Bare,CLIBare,WebHostCLIBare}')" \
+  build_entry_point_launch_fixtures
+
 run_function_step \
   "Run entry-point launch tests" \
   "$(swift_command_text test --filter EntryPointLaunchTests)" \

@@ -1,3 +1,4 @@
+import SwiftTUICore
 import SwiftTUIRuntime
 import Synchronization
 
@@ -38,6 +39,18 @@ public enum AndroidHostHandleRegistry {
   }
 }
 
+// The `@_cdecl` entry points below are nonisolated → MainActor bridges whose
+// thread contract is Kotlin caller discipline: every call arrives on the
+// Android main looper (Compose lifecycle effects, the pollFrames tick, and UI
+// input callbacks), matching the pthread `HostMainExecutor` captures at
+// install. A bare `assumeIsolated` verified that contract in debug only —
+// in release a mis-threaded caller became a silent data race. These routes
+// go through `withCheckedMainActorAccess` (F50), whose
+// `MainActor.preconditionIsolated` is release-checked: `HostMainExecutor`
+// implements `checkIsolated` via `pthread_equal`, so a wrong-thread call
+// traps loudly with an attributable accessor name instead. The two copy_*
+// entry points and install/diag need no bridge (nonisolated Mutex-guarded
+// state or pump-local work).
 @_cdecl("swift_tui_android_start")
 public func swift_tui_android_start(
   _ handle: Int64
@@ -46,7 +59,7 @@ public func swift_tui_android_start(
     return
   }
 
-  MainActor.assumeIsolated {
+  withCheckedMainActorAccess("swift_tui_android_start") {
     host.start()
   }
 }
@@ -59,7 +72,7 @@ public func swift_tui_android_stop(
     return
   }
 
-  MainActor.assumeIsolated {
+  withCheckedMainActorAccess("swift_tui_android_stop") {
     host.stop()
   }
 }
@@ -72,7 +85,7 @@ public func swift_tui_android_destroy(
     return
   }
 
-  MainActor.assumeIsolated {
+  withCheckedMainActorAccess("swift_tui_android_destroy") {
     host.stop()
   }
 }
@@ -96,7 +109,7 @@ public func swift_tui_android_tick(
     return 0
   }
 
-  return MainActor.assumeIsolated {
+  return withCheckedMainActorAccess("swift_tui_android_tick") {
     host.tick()
   }
 }
@@ -124,7 +137,7 @@ public func swift_tui_android_resize(
     return
   }
 
-  MainActor.assumeIsolated {
+  withCheckedMainActorAccess("swift_tui_android_resize") {
     host.resize(
       columns: Int(columns),
       rows: Int(rows),
@@ -148,7 +161,7 @@ public func swift_tui_android_send_input(
   }
 
   let payload = unsafe Array(UnsafeBufferPointer(start: bytes, count: Int(count)))
-  MainActor.assumeIsolated {
+  withCheckedMainActorAccess("swift_tui_android_send_input") {
     host.sendInput(payload)
   }
 }

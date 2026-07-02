@@ -24,6 +24,9 @@ struct SoundnessProbeConfigurationTests {
     let latch = SoundnessProbeConfiguration.isSampledFrame
     let stampCount = SoundnessProbeConfiguration.stampCoherenceViolationCount
     let deltaCount = SoundnessProbeConfiguration.deltaCheckpointViolationCount
+    let rasterCount = SoundnessProbeConfiguration.rasterDamageMismatchCount
+    let teardownCount = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+    let publicationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
@@ -31,9 +34,44 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.isSampledFrame = latch
       SoundnessProbeConfiguration.stampCoherenceViolationCount = stampCount
       SoundnessProbeConfiguration.deltaCheckpointViolationCount = deltaCount
+      SoundnessProbeConfiguration.rasterDamageMismatchCount = rasterCount
+      SoundnessProbeConfiguration.teardownCoherenceViolationCount = teardownCount
+      SoundnessProbeConfiguration.registrationPublicationViolationCount = publicationCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     try body()
+  }
+
+  @Test("teardown coherence violations are counted with detail")
+  func teardownCoherenceViolationRecordsCountAndDetail() {
+    withRestoredProbeState {
+      let before = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+      SoundnessProbeConfiguration.recordTeardownCoherenceViolation("orphan strand")
+      #expect(SoundnessProbeConfiguration.teardownCoherenceViolationCount == before + 1)
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == "orphan strand")
+    }
+  }
+
+  @Test("registration publication violations are counted with detail")
+  func registrationPublicationViolationRecordsCountAndDetail() {
+    withRestoredProbeState {
+      let before = SoundnessProbeConfiguration.registrationPublicationViolationCount
+      SoundnessProbeConfiguration.recordRegistrationPublicationViolation("keys diverged")
+      #expect(
+        SoundnessProbeConfiguration.registrationPublicationViolationCount == before + 1
+      )
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == "keys diverged")
+    }
+  }
+
+  @Test("raster damage mismatches are counted with detail")
+  func rasterDamageMismatchRecordsCountAndDetail() {
+    withRestoredProbeState {
+      let before = SoundnessProbeConfiguration.rasterDamageMismatchCount
+      SoundnessProbeConfiguration.recordRasterDamageMismatch("rows [3] diverged")
+      #expect(SoundnessProbeConfiguration.rasterDamageMismatchCount == before + 1)
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == "rows [3] diverged")
+    }
   }
 
   // MARK: - Gating & sampling math (this is how the release #else logic is validated)

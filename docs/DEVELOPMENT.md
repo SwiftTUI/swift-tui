@@ -177,6 +177,19 @@ The default repo-gate workflow skips the slow public API symbol-graph check and
 manual dispatch. The repo-gate matrix summary includes per-lane durations so
 slow checks are visible without opening every job log.
 
+The scheduled `Release Soundness Lane` (`.github/workflows/release-soundness.yml`,
+nightly + dispatch) is the only **release-configuration** test execution: it
+runs the core, runtime, stress, and reconciliation suites under
+`swift test -c release` with the soundness probe forced to every frame and
+violation tracing on (`Scripts/release_soundness_lane.sh`), so the
+release-only behavioral arms — `.trustSoundDamage` raster reuse, delta-checkpoint
+trust, the release-checked isolation traps, and the sampled probe oracles —
+actually execute somewhere before a tag ships them. The known load-flaky
+run-loop suites run serialized in a `continue-on-error` step (an intermittent
+red there is flake-#1 signal, not a merge blocker), and a second variant
+rebuilds the stress/reconciliation subset with
+`-enable-actor-data-race-checks`.
+
 CI jobs also carry workflow-level caps: the Linux repo gate is capped at 45
 minutes, the macOS repo gate at 30 minutes, the iOS build at 15 minutes, the
 Linux image build at 45 minutes, the Linux image manifest publish at 10

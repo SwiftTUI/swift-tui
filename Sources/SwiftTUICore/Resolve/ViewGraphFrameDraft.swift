@@ -157,6 +157,7 @@ package final class ViewGraphFrameDraft {
     // the full O(liveNodeIDs) fingerprint a second time. Other branches leave
     // this nil and the record call rebuilds.
     var committedFingerprint: RuntimeRegistrationGraphFingerprint?
+    var usedScopedRestore = false
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live
@@ -186,6 +187,7 @@ package final class ViewGraphFrameDraft {
             into: liveRegistrations
           )
           liveRegistrations.normalizeScopedRestoreOrder()
+          usedScopedRestore = true
         }
         viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
       } else {
@@ -221,6 +223,32 @@ package final class ViewGraphFrameDraft {
       // live registries or runtime commit/observation effects cannot invoke
       // them.
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
+      usedScopedRestore = true
+    }
+    // F04 publication oracle: on sampled probe frames, a scoped restore must
+    // leave the live registries equal (keys + stacked-handler counts) to a
+    // scratch full rebuild of the current frame's registrations. The scratch
+    // set receives the same effect republication the live set got so the two
+    // constructions are comparable.
+    if usedScopedRestore, SoundnessProbeConfiguration.isSampledFrame {
+      let scratch = RuntimeRegistrationSet.scratch()
+      viewGraph.restoreCurrentFrameRuntimeRegistrations(into: scratch)
+      viewGraph.republishAllEffectRegistrations(into: scratch)
+      let live = liveRegistrations.publicationOracleFingerprint()
+      let rebuilt = scratch.publicationOracleFingerprint()
+      if live != rebuilt {
+        let diverged = Set(rebuilt.keys).union(live.keys)
+          .filter { live[$0] != rebuilt[$0] }
+          .sorted()
+          .prefix(4)
+          .map { "\($0) live=\(live[$0] ?? 0) rebuilt=\(rebuilt[$0] ?? 0)" }
+        SoundnessProbeConfiguration.recordRegistrationPublicationViolation(
+          """
+          registration publication: scoped restore diverged from full \
+          rebuild: \(diverged.joined(separator: ", "))
+          """
+        )
+      }
     }
     viewGraph.recordCommittedRuntimeRegistrationFingerprint(committedFingerprint)
     didCommit = true

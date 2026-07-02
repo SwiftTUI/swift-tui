@@ -25,6 +25,13 @@ struct FeatureGateRegistryTests {
     #expect(!FeatureGate.rasterTrustSoundDamage.defaultIsEnabled)
   }
 
+  @Test("the soundness probe defaults on in every configuration")
+  func soundnessProbeDefaultsOn() {
+    // F34: release builds run the oracles on sampled frames by default so the
+    // reconciliation-seam bug class stays observable outside DEBUG.
+    #expect(FeatureGate.soundnessProbe.defaultIsEnabled)
+  }
+
   @Test("configuration enums route their enrollment through the registry")
   func configurationEnumsRouteEnrollmentThroughRegistry() {
     #expect(

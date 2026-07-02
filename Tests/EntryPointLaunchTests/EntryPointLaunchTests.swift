@@ -35,10 +35,15 @@ import Testing
 /// in, so the repo gate (DEBUG) exercises this suite directly. The fix is
 /// `main()` overload resolution — a compile-time decision independent of the
 /// optimization level — so DEBUG and release are equivalent by construction.
-/// Release is additionally verified by building these fixtures with
-/// `swift build -c release` and running the resulting binaries; the same does
-/// not run via `swift test -c release` because other test targets in the
-/// bundle do not currently compile under release optimization.
+///
+/// The fixture executables are NOT dependencies of this test target: an
+/// executable dependency links its `main` into the package test runner, and
+/// under `-c release` a fixture's entry point wins the runner binary's
+/// `_main`, hijacking every `swift test -c release` invocation (the release
+/// soundness lane's discovery, F05). The gate builds the fixtures explicitly
+/// before running this suite; running it standalone requires
+/// `swift build --target EntryPointFixture…` first (the locator error names
+/// the missing binary).
 @Suite("EntryPointLaunch", .serialized)
 struct EntryPointLaunchTests {
   /// A marker rendered by the `@main` fixture's single `Text` view. Its

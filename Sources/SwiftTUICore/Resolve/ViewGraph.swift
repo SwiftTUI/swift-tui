@@ -2001,7 +2001,133 @@ package final class ViewGraph {
     graphLocalDirtyNodeIDs.removeAll(keepingCapacity: true)
     stateMutationKeys.removeAll(keepingCapacity: true)
     stateMutationNodeIDsByKey.removeAll(keepingCapacity: true)
+    if SoundnessProbeConfiguration.isSampledFrame,
+      let violation = teardownCoherenceViolation()
+    {
+      SoundnessProbeConfiguration.recordTeardownCoherenceViolation(violation.detail)
+      #if DEBUG
+        // The stale-alias direction measured zero across the stress suite
+        // when introduced, so any hit is a regression of the deleted sweep's
+        // failure mode. The leak direction stays counter-only until its
+        // documented residual class (see ``teardownCoherenceViolation()``)
+        // is burned down.
+        if violation.isOverRemoval {
+          assertionFailure(violation.detail)
+        }
+      #endif
+    }
     return latestLifecycleEvents
+  }
+
+  /// F04 teardown-coherence oracle. Runs at the end of ``finalizeFrame`` —
+  /// the single point where the committed root and the teardown barriers are
+  /// all settled for the frame — on sampled probe frames. Checks both
+  /// subtractive failure directions the frame pipeline previously never
+  /// observed:
+  ///
+  /// 1. **Over-removal (stale alias):** any node the committed structure
+  ///    walks whose ID the store maps to a DIFFERENT object. Removing a live
+  ///    re-adopted node (the deleted churn sweep's demonstrated failure mode)
+  ///    surfaces this way. Child entries whose ID left the store entirely are
+  ///    expected — children arrays rewire lazily on the parent's next apply.
+  /// 2. **Under-removal (leak):** every stored node must be anchored to the
+  ///    committed root. An orphan strand that event-driven teardown missed
+  ///    trips this — the invariant the F02 root fixes established when the
+  ///    identity-space sweep was deleted.
+  ///
+  /// Anchoring is wider than children arrays: capture-hosted islands (scoped
+  /// content payloads, portal attachments, lazy tab bodies, lazy viewport
+  /// entries) are deliberately reachable from their host only through body
+  /// resolution, so they anchor through `parent`/`evaluationHost` object
+  /// links instead of a children slot. `liveNodeIDs` is deliberately not
+  /// consulted — it records frame-visitation for the registration
+  /// fingerprint, not liveness (deferred hosts are stored and referenced
+  /// without ever entering a finalized frame's order).
+  ///
+  /// Known leak-direction residual at introduction (2026-07-02, counted but
+  /// not asserted): button styling-wrapper interiors (`ButtonBody/…/base`,
+  /// `/overlay`, `/background`) inside presentation-portal overlay entries
+  /// are stored with no children slot and no anchor chain that reaches the
+  /// committed root — a bounded strand per open overlay entry, surfaced the
+  /// day this oracle was armed. Classifying/fixing that strand is the
+  /// oracle's first follow-up work item.
+  private func teardownCoherenceViolation() -> (isOverRemoval: Bool, detail: String)? {
+    guard let root else {
+      return nil
+    }
+    var reachable: Set<ViewNodeID> = []
+
+    // Walk the live structure: children arrays plus hosted-detached ledger
+    // edges, descending only nodes the store still holds. A child entry whose
+    // ID is absent from the store is EXPECTED — children arrays are lazily
+    // rewired on the parent's next apply, so a removed variant strand
+    // (ButtonBody press chrome is the common case) lingers until then. What
+    // must never happen is aliasing: the store holding a DIFFERENT object for
+    // an ID the committed structure still walks — that is the deleted sweep's
+    // "removed a live re-adopted node" failure mode.
+    var staleAliasDetail: String?
+    func absorb(_ subtreeRoot: ViewNode) {
+      var stack: [ViewNode] = [subtreeRoot]
+      while let node = stack.popLast() {
+        let nodeID = node.viewNodeID
+        // `insert` doubles as the cycle guard: `ViewNode.apply` deliberately
+        // tolerates self-in-children chains.
+        guard reachable.insert(nodeID).inserted else {
+          continue
+        }
+        guard let stored = nodesByNodeID[nodeID] else {
+          continue
+        }
+        if stored !== node, staleAliasDetail == nil {
+          staleAliasDetail = """
+            teardown coherence: committed structure holds a stale copy of \
+            \(nodeID) at \(node.identity.path)
+            """
+        }
+        stack.append(contentsOf: node.children)
+        for hostedRootID in detachedHostedSubtreeRootsByHost[nodeID] ?? [] {
+          if let hostedRoot = nodesByNodeID[hostedRootID] {
+            stack.append(hostedRoot)
+          }
+        }
+      }
+    }
+
+    absorb(root)
+    if let staleAliasDetail {
+      return (isOverRemoval: true, detail: staleAliasDetail)
+    }
+
+    // Fixed point: absorb any stored node whose parent/evaluation-host anchor
+    // is already reachable (island seams), then its subtree, until nothing
+    // new is absorbed.
+    var absorbedAny = true
+    while absorbedAny {
+      absorbedAny = false
+      for node in nodesByNodeID.values where !reachable.contains(node.viewNodeID) {
+        let anchor = node.parent ?? node.evaluationHost
+        guard let anchor, reachable.contains(anchor.viewNodeID) else {
+          continue
+        }
+        absorb(node)
+        absorbedAny = true
+      }
+    }
+
+    let unreachableIDs = nodesByNodeID.keys.filter { !reachable.contains($0) }
+    guard unreachableIDs.isEmpty else {
+      let samples = unreachableIDs.prefix(4).map { nodeID in
+        "\(nodeID) at \(nodesByNodeID[nodeID]?.identity.path ?? "?")"
+      }
+      return (
+        isOverRemoval: false,
+        detail: """
+        teardown coherence: \(unreachableIDs.count) stored node(s) \
+        unreachable from the committed root: \(samples.joined(separator: ", "))
+        """
+      )
+    }
+    return nil
   }
 
   package func snapshot() -> ResolvedNode {

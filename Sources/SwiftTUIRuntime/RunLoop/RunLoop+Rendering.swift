@@ -113,6 +113,7 @@ extension RunLoop {
   ) throws {
     var artifacts = acquiredArtifacts
     reportRuntimeIssues(artifacts.diagnostics.runtime.issues)
+    reportNewSoundnessProbeViolations()
     mergeLifecycleCarryForward(
       convergence.lifecycleCarryForward,
       into: &artifacts.commitPlan.lifecycle
@@ -129,10 +130,12 @@ extension RunLoop {
       hasFrameSink: hasFrameSink
     )
     recordPresentedRasterSurface(artifacts.rasterSurface)
-    lifecycleCoordinator.applyCommittedFrame(
-      plan: artifacts.commitPlan,
-      currentLifecycleRegistry: localLifecycleRegistry,
-      currentTaskRegistry: localTaskRegistry
+    reportRuntimeIssues(
+      lifecycleCoordinator.applyCommittedFrame(
+        plan: artifacts.commitPlan,
+        currentLifecycleRegistry: localLifecycleRegistry,
+        currentTaskRegistry: localTaskRegistry
+      )
     )
     updateFocusPresentation(focusPresentation)
     // Record the committed focus so the next frame's reuse-safety gate can

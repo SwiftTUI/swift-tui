@@ -33,11 +33,13 @@ package enum FeatureGate: CaseIterable, Sendable {
   package var defaultIsEnabled: Bool {
     switch self {
     case .soundnessProbe:
-      #if DEBUG
-        true
-      #else
-        false
-      #endif
+      // On in every configuration (F34). Release runs the oracles on a
+      // 1-in-N sampled frame (see `SoundnessProbeConfiguration`), so the
+      // steady-state cost is one Bool store per frame plus rare oracle
+      // frames; in exchange the reconciliation-seam bug class stays
+      // observable in the builds users actually run. `SWIFTTUI_SOUNDNESS_PROBE=0`
+      // opts out.
+      true
     case .overlayIncrementalDamage, .rasterVerifyIncremental, .rasterTrustSoundDamage:
       // Opt-in behavior/verification toggles: absent ⇒ off, leaving the default
       // build (and, for the raster pair, the `#if DEBUG` policy fallback at their

@@ -97,13 +97,17 @@ package struct PlacedNode: Equatable, Sendable {
   package var identity: Identity
   package var kind: NodeKind
   package var environmentSnapshot: EnvironmentSnapshot
-  package var bounds: CellRect
+  package var bounds: CellRect {
+    didSet {
+      recomputeSubtreeAggregates()
+    }
+  }
   package var contentBounds: CellRect
   package var clipBounds: CellRect?
   package var zIndex: Double
   package var children: [PlacedNode] {
     didSet {
-      recomputeSubtreeNodeCount()
+      recomputeSubtreeAggregates()
     }
   }
   package var semanticRole: SemanticRole
@@ -157,6 +161,17 @@ package struct PlacedNode: Equatable, Sendable {
     }
   }
   package private(set) var subtreeNodeCount: Int
+  /// The absolute union of this node's `bounds` and every descendant's
+  /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
+  /// *child's* absolute bounds (the wrapper keeps its own slot), so a node's
+  /// own `bounds` is not a sound basis for presentation damage: a translated
+  /// descendant can paint rows far outside its ancestor's slot. Damage
+  /// producers must use this subtree extent. For normally-contained layouts
+  /// children sit within the parent, so `subtreeBounds == bounds`. Mirrors
+  /// ``DrawNode/subtreeBounds``; kept fresh by the `bounds`/`children`
+  /// `didSet` recomputes (the animation overlay translates bounds in place
+  /// after construction).
+  package private(set) var subtreeBounds: CellRect
   /// Mirror of ``ResolvedNode/isTransient``.  Set by the animation
   /// controller's removal-overlay injection path, propagated through
   /// measure and place by the layout engine, and filtered out by the
@@ -277,7 +292,8 @@ package struct PlacedNode: Equatable, Sendable {
     self.isTransient = isTransient
     self.matchedGeometry = matchedGeometry
     subtreeNodeCount = 1
-    recomputeSubtreeNodeCount()
+    subtreeBounds = bounds
+    recomputeSubtreeAggregates()
   }
 
   private mutating func applyResolvedMetadata(_ metadata: PlacedNodeResolvedMetadata) {
@@ -297,8 +313,15 @@ package struct PlacedNode: Equatable, Sendable {
     matchedGeometry = metadata.matchedGeometry
   }
 
-  private mutating func recomputeSubtreeNodeCount() {
-    subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
+  private mutating func recomputeSubtreeAggregates() {
+    var count = 1
+    var extent = bounds
+    for child in children {
+      count += child.subtreeNodeCount
+      extent = extent.union(child.subtreeBounds)
+    }
+    subtreeNodeCount = count
+    subtreeBounds = extent
   }
 
   package mutating func synchronizeResolvedPhaseMetadata(

@@ -103,6 +103,49 @@ suspect seam from "judged safe by static analysis" into "self-reporting if the
 analysis was wrong"; the remaining `assumeIsolated` sites are still un-instrumented.
 (Rationale: org-root `docs/proposals/2026-06-26-001-architecture-fragility-improvements-proposal.md`, opportunity #3.)
 
+**Release-checked seams update (2026-07-02).** The 2026-06-26 note above is
+superseded: every previously suspected seam is now **release-checked**, not just
+the one.
+
+- *Observation bridge* — `withObservationTracking`'s `onChange` hop routes
+  through `withCheckedMainActorAccess("ObservationBridge.recordChange")`
+  (`SwiftTUIViews/Environment/Observation.swift`), landed `39b7d739`.
+- *`LayoutProxyBox`* — the local `preconditionMainActor()` described above was
+  refactored into the shared release-checked helper
+  `withCheckedMainActorAccess` (`SwiftTUICore/Support/CheckedMainActorAccess.swift`)
+  covering all five entry points (`247e4dc3`), after the deterministic
+  off-main trap landed in `78417f02`.
+- *`FrameScheduler`* — redesigned lock-based and `Sendable`
+  (`OSAllocatedUnfairLock` around all coalescing state, `Pipeline/Scheduler.swift`),
+  landed `39b7d739` with `FrameSchedulerConcurrencyTests`. This closed the
+  "raced `consumeReadyFrame`" mechanism the commit named as the suspected #1
+  class.
+- The sibling bridges (`IndexedChildSources` ×4, `LayoutDependentContent` ×2,
+  the `.assumedMainActor` host frame bridge in `HostedRasterSurface`) are
+  likewise checked (`247e4dc3`, `a2eec874`). The only bare `assumeIsolated`
+  hops left in core targets are three deliberately-exempt pure read-recording
+  scans in `Environment.swift` plus the Android-only `directWake`
+  (`RunLoop.swift`) and the Android `@_cdecl` ABI entry points.
+
+**New triage rule (2026-07-02).** Because every suspect seam now carries a
+release-mode `preconditionIsolated` check:
+
+- a crash that presents as a **`preconditionIsolated` trap with an attributable
+  accessor name** = the old mechanism, finally located — file it against the
+  named seam;
+- a **raw `SIGSEGV`/`SIGBUS`** now *falsifies* the `assumeIsolated`-race
+  hypothesis class for the checked seams — treat it as evidence of non-race
+  heap corruption and pursue dynamically (e.g. `libgmalloc`, plus the release
+  lane below), not with further static seam audits.
+
+The scheduled **Release Soundness Lane**
+(`.github/workflows/release-soundness.yml`, `Scripts/release_soundness_lane.sh`,
+added 2026-07-02) runs the flaky trio (`InteractiveRuntimeTests`,
+`PortalPrimitiveTests`, `ActorIsolationSurfaceTests`) serialized in release
+configuration as a `continue-on-error` step — the standing soak where the
+release-checked traps get their chance to convert this flake into an
+attributable failure.
+
 *Separate, real-but-benign finding.* The one-shot commit path stores a live
 `@MainActor` source into retained state with no snapshot conversion
 (`commitOneShotFrame` → `storeCommittedFrame`). It is harmless today (off-main reuse
@@ -113,9 +156,14 @@ defense-in-depth: snapshot-convert in the one-shot commit path before
 commit). Full analysis: org-root `docs/reports/2026-05-30-flake-bcd-investigation.md`.
 
 **Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29). Both identified
-static off-main-reach paths closed 2026-05-30 (see above); the corruption mechanism is
-now unidentified, so the next move is dynamic instrumentation rather than a static
-repro. The `beforeOverlayApply` repro instrument remains available but is not the path.
+static off-main-reach paths closed 2026-05-30; all suspect seams release-checked
+2026-07-02 (see above), so the register's stale "next move is dynamic
+instrumentation" judgment now has teeth: raw-signal crashes falsify the checked-seam
+race class outright. The `beforeOverlayApply` parked-worker forced-repro remains
+designed-but-unlanded (`FrameTailOverlayApplyHookTests.swift` header documents the
+experiment; the stronger corruptor candidate needs a layout-stage parking seam that
+does not exist yet). The release soundness lane's serialized flaky-trio step is the
+standing soak.
 
 ---
 

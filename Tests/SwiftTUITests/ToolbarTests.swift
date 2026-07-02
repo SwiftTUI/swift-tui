@@ -445,12 +445,14 @@ struct ToolbarTests {
     }
 
     let result = try await runLoop.run()
-    let issue = receivedIssues.value.first
+    // Filter to the toolbar issue: the soundness probe's counters are
+    // process-global, so concurrently-running suites' sampled violations can
+    // legitimately reach this run loop's sink too (F34 routing).
+    let toolbarIssues = receivedIssues.value.filter { $0.code == "toolbar.unhostedItems" }
 
     #expect(result.exitReason == .inputEnded)
-    #expect(receivedIssues.value.count == 1)
-    #expect(issue?.code == "toolbar.unhostedItems")
-    #expect(issue?.severity == .warning)
+    #expect(toolbarIssues.count == 1)
+    #expect(toolbarIssues.first?.severity == .warning)
   }
 
   @Test(

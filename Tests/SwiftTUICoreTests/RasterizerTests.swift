@@ -1131,8 +1131,84 @@ struct RasterizerTests {
       damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
     )
 
+    // The default policy is configuration-dependent by design (see
+    // `defaultIncrementalVerificationPolicy()`): DEBUG verifies and repairs,
+    // release trusts proven damage as-is (the sampled probe records the
+    // mismatch instead of repairing). The release soundness lane runs this
+    // test in release, so pin each configuration's contract.
+    #if DEBUG
+      #expect(verified.surface == fresh.surface)
+      #expect(verified.presentationDamage == nil)
+    #else
+      #expect(verified.surface != fresh.surface)
+      #expect(verified.presentationDamage != nil)
+      #expect(verified.incrementalMismatch == nil)
+    #endif
+  }
+
+  @Test("incremental mismatch fallback reports which rows diverged")
+  func incrementalMismatchFallbackReportsDivergedRows() {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .verifySoundDamage)
+    let minimumSize = CellSize(width: 6, height: 1)
+    let previous = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+      ])
+    let current = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+      ])
+
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
+    let fresh = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: nil,
+      damage: nil
+    )
+    let verified = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
+    )
+
+    // The repair still happens — but it may no longer happen in silence.
     #expect(verified.surface == fresh.surface)
-    #expect(verified.presentationDamage == nil)
+    #expect(verified.incrementalMismatch != nil)
+    #expect(verified.incrementalMismatch?.mismatchedRows == [0])
+  }
+
+  @Test("a sound incremental repaint reports no mismatch")
+  func soundIncrementalRepaintReportsNoMismatch() {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .verifySoundDamage)
+    let minimumSize = CellSize(width: 6, height: 1)
+    let previous = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+      ])
+    let current = coreRasterRoot(
+      width: 6,
+      height: 1,
+      children: [
+        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+      ])
+
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
+    let sound = rasterizer.rasterizeCollectingVisibleIdentities(
+      current,
+      minimumSize: minimumSize,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [0..<6])])
+    )
+
+    #expect(sound.incrementalMismatch == nil)
   }
 
   @Test("trusted incremental raster policy skips fresh fallback for incomplete damage")

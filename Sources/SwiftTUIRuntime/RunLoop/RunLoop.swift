@@ -83,6 +83,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var previousPresentedRasterSurface: RasterSurface?
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
+  package var lastSeenSoundnessViolationCounts = SoundnessViolationCounts()
 
   /// Test seam for the **frame-readiness clock**: the instant the drain compares
   /// against pending scheduler deadlines when deciding which frames are ready to
@@ -241,6 +242,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   }
 
   private func runWithInstalledAnimationSinks() async throws -> RunLoopResult<State> {
+    // See ``SoundnessViolationCounts/currentTotals()``: report only
+    // violations recorded during this run loop's own lifetime.
+    lastSeenSoundnessViolationCounts = .currentTotals()
     stateContainer.invalidator = scheduler
     focusTracker.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
@@ -264,7 +268,12 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       let directWake: (@Sendable () -> Void)? =
         renderMode == .sync
         ? { @Sendable [weak self, directPumpState] in
-          MainActor.assumeIsolated {
+          // Fires from the direct input/signal handlers, which the Android
+          // host only invokes on the main looper (via the send_input ABI).
+          // Release-checked (F50): `HostMainExecutor.checkIsolated` proves
+          // the thread via pthread_equal, so a mis-threaded wake traps
+          // attributably instead of racing the run loop.
+          withCheckedMainActorAccess("RunLoop.directWake") {
             guard let self,
               let eventPump = directPumpState.eventPump,
               directPumpState.exitReason == nil,

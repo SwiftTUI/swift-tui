@@ -520,10 +520,15 @@ let package = Package(
         "SwiftTUIPTYPrimitives",
         "SwiftTUITerminal",
         "CEntryPointImageLocator",
-        "EntryPointFixtureAtMain",
-        "EntryPointFixtureBare",
-        "EntryPointFixtureCLIBare",
-        "EntryPointFixtureWebHostCLIBare",
+        // The EntryPointFixture* executables are deliberately NOT
+        // dependencies. Depending on an executable target links its `main`
+        // into the package test runner, and under `-c release` a fixture's
+        // entry point wins the binary's `_main` — every
+        // `swift test -c release` then launches the fixture CLI instead of
+        // the test runner (found by the release soundness lane, F05). The
+        // suite locates the fixture binaries on disk; the gate builds them
+        // explicitly first (Scripts/test_all.sh, "Build entry-point launch
+        // fixtures").
       ],
       path: "Tests/EntryPointLaunchTests",
       swiftSettings: swiftSettings()
