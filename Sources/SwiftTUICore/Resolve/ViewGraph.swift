@@ -1238,28 +1238,11 @@ package final class ViewGraph {
 
     if node.wasPresentAtFrameStart {
       if emitsOwnLifecycleEvents {
-        let previousTasks = node.previousLifecycleMetadata.tasks
-        let currentTasks = node.lifecycleMetadata.tasks
-        let removedAllTasksAcrossResolvedIdentityChange =
-          didChangeResolvedIdentity && currentTasks.isEmpty
-        for previousTask in previousTasks where !currentTasks.contains(previousTask) {
-          if !didChangeResolvedIdentity || removedAllTasksAcrossResolvedIdentityChange {
-            appendTaskCancelEvent(
-              identity: removedAllTasksAcrossResolvedIdentityChange
-                ? node.resolvedIdentity : previousResolvedIdentity,
-              task: previousTask,
-              isStructural: false
-            )
-          }
-        }
-        if !didChangeResolvedIdentity {
-          for currentTask in currentTasks where !previousTasks.contains(currentTask) {
-            appendTaskStartEvent(
-              identity: node.resolvedIdentity,
-              task: currentTask
-            )
-          }
-        }
+        appendStableTaskLifecycleEvents(
+          for: node,
+          previousResolvedIdentity: previousResolvedIdentity,
+          didChangeResolvedIdentity: didChangeResolvedIdentity
+        )
       }
       node.setLifecycleState(.alive)
     } else {
@@ -1487,30 +1470,44 @@ package final class ViewGraph {
       node.setLifecycleState(.appearing)
     } else {
       if emitsOwnLifecycleEvents {
-        let previousTasks = node.previousLifecycleMetadata.tasks
-        let currentTasks = node.lifecycleMetadata.tasks
-        let removedAllTasksAcrossResolvedIdentityChange =
-          didChangeResolvedIdentity && currentTasks.isEmpty
-        for previousTask in previousTasks where !currentTasks.contains(previousTask) {
-          if !didChangeResolvedIdentity || removedAllTasksAcrossResolvedIdentityChange {
-            appendTaskCancelEvent(
-              identity: removedAllTasksAcrossResolvedIdentityChange
-                ? node.resolvedIdentity : previousResolvedIdentity,
-              task: previousTask,
-              isStructural: false
-            )
-          }
-        }
-        if !didChangeResolvedIdentity {
-          for currentTask in currentTasks where !previousTasks.contains(currentTask) {
-            appendTaskStartEvent(
-              identity: node.resolvedIdentity,
-              task: currentTask
-            )
-          }
-        }
+        appendStableTaskLifecycleEvents(
+          for: node,
+          previousResolvedIdentity: previousResolvedIdentity,
+          didChangeResolvedIdentity: didChangeResolvedIdentity
+        )
       }
       node.setLifecycleState(.alive)
+    }
+  }
+
+  /// Emits the stable-arm task lifecycle events for a present node by applying
+  /// the shared ``TaskLifecycleDiff`` policy to its previous vs current task
+  /// descriptors. Shared by the recompute (`finishEvaluation`) and reuse
+  /// (`recordReusedSubtree`) paths, which previously mirrored this policy
+  /// inline.
+  private func appendStableTaskLifecycleEvents(
+    for node: ViewNode,
+    previousResolvedIdentity: Identity,
+    didChangeResolvedIdentity: Bool
+  ) {
+    let diff = TaskLifecycleDiff.between(
+      previous: node.previousLifecycleMetadata.tasks,
+      current: node.lifecycleMetadata.tasks,
+      identityChanged: didChangeResolvedIdentity
+    )
+    for task in diff.cancels {
+      appendTaskCancelEvent(
+        identity: diff.cancelsKeyToCurrentIdentity
+          ? node.resolvedIdentity : previousResolvedIdentity,
+        task: task,
+        isStructural: false
+      )
+    }
+    for task in diff.starts {
+      appendTaskStartEvent(
+        identity: node.resolvedIdentity,
+        task: task
+      )
     }
   }
 
@@ -2190,9 +2187,26 @@ package final class ViewGraph {
     {
       if let routedNode = nodeIfExists(for: routedNodeID) {
         recordCheckpointGraphMutation()
+        // Re-routing moves the node to a new `Identity`. Clear the old
+        // identity's index entry so nothing else resolving at the old
+        // (possibly aliased) identity this frame adopts the moved node — that
+        // would wire it as a child inside its own subtree (a children-graph
+        // cycle).
+        if let previousIdentity = identityByNodeID[routedNodeID],
+          previousIdentity != identity,
+          nodeIDByIdentity[previousIdentity] == routedNodeID
+        {
+          nodeIDByIdentity.removeValue(forKey: previousIdentity)
+        }
         nodeIDByIdentity[identity] = routedNodeID
         identityByNodeID[routedNodeID] = identity
         entityRoutingTable.bind(entityIdentity, to: routedNodeID)
+        if identity != routedNode.identity {
+          // Adopted across identities: the committed value's positional stamp
+          // pairing is unverified against whatever children this position
+          // resolves next — withdraw the fast-path claim.
+          routedNode.withdrawCommittedStampClaim()
+        }
         return routedNode
       }
       recordCheckpointGraphMutation()
@@ -2430,15 +2444,42 @@ package final class ViewGraph {
     }
   }
 
+  /// Per-cascade re-entrancy guard for subtree removal. One walk instance is
+  /// created at each removal root and threaded through the descent, so aliased
+  /// identity/structural-path lookups cannot re-enter a node the cascade is
+  /// already removing.
+  private final class SubtreeRemovalWalk {
+    var enteredNodeIDs: Set<ViewNodeID> = []
+  }
+
   private func removeSubtree(
     rootedAt node: ViewNode,
     committedSnapshot: ResolvedNode? = nil,
     sparingVisitedNodes: Bool = false,
-    isSubtreeDescent: Bool = false
+    isSubtreeDescent: Bool = false,
+    walk: SubtreeRemovalWalk? = nil
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
       current === node
     else {
+      return
+    }
+
+    // The descent below walks committed snapshots whose identity and
+    // structural-path lookups can alias a node already being removed higher in
+    // this same cascade (an absolute-`.id` re-root shares structural paths with
+    // its wrapper). Re-entering it re-runs the whole body with no progress —
+    // track entered nodes per removal cascade and run the node-local teardown
+    // once. A re-entry still descends its own snapshot's children: an aliased
+    // snapshot can cover departed descendants the first entry's snapshot does
+    // not, and the descent strictly shrinks into the finite resolved tree.
+    let walk = walk ?? SubtreeRemovalWalk()
+    guard walk.enteredNodeIDs.insert(node.viewNodeID).inserted else {
+      if let committedSnapshot {
+        for child in committedSnapshot.children {
+          removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
+        }
+      }
       return
     }
 
@@ -2497,12 +2538,13 @@ package final class ViewGraph {
         removeSubtree(
           rootedAt: child,
           sparingVisitedNodes: sparingVisitedNodes,
-          isSubtreeDescent: true
+          isSubtreeDescent: true,
+          walk: walk
         )
       }
     } else {
       for child in snapshot.children {
-        removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes)
+        removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
       }
     }
 
@@ -2590,8 +2632,10 @@ package final class ViewGraph {
 
   private func removeResolvedSubtree(
     _ resolved: ResolvedNode,
-    sparingVisitedNodes: Bool = false
+    sparingVisitedNodes: Bool = false,
+    walk: SubtreeRemovalWalk? = nil
   ) {
+    let walk = walk ?? SubtreeRemovalWalk()
     let nodes = nodeIDsForResolvedNode(resolved)
       .compactMap { nodeIfExists(for: $0) }
       .sorted { lhs, rhs in
@@ -2606,7 +2650,8 @@ package final class ViewGraph {
           rootedAt: node,
           committedSnapshot: resolved,
           sparingVisitedNodes: sparingVisitedNodes,
-          isSubtreeDescent: true
+          isSubtreeDescent: true,
+          walk: walk
         )
       }
       return
@@ -2617,13 +2662,14 @@ package final class ViewGraph {
         rootedAt: node,
         committedSnapshot: resolved,
         sparingVisitedNodes: sparingVisitedNodes,
-        isSubtreeDescent: true
+        isSubtreeDescent: true,
+        walk: walk
       )
       return
     }
 
     for child in resolved.children {
-      removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes)
+      removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
     }
   }
 

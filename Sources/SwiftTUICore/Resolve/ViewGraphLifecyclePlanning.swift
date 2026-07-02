@@ -231,9 +231,14 @@ enum ViewGraphLifecyclePlanner {
           )
         )
       }
-      let previousTasks = previousNode?.tasks ?? []
-      let currentTasks = currentNode.tasks
-      for task in previousTasks where !currentTasks.contains(task) {
+      // Viewport keying is identity-stable by construction (`ViewportLifecycleKey`
+      // tracks the node, not the resolved identity), so the diff runs without the
+      // stable arm's identity-churn suppression.
+      let diff = TaskLifecycleDiff.between(
+        previous: previousNode?.tasks ?? [],
+        current: currentNode.tasks
+      )
+      for task in diff.cancels {
         taskCancels.append(
           .init(
             viewNodeID: currentNode.viewNodeID,
@@ -242,7 +247,7 @@ enum ViewGraphLifecyclePlanner {
           )
         )
       }
-      for task in currentTasks where !previousTasks.contains(task) {
+      for task in diff.starts {
         taskStarts.append(
           .init(
             viewNodeID: currentNode.viewNodeID,

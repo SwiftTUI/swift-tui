@@ -466,6 +466,16 @@ package final class ViewNode {
     evaluationDepth == 1
   }
 
+  /// Withdraws the committed subtree's runtime-ID stamp claim so the next
+  /// apply takes the slow restamping path. Entity routing calls this when it
+  /// adopts this node across identities: the committed value's positional
+  /// stamp pairing is no longer verified against the node's next live
+  /// children.
+  package func withdrawCommittedStampClaim() {
+    recordCheckpointMutation()
+    committed.markSubtreeRuntimeNodeIDsUnstamped()
+  }
+
   package func recordEnvironmentRead(
     _ key: ObjectIdentifier
   ) {
@@ -1208,13 +1218,30 @@ package final class ViewNode {
     if isCommittedSnapshotFresh {
       return committed
     }
+    var entered: Set<ObjectIdentifier> = []
+    return snapshotRebuilding(entered: &entered)
+  }
 
+  private func snapshotRebuilding(
+    entered: inout Set<ObjectIdentifier>
+  ) -> ResolvedNode {
+    if isCommittedSnapshotFresh {
+      return committed
+    }
     // Rebuild the whole-subtree snapshot by recursively pulling each
     // child ViewNode's current snapshot.  The `didSet` on
     // `ResolvedNode.children` then recomputes preferenceValues,
     // subtreeNodeCount, and supportsRetainedReuse from the new children.
+    // `apply` tolerates a node re-appearing inside its own `children`
+    // (an entity-routed wrapper collapse leaves the slot node aliased into
+    // its own resolved subtree; the parent pointer is never wired), so the
+    // rebuild tracks entered nodes and hands back the committed value on
+    // re-entry instead of recursing forever.
+    guard entered.insert(ObjectIdentifier(self)).inserted else {
+      return committed
+    }
     var rebuilt = committed
-    rebuilt.children = children.map { $0.snapshot() }
+    rebuilt.children = children.map { $0.snapshotRebuilding(entered: &entered) }
     committed = rebuilt
     isCommittedSnapshotFresh = true
     return committed
