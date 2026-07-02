@@ -117,6 +117,14 @@ package final class ViewGraph {
     get { index.nextViewNodeIDRawValue }
     set { index.nextViewNodeIDRawValue = newValue }
   }
+  private var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>] {
+    get { index.detachedHostedSubtreeRootsByHost }
+    set { index.detachedHostedSubtreeRootsByHost = newValue }
+  }
+  private var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID] {
+    get { index.detachedHostedSubtreeHostByRoot }
+    set { index.detachedHostedSubtreeHostByRoot = newValue }
+  }
   private var rootEvaluator: (@MainActor () -> Void)? {
     get { rootEvaluation.rootEvaluator }
     set { rootEvaluation.rootEvaluator = newValue }
@@ -160,10 +168,6 @@ package final class ViewGraph {
   private var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> {
     get { eventBuffers.pendingEntityRoutedRemovalNodeIDs }
     set { eventBuffers.pendingEntityRoutedRemovalNodeIDs = newValue }
-  }
-  private var churnedSubtreeDepartedIdentities: Set<Identity> {
-    get { eventBuffers.churnedSubtreeDepartedIdentities }
-    set { eventBuffers.churnedSubtreeDepartedIdentities = newValue }
   }
   private var absorbedShadowedNodeIDs: Set<ViewNodeID> {
     get { eventBuffers.absorbedShadowedNodeIDs }
@@ -400,6 +404,16 @@ package final class ViewGraph {
       shadowedNodeID != node.viewNodeID
     {
       absorbedShadowedNodeIDs.insert(shadowedNodeID)
+      // The shadowed node shares this node's re-rooted resolved identity — a
+      // chain collapse absorbed its output into this node (the interior mint
+      // of a collapsed `.id` chain). While warm, the interior stays alive
+      // through re-evaluation, but it lives in NO committed value tree and
+      // owns only its per-generation allocation identity, so this node's
+      // teardown could never reach it. Anchor its lifetime here with a
+      // hosted-detached edge; the teardown descent's visited/entity guards
+      // keep it whenever it is genuinely live (steady frames, G13 siblings,
+      // re-homed controls).
+      recordDetachedHostedNode(shadowedNodeID, hostedByNodeID: node.viewNodeID)
     }
     nodeIDByIdentity[node.resolvedIdentity] = node.viewNodeID
     identityByNodeID[node.viewNodeID] = node.resolvedIdentity
@@ -470,6 +484,8 @@ package final class ViewGraph {
       nodeIDsByStructuralPath: nodeIDsByStructuralPath,
       entityRoutingTable: entityRoutingTable,
       nextViewNodeIDRawValue: nextViewNodeIDRawValue,
+      detachedHostedSubtreeRootsByHost: detachedHostedSubtreeRootsByHost,
+      detachedHostedSubtreeHostByRoot: detachedHostedSubtreeHostByRoot,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
       viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
@@ -481,7 +497,6 @@ package final class ViewGraph {
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
       pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
-      churnedSubtreeDepartedIdentities: churnedSubtreeDepartedIdentities,
       absorbedShadowedNodeIDs: absorbedShadowedNodeIDs,
       requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
@@ -1155,7 +1170,6 @@ package final class ViewGraph {
     structuralTaskCancelEvents.removeAll(keepingCapacity: true)
     structuralDisappearEvents.removeAll(keepingCapacity: true)
     pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
-    churnedSubtreeDepartedIdentities.removeAll(keepingCapacity: true)
     absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
   }
@@ -1336,6 +1350,47 @@ package final class ViewGraph {
     return node.committed
   }
 
+  /// Declares that `host` resolved `resolved` this frame without committing it
+  /// as a child (a navigation stack's root while a destination is presented).
+  /// Such a subtree is reachable through neither committed values nor parent
+  /// links — resolution is its only lifetime anchor — so `removeSubtree`
+  /// descends these edges when the host departs, tearing the hosted subtree
+  /// down with the same visited-sparing and entity-deferral guards as every
+  /// other departed-subtree descent. Re-committing the subtree later (the
+  /// destination dismisses) makes the edge redundant, not wrong: the host's
+  /// teardown already reaches an attached child, and the walk is idempotent.
+  package func recordDetachedHostedSubtree(
+    _ resolved: ResolvedNode,
+    hostedBy host: ViewNode?
+  ) {
+    guard let host,
+      let rootNodeID = resolved.viewNodeID ?? viewNodeID(for: resolved.identity),
+      rootNodeID != host.viewNodeID,
+      nodeIfExists(for: rootNodeID) != nil
+    else {
+      return
+    }
+    recordDetachedHostedNode(rootNodeID, hostedByNodeID: host.viewNodeID)
+  }
+
+  private func recordDetachedHostedNode(
+    _ rootNodeID: ViewNodeID,
+    hostedByNodeID hostID: ViewNodeID
+  ) {
+    if detachedHostedSubtreeHostByRoot[rootNodeID] == hostID {
+      return
+    }
+    recordCheckpointGraphMutation()
+    if let previousHost = detachedHostedSubtreeHostByRoot[rootNodeID] {
+      detachedHostedSubtreeRootsByHost[previousHost]?.remove(rootNodeID)
+      if detachedHostedSubtreeRootsByHost[previousHost]?.isEmpty == true {
+        detachedHostedSubtreeRootsByHost.removeValue(forKey: previousHost)
+      }
+    }
+    detachedHostedSubtreeRootsByHost[hostID, default: []].insert(rootNodeID)
+    detachedHostedSubtreeHostByRoot[rootNodeID] = hostID
+  }
+
   package func installLayoutRealizedChildren(
     for identity: Identity,
     children: [ResolvedNode]
@@ -1433,9 +1488,19 @@ package final class ViewGraph {
     let candidates = absorbedShadowedNodeIDs
     absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
     for nodeID in candidates.sorted() {
+      // Two stranded shapes qualify:
+      // - a same-frame mint (`!wasPresentAtFrameStart`) — the cold-resolve
+      //   chain-collapse artifact, reclaimable even though its mint visited it;
+      // - a WARM strand (`!visitedThisFrame`) — the same absorbed interior
+      //   discovered late: the absorber re-shadows its identity entry on every
+      //   apply, so lookups land on the absorber and the interior is never
+      //   visited again. Parentless, un-routed, and index-shadowed, nothing
+      //   can reach it; without this arm it leaks until (at best) an identity
+      //   prefix sweep. A visited warm node stays: something resolved it this
+      //   frame, so it is live (a re-rooted control, a hosted detached root).
       guard let node = nodeIfExists(for: nodeID),
         node.viewNodeID != root?.viewNodeID,
-        !node.wasPresentAtFrameStart,
+        !node.wasPresentAtFrameStart || !node.visitedThisFrame(currentFrameID),
         node.parent == nil
       else {
         continue
@@ -1445,8 +1510,16 @@ package final class ViewGraph {
       // a routed node reached by shadowing (a re-rooted stable-`.id` control
       // is parent-detached by design) is still the entity's binding — its
       // lifetime belongs to the entity lifecycle (release/pending-removal).
+      // Unless the home is stale: routing alone cannot prove liveness when
+      // claims are suppressed inside a hosting boundary (`entityHosting`) —
+      // the shadow that put this node in the candidate set means the arriving
+      // tree re-resolved its identity onto a different node. A live home owns
+      // its resolved-identity index entry (its apply reindexed it); duplicate
+      // occurrences (> 0) share entries by design and stay route-governed.
       if let entityIdentity = entityRoutingTable.entityByNodeID[nodeID],
-        entityRoutingTable.route(entityIdentity) == nodeID
+        entityRoutingTable.route(entityIdentity) == nodeID,
+        entityIdentity.occurrence > 0
+          || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
       {
         continue
       }
@@ -1878,7 +1951,6 @@ package final class ViewGraph {
       activeEntities: entityIdentities(in: resolved)
     )
     pruneAbsorbedShadowedNodes()
-    pruneChurnedSubtreeOrphans()
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -1895,7 +1967,6 @@ package final class ViewGraph {
     let activeEntities = entityIdentities(in: resolved)
     prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     pruneAbsorbedShadowedNodes()
-    pruneChurnedSubtreeOrphans()
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
@@ -2374,17 +2445,12 @@ package final class ViewGraph {
         // track both siblings.
         if entityIdentity.occurrence == 0 {
           if existingEntityIdentity != nil {
-            // The displaced occupant's resolved subtree departs right here —
-            // record its resolved identity so the finalize-frame sweep can
-            // catch anything this eviction's snapshot descent cannot reach
-            // (ghost placeholders, re-rooted descendants outside committed
-            // snapshots). The fresh node minted below carries the
-            // displacement mark so `ExactIdentityModifier`'s churn predicate
-            // (reuse suppression) fires even though the fresh node was never
-            // present at frame start.
-            recordChurnedSubtreeDeparture(
-              previousResolvedIdentity: existing.resolvedIdentity
-            )
+            // The displaced occupant's resolved subtree departs right here.
+            // The eviction's descent covers committed values, live children,
+            // and hosted-detached edges; the fresh node minted below carries
+            // the displacement mark so `ExactIdentityModifier`'s churn
+            // predicate (reuse suppression) fires even though the fresh node
+            // was never present at frame start.
             removeSubtree(rootedAt: existing)
             displacedOccupant = true
           } else {
@@ -2506,79 +2572,25 @@ package final class ViewGraph {
         // churn re-attached it to the arriving generation) leaves this node a
         // displaced stale copy — tear it down, sparing any descendants the
         // arriving tree already re-adopted (they are visited).
+        //
+        // Routing alone cannot prove liveness when the entity's claims are
+        // suppressed inside a hosting boundary (`entityHosting`): the arriving
+        // generation re-resolves the same re-rooted identity onto a fresh
+        // structural node without ever re-binding the route, and the stale
+        // copy would be kept as "the home" forever. The resolved-identity
+        // index is the tiebreaker — the live home's apply owns that entry; a
+        // stale copy lost it to the arriving node's reindex. Duplicate-id
+        // occurrences (> 0) are exempt: siblings share the identity entry by
+        // design, so only the entity route is authoritative for them (G13).
         if activeEntities.contains(entityIdentity),
-          entityRoutingTable.route(entityIdentity) == node.viewNodeID
+          entityRoutingTable.route(entityIdentity) == node.viewNodeID,
+          entityIdentity.occurrence > 0
+            || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
         {
           continue
         }
         removeSubtree(rootedAt: node, sparingVisitedNodes: true)
       }
-    }
-  }
-
-  /// Records that an explicit-`.id` slot re-rooted away from
-  /// `previousResolvedIdentity` this frame (owner `.id` churn). Node allocation
-  /// is keyed by identity, so the churned slot minted a fresh subtree at the new
-  /// identity, but child removal-diffing is positional (`ChildDescriptor.==`
-  /// ignores `identity`), so the slot stays `.matched` and the displaced old
-  /// generation is never handed to `removeSubtree` — it would otherwise stay in
-  /// `liveNodeIDs` forever, re-publishing its runtime registrations on every
-  /// rebuild. `finalizeFrame` consumes these prefixes via
-  /// ``pruneChurnedSubtreeOrphans()``.
-  package func recordChurnedSubtreeDeparture(
-    previousResolvedIdentity: Identity
-  ) {
-    recordCheckpointGraphMutation()
-    churnedSubtreeDepartedIdentities.insert(previousResolvedIdentity)
-  }
-
-  /// Tears down the still-live nodes displaced by this frame's explicit-`.id`
-  /// churns: every live node under a departed identity prefix that the frame's
-  /// walk did not visit. Runs post-walk (from `finalizeFrame`, before the
-  /// lifecycle-event plan and registration publication), where
-  /// `visitedThisFrame` is authoritative for the churned scope — reuse is
-  /// suppressed inside churned subtrees (`ResolveContext.withinChurnedSubtree`),
-  /// so every node genuinely belonging to the arriving generation was visited.
-  /// The removal spares visited nodes wherever the teardown walk reaches them:
-  /// a stable-`.id` descendant re-rooted out of the departing generation (e.g.
-  /// a control the arriving subtree re-adopted at its own identity) is reachable
-  /// through the departed generation's committed snapshots and identity lookups,
-  /// but is live now and must keep its registrations and pointer routes.
-  private func pruneChurnedSubtreeOrphans() {
-    guard !churnedSubtreeDepartedIdentities.isEmpty else {
-      return
-    }
-    recordCheckpointGraphMutation()
-    let departedPrefixes = churnedSubtreeDepartedIdentities
-    churnedSubtreeDepartedIdentities.removeAll(keepingCapacity: true)
-
-    var orphans: [ViewNode] = []
-    for nodeID in liveNodeIDs {
-      guard let node = nodesByNodeID[nodeID],
-        node.viewNodeID != root?.viewNodeID,
-        !node.visitedThisFrame(currentFrameID)
-      else {
-        continue
-      }
-      let isDeparted = departedPrefixes.contains { prefix in
-        node.identity == prefix || node.identity.isDescendant(of: prefix)
-          || node.resolvedIdentity == prefix || node.resolvedIdentity.isDescendant(of: prefix)
-      }
-      if isDeparted {
-        orphans.append(node)
-      }
-    }
-    guard !orphans.isEmpty else {
-      return
-    }
-    orphans.sort { lhs, rhs in
-      if lhs.identity == rhs.identity {
-        return lhs.viewNodeID < rhs.viewNodeID
-      }
-      return lhs.identity < rhs.identity
-    }
-    for orphan in orphans {
-      removeSubtree(rootedAt: orphan, sparingVisitedNodes: true)
     }
   }
 
@@ -2657,10 +2669,45 @@ package final class ViewGraph {
     // not, and the descent strictly shrinks into the finite resolved tree.
     let walk = walk ?? SubtreeRemovalWalk()
     guard walk.enteredNodeIDs.insert(node.viewNodeID).inserted else {
-      if let committedSnapshot {
+      guard let committedSnapshot else {
+        return
+      }
+      // The re-entry snapshot can name an interior node DISTINCT from the
+      // re-entered absorber: a chain collapse leaves the interior's value
+      // stamped with the absorber, but the interior still owns its re-rooted
+      // identity index entry (a `.id` slot node under a hosting boundary).
+      // Enter any not-yet-entered node the snapshot maps to — the walk's
+      // entered-set makes this cycle-proof and strictly shrinking. When
+      // nothing new maps, fall back to the children-only descent.
+      var interiorNodes = nodeIDsForResolvedNode(committedSnapshot)
+        .subtracting(walk.enteredNodeIDs)
+        .compactMap { nodeIfExists(for: $0) }
+      if interiorNodes.isEmpty,
+        let interior = nodeIfExists(for: committedSnapshot.identity),
+        !walk.enteredNodeIDs.contains(interior.viewNodeID)
+      {
+        interiorNodes = [interior]
+      }
+      guard !interiorNodes.isEmpty else {
         for child in committedSnapshot.children {
           removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
         }
+        return
+      }
+      interiorNodes.sort { lhs, rhs in
+        if lhs.identity == rhs.identity {
+          return lhs.viewNodeID < rhs.viewNodeID
+        }
+        return lhs.identity < rhs.identity
+      }
+      for interior in interiorNodes {
+        removeSubtree(
+          rootedAt: interior,
+          committedSnapshot: committedSnapshot,
+          sparingVisitedNodes: sparingVisitedNodes,
+          isSubtreeDescent: true,
+          walk: walk
+        )
       }
       return
     }
@@ -2774,6 +2821,32 @@ package final class ViewGraph {
           isSubtreeDescent: true,
           walk: walk
         )
+      }
+    }
+
+    // Hosted detached subtrees: content this node resolved but did not commit
+    // as a child (see `recordDetachedHostedSubtree`) is reachable through
+    // neither the committed values above nor the parent links — its lifetime
+    // anchors here. Visited roots (still being resolved by a live replacement)
+    // and entity-routed re-homes are kept by the descent's standard guards.
+    if let hostedRootIDs = detachedHostedSubtreeRootsByHost.removeValue(forKey: node.viewNodeID) {
+      for hostedRootID in hostedRootIDs.sorted() {
+        detachedHostedSubtreeHostByRoot.removeValue(forKey: hostedRootID)
+        guard let hostedRoot = nodeIfExists(for: hostedRootID) else {
+          continue
+        }
+        removeSubtree(
+          rootedAt: hostedRoot,
+          sparingVisitedNodes: true,
+          isSubtreeDescent: true,
+          walk: walk
+        )
+      }
+    }
+    if let hostID = detachedHostedSubtreeHostByRoot.removeValue(forKey: node.viewNodeID) {
+      detachedHostedSubtreeRootsByHost[hostID]?.remove(node.viewNodeID)
+      if detachedHostedSubtreeRootsByHost[hostID]?.isEmpty == true {
+        detachedHostedSubtreeRootsByHost.removeValue(forKey: hostID)
       }
     }
 

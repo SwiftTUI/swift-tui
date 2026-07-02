@@ -20,6 +20,13 @@ extension ViewGraph {
     package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] = [:]
     package var entityRoutingTable: EntityRoutingTable = .init()
     package var nextViewNodeIDRawValue: UInt64 = 0
+    // Subtrees a host resolves every frame but does not commit as children (a
+    // navigation stack's root while a destination is presented). They are
+    // reachable through neither committed values nor parent links, so their
+    // lifetime anchors to the declaring host: `removeSubtree` descends these
+    // edges when the host departs. See `recordDetachedHostedSubtree`.
+    package var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>] = [:]
+    package var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID] = [:]
   }
 
   /// The root evaluator closure and the identity it re-roots from.
@@ -45,12 +52,6 @@ extension ViewGraph {
     package var structuralTaskCancelEvents: [LifecycleEvent] = []
     package var structuralDisappearEvents: [LifecycleEvent] = []
     package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> = []
-    // Old resolved identities departed by an explicit-`.id` churn this frame
-    // (`ExactIdentityModifier` re-rooted the slot to a different identity).
-    // `finalizeFrame` prunes the still-live, unvisited nodes left under these
-    // prefixes — the churned slot stays positionally `.matched`, so the
-    // structural child diff never removes the displaced generation.
-    package var churnedSubtreeDepartedIdentities: Set<Identity> = []
     // Nodes whose identity index entry was overwritten by another node's
     // re-rooted resolved identity this frame (a transparent chain collapse
     // absorbed their output). The finalize barrier reclaims the ones that end

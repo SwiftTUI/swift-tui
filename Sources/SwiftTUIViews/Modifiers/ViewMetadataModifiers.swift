@@ -252,32 +252,29 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
     // refreshed — not runtime state the framework deliberately keeps.
     //
     // Two churn shapes reach here since the modifier attaches an entity:
-    // - Slot-node rebinding (`wasPresentAtFrameStart`, resolved identity moved):
-    //   the slot node survived and re-rooted; record the departed identity for
-    //   the finalize-frame sweep exactly as before.
+    // - Slot-node rebinding (`wasPresentAtFrameStart`, resolved identity
+    //   moved): the slot node survived and re-rooted; suppress reuse for the
+    //   arriving subtree so every positional descendant re-resolves fresh.
+    //   Teardown of the departed generation is event-driven (displacement
+    //   eviction, structural diff, hosted-detached edges) — no sweep.
     // - Displacement mint (`hasEntityDisplacedOccupantThisFrame`): the entity
     //   claim evicted a different-entity occupant and minted this node fresh,
     //   so the rebinding predicate can never fire; `nodeForIdentity` already
-    //   recorded the departure and tore the occupant down at the claim.
+    //   tore the occupant down at the claim.
     if !routedContext.withinChurnedSubtree, let slotNode {
       // Continuity guard: when this modifier's entity already routes to the
       // slot node, the slot is this chain's steady home — the resolved
       // identity re-rooted because a *deeper* `.id` re-rooted it (a stable
       // `.id(control)` collapsed inside `.id(owner)`), not because a different
       // identity moved into this slot. A deeper churn fires its own predicate
-      // at its own level; re-firing here would record a false departure and
-      // suppress reuse on every frame of the steady state.
+      // at its own level; re-firing here would suppress reuse on every frame
+      // of the steady state.
       let rebindChurn =
         slotNode.wasPresentAtFrameStart
         && slotNode.resolvedIdentity != slotNode.identity
         && !identity.isAncestor(of: slotNode.resolvedIdentity)
         && context.viewGraph?.entityRouteIsBound(entityIdentity, to: slotNode) != true
-      if rebindChurn {
-        routedContext.withinChurnedSubtree = true
-        context.viewGraph?.recordChurnedSubtreeDeparture(
-          previousResolvedIdentity: slotNode.resolvedIdentity
-        )
-      } else if slotNode.hasEntityDisplacedOccupantThisFrame {
+      if rebindChurn || slotNode.hasEntityDisplacedOccupantThisFrame {
         routedContext.withinChurnedSubtree = true
       }
     }

@@ -33,6 +33,19 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
       in: context
     )
 
+    // While a destination is presented, the root subtree stays resolved every
+    // frame (its state must survive the push) but is absent from this stack's
+    // committed children — reachable through neither committed values nor
+    // parent links. Anchor its lifetime to the resolving host node so the
+    // host's teardown (an owner `.id` churn, a structural removal) tears the
+    // root subtree down with it instead of stranding it.
+    if resolution.visibleNode.identity != rootNode.identity {
+      context.viewGraph?.recordDetachedHostedSubtree(
+        rootNode,
+        hostedBy: ViewNodeContext.current
+      )
+    }
+
     // A NavigationStack is a command host (Role A): a focus scope, not a focus
     // target. Tab passes through to the focusable item leaves of the visible
     // destination; the stack itself is never a Tab stop.

@@ -12,6 +12,8 @@ extension ViewGraph {
     package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
     package var entityRoutingTable: EntityRoutingTable
     package var nextViewNodeIDRawValue: UInt64
+    package var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>]
+    package var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID]
     package var rootEvaluator: Bool
     package var evaluationRootIdentity: Identity?
     package var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
@@ -23,7 +25,6 @@ extension ViewGraph {
     package var structuralTaskCancelEvents: [LifecycleEvent]
     package var structuralDisappearEvents: [LifecycleEvent]
     package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
-    package var churnedSubtreeDepartedIdentities: Set<Identity>
     package var absorbedShadowedNodeIDs: Set<ViewNodeID>
     package var requiresRootEvaluation: Bool
     package var invalidatedNodeIDs: Set<ViewNodeID>

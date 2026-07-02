@@ -695,7 +695,23 @@ package final class ViewNode {
     resolved.viewNodeID = viewNodeID
     if resolved.children.count == children.count {
       let stampedChildren = zip(resolved.children, children).map { childResolved, childNode in
-        childNode.resolvedWithRuntimeNodeIDs(
+        // Transparent-chain fixed point: this node absorbed a node-less chain
+        // level (`.frame` wrapper -> `.id` -> primitive), so the positional
+        // pairing lands back on the absorber itself. The absorbed level's
+        // value takes the absorber's stamp, but the values BELOW it belong to
+        // the chain's interior nodes and arrived stamped by those nodes' own
+        // applies. Recursing the self-pairing would clobber every deeper
+        // stamp with the absorber's ID — the committed value tree would then
+        // claim the interior head is the absorber, and teardown's value
+        // descent could never reach the interior node again (it re-enters the
+        // absorber and strands the head as a churn orphan).
+        if childNode === self {
+          var absorbed = childResolved
+          absorbed.viewNodeID = viewNodeID
+          absorbed.recomputeSubtreeRuntimeNodeIDsStamped()
+          return absorbed
+        }
+        return childNode.resolvedWithRuntimeNodeIDs(
           childResolved,
           children: childNode.children
         )
@@ -750,6 +766,20 @@ package final class ViewNode {
       return nil
     }
     for (childResolved, childNode) in zip(resolved.children, children) {
+      // Mirror the stamping walk's transparent-chain fixed point: a
+      // self-paired child value carries the absorber's stamp, and the values
+      // below it belong to the chain's interior nodes — the full walk does
+      // not restamp past the self-pairing, so the checker must not demand
+      // absorber stamps there either.
+      if childNode === self {
+        if childResolved.viewNodeID != viewNodeID {
+          return
+            "stamp skip: absorbed chain value stamp "
+            + "\(String(describing: childResolved.viewNodeID)) diverges from absorber "
+            + "\(viewNodeID) at \(identity)"
+        }
+        continue
+      }
       if let violation = childNode.resolvedStampsCoherenceViolation(
         childResolved,
         children: childNode.children
