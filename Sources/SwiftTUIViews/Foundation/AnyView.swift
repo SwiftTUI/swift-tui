@@ -116,7 +116,10 @@ private struct AnyViewPayload: PrimitiveView, ResolvableView {
   }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentContext = context.child(component: .named("Content"))
+    // The payload's stored view resolves through this Content node — a
+    // non-transparent hosting boundary. Host-escaping entity routes must not
+    // be claimed here (see `ResolveContext.entityHosting`).
+    let contentContext = context.child(component: .named("Content")).asEntityHost()
     return [
       storage.resolve(contentContext)
     ]

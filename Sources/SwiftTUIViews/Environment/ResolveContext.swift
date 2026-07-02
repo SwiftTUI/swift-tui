@@ -39,6 +39,20 @@ public struct ResolveContext: Equatable, Sendable {
   }
   package var invalidationSummary: InvalidationSummary
   package var forceRootEvaluation: Bool
+  /// True exactly while a non-transparent host (an `AnyView` payload, a
+  /// captured-subview/scoped-content boundary) resolves foreign content through
+  /// its own node. Such a host must never be entity-collapsed with the content
+  /// it hosts: a host-escaping entity route (``ExactIdentityModifier``'s
+  /// wholesale identity replacement) claimed at the host's `beginEvaluation`
+  /// would route the entity back to the host from an interior position and wire
+  /// the node into its own subtree. Deliberately *not* in
+  /// ``PropagatedRegistries``: `child` / `replacingIdentity` derivations rebuild
+  /// the context and drop it, so the signal is one-shot — visible to the hosted
+  /// chain's own modifier resolution, reset for every structural descendant.
+  /// Host-*descending* routes (``IDModifier``'s appended explicit id) are not
+  /// suppressed; adopting the prior entity node as the host-content node is the
+  /// entity-routing collapse that keeps `@State` alive across wrapper toggles.
+  package var entityHosting: Bool = false
   package var localActionRegistry: LocalActionRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
@@ -252,6 +266,14 @@ public struct ResolveContext: Equatable, Sendable {
   package func suppressingStructuralLifecycle() -> Self {
     var context = self
     context.suppressesStructuralLifecycle = true
+    return context
+  }
+
+  /// Marks this context as resolving content through a non-transparent host's
+  /// own node. See ``entityHosting``.
+  package func asEntityHost() -> Self {
+    var context = self
+    context.entityHosting = true
     return context
   }
 

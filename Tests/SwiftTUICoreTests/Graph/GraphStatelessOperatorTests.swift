@@ -64,7 +64,8 @@ struct GraphNodeIndexQueryTests {
   @Test("viewNodeID(for:identity) maps a present identity to its id")
   func viewNodeIDForIdentity() {
     let fixture = makeFixture()
-    #expect(GraphNodeIndexQuery.viewNodeID(for: fixture.identityA, in: fixture.index) == fixture.idA)
+    #expect(
+      GraphNodeIndexQuery.viewNodeID(for: fixture.identityA, in: fixture.index) == fixture.idA)
     #expect(
       GraphNodeIndexQuery.viewNodeID(for: testIdentity("Root", "Absent"), in: fixture.index) == nil
     )
@@ -79,7 +80,8 @@ struct GraphNodeIndexQueryTests {
     )
     // An id with no identity mapping contributes nothing.
     #expect(
-      GraphNodeIndexQuery.identities(for: [fixture.idA, ViewNodeID(rawValue: 999)], in: fixture.index)
+      GraphNodeIndexQuery.identities(
+        for: [fixture.idA, ViewNodeID(rawValue: 999)], in: fixture.index)
         == Set([fixture.identityA])
     )
   }

@@ -235,7 +235,9 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    let entityIdentity = EntityIdentity(identity)
     var routedContext = context.replacingIdentity(with: identity)
+    let slotNode = ViewNodeContext.current
     // Identity churn: the structural slot at this position resolved to a
     // *different* explicit identity last frame (e.g. `.id("owner-\(gen)")` with a
     // bumped generation). The committed reuse-containment checks key on
@@ -248,27 +250,65 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
     // layer. Node `@State` slots persist across the recompute (they are keyed by
     // the descendant's own stable identity), so only closures/bindings/labels are
     // refreshed — not runtime state the framework deliberately keeps.
-    if !routedContext.withinChurnedSubtree,
-      let slotNode = ViewNodeContext.current,
-      slotNode.wasPresentAtFrameStart,
-      slotNode.resolvedIdentity != slotNode.identity,
-      !identity.isAncestor(of: slotNode.resolvedIdentity)
-    {
-      routedContext.withinChurnedSubtree = true
-      // The churned slot stays positionally `.matched` through the structural
-      // child diff (`ChildDescriptor.==` never compares `identity`), so the
-      // displaced old generation is never structurally removed. Record its
-      // departed resolved identity so `finalizeFrame` prunes the abandoned
-      // nodes — and with them their runtime registrations, tasks, and
-      // lifecycle handlers — on this same frame.
-      context.viewGraph?.recordChurnedSubtreeDeparture(
-        previousResolvedIdentity: slotNode.resolvedIdentity
+    //
+    // Two churn shapes reach here since the modifier attaches an entity:
+    // - Slot-node rebinding (`wasPresentAtFrameStart`, resolved identity moved):
+    //   the slot node survived and re-rooted; record the departed identity for
+    //   the finalize-frame sweep exactly as before.
+    // - Displacement mint (`hasEntityDisplacedOccupantThisFrame`): the entity
+    //   claim evicted a different-entity occupant and minted this node fresh,
+    //   so the rebinding predicate can never fire; `nodeForIdentity` already
+    //   recorded the departure and tore the occupant down at the claim.
+    if !routedContext.withinChurnedSubtree, let slotNode {
+      let rebindChurn =
+        slotNode.wasPresentAtFrameStart
+        && slotNode.resolvedIdentity != slotNode.identity
+        && !identity.isAncestor(of: slotNode.resolvedIdentity)
+      if rebindChurn {
+        routedContext.withinChurnedSubtree = true
+        context.viewGraph?.recordChurnedSubtreeDeparture(
+          previousResolvedIdentity: slotNode.resolvedIdentity
+        )
+      } else if slotNode.hasEntityDisplacedOccupantThisFrame {
+        routedContext.withinChurnedSubtree = true
+      }
+    }
+    // Mirror `IDModifier`: attach the entity so the churn is visible to
+    // `ChildDescriptor` diffing and the entity routing table, and pre-bind the
+    // slot node as the entity's owner so interior same-path resolution routes
+    // to it (the transparent-chain collapse). Suppressed while a
+    // non-transparent host resolves this chain through its own node
+    // (`entityHosting`): the host must stay a positional node, never the
+    // entity's home — the route also escapes the host's identity subtree
+    // (`escapesHostingBoundary`), so hosting boundaries refuse to claim it.
+    if !context.entityHosting {
+      context.viewGraph?.prepareEntityRoutedOwner(
+        entityIdentity,
+        for: slotNode
       )
     }
-    return [
+    let route = ResolveEntityRoute(
+      identity: entityIdentity,
+      structuralPath: context.structuralPath,
+      escapesHostingBoundary: true
+    )
+    var resolved = withResolveEntityRoute(route) {
       content.resolveOwned(in: routedContext)
-    ]
+    }
+    resolved.attachingEntityIdentity(
+      entityIdentity,
+      at: context.structuralPath
+    )
+    return [resolved]
   }
+}
+
+extension ExactIdentityModifier: EntityRouteProvidingModifier {
+  package func resolveEntityRouteIdentity(in context: ResolveContext) -> EntityIdentity {
+    EntityIdentity(identity)
+  }
+
+  package var providesHostEscapingEntityRoute: Bool { true }
 }
 
 package struct LayoutMetadataModifier: PrimitiveViewModifier, Sendable {

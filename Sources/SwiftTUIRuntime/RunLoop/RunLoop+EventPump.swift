@@ -1,7 +1,8 @@
+import SwiftTUICore
+
 #if os(Android)
   @_spi(MainActorUtilities) import _Concurrency
 #endif
-import SwiftTUICore
 
 extension RunLoop {
   package struct EventPump {

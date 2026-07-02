@@ -24,7 +24,10 @@ package struct ScopedContentPayload: Sendable {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveElementsClosure(context)
+    // Captured content resolves through whatever node hosts this payload — a
+    // non-transparent hosting boundary. Host-escaping entity routes must not
+    // be claimed at that node (see `ResolveContext.entityHosting`).
+    resolveElementsClosure(context.asEntityHost())
   }
 
   package func resolve(in context: ResolveContext) -> ResolvedNode {

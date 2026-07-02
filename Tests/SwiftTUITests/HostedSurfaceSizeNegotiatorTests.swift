@@ -1,6 +1,7 @@
 import SwiftTUICore
-@testable import SwiftTUIRuntime
 import Testing
+
+@testable import SwiftTUIRuntime
 
 @Test
 func hosted_surface_initial_sizing_probes_parent_without_showing_warmup_grid() {

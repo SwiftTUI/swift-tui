@@ -1,9 +1,8 @@
+@_spi(Testing) import SwiftTUICore
 @_spi(Runners) import SwiftTUIRuntime
 @_spi(Testing) import SwiftTUITestSupport
 import SwiftTUIViews
 import Testing
-
-@_spi(Testing) import SwiftTUICore
 
 /// Regression coverage for the scroll drag-to-pan feature shadowing taps on
 /// controls *inside* a scroll view.
@@ -90,14 +89,18 @@ struct ScrollHostedControlActivationTests {
           if inScrollView {
             ScrollView { content }
           } else {
-            VStack(alignment: .leading, spacing: 0) { content; Spacer(minLength: 0) }
+            VStack(alignment: .leading, spacing: 0) {
+              content
+              Spacer(minLength: 0)
+            }
           }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
     }
     let loc = try clickLocation(
-      forControl: "PRESSBTN", in: Fixture(taps: taps, inScrollView: inScrollView), surfaceSize: size)
+      forControl: "PRESSBTN", in: Fixture(taps: taps, inScrollView: inScrollView), surfaceSize: size
+    )
 
     let result = try await runTestSceneSession(
       scene: WindowGroup { Fixture(taps: taps, inScrollView: inScrollView) },

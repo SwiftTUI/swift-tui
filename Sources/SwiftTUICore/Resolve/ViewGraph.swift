@@ -1176,11 +1176,46 @@ package final class ViewGraph {
     nodeIfExists(for: identity)?.setSuppressesStructuralLifecycle(suppressesStructuralLifecycle)
   }
 
+  /// Whether a claim of `entityIdentity` at `identity` would cross-identity
+  /// adopt a node whose body resolution is currently on the stack. A forwarded
+  /// (`EntityRouteProvidingView`) claim from a wrapper-derived interior
+  /// `resolveView` — a `.frame`/`.padding` content wrapper re-resolving the
+  /// same chain one level down — must not steal the node an enclosing level of
+  /// the chain claimed moments ago: re-indexing it away from the enclosing
+  /// identity aliases the parent's committed child pairing (the stamp-coherence
+  /// trap). Cross-frame adoption (the routed node is idle) and same-identity
+  /// re-entrant claims (the transparent-chain collapse) are unaffected.
+  package func entityRouteTargetsMidEvaluationNode(
+    _ entityIdentity: EntityIdentity,
+    claimedAt identity: Identity
+  ) -> Bool {
+    guard let routedNodeID = entityRoutingTable.route(entityIdentity),
+      let node = nodeIfExists(for: routedNodeID)
+    else {
+      return false
+    }
+    return node.isEvaluating && node.identity != identity
+  }
+
   package func prepareEntityRoutedOwner(
     _ entityIdentity: EntityIdentity,
     for node: ViewNode?
   ) {
     guard let node else {
+      return
+    }
+    // The outermost same-frame claim owns the entity. This runs at the
+    // innermost chain level (where the `.id` modifier resolves); when an
+    // enclosing wrapper level already claimed the entity this frame — its
+    // node is mid-evaluation on the stack, or already visited — re-binding
+    // here would hand the entity to the innermost wrapper node and invert
+    // next frame's adoption direction (the outer level would cross-identity
+    // steal the inner node, aliasing the parent's committed child pairing).
+    if let boundNodeID = entityRoutingTable.route(entityIdentity),
+      boundNodeID != node.viewNodeID,
+      let bound = nodeIfExists(for: boundNodeID),
+      bound.isEvaluating
+    {
       return
     }
     let existingEntityIdentity =
@@ -1754,7 +1789,18 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
-    frameLifecycleEventPlan(
+    // The finalize-frame teardown barrier emits the departed subtrees'
+    // cancel/disappear events (an entity-routed removal deferred out of the
+    // structural diff resolves here, once the full old-vs-new entity set is
+    // known). Run it for the preview too, so the previewed plan matches the
+    // committed one. Both prunes are self-consuming — the later
+    // `finalizeFrame` re-run is a no-op — and an aborted candidate rolls the
+    // mutations back with the rest of the prepared frame state.
+    prunePendingEntityRoutedRemovals(
+      activeEntities: entityIdentities(in: resolved)
+    )
+    pruneChurnedSubtreeOrphans()
+    return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
     ).events
@@ -2182,6 +2228,7 @@ package final class ViewGraph {
     for identity: Identity,
     entityIdentity: EntityIdentity? = nil
   ) -> ViewNode {
+    var displacedOccupant = false
     if let entityIdentity,
       let routedNodeID = entityRoutingTable.route(entityIdentity)
     {
@@ -2191,9 +2238,15 @@ package final class ViewGraph {
         // identity's index entry so nothing else resolving at the old
         // (possibly aliased) identity this frame adopts the moved node — that
         // would wire it as a child inside its own subtree (a children-graph
-        // cycle).
+        // cycle). The node's own resolved identity is spared, mirroring
+        // `reindexIdentity`: it is position-independent (an explicit-id
+        // re-root resolves the same stable identity at every position), stays
+        // correct across the move, and identity-keyed lookups (`onChange`'s
+        // previous-value owner) read it mid-resolve, before the apply would
+        // restore it.
         if let previousIdentity = identityByNodeID[routedNodeID],
           previousIdentity != identity,
+          previousIdentity != routedNode.resolvedIdentity,
           nodeIDByIdentity[previousIdentity] == routedNodeID
         {
           nodeIDByIdentity.removeValue(forKey: previousIdentity)
@@ -2237,7 +2290,19 @@ package final class ViewGraph {
         // track both siblings.
         if entityIdentity.occurrence == 0 {
           if existingEntityIdentity != nil {
+            // The displaced occupant's resolved subtree departs right here —
+            // record its resolved identity so the finalize-frame sweep can
+            // catch anything this eviction's snapshot descent cannot reach
+            // (ghost placeholders, re-rooted descendants outside committed
+            // snapshots). The fresh node minted below carries the
+            // displacement mark so `ExactIdentityModifier`'s churn predicate
+            // (reuse suppression) fires even though the fresh node was never
+            // present at frame start.
+            recordChurnedSubtreeDeparture(
+              previousResolvedIdentity: existing.resolvedIdentity
+            )
             removeSubtree(rootedAt: existing)
+            displacedOccupant = true
           } else {
             recordCheckpointGraphMutation()
             entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
@@ -2263,6 +2328,9 @@ package final class ViewGraph {
     if let entityIdentity {
       entityRoutingTable.bind(entityIdentity, to: viewNodeID)
     }
+    if displacedOccupant {
+      node.entityDisplacedOccupantFrameID = currentFrameID
+    }
     return node
   }
 
@@ -2271,6 +2339,20 @@ package final class ViewGraph {
     to viewNodeID: ViewNodeID
   ) {
     guard let entityIdentity = resolved.entityIdentity else {
+      return
+    }
+    // The outermost same-frame claim owns the entity (see
+    // `prepareEntityRoutedOwner`). The entity-carrying resolved value bubbles
+    // through every wrapper level of its chain, and each level's apply lands
+    // here — an inner level must not re-bind the entity away from the
+    // enclosing claimer still on the evaluation stack, or next frame's
+    // forwarded claim adopts the inner node cross-identity and aliases the
+    // parent's committed child pairing.
+    if let boundNodeID = entityRoutingTable.route(entityIdentity),
+      boundNodeID != viewNodeID,
+      let bound = nodeIfExists(for: boundNodeID),
+      bound.isEvaluating
+    {
       return
     }
     recordCheckpointGraphMutation()
@@ -2314,23 +2396,39 @@ package final class ViewGraph {
     activeEntities: Set<EntityIdentity>
   ) {
     recordCheckpointGraphMutation()
-    let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
-    pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
-    for viewNodeID in pendingNodeIDs {
-      guard let node = nodeIfExists(for: viewNodeID),
-        let entityIdentity = node.committed.entityIdentity,
-        !activeEntities.contains(entityIdentity),
-        // Use the frame-stamped `visitedThisFrame` signal, not the stored
-        // `wasVisitedThisFrame` bool: a genuinely-gone node is never
-        // re-prepared in the frame it disappears, so the stored bool stays
-        // stale-`true` from its last live frame and would wrongly skip the
-        // teardown — leaking the node (and, for duplicate-id siblings, the
-        // occurrence-`>0` lifetime) in `nodesByNodeID` forever (G13).
-        !node.visitedThisFrame(currentFrameID)
-      else {
-        continue
+    // Fixed-point: removing a pending subtree can itself defer deeper
+    // entity-routed descendants back into the pending set. Each pass consumes
+    // a disjoint snapshot and either keeps or removes every node in it, so
+    // the loop strictly shrinks into the finite node store.
+    while !pendingEntityRoutedRemovalNodeIDs.isEmpty {
+      let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
+      pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
+      for viewNodeID in pendingNodeIDs {
+        guard let node = nodeIfExists(for: viewNodeID),
+          let entityIdentity = node.committed.entityIdentity,
+          // Use the frame-stamped `visitedThisFrame` signal, not the stored
+          // `wasVisitedThisFrame` bool: a genuinely-gone node is never
+          // re-prepared in the frame it disappears, so the stored bool stays
+          // stale-`true` from its last live frame and would wrongly skip the
+          // teardown — leaking the node (and, for duplicate-id siblings, the
+          // occurrence-`>0` lifetime) in `nodesByNodeID` forever (G13).
+          !node.visitedThisFrame(currentFrameID)
+        else {
+          continue
+        }
+        // Keep the node only while it is still the entity's live home: the
+        // entity must be active in the new tree AND still route here. An
+        // active entity that re-homed to another node this frame (an owner
+        // churn re-attached it to the arriving generation) leaves this node a
+        // displaced stale copy — tear it down, sparing any descendants the
+        // arriving tree already re-adopted (they are visited).
+        if activeEntities.contains(entityIdentity),
+          entityRoutingTable.route(entityIdentity) == node.viewNodeID
+        {
+          continue
+        }
+        removeSubtree(rootedAt: node, sparingVisitedNodes: true)
       }
-      removeSubtree(rootedAt: node)
     }
   }
 
@@ -2518,6 +2616,24 @@ package final class ViewGraph {
       node.viewNodeID != root?.viewNodeID,
       node.visitedThisFrame(currentFrameID)
     {
+      return
+    }
+
+    // An entity-routed node reached by DESCENT is not necessarily departing
+    // with the subtree being torn down: its entity may reappear elsewhere this
+    // frame (a stable explicit-id control inside a churned owner, an `AnyView`
+    // payload whose entity is re-attached by the arriving generation). Defer
+    // the decision to the frame barrier (`prunePendingEntityRoutedRemovals`),
+    // where the full old-vs-new entity set is known — the Stage 6 release
+    // contract. An explicitly removed root (`isSubtreeDescent == false`, e.g.
+    // the mid-resolve different-entity eviction) is still torn down
+    // unconditionally; that eviction is load-bearing for same-frame
+    // convergence of fixed-slot explicit-id churn.
+    if isSubtreeDescent,
+      shouldDeferEntityRoutedRemoval(of: node)
+    {
+      recordCheckpointGraphMutation()
+      pendingEntityRoutedRemovalNodeIDs.insert(node.viewNodeID)
       return
     }
 

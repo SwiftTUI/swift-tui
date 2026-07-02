@@ -671,10 +671,18 @@ struct RasterizerTests {
     let blendThenGroupCompositing = try #require(blendThenGroup.compositing)
     let groupThenBlendCompositing = try #require(groupThenBlend.compositing)
 
-    #expect(blendThenGroupCompositing.destinationBackdrop.cells == [.init(backgroundColor: .blue, glyph: " ")])
+    #expect(
+      blendThenGroupCompositing.destinationBackdrop.cells == [
+        .init(backgroundColor: .blue, glyph: " ")
+      ])
     #expect(blendThenGroupCompositing.sourceBackdrop == nil)
-    #expect(groupThenBlendCompositing.destinationBackdrop.cells == [.init(backgroundColor: .red, glyph: " ")])
-    #expect(groupThenBlendCompositing.sourceBackdrop?.cells == [.init(backgroundColor: .blue, glyph: " ")])
+    #expect(
+      groupThenBlendCompositing.destinationBackdrop.cells == [
+        .init(backgroundColor: .red, glyph: " ")
+      ])
+    #expect(
+      groupThenBlendCompositing.sourceBackdrop?.cells == [.init(backgroundColor: .blue, glyph: " ")]
+    )
     #expect(blendThenGroupCompositing != groupThenBlendCompositing)
   }
 
@@ -720,9 +728,10 @@ struct RasterizerTests {
     let surface = rasterizer.rasterize(draw)
 
     #expect(surface.lines == [" T "])
-    #expect(surface.presentationLayers.map(layerContentKind) == [
-      "cells", "cells", "cells", "image", "cells",
-    ])
+    #expect(
+      surface.presentationLayers.map(layerContentKind) == [
+        "cells", "cells", "cells", "image", "cells",
+      ])
     try #require(surface.presentationLayers.count > 3)
     let imageLayer = surface.presentationLayers[3]
     let textLayer = try #require(surface.presentationLayers.last)

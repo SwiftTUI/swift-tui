@@ -39,6 +39,12 @@ extension ViewNode {
     package var nextChangeModifierOrdinal: Int = 0
     package var nextNavigationDestinationModifierOrdinal: Int = 0
     package var nextTaskModifierOrdinal: Int = 0
+    // The frame in which this node was freshly minted after `nodeForIdentity`
+    // evicted a different-entity occupant from its identity slot. Frame-scoped
+    // by comparison against `preparedFrameID` (the `visitedFrameID` pattern)
+    // because the mint happens *before* the fresh node's first
+    // `prepareForFrame`, which would wipe a plain Bool.
+    package var entityDisplacedOccupantFrameID: UInt64 = 0
   }
 
   /// Internal node bookkeeping that persists across frames (unlike

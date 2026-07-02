@@ -139,12 +139,12 @@ extension Rasterizer {
             ),
             atX: x,
             y: y,
-              cells: &cells,
-              clip: clip,
-              blendMode: blendMode,
-              presentationRecorder: presentationRecorder,
-              presentationEffects: presentationEffects
-            )
+            cells: &cells,
+            clip: clip,
+            blendMode: blendMode,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects
+          )
           x += 1
           continue
         }

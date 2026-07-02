@@ -500,7 +500,8 @@ private final class ScrollBox: Sendable {
 
 private enum Phase1BenchmarkIdentity {
   static let root = testIdentity("Phase1Benchmark", "root")
-  static let toolbarStrip = root
+  static let toolbarStrip =
+    root
     .child(.named("content"))
     .child(.named("toolbar-strip"))
   static let incrementButton = testIdentity("Phase1Benchmark", "button")

@@ -327,7 +327,8 @@ extension SnapshotRenderer {
     case .cells(let fragment):
       return "#\(layer.order) cells[\(describe(fragment.bounds))]\(effectDescription)"
     case .image(let attachment):
-      return "#\(layer.order) image[\(describe(attachment.visibleBounds)) id=\(attachment.identity.path)]\(effectDescription)"
+      return
+        "#\(layer.order) image[\(describe(attachment.visibleBounds)) id=\(attachment.identity.path)]\(effectDescription)"
     }
   }
 

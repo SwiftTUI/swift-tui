@@ -51,9 +51,11 @@ package final class LocalGestureRegistry: Equatable {
     identity: Identity,
     recognizer: AnyGestureRecognizer
   ) {
-    guard let currentPassRecognizer = ViewNodeContext.current?.gestureRegistration(
-      for: identity
-    ) else {
+    guard
+      let currentPassRecognizer = ViewNodeContext.current?.gestureRegistration(
+        for: identity
+      )
+    else {
       register(identity: identity, recognizer: recognizer)
       return
     }
@@ -185,7 +187,8 @@ package final class LocalGestureRegistry: Equatable {
             recognizer.tearDown()
           }
           self.ownersByIdentity[identity] =
-            ownersByIdentity[identity] ?? self.ownersByIdentity[identity] ?? .init(identity: identity)
+            ownersByIdentity[identity] ?? self.ownersByIdentity[identity]
+            ?? .init(identity: identity)
           continue
         }
         if existing !== recognizer {

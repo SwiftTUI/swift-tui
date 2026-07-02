@@ -113,7 +113,8 @@ extension Button {
 
     if context.environmentValues.isEnabled, let action {
       let dynamicPropertyScope = authoringScope ?? currentAuthoringContext()
-      let mutationScope = ImperativeAuthoringContextSnapshot(dynamicPropertyScope)
+      let mutationScope =
+        ImperativeAuthoringContextSnapshot(dynamicPropertyScope)
         ?? currentImperativeAuthoringContextSnapshot()
       context.localActionRegistry?.register(
         identity: context.identity,

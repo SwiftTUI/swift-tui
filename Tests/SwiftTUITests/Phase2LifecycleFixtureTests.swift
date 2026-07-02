@@ -32,18 +32,20 @@ struct Phase2LifecycleFixtureTests {
 
     let plan = fixture.commitPlan()
 
-    #expect(plan.lifecycle.map(\.identity) == [
-      testIdentity("Branch", "A"),
-      testIdentity("Branch", "A"),
-      testIdentity("Branch", "B"),
-      testIdentity("Branch", "B"),
-    ])
-    #expect(plan.lifecycle.map(\.operation) == [
-      .taskCancel(.init(id: "task-A", priority: .medium)),
-      .disappear(handlerIDs: ["disappear-A"]),
-      .appear(handlerIDs: ["appear-B"]),
-      .taskStart(.init(id: "task-B", priority: .medium)),
-    ])
+    #expect(
+      plan.lifecycle.map(\.identity) == [
+        testIdentity("Branch", "A"),
+        testIdentity("Branch", "A"),
+        testIdentity("Branch", "B"),
+        testIdentity("Branch", "B"),
+      ])
+    #expect(
+      plan.lifecycle.map(\.operation) == [
+        .taskCancel(.init(id: "task-A", priority: .medium)),
+        .disappear(handlerIDs: ["disappear-A"]),
+        .appear(handlerIDs: ["appear-B"]),
+        .taskStart(.init(id: "task-B", priority: .medium)),
+      ])
     #expect(plan.lifecycle.map { $0.viewNodeID != nil } == [true, false, false, true])
   }
 
@@ -77,14 +79,16 @@ struct Phase2LifecycleFixtureTests {
 
     let plan = fixture.commitPlan()
 
-    #expect(plan.lifecycle.map(\.identity) == [
-      testIdentity("Container", "Leaf"),
-      testIdentity("Container", "Leaf"),
-    ])
-    #expect(plan.lifecycle.map(\.operation) == [
-      .appear(handlerIDs: ["appear-leaf"]),
-      .taskStart(.init(id: "task-leaf", priority: .high)),
-    ])
+    #expect(
+      plan.lifecycle.map(\.identity) == [
+        testIdentity("Container", "Leaf"),
+        testIdentity("Container", "Leaf"),
+      ])
+    #expect(
+      plan.lifecycle.map(\.operation) == [
+        .appear(handlerIDs: ["appear-leaf"]),
+        .taskStart(.init(id: "task-leaf", priority: .high)),
+      ])
     #expect(plan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
   }
 }

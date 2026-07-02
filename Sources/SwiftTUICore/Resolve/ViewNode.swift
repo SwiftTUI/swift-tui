@@ -113,6 +113,25 @@ package final class ViewNode {
     get { frameState.wasPresentAtFrameStart }
     set { frameState.wasPresentAtFrameStart = newValue }
   }
+  package var entityDisplacedOccupantFrameID: UInt64 {
+    get { frameState.entityDisplacedOccupantFrameID }
+    set { frameState.entityDisplacedOccupantFrameID = newValue }
+  }
+  /// True when this node was freshly minted this frame after its identity
+  /// slot's prior occupant was displaced by a different entity (an explicit-id
+  /// value churn). The churn-detection predicate in `ExactIdentityModifier`
+  /// keys on `wasPresentAtFrameStart`-style rebinding, which a displacement
+  /// mint never satisfies — this is the graph-side signal that replaces it.
+  package var hasEntityDisplacedOccupantThisFrame: Bool {
+    frameState.entityDisplacedOccupantFrameID != 0
+      && frameState.entityDisplacedOccupantFrameID == frameState.preparedFrameID
+  }
+
+  /// Whether this node is currently inside a `beginEvaluation` /
+  /// `finishEvaluation` pair (its body resolution is on the stack).
+  package var isEvaluating: Bool {
+    evaluationDepth > 0
+  }
   package var wasVisitedThisFrame: Bool {
     get { frameState.wasVisitedThisFrame }
     set { frameState.wasVisitedThisFrame = newValue }
@@ -283,6 +302,14 @@ package final class ViewNode {
     prepareForFrame(frameID)
     recordCheckpointMutation()
     self.invalidator = invalidator
+    // Re-bind to the host evaluating this reuse, exactly as `beginEvaluation`
+    // does for a recompute. A subtree reused across a capture-host re-resolve
+    // otherwise keeps a stale `evaluationHost` — possibly a retired node —
+    // orphaning the island-invalidation walk that reaches capture-hosted
+    // content only through this link.
+    if let host = ViewNodeContext.current, host !== self {
+      evaluationHost = host
+    }
     wasVisitedThisFrame = true
     visitedFrameID = frameID
     isDirty = false
@@ -1479,6 +1506,7 @@ extension ViewNode {
       nextTaskModifierOrdinal: nextTaskModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
+      entityDisplacedOccupantFrameID: entityDisplacedOccupantFrameID,
       evaluatorInstalled: evaluator != nil
     )
   }

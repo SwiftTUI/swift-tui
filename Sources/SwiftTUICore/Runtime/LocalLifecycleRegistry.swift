@@ -34,10 +34,12 @@ package struct LifecycleHandlerRegistration: Sendable {
   ) {
     self.identity = identity
     self.key = key
-    self.handlerID = handlerID ?? Self.handlerID(
-      identity: identity,
-      suffix: key.suffix
-    )
+    self.handlerID =
+      handlerID
+      ?? Self.handlerID(
+        identity: identity,
+        suffix: key.suffix
+      )
     self.handler = handler
   }
 

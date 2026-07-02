@@ -183,8 +183,7 @@ package enum MemoValueComparator {
   ///   Authors regain precision by making the enum `Equatable` (fast path).
   /// - Matching arity with payload => compare the case-name labels, then recurse
   ///   on the associated value(s).
-  private static func compareEnumCase(_ lhsMirror: Mirror, _ rhsMirror: Mirror) -> MemoComparison
-  {
+  private static func compareEnumCase(_ lhsMirror: Mirror, _ rhsMirror: Mirror) -> MemoComparison {
     let lhsChildren = Array(lhsMirror.children)
     let rhsChildren = Array(rhsMirror.children)
     guard lhsChildren.count == rhsChildren.count else {

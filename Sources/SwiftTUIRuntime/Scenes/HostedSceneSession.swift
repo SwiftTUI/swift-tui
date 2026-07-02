@@ -1,7 +1,8 @@
+import SwiftTUIViews
+
 #if os(Android)
   @_spi(MainActorUtilities) import _Concurrency
 #endif
-import SwiftTUIViews
 
 public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringConvertible {
   case sceneNotFound(WindowIdentifier)

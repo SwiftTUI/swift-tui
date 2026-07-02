@@ -139,18 +139,20 @@ struct LifecycleSelectiveEvaluationTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
-      testIdentity("Root", "Group[0]"),
-      testIdentity("Root", "Group[0]"),
-    ])
-    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
-      .taskCancel(
-        .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
-      ),
-      .taskStart(
-        .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
-      ),
-    ])
+    #expect(
+      updated.commitPlan.lifecycle.map(\.identity) == [
+        testIdentity("Root", "Group[0]"),
+        testIdentity("Root", "Group[0]"),
+      ])
+    #expect(
+      updated.commitPlan.lifecycle.map(\.operation) == [
+        .taskCancel(
+          .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
+        ),
+        .taskStart(
+          .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
+        ),
+      ])
     #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
   }
 
@@ -167,18 +169,20 @@ struct LifecycleSelectiveEvaluationTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
-      testIdentity("Root", "Group[0]"),
-      testIdentity("Root", "Group[0]"),
-    ])
-    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
-      .taskCancel(
-        .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
-      ),
-      .taskStart(
-        .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
-      ),
-    ])
+    #expect(
+      updated.commitPlan.lifecycle.map(\.identity) == [
+        testIdentity("Root", "Group[0]"),
+        testIdentity("Root", "Group[0]"),
+      ])
+    #expect(
+      updated.commitPlan.lifecycle.map(\.operation) == [
+        .taskCancel(
+          .init(id: "Root/Group[0]#task[id:1]", priority: .userInitiated)
+        ),
+        .taskStart(
+          .init(id: "Root/Group[0]#task[id:2]", priority: .userInitiated)
+        ),
+      ])
     #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
   }
 
@@ -195,14 +199,16 @@ struct LifecycleSelectiveEvaluationTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(updated.commitPlan.lifecycle.map(\.identity) == [
-      testIdentity("Root", "false", "Group[0]")
-    ])
-    #expect(updated.commitPlan.lifecycle.map(\.operation) == [
-      .taskCancel(
-        .init(id: "Root/true/Group[0]#task[id:1]", priority: .userInitiated)
-      )
-    ])
+    #expect(
+      updated.commitPlan.lifecycle.map(\.identity) == [
+        testIdentity("Root", "false", "Group[0]")
+      ])
+    #expect(
+      updated.commitPlan.lifecycle.map(\.operation) == [
+        .taskCancel(
+          .init(id: "Root/true/Group[0]#task[id:1]", priority: .userInitiated)
+        )
+      ])
     #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
   }
 }

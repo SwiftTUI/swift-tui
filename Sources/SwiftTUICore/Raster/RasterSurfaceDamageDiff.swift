@@ -82,8 +82,9 @@ package enum RasterSurfaceDamageDiff {
     current: RasterSurface,
     to rowRanges: inout [Int: [Range<Int>]]
   ) {
-    guard presentationLayerTopology(previous.presentationLayers)
-      != presentationLayerTopology(current.presentationLayers)
+    guard
+      presentationLayerTopology(previous.presentationLayers)
+        != presentationLayerTopology(current.presentationLayers)
     else {
       return
     }

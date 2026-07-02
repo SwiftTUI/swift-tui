@@ -57,10 +57,11 @@ package final class LifecycleCoordinator {
         currentLifecycleRegistry.changeHandler(for: handlerID)?()
       }
     case .taskStart(let descriptor):
-      guard let registration = currentTaskRegistry.registration(
-        for: entry.identity,
-        descriptor: descriptor
-      ),
+      guard
+        let registration = currentTaskRegistry.registration(
+          for: entry.identity,
+          descriptor: descriptor
+        ),
         let viewNodeID = entry.viewNodeID
       else {
         return

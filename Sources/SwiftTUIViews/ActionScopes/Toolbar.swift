@@ -316,12 +316,13 @@ private func resolvedToolbarItemsStrip<S: ToolbarStyle>(
 
   if !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.cachedReusableResolvedNode(
-    namespace: toolbarStripReuseCacheNamespace,
-    owner: context.identity,
-    signature: signature.cacheSignature,
-    environment: context.environment,
-    transaction: context.transaction
-  ) {
+      namespace: toolbarStripReuseCacheNamespace,
+      owner: context.identity,
+      signature: signature.cacheSignature,
+      environment: context.environment,
+      transaction: context.transaction
+    )
+  {
     context.viewGraph?.recordReusedSubtree(
       reused,
       invalidator: context.invalidationProxy?.invalidator,

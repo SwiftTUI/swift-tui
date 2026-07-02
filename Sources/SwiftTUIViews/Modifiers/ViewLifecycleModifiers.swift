@@ -96,15 +96,16 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
     )
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let lifecycleAction = action
-    let handlerID = context.localLifecycleRegistry?.registerAppear(
-      identity: node.identity,
-      ordinal: node.lifecycleMetadata.appearHandlerIDs.count,
-      handler: {
-        withImperativeAuthoringContext(authoringContext) {
-          lifecycleAction()
+    let handlerID =
+      context.localLifecycleRegistry?.registerAppear(
+        identity: node.identity,
+        ordinal: node.lifecycleMetadata.appearHandlerIDs.count,
+        handler: {
+          withImperativeAuthoringContext(authoringContext) {
+            lifecycleAction()
+          }
         }
-      }
-    ) ?? "\(node.identity)#appear[\(node.lifecycleMetadata.appearHandlerIDs.count)]"
+      ) ?? "\(node.identity)#appear[\(node.lifecycleMetadata.appearHandlerIDs.count)]"
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
       .init(appearHandlerIDs: [handlerID])
     )
@@ -126,15 +127,16 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
     )
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let lifecycleAction = action
-    let handlerID = context.localLifecycleRegistry?.registerDisappear(
-      identity: node.identity,
-      ordinal: node.lifecycleMetadata.disappearHandlerIDs.count,
-      handler: {
-        withImperativeAuthoringContext(authoringContext) {
-          lifecycleAction()
+    let handlerID =
+      context.localLifecycleRegistry?.registerDisappear(
+        identity: node.identity,
+        ordinal: node.lifecycleMetadata.disappearHandlerIDs.count,
+        handler: {
+          withImperativeAuthoringContext(authoringContext) {
+            lifecycleAction()
+          }
         }
-      }
-    ) ?? "\(node.identity)#disappear[\(node.lifecycleMetadata.disappearHandlerIDs.count)]"
+      ) ?? "\(node.identity)#disappear[\(node.lifecycleMetadata.disappearHandlerIDs.count)]"
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
       .init(disappearHandlerIDs: [handlerID])
     )
@@ -216,15 +218,16 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
     let oldValue = previousValue ?? value
     let lifecycleAction = action
 
-    let handlerID = context.localLifecycleRegistry?.registerChange(
-      identity: node.identity,
-      ordinal: modifierOrdinal,
-      handler: {
-        withImperativeAuthoringContext(authoringContext) {
-          lifecycleAction(oldValue, value)
+    let handlerID =
+      context.localLifecycleRegistry?.registerChange(
+        identity: node.identity,
+        ordinal: modifierOrdinal,
+        handler: {
+          withImperativeAuthoringContext(authoringContext) {
+            lifecycleAction(oldValue, value)
+          }
         }
-      }
-    ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
+      ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
     ownerNode?.queueChangeHandler(handlerID)
     return [node]
   }

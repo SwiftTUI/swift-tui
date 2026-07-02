@@ -175,6 +175,18 @@ where Content: View, Modifier: ViewModifier {
     }
     return nil
   }
+
+  package var providesHostEscapingEntityRoute: Bool {
+    // Mirrors the forwarding cascade above: escaping-ness is a property of
+    // whichever provider actually supplies the route.
+    if let entityModifier = modifier as? any EntityRouteProvidingModifier {
+      return entityModifier.providesHostEscapingEntityRoute
+    }
+    if let entityContent = content as? any EntityRouteProvidingView {
+      return entityContent.providesHostEscapingEntityRoute
+    }
+    return false
+  }
 }
 
 extension ModifiedContent: Sendable where Content: Sendable, Modifier: Sendable {}

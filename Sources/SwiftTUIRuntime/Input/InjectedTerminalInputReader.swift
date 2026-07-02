@@ -94,24 +94,24 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
         AsyncStream<InputEvent>.Continuation?,
         (@Sendable (InputEvent) -> Void)?
       ) = state.withLock { state in
-      guard !state.finished else {
-        return (
-          nil as AsyncStream<InputEvent>.Continuation?,
-          nil as (@Sendable (InputEvent) -> Void)?
-        )
-      }
+        guard !state.finished else {
+          return (
+            nil as AsyncStream<InputEvent>.Continuation?,
+            nil as (@Sendable (InputEvent) -> Void)?
+          )
+        }
 
-      if let directHandler = state.directHandler {
-        return (nil, directHandler)
-      }
+        if let directHandler = state.directHandler {
+          return (nil, directHandler)
+        }
 
-      guard let continuation = state.continuation else {
-        state.pendingEvents.append(event)
-        return (nil, nil)
-      }
+        guard let continuation = state.continuation else {
+          state.pendingEvents.append(event)
+          return (nil, nil)
+        }
 
-      return (continuation, nil)
-    }
+        return (continuation, nil)
+      }
 
     if let directHandler {
       directHandler(event)

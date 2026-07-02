@@ -64,6 +64,7 @@ extension ViewNode {
     package var nextTaskModifierOrdinal: Int
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
+    package var entityDisplacedOccupantFrameID: UInt64
     package var evaluatorInstalled: Bool
   }
 }

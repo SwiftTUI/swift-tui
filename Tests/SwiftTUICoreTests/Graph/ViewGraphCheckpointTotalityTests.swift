@@ -118,8 +118,8 @@ struct ViewGraphCheckpointTotalityTests {
         relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
       )
     }
-    // 11 FrameState + 6 EvaluationState + 3 ReuseState + 5 PersistentState
-    #expect(groupMembers.count == 25)
+    // 12 FrameState + 6 EvaluationState + 3 ReuseState + 5 PersistentState
+    #expect(groupMembers.count == 26)
 
     let snapshotBody = functionBodyText(
       named: "debugTotalStateSnapshot",

@@ -190,7 +190,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       policy: ImageBlendCompositorCachePolicy
     ) {
       accessGeneration += 1
-      var entry = entries[key]
+      var entry =
+        entries[key]
         ?? CacheEntry(
           id: variant.id,
           pixelSize: variant.image.pixelSize,
@@ -216,7 +217,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       policy: ImageBlendCompositorCachePolicy
     ) {
       accessGeneration += 1
-      var entry = entries[key]
+      var entry =
+        entries[key]
         ?? CacheEntry(
           id: payload.id,
           pixelSize: payload.pixelSize,
@@ -355,7 +357,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       return nil
     }
 
-    let outputSize = requestedOutputSize ?? blendedOutputSize(for: attachment, compositing: compositing)
+    let outputSize =
+      requestedOutputSize ?? blendedOutputSize(for: attachment, compositing: compositing)
     guard outputSize.width > 0, outputSize.height > 0 else {
       return nil
     }
@@ -392,7 +395,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     }
 
     let id = blendedImageID(for: key)
-    let encodedBytes = lookup.encodedBytes
+    let encodedBytes =
+      lookup.encodedBytes
       ?? ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize)
     let presentationAttachment = imageBlendPresentationAttachment(
       from: attachment,
@@ -517,14 +521,18 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       width: max(1, visibleBounds.size.width * max(1, cellPixelSize.width)),
       height: max(1, visibleBounds.size.height * max(1, cellPixelSize.height))
     )
-    let hiddenLeftPixels = max(0, visibleBounds.origin.x - bounds.origin.x) * max(
-      1,
-      cellPixelSize.width
-    )
-    let hiddenTopPixels = max(0, visibleBounds.origin.y - bounds.origin.y) * max(
-      1,
-      cellPixelSize.height
-    )
+    let hiddenLeftPixels =
+      max(0, visibleBounds.origin.x - bounds.origin.x)
+      * max(
+        1,
+        cellPixelSize.width
+      )
+    let hiddenTopPixels =
+      max(0, visibleBounds.origin.y - bounds.origin.y)
+      * max(
+        1,
+        cellPixelSize.height
+      )
     let cellPixelWidth = max(1, cellPixelSize.width)
     let cellPixelHeight = max(1, cellPixelSize.height)
 
@@ -626,7 +634,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   ) -> PixelSize {
     PixelSize(
       width: max(1, attachment.visibleBounds.size.width * max(1, compositing.cellPixelSize.width)),
-      height: max(1, attachment.visibleBounds.size.height * max(1, compositing.cellPixelSize.height))
+      height: max(
+        1, attachment.visibleBounds.size.height * max(1, compositing.cellPixelSize.height))
     )
   }
 
@@ -688,26 +697,28 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     case .quadrant(let mask):
       let column = min(1, (x * 2) / width)
       let row = min(1, (y * 2) / height)
-      let bit: UInt8 = switch (row, column) {
-      case (0, 0): 0b0001
-      case (0, 1): 0b0010
-      case (1, 0): 0b0100
-      default: 0b1000
-      }
+      let bit: UInt8 =
+        switch (row, column) {
+        case (0, 0): 0b0001
+        case (0, 1): 0b0010
+        case (1, 0): 0b0100
+        default: 0b1000
+        }
       return (mask & bit) != 0
     case .braille(let mask):
       let column = min(1, (x * 2) / width)
       let row = min(3, (y * 4) / height)
-      let bitIndex: UInt8 = switch (column, row) {
-      case (0, 0): 0
-      case (0, 1): 1
-      case (0, 2): 2
-      case (1, 0): 3
-      case (1, 1): 4
-      case (1, 2): 5
-      case (0, 3): 6
-      default: 7
-      }
+      let bitIndex: UInt8 =
+        switch (column, row) {
+        case (0, 0): 0
+        case (0, 1): 1
+        case (0, 2): 2
+        case (1, 0): 3
+        case (1, 1): 4
+        case (1, 2): 5
+        case (0, 3): 6
+        default: 7
+        }
       return (mask & (UInt8(1) << bitIndex)) != 0
     case .textApproximation:
       let textSpanWidth = max(1, spanWidth)
