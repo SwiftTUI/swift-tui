@@ -122,6 +122,45 @@ struct ViewGraphTests {
     #expect(leafEvaluations == 1)
   }
 
+  @Test("graph-local suppression dirty work forms a plan without scheduler invalidation")
+  func graphLocalSuppressionDirtyWorkFormsPlanWithoutSchedulerInvalidation() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let readerIdentity = testIdentity("Root", "Reader")
+    let leafIdentity = testIdentity("Root", "Reader", "Leaf")
+    let stableIdentity = testIdentity("Root", "Stable")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(
+            identity: readerIdentity,
+            kind: .view("Reader"),
+            children: [
+              ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+            ]
+          ),
+          ResolvedNode(identity: stableIdentity, kind: .view("Stable")),
+        ]
+      )
+    )
+
+    graph.setRootEvaluator(rootIdentity: rootIdentity) {}
+    graph.setEvaluator(for: readerIdentity) {}
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirtyDescendants(of: [readerIdentity])
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: []
+    )
+
+    #expect(result.plan?.frontierIdentities == [readerIdentity])
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.invalidatedIdentityCount == 0)
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 0)
+  }
+
   @Test("graph-local root dirtiness still reevaluates through the root node evaluator")
   func graphLocalRootDirtyEvaluationUsesRootNodeEvaluator() {
     let graph = ViewGraph()

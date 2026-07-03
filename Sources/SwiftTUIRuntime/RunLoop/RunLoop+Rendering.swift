@@ -49,15 +49,13 @@ extension RunLoop {
         // its runtime readers. A stale scope here would let a focus reader
         // outside it take retained reuse of pre-relocation content.
         let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
-        if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
+        if convergence.rerenderedForFocusSync || retainedReuseSuppressionScope.suppressesAll {
           renderer.forceRootEvaluation()
         }
         if !retainedReuseSuppressionScope.isEmpty {
-          // Reuse-unsafe identities: forcing root evaluation only makes the
-          // walk *reach* every node — each reached node still independently
-          // chooses reuse — so suppress the fast path for the affected scope.
-          // Focus-sync rerenders still keep reuse to carry first-pass
-          // measurement/scroll state across the convergence loop.
+          // Finite reuse-unsafe scopes are queued as graph-local dirty work by
+          // the frame head. Identity-agnostic scopes and focus-sync rerenders
+          // remain root-forced because there is no narrower target to name.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let renderedArtifacts = renderer.renderArtifacts(
@@ -273,15 +271,13 @@ extension RunLoop {
         // scope would let a focus reader outside it reuse pre-relocation
         // content.
         let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
-        if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
+        if convergence.rerenderedForFocusSync || retainedReuseSuppressionScope.suppressesAll {
           renderer.forceRootEvaluation()
         }
         if !retainedReuseSuppressionScope.isEmpty {
-          // Reuse-unsafe identities: forcing root evaluation only makes the
-          // walk *reach* every node — each reached node still independently
-          // chooses reuse — so suppress the fast path for the affected scope.
-          // Focus-sync rerenders still keep reuse to carry first-pass
-          // measurement/scroll state across the convergence loop.
+          // Finite reuse-unsafe scopes are queued as graph-local dirty work by
+          // the frame head. Identity-agnostic scopes and focus-sync rerenders
+          // remain root-forced because there is no narrower target to name.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let acquired = await acquireFrameArtifactsAsync(

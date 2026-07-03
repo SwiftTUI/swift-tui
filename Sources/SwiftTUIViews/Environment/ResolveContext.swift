@@ -327,7 +327,16 @@ public struct ResolveContext: Equatable, Sendable {
     var refreshed = self
     refreshed.invalidatedIdentities = inputs.invalidatedIdentities
     refreshed.invalidationSummary = inputs.invalidationSummary
+    var environmentValues = refreshed.environmentValues
+    environmentValues.focusedIdentity = inputs.environmentValues.focusedIdentity
+    environmentValues.pressedIdentity = inputs.environmentValues.pressedIdentity
+    refreshed.environmentValues = Self.contextualEnvironmentValues(
+      environmentValues,
+      for: refreshed.identity
+    )
+    refreshed.focusedValues = inputs.focusedValues
     refreshed.transaction = inputs.transaction
+    refreshed.resolveWorkTracker = inputs.resolveWorkTracker
     return refreshed
   }
 

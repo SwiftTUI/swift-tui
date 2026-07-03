@@ -294,6 +294,7 @@ struct DefaultRendererFrameHeadCoordinator {
     viewGraph.beginFrame()
     if resolveInputs.usesSelectiveEvaluation {
       viewGraph.invalidateAndQueueDirty(resolveInputs.invalidatedIdentities)
+      queueRetainedReuseSuppressionScope(resolveInputs.retainedReuseSuppressionScope)
     } else {
       viewGraph.invalidate(resolveInputs.invalidatedIdentities)
     }
@@ -301,6 +302,17 @@ struct DefaultRendererFrameHeadCoordinator {
     return resolveContext.observationBridge?.makeDraft(
       attaching: viewGraph
     )
+  }
+
+  private func queueRetainedReuseSuppressionScope(
+    _ scope: RetainedReuseSuppressionScope
+  ) {
+    guard !scope.isEmpty,
+      !scope.suppressesAll
+    else {
+      return
+    }
+    viewGraph.invalidateAndQueueDirtyDescendants(of: scope.identities)
   }
 
   private func installPresentationPortalEvaluator<V: View>(

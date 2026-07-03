@@ -292,6 +292,99 @@ struct ResolveReuseAncestorInvalidationTests {
     #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
   }
 
+  @Test("finite focus suppression reaches focus readers without root force")
+  func finiteFocusSuppressionReachesFocusReadersWithoutRootForce() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let rootIdentity = testIdentity("FiniteFocusSuppression")
+    let readoutID = testIdentity("FiniteFocusSuppression", "Readout")
+    let previousID = testIdentity("FiniteFocusSuppression", "Previous")
+    let currentID = testIdentity("FiniteFocusSuppression", "Current")
+    let stableID = testIdentity("FiniteFocusSuppression", "Stable")
+
+    struct FocusReaderShell: View {
+      let readoutID: Identity
+      let previousID: Identity
+      let currentID: Identity
+      let stableID: Identity
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+            Text(focusLabel(focusedIdentity))
+          }
+          .id(readoutID)
+          Button("previous") {}
+            .id(previousID)
+          Button("current") {}
+            .id(currentID)
+          VStack(alignment: .leading, spacing: 0) {
+            Text("stable sibling")
+          }
+          .id(stableID)
+        }
+      }
+
+      private func focusLabel(_ focusedIdentity: Identity?) -> String {
+        if focusedIdentity == currentID {
+          return "focus current"
+        }
+        if focusedIdentity == previousID {
+          return "focus previous"
+        }
+        return "focus none"
+      }
+    }
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = previousID
+    _ = renderer.render(
+      FocusReaderShell(
+        readoutID: readoutID,
+        previousID: previousID,
+        currentID: currentID,
+        stableID: stableID
+      ),
+      context: .init(
+        identity: rootIdentity,
+        environmentValues: environmentValues
+      )
+    )
+
+    renderer.enableSelectiveEvaluation()
+    environmentValues.focusedIdentity = currentID
+    var suppressionIdentities = renderer.runtimeFocusStateDependentIdentities()
+    #expect(!suppressionIdentities.isEmpty)
+    suppressionIdentities.insert(previousID)
+    suppressionIdentities.insert(currentID)
+    renderer.suppressRetainedReuseForNextFrame(
+      .init(identities: suppressionIdentities)
+    )
+
+    let updated = renderer.render(
+      FocusReaderShell(
+        readoutID: readoutID,
+        previousID: previousID,
+        currentID: currentID,
+        stableID: stableID
+      ),
+      context: .init(
+        identity: rootIdentity,
+        environmentValues: environmentValues
+      )
+    )
+
+    let rendered = updated.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("focus current"))
+    #expect(!rendered.contains("focus previous"))
+    #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
+    #expect(
+      renderer.debugRuntimeSubsystemSnapshot().frameInputs.inputs?
+        .usesSelectiveEvaluation == true
+    )
+  }
+
   @Test("runtime focus-state dependency tracking is limited to authored environment readers")
   func runtimeFocusStateDependencyTrackingFindsEnvironmentReadersOnly() {
     let renderer = DefaultRenderer(
