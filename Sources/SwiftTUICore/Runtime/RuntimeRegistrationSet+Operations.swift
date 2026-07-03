@@ -94,8 +94,11 @@ extension RuntimeRegistrationSet {
     let activeGestureIdentities = gestureRegistry?.activeIdentitySnapshot() ?? []
     let pointerHandlerRegistrations =
       handlers.pointerHandlerRegistrations.filter { routeID, _ in
+        // Pairing (not exact) lookup: the live gesture handler may have
+        // re-registered under a re-minted owner, and the recorded routeID's
+        // stale owner must still recognize it and skip the stale restore.
         !(activeGestureIdentities.contains(routeID.identity)
-          && (pointerHandlerRegistry?.hasHandler(routeID: routeID) ?? false))
+          && (pointerHandlerRegistry?.hasHandler(pairingWith: routeID) ?? false))
       }
     actionRegistry?.restore(
       handlers.actionRegistrations,
@@ -107,11 +110,13 @@ extension RuntimeRegistrationSet {
     )
     keyHandlerRegistry?.restoreKeyPressHandlers(
       handlers.keyPressHandlerRegistrations,
-      ownersByIdentity: handlers.keyPressHandlerRegistrationOwners
+      ownersByIdentity: handlers.keyPressHandlerRegistrationOwners,
+      ordinalsByIdentity: handlers.keyPressHandlerRegistrationOrdinals
     )
     keyHandlerRegistry?.restorePasteHandlers(
       handlers.pasteHandlerRegistrations,
-      ownersByIdentity: handlers.pasteHandlerRegistrationOwners
+      ownersByIdentity: handlers.pasteHandlerRegistrationOwners,
+      ordinalsByIdentity: handlers.pasteHandlerRegistrationOrdinals
     )
     terminationRegistry?.restore(
       handlers.terminationHandlerRegistrations,

@@ -711,7 +711,7 @@ struct TabViewSurfaceTests {
     let triggerRouteID = primaryRouteID(
       for: testIdentity("Tabs").child(.named("TabOverflowTrigger"))
     )
-    #expect(pointerRegistry.hasHandler(routeID: triggerRouteID))
+    #expect(pointerRegistry.hasHandler(pairingWith: triggerRouteID))
     #expect(
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
@@ -731,7 +731,7 @@ struct TabViewSurfaceTests {
     let hiddenRouteID = primaryRouteID(
       for: testIdentity("Tabs").child(.indexed("TabOverflowItem", index: 3))
     )
-    #expect(pointerRegistry.hasHandler(routeID: hiddenRouteID))
+    #expect(pointerRegistry.hasHandler(pairingWith: hiddenRouteID))
     #expect(
       pointerRegistry.dispatch(
         routeID: hiddenRouteID,

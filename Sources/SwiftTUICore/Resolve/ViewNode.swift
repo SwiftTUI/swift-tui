@@ -1004,22 +1004,26 @@ package final class ViewNode {
 
   package func recordKeyPressHandlerRegistration(
     identity: Identity,
+    ordinal: UInt64,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordKeyPressHandler(
       identity: identity,
+      ordinal: ordinal,
       handler: handler
     )
   }
 
   package func recordPasteHandlerRegistration(
     identity: Identity,
+    ordinal: UInt64,
     handler: @escaping LocalKeyHandlerRegistry.PasteHandler
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordPasteHandler(
       identity: identity,
+      ordinal: ordinal,
       handler: handler
     )
   }

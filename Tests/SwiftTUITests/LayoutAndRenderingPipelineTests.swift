@@ -58,14 +58,17 @@ struct LayoutAndRenderingPipelineTests {
     #expect(artifacts.placedTree.children[1].identity == testIdentity("Root", "VStack[1]"))
     #expect(artifacts.semanticSnapshot.focusRegions.count == 1)
     #expect(artifacts.semanticSnapshot.interactionRegions.count == 1)
+    // Pairing (not exact) matches: pipeline-minted routes carry the producing
+    // node's `ownerNodeID`; the test addresses them by identity + kind.
     #expect(
-      artifacts.semanticSnapshot.interactionRegions[0].routeID == testRoute("Root", "VStack[1]"))
+      artifacts.semanticSnapshot.interactionRegions[0].routeID
+        .pairsIgnoringOwner(with: testRoute("Root", "VStack[1]")))
     #expect(artifacts.drawTree.children.count == 2)
     #expect(artifacts.rasterSurface.lines == ["Hello", "", "Tap"])
+    #expect(artifacts.commitPlan.handlerInstallations.count == 1)
     #expect(
-      artifacts.commitPlan.handlerInstallations == [
-        .init(handlerID: testRoute("Root", "VStack[1]"))
-      ])
+      artifacts.commitPlan.handlerInstallations.first?.handlerID
+        .pairsIgnoringOwner(with: testRoute("Root", "VStack[1]")) == true)
   }
 
   @Test("overlay layout places children at the same origin and raster keeps last draw visible")

@@ -1003,10 +1003,10 @@ struct RuntimeRegistrationRestoreScopingTests {
       node.recordKeyHandlerRegistration(identity: identity) { _ in
         marker.hasSuffix("1")
       }
-      node.recordKeyPressHandlerRegistration(identity: identity) { _ in
+      node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in
         marker.hasSuffix("1")
       }
-      node.recordPasteHandlerRegistration(identity: identity) { _ in
+      node.recordPasteHandlerRegistration(identity: identity, ordinal: 0) { _ in
         marker.hasSuffix("1")
       }
       node.recordTerminationHandlerRegistration(identity: identity) { _ in

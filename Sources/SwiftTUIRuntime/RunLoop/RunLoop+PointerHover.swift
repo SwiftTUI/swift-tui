@@ -18,8 +18,11 @@ extension RunLoop {
         )
       }
 
+    // Paired lookup: a fallback hover route from the ancestor walk carries no
+    // `ownerNodeID`, while every snapshot region carries one, so the exact
+    // probe alone would never find its region.
     guard let hoveredRouteID,
-      let hoveredRegion = interactionRegion(routeID: hoveredRouteID)
+      let hoveredRegion = pairedInteractionRegion(for: hoveredRouteID)
     else {
       clearPointerHover()
       return
@@ -30,7 +33,15 @@ extension RunLoop {
       y: location.location.y - Double(hoveredRegion.rect.origin.y)
     )
 
-    if hoveredPointerRouteID == hoveredRouteID {
+    // Owner-agnostic continuity: a churn frame that re-minted the hovered
+    // control's chrome changes only the route's `ownerNodeID`. The pointer
+    // never left the logical control, so re-key to the fresh route and keep
+    // reporting `.moved` — an exact comparison would fabricate an exit/enter
+    // flicker on every mid-hover re-mint.
+    if let currentRouteID = hoveredPointerRouteID,
+      currentRouteID.pairsIgnoringOwner(with: hoveredRouteID)
+    {
+      hoveredPointerRouteID = hoveredRouteID
       localPointerHandlerRegistry.dispatchHover(
         routeID: hoveredRouteID,
         phase: .moved(localLocation)
@@ -60,7 +71,11 @@ extension RunLoop {
     startingAt identity: Identity,
     preferredRouteID: RouteID
   ) -> RouteID? {
-    if localPointerHandlerRegistry.hasHoverHandler(routeID: preferredRouteID) {
+    // Pairing (not exact) lookups: the hit region's route carries the placed
+    // node's owner while the handler registered under its evaluation node's —
+    // the two legitimately differ (and diverge further across re-mints), so
+    // an exact registry probe would miss live handlers.
+    if localPointerHandlerRegistry.hasHoverHandler(pairingWith: preferredRouteID) {
       return preferredRouteID
     }
 
@@ -69,7 +84,7 @@ extension RunLoop {
       excluding: preferredRouteID
     )
     .first { routeID in
-      localPointerHandlerRegistry.hasHoverHandler(routeID: routeID)
+      localPointerHandlerRegistry.hasHoverHandler(pairingWith: routeID)
     }
   }
 
@@ -80,10 +95,16 @@ extension RunLoop {
       return
     }
 
+    // Owner-agnostic: pressed-state feedback must survive a mid-press re-mint
+    // of the armed control's chrome, exactly like the release pairing.
     let currentRouteID = hitTarget(at: location)?.region.routeID
-    if currentRouteID == armedRouteID,
-      let region = interactionRegion(routeID: armedRouteID)
+    if let currentRouteID,
+      currentRouteID.pairsIgnoringOwner(with: armedRouteID),
+      let region = pairedInteractionRegion(for: armedRouteID)
     {
+      if region.routeID != armedRouteID {
+        pointerInteraction.rekeyArmedRoute(to: region.routeID)
+      }
       setPressedIdentity(focusIdentity(for: region.identity), transient: false)
     } else {
       setPressedIdentity(nil, transient: false)

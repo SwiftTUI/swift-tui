@@ -5584,8 +5584,10 @@ private func renderedInteractionRect<V: View>(
     proposal: .init(width: terminalSize.width, height: terminalSize.height)
   )
 
+  // Pairing (not exact) match: tests address regions by identity + kind, while
+  // every snapshot region carries the minting node's `ownerNodeID`.
   return artifacts.semanticSnapshot.interactionRegions.first { region in
-    region.routeID == routeID
+    region.routeID.pairsIgnoringOwner(with: routeID)
   }?.rect
 }
 

@@ -2579,7 +2579,9 @@ struct AsyncFrameTailRenderingTests {
     try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
     let buttonRect = try #require(
       runLoop.latestSemanticSnapshot.interactionRegions.first { region in
-        region.routeID == primaryRouteID(for: buttonIdentity)
+        // Pairing (not exact) match: the snapshot's region carries the minting
+        // node's `ownerNodeID`; the test addresses it by identity + kind.
+        region.routeID.pairsIgnoringOwner(with: primaryRouteID(for: buttonIdentity))
       }?.rect
     )
     let clickLocation = asyncFrameHeadCenterPoint(of: buttonRect)

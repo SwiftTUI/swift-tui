@@ -51,6 +51,18 @@ package final class LocalKeyHandlerRegistry: Equatable {
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
   package typealias PasteHandler = @MainActor (String) -> Bool
 
+  /// One contributing owner's stacked handlers plus the persisted ordinal of
+  /// the bucket's first registration. The ordinal — not the owner's
+  /// `ViewNodeID` — carries dispatch priority between buckets: node IDs
+  /// re-allocate when a level's node re-mints, so an order inferred from them
+  /// inverts which stacked handler consumes first as soon as only part of the
+  /// stack republishes, while a recorded ordinal survives scoped restores
+  /// unchanged.
+  private struct ContributedBucket<H> {
+    var ordinal: UInt64
+    var handlers: [H]
+  }
+
   /// One identity's handlers can be contributed by SEVERAL live nodes: stacked
   /// modifiers register at the same resolved identity while each level captures
   /// on its own evaluation node. The registry therefore buckets handlers per
@@ -59,15 +71,21 @@ package final class LocalKeyHandlerRegistry: Equatable {
   /// cannot wipe node B's stacked sibling handler, and repeated restores of one
   /// node stay idempotent.
   private struct ContributedHandlers<H> {
-    var byOwner: [RuntimeRegistrationOwnerKey: [H]] = [:]
+    var byOwner: [RuntimeRegistrationOwnerKey: ContributedBucket<H>] = [:]
 
     var flattened: [H] {
-      // Descending owner order (nil owners last) mirrors in-frame registration
-      // order: inner modifier levels resolve — and register — before outer
-      // levels, and their evaluation nodes are allocated after them.
+      // Ascending ordinal order mirrors in-frame registration order: inner
+      // modifier levels resolve — and register — before outer levels. The
+      // owner tiebreak (descending, nil owners last) only orders buckets whose
+      // ordinals collide, which unique minting makes effectively unreachable.
       byOwner
-        .sorted { lhs, rhs in lhs.key > rhs.key }
-        .flatMap(\.value)
+        .sorted { lhs, rhs in
+          if lhs.value.ordinal != rhs.value.ordinal {
+            return lhs.value.ordinal < rhs.value.ordinal
+          }
+          return lhs.key > rhs.key
+        }
+        .flatMap(\.value.handlers)
     }
 
     var isEmpty: Bool {
@@ -79,6 +97,10 @@ package final class LocalKeyHandlerRegistry: Equatable {
   private var keyPressHandlers: [Identity: ContributedHandlers<KeyPressHandler>] = [:]
   private var pasteHandlers: [Identity: ContributedHandlers<PasteHandler>] = [:]
   private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  /// Monotonic mint for ``ContributedBucket/ordinal``. Never reset: ordinals
+  /// only need a stable relative order, and reuse after `reset()` could pair a
+  /// fresh bucket with a restored one's recorded ordinal.
+  private var nextContributionOrdinal: UInt64 = 0
 
   package init() {}
 
@@ -105,12 +127,15 @@ package final class LocalKeyHandlerRegistry: Equatable {
     keyPressHandler: @escaping KeyPressHandler
   ) {
     let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
+    let ordinal =
+      keyPressHandlers[identity]?.byOwner[owner]?.ordinal ?? claimContributionOrdinal()
     keyPressHandlers[identity, default: .init()]
-      .byOwner[owner, default: []]
-      .append(keyPressHandler)
+      .byOwner[owner, default: ContributedBucket(ordinal: ordinal, handlers: [])]
+      .handlers.append(keyPressHandler)
     ownersByIdentity[identity] = owner
     ViewNodeContext.current?.recordKeyPressHandlerRegistration(
       identity: identity,
+      ordinal: ordinal,
       handler: keyPressHandler
     )
   }
@@ -120,14 +145,22 @@ package final class LocalKeyHandlerRegistry: Equatable {
     pasteHandler: @escaping PasteHandler
   ) {
     let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
+    let ordinal =
+      pasteHandlers[identity]?.byOwner[owner]?.ordinal ?? claimContributionOrdinal()
     pasteHandlers[identity, default: .init()]
-      .byOwner[owner, default: []]
-      .append(pasteHandler)
+      .byOwner[owner, default: ContributedBucket(ordinal: ordinal, handlers: [])]
+      .handlers.append(pasteHandler)
     ownersByIdentity[identity] = owner
     ViewNodeContext.current?.recordPasteHandlerRegistration(
       identity: identity,
+      ordinal: ordinal,
       handler: pasteHandler
     )
+  }
+
+  private func claimContributionOrdinal() -> UInt64 {
+    defer { nextContributionOrdinal += 1 }
+    return nextContributionOrdinal
   }
 
   @discardableResult
@@ -248,7 +281,8 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
   package func restoreKeyPressHandlers(
     _ snapshot: [Identity: [KeyPressHandler]],
-    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:],
+    ordinalsByIdentity: [Identity: UInt64] = [:]
   ) {
     guard !snapshot.isEmpty else {
       return
@@ -256,14 +290,26 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
     for (identity, handlers) in snapshot {
       let owner = ownersByIdentity[identity] ?? .init(identity: identity)
-      keyPressHandlers[identity, default: .init()].byOwner[owner] = handlers
+      // The recorded ordinal keeps the restored bucket's dispatch priority
+      // where it was originally registered; only a snapshot predating the
+      // record (none in practice) falls back to a fresh mint. The mint always
+      // advances past restored ordinals so a genuinely fresh registration
+      // joins the back of the stack instead of colliding into a tie.
+      let ordinal =
+        ordinalsByIdentity[identity]
+        ?? keyPressHandlers[identity]?.byOwner[owner]?.ordinal
+        ?? claimContributionOrdinal()
+      nextContributionOrdinal = max(nextContributionOrdinal, ordinal + 1)
+      keyPressHandlers[identity, default: .init()].byOwner[owner] =
+        ContributedBucket(ordinal: ordinal, handlers: handlers)
       self.ownersByIdentity[identity] = owner
     }
   }
 
   package func restorePasteHandlers(
     _ snapshot: [Identity: [PasteHandler]],
-    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:],
+    ordinalsByIdentity: [Identity: UInt64] = [:]
   ) {
     guard !snapshot.isEmpty else {
       return
@@ -271,7 +317,13 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
     for (identity, handlers) in snapshot {
       let owner = ownersByIdentity[identity] ?? .init(identity: identity)
-      pasteHandlers[identity, default: .init()].byOwner[owner] = handlers
+      let ordinal =
+        ordinalsByIdentity[identity]
+        ?? pasteHandlers[identity]?.byOwner[owner]?.ordinal
+        ?? claimContributionOrdinal()
+      nextContributionOrdinal = max(nextContributionOrdinal, ordinal + 1)
+      pasteHandlers[identity, default: .init()].byOwner[owner] =
+        ContributedBucket(ordinal: ordinal, handlers: handlers)
       self.ownersByIdentity[identity] = owner
     }
   }

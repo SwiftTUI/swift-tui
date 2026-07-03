@@ -6,8 +6,10 @@ package struct NodeHandlers {
   package var keyHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]]
   package var keyPressHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
+  package var keyPressHandlerRegistrationOrdinals: [Identity: UInt64]
   package var pasteHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.PasteHandler]]
   package var pasteHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
+  package var pasteHandlerRegistrationOrdinals: [Identity: UInt64]
   package var terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]]
   package var terminationHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
@@ -36,8 +38,10 @@ package struct NodeHandlers {
     keyHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]] = [:],
     keyPressHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
+    keyPressHandlerRegistrationOrdinals: [Identity: UInt64] = [:],
     pasteHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.PasteHandler]] = [:],
     pasteHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
+    pasteHandlerRegistrationOrdinals: [Identity: UInt64] = [:],
     terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]] = [:],
     terminationHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
@@ -65,8 +69,10 @@ package struct NodeHandlers {
     self.keyHandlerRegistrationOwners = keyHandlerRegistrationOwners
     self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
     self.keyPressHandlerRegistrationOwners = keyPressHandlerRegistrationOwners
+    self.keyPressHandlerRegistrationOrdinals = keyPressHandlerRegistrationOrdinals
     self.pasteHandlerRegistrations = pasteHandlerRegistrations
     self.pasteHandlerRegistrationOwners = pasteHandlerRegistrationOwners
+    self.pasteHandlerRegistrationOrdinals = pasteHandlerRegistrationOrdinals
     self.terminationHandlerRegistrations = terminationHandlerRegistrations
     self.terminationHandlerRegistrationOwners = terminationHandlerRegistrationOwners
     self.pointerHandlerRegistrations = pointerHandlerRegistrations
@@ -150,17 +156,21 @@ package struct NodeHandlers {
 
   package mutating func recordKeyPressHandler(
     identity: Identity,
+    ordinal: UInt64,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
     keyPressHandlerRegistrationOwners[identity] = .current(identity: identity)
+    keyPressHandlerRegistrationOrdinals[identity] = ordinal
     keyPressHandlerRegistrations[identity, default: []].append(handler)
   }
 
   package mutating func recordPasteHandler(
     identity: Identity,
+    ordinal: UInt64,
     handler: @escaping LocalKeyHandlerRegistry.PasteHandler
   ) {
     pasteHandlerRegistrationOwners[identity] = .current(identity: identity)
+    pasteHandlerRegistrationOrdinals[identity] = ordinal
     pasteHandlerRegistrations[identity, default: []].append(handler)
   }
 

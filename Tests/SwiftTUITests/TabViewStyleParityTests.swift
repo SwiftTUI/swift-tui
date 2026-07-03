@@ -45,7 +45,7 @@ struct TabViewStyleParityTests {
     )
 
     let routeID = tabItemRouteID(for: tabsIdentity, index: 1)
-    #expect(pointerRegistry.hasHandler(routeID: routeID))
+    #expect(pointerRegistry.hasHandler(pairingWith: routeID))
     #expect(
       pointerRegistry.dispatch(
         routeID: routeID,
@@ -81,7 +81,7 @@ struct TabViewStyleParityTests {
     )
 
     let triggerRouteID = tabOverflowTriggerRouteID(for: tabsIdentity)
-    #expect(pointerRegistry.hasHandler(routeID: triggerRouteID))
+    #expect(pointerRegistry.hasHandler(pairingWith: triggerRouteID))
     #expect(
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
@@ -112,7 +112,7 @@ struct TabViewStyleParityTests {
     )
 
     let overflowItemRouteID = tabOverflowItemRouteID(for: tabsIdentity, index: 2)
-    #expect(pointerRegistry.hasHandler(routeID: overflowItemRouteID))
+    #expect(pointerRegistry.hasHandler(pairingWith: overflowItemRouteID))
     #expect(
       pointerRegistry.dispatch(
         routeID: overflowItemRouteID,

@@ -62,6 +62,28 @@ package struct PointerInteractionState: Equatable, Sendable {
     armedRouteUsesPointerHandler = false
   }
 
+  /// Re-key the armed route after a mid-press re-mint: the control's region
+  /// re-appeared under the same identity + kind with a fresh `ownerNodeID`, so
+  /// subsequent events must pair against the fresh route. The pointer-handler
+  /// flag and press origin describe the logical interaction, not the node, and
+  /// carry over unchanged. No-op unless a route is armed.
+  package mutating func rekeyArmedRoute(to routeID: RouteID) {
+    guard armedRouteID != nil else {
+      return
+    }
+    armedRouteID = routeID
+  }
+
+  /// Captured counterpart of ``rekeyArmedRoute(to:)``: keeps a mid-gesture
+  /// capture pointing at the control's live route across a re-mint instead of
+  /// letting the stale route force-release the capture.
+  package mutating func rekeyCapturedRoute(to routeID: RouteID) {
+    guard capturedRouteID != nil else {
+      return
+    }
+    capturedRouteID = routeID
+  }
+
   /// Drop all routing — armed and captured — but keep the press origin. Used
   /// when a press resolves to nothing actionable, or when a captured region
   /// disappears from the rendered tree mid-interaction.

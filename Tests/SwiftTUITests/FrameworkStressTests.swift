@@ -384,6 +384,127 @@ struct FrameworkStressTests {
     #expect(maxHoverHandlers == 1)
   }
 
+  @Test("captured drag keeps dispatching when its route's owner re-mints mid-gesture")
+  func capturedDragKeepsDispatchingWhenRouteOwnerReMintsMidGesture() throws {
+    // Hypothesis: a capturing gesture (DragGesture) must keep receiving
+    // `.dragged` and `.up` when the captured route's `ownerNodeID` goes stale
+    // mid-gesture — the effect a churn frame's chrome re-mint has on a route
+    // captured at press time (the region re-appears with a fresh owner under
+    // the same stable identity). The capture must re-key by identity + kind
+    // pairing instead of being force-released, which silently dropped the
+    // rest of the gesture including `onEnded`. The staleness is injected
+    // directly so the straddle is exercised deterministically, independent of
+    // how aggressively node reuse preserves owners for any given churn shape;
+    // the fixture's own `.id` churn per change keeps the real seam in play.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("CapturedDragChurnStressRoot"),
+      size: .init(width: 78, height: 8)
+    ) {
+      CapturedDragChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    func staleCapturedRoute() throws {
+      let captured = try #require(harness.runLoop.pointerInteraction.capturedRouteID)
+      harness.runLoop.pointerInteraction.capture(
+        RouteID(
+          identity: captured.identity,
+          kind: captured.kind,
+          ownerNodeID: ViewNodeID(rawValue: .max)
+        )
+      )
+    }
+
+    let start = try #require(harness.point(forText: "Drag Pad"))
+    var frame = try harness.sendMouse(.down(.primary), at: start)
+    #expect(frame.contains("changes 1 ends 0"), "press must arm the drag; frame:\n\(frame)")
+
+    // A stale captured owner must not stop `.dragged` dispatch.
+    try staleCapturedRoute()
+    frame = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 2, y: start.y))
+    #expect(
+      frame.contains("changes 2 ends 0"),
+      "drag must pair a stale captured route to the live region; frame:\n\(frame)"
+    )
+
+    // Focus-sync on a rendered frame must re-key — not force-release — a
+    // stale captured route whose control is still present.
+    try staleCapturedRoute()
+    _ = try harness.render()
+    frame = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 3, y: start.y))
+    #expect(
+      frame.contains("changes 3 ends 0"),
+      "focus-sync must keep a paired capture alive; frame:\n\(frame)"
+    )
+
+    // The release must still reach `onEnded` through a stale captured route.
+    try staleCapturedRoute()
+    frame = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 3, y: start.y))
+    #expect(
+      frame.contains("changes 4 ends 1"),
+      "captured release must pair to the live region; frame:\n\(frame)"
+    )
+  }
+
+  @Test("hover stays continuous when its route's owner re-mints mid-hover")
+  func hoverStaysContinuousWhenRouteOwnerReMintsMidHover() throws {
+    // Hypothesis: a pointer that never leaves a hovered control must observe a
+    // continuous hover — `.entered` once, then `.moved` — even when the stored
+    // hover route's `ownerNodeID` goes stale mid-hover (the effect of a churn
+    // frame re-minting the control's chrome). The stored route re-keys by
+    // identity + kind pairing; an exact comparison instead fabricated an
+    // exit/enter flicker on the next move. Staleness is injected directly so
+    // the straddle is deterministic; the fixture's own `.id` churn on the
+    // first move keeps the real seam in play.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("HoverContinuityChurnStressRoot"),
+      size: .init(width: 78, height: 8)
+    ) {
+      HoverContinuityChurnStressFixture()
+    }
+    defer { harness.shutdown() }
+
+    func staleHoveredRoute() throws {
+      let hovered = try #require(harness.runLoop.hoveredPointerRouteID)
+      harness.runLoop.hoveredPointerRouteID = RouteID(
+        identity: hovered.identity,
+        kind: hovered.kind,
+        ownerNodeID: ViewNodeID(rawValue: .max)
+      )
+    }
+
+    let hoverPoint = try #require(harness.point(forText: "Hover Strip"))
+    _ = try harness.movePointer(to: hoverPoint)
+
+    // A move that arrives while the stored route's owner is stale must stay a
+    // `.moved`, not a fabricated exit/enter pair. (This move also churns the
+    // fixture's owner.)
+    try staleHoveredRoute()
+    var frame = try harness.movePointer(to: Point(x: hoverPoint.x + 1, y: hoverPoint.y))
+    #expect(
+      frame.contains("hover generation 1 entered 1 moved 1 exited 0"),
+      "hover must stay continuous across a stale owner; frame:\n\(frame)"
+    )
+
+    // Focus-sync must re-key — not drop — a stale hovered route whose control
+    // is still present, so the following move stays `.moved`.
+    try staleHoveredRoute()
+    _ = try harness.render()
+    frame = try harness.movePointer(to: Point(x: hoverPoint.x + 2, y: hoverPoint.y))
+    #expect(
+      frame.contains("hover generation 1 entered 1 moved 2 exited 0"),
+      "focus-sync must keep a paired hover alive; frame:\n\(frame)"
+    )
+
+    // Leaving the control must still deliver `.exited` through a stale route.
+    try staleHoveredRoute()
+    frame = try harness.movePointer(to: Point(x: 77, y: 7))
+    #expect(
+      frame.contains("hover generation 1 entered 1 moved 2 exited 1"),
+      "hover exit must pair to the live handler; frame:\n\(frame)"
+    )
+  }
+
   @Test("directed stress discovery case", arguments: FrameworkStressDiscoveryCase.allCases)
   func directedStressDiscoveryCase(_ discoveryCase: FrameworkStressDiscoveryCase) throws {
     try discoveryCase.run()
@@ -1514,6 +1635,109 @@ private struct PointerHoverHandlerChurnOwner: View {
       }
       .onAppear {}
       .onDisappear {}
+  }
+}
+
+private struct CapturedDragChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var changes = 0
+  @State private var ends = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("drag generation \(generation) changes \(changes) ends \(ends)")
+      CapturedDragChurnOwner(
+        onChanged: {
+          changes += 1
+          // Every drag change re-mints the owner, so the NEXT gesture event
+          // must pair across a re-mint to keep dispatching.
+          generation += 1
+        },
+        onEnded: { ends += 1 }
+      )
+      .id(testIdentity("CapturedDragChurn", "owner", "\(generation)"))
+    }
+    .frame(width: 78, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct CapturedDragChurnOwner: View {
+  let onChanged: @MainActor () -> Void
+  let onEnded: @MainActor () -> Void
+
+  var body: some View {
+    // The AnyView capture seam takes the owner's churned `.id`, so the pad
+    // below keeps its stable explicit identity while the seam's re-rooting
+    // re-mints its node each generation.
+    AnyView(
+      Text("Drag Pad")
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture()
+            .onChanged { _ in onChanged() }
+            .onEnded { _ in onEnded() }
+        )
+        .id(testIdentity("CapturedDragChurn", "pad"))
+    )
+  }
+}
+
+private struct HoverContinuityChurnStressFixture: View {
+  @State private var generation = 0
+  @State private var enteredTotal = 0
+  @State private var movedTotal = 0
+  @State private var exitedTotal = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(
+        """
+        hover generation \(generation) entered \(enteredTotal) moved \(movedTotal) \
+        exited \(exitedTotal)
+        """
+      )
+      HoverContinuityChurnOwner(
+        onEntered: { enteredTotal += 1 },
+        onMoved: {
+          movedTotal += 1
+          // The first move re-mints the owner mid-hover; continuity means the
+          // next move is still `.moved`, not a fabricated exit/enter pair.
+          if movedTotal == 1 {
+            generation += 1
+          }
+        },
+        onExited: { exitedTotal += 1 }
+      )
+      .id(testIdentity("HoverContinuityChurn", "owner", "\(generation)"))
+    }
+    .frame(width: 78, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct HoverContinuityChurnOwner: View {
+  let onEntered: @MainActor () -> Void
+  let onMoved: @MainActor () -> Void
+  let onExited: @MainActor () -> Void
+
+  var body: some View {
+    // The AnyView capture seam takes the owner's churned `.id`, so the strip
+    // below keeps its stable explicit identity while the seam's re-rooting
+    // re-mints its node each generation.
+    AnyView(
+      Text("Hover Strip")
+        .frame(width: 24, height: 1, alignment: .leading)
+        .id(testIdentity("HoverContinuityChurn", "strip"))
+        .onPointerHover { phase in
+          switch phase {
+          case .entered:
+            onEntered()
+          case .moved:
+            onMoved()
+          case .exited:
+            onExited()
+          }
+        }
+    )
   }
 }
 
@@ -4492,7 +4716,7 @@ private struct MultipleTaskModifierStressID: Equatable, Sendable {
 @MainActor
 private final class StressRuntimeHarness<Content: View> {
   private let terminal: StressRecordingHost
-  private let runLoop: SwiftTUIRuntime.RunLoop<Int, Content>
+  let runLoop: SwiftTUIRuntime.RunLoop<Int, Content>
   private var renderedFrames = 0
   private var didShutdown = false
 
@@ -4752,7 +4976,7 @@ private final class StressRuntimeHarness<Content: View> {
   }
 
   @discardableResult
-  private func sendMouse(_ kind: MouseEvent.Kind, at point: Point) throws -> String {
+  func sendMouse(_ kind: MouseEvent.Kind, at point: Point) throws -> String {
     #expect(
       runLoop.handle(
         RuntimeEvent.input(InputEvent.mouse(.init(kind: kind, location: point)))

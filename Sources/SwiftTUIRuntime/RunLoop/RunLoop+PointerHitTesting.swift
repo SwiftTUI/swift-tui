@@ -90,6 +90,25 @@ extension RunLoop {
     }
   }
 
+  /// Region lookup for an event stream that may straddle a re-mint. A route
+  /// captured or armed at press time carries the `ownerNodeID` of the node
+  /// that minted it; if a churn frame rebuilds that node mid-interaction, the
+  /// snapshot's region for the same logical control carries a fresh owner and
+  /// an exact match fails. Resolve exactly first, then pair by identity + kind
+  /// (topmost `hitTestOrder` wins, deterministically). The returned region's
+  /// own `routeID` is the fresh one — callers that hold the stale route across
+  /// further events should re-key their stored state to it.
+  package func pairedInteractionRegion(
+    for routeID: RouteID
+  ) -> InteractionRegion? {
+    if let exact = interactionRegion(routeID: routeID) {
+      return exact
+    }
+    return latestSemanticSnapshot.interactionRegions
+      .filter { $0.routeID.pairsIgnoringOwner(with: routeID) }
+      .max { $0.hitTestOrder < $1.hitTestOrder }
+  }
+
   package func focusIdentity(
     for identity: Identity
   ) -> Identity? {
@@ -152,22 +171,17 @@ extension RunLoop {
 
     while let current = nextIdentity {
       let candidateRouteID = primaryRouteID(for: current)
-      if !strictlySameRouteID(candidateRouteID, routeID) {
+      // Pairing (not strict) exclusion: the candidate for the starting
+      // identity is the preferred route minus its owner, and dispatch resolves
+      // both to the same handler — including it would probe that handler a
+      // second time with the same event.
+      if !candidateRouteID.pairsIgnoringOwner(with: routeID) {
         candidates.append(candidateRouteID)
       }
       nextIdentity = current.parent
     }
 
     return candidates
-  }
-
-  private func strictlySameRouteID(
-    _ lhs: RouteID,
-    _ rhs: RouteID
-  ) -> Bool {
-    lhs.identity == rhs.identity
-      && lhs.kind == rhs.kind
-      && lhs.ownerNodeID == rhs.ownerNodeID
   }
 
   package func isActivationIdentity(

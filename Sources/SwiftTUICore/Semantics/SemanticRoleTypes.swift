@@ -213,28 +213,14 @@ public struct RouteID: Hashable, Sendable, CustomStringConvertible {
     "\(identity.path)#\(kind)"
   }
 
-  /// A copy scoped to identity + kind only, with no owning node. Because a `nil`
-  /// `ownerNodeID` matches any occupant in `==`, this pairs with a route whose
-  /// node re-minted (e.g. a control's chrome rebuilt under owner `.id` churn)
-  /// while its identity stayed stable.
-  package var ownerAgnostic: RouteID {
-    RouteID(identity: identity, kind: kind)
-  }
-
-  public static func == (lhs: RouteID, rhs: RouteID) -> Bool {
-    guard lhs.identity == rhs.identity, lhs.kind == rhs.kind else {
-      return false
-    }
-    switch (lhs.ownerNodeID, rhs.ownerNodeID) {
-    case (.some(let lhsID), .some(let rhsID)):
-      return lhsID == rhsID
-    case (.none, _), (_, .none):
-      return true
-    }
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(identity)
-    hasher.combine(kind)
+  /// Whether `other` addresses the same logical route regardless of which
+  /// node minted it. A control whose chrome re-mints (e.g. under owner `.id`
+  /// churn) keeps its identity and kind but gets a fresh `ownerNodeID`, so an
+  /// event stream that started before the re-mint must pair by identity + kind
+  /// alone. Unlike a wildcard `==`, this is a transitive equivalence, so it is
+  /// safe to use as an explicit query while `==` stays strict for dictionary
+  /// keys.
+  package func pairsIgnoringOwner(with other: RouteID) -> Bool {
+    identity == other.identity && kind == other.kind
   }
 }

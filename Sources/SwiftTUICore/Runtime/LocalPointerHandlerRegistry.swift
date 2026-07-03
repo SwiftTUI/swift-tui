@@ -141,7 +141,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     recency: UInt64
   ) {
     let collidingRoutes = hoverHandlers.keys.filter { existing in
-      existing == routeID.ownerAgnostic && existing != routeID
+      existing.pairsIgnoringOwner(with: routeID) && existing != routeID
     }
     for existing in collidingRoutes {
       let existingRecency = hoverHandlerRecencies[existing] ?? 0
@@ -164,14 +164,81 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handlers[routeID] != nil
   }
 
+  package func hasHandler(
+    pairingWith routeID: RouteID
+  ) -> Bool {
+    handlerRouteID(pairingWith: routeID) != nil
+  }
+
   package func hasHoverHandler(
     routeID: RouteID
   ) -> Bool {
     hoverHandlers[routeID] != nil
   }
 
+  package func hasHoverHandler(
+    pairingWith routeID: RouteID
+  ) -> Bool {
+    hoverRouteID(pairingWith: routeID) != nil
+  }
+
   package var hasHoverSubscribers: Bool {
     !hoverHandlers.isEmpty
+  }
+
+  /// Resolves the registered key that pairs with `routeID`: the exact key when
+  /// present, else — after a re-mint changed the route's `ownerNodeID` — the
+  /// paired key (same identity + kind) whose owner is freshest. Among several
+  /// paired entries (a stale shadowed copy next to a live re-registration) the
+  /// highest `ownerNodeID` wins, `nil`-owner entries last: node IDs allocate
+  /// monotonically, so the freshest registration is the live one. The pick is
+  /// a total order, so delivery is deterministic where the old wildcard
+  /// `RouteID.==` dictionary probe was hash-seeded.
+  package func handlerRouteID(
+    pairingWith routeID: RouteID
+  ) -> RouteID? {
+    if handlers[routeID] != nil {
+      return routeID
+    }
+    return handlers.keys
+      .filter { $0.pairsIgnoringOwner(with: routeID) }
+      .max { Self.staleOwnerFirst($0.ownerNodeID, $1.ownerNodeID) }
+  }
+
+  /// Hover counterpart of ``handlerRouteID(pairingWith:)``. Prefers the entry
+  /// with the freshest recency stamp (the contributing node's visited frame),
+  /// tie-broken by owner, so a stale shadowed copy that survived eviction can
+  /// never outrank the live re-registration.
+  package func hoverRouteID(
+    pairingWith routeID: RouteID
+  ) -> RouteID? {
+    if hoverHandlers[routeID] != nil {
+      return routeID
+    }
+    return hoverHandlers.keys
+      .filter { $0.pairsIgnoringOwner(with: routeID) }
+      .max { lhs, rhs in
+        let lhsRecency = hoverHandlerRecencies[lhs] ?? 0
+        let rhsRecency = hoverHandlerRecencies[rhs] ?? 0
+        if lhsRecency != rhsRecency {
+          return lhsRecency < rhsRecency
+        }
+        return Self.staleOwnerFirst(lhs.ownerNodeID, rhs.ownerNodeID)
+      }
+  }
+
+  private static func staleOwnerFirst(
+    _ lhs: ViewNodeID?,
+    _ rhs: ViewNodeID?
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.none, .some):
+      true
+    case (.some, .none), (.none, .none):
+      false
+    case (.some(let lhsID), .some(let rhsID)):
+      lhsID < rhsID
+    }
   }
 
   @discardableResult
@@ -179,25 +246,23 @@ package final class LocalPointerHandlerRegistry: Equatable {
     routeID: RouteID,
     event: LocalPointerEvent
   ) -> Bool {
-    handlers[routeID]?(event) ?? false
+    guard let resolved = handlerRouteID(pairingWith: routeID) else {
+      return false
+    }
+    return handlers[resolved]?(event) ?? false
   }
 
   package func dispatchHover(
     routeID: RouteID,
     phase: HoverPhase
   ) {
-    if let handler = hoverHandlers[routeID] {
-      handler(phase)
+    // The caller's route may carry a stale `ownerNodeID` (a hover exit paired
+    // against a route captured before the hovered node re-minted), so resolve
+    // through the same explicit pairing query the pointer release path uses.
+    guard let resolved = hoverRouteID(pairingWith: routeID) else {
       return
     }
-    // The caller's route may carry a stale `ownerNodeID` (a hover exit paired
-    // against a route captured before the hovered node re-minted). The stale
-    // registry entry that used to satisfy that exact match is evicted on
-    // re-registration now, so fall back to the same owner-agnostic pairing the
-    // pointer release path uses.
-    hoverHandlers.first { existing, _ in
-      existing == routeID.ownerAgnostic
-    }?.value(phase)
+    hoverHandlers[resolved]?(phase)
   }
 
   package func reset() {

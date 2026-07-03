@@ -1851,9 +1851,7 @@ SwiftTUICore.RichTextRun.init(text:style:destination:linkIdentifier:)
 SwiftTUICore.RichTextRun.style
 SwiftTUICore.RichTextRun.text
 SwiftTUICore.RouteID
-SwiftTUICore.RouteID.==(_:_:)
 SwiftTUICore.RouteID.description
-SwiftTUICore.RouteID.hash(into:)
 SwiftTUICore.RouteID.identity
 SwiftTUICore.RouteID.init(identity:kind:)
 SwiftTUICore.RouteID.kind

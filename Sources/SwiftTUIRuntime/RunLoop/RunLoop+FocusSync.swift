@@ -72,18 +72,32 @@ extension RunLoop {
     localFocusedValuesRegistry.pruneToTreeIdentities(in: renderedArtifacts.resolvedTree)
     try updateTerminalPointerHoverModeIfNeeded()
 
-    // Release pointer capture if the captured region disappeared from
-    // the rendered tree (e.g. a view with an active gesture was removed
-    // mid-interaction).
-    if let capturedID = pointerInteraction.capturedRouteID,
-      interactionRegion(routeID: capturedID) == nil
-    {
-      pointerInteraction.clearRouting()
+    // Release pointer capture only if the captured control genuinely left the
+    // rendered tree (e.g. a view with an active gesture was removed
+    // mid-interaction). A churn frame that merely re-minted the control's
+    // chrome keeps a region at the same identity + kind under a fresh
+    // `ownerNodeID` — re-key the capture to it instead of force-releasing a
+    // live gesture.
+    if let capturedID = pointerInteraction.capturedRouteID {
+      if let paired = pairedInteractionRegion(for: capturedID) {
+        if paired.routeID != capturedID {
+          pointerInteraction.rekeyCapturedRoute(to: paired.routeID)
+        }
+      } else {
+        pointerInteraction.clearRouting()
+      }
     }
-    if let hoveredPointerRouteID,
-      interactionRegion(routeID: hoveredPointerRouteID) == nil
-    {
-      self.hoveredPointerRouteID = nil
+    // Same re-mint tolerance for hover continuity: only a genuinely departed
+    // region ends the hover; a re-minted one re-keys so the next move stays a
+    // `.moved`, not a spurious exit/enter pair.
+    if let hoveredPointerRouteID {
+      if let paired = pairedInteractionRegion(for: hoveredPointerRouteID) {
+        if paired.routeID != hoveredPointerRouteID {
+          self.hoveredPointerRouteID = paired.routeID
+        }
+      } else {
+        self.hoveredPointerRouteID = nil
+      }
     }
 
     let previousModalFocusScopePath = currentModalFocusScopePath()

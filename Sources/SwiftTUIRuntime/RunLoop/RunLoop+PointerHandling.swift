@@ -124,11 +124,16 @@ extension RunLoop {
       setPressedIdentity(nil, transient: false)
     }
 
+    // Paired (not exact) region lookup: a captured gesture's `.up` must still
+    // reach the recognizer when the control's chrome re-minted mid-gesture —
+    // the same press/release straddle the armed path below tolerates. Without
+    // it the release is dropped entirely: capture nils the armed route, so
+    // there is no second chance.
     if let capturedRouteID = pointerInteraction.capturedRouteID,
-      let region = interactionRegion(routeID: capturedRouteID)
+      let region = pairedInteractionRegion(for: capturedRouteID)
     {
       _ = dispatchPointerEvent(
-        preferredRouteID: capturedRouteID,
+        preferredRouteID: region.routeID,
         identity: region.identity,
         event: .init(
           kind: .up(.primary),
@@ -160,14 +165,11 @@ extension RunLoop {
     // mid-press frame) rebuilds the control's chrome with a fresh `ViewNodeID`,
     // so the region's `RouteID.ownerNodeID` changes while its stable identity and
     // kind do not. An exact match then fails and the release is dropped — a click
-    // whose press/release straddle a churn stops dispatching. Fall back to an
-    // owner-agnostic match (nil `ownerNodeID` is a wildcard in `RouteID.==`) so
-    // the release still pairs with the same logical control. The action itself is
-    // registered at the control's stable identity, so dispatch below is unaffected.
-    guard
-      let region = interactionRegion(routeID: armedRouteID)
-        ?? interactionRegion(routeID: armedRouteID.ownerAgnostic)
-    else {
+    // whose press/release straddle a churn stops dispatching. Pair by identity +
+    // kind so the release still reaches the same logical control. The action
+    // itself is registered at the control's stable identity, so dispatch below
+    // is unaffected.
+    guard let region = pairedInteractionRegion(for: armedRouteID) else {
       return
     }
 
@@ -194,7 +196,7 @@ extension RunLoop {
     // still be over the armed control, but a mid-press re-mint changes only the
     // hit region's `ownerNodeID`, not its identity, so compare owner-agnostically.
     guard let upRouteID = hitTarget?.region.routeID,
-      upRouteID == armedRouteID || upRouteID == armedRouteID.ownerAgnostic
+      upRouteID.pairsIgnoringOwner(with: armedRouteID)
     else {
       return
     }
@@ -229,10 +231,16 @@ extension RunLoop {
     }
     if pointerInteraction.armedRouteUsesPointerHandler,
       let armedRouteID = pointerInteraction.armedRouteID,
-      let region = interactionRegion(routeID: armedRouteID)
+      let region = pairedInteractionRegion(for: armedRouteID)
     {
+      // A churn frame mid-press re-minted the armed control's chrome; the
+      // paired region carries the fresh route, so adopt it for the rest of
+      // the interaction.
+      if region.routeID != armedRouteID {
+        pointerInteraction.rekeyArmedRoute(to: region.routeID)
+      }
       let handled = dispatchPointerEvent(
-        preferredRouteID: armedRouteID,
+        preferredRouteID: region.routeID,
         identity: region.identity,
         event: .init(
           kind: .dragged(.primary),
@@ -268,14 +276,19 @@ extension RunLoop {
     }
 
     if let capturedRouteID = pointerInteraction.capturedRouteID,
-      let region = interactionRegion(routeID: capturedRouteID)
+      let region = pairedInteractionRegion(for: capturedRouteID)
     {
+      // A churn frame mid-gesture re-minted the captured control's chrome;
+      // adopt the paired region's fresh route so later events match exactly.
+      if region.routeID != capturedRouteID {
+        pointerInteraction.rekeyCapturedRoute(to: region.routeID)
+      }
       // Sample the captured pan so a release can estimate fling velocity. Cheap
       // and harmless for non-scroll captured routes (consumed only at a scroll
       // route's `.up`).
       recordScrollPanSample(location: location, timestamp: timestamp)
       _ = dispatchPointerEvent(
-        preferredRouteID: capturedRouteID,
+        preferredRouteID: region.routeID,
         identity: region.identity,
         event: .init(
           kind: .dragged(.primary),

@@ -33,6 +33,16 @@ package final class LocalGestureRegistry: Equatable {
         if existing !== recognizer {
           recognizer.tearDown()
         }
+        // The preserved mid-interaction recognizer is now hosted by the node
+        // that attempted the replacement: re-own (and re-record) it so
+        // liveness pruning against the fresh frame's nodes keeps the active
+        // gesture. A mid-gesture owner re-mint would otherwise strand it on
+        // the departed node and tear it down in flight.
+        ownersByIdentity[identity] = .current(identity: identity)
+        ViewNodeContext.current?.recordGestureRegistration(
+          identity: identity,
+          recognizer: existing
+        )
         return
       }
       if existing !== recognizer {
