@@ -94,6 +94,148 @@ struct AnimationScopedReuseRuntimeTests {
   }
 }
 
+extension AnimationScopedReuseRuntimeTests {
+  /// A focus relocation DISCOVERED MID-FRAME (the focused control is removed
+  /// with a transition, and focus-sync adopts the next candidate after the
+  /// first resolve pass) must reach runtime focus readers in the SAME
+  /// committed frame: the eager rerender pass recomputes the frame-safety
+  /// scope, so the relocated focus target's runtime readers are suppressed
+  /// out of retained reuse even though the frame's ordinary invalidation does
+  /// not touch them. With a frame-start scope snapshot, the disjoint readout
+  /// below reuses its pre-relocation content and the committed frame shows
+  /// the OLD focus.
+  @Test("mid-frame focus relocation reaches disjoint runtime focus readers in the committed frame")
+  func midFrameFocusRelocationReachesDisjointFocusReaders() throws {
+    let terminalSize = CellSize(width: 60, height: 6)
+    let rootIdentity = testIdentity("ScopedReuseFocusRelocation", "Root")
+    let terminal = ScopedReuseProbeTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ScopedReuseEmptyInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        FocusRelocationScopedReuseProbe()
+      }
+    )
+
+    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+      AnimationCompletionStorage.currentSink = nil
+    }
+
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    // Mount (focus adopts the panel's button) + the onAppear follow-up frame:
+    // the focused button's subtree is removed with a transition, so the SAME
+    // frame's focus-sync pass discovers the loss, adopts the surviving
+    // button, and eagerly rerenders.
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    // Frame timeline: [0] mount, [1] removal starts (panel-gone onAppear
+    // requests survivor focus post-commit), [2] the request resolves and
+    // focus-sync relocates focus mid-frame — the frame under test. Later
+    // frames recompute fully via the tracker's root invalidation, so only
+    // frame [2] discriminates a stale frame-start suppression scope.
+    #expect(terminal.presentedFrames.count >= 3, "expected the relocation frame to present")
+    let relocationFrame = try #require(
+      terminal.presentedFrames.dropFirst(2).first,
+      "the relocation frame must present"
+    )
+    let readoutLine = try #require(
+      relocationFrame.split(separator: "\n").first(where: { $0.contains("F:") }),
+      "the focus readout line must render: \(relocationFrame)"
+    )
+    #expect(
+      readoutLine.contains("SurvivorButton"),
+      "committed relocation frame shows: \(readoutLine)"
+    )
+    #expect(
+      !readoutLine.contains("PanelButton"),
+      "the disjoint focus readout must not reuse pre-relocation content: \(readoutLine)"
+    )
+    #expect(
+      !runLoop.renderer.internalAnimationController.debugStateSnapshot()
+        .removingIdentities.isEmpty,
+      "the removal transition must still be in flight on the relocation frame"
+    )
+  }
+}
+
+private struct FocusRelocationScopedReuseProbe: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      RelocationPanelSection()
+        .id(testIdentity("RelocationPanelSection"))
+      RelocationFocusReadout()
+        .id(testIdentity("RelocationFocusReadout"))
+    }
+    .frame(width: 60, height: 6)
+  }
+}
+
+private struct RelocationPanelSection: View {
+  @State private var showPanel: Bool = true
+  @FocusState private var survivorFocused: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if showPanel {
+        Button("panel") {}
+          .id(testIdentity("PanelButton"))
+          .transition(.opacity)
+      } else {
+        // Appears on the removal frame; its onAppear fires post-commit and
+        // requests survivor focus, so the NEXT frame resolves the request and
+        // focus-sync relocates focus MID-frame (eager rerender) while the
+        // removal transition is still in flight.
+        Text("panel gone")
+          .onAppear {
+            survivorFocused = true
+          }
+      }
+      Button("survivor") {}
+        .id(testIdentity("SurvivorButton"))
+        .focused($survivorFocused)
+    }
+    .onAppear {
+      withAnimation(.linear(duration: .milliseconds(200))) {
+        showPanel = false
+      }
+    }
+  }
+}
+
+private struct RelocationFocusReadout: View {
+  var body: some View {
+    EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+      Text("F:\(focusedIdentity?.path.suffix(40) ?? "none")")
+    }
+  }
+}
+
 private struct RemovalScopedReuseProbe: View {
   @State private var showPanel: Bool = true
   let siblingCounter: ScopedReuseEvaluationCounter
@@ -139,6 +281,7 @@ private final class ScopedReuseProbeTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
+  private(set) var presentedFrames: [String] = []
 
   init(surfaceSize: CellSize) {
     self.surfaceSize = surfaceSize
@@ -152,7 +295,8 @@ private final class ScopedReuseProbeTerminalHost: PresentationSurface {
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    .init(
+    presentedFrames.append(surface.lines.joined(separator: "\n"))
+    return .init(
       bytesWritten: 0,
       linesTouched: surface.size.height,
       cellsChanged: surface.size.width * surface.size.height,

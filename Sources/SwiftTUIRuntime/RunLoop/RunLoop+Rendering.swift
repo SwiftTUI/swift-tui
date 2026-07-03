@@ -38,9 +38,17 @@ extension RunLoop {
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
 
-      let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
       var artifacts: FrameArtifacts?
       while true {
+        // Recomputed PER convergence iteration, not once per scheduled frame:
+        // the eager focus-location rerender runs after a mid-frame relocation
+        // (default-focus adoption, an applied focus request, scroll-reveal)
+        // that a frame-start snapshot cannot have observed —
+        // `previousFrameFocusIdentity` only advances after the frame commits,
+        // so the second pass's scope unions the relocated focus target and
+        // its runtime readers. A stale scope here would let a focus reader
+        // outside it take retained reuse of pre-relocation content.
+        let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
         if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
           renderer.forceRootEvaluation()
         }
@@ -258,8 +266,13 @@ extension RunLoop {
       // difference (ADR-0021); the per-iteration side effects
       // (`processFocusSyncIteration`) and post-acquisition body
       // (`applyAcquiredFrame`) are shared with the synchronous driver.
-      let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
       convergenceLoop: while true {
+        // Recomputed PER convergence iteration — see the synchronous driver's
+        // twin comment: the eager focus-location rerender follows a mid-frame
+        // relocation a frame-start scope snapshot cannot name, and a stale
+        // scope would let a focus reader outside it reuse pre-relocation
+        // content.
+        let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
         if convergence.rerenderedForFocusSync || !retainedReuseSuppressionScope.isEmpty {
           renderer.forceRootEvaluation()
         }
