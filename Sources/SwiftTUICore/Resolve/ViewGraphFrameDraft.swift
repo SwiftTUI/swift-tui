@@ -177,30 +177,36 @@ package final class ViewGraphFrameDraft {
         usedScopedRestore: &usedScopedRestore
       )
     case .subtrees(let roots):
-      // A publication whose roots cover the graph root cannot be scoped: the
-      // identity-prefix reset/restore axes diverge from the structural cover
-      // at the portal-host seam (see
-      // ``ViewGraph/runtimeRegistrationRootsRequireFullPublication(_:)``).
-      guard !viewGraph.runtimeRegistrationRootsRequireFullPublication(roots) else {
-        if publicationDiagnosticsEnabled {
-          restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
-        }
-        liveRegistrations.resetAll()
-        viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
-        break
-      }
-      // Coverage escalation: a frontier that covers most of the live tree
-      // makes the per-node scoped restore O(live) even when almost no
-      // registration actually changed — a wide focus/press suppression cone
-      // over a large tree publishes ~every node on each interaction frame.
-      // The fingerprint-delta path restores only the real delta and is
-      // byte-identical (restoring an unchanged subtree is a no-op), so wide
-      // covers take it; narrow frontiers keep the O(cover) scoped restore.
+      // Two escalations route onto the fingerprint-delta body (the `.all`-frame
+      // publication), which restores only the entries whose registrations
+      // actually changed and never consumes the frontier roots:
+      //
+      // 1. Root-rooted covers: a publication whose roots cover the graph root
+      //    cannot take the identity-prefix scoped restore — the reset/restore
+      //    axes diverge from the structural cover at the portal-host seam (see
+      //    ``ViewGraph/runtimeRegistrationRootsRequireFullPublication(_:)``).
+      //    The delta body is immune: its roots are fingerprint-entry
+      //    identities, so capture-island entries are reached in their own
+      //    authored identity space, and it self-escalates to the full
+      //    reset-and-rebuild when the delta itself demands one (or when no
+      //    committed fingerprint exists to diff against). F08's focus/press
+      //    dirty frontier includes the graph root on every interaction frame
+      //    (the root node is a dirty focus reader's nearest evaluator
+      //    ancestor), so an unconditional full rebuild here costs O(live)
+      //    commit per interaction frame — the sheet-scenario regression that
+      //    held the 2026-07-03 reland.
+      //
+      // 2. Wide covers: a frontier that covers most of the live tree makes
+      //    the per-node scoped restore O(live) even when almost no
+      //    registration actually changed. Narrow, non-root frontiers keep the
+      //    O(cover) scoped restore.
       let liveNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
-      if viewGraph.runtimeRegistrationSubtreeCoverReaches(
-        (liveNodeCount + 1) / 2,
-        rootedAt: roots
-      ) {
+      if viewGraph.runtimeRegistrationRootsRequireFullPublication(roots)
+        || viewGraph.runtimeRegistrationSubtreeCoverReaches(
+          (liveNodeCount + 1) / 2,
+          rootedAt: roots
+        )
+      {
         commitFingerprintDeltaPublication(
           from: viewGraph,
           restoredNodeCount: &restoredNodeCount,
@@ -301,8 +307,8 @@ package final class ViewGraphFrameDraft {
 
   /// The `.all`-frame publication body: fingerprint-delta scoped restore when
   /// the delta is publishable, full reset-and-rebuild otherwise. Also the
-  /// coverage-escalation target for `.subtrees` frames whose frontier covers
-  /// most of the live tree.
+  /// escalation target for `.subtrees` frames whose frontier covers the graph
+  /// root or most of the live tree.
   private func commitFingerprintDeltaPublication(
     from viewGraph: ViewGraph,
     restoredNodeCount: inout Int?,

@@ -575,7 +575,8 @@ struct RuntimeRegistrationRestoreScopingTests {
   /// position, behind *some* framework seam, and on *some* publication path. This
   /// deterministically enumerates a `(kind, siblingCount, changedIndex,
   /// publication)` product and asserts the universal property — a scoped
-  /// `.subtrees`/diffed `.all` restore must equal a full rebuild across all 15
+  /// `.subtrees`, root-rooted `.subtrees` (fingerprint-delta body), or diffed
+  /// `.all` restore must equal a full rebuild across all 15
   /// registry families
   /// (``assertBroadRegistriesMatch``) — for every shape. No RNG: the shapes are
   /// enumerated, so a failure is reproducible by its `SeamCase` argument.
@@ -627,6 +628,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     seamCase.publication.record(
       on: rootFrameDraft,
       graph: graph,
+      rootIdentity: rootIdentity,
       changedIdentity: changed.identity
     )
     _ = rootFrameDraft.commitRuntimeRegistrations(from: graph)
@@ -654,8 +656,11 @@ struct RuntimeRegistrationRestoreScopingTests {
     // from the live registry are unreachable by both the ViewNode walk (the
     // capture seam) and the identity-prefix island arm (no shared prefix) —
     // dead controls until the next full publication (the gallery's
-    // "scroll-control actions after a tab revisit" report). The commit must
-    // escalate such roots to the full reset-and-rebuild path.
+    // "scroll-control actions after a tab revisit" report). Root-rooted
+    // covers route onto the fingerprint-delta body; with NO committed
+    // fingerprint to diff against (this graph never committed through a
+    // draft), that body must fall back to the full reset-and-rebuild path
+    // and heal the divergence.
     let portalIdentity = testIdentity("__TestPortalHost", "Root")
     let rootIdentity = testIdentity("Root")
     let islandIdentity = testIdentity("Root", "Island")
@@ -854,6 +859,86 @@ struct RuntimeRegistrationRestoreScopingTests {
       )
     )
     _ = graphDraft.commitRuntimeRegistrations(from: graph)
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+    #expect(
+      liveRegistrations.publicationOracleFingerprint()
+        == fullRebuild.publicationOracleFingerprint()
+    )
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+  }
+
+  @Test("a root-rooted subtrees publication takes the fingerprint-delta body")
+  func rootRootedSubtreesPublicationTakesFingerprintDeltaBody() {
+    // With a committed fingerprint to diff against, a frontier that covers
+    // the graph root routes onto the fingerprint-delta body instead of the
+    // full reset-and-rebuild: F08's focus/press dirty frontier includes the
+    // graph root on every interaction frame (the root node is a dirty focus
+    // reader's nearest evaluator ancestor), so an unconditional full rebuild
+    // is O(live) commit per interaction frame — the sheet-scenario
+    // regression that held the 2026-07-03 reland. The commit must restore
+    // only the changed entries and stay byte-identical to a full rebuild.
+    let rootIdentity = testIdentity("Root")
+    let aIdentity = testIdentity("Root", "A")
+    let bIdentity = testIdentity("Root", "B")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    seedTwoFocusableSiblings(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      aIdentity: aIdentity,
+      bIdentity: bIdentity,
+      namespace: namespace
+    )
+
+    // Frame 1: an `.all` draft commit publishes the live registry AND records
+    // the committed fingerprint the delta path diffs against.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let seedDraft = ViewGraphFrameDraft(liveRegistrations: liveRegistrations, checkpoint: nil)
+    seedDraft.recordDirtyEvaluationPlan(nil)
+    _ = seedDraft.commitRuntimeRegistrations(from: graph)
+
+    // Frame 2: narrowly re-evaluate ONLY subtree A, then publish with the
+    // frontier collapsed to the GRAPH ROOT.
+    graph.beginFrame()
+    let aNode = graph.beginEvaluation(identity: aIdentity, invalidator: nil)
+    recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
+    graph.finishEvaluation(
+      aNode,
+      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let nodeIDByIdentity = graph.debugTotalStateSnapshot().nodeIDByIdentity
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(
+        frontierNodeIDs: [nodeIDByIdentity[rootIdentity]!],
+        frontierIdentities: [rootIdentity]
+      )
+    )
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: graph)
+
+    // The delta body restored only A's changed entry — not the live tree the
+    // frontier covers structurally (the pre-fix full rebuild reported the
+    // whole live node count here).
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+    #expect(diagnostics.publication.restoredNodeCount == 1)
 
     let fullRebuild = RuntimeRegistrationSet.scratch()
     graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
@@ -1152,6 +1237,11 @@ struct RuntimeRegistrationRestoreScopingTests {
   enum SeamPublication: String, CaseIterable, CustomStringConvertible, Sendable {
     case diffedAll
     case subtreeFrontier
+    // A `.subtrees` frontier collapsed to the graph root — routed onto the
+    // fingerprint-delta body (the identity-prefix scoped restore diverges at
+    // the portal-host seam for such covers; see
+    // `runtimeRegistrationRootsRequireFullPublication`).
+    case rootRootedFrontier
 
     var description: String { rawValue }
 
@@ -1159,6 +1249,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     func record(
       on draft: ViewGraphFrameDraft,
       graph: ViewGraph,
+      rootIdentity: Identity,
       changedIdentity: Identity
     ) {
       switch self {
@@ -1170,6 +1261,14 @@ struct RuntimeRegistrationRestoreScopingTests {
           .init(
             frontierNodeIDs: [changedNodeID],
             frontierIdentities: [changedIdentity]
+          )
+        )
+      case .rootRootedFrontier:
+        let rootNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[rootIdentity]!
+        draft.recordDirtyEvaluationPlan(
+          .init(
+            frontierNodeIDs: [rootNodeID],
+            frontierIdentities: [rootIdentity]
           )
         )
       }

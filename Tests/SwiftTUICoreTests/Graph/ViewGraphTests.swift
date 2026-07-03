@@ -1230,13 +1230,22 @@ struct ViewGraphTests {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
+    // Padding siblings keep the one-node frontier under the half-tree
+    // wide-cover escalation threshold: this test pins the SCOPED-restore
+    // diagnostics, and in a two-node graph any single-node frontier covers
+    // half the live tree and escalates to the fingerprint-delta body instead.
+    let paddingIdentities = [
+      testIdentity("Root", "PaddingA"),
+      testIdentity("Root", "PaddingB"),
+    ]
     seedCommandGraph(
       graph: graph,
       rootIdentity: rootIdentity,
       childIdentity: childIdentity,
       binding: KeyBinding(key: .character("x"), modifiers: .ctrl),
       description: "Original",
-      counter: RegistrationCounter()
+      counter: RegistrationCounter(),
+      paddingSiblingIdentities: paddingIdentities
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
     _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
@@ -1269,8 +1278,8 @@ struct ViewGraphTests {
     #expect(diagnostics.publication.restoredNodeCount == 1)
     #expect(diagnostics.publication.invalidatedIdentityCount == 1)
     #expect(diagnostics.publication.unmappedInvalidatedIdentityCount == 0)
-    #expect(diagnostics.publication.graphCheckpointBaselineNodeCount == 2)
-    #expect(diagnostics.publication.graphCheckpointPreparedNodeCount == 2)
+    #expect(diagnostics.publication.graphCheckpointBaselineNodeCount == 4)
+    #expect(diagnostics.publication.graphCheckpointPreparedNodeCount == 4)
     #expect(
       diagnostics.publication.graphCheckpointDirtySubtreeCandidateNodeCount == 1
     )
@@ -1541,7 +1550,8 @@ private func seedCommandGraph(
   childIdentity: Identity,
   binding: KeyBinding,
   description: String,
-  counter: RegistrationCounter
+  counter: RegistrationCounter,
+  paddingSiblingIdentities: [Identity] = []
 ) {
   graph.beginFrame()
   let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
@@ -1559,14 +1569,21 @@ private func seedCommandGraph(
     resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
     accessedStateSlots: 0
   )
+  for paddingIdentity in paddingSiblingIdentities {
+    let paddingNode = graph.beginEvaluation(identity: paddingIdentity, invalidator: nil)
+    graph.finishEvaluation(
+      paddingNode,
+      resolved: ResolvedNode(identity: paddingIdentity, kind: .view("Padding")),
+      accessedStateSlots: 0
+    )
+  }
   graph.finishEvaluation(
     rootNode,
     resolved: ResolvedNode(
       identity: rootIdentity,
       kind: .root,
-      children: [
-        ResolvedNode(identity: childIdentity, kind: .view("Child"))
-      ]
+      children: [ResolvedNode(identity: childIdentity, kind: .view("Child"))]
+        + paddingSiblingIdentities.map { ResolvedNode(identity: $0, kind: .view("Padding")) }
     ),
     accessedStateSlots: 0
   )

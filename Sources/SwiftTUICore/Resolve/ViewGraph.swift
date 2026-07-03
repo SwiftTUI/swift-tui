@@ -2403,8 +2403,11 @@ package final class ViewGraph {
   /// portal-host identity. A root-rooted scoped publication therefore both
   /// dropped island registrations an earlier narrow frame's reset had removed
   /// (dead controls: live=0/rebuilt=1) and failed to clear stale
-  /// identity-space entries (live=1/rebuilt=0). Such roots take the full
-  /// reset-and-rebuild publication instead.
+  /// identity-space entries (live=1/rebuilt=0). Such roots must not take the
+  /// identity-prefix scoped restore: `.subtrees` commits route them onto the
+  /// fingerprint-delta body (whose roots are per-entry identities and thus
+  /// island-safe), and a *delta* containing such roots takes the full
+  /// reset-and-rebuild publication.
   package func runtimeRegistrationRootsRequireFullPublication(
     _ roots: [Identity]
   ) -> Bool {
