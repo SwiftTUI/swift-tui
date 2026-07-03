@@ -230,6 +230,52 @@ struct FrameResolveStateTests {
       ]
     )
   }
+
+  @Test("runtime gate: force-root sources surface once and clear")
+  func forceRootSourcesSurfaceOnceAndClear() {
+    let rootIdentity = testIdentity("Root")
+    let state = warmedSelectiveState(rootIdentity: rootIdentity)
+    state.forceRootEvaluation = true
+    state.forceRootEvaluationSources = [.focusSyncRerender, .animationPropertySafety]
+
+    let inputs = state.prepareInputs(
+      from: resolveContext(rootIdentity: rootIdentity),
+      proposal: baselineProposal
+    )
+
+    #expect(
+      inputs.forceRootEvaluationSources == [
+        .animationPropertySafety, .focusSyncRerender,
+      ]
+    )
+    #expect(inputs.selectiveEvaluationDisabledReasons.contains(.frameStateForceRoot))
+
+    let second = state.prepareInputs(
+      from: resolveContext(rootIdentity: rootIdentity),
+      proposal: baselineProposal
+    )
+    #expect(second.forceRootEvaluationSources.isEmpty)
+    #expect(!second.selectiveEvaluationDisabledReasons.contains(.frameStateForceRoot))
+  }
+
+  @Test("diagnostic names enrich frame_state_force_root with sources")
+  func diagnosticNamesEnrichFrameStateForceRootWithSources() {
+    let rootIdentity = testIdentity("Root")
+    let state = warmedSelectiveState(rootIdentity: rootIdentity)
+    state.forceRootEvaluation = true
+    state.forceRootEvaluationSources = [.identityAgnosticAnimationSafety]
+
+    let inputs = state.prepareInputs(
+      from: resolveContext(rootIdentity: rootIdentity),
+      proposal: baselineProposal
+    )
+
+    #expect(
+      inputs.diagnosticSelectiveEvaluationDisabledReasonNames.contains(
+        "frame_state_force_root(identity_agnostic_animation_safety)"
+      )
+    )
+  }
 }
 
 @MainActor
