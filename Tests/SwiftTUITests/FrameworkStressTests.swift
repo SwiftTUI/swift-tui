@@ -45,6 +45,36 @@ struct FrameworkStressTests {
     )
   }
 
+  @Test("segmented picker interiors survive tab churn without teardown-coherence orphans")
+  func segmentedPickerTabChurnLeavesNoTeardownCoherenceOrphans() throws {
+    // Gallery-reported F04 leak: `PickerOptions/ID[<case>]` option rows and
+    // `PickerBody` interiors under a churned `TabContentPayload` stay in the
+    // node store but lose every anchor to the committed root when the tab
+    // switches away (teardown coherence: "N stored node(s) unreachable from
+    // the committed root" on every later sampled frame).
+    let baseline = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PickerTabChurnRoot"),
+      size: .init(width: 72, height: 20)
+    ) {
+      PickerTabChurnFixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...3 {
+      var frame = try harness.clickText("Next Tab")
+      #expect(frame.contains("Other body"))
+      frame = try harness.clickText("Next Tab")
+      #expect(frame.contains("Picker body"))
+    }
+
+    let violations = SoundnessProbeConfiguration.teardownCoherenceViolationCount - baseline
+    #expect(
+      violations == 0,
+      "picker interiors stranded across tab churn (\(violations) violation(s)): \(SoundnessProbeConfiguration.lastViolationDetail ?? "no detail recorded")"
+    )
+  }
+
   @Test("mixed deferred runtime surfaces survive repeated teardown and recreation")
   func mixedDeferredRuntimeSurfacesSurviveRepeatedTeardownAndRecreation() throws {
     let harness = try StressRuntimeHarness(
@@ -1186,6 +1216,45 @@ private struct PortalButtonOrphanFixture: View {
         Text("Sheet body \(rootCount)")
         Button("Close Sheet") { sheetPresented = false }
       }
+    }
+    .frame(width: 72, height: 20, alignment: .topLeading)
+  }
+}
+
+private enum PickerChurnPriority: String, CaseIterable, Hashable {
+  case low
+  case normal
+  case high
+}
+
+private struct PickerTabChurnFixture: View {
+  @State private var selectedTab = "picker"
+  @State private var priority: PickerChurnPriority = .normal
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Next Tab") {
+        selectedTab = selectedTab == "picker" ? "other" : "picker"
+      }
+
+      TabView(selection: $selectedTab) {
+        Tab("Picker", value: "picker") {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("Picker body")
+            Picker("Priority", selection: $priority) {
+              ForEach(PickerChurnPriority.allCases, id: \.self) { priority in
+                Text(priority.rawValue).tag(priority)
+              }
+            }
+            .pickerStyle(SegmentedPickerStyle())
+          }
+        }
+
+        Tab("Other", value: "other") {
+          Text("Other body")
+        }
+      }
+      .tabViewStyle(.literalTabs)
     }
     .frame(width: 72, height: 20, alignment: .topLeading)
   }

@@ -85,6 +85,19 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       if elementNode.identity == elementContext.identity,
         elementNode.kind == .view("Group")
       {
+        // Splicing lifts the row's children into the enclosing container, so
+        // the row's own mint (the node carrying this iteration's entity route
+        // and any row-scoped state) appears in no committed value afterwards
+        // — reachable through neither children arrays nor parent links.
+        // Anchor its lifetime to the resolving host so teardown reaches it
+        // (a churned tab payload otherwise strands it as a
+        // teardown-coherence census orphan). The spliced children are
+        // committed normally; the hosted edge is redundant for them, not
+        // wrong (see `recordDetachedHostedSubtree`).
+        context.viewGraph?.recordDetachedHostedSubtree(
+          elementNode,
+          hostedBy: ViewNodeContext.current
+        )
         resolved.append(contentsOf: elementNode.children)
       } else {
         resolved.append(elementNode)

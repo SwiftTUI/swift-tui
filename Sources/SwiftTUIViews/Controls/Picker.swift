@@ -161,6 +161,21 @@ extension Picker {
   ) -> [Option] {
     let nodes = content.resolveElements(in: context)
 
+    // The authored options resolve ONLY to extract tags/labels — the style
+    // body renders separate `PickerOption` chrome, so these resolved nodes
+    // are committed nowhere. Any ViewNodes the resolution minted (a
+    // `ForEach`'s tagged rows carrying option state) are reachable through
+    // neither committed values nor parent links; anchor their lifetime to
+    // the resolving host so the picker's teardown (tab churn, structural
+    // removal) reaches them instead of stranding teardown-coherence census
+    // orphans. Mirrors `NavigationStack`'s root-while-pushed anchor.
+    for node in nodes {
+      context.viewGraph?.recordDetachedHostedSubtree(
+        node,
+        hostedBy: ViewNodeContext.current
+      )
+    }
+
     var options: [Option] = []
     collectOptions(from: nodes, into: &options)
     return options

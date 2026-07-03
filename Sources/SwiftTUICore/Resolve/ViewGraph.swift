@@ -2211,7 +2211,9 @@ package final class ViewGraph {
     let unreachableIDs = nodesByNodeID.keys.filter { !reachable.contains($0) }
     guard unreachableIDs.isEmpty else {
       let samples = unreachableIDs.prefix(4).map { nodeID in
-        "\(nodeID) at \(nodesByNodeID[nodeID]?.identity.path ?? "?")"
+        let path = nodesByNodeID[nodeID]?.identity.path ?? "?"
+        let forensics = teardownCoherenceAnchorForensics(for: nodeID)
+        return "\(nodeID) at \(path) [\(forensics)]"
       }
       return (
         isOverRemoval: false,
@@ -2222,6 +2224,43 @@ package final class ViewGraph {
       )
     }
     return nil
+  }
+
+  /// Anchor forensics for one census orphan: which lifetime anchor broke.
+  /// Cheap to build and only reached on a violation, where the detail is the
+  /// entire diagnostic surface.
+  private func teardownCoherenceAnchorForensics(for nodeID: ViewNodeID) -> String {
+    guard let node = nodesByNodeID[nodeID] else {
+      return "gone"
+    }
+    var parts: [String] = []
+    if let parent = node.parent {
+      let stored = nodesByNodeID[parent.viewNodeID]
+      parts.append(
+        "parent=\(parent.viewNodeID)/\(stored == nil ? "unstored" : (stored === parent ? "stored" : "aliased"))"
+      )
+    } else {
+      parts.append("parent=nil")
+    }
+    if let host = node.evaluationHost {
+      let stored = nodesByNodeID[host.viewNodeID]
+      parts.append(
+        "evalHost=\(host.viewNodeID)/\(stored == nil ? "unstored" : (stored === host ? "stored" : "aliased"))"
+      )
+    } else {
+      parts.append("evalHost=nil")
+    }
+    let hostingEdges = detachedHostedSubtreeRootsByHost.filter { $0.value.contains(nodeID) }
+    if hostingEdges.isEmpty {
+      parts.append("ledger=none")
+    } else {
+      let hosts = hostingEdges.keys.map { hostID in
+        "\(hostID)/\(nodesByNodeID[hostID] == nil ? "unstored" : "stored")"
+      }
+      parts.append("ledger=\(hosts.joined(separator: "+"))")
+    }
+    parts.append("lifecycle=\(node.lifecycleState)")
+    return parts.joined(separator: " ")
   }
 
   package func snapshot() -> ResolvedNode {
