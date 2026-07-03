@@ -50,10 +50,13 @@ extension RunLoop {
         // outside it take retained reuse of pre-relocation content.
         let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
         let retainedReuseSuppressionScope = retainedReuseFrameSafety.suppressionScope
-        if convergence.rerenderedForFocusSync
-          || retainedReuseFrameSafety.requiresRootEvaluation
-        {
-          renderer.forceRootEvaluation()
+        if convergence.rerenderedForFocusSync {
+          renderer.forceRootEvaluation(source: .focusSyncRerender)
+        }
+        if retainedReuseFrameSafety.requiresRootEvaluation {
+          renderer.forceRootEvaluation(
+            source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
+          )
         }
         if !retainedReuseSuppressionScope.isEmpty {
           // Focus/press-only finite scopes are queued as graph-local dirty work
@@ -276,10 +279,13 @@ extension RunLoop {
         // content.
         let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
         let retainedReuseSuppressionScope = retainedReuseFrameSafety.suppressionScope
-        if convergence.rerenderedForFocusSync
-          || retainedReuseFrameSafety.requiresRootEvaluation
-        {
-          renderer.forceRootEvaluation()
+        if convergence.rerenderedForFocusSync {
+          renderer.forceRootEvaluation(source: .focusSyncRerender)
+        }
+        if retainedReuseFrameSafety.requiresRootEvaluation {
+          renderer.forceRootEvaluation(
+            source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
+          )
         }
         if !retainedReuseSuppressionScope.isEmpty {
           // Focus/press-only finite scopes are queued as graph-local dirty work
@@ -414,6 +420,7 @@ extension RunLoop {
   private struct RetainedReuseFrameSafety {
     var suppressionScope: RetainedReuseSuppressionScope
     var requiresRootEvaluation: Bool
+    var rootEvaluationSource: ForceRootEvaluationSource?
   }
 
   private func retainedReuseFrameSafetyForFrame()
@@ -421,6 +428,7 @@ extension RunLoop {
   {
     var scope = RetainedReuseSuppressionScope()
     var requiresRootEvaluation = false
+    var rootEvaluationSource: ForceRootEvaluationSource?
 
     let currentFocusIdentity = focusTracker.currentFocusIdentity
     if currentFocusIdentity != previousFrameFocusIdentity {
@@ -448,6 +456,7 @@ extension RunLoop {
     if !activePropertyIdentities.isEmpty {
       scope.formUnion(activePropertyIdentities)
       requiresRootEvaluation = true
+      rootEvaluationSource = .animationPropertySafety
     }
     if controller.lastTickResult.hasPendingWork,
       activePropertyIdentities.isEmpty
@@ -462,14 +471,20 @@ extension RunLoop {
       guard
         let attributableIdentities = controller.attributablePendingAnimationIdentities
       else {
-        return .init(suppressionScope: .all, requiresRootEvaluation: true)
+        return .init(
+          suppressionScope: .all,
+          requiresRootEvaluation: true,
+          rootEvaluationSource: .identityAgnosticAnimationSafety
+        )
       }
       scope.formUnion(attributableIdentities)
       requiresRootEvaluation = true
+      rootEvaluationSource = .animationPendingWorkSafety
     }
     return .init(
       suppressionScope: scope,
-      requiresRootEvaluation: requiresRootEvaluation
+      requiresRootEvaluation: requiresRootEvaluation,
+      rootEvaluationSource: rootEvaluationSource
     )
   }
 

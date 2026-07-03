@@ -777,8 +777,11 @@ public struct DefaultRenderer {
   /// Forces the next render to use root evaluation regardless of whether
   /// selective evaluation would otherwise apply.
   @MainActor
-  package func forceRootEvaluation() {
+  package func forceRootEvaluation(
+    source: ForceRootEvaluationSource = .unattributed
+  ) {
     frameState.forceRootEvaluation = true
+    frameState.forceRootEvaluationSources.insert(source)
   }
 
   /// Suppresses retained reuse for a scoped set of identities on the next

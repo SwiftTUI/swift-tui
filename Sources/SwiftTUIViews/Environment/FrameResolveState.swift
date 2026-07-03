@@ -60,6 +60,19 @@ package enum SelectiveEvaluationDisabledReason: String, Sendable {
   }
 }
 
+/// Attribution for a pending `forceRootEvaluation()` request. Root-forced
+/// frames surface as `frame_state_force_root` in selective-evaluation
+/// diagnostics; the source set says who asked, so dirty-frontier narrowing
+/// decisions can attribute the remaining root-forced frames instead of
+/// guessing.
+package enum ForceRootEvaluationSource: String, Sendable, CaseIterable {
+  case focusSyncRerender = "focus_sync_rerender"
+  case animationPropertySafety = "animation_property_safety"
+  case animationPendingWorkSafety = "animation_pending_work_safety"
+  case identityAgnosticAnimationSafety = "identity_agnostic_animation_safety"
+  case unattributed = "unattributed"
+}
+
 /// Value-owned inputs for one resolve pass.
 ///
 /// Stored evaluator closures can outlive the frame where they were first
@@ -79,6 +92,9 @@ package struct FrameResolveInputs {
   package var usesSelectiveEvaluation: Bool
   package var environmentRequiresRootEvaluation: Bool
   package var selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason]
+  /// Attribution for this frame's `frame_state_force_root` disabled reason,
+  /// sorted for deterministic diagnostics. Empty when nothing forced root.
+  package var forceRootEvaluationSources: [ForceRootEvaluationSource]
   /// Retained-reuse suppression for reuse-unsafe identities this frame.
   ///
   /// The run loop sets this on frames where some reached nodes must recompute
@@ -99,6 +115,7 @@ package struct FrameResolveInputs {
     usesSelectiveEvaluation: Bool,
     environmentRequiresRootEvaluation: Bool,
     selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason] = [],
+    forceRootEvaluationSources: [ForceRootEvaluationSource] = [],
     retainedReuseSuppressionScope: RetainedReuseSuppressionScope = .none
   ) {
     self.invalidatedIdentities = invalidatedIdentities
@@ -112,7 +129,22 @@ package struct FrameResolveInputs {
     self.usesSelectiveEvaluation = usesSelectiveEvaluation
     self.environmentRequiresRootEvaluation = environmentRequiresRootEvaluation
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
+    self.forceRootEvaluationSources = forceRootEvaluationSources
     self.retainedReuseSuppressionScope = retainedReuseSuppressionScope
+  }
+
+  /// Disabled-reason diagnostic names with `frame_state_force_root` enriched
+  /// by its attribution, e.g. `frame_state_force_root(focus_sync_rerender)`.
+  /// Consumers matching on the plain reason substring keep matching.
+  package var diagnosticSelectiveEvaluationDisabledReasonNames: [String] {
+    selectiveEvaluationDisabledReasons.map { reason in
+      guard reason == .frameStateForceRoot, !forceRootEvaluationSources.isEmpty
+      else {
+        return reason.diagnosticName
+      }
+      let sources = forceRootEvaluationSources.map(\.rawValue).joined(separator: "+")
+      return "\(reason.diagnosticName)(\(sources))"
+    }
   }
 }
 
@@ -147,6 +179,7 @@ extension FrameResolveInputBox {
       package var usesSelectiveEvaluation: Bool
       package var environmentRequiresRootEvaluation: Bool
       package var selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason]
+      package var forceRootEvaluationSources: [ForceRootEvaluationSource]
       package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     }
 
@@ -174,6 +207,7 @@ extension FrameResolveInputBox {
           usesSelectiveEvaluation: $0.usesSelectiveEvaluation,
           environmentRequiresRootEvaluation: $0.environmentRequiresRootEvaluation,
           selectiveEvaluationDisabledReasons: $0.selectiveEvaluationDisabledReasons,
+          forceRootEvaluationSources: $0.forceRootEvaluationSources,
           retainedReuseSuppressionScope: $0.retainedReuseSuppressionScope
         )
       }
@@ -191,6 +225,10 @@ package final class FrameResolveState {
   /// RunLoop sets this when the view builder's input changed (state mutation)
   /// or during focus sync re-renders.
   package var forceRootEvaluation: Bool = false
+
+  /// Attribution for the pending ``forceRootEvaluation`` request, cleared with
+  /// it by ``prepareInputs(from:proposal:)``.
+  package var forceRootEvaluationSources: Set<ForceRootEvaluationSource> = []
 
   /// One-shot retained-reuse suppression consumed by
   /// ``prepareInputs(from:proposal:)``.
@@ -227,10 +265,13 @@ package final class FrameResolveState {
       || focusChangeRequiresRoot
       || pressedChangeRequiresRoot
       || proposalChanged
+    let frameStateForceRootSources = forceRootEvaluationSources
+      .sorted { $0.rawValue < $1.rawValue }
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed
     previousProposal = proposal
     forceRootEvaluation = false
+    forceRootEvaluationSources.removeAll()
     retainedReuseSuppressionScope = .none
 
     let usesSelectiveEvaluation =
@@ -273,6 +314,7 @@ package final class FrameResolveState {
       usesSelectiveEvaluation: usesSelectiveEvaluation,
       environmentRequiresRootEvaluation: environmentRequiresRootEvaluation,
       selectiveEvaluationDisabledReasons: usesSelectiveEvaluation ? [] : disabledReasons,
+      forceRootEvaluationSources: frameStateForceRoot ? frameStateForceRootSources : [],
       retainedReuseSuppressionScope: suppressionScope
     )
   }
@@ -281,6 +323,7 @@ package final class FrameResolveState {
 extension FrameResolveState {
   package struct Checkpoint {
     package var forceRootEvaluation: Bool
+    package var forceRootEvaluationSources: Set<ForceRootEvaluationSource>
     package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     package var previousFocusedIdentity: Identity?
     package var previousPressedIdentity: Identity?
@@ -290,6 +333,7 @@ extension FrameResolveState {
   package func makeCheckpoint() -> Checkpoint {
     Checkpoint(
       forceRootEvaluation: forceRootEvaluation,
+      forceRootEvaluationSources: forceRootEvaluationSources,
       retainedReuseSuppressionScope: retainedReuseSuppressionScope,
       previousFocusedIdentity: previousFocusedIdentity,
       previousPressedIdentity: previousPressedIdentity,
@@ -299,6 +343,7 @@ extension FrameResolveState {
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     forceRootEvaluation = checkpoint.forceRootEvaluation
+    forceRootEvaluationSources = checkpoint.forceRootEvaluationSources
     retainedReuseSuppressionScope = checkpoint.retainedReuseSuppressionScope
     previousFocusedIdentity = checkpoint.previousFocusedIdentity
     previousPressedIdentity = checkpoint.previousPressedIdentity
@@ -307,6 +352,7 @@ extension FrameResolveState {
 
   package struct DebugStateSnapshot: Equatable {
     package var forceRootEvaluation: Bool
+    package var forceRootEvaluationSources: Set<ForceRootEvaluationSource>
     package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
     package var previousFocusedIdentity: Identity?
     package var previousPressedIdentity: Identity?
@@ -317,6 +363,7 @@ extension FrameResolveState {
     let checkpoint = makeCheckpoint()
     return DebugStateSnapshot(
       forceRootEvaluation: checkpoint.forceRootEvaluation,
+      forceRootEvaluationSources: checkpoint.forceRootEvaluationSources,
       retainedReuseSuppressionScope: checkpoint.retainedReuseSuppressionScope,
       previousFocusedIdentity: checkpoint.previousFocusedIdentity,
       previousPressedIdentity: checkpoint.previousPressedIdentity,

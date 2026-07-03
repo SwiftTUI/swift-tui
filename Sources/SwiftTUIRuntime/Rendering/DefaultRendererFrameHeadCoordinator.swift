@@ -392,7 +392,7 @@ struct DefaultRendererFrameHeadCoordinator {
             viewGraph.disabledSelectiveEvaluationPlanDiagnostics(
               invalidatedIdentities: resolveInputs.invalidatedIdentities,
               selectiveEvaluationDisabledReasons: resolveInputs
-                .selectiveEvaluationDisabledReasons.map(\.diagnosticName)
+                .diagnosticSelectiveEvaluationDisabledReasonNames
             )
           )
         }
