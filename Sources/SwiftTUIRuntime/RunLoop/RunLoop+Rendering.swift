@@ -420,7 +420,19 @@ extension RunLoop {
     if controller.lastTickResult.hasPendingWork,
       activePropertyIdentities.isEmpty
     {
-      return .all
+      // Non-property pending work (insertion offsets, matched geometry,
+      // removal transitions) is identity-attributable, so suppress reuse for
+      // those cones only — subtrees disjoint from the animating identities
+      // keep retained/memoized reuse on every tick (F32). Identity-agnostic
+      // pending work (stranded empty-batch completion drains) still falls
+      // back to full suppression because there is no narrower subtree to
+      // name.
+      guard
+        let attributableIdentities = controller.attributablePendingAnimationIdentities
+      else {
+        return .all
+      }
+      scope.formUnion(attributableIdentities)
     }
     return scope
   }

@@ -1828,12 +1828,23 @@ package final class ViewGraph {
     invalidationSummary: InvalidationSummary? = nil,
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot,
+    allowsEmptyInvalidation: Bool = false,
     invalidator: (any Invalidating)?
   ) -> ResolvedNode? {
     guard let node = nodeIfExists(for: identity) else {
       return nil
     }
-    guard !invalidatedIdentities.isEmpty else {
+    // An empty invalidation set on a frame that still resolves means the
+    // frame was forced for a reason OUTSIDE invalidation tracking, so
+    // disjointness from the (empty) set proves nothing — deny reuse — UNLESS
+    // the caller certifies that reason is fully named by a finite
+    // retained-reuse suppression scope (focus/press runtime readers, active
+    // animation cones). The caller rejects suppressed identities before
+    // consulting this gate, so a node reaching it with
+    // `allowsEmptyInvalidation` is outside every named recompute cone and
+    // the environment/transaction equality checks below are the remaining
+    // (sufficient) freshness proof.
+    guard !invalidatedIdentities.isEmpty || allowsEmptyInvalidation else {
       return nil
     }
 

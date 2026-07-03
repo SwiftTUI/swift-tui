@@ -435,6 +435,24 @@ package final class AnimationController: Sendable {
     Set(removingNodes.values.map(\.identity))
   }
 
+  /// The identities of every pending animation work item when ALL pending
+  /// work is identity-attributable: active animations of any scope (property,
+  /// insertion offset, matched geometry) plus in-flight removal transitions.
+  /// `nil` when identity-agnostic work is pending — stranded empty-batch
+  /// completion drains carry no identity — in which case the caller cannot
+  /// name a suppression scope narrower than `.all`. The run loop's
+  /// frame-safety scope unions this instead of falling back to full retained-
+  /// reuse suppression, so subtrees disjoint from the animating cones keep
+  /// reuse on every tick of a non-property animation.
+  package var attributablePendingAnimationIdentities: Set<Identity>? {
+    guard pendingEmptyBatchCompletions.isEmpty else {
+      return nil
+    }
+    var identities = Set(activeAnimations.keys.map(\.identity))
+    identities.formUnion(removingIdentitySet)
+    return identities
+  }
+
   package var preFrameHeadOffscreenPropertyAnimationRedrawIdentities: Set<Identity>? {
     guard !isFrameHeadTransactionActive else { return nil }
     guard !activeAnimations.isEmpty else { return nil }

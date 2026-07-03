@@ -341,14 +341,30 @@ public struct ResolveContext: Equatable, Sendable {
   /// Returns whether retained reuse is suppressed for `identity` in this frame.
   /// Suppressed identities recompute even when disjoint from ordinary
   /// invalidation. The run loop scopes this to focus/press runtime readers and
-  /// active property-animation identities, with a conservative full-suppression
-  /// fallback for identity-agnostic animation work.
+  /// active animation cones, with a conservative full-suppression fallback for
+  /// identity-agnostic animation work.
   @MainActor
   package func effectiveSuppressesRetainedReuse(
     at identity: Identity
   ) -> Bool {
     effectiveFrameResolveInputs?.retainedReuseSuppressionScope
       .suppresses(identity: identity) ?? false
+  }
+
+  /// Whether this frame's forced evaluation is fully named by a FINITE
+  /// retained-reuse suppression scope. Such frames (pure focus moves,
+  /// non-property animation ticks) carry no ordinary invalidation, but every
+  /// identity that must recompute is in the scope — so a node that already
+  /// passed the suppression check may take retained reuse even though the
+  /// frame's invalidation set is empty.
+  @MainActor
+  package var effectiveFiniteSuppressionScopeNamesForcedEvaluation: Bool {
+    guard
+      let scope = effectiveFrameResolveInputs?.retainedReuseSuppressionScope
+    else {
+      return false
+    }
+    return !scope.isEmpty && !scope.suppressesAll
   }
 
   @MainActor

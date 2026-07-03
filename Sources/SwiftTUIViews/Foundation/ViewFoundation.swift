@@ -320,6 +320,8 @@ func resolveView<V: View>(
       invalidationSummary: context.effectiveInvalidationSummary,
       environment: context.environment,
       transaction: context.transaction,
+      allowsEmptyInvalidation:
+        context.effectiveFiniteSuppressionScopeNamesForcedEvaluation,
       invalidator: context.invalidationProxy?.invalidator
     )
   {
