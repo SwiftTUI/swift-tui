@@ -244,12 +244,16 @@ struct ViewGraphCheckpointTotalityTests {
     }
   }
 
-  @Test("every RuntimeRegistrationSet registry is wired into reset and removeSubtrees")
+  @Test("every RuntimeRegistrationSet registry is wired into the lifecycle fan-out list")
   func registriesAreCoveredByLifecycleOperations() throws {
-    // The 15 Local*Registry members fan out across ~8 operation sites by hand;
-    // a registry added to the set but forgotten in resetAll/removeSubtrees leaks
-    // stale state across frames (a strand). resetAll and removeSubtrees must
-    // each touch every registry.
+    // The bulk lifecycle operations (reset, subtree removal, restore,
+    // fingerprinting, frame-drop blockers) are loops over `allRegistries`, so
+    // the one place a stored registry can still be forgotten is the `members`
+    // list in the set's init. A member missing there silently drops out of
+    // EVERY fan-out — stale state leaks across frames (a strand).
+    // `RuntimeRegistrationKindTotalityTests` behaviorally covers every
+    // declared `RuntimeRegistrationKind`; this source guard additionally
+    // catches a stored registry property that never gained a kind at all.
     let registries = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "RuntimeRegistrationSet",
@@ -258,18 +262,27 @@ struct ViewGraphCheckpointTotalityTests {
     .filter { $0.hasSuffix("Registry") }
     #expect(registries.count >= 15)
 
-    let operations = try sourceText(
-      relativePath: "Sources/SwiftTUICore/Runtime/RuntimeRegistrationSet+Operations.swift"
+    let source = try sourceText(
+      relativePath: "Sources/SwiftTUICore/Runtime/RuntimeRegistrationSet.swift"
     )
-    for operation in ["resetAll", "removeSubtrees"] {
-      let body = functionBodyText(named: operation, in: operations)
-      #expect(!body.isEmpty, "could not locate RuntimeRegistrationSet.\(operation)(…)")
-      for registry in registries {
-        #expect(
-          body.contains(registry),
-          "\(registry) is not wired into RuntimeRegistrationSet.\(operation): a scoped restore would then diverge from a full rebuild for that family."
-        )
-      }
+    guard
+      let membersStart = source.range(of: "let members: [(any RuntimeRegistry)?] = ["),
+      let membersEnd = source.range(
+        of: "allRegistries = members",
+        range: membersStart.upperBound..<source.endIndex
+      )
+    else {
+      Issue.record(
+        "could not locate the `members` fan-out list in RuntimeRegistrationSet.init"
+      )
+      return
+    }
+    let membersList = source[membersStart.upperBound..<membersEnd.lowerBound]
+    for registry in registries {
+      #expect(
+        membersList.contains(registry),
+        "\(registry) is not wired into RuntimeRegistrationSet's allRegistries fan-out list: every bulk lifecycle operation would skip that family and a scoped restore would diverge from a full rebuild."
+      )
     }
   }
 }
