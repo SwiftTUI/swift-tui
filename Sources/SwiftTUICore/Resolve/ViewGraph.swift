@@ -2525,6 +2525,57 @@ package final class ViewGraph {
     return count
   }
 
+  /// Returns whether the ViewNode cover rooted at `roots` reaches at least
+  /// `threshold` nodes. Stops walking as soon as the threshold is met, so a
+  /// narrow cover costs O(cover) and a wide cover costs O(threshold).
+  package func runtimeRegistrationSubtreeCoverReaches(
+    _ threshold: Int,
+    rootedAt roots: [Identity]
+  ) -> Bool {
+    guard threshold > 0 else {
+      return true
+    }
+    var traversedNodes: Set<ObjectIdentifier> = []
+    var remaining = threshold
+    for root in roots {
+      guard let node = nodeIfExists(for: root) else {
+        continue
+      }
+      if runtimeRegistrationSubtreeCoverConsumes(
+        node,
+        remaining: &remaining,
+        traversedNodes: &traversedNodes
+      ) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private func runtimeRegistrationSubtreeCoverConsumes(
+    _ node: ViewNode,
+    remaining: inout Int,
+    traversedNodes: inout Set<ObjectIdentifier>
+  ) -> Bool {
+    guard traversedNodes.insert(ObjectIdentifier(node)).inserted else {
+      return false
+    }
+    remaining -= 1
+    if remaining <= 0 {
+      return true
+    }
+    for child in node.children {
+      if runtimeRegistrationSubtreeCoverConsumes(
+        child,
+        remaining: &remaining,
+        traversedNodes: &traversedNodes
+      ) {
+        return true
+      }
+    }
+    return false
+  }
+
   /// Republishes low-volume effect registries from EVERY live node, regardless
   /// of the frame's runtime-registration publication scope. Scoped
   /// (`.subtrees`) publication restores registrations by walking each frontier

@@ -170,33 +170,12 @@ package final class ViewGraphFrameDraft {
       restoredNodeCount = 0
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
     case .all:
-      let publication = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame()
-      committedFingerprint = publication?.current
-      if let delta = publication?.delta,
-        !viewGraph.runtimeRegistrationDeltaRequiresFullPublication(delta)
-      {
-        if publicationDiagnosticsEnabled {
-          restoredNodeCount = viewGraph.runtimeRegistrationSubtreeNodeCount(
-            rootedAt: delta.restorationRoots
-          )
-        }
-        if !delta.isEmpty {
-          liveRegistrations.removeSubtrees(rootedAt: delta.removalRoots)
-          viewGraph.restoreRuntimeRegistrationSubtrees(
-            rootedAt: delta.restorationRoots,
-            into: liveRegistrations
-          )
-          liveRegistrations.normalizeScopedRestoreOrder()
-          usedScopedRestore = true
-        }
-        viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
-      } else {
-        if publicationDiagnosticsEnabled {
-          restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
-        }
-        liveRegistrations.resetAll()
-        viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
-      }
+      commitFingerprintDeltaPublication(
+        from: viewGraph,
+        restoredNodeCount: &restoredNodeCount,
+        committedFingerprint: &committedFingerprint,
+        usedScopedRestore: &usedScopedRestore
+      )
     case .subtrees(let roots):
       // A publication whose roots cover the graph root cannot be scoped: the
       // identity-prefix reset/restore axes diverge from the structural cover
@@ -208,6 +187,26 @@ package final class ViewGraphFrameDraft {
         }
         liveRegistrations.resetAll()
         viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+        break
+      }
+      // Coverage escalation: a frontier that covers most of the live tree
+      // makes the per-node scoped restore O(live) even when almost no
+      // registration actually changed — a wide focus/press suppression cone
+      // over a large tree publishes ~every node on each interaction frame.
+      // The fingerprint-delta path restores only the real delta and is
+      // byte-identical (restoring an unchanged subtree is a no-op), so wide
+      // covers take it; narrow frontiers keep the O(cover) scoped restore.
+      let liveNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
+      if viewGraph.runtimeRegistrationSubtreeCoverReaches(
+        (liveNodeCount + 1) / 2,
+        rootedAt: roots
+      ) {
+        commitFingerprintDeltaPublication(
+          from: viewGraph,
+          restoredNodeCount: &restoredNodeCount,
+          committedFingerprint: &committedFingerprint,
+          usedScopedRestore: &usedScopedRestore
+        )
         break
       }
       // The reset is scoped to `roots`; scope the restore to match instead of
@@ -298,6 +297,45 @@ package final class ViewGraphFrameDraft {
       preservingCurrentStateMutations: preservingCurrentStateMutations
     )
     didDiscard = true
+  }
+
+  /// The `.all`-frame publication body: fingerprint-delta scoped restore when
+  /// the delta is publishable, full reset-and-rebuild otherwise. Also the
+  /// coverage-escalation target for `.subtrees` frames whose frontier covers
+  /// most of the live tree.
+  private func commitFingerprintDeltaPublication(
+    from viewGraph: ViewGraph,
+    restoredNodeCount: inout Int?,
+    committedFingerprint: inout RuntimeRegistrationGraphFingerprint?,
+    usedScopedRestore: inout Bool
+  ) {
+    let publication = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame()
+    committedFingerprint = publication?.current
+    if let delta = publication?.delta,
+      !viewGraph.runtimeRegistrationDeltaRequiresFullPublication(delta)
+    {
+      if publicationDiagnosticsEnabled {
+        restoredNodeCount = viewGraph.runtimeRegistrationSubtreeNodeCount(
+          rootedAt: delta.restorationRoots
+        )
+      }
+      if !delta.isEmpty {
+        liveRegistrations.removeSubtrees(rootedAt: delta.removalRoots)
+        viewGraph.restoreRuntimeRegistrationSubtrees(
+          rootedAt: delta.restorationRoots,
+          into: liveRegistrations
+        )
+        liveRegistrations.normalizeScopedRestoreOrder()
+        usedScopedRestore = true
+      }
+      viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
+    } else {
+      if publicationDiagnosticsEnabled {
+        restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
+      }
+      liveRegistrations.resetAll()
+      viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    }
   }
 
   private func recordSubtreePublication(rootedAt roots: [Identity]) {

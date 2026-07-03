@@ -725,6 +725,152 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
   }
 
+  @Test("subtree cover threshold probe dedups overlap and stops at the cap")
+  func subtreeCoverProbeDedupsOverlapAndStopsAtCap() {
+    // Root → A(A1, A2, A3), B(B1) — 7 live nodes.
+    let rootIdentity = testIdentity("Root")
+    let aIdentity = testIdentity("Root", "A")
+    let aChildIdentities = (1...3).map { testIdentity("Root", "A", "A\($0)") }
+    let bIdentity = testIdentity("Root", "B")
+    let bChildIdentity = testIdentity("Root", "B", "B1")
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let aNode = graph.beginEvaluation(identity: aIdentity, invalidator: nil)
+    for childIdentity in aChildIdentities {
+      let child = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
+      graph.finishEvaluation(
+        child,
+        resolved: ResolvedNode(identity: childIdentity, kind: .view("Leaf")),
+        accessedStateSlots: 0
+      )
+    }
+    graph.finishEvaluation(
+      aNode,
+      resolved: ResolvedNode(
+        identity: aIdentity,
+        kind: .view("A"),
+        children: aChildIdentities.map { ResolvedNode(identity: $0, kind: .view("Leaf")) }
+      ),
+      accessedStateSlots: 0
+    )
+    let bNode = graph.beginEvaluation(identity: bIdentity, invalidator: nil)
+    let bChild = graph.beginEvaluation(identity: bChildIdentity, invalidator: nil)
+    graph.finishEvaluation(
+      bChild,
+      resolved: ResolvedNode(identity: bChildIdentity, kind: .view("Leaf")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      bNode,
+      resolved: ResolvedNode(
+        identity: bIdentity,
+        kind: .view("B"),
+        children: [ResolvedNode(identity: bChildIdentity, kind: .view("Leaf"))]
+      ),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: aIdentity, kind: .view("A")),
+          ResolvedNode(identity: bIdentity, kind: .view("B")),
+        ]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    #expect(graph.runtimeRegistrationSubtreeCoverReaches(4, rootedAt: [aIdentity]))
+    #expect(!graph.runtimeRegistrationSubtreeCoverReaches(5, rootedAt: [aIdentity]))
+    // Overlapping roots must not double-count: A1 is inside A's cover.
+    #expect(
+      !graph.runtimeRegistrationSubtreeCoverReaches(
+        5,
+        rootedAt: [aIdentity, aChildIdentities[0]]
+      )
+    )
+    #expect(graph.runtimeRegistrationSubtreeCoverReaches(6, rootedAt: [aIdentity, bIdentity]))
+    #expect(!graph.runtimeRegistrationSubtreeCoverReaches(7, rootedAt: [aIdentity, bIdentity]))
+    // A zero threshold is vacuously reached; a positive one needs live roots.
+    #expect(graph.runtimeRegistrationSubtreeCoverReaches(0, rootedAt: []))
+    #expect(!graph.runtimeRegistrationSubtreeCoverReaches(1, rootedAt: []))
+  }
+
+  @Test("a wide-cover subtrees publication stays byte-identical to a full rebuild")
+  func wideCoverSubtreesPublicationMatchesFullRebuild() {
+    // A frontier covering most of the live tree escalates to the
+    // fingerprint-delta publication (the `.all`-frame body) instead of the
+    // per-node scoped restore — the wide-cover commit must stay
+    // byte-identical to a full rebuild, including focus-list order.
+    let rootIdentity = testIdentity("Root")
+    let aIdentity = testIdentity("Root", "A")
+    let bIdentity = testIdentity("Root", "B")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    seedTwoFocusableSiblings(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      aIdentity: aIdentity,
+      bIdentity: bIdentity,
+      namespace: namespace
+    )
+
+    // Frame 1: an `.all` draft commit publishes the live registry AND records
+    // the committed fingerprint the delta path diffs against.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let seedDraft = ViewGraphFrameDraft(liveRegistrations: liveRegistrations, checkpoint: nil)
+    seedDraft.recordDirtyEvaluationPlan(nil)
+    _ = seedDraft.commitRuntimeRegistrations(from: graph)
+
+    // Frame 2: narrowly re-evaluate ONLY subtree A, then publish with a WIDE
+    // frontier [A, B] — 2 of 3 live nodes, past the half-tree threshold.
+    graph.beginFrame()
+    let aNode = graph.beginEvaluation(identity: aIdentity, invalidator: nil)
+    recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
+    graph.finishEvaluation(
+      aNode,
+      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    let nodeIDByIdentity = graph.debugTotalStateSnapshot().nodeIDByIdentity
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(
+        frontierNodeIDs: [nodeIDByIdentity[aIdentity]!, nodeIDByIdentity[bIdentity]!],
+        frontierIdentities: [aIdentity, bIdentity]
+      )
+    )
+    _ = graphDraft.commitRuntimeRegistrations(from: graph)
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+    #expect(
+      liveRegistrations.publicationOracleFingerprint()
+        == fullRebuild.publicationOracleFingerprint()
+    )
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+  }
+
   @Test("structured lifecycle teardown preserves path-colliding sibling component")
   func structuredLifecycleTeardownPreservesPathCollidingSiblingComponent() {
     let preservedIdentity = Identity(components: ["Root", "A/B"])
