@@ -286,6 +286,9 @@ public struct ResolveContext: Equatable, Sendable {
     let reuseStyle = !Self.isStyleKeyPath(keyPath)
     copy.environment = copy.environmentValues.applying(
       to: copy.environment, reuseStyle: reuseStyle)
+    copy.propagated.authoredFocusPressOverrides.formUnion(
+      Self.focusPressOverrides(writtenBy: keyPath)
+    )
     return copy
   }
 
@@ -298,7 +301,30 @@ public struct ResolveContext: Equatable, Sendable {
     let reuseStyle = !Self.isStyleKeyPath(keyPath)
     copy.environment = copy.environmentValues.applying(
       to: copy.environment, reuseStyle: reuseStyle)
+    // A transform rooted above the two keys (e.g. `\.self`) can write them
+    // without naming them, so value changes count as authored writes too.
+    var overrides = Self.focusPressOverrides(writtenBy: keyPath)
+    if copy.environmentValues.focusedIdentity != environmentValues.focusedIdentity {
+      overrides.insert(.focusedIdentity)
+    }
+    if copy.environmentValues.pressedIdentity != environmentValues.pressedIdentity {
+      overrides.insert(.pressedIdentity)
+    }
+    copy.propagated.authoredFocusPressOverrides.formUnion(overrides)
     return copy
+  }
+
+  private static func focusPressOverrides<Value>(
+    writtenBy keyPath: WritableKeyPath<EnvironmentValues, Value>
+  ) -> AuthoredFocusPressOverrides {
+    let erased: AnyKeyPath = keyPath
+    if erased == \EnvironmentValues.focusedIdentity {
+      return .focusedIdentity
+    }
+    if erased == \EnvironmentValues.pressedIdentity {
+      return .pressedIdentity
+    }
+    return []
   }
 
   private static func isStyleKeyPath<Value>(
@@ -327,9 +353,20 @@ public struct ResolveContext: Equatable, Sendable {
     var refreshed = self
     refreshed.invalidatedIdentities = inputs.invalidatedIdentities
     refreshed.invalidationSummary = inputs.invalidationSummary
+    // Focus/press refresh keeps re-run evaluator closures — whose captured
+    // context predates the current frame — in sync with the frame-level focus
+    // and press state, which is what lets finite suppression scopes replace
+    // root-forced evaluation. An authored `.environment` write must still win
+    // below its modifier, so keys the authoring surface owns in this scope are
+    // exempt: for them the captured value IS the current value.
     var environmentValues = refreshed.environmentValues
-    environmentValues.focusedIdentity = inputs.environmentValues.focusedIdentity
-    environmentValues.pressedIdentity = inputs.environmentValues.pressedIdentity
+    let authoredOverrides = propagated.authoredFocusPressOverrides
+    if !authoredOverrides.contains(.focusedIdentity) {
+      environmentValues.focusedIdentity = inputs.environmentValues.focusedIdentity
+    }
+    if !authoredOverrides.contains(.pressedIdentity) {
+      environmentValues.pressedIdentity = inputs.environmentValues.pressedIdentity
+    }
     refreshed.environmentValues = Self.contextualEnvironmentValues(
       environmentValues,
       for: refreshed.identity
@@ -474,6 +511,15 @@ extension ResolveContext {
     /// checks key on identity/structural ancestry, which a re-rooted descendant
     /// escapes.
     package var withinChurnedSubtree: Bool
+    /// Focus/press environment keys written by an authored `.environment` /
+    /// `.transformEnvironment` modifier in this context's scope. Set by
+    /// `settingEnvironment` / `transformingEnvironment` at the write point and
+    /// inherited by every derived context (like `withinChurnedSubtree`), so
+    /// captured evaluator contexts below the modifier keep the marker across
+    /// frames. `applyingCurrentFrameResolveInputs` refreshes frame-level
+    /// focus/press into captured contexts; keys marked here are exempt because
+    /// the authored value must keep winning below its modifier.
+    package var authoredFocusPressOverrides: AuthoredFocusPressOverrides
     /// Forwards deadline requests to the frame scheduler.
     /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
     package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
@@ -498,6 +544,7 @@ extension ResolveContext {
       frameInputs: FrameResolveInputBox? = nil,
       suppressesStructuralLifecycle: Bool = false,
       withinChurnedSubtree: Bool = false,
+      authoredFocusPressOverrides: AuthoredFocusPressOverrides = [],
       requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)? = nil
     ) {
       self.resolveWorkTracker = resolveWorkTracker
@@ -519,8 +566,23 @@ extension ResolveContext {
       self.frameInputs = frameInputs
       self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
       self.withinChurnedSubtree = withinChurnedSubtree
+      self.authoredFocusPressOverrides = authoredFocusPressOverrides
       self.requestDeadline = requestDeadline
     }
+  }
+
+  /// Environment keys whose in-scope values are owned by an authored
+  /// `.environment` / `.transformEnvironment` write. See
+  /// ``PropagatedRegistries/authoredFocusPressOverrides``.
+  package struct AuthoredFocusPressOverrides: OptionSet, Equatable, Sendable {
+    package let rawValue: UInt8
+
+    package init(rawValue: UInt8) {
+      self.rawValue = rawValue
+    }
+
+    package static let focusedIdentity = Self(rawValue: 1 << 0)
+    package static let pressedIdentity = Self(rawValue: 1 << 1)
   }
 
   package init(

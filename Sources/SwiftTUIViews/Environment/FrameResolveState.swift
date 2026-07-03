@@ -81,11 +81,10 @@ package struct FrameResolveInputs {
   package var selectiveEvaluationDisabledReasons: [SelectiveEvaluationDisabledReason]
   /// Retained-reuse suppression for reuse-unsafe identities this frame.
   ///
-  /// The run loop sets this alongside `forceRootEvaluation` on frames where
-  /// some reached nodes must recompute even if they are disjoint from ordinary
-  /// invalidation: focus/press runtime readers and active property-animation
-  /// identities. The scope may still conservatively suppress all reached nodes
-  /// when animation work is identity-agnostic.
+  /// The run loop sets this on frames where some reached nodes must recompute
+  /// even if they are disjoint from ordinary invalidation: focus/press runtime
+  /// readers and active property-animation identities. The run-loop policy
+  /// decides separately whether that safety scope also needs root evaluation.
   package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
 
   package init(

@@ -48,14 +48,18 @@ extension RunLoop {
         // so the second pass's scope unions the relocated focus target and
         // its runtime readers. A stale scope here would let a focus reader
         // outside it take retained reuse of pre-relocation content.
-        let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
-        if convergence.rerenderedForFocusSync || retainedReuseSuppressionScope.suppressesAll {
+        let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
+        let retainedReuseSuppressionScope = retainedReuseFrameSafety.suppressionScope
+        if convergence.rerenderedForFocusSync
+          || retainedReuseFrameSafety.requiresRootEvaluation
+        {
           renderer.forceRootEvaluation()
         }
         if !retainedReuseSuppressionScope.isEmpty {
-          // Finite reuse-unsafe scopes are queued as graph-local dirty work by
-          // the frame head. Identity-agnostic scopes and focus-sync rerenders
-          // remain root-forced because there is no narrower target to name.
+          // Focus/press-only finite scopes are queued as graph-local dirty work
+          // by the frame head. Animation safety and focus-sync rerenders stay
+          // root-forced until their own measurement tranche proves a narrower
+          // policy is profitable.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let renderedArtifacts = renderer.renderArtifacts(
@@ -270,14 +274,18 @@ extension RunLoop {
         // relocation a frame-start scope snapshot cannot name, and a stale
         // scope would let a focus reader outside it reuse pre-relocation
         // content.
-        let retainedReuseSuppressionScope = retainedReuseSuppressionScopeForFrameSafety()
-        if convergence.rerenderedForFocusSync || retainedReuseSuppressionScope.suppressesAll {
+        let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
+        let retainedReuseSuppressionScope = retainedReuseFrameSafety.suppressionScope
+        if convergence.rerenderedForFocusSync
+          || retainedReuseFrameSafety.requiresRootEvaluation
+        {
           renderer.forceRootEvaluation()
         }
         if !retainedReuseSuppressionScope.isEmpty {
-          // Finite reuse-unsafe scopes are queued as graph-local dirty work by
-          // the frame head. Identity-agnostic scopes and focus-sync rerenders
-          // remain root-forced because there is no narrower target to name.
+          // Focus/press-only finite scopes are queued as graph-local dirty work
+          // by the frame head. Animation safety and focus-sync rerenders stay
+          // root-forced until their own measurement tranche proves a narrower
+          // policy is profitable.
           renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
         }
         let acquired = await acquireFrameArtifactsAsync(
@@ -397,10 +405,22 @@ extension RunLoop {
   ///
   /// Identity-agnostic pending animation work still falls back to full
   /// suppression because there is no narrower subtree to name.
-  private func retainedReuseSuppressionScopeForFrameSafety()
-    -> RetainedReuseSuppressionScope
+  ///
+  /// The run-loop policy decides separately whether the safety scope also
+  /// needs root evaluation: focus/press-only finite scopes are queued as
+  /// graph-local dirty work by the frame head, while animation safety stays
+  /// root-forced until its own measurement tranche proves a narrower policy
+  /// is profitable (the F32 reuse gate already scopes tick-frame recompute).
+  private struct RetainedReuseFrameSafety {
+    var suppressionScope: RetainedReuseSuppressionScope
+    var requiresRootEvaluation: Bool
+  }
+
+  private func retainedReuseFrameSafetyForFrame()
+    -> RetainedReuseFrameSafety
   {
     var scope = RetainedReuseSuppressionScope()
+    var requiresRootEvaluation = false
 
     let currentFocusIdentity = focusTracker.currentFocusIdentity
     if currentFocusIdentity != previousFrameFocusIdentity {
@@ -425,7 +445,10 @@ extension RunLoop {
 
     let controller = renderer.internalAnimationController
     let activePropertyIdentities = controller.activePropertyAnimationIdentities
-    scope.formUnion(activePropertyIdentities)
+    if !activePropertyIdentities.isEmpty {
+      scope.formUnion(activePropertyIdentities)
+      requiresRootEvaluation = true
+    }
     if controller.lastTickResult.hasPendingWork,
       activePropertyIdentities.isEmpty
     {
@@ -439,11 +462,15 @@ extension RunLoop {
       guard
         let attributableIdentities = controller.attributablePendingAnimationIdentities
       else {
-        return .all
+        return .init(suppressionScope: .all, requiresRootEvaluation: true)
       }
       scope.formUnion(attributableIdentities)
+      requiresRootEvaluation = true
     }
-    return scope
+    return .init(
+      suppressionScope: scope,
+      requiresRootEvaluation: requiresRootEvaluation
+    )
   }
 
   private func appendPendingAccessibilityAnnouncements(
