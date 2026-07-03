@@ -1,37 +1,39 @@
 extension NodeHandlers {
   func debugTotalStateSnapshot() -> ViewNode.DebugTotalStateSnapshot.HandlerSnapshot {
     ViewNode.DebugTotalStateSnapshot.HandlerSnapshot(
-      actionRegistrationIdentities: sortedIdentityStrings(actionRegistrations.keys),
-      keyHandlerRegistrationIdentities: sortedIdentityStrings(keyHandlerRegistrations.keys),
+      actionRegistrationIdentities: sortedIdentityStrings(action.registrations.keys),
+      keyHandlerRegistrationIdentities: sortedIdentityStrings(keyHandler.handlers.keys),
       keyPressHandlerRegistrationIdentities: sortedIdentityStrings(
-        keyPressHandlerRegistrations.keys
+        keyHandler.keyPress.handlers.keys
       ),
-      pasteHandlerRegistrationIdentities: sortedIdentityStrings(pasteHandlerRegistrations.keys),
+      pasteHandlerRegistrationIdentities: sortedIdentityStrings(keyHandler.paste.handlers.keys),
       terminationHandlerRegistrationIdentities: sortedIdentityStrings(
-        terminationHandlerRegistrations.keys
+        termination.handlers.keys
       ),
-      pointerHandlerRouteIDs: sortedDescriptions(pointerHandlerRegistrations.keys),
-      pointerHoverHandlerRouteIDs: sortedDescriptions(pointerHoverHandlerRegistrations.keys),
-      gestureRegistrationIdentities: sortedIdentityStrings(gestureRegistrations.keys),
-      gestureStateRegistrationIdentities: sortedIdentityStrings(gestureStateRegistrations.keys),
+      pointerHandlerRouteIDs: sortedDescriptions(pointer.handlers.keys),
+      pointerHoverHandlerRouteIDs: sortedDescriptions(pointer.hoverHandlers.keys),
+      gestureRegistrationIdentities: sortedIdentityStrings(gesture.recognizers.keys),
+      gestureStateRegistrationIdentities: sortedIdentityStrings(gestureState.bindings.keys),
       defaultFocusScopeIdentities: sortedIdentityStrings(
-        defaultFocusRegistrations.scopes.map(\.identity)
+        defaultFocus.scopes.map(\.identity)
       ),
       defaultFocusCandidateIdentities: sortedIdentityStrings(
-        defaultFocusRegistrations.candidates.map(\.identity)
+        defaultFocus.candidates.map(\.identity)
       ),
-      focusBindingIdentities: sortedIdentityStrings(focusBindingRegistrations.map(\.identity)),
-      focusedValuesIdentities: sortedIdentityStrings(focusedValuesRegistrations.map(\.identity)),
-      scrollPositionIdentities: sortedIdentityStrings(scrollPositionRegistrations.map(\.identity)),
-      lifecycleHandlerIDs: (Array(lifecycleRegistrations.appearHandlers.keys)
-        + Array(lifecycleRegistrations.disappearHandlers.keys)
-        + Array(lifecycleRegistrations.changeHandlers.keys)).sorted(),
-      taskRegistrationIdentities: sortedIdentityStrings(taskRegistrations.keys),
+      focusBindingIdentities: sortedIdentityStrings(focusBinding.registrations.map(\.identity)),
+      focusedValuesIdentities: sortedIdentityStrings(focusedValues.registrations.map(\.identity)),
+      scrollPositionIdentities: sortedIdentityStrings(
+        scrollPosition.registrations.map(\.identity)
+      ),
+      lifecycleHandlerIDs: (Array(lifecycle.appearHandlers.keys)
+        + Array(lifecycle.disappearHandlers.keys)
+        + Array(lifecycle.changeHandlers.keys)).sorted(),
+      taskRegistrationIdentities: sortedIdentityStrings(task.registrations.keys),
       preferenceObservationHandlerIDs:
-        preferenceObservationRegistrations
+        preferenceObservation.registrations
         .map(\.handlerID)
         .sorted(),
-      commandRegistrations: commandRegistrations.keyCommandsByScope
+      commandRegistrations: command.keyCommandsByScope
         .flatMap { identity, commands in
           commands.map { binding, command in
             "\(identity.description):\(binding):\(command.description):\(command.isEnabled)"
@@ -39,7 +41,7 @@ extension NodeHandlers {
         }
         .sorted(),
       dropDestinationIdentities: sortedIdentityStrings(
-        dropDestinationRegistrations.handlersByScope.keys)
+        dropDestination.handlersByScope.keys)
     )
   }
 }

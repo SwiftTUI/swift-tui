@@ -1,99 +1,492 @@
+// The per-node capture of one resolve pass's runtime registrations: one
+// `RuntimeNodeRecord` field per registration family, written by the typed
+// `record*` intake methods below and read back by each registry's
+// `RuntimeRegistry.restore(from:context:)`. Family capture semantics
+// (last-write-wins vs append, descriptor dedup, owner stamping) live on the
+// record types; the whole-bag operations fold over `allRecordFields`, so a
+// family participates in emptiness checks and absorb adoption by
+// construction once its field joins that list —
+// `RuntimeRegistrationKindTotalityTests` pins the coverage.
+
+package struct ActionNodeRecord: RuntimeNodeRecord {
+  package var registrations: [Identity: LocalActionRegistry.Registration] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    registrations.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: ActionNodeRecord) {
+    registrations.merge(departing.registrations) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    handler: @escaping LocalActionRegistry.Handler,
+    followUpInvalidationIdentity: Identity?,
+    owner: RuntimeRegistrationOwnerKey
+  ) {
+    owners[identity] = owner
+    registrations[identity] = .init(
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity
+    )
+  }
+}
+
+/// A stacked handler family (key press / paste) whose per-identity handler
+/// lists carry a persisted contribution ordinal for cross-owner dispatch
+/// priority.
+package struct ContributedHandlerNodeRecord<Handler>: RuntimeNodeRecord {
+  package var handlers: [Identity: [Handler]] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  package var ordinals: [Identity: UInt64] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    handlers.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: Self) {
+    handlers.merge(departing.handlers) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+    ordinals.merge(departing.ordinals) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    ordinal: UInt64,
+    handler: Handler
+  ) {
+    owners[identity] = .current(identity: identity)
+    ordinals[identity] = ordinal
+    handlers[identity, default: []].append(handler)
+  }
+}
+
+package struct KeyHandlerNodeRecord: RuntimeNodeRecord {
+  package var handlers: [Identity: LocalKeyHandlerRegistry.Handler] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  package var keyPress = ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.KeyPressHandler>()
+  package var paste = ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.PasteHandler>()
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    handlers.isEmpty && keyPress.isEmpty && paste.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: KeyHandlerNodeRecord) {
+    handlers.merge(departing.handlers) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+    keyPress.absorbAdopted(departing.keyPress)
+    paste.absorbAdopted(departing.paste)
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.Handler
+  ) {
+    owners[identity] = .current(identity: identity)
+    handlers[identity] = handler
+  }
+}
+
+package struct TerminationNodeRecord: RuntimeNodeRecord {
+  package var handlers: [Identity: [LocalTerminationRegistry.Handler]] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    handlers.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: TerminationNodeRecord) {
+    handlers.merge(departing.handlers) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    handler: @escaping LocalTerminationRegistry.Handler
+  ) {
+    owners[identity] = .current(identity: identity)
+    handlers[identity, default: []].append(handler)
+  }
+}
+
+package struct PointerNodeRecord: RuntimeNodeRecord {
+  package var handlers: [RouteID: LocalPointerHandlerRegistry.Handler] = [:]
+  package var handlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  package var hoverHandlers: [RouteID: LocalPointerHandlerRegistry.HoverHandler] = [:]
+  package var hoverOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    handlers.isEmpty && hoverHandlers.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: PointerNodeRecord) {
+    handlers.merge(departing.handlers) { current, _ in current }
+    handlerOwners.merge(departing.handlerOwners) { current, _ in current }
+    hoverHandlers.merge(departing.hoverHandlers) { current, _ in current }
+    hoverOwners.merge(departing.hoverOwners) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    routeID: RouteID,
+    handler: @escaping LocalPointerHandlerRegistry.Handler
+  ) {
+    handlerOwners[routeID] = .current(identity: routeID.identity)
+    handlers[routeID] = handler
+  }
+
+  @MainActor
+  package mutating func recordHover(
+    routeID: RouteID,
+    handler: @escaping LocalPointerHandlerRegistry.HoverHandler
+  ) {
+    hoverOwners[routeID] = .current(identity: routeID.identity)
+    hoverHandlers[routeID] = handler
+  }
+}
+
+package struct GestureNodeRecord: RuntimeNodeRecord {
+  package var recognizers: [Identity: AnyGestureRecognizer] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    recognizers.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: GestureNodeRecord) {
+    recognizers.merge(departing.recognizers) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    recognizer: AnyGestureRecognizer
+  ) {
+    owners[identity] = .current(identity: identity)
+    recognizers[identity] = recognizer
+  }
+}
+
+package struct GestureStateNodeRecord: RuntimeNodeRecord {
+  package var bindings: [Identity: [AnyGestureStateBinding]] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    bindings.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: GestureStateNodeRecord) {
+    bindings.merge(departing.bindings) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    binding: AnyGestureStateBinding
+  ) {
+    owners[identity] = .current(identity: identity)
+    bindings[identity, default: []].append(binding)
+  }
+}
+
+package struct FocusBindingNodeRecord: RuntimeNodeRecord {
+  package var registrations: [FocusBindingRegistrationSnapshot] = []
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    registrations.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: FocusBindingNodeRecord) {
+    registrations.append(contentsOf: departing.registrations)
+  }
+
+  @MainActor
+  package mutating func record(_ registration: FocusBindingRegistrationSnapshot) {
+    registrations.append(registration)
+  }
+}
+
+package struct FocusedValuesNodeRecord: RuntimeNodeRecord {
+  package var registrations: [FocusedValuesRegistrationSnapshot] = []
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    registrations.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: FocusedValuesNodeRecord) {
+    registrations.append(contentsOf: departing.registrations)
+  }
+
+  @MainActor
+  package mutating func record(_ registration: FocusedValuesRegistrationSnapshot) {
+    if let existingIndex = registrations.firstIndex(where: {
+      $0.identity == registration.identity
+    }) {
+      registrations[existingIndex].descendantIdentities.formUnion(
+        registration.descendantIdentities
+      )
+      registrations[existingIndex].values.merge(registration.values)
+    } else {
+      registrations.append(registration)
+    }
+  }
+}
+
+package struct ScrollPositionNodeRecord: RuntimeNodeRecord {
+  package var registrations: [ScrollPositionRegistrationSnapshot] = []
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    registrations.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: ScrollPositionNodeRecord) {
+    registrations.append(contentsOf: departing.registrations)
+  }
+
+  @MainActor
+  package mutating func record(_ registration: ScrollPositionRegistrationSnapshot) {
+    if let existingIndex = registrations.firstIndex(where: {
+      $0.identity == registration.identity
+    }) {
+      registrations[existingIndex] = registration
+    } else {
+      registrations.append(registration)
+    }
+  }
+}
+
+package struct TaskNodeRecord: RuntimeNodeRecord {
+  package var registrations: [Identity: [TaskRegistration]] = [:]
+  package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    registrations.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: TaskNodeRecord) {
+    registrations.merge(departing.registrations) { current, _ in current }
+    owners.merge(departing.owners) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(
+    identity: Identity,
+    registration: TaskRegistration
+  ) {
+    owners[identity] = .current(identity: identity)
+    var identityRegistrations = registrations[identity] ?? []
+    if let index = identityRegistrations.firstIndex(where: {
+      $0.descriptor.id == registration.descriptor.id
+    }) {
+      identityRegistrations[index] = registration
+    } else {
+      identityRegistrations.append(registration)
+    }
+    registrations[identity] = identityRegistrations
+  }
+}
+
+package struct PreferenceObservationNodeRecord: RuntimeNodeRecord {
+  package var registrations: [PreferenceObservationRegistrationSnapshot] = []
+
+  package init() {}
+
+  package var isEmpty: Bool {
+    registrations.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: PreferenceObservationNodeRecord) {
+    registrations.append(contentsOf: departing.registrations)
+  }
+
+  @MainActor
+  package mutating func record(_ registration: PreferenceObservationRegistrationSnapshot) {
+    registrations.append(registration)
+  }
+}
+
+extension DefaultFocusRegistrationSnapshot: RuntimeNodeRecord {
+  package init() {
+    self.init(scopes: [], candidates: [])
+  }
+
+  package var isEmpty: Bool {
+    scopes.isEmpty && candidates.isEmpty
+  }
+
+  package mutating func absorbAdopted(_ departing: DefaultFocusRegistrationSnapshot) {
+    scopes.append(contentsOf: departing.scopes)
+    candidates.append(contentsOf: departing.candidates)
+  }
+
+  @MainActor
+  package mutating func record(_ registration: DefaultFocusScopeRegistrationSnapshot) {
+    if !scopes.contains(where: {
+      $0.namespace == registration.namespace && $0.identity == registration.identity
+    }) {
+      scopes.append(registration)
+    }
+  }
+
+  @MainActor
+  package mutating func record(_ registration: DefaultFocusCandidateRegistrationSnapshot) {
+    if !candidates.contains(where: {
+      $0.namespace == registration.namespace && $0.identity == registration.identity
+    }) {
+      candidates.append(registration)
+    }
+  }
+}
+
+extension LifecycleHandlerSnapshot: RuntimeNodeRecord {
+  package init() {
+    self.init(appearRegistrations: [:], disappearRegistrations: [:], changeRegistrations: [:])
+  }
+}
+
+extension CommandRegistrySnapshot: RuntimeNodeRecord {
+  package init() {
+    self.init(keyCommandsByScope: [:], ownersByScope: [:])
+  }
+
+  package mutating func absorbAdopted(_ departing: CommandRegistrySnapshot) {
+    keyCommandsByScope.merge(departing.keyCommandsByScope) { current, _ in current }
+    ownersByScope.merge(departing.ownersByScope) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(_ registration: CommandRegistrySnapshot) {
+    for (identity, commands) in registration.keyCommandsByScope {
+      keyCommandsByScope[identity] = commands
+      ownersByScope[identity] =
+        registration.ownersByScope[identity] ?? .current(identity: identity)
+    }
+  }
+}
+
+extension DropDestinationRegistrySnapshot: RuntimeNodeRecord {
+  package init() {
+    self.init(handlersByScope: [:], ownersByScope: [:])
+  }
+
+  package mutating func absorbAdopted(_ departing: DropDestinationRegistrySnapshot) {
+    handlersByScope.merge(departing.handlersByScope) { current, _ in current }
+    ownersByScope.merge(departing.ownersByScope) { current, _ in current }
+  }
+
+  @MainActor
+  package mutating func record(_ registration: DropDestinationRegistrySnapshot) {
+    for (identity, handler) in registration.handlersByScope {
+      handlersByScope[identity] = handler
+      ownersByScope[identity] =
+        registration.ownersByScope[identity] ?? .current(identity: identity)
+    }
+  }
+}
+
 @MainActor
 package struct NodeHandlers {
-  package var actionRegistrations: [Identity: LocalActionRegistry.Registration]
-  package var actionRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler]
-  package var keyHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]]
-  package var keyPressHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var keyPressHandlerRegistrationOrdinals: [Identity: UInt64]
-  package var pasteHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.PasteHandler]]
-  package var pasteHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var pasteHandlerRegistrationOrdinals: [Identity: UInt64]
-  package var terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]]
-  package var terminationHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
-  package var pointerHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey]
-  package var pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler]
-  package var pointerHoverHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey]
-  package var gestureRegistrations: [Identity: AnyGestureRecognizer]
-  package var gestureRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
-  package var gestureStateRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var defaultFocusRegistrations: DefaultFocusRegistrationSnapshot
-  package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
-  package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
-  package var scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot]
-  package var lifecycleRegistrations: LifecycleHandlerSnapshot
-  package var taskRegistrations: [Identity: [TaskRegistration]]
-  package var taskRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey]
-  package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
-  package var commandRegistrations: CommandRegistrySnapshot
-  package var dropDestinationRegistrations: DropDestinationRegistrySnapshot
+  package var action = ActionNodeRecord()
+  package var keyHandler = KeyHandlerNodeRecord()
+  package var termination = TerminationNodeRecord()
+  package var pointer = PointerNodeRecord()
+  package var gesture = GestureNodeRecord()
+  package var gestureState = GestureStateNodeRecord()
+  package var defaultFocus = DefaultFocusRegistrationSnapshot()
+  package var focusBinding = FocusBindingNodeRecord()
+  package var focusedValues = FocusedValuesNodeRecord()
+  package var scrollPosition = ScrollPositionNodeRecord()
+  package var lifecycle = LifecycleHandlerSnapshot()
+  package var task = TaskNodeRecord()
+  package var preferenceObservation = PreferenceObservationNodeRecord()
+  package var command = CommandRegistrySnapshot()
+  package var dropDestination = DropDestinationRegistrySnapshot()
 
-  package init(
-    actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
-    actionRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
-    keyHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]] = [:],
-    keyPressHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    keyPressHandlerRegistrationOrdinals: [Identity: UInt64] = [:],
-    pasteHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.PasteHandler]] = [:],
-    pasteHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    pasteHandlerRegistrationOrdinals: [Identity: UInt64] = [:],
-    terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]] = [:],
-    terminationHandlerRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
-    pointerHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:],
-    pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler] = [:],
-    pointerHoverHandlerRegistrationOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:],
-    gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
-    gestureRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
-    gestureStateRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    defaultFocusRegistrations: DefaultFocusRegistrationSnapshot = .init(),
-    focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
-    focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
-    scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
-    lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
-    taskRegistrations: [Identity: [TaskRegistration]] = [:],
-    taskRegistrationOwners: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = [],
-    commandRegistrations: CommandRegistrySnapshot = .init(),
-    dropDestinationRegistrations: DropDestinationRegistrySnapshot = .init()
-  ) {
-    self.actionRegistrations = actionRegistrations
-    self.actionRegistrationOwners = actionRegistrationOwners
-    self.keyHandlerRegistrations = keyHandlerRegistrations
-    self.keyHandlerRegistrationOwners = keyHandlerRegistrationOwners
-    self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
-    self.keyPressHandlerRegistrationOwners = keyPressHandlerRegistrationOwners
-    self.keyPressHandlerRegistrationOrdinals = keyPressHandlerRegistrationOrdinals
-    self.pasteHandlerRegistrations = pasteHandlerRegistrations
-    self.pasteHandlerRegistrationOwners = pasteHandlerRegistrationOwners
-    self.pasteHandlerRegistrationOrdinals = pasteHandlerRegistrationOrdinals
-    self.terminationHandlerRegistrations = terminationHandlerRegistrations
-    self.terminationHandlerRegistrationOwners = terminationHandlerRegistrationOwners
-    self.pointerHandlerRegistrations = pointerHandlerRegistrations
-    self.pointerHandlerRegistrationOwners = pointerHandlerRegistrationOwners
-    self.pointerHoverHandlerRegistrations = pointerHoverHandlerRegistrations
-    self.pointerHoverHandlerRegistrationOwners = pointerHoverHandlerRegistrationOwners
-    self.gestureRegistrations = gestureRegistrations
-    self.gestureRegistrationOwners = gestureRegistrationOwners
-    self.gestureStateRegistrations = gestureStateRegistrations
-    self.gestureStateRegistrationOwners = gestureStateRegistrationOwners
-    self.defaultFocusRegistrations = defaultFocusRegistrations
-    self.focusBindingRegistrations = focusBindingRegistrations
-    self.focusedValuesRegistrations = focusedValuesRegistrations
-    self.scrollPositionRegistrations = scrollPositionRegistrations
-    self.lifecycleRegistrations = lifecycleRegistrations
-    self.taskRegistrations = taskRegistrations
-    self.taskRegistrationOwners = taskRegistrationOwners
-    self.preferenceObservationRegistrations = preferenceObservationRegistrations
-    self.commandRegistrations = commandRegistrations
-    self.dropDestinationRegistrations = dropDestinationRegistrations
+  package init() {}
+
+  /// The uniform record operations of every family field above, in kind
+  /// order. `absorbAdopted` and `hasRuntimeRegistrations` fold over this
+  /// list, so a family cannot gain a field here without joining both — the
+  /// totality suite's absorb-adoption and round-trip tests fail on a missing
+  /// entry.
+  private struct RecordField {
+    let isEmpty: @MainActor (NodeHandlers) -> Bool
+    let absorb: @MainActor (inout NodeHandlers, NodeHandlers) -> Void
   }
+
+  private static let allRecordFields: [RecordField] = [
+    .init(isEmpty: { $0.action.isEmpty }, absorb: { $0.action.absorbAdopted($1.action) }),
+    .init(
+      isEmpty: { $0.keyHandler.isEmpty }, absorb: { $0.keyHandler.absorbAdopted($1.keyHandler) }
+    ),
+    .init(
+      isEmpty: { $0.termination.isEmpty }, absorb: { $0.termination.absorbAdopted($1.termination) }
+    ),
+    .init(isEmpty: { $0.pointer.isEmpty }, absorb: { $0.pointer.absorbAdopted($1.pointer) }),
+    .init(isEmpty: { $0.gesture.isEmpty }, absorb: { $0.gesture.absorbAdopted($1.gesture) }),
+    .init(
+      isEmpty: { $0.gestureState.isEmpty },
+      absorb: { $0.gestureState.absorbAdopted($1.gestureState) }
+    ),
+    .init(
+      isEmpty: { $0.defaultFocus.isEmpty },
+      absorb: { $0.defaultFocus.absorbAdopted($1.defaultFocus) }
+    ),
+    .init(
+      isEmpty: { $0.focusBinding.isEmpty },
+      absorb: { $0.focusBinding.absorbAdopted($1.focusBinding) }
+    ),
+    .init(
+      isEmpty: { $0.focusedValues.isEmpty },
+      absorb: { $0.focusedValues.absorbAdopted($1.focusedValues) }
+    ),
+    .init(
+      isEmpty: { $0.scrollPosition.isEmpty },
+      absorb: { $0.scrollPosition.absorbAdopted($1.scrollPosition) }
+    ),
+    .init(isEmpty: { $0.lifecycle.isEmpty }, absorb: { $0.lifecycle.absorbAdopted($1.lifecycle) }),
+    .init(isEmpty: { $0.task.isEmpty }, absorb: { $0.task.absorbAdopted($1.task) }),
+    .init(
+      isEmpty: { $0.preferenceObservation.isEmpty },
+      absorb: { $0.preferenceObservation.absorbAdopted($1.preferenceObservation) }
+    ),
+    .init(isEmpty: { $0.command.isEmpty }, absorb: { $0.command.absorbAdopted($1.command) }),
+    .init(
+      isEmpty: { $0.dropDestination.isEmpty },
+      absorb: { $0.dropDestination.absorbAdopted($1.dropDestination) }
+    ),
+  ]
 
   package mutating func reset() {
     self = .init()
@@ -110,98 +503,13 @@ package struct NodeHandlers {
   /// are its own resolve products and disjoint from the absorber's in
   /// practice.
   package mutating func absorbAdopted(_ departing: NodeHandlers) {
-    actionRegistrations.merge(departing.actionRegistrations) { current, _ in current }
-    actionRegistrationOwners.merge(departing.actionRegistrationOwners) { current, _ in current }
-    keyHandlerRegistrations.merge(departing.keyHandlerRegistrations) { current, _ in current }
-    keyHandlerRegistrationOwners.merge(departing.keyHandlerRegistrationOwners) {
-      current, _ in current
+    for field in Self.allRecordFields {
+      field.absorb(&self, departing)
     }
-    keyPressHandlerRegistrations.merge(departing.keyPressHandlerRegistrations) {
-      current, _ in current
-    }
-    keyPressHandlerRegistrationOwners.merge(departing.keyPressHandlerRegistrationOwners) {
-      current, _ in current
-    }
-    keyPressHandlerRegistrationOrdinals.merge(departing.keyPressHandlerRegistrationOrdinals) {
-      current, _ in current
-    }
-    pasteHandlerRegistrations.merge(departing.pasteHandlerRegistrations) { current, _ in current }
-    pasteHandlerRegistrationOwners.merge(departing.pasteHandlerRegistrationOwners) {
-      current, _ in current
-    }
-    pasteHandlerRegistrationOrdinals.merge(departing.pasteHandlerRegistrationOrdinals) {
-      current, _ in current
-    }
-    terminationHandlerRegistrations.merge(departing.terminationHandlerRegistrations) {
-      current, _ in current
-    }
-    terminationHandlerRegistrationOwners.merge(departing.terminationHandlerRegistrationOwners) {
-      current, _ in current
-    }
-    pointerHandlerRegistrations.merge(departing.pointerHandlerRegistrations) {
-      current, _ in current
-    }
-    pointerHandlerRegistrationOwners.merge(departing.pointerHandlerRegistrationOwners) {
-      current, _ in current
-    }
-    pointerHoverHandlerRegistrations.merge(departing.pointerHoverHandlerRegistrations) {
-      current, _ in current
-    }
-    pointerHoverHandlerRegistrationOwners.merge(departing.pointerHoverHandlerRegistrationOwners) {
-      current, _ in current
-    }
-    gestureRegistrations.merge(departing.gestureRegistrations) { current, _ in current }
-    gestureRegistrationOwners.merge(departing.gestureRegistrationOwners) { current, _ in current }
-    gestureStateRegistrations.merge(departing.gestureStateRegistrations) { current, _ in current }
-    gestureStateRegistrationOwners.merge(departing.gestureStateRegistrationOwners) {
-      current, _ in current
-    }
-    defaultFocusRegistrations.scopes.append(contentsOf: departing.defaultFocusRegistrations.scopes)
-    defaultFocusRegistrations.candidates.append(
-      contentsOf: departing.defaultFocusRegistrations.candidates
-    )
-    focusBindingRegistrations.append(contentsOf: departing.focusBindingRegistrations)
-    focusedValuesRegistrations.append(contentsOf: departing.focusedValuesRegistrations)
-    scrollPositionRegistrations.append(contentsOf: departing.scrollPositionRegistrations)
-    lifecycleRegistrations.absorbAdopted(departing.lifecycleRegistrations)
-    taskRegistrations.merge(departing.taskRegistrations) { current, _ in current }
-    taskRegistrationOwners.merge(departing.taskRegistrationOwners) { current, _ in current }
-    preferenceObservationRegistrations.append(
-      contentsOf: departing.preferenceObservationRegistrations
-    )
-    commandRegistrations.keyCommandsByScope.merge(
-      departing.commandRegistrations.keyCommandsByScope
-    ) { current, _ in current }
-    commandRegistrations.ownersByScope.merge(departing.commandRegistrations.ownersByScope) {
-      current, _ in current
-    }
-    dropDestinationRegistrations.handlersByScope.merge(
-      departing.dropDestinationRegistrations.handlersByScope
-    ) { current, _ in current }
-    dropDestinationRegistrations.ownersByScope.merge(
-      departing.dropDestinationRegistrations.ownersByScope
-    ) { current, _ in current }
   }
 
   package var hasRuntimeRegistrations: Bool {
-    !actionRegistrations.isEmpty
-      || !keyHandlerRegistrations.isEmpty
-      || !keyPressHandlerRegistrations.isEmpty
-      || !pasteHandlerRegistrations.isEmpty
-      || !terminationHandlerRegistrations.isEmpty
-      || !pointerHandlerRegistrations.isEmpty
-      || !pointerHoverHandlerRegistrations.isEmpty
-      || !gestureRegistrations.isEmpty
-      || !gestureStateRegistrations.isEmpty
-      || defaultFocusRegistrations != DefaultFocusRegistrationSnapshot()
-      || !focusBindingRegistrations.isEmpty
-      || !focusedValuesRegistrations.isEmpty
-      || !scrollPositionRegistrations.isEmpty
-      || !lifecycleRegistrations.isEmpty
-      || !taskRegistrations.isEmpty
-      || !preferenceObservationRegistrations.isEmpty
-      || !commandRegistrations.isEmpty
-      || !dropDestinationRegistrations.isEmpty
+    Self.allRecordFields.contains { !$0.isEmpty(self) }
   }
 
   package mutating func recordAction(
@@ -223,10 +531,11 @@ package struct NodeHandlers {
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
-    actionRegistrationOwners[identity] = owner
-    actionRegistrations[identity] = .init(
+    action.record(
+      identity: identity,
       handler: handler,
-      followUpInvalidationIdentity: followUpInvalidationIdentity
+      followUpInvalidationIdentity: followUpInvalidationIdentity,
+      owner: owner
     )
   }
 
@@ -234,8 +543,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.Handler
   ) {
-    keyHandlerRegistrationOwners[identity] = .current(identity: identity)
-    keyHandlerRegistrations[identity] = handler
+    keyHandler.record(identity: identity, handler: handler)
   }
 
   package mutating func recordKeyPressHandler(
@@ -243,9 +551,7 @@ package struct NodeHandlers {
     ordinal: UInt64,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
-    keyPressHandlerRegistrationOwners[identity] = .current(identity: identity)
-    keyPressHandlerRegistrationOrdinals[identity] = ordinal
-    keyPressHandlerRegistrations[identity, default: []].append(handler)
+    keyHandler.keyPress.record(identity: identity, ordinal: ordinal, handler: handler)
   }
 
   package mutating func recordPasteHandler(
@@ -253,161 +559,114 @@ package struct NodeHandlers {
     ordinal: UInt64,
     handler: @escaping LocalKeyHandlerRegistry.PasteHandler
   ) {
-    pasteHandlerRegistrationOwners[identity] = .current(identity: identity)
-    pasteHandlerRegistrationOrdinals[identity] = ordinal
-    pasteHandlerRegistrations[identity, default: []].append(handler)
+    keyHandler.paste.record(identity: identity, ordinal: ordinal, handler: handler)
   }
 
   package mutating func recordTerminationHandler(
     identity: Identity,
     handler: @escaping LocalTerminationRegistry.Handler
   ) {
-    terminationHandlerRegistrationOwners[identity] = .current(identity: identity)
-    terminationHandlerRegistrations[identity, default: []].append(handler)
+    termination.record(identity: identity, handler: handler)
   }
 
   package mutating func recordPointerHandler(
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
-    pointerHandlerRegistrationOwners[routeID] = .current(identity: routeID.identity)
-    pointerHandlerRegistrations[routeID] = handler
+    pointer.record(routeID: routeID, handler: handler)
   }
 
   package mutating func recordPointerHoverHandler(
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
-    pointerHoverHandlerRegistrationOwners[routeID] = .current(identity: routeID.identity)
-    pointerHoverHandlerRegistrations[routeID] = handler
+    pointer.recordHover(routeID: routeID, handler: handler)
   }
 
   package mutating func recordGesture(
     identity: Identity,
     recognizer: AnyGestureRecognizer
   ) {
-    gestureRegistrationOwners[identity] = .current(identity: identity)
-    gestureRegistrations[identity] = recognizer
+    gesture.record(identity: identity, recognizer: recognizer)
   }
 
   package mutating func recordGestureStateBinding(
     identity: Identity,
     binding: AnyGestureStateBinding
   ) {
-    gestureStateRegistrationOwners[identity] = .current(identity: identity)
-    gestureStateRegistrations[identity, default: []].append(binding)
+    gestureState.record(identity: identity, binding: binding)
   }
 
   package mutating func recordDefaultFocus(
     _ registration: DefaultFocusScopeRegistrationSnapshot
   ) {
-    if !defaultFocusRegistrations.scopes.contains(where: {
-      $0.namespace == registration.namespace && $0.identity == registration.identity
-    }) {
-      defaultFocusRegistrations.scopes.append(registration)
-    }
+    defaultFocus.record(registration)
   }
 
   package mutating func recordDefaultFocus(
     _ registration: DefaultFocusCandidateRegistrationSnapshot
   ) {
-    if !defaultFocusRegistrations.candidates.contains(where: {
-      $0.namespace == registration.namespace && $0.identity == registration.identity
-    }) {
-      defaultFocusRegistrations.candidates.append(registration)
-    }
+    defaultFocus.record(registration)
   }
 
   package mutating func recordFocusBinding(
     _ registration: FocusBindingRegistrationSnapshot
   ) {
-    focusBindingRegistrations.append(registration)
+    focusBinding.record(registration)
   }
 
   package mutating func recordFocusedValues(
     _ registration: FocusedValuesRegistrationSnapshot
   ) {
-    if let existingIndex = focusedValuesRegistrations.firstIndex(where: {
-      $0.identity == registration.identity
-    }) {
-      focusedValuesRegistrations[existingIndex].descendantIdentities.formUnion(
-        registration.descendantIdentities
-      )
-      focusedValuesRegistrations[existingIndex].values.merge(registration.values)
-    } else {
-      focusedValuesRegistrations.append(registration)
-    }
+    focusedValues.record(registration)
   }
 
   package mutating func recordScrollPosition(
     _ registration: ScrollPositionRegistrationSnapshot
   ) {
-    if let existingIndex = scrollPositionRegistrations.firstIndex(where: {
-      $0.identity == registration.identity
-    }) {
-      scrollPositionRegistrations[existingIndex] = registration
-    } else {
-      scrollPositionRegistrations.append(registration)
-    }
+    scrollPosition.record(registration)
   }
 
   package mutating func recordLifecycleAppear(
     _ registration: LifecycleHandlerRegistration
   ) {
-    lifecycleRegistrations.recordAppear(registration)
+    lifecycle.recordAppear(registration)
   }
 
   package mutating func recordLifecycleDisappear(
     _ registration: LifecycleHandlerRegistration
   ) {
-    lifecycleRegistrations.recordDisappear(registration)
+    lifecycle.recordDisappear(registration)
   }
 
   package mutating func recordLifecycleChange(
     _ registration: LifecycleHandlerRegistration
   ) {
-    lifecycleRegistrations.recordChange(registration)
+    lifecycle.recordChange(registration)
   }
 
   package mutating func recordTask(
     identity: Identity,
     registration: TaskRegistration
   ) {
-    taskRegistrationOwners[identity] = .current(identity: identity)
-    var identityRegistrations = taskRegistrations[identity] ?? []
-    if let index = identityRegistrations.firstIndex(where: {
-      $0.descriptor.id == registration.descriptor.id
-    }) {
-      identityRegistrations[index] = registration
-    } else {
-      identityRegistrations.append(registration)
-    }
-    taskRegistrations[identity] = identityRegistrations
+    task.record(identity: identity, registration: registration)
   }
 
   package mutating func recordPreferenceObservation(
     _ registration: PreferenceObservationRegistrationSnapshot
   ) {
-    preferenceObservationRegistrations.append(registration)
+    preferenceObservation.record(registration)
   }
 
   package mutating func recordCommand(
     _ registration: CommandRegistrySnapshot
   ) {
-    for (identity, commands) in registration.keyCommandsByScope {
-      commandRegistrations.keyCommandsByScope[identity] = commands
-      commandRegistrations.ownersByScope[identity] =
-        registration.ownersByScope[identity] ?? .current(identity: identity)
-    }
+    command.record(registration)
   }
 
   package mutating func recordDropDestination(
     _ registration: DropDestinationRegistrySnapshot
   ) {
-    for (identity, handler) in registration.handlersByScope {
-      dropDestinationRegistrations.handlersByScope[identity] = handler
-      dropDestinationRegistrations.ownersByScope[identity] =
-        registration.ownersByScope[identity] ?? .current(identity: identity)
-    }
+    dropDestination.record(registration)
   }
 }

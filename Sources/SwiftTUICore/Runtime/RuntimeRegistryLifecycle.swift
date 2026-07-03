@@ -76,6 +76,18 @@ package struct RuntimeRegistrationFingerprintBuilder {
   }
 }
 
+/// One registration family's per-node recorded slice: the registrations plus
+/// their owner keys and ordinals, bundled as one value so `NodeHandlers` holds
+/// exactly one field per family and its whole-bag operations (empty check,
+/// absorb adoption) are uniform one-line folds instead of per-field merge
+/// logic. Records must keep "absorb keeps the absorber's entries on
+/// collision" semantics — see `NodeHandlers.absorbAdopted`.
+package protocol RuntimeNodeRecord {
+  init()
+  var isEmpty: Bool { get }
+  mutating func absorbAdopted(_ departing: Self)
+}
+
 /// The uniform lifecycle contract every runtime registry implements. The
 /// bulk operations on ``RuntimeRegistrationSet`` are loops over its member
 /// registries through this protocol, so a registry cannot join the set

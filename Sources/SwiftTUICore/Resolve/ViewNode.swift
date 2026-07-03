@@ -1075,7 +1075,7 @@ package final class ViewNode {
   package func gestureRegistration(
     for identity: Identity
   ) -> AnyGestureRecognizer? {
-    registeredHandlers.gestureRegistrations[identity]
+    registeredHandlers.gesture.recognizers[identity]
   }
 
   package func recordGestureStateBinding(

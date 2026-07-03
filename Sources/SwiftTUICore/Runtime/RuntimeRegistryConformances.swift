@@ -31,8 +31,8 @@ extension LocalActionRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(
-      handlers.actionRegistrations,
-      ownersByIdentity: handlers.actionRegistrationOwners
+      handlers.action.registrations,
+      ownersByIdentity: handlers.action.owners
     )
   }
 
@@ -70,18 +70,18 @@ extension LocalKeyHandlerRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(
-      handlers.keyHandlerRegistrations,
-      ownersByIdentity: handlers.keyHandlerRegistrationOwners
+      handlers.keyHandler.handlers,
+      ownersByIdentity: handlers.keyHandler.owners
     )
     restoreKeyPressHandlers(
-      handlers.keyPressHandlerRegistrations,
-      ownersByIdentity: handlers.keyPressHandlerRegistrationOwners,
-      ordinalsByIdentity: handlers.keyPressHandlerRegistrationOrdinals
+      handlers.keyHandler.keyPress.handlers,
+      ownersByIdentity: handlers.keyHandler.keyPress.owners,
+      ordinalsByIdentity: handlers.keyHandler.keyPress.ordinals
     )
     restorePasteHandlers(
-      handlers.pasteHandlerRegistrations,
-      ownersByIdentity: handlers.pasteHandlerRegistrationOwners,
-      ordinalsByIdentity: handlers.pasteHandlerRegistrationOrdinals
+      handlers.keyHandler.paste.handlers,
+      ownersByIdentity: handlers.keyHandler.paste.owners,
+      ordinalsByIdentity: handlers.keyHandler.paste.ordinals
     )
   }
 
@@ -121,8 +121,8 @@ extension LocalTerminationRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(
-      handlers.terminationHandlerRegistrations,
-      ownersByIdentity: handlers.terminationHandlerRegistrationOwners
+      handlers.termination.handlers,
+      ownersByIdentity: handlers.termination.owners
     )
   }
 
@@ -160,7 +160,7 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    let registrations = handlers.pointerHandlerRegistrations.filter { routeID, _ in
+    let registrations = handlers.pointer.handlers.filter { routeID, _ in
       // Pairing (not exact) lookup: the live gesture handler may have
       // re-registered under a re-minted owner, and the recorded routeID's
       // stale owner must still recognize it and skip the stale restore.
@@ -169,11 +169,11 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
     }
     restore(
       registrations,
-      ownersByRouteID: handlers.pointerHandlerRegistrationOwners
+      ownersByRouteID: handlers.pointer.handlerOwners
     )
     restoreHover(
-      handlers.pointerHoverHandlerRegistrations,
-      ownersByRouteID: handlers.pointerHoverHandlerRegistrationOwners,
+      handlers.pointer.hoverHandlers,
+      ownersByRouteID: handlers.pointer.hoverOwners,
       recency: context.recency
     )
   }
@@ -214,8 +214,8 @@ extension LocalGestureRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(
-      handlers.gestureRegistrations,
-      ownersByIdentity: handlers.gestureRegistrationOwners
+      handlers.gesture.recognizers,
+      ownersByIdentity: handlers.gesture.owners
     )
   }
 
@@ -252,8 +252,8 @@ extension LocalGestureStateRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(
-      handlers.gestureStateRegistrations,
-      ownersByIdentity: handlers.gestureStateRegistrationOwners
+      handlers.gestureState.bindings,
+      ownersByIdentity: handlers.gestureState.owners
     )
   }
 
@@ -286,7 +286,7 @@ extension LocalDefaultFocusRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.defaultFocusRegistrations)
+    restore(handlers.defaultFocus)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -322,7 +322,7 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.focusBindingRegistrations)
+    restore(handlers.focusBinding.registrations)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -357,7 +357,7 @@ extension LocalFocusedValuesRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.focusedValuesRegistrations)
+    restore(handlers.focusedValues.registrations)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -389,7 +389,7 @@ extension LocalScrollPositionRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.scrollPositionRegistrations)
+    restore(handlers.scrollPosition.registrations)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -425,7 +425,7 @@ extension LocalLifecycleRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.lifecycleRegistrations)
+    restore(handlers.lifecycle)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -469,8 +469,8 @@ extension LocalTaskRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(
-      handlers.taskRegistrations,
-      ownersByIdentity: handlers.taskRegistrationOwners
+      handlers.task.registrations,
+      ownersByIdentity: handlers.task.owners
     )
   }
 
@@ -507,7 +507,7 @@ extension LocalPreferenceObservationRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.preferenceObservationRegistrations)
+    restore(handlers.preferenceObservation.registrations)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -542,7 +542,7 @@ extension CommandRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.commandRegistrations)
+    restore(handlers.command)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -574,7 +574,7 @@ extension DropDestinationRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(handlers.dropDestinationRegistrations)
+    restore(handlers.dropDestination)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
