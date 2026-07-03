@@ -8,6 +8,43 @@ import Testing
 @MainActor
 @Suite("SwiftTUI framework stress behavior", .serialized)
 struct FrameworkStressTests {
+  @Test("portal overlay button chrome leaves no teardown-coherence orphans")
+  func portalOverlayButtonChromeLeavesNoTeardownCoherenceOrphans() throws {
+    // F04 leak-census residual: button styling-wrapper interiors
+    // (`ButtonBody/…/base`, `/overlay`, `/background`) inside
+    // presentation-portal overlay entries are anchored only by weak
+    // `evaluationHost` links — the style body resolves without its own view
+    // node, so the interiors sit in no children slot. When the overlay entry's
+    // host generation churns, the strand loses its anchor and the teardown
+    // census counts it as an unreachable stored node. The counter must stay
+    // flat across open → churn → close → reopen.
+    let baseline = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PortalButtonOrphanRoot"),
+      size: .init(width: 72, height: 20)
+    ) {
+      PortalButtonOrphanFixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...3 {
+      let rootButtonPoint = try #require(harness.point(forText: "Increment Root"))
+      var frame = try harness.clickText("Open Sheet")
+      #expect(frame.contains("Sheet body"))
+      frame = try harness.click(rootButtonPoint)
+      #expect(frame.contains("Sheet body"))
+      frame = try harness.clickText("Close Sheet", chooseLast: true)
+      #expect(!frame.contains("Sheet body"))
+      _ = try harness.click(rootButtonPoint)
+    }
+
+    let violations = SoundnessProbeConfiguration.teardownCoherenceViolationCount - baseline
+    #expect(
+      violations == 0,
+      "portal button chrome stranded \(violations) node(s): \(SoundnessProbeConfiguration.lastViolationDetail ?? "no detail recorded")"
+    )
+  }
+
   @Test("mixed deferred runtime surfaces survive repeated teardown and recreation")
   func mixedDeferredRuntimeSurfacesSurviveRepeatedTeardownAndRecreation() throws {
     let harness = try StressRuntimeHarness(
@@ -1131,6 +1168,26 @@ struct FrameworkStressTests {
 
     harness.shutdown()
     #expect(harness.activeTaskCount == 0)
+  }
+}
+
+private struct PortalButtonOrphanFixture: View {
+  @State private var rootCount = 0
+  @State private var sheetPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Root count \(rootCount)")
+      Button("Increment Root") { rootCount += 1 }
+      Button("Open Sheet") { sheetPresented = true }
+    }
+    .sheet("Orphan Probe Sheet", isPresented: $sheetPresented) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Sheet body \(rootCount)")
+        Button("Close Sheet") { sheetPresented = false }
+      }
+    }
+    .frame(width: 72, height: 20, alignment: .topLeading)
   }
 }
 

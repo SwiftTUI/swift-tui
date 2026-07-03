@@ -176,6 +176,170 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(candidates.map(\.identity) == [rewritten, bIdentity])
   }
 
+  @Test("scoped restore does not stack detached-identity focus registrations (F04)")
+  func scopedRestoreDoesNotStackDetachedIdentityFocusRegistrations() {
+    // A publisher can register focus entries at an identity DETACHED from the
+    // frontier (an exact `.id(_:)` — an absolute identity that is no
+    // descendant of any structural root). `removeSubtrees` prunes by
+    // identity-prefix against the frontier roots and misses those entries,
+    // while the scoped restore's structural view-node walk still reaches the
+    // publisher node and re-appends its snapshots — so every scoped frame
+    // stacks one more copy (the publication oracle's live=3 vs rebuilt=1
+    // finding), and a churned old generation is never removed at all.
+    let rootIdentity = testIdentity("Root")
+    let authored = testIdentity("Root", "Custom")
+    let detached = testIdentity("Detached", "field")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let customNode = graph.beginEvaluation(identity: authored, invalidator: nil)
+    recordFocus(on: customNode, identity: detached, namespace: namespace)
+    recordFocusedValues(on: customNode, identity: detached)
+    graph.finishEvaluation(
+      customNode,
+      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: authored, kind: .view("Custom"))]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved0 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved0, placed: nil)
+
+    // Frame 1: full publish — the canonical state (one entry per registry).
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+
+    // Frame 2: narrowly re-evaluate ONLY the publisher (same registrations),
+    // then commit with a `.subtrees([authored])` scoped restore.
+    graph.beginFrame()
+    let custom2 = graph.beginEvaluation(identity: authored, invalidator: nil)
+    recordFocus(on: custom2, identity: detached, namespace: namespace)
+    recordFocusedValues(on: custom2, identity: detached)
+    graph.finishEvaluation(
+      custom2,
+      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved2, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    let customNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[authored]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [customNodeID], frontierIdentities: [authored])
+    )
+    graphDraft.commitRuntimeRegistrations(from: graph)
+
+    // Oracle: a full rebuild of the same committed graph holds exactly ONE
+    // registration per focus registry.
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+    #expect(
+      liveRegistrations.focusedValuesRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusedValuesRegistry?.snapshot().map(\.identity)
+    )
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+  }
+
+  @Test("scoped restore removes a churned detached-identity focus registration (F04)")
+  func scopedRestoreRemovesChurnedDetachedIdentityFocusRegistration() {
+    // The churn direction of the same hole: the publisher re-registers at a
+    // NEW detached identity each generation (`.id(gen)`), so the previous
+    // generation's entry — outside every frontier root — must still leave the
+    // live registry on the scoped commit or it stacks forever and can win
+    // dispatch ahead of the live generation.
+    let rootIdentity = testIdentity("Root")
+    let authored = testIdentity("Root", "Custom")
+    let firstGeneration = testIdentity("Detached", "generation-0")
+    let secondGeneration = testIdentity("Detached", "generation-1")
+    let namespace = MatchedGeometryNamespace(0)
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let customNode = graph.beginEvaluation(identity: authored, invalidator: nil)
+    recordFocus(on: customNode, identity: firstGeneration, namespace: namespace)
+    recordFocusedValues(on: customNode, identity: firstGeneration)
+    graph.finishEvaluation(
+      customNode,
+      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: authored, kind: .view("Custom"))]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved0 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved0, placed: nil)
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+
+    // Frame 2: the publisher churns its detached registration identity.
+    graph.beginFrame()
+    let custom2 = graph.beginEvaluation(identity: authored, invalidator: nil)
+    recordFocus(on: custom2, identity: secondGeneration, namespace: namespace)
+    recordFocusedValues(on: custom2, identity: secondGeneration)
+    graph.finishEvaluation(
+      custom2,
+      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved2, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    let customNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[authored]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [customNodeID], frontierIdentities: [authored])
+    )
+    graphDraft.commitRuntimeRegistrations(from: graph)
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    #expect(
+      liveRegistrations.focusBindingRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusBindingRegistry?.snapshot().map(\.identity)
+    )
+    #expect(
+      liveRegistrations.focusedValuesRegistry?.snapshot().map(\.identity)
+        == fullRebuild.focusedValuesRegistry?.snapshot().map(\.identity)
+    )
+    #expect(
+      liveRegistrations.defaultFocusRegistry?.snapshot()
+        == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+  }
+
   @Test(".unchanged commit re-publishes nothing — registry stays byte-identical (no focus dup)")
   func unchangedCommitLeavesRegistryByteIdentical() {
     let rootIdentity = testIdentity("Root")
@@ -644,6 +808,20 @@ struct RuntimeRegistrationRestoreScopingTests {
         hasPendingRequest: false,
         isSelected: false,
         applyRuntimeFocus: { _ in false }
+      )
+    )
+  }
+
+  @MainActor
+  private func recordFocusedValues(
+    on node: ViewNode,
+    identity: Identity
+  ) {
+    node.recordFocusedValuesRegistration(
+      FocusedValuesRegistrationSnapshot(
+        identity: identity,
+        descendantIdentities: [identity],
+        values: FocusedValues()
       )
     )
   }

@@ -1089,9 +1089,19 @@ package final class ViewNode {
     )
   }
 
+  // The focus-family recorders stamp `ownerIdentity` with the recording
+  // node's identity: focus snapshots can be published at identities DETACHED
+  // from every structural root (an exact `.id(_:)`), and the commit's
+  // `removeSubtrees` needs the owner to clear them before the scoped restore
+  // re-appends this node's snapshots — identity-prefix matching alone leaves
+  // detached entries stacking one copy per scoped commit (the F04
+  // registration-publication oracle's live=3 vs rebuilt=1 finding).
+
   package func recordDefaultFocus(
     _ registration: DefaultFocusScopeRegistrationSnapshot
   ) {
+    var registration = registration
+    registration.ownerIdentity = registration.ownerIdentity ?? identity
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordDefaultFocus(registration)
   }
@@ -1099,6 +1109,8 @@ package final class ViewNode {
   package func recordDefaultFocus(
     _ registration: DefaultFocusCandidateRegistrationSnapshot
   ) {
+    var registration = registration
+    registration.ownerIdentity = registration.ownerIdentity ?? identity
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordDefaultFocus(registration)
   }
@@ -1106,6 +1118,8 @@ package final class ViewNode {
   package func recordFocusBindingRegistration(
     _ registration: FocusBindingRegistrationSnapshot
   ) {
+    var registration = registration
+    registration.ownerIdentity = registration.ownerIdentity ?? identity
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordFocusBinding(registration)
   }
@@ -1113,6 +1127,8 @@ package final class ViewNode {
   package func recordFocusedValuesRegistration(
     _ registration: FocusedValuesRegistrationSnapshot
   ) {
+    var registration = registration
+    registration.ownerIdentity = registration.ownerIdentity ?? identity
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordFocusedValues(registration)
   }
@@ -1210,6 +1226,20 @@ package final class ViewNode {
       into: registrations,
       traversedNodes: &traversedNodes
     )
+  }
+
+  /// Adopts a departing node's recorded runtime registrations. Called when an
+  /// absorbed shadowed interior mint is reclaimed while this node's committed
+  /// value carries the interior's output (the chain-collapse stamp fixed
+  /// point): registration bookkeeping must follow the value, or publication
+  /// rebuilds drop the interior's handlers and its committed tasks never
+  /// start ("no task registration at commit").
+  package func adoptRuntimeRegistrations(from departing: ViewNode) {
+    guard departing.registeredHandlers.hasRuntimeRegistrations else {
+      return
+    }
+    recordRuntimeRegistrationMutation()
+    registeredHandlers.absorbAdopted(departing.registeredHandlers)
   }
 
   package func restoreOwnRuntimeRegistrations(

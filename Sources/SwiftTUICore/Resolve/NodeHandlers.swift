@@ -99,6 +99,90 @@ package struct NodeHandlers {
     self = .init()
   }
 
+  /// Absorbs a departing node's recorded registrations into this node's
+  /// bookkeeping. Used when an absorbed shadowed interior mint is reclaimed
+  /// (see `ViewGraph.pruneAbsorbedShadowedNodes`): the chain collapse already
+  /// hands the interior's committed value to the absorber, so the interior's
+  /// recorded registrations must follow — otherwise the next registration
+  /// publication rebuilds from live nodes only and silently drops the
+  /// interior's handlers and tasks ("no task registration at commit").
+  /// Collisions keep this node's own entries; the departing node's identities
+  /// are its own resolve products and disjoint from the absorber's in
+  /// practice.
+  package mutating func absorbAdopted(_ departing: NodeHandlers) {
+    actionRegistrations.merge(departing.actionRegistrations) { current, _ in current }
+    actionRegistrationOwners.merge(departing.actionRegistrationOwners) { current, _ in current }
+    keyHandlerRegistrations.merge(departing.keyHandlerRegistrations) { current, _ in current }
+    keyHandlerRegistrationOwners.merge(departing.keyHandlerRegistrationOwners) {
+      current, _ in current
+    }
+    keyPressHandlerRegistrations.merge(departing.keyPressHandlerRegistrations) {
+      current, _ in current
+    }
+    keyPressHandlerRegistrationOwners.merge(departing.keyPressHandlerRegistrationOwners) {
+      current, _ in current
+    }
+    keyPressHandlerRegistrationOrdinals.merge(departing.keyPressHandlerRegistrationOrdinals) {
+      current, _ in current
+    }
+    pasteHandlerRegistrations.merge(departing.pasteHandlerRegistrations) { current, _ in current }
+    pasteHandlerRegistrationOwners.merge(departing.pasteHandlerRegistrationOwners) {
+      current, _ in current
+    }
+    pasteHandlerRegistrationOrdinals.merge(departing.pasteHandlerRegistrationOrdinals) {
+      current, _ in current
+    }
+    terminationHandlerRegistrations.merge(departing.terminationHandlerRegistrations) {
+      current, _ in current
+    }
+    terminationHandlerRegistrationOwners.merge(departing.terminationHandlerRegistrationOwners) {
+      current, _ in current
+    }
+    pointerHandlerRegistrations.merge(departing.pointerHandlerRegistrations) {
+      current, _ in current
+    }
+    pointerHandlerRegistrationOwners.merge(departing.pointerHandlerRegistrationOwners) {
+      current, _ in current
+    }
+    pointerHoverHandlerRegistrations.merge(departing.pointerHoverHandlerRegistrations) {
+      current, _ in current
+    }
+    pointerHoverHandlerRegistrationOwners.merge(departing.pointerHoverHandlerRegistrationOwners) {
+      current, _ in current
+    }
+    gestureRegistrations.merge(departing.gestureRegistrations) { current, _ in current }
+    gestureRegistrationOwners.merge(departing.gestureRegistrationOwners) { current, _ in current }
+    gestureStateRegistrations.merge(departing.gestureStateRegistrations) { current, _ in current }
+    gestureStateRegistrationOwners.merge(departing.gestureStateRegistrationOwners) {
+      current, _ in current
+    }
+    defaultFocusRegistrations.scopes.append(contentsOf: departing.defaultFocusRegistrations.scopes)
+    defaultFocusRegistrations.candidates.append(
+      contentsOf: departing.defaultFocusRegistrations.candidates
+    )
+    focusBindingRegistrations.append(contentsOf: departing.focusBindingRegistrations)
+    focusedValuesRegistrations.append(contentsOf: departing.focusedValuesRegistrations)
+    scrollPositionRegistrations.append(contentsOf: departing.scrollPositionRegistrations)
+    lifecycleRegistrations.absorbAdopted(departing.lifecycleRegistrations)
+    taskRegistrations.merge(departing.taskRegistrations) { current, _ in current }
+    taskRegistrationOwners.merge(departing.taskRegistrationOwners) { current, _ in current }
+    preferenceObservationRegistrations.append(
+      contentsOf: departing.preferenceObservationRegistrations
+    )
+    commandRegistrations.keyCommandsByScope.merge(
+      departing.commandRegistrations.keyCommandsByScope
+    ) { current, _ in current }
+    commandRegistrations.ownersByScope.merge(departing.commandRegistrations.ownersByScope) {
+      current, _ in current
+    }
+    dropDestinationRegistrations.handlersByScope.merge(
+      departing.dropDestinationRegistrations.handlersByScope
+    ) { current, _ in current }
+    dropDestinationRegistrations.ownersByScope.merge(
+      departing.dropDestinationRegistrations.ownersByScope
+    ) { current, _ in current }
+  }
+
   package var hasRuntimeRegistrations: Bool {
     !actionRegistrations.isEmpty
       || !keyHandlerRegistrations.isEmpty

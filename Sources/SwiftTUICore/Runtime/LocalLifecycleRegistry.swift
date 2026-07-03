@@ -116,6 +116,19 @@ package struct LifecycleHandlerSnapshot: Sendable {
     changeHandlers[registration.handlerID] = registration.handler
   }
 
+  /// Merges a departing node's lifecycle registrations into this snapshot,
+  /// keeping this snapshot's own entries on key collisions. Counterpart of
+  /// ``NodeHandlers/absorbAdopted(_:)`` for the absorbed-shadowed-node
+  /// reclaim (see `ViewGraph.pruneAbsorbedShadowedNodes`).
+  package mutating func absorbAdopted(_ departing: LifecycleHandlerSnapshot) {
+    appearRegistrations.merge(departing.appearRegistrations) { current, _ in current }
+    disappearRegistrations.merge(departing.disappearRegistrations) { current, _ in current }
+    changeRegistrations.merge(departing.changeRegistrations) { current, _ in current }
+    appearHandlers.merge(departing.appearHandlers) { current, _ in current }
+    disappearHandlers.merge(departing.disappearHandlers) { current, _ in current }
+    changeHandlers.merge(departing.changeHandlers) { current, _ in current }
+  }
+
   private static func legacyRegistrations(
     handlersByID: [String: LocalLifecycleRegistry.Handler]
   ) -> [LifecycleHandlerKey: LifecycleHandlerRegistration] {

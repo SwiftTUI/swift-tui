@@ -1299,6 +1299,10 @@ package final class ViewGraph {
       for: node
     )
     let childNodes = resolved.children.map(nodeForResolvedNode)
+    recordValueOnlyChildInteriorAnchors(
+      resolved.children,
+      hostedBy: node
+    )
     applyStructuralChildDiff(
       for: node,
       resolved: resolved
@@ -1348,6 +1352,58 @@ package final class ViewGraph {
     }
     pruneLifecycleEvaluationOwners(ownedBy: node.identity)
     return node.committed
+  }
+
+  /// A value-only child (a styling-wrapper ResolvedNode with no view node —
+  /// button/text-field chrome resolved without its own `resolveView`) maps to
+  /// a placeholder ViewNode that is never evaluated: its children array stays
+  /// permanently empty, so the evaluated interior nodes beneath it
+  /// (`…/ButtonBody/false/base`, `/overlay`, `/background`) are reachable only
+  /// through weak `evaluationHost` links. Anchor them with hosted-detached
+  /// edges from the EVALUATED parent (not the per-generation placeholder,
+  /// which is re-minted and discarded on every re-resolve): the parent's
+  /// teardown then reclaims the interiors, and the reachability census keeps
+  /// them absorbed while the parent lives — otherwise a departing host
+  /// generation (a dismissed presentation-overlay entry) strands one interior
+  /// generation per entry, the F04 leak-census residual. The style-seam root
+  /// fix (resolving style bodies through their own view node) supersedes this
+  /// once landed.
+  private func recordValueOnlyChildInteriorAnchors(
+    _ resolvedChildren: [ResolvedNode],
+    hostedBy node: ViewNode
+  ) {
+    for resolvedChild in resolvedChildren {
+      guard resolvedChild.viewNodeID == nil,
+        !resolvedChild.children.isEmpty
+      else {
+        continue
+      }
+      recordInteriorAnchors(
+        under: resolvedChild,
+        hostedByNodeID: node.viewNodeID
+      )
+    }
+  }
+
+  /// Records a hosted-detached edge from the placeholder to each nearest
+  /// evaluated interior under a value-only resolved layer. Evaluated interiors
+  /// wire their own children through `finishEvaluation`, so the walk stops at
+  /// the first stamped node and recurses only through deeper value-only
+  /// layers.
+  private func recordInteriorAnchors(
+    under resolved: ResolvedNode,
+    hostedByNodeID hostID: ViewNodeID
+  ) {
+    for child in resolved.children {
+      if let interiorID = child.viewNodeID,
+        interiorID != hostID,
+        nodeIfExists(for: interiorID) != nil
+      {
+        recordDetachedHostedNode(interiorID, hostedByNodeID: hostID)
+      } else {
+        recordInteriorAnchors(under: child, hostedByNodeID: hostID)
+      }
+    }
   }
 
   /// Declares that `host` resolved `resolved` this frame without committing it
@@ -1522,6 +1578,31 @@ package final class ViewGraph {
           || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
       {
         continue
+      }
+      // The interior recorded runtime registrations while evaluating the chain
+      // whose committed value the absorber now carries (the stamp fixed
+      // point). Re-home that bookkeeping to the identity's current owner
+      // before reclaiming the node — publication rebuilds walk live nodes
+      // only, so registrations left on the reclaimed interior are silently
+      // dropped and its committed tasks never start ("no task registration at
+      // commit", the F43 start-skip).
+      if node.registeredHandlers.hasRuntimeRegistrations,
+        let absorberID = nodeIDByIdentity[node.identity],
+        absorberID != node.viewNodeID,
+        let absorber = nodesByNodeID[absorberID]
+      {
+        absorber.adoptRuntimeRegistrations(from: node)
+        // The interior's task-descriptor identity slots move with the
+        // registrations: the absorber evaluates this chain on the next warm
+        // resolve, and a slot left keyed to the reclaimed node would miss,
+        // mint a fresh identity token, and plan a spurious cancel + restart
+        // of a task whose `.task(id:)` value never changed.
+        for (key, slot) in taskDescriptorNodeSlots where key.node == node.viewNodeID {
+          let adoptedKey = TaskDescriptorSlotKey(node: absorberID, ordinal: key.ordinal)
+          if taskDescriptorNodeSlots[adoptedKey] == nil {
+            taskDescriptorNodeSlots[adoptedKey] = slot
+          }
+        }
       }
       removeSubtree(rootedAt: node, sparingVisitedNodes: true)
     }
@@ -2044,13 +2125,15 @@ package final class ViewGraph {
   /// fingerprint, not liveness (deferred hosts are stored and referenced
   /// without ever entering a finalized frame's order).
   ///
-  /// Known leak-direction residual at introduction (2026-07-02, counted but
-  /// not asserted): button styling-wrapper interiors (`ButtonBody/…/base`,
-  /// `/overlay`, `/background`) inside presentation-portal overlay entries
-  /// are stored with no children slot and no anchor chain that reaches the
-  /// committed root — a bounded strand per open overlay entry, surfaced the
-  /// day this oracle was armed. Classifying/fixing that strand is the
-  /// oracle's first follow-up work item.
+  /// The residual known at introduction (2026-07-02) — button styling-wrapper
+  /// interiors (`ButtonBody/…/base`, `/overlay`, `/background`) stranded
+  /// inside dismissed presentation-portal overlay entries — is CLOSED: the
+  /// interiors under a value-only styling child are anchored to their
+  /// evaluated parent with hosted-detached edges
+  /// (`recordValueOnlyChildInteriorAnchors`), and the hosted-root teardown
+  /// spares a visited root only while an anchor outside the removal cascade
+  /// survives. `FrameworkStressTests` pins the zero-count
+  /// ("portal overlay button chrome leaves no teardown-coherence orphans").
   private func teardownCoherenceViolation() -> (isOverRemoval: Bool, detail: String)? {
     guard let root else {
       return nil
@@ -2784,7 +2867,6 @@ package final class ViewGraph {
     else {
       return
     }
-
     // The descent below walks committed snapshots whose identity and
     // structural-path lookups can alias a node already being removed higher in
     // this same cascade (an absolute-`.id` re-root shares structural paths with
@@ -2961,9 +3043,23 @@ package final class ViewGraph {
         guard let hostedRoot = nodeIfExists(for: hostedRootID) else {
           continue
         }
+        // Spare a visited hosted root only while something OUTSIDE this
+        // removal cascade still anchors it (a live parent or a live
+        // re-binding evaluation host): "visited this frame" alone is not
+        // liveness — a dismissing overlay entry resolves its content one
+        // last time in the frame that tears the whole entry down, and
+        // sparing on that visit strands the root with no anchor at all
+        // (unreachable until an eventual same-identity re-mint reuses it —
+        // the census leak the hosted ledger exists to prevent).
+        let anchor = hostedRoot.parent ?? hostedRoot.evaluationHost
+        let anchorSurvivesRemoval =
+          anchor.map { anchor in
+            nodeIfExists(for: anchor.viewNodeID) === anchor
+              && !walk.enteredNodeIDs.contains(anchor.viewNodeID)
+          } ?? false
         removeSubtree(
           rootedAt: hostedRoot,
-          sparingVisitedNodes: true,
+          sparingVisitedNodes: anchorSurvivesRemoval,
           isSubtreeDescent: true,
           walk: walk
         )

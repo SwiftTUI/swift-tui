@@ -2,15 +2,19 @@ package struct FocusedValuesRegistrationSnapshot: Sendable {
   package var identity: Identity
   package var descendantIdentities: Set<Identity>
   package var values: FocusedValues
+  /// See ``DefaultFocusScopeRegistrationSnapshot/ownerIdentity``.
+  package var ownerIdentity: Identity?
 
   package init(
     identity: Identity,
     descendantIdentities: Set<Identity>,
-    values: FocusedValues
+    values: FocusedValues,
+    ownerIdentity: Identity? = nil
   ) {
     self.identity = identity
     self.descendantIdentities = descendantIdentities
     self.values = values
+    self.ownerIdentity = ownerIdentity
   }
 }
 
@@ -114,38 +118,11 @@ package final class LocalFocusedValuesRegistry: Equatable {
     }
 
     registrations.removeAll { registration in
-      identityMatchesAnySubtreeRoot(
-        registration.identity,
+      focusRegistrationMatchesAnySubtreeRoot(
+        identity: registration.identity,
+        ownerIdentity: registration.ownerIdentity,
         roots: roots
       )
-    }
-  }
-
-  /// Drops registrations whose publisher identity is absent from the committed
-  /// tree.
-  ///
-  /// `removeSubtrees` prunes by identity-prefix against the re-evaluated
-  /// frontier roots, but the scoped restore re-adds registrations via a
-  /// structural view-node walk. A publisher whose identity is detached from the
-  /// frontier (an exact `.id(_:)` that churns per rebuild) is therefore missed
-  /// by removal yet re-appended by restore, so the registry grows unbounded.
-  /// This end-of-frame prune closes that gap by intersecting against the freshly
-  /// rendered tree — the authoritative live-publisher set, independent of
-  /// publication mode. Gated on a non-empty registry so the common
-  /// no-focused-values path never walks the tree.
-  package func pruneToTreeIdentities(
-    in resolvedTree: ResolvedNode
-  ) {
-    guard !registrations.isEmpty else {
-      return
-    }
-
-    var liveIdentities: Set<Identity> = []
-    for identity in resolvedTree.collectIdentities() {
-      liveIdentities.insert(identity)
-    }
-    registrations.removeAll { registration in
-      !liveIdentities.contains(registration.identity)
     }
   }
 
@@ -161,14 +138,5 @@ package final class LocalFocusedValuesRegistry: Equatable {
     }
 
     registrations.append(contentsOf: snapshot)
-  }
-}
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
   }
 }

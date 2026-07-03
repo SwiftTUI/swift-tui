@@ -20,13 +20,18 @@ package final class LifecycleCoordinator {
   /// cancel that finds nothing is the expected steady state under churn.
   package private(set) var taskCancelSkipCount = 0
 
-  // `assertsOnTaskStartSkip` defaults OFF: the first armed run immediately
-  // found a live skip — TermUIPerf's synthetic-text-shimmer scenario drops
-  // the second `.task` (`…/Group[1]#task[id:1]`, "no task registration at
-  // commit") on a Layout-hosted Group. Until that instance is root-caused,
-  // the skip stays observable through the counter and the reported
-  // `lifecycle.taskStartSkipped` runtime issue rather than a crash; flip the
-  // flag per-coordinator to assert in a focused investigation.
+  // `assertsOnTaskStartSkip` defaults OFF. The one live skip the first armed
+  // run found (TermUIPerf's synthetic-text-shimmer `…/Group[1]#task[id:1]`,
+  // "no task registration at commit") is root-caused and fixed: the `.task`
+  // registration was recorded on an absorbed shadowed interior mint that
+  // `pruneAbsorbedShadowedNodes` reclaimed before the registration
+  // publication, so the committed plan's start found no registration —
+  // reclaim now re-homes the interior's registrations and descriptor slots
+  // to the absorber (see `ViewGraph.pruneAbsorbedShadowedNodes` and
+  // `TimelineTaskStartSkipRuntimeTests`). The flag stays observability-first
+  // (counter + `lifecycle.taskStartSkipped` runtime issue) because a skip in
+  // a user app is better reported than crashed; flip it per-coordinator to
+  // assert in a focused investigation.
   init(
     taskRunner: TaskRunner = .init(),
     assertsOnTaskStartSkip: Bool = false

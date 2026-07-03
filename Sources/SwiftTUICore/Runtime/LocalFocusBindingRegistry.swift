@@ -26,26 +26,39 @@ package typealias FocusBindingKey = ViewNodeRuntimeKey<FocusBindingKeySuffix>
 package struct DefaultFocusScopeRegistrationSnapshot: Equatable, Sendable {
   package var namespace: MatchedGeometryNamespace
   package var identity: Identity
+  /// Identity of the ViewNode that recorded this registration (stamped by
+  /// `ViewNode.recordDefaultFocus`). `removeSubtrees` matches it in addition
+  /// to `identity`: a registration published at a DETACHED identity (an exact
+  /// `.id(_:)`) is invisible to identity-prefix removal, while the scoped
+  /// restore's structural node walk still re-appends it — without the owner
+  /// match the registry stacks one copy per scoped commit.
+  package var ownerIdentity: Identity?
 
   package init(
     namespace: MatchedGeometryNamespace,
-    identity: Identity
+    identity: Identity,
+    ownerIdentity: Identity? = nil
   ) {
     self.namespace = namespace
     self.identity = identity
+    self.ownerIdentity = ownerIdentity
   }
 }
 
 package struct DefaultFocusCandidateRegistrationSnapshot: Equatable, Sendable {
   package var namespace: MatchedGeometryNamespace
   package var identity: Identity
+  /// See ``DefaultFocusScopeRegistrationSnapshot/ownerIdentity``.
+  package var ownerIdentity: Identity?
 
   package init(
     namespace: MatchedGeometryNamespace,
-    identity: Identity
+    identity: Identity,
+    ownerIdentity: Identity? = nil
   ) {
     self.namespace = namespace
     self.identity = identity
+    self.ownerIdentity = ownerIdentity
   }
 }
 
@@ -154,14 +167,16 @@ package final class LocalDefaultFocusRegistry: Equatable {
     }
 
     scopes.removeAll { registration in
-      identityMatchesAnySubtreeRoot(
-        registration.identity,
+      focusRegistrationMatchesAnySubtreeRoot(
+        identity: registration.identity,
+        ownerIdentity: registration.ownerIdentity,
         roots: roots
       )
     }
     candidates.removeAll { registration in
-      identityMatchesAnySubtreeRoot(
-        registration.identity,
+      focusRegistrationMatchesAnySubtreeRoot(
+        identity: registration.identity,
+        ownerIdentity: registration.ownerIdentity,
         roots: roots
       )
     }
@@ -259,6 +274,8 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
   package var hasPendingRequest: Bool
   package var isSelected: Bool
   package var applyRuntimeFocus: @MainActor @Sendable (Bool) -> Bool
+  /// See ``DefaultFocusScopeRegistrationSnapshot/ownerIdentity``.
+  package var ownerIdentity: Identity?
 
   package init(
     identity: Identity,
@@ -266,6 +283,7 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
+    ownerIdentity: Identity? = nil,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
   ) {
     self.identity = identity
@@ -273,6 +291,7 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     self.bindingID = bindingID
     self.hasPendingRequest = hasPendingRequest
     self.isSelected = isSelected
+    self.ownerIdentity = ownerIdentity
     self.applyRuntimeFocus = applyRuntimeFocus
   }
 
@@ -412,8 +431,9 @@ package final class LocalFocusBindingRegistry: Equatable {
     }
 
     registrations.removeAll { registration in
-      identityMatchesAnySubtreeRoot(
-        registration.identity,
+      focusRegistrationMatchesAnySubtreeRoot(
+        identity: registration.identity,
+        ownerIdentity: registration.ownerIdentity,
         roots: roots
       )
     }
@@ -467,11 +487,20 @@ package final class LocalFocusBindingRegistry: Equatable {
   }
 }
 
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
+/// Matches a focus registration against subtree-removal roots by its
+/// registered identity AND by the identity of the node that recorded it. The
+/// owner match is what clears registrations published at detached identities
+/// (an exact `.id(_:)`) when their publisher is re-evaluated — the scoped
+/// restore re-appends the publisher's snapshots, so a removal that misses
+/// them stacks one copy per scoped commit.
+package func focusRegistrationMatchesAnySubtreeRoot(
+  identity: Identity,
+  ownerIdentity: Identity?,
   roots: [Identity]
 ) -> Bool {
   roots.contains { root in
     identity == root || identity.isDescendant(of: root)
+      || ownerIdentity == root
+      || ownerIdentity?.isDescendant(of: root) == true
   }
 }
