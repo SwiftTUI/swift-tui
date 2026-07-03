@@ -201,12 +201,3 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     }
   }
 }
-
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
-  }
-}

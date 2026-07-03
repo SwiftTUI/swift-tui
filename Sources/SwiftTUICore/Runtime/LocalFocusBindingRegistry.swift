@@ -486,21 +486,3 @@ package final class LocalFocusBindingRegistry: Equatable {
     return orderedBindingKeys.compactMap { grouped[$0] }
   }
 }
-
-/// Matches a focus registration against subtree-removal roots by its
-/// registered identity AND by the identity of the node that recorded it. The
-/// owner match is what clears registrations published at detached identities
-/// (an exact `.id(_:)`) when their publisher is re-evaluated — the scoped
-/// restore re-appends the publisher's snapshots, so a removal that misses
-/// them stacks one copy per scoped commit.
-package func focusRegistrationMatchesAnySubtreeRoot(
-  identity: Identity,
-  ownerIdentity: Identity?,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
-      || ownerIdentity == root
-      || ownerIdentity?.isDescendant(of: root) == true
-  }
-}

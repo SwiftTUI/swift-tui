@@ -389,15 +389,6 @@ package final class LocalLifecycleRegistry: Equatable {
   }
 }
 
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
-  }
-}
-
 private func lifecycleHandlerIdentity(
   from handlerID: String
 ) -> Identity {

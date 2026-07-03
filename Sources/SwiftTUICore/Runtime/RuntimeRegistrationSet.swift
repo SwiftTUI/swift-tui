@@ -58,6 +58,14 @@ package struct RuntimeRegistrationSet {
   package let commandRegistry: CommandRegistry?
   package let dropDestinationRegistry: DropDestinationRegistry?
 
+  /// Every present member registry in canonical fan-out order. All bulk
+  /// lifecycle operations (reset, subtree removal, restore, fingerprinting,
+  /// frame-drop blockers) iterate this list, so a member participates in
+  /// every fan-out by construction. `RuntimeRegistrationKindTotalityTests`
+  /// asserts the list covers every ``RuntimeRegistrationKind`` exactly once
+  /// for a `scratch()` set.
+  package let allRegistries: [any RuntimeRegistry]
+
   package init(
     actionRegistry: LocalActionRegistry? = nil,
     keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
@@ -90,6 +98,24 @@ package struct RuntimeRegistrationSet {
     self.preferenceObservationRegistry = preferenceObservationRegistry
     self.commandRegistry = commandRegistry
     self.dropDestinationRegistry = dropDestinationRegistry
+    let members: [(any RuntimeRegistry)?] = [
+      actionRegistry,
+      keyHandlerRegistry,
+      terminationRegistry,
+      pointerHandlerRegistry,
+      gestureRegistry,
+      gestureStateRegistry,
+      defaultFocusRegistry,
+      focusBindingRegistry,
+      focusedValuesRegistry,
+      scrollPositionRegistry,
+      lifecycleRegistry,
+      taskRegistry,
+      preferenceObservationRegistry,
+      commandRegistry,
+      dropDestinationRegistry,
+    ]
+    allRegistries = members.compactMap { $0 }
   }
 
   @MainActor

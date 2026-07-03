@@ -496,15 +496,6 @@ package final class LocalScrollPositionRegistry: Equatable {
   }
 }
 
-private func identityMatchesAnySubtreeRoot(
-  _ identity: Identity,
-  roots: [Identity]
-) -> Bool {
-  roots.contains { root in
-    identity == root || identity.isDescendant(of: root)
-  }
-}
-
 /// Identifies what a scroll route last auto-revealed: the focused element and,
 /// for a focused text input, its cursor anchor. `sync` re-reveals only when this
 /// changes (focus moved, or a text cursor advanced) — never merely because the
