@@ -2365,10 +2365,27 @@ package final class ViewGraph {
   package func runtimeRegistrationDeltaRequiresFullPublication(
     _ delta: RuntimeRegistrationPublicationDelta
   ) -> Bool {
+    runtimeRegistrationRootsRequireFullPublication(delta.removalRoots)
+  }
+
+  /// A publication rooted at the graph root (the portal host — an
+  /// invalidation frame whose frontier collapses to the root publishes
+  /// `.subtrees([portalRoot])`) covers every live node STRUCTURALLY, but the
+  /// scoped reset/restore machinery matches IDENTITY prefixes — and
+  /// capture-hosted island identities (a lazy tab payload's interiors) live
+  /// in the authored identity space, which does not descend from the
+  /// portal-host identity. A root-rooted scoped publication therefore both
+  /// dropped island registrations an earlier narrow frame's reset had removed
+  /// (dead controls: live=0/rebuilt=1) and failed to clear stale
+  /// identity-space entries (live=1/rebuilt=0). Such roots take the full
+  /// reset-and-rebuild publication instead.
+  package func runtimeRegistrationRootsRequireFullPublication(
+    _ roots: [Identity]
+  ) -> Bool {
     guard let root else {
       return true
     }
-    return delta.removalRoots.contains { changedRoot in
+    return roots.contains { changedRoot in
       changedRoot == root.identity || changedRoot == root.resolvedIdentity
     }
   }

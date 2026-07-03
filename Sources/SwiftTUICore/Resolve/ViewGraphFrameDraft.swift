@@ -198,6 +198,18 @@ package final class ViewGraphFrameDraft {
         viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
       }
     case .subtrees(let roots):
+      // A publication whose roots cover the graph root cannot be scoped: the
+      // identity-prefix reset/restore axes diverge from the structural cover
+      // at the portal-host seam (see
+      // ``ViewGraph/runtimeRegistrationRootsRequireFullPublication(_:)``).
+      guard !viewGraph.runtimeRegistrationRootsRequireFullPublication(roots) else {
+        if publicationDiagnosticsEnabled {
+          restoredNodeCount = viewGraph.runtimeRegistrationLiveNodeCount
+        }
+        liveRegistrations.resetAll()
+        viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+        break
+      }
       // The reset is scoped to `roots`; scope the restore to match instead of
       // re-publishing the whole tree. Untouched subtrees' registrations stay in
       // place, so the result equals a full rebuild for the changed subtrees —

@@ -645,6 +645,86 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
   }
 
+  @Test("a graph-root-rooted publication escalates to a full registration rebuild")
+  func rootRootedPublicationEscalatesToFullRebuild() {
+    // The portal host wraps the authored tree in a DIFFERENT identity space
+    // (`__TerminalUIPortalHost/<root>` vs `<root>/...`), so a publication
+    // whose frontier collapsed to the graph root cannot be scoped by identity
+    // prefix: capture-island registrations that interaction history removed
+    // from the live registry are unreachable by both the ViewNode walk (the
+    // capture seam) and the identity-prefix island arm (no shared prefix) —
+    // dead controls until the next full publication (the gallery's
+    // "scroll-control actions after a tab revisit" report). The commit must
+    // escalate such roots to the full reset-and-rebuild path.
+    let portalIdentity = testIdentity("__TestPortalHost", "Root")
+    let rootIdentity = testIdentity("Root")
+    let islandIdentity = testIdentity("Root", "Island")
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let portalNode = graph.beginEvaluation(identity: portalIdentity, invalidator: nil)
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    // Capture-hosted island: evaluated during the frame but committed in no
+    // children array — anchored through its evaluation host only.
+    let islandNode = graph.beginEvaluation(identity: islandIdentity, invalidator: nil)
+    ViewNodeContext.withValue(islandNode) {
+      islandNode.recordActionRegistration(
+        identity: islandIdentity,
+        handler: { true },
+        followUpInvalidationIdentity: nil
+      )
+    }
+    graph.finishEvaluation(
+      islandNode,
+      resolved: ResolvedNode(identity: islandIdentity, kind: .view("Island")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(identity: rootIdentity, kind: .view("Root")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      portalNode,
+      resolved: ResolvedNode(
+        identity: portalIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: rootIdentity, kind: .view("Root"))]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: portalIdentity)
+    _ = graph.finalizeFrame(rootIdentity: portalIdentity, resolved: resolved, placed: nil)
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    #expect(liveRegistrations.actionRegistry?.hasHandler(identity: islandIdentity) == true)
+
+    // Interaction history diverges the live registry: a narrow frame's reset
+    // removed the island's action without a matching restore.
+    liveRegistrations.actionRegistry?.removeSubtrees(rootedAt: [islandIdentity])
+    #expect(liveRegistrations.actionRegistry?.hasHandler(identity: islandIdentity) == false)
+
+    // A publication whose frontier is the GRAPH ROOT must heal the divergence.
+    let draft = ViewGraphFrameDraft(liveRegistrations: liveRegistrations, checkpoint: nil)
+    let portalNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[portalIdentity]!
+    draft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [portalNodeID], frontierIdentities: [portalIdentity])
+    )
+    _ = draft.commitRuntimeRegistrations(from: graph)
+
+    #expect(
+      liveRegistrations.actionRegistry?.hasHandler(identity: islandIdentity) == true,
+      "a graph-root-rooted publication left the capture-island action dead"
+    )
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+    #expect(
+      liveRegistrations.publicationOracleFingerprint()
+        == fullRebuild.publicationOracleFingerprint()
+    )
+  }
+
   @Test("structured lifecycle teardown preserves path-colliding sibling component")
   func structuredLifecycleTeardownPreservesPathCollidingSiblingComponent() {
     let preservedIdentity = Identity(components: ["Root", "A/B"])
