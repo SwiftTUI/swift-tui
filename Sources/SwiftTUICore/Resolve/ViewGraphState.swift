@@ -56,9 +56,11 @@ package struct ResolvedNodeReuseCacheEntry: Equatable, Sendable {
 extension ViewGraph {
   // The checkpoint mirrors ViewGraph's field groups (see
   // ViewGraphFieldGroups.swift) one-for-one, so makeCheckpoint/restoreCheckpoint
-  // move whole groups instead of copying every field by hand. `root`,
-  // `nodeCheckpoints`, and the capture-metadata epoch are the only non-group
-  // members.
+  // move whole groups instead of copying every field by hand. `root` and
+  // `nodeCheckpoints` are the only non-group members. Per-node staleness rides
+  // each image's capture-metadata generation; graph fields restore
+  // unconditionally (whole-group COW assignments), so the checkpoint carries no
+  // graph-level mutation state.
   package struct Checkpoint {
     package var root: ViewNode?
     package var index: GraphIndex
@@ -70,34 +72,7 @@ extension ViewGraph {
     package var taskDescriptors: TaskDescriptorState
     package var dependencyIndex: DependencyIndex
     package var frameCommit: FrameCommitState
-    /// Capture metadata, not restored state: the graph's checkpoint mutation
-    /// epoch at the moment this checkpoint was taken. Restores never write it
-    /// back — the live epoch is monotonic (every restore bumps it through the
-    /// field-group observers).
-    package var checkpointMutationEpoch: UInt64
     package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
-  }
-
-  package struct CheckpointMutationState: Equatable, Sendable {
-    package var checkpointMutationEpoch: UInt64
-    package var nodeMutationGenerations: [ViewNodeID: UInt64]
-
-    package init(
-      checkpointMutationEpoch: UInt64,
-      nodeMutationGenerations: [ViewNodeID: UInt64]
-    ) {
-      self.checkpointMutationEpoch = checkpointMutationEpoch
-      self.nodeMutationGenerations = nodeMutationGenerations
-    }
-
-    package init(checkpoint: Checkpoint) {
-      self.init(
-        checkpointMutationEpoch: checkpoint.checkpointMutationEpoch,
-        nodeMutationGenerations: checkpoint.nodeCheckpoints.mapValues {
-          $0.checkpointMutationGeneration
-        }
-      )
-    }
   }
 
   package struct StateMutationOverlay {

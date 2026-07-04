@@ -18,10 +18,9 @@
 /// verifies exactly this end to end.
 ///
 /// The store is derived cache, not graph state: it is deliberately **outside**
-/// the checkpointed field groups (mutating it must not bump the mutation
-/// epoch, or every capture would invalidate the delta-restore matcher), it is
-/// never part of a checkpoint, and every ``ViewGraph/restoreCheckpoint(_:)``
-/// resets it wholesale from the restore target.
+/// the checkpointed field groups, it is never part of a checkpoint, and every
+/// ``ViewGraph/restoreCheckpoint(_:)`` resets it wholesale from the restore
+/// target.
 @MainActor
 package struct NodeCheckpointImageStore {
   /// One image per live node, current as of ``capturedGenerations``' entry.
@@ -30,8 +29,11 @@ package struct NodeCheckpointImageStore {
   /// Kept in lockstep with ``images`` (same key set). Deliberately separate
   /// from the image's own capture-metadata generation: after a restore the
   /// adopted images keep their original capture generations while the live
-  /// nodes carry freshly bumped ones, and updating a `UInt64` here is cheaper
-  /// than rewriting the image struct.
+  /// nodes carry freshly bumped ones — re-pairing here (an O(N) integer map
+  /// per adopt, measured ~35 µs at sheet scale) is what keeps post-restore
+  /// captures from re-imaging every restore-rewritten node (an images-only
+  /// variant was measured 2.5× worse on checkpoint create for identical
+  /// whole-frame CPU).
   private var capturedGenerations: [ViewNodeID: UInt64] = [:]
 
   package init() {}
@@ -71,7 +73,7 @@ package struct NodeCheckpointImageStore {
   /// definition. Captured generations are re-read from the live nodes because
   /// restores bump generations rather than restore them — the adopted image of
   /// a rewritten node pairs with that node's fresh post-restore generation,
-  /// and an untouched (delta-skipped) node keeps its unchanged one.
+  /// and an untouched (gate-skipped) node keeps its unchanged one.
   package mutating func adopt(
     images: [ViewNodeID: ViewNode.Checkpoint],
     nodesByNodeID: [ViewNodeID: ViewNode]

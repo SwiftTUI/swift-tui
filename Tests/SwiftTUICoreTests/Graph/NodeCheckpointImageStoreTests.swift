@@ -29,46 +29,58 @@ struct NodeCheckpointImageStoreTests {
     return (graph, rootIdentity, childIdentity)
   }
 
+  /// Runs `body` with the soundness probe disabled: the DEBUG create oracle's
+  /// ungated restore bumps every generation past the handed-out images, so
+  /// fast-path properties (O(1) image reuse, refresh precision) are only
+  /// observable with the oracle off — exactly the release unsampled-frame
+  /// behavior.
+  private func withProbeDisabled<T>(_ body: () throws -> T) rethrows -> T {
+    let wasEnabled = SoundnessProbeConfiguration.isEnabled
+    SoundnessProbeConfiguration.isEnabled = false
+    defer { SoundnessProbeConfiguration.isEnabled = wasEnabled }
+    return try body()
+  }
+
   @Test("an unchanged graph hands out identical images across captures")
   func unchangedCaptureReusesImages() {
-    let violationsBefore = SoundnessProbeConfiguration.checkpointStoreViolationCount
-    let (graph, _, _) = makeGraph()
+    withProbeDisabled {
+      let (graph, _, _) = makeGraph()
 
-    let first = graph.makeCheckpoint()
-    let second = graph.makeCheckpoint()
+      let first = graph.makeCheckpoint()
+      let second = graph.makeCheckpoint()
 
-    #expect(Set(first.nodeCheckpoints.keys) == Set(second.nodeCheckpoints.keys))
-    #expect(
-      first.nodeCheckpoints.mapValues(\.checkpointMutationGeneration)
-        == second.nodeCheckpoints.mapValues(\.checkpointMutationGeneration)
-    )
-    #expect(SoundnessProbeConfiguration.checkpointStoreViolationCount == violationsBefore)
+      #expect(Set(first.nodeCheckpoints.keys) == Set(second.nodeCheckpoints.keys))
+      #expect(
+        first.nodeCheckpoints.mapValues(\.checkpointMutationGeneration)
+          == second.nodeCheckpoints.mapValues(\.checkpointMutationGeneration)
+      )
+    }
   }
 
   @Test("a node-local mutation refreshes exactly that node's image")
   func mutationRefreshesOnlyTheMutatedImage() throws {
-    let violationsBefore = SoundnessProbeConfiguration.checkpointStoreViolationCount
-    let (graph, rootIdentity, childIdentity) = makeGraph()
+    try withProbeDisabled {
+      let (graph, rootIdentity, childIdentity) = makeGraph()
 
-    let first = graph.makeCheckpoint()
-    let rootID = try #require(first.index.nodeIDByIdentity[rootIdentity])
-    let childID = try #require(first.index.nodeIDByIdentity[childIdentity])
-    let childNode = try #require(first.index.nodesByNodeID[childID])
+      let first = graph.makeCheckpoint()
+      let rootID = try #require(first.index.nodeIDByIdentity[rootIdentity])
+      let childID = try #require(first.index.nodeIDByIdentity[childIdentity])
+      let childNode = try #require(first.index.nodesByNodeID[childID])
 
-    // A node-local observed write (no upward invalidation walk): the child's
-    // generation moves, the root's does not.
-    childNode.setLifecycleState(.alive)
-    let second = graph.makeCheckpoint()
+      // A node-local observed write (no upward invalidation walk): the child's
+      // generation moves, the root's does not.
+      childNode.setLifecycleState(.alive)
+      let second = graph.makeCheckpoint()
 
-    #expect(
-      second.nodeCheckpoints[childID]!.checkpointMutationGeneration
-        > first.nodeCheckpoints[childID]!.checkpointMutationGeneration
-    )
-    #expect(
-      second.nodeCheckpoints[rootID]!.checkpointMutationGeneration
-        == first.nodeCheckpoints[rootID]!.checkpointMutationGeneration
-    )
-    #expect(SoundnessProbeConfiguration.checkpointStoreViolationCount == violationsBefore)
+      #expect(
+        second.nodeCheckpoints[childID]!.checkpointMutationGeneration
+          > first.nodeCheckpoints[childID]!.checkpointMutationGeneration
+      )
+      #expect(
+        second.nodeCheckpoints[rootID]!.checkpointMutationGeneration
+          == first.nodeCheckpoints[rootID]!.checkpointMutationGeneration
+      )
+    }
   }
 
   @Test("image membership tracks the live node set across structural change")

@@ -62,12 +62,9 @@ struct ViewGraphCheckpointTotalityTests {
     #expect(Set(groupMemberFields).count == groupMemberFields.count)
 
     // ViewGraph stores exactly `root` plus one property per field group, plus
-    // the checkpoint mutation epoch — tracker *metadata* about mutations, not
-    // state: it lives outside the groups so the group didSet observers can bump
-    // it without recursing, restores never write it back (monotonicity is what
-    // keeps "epoch equal ⇒ graph state equal" sound), and it is deliberately
-    // absent from DebugTotalStateSnapshot so state-equality oracles do not
-    // fail on bookkeeping differences.
+    // the F29 `nodeCheckpointImageStore` — derived cache, not graph state: it
+    // is reset wholesale by every restore, never checkpointed itself, and its
+    // coherence is enforced by makeCheckpoint's restore-no-op oracle.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -79,22 +76,14 @@ struct ViewGraphCheckpointTotalityTests {
       "dependencyIndex",
       "frameCommit",
     ]
-    // `nodeCheckpointImageStore` (F29) is derived cache, not graph state: it
-    // is reset wholesale by every restore, never checkpointed itself, and its
-    // coherence is enforced by makeCheckpoint's restore-no-op oracle.
     #expect(
       Set(viewGraphGroupFields)
-        == groupPropertyNames.union([
-          "root", "checkpointMutationEpoch", "nodeCheckpointImageStore",
-        ])
+        == groupPropertyNames.union(["root", "nodeCheckpointImageStore"])
     )
-    // The checkpoint stores the same groups plus `root`, `nodeCheckpoints`,
-    // and the capture-metadata epoch.
+    // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
     #expect(
       Set(viewGraphCheckpointGroupFields)
-        == groupPropertyNames.union([
-          "root", "nodeCheckpoints", "checkpointMutationEpoch",
-        ])
+        == groupPropertyNames.union(["root", "nodeCheckpoints"])
     )
     // Every per-field name across all groups, plus the standalone `root`, is
     // mirrored by the flat debug snapshot — the checkpoint-totality contract

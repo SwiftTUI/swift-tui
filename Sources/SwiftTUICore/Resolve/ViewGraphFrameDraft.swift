@@ -15,17 +15,17 @@ package final class ViewGraphFrameDraft {
   private let liveRegistrations: RuntimeRegistrationSet
   private let checkpoint: ViewGraph.Checkpoint?
   private var preparedCheckpoint: ViewGraph.Checkpoint?
-  private var deltaCheckpointShadow: ViewGraphDeltaCheckpointShadow?
-  private var currentDeltaSourceState: ViewGraph.CheckpointMutationState?
   private var dirtyEvaluationPlan: DirtyEvaluationPlan?
-  private(set) package var debugLastDeltaCheckpointRestoreResult:
-    ViewGraphDeltaCheckpointShadow.RestoreResult?
+  /// The node count the most recent restore actually rewrote (the
+  /// generation-gated restore skips nodes whose live generation matches the
+  /// image). `nil` until a restore ran. Read by tests asserting restore
+  /// precision.
+  private(set) package var debugLastRestoreRestoredNodeCount: Int?
   private(set) package var runtimeRegistrationPublication: RuntimeRegistrationPublication =
     .unchanged
   private let publicationDiagnosticsEnabled: Bool
   private var publicationDiagnostics = RuntimeRegistrationPublicationDiagnostics()
-  private var graphCheckpointDeltaRestoreCount = 0
-  private var graphCheckpointFallbackRestoreCount = 0
+  private var graphCheckpointRestoreCount = 0
   private var didCommit = false
   private var didDiscard = false
 
@@ -38,7 +38,6 @@ package final class ViewGraphFrameDraft {
     self.liveRegistrations = liveRegistrations
     self.checkpoint = checkpoint
     self.publicationDiagnosticsEnabled = publicationDiagnosticsEnabled
-    deltaCheckpointShadow = checkpoint.map { ViewGraphDeltaCheckpointShadow(baseline: $0) }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointBaselineNodeCount =
         checkpoint?.index.nodesByNodeID.count
@@ -88,40 +87,13 @@ package final class ViewGraphFrameDraft {
       return
     }
     preparedCheckpoint = viewGraph.makeCheckpoint()
-    if let preparedCheckpoint,
-      let checkpoint
-    {
-      deltaCheckpointShadow?.recordPreparedCheckpoint(
-        preparedCheckpoint,
-        baseline: checkpoint
-      )
-      // "The graph is currently at prepared" — derived from the LIVE state,
-      // not the images: the store's create oracle may have restore-cycled the
-      // graph inside makeCheckpoint (bumping every monotonic generation), so
-      // the image generations no longer name the live ones.
-      currentDeltaSourceState = viewGraph.checkpointMutationStateSnapshot()
-    }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointPreparedNodeCount =
         preparedCheckpoint?.index.nodesByNodeID.count
       publicationDiagnostics.graphCheckpointDirtySubtreeCandidateNodeCount =
         graphCheckpointDirtySubtreeCandidateNodeCount(in: viewGraph)
-      if let deltaSummary = deltaCheckpointShadow?.summary {
-        publicationDiagnostics.graphCheckpointStrategy = "full_shadow_delta"
-        publicationDiagnostics.graphDeltaCheckpointNodeCount =
-          deltaSummary.touchedNodeCount
-        publicationDiagnostics.graphDeltaCheckpointCreatedNodeCount =
-          deltaSummary.createdNodeCount
-        publicationDiagnostics.graphDeltaCheckpointRemovedNodeCount =
-          deltaSummary.removedNodeCount
-        publicationDiagnostics.graphDeltaCheckpointEpochDelta =
-          deltaSummary.graphMutationEpochDelta
-      }
+      publicationDiagnostics.graphCheckpointStrategy = "gen_gated_store"
     }
-  }
-
-  package var debugDeltaCheckpointSummary: ViewGraphDeltaCheckpointSummary? {
-    deltaCheckpointShadow?.summary
   }
 
   package func materializePreparedState(
@@ -133,7 +105,6 @@ package final class ViewGraphFrameDraft {
       return
     }
     restoreGraphState(
-      .prepared,
       targetCheckpoint: preparedCheckpoint,
       in: viewGraph,
       preservingCurrentStateMutations: preservingCurrentStateMutations
@@ -149,7 +120,6 @@ package final class ViewGraphFrameDraft {
       return
     }
     restoreGraphState(
-      .baseline,
       targetCheckpoint: checkpoint,
       in: viewGraph,
       preservingCurrentStateMutations: preservingCurrentStateMutations
@@ -284,10 +254,8 @@ package final class ViewGraphFrameDraft {
       publicationDiagnostics.publicationMode = publicationModeName
       publicationDiagnostics.subtreeRootCount = publicationSubtreeRootCount
       publicationDiagnostics.restoredNodeCount = restoredNodeCount
-      publicationDiagnostics.graphCheckpointDeltaRestoreCount =
-        graphCheckpointDeltaRestoreCount
-      publicationDiagnostics.graphCheckpointFallbackRestoreCount =
-        graphCheckpointFallbackRestoreCount
+      publicationDiagnostics.graphCheckpointDeltaRestoreCount = graphCheckpointRestoreCount
+      publicationDiagnostics.graphCheckpointFallbackRestoreCount = 0
       diagnostics.publication = publicationDiagnostics
     }
     return diagnostics
@@ -412,112 +380,34 @@ package final class ViewGraphFrameDraft {
   }
 
   private func restoreGraphState(
-    _ target: ViewGraphDeltaCheckpointShadow.RestoreTarget,
     targetCheckpoint: ViewGraph.Checkpoint,
     in viewGraph: ViewGraph,
     preservingCurrentStateMutations: Bool
   ) {
     let stateMutations =
       preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
-    let result = restoreGraphCheckpoint(
-      target,
-      targetCheckpoint: targetCheckpoint,
-      in: viewGraph
-    )
-    recordDeltaRestoreResult(result)
+    // The restore is generation-gated inside ViewGraph (only nodes whose live
+    // generation differs from the image are rewritten) and carries its own
+    // gated-vs-ungated soundness oracle — no plan/fallback machinery here.
+    let restoredNodeCount = viewGraph.restoreCheckpoint(targetCheckpoint)
+    recordRestoreResult(restoredNodeCount: restoredNodeCount)
     if let stateMutations, !stateMutations.isEmpty {
       viewGraph.applyStateMutationOverlay(stateMutations)
     }
-    if checkpoint != nil {
-      currentDeltaSourceState = viewGraph.checkpointMutationStateSnapshot()
-    }
   }
 
-  private func restoreGraphCheckpoint(
-    _ target: ViewGraphDeltaCheckpointShadow.RestoreTarget,
-    targetCheckpoint: ViewGraph.Checkpoint,
-    in viewGraph: ViewGraph
-  ) -> ViewGraphDeltaCheckpointShadow.RestoreResult {
-    guard let checkpoint else {
-      viewGraph.restoreCheckpoint(targetCheckpoint)
-      return .full(target: target, reason: .missingPreparedCheckpoint)
-    }
-
-    let plan =
-      deltaCheckpointShadow?.restorePlan(
-        target: target,
-        in: viewGraph,
-        baseline: checkpoint,
-        prepared: preparedCheckpoint,
-        currentSourceState: currentDeltaSourceState
-      ) ?? .full(target: target, reason: .missingPreparedCheckpoint)
-
-    switch plan {
-    case .full(_, let reason):
-      viewGraph.restoreCheckpoint(targetCheckpoint)
-      return .full(target: target, reason: reason)
-    case .delta(_, let nodeCheckpoints):
-      viewGraph.restoreCheckpoint(targetCheckpoint, nodeCheckpoints: nodeCheckpoints)
-      #if DEBUG
-        if !deltaRestoreMatchesFullRestore(targetCheckpoint: targetCheckpoint, in: viewGraph) {
-          return .full(target: target, reason: .debugOracleMismatch)
-        }
-      #else
-        // Release: verify the scoped delta restore equals a full restore only on
-        // sampled frames when the soundness probe is opted in. Off by default →
-        // the delta fast path is unchanged (no extra full restore / 2x snapshot).
-        if SoundnessProbeConfiguration.isSampledFrame,
-          !deltaRestoreMatchesFullRestore(targetCheckpoint: targetCheckpoint, in: viewGraph)
-        {
-          SoundnessProbeConfiguration.recordDeltaCheckpointViolation(
-            "delta restore diverged from full restore for target \(target)"
-          )
-          return .full(target: target, reason: .debugOracleMismatch)
-        }
-      #endif
-      return .delta(target: target)
-    }
-  }
-
-  /// Soundness oracle for the scoped delta-checkpoint restore: a delta restore
-  /// must leave the graph byte-equal to a full restore. The caller has just
-  /// applied the delta restore; this snapshots that state, performs a full
-  /// restore, and reports whether the two snapshots matched.
-  ///
-  /// It is sound to mutate the graph into the full-restored state here: on a
-  /// match the delta- and full-restored states are equal, and on a mismatch the
-  /// caller downgrades to `.full` anyway — so the graph is always left in the
-  /// state the returned result describes. Do not "optimize" the second restore
-  /// away or a returned `.delta` would no longer match the graph state.
-  private func deltaRestoreMatchesFullRestore(
-    targetCheckpoint: ViewGraph.Checkpoint,
-    in viewGraph: ViewGraph
-  ) -> Bool {
-    let deltaSnapshot = viewGraph.debugTotalStateSnapshot()
-    viewGraph.restoreCheckpoint(targetCheckpoint)
-    return deltaSnapshot == viewGraph.debugTotalStateSnapshot()
-  }
-
-  private func recordDeltaRestoreResult(
-    _ result: ViewGraphDeltaCheckpointShadow.RestoreResult
-  ) {
-    debugLastDeltaCheckpointRestoreResult = result
-    switch result {
-    case .delta:
-      graphCheckpointDeltaRestoreCount += 1
-    case .full:
-      graphCheckpointFallbackRestoreCount += 1
-    }
+  private func recordRestoreResult(restoredNodeCount: Int) {
+    debugLastRestoreRestoredNodeCount = restoredNodeCount
+    graphCheckpointRestoreCount += 1
 
     guard publicationDiagnosticsEnabled else {
       return
     }
-    publicationDiagnostics.graphCheckpointRestoreStrategy = result.strategyName
-    publicationDiagnostics.graphCheckpointRestoreFallbackReason = result.fallbackReasonName
-    publicationDiagnostics.graphCheckpointDeltaRestoreCount =
-      graphCheckpointDeltaRestoreCount
-    publicationDiagnostics.graphCheckpointFallbackRestoreCount =
-      graphCheckpointFallbackRestoreCount
+    publicationDiagnostics.graphCheckpointRestoreStrategy = "gen_gated"
+    publicationDiagnostics.graphCheckpointRestoreFallbackReason = nil
+    publicationDiagnostics.graphDeltaCheckpointNodeCount = restoredNodeCount
+    publicationDiagnostics.graphCheckpointDeltaRestoreCount = graphCheckpointRestoreCount
+    publicationDiagnostics.graphCheckpointFallbackRestoreCount = 0
   }
 
   private var publicationModeName: String {

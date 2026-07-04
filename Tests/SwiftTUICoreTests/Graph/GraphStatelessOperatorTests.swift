@@ -164,7 +164,6 @@ struct GraphCheckpointStoreTests {
       taskDescriptors: taskDescriptors,
       dependencyIndex: ViewGraph.DependencyIndex(),
       frameCommit: frameCommit,
-      checkpointMutationEpoch: 7,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(index.nodesByNodeID)
     )
 
@@ -175,13 +174,12 @@ struct GraphCheckpointStoreTests {
     #expect(checkpoint.dirtyState.invalidatedNodeIDs == [rootID])
     #expect(checkpoint.taskDescriptors.nextTaskDescriptorIdentityToken == 77)
     #expect(checkpoint.frameCommit.currentFrameID == 42)
-    #expect(checkpoint.checkpointMutationEpoch == 7)
     // One node checkpoint is produced per live node.
     #expect(Set(checkpoint.nodeCheckpoints.keys) == Set([rootID]))
   }
 
-  @Test("checkpointMutationStateSnapshot captures the epoch and per-node generations")
-  func mutationStateSnapshot() {
+  @Test("node images carry their capture generation as metadata")
+  func nodeImagesCarryCaptureGenerations() {
     let idA = ViewNodeID(rawValue: 1)
     let idB = ViewNodeID(rawValue: 2)
     let nodeA = ViewNode(viewNodeID: idA, identity: testIdentity("A"))
@@ -192,61 +190,8 @@ struct GraphCheckpointStoreTests {
     nodeB.markDirty()
     nodeB.markDirty()
 
-    let state = GraphCheckpointStore.checkpointMutationStateSnapshot(
-      epoch: 5,
-      nodesByNodeID: [idA: nodeA, idB: nodeB]
-    )
+    let images = ViewGraphNodeCheckpointing.makeNodeCheckpoints([idA: nodeA, idB: nodeB])
 
-    #expect(state.checkpointMutationEpoch == 5)
-    #expect(state.nodeMutationGenerations == [idA: 0, idB: 2])
-  }
-
-  @Test("checkpointMutationStateMatches holds only when epoch, keys, and generations all agree")
-  func mutationStateMatches() {
-    let idA = ViewNodeID(rawValue: 1)
-    let idB = ViewNodeID(rawValue: 2)
-    let nodeA = ViewNode(viewNodeID: idA, identity: testIdentity("A"))
-    let nodeB = ViewNode(viewNodeID: idB, identity: testIdentity("B"))
-    let nodes = [idA: nodeA, idB: nodeB]
-
-    let state = GraphCheckpointStore.checkpointMutationStateSnapshot(
-      epoch: 5,
-      nodesByNodeID: nodes
-    )
-
-    // Identical epoch + key set + generations → match.
-    #expect(
-      GraphCheckpointStore.checkpointMutationStateMatches(
-        epoch: 5,
-        nodesByNodeID: nodes,
-        against: state
-      )
-    )
-    // A different epoch breaks the match even when nodes are untouched.
-    #expect(
-      !GraphCheckpointStore.checkpointMutationStateMatches(
-        epoch: 6,
-        nodesByNodeID: nodes,
-        against: state
-      )
-    )
-    // A changed key set breaks the match.
-    #expect(
-      !GraphCheckpointStore.checkpointMutationStateMatches(
-        epoch: 5,
-        nodesByNodeID: [idA: nodeA],
-        against: state
-      )
-    )
-    // A bumped per-node generation breaks the match (markDirty performs one
-    // observed write, so the structural recording bumps exactly once).
-    nodeB.markDirty()
-    #expect(
-      !GraphCheckpointStore.checkpointMutationStateMatches(
-        epoch: 5,
-        nodesByNodeID: nodes,
-        against: state
-      )
-    )
+    #expect(images.mapValues(\.checkpointMutationGeneration) == [idA: 0, idB: 2])
   }
 }

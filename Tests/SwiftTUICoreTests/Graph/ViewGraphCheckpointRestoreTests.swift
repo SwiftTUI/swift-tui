@@ -2,11 +2,21 @@ import Testing
 
 @testable import SwiftTUICore
 
+// F29 slice 3: checkpoint restores are generation-gated (only nodes whose live
+// generation differs from the image are rewritten) — the successor of the
+// Stage-2B guarded delta restore, without the shadow tracker, restore plans,
+// budget heuristic, or fallback reasons. These tests carry forward the shadow
+// suite's behavioral scenarios: exact baseline/prepared round-trips, precision
+// (untouched nodes are skipped), created/removed membership, materialize ↔
+// suspend cycles with a preserved dirty overlay, near-full changes, and an
+// intervening mutation between suspend and materialize. Under DEBUG every
+// restore additionally runs the gated-vs-ungated oracle and every capture the
+// restore-no-op oracle.
 @MainActor
-@Suite("ViewGraph delta checkpoint shadow")
-struct ViewGraphDeltaCheckpointShadowTests {
-  @Test("shadow summary records touched nodes while full checkpoint still restores")
-  func shadowSummaryRecordsTouchedNodesWhileFullCheckpointStillRestores() {
+@Suite("ViewGraph gen-gated checkpoint restore")
+struct ViewGraphCheckpointRestoreTests {
+  @Test("restore lands exactly on baseline and reports the restored count")
+  func restoreLandsOnBaseline() throws {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -24,35 +34,62 @@ struct ViewGraphDeltaCheckpointShadowTests {
     )
 
     let baseline = graph.debugTotalStateSnapshot()
-    let childNodeID = baseline.nodeIDByIdentity[childIdentity]!
-    let siblingNodeID = baseline.nodeIDByIdentity[siblingIdentity]!
     let draft = makeDraft(graph)
 
-    graph.beginFrame()
-    let childNode = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
-    _ = graph.finishEvaluation(
-      childNode,
-      resolved: ResolvedNode(identity: childIdentity, kind: .view("ChildUpdated")),
-      accessedStateSlots: 0
+    updateNode(
+      graph,
+      identity: childIdentity,
+      kind: .view("ChildUpdated")
     )
     draft.recordPreparedCheckpoint(from: graph)
-
-    let summary = draft.debugDeltaCheckpointSummary
-    #expect(summary?.baselineNodeCount == 3)
-    #expect(summary?.preparedNodeCount == 3)
-    #expect(summary?.createdNodeIDs.isEmpty == true)
-    #expect(summary?.removedNodeIDs.isEmpty == true)
-    #expect(summary?.touchedNodeIDs.contains(childNodeID) == true)
-    #expect(summary?.touchedNodeIDs.contains(siblingNodeID) == false)
-    #expect((summary?.graphMutationEpochDelta ?? 0) > 0)
 
     #expect(graph.debugTotalStateSnapshot() != baseline)
     draft.restoreBaselineState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == baseline)
+
+    // Skip precision is NOT observable here under DEBUG: the create oracle's
+    // ungated restore inside every makeCheckpoint bumps all live generations
+    // past the handed-out images' capture metadata, so gated restores rewrite
+    // everything on oracle-verified captures (release unsampled frames skip
+    // precisely — see `gatingSkipsGenerationMatchedNodes` for the primitive).
+    let restored = try #require(draft.debugLastRestoreRestoredNodeCount)
+    #expect(restored >= 1 && restored <= 3)
   }
 
-  @Test("guarded delta restores baseline and prepared state")
-  func guardedDeltaRestoresBaselineAndPreparedState() {
+  @Test("the gating primitive skips generation-matched nodes and counts rewrites")
+  func gatingSkipsGenerationMatchedNodes() {
+    let idA = ViewNodeID(rawValue: 1)
+    let idB = ViewNodeID(rawValue: 2)
+    let nodeA = ViewNode(viewNodeID: idA, identity: testIdentity("A"))
+    let nodeB = ViewNode(viewNodeID: idB, identity: testIdentity("B"))
+    let nodes = [idA: nodeA, idB: nodeB]
+
+    let images = ViewGraphNodeCheckpointing.makeNodeCheckpoints(nodes)
+
+    // Untouched since capture: both skipped.
+    #expect(
+      ViewGraphNodeCheckpointing.restoreNodeCheckpoints(images, nodesByNodeID: nodes) == 0
+    )
+    #expect(nodeB.isDirty == true)
+
+    // Mutate one node past its image (markDirty is fresh-node-idempotent on
+    // state but still bumps the generation through the observer).
+    nodeB.markDirty()
+    #expect(
+      ViewGraphNodeCheckpointing.restoreNodeCheckpoints(images, nodesByNodeID: nodes) == 1
+    )
+    // The rewrite itself bumps the generation (restores never rewind), so a
+    // second pass restores the same node again rather than aliasing.
+    #expect(
+      ViewGraphNodeCheckpointing.restoreNodeCheckpoints(images, nodesByNodeID: nodes) == 1
+    )
+    // The ungated ground truth rewrites unconditionally.
+    ViewGraphNodeCheckpointing.restoreNodeCheckpointsUngated(images, nodesByNodeID: nodes)
+    #expect(nodeA.isDirty == true && nodeB.isDirty == true)
+  }
+
+  @Test("gen-gated restore round-trips baseline and prepared state")
+  func restoreRoundTripsBaselineAndPreparedState() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -82,19 +119,13 @@ struct ViewGraphDeltaCheckpointShadowTests {
 
     draft.restoreBaselineState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == baseline)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .baseline)
-    )
 
     draft.materializePreparedState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == prepared)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .prepared)
-    )
   }
 
-  @Test("guarded delta restores created and removed node state")
-  func guardedDeltaRestoresCreatedAndRemovedNodeState() {
+  @Test("gen-gated restore round-trips created and removed node state")
+  func restoreRoundTripsCreatedAndRemovedNodeState() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -126,19 +157,13 @@ struct ViewGraphDeltaCheckpointShadowTests {
 
     draft.restoreBaselineState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == baseline)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .baseline)
-    )
 
     draft.materializePreparedState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == prepared)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .prepared)
-    )
   }
 
-  @Test("guarded delta survives materialize suspend cycles with preserved dirty overlay")
-  func guardedDeltaSurvivesMaterializeSuspendCyclesWithPreservedDirtyOverlay() {
+  @Test("gen-gated restore survives materialize suspend cycles with preserved dirty overlay")
+  func restoreSurvivesMaterializeSuspendCyclesWithPreservedDirtyOverlay() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -168,9 +193,6 @@ struct ViewGraphDeltaCheckpointShadowTests {
 
     draft.restoreBaselineState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == baseline)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .baseline)
-    )
 
     draft.materializePreparedState(
       in: graph,
@@ -180,9 +202,6 @@ struct ViewGraphDeltaCheckpointShadowTests {
       graph.debugTotalStateSnapshot().graphLocalDirtyIdentities.contains(
         siblingIdentity
       )
-    )
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .prepared)
     )
 
     draft.restoreBaselineState(
@@ -194,9 +213,6 @@ struct ViewGraphDeltaCheckpointShadowTests {
         siblingIdentity
       )
     )
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .baseline)
-    )
 
     draft.materializePreparedState(
       in: graph,
@@ -207,13 +223,10 @@ struct ViewGraphDeltaCheckpointShadowTests {
         siblingIdentity
       )
     )
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult == .delta(target: .prepared)
-    )
   }
 
-  @Test("large near-full delta restore uses budget fallback")
-  func largeNearFullDeltaRestoreUsesBudgetFallback() {
+  @Test("near-full structural change restores exactly (no budget heuristic)")
+  func nearFullChangeRestoresExactly() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentities = (0..<40).map { index in
@@ -243,17 +256,10 @@ struct ViewGraphDeltaCheckpointShadowTests {
 
     draft.restoreBaselineState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == baseline)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult
-        == .full(
-          target: .baseline,
-          reason: .deltaNodeBudgetExceeded
-        )
-    )
   }
 
-  @Test("delta restore falls back when current graph no longer matches source checkpoint")
-  func deltaRestoreFallsBackWhenCurrentGraphNoLongerMatchesSourceCheckpoint() {
+  @Test("a mutation between suspend and materialize still lands exactly on prepared")
+  func interveningMutationStillLandsOnPrepared() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -283,77 +289,16 @@ struct ViewGraphDeltaCheckpointShadowTests {
 
     draft.materializePreparedState(in: graph)
     #expect(graph.debugTotalStateSnapshot() == prepared)
-    #expect(
-      draft.debugLastDeltaCheckpointRestoreResult
-        == .full(
-          target: .prepared,
-          reason: .currentCheckpointMismatch
-        )
-    )
 
     let diagnostics = draft.commitRuntimeRegistrations(from: graph)
-    #expect(
-      diagnostics.publication.graphCheckpointRestoreStrategy == "full_fallback"
-    )
-    #expect(
-      diagnostics.publication.graphCheckpointRestoreFallbackReason
-        == "current_checkpoint_mismatch"
-    )
-    #expect(diagnostics.publication.graphCheckpointDeltaRestoreCount == 1)
-    #expect(diagnostics.publication.graphCheckpointFallbackRestoreCount == 1)
+    #expect(diagnostics.publication.graphCheckpointRestoreStrategy == "gen_gated")
+    #expect(diagnostics.publication.graphCheckpointRestoreFallbackReason == nil)
+    #expect(diagnostics.publication.graphCheckpointDeltaRestoreCount == 2)
+    #expect(diagnostics.publication.graphCheckpointFallbackRestoreCount == 0)
   }
 
-  @Test("shadow summary records created and removed node IDs")
-  func shadowSummaryRecordsCreatedAndRemovedNodeIDs() {
-    let graph = ViewGraph()
-    let rootIdentity = testIdentity("Root")
-    let childIdentity = testIdentity("Root", "Child")
-    let insertedIdentity = testIdentity("Root", "Inserted")
-
-    _ = graph.applySnapshot(
-      ResolvedNode(
-        identity: rootIdentity,
-        kind: .root,
-        children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
-        ]
-      )
-    )
-
-    let baseline = graph.debugTotalStateSnapshot()
-    let childNodeID = baseline.nodeIDByIdentity[childIdentity]!
-    let draft = makeDraft(graph)
-
-    graph.beginFrame()
-    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
-    _ = graph.finishEvaluation(
-      rootNode,
-      resolved: ResolvedNode(
-        identity: rootIdentity,
-        kind: .root,
-        children: [
-          ResolvedNode(identity: insertedIdentity, kind: .view("Inserted"))
-        ]
-      ),
-      accessedStateSlots: 0
-    )
-    draft.recordPreparedCheckpoint(from: graph)
-
-    let summary = draft.debugDeltaCheckpointSummary
-    #expect(summary?.baselineNodeCount == 2)
-    #expect(summary?.preparedNodeCount == 2)
-    #expect(summary?.createdNodeIDs.count == 1)
-    #expect(summary?.removedNodeIDs == [childNodeID])
-    #expect(summary?.touchedNodeCount == summary?.touchedNodeIDs.count)
-    #expect(summary?.createdNodeCount == summary?.createdNodeIDs.count)
-    #expect(summary?.removedNodeCount == summary?.removedNodeIDs.count)
-
-    draft.restoreBaselineState(in: graph)
-    #expect(graph.debugTotalStateSnapshot() == baseline)
-  }
-
-  @Test("publication diagnostics include shadow delta checkpoint summary")
-  func publicationDiagnosticsIncludeShadowDeltaCheckpointSummary() {
+  @Test("publication diagnostics carry the gen-gated strategy and restored count")
+  func publicationDiagnosticsCarryGenGatedRestoreCounts() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -369,34 +314,22 @@ struct ViewGraphDeltaCheckpointShadowTests {
     )
     let draft = makeDraft(graph, diagnostics: true)
 
-    graph.beginFrame()
-    let childNode = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
-    _ = graph.finishEvaluation(
-      childNode,
-      resolved: ResolvedNode(identity: childIdentity, kind: .view("ChildUpdated")),
-      accessedStateSlots: 0
+    updateNode(
+      graph,
+      identity: childIdentity,
+      kind: .view("ChildUpdated")
     )
     draft.recordPreparedCheckpoint(from: graph)
+    draft.restoreBaselineState(in: graph)
 
     let diagnostics = draft.commitRuntimeRegistrations(from: graph)
-    let summary = draft.debugDeltaCheckpointSummary
-
-    #expect(diagnostics.publication.graphCheckpointStrategy == "full_shadow_delta")
+    #expect(diagnostics.publication.graphCheckpointStrategy == "gen_gated_store")
+    #expect(diagnostics.publication.graphCheckpointRestoreStrategy == "gen_gated")
     #expect(
-      diagnostics.publication.graphDeltaCheckpointNodeCount == summary?.touchedNodeCount
+      diagnostics.publication.graphDeltaCheckpointNodeCount
+        == draft.debugLastRestoreRestoredNodeCount
     )
-    #expect(
-      diagnostics.publication.graphDeltaCheckpointCreatedNodeCount
-        == summary?.createdNodeCount
-    )
-    #expect(
-      diagnostics.publication.graphDeltaCheckpointRemovedNodeCount
-        == summary?.removedNodeCount
-    )
-    #expect(
-      diagnostics.publication.graphDeltaCheckpointEpochDelta
-        == summary?.graphMutationEpochDelta
-    )
+    #expect(diagnostics.publication.graphCheckpointDeltaRestoreCount == 1)
   }
 
   private func updateNode(
