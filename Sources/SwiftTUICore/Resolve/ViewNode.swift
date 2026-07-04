@@ -1479,10 +1479,17 @@ package final class ViewNode {
 extension ViewNode {
   package struct Checkpoint {
     package var viewNodeID: ViewNodeID
-    package var invalidator: (any Invalidating)?
-    package var ownerGraph: ViewGraph?
-    package var parent: ViewNode?
-    package var evaluationHost: ViewNode?
+    // The four upward references mirror the live properties' `weak` storage.
+    // This matters once images persist in the F29 ``NodeCheckpointImageStore``:
+    // a strong `ownerGraph`/`invalidator` here would form a permanent retain
+    // cycle (graph → store → image → graph / run loop), where the live graph's
+    // ownership shape has strong edges pointing downward only. Weak images
+    // also restore what the live weak property would actually hold — a
+    // referent that died since capture reads nil either way.
+    package weak var invalidator: (any Invalidating)?
+    package weak var ownerGraph: ViewGraph?
+    package weak var parent: ViewNode?
+    package weak var evaluationHost: ViewNode?
     package var committed: ResolvedNode
     package var reuseState: ReuseState
     package var children: [ViewNode]

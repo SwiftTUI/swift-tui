@@ -79,9 +79,14 @@ struct ViewGraphCheckpointTotalityTests {
       "dependencyIndex",
       "frameCommit",
     ]
+    // `nodeCheckpointImageStore` (F29) is derived cache, not graph state: it
+    // is reset wholesale by every restore, never checkpointed itself, and its
+    // coherence is enforced by makeCheckpoint's restore-no-op oracle.
     #expect(
       Set(viewGraphGroupFields)
-        == groupPropertyNames.union(["root", "checkpointMutationEpoch"])
+        == groupPropertyNames.union([
+          "root", "checkpointMutationEpoch", "nodeCheckpointImageStore",
+        ])
     )
     // The checkpoint stores the same groups plus `root`, `nodeCheckpoints`,
     // and the capture-metadata epoch.

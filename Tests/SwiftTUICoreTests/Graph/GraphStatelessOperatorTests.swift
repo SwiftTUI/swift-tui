@@ -165,7 +165,7 @@ struct GraphCheckpointStoreTests {
       dependencyIndex: ViewGraph.DependencyIndex(),
       frameCommit: frameCommit,
       checkpointMutationEpoch: 7,
-      nodesByNodeID: index.nodesByNodeID
+      nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(index.nodesByNodeID)
     )
 
     // Sentinels spread across the parameter list catch any slot transposition.

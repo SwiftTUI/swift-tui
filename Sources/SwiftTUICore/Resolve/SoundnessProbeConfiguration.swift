@@ -39,6 +39,7 @@ package enum SoundnessProbeConfiguration {
   /// runtime layer and cannot reach the issue sink directly).
   package static var stampCoherenceViolationCount = 0
   package static var deltaCheckpointViolationCount = 0
+  package static var checkpointStoreViolationCount = 0
   package static var rasterDamageMismatchCount = 0
   package static var teardownCoherenceViolationCount = 0
   package static var registrationPublicationViolationCount = 0
@@ -64,6 +65,15 @@ package enum SoundnessProbeConfiguration {
     deltaCheckpointViolationCount += 1
     lastViolationDetail = detail()
     emitTrace("delta-checkpoint")
+  }
+
+  /// Records one caught checkpoint-store incoherence (F29): restoring a
+  /// just-created store-built checkpoint changed graph state — a store image
+  /// went stale without its owner's generation moving, or membership drifted.
+  package static func recordCheckpointStoreViolation(_ detail: @autoclosure () -> String) {
+    checkpointStoreViolationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("checkpoint-store")
   }
 
   /// Records one caught incremental-raster mismatch (the F13 oracle repaired a

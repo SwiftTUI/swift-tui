@@ -95,9 +95,11 @@ package final class ViewGraphFrameDraft {
         preparedCheckpoint,
         baseline: checkpoint
       )
-      currentDeltaSourceState = ViewGraph.CheckpointMutationState(
-        checkpoint: preparedCheckpoint
-      )
+      // "The graph is currently at prepared" — derived from the LIVE state,
+      // not the images: the store's create oracle may have restore-cycled the
+      // graph inside makeCheckpoint (bumping every monotonic generation), so
+      // the image generations no longer name the live ones.
+      currentDeltaSourceState = viewGraph.checkpointMutationStateSnapshot()
     }
     if publicationDiagnosticsEnabled {
       publicationDiagnostics.graphCheckpointPreparedNodeCount =

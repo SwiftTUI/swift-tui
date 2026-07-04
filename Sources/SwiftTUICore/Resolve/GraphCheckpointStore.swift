@@ -17,9 +17,10 @@
 /// epoch) stay on ``ViewGraph`` for a later, separately-gated pass.
 @MainActor
 package enum GraphCheckpointStore {
-  /// Assembles a whole-field-group checkpoint plus per-node snapshots. Pure read
-  /// of the passed groups; node snapshots delegate to the unchanged
-  /// ``ViewGraphNodeCheckpointing``.
+  /// Assembles a whole-field-group checkpoint around prebuilt per-node images.
+  /// Pure read of the passed groups; the images come from the caller's
+  /// ``NodeCheckpointImageStore`` (F29) so an unchanged graph hands out an O(1)
+  /// COW copy instead of rebuilding the node dictionary.
   package static func makeCheckpoint(
     root: ViewNode?,
     index: ViewGraph.GraphIndex,
@@ -32,7 +33,7 @@ package enum GraphCheckpointStore {
     dependencyIndex: ViewGraph.DependencyIndex,
     frameCommit: ViewGraph.FrameCommitState,
     checkpointMutationEpoch: UInt64,
-    nodesByNodeID: [ViewNodeID: ViewNode]
+    nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
   ) -> ViewGraph.Checkpoint {
     ViewGraph.Checkpoint(
       root: root,
@@ -46,7 +47,7 @@ package enum GraphCheckpointStore {
       dependencyIndex: dependencyIndex,
       frameCommit: frameCommit,
       checkpointMutationEpoch: checkpointMutationEpoch,
-      nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(nodesByNodeID)
+      nodeCheckpoints: nodeCheckpoints
     )
   }
 

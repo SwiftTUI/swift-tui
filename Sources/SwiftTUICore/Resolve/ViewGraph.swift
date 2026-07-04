@@ -1,6 +1,6 @@
 extension ViewGraph {
   package func makeCheckpoint() -> Checkpoint {
-    GraphCheckpointStore.makeCheckpoint(
+    let checkpoint = GraphCheckpointStore.makeCheckpoint(
       root: root,
       index: index,
       rootEvaluation: rootEvaluation,
@@ -12,8 +12,40 @@ extension ViewGraph {
       dependencyIndex: dependencyIndex,
       frameCommit: frameCommit,
       checkpointMutationEpoch: checkpointMutationEpoch,
-      nodesByNodeID: nodesByNodeID
+      nodeCheckpoints: nodeCheckpointImageStore.currentImages(of: nodesByNodeID)
     )
+    #if DEBUG
+      verifyCheckpointIsRestoreNoOp(checkpoint)
+    #else
+      // Release: verify the store-built checkpoint on sampled frames when the
+      // soundness probe is opted in. Off-sample captures keep the fast path
+      // (no restore, no snapshots).
+      if SoundnessProbeConfiguration.isSampledFrame {
+        verifyCheckpointIsRestoreNoOp(checkpoint)
+      }
+    #endif
+    return checkpoint
+  }
+
+  /// F29 create-side oracle: restoring a just-created checkpoint must be a
+  /// state no-op. A stale store image (a mutation the generation tracking
+  /// missed), membership drift, or graph-field skew all surface here as a
+  /// before/after debug-snapshot mismatch. It also covers the one recording
+  /// seam property observation cannot see — `DependencyTracker` state is part
+  /// of the node debug snapshot.
+  ///
+  /// It is sound to leave the restore applied: on a match the restore changed
+  /// nothing, and on a mismatch the graph now equals the checkpoint callers
+  /// were about to trust anyway — consistent-but-flagged, mirroring the
+  /// delta-restore oracle's mutate-then-report contract.
+  private func verifyCheckpointIsRestoreNoOp(_ checkpoint: Checkpoint) {
+    let before = debugTotalStateSnapshot()
+    restoreCheckpoint(checkpoint)
+    if before != debugTotalStateSnapshot() {
+      SoundnessProbeConfiguration.recordCheckpointStoreViolation(
+        "checkpoint store: restoring a just-created checkpoint changed graph state"
+      )
+    }
   }
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
@@ -21,6 +53,10 @@ extension ViewGraph {
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       checkpoint.nodeCheckpoints,
+      nodesByNodeID: checkpoint.index.nodesByNodeID
+    )
+    nodeCheckpointImageStore.adopt(
+      images: checkpoint.nodeCheckpoints,
       nodesByNodeID: checkpoint.index.nodesByNodeID
     )
   }
@@ -33,6 +69,14 @@ extension ViewGraph {
 
     ViewGraphNodeCheckpointing.restoreNodeCheckpoints(
       nodeCheckpoints,
+      nodesByNodeID: checkpoint.index.nodesByNodeID
+    )
+    // The scoped restore rewrote only `nodeCheckpoints`' subset, but the graph
+    // now equals the WHOLE target checkpoint (the skipped nodes matched it
+    // already — that is what made the delta plan valid), so the store adopts
+    // the target's full image set.
+    nodeCheckpointImageStore.adopt(
+      images: checkpoint.nodeCheckpoints,
       nodesByNodeID: checkpoint.index.nodesByNodeID
     )
   }
@@ -277,6 +321,15 @@ package final class ViewGraph {
   /// a restore performs bump it instead. See the matching per-node counter on
   /// ``ViewNode``.
   private var checkpointMutationEpoch: UInt64 = 0
+
+  /// F29: derived cache behind ``makeCheckpoint()`` — one live image per node,
+  /// refreshed by generation compare, handed out as an O(1) COW copy. Like the
+  /// epoch above it is meta-state outside the checkpointed groups (and carries
+  /// no `didSet`: refreshing the cache must not count as a graph mutation, or
+  /// every capture would invalidate the delta-restore matcher). Reset wholesale
+  /// by every `restoreCheckpoint`; coherence is enforced by the
+  /// restore-no-op oracle in `makeCheckpoint()`.
+  private var nodeCheckpointImageStore = NodeCheckpointImageStore()
 
   /// Bumps the checkpoint mutation epoch. Recording is structural: the `didSet`
   /// observers on `root` and every field group call this, so a graph-state

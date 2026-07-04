@@ -5,6 +5,7 @@ import SwiftTUICore
 package struct SoundnessViolationCounts: Sendable, Equatable {
   package var stampCoherence = 0
   package var deltaCheckpoint = 0
+  package var checkpointStore = 0
   package var rasterDamage = 0
   package var teardownCoherence = 0
   package var registrationPublication = 0
@@ -20,6 +21,7 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
     var counts = SoundnessViolationCounts()
     counts.stampCoherence = SoundnessProbeConfiguration.stampCoherenceViolationCount
     counts.deltaCheckpoint = SoundnessProbeConfiguration.deltaCheckpointViolationCount
+    counts.checkpointStore = SoundnessProbeConfiguration.checkpointStoreViolationCount
     counts.rasterDamage = SoundnessProbeConfiguration.rasterDamageMismatchCount
     counts.teardownCoherence = SoundnessProbeConfiguration.teardownCoherenceViolationCount
     counts.registrationPublication =
@@ -47,6 +49,11 @@ extension RunLoop {
       kind: "deltaCheckpoint",
       total: SoundnessProbeConfiguration.deltaCheckpointViolationCount,
       lastSeen: &counts.deltaCheckpoint
+    )
+    reportSoundnessViolationGrowth(
+      kind: "checkpointStore",
+      total: SoundnessProbeConfiguration.checkpointStoreViolationCount,
+      lastSeen: &counts.checkpointStore
     )
     reportSoundnessViolationGrowth(
       kind: "rasterDamage",
