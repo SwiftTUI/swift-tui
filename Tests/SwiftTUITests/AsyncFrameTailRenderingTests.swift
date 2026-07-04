@@ -277,27 +277,22 @@ struct AsyncFrameTailRenderingTests {
       eventPump: eventPump
     )
 
-    // KNOWN ISSUE (F10 slice 4 finding, own tranche): the authored request
-    // LANDS on the live shared storage (verified by instrumentation), but
-    // the resumed frame's focus-sync re-derives bindings from the tracker
-    // via `applyRuntimeValue`, which unconditionally overwrites the value
-    // and clears `hasPendingRequest` — clobbering an authored request that
-    // landed between the suspended frame's resolve and its commit — while
-    // the write's scheduler invalidation is absorbed by the resumed frame's
-    // delta window, so no later resolve ever re-reads the request. Fix
-    // direction: runtime re-application must not clobber storages with an
-    // unconsumed authored request, and the mid-suspension invalidation must
-    // survive into a follow-up frame.
-    withKnownIssue {
-      #expect(
-        terminal.frames.last?.contains("phase 1 field second") == true,
-        "frames: \(terminal.frames)"
-      )
-      #expect(
-        focusTracker.currentFocusIdentity
-          == testIdentity("AsyncFrameTailFocusMutation", "Second")
-      )
-    }
+    // The authored request lands on the live shared storage while the
+    // phase-1 frame's tail is suspended; the resumed frame's focus-sync
+    // re-derives bindings via `applyRuntimeValue`, whose request-generation
+    // guard refuses to consume a request its resolve-time registrations
+    // predate (they observed the pre-write generation). The request's own
+    // invalidation stays pending in the scheduler — the eager rerender only
+    // peeks — so the follow-up frame re-resolves with the surviving request,
+    // applies `.focus(Second)`, and consumes it with matching generations.
+    #expect(
+      terminal.frames.last?.contains("phase 1 field second") == true,
+      "frames: \(terminal.frames)"
+    )
+    #expect(
+      focusTracker.currentFocusIdentity
+        == testIdentity("AsyncFrameTailFocusMutation", "Second")
+    )
   }
 
   @Test("blocked built-in layout queues input without committing ahead")

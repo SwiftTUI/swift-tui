@@ -3,6 +3,17 @@ package import SwiftTUICore
 private struct FocusStateSnapshot<Value: Equatable> {
   var value: Value
   var hasPendingRequest: Bool
+  /// Monotonic count of authored requests (`requestValue` calls). Runtime
+  /// re-application carries the generation its resolve-time registration
+  /// observed; `applyRuntimeValue` refuses to touch a storage holding a NEWER
+  /// authored request. Without this, focus-sync's per-frame binding re-derive
+  /// clobbers a request that lands between a frame's resolve and its commit
+  /// (an async tail suspension, a mid-frame task write): the value is
+  /// overwritten and `hasPendingRequest` cleared before any resolve ever
+  /// observes the request. The skipped application is not lost — every
+  /// authored request also queues its owner dirty, so a follow-up resolve
+  /// re-registers with the new generation and consumes it there.
+  var requestGeneration: UInt64
 }
 
 @MainActor
@@ -11,11 +22,13 @@ private final class FocusStateStorage<Value: Equatable> {
 
   init(
     value: Value,
-    hasPendingRequest: Bool = false
+    hasPendingRequest: Bool = false,
+    requestGeneration: UInt64 = 0
   ) {
     snapshot = .init(
       value: value,
-      hasPendingRequest: hasPendingRequest
+      hasPendingRequest: hasPendingRequest,
+      requestGeneration: requestGeneration
     )
   }
 
@@ -26,10 +39,22 @@ private final class FocusStateStorage<Value: Equatable> {
   func requestValue(_ newValue: Value) {
     snapshot.value = newValue
     snapshot.hasPendingRequest = true
+    snapshot.requestGeneration &+= 1
   }
 
   @discardableResult
-  func applyRuntimeValue(_ newValue: Value) -> Bool {
+  func applyRuntimeValue(
+    _ newValue: Value,
+    observedRequestGeneration: UInt64
+  ) -> Bool {
+    guard observedRequestGeneration == snapshot.requestGeneration else {
+      // An authored request landed after the caller's registration was
+      // resolved. Consuming it here would destroy a request no resolve has
+      // seen yet (see ``FocusStateSnapshot/requestGeneration``); leave the
+      // storage untouched and let the request's own invalidation drive the
+      // follow-up resolve that consumes it.
+      return false
+    }
     let didChange = snapshot.value != newValue
     snapshot.value = newValue
     snapshot.hasPendingRequest = false
@@ -43,7 +68,7 @@ private struct FocusStateLocation<Value: Equatable> {
   var bindingID: String
   var snapshot: () -> FocusStateSnapshot<Value>
   var requestValue: (Value) -> Void
-  var applyRuntimeValue: (Value) -> Bool
+  var applyRuntimeValue: (Value, _ observedRequestGeneration: UInt64) -> Bool
 }
 
 @MainActor
@@ -77,8 +102,14 @@ private final class FocusStateBox<Value: Equatable> {
   }
 
   @discardableResult
-  func applyRuntimeLocalValue(_ newValue: Value) -> Bool {
-    storage.localStorage.applyRuntimeValue(newValue)
+  func applyRuntimeLocalValue(
+    _ newValue: Value,
+    observedRequestGeneration: UInt64
+  ) -> Bool {
+    storage.localStorage.applyRuntimeValue(
+      newValue,
+      observedRequestGeneration: observedRequestGeneration
+    )
   }
 
   func remember(_ location: FocusStateLocation<Value>) {
@@ -220,12 +251,14 @@ public struct FocusState<Value: Equatable> {
       // frame late, once a re-registration re-captured it.
       let seedValue = seedSnapshot.value
       let seedHasPendingRequest = seedSnapshot.hasPendingRequest
+      let seedRequestGeneration = seedSnapshot.requestGeneration
       let liveStorage: @MainActor () -> FocusStateStorage<Value> = {
         viewNode.stateSlot(
           ordinal: ordinal,
           seed: FocusStateStorage(
             value: seedValue,
-            hasPendingRequest: seedHasPendingRequest
+            hasPendingRequest: seedHasPendingRequest,
+            requestGeneration: seedRequestGeneration
           )
         )
       }
@@ -240,8 +273,11 @@ public struct FocusState<Value: Equatable> {
           liveStorage().requestValue(newValue)
           viewNode.requestInvalidation()
         },
-        applyRuntimeValue: { newValue in
-          let didChange = liveStorage().applyRuntimeValue(newValue)
+        applyRuntimeValue: { newValue, observedRequestGeneration in
+          let didChange = liveStorage().applyRuntimeValue(
+            newValue,
+            observedRequestGeneration: observedRequestGeneration
+          )
           if didChange {
             viewNode.requestInvalidation()
           }
@@ -266,8 +302,11 @@ public struct FocusState<Value: Equatable> {
       requestValue: { newValue in
         box.requestLocalValue(newValue)
       },
-      applyRuntimeValue: { newValue in
-        box.applyRuntimeLocalValue(newValue)
+      applyRuntimeValue: { newValue, observedRequestGeneration in
+        box.applyRuntimeLocalValue(
+          newValue,
+          observedRequestGeneration: observedRequestGeneration
+        )
       }
     )
   }
@@ -287,8 +326,19 @@ extension FocusState.Binding {
     location.snapshot().hasPendingRequest
   }
 
-  package func applyRuntimeValue(_ newValue: Value) -> Bool {
-    location.applyRuntimeValue(newValue)
+  /// The storage's current authored-request generation. Registration sites
+  /// capture this at resolve and pass it back through
+  /// ``applyRuntimeValue(_:observedRequestGeneration:)`` so runtime
+  /// re-application can never consume a request the registration predates.
+  package var requestGeneration: UInt64 {
+    location.snapshot().requestGeneration
+  }
+
+  package func applyRuntimeValue(
+    _ newValue: Value,
+    observedRequestGeneration: UInt64
+  ) -> Bool {
+    location.applyRuntimeValue(newValue, observedRequestGeneration)
   }
 }
 
@@ -321,6 +371,7 @@ public struct BoolFocusBindingModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
+    let observedRequestGeneration = binding.requestGeneration
     context.localFocusBindingRegistry?.register(
       identity: node.identity,
       bindingKey: binding.bindingKey,
@@ -328,7 +379,10 @@ public struct BoolFocusBindingModifier: PrimitiveViewModifier {
       hasPendingRequest: binding.hasPendingRequest,
       isSelected: binding.wrappedValue,
       applyRuntimeFocus: { isFocused in
-        binding.applyRuntimeValue(isFocused)
+        binding.applyRuntimeValue(
+          isFocused,
+          observedRequestGeneration: observedRequestGeneration
+        )
       }
     )
     return [node]
@@ -345,6 +399,7 @@ public struct OptionalFocusBindingModifier<Value: Hashable>: PrimitiveViewModifi
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
+    let observedRequestGeneration = binding.requestGeneration
     context.localFocusBindingRegistry?.register(
       identity: node.identity,
       bindingKey: binding.bindingKey,
@@ -353,12 +408,18 @@ public struct OptionalFocusBindingModifier<Value: Hashable>: PrimitiveViewModifi
       isSelected: binding.wrappedValue == value,
       applyRuntimeFocus: { isFocused in
         if isFocused {
-          return binding.applyRuntimeValue(value)
+          return binding.applyRuntimeValue(
+            value,
+            observedRequestGeneration: observedRequestGeneration
+          )
         }
         guard binding.wrappedValue == value else {
           return false
         }
-        return binding.applyRuntimeValue(nil)
+        return binding.applyRuntimeValue(
+          nil,
+          observedRequestGeneration: observedRequestGeneration
+        )
       }
     )
     return [node]
