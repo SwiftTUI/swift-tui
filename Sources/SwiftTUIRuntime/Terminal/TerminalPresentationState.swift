@@ -216,13 +216,23 @@ import Synchronization
   /// the terminal's screen contents and graphics placements are known again.
   struct TerminalPresentationSession {
     var lastSubmittedSurface: RasterSurface?
+    /// Kitty image ids with a *placement* we can re-place by id. Cleared on drop
+    /// / invalidation / repaint so the recovery frame re-transmits (the on-screen
+    /// placement can no longer be trusted).
     var transmittedKittyImages: Set<UInt32> = []
+    /// Kitty image ids whose *pixel data* is resident in the terminal's store.
+    /// Unlike placements, stored image data survives a screen clear or a dropped
+    /// frame — kitty only releases it on an explicit delete (`d=I` / `d=A`). So
+    /// this is preserved across drops/invalidations, letting the recovery frame
+    /// free the images it superseded instead of leaking one per drop.
+    var residentKittyImageData: Set<UInt32> = []
     var forceFullRepaint = false
     var writer: TerminalPresentationWriter?
 
     mutating func reset() {
       lastSubmittedSurface = nil
       transmittedKittyImages.removeAll()
+      residentKittyImageData.removeAll()
       forceFullRepaint = false
       writer = nil
     }

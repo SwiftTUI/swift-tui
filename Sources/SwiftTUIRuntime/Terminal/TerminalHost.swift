@@ -421,18 +421,26 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       )
       presentationSession.forceFullRepaint = false
 
-      let emission = TerminalHostPresentationEmissionBuilder(
+      let emissionBuilder = TerminalHostPresentationEmissionBuilder(
         capabilityProfile: capabilityProfile,
         usesTerminalEditOperations: usesTerminalEditOperations,
         imageRenderer: imageRenderer,
         fallbackBackground: appearance.backgroundColor,
         terminalBackgroundColor: appearance.backgroundColor
-      ).build(
+      )
+      // Bind to locals: passing two `inout` arguments both derived from
+      // `presentationSession` would overlap and trap on exclusive access.
+      var transmittedKittyImages = presentationSession.transmittedKittyImages
+      var residentKittyImageData = presentationSession.residentKittyImageData
+      let emission = emissionBuilder.build(
         for: preparedSurface,
         plan: plan,
         graphicsCapabilities: graphicsCapabilities,
-        transmittedKittyImages: &presentationSession.transmittedKittyImages
+        transmittedKittyImages: &transmittedKittyImages,
+        residentKittyImageData: &residentKittyImageData
       )
+      presentationSession.transmittedKittyImages = transmittedKittyImages
+      presentationSession.residentKittyImageData = residentKittyImageData
       let usedSynchronizedOutput = TerminalHostEscapeSequences.usesSynchronizedOutput(
         for: emission.output,
         strategy: plan.strategy,

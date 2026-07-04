@@ -12,16 +12,21 @@ import SwiftTUICore
       for preparedSurface: RasterSurface,
       plan: TerminalPresentationPlan,
       graphicsCapabilities: TerminalGraphicsCapabilities,
-      transmittedKittyImages: inout Set<UInt32>
+      transmittedKittyImages: inout Set<UInt32>,
+      residentKittyImageData: inout Set<UInt32>
     ) -> TerminalPresentationEmission {
       var emission = TerminalPresentationEmission()
-      // Image ids resident in the terminal's store before this frame. A frame
-      // that re-places every attachment (full repaint / full-scope replay)
-      // reports every id it still needs via `referencedImageIDs`; anything
-      // resident but no longer referenced is a superseded blend variant whose
-      // pixel buffer we must free, or the terminal accumulates one image per
-      // animated frame (only placement-deletes are otherwise emitted).
-      let residentKittyImages = transmittedKittyImages
+      // Image ids whose pixel data is resident in the terminal's store before
+      // this frame. A frame that re-places every attachment (full repaint /
+      // full-scope replay) reports every id it still needs via
+      // `referencedImageIDs`; anything resident but no longer referenced is a
+      // superseded blend variant whose buffer we must free, or the terminal
+      // accumulates one image per animated frame (only placement-deletes are
+      // otherwise emitted). This is sourced from `residentKittyImageData`, not
+      // the transmit set, because stored data outlives the dropped/cleared
+      // placements that reset the transmit set — so the recovery repaint after a
+      // dropped frame still frees the images it superseded.
+      let residentBefore = residentKittyImageData
       var referencedImageIDs: Set<UInt32> = []
       switch plan.strategy {
       case .fullRepaint:
@@ -51,10 +56,11 @@ import SwiftTUICore
         graphicsCapabilities.preferredProtocol == .kitty
         && (plan.strategy == .fullRepaint || plan.graphicsReplay.scope == .full)
       if replacedAllKittyImages {
-        for staleImageID in residentKittyImages.subtracting(referencedImageIDs).sorted() {
+        for staleImageID in residentBefore.subtracting(referencedImageIDs).sorted() {
           emission.append(TerminalHostEscapeSequences.freeKittyImageData(id: staleImageID))
         }
         transmittedKittyImages = referencedImageIDs
+        residentKittyImageData = referencedImageIDs
       }
 
       return emission

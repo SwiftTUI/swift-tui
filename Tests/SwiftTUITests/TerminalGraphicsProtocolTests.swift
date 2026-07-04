@@ -1287,6 +1287,82 @@ struct TerminalGraphicsProtocolTests {
     #expect(!updateWrite.contains("d=I,i=\(secondVariantID)"))
   }
 
+  @Test("resident kitty image data survives a dropped frame so recovery can free it")
+  func residentKittyImageDataSurvivesDroppedFrame() {
+    var session = TerminalPresentationSession()
+    session.transmittedKittyImages = [10, 20]
+    session.residentKittyImageData = [10, 20]
+
+    // A dropped frame invalidates on-screen placements (force a re-transmit) but
+    // the terminal still holds the pixel data — so it stays freeable.
+    session.markDroppedFrame()
+    #expect(session.forceFullRepaint)
+    #expect(session.transmittedKittyImages.isEmpty)
+    #expect(session.residentKittyImageData == [10, 20])
+
+    // A dropped queued frame (invalidateRetainedState) behaves the same.
+    var invalidated = TerminalPresentationSession()
+    invalidated.transmittedKittyImages = [10]
+    invalidated.residentKittyImageData = [10]
+    invalidated.invalidateRetainedState()
+    #expect(invalidated.transmittedKittyImages.isEmpty)
+    #expect(invalidated.residentKittyImageData == [10])
+
+    // A full session reset drops the record (fresh writer / unknown store).
+    session.reset()
+    #expect(session.residentKittyImageData.isEmpty)
+    #expect(session.transmittedKittyImages.isEmpty)
+  }
+
+  @Test("recovery repaint after a dropped frame frees kitty image data the drop left resident")
+  func recoveryRepaintFreesResidentDataAfterDrop() throws {
+    let renderer = TerminalImageRenderer(repository: ImageAssetRepository())
+    let graphicsCapabilities = TerminalGraphicsCapabilities(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty,
+      cellPixelSize: .init(width: 1, height: 1)
+    )
+    let pngBytes = try makePNGBytes(
+      width: 1,
+      height: 1,
+      pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]
+    )
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["    "],
+      imageAttachments: [
+        blendedRasterImageAttachment(pngBytes: pngBytes, background: .blue, signature: 1)
+      ]
+    )
+    let builder = TerminalHostPresentationEmissionBuilder(
+      capabilityProfile: .trueColor,
+      usesTerminalEditOperations: false,
+      imageRenderer: renderer,
+      fallbackBackground: .black,
+      terminalBackgroundColor: nil
+    )
+
+    // Post-drop recovery state: placements cleared (so the frame re-transmits),
+    // but an image the terminal still holds (999_999) is recorded as resident.
+    var transmitted: Set<UInt32> = []
+    var resident: Set<UInt32> = [999_999]
+    let emission = builder.build(
+      for: surface,
+      plan: TerminalPresentationPlan.fullRepaint(surfaceSize: surface.size),
+      graphicsCapabilities: graphicsCapabilities,
+      transmittedKittyImages: &transmitted,
+      residentKittyImageData: &resident
+    )
+
+    let transmittedID = try #require(kittyTransmitImageID(in: emission.output))
+    #expect(transmittedID != 999_999)
+    // The orphan left resident by the drop is freed; the live image is not.
+    #expect(emission.output.contains("\u{001B}_Ga=d,d=I,i=999999,q=2\u{001B}\\"))
+    #expect(!emission.output.contains("d=I,i=\(transmittedID)"))
+    #expect(resident == [transmittedID])
+    #expect(transmitted == [transmittedID])
+  }
+
   @Test("kitty image placement crops bottom overflow so it does not paint over sibling regions")
   func kittyImagePlacementCropsBottomOverflow() throws {
     // When an ancestor (e.g. a ScrollView clip rect, or a safeAreaInset
