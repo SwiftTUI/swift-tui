@@ -73,23 +73,16 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     )
   }
 
-  package func handle(
-    hostIdentity: Identity,
-    invalidator: (any Invalidating)?
-  ) -> PresentationCoordinatorHandle<C.Item> {
-    setImperativeInvalidationTarget(
-      identity: hostIdentity,
-      invalidator: invalidator
-    )
-    return PresentationCoordinatorHandle(
-      snapshotLabel: C.overlayKindName,
-      present: { [weak self] item in
-        self?.instance().present(item)
-      },
-      dismiss: { [weak self] itemID in
-        self?.instance().dismiss(id: itemID)
-      }
-    )
+  package func present(
+    _ item: C.Item
+  ) {
+    instance().present(item)
+  }
+
+  package func dismiss(
+    id: C.Item.ID
+  ) {
+    instance().dismiss(id: id)
   }
 
   package func overlayEntry() -> OverlayStackEntry? {
@@ -225,28 +218,14 @@ package final class PresentationCoordinatorRegistry {
     toast.restoreCheckpoint(checkpoint.toast)
   }
 
-  package func injectHandles(
-    into environmentValues: inout EnvironmentValues,
-    hostIdentity: Identity,
+  package func setImperativeInvalidationTarget(
+    identity: Identity,
     invalidator: (any Invalidating)?
   ) {
-    environmentValues.alertPresentationCoordinator = alert.handle(
-      hostIdentity: hostIdentity,
-      invalidator: invalidator
-    )
-    environmentValues.confirmationDialogPresentationCoordinator =
-      confirmationDialog.handle(
-        hostIdentity: hostIdentity,
-        invalidator: invalidator
-      )
-    environmentValues.sheetPresentationCoordinator = sheet.handle(
-      hostIdentity: hostIdentity,
-      invalidator: invalidator
-    )
-    environmentValues.toastPresentationCoordinator = toast.handle(
-      hostIdentity: hostIdentity,
-      invalidator: invalidator
-    )
+    alert.setImperativeInvalidationTarget(identity: identity, invalidator: invalidator)
+    confirmationDialog.setImperativeInvalidationTarget(identity: identity, invalidator: invalidator)
+    sheet.setImperativeInvalidationTarget(identity: identity, invalidator: invalidator)
+    toast.setImperativeInvalidationTarget(identity: identity, invalidator: invalidator)
   }
 
   package func reconcile(

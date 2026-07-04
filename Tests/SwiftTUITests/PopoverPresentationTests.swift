@@ -255,13 +255,9 @@ struct PopoverPresentationEscapeDismissTests {
   @Test("an active popover exposes its dismiss closure as the Escape action")
   func activePopoverExposesDismissAction() {
     let registry = PresentationCoordinatorRegistry()
-    let handle = registry.popover.handle(
-      hostIdentity: testIdentity("Host"),
-      invalidator: nil
-    )
 
     var dismissed = 0
-    handle.present(
+    registry.popover.present(
       PopoverPresentationItem(
         id: "popover#1",
         sourceIdentity: testIdentity("Source"),

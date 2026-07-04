@@ -16,13 +16,9 @@ struct PresentationEscapeDismissTests {
   @Test("An active sheet exposes its dismiss closure as the Escape action")
   func activeSheetExposesDismissAction() {
     let registry = PresentationCoordinatorRegistry()
-    let handle = registry.sheet.handle(
-      hostIdentity: testIdentity("Host"),
-      invalidator: nil
-    )
 
     var dismissed = 0
-    handle.present(
+    registry.sheet.present(
       PromptPresentationItem(
         id: "sheet#1",
         title: "",
@@ -43,19 +39,11 @@ struct PresentationEscapeDismissTests {
   @Test("Alert beats sheet: alert dismisses first when both are active")
   func alertBeatsSheetWhenBothActive() {
     let registry = PresentationCoordinatorRegistry()
-    let sheetHandle = registry.sheet.handle(
-      hostIdentity: testIdentity("Host"),
-      invalidator: nil
-    )
-    let alertHandle = registry.alert.handle(
-      hostIdentity: testIdentity("Host"),
-      invalidator: nil
-    )
 
     var sheetDismissed = 0
     var alertDismissed = 0
 
-    sheetHandle.present(
+    registry.sheet.present(
       PromptPresentationItem(
         id: "sheet#1",
         title: "",
@@ -66,7 +54,7 @@ struct PresentationEscapeDismissTests {
         dismiss: { sheetDismissed += 1 }
       )
     )
-    alertHandle.present(
+    registry.alert.present(
       PromptPresentationItem(
         id: "alert#1",
         title: "",
@@ -89,13 +77,9 @@ struct PresentationEscapeDismissTests {
   @Test("Toasts do not contribute an Escape dismiss action")
   func toastsDoNotContributeDismissAction() {
     let registry = PresentationCoordinatorRegistry()
-    let toastHandle = registry.toast.handle(
-      hostIdentity: testIdentity("Host"),
-      invalidator: nil
-    )
 
     var toastDismissed = 0
-    toastHandle.present(
+    registry.toast.present(
       ToastPresentationItem(
         id: "toast#1",
         contentPayloads: [],
