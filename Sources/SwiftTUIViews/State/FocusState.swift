@@ -194,7 +194,18 @@ public struct FocusState<Value: Equatable> {
     let ordinal = box.currentOrdinal
     let seedSnapshot = box.currentLocalSnapshot()
 
-    if let viewNode = context.viewNode {
+    // Imperative contexts (a `.task` loop, an action callback) carry the
+    // owner by ID with no live node reference; recover the node the same
+    // way `@State`'s imperative location does, so a `$focus` write from a
+    // task reaches the live slot instead of silently landing in the
+    // detached local box.
+    let ownerNode =
+      context.viewNode
+      ?? liveAuthoringOwnerNode(
+        ownerNodeID: context.ownerNodeID,
+        stateGraphScope: context.stateGraphScope
+      )
+    if let viewNode = ownerNode {
       let bindingKey = FocusBindingKey(
         ownerNodeID: viewNode.viewNodeID,
         suffix: .stateSlot(ordinal: ordinal)

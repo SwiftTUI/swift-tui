@@ -111,6 +111,44 @@ package func stateStorageOwner(
   )
 }
 
+/// Resolves the live owner node an authoring context names, for property
+/// wrappers whose accesses run outside any resolve pass (a `.task` loop, a
+/// gesture or action callback). During a resolve pass the enclosing graph is
+/// the source of truth; the captured scope must match it so a scoped subtree
+/// never reaches into a different graph than the one resolving it. Outside a
+/// resolve pass the live graph is recovered from the captured scope via
+/// `LiveViewGraphRegistry` — weak, so a retired graph yields nil and the
+/// caller falls back to its seed storage.
+@MainActor
+package func liveAuthoringOwnerNode(
+  ownerNodeID: ViewNodeID?,
+  stateGraphScope: StateGraphScopeID?
+) -> SwiftTUICore.ViewNode? {
+  guard let ownerNodeID else {
+    return nil
+  }
+
+  if ViewNodeContext.current != nil {
+    guard let currentGraph = ViewNodeContext.current?.ownerGraph else {
+      return nil
+    }
+    if let stateGraphScope,
+      stateGraphScope != StateGraphScopeID(currentGraph)
+    {
+      return nil
+    }
+    return currentGraph.nodeForViewNodeID(ownerNodeID)
+  }
+
+  guard
+    let stateGraphScope,
+    let scopedGraph = LiveViewGraphRegistry.graph(for: stateGraphScope)
+  else {
+    return nil
+  }
+  return scopedGraph.nodeForViewNodeID(ownerNodeID)
+}
+
 package struct CapturedAuthoringContextSnapshot: Sendable {
   package let viewIdentity: Identity
   package let structuralIdentity: Identity

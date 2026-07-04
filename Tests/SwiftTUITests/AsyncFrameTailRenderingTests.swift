@@ -178,6 +178,128 @@ struct AsyncFrameTailRenderingTests {
     )
   }
 
+  @Test("authored @FocusState write during suspended async frame tail survives commit")
+  func focusStateWriteDuringSuspendedAsyncTailSurvivesCommit() async throws {
+    // F10 slice 4 deciding test. @FocusState bypasses the @State
+    // checkpoint-restore mirror (`stateMutationKeys`), so a mid-suspension
+    // authored focus write relies on `FocusStateStorage` being a shared
+    // class instance that suspend/materialize never rolls back, plus
+    // focus-sync re-deriving bindings from the tracker. This pins that
+    // contract: the write lands while the phase-1 frame's tail is
+    // suspended-to-baseline, and the committed run must still relocate
+    // focus to the requested field. (The narrower first-frame-slot residue
+    // is not constructible through production paths: tasks start at
+    // commit, input cannot target uncommitted regions, and resolve-time
+    // seeds land in the prepared state that materialize restores.)
+    let rootIdentity = testIdentity("AsyncFrameTailFocusMutationRoot")
+    // Unlike the internal-@State sibling above, the blocking hooks install
+    // only after the initial render: resolve-time `.defaultFocus` seeding
+    // gives the first frame a focus-sync pass-2 rerender (two raster
+    // entries), so counting entries from renderer construction would stall
+    // the initial `renderPendingFramesAsync` await with nothing able to
+    // release the gate.
+    let gate = AsyncFrameTailBlockingGate()
+    let renderer = DefaultRenderer()
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let terminal = AsyncFrameTailTerminalHost()
+    let trigger = AsyncFrameTailInternalStateTrigger()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { phase, _ in
+        AsyncFrameTailFocusMutationView(
+          phase: phase,
+          trigger: trigger
+        )
+      }
+    )
+    focusTracker.invalidator = runLoop.scheduler
+    let eventPump = runLoop.makeEventPump()
+    defer {
+      eventPump.cancel()
+    }
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    _ = try await runLoop.renderPendingFramesAsync(
+      renderedFrames: &initialFrames,
+      eventPump: eventPump
+    )
+    #expect(terminal.frames.last?.contains("phase 0 field first") == true)
+
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    runLoop.stateContainer.mutate { phase in
+      phase = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: eventPump
+      )
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+    trigger.fire()
+    gate.release()
+
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    // Drain any follow-up frame the authored request scheduled (the request
+    // is consumed by a re-resolve's registration snapshot, not by the
+    // resumed frame itself).
+    var followUpFrames = 0
+    _ = try await runLoop.renderPendingFramesAsync(
+      renderedFrames: &followUpFrames,
+      eventPump: eventPump
+    )
+
+    // KNOWN ISSUE (F10 slice 4 finding, own tranche): the authored request
+    // LANDS on the live shared storage (verified by instrumentation), but
+    // the resumed frame's focus-sync re-derives bindings from the tracker
+    // via `applyRuntimeValue`, which unconditionally overwrites the value
+    // and clears `hasPendingRequest` — clobbering an authored request that
+    // landed between the suspended frame's resolve and its commit — while
+    // the write's scheduler invalidation is absorbed by the resumed frame's
+    // delta window, so no later resolve ever re-reads the request. Fix
+    // direction: runtime re-application must not clobber storages with an
+    // unconsumed authored request, and the mid-suspension invalidation must
+    // survive into a follow-up frame.
+    withKnownIssue {
+      #expect(
+        terminal.frames.last?.contains("phase 1 field second") == true,
+        "frames: \(terminal.frames)"
+      )
+      #expect(
+        focusTracker.currentFocusIdentity
+          == testIdentity("AsyncFrameTailFocusMutation", "Second")
+      )
+    }
+  }
+
   @Test("blocked built-in layout queues input without committing ahead")
   func blockedBuiltInLayoutQueuesInputWithoutCommittingAhead() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailLayoutRoot")
@@ -3504,6 +3626,30 @@ private struct AsyncFrameTailInternalStateMutationView: View {
         await trigger.wait()
         count = 1
       }
+  }
+}
+
+private struct AsyncFrameTailFocusMutationView: View {
+  var phase: Int
+  var trigger: AsyncFrameTailInternalStateTrigger
+
+  @FocusState private var focusedField: AsyncFrameTailSendableFocusField?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("phase \(phase) field \(focusedField?.rawValue ?? "none")")
+      Button("first") {}
+        .id(testIdentity("AsyncFrameTailFocusMutation", "First"))
+        .focused($focusedField, equals: .first)
+      Button("second") {}
+        .id(testIdentity("AsyncFrameTailFocusMutation", "Second"))
+        .focused($focusedField, equals: .second)
+    }
+    .defaultFocus($focusedField, .first)
+    .task {
+      await trigger.wait()
+      focusedField = .second
+    }
   }
 }
 

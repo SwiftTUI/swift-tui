@@ -417,36 +417,10 @@ public struct State<Value> {
     ownerNodeID: ViewNodeID?,
     stateGraphScope: StateGraphScopeID?
   ) -> SwiftTUICore.ViewNode? {
-    guard let ownerNodeID else {
-      return nil
-    }
-
-    // During a resolve pass the enclosing graph is the source of truth; require
-    // the captured scope to match it so a scoped subtree never reaches into a
-    // different graph than the one resolving it. (Unchanged from the original
-    // resolve-time behavior: no enclosing graph means no node.)
-    if ViewNodeContext.current != nil {
-      guard let currentGraph = ViewNodeContext.current?.ownerGraph else {
-        return nil
-      }
-      if let stateGraphScope,
-        stateGraphScope != StateGraphScopeID(currentGraph)
-      {
-        return nil
-      }
-      return currentGraph.nodeForViewNodeID(ownerNodeID)
-    }
-
-    // Outside a resolve pass (imperative callbacks, `.task` loops): recover the
-    // live graph from the captured scope. Weak in the registry, so a retired
-    // graph yields nil and the read falls back to the seed.
-    guard
-      let stateGraphScope,
-      let scopedGraph = LiveViewGraphRegistry.graph(for: stateGraphScope)
-    else {
-      return nil
-    }
-    return scopedGraph.nodeForViewNodeID(ownerNodeID)
+    liveAuthoringOwnerNode(
+      ownerNodeID: ownerNodeID,
+      stateGraphScope: stateGraphScope
+    )
   }
 }
 
