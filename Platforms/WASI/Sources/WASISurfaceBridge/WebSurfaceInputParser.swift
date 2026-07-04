@@ -264,7 +264,24 @@ package struct WebSurfaceInputParser {
       return .home
     case "end":
       return .end
+    case "insert":
+      return .insert
+    case "delete":
+      return .delete
+    case "pageUp":
+      return .pageUp
+    case "pageDown":
+      return .pageDown
     default:
+      // Function keys arrive as "f1"…"f24" (mirroring DOM `key` values
+      // lowercased into this wire's naming convention). Unknown names keep
+      // falling through to nil, so an older page bundle degrades to dropping
+      // the key rather than misdelivering it.
+      if name.count >= 2, name.hasPrefix("f"),
+        let number = Int(name.dropFirst()), (1...24).contains(number)
+      {
+        return .functionKey(number)
+      }
       return nil
     }
   }

@@ -106,6 +106,31 @@ extension TerminalInputParser {
       return .key(KeyPress(.escape))
     }
 
+    // SS3 sequences: ESC O <final>. xterm-family terminals send F1–F4 this
+    // way (and arrows/Home/End in application-cursor mode). This must be
+    // matched before the Alt+key fall-through: without it, ESC O P parsed as
+    // Alt+O followed by a literal 'P' — actively corrupting focused text
+    // fields on every F1–F4 press.
+    if bufferedBytes[1] == 0x4F {
+      guard bufferedBytes.count > 2 else {
+        // The chunk ends at ESC O: treat it as Alt+O, mirroring the lone-ESC
+        // convention (a chunk boundary is the implicit ESC timeout — real SS3
+        // sequences arrive atomically in one terminal read, while a typed
+        // Alt+O ends its read here). Waiting instead would stall Alt+O until
+        // the NEXT keystroke and then swallow that key as an SS3 final.
+        bufferedBytes.removeFirst(2)
+        return .key(KeyPress(.character("O"), modifiers: .alt))
+      }
+      let finalByte = bufferedBytes[2]
+      bufferedBytes.removeFirst(3)
+      guard let key = ss3Key(from: finalByte) else {
+        // Unknown SS3 final: the envelope is consumed whole so the final
+        // byte is never inserted as literal text. Keep draining the buffer.
+        return parseNextEvent()
+      }
+      return .key(KeyPress(key))
+    }
+
     guard bufferedBytes[1] == 0x5B else {
       // Alt+key: ESC followed by a printable byte
       if (0x20...0x7E).contains(bufferedBytes[1]) {
@@ -238,15 +263,10 @@ extension TerminalInputParser {
   }
 
   /// Maps an already-consumed VT220 tilde key envelope (`ESC [ n [;mod] ~`) to
-  /// an input event.
-  ///
-  /// Numbers with an existing ``KeyEvent`` representation (Home = 1 or 7,
-  /// End = 4 or 8) are mapped through, honoring any xterm modifier parameter.
-  /// The remainder (Insert = 2, Delete = 3, PageUp = 5, PageDown = 6, and the
-  /// function keys 11...24) currently have no ``KeyEvent`` case; they are
-  /// dropped rather than surfaced, which is correct precisely because the
-  /// previous fall-through corrupted input with a stray Escape plus a literal
-  /// '~'. Adding first-class cases for these is a separate public-API change.
+  /// an input event, honoring any xterm modifier parameter. Unknown numbers
+  /// (unassigned VT220 slots) consume the envelope and map to nothing — the
+  /// pre-F14 fall-through corrupted input with a stray Escape plus a literal
+  /// '~', so consuming whole envelopes is load-bearing either way.
   private func tildeKeyEvent(parameterBytes: [UInt8]) -> InputEvent? {
     let groups = parameterBytes.split(separator: 0x3B)  // ';'
     guard let keyGroup = groups.first, let keyID = asciiInteger(from: keyGroup) else {
@@ -258,12 +278,55 @@ extension TerminalInputParser {
     switch keyID {
     case 1, 7:
       key = .home
+    case 2:
+      key = .insert
+    case 3:
+      key = .delete
     case 4, 8:
       key = .end
+    case 5:
+      key = .pageUp
+    case 6:
+      key = .pageDown
+    // The VT220 function-key map is discontiguous (16, 22, 27, and 30 are
+    // unassigned): 11–15 = F1–F5, 17–21 = F6–F10, 23–24 = F11–F12, and the
+    // less common 25–26 = F13–F14, 28–29 = F15–F16, 31–34 = F17–F20.
+    case 11...15:
+      key = .functionKey(keyID - 10)
+    case 17...21:
+      key = .functionKey(keyID - 11)
+    case 23...24:
+      key = .functionKey(keyID - 12)
+    case 25...26:
+      key = .functionKey(keyID - 12)
+    case 28...29:
+      key = .functionKey(keyID - 13)
+    case 31...34:
+      key = .functionKey(keyID - 14)
     default:
       return nil
     }
     return .key(KeyPress(key, modifiers: modifiers))
+  }
+
+  /// Maps an SS3 final byte (`ESC O <final>`) to its key. PC-style function
+  /// keys F1–F4 plus the application-cursor-mode aliases for the arrows,
+  /// Home/End, and keypad Enter.
+  private func ss3Key(from finalByte: UInt8) -> KeyEvent? {
+    switch finalByte {
+    case 0x50: return .functionKey(1)  // P
+    case 0x51: return .functionKey(2)  // Q
+    case 0x52: return .functionKey(3)  // R
+    case 0x53: return .functionKey(4)  // S
+    case 0x41: return .arrowUp  // A
+    case 0x42: return .arrowDown  // B
+    case 0x43: return .arrowRight  // C
+    case 0x44: return .arrowLeft  // D
+    case 0x48: return .home  // H
+    case 0x46: return .end  // F
+    case 0x4D: return .return  // M (keypad Enter)
+    default: return nil
+    }
   }
 
   private func csiModifiers(from bytes: [UInt8]) -> EventModifiers {
@@ -293,6 +356,12 @@ extension TerminalInputParser {
     case 0x44: return .arrowLeft
     case 0x48: return .home
     case 0x46: return .end
+    // Modified F1–F4 arrive in CSI form (`ESC [ 1 ; <mod> P…S`) even on
+    // terminals that send the unmodified keys as SS3.
+    case 0x50: return .functionKey(1)
+    case 0x51: return .functionKey(2)
+    case 0x52: return .functionKey(3)
+    case 0x53: return .functionKey(4)
     default: return nil
     }
   }

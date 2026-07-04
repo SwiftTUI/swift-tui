@@ -43,6 +43,16 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
   case escape
   case home
   case end
+  case insert
+  /// Forward delete (the VT220 `Delete` key, `ESC [ 3 ~`). Backward delete
+  /// remains ``backspace``.
+  case delete
+  case pageUp
+  case pageDown
+  /// A function key, 1-based (`F1` = `.functionKey(1)`). Terminals deliver
+  /// F1–F4 as SS3 (`ESC O P…S`) or modified CSI, and F5+ as VT220 tilde
+  /// sequences; the parser normalizes all of them here.
+  case functionKey(Int)
 }
 
 @MainActor

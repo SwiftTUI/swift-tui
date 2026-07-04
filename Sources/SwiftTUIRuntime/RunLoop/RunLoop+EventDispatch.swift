@@ -137,7 +137,8 @@ extension RunLoop {
       case let keyPress where keyPress.modifiers.isEmpty:
         switch keyPress.key {
         case .arrowLeft, .arrowRight, .arrowUp, .arrowDown,
-          .character, .escape, .backspace, .home, .end:
+          .character, .escape, .backspace, .home, .end,
+          .insert, .delete, .pageUp, .pageDown, .functionKey:
           return nil
         case .return, .space:
           if focusedActivationIdentity == nil {

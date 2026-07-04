@@ -13,6 +13,8 @@ public struct TerminalEmulatorKey: Sendable, Equatable, Hashable {
     case arrowRight
     case home
     case end
+    case insert
+    case delete
     case pageUp
     case pageDown
     case function(Int)
@@ -79,6 +81,10 @@ public struct TerminalEmulatorKey: Sendable, Equatable, Hashable {
       return [0x1B, 0x5B, 0x48]
     case .end:
       return [0x1B, 0x5B, 0x46]
+    case .insert:
+      return [0x1B, 0x5B, 0x32, 0x7E]
+    case .delete:
+      return [0x1B, 0x5B, 0x33, 0x7E]
     case .pageUp:
       return [0x1B, 0x5B, 0x35, 0x7E]
     case .pageDown:
@@ -128,6 +134,16 @@ extension TerminalEmulatorKey.Code {
       self = .home
     case .end:
       self = .end
+    case .insert:
+      self = .insert
+    case .delete:
+      self = .delete
+    case .pageUp:
+      self = .pageUp
+    case .pageDown:
+      self = .pageDown
+    case .functionKey(let number):
+      self = .function(number)
     }
   }
 }
