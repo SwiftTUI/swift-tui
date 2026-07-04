@@ -45,6 +45,51 @@ func scaledPixels(
   return output
 }
 
+/// Nearest-neighbor resample of the decoded pixels to `outputSize`,
+/// keeping every pixel (including fully transparent ones) at its
+/// sampled alpha. The optional-pixel variant above serves cell-fallback
+/// rendering, which drops near-transparent pixels; raw RGBA payloads
+/// (kitty `f=32`) must preserve them.
+func scaledRGBAPixels(
+  from image: DecodedImage,
+  outputSize: PixelSize
+) -> [RGBAImagePixel] {
+  guard
+    outputSize.width > 0,
+    outputSize.height > 0,
+    image.pixelSize.width > 0,
+    image.pixelSize.height > 0
+  else {
+    return []
+  }
+
+  var output = [RGBAImagePixel]()
+  output.reserveCapacity(outputSize.width * outputSize.height)
+
+  for y in 0..<outputSize.height {
+    let sourceY = min(
+      image.pixelSize.height - 1,
+      Int(
+        (Double((y * 2) + 1) * Double(image.pixelSize.height))
+          / Double(outputSize.height * 2)
+      )
+    )
+
+    for x in 0..<outputSize.width {
+      let sourceX = min(
+        image.pixelSize.width - 1,
+        Int(
+          (Double((x * 2) + 1) * Double(image.pixelSize.width))
+            / Double(outputSize.width * 2)
+        )
+      )
+      output.append(image.pixels[(sourceY * image.pixelSize.width) + sourceX])
+    }
+  }
+
+  return output
+}
+
 func floydSteinbergQuantizedIndices(
   pixels: [RGBAImagePixel?],
   size: PixelSize,

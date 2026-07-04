@@ -21,13 +21,26 @@ enum KittyPayloadFormat: Sendable, Equatable {
 }
 
 struct KittyPayload: Sendable {
-  /// Base64-encoded image payload.
-  var encodedData: String
+  /// Base64-encoded image payload, pre-split into transmission chunks.
+  /// Every chunk holds at most ``kittyPayloadChunkByteLimit`` bytes, and
+  /// every chunk except the last holds whole base64 quartets so the
+  /// receiver can reassemble the stream by concatenation. Full repaints
+  /// retransmit kitty images, so the split is stored with the payload
+  /// rather than recomputed from one large string per emission.
+  var encodedChunks: [String]
   /// Container format the payload is shipped in.
   var format: KittyPayloadFormat
+
+  /// Approximate wire size of the payload, for cache byte budgeting.
+  var approxByteCount: Int {
+    encodedChunks.reduce(0) { $0 + $1.utf8.count }
+  }
 }
 
-func makeKittyPayload(for image: DecodedImage) -> KittyPayload? {
+func makeKittyPayload(
+  for image: DecodedImage,
+  rgbaOutputSize: PixelSize? = nil
+) -> KittyPayload? {
   guard !image.encodedBytes.isEmpty else {
     return nil
   }
@@ -38,19 +51,77 @@ func makeKittyPayload(for image: DecodedImage) -> KittyPayload? {
     // natively, smaller on the wire than RGBA and without any
     // software-scaling artifacts on our side.
     return KittyPayload(
-      encodedData: base64Encoded(image.encodedBytes),
+      encodedChunks: base64EncodedChunks(image.encodedBytes),
       format: .png
     )
   case .jpeg:
     // Kitty has no JPEG decoder. Serialize the already-decoded pixels
     // as raw RGBA and let kitty ingest them via `f=32` with explicit
-    // pixel-size keys (`s=`, `v=`).
+    // pixel-size keys (`s=`, `v=`). Raw pixels carry no compression, so
+    // callers pass `rgbaOutputSize` (see ``kittyRGBATransmitSize``) to
+    // cap the buffer at the placement's displayable footprint.
+    let outputSize = rgbaOutputSize ?? image.pixelSize
+    let needsResample =
+      outputSize.width != image.pixelSize.width
+      || outputSize.height != image.pixelSize.height
+    let pixels =
+      needsResample
+      ? scaledRGBAPixels(from: image, outputSize: outputSize)
+      : image.pixels
     return KittyPayload(
-      encodedData: base64Encoded(SwiftTUI_rgbaBytes(from: image.pixels)),
-      format: .rgba(pixelSize: image.pixelSize)
+      encodedChunks: base64EncodedChunks(SwiftTUI_rgbaBytes(from: pixels)),
+      format: .rgba(pixelSize: outputSize)
     )
   }
 }
+
+/// Pixel size at which a non-PNG image is serialized as raw RGBA for
+/// kitty transmission. PNG payloads ship their compressed bytes
+/// untouched, but `f=32` buffers are uncompressed pixels: shipping more
+/// of them than the placement can display only inflates the escape
+/// stream. Caps the buffer at the placement's pixel footprint
+/// (cells x cell pixel size), scaling to fill so neither axis drops
+/// below display resolution, and never upscales.
+func kittyRGBATransmitSize(
+  imagePixelSize: PixelSize,
+  encodedFormat: ImageEncodedFormat,
+  placementCellSize: CellSize,
+  cellPixelSize: PixelSize?
+) -> PixelSize {
+  guard encodedFormat != .png else {
+    return imagePixelSize
+  }
+  guard imagePixelSize.width > 0, imagePixelSize.height > 0 else {
+    return imagePixelSize
+  }
+  let cellPixels = cellPixelSize ?? kittyAssumedCellPixelSize
+  let targetWidth = max(1, placementCellSize.width * max(1, cellPixels.width))
+  let targetHeight = max(1, placementCellSize.height * max(1, cellPixels.height))
+  guard imagePixelSize.width > targetWidth || imagePixelSize.height > targetHeight else {
+    return imagePixelSize
+  }
+  let scale = max(
+    Double(targetWidth) / Double(imagePixelSize.width),
+    Double(targetHeight) / Double(imagePixelSize.height)
+  )
+  guard scale < 1 else {
+    return imagePixelSize
+  }
+  return PixelSize(
+    width: min(
+      imagePixelSize.width,
+      max(1, Int((Double(imagePixelSize.width) * scale).rounded()))
+    ),
+    height: min(
+      imagePixelSize.height,
+      max(1, Int((Double(imagePixelSize.height) * scale).rounded()))
+    )
+  )
+}
+
+/// Mirror of the sixel path's assumed cell size when the terminal did
+/// not report pixel metrics.
+private let kittyAssumedCellPixelSize = PixelSize(width: 8, height: 16)
 
 struct KittySourceRect: Sendable, Equatable {
   var x: Int
@@ -182,20 +253,7 @@ func kittyTransmitAndPlaceCommands(
   cellRows: Int,
   sourceRect: KittySourceRect?
 ) -> [String] {
-  // Kitty requires payload chunks no larger than 4096 bytes of base64 data,
-  // and every chunk except the last must be a multiple of 4 bytes so the
-  // receiver can reassemble base64 boundaries.
-  let chunkSize = 4096
-  let chunks = stride(from: 0, to: payload.encodedData.count, by: chunkSize).map { index in
-    let start = payload.encodedData.index(payload.encodedData.startIndex, offsetBy: index)
-    let end =
-      payload.encodedData.index(
-        start,
-        offsetBy: min(chunkSize, payload.encodedData.count - index),
-        limitedBy: payload.encodedData.endIndex
-      ) ?? payload.encodedData.endIndex
-    return String(payload.encodedData[start..<end])
-  }
+  let chunks = payload.encodedChunks
 
   guard !chunks.isEmpty else {
     return []
@@ -268,10 +326,39 @@ func kittyPlacementCommand(
   return "\u{001B}\(controlData)\u{001B}\\"
 }
 
+/// Stable kitty image id for a source reference. When a non-PNG payload
+/// was downsampled for transmission (`rgbaTransmitSize` present), the
+/// transmit size participates in the id: the terminal's stored buffer
+/// and the placement's source-rect coordinates are in transmit-pixel
+/// space, so a placement resized to a different transmit size must
+/// retransmit under a fresh id rather than re-place a buffer with
+/// mismatched geometry.
 func kittyImageID(
-  reference: ImageAssetReference
+  reference: ImageAssetReference,
+  rgbaTransmitSize: PixelSize? = nil
 ) -> UInt32 {
-  stableIdentifier(from: stableBytes(for: reference))
+  stableIdentifier(
+    from: stableBytes(for: reference) + rgbaTransmitSuffixBytes(rgbaTransmitSize)
+  )
+}
+
+/// Blended-variant counterpart of ``kittyImageID(reference:rgbaTransmitSize:)``.
+func kittyVariantImageID(
+  variantID: String,
+  rgbaTransmitSize: PixelSize? = nil
+) -> UInt32 {
+  stableIdentifier(
+    from: Array(variantID.utf8) + rgbaTransmitSuffixBytes(rgbaTransmitSize)
+  )
+}
+
+private func rgbaTransmitSuffixBytes(
+  _ size: PixelSize?
+) -> [UInt8] {
+  guard let size else {
+    return []
+  }
+  return Array(":rgba=\(size.width)x\(size.height)".utf8)
 }
 
 private func stableBytes(
@@ -314,11 +401,33 @@ func terminalCursorSequence(
   return "\u{001B}[\(row);\(column)H"
 }
 
-func base64Encoded(
-  _ bytes: [UInt8]
-) -> String {
-  let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
-  var result = ""
+/// Byte budget for one kitty escape-code payload chunk. The graphics
+/// protocol rejects chunks larger than 4096 bytes of base64 data.
+let kittyPayloadChunkByteLimit = 4096
+
+/// Base64-encodes `bytes`, split into chunks of at most `maxChunkBytes`
+/// characters in one pass over the input. `maxChunkBytes` must be a
+/// positive multiple of 4 so every non-final chunk carries whole base64
+/// quartets and the receiver can reassemble the stream by concatenation.
+func base64EncodedChunks(
+  _ bytes: [UInt8],
+  maxChunkBytes: Int = kittyPayloadChunkByteLimit
+) -> [String] {
+  precondition(
+    maxChunkBytes > 0 && maxChunkBytes.isMultiple(of: 4),
+    "base64 chunk limits must be positive multiples of 4"
+  )
+  guard !bytes.isEmpty else {
+    return []
+  }
+
+  let alphabet = Array(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8
+  )
+  let padding = UInt8(ascii: "=")
+  var chunks: [String] = []
+  var chunk = [UInt8]()
+  chunk.reserveCapacity(min(maxChunkBytes, ((bytes.count + 2) / 3) * 4))
   var index = 0
 
   while index < bytes.count {
@@ -327,21 +436,20 @@ func base64Encoded(
     let third = index + 2 < bytes.count ? Int(bytes[index + 2]) : 0
     let combined = (first << 16) | (second << 8) | third
 
-    result.append(alphabet[(combined >> 18) & 0x3F])
-    result.append(alphabet[(combined >> 12) & 0x3F])
-    if index + 1 < bytes.count {
-      result.append(alphabet[(combined >> 6) & 0x3F])
-    } else {
-      result.append("=")
-    }
-    if index + 2 < bytes.count {
-      result.append(alphabet[combined & 0x3F])
-    } else {
-      result.append("=")
-    }
+    chunk.append(alphabet[(combined >> 18) & 0x3F])
+    chunk.append(alphabet[(combined >> 12) & 0x3F])
+    chunk.append(index + 1 < bytes.count ? alphabet[(combined >> 6) & 0x3F] : padding)
+    chunk.append(index + 2 < bytes.count ? alphabet[combined & 0x3F] : padding)
 
+    if chunk.count == maxChunkBytes {
+      chunks.append(String(decoding: chunk, as: UTF8.self))
+      chunk.removeAll(keepingCapacity: true)
+    }
     index += 3
   }
 
-  return result
+  if !chunk.isEmpty {
+    chunks.append(String(decoding: chunk, as: UTF8.self))
+  }
+  return chunks
 }

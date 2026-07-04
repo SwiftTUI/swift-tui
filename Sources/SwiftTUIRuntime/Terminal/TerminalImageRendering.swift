@@ -325,19 +325,39 @@ final class TerminalImageRenderer: Sendable {
         )
         let displayAttachment = presentation?.attachment ?? attachment
         let image = presentation?.image ?? sourceImage
+        // Non-PNG payloads ship as raw RGBA capped at the placement's
+        // displayable pixel footprint. The placement's source rect, the
+        // payload's `s=`/`v=` keys, and the image id must all agree on
+        // the transmitted buffer's geometry, so the transmit size drives
+        // all three.
+        let transmitPixelSize = kittyRGBATransmitSize(
+          imagePixelSize: image.pixelSize,
+          encodedFormat: image.encodedFormat,
+          placementCellSize: displayAttachment.bounds.size,
+          cellPixelSize: graphicsCapabilities.cellPixelSize
+        )
+        let isDownsampled =
+          transmitPixelSize.width != image.pixelSize.width
+          || transmitPixelSize.height != image.pixelSize.height
         guard
           let placement = kittyPlacement(
             for: displayAttachment,
-            imagePixelSize: image.pixelSize
+            imagePixelSize: transmitPixelSize
           )
         else {
           continue
         }
         let imageID =
           if let presentation {
-            stableIdentifier(from: Array(presentation.id.utf8))
+            kittyVariantImageID(
+              variantID: presentation.id,
+              rgbaTransmitSize: isDownsampled ? transmitPixelSize : nil
+            )
           } else {
-            kittyImageID(reference: reference)
+            kittyImageID(
+              reference: reference,
+              rgbaTransmitSize: isDownsampled ? transmitPixelSize : nil
+            )
           }
         writeSteps.append(terminalSaveCursorSequence())
         writeSteps.append(terminalCursorSequence(to: placement.origin))
@@ -354,7 +374,8 @@ final class TerminalImageRenderer: Sendable {
         } else if let payload = kittyPayload(
           for: reference,
           variantID: presentation?.id,
-          image: image
+          image: image,
+          rgbaOutputSize: transmitPixelSize
         ) {
           writeSteps.append(
             contentsOf: kittyTransmitAndPlaceCommands(
@@ -468,7 +489,8 @@ final class TerminalImageRenderer: Sendable {
   private func kittyPayload(
     for reference: ImageAssetReference,
     variantID: String?,
-    image: DecodedImage
+    image: DecodedImage,
+    rgbaOutputSize: PixelSize
   ) -> KittyPayload? {
     guard !image.encodedBytes.isEmpty else {
       return nil
@@ -478,7 +500,7 @@ final class TerminalImageRenderer: Sendable {
       reference: reference,
       variantID: variantID,
       mode: .kitty,
-      outputSize: image.pixelSize,
+      outputSize: rgbaOutputSize,
       paletteSize: 0
     )
 
@@ -486,14 +508,14 @@ final class TerminalImageRenderer: Sendable {
       return cached
     }
 
-    guard let payload = makeKittyPayload(for: image) else {
+    guard let payload = makeKittyPayload(for: image, rgbaOutputSize: rgbaOutputSize) else {
       return nil
     }
 
     storage.withLockUnchecked { storage in
       storage.kittyPayloads.store(
         payload,
-        approxBytes: payload.encodedData.utf8.count,
+        approxBytes: payload.approxByteCount,
         for: key,
         policy: cachePolicy
       )
