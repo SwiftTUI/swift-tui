@@ -4,6 +4,18 @@ enum TerminalHostEscapeSequences {
   static let clearScreen = "\u{001B}[2J"
   static let eraseToEndOfLine = "\u{001B}[K"
   static let deleteVisibleKittyPlacements = "\u{001B}_Ga=d,q=2\u{001B}\\"
+
+  /// Frees a specific kitty image's stored data (and any placements) from the
+  /// terminal's image store. `d=I` (uppercase) deletes by image id *and*
+  /// releases the pixel buffer, unlike `deleteVisibleKittyPlacements` (`d=a`)
+  /// which only removes on-screen placements and leaves the data resident. Used
+  /// to reclaim superseded blend variants that would otherwise accumulate one
+  /// image per frame under animation.
+  static func freeKittyImageData(
+    id: UInt32
+  ) -> String {
+    "\u{001B}_Ga=d,d=I,i=\(id),q=2\u{001B}\\"
+  }
   static let beginSynchronizedOutput = "\u{001B}[?2026h"
   static let endSynchronizedOutput = "\u{001B}[?2026l"
   static let enterAlternateScreen = "\u{001B}[?1049h"

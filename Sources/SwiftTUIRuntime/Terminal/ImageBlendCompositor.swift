@@ -171,7 +171,10 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     mutating func encodedLookup(
       for key: ImageBlendCacheKey
     ) -> BlendedImageEncodedPayload? {
-      guard var entry = entries[key] else {
+      // A decoded-only entry carries no PNG (see the lazy-PNG note in
+      // `decodedVariant`), so treat empty encoded bytes as a miss and let the
+      // caller encode on demand rather than returning an empty payload.
+      guard var entry = entries[key], !entry.encodedBytes.isEmpty else {
         encodedMisses += 1
         return nil
       }
@@ -395,9 +398,12 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     }
 
     let id = blendedImageID(for: key)
-    let encodedBytes =
-      lookup.encodedBytes
-      ?? ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize)
+    // Lazy PNG: the terminal kitty path ships blended variants as raw RGBA
+    // (`f=32`) from `pixels`, and the sixel/fallback paths sample `pixels`
+    // directly, so a decoded variant needs no PNG. Reuse a PNG only if one was
+    // already encoded for this key (e.g. via `encodedPNGPayload` on the SwiftUI/
+    // web host); otherwise skip the per-frame `crc32`/`adler32`/deflate passes.
+    let encodedBytes = lookup.encodedBytes ?? []
     let presentationAttachment = imageBlendPresentationAttachment(
       from: attachment,
       outputSize: outputSize
@@ -536,6 +542,26 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     let cellPixelWidth = max(1, cellPixelSize.width)
     let cellPixelHeight = max(1, cellPixelSize.height)
 
+    let clampedCellPixelSize = PixelSize(width: cellPixelWidth, height: cellPixelHeight)
+
+    // Fast path: all-sRGB backdrops let us composite in linear space with a
+    // decode LUT instead of a `Color` (and ~three colour-space conversions) per
+    // pixel. Any non-sRGB colour returns nil and we drop to the exact route.
+    if let fastPixels = fastBlendedPixels(
+      sourceImage: sourceImage,
+      compositing: compositing,
+      outputSize: outputSize,
+      visibleBounds: visibleBounds,
+      logicalOutputSize: logicalOutputSize,
+      visibleLogicalPixelSize: visibleLogicalPixelSize,
+      hiddenLeftPixels: hiddenLeftPixels,
+      hiddenTopPixels: hiddenTopPixels,
+      cellPixelSize: clampedCellPixelSize,
+      fallbackBackground: fallbackBackground
+    ) {
+      return fastPixels
+    }
+
     var pixels: [RGBAImagePixel] = []
     pixels.reserveCapacity(outputSize.width * outputSize.height)
 
@@ -578,7 +604,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           relativeY: backdropCellY,
           pixelX: backdropPixelX,
           pixelY: backdropPixelY,
-          cellPixelSize: PixelSize(width: cellPixelWidth, height: cellPixelHeight),
+          cellPixelSize: clampedCellPixelSize,
           fallbackBackground: fallbackBackground
         )
         if let sourceBackdrop = compositing.sourceBackdrop {
@@ -588,7 +614,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
             relativeY: backdropCellY,
             pixelX: backdropPixelX,
             pixelY: backdropPixelY,
-            cellPixelSize: PixelSize(width: cellPixelWidth, height: cellPixelHeight),
+            cellPixelSize: clampedCellPixelSize,
             fallbackBackground: fallbackBackground
           )
           let flattenedSource = source.composited(over: groupBackdrop)
@@ -606,6 +632,140 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
               from: source.composited(
                 over: destination,
                 mode: compositing.blendMode
+              )
+            )
+          )
+        }
+      }
+    }
+
+    return pixels
+  }
+
+  /// All-sRGB fast counterpart of the `blendedPixels` inner loop. Returns nil
+  /// (deferring to the exact `Color` route) if any backdrop colour is not sRGB.
+  /// The coordinate math is identical to the slow loop; only the per-pixel
+  /// colour operations are replaced with linear-space LUT arithmetic.
+  private func fastBlendedPixels(
+    sourceImage: DecodedImage,
+    compositing: RasterImageCompositing,
+    outputSize: PixelSize,
+    visibleBounds: CellRect,
+    logicalOutputSize: PixelSize,
+    visibleLogicalPixelSize: PixelSize,
+    hiddenLeftPixels: Int,
+    hiddenTopPixels: Int,
+    cellPixelSize: PixelSize,
+    fallbackBackground: Color
+  ) -> [RGBAImagePixel]? {
+    guard
+      let fallbackLinear = ImageBlendFastPixels.linear(from: fallbackBackground),
+      let destinationCells = ImageBlendFastPixels.fastBackdropCells(
+        from: compositing.destinationBackdrop,
+        fallbackBackground: fallbackBackground
+      )
+    else {
+      return nil
+    }
+    let destinationSize = compositing.destinationBackdrop.bounds.size
+
+    var sourceCells: [ImageBlendFastBackdropCell]?
+    var sourceSize = CellSize(width: 0, height: 0)
+    if let sourceBackdrop = compositing.sourceBackdrop {
+      guard
+        let cells = ImageBlendFastPixels.fastBackdropCells(
+          from: sourceBackdrop,
+          fallbackBackground: fallbackBackground
+        )
+      else {
+        return nil
+      }
+      sourceCells = cells
+      sourceSize = sourceBackdrop.bounds.size
+    }
+
+    let cellPixelWidth = max(1, cellPixelSize.width)
+    let cellPixelHeight = max(1, cellPixelSize.height)
+    let blendMode = compositing.blendMode
+
+    var pixels: [RGBAImagePixel] = []
+    pixels.reserveCapacity(outputSize.width * outputSize.height)
+
+    for y in 0..<outputSize.height {
+      let visiblePixelY = proportionalPixelSample(
+        destinationIndex: y,
+        destinationCount: outputSize.height,
+        sourceCount: visibleLogicalPixelSize.height
+      )
+      let logicalY = min(logicalOutputSize.height - 1, hiddenTopPixels + visiblePixelY)
+      let sourceY = proportionalPixelSample(
+        destinationIndex: logicalY,
+        destinationCount: logicalOutputSize.height,
+        sourceCount: sourceImage.pixelSize.height
+      )
+      let backdropCellY = min(visibleBounds.size.height - 1, visiblePixelY / cellPixelHeight)
+      let backdropPixelY = visiblePixelY % cellPixelHeight
+
+      for x in 0..<outputSize.width {
+        let visiblePixelX = proportionalPixelSample(
+          destinationIndex: x,
+          destinationCount: outputSize.width,
+          sourceCount: visibleLogicalPixelSize.width
+        )
+        let logicalX = min(logicalOutputSize.width - 1, hiddenLeftPixels + visiblePixelX)
+        let sourceX = proportionalPixelSample(
+          destinationIndex: logicalX,
+          destinationCount: logicalOutputSize.width,
+          sourceCount: sourceImage.pixelSize.width
+        )
+        let backdropCellX = min(visibleBounds.size.width - 1, visiblePixelX / cellPixelWidth)
+        let backdropPixelX = visiblePixelX % cellPixelWidth
+
+        let source = ImageBlendFastPixels.linear(
+          fromPixel: sourceImage.pixels[(sourceY * sourceImage.pixelSize.width) + sourceX]
+        )
+        let destination = ImageBlendFastPixels.backdropLinear(
+          cells: destinationCells,
+          backdropSize: destinationSize,
+          relativeX: backdropCellX,
+          relativeY: backdropCellY,
+          pixelX: backdropPixelX,
+          pixelY: backdropPixelY,
+          cellPixelSize: cellPixelSize,
+          fallbackBackground: fallbackLinear
+        )
+        if let sourceCells {
+          let groupBackdrop = ImageBlendFastPixels.backdropLinear(
+            cells: sourceCells,
+            backdropSize: sourceSize,
+            relativeX: backdropCellX,
+            relativeY: backdropCellY,
+            pixelX: backdropPixelX,
+            pixelY: backdropPixelY,
+            cellPixelSize: cellPixelSize,
+            fallbackBackground: fallbackLinear
+          )
+          let flattenedSource = ImageBlendFastPixels.composited(
+            source,
+            over: groupBackdrop,
+            mode: .normal
+          )
+          pixels.append(
+            ImageBlendFastPixels.pixel(
+              from: ImageBlendFastPixels.composited(
+                flattenedSource,
+                over: destination,
+                mode: blendMode
+              )
+            )
+          )
+        } else {
+          pixels.append(
+            ImageBlendFastPixels.pixel(
+              from: ImageBlendFastPixels.composited(
+                source,
+                over: destination,
+                mode: blendMode
               )
             )
           )
@@ -684,54 +844,14 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     spanOffset: Int,
     cellPixelSize: PixelSize
   ) -> Bool {
-    let width = max(1, cellPixelSize.width)
-    let height = max(1, cellPixelSize.height)
-    let x = max(0, min(width - 1, pixelX))
-    let y = max(0, min(height - 1, pixelY))
-
-    switch coverage {
-    case .none:
-      return false
-    case .full:
-      return true
-    case .quadrant(let mask):
-      let column = min(1, (x * 2) / width)
-      let row = min(1, (y * 2) / height)
-      let bit: UInt8 =
-        switch (row, column) {
-        case (0, 0): 0b0001
-        case (0, 1): 0b0010
-        case (1, 0): 0b0100
-        default: 0b1000
-        }
-      return (mask & bit) != 0
-    case .braille(let mask):
-      let column = min(1, (x * 2) / width)
-      let row = min(3, (y * 4) / height)
-      let bitIndex: UInt8 =
-        switch (column, row) {
-        case (0, 0): 0
-        case (0, 1): 1
-        case (0, 2): 2
-        case (1, 0): 3
-        case (1, 1): 4
-        case (1, 2): 5
-        case (0, 3): 6
-        default: 7
-        }
-      return (mask & (UInt8(1) << bitIndex)) != 0
-    case .textApproximation:
-      let textSpanWidth = max(1, spanWidth)
-      let clampedOffset = max(0, min(textSpanWidth - 1, spanOffset))
-      let expandedWidth = width * textSpanWidth
-      let expandedX = (clampedOffset * width) + x
-      let horizontalInset = expandedWidth > 2 ? max(1, expandedWidth / 4) : 0
-      let verticalInset = height > 2 ? max(1, height / 5) : 0
-      return expandedX >= horizontalInset
-        && expandedX <= expandedWidth - 1 - horizontalInset
-        && y >= verticalInset
-        && y <= height - 1 - verticalInset
-    }
+    imageBlendCoverageContains(
+      coverage,
+      pixelX: pixelX,
+      pixelY: pixelY,
+      spanWidth: spanWidth,
+      spanOffset: spanOffset,
+      cellPixelSize: cellPixelSize
+    )
   }
 
   private func color(

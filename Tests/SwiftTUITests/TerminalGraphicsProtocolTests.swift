@@ -445,11 +445,15 @@ struct TerminalGraphicsProtocolTests {
       transmittedKittyImages: &transmittedKittyImages
     ).joined()
 
-    #expect(firstWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    #expect(firstWrite.contains("_Ga=T,q=2,t=d,f=32,C=1,c=1,r=1,"))
     #expect(!firstWrite.contains("_Ga=p"))
+    // Blended variants ship as raw RGBA (f=32) with explicit pixel-size keys,
+    // never as PNG (f=100) — the terminal skips a PNG decode per frame.
+    #expect(firstWrite.contains(",s=1,v=1"))
+    #expect(!firstWrite.contains("f=100"))
     #expect(stableBackdropWrite.contains("_Ga=p,q=2,C=1,c=1,r=1,i="))
     #expect(!stableBackdropWrite.contains("_Ga=T"))
-    #expect(changedBackdropWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    #expect(changedBackdropWrite.contains("_Ga=T,q=2,t=d,f=32,C=1,c=1,r=1,"))
   }
 
   @Test("Kitty blended image variants replay when backdrop glyph changes")
@@ -513,10 +517,10 @@ struct TerminalGraphicsProtocolTests {
       transmittedKittyImages: &transmittedKittyImages
     ).joined()
 
-    #expect(firstWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    #expect(firstWrite.contains("_Ga=T,q=2,t=d,f=32,C=1,c=1,r=1,"))
     #expect(stableGlyphWrite.contains("_Ga=p,q=2,C=1,c=1,r=1,i="))
     #expect(!stableGlyphWrite.contains("_Ga=T"))
-    #expect(changedGlyphWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+    #expect(changedGlyphWrite.contains("_Ga=T,q=2,t=d,f=32,C=1,c=1,r=1,"))
   }
 
   @Test("Kitty blended image replay survives renderer compositor eviction")
@@ -556,7 +560,7 @@ struct TerminalGraphicsProtocolTests {
         transmittedKittyImages: &transmittedKittyImages
       ).joined()
 
-      #expect(write.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+      #expect(write.contains("_Ga=T,q=2,t=d,f=32,C=1,c=1,r=1,"))
     }
 
     let snapshot = renderer.imageBlendCacheSnapshot()
@@ -599,7 +603,7 @@ struct TerminalGraphicsProtocolTests {
         transmittedKittyImages: &transmittedKittyImages
       ).joined()
       // Each distinct variant must build and transmit a fresh payload.
-      #expect(write.contains("_Ga=T,q=2,t=d,f=100,C=1,c=1,r=1,"))
+      #expect(write.contains("_Ga=T,q=2,t=d,f=32,C=1,c=1,r=1,"))
     }
 
     return renderer.occupancy().kitty
@@ -1201,6 +1205,9 @@ struct TerminalGraphicsProtocolTests {
 
     _ = try host.present(initialSurface)
     try host.drainPendingPresentation()
+    let transmittedID = try #require(
+      kittyTransmitImageID(in: Array(controller.writes).joined())
+    )
     let writesBeforeUpdate = controller.writes.count
 
     let metrics = try host.present(updatedSurface)
@@ -1213,7 +1220,71 @@ struct TerminalGraphicsProtocolTests {
     #expect(metrics.graphicsAttachmentsReplayed == 0)
     #expect(updateWrites.count == 1)
     let updateWrite = try #require(updateWrites.first)
-    #expect(updateWrite == "\u{001B}_Ga=d,q=2\u{001B}\\")
+    // The placement delete still fires, and the removed image's stored pixel
+    // data is now freed (`d=I`) instead of leaking in the terminal's store.
+    #expect(updateWrite.contains("\u{001B}_Ga=d,q=2\u{001B}\\"))
+    #expect(updateWrite.contains("\u{001B}_Ga=d,d=I,i=\(transmittedID),q=2\u{001B}\\"))
+  }
+
+  @Test("Kitty blended-image backdrop animation frees the superseded variant's stored data")
+  func kittyBlendedBackdropAnimationFreesSupersededVariantData() throws {
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 1, height: 1)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 4, height: 1),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 1,
+      height: 1,
+      pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]
+    )
+    func blendedSurface(
+      signature: UInt64,
+      background: Color
+    ) -> RasterSurface {
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["    "],
+        imageAttachments: [
+          blendedRasterImageAttachment(
+            pngBytes: pngBytes,
+            background: background,
+            signature: signature
+          )
+        ]
+      )
+    }
+
+    _ = try host.present(blendedSurface(signature: 1, background: .blue))
+    try host.drainPendingPresentation()
+    let firstVariantID = try #require(
+      kittyTransmitImageID(in: Array(controller.writes).joined())
+    )
+    let writesBeforeUpdate = controller.writes.count
+
+    // The content behind the blended image changed: a new blended variant is
+    // minted under a fresh kitty image id, so the previous variant's stored
+    // pixels must be freed or the terminal accumulates one image per frame.
+    _ = try host.present(blendedSurface(signature: 2, background: .green))
+    try host.drainPendingPresentation()
+    let updateWrite = Array(controller.writes.dropFirst(writesBeforeUpdate)).joined()
+    let secondVariantID = try #require(kittyTransmitImageID(in: updateWrite))
+
+    #expect(secondVariantID != firstVariantID)
+    #expect(updateWrite.contains("\u{001B}_Ga=d,d=I,i=\(firstVariantID),q=2\u{001B}\\"))
+    #expect(!updateWrite.contains("d=I,i=\(secondVariantID)"))
   }
 
   @Test("kitty image placement crops bottom overflow so it does not paint over sibling regions")
@@ -1794,6 +1865,26 @@ private func blendedRasterImageAttachment(
     backdropSignature: signature
   )
   return attachment
+}
+
+/// Extracts the `i=<id>` image id from the first kitty transmit-and-place
+/// (`a=T`) control block in `output`, or nil if none is present.
+private func kittyTransmitImageID(
+  in output: String
+) -> UInt32? {
+  guard let transmitRange = output.range(of: "_Ga=T") else {
+    return nil
+  }
+  let afterTransmit = output[transmitRange.upperBound...]
+  // Control data runs up to the first `;`, which separates it from the payload.
+  guard let terminator = afterTransmit.firstIndex(of: ";") else {
+    return nil
+  }
+  let controlData = afterTransmit[..<terminator]
+  guard let idRange = controlData.range(of: "i=") else {
+    return nil
+  }
+  return UInt32(controlData[idRange.upperBound...].prefix { $0.isNumber })
 }
 
 private func repoFixturePath(

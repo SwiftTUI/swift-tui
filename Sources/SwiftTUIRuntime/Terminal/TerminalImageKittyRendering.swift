@@ -39,8 +39,31 @@ struct KittyPayload: Sendable {
 
 func makeKittyPayload(
   for image: DecodedImage,
-  rgbaOutputSize: PixelSize? = nil
+  rgbaOutputSize: PixelSize? = nil,
+  preferRawRGBA: Bool = false
 ) -> KittyPayload? {
+  // Blended variants are already the exact display footprint in decoded pixels,
+  // so they ship as raw `f=32` RGBA directly: no PNG framing on our side, no
+  // PNG decode on the terminal's, and none of the generic downsample (which
+  // keys off terminal cell metrics that can differ from the blend's cell size).
+  if preferRawRGBA {
+    guard !image.pixels.isEmpty else {
+      return nil
+    }
+    let outputSize = rgbaOutputSize ?? image.pixelSize
+    let needsResample =
+      outputSize.width != image.pixelSize.width
+      || outputSize.height != image.pixelSize.height
+    let pixels =
+      needsResample
+      ? scaledRGBAPixels(from: image, outputSize: outputSize)
+      : image.pixels
+    return KittyPayload(
+      encodedChunks: base64EncodedChunks(SwiftTUI_rgbaBytes(from: pixels)),
+      format: .rgba(pixelSize: outputSize)
+    )
+  }
+
   guard !image.encodedBytes.isEmpty else {
     return nil
   }

@@ -284,12 +284,14 @@ final class TerminalImageRenderer: Sendable {
     fallbackBackground: Color,
     transmittedKittyImages: inout Set<UInt32>
   ) -> [String] {
-    graphicsWriteSteps(
+    var referencedImageIDs: Set<UInt32> = []
+    return graphicsWriteSteps(
       for: surface.imageAttachments,
       capabilityProfile: capabilityProfile,
       graphicsCapabilities: graphicsCapabilities,
       fallbackBackground: fallbackBackground,
-      transmittedKittyImages: &transmittedKittyImages
+      transmittedKittyImages: &transmittedKittyImages,
+      referencedImageIDs: &referencedImageIDs
     )
   }
 
@@ -299,6 +301,29 @@ final class TerminalImageRenderer: Sendable {
     graphicsCapabilities: TerminalGraphicsCapabilities,
     fallbackBackground: Color,
     transmittedKittyImages: inout Set<UInt32>
+  ) -> [String] {
+    var referencedImageIDs: Set<UInt32> = []
+    return graphicsWriteSteps(
+      for: attachments,
+      capabilityProfile: capabilityProfile,
+      graphicsCapabilities: graphicsCapabilities,
+      fallbackBackground: fallbackBackground,
+      transmittedKittyImages: &transmittedKittyImages,
+      referencedImageIDs: &referencedImageIDs
+    )
+  }
+
+  /// Emits the graphics write steps and reports, via `referencedImageIDs`, the
+  /// kitty image ids this call transmitted or re-placed. The emission builder
+  /// uses that set to free superseded ids (`resident − referenced`) after a
+  /// frame that re-placed every attachment (full-scope replay / full repaint).
+  func graphicsWriteSteps(
+    for attachments: [RasterImageAttachment],
+    capabilityProfile: TerminalCapabilityProfile,
+    graphicsCapabilities: TerminalGraphicsCapabilities,
+    fallbackBackground: Color,
+    transmittedKittyImages: inout Set<UInt32>,
+    referencedImageIDs: inout Set<UInt32>
   ) -> [String] {
     guard
       !attachments.isEmpty,
@@ -371,11 +396,13 @@ final class TerminalImageRenderer: Sendable {
               sourceRect: placement.sourceRect
             )
           )
+          referencedImageIDs.insert(imageID)
         } else if let payload = kittyPayload(
           for: reference,
           variantID: presentation?.id,
           image: image,
-          rgbaOutputSize: transmitPixelSize
+          rgbaOutputSize: transmitPixelSize,
+          preferRawRGBA: presentation != nil
         ) {
           writeSteps.append(
             contentsOf: kittyTransmitAndPlaceCommands(
@@ -387,6 +414,7 @@ final class TerminalImageRenderer: Sendable {
             )
           )
           transmittedKittyImages.insert(imageID)
+          referencedImageIDs.insert(imageID)
         }
 
         writeSteps.append(terminalRestoreCursorSequence())
@@ -490,9 +518,10 @@ final class TerminalImageRenderer: Sendable {
     for reference: ImageAssetReference,
     variantID: String?,
     image: DecodedImage,
-    rgbaOutputSize: PixelSize
+    rgbaOutputSize: PixelSize,
+    preferRawRGBA: Bool = false
   ) -> KittyPayload? {
-    guard !image.encodedBytes.isEmpty else {
+    guard preferRawRGBA ? !image.pixels.isEmpty : !image.encodedBytes.isEmpty else {
       return nil
     }
 
@@ -508,7 +537,13 @@ final class TerminalImageRenderer: Sendable {
       return cached
     }
 
-    guard let payload = makeKittyPayload(for: image, rgbaOutputSize: rgbaOutputSize) else {
+    guard
+      let payload = makeKittyPayload(
+        for: image,
+        rgbaOutputSize: rgbaOutputSize,
+        preferRawRGBA: preferRawRGBA
+      )
+    else {
       return nil
     }
 
