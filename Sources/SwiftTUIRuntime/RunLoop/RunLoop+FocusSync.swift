@@ -19,6 +19,20 @@ extension RunLoop {
     /// loop and no budget to exhaust).
     var didEagerFocusLocationRerender = false
     var lifecycleCarryForward: [LifecycleCommitEntry] = []
+    /// The scheduler's pending invalidations snapshotted by the driver right
+    /// before each render pass. The rerender branch diffs against this to
+    /// name every identity invalidated since the pass began.
+    var pendingInvalidationsAtPassStart: Set<Identity> = []
+    /// Identities invalidated after the previous render pass started — by
+    /// resolve-time side effects the pass could not see at its head
+    /// (default-focus seeding through a `@FocusState` request) and by the
+    /// relocation side effects of focus-sync processing (`@FocusState` flips
+    /// applied by the binding sync, the focus tracker's old/new notification,
+    /// scroll-reveal offset writes). The eager rerender folds them into its
+    /// invalidation set: they are already queued as graph-local dirty work,
+    /// but without an invalidation cone their structural descendants would
+    /// take retained reuse of pre-relocation content.
+    var midFrameRelocationInvalidations: Set<Identity> = []
 
     /// Focus-sync eager re-renders this frame (0 or 1). Surfaced as the
     /// `focusSyncRerenders` frame diagnostic.
@@ -172,6 +186,11 @@ extension RunLoop {
       if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
         convergence.didEagerFocusLocationRerender = true
         convergence.rerenderedForFocusSync = true
+        convergence.midFrameRelocationInvalidations.formUnion(
+          schedulerPendingInvalidations().subtracting(
+            convergence.pendingInvalidationsAtPassStart
+          )
+        )
         return .rerender
       }
 

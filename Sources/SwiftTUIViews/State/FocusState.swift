@@ -200,26 +200,37 @@ public struct FocusState<Value: Equatable> {
         suffix: .stateSlot(ordinal: ordinal)
       )
       let bindingID = "\(viewNode.identity.path)#FocusState[\(ordinal)]"
-      let storage = viewNode.stateSlot(
-        ordinal: ordinal,
-        seed: FocusStateStorage(
-          value: seedSnapshot.value,
-          hasPendingRequest: seedSnapshot.hasPendingRequest
+      // Resolve the slot storage at CALL time, not capture time: a location's
+      // closures outlive the body evaluation that created them (focus-binding
+      // registrations are restored across selective frames), while commit-time
+      // checkpoint restores can replace the node's stored slot instance. A
+      // captured instance goes stale after such a restore — a runtime focus
+      // flip would then write a detached ghost and only reach the live slot a
+      // frame late, once a re-registration re-captured it.
+      let seedValue = seedSnapshot.value
+      let seedHasPendingRequest = seedSnapshot.hasPendingRequest
+      let liveStorage: @MainActor () -> FocusStateStorage<Value> = {
+        viewNode.stateSlot(
+          ordinal: ordinal,
+          seed: FocusStateStorage(
+            value: seedValue,
+            hasPendingRequest: seedHasPendingRequest
+          )
         )
-      )
+      }
 
       return FocusStateLocation(
         bindingKey: bindingKey,
         bindingID: bindingID,
         snapshot: {
-          storage.currentSnapshot()
+          liveStorage().currentSnapshot()
         },
         requestValue: { newValue in
-          storage.requestValue(newValue)
+          liveStorage().requestValue(newValue)
           viewNode.requestInvalidation()
         },
         applyRuntimeValue: { newValue in
-          let didChange = storage.applyRuntimeValue(newValue)
+          let didChange = liveStorage().applyRuntimeValue(newValue)
           if didChange {
             viewNode.requestInvalidation()
           }

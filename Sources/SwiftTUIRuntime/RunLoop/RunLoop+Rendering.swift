@@ -41,38 +41,19 @@ extension RunLoop {
 
       var artifacts: FrameArtifacts?
       while true {
-        // Recomputed PER convergence iteration, not once per scheduled frame:
-        // the eager focus-location rerender runs after a mid-frame relocation
-        // (default-focus adoption, an applied focus request, scroll-reveal)
-        // that a frame-start snapshot cannot have observed —
-        // `previousFrameFocusIdentity` only advances after the frame commits,
-        // so the second pass's scope unions the relocated focus target and
-        // its runtime readers. A stale scope here would let a focus reader
-        // outside it take retained reuse of pre-relocation content.
-        let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
-        let retainedReuseSuppressionScope = retainedReuseFrameSafety.suppressionScope
-        if convergence.rerenderedForFocusSync {
-          renderer.forceRootEvaluation(source: .focusSyncRerender)
-        }
-        if retainedReuseFrameSafety.requiresRootEvaluation {
-          renderer.forceRootEvaluation(
-            source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
-          )
-        }
-        if !retainedReuseSuppressionScope.isEmpty {
-          // Focus/press-only finite scopes are queued as graph-local dirty work
-          // by the frame head. Animation safety and focus-sync rerenders stay
-          // root-forced until their own measurement tranche proves a narrower
-          // policy is profitable.
-          renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
-        }
+        applyRenderPassEvaluationPolicy(convergence: convergence)
+        let passScheduledFrame =
+          convergence.rerenderedForFocusSync
+          ? rerenderScheduledFrame(from: scheduledFrame, convergence: convergence)
+          : scheduledFrame
+        convergence.pendingInvalidationsAtPassStart = schedulerPendingInvalidations()
         let renderedArtifacts = renderer.renderArtifacts(
           viewBuilder(
             (
               state: currentState,
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
-          context: resolveContext(for: scheduledFrame),
+          context: resolveContext(for: passScheduledFrame),
           proposal: proposal()
         )
         artifacts = renderedArtifacts
@@ -287,30 +268,14 @@ extension RunLoop {
       // (`processFocusSyncIteration`) and post-acquisition body
       // (`applyAcquiredFrame`) are shared with the synchronous driver.
       convergenceLoop: while true {
-        // Recomputed PER convergence iteration — see the synchronous driver's
-        // twin comment: the eager focus-location rerender follows a mid-frame
-        // relocation a frame-start scope snapshot cannot name, and a stale
-        // scope would let a focus reader outside it reuse pre-relocation
-        // content.
-        let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
-        let retainedReuseSuppressionScope = retainedReuseFrameSafety.suppressionScope
-        if convergence.rerenderedForFocusSync {
-          renderer.forceRootEvaluation(source: .focusSyncRerender)
-        }
-        if retainedReuseFrameSafety.requiresRootEvaluation {
-          renderer.forceRootEvaluation(
-            source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
-          )
-        }
-        if !retainedReuseSuppressionScope.isEmpty {
-          // Focus/press-only finite scopes are queued as graph-local dirty work
-          // by the frame head. Animation safety and focus-sync rerenders stay
-          // root-forced until their own measurement tranche proves a narrower
-          // policy is profitable.
-          renderer.suppressRetainedReuseForNextFrame(retainedReuseSuppressionScope)
-        }
+        applyRenderPassEvaluationPolicy(convergence: convergence)
+        let passScheduledFrame =
+          convergence.rerenderedForFocusSync
+          ? rerenderScheduledFrame(from: scheduledFrame, convergence: convergence)
+          : scheduledFrame
+        convergence.pendingInvalidationsAtPassStart = schedulerPendingInvalidations()
         let acquired = await acquireFrameArtifactsAsync(
-          scheduledFrame: scheduledFrame,
+          scheduledFrame: passScheduledFrame,
           currentState: currentState,
           eventPump: eventPump,
           renderIntentDiagnostics: renderIntentDiagnostics,
@@ -436,6 +401,56 @@ extension RunLoop {
     var suppressionScope: RetainedReuseSuppressionScope
     var requiresRootEvaluation: Bool
     var rootEvaluationSource: ForceRootEvaluationSource?
+  }
+
+  /// Per-render-pass evaluation policy, shared by both frame drivers and
+  /// recomputed PER convergence iteration, not once per scheduled frame: the
+  /// eager focus-location rerender runs after a mid-frame relocation
+  /// (default-focus adoption, an applied focus request, a focused control's
+  /// departure) that a frame-start snapshot cannot have observed —
+  /// `previousFrameFocusIdentity` only advances after the frame commits, so
+  /// the second pass's scope unions the relocated focus target and its
+  /// runtime readers. A stale scope here would let a focus reader outside it
+  /// take retained reuse of pre-relocation content.
+  ///
+  /// The focus-sync rerender itself is selective (F08 lever B): the
+  /// relocation cone plus the runtime focus readers already form the pass's
+  /// finite suppression scope, the frame head queues that scope as graph-local
+  /// dirty work, and the identities the relocation's side effects invalidated
+  /// ride the pass's invalidation set (see ``rerenderScheduledFrame``). Two
+  /// additions keep it sound:
+  ///
+  /// - When the previous pass updated `currentFocusedValues`, the
+  ///   `@FocusedValue`/`@FocusedBinding` readers must ride this pass's scope:
+  ///   the rerender path returns before the converged path's reader
+  ///   invalidation, and this pass's convergence check compares against the
+  ///   already-updated values — a reader outside the scope would never be
+  ///   scheduled again and go permanently stale.
+  /// - A scroll-reveal rerender repositions viewport content with no
+  ///   attributable identity cone, so it keeps the root-forced fallback.
+  ///
+  /// Animation safety stays root-forced until its own measurement tranche
+  /// proves a narrower policy is profitable.
+  private func applyRenderPassEvaluationPolicy(
+    convergence: FocusSyncConvergenceState
+  ) {
+    let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
+    var suppressionScope = retainedReuseFrameSafety.suppressionScope
+    if convergence.rerenderedForFocusSync {
+      if convergence.scrollPositionChanged {
+        renderer.forceRootEvaluation(source: .focusSyncRerender)
+      } else if convergence.focusedValuesChanged {
+        suppressionScope.formUnion(renderer.focusedValuesDependentIdentities())
+      }
+    }
+    if retainedReuseFrameSafety.requiresRootEvaluation {
+      renderer.forceRootEvaluation(
+        source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
+      )
+    }
+    if !suppressionScope.isEmpty {
+      renderer.suppressRetainedReuseForNextFrame(suppressionScope)
+    }
   }
 
   private func retainedReuseFrameSafetyForFrame()

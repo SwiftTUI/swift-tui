@@ -58,6 +58,38 @@ extension RunLoop {
     return reconciled
   }
 
+  /// The scheduled frame the eager focus-sync rerender pass renders.
+  ///
+  /// The rerender re-renders the same scheduled frame, folding in every
+  /// identity invalidated since the previous pass began — resolve-time side
+  /// effects that pass could not see at its head (default-focus seeding
+  /// through a `@FocusState` request) plus the relocation side effects of
+  /// focus-sync processing (binding-sync flips, the focus tracker's old/new
+  /// notification, scroll-reveal offset writes). Their cones must conflict
+  /// with retained reuse on the rerender or pre-relocation content survives
+  /// the commit.
+  ///
+  /// The set is then filtered to identities that still map to graph nodes:
+  /// the previous pass's evaluation may have removed an invalidated node
+  /// (a focused control whose departure is what triggered the rerender), and
+  /// re-presenting its identity would trip the unmapped-invalidated-identity
+  /// escalation into a full root evaluation. A dropped identity loses
+  /// nothing — an unmapped member of the original set already escalated the
+  /// previous pass to a full evaluation, and mid-frame arrivals stay pending
+  /// in the scheduler for the next frame regardless (the rerender only peeks).
+  func rerenderScheduledFrame(
+    from scheduledFrame: ScheduledFrame,
+    convergence: FocusSyncConvergenceState
+  ) -> ScheduledFrame {
+    var rerender = scheduledFrame
+    let liveIdentities = renderer.liveIdentitySnapshot()
+    rerender.invalidatedIdentities =
+      scheduledFrame.invalidatedIdentities
+      .union(convergence.midFrameRelocationInvalidations)
+      .filter { liveIdentities.contains($0) }
+    return rerender
+  }
+
   func mergeLifecycleCarryForward(
     _ carryForward: [LifecycleCommitEntry],
     into lifecycle: inout [LifecycleCommitEntry]
