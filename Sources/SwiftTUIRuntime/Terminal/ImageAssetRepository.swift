@@ -24,6 +24,31 @@ private struct ImageLookupKey: Sendable {
   var cellPixelSize: PixelSize
 }
 
+/// Entry-count + byte cost for the repository's decode/resolution caches.
+private struct ImageAssetCacheCost: BoundedLRUCost {
+  var entryCount: Int
+  var byteCount: Int
+
+  static let zero = ImageAssetCacheCost(entryCount: 0, byteCount: 0)
+
+  static func + (lhs: Self, rhs: Self) -> Self {
+    Self(entryCount: lhs.entryCount + rhs.entryCount, byteCount: lhs.byteCount + rhs.byteCount)
+  }
+
+  static func - (lhs: Self, rhs: Self) -> Self {
+    Self(entryCount: lhs.entryCount - rhs.entryCount, byteCount: lhs.byteCount - rhs.byteCount)
+  }
+
+  func violates(_ policy: ImageAssetCachePolicy) -> Bool {
+    entryCount > policy.maxEntries || byteCount > policy.maxBytes
+  }
+}
+
+private struct ImageAssetCachePolicy: Sendable {
+  var maxEntries: Int
+  var maxBytes: Int
+}
+
 extension ImageLookupKey: Hashable {
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.source == rhs.source
@@ -105,33 +130,18 @@ final class ImageAssetRepository: Sendable {
   // Both caches live for the process (`sharedImageAssetRepository`), so without a
   // bound a long session that views many distinct images grows them without
   // limit (and leaks across tests sharing the singleton). Cap each by entry
-  // count with FIFO eviction — the working set of on-screen images is small, so
-  // a generous cap bounds memory without measurably hurting hit rate. (A
-  // generational LRU like ImageBlendCompositor's is a later refinement.)
-  private static let maxResolutions = 512
-  private static let maxDecodedImages = 256
+  // count; F52 moved them onto the shared generational-LRU ``BoundedLRUCache``
+  // (recency-ordered, O(1) eviction) — the working set of on-screen images is
+  // small, so a generous cap bounds memory without measurably hurting hit rate.
+  private static let resolutionPolicy = ImageAssetCachePolicy(maxEntries: 512, maxBytes: .max)
+  private static let decodedPolicy = ImageAssetCachePolicy(maxEntries: 256, maxBytes: .max)
 
   private struct Storage {
-    var resolutions: [ImageLookupKey: ResolvedImageAsset] = [:]
-    var resolutionOrder: [ImageLookupKey] = []
-    var decodedImages: [ImageAssetReference: DecodedImage] = [:]
-    var decodedOrder: [ImageAssetReference] = []
+    var resolutions = BoundedLRUCache<ImageLookupKey, ResolvedImageAsset, ImageAssetCacheCost>()
+    var decodedImages = BoundedLRUCache<ImageAssetReference, DecodedImage, ImageAssetCacheCost>()
   }
 
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
-
-  /// Evicts oldest-inserted entries until `map` is within `cap`. `order` holds
-  /// each live key exactly once (callers append only on first insert).
-  private static func evictToCap<Key: Hashable, Value>(
-    _ map: inout [Key: Value],
-    order: inout [Key],
-    cap: Int
-  ) {
-    while order.count > cap {
-      let victim = order.removeFirst()
-      map.removeValue(forKey: victim)
-    }
-  }
 
   func resolver() -> ImageAssetResolver {
     { [weak self] source, resourceRoots, cellPixelSize in
@@ -154,7 +164,7 @@ final class ImageAssetRepository: Sendable {
       cellPixelSize: cellPixelSize
     )
 
-    if let cached = storage.withLockUnchecked({ $0.resolutions[lookupKey] }) {
+    if let cached = storage.withLockUnchecked({ $0.resolutions.recordAccess(lookupKey) }) {
       return cached
     }
 
@@ -175,14 +185,11 @@ final class ImageAssetRepository: Sendable {
     )
 
     storage.withLockUnchecked { storage in
-      if storage.resolutions[lookupKey] == nil {
-        storage.resolutionOrder.append(lookupKey)
-      }
-      storage.resolutions[lookupKey] = resolved
-      Self.evictToCap(
-        &storage.resolutions,
-        order: &storage.resolutionOrder,
-        cap: Self.maxResolutions
+      storage.resolutions.upsert(
+        lookupKey,
+        value: resolved,
+        cost: ImageAssetCacheCost(entryCount: 1, byteCount: 0),
+        policy: Self.resolutionPolicy
       )
     }
     return resolved
@@ -191,7 +198,7 @@ final class ImageAssetRepository: Sendable {
   func decodedImage(
     for reference: ImageAssetReference
   ) -> DecodedImage? {
-    if let cached = storage.withLockUnchecked({ $0.decodedImages[reference] }) {
+    if let cached = storage.withLockUnchecked({ $0.decodedImages.recordAccess(reference) }) {
       return cached
     }
 
@@ -199,15 +206,15 @@ final class ImageAssetRepository: Sendable {
       return nil
     }
 
+    let byteCount =
+      decoded.encodedBytes.count
+      + decoded.pixels.count * MemoryLayout<RGBAImagePixel>.stride
     storage.withLockUnchecked { storage in
-      if storage.decodedImages[reference] == nil {
-        storage.decodedOrder.append(reference)
-      }
-      storage.decodedImages[reference] = decoded
-      Self.evictToCap(
-        &storage.decodedImages,
-        order: &storage.decodedOrder,
-        cap: Self.maxDecodedImages
+      storage.decodedImages.upsert(
+        reference,
+        value: decoded,
+        cost: ImageAssetCacheCost(entryCount: 1, byteCount: byteCount),
+        policy: Self.decodedPolicy
       )
     }
     return decoded
@@ -299,11 +306,11 @@ final class ImageAssetRepository: Sendable {
 
   func occupancy() -> (resolutionCount: Int, decodedCount: Int, approxBytes: Int) {
     storage.withLockUnchecked { storage in
-      let approxBytes = storage.decodedImages.values.reduce(0) { total, image in
-        total + image.encodedBytes.count
-          + image.pixels.count * MemoryLayout<RGBAImagePixel>.stride
-      }
-      return (storage.resolutions.count, storage.decodedImages.count, approxBytes)
+      (
+        storage.resolutions.count,
+        storage.decodedImages.count,
+        storage.decodedImages.totalCost.byteCount
+      )
     }
   }
 

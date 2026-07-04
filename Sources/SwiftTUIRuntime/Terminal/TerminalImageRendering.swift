@@ -61,42 +61,52 @@ package struct TerminalImageRendererCachePolicy: Sendable, Equatable {
   }
 }
 
-/// A single-kind LRU + byte-budget cache keyed by ``TerminalImageVariantKey``.
-/// Each entry remembers the approximate byte cost supplied at store time plus
-/// the access generation it was last touched on;
-/// ``store(_:approxBytes:for:policy:)`` evicts the lowest-generation entries
-/// (never the key just written) until the kind is back within `policy`. A
-/// stateless mirror of the eviction logic already proven in
-/// ``ImageBlendCompositor``.
-private struct BoundedVariantCache<Value> {
-  private struct Entry {
-    var value: Value
-    var approxBytes: Int
-    var lastAccessGeneration: Int
+/// Entry-count + approximate-byte cost of one payload-cache entry, budgeted by
+/// ``TerminalImageRendererCachePolicy``.
+private struct TerminalImagePayloadCost: BoundedLRUCost {
+  var entryCount: Int
+  var approxBytes: Int
+
+  static let zero = TerminalImagePayloadCost(entryCount: 0, approxBytes: 0)
+
+  static func + (lhs: Self, rhs: Self) -> Self {
+    Self(
+      entryCount: lhs.entryCount + rhs.entryCount, approxBytes: lhs.approxBytes + rhs.approxBytes)
   }
 
-  private var entries: [TerminalImageVariantKey: Entry] = [:]
-  private var accessGeneration = 0
-  private(set) var evictionCount = 0
+  static func - (lhs: Self, rhs: Self) -> Self {
+    Self(
+      entryCount: lhs.entryCount - rhs.entryCount, approxBytes: lhs.approxBytes - rhs.approxBytes)
+  }
+
+  func violates(_ policy: TerminalImageRendererCachePolicy) -> Bool {
+    entryCount > policy.maxEntriesPerKind || approxBytes > policy.maxApproxBytesPerKind
+  }
+}
+
+/// A single-kind LRU + byte-budget cache keyed by ``TerminalImageVariantKey``,
+/// backed by the shared ``BoundedLRUCache`` (O(1) touch/insert/evict). Was a
+/// bespoke min-scan mirror of ``ImageBlendCompositor``'s eviction; F52 folded
+/// both onto the one implementation.
+private struct BoundedVariantCache<Value: Sendable> {
+  private var cache = BoundedLRUCache<TerminalImageVariantKey, Value, TerminalImagePayloadCost>()
 
   var count: Int {
-    entries.count
+    cache.count
   }
 
   var approxBytes: Int {
-    entries.values.reduce(0) { $0 + $1.approxBytes }
+    cache.totalCost.approxBytes
+  }
+
+  var evictionCount: Int {
+    cache.evictionCount
   }
 
   mutating func lookup(
     _ key: TerminalImageVariantKey
   ) -> Value? {
-    guard var entry = entries[key] else {
-      return nil
-    }
-    accessGeneration += 1
-    entry.lastAccessGeneration = accessGeneration
-    entries[key] = entry
-    return entry.value
+    cache.recordAccess(key)
   }
 
   mutating func store(
@@ -105,41 +115,12 @@ private struct BoundedVariantCache<Value> {
     for key: TerminalImageVariantKey,
     policy: TerminalImageRendererCachePolicy
   ) {
-    accessGeneration += 1
-    entries[key] = Entry(
+    cache.upsert(
+      key,
       value: value,
-      approxBytes: max(0, approxBytes),
-      lastAccessGeneration: accessGeneration
+      cost: TerminalImagePayloadCost(entryCount: 1, approxBytes: max(0, approxBytes)),
+      policy: policy
     )
-    evictIfNeeded(policy: policy, protecting: key)
-  }
-
-  private mutating func evictIfNeeded(
-    policy: TerminalImageRendererCachePolicy,
-    protecting protectedKey: TerminalImageVariantKey
-  ) {
-    while violates(policy), let key = oldestEvictableKey(protecting: protectedKey) {
-      entries.removeValue(forKey: key)
-      evictionCount += 1
-    }
-  }
-
-  private func violates(
-    _ policy: TerminalImageRendererCachePolicy
-  ) -> Bool {
-    entries.count > policy.maxEntriesPerKind
-      || approxBytes > policy.maxApproxBytesPerKind
-  }
-
-  private func oldestEvictableKey(
-    protecting protectedKey: TerminalImageVariantKey
-  ) -> TerminalImageVariantKey? {
-    entries
-      .filter { key, _ in key != protectedKey }
-      .min { lhs, rhs in
-        lhs.value.lastAccessGeneration < rhs.value.lastAccessGeneration
-      }?
-      .key
   }
 }
 

@@ -103,7 +103,6 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     var encodedBytes: [UInt8]
     var decodedImage: DecodedImage?
     var presentationAttachment: PresentationAttachment
-    var lastAccessGeneration: Int
 
     var decodedPixelCount: Int {
       decodedImage?.pixels.count ?? 0
@@ -139,33 +138,77 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     }
   }
 
+  /// Cost of one blend-cache entry along the three budgeted dimensions in
+  /// ``ImageBlendCompositorCachePolicy`` (entry count / decoded pixels / encoded
+  /// + metadata bytes). Encoded and metadata bytes are tracked separately so the
+  /// snapshot can still report them individually, but budgeted together.
+  private struct BlendVariantCost: BoundedLRUCost {
+    var entryCount: Int
+    var decodedPixelCount: Int
+    var encodedByteCount: Int
+    var retainedMetadataBytes: Int
+
+    static let zero = BlendVariantCost(
+      entryCount: 0, decodedPixelCount: 0, encodedByteCount: 0, retainedMetadataBytes: 0)
+
+    static func + (lhs: Self, rhs: Self) -> Self {
+      Self(
+        entryCount: lhs.entryCount + rhs.entryCount,
+        decodedPixelCount: lhs.decodedPixelCount + rhs.decodedPixelCount,
+        encodedByteCount: lhs.encodedByteCount + rhs.encodedByteCount,
+        retainedMetadataBytes: lhs.retainedMetadataBytes + rhs.retainedMetadataBytes)
+    }
+
+    static func - (lhs: Self, rhs: Self) -> Self {
+      Self(
+        entryCount: lhs.entryCount - rhs.entryCount,
+        decodedPixelCount: lhs.decodedPixelCount - rhs.decodedPixelCount,
+        encodedByteCount: lhs.encodedByteCount - rhs.encodedByteCount,
+        retainedMetadataBytes: lhs.retainedMetadataBytes - rhs.retainedMetadataBytes)
+    }
+
+    func violates(_ policy: ImageBlendCompositorCachePolicy) -> Bool {
+      entryCount > policy.maxEntries
+        || decodedPixelCount > policy.maxDecodedPixels
+        || (encodedByteCount + retainedMetadataBytes) > policy.maxEncodedBytes
+    }
+  }
+
   private struct Storage {
-    var entries: [ImageBlendCacheKey: CacheEntry] = [:]
+    var cache = BoundedLRUCache<ImageBlendCacheKey, CacheEntry, BlendVariantCost>()
     var accessGeneration = 0
-    var evictionCount = 0
     var decodedHits = 0
     var decodedMisses = 0
     var encodedHits = 0
     var encodedMisses = 0
 
+    private static func cost(
+      for entry: CacheEntry,
+      key: ImageBlendCacheKey
+    ) -> BlendVariantCost {
+      BlendVariantCost(
+        entryCount: 1,
+        decodedPixelCount: entry.decodedPixelCount,
+        encodedByteCount: entry.encodedByteCount,
+        retainedMetadataBytes: key.retainedByteEstimate + entry.retainedMetadataBytes
+      )
+    }
+
     mutating func decodedLookup(
       for key: ImageBlendCacheKey
     ) -> (variant: BlendedImageVariant?, encodedBytes: [UInt8]?) {
-      if var entry = entries[key] {
-        if let variant = entry.decodedVariant {
-          accessGeneration += 1
-          entry.lastAccessGeneration = accessGeneration
-          entries[key] = entry
-          decodedHits += 1
-          return (variant, entry.encodedBytes)
-        }
-
+      guard let entry = cache.peek(key) else {
         decodedMisses += 1
-        return (nil, entry.encodedBytes)
+        return (nil, nil)
       }
-
+      if let variant = entry.decodedVariant {
+        accessGeneration += 1
+        cache.recordAccess(key)
+        decodedHits += 1
+        return (variant, entry.encodedBytes)
+      }
       decodedMisses += 1
-      return (nil, nil)
+      return (nil, entry.encodedBytes)
     }
 
     mutating func encodedLookup(
@@ -174,14 +217,12 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       // A decoded-only entry carries no PNG (see the lazy-PNG note in
       // `decodedVariant`), so treat empty encoded bytes as a miss and let the
       // caller encode on demand rather than returning an empty payload.
-      guard var entry = entries[key], !entry.encodedBytes.isEmpty else {
+      guard let entry = cache.peek(key), !entry.encodedBytes.isEmpty else {
         encodedMisses += 1
         return nil
       }
-
       accessGeneration += 1
-      entry.lastAccessGeneration = accessGeneration
-      entries[key] = entry
+      cache.recordAccess(key)
       encodedHits += 1
       return entry.encodedPayload
     }
@@ -194,23 +235,20 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     ) {
       accessGeneration += 1
       var entry =
-        entries[key]
+        cache.peek(key)
         ?? CacheEntry(
           id: variant.id,
           pixelSize: variant.image.pixelSize,
           encodedBytes: variant.image.encodedBytes,
           decodedImage: nil,
-          presentationAttachment: presentationAttachment,
-          lastAccessGeneration: accessGeneration
+          presentationAttachment: presentationAttachment
         )
       entry.id = variant.id
       entry.pixelSize = variant.image.pixelSize
       entry.encodedBytes = variant.image.encodedBytes
       entry.decodedImage = variant.image
       entry.presentationAttachment = presentationAttachment
-      entry.lastAccessGeneration = accessGeneration
-      entries[key] = entry
-      evictIfNeeded(policy: policy, protecting: key)
+      cache.upsert(key, value: entry, cost: Self.cost(for: entry, key: key), policy: policy)
     }
 
     mutating func storeEncodedPayload(
@@ -221,79 +259,35 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     ) {
       accessGeneration += 1
       var entry =
-        entries[key]
+        cache.peek(key)
         ?? CacheEntry(
           id: payload.id,
           pixelSize: payload.pixelSize,
           encodedBytes: payload.bytes,
           decodedImage: nil,
-          presentationAttachment: presentationAttachment,
-          lastAccessGeneration: accessGeneration
+          presentationAttachment: presentationAttachment
         )
       entry.id = payload.id
       entry.pixelSize = payload.pixelSize
       entry.encodedBytes = payload.bytes
       entry.presentationAttachment = presentationAttachment
-      entry.lastAccessGeneration = accessGeneration
-      entries[key] = entry
-      evictIfNeeded(policy: policy, protecting: key)
+      cache.upsert(key, value: entry, cost: Self.cost(for: entry, key: key), policy: policy)
     }
 
     func snapshot() -> ImageBlendCompositorCacheSnapshot {
-      var decodedPixelBytes = 0
-      var encodedBytes = 0
-      var retainedMetadataBytes = 0
-      for (key, entry) in entries {
-        decodedPixelBytes += entry.decodedPixelBytes
-        encodedBytes += entry.encodedByteCount
-        retainedMetadataBytes += key.retainedByteEstimate + entry.retainedMetadataBytes
-      }
+      let total = cache.totalCost
       return ImageBlendCompositorCacheSnapshot(
-        entryCount: entries.count,
-        decodedPixelBytes: decodedPixelBytes,
-        encodedBytes: encodedBytes,
-        retainedMetadataBytes: retainedMetadataBytes,
+        entryCount: cache.count,
+        decodedPixelBytes: total.decodedPixelCount * MemoryLayout<RGBAImagePixel>.stride,
+        encodedBytes: total.encodedByteCount,
+        retainedMetadataBytes: total.retainedMetadataBytes,
         accessGeneration: accessGeneration,
-        evictionCount: evictionCount,
+        evictionCount: cache.evictionCount,
         decodedHits: decodedHits,
         decodedMisses: decodedMisses,
         encodedHits: encodedHits,
         encodedMisses: encodedMisses
       )
-    }
-
-    private mutating func evictIfNeeded(
-      policy: ImageBlendCompositorCachePolicy,
-      protecting protectedKey: ImageBlendCacheKey
-    ) {
-      while violates(policy), let key = oldestEvictableKey(protecting: protectedKey) {
-        entries.removeValue(forKey: key)
-        evictionCount += 1
-      }
-    }
-
-    private func violates(
-      _ policy: ImageBlendCompositorCachePolicy
-    ) -> Bool {
-      let snapshot = snapshot()
-      return snapshot.entryCount > policy.maxEntries
-        || decodedPixelCount > policy.maxDecodedPixels
-        || snapshot.encodedBytes + snapshot.retainedMetadataBytes > policy.maxEncodedBytes
-    }
-
-    private var decodedPixelCount: Int {
-      entries.values.reduce(0) { $0 + $1.decodedPixelCount }
-    }
-
-    private func oldestEvictableKey(
-      protecting protectedKey: ImageBlendCacheKey
-    ) -> ImageBlendCacheKey? {
-      entries
-        .filter { key, _ in key != protectedKey }
-        .min { lhs, rhs in
-          lhs.value.lastAccessGeneration < rhs.value.lastAccessGeneration
-        }?
-        .key
     }
   }
 

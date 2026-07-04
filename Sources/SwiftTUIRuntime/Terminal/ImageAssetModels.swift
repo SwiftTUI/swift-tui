@@ -9,10 +9,19 @@ import SwiftTUICore
 #endif
 
 struct RGBAImagePixel: Equatable, Hashable, Sendable {
-  var red: Int
-  var green: Int
-  var blue: Int
-  var alpha: Int
+  // Channels are 0-255, so pack into four bytes (4 bytes/pixel) instead of four
+  // `Int`s (32 bytes/pixel on 64-bit) — an 8x shrink in every retained pixel
+  // buffer (repository decode cache, blend variants). The `Int` accessors keep
+  // every call site (LUT indexing, luminance sums, `UInt8(...)` casts) unchanged.
+  private var storedRed: UInt8
+  private var storedGreen: UInt8
+  private var storedBlue: UInt8
+  private var storedAlpha: UInt8
+
+  var red: Int { Int(storedRed) }
+  var green: Int { Int(storedGreen) }
+  var blue: Int { Int(storedBlue) }
+  var alpha: Int { Int(storedAlpha) }
 
   var color: Color {
     Color(
@@ -26,10 +35,10 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
     blue: Int,
     alpha: Int
   ) {
-    self.red = min(255, max(0, red))
-    self.green = min(255, max(0, green))
-    self.blue = min(255, max(0, blue))
-    self.alpha = min(255, max(0, alpha))
+    storedRed = UInt8(min(255, max(0, red)))
+    storedGreen = UInt8(min(255, max(0, green)))
+    storedBlue = UInt8(min(255, max(0, blue)))
+    storedAlpha = UInt8(min(255, max(0, alpha)))
   }
 
   #if canImport(PNG)
