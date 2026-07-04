@@ -63,8 +63,9 @@ extension Picker {
     if isEnabled {
       let binding = selection
       let authoringContext =
-        currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope)
+        (currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope))?
+        .withEnvironmentValues(context.environmentValues)
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta = pickerStyle.selectionDelta(for: event)
         guard let delta, !options.isEmpty else {

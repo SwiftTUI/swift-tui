@@ -307,6 +307,16 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
   package let focusedValues: FocusedValues
   package let ownerNodeID: SwiftTUICore.ViewNodeID?
   package let stateGraphScope: StateGraphScopeID?
+  /// The environment ambient where the handler was registered — its lexical
+  /// position in the hierarchy. Unlike `focusedValues` (runtime state, read
+  /// live at fire time) the environment is *registration* state: an ancestor
+  /// changing an environment value denies retained reuse for this subtree, so
+  /// the body re-resolves and re-registers the handler with the fresh
+  /// capture — a live handler's captured environment is always current.
+  /// `withImperativeAuthoringContext` re-establishes it around dispatch so
+  /// `@Environment` reads inside action closures see the injected values the
+  /// same body rendered with, not the defaults (F08 step-4 follow-up).
+  package let environmentValues: EnvironmentValues?
 
   @MainActor
   package init?(_ context: AuthoringContext? = currentAuthoringContext()) {
@@ -317,6 +327,39 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
     focusedValues = context.focusedValues
     ownerNodeID = context.ownerNodeID
     stateGraphScope = graphScopeID(for: context)
+    environmentValues = EnvironmentValuesStorage.current
+  }
+
+  private init(
+    viewIdentity: Identity,
+    focusedValues: FocusedValues,
+    ownerNodeID: SwiftTUICore.ViewNodeID?,
+    stateGraphScope: StateGraphScopeID?,
+    environmentValues: EnvironmentValues?
+  ) {
+    self.viewIdentity = viewIdentity
+    self.focusedValues = focusedValues
+    self.ownerNodeID = ownerNodeID
+    self.stateGraphScope = stateGraphScope
+    self.environmentValues = environmentValues
+  }
+
+  /// The same snapshot with `environmentValues` replaced. Registration sites
+  /// that run with a `ResolveContext` in hand stamp its authoritative
+  /// `environmentValues` here — the ambient task-local captured by `init` is
+  /// best-effort and can predate the attachment point's environment edits
+  /// (a modifier resolving at a body boundary sees the enclosing body's
+  /// storage, not the wrapped subtree's).
+  package func withEnvironmentValues(
+    _ environmentValues: EnvironmentValues?
+  ) -> ImperativeAuthoringContextSnapshot {
+    ImperativeAuthoringContextSnapshot(
+      viewIdentity: viewIdentity,
+      focusedValues: focusedValues,
+      ownerNodeID: ownerNodeID,
+      stateGraphScope: stateGraphScope,
+      environmentValues: environmentValues ?? self.environmentValues
+    )
   }
 
   @MainActor
@@ -349,7 +392,9 @@ package func withImperativeAuthoringContext<Result>(
   _ apply: () -> Result
 ) -> Result {
   withAuthoringContext(snapshot?.authoringContext) {
-    apply()
+    withRegistrationEnvironment(snapshot?.environmentValues) {
+      apply()
+    }
   }
 }
 
@@ -359,6 +404,37 @@ package func withImperativeAuthoringContext<Result>(
   _ apply: () async -> Result
 ) async -> Result {
   await withAuthoringContext(snapshot?.authoringContext) {
+    await withRegistrationEnvironment(snapshot?.environmentValues) {
+      await apply()
+    }
+  }
+}
+
+/// Establishes the registration-time environment for an imperative dispatch
+/// (see ``ImperativeAuthoringContextSnapshot/environmentValues``). Snapshots
+/// captured without ambient environment leave dispatch behavior unchanged.
+@MainActor
+private func withRegistrationEnvironment<Result>(
+  _ environmentValues: EnvironmentValues?,
+  _ apply: () -> Result
+) -> Result {
+  guard let environmentValues else {
+    return apply()
+  }
+  return EnvironmentValuesStorage.$current.withValue(environmentValues) {
+    apply()
+  }
+}
+
+@MainActor
+private func withRegistrationEnvironment<Result>(
+  _ environmentValues: EnvironmentValues?,
+  _ apply: () async -> Result
+) async -> Result {
+  guard let environmentValues else {
+    return await apply()
+  }
+  return await EnvironmentValuesStorage.$current.withValue(environmentValues) {
     await apply()
   }
 }

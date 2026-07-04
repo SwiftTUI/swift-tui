@@ -94,7 +94,8 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
       for: node.identity,
       in: context
     )
-    let authoringContext = currentImperativeAuthoringContextSnapshot()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()?
+      .withEnvironmentValues(context.environmentValues)
     let lifecycleAction = action
     let handlerID =
       context.localLifecycleRegistry?.registerAppear(
@@ -125,7 +126,8 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
       for: node.identity,
       in: context
     )
-    let authoringContext = currentImperativeAuthoringContextSnapshot()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()?
+      .withEnvironmentValues(context.environmentValues)
     let lifecycleAction = action
     let handlerID =
       context.localLifecycleRegistry?.registerDisappear(
@@ -153,7 +155,8 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let authoringContext = currentImperativeAuthoringContextSnapshot()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()?
+      .withEnvironmentValues(context.environmentValues)
     let node = content.resolve(in: context)
     let viewGraph = context.viewGraph
     let ownerNode = viewGraph?.nodeForIdentity(node.identity)
@@ -287,7 +290,8 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let authoringContext = currentImperativeAuthoringContextSnapshot()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()?
+      .withEnvironmentValues(context.environmentValues)
     let taskAction = action
     let lifecycleIdentity = node.identity
     recordLifecycleEvaluationOwner(

@@ -89,7 +89,8 @@ public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
+    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
+      .withEnvironmentValues(context.environmentValues)
     var wrappedConfig = config
     wrappedConfig.sourceIdentity = node.identity
     wrappedConfig.action = { [action = config.action] in

@@ -63,8 +63,9 @@ extension SecureField {
       text,
       value: $textInputValue,
       traits: .secureField,
-      authoringContext: currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope),
+      authoringContext: (currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope))?
+        .withEnvironmentValues(context.environmentValues),
       in: context
     )
     let presentation = TextInputPresentation(

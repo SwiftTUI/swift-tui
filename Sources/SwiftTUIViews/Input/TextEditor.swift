@@ -52,8 +52,9 @@ extension TextEditor {
           width: nil
         ).layoutMap
       },
-      authoringContext: currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope),
+      authoringContext: (currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope))?
+        .withEnvironmentValues(context.environmentValues),
       in: context
     )
 

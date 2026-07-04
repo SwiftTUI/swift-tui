@@ -54,7 +54,8 @@ public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendab
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
-    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
+    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
+      .withEnvironmentValues(context.environmentValues)
     context.dropDestinationRegistry?.register(
       at: node.identity,
       handler: { paths, dropContext in

@@ -143,6 +143,55 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(surfaceText(secondary.host).contains("commits:0"))
   }
 
+  // F08 step-4 follow-up re-tests (2026-07-04). Both were documented as
+  // dispatch-time imperative-context gaps; F10 slice 4 fixed the suspected
+  // mechanism for the first (FocusState.makeLocation fell back to a detached
+  // local box when the authoring context carried the owner by ID only) and
+  // 5cdfde32 fixed the async-tail request clobber behind it.
+
+  @Test("@FocusState write from a keyCommand action lands and moves focus")
+  func keyCommandFocusStateWriteMovesFocus() throws {
+    let fixture = KeyCommandFocusWriteFixture()
+    let primary = makeRunLoop(rootName: "KeyCommandFocusWrite") { fixture }
+
+    try renderInitial(primary.runLoop)
+    #expect(surfaceText(primary.host).contains("focus:first"))
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("m"), modifiers: .ctrl))
+    try renderPending(primary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("focus:second"))
+  }
+
+  @Test("@Environment read from a keyCommand action sees the injected value")
+  func keyCommandEnvironmentReadSeesInjectedValue() throws {
+    let fixture = KeyCommandEnvironmentReadFixture()
+    let primary = makeRunLoop(rootName: "KeyCommandEnvRead") { fixture }
+
+    try renderInitial(primary.runLoop)
+    // Body-time read renders the injected value.
+    #expect(surfaceText(primary.host).contains("body:injected"))
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("e"), modifiers: .ctrl))
+    try renderPending(primary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("action:injected"))
+  }
+
+  @Test("@Environment read from a Button action sees the injected value")
+  func buttonActionEnvironmentReadSeesInjectedValue() throws {
+    let fixture = ButtonEnvironmentReadFixture()
+    let primary = makeRunLoop(rootName: "ButtonEnvRead") { fixture }
+
+    try renderInitial(primary.runLoop)
+    focusLeafmostFocusable(in: primary.runLoop)
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+    try renderPending(primary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("action:injected"))
+  }
+
   @Test(
     "onAppear mutates the graph that revealed the child when the same view instance is hosted twice"
   )
@@ -510,6 +559,95 @@ private struct KeyCommandScopeFixture: View {
     }
     .keyCommand("Mutate", key: .character("m"), modifiers: .ctrl) {
       value = "mutated"
+    }
+  }
+}
+
+private enum DispatchContextProbeKey: EnvironmentKey {
+  static let defaultValue = "default"
+}
+
+extension EnvironmentValues {
+  fileprivate var dispatchContextProbe: String {
+    get { self[DispatchContextProbeKey.self] }
+    set { self[DispatchContextProbeKey.self] = newValue }
+  }
+}
+
+private enum KeyCommandFocusField: Hashable {
+  case first
+  case second
+}
+
+private struct KeyCommandFocusWriteFixture: View {
+  @FocusState private var focusedField: KeyCommandFocusField?
+
+  var body: some View {
+    Panel(id: "focus-scope") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("focus:\(focusLabel)")
+        Button("First") {}
+          .focused($focusedField, equals: .first)
+        Button("Second") {}
+          .focused($focusedField, equals: .second)
+      }
+    }
+    .keyCommand("FocusSecond", key: .character("m"), modifiers: .ctrl) {
+      focusedField = .second
+    }
+    .defaultFocus($focusedField, .first)
+  }
+
+  private var focusLabel: String {
+    switch focusedField {
+    case .first: "first"
+    case .second: "second"
+    case nil: "none"
+    }
+  }
+}
+
+private struct KeyCommandEnvironmentReadFixture: View {
+  var body: some View {
+    KeyCommandEnvironmentReadContent()
+      .environment(\.dispatchContextProbe, "injected")
+  }
+}
+
+private struct KeyCommandEnvironmentReadContent: View {
+  @Environment(\.dispatchContextProbe) private var probe
+  @State private var actionRead = "unread"
+
+  var body: some View {
+    Panel(id: "env-scope") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("body:\(probe)").focusable(true)
+        Text("action:\(actionRead)")
+      }
+    }
+    .keyCommand("ReadEnv", key: .character("e"), modifiers: .ctrl) {
+      actionRead = probe
+    }
+  }
+}
+
+private struct ButtonEnvironmentReadFixture: View {
+  var body: some View {
+    ButtonEnvironmentReadContent()
+      .environment(\.dispatchContextProbe, "injected")
+  }
+}
+
+private struct ButtonEnvironmentReadContent: View {
+  @Environment(\.dispatchContextProbe) private var probe
+  @State private var actionRead = "unread"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("action:\(actionRead)")
+      Button("Read") {
+        actionRead = probe
+      }
     }
   }
 }

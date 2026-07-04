@@ -55,8 +55,9 @@ extension Toggle {
         handler: {
           [
             authoringContext =
-              currentImperativeAuthoringContextSnapshot()
-              ?? ImperativeAuthoringContextSnapshot(authoringScope)
+              (currentImperativeAuthoringContextSnapshot()
+              ?? ImperativeAuthoringContextSnapshot(authoringScope))?
+              .withEnvironmentValues(context.environmentValues)
           ] in
           withImperativeAuthoringContext(authoringContext) {
             binding.wrappedValue.toggle()
@@ -181,8 +182,9 @@ extension TextField {
       text,
       value: $textInputValue,
       traits: .singleLine,
-      authoringContext: currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope),
+      authoringContext: (currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope))?
+        .withEnvironmentValues(context.environmentValues),
       in: context
     )
     let presentation = TextInputPresentation(

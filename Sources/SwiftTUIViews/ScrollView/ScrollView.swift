@@ -72,8 +72,9 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
       if context.environmentValues.isEnabled {
         let binding = position
         let authoringContext =
-          currentImperativeAuthoringContextSnapshot()
-          ?? ImperativeAuthoringContextSnapshot(interactionAuthoringScope)
+          (currentImperativeAuthoringContextSnapshot()
+          ?? ImperativeAuthoringContextSnapshot(interactionAuthoringScope))?
+          .withEnvironmentValues(context.environmentValues)
         context.localScrollPositionRegistry?.register(
           identity: context.identity,
           currentOffset: {

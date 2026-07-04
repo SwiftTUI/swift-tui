@@ -70,7 +70,11 @@ extension Menu {
       let binding = expansionBinding
       context.localActionRegistry?.register(
         identity: context.identity,
-        handler: { [authoringContext = currentImperativeAuthoringContextSnapshot()] in
+        handler: {
+          [
+            authoringContext = currentImperativeAuthoringContextSnapshot()?
+              .withEnvironmentValues(context.environmentValues)
+          ] in
           withImperativeAuthoringContext(authoringContext) {
             binding.wrappedValue.toggle()
             return true
