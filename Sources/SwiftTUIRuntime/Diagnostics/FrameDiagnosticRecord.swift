@@ -55,6 +55,7 @@ public struct FrameDiagnosticRecord: Sendable {
   package var runtimePublicationUnmappedInvalidatedIdentitySample: [Identity] = []
   package var runtimeSelectiveEvaluationDisabledReasons: [String] = []
   package var runtimePublicationPresentationPortalRootQueued: Bool?
+  package var runtimePublicationPresentationPortalEscalated: Bool?
   package var runtimePublicationGraphCheckpointBaselineNodeCount: Int?
   package var runtimePublicationGraphCheckpointPreparedNodeCount: Int?
   package var runtimePublicationGraphCheckpointDirtySubtreeCandidateNodeCount: Int?

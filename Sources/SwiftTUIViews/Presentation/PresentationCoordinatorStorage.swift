@@ -107,6 +107,15 @@ where Item.ID: Sendable {
     !mergedActiveItems().isEmpty
   }
 
+  /// Source identities with declaratively-synced items — the sources whose
+  /// declaration emitters were active at the last reconcile. The frame head
+  /// compares these against per-frame emitter observations (and against node
+  /// liveness, for source-subtree removal) to decide whether a selective
+  /// frame must escalate to a portal-root reconcile.
+  package var declaredSourceIdentities: Set<Identity> {
+    Set(declarativeItemsBySource.keys)
+  }
+
   package var latestItem: Item? {
     newestFirst.first
   }
@@ -254,6 +263,10 @@ where Item.ID: Sendable {
 
   package var isActive: Bool {
     itemStore.isActive
+  }
+
+  package var declaredSourceIdentities: Set<Identity> {
+    itemStore.declaredSourceIdentities
   }
 
   package var latestItem: Item? {

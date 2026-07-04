@@ -38,6 +38,10 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     coordinator?.isActive ?? false
   }
 
+  package var declaredSourceIdentities: Set<Identity> {
+    coordinator?.declaredSourceIdentities ?? []
+  }
+
   package var latestItem: C.Item? {
     coordinator?.latestItem
   }
@@ -136,6 +140,7 @@ private struct AnyPresentationCoordinatorBox {
   private let beginSynchronizingImpl: @MainActor () -> Void
   private let endSynchronizingImpl: @MainActor () -> Void
   private let overlayEntryImpl: @MainActor () -> OverlayStackEntry?
+  private let declaredSourceIdentitiesImpl: @MainActor () -> Set<Identity>
 
   init<C>(
     _ box: PresentationCoordinatorBox<C>
@@ -148,6 +153,9 @@ private struct AnyPresentationCoordinatorBox {
     }
     overlayEntryImpl = {
       box.overlayEntry()
+    }
+    declaredSourceIdentitiesImpl = {
+      box.declaredSourceIdentities
     }
   }
 
@@ -164,6 +172,11 @@ private struct AnyPresentationCoordinatorBox {
   @MainActor
   func overlayEntry() -> OverlayStackEntry? {
     overlayEntryImpl()
+  }
+
+  @MainActor
+  func declaredSourceIdentities() -> Set<Identity> {
+    declaredSourceIdentitiesImpl()
   }
 }
 
@@ -252,6 +265,12 @@ package final class PresentationCoordinatorRegistry {
       .sorted { lhs, rhs in
         portalOrderingPrecedes(lhs.ordering, rhs.ordering)
       }
+  }
+
+  package func declaredSourceIdentities() -> Set<Identity> {
+    allBoxes.reduce(into: Set<Identity>()) { union, box in
+      union.formUnion(box.declaredSourceIdentities())
+    }
   }
 
   package func dismissStack() -> DismissStack {

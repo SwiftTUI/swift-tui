@@ -59,6 +59,18 @@ enum ViewGraphDirtyEvaluationPlanner {
     return ViewGraphDirtyEvaluationTargetPlan(targetNodes: targetNodes)
   }
 
+  /// The next node on the evaluation-ancestry walk. Capture-hosted island
+  /// content has no `parent` link to its host; crossing the seam via
+  /// `evaluationHost` keeps the walk going so an island-interior dirty node
+  /// hoists to an evaluator whose body re-run re-captures the island by value.
+  /// Evaluating such a node in place would strand its output: the host's
+  /// committed snapshot stays fresh across the seam (see
+  /// `ViewNode.invalidateCachedSnapshots`), so nothing would stitch the new
+  /// content into the frame.
+  private static func evaluationAncestor(of node: ViewNode) -> ViewNode? {
+    node.parent ?? node.evaluationHost
+  }
+
   private static func dirtyFrontierNodes(
     graphLocalDirtyNodeIDs: Set<ViewNodeID>,
     nodesByNodeID: [ViewNodeID: ViewNode]
@@ -73,7 +85,7 @@ enum ViewGraphDirtyEvaluationPlanner {
         continue
       }
 
-      var ancestor = node.parent
+      var ancestor = evaluationAncestor(of: node)
       var hasDirtyAncestor = false
       var visitedAncestors: Set<ObjectIdentifier> = []
 
@@ -82,11 +94,15 @@ enum ViewGraphDirtyEvaluationPlanner {
         guard visitedAncestors.insert(currentID).inserted else {
           break
         }
-        if current.isDirty {
+        // Defer only to ancestors this plan will actually evaluate (queued
+        // graph-local dirty work). A node can be dirty without being queued —
+        // `invalidate` marks reuse denial without scheduling — and deferring
+        // to such an ancestor would strand the descendant's re-evaluation.
+        if current.isDirty, graphLocalDirtyNodeIDs.contains(current.viewNodeID) {
           hasDirtyAncestor = true
           break
         }
-        ancestor = current.parent
+        ancestor = evaluationAncestor(of: current)
       }
 
       guard !hasDirtyAncestor,
@@ -106,22 +122,36 @@ enum ViewGraphDirtyEvaluationPlanner {
     }
   }
 
-  private static func nearestEvaluatorAncestor(
-    of node: ViewNode
+  /// The nearest evaluator whose re-evaluation both reaches `node` and
+  /// stitches into the committed frame. Walks the full chain to the graph
+  /// root; every island-seam crossing (parent-less node reached only via
+  /// `evaluationHost`) resets the candidate, because an evaluator below a
+  /// seam re-resolves in place without the host re-capturing its output —
+  /// the committed snapshot above the seam would stay stale. The surviving
+  /// candidate is the first evaluator above the last seam.
+  private static func stitchableEvaluatorTarget(
+    startingAt node: ViewNode
   ) -> ViewNode? {
-    var current = node.parent
+    var candidate: ViewNode? = node.hasEvaluator ? node : nil
+    var child = node
     var visited: Set<ObjectIdentifier> = []
-    while let ancestor = current {
-      let id = ObjectIdentifier(ancestor)
-      guard visited.insert(id).inserted else {
-        return nil
+    while true {
+      let crossesSeam = child.parent == nil && child.evaluationHost != nil
+      guard let ancestor = evaluationAncestor(of: child) else {
+        break
       }
-      if ancestor.hasEvaluator {
-        return ancestor
+      guard visited.insert(ObjectIdentifier(ancestor)).inserted else {
+        break
       }
-      current = ancestor.parent
+      if crossesSeam {
+        candidate = nil
+      }
+      if candidate == nil, ancestor.hasEvaluator {
+        candidate = ancestor
+      }
+      child = ancestor
     }
-    return nil
+    return candidate
   }
 
   private static func lifecycleEvaluationOwnerAncestor(
@@ -142,7 +172,7 @@ enum ViewGraphDirtyEvaluationPlanner {
       {
         return ownerNode
       }
-      current = candidate.parent
+      current = evaluationAncestor(of: candidate)
     }
 
     return nil
@@ -158,10 +188,8 @@ enum ViewGraphDirtyEvaluationPlanner {
       nodesByNodeID: nodesByNodeID,
       lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
     ) {
-      return lifecycleOwner.hasEvaluator
-        ? lifecycleOwner
-        : nearestEvaluatorAncestor(of: lifecycleOwner)
+      return stitchableEvaluatorTarget(startingAt: lifecycleOwner)
     }
-    return dirtyNode.hasEvaluator ? dirtyNode : nearestEvaluatorAncestor(of: dirtyNode)
+    return stitchableEvaluatorTarget(startingAt: dirtyNode)
   }
 }

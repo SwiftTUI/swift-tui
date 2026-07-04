@@ -21,6 +21,10 @@ import SwiftTUICore
 /// as a preference exactly as the background did before, so nothing downstream
 /// of the portal changes.
 struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
+  /// The declaration's source identity (the resolved background's identity) —
+  /// reported with every resolve so the frame head can compare observations
+  /// against the portal registry's declared sources.
+  let sourceIdentity: Identity
   /// Reads the presentation's activation state (`isPresented.wrappedValue`,
   /// `item.wrappedValue != nil`, tip eligibility + dismissal `@State`, …).
   /// Invoked only inside this leaf's resolve so every `@State`/binding read it
@@ -41,7 +45,15 @@ struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
     // dependency on THIS leaf rather than the binding's slot owner (an ancestor
     // of the background). Toggling the presentation state then dirties only
     // this leaf, leaving the disjoint-sibling background reusable.
-    if isActive() {
+    let active = isActive()
+    // Reported on EVERY resolve (active or not): the frame head no longer
+    // force-queues the portal root on invalidation frames, so an observed
+    // activation change is what escalates the frame to a portal reconcile.
+    context.presentationTriggerObserver?.record(
+      sourceIdentity: sourceIdentity,
+      isActive: active
+    )
+    if active {
       node.preferenceValues.merge(
         PresentationCoordinatorDeclarationPreferenceKey.self,
         value: makeDeclaration()
@@ -101,7 +113,10 @@ func resolvePresentationModifier<Base: View>(
   var background = content.resolve(in: context.child(component: .named("base")))
   prepareBackground(&background)
   let resolvedBackground = background
-  let trigger = PresentationTriggerLeaf(isActive: isActive) {
+  let trigger = PresentationTriggerLeaf(
+    sourceIdentity: resolvedBackground.identity,
+    isActive: isActive
+  ) {
     declaration(resolvedBackground)
   }
   let triggerNode = resolveView(

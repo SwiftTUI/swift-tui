@@ -109,6 +109,7 @@ package protocol ManagedPresentationCoordinator: PresentationCoordinator {
   static var overlayKindName: String { get }
 
   var isActive: Bool { get }
+  var declaredSourceIdentities: Set<Identity> { get }
   var latestItem: Item? { get }
   var latestActivationOrdinal: Int? { get }
   func dismissAction(for item: Item) -> (@MainActor @Sendable () -> Void)?

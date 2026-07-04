@@ -14,6 +14,7 @@ extension RunLoop {
   /// complexity here would serve no production path.
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
+    registerLiveFocusedValuesProvider()
 
     let hasFrameSink = frameSink != nil
     renderer.setElidedFrameTimingDiagnosticsEnabled(
@@ -105,6 +106,19 @@ extension RunLoop {
       previousRenderedState = currentState
     }
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
+  }
+
+  /// Publishes this run loop's `currentFocusedValues` as the live
+  /// focused-values source for its graph scope, so imperative callbacks
+  /// (key commands, gesture handlers) re-materialize their authoring context
+  /// against current focus state instead of their registration-time snapshot.
+  private func registerLiveFocusedValuesProvider() {
+    LiveFocusedValuesRegistry.register(
+      scope: StateGraphScopeID(renderer.viewGraph),
+      provider: { [weak self] in
+        self?.currentFocusedValues
+      }
+    )
   }
 
   /// Shared post-acquisition per-frame body. Both `renderPendingFrames` and
@@ -240,6 +254,7 @@ extension RunLoop {
     eventPump: EventPump?
   ) async throws -> RunLoopExitReason? {
     observationBridge.attachInvalidator(scheduler)
+    registerLiveFocusedValuesProvider()
 
     let hasFrameSink = frameSink != nil
     renderer.setElidedFrameTimingDiagnosticsEnabled(

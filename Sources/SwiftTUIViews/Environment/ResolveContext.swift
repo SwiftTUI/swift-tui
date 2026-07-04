@@ -146,6 +146,10 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.requestDeadline }
     set { propagated.requestDeadline = newValue }
   }
+  package var presentationTriggerObserver: PresentationTriggerObservationLog? {
+    get { propagated.presentationTriggerObserver }
+    set { propagated.presentationTriggerObserver = newValue }
+  }
 
   @MainActor
   package var runtimeRegistrations: RuntimeRegistrationSet {
@@ -523,6 +527,11 @@ extension ResolveContext {
     /// Forwards deadline requests to the frame scheduler.
     /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
     package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
+    /// Frame-scoped sink for presentation declaration-emitter observations
+    /// (the portal force-queue narrowing's escalation signal). Points at the
+    /// stable live-state log, so evaluator closures captured on earlier
+    /// frames keep reporting into the current frame's log.
+    package var presentationTriggerObserver: PresentationTriggerObservationLog?
 
     package init(
       resolveWorkTracker: ResolveWorkTracker? = nil,

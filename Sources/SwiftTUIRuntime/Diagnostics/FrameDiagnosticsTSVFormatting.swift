@@ -70,6 +70,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "runtime_publication_unmapped_invalidated",
     "runtime_publication_unmapped_sample",
     "runtime_publication_portal_root_queued",
+    "runtime_publication_portal_escalated",
     "runtime_graph_checkpoint_baseline_nodes",
     "runtime_graph_checkpoint_prepared_nodes",
     "runtime_graph_checkpoint_dirty_subtree_candidate_nodes",
@@ -268,6 +269,7 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.runtimePublicationUnmappedInvalidatedIdentityCount),
       publicationUnmappedSample.isEmpty ? "-" : sanitizeField(publicationUnmappedSample),
       formatOptionalBool(record.runtimePublicationPresentationPortalRootQueued),
+      formatOptionalBool(record.runtimePublicationPresentationPortalEscalated),
       formatOptionalInt(record.runtimePublicationGraphCheckpointBaselineNodeCount),
       formatOptionalInt(record.runtimePublicationGraphCheckpointPreparedNodeCount),
       formatOptionalInt(

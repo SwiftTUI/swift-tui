@@ -18,6 +18,160 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PresentationPortalForceQueueTests {
+  @Test("unrelated invalidation leaves the portal root unqueued and unescalated")
+  func unrelatedInvalidationLeavesPortalRootUnqueued() async throws {
+    let outcome = try await runPortalForceQueueScenario(
+      rootLabel: "PortalForceQueueCounterRoot",
+      steps: { terminal in
+        [
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Count 0") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Count 1") }
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]
+      },
+      viewBuilder: {
+        SheetForceQueueCounterProbe()
+      }
+    )
+
+    #expect(outcome.frames.contains { $0.contains("Count 1") })
+    let interactionRows = outcome.rows.filter { row in
+      (Int(row["invalidated"] ?? "") ?? 0) > 0
+        && row["runtime_dirty_plan_result"] == "formed"
+    }
+    #expect(!interactionRows.isEmpty)
+    #expect(
+      interactionRows.allSatisfy { row in
+        row["runtime_publication_portal_root_queued"] == "0"
+      }
+    )
+    #expect(
+      interactionRows.allSatisfy { row in
+        row["runtime_publication_portal_escalated"] != "1"
+      }
+    )
+  }
+
+  @Test("declarative sheet opens in the committed frame via reconcile escalation")
+  func declarativeSheetOpensSameFrameViaEscalation() async throws {
+    let outcome = try await runPortalForceQueueScenario(
+      rootLabel: "PortalForceQueueSheetOpenRoot",
+      steps: { terminal in
+        [
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Open Sheet") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("SheetBodyMarker") }
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]
+      },
+      viewBuilder: {
+        SheetForceQueueOpenProbe()
+      }
+    )
+
+    // Same-frame visibility IS the escalation evidence for sheets: the
+    // committed open frame is the eager focus-sync rerender (default focus
+    // adopts into the modal), which only runs because the discarded selective
+    // pass escalated and composed the sheet into its focus regions. The
+    // committed row is therefore root-forced; the escalation flag is pinned
+    // directly on the (focus-neutral) toast scenario instead.
+    #expect(outcome.frames.contains { $0.contains("SheetBodyMarker") })
+    let formedRows = outcome.rows.filter { row in
+      row["runtime_dirty_plan_result"] == "formed"
+    }
+    #expect(!formedRows.isEmpty)
+    #expect(
+      formedRows.allSatisfy { row in
+        row["runtime_publication_portal_root_queued"] == "0"
+      }
+    )
+  }
+
+  @Test("declarative toast open and close escalate the committed selective frame")
+  func declarativeToastTogglesViaEscalation() async throws {
+    let outcome = try await runPortalForceQueueScenario(
+      rootLabel: "PortalForceQueueToastToggleRoot",
+      steps: { terminal in
+        [
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Toggle Toast") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("ToastBodyMarker") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.last.map { !$0.contains("ToastBodyMarker") } ?? false
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]
+      },
+      viewBuilder: {
+        ToastForceQueueToggleProbe()
+      }
+    )
+
+    #expect(outcome.frames.contains { $0.contains("ToastBodyMarker") })
+    let finalFrame = try #require(outcome.frames.last)
+    #expect(!finalFrame.contains("ToastBodyMarker"))
+    // Toasts adopt no focus, so no eager focus-sync rerender replaces the
+    // escalating pass: the committed open and close frames each carry the
+    // escalation, on a formed (never install-queued) selective plan.
+    let escalatedRows = outcome.rows.filter { row in
+      row["runtime_publication_portal_escalated"] == "1"
+    }
+    #expect(escalatedRows.count >= 2)
+    #expect(
+      escalatedRows.allSatisfy { row in
+        row["runtime_publication_portal_root_queued"] == "0"
+          && row["runtime_dirty_plan_result"] == "formed"
+      }
+    )
+  }
+
+  @Test("declarative sheet dismiss prunes the overlay via reconcile escalation")
+  func declarativeSheetClosesViaEscalation() async throws {
+    let outcome = try await runPortalForceQueueScenario(
+      rootLabel: "PortalForceQueueSheetCloseRoot",
+      steps: { terminal in
+        [
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Open Sheet") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("SheetBodyMarker") }
+          },
+          .press(KeyPress(.escape)),
+          .awaitCondition {
+            terminal.frames.last.map { !$0.contains("SheetBodyMarker") } ?? false
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]
+      },
+      viewBuilder: {
+        SheetForceQueueOpenProbe()
+      }
+    )
+
+    // Visibility both ways is the contract; the committed open/close frames
+    // are focus-sync rerenders (focus moves into and back out of the modal),
+    // so the escalation flag is pinned on the toast scenario instead.
+    #expect(outcome.frames.contains { $0.contains("SheetBodyMarker") })
+    let finalFrame = try #require(outcome.frames.last)
+    #expect(!finalFrame.contains("SheetBodyMarker"))
+  }
+
   @Test("removing a declared source subtree prunes its overlay")
   func declaredSourceRemovalPrunesOverlay() async throws {
     let outcome = try await runPortalForceQueueScenario(
@@ -185,6 +339,7 @@ private func runPortalForceQueueScenario<V: View>(
   }
 
   let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+  try? diagnostics.write(toFile: "/tmp/pfq-last.tsv", atomically: true, encoding: .utf8)
   return PortalForceQueueOutcome(
     frames: terminal.frames,
     rows: portalForceQueueDiagnosticRows(diagnostics)
@@ -220,6 +375,22 @@ private struct SheetForceQueueOpenProbe: View {
       }
       .sheet(isPresented: $isPresented) {
         Text("SheetBodyMarker")
+      }
+      Text("Background")
+    }
+  }
+}
+
+private struct ToastForceQueueToggleProbe: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    VStack {
+      Button("Toggle Toast") {
+        isPresented.toggle()
+      }
+      .toast(isPresented: $isPresented, duration: nil) {
+        Text("ToastBodyMarker")
       }
       Text("Background")
     }

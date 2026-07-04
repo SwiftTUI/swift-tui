@@ -54,9 +54,38 @@ package enum SelectiveEvaluationDisabledReason: String, Sendable {
   case pressedChanged = "pressed_changed"
   case proposalChanged = "proposal_changed"
   case rootInvalidated = "root_invalidated"
+  case runtimeEnvironmentChanged = "runtime_environment_changed"
 
   package var diagnosticName: String {
     rawValue
+  }
+}
+
+/// The runtime-owned root environment values the run loop refreshes into every
+/// frame's root context (see `RunLoop.resolveContext(for:)`), excluding
+/// focus/press/focused-values (which have their own dirty-frontier machinery)
+/// and terminal size (covered by the proposal comparison). A change here must
+/// force root evaluation: environment readers anywhere in the tree may depend
+/// on these values, selective frames have no reader-invalidation path for
+/// them, and such changes (theme flips, appearance reloads, capability
+/// renegotiation) are far too rare to justify one.
+package struct RuntimeRootEnvironmentSignature: Equatable, Sendable {
+  package var terminalAppearance: TerminalAppearance
+  package var theme: Theme?
+  package var cellPixelMetrics: CellPixelMetrics
+  package var pointerInputCapabilities: PointerInputCapabilities
+  package var accessibilityReduceMotion: Bool
+  package var suppressesProgress: Bool
+  package var cursorFollowsFocus: Bool
+
+  package init(environmentValues: EnvironmentValues) {
+    terminalAppearance = environmentValues.terminalAppearance
+    theme = environmentValues.theme
+    cellPixelMetrics = environmentValues.cellPixelMetrics
+    pointerInputCapabilities = environmentValues.pointerInputCapabilities
+    accessibilityReduceMotion = environmentValues.accessibilityReduceMotion
+    suppressesProgress = environmentValues.suppressesProgress
+    cursorFollowsFocus = environmentValues.cursorFollowsFocus
   }
 }
 
@@ -237,6 +266,7 @@ package final class FrameResolveState {
   private var previousFocusedIdentity: Identity?
   private var previousPressedIdentity: Identity?
   private var previousProposal: ProposedSize?
+  private var previousRuntimeRootEnvironment: RuntimeRootEnvironmentSignature?
 
   package init() {
     selectiveEvaluationEnabled = false
@@ -259,17 +289,25 @@ package final class FrameResolveState {
       !suppressionScope.isEmpty && !suppressionScope.suppressesAll
     let focusChangeRequiresRoot = focusChanged && !finiteSuppressionCoversFocusPress
     let pressedChangeRequiresRoot = pressedChanged && !finiteSuppressionCoversFocusPress
+    let runtimeRootEnvironment = RuntimeRootEnvironmentSignature(
+      environmentValues: context.environmentValues
+    )
+    let runtimeEnvironmentChanged =
+      previousRuntimeRootEnvironment != nil
+      && runtimeRootEnvironment != previousRuntimeRootEnvironment
     let environmentRequiresRootEvaluation =
       frameStateForceRoot
       || contextForceRoot
       || focusChangeRequiresRoot
       || pressedChangeRequiresRoot
       || proposalChanged
+      || runtimeEnvironmentChanged
     let frameStateForceRootSources = forceRootEvaluationSources
       .sorted { $0.rawValue < $1.rawValue }
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed
     previousProposal = proposal
+    previousRuntimeRootEnvironment = runtimeRootEnvironment
     forceRootEvaluation = false
     forceRootEvaluationSources.removeAll()
     retainedReuseSuppressionScope = .none
@@ -301,6 +339,9 @@ package final class FrameResolveState {
     if rootInvalidated {
       disabledReasons.append(.rootInvalidated)
     }
+    if runtimeEnvironmentChanged {
+      disabledReasons.append(.runtimeEnvironmentChanged)
+    }
 
     return FrameResolveInputs(
       invalidatedIdentities: context.invalidatedIdentities,
@@ -328,6 +369,7 @@ extension FrameResolveState {
     package var previousFocusedIdentity: Identity?
     package var previousPressedIdentity: Identity?
     package var previousProposal: ProposedSize?
+    package var previousRuntimeRootEnvironment: RuntimeRootEnvironmentSignature?
   }
 
   package func makeCheckpoint() -> Checkpoint {
@@ -337,7 +379,8 @@ extension FrameResolveState {
       retainedReuseSuppressionScope: retainedReuseSuppressionScope,
       previousFocusedIdentity: previousFocusedIdentity,
       previousPressedIdentity: previousPressedIdentity,
-      previousProposal: previousProposal
+      previousProposal: previousProposal,
+      previousRuntimeRootEnvironment: previousRuntimeRootEnvironment
     )
   }
 
@@ -348,6 +391,7 @@ extension FrameResolveState {
     previousFocusedIdentity = checkpoint.previousFocusedIdentity
     previousPressedIdentity = checkpoint.previousPressedIdentity
     previousProposal = checkpoint.previousProposal
+    previousRuntimeRootEnvironment = checkpoint.previousRuntimeRootEnvironment
   }
 
   package struct DebugStateSnapshot: Equatable {
@@ -357,6 +401,7 @@ extension FrameResolveState {
     package var previousFocusedIdentity: Identity?
     package var previousPressedIdentity: Identity?
     package var previousProposal: ProposedSize?
+    package var previousRuntimeRootEnvironment: RuntimeRootEnvironmentSignature?
   }
 
   package func debugStateSnapshot() -> DebugStateSnapshot {
@@ -367,7 +412,8 @@ extension FrameResolveState {
       retainedReuseSuppressionScope: checkpoint.retainedReuseSuppressionScope,
       previousFocusedIdentity: checkpoint.previousFocusedIdentity,
       previousPressedIdentity: checkpoint.previousPressedIdentity,
-      previousProposal: checkpoint.previousProposal
+      previousProposal: checkpoint.previousProposal,
+      previousRuntimeRootEnvironment: checkpoint.previousRuntimeRootEnvironment
     )
   }
 }

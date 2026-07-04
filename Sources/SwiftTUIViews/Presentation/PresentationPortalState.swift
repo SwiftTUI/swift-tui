@@ -9,6 +9,10 @@ package final class PresentationPortalState {
   private var registry = PresentationCoordinatorRegistry()
   private var imperativeHostIdentity: Identity?
   private weak var imperativeInvalidator: (any Invalidating)?
+  /// Frame-scoped declaration-emitter observations; reset by the frame head
+  /// at every head attempt. Lives here (not on the per-frame draft) so
+  /// evaluator closures captured on earlier frames keep a valid sink.
+  package let triggerObservations = PresentationTriggerObservationLog()
   /// Imperative present/dismiss operations applied to the live registry since
   /// the newest draft was checkpointed. A draft commit replaces the live
   /// registry wholesale with the draft's copy, so an operation that landed
@@ -204,6 +208,13 @@ package final class PresentationPortalDraft {
   package func overlayEntries() -> [OverlayStackEntry] {
     precondition(!didCommit && !didDiscard)
     return registry.overlayEntries()
+  }
+
+  /// Sources with declaratively-synced items in this draft's (last committed)
+  /// registry state — the escalation comparison baseline for the frame head.
+  package func declaredSourceIdentities() -> Set<Identity> {
+    precondition(!didCommit && !didDiscard)
+    return registry.declaredSourceIdentities()
   }
 
   package func dismissStack() -> DismissStack {

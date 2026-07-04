@@ -283,9 +283,17 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
 
   @MainActor
   fileprivate var authoringContext: AuthoringContext {
-    AuthoringContext(
+    // Focused values are runtime state, not registration state: prefer the
+    // graph scope's live set at fire time so `@FocusedValue`/`@FocusedBinding`
+    // reads inside imperative callbacks track focus moves that happened after
+    // this snapshot was captured. The captured set remains the fallback for
+    // scopes without a live provider (snapshot rendering, retired graphs).
+    let liveFocusedValues = stateGraphScope.flatMap {
+      LiveFocusedValuesRegistry.currentFocusedValues(for: $0)
+    }
+    return AuthoringContext(
       viewIdentity: viewIdentity,
-      focusedValues: focusedValues,
+      focusedValues: liveFocusedValues ?? focusedValues,
       ownerNodeID: ownerNodeID,
       stateGraphScope: stateGraphScope
     )

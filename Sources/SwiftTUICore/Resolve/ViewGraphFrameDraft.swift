@@ -72,6 +72,14 @@ package final class ViewGraphFrameDraft {
       return
     }
     publicationDiagnostics.presentationPortalRootQueued = queued
+    publicationDiagnostics.presentationPortalEscalated = false
+  }
+
+  package func recordPresentationPortalEscalation() {
+    guard publicationDiagnosticsEnabled else {
+      return
+    }
+    publicationDiagnostics.presentationPortalEscalated = true
   }
 
   package func recordPreparedCheckpoint(from viewGraph: ViewGraph) {

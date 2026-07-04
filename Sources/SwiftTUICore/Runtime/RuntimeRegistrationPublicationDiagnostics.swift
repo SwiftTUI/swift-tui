@@ -20,6 +20,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var unmappedInvalidatedIdentitySample: [Identity]
   package var selectiveEvaluationDisabledReasons: [String]
   package var presentationPortalRootQueued: Bool?
+  package var presentationPortalEscalated: Bool?
   package var graphCheckpointBaselineNodeCount: Int?
   package var graphCheckpointPreparedNodeCount: Int?
   package var graphCheckpointDirtySubtreeCandidateNodeCount: Int?
@@ -44,6 +45,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     unmappedInvalidatedIdentitySample: [Identity] = [],
     selectiveEvaluationDisabledReasons: [String] = [],
     presentationPortalRootQueued: Bool? = nil,
+    presentationPortalEscalated: Bool? = nil,
     graphCheckpointBaselineNodeCount: Int? = nil,
     graphCheckpointPreparedNodeCount: Int? = nil,
     graphCheckpointDirtySubtreeCandidateNodeCount: Int? = nil,
@@ -67,6 +69,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
     self.presentationPortalRootQueued = presentationPortalRootQueued
+    self.presentationPortalEscalated = presentationPortalEscalated
     self.graphCheckpointBaselineNodeCount = graphCheckpointBaselineNodeCount
     self.graphCheckpointPreparedNodeCount = graphCheckpointPreparedNodeCount
     self.graphCheckpointDirtySubtreeCandidateNodeCount =

@@ -86,6 +86,7 @@ struct DefaultRendererFrameHeadCoordinator {
       animationDraft: animationDraft,
       resolveInputs: resolveInputs,
       canUseSelectiveEvaluation: resolveInputs.usesSelectiveEvaluation,
+      portal: portal,
       clock: clock
     )
     let frameProducts = makeFrameTailProducts(
@@ -291,6 +292,13 @@ struct DefaultRendererFrameHeadCoordinator {
     resolveContext: inout ResolveContext,
     resolveInputs: FrameResolveInputs
   ) -> ObservationBridgeDraft? {
+    // Fresh observation window per head attempt: declaration emitters report
+    // every resolve into the live-state log, and the post-evaluation portal
+    // escalation reads it (see `resolveGraphHead`). The observer rides the
+    // propagated context so evaluator closures captured on earlier frames
+    // keep reporting into the current frame's log.
+    presentationPortalState.triggerObservations.reset()
+    resolveContext.presentationTriggerObserver = presentationPortalState.triggerObservations
     viewGraph.beginFrame()
     if resolveInputs.usesSelectiveEvaluation {
       viewGraph.invalidateAndQueueDirty(resolveInputs.invalidatedIdentities)
@@ -313,6 +321,59 @@ struct DefaultRendererFrameHeadCoordinator {
       return
     }
     viewGraph.invalidateAndQueueDirtyDescendants(of: scope.identities)
+  }
+
+  /// Whether this frame's narrow evaluation may have changed the
+  /// overlay-entry set, requiring the portal root to re-reconcile:
+  ///
+  /// - an emitter observed ACTIVE (open, or item change while presented —
+  ///   conservative: re-reconciling an unchanged declaration is idempotent),
+  /// - an emitter observed INACTIVE whose source is still declared (close),
+  /// - a declared source whose graph node departed this frame (prune —
+  ///   the emitter is gone, so no observation can report the close).
+  private func presentationPortalRequiresReconcileEscalation(
+    portal: PresentationPortalPreparation
+  ) -> Bool {
+    let observations = presentationPortalState.triggerObservations.observations
+    let declaredSources = portal.draft.declaredSourceIdentities()
+    if observations.contains(where: { observation in
+      observation.isActive || declaredSources.contains(observation.sourceIdentity)
+    }) {
+      return true
+    }
+    guard !declaredSources.isEmpty else {
+      return false
+    }
+    return declaredSources.contains { !viewGraph.containsNode(for: $0) }
+  }
+
+  private func escalateToPresentationPortalReconcile(
+    portal: PresentationPortalPreparation,
+    graphDraft: ViewGraphFrameDraft,
+    resolveInputs: FrameResolveInputs
+  ) {
+    viewGraph.queueDirty([portal.graphRootIdentity])
+    let escalation:
+      (
+        plan: DirtyEvaluationPlan?,
+        diagnostics: DirtyEvaluationPlanDiagnostics?
+      )
+    if RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled {
+      let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+        invalidatedIdentities: resolveInputs.invalidatedIdentities
+      )
+      escalation = (evaluation.plan, evaluation.diagnostics)
+    } else {
+      escalation = (viewGraph.selectiveDirtyEvaluationPlan(), nil)
+    }
+    // Accumulates onto the first plan's publication roots; a nil escalation
+    // plan falls back to `.all` and the full root evaluation below.
+    graphDraft.recordDirtyEvaluationPlan(
+      escalation.plan,
+      diagnostics: escalation.diagnostics
+    )
+    graphDraft.recordPresentationPortalEscalation()
+    _ = viewGraph.evaluateDirtyNodes(using: escalation.plan)
   }
 
   private func installPresentationPortalEvaluator<V: View>(
@@ -338,10 +399,19 @@ struct DefaultRendererFrameHeadCoordinator {
     viewGraph.setEvaluator(for: presentationPortalContext.identity) {
       _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
     }
+    // F08 step 4: a selective frame with invalidations no longer queues the
+    // portal root eagerly (the removed third condition,
+    // `!resolveInputs.invalidatedIdentities.isEmpty`, made every interaction
+    // frame's frontier root-rooted). Declarative activation flips are
+    // observed by the declaration emitters during subtree evaluation and
+    // escalate to a portal-root re-resolve after the narrow plan runs
+    // (`escalateToPresentationPortalReconcile`), so open/close/prune keep
+    // their same-frame semantics. Stale overlay-entry identities that the
+    // portal translation leaves unmapped still force a full evaluation via
+    // `ViewGraph.nodeIDsForInvalidation`.
     let shouldQueuePresentationPortalRoot =
       !hasExistingPresentationPortalRoot
       || !resolveInputs.usesSelectiveEvaluation
-      || !resolveInputs.invalidatedIdentities.isEmpty
     if shouldQueuePresentationPortalRoot {
       viewGraph.queueDirty([presentationPortalContext.identity])
     }
@@ -359,6 +429,7 @@ struct DefaultRendererFrameHeadCoordinator {
     animationDraft: AnimationFrameDraft,
     resolveInputs: FrameResolveInputs,
     canUseSelectiveEvaluation: Bool,
+    portal: PresentationPortalPreparation,
     clock: ContinuousClock
   ) -> (resolved: ResolvedNode, resolveDuration: Duration) {
     let (_, resolveDuration): (Void, Duration)
@@ -407,9 +478,27 @@ struct DefaultRendererFrameHeadCoordinator {
 
       (_, resolveDuration) = measurePhase(clock: clock) {
         withAnimationDraftSinks(animationDraft) {
-          viewGraph.evaluateDirtyNodes(
+          _ = viewGraph.evaluateDirtyNodes(
             using: dirtyEvaluationPlan
           )
+          // Portal reconcile escalation: a narrow plan cannot consume the
+          // presentation declaration preference (only the portal root's own
+          // resolve reconciles it), so when this frame's emitter
+          // observations — or a departed declared source — prove the
+          // overlay-entry set may have changed, re-evaluate from the portal
+          // root within the same frame. The accumulated `.subtrees`
+          // publication becomes root-rooted and routes onto the
+          // fingerprint-delta commit body.
+          if dirtyEvaluationPlan != nil,
+            !portal.queuedRoot,
+            presentationPortalRequiresReconcileEscalation(portal: portal)
+          {
+            escalateToPresentationPortalReconcile(
+              portal: portal,
+              graphDraft: graphDraft,
+              resolveInputs: resolveInputs
+            )
+          }
         }
       }
     }

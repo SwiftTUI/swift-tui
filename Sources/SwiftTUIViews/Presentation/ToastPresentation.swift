@@ -261,7 +261,15 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    guard isPresented.wrappedValue else {
+    // Toasts emit their declaration directly (no trigger leaf), so they
+    // report the activation observation here — the frame head's portal
+    // reconcile escalation depends on seeing every emitter's resolve.
+    let active = isPresented.wrappedValue
+    context.presentationTriggerObserver?.record(
+      sourceIdentity: node.identity,
+      isActive: active
+    )
+    guard active else {
       return [node]
     }
 

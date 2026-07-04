@@ -19,14 +19,17 @@
 # forms (usleep/nanosleep/Thread.sleep) were added 2026-05-30 after a flake
 # audit found they slipped past the original regex set.
 #
-# Baseline composition (14): 6 DispatchSemaphore barriers
+# Baseline composition (15): 6 DispatchSemaphore barriers
 # (TerminalPresentationTests x4, AsyncFrameTailRenderingTests x1,
 # TerminalHostPresentationBatchingTests x1) + 4 fixed sleeps
 # (InteractiveRuntimeTests x2 usleep, AnimationRepeatForeverGrowthTests x1
-# usleep, RenderDiffTests x1 Thread.sleep) + 2 process/loop watchdogs
+# usleep, RenderDiffTests x1 Thread.sleep) + 3 process/loop watchdogs
 # (EntryPointLaunchTests x1 Task.sleep, GeometryReaderSurfaceTests x1
-# Task.sleep) + 2 autonomous-workload ticks (GeometryReaderSurfaceTests x1
-# Task.sleep, TaskReadsUnbodiedStateTests x1 Task.sleep).
+# Task.sleep, PresentationPortalForceQueueTests x1 Task.sleep — bounds the
+# scripted-input frame-condition waits so a wrong predicate fails the test
+# with diagnostics instead of hanging the suite) + 2 autonomous-workload
+# ticks (GeometryReaderSurfaceTests x1 Task.sleep,
+# TaskReadsUnbodiedStateTests x1 Task.sleep).
 #
 # NOTE: the EntryPointLaunchTests occurrence is a *process watchdog backstop*,
 # not timeout-driven synchronisation. `runFixture` reads a launched fixture's

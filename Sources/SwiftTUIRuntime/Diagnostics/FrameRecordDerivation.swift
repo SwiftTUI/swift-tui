@@ -146,6 +146,8 @@ package enum FrameRecordDerivation {
       publication.selectiveEvaluationDisabledReasons
     record.runtimePublicationPresentationPortalRootQueued =
       publication.presentationPortalRootQueued
+    record.runtimePublicationPresentationPortalEscalated =
+      publication.presentationPortalEscalated
     record.runtimePublicationGraphCheckpointBaselineNodeCount =
       publication.graphCheckpointBaselineNodeCount
     record.runtimePublicationGraphCheckpointPreparedNodeCount =
