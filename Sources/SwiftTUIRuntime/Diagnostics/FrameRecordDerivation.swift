@@ -146,6 +146,8 @@ package enum FrameRecordDerivation {
       publication.remappedInvalidatedIdentityCount
     record.runtimePublicationDroppedInvalidatedIdentityCount =
       publication.droppedInvalidatedIdentityCount
+    record.runtimePublicationReconciledInvalidatedNodeCount =
+      publication.reconciledInvalidatedNodeCount
     record.runtimeSelectiveEvaluationDisabledReasons =
       publication.selectiveEvaluationDisabledReasons
     record.runtimePublicationPresentationPortalRootQueued =

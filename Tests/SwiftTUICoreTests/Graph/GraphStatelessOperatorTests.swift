@@ -145,7 +145,6 @@ struct GraphCheckpointStoreTests {
     rootEvaluation.evaluationRootIdentity = rootIdentity
 
     var dirtyState = ViewGraph.DirtyState()
-    dirtyState.requiresRootEvaluation = true
     dirtyState.invalidatedNodeIDs = [rootID]
 
     var taskDescriptors = ViewGraph.TaskDescriptorState()
@@ -173,7 +172,6 @@ struct GraphCheckpointStoreTests {
     #expect(checkpoint.root === root)
     #expect(checkpoint.index.nodeIDByIdentity[rootIdentity] == rootID)
     #expect(checkpoint.rootEvaluation.evaluationRootIdentity == rootIdentity)
-    #expect(checkpoint.dirtyState.requiresRootEvaluation)
     #expect(checkpoint.dirtyState.invalidatedNodeIDs == [rootID])
     #expect(checkpoint.taskDescriptors.nextTaskDescriptorIdentityToken == 77)
     #expect(checkpoint.frameCommit.currentFrameID == 42)

@@ -64,7 +64,6 @@ extension ViewGraph {
   /// The dirty frontier: what must be re-evaluated, and the state-mutation keys
   /// driving it. `finalizeFrame` clears these once the frame commits.
   package struct DirtyState {
-    package var requiresRootEvaluation: Bool = false
     package var invalidatedNodeIDs: Set<ViewNodeID> = []
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID> = []
     package var stateMutationKeys: Set<StateSlotKey> = []

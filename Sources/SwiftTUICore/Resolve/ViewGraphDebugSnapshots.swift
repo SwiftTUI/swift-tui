@@ -26,7 +26,6 @@ extension ViewGraph {
     package var structuralDisappearEvents: [LifecycleEvent]
     package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
     package var absorbedShadowedNodeIDs: Set<ViewNodeID>
-    package var requiresRootEvaluation: Bool
     package var invalidatedNodeIDs: Set<ViewNodeID>
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var latestLifecycleEvents: [LifecycleEvent]

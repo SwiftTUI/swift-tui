@@ -1,6 +1,5 @@
 struct ViewGraphDirtyEvaluationPlanningInput {
   var hasRoot: Bool
-  var invalidatedNodeIDs: Set<ViewNodeID>
   var graphLocalDirtyNodeIDs: Set<ViewNodeID>
   var nodesByNodeID: [ViewNodeID: ViewNode]
   var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
@@ -21,16 +20,9 @@ enum ViewGraphDirtyEvaluationPlanner {
       return nil
     }
 
-    // Every invalidated node that still exists in the graph must be tracked
-    // as graph-local dirty. Missing node ids cannot produce a
-    // dirty frontier and are safe to ignore.
-    let graphKnownInvalidated = input.invalidatedNodeIDs.filter {
-      input.nodesByNodeID[$0] != nil
-    }
-    guard graphKnownInvalidated.isSubset(of: input.graphLocalDirtyNodeIDs) else {
-      return nil
-    }
-
+    // Live invalidated nodes are unioned into `graphLocalDirtyNodeIDs` by
+    // the caller before planning (inter-rail reconciliation, F10 slice 2),
+    // so the dirty set is authoritative here.
     let dirtyFrontier = dirtyFrontierNodes(
       graphLocalDirtyNodeIDs: input.graphLocalDirtyNodeIDs,
       nodesByNodeID: input.nodesByNodeID

@@ -96,14 +96,13 @@ extension ViewGraph {
 
   package struct StateMutationOverlay {
     package var stateSlots: [StateMutationSlotKey: AnyStateSlot]
-    package var requiresRootEvaluation: Bool
     package var invalidatedNodeIDs: Set<ViewNodeID>
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var stateMutationKeys: Set<StateSlotKey>
     package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
 
     package var isEmpty: Bool {
-      stateSlots.isEmpty && !requiresRootEvaluation && invalidatedNodeIDs.isEmpty
+      stateSlots.isEmpty && invalidatedNodeIDs.isEmpty
         && graphLocalDirtyNodeIDs.isEmpty && stateMutationKeys.isEmpty
         && stateMutationNodeIDsByKey.isEmpty
     }
@@ -144,6 +143,11 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
   // remapped + dropped == unmapped.
   package var remappedInvalidatedIdentityCount: Int
   package var droppedInvalidatedIdentityCount: Int
+  // Live invalidated nodes the planner had to union into the graph-local
+  // dirty set because the two rails diverged (F10 slice 2). Zero on healthy
+  // selective frames; routine on non-selective frames, where `invalidate()`
+  // fills only the invalidated rail.
+  package var reconciledInvalidatedNodeCount: Int
   package var selectiveEvaluationDisabledReasons: [String]
 
   package init(
@@ -154,6 +158,7 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
     unmappedInvalidatedIdentitySample: [Identity] = [],
     remappedInvalidatedIdentityCount: Int = 0,
     droppedInvalidatedIdentityCount: Int = 0,
+    reconciledInvalidatedNodeCount: Int = 0,
     selectiveEvaluationDisabledReasons: [String] = []
   ) {
     self.result = result
@@ -163,6 +168,7 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
     self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
     self.remappedInvalidatedIdentityCount = remappedInvalidatedIdentityCount
     self.droppedInvalidatedIdentityCount = droppedInvalidatedIdentityCount
+    self.reconciledInvalidatedNodeCount = reconciledInvalidatedNodeCount
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
   }
 }

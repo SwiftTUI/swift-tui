@@ -275,6 +275,62 @@ struct ViewGraphTests {
     #expect(result.diagnostics.droppedInvalidatedIdentityCount == 0)
   }
 
+  @Test("inter-rail divergence reconciles into the plan instead of escalating")
+  func interRailDivergenceReconcilesIntoThePlan() {
+    // Rail drift — a node in `invalidatedNodeIDs` missing from
+    // `graphLocalDirtyNodeIDs` — used to nil the plan
+    // (`nil_invalidated_nodes_not_graph_local_dirty`) and escalate to a full
+    // root evaluation. The planner now unions the difference into the dirty
+    // set and proceeds; on non-selective frames the force-queued portal root
+    // dominates the union, so the reconciled frontier still resolves from
+    // the root as those frames intend.
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let containerIdentity = rootIdentity.child("Container")
+    seedContainerGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      containerIdentity: containerIdentity
+    )
+    graph.setEvaluator(for: rootIdentity) {}
+    graph.setEvaluator(for: containerIdentity) {}
+
+    graph.beginFrame()
+    graph.invalidate([containerIdentity])
+    graph.queueDirty([rootIdentity])
+
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: [containerIdentity]
+    )
+
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.plan?.frontierIdentities == [rootIdentity])
+    #expect(result.diagnostics.reconciledInvalidatedNodeCount == 1)
+  }
+
+  @Test("a selective plan reports zero reconciled nodes when the rails agree")
+  func selectivePlanReportsZeroReconciledNodesWhenRailsAgree() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let containerIdentity = rootIdentity.child("Container")
+    seedContainerGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      containerIdentity: containerIdentity
+    )
+    graph.setEvaluator(for: containerIdentity) {}
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty([containerIdentity])
+
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: [containerIdentity]
+    )
+
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.reconciledInvalidatedNodeCount == 0)
+  }
+
   @Test("unmapped invalidation with no live ancestor is dropped, not escalated")
   func unmappedInvalidationWithNoLiveAncestorIsDropped() {
     // A departed `.id`-rebased identity space shares no path prefix with any

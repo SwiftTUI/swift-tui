@@ -20,6 +20,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var unmappedInvalidatedIdentitySample: [Identity]
   package var remappedInvalidatedIdentityCount: Int
   package var droppedInvalidatedIdentityCount: Int
+  package var reconciledInvalidatedNodeCount: Int
   package var selectiveEvaluationDisabledReasons: [String]
   package var presentationPortalRootQueued: Bool?
   package var presentationPortalEscalated: Bool?
@@ -47,6 +48,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     unmappedInvalidatedIdentitySample: [Identity] = [],
     remappedInvalidatedIdentityCount: Int = 0,
     droppedInvalidatedIdentityCount: Int = 0,
+    reconciledInvalidatedNodeCount: Int = 0,
     selectiveEvaluationDisabledReasons: [String] = [],
     presentationPortalRootQueued: Bool? = nil,
     presentationPortalEscalated: Bool? = nil,
@@ -73,6 +75,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
     self.remappedInvalidatedIdentityCount = remappedInvalidatedIdentityCount
     self.droppedInvalidatedIdentityCount = droppedInvalidatedIdentityCount
+    self.reconciledInvalidatedNodeCount = reconciledInvalidatedNodeCount
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
     self.presentationPortalRootQueued = presentationPortalRootQueued
     self.presentationPortalEscalated = presentationPortalEscalated

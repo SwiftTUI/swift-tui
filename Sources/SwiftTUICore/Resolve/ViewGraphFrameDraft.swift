@@ -403,6 +403,8 @@ package final class ViewGraphFrameDraft {
       dirtyPlanDiagnostics.remappedInvalidatedIdentityCount
     publicationDiagnostics.droppedInvalidatedIdentityCount =
       dirtyPlanDiagnostics.droppedInvalidatedIdentityCount
+    publicationDiagnostics.reconciledInvalidatedNodeCount =
+      dirtyPlanDiagnostics.reconciledInvalidatedNodeCount
     publicationDiagnostics.selectiveEvaluationDisabledReasons =
       dirtyPlanDiagnostics.selectiveEvaluationDisabledReasons
   }

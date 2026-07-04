@@ -177,10 +177,6 @@ package final class ViewGraph {
     get { eventBuffers.latestLifecycleEvents }
     set { eventBuffers.latestLifecycleEvents = newValue }
   }
-  private var requiresRootEvaluation: Bool {
-    get { dirtyState.requiresRootEvaluation }
-    set { dirtyState.requiresRootEvaluation = newValue }
-  }
   private var invalidatedNodeIDs: Set<ViewNodeID> {
     get { dirtyState.invalidatedNodeIDs }
     set { dirtyState.invalidatedNodeIDs = newValue }
@@ -511,7 +507,6 @@ package final class ViewGraph {
       structuralDisappearEvents: structuralDisappearEvents,
       pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       absorbedShadowedNodeIDs: absorbedShadowedNodeIDs,
-      requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
       latestLifecycleEvents: latestLifecycleEvents,
@@ -909,7 +904,6 @@ package final class ViewGraph {
     }
     return StateMutationOverlay(
       stateSlots: stateSlots,
-      requiresRootEvaluation: requiresRootEvaluation,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
       stateMutationKeys: stateMutationKeys,
@@ -932,7 +926,6 @@ package final class ViewGraph {
       node.restoreStateSlot(ordinal: key.key.ordinal, slot: slot)
       node.markDirty()
     }
-    requiresRootEvaluation = requiresRootEvaluation || overlay.requiresRootEvaluation
     invalidatedNodeIDs.formUnion(overlay.invalidatedNodeIDs)
     graphLocalDirtyNodeIDs.formUnion(overlay.graphLocalDirtyNodeIDs)
     stateMutationKeys.formUnion(overlay.stateMutationKeys)
@@ -1079,17 +1072,6 @@ package final class ViewGraph {
       invalidatedIdentities: invalidatedIdentities,
       unmappedIdentities: unmappedIdentities
     )
-    // Unmapped invalidated identities no longer set `requiresRootEvaluation`
-    // (the queue boundary remaps them onto a nearest live ancestor or drops
-    // them — see `nodeIDsForInvalidation`), so this guard covers only the
-    // restore-carried flag; the retired `nil_unmapped_invalidated_identity`
-    // reason cannot be produced anymore.
-    guard !requiresRootEvaluation else {
-      return (
-        nil,
-        baseDiagnostics("nil_root_evaluation_required", 0)
-      )
-    }
     guard root != nil else {
       return (nil, baseDiagnostics("nil_missing_root", 0))
     }
@@ -1100,25 +1082,42 @@ package final class ViewGraph {
       return (nil, baseDiagnostics("nil_no_graph_local_dirty_nodes", 0))
     }
 
-    let graphKnownInvalidated = invalidatedNodeIDs.filter {
-      nodesByNodeID[$0] != nil
-    }
-    guard graphKnownInvalidated.isSubset(of: graphLocalDirtyNodeIDs) else {
-      return (nil, baseDiagnostics("nil_invalidated_nodes_not_graph_local_dirty", 0))
+    // Inter-rail reconciliation (F10 slice 2): a live invalidated node
+    // missing from the graph-local dirty set is unioned in instead of
+    // nil-ing the plan (the retired
+    // `nil_invalidated_nodes_not_graph_local_dirty` escalation into a full
+    // root evaluation). Zero on healthy selective frames by construction;
+    // routine on non-selective frames, where `invalidate()` fills only the
+    // invalidated rail and the force-queued portal root dominates the
+    // union, so the reconciled frontier still resolves from the root as
+    // those frames intend. The count is census-visible on the plan
+    // diagnostics.
+    let unqueuedInvalidated =
+      invalidatedNodeIDs
+      .filter { nodesByNodeID[$0] != nil }
+      .subtracting(graphLocalDirtyNodeIDs)
+    if !unqueuedInvalidated.isEmpty {
+      recordCheckpointGraphMutation()
+      ViewGraphInvalidationPlanner.queueDirty(
+        unqueuedInvalidated,
+        graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+        nodesByNodeID: nodesByNodeID
+      )
     }
 
     guard
       let targetPlan = ViewGraphDirtyEvaluationPlanner.targetPlan(
         input: ViewGraphDirtyEvaluationPlanningInput(
           hasRoot: root != nil,
-          invalidatedNodeIDs: invalidatedNodeIDs,
           graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
           nodesByNodeID: nodesByNodeID,
           lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
         )
       )
     else {
-      return (nil, baseDiagnostics("nil_no_frontier", 0))
+      var diagnostics = baseDiagnostics("nil_no_frontier", 0)
+      diagnostics.reconciledInvalidatedNodeCount = unqueuedInvalidated.count
+      return (nil, diagnostics)
     }
 
     for target in targetPlan.targetNodes {
@@ -1128,17 +1127,18 @@ package final class ViewGraph {
     guard !targetPlan.targetNodes.isEmpty,
       targetPlan.targetNodes.allSatisfy(\.hasEvaluator)
     else {
-      return (nil, baseDiagnostics("nil_missing_evaluator", targetPlan.targetNodes.count))
+      var diagnostics = baseDiagnostics("nil_missing_evaluator", targetPlan.targetNodes.count)
+      diagnostics.reconciledInvalidatedNodeCount = unqueuedInvalidated.count
+      return (nil, diagnostics)
     }
 
     let plan = DirtyEvaluationPlan(
       frontierNodeIDs: targetPlan.targetNodes.map(\.viewNodeID),
       frontierIdentities: targetPlan.targetNodes.map(\.identity)
     )
-    return (
-      plan,
-      baseDiagnostics("formed", plan.frontierIdentities.count)
-    )
+    var diagnostics = baseDiagnostics("formed", plan.frontierIdentities.count)
+    diagnostics.reconciledInvalidatedNodeCount = unqueuedInvalidated.count
+    return (plan, diagnostics)
   }
 
   package func noDirtyWorkPlanDiagnostics(
@@ -1172,7 +1172,7 @@ package final class ViewGraph {
 
   /// Whether any identities are dirty and need evaluation this frame.
   package var hasDirtyWork: Bool {
-    requiresRootEvaluation || !invalidatedNodeIDs.isEmpty || !graphLocalDirtyNodeIDs.isEmpty
+    !invalidatedNodeIDs.isEmpty || !graphLocalDirtyNodeIDs.isEmpty
   }
 
   package func evaluateDirtyNodes(
@@ -2133,7 +2133,6 @@ package final class ViewGraph {
       activeEntities: activeEntities
     )
     pruneDepartedChangeObservationValues()
-    requiresRootEvaluation = false
     invalidatedNodeIDs.removeAll(keepingCapacity: true)
     graphLocalDirtyNodeIDs.removeAll(keepingCapacity: true)
     stateMutationKeys.removeAll(keepingCapacity: true)
