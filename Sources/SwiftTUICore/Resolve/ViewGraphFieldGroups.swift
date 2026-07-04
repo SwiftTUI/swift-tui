@@ -94,8 +94,13 @@ extension ViewGraph {
   }
 
   /// Frame counter, the live-node working set, the resolved-node reuse cache,
-  /// `onChange`'s cross-frame previous-value memory, the committed
-  /// runtime-registration fingerprint, and the checkpoint epoch.
+  /// `onChange`'s cross-frame previous-value memory, and the committed
+  /// runtime-registration fingerprint.
+  ///
+  /// The checkpoint mutation epoch deliberately lives *outside* this group (as
+  /// a plain stored property on ``ViewGraph``): it is tracker metadata about
+  /// mutations, not state — restores bump it rather than write it back, keeping
+  /// it monotonic. See the matching per-node generation on ``ViewNode``.
   package struct FrameCommitState {
     package var currentFrameID: UInt64 = 0
     package var liveNodeIDs: Set<ViewNodeID> = []
@@ -109,6 +114,5 @@ extension ViewGraph {
     // a live node. See `ChangeLifecycleModifier`.
     package var changeObservationValues: [ChangeObservationValueKey: AnyStateSlot] = [:]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
-    package var checkpointMutationEpoch: UInt64 = 0
   }
 }

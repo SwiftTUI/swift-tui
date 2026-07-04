@@ -152,7 +152,6 @@ struct GraphCheckpointStoreTests {
 
     var frameCommit = ViewGraph.FrameCommitState()
     frameCommit.currentFrameID = 42
-    frameCommit.checkpointMutationEpoch = 7
 
     let checkpoint = GraphCheckpointStore.makeCheckpoint(
       root: root,
@@ -165,6 +164,7 @@ struct GraphCheckpointStoreTests {
       taskDescriptors: taskDescriptors,
       dependencyIndex: ViewGraph.DependencyIndex(),
       frameCommit: frameCommit,
+      checkpointMutationEpoch: 7,
       nodesByNodeID: index.nodesByNodeID
     )
 
@@ -175,7 +175,7 @@ struct GraphCheckpointStoreTests {
     #expect(checkpoint.dirtyState.invalidatedNodeIDs == [rootID])
     #expect(checkpoint.taskDescriptors.nextTaskDescriptorIdentityToken == 77)
     #expect(checkpoint.frameCommit.currentFrameID == 42)
-    #expect(checkpoint.frameCommit.checkpointMutationEpoch == 7)
+    #expect(checkpoint.checkpointMutationEpoch == 7)
     // One node checkpoint is produced per live node.
     #expect(Set(checkpoint.nodeCheckpoints.keys) == Set([rootID]))
   }
@@ -186,8 +186,11 @@ struct GraphCheckpointStoreTests {
     let idB = ViewNodeID(rawValue: 2)
     let nodeA = ViewNode(viewNodeID: idA, identity: testIdentity("A"))
     let nodeB = ViewNode(viewNodeID: idB, identity: testIdentity("B"))
-    nodeB.recordCheckpointMutation()
-    nodeB.recordCheckpointMutation()
+    // Recording is structural (stored-property didSet observers), so bump the
+    // generation through a real mutation: markDirty writes exactly one
+    // observed field per call.
+    nodeB.markDirty()
+    nodeB.markDirty()
 
     let state = GraphCheckpointStore.checkpointMutationStateSnapshot(
       epoch: 5,
@@ -235,8 +238,9 @@ struct GraphCheckpointStoreTests {
         against: state
       )
     )
-    // A bumped per-node generation breaks the match.
-    nodeB.recordCheckpointMutation()
+    // A bumped per-node generation breaks the match (markDirty performs one
+    // observed write, so the structural recording bumps exactly once).
+    nodeB.markDirty()
     #expect(
       !GraphCheckpointStore.checkpointMutationStateMatches(
         epoch: 5,

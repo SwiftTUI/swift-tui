@@ -2,9 +2,15 @@
 package final class ViewNode {
   package let viewNodeID: ViewNodeID
   package let identity: Identity
-  package weak var invalidator: (any Invalidating)?
-  package weak var ownerGraph: ViewGraph?
-  package weak var parent: ViewNode?
+  package weak var invalidator: (any Invalidating)? {
+    didSet { recordCheckpointMutation() }
+  }
+  package weak var ownerGraph: ViewGraph? {
+    didSet { recordCheckpointMutation() }
+  }
+  package weak var parent: ViewNode? {
+    didSet { recordCheckpointMutation() }
+  }
   /// The node whose body resolution evaluated this node, captured at
   /// outermost `beginEvaluation`. Bridges island seams in the upward
   /// invalidation walks: capture-hosted content (scoped content payloads, AnyView
@@ -17,12 +23,16 @@ package final class ViewNode {
   /// Never cleared when a frontier evaluator re-runs outside an enclosing
   /// resolution (`ViewNodeContext.current == nil` there); weak, so a
   /// vanished host degrades to the old walk-stops-here behavior.
-  package private(set) weak var evaluationHost: ViewNode?
+  package private(set) weak var evaluationHost: ViewNode? {
+    didSet { recordCheckpointMutation() }
+  }
 
   /// Reuse/freshness gating, grouped so checkpoint/restore move it as a unit
   /// (see ``ReuseState`` in ViewNodeFieldGroups.swift). The three flags below
   /// are computed forwarders preserving their names and visibility.
-  private var reuseState = ReuseState()
+  private var reuseState = ReuseState() {
+    didSet { recordCheckpointMutation() }
+  }
 
   /// Set when a node behind an island seam below this node was dirtied or
   /// re-applied; consumed only by `canReuse`, so retained reuse cannot skip
@@ -56,7 +66,9 @@ package final class ViewNode {
   ///    `resolvedIdentity` field: it's the identity the resolved tree
   ///    was built with, which may differ from `self.identity` when a
   ///    registration alias remaps identity during resolve.
-  package private(set) var committed: ResolvedNode
+  package private(set) var committed: ResolvedNode {
+    didSet { recordCheckpointMutation() }
+  }
 
   /// Whether `committed.children` still reflects the current state of
   /// descendant `ViewNode`s.
@@ -74,12 +86,16 @@ package final class ViewNode {
     set { reuseState.isCommittedSnapshotFresh = newValue }
   }
 
-  package private(set) var children: [ViewNode]
+  package private(set) var children: [ViewNode] {
+    didSet { recordCheckpointMutation() }
+  }
 
   /// Retained per-node state, grouped so checkpoint/restore move it as a unit
   /// (see ``PersistentState`` in ViewNodeFieldGroups.swift). The five fields are
   /// computed forwarders preserving their names and `package private(set)`.
-  private var persistentState = PersistentState()
+  private var persistentState = PersistentState() {
+    didSet { recordCheckpointMutation() }
+  }
 
   package private(set) var stateSlots: [Int: AnyStateSlot] {
     get { persistentState.stateSlots }
@@ -107,7 +123,9 @@ package final class ViewNode {
   /// restore move it as a unit (see ``FrameState`` in ViewNodeFieldGroups.swift).
   /// The eight fields below are computed forwarders preserving their original
   /// names and visibility; the reconciler is unchanged.
-  private var frameState = FrameState()
+  private var frameState = FrameState() {
+    didSet { recordCheckpointMutation() }
+  }
 
   package var wasPresentAtFrameStart: Bool {
     get { frameState.wasPresentAtFrameStart }
@@ -159,9 +177,11 @@ package final class ViewNode {
 
   private let dependencyTracker: DependencyTracker
   /// Cross-frame internal bookkeeping, grouped so checkpoint/restore move it as
-  /// a unit (see ``EvaluationState`` in ViewNodeFieldGroups.swift). The six
+  /// a unit (see ``EvaluationState`` in ViewNodeFieldGroups.swift). The five
   /// fields below are computed forwarders preserving their original names.
-  private var evaluationState = EvaluationState()
+  private var evaluationState = EvaluationState() {
+    didSet { recordCheckpointMutation() }
+  }
 
   private var registrationCaptureDepth: Int {
     get { evaluationState.registrationCaptureDepth }
@@ -170,10 +190,6 @@ package final class ViewNode {
   private var runtimeRegistrationMutationGeneration: UInt64 {
     get { evaluationState.runtimeRegistrationMutationGeneration }
     set { evaluationState.runtimeRegistrationMutationGeneration = newValue }
-  }
-  private var checkpointMutationGeneration: UInt64 {
-    get { evaluationState.checkpointMutationGeneration }
-    set { evaluationState.checkpointMutationGeneration = newValue }
   }
   private var evaluationDepth: Int {
     get { evaluationState.evaluationDepth }
@@ -207,7 +223,18 @@ package final class ViewNode {
     get { frameState.visitedFrameID }
     set { frameState.visitedFrameID = newValue }
   }
-  private var evaluator: (@MainActor () -> Void)?
+  private var evaluator: (@MainActor () -> Void)? {
+    didSet { recordCheckpointMutation() }
+  }
+
+  /// Checkpoint-mutation tracker metadata, deliberately a plain stored property
+  /// outside every observed field group: the `didSet` observers above bump it,
+  /// so placing it inside an observed group would recurse, and it must stay
+  /// monotonic — ``restoreCheckpoint(_:)`` never writes it back (the group
+  /// assignments a restore performs bump it instead). Monotonicity is what
+  /// makes "generation equal ⇒ state equal" hold across any window, which the
+  /// delta-checkpoint machinery (and the F29 checkpoint store) relies on.
+  private var checkpointMutationGeneration: UInt64 = 0
 
   package init(
     viewNodeID: ViewNodeID,
@@ -227,13 +254,27 @@ package final class ViewNode {
     // empty/zero values.
     dependencyTracker = .init()
     // registrationCaptureDepth/runtimeRegistrationMutationGeneration/
-    // checkpointMutationGeneration/evaluationDepth default to 0 and
-    // hasCommittedPresence/suppressesStructuralLifecycle to false via
-    // EvaluationState()'s defaults.
+    // evaluationDepth default to 0 and hasCommittedPresence/
+    // suppressesStructuralLifecycle to false via EvaluationState()'s defaults.
     evaluator = nil
   }
 
-  package func recordCheckpointMutation() {
+  /// Bumps the checkpoint-mutation generation. Recording is structural: the
+  /// `didSet` observers on every stored mutable property call this, so a field
+  /// write cannot forget to record. The only remaining explicit calls cover
+  /// mutations of the reference-typed `dependencyTracker`, which property
+  /// observation cannot see (`recordStateReadDependency`,
+  /// `recordEnvironmentRead`, `recordObservableRead`).
+  private func recordCheckpointMutation() {
+    checkpointMutationGeneration &+= 1
+  }
+
+  /// The explicit recording seam for mutations of the reference-typed
+  /// `dependencyTracker`: it is the one mutable member property observation
+  /// cannot see (a `let` class), so its three mutation entry points call this
+  /// by hand. Every other checkpoint-covered mutation records structurally via
+  /// the stored-property `didSet` observers.
+  private func recordDependencyTrackerMutation() {
     checkpointMutationGeneration &+= 1
   }
 
@@ -256,8 +297,6 @@ package final class ViewNode {
     guard preparedFrameID != frameID else {
       return
     }
-
-    recordCheckpointMutation()
     wasPresentAtFrameStart = hasCommittedPresence
     wasVisitedThisFrame = false
     previousChildrenIdentities = children.map(\.identity)
@@ -276,7 +315,6 @@ package final class ViewNode {
     suppressesStructuralLifecycle: Bool = false
   ) {
     prepareForFrame(frameID)
-    recordCheckpointMutation()
     self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     if evaluationDepth == 0 {
       self.invalidator = invalidator
@@ -300,7 +338,6 @@ package final class ViewNode {
     invalidator: (any Invalidating)?
   ) {
     prepareForFrame(frameID)
-    recordCheckpointMutation()
     self.invalidator = invalidator
     // Re-bind to the host evaluating this reuse, exactly as `beginEvaluation`
     // does for a recompute. A subtree reused across a capture-host re-resolve
@@ -318,7 +355,6 @@ package final class ViewNode {
   package func finishEvaluation(
     accessedStateSlots: Int
   ) -> Bool {
-    recordCheckpointMutation()
     bodyStateSlotCount = max(bodyStateSlotCount ?? 0, accessedStateSlots)
     evaluationDepth = max(0, evaluationDepth - 1)
     guard evaluationDepth == 0 else {
@@ -339,7 +375,6 @@ package final class ViewNode {
     ordinal: Int,
     seed: @autoclosure () -> Value
   ) -> Value {
-    recordCheckpointMutation()
     var slot = stateSlots[ordinal] ?? .init()
     slot.initializeIfNeeded(with: seed())
     stateSlots[ordinal] = slot
@@ -374,7 +409,7 @@ package final class ViewNode {
   package func recordStateReadDependency(
     _ key: StateSlotKey
   ) {
-    recordCheckpointMutation()
+    recordDependencyTrackerMutation()
     dependencyTracker.recordStateRead(key)
   }
 
@@ -383,7 +418,6 @@ package final class ViewNode {
     value: Value,
     invalidationIdentity: Identity? = nil
   ) {
-    recordCheckpointMutation()
     var slot = stateSlots[ordinal] ?? .init()
     let didChange = slot.set(value)
     stateSlots[ordinal] = slot
@@ -440,7 +474,6 @@ package final class ViewNode {
     ordinal: Int,
     value: Value
   ) {
-    recordCheckpointMutation()
     var slot = stateSlots[ordinal] ?? .init()
     _ = slot.set(value)
     stateSlots[ordinal] = slot
@@ -456,18 +489,15 @@ package final class ViewNode {
     ordinal: Int,
     slot: AnyStateSlot
   ) {
-    recordCheckpointMutation()
     stateSlots[ordinal] = slot
   }
 
   package func resetStateSlots() {
-    recordCheckpointMutation()
     stateSlots.removeAll(keepingCapacity: false)
   }
 
   package func markDirty() {
     let wasDirty = isDirty
-    recordCheckpointMutation()
     isDirty = true
     if !wasDirty {
       invalidateCachedSnapshotUpward()
@@ -477,7 +507,6 @@ package final class ViewNode {
   package func setEvaluator(
     _ evaluator: @escaping @MainActor () -> Void
   ) {
-    recordCheckpointMutation()
     self.evaluator = evaluator
   }
 
@@ -499,21 +528,20 @@ package final class ViewNode {
   /// stamp pairing is no longer verified against the node's next live
   /// children.
   package func withdrawCommittedStampClaim() {
-    recordCheckpointMutation()
     committed.markSubtreeRuntimeNodeIDsUnstamped()
   }
 
   package func recordEnvironmentRead(
     _ key: ObjectIdentifier
   ) {
-    recordCheckpointMutation()
+    recordDependencyTrackerMutation()
     dependencyTracker.recordEnvironmentRead(key)
   }
 
   package func recordObservableRead(
     _ key: ObjectIdentifier
   ) {
-    recordCheckpointMutation()
+    recordDependencyTrackerMutation()
     dependencyTracker.recordObservableRead(key)
   }
 
@@ -525,12 +553,10 @@ package final class ViewNode {
   package func setLifecycleState(
     _ lifecycleState: NodeLifecycleState
   ) {
-    recordCheckpointMutation()
     self.lifecycleState = lifecycleState
   }
 
   package func claimChangeModifierOrdinal() -> Int {
-    recordCheckpointMutation()
     defer {
       nextChangeModifierOrdinal += 1
     }
@@ -538,7 +564,6 @@ package final class ViewNode {
   }
 
   package func claimNavigationDestinationModifierOrdinal() -> Int {
-    recordCheckpointMutation()
     defer {
       nextNavigationDestinationModifierOrdinal += 1
     }
@@ -546,7 +571,6 @@ package final class ViewNode {
   }
 
   package func claimTaskModifierOrdinal() -> Int {
-    recordCheckpointMutation()
     defer {
       nextTaskModifierOrdinal += 1
     }
@@ -559,7 +583,6 @@ package final class ViewNode {
     guard !pendingChangeHandlerIDs.contains(handlerID) else {
       return
     }
-    recordCheckpointMutation()
     pendingChangeHandlerIDs.append(handlerID)
   }
 
@@ -567,7 +590,6 @@ package final class ViewNode {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
-    recordCheckpointMutation()
     refreshChildResolvedMetadata(
       from: resolved.children,
       children: children
@@ -593,7 +615,6 @@ package final class ViewNode {
     let newChildrenByIdentity = Set(children.map(\.identity))
     for child in self.children
     where !newChildrenByIdentity.contains(child.identity) && child.parent === self {
-      child.recordCheckpointMutation()
       child.parent = nil
     }
 
@@ -605,7 +626,6 @@ package final class ViewNode {
       guard child !== self else {
         continue
       }
-      child.recordCheckpointMutation()
       child.parent = self
     }
     invalidateAncestorCachedSnapshots()
@@ -614,7 +634,6 @@ package final class ViewNode {
   package func applyRetainedSnapshot(
     _ snapshot: ResolvedNode
   ) {
-    recordCheckpointMutation()
     var snapshot = snapshot
     snapshot.viewNodeID = viewNodeID
     snapshot.recomputeSubtreeRuntimeNodeIDsStamped()
@@ -639,7 +658,6 @@ package final class ViewNode {
   package func refreshResolvedMetadata(
     from resolved: ResolvedNode
   ) {
-    recordCheckpointMutation()
     committed.structuralPath = resolved.structuralPath
     committed.structuralEdgeRole = resolved.structuralEdgeRole
     committed.entityIdentity = resolved.entityIdentity
@@ -796,7 +814,9 @@ package final class ViewNode {
   /// ``MemoSkipTrace`` diagnostics are observing this frame); `nil` otherwise,
   /// so it costs nothing when both features are off. Checkpointed so an aborted
   /// frame does not leave a stale value that would mis-compare on the next frame.
-  package var memoViewValue: Any?
+  package var memoViewValue: Any? {
+    didSet { recordCheckpointMutation() }
+  }
 
   /// Whether this node would pass the retained-reuse guards *except* for the
   /// dirty / invalidation-intersection veto — the conjuncts that make a memoized
@@ -950,7 +970,6 @@ package final class ViewNode {
   }
 
   package func beginRegistrationCapture() {
-    recordCheckpointMutation()
     if registrationCaptureDepth == 0 {
       registeredHandlers.reset()
       recordRuntimeRegistrationMutation()
@@ -959,7 +978,6 @@ package final class ViewNode {
   }
 
   package func endRegistrationCapture() {
-    recordCheckpointMutation()
     registrationCaptureDepth = max(0, registrationCaptureDepth - 1)
   }
 
@@ -1200,7 +1218,6 @@ package final class ViewNode {
   }
 
   private func recordRuntimeRegistrationMutation() {
-    recordCheckpointMutation()
     runtimeRegistrationMutationGeneration &+= 1
   }
 
@@ -1377,7 +1394,6 @@ package final class ViewNode {
       guard visited.insert(nodeID).inserted else {
         return
       }
-      node.recordCheckpointMutation()
       if crossedIslandSeam {
         node.hasStaleIslandDescendant = true
       } else {
@@ -1450,14 +1466,12 @@ package final class ViewNode {
   package func setCommittedPresence(
     _ hasCommittedPresence: Bool
   ) {
-    recordCheckpointMutation()
     self.hasCommittedPresence = hasCommittedPresence
   }
 
   package func setSuppressesStructuralLifecycle(
     _ suppressesStructuralLifecycle: Bool
   ) {
-    recordCheckpointMutation()
     self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
   }
 }
@@ -1478,13 +1492,12 @@ extension ViewNode {
     package var evaluationState: EvaluationState
     package var evaluator: (@MainActor () -> Void)?
     package var memoViewValue: Any?
-
-    /// Convenience read of the per-node checkpoint mutation generation, forwarded
-    /// from ``evaluationState`` so the delta-checkpoint shadow keeps reading it
-    /// directly off the checkpoint.
-    package var checkpointMutationGeneration: UInt64 {
-      evaluationState.checkpointMutationGeneration
-    }
+    /// Capture metadata, not restored state: the node's checkpoint-mutation
+    /// generation at the moment this image was taken. ``restoreCheckpoint(_:)``
+    /// never writes it back — live generations are monotonic (every restore
+    /// bumps them via the stored-property observers), which is what keeps
+    /// "generation equal ⇒ state equal" sound across restore cycles.
+    package var checkpointMutationGeneration: UInt64
   }
 
   package func makeCheckpoint() -> Checkpoint {
@@ -1502,7 +1515,8 @@ extension ViewNode {
       dependencyTracker: dependencyTracker.makeCheckpoint(),
       evaluationState: evaluationState,
       evaluator: evaluator,
-      memoViewValue: memoViewValue
+      memoViewValue: memoViewValue,
+      checkpointMutationGeneration: checkpointMutationGeneration
     )
   }
 
@@ -1558,7 +1572,6 @@ extension ViewNode {
       dependencyTracker: dependencyTracker.currentDependencies,
       registrationCaptureDepth: registrationCaptureDepth,
       runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,
-      checkpointMutationGeneration: checkpointMutationGeneration,
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,

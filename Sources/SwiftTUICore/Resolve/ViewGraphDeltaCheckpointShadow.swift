@@ -56,7 +56,7 @@ package struct ViewGraphDeltaCheckpointShadow {
   private static let maximumDeltaTouchedNodeRatio = 0.70
 
   package init(baseline checkpoint: ViewGraph.Checkpoint) {
-    baselineGraphMutationEpoch = checkpoint.frameCommit.checkpointMutationEpoch
+    baselineGraphMutationEpoch = checkpoint.checkpointMutationEpoch
     baselineNodeMutationGenerations = checkpoint.nodeCheckpoints.mapValues {
       $0.checkpointMutationGeneration
     }
@@ -100,7 +100,7 @@ package struct ViewGraphDeltaCheckpointShadow {
     )
     preparedNodeCount = checkpoint.nodeCheckpoints.count
     graphMutationEpochDelta =
-      checkpoint.frameCommit.checkpointMutationEpoch &- baselineGraphMutationEpoch
+      checkpoint.checkpointMutationEpoch &- baselineGraphMutationEpoch
   }
 
   package func restorePlan(

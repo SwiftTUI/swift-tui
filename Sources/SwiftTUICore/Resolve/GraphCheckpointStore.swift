@@ -31,6 +31,7 @@ package enum GraphCheckpointStore {
     taskDescriptors: ViewGraph.TaskDescriptorState,
     dependencyIndex: ViewGraph.DependencyIndex,
     frameCommit: ViewGraph.FrameCommitState,
+    checkpointMutationEpoch: UInt64,
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) -> ViewGraph.Checkpoint {
     ViewGraph.Checkpoint(
@@ -44,6 +45,7 @@ package enum GraphCheckpointStore {
       taskDescriptors: taskDescriptors,
       dependencyIndex: dependencyIndex,
       frameCommit: frameCommit,
+      checkpointMutationEpoch: checkpointMutationEpoch,
       nodeCheckpoints: ViewGraphNodeCheckpointing.makeNodeCheckpoints(nodesByNodeID)
     )
   }

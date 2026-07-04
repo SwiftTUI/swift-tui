@@ -61,7 +61,13 @@ struct ViewGraphCheckpointTotalityTests {
     #expect(Set(viewGraphDebugFields).count == viewGraphDebugFields.count)
     #expect(Set(groupMemberFields).count == groupMemberFields.count)
 
-    // ViewGraph stores exactly `root` plus one property per field group.
+    // ViewGraph stores exactly `root` plus one property per field group, plus
+    // the checkpoint mutation epoch — tracker *metadata* about mutations, not
+    // state: it lives outside the groups so the group didSet observers can bump
+    // it without recursing, restores never write it back (monotonicity is what
+    // keeps "epoch equal ⇒ graph state equal" sound), and it is deliberately
+    // absent from DebugTotalStateSnapshot so state-equality oracles do not
+    // fail on bookkeeping differences.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -73,11 +79,17 @@ struct ViewGraphCheckpointTotalityTests {
       "dependencyIndex",
       "frameCommit",
     ]
-    #expect(Set(viewGraphGroupFields) == groupPropertyNames.union(["root"]))
-    // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
+    #expect(
+      Set(viewGraphGroupFields)
+        == groupPropertyNames.union(["root", "checkpointMutationEpoch"])
+    )
+    // The checkpoint stores the same groups plus `root`, `nodeCheckpoints`,
+    // and the capture-metadata epoch.
     #expect(
       Set(viewGraphCheckpointGroupFields)
-        == groupPropertyNames.union(["root", "nodeCheckpoints"])
+        == groupPropertyNames.union([
+          "root", "nodeCheckpoints", "checkpointMutationEpoch",
+        ])
     )
     // Every per-field name across all groups, plus the standalone `root`, is
     // mirrored by the flat debug snapshot — the checkpoint-totality contract
@@ -118,8 +130,10 @@ struct ViewGraphCheckpointTotalityTests {
         relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
       )
     }
-    // 12 FrameState + 6 EvaluationState + 3 ReuseState + 5 PersistentState
-    #expect(groupMembers.count == 26)
+    // 12 FrameState + 5 EvaluationState + 3 ReuseState + 5 PersistentState
+    // (the checkpoint mutation generation is tracker metadata stored outside
+    // the groups; see ViewNode.checkpointMutationGeneration).
+    #expect(groupMembers.count == 25)
 
     let snapshotBody = functionBodyText(
       named: "debugTotalStateSnapshot",

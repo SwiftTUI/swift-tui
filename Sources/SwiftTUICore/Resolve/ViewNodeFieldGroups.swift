@@ -49,13 +49,17 @@ extension ViewNode {
 
   /// Internal node bookkeeping that persists across frames (unlike
   /// ``FrameState``): the evaluation/registration nesting depths, the monotonic
-  /// mutation-generation counters that gate registration and checkpoint reuse,
-  /// and the two lifecycle flags (has-this-node-ever-committed and
-  /// suppress-structural-lifecycle). None of it is render state.
+  /// registration mutation-generation counter, and the two lifecycle flags
+  /// (has-this-node-ever-committed and suppress-structural-lifecycle). None of
+  /// it is render state.
+  ///
+  /// The checkpoint mutation generation deliberately lives *outside* this group
+  /// (as a plain stored property on ``ViewNode``): it is tracker metadata about
+  /// mutations, not state — restores bump it rather than write it back, keeping
+  /// it monotonic so generation equality always implies state equality.
   package struct EvaluationState {
     package var registrationCaptureDepth: Int = 0
     package var runtimeRegistrationMutationGeneration: UInt64 = 0
-    package var checkpointMutationGeneration: UInt64 = 0
     package var evaluationDepth: Int = 0
     package var hasCommittedPresence: Bool = false
     package var suppressesStructuralLifecycle: Bool = false
