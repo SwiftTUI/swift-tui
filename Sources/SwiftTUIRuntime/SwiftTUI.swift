@@ -824,6 +824,25 @@ public struct DefaultRenderer {
     viewGraph.liveIdentitySnapshot()
   }
 
+  /// Resolves a rerender pass's invalidation set onto live graph targets:
+  /// identities are first translated through the presentation-portal mapping
+  /// (an overlay-hosted identity resolves to its live host, exactly as the
+  /// frame head would translate them), then filtered to existing graph
+  /// nodes. A raw liveness filter would silently drop portal-translatable
+  /// identities; see ``RunLoop`` `rerenderScheduledFrame(from:convergence:)`
+  /// for why dropping the untranslatable remainder is sound there.
+  @MainActor
+  package func rerenderInvalidationTargets(
+    _ identities: Set<Identity>,
+    contentRootIdentity: Identity
+  ) -> Set<Identity> {
+    let translated = viewGraph.translatePresentationPortalInvalidations(
+      identities,
+      portalRootIdentity: presentationPortalIdentity(for: contentRootIdentity)
+    )
+    return translated.filter { viewGraph.containsNode(for: $0) }
+  }
+
   @MainActor
   package func liveNodeIDSnapshot() -> Set<ViewNodeID> {
     viewGraph.liveNodeIDSnapshot()

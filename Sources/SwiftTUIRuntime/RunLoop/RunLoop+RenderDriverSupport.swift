@@ -69,24 +69,27 @@ extension RunLoop {
   /// with retained reuse on the rerender or pre-relocation content survives
   /// the commit.
   ///
-  /// The set is then filtered to identities that still map to graph nodes:
-  /// the previous pass's evaluation may have removed an invalidated node
-  /// (a focused control whose departure is what triggered the rerender), and
-  /// re-presenting its identity would trip the unmapped-invalidated-identity
-  /// escalation into a full root evaluation. A dropped identity loses
-  /// nothing — an unmapped member of the original set already escalated the
-  /// previous pass to a full evaluation, and mid-frame arrivals stay pending
-  /// in the scheduler for the next frame regardless (the rerender only peeks).
+  /// The set is then resolved onto live graph targets — portal-translated
+  /// first (an overlay-hosted identity maps to its live host, matching what
+  /// the frame head's own translation would do), then filtered to identities
+  /// that still map to graph nodes: the previous pass's evaluation may have
+  /// removed an invalidated node (a focused control whose departure is what
+  /// triggered the rerender), and re-presenting its identity would trip the
+  /// unmapped-invalidated-identity escalation into a full root evaluation. A
+  /// dropped identity loses nothing — an untranslatable unmapped member of
+  /// the original set already escalated the previous pass to a full
+  /// evaluation, and mid-frame arrivals stay pending in the scheduler for the
+  /// next frame regardless (the rerender only peeks).
   func rerenderScheduledFrame(
     from scheduledFrame: ScheduledFrame,
     convergence: FocusSyncConvergenceState
   ) -> ScheduledFrame {
     var rerender = scheduledFrame
-    let liveIdentities = renderer.liveIdentitySnapshot()
-    rerender.invalidatedIdentities =
+    rerender.invalidatedIdentities = renderer.rerenderInvalidationTargets(
       scheduledFrame.invalidatedIdentities
-      .union(convergence.midFrameRelocationInvalidations)
-      .filter { liveIdentities.contains($0) }
+        .union(convergence.midFrameRelocationInvalidations),
+      contentRootIdentity: rootIdentity
+    )
     return rerender
   }
 

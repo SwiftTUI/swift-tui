@@ -234,10 +234,18 @@ private final class SelectiveRerenderHarness<Root: View> {
     self.runLoop = runLoop
 
     runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    // Drain focus-adoption follow-up frames so tests observe steady state.
-    try settle()
+    do {
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      // Drain focus-adoption follow-up frames so tests observe steady state.
+      try settle()
+    } catch {
+      // The caller's `defer { harness.tearDown() }` never registers when init
+      // throws; restore the process-wide diagnostics flag here.
+      RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled =
+        previousDiagnosticsEnabled
+      throw error
+    }
   }
 
   func tearDown() {
