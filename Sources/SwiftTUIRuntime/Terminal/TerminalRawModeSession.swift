@@ -14,6 +14,7 @@ import SwiftTUICore
     var savedInputFileStatusFlags: Int32?
     var mouseCoordinateMode: MouseCoordinateMode
     var pointerHoverEnabled: Bool
+    var kittyKeyboardPushed: Bool
   }
 
   struct TerminalRawModeSession {
@@ -24,6 +25,7 @@ import SwiftTUICore
     var isEnabled = false
     var mouseCoordinateMode = MouseCoordinateMode.cells
     var pointerHoverEnabled = false
+    var kittyKeyboardPushed = false
 
     mutating func activate(
       savedAttributes: termios,
@@ -48,7 +50,8 @@ import SwiftTUICore
         savedAttributes: savedAttributes,
         savedInputFileStatusFlags: savedInputFileStatusFlags,
         mouseCoordinateMode: mouseCoordinateMode,
-        pointerHoverEnabled: pointerHoverEnabled
+        pointerHoverEnabled: pointerHoverEnabled,
+        kittyKeyboardPushed: kittyKeyboardPushed
       )
       reset()
       return restorePlan
@@ -88,13 +91,15 @@ import SwiftTUICore
       isEnabled = false
       mouseCoordinateMode = .cells
       pointerHoverEnabled = false
+      kittyKeyboardPushed = false
     }
 
     private func processExitResetBytes() -> [UInt8] {
       Array(
         TerminalHostEscapeSequences.processExitReset(
           mouseCoordinateMode: mouseCoordinateMode,
-          hoverEnabled: pointerHoverEnabled
+          hoverEnabled: pointerHoverEnabled,
+          kittyKeyboardPushed: kittyKeyboardPushed
         ).utf8
       )
     }

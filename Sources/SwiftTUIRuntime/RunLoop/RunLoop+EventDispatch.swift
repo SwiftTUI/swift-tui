@@ -43,14 +43,19 @@ extension RunLoop {
   package func handleKeyPress(
     _ keyPress: KeyPress
   ) -> RunLoopExitReason? {
-    // Scope-based keyCommand dispatch for modifier-bearing keys.
+    // Scope-based keyCommand dispatch for modifier-bearing keys (plus
+    // bare function keys, which never produce text and so are safe to
+    // dispatch unmodified — this runs before edit-focus absorption, so
+    // F-key commands fire even while a text input is focused).
     // Walks the current focus chain shallowest-first; a matching
     // keyCommand consumes the event (or blocks dispatch if disabled)
     // before the configured exit bindings run — so a consumer that
     // registers a `keyCommand` for an exit key (e.g. Ctrl+D) takes
     // precedence over the framework-level exit for the duration that
     // scope is on the focus chain.
-    if !keyPress.modifiers.isEmpty {
+    if !keyPress.modifiers.isEmpty
+      || KeyBinding.allowsModifierlessCommands(for: keyPress.key)
+    {
       let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
       if commandRegistry.dispatch(key: binding, along: commandDispatchScopePath()) {
         scheduler.requestInvalidation(of: [rootIdentity])

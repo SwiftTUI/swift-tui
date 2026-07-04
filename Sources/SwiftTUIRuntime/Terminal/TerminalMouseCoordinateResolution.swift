@@ -81,7 +81,9 @@ import SwiftTUICore
       }
     }
 
-    private var isInsideTerminalMultiplexer: Bool {
+    // Visibility note: shared with the kitty keyboard probe in
+    // `TerminalHostCapabilities.swift`, so file-internal rather than private.
+    var isInsideTerminalMultiplexer: Bool {
       if environment["TMUX"] != nil {
         return true
       }
@@ -170,7 +172,9 @@ import SwiftTUICore
       return supported
     }
 
-    private func performInputCapabilityQuery(
+    // Visibility note: shared with the kitty keyboard probe in
+    // `TerminalHostCapabilities.swift`, so file-internal rather than private.
+    func performInputCapabilityQuery(
       _ query: TerminalInputCapabilityQuery
     ) throws -> [UInt8] {
       try controller.write(query.request, to: outputFileDescriptor)
@@ -191,6 +195,14 @@ import SwiftTUICore
         switch query {
         case .decPrivateMode(let mode):
           if parseDECPrivateModeReport(from: buffer, mode: mode) != nil {
+            return buffer
+          }
+        case .kittyKeyboardFlags:
+          // The piggybacked device-attributes report is the terminator:
+          // it always arrives, and the flags report (when the terminal
+          // supports the protocol) is ordered before it. Waiting for the
+          // flags report alone would stall on unsupporting terminals.
+          if parsePrimaryDeviceAttributes(from: buffer) != nil {
             return buffer
           }
         }

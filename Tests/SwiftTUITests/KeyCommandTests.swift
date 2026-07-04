@@ -65,6 +65,35 @@ struct KeyCommandTests {
     #expect(match == nil)
   }
 
+  @Test("keyCommand with a bare function key registers (F14 stage 2 policy)")
+  func keyCommandAcceptsModifierlessFunctionKey() {
+    let registry = CommandRegistry()
+
+    let panel = Panel(id: "editor") { EmptyView() }
+      .keyCommand(
+        "Help",
+        key: .functionKey(1),
+        modifiers: [],
+        action: {}
+      )
+
+    var context = ResolveContext(identity: testIdentity("key-command-root"))
+    context.commandRegistry = registry
+    let resolved = Resolver().resolve(AnyView(panel), in: context)
+
+    let panelNode = findPanelNode(in: resolved)
+    #expect(panelNode != nil)
+
+    let match = panelNode.flatMap { node in
+      registry.keyCommand(
+        at: node.identity,
+        matching: KeyBinding(key: .functionKey(1), modifiers: [])
+      )
+    }
+    #expect(match != nil)
+    #expect(match?.description == "Help")
+  }
+
   @Test("keyCommand with isEnabled=false still registers but is marked disabled")
   func keyCommandDisabledRegistration() {
     let registry = CommandRegistry()
@@ -127,6 +156,42 @@ struct KeyCommandDispatchTests {
 
     _ = runLoop.handleKeyPress(KeyPress(.character("s"), modifiers: .ctrl))
     #expect(fired.count == 1)
+  }
+
+  @Test("Bare F5 fires a modifier-less function-key keyCommand")
+  func bareFunctionKeyDispatches() throws {
+    let fired = Counter()
+
+    let runLoop = makeRunLoop {
+      Panel(id: "editor") {
+        Text("inside").focusable(true)
+      }
+      .keyCommand("Refresh", key: .functionKey(5), modifiers: []) {
+        fired.increment()
+      }
+    }
+    try renderInitial(runLoop)
+
+    _ = runLoop.handleKeyPress(KeyPress(.functionKey(5)))
+    #expect(fired.count == 1)
+  }
+
+  @Test("Bare character keys never dispatch commands (typing stays reserved)")
+  func bareCharacterKeyDoesNotDispatch() throws {
+    let fired = Counter()
+
+    let runLoop = makeRunLoop {
+      Panel(id: "editor") {
+        Text("inside").focusable(true)
+      }
+      .keyCommand("Bad", key: .character("s"), modifiers: []) {
+        fired.increment()
+      }
+    }
+    try renderInitial(runLoop)
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("s")))
+    #expect(fired.count == 0)
   }
 
   @Test("keyCommand does not fire when modifiers don't match")

@@ -79,11 +79,18 @@ enum TerminalGraphicsQuery {
 
 enum TerminalInputCapabilityQuery {
   case decPrivateMode(mode: Int)
+  case kittyKeyboardFlags
 
   var request: String {
     switch self {
     case .decPrivateMode(let mode):
       return "\u{001B}[?\(mode)$p"
+    case .kittyKeyboardFlags:
+      // The flags query piggybacks a primary-device-attributes query, the
+      // same trick as the kitty graphics probe: every terminal answers
+      // `\e[c`, so the DA report is the guaranteed terminator that keeps
+      // the probe from stalling on terminals that ignore `\e[?u`.
+      return "\u{001B}[?u\u{001B}[c"
     }
   }
 }
@@ -201,6 +208,34 @@ func parseWindowSizeResponse(
   }
 
   return .init(width: values[1], height: values[0])
+}
+
+/// Extracts the flags value from a kitty keyboard protocol flags report
+/// (`ESC [ ? <flags> u`). The probe buffer may also hold the piggybacked
+/// primary-device-attributes report (`ESC [ ? … c`), so every `ESC [ ?`
+/// occurrence is tested until one terminates in `u` with a purely numeric
+/// parameter.
+func parseKittyKeyboardFlagsReport(
+  from bytes: [UInt8]
+) -> Int? {
+  guard let response = terminalStrictUTF8String(from: bytes) else {
+    return nil
+  }
+
+  var remainder = response
+  while let prefixRange = remainder.firstLiteralRange(of: "\u{001B}[?") {
+    let suffix = remainder[prefixRange.upperBound...]
+    let digits = suffix.prefix(while: \.isNumber)
+    let terminatorIndex = digits.endIndex
+    if terminatorIndex < suffix.endIndex,
+      suffix[terminatorIndex] == "u",
+      let flags = Int(digits)
+    {
+      return flags
+    }
+    remainder = String(suffix)
+  }
+  return nil
 }
 
 func parseDECPrivateModeReport(

@@ -14,6 +14,13 @@ enum TerminalHostEscapeSequences {
   static let disableBracketedPaste = "\u{001B}[?2004l"
   static let disableAllMouseMotion = "\u{001B}[?1003l"
   static let resetStyle = "\u{001B}[0m"
+  // Kitty keyboard protocol: push flag 1 (disambiguate escape codes) onto
+  // the enhancement stack / pop one entry back off. The stack is
+  // per-screen, so pushing after entering the alternate screen and popping
+  // before leaving it means even an unclean exit cannot leave the user's
+  // shell (main screen) in enhanced mode on a compliant terminal.
+  static let pushKittyKeyboardEnhancements = "\u{001B}[>1u"
+  static let popKittyKeyboardEnhancements = "\u{001B}[<u"
 
   static func cursor(
     to point: CellPoint
@@ -63,7 +70,8 @@ enum TerminalHostEscapeSequences {
 
   static func processExitReset(
     mouseCoordinateMode: MouseCoordinateMode,
-    hoverEnabled: Bool
+    hoverEnabled: Bool,
+    kittyKeyboardPushed: Bool
   ) -> String {
     var reset = ""
     if mouseCoordinateMode.reportsMouseInput {
@@ -71,6 +79,12 @@ enum TerminalHostEscapeSequences {
         mouseCoordinateMode: mouseCoordinateMode,
         hoverEnabled: hoverEnabled
       )
+    }
+    if kittyKeyboardPushed {
+      // Must precede exitAlternateScreen: the enhancement stack is
+      // per-screen, so the pop only reaches our pushed entry while the
+      // alternate screen is still active.
+      reset += popKittyKeyboardEnhancements
     }
     reset += disableBracketedPaste
     reset += showCursor

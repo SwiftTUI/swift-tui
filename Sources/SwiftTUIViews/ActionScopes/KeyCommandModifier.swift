@@ -7,7 +7,9 @@ extension ActionScope where Self: View & Sendable {
   /// shallower scope on that chain has claimed the same
   /// `(key, modifiers)` combination (strict shallowest-wins).
   ///
-  /// `modifiers` must be non-empty. Single-key bindings are reserved
+  /// `modifiers` must be non-empty unless `key` is a function key
+  /// (`.functionKey`): F-keys never produce text, so bare F-key commands
+  /// are allowed. For every other key, single-key bindings are reserved
   /// for framework-internal dispatch (typing, arrow navigation, Tab,
   /// Enter, Escape); modifier-less registrations are silently dropped
   /// and the command will never fire.
@@ -57,9 +59,13 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
-    guard !binding.modifiers.isEmpty else {
+    guard
+      !binding.modifiers.isEmpty
+        || KeyBinding.allowsModifierlessCommands(for: binding.key)
+    else {
       // Modifier-less registrations are framework-reserved for typing,
-      // arrow navigation, Tab, Enter, and Escape. Silently drop the
+      // arrow navigation, Tab, Enter, and Escape (function keys are the
+      // exception — they never produce text). Silently drop the
       // registration; the command will never fire.
       return [node]
     }

@@ -188,6 +188,21 @@ extension TerminalInputParser {
         // following keystroke in the same chunk is not stranded.
         return parseNextEvent()
       }
+      // Kitty keyboard protocol key: ESC [ <params> u. Parsed whether or not
+      // this host pushed the enhancement flags: terminals never emit CSI u
+      // envelopes unprompted, and consuming them whole means a stray envelope
+      // can never mangle into an Escape plus literal parameter text.
+      if bufferedBytes[index] == 0x75 {
+        let parameterBytes = Array(bufferedBytes[2..<index])
+        bufferedBytes.removeFirst(index + 1)
+        if let event = kittyKeyEvent(parameterBytes: parameterBytes) {
+          return event
+        }
+        // Consumed whole with no deliverable event (key release, modifier
+        // set the framework cannot represent, or an unmapped functional
+        // code). Keep draining the buffer.
+        return parseNextEvent()
+      }
       // Letter-terminated parameterized sequence (e.g. ESC[1;5A): fall through
       // to the existing modifier handling below.
     }
@@ -307,6 +322,117 @@ extension TerminalInputParser {
       return nil
     }
     return .key(KeyPress(key, modifiers: modifiers))
+  }
+
+  /// Maps an already-consumed kitty keyboard envelope (`ESC [ <params> u`)
+  /// to an input event. Parameter layout per the kitty keyboard protocol:
+  /// `<code>[:<shifted>[:<base>]] [; <modifiers>[:<event>] [; <text…>]]`.
+  /// Only the base code point, the modifier bitmask, and the event type are
+  /// consulted; the alternate-key and associated-text sections arrive only
+  /// under enhancement flags this host never requests and are tolerated by
+  /// ignoring them. Returns nil — envelope consumed, no event — for key
+  /// releases, modifier bitmasks the framework cannot represent, and
+  /// functional code points with no `KeyEvent` mapping.
+  private func kittyKeyEvent(parameterBytes: [UInt8]) -> InputEvent? {
+    let sections = parameterBytes.split(
+      separator: 0x3B,  // ';'
+      omittingEmptySubsequences: false
+    )
+    guard
+      let keySection = sections.first,
+      let keyPart = keySection.split(
+        separator: 0x3A,  // ':'
+        omittingEmptySubsequences: false
+      ).first,
+      let keyCode = asciiInteger(from: keyPart)
+    else {
+      return nil
+    }
+
+    var modifiers: EventModifiers = []
+    if sections.count > 1, !sections[1].isEmpty {
+      let modifierParts = sections[1].split(
+        separator: 0x3A,  // ':'
+        omittingEmptySubsequences: false
+      )
+      guard
+        let modifierValue = asciiInteger(from: modifierParts[0]),
+        modifierValue >= 1
+      else {
+        return nil
+      }
+      // Event-type subparameter: 1 = press, 2 = repeat, 3 = release.
+      // Releases arrive only under enhancement flags this host never
+      // requests; swallow them so a stray one can never double-fire.
+      if modifierParts.count > 1,
+        let eventType = asciiInteger(from: modifierParts[1]),
+        eventType == 3
+      {
+        return nil
+      }
+      // Kitty encodes the modifier parameter as 1 + bitmask: shift=1,
+      // alt=2, ctrl=4, super=8, hyper=16, meta=32, caps_lock=64,
+      // num_lock=128. Lock-state bits do not change the key; drop them.
+      // Any other bit the framework cannot represent swallows the event:
+      // delivering super+j as a plain "j" would type text the user never
+      // intended.
+      let bitmask = (modifierValue - 1) & ~(64 | 128)
+      guard bitmask & ~(1 | 2 | 4) == 0 else {
+        return nil
+      }
+      if bitmask & 1 != 0 {
+        modifiers.insert(.shift)
+      }
+      if bitmask & 2 != 0 {
+        modifiers.insert(.alt)
+      }
+      if bitmask & 4 != 0 {
+        modifiers.insert(.ctrl)
+      }
+    }
+
+    guard let key = kittyKey(fromCodePoint: keyCode) else {
+      return nil
+    }
+    return .key(KeyPress(key, modifiers: modifiers))
+  }
+
+  /// Maps a kitty key code point to its `KeyEvent`. Text code points map to
+  /// `.character`; keys with legacy escape encodings (arrows, Home/End,
+  /// Insert/Delete, PageUp/PageDown, F1–F12) keep those encodings even in
+  /// enhanced mode, so only the code points kitty actually ships as CSI u
+  /// need mapping here. Functional code points in the protocol's
+  /// private-use block with no `KeyEvent` case return nil (consumed silent).
+  private func kittyKey(fromCodePoint code: Int) -> KeyEvent? {
+    switch code {
+    case 9:
+      return .tab
+    case 13:
+      return .return
+    case 27:
+      return .escape
+    case 32:
+      return .space
+    case 127:
+      return .backspace
+    // F1–F24 occupy 57364–57387. F1–F12 normally arrive in legacy form,
+    // but the block is contiguous and reserved, so map it whole.
+    case 57364...57387:
+      return .functionKey(code - 57363)
+    case 57414:
+      return .return  // keypad Enter — no legacy CSI form of its own
+    case 57344...63743:
+      // Remaining private-use functional codes (lock/media/keypad keys,
+      // F25+) have no KeyEvent mapping; consume their envelopes silently.
+      return nil
+    case 33...0x10FFFF:
+      guard let scalar = UnicodeScalar(code) else {
+        return nil
+      }
+      return .character(Character(scalar))
+    default:
+      return nil
+    }
   }
 
   /// Maps an SS3 final byte (`ESC O <final>`) to its key. PC-style function

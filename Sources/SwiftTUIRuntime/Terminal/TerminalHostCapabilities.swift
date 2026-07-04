@@ -7,6 +7,8 @@ import SwiftTUICore
     var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
     var hasProbedSGRPixelsMode = false
     var cachedSGRPixelsModeSupport: Bool?
+    var hasProbedKittyKeyboardSupport = false
+    var cachedKittyKeyboardSupport = false
   }
 
   extension TerminalHost {
@@ -115,6 +117,36 @@ import SwiftTUICore
 
       capabilityProbe.cachedGraphicsCapabilities = capabilities
       return capabilities
+    }
+
+    /// Probes once for the kitty keyboard protocol (`CSI ? u` flags query,
+    /// piggybacking `CSI c` as the guaranteed terminator). Skipped inside
+    /// terminal multiplexers — tmux/screen pass the push through to panes
+    /// they don't own — and disabled by `SWIFTTUI_KITTY_KEYBOARD=0`.
+    func probeKittyKeyboardSupportIfNeeded() -> Bool {
+      if capabilityProbe.hasProbedKittyKeyboardSupport {
+        return capabilityProbe.cachedKittyKeyboardSupport
+      }
+      capabilityProbe.hasProbedKittyKeyboardSupport = true
+      capabilityProbe.cachedKittyKeyboardSupport = false
+
+      guard environment["SWIFTTUI_KITTY_KEYBOARD"] != "0" else {
+        return false
+      }
+      guard !isInsideTerminalMultiplexer else {
+        return false
+      }
+      guard
+        controller.isATTY(inputFileDescriptor),
+        controller.isATTY(outputFileDescriptor)
+      else {
+        return false
+      }
+
+      let response = (try? performInputCapabilityQuery(.kittyKeyboardFlags)) ?? []
+      let supported = parseKittyKeyboardFlagsReport(from: response) != nil
+      capabilityProbe.cachedKittyKeyboardSupport = supported
+      return supported
     }
 
     private func performGraphicsQuery(

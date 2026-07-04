@@ -238,6 +238,18 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         )
       }
       try write(TerminalHostEscapeSequences.enableBracketedPaste)
+      // Kitty keyboard protocol: push after entering the alternate screen
+      // (the enhancement stack is per-screen, so an unclean exit can never
+      // leave the user's shell in enhanced mode) and refresh the
+      // process-exit cleanup so crash-path reset bytes include the pop.
+      if probeKittyKeyboardSupportIfNeeded() {
+        try write(TerminalHostEscapeSequences.pushKittyKeyboardEnhancements)
+        rawModeSession.kittyKeyboardPushed = true
+        rawModeSession.refreshProcessExitCleanupRegistration(
+          inputFileDescriptor: inputFileDescriptor,
+          outputFileDescriptor: outputFileDescriptor
+        )
+      }
       shouldRestoreOnFailure = false
     }
 
@@ -273,6 +285,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
             hoverEnabled: restorePlan.pointerHoverEnabled
           )
         )
+      }
+      if restorePlan.kittyKeyboardPushed {
+        // Must precede exitAlternateScreen: the enhancement stack is
+        // per-screen, so the pop only reaches our pushed entry while the
+        // alternate screen is still active.
+        try writeSynchronously(TerminalHostEscapeSequences.popKittyKeyboardEnhancements)
       }
       try writeSynchronously(TerminalHostEscapeSequences.disableBracketedPaste)
       try writeSynchronously(TerminalHostEscapeSequences.resetStyle)

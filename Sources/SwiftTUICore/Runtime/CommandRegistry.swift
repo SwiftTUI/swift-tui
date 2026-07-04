@@ -15,6 +15,18 @@ package struct KeyBinding: Equatable, Hashable, Sendable {
     self.key = key
     self.modifiers = modifiers
   }
+
+  /// Whether `key` may register and dispatch as a keyCommand with no
+  /// modifiers. Function keys never produce text and are not consumed by
+  /// text editing, so bare F-key commands are safe; every other key stays
+  /// framework-reserved when unmodified (typing, arrow navigation, Tab,
+  /// Enter, Escape).
+  package static func allowsModifierlessCommands(for key: KeyEvent) -> Bool {
+    if case .functionKey = key {
+      return true
+    }
+    return false
+  }
 }
 
 /// A registered key command.
