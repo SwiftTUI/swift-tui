@@ -72,14 +72,14 @@ extension RunLoop {
   /// The set is then resolved onto live graph targets — portal-translated
   /// first (an overlay-hosted identity maps to its live host, matching what
   /// the frame head's own translation would do), then filtered to identities
-  /// that still map to graph nodes: the previous pass's evaluation may have
-  /// removed an invalidated node (a focused control whose departure is what
-  /// triggered the rerender), and re-presenting its identity would trip the
-  /// unmapped-invalidated-identity escalation into a full root evaluation. A
-  /// dropped identity loses nothing — an untranslatable unmapped member of
-  /// the original set already escalated the previous pass to a full
-  /// evaluation, and mid-frame arrivals stay pending in the scheduler for the
-  /// next frame regardless (the rerender only peeks).
+  /// the queue boundary can still resolve. A departed identity with a live
+  /// ancestor is CARRIED: `ViewGraph.nodeIDsForInvalidation` remaps its
+  /// evaluation onto that ancestor while the identity itself keeps its
+  /// narrow ancestor-chain reuse-denial cone (F10 slice 1). Only identities
+  /// with no live ancestor at all are dropped — there is no node their
+  /// evaluation could target (the queue boundary would drop them anyway,
+  /// census-visible), and mid-frame arrivals stay pending in the scheduler
+  /// for the next frame regardless (the rerender only peeks).
   func rerenderScheduledFrame(
     from scheduledFrame: ScheduledFrame,
     convergence: FocusSyncConvergenceState

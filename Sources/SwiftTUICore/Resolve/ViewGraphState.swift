@@ -139,6 +139,11 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
   package var invalidatedIdentityCount: Int
   package var unmappedInvalidatedIdentityCount: Int
   package var unmappedInvalidatedIdentitySample: [Identity]
+  // Unmapped identities split by how the queue boundary resolved them:
+  // remapped onto a nearest live ancestor, or dropped (no live ancestor).
+  // remapped + dropped == unmapped.
+  package var remappedInvalidatedIdentityCount: Int
+  package var droppedInvalidatedIdentityCount: Int
   package var selectiveEvaluationDisabledReasons: [String]
 
   package init(
@@ -147,6 +152,8 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
     invalidatedIdentityCount: Int = 0,
     unmappedInvalidatedIdentityCount: Int = 0,
     unmappedInvalidatedIdentitySample: [Identity] = [],
+    remappedInvalidatedIdentityCount: Int = 0,
+    droppedInvalidatedIdentityCount: Int = 0,
     selectiveEvaluationDisabledReasons: [String] = []
   ) {
     self.result = result
@@ -154,6 +161,8 @@ package struct DirtyEvaluationPlanDiagnostics: Equatable, Sendable {
     self.invalidatedIdentityCount = invalidatedIdentityCount
     self.unmappedInvalidatedIdentityCount = unmappedInvalidatedIdentityCount
     self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
+    self.remappedInvalidatedIdentityCount = remappedInvalidatedIdentityCount
+    self.droppedInvalidatedIdentityCount = droppedInvalidatedIdentityCount
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
   }
 }

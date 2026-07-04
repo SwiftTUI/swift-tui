@@ -1044,7 +1044,7 @@ struct InteractiveRuntimeTests {
 
   @MainActor
   @Test("post-action follow-up is skipped when the dispatched action already invalidated")
-  func postActionFollowUpSkippedWhenActionAlreadyInvalidated() {
+  func postActionFollowUpSkippedWhenActionAlreadyInvalidated() throws {
     let recorder = RunLoopInvalidationRecorder()
     let rootIdentity = testIdentity("PostActionProbe")
     let ownerIdentity = rootIdentity.child("Owner[0]")
@@ -1064,6 +1064,18 @@ struct InteractiveRuntimeTests {
         RunLoopInvalidationProbeRoot(state: state, recorder: recorder)
       }
     )
+    // Render once so the content root node exists: the backstop resolves the
+    // registered owner against the live graph (an owner with no live
+    // ancestor falls back to the content root), and an unrendered graph
+    // would misclassify the owner as unresolvable. Render BEFORE the
+    // synthetic registration below — the commit republishes the action
+    // registry and would wipe it.
+    var renderedFrames = 0
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(renderedFrames > 0)
+    #expect(runLoop.renderer.hasLiveInvalidationTarget(for: ownerIdentity))
+
     runLoop.localActionRegistry.register(
       identity: actionIdentity,
       handler: { true },

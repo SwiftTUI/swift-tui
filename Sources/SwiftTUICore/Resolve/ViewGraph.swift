@@ -434,12 +434,25 @@ package final class ViewGraph {
     )
   }
 
+  /// Resolves invalidated identities onto evaluation targets. An identity
+  /// that no longer maps to a live node is remapped onto its nearest live
+  /// ancestor (`nearestLiveAncestorNodeID`); an identity with no live
+  /// ancestor at all is dropped. Neither case escalates to root evaluation
+  /// anymore — the plan diagnostics carry the remapped/dropped counts so a
+  /// census can still surface rail drift (F10 slice 1). The per-identity
+  /// resolution also retires the old `count`-mismatch heuristic, which
+  /// false-escalated when two identities mapped to the same node.
   private func nodeIDsForInvalidation(
     _ identities: Set<Identity>
   ) -> Set<ViewNodeID> {
-    let viewNodeIDs = nodeIDs(for: identities)
-    if viewNodeIDs.count != identities.count {
-      requiresRootEvaluation = true
+    var viewNodeIDs = Set<ViewNodeID>()
+    viewNodeIDs.reserveCapacity(identities.count)
+    for identity in identities {
+      if let viewNodeID = viewNodeID(for: identity) {
+        viewNodeIDs.insert(viewNodeID)
+      } else if let ancestorNodeID = nearestLiveAncestorNodeID(for: identity) {
+        viewNodeIDs.insert(ancestorNodeID)
+      }
     }
     return viewNodeIDs
   }
@@ -1066,14 +1079,15 @@ package final class ViewGraph {
       invalidatedIdentities: invalidatedIdentities,
       unmappedIdentities: unmappedIdentities
     )
+    // Unmapped invalidated identities no longer set `requiresRootEvaluation`
+    // (the queue boundary remaps them onto a nearest live ancestor or drops
+    // them — see `nodeIDsForInvalidation`), so this guard covers only the
+    // restore-carried flag; the retired `nil_unmapped_invalidated_identity`
+    // reason cannot be produced anymore.
     guard !requiresRootEvaluation else {
-      let reason =
-        unmappedIdentities.isEmpty
-        ? "nil_root_evaluation_required"
-        : "nil_unmapped_invalidated_identity"
       return (
         nil,
-        baseDiagnostics(reason, 0)
+        baseDiagnostics("nil_root_evaluation_required", 0)
       )
     }
     guard root != nil else {
@@ -1142,11 +1156,16 @@ package final class ViewGraph {
     selectiveEvaluationDisabledReasons: [String] = []
   ) -> DirtyEvaluationPlanDiagnostics {
     let unmappedIdentities = unmappedInvalidatedIdentities(invalidatedIdentities)
+    let remappedCount = unmappedIdentities.filter {
+      nearestLiveAncestorNodeID(for: $0) != nil
+    }.count
     return DirtyEvaluationPlanDiagnostics(
       result: "nil_selective_evaluation_disabled",
       invalidatedIdentityCount: invalidatedIdentities.count,
       unmappedInvalidatedIdentityCount: unmappedIdentities.count,
       unmappedInvalidatedIdentitySample: Array(unmappedIdentities.prefix(5)),
+      remappedInvalidatedIdentityCount: remappedCount,
+      droppedInvalidatedIdentityCount: unmappedIdentities.count - remappedCount,
       selectiveEvaluationDisabledReasons: selectiveEvaluationDisabledReasons
     )
   }
@@ -2720,17 +2739,52 @@ package final class ViewGraph {
       .sorted()
   }
 
+  /// Resolves an invalidated identity that no longer maps to a live node onto
+  /// its nearest live ancestor. A departed identity names torn-down content
+  /// (a focused control the previous frame removed, a churned subtree); the
+  /// closest ancestor that still exists owns the region the departure
+  /// changed, and the identity-axis reuse-conflict scan already denies
+  /// retained reuse along that live ancestor chain, so evaluating the
+  /// ancestor is the narrow equivalent of the full-root escalation this
+  /// replaces. Returns nil for an identity space with no live ancestor at
+  /// all (an `.id`-rebased subtree that departed wholesale) — there is no
+  /// node an evaluation could target, and the caller drops the identity.
+  private func nearestLiveAncestorNodeID(for identity: Identity) -> ViewNodeID? {
+    var candidate = identity.parent
+    while let current = candidate {
+      if let viewNodeID = viewNodeID(for: current) {
+        return viewNodeID
+      }
+      candidate = current.parent
+    }
+    return nil
+  }
+
+  /// Whether the identity still resolves to evaluation work: it maps to a
+  /// live node, or the queue boundary can remap it onto a nearest live
+  /// ancestor. Used by the rerender pass's target filter so a departed
+  /// identity with a live ancestor is carried (and remapped at queue time)
+  /// instead of dropped.
+  package func hasLiveInvalidationTarget(for identity: Identity) -> Bool {
+    viewNodeID(for: identity) != nil || nearestLiveAncestorNodeID(for: identity) != nil
+  }
+
   private func dirtyPlanBaseDiagnostics(
     invalidatedIdentities: Set<Identity>,
     unmappedIdentities: [Identity]
   ) -> (_ result: String, _ frontierRootCount: Int) -> DirtyEvaluationPlanDiagnostics {
-    { result, frontierRootCount in
+    let remappedCount = unmappedIdentities.filter {
+      nearestLiveAncestorNodeID(for: $0) != nil
+    }.count
+    return { result, frontierRootCount in
       DirtyEvaluationPlanDiagnostics(
         result: result,
         frontierRootCount: frontierRootCount,
         invalidatedIdentityCount: invalidatedIdentities.count,
         unmappedInvalidatedIdentityCount: unmappedIdentities.count,
-        unmappedInvalidatedIdentitySample: Array(unmappedIdentities.prefix(5))
+        unmappedInvalidatedIdentitySample: Array(unmappedIdentities.prefix(5)),
+        remappedInvalidatedIdentityCount: remappedCount,
+        droppedInvalidatedIdentityCount: unmappedIdentities.count - remappedCount
       )
     }
   }

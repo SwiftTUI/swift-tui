@@ -18,6 +18,8 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var invalidatedIdentityCount: Int
   package var unmappedInvalidatedIdentityCount: Int
   package var unmappedInvalidatedIdentitySample: [Identity]
+  package var remappedInvalidatedIdentityCount: Int
+  package var droppedInvalidatedIdentityCount: Int
   package var selectiveEvaluationDisabledReasons: [String]
   package var presentationPortalRootQueued: Bool?
   package var presentationPortalEscalated: Bool?
@@ -43,6 +45,8 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     invalidatedIdentityCount: Int = 0,
     unmappedInvalidatedIdentityCount: Int = 0,
     unmappedInvalidatedIdentitySample: [Identity] = [],
+    remappedInvalidatedIdentityCount: Int = 0,
+    droppedInvalidatedIdentityCount: Int = 0,
     selectiveEvaluationDisabledReasons: [String] = [],
     presentationPortalRootQueued: Bool? = nil,
     presentationPortalEscalated: Bool? = nil,
@@ -67,6 +71,8 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.invalidatedIdentityCount = invalidatedIdentityCount
     self.unmappedInvalidatedIdentityCount = unmappedInvalidatedIdentityCount
     self.unmappedInvalidatedIdentitySample = unmappedInvalidatedIdentitySample
+    self.remappedInvalidatedIdentityCount = remappedInvalidatedIdentityCount
+    self.droppedInvalidatedIdentityCount = droppedInvalidatedIdentityCount
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
     self.presentationPortalRootQueued = presentationPortalRootQueued
     self.presentationPortalEscalated = presentationPortalEscalated

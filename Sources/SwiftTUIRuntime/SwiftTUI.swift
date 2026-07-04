@@ -824,13 +824,25 @@ public struct DefaultRenderer {
     viewGraph.liveIdentitySnapshot()
   }
 
+  /// Whether the queue boundary can still resolve an invalidation of
+  /// `identity` onto graph work (a live node, or a nearest-live-ancestor
+  /// remap). See `ViewGraph.hasLiveInvalidationTarget(for:)`.
+  @MainActor
+  package func hasLiveInvalidationTarget(for identity: Identity) -> Bool {
+    viewGraph.hasLiveInvalidationTarget(for: identity)
+  }
+
   /// Resolves a rerender pass's invalidation set onto live graph targets:
   /// identities are first translated through the presentation-portal mapping
   /// (an overlay-hosted identity resolves to its live host, exactly as the
-  /// frame head would translate them), then filtered to existing graph
-  /// nodes. A raw liveness filter would silently drop portal-translatable
-  /// identities; see ``RunLoop`` `rerenderScheduledFrame(from:convergence:)`
-  /// for why dropping the untranslatable remainder is sound there.
+  /// frame head would translate them), then filtered to identities the queue
+  /// boundary can still resolve — a live node, or a departed identity with a
+  /// live ancestor that `ViewGraph.nodeIDsForInvalidation` remaps at queue
+  /// time (keeping the departed identity itself in the set preserves its
+  /// narrow ancestor-chain reuse-denial cone). A raw liveness filter would
+  /// silently drop portal-translatable identities; see ``RunLoop``
+  /// `rerenderScheduledFrame(from:convergence:)` for why dropping the
+  /// no-live-ancestor remainder is sound there.
   @MainActor
   package func rerenderInvalidationTargets(
     _ identities: Set<Identity>,
@@ -840,7 +852,7 @@ public struct DefaultRenderer {
       identities,
       portalRootIdentity: presentationPortalIdentity(for: contentRootIdentity)
     )
-    return translated.filter { viewGraph.containsNode(for: $0) }
+    return translated.filter { viewGraph.hasLiveInvalidationTarget(for: $0) }
   }
 
   @MainActor

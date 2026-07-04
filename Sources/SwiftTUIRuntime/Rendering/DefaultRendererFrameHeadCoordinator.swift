@@ -407,8 +407,10 @@ struct DefaultRendererFrameHeadCoordinator {
     // escalate to a portal-root re-resolve after the narrow plan runs
     // (`escalateToPresentationPortalReconcile`), so open/close/prune keep
     // their same-frame semantics. Stale overlay-entry identities that the
-    // portal translation leaves unmapped still force a full evaluation via
-    // `ViewGraph.nodeIDsForInvalidation`.
+    // portal translation leaves unmapped resolve onto their nearest live
+    // ancestor at the queue boundary (`ViewGraph.nodeIDsForInvalidation`,
+    // F10 slice 1) — for an absent overlay host that is the portal root
+    // itself, whose re-resolve recomposes the overlay.
     let shouldQueuePresentationPortalRoot =
       !hasExistingPresentationPortalRoot
       || !resolveInputs.usesSelectiveEvaluation

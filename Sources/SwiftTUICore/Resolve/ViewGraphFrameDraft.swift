@@ -399,6 +399,10 @@ package final class ViewGraphFrameDraft {
       dirtyPlanDiagnostics.unmappedInvalidatedIdentityCount
     publicationDiagnostics.unmappedInvalidatedIdentitySample =
       dirtyPlanDiagnostics.unmappedInvalidatedIdentitySample
+    publicationDiagnostics.remappedInvalidatedIdentityCount =
+      dirtyPlanDiagnostics.remappedInvalidatedIdentityCount
+    publicationDiagnostics.droppedInvalidatedIdentityCount =
+      dirtyPlanDiagnostics.droppedInvalidatedIdentityCount
     publicationDiagnostics.selectiveEvaluationDisabledReasons =
       dirtyPlanDiagnostics.selectiveEvaluationDisabledReasons
   }

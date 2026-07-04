@@ -394,8 +394,25 @@ func resolveView<V: View>(
     suppressesStructuralLifecycle: context.suppressesStructuralLifecycle
   )
   if let graphNode, graphNode.isAtOutermostEvaluationDepth {
+    // A dirty-frontier re-run invokes this evaluator OUTSIDE the enclosing
+    // resolve pass, so the enclosing view's authoring context (a task-local)
+    // is absent. Container registration code that snapshots
+    // `currentAuthoringContext()` at resolve time (List/Menu/Stepper row
+    // actions' mutation scopes and follow-up owners) would capture nil and
+    // re-register DEGRADED handlers whose imperative `@State` writes land in
+    // the detached seed box — silently, with no invalidation. Full-root
+    // frames masked this by re-running the enclosing body; selective
+    // frontiers must reinstall the captured enclosing scope instead (the
+    // same capture the lazy-subview and portal-attachment seams use).
+    let capturedEnclosingScope = makeCapturedAuthoringContext()
     context.viewGraph?.setEvaluator(for: context.identity) {
-      _ = resolveView(view, in: context)
+      if let capturedEnclosingScope, currentAuthoringContext() == nil {
+        withAuthoringContext(capturedEnclosingScope) {
+          _ = resolveView(view, in: context)
+        }
+      } else {
+        _ = resolveView(view, in: context)
+      }
     }
   }
   context.recordResolvedComputation()

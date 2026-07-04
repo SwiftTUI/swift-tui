@@ -142,6 +142,10 @@ package enum FrameRecordDerivation {
       publication.unmappedInvalidatedIdentityCount
     record.runtimePublicationUnmappedInvalidatedIdentitySample =
       publication.unmappedInvalidatedIdentitySample
+    record.runtimePublicationRemappedInvalidatedIdentityCount =
+      publication.remappedInvalidatedIdentityCount
+    record.runtimePublicationDroppedInvalidatedIdentityCount =
+      publication.droppedInvalidatedIdentityCount
     record.runtimeSelectiveEvaluationDisabledReasons =
       publication.selectiveEvaluationDisabledReasons
     record.runtimePublicationPresentationPortalRootQueued =

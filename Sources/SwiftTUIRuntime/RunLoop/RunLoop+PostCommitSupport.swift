@@ -87,14 +87,24 @@ extension RunLoop {
     for actionIdentity: Identity,
     schedulerInvalidationsBeforeDispatch before: Set<Identity>
   ) {
-    guard let identity = localActionRegistry.followUpInvalidationIdentity(for: actionIdentity)
-    else {
-      return
-    }
     let actionRequestedInvalidation = schedulerPendingInvalidations() != before
     guard !actionRequestedInvalidation else {
       return
     }
+    // A handled action with no tracked side effect and no resolvable
+    // dynamic-property-scope owner has an unknown effect scope, so the only
+    // sound follow-up target is the content root. This class used to render
+    // by accident: the owner identity (departed, or never registered when
+    // the authoring context was unavailable at registration time) tripped
+    // the unmapped-identity escalation into a full root evaluation. That
+    // escalation is retired (F10 slice 1) — the queue boundary remaps or
+    // drops unmapped identities — so the unattributable sweep is requested
+    // explicitly instead.
+    let registeredOwner = localActionRegistry.followUpInvalidationIdentity(for: actionIdentity)
+    let identity =
+      registeredOwner.flatMap { owner in
+        renderer.hasLiveInvalidationTarget(for: owner) ? owner : nil
+      } ?? rootIdentity
     postActionInvalidationIdentities.insert(identity)
   }
 

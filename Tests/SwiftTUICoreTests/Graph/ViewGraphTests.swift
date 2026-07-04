@@ -218,8 +218,37 @@ struct ViewGraphTests {
     #expect(!graph.hasDirtyWork)
   }
 
-  @Test("dirty-plan diagnostics identify unmapped invalidation fallback")
-  func dirtyPlanDiagnosticsIdentifyUnmappedInvalidationFallback() {
+  @Test("unmapped invalidation remaps to its nearest live interior ancestor")
+  func unmappedInvalidationRemapsToNearestLiveInteriorAncestor() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let containerIdentity = rootIdentity.child("Container")
+    let removedIdentity = containerIdentity.child("RemovedRow").child("Leaf")
+    seedContainerGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      containerIdentity: containerIdentity
+    )
+    graph.setEvaluator(for: containerIdentity) {}
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty([removedIdentity])
+
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: [removedIdentity]
+    )
+
+    #expect(result.plan?.frontierIdentities == [containerIdentity])
+    #expect(result.diagnostics.result == "formed")
+    #expect(result.diagnostics.invalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [removedIdentity])
+    #expect(result.diagnostics.remappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.droppedInvalidatedIdentityCount == 0)
+  }
+
+  @Test("unmapped invalidation whose nearest live ancestor is the root remaps to the root")
+  func unmappedInvalidationWithOnlyRootLiveRemapsToRoot() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let removedIdentity = testIdentity("Root", "RemovedAlias")
@@ -229,19 +258,54 @@ struct ViewGraphTests {
         kind: .root
       )
     )
+    graph.setEvaluator(for: rootIdentity) {}
 
     graph.beginFrame()
-    graph.invalidate([removedIdentity])
+    graph.invalidateAndQueueDirty([removedIdentity])
 
     let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
       invalidatedIdentities: [removedIdentity]
     )
 
-    #expect(result.plan == nil)
-    #expect(result.diagnostics.result == "nil_unmapped_invalidated_identity")
+    #expect(result.plan?.frontierIdentities == [rootIdentity])
+    #expect(result.diagnostics.result == "formed")
     #expect(result.diagnostics.invalidatedIdentityCount == 1)
     #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
-    #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [removedIdentity])
+    #expect(result.diagnostics.remappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.droppedInvalidatedIdentityCount == 0)
+  }
+
+  @Test("unmapped invalidation with no live ancestor is dropped, not escalated")
+  func unmappedInvalidationWithNoLiveAncestorIsDropped() {
+    // A departed `.id`-rebased identity space shares no path prefix with any
+    // live node (the authored `.id` rebases the subtree absolutely). There is
+    // no node an evaluation could target, and the frame that removed the
+    // subtree already committed the collapse — the residue invalidation is
+    // dropped (census-visible) instead of escalating into a full evaluation.
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let departedRebasedIdentity = testIdentity("DetachedSpace", "DepartedControl")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root
+      )
+    )
+    graph.setEvaluator(for: rootIdentity) {}
+
+    graph.beginFrame()
+    graph.invalidateAndQueueDirty([departedRebasedIdentity])
+
+    let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: [departedRebasedIdentity]
+    )
+
+    #expect(result.plan == nil)
+    #expect(result.diagnostics.result == "nil_no_dirty_work")
+    #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.remappedInvalidatedIdentityCount == 0)
+    #expect(result.diagnostics.droppedInvalidatedIdentityCount == 1)
+    #expect(!graph.hasDirtyWork)
   }
 
   @Test("presentation portal descendant invalidation maps to existing overlay subtree")
@@ -354,23 +418,29 @@ struct ViewGraphTests {
       invalidatedIdentities: translated
     )
 
+    // The inactive portal-root space shares no live ancestor with the graph:
+    // the queue boundary drops the identity (census-visible) rather than
+    // escalating into a full evaluation.
     #expect(result.plan == nil)
-    #expect(result.diagnostics.result == "nil_unmapped_invalidated_identity")
+    #expect(result.diagnostics.result == "nil_no_dirty_work")
     #expect(result.diagnostics.invalidatedIdentityCount == 1)
     #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
     #expect(result.diagnostics.unmappedInvalidatedIdentitySample == [unknownBodyDescendant])
+    #expect(result.diagnostics.remappedInvalidatedIdentityCount == 0)
+    #expect(result.diagnostics.droppedInvalidatedIdentityCount == 1)
   }
 
-  @Test("presentation entry under live portal root stays unmapped when the overlay host is absent")
-  func presentationEntryUnderLivePortalRootStaysUnmappedWhenHostIsAbsent() {
+  @Test("presentation entry with an absent overlay host remaps evaluation to the portal root")
+  func presentationEntryUnderLivePortalRootRemapsEvaluationToPortalRoot() {
     // Regression guard for the sheet-settle cone: an overlay-entry invalidation
-    // whose overlay host is not yet materialized must NOT fall back to the
-    // portal root. The portal root is the graph root and an ancestor of the
-    // content, so mapping onto it swept the entire disjoint background into the
-    // reuse-conflict cone. It now stays unmapped (a `.all` fallback, which is
-    // already the case on these force-root frames), leaving the background
-    // reuse-eligible; `installPresentationPortalEvaluator` re-resolves the
-    // portal root regardless.
+    // whose overlay host is not yet materialized must NOT translate onto the
+    // portal root IDENTITY — the portal root is the graph root and an ancestor
+    // of the content, so putting it in the invalidation set would sweep the
+    // entire disjoint background into the reuse-conflict cone. The identity
+    // stays untranslated (narrow cone), while the QUEUE boundary resolves the
+    // evaluation target onto the nearest live ancestor — here the portal root
+    // node, which `installPresentationPortalEvaluator` equips — so the frame
+    // plans selectively instead of escalating into a full evaluation.
     let graph = ViewGraph()
     let portalRootIdentity = testPresentationPortalRootIdentity()
     let staleEntryDescendant = testPresentationPortalBodyIdentity(
@@ -399,9 +469,11 @@ struct ViewGraphTests {
       invalidatedIdentities: translated
     )
 
-    #expect(result.plan == nil)
-    #expect(result.diagnostics.result == "nil_unmapped_invalidated_identity")
+    #expect(result.plan?.frontierIdentities == [portalRootIdentity])
+    #expect(result.diagnostics.result == "formed")
     #expect(result.diagnostics.unmappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.remappedInvalidatedIdentityCount == 1)
+    #expect(result.diagnostics.droppedInvalidatedIdentityCount == 0)
   }
 
   @Test("inactive presentation entry under live overlay host maps to overlay host")
@@ -1584,6 +1656,32 @@ private func seedCommandGraph(
       kind: .root,
       children: [ResolvedNode(identity: childIdentity, kind: .view("Child"))]
         + paddingSiblingIdentities.map { ResolvedNode(identity: $0, kind: .view("Padding")) }
+    ),
+    accessedStateSlots: 0
+  )
+  _ = graph.snapshot(rootIdentity: rootIdentity)
+}
+
+@MainActor
+private func seedContainerGraph(
+  graph: ViewGraph,
+  rootIdentity: Identity,
+  containerIdentity: Identity
+) {
+  graph.beginFrame()
+  let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+  let containerNode = graph.beginEvaluation(identity: containerIdentity, invalidator: nil)
+  graph.finishEvaluation(
+    containerNode,
+    resolved: ResolvedNode(identity: containerIdentity, kind: .view("Container")),
+    accessedStateSlots: 0
+  )
+  graph.finishEvaluation(
+    rootNode,
+    resolved: ResolvedNode(
+      identity: rootIdentity,
+      kind: .root,
+      children: [ResolvedNode(identity: containerIdentity, kind: .view("Container"))]
     ),
     accessedStateSlots: 0
   )

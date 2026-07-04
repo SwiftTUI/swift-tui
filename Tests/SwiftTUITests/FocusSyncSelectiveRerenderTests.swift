@@ -105,19 +105,33 @@ struct FocusSyncSelectiveRerenderTests {
     #expect(harness.focusedIdentity == DepartureRerenderIDs.landing)
 
     // Narrowness: the static sibling outside the focus cone must not
-    // re-evaluate on the rerender pass. FOLLOW-UP tolerance: the focus
-    // tracker's mid-frame move schedules a follow-up frame whose invalidation
-    // set still names the DEPARTED identity; that identity no longer maps to
-    // a graph node, so the follow-up trips `nil_unmapped_invalidated_identity`
-    // into one full evaluation (+1 below). Narrowing that follow-up is its own
-    // tranche — this bound fails if the rerender pass itself widens.
+    // re-evaluate on the rerender pass OR on the tracker's follow-up frame.
+    // The follow-up frame's invalidation set still names the DEPARTED
+    // identity; it no longer maps to a graph node and its `.id`-rebased
+    // space has no live ancestor, so the queue boundary drops it
+    // (census-visible) instead of tripping
+    // `nil_unmapped_invalidated_identity` into a full evaluation. The
+    // follow-up therefore carries only the landing identity and commits
+    // narrowly.
     #expect(
-      harness.stableCounter.count <= stableEvaluationsBeforeDeparture + 1,
+      harness.stableCounter.count == stableEvaluationsBeforeDeparture,
       """
       the static sibling re-evaluated \
       \(harness.stableCounter.count - stableEvaluationsBeforeDeparture) time(s) \
       during a scoped focus-sync rerender interaction
       """
+    )
+
+    // No frame in the interaction — the rerender or any follow-up — pays the
+    // unmapped-identity escalation.
+    #expect(
+      harness.sink.committedSamples
+        .filter { $0.frameNumber > framesBeforeDeparture }
+        .allSatisfy { sample in
+          sample.diagnostics.runtime.registrations.publication.dirtyPlanResult
+            != "nil_unmapped_invalidated_identity"
+        },
+      "a follow-up frame escalated on the departed identity"
     )
   }
 
