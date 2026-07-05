@@ -58,7 +58,27 @@ package func composeOverlayStackTree(
     $0.modalPolicy == .disablesBaseInteraction
   }
   let hostContext = context.child(component: .named("PortalHost"))
-  let overlayContext = hostContext.child(component: .named("overlays"))
+  var overlayContext = hostContext.child(component: .named("overlays"))
+  // Retained-subtree reuse is value-blind: it serves the committed overlays
+  // subtree whenever this identity's subtree does not intersect the frame's
+  // invalidation set — and an overlay-entry set change never invalidates it
+  // (the activation flip dirties the trigger leaf and the portal root, not
+  // this host). A 0↔1 transition restructures the wrapper above, but
+  // 1→2 / 2→1 transitions change only this host's children, so the stale
+  // entry list is served verbatim: a second presentation never appears and a
+  // dismissed one never leaves the screen (its strand then shadows the
+  // reopened entry's routes — the "undismissable sheet"). Mark the subtree
+  // churned when the composed entry list differs from the committed children
+  // so the host re-resolves fresh; surviving entries keep their runtime
+  // state (slots key off their stable identities).
+  let desiredEntryIdentities = sortedEntries.map { entry in
+    overlayContext.identity.child("entry:\(entry.id)")
+  }
+  if let committedOverlayHost = context.viewGraph?.nodeForIdentity(overlayContext.identity),
+    committedOverlayHost.children.map(\.identity) != desiredEntryIdentities
+  {
+    overlayContext.withinChurnedSubtree = true
+  }
   let overlayNode = resolveView(
     OverlayStackOverlayHost(entries: sortedEntries),
     in: overlayContext
