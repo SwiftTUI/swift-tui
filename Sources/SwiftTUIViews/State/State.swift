@@ -355,7 +355,8 @@ public struct State<Value> {
     guard
       let viewNode = liveOwnerNode(
         ownerNodeID: context.ownerNodeID,
-        stateGraphScope: context.stateGraphScope
+        stateGraphScope: context.stateGraphScope,
+        ownerIdentity: context.viewIdentity
       )
     else {
       return nil
@@ -379,6 +380,10 @@ public struct State<Value> {
     let ordinal = box.currentOrdinal
     let retainedSeed =
       box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
+    // Access-time re-resolution is identity-aware: if the registration-time
+    // node was displaced by a fresh mint at the same identity (a lazy-tab
+    // revisit, a mid-frame eviction), the closures follow the identity to the
+    // live occupant instead of writing the orphaned node's slots.
     return DynamicStateLocation(
       getValue: { [weak viewNode, weak box] in
         guard let viewNode else {
@@ -388,7 +393,10 @@ public struct State<Value> {
           return retainedSeed
         }
         let liveViewNode =
-          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+          viewNode.ownerGraph?.liveStateOwnerNode(
+            registeredOwner: viewNode.viewNodeID,
+            identity: invalidationIdentity
+          ) ?? viewNode
         return liveViewNode.stateSlot(
           ordinal: ordinal,
           seed: retainedSeed
@@ -397,7 +405,10 @@ public struct State<Value> {
       setValue: { [weak viewNode, weak box] newValue in
         if let viewNode {
           let liveViewNode =
-            viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+            viewNode.ownerGraph?.liveStateOwnerNode(
+              registeredOwner: viewNode.viewNodeID,
+              identity: invalidationIdentity
+            ) ?? viewNode
           liveViewNode.setStateSlot(
             ordinal: ordinal,
             value: newValue,
@@ -415,11 +426,13 @@ public struct State<Value> {
 
   private func liveOwnerNode(
     ownerNodeID: ViewNodeID?,
-    stateGraphScope: StateGraphScopeID?
+    stateGraphScope: StateGraphScopeID?,
+    ownerIdentity: Identity? = nil
   ) -> SwiftTUICore.ViewNode? {
     liveAuthoringOwnerNode(
       ownerNodeID: ownerNodeID,
-      stateGraphScope: stateGraphScope
+      stateGraphScope: stateGraphScope,
+      ownerIdentity: ownerIdentity
     )
   }
 }

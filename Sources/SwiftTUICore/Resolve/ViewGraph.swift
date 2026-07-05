@@ -713,6 +713,41 @@ package final class ViewGraph {
   package func nodeForViewNodeID(_ viewNodeID: ViewNodeID) -> ViewNode? {
     nodeIfExists(for: viewNodeID)
   }
+  /// Resolves the live node that owns imperative state registered against
+  /// `viewNodeID` at `identity`. The registration-time node wins while it is
+  /// still the live occupant of its identity; when the identity has been
+  /// re-minted to a fresh node after registration (a lazy-tab revisit, a
+  /// displacement eviction), the fresh occupant is returned instead, so
+  /// closure-held `@State` projections (`.task` loops, `.onAppear`, gesture
+  /// callbacks) keep reading and writing the state the committed graph
+  /// serves. Without the identity re-key the closures write the orphaned
+  /// node's slots: the writes invalidate the identity (dirtying the fresh
+  /// node), the fresh node re-resolves its unchanged slots, and every frame
+  /// completes empty — the gallery Life-tab revisit freeze. Mirrors
+  /// `onChange`'s identity-keyed cross-frame memory.
+  package func liveStateOwnerNode(
+    registeredOwner viewNodeID: ViewNodeID,
+    identity: Identity
+  ) -> ViewNode? {
+    let registered = nodeIfExists(for: viewNodeID)
+    if let registered {
+      let occupant = nodeIfExists(for: registered.identity)
+      if occupant === registered {
+        return registered
+      }
+      // The registered node's own identity is the exact index key its
+      // successor occupies; the authoring identity below can name a different
+      // node when state slots live on a wrapper (a capture-host or modifier
+      // node) rather than the authored view's node.
+      if let occupant {
+        return occupant
+      }
+    }
+    if let reminted = nodeIfExists(for: identity) {
+      return reminted
+    }
+    return registered
+  }
 
   package func containsNode(
     for identity: Identity

@@ -122,7 +122,8 @@ package func stateStorageOwner(
 @MainActor
 package func liveAuthoringOwnerNode(
   ownerNodeID: ViewNodeID?,
-  stateGraphScope: StateGraphScopeID?
+  stateGraphScope: StateGraphScopeID?,
+  ownerIdentity: Identity? = nil
 ) -> SwiftTUICore.ViewNode? {
   guard let ownerNodeID else {
     return nil
@@ -145,6 +146,16 @@ package func liveAuthoringOwnerNode(
     let scopedGraph = LiveViewGraphRegistry.graph(for: stateGraphScope)
   else {
     return nil
+  }
+  // Outside a resolve pass the frozen `ownerNodeID` can name a node the graph
+  // re-minted after registration (a lazy-tab revisit, a displacement
+  // eviction). Re-key by the registration identity so imperative accesses
+  // land on the state the committed graph serves.
+  if let ownerIdentity {
+    return scopedGraph.liveStateOwnerNode(
+      registeredOwner: ownerNodeID,
+      identity: ownerIdentity
+    )
   }
   return scopedGraph.nodeForViewNodeID(ownerNodeID)
 }
