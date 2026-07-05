@@ -11,6 +11,7 @@ package struct SkippedFrameReconciliation: Equatable, Sendable {
     case orderedCommitPolicy = "ordered_commit_policy"
     case dropEligibilityBlockers = "drop_eligibility_blockers"
     case nonEmptyReconciliationUnavailable = "non_empty_reconciliation_unavailable"
+    case progressStarvation = "progress_starvation"
   }
 
   package var mode: Mode
@@ -99,6 +100,26 @@ package struct CompletedFrameDropDecision: Equatable, Sendable {
     )
   }
 
+  /// Forward-progress guard: the previous completed frames were all dropped
+  /// visual-only, so this one must commit even though a newer render intent is
+  /// pending. Without the guard, a sustained invalidation cadence faster than
+  /// the frame latency (an autonomous `.task` ticking a slow-to-render tab)
+  /// supersedes every completed frame before its drop decision — each is
+  /// "safely" dropped in favor of the next, and the screen never updates
+  /// again (the gallery Life-tab freeze).
+  package static func progressStarvationCommit(
+    eligibility: FrameDropEligibility
+  ) -> Self {
+    Self(
+      action: .commitOrdered,
+      eligibility: eligibility.decision,
+      reconciliation: .blocked(
+        reason: .progressStarvation,
+        blockers: eligibility.blockers
+      )
+    )
+  }
+
   package static func blocked(
     eligibility: FrameDropEligibility
   ) -> Self {
@@ -146,10 +167,19 @@ package struct CompletedFramePolicy: Equatable, Sendable {
   package static let orderedCommitOnly = Self()
   package static let dropCompletedVisualOnly = Self(mode: .dropCompletedVisualOnly)
 
+  /// The maximum run of consecutive visual-only drops before the guard forces
+  /// a commit. Dropping is an optimization for bursts (a superseded frame's
+  /// content reappears in the newer frame about to render); two in a row is
+  /// already a sign the pipeline is being outpaced, and the bound converts a
+  /// potential presentation livelock into at-worst one committed frame per
+  /// three completed ones.
+  package static let maxConsecutiveVisualOnlyDrops = 2
+
   package func decide(
     candidateGeneration: RenderGeneration,
     newestDesiredGeneration: RenderGeneration,
-    eligibility: FrameDropEligibility
+    eligibility: FrameDropEligibility,
+    consecutiveVisualOnlyDrops: Int = 0
   ) -> CompletedFrameDropDecision {
     guard candidateGeneration < newestDesiredGeneration else {
       return .orderedCommit(eligibility: eligibility)
@@ -159,6 +189,13 @@ package struct CompletedFramePolicy: Equatable, Sendable {
     case .orderedCommitOnly:
       return .orderedCommit(eligibility: eligibility)
     case .dropCompletedVisualOnly:
+      // Forward-progress guard: under a sustained invalidation cadence faster
+      // than frame latency, every completed frame has a newer intent pending
+      // and would drop forever — the screen never updates again. Bound the
+      // consecutive-drop run so presentation always makes progress.
+      guard consecutiveVisualOnlyDrops < Self.maxConsecutiveVisualOnlyDrops else {
+        return .progressStarvationCommit(eligibility: eligibility)
+      }
       return CompletedFrameDropDecision.dropVisualOnly(eligibility: eligibility)
     }
   }

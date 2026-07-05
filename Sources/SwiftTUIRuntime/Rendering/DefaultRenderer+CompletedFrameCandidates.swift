@@ -48,7 +48,8 @@ extension DefaultRenderer {
       dropDecision: (completedFramePolicy ?? .dropCompletedVisualOnly).decide(
         candidateGeneration: draft.renderGeneration,
         newestDesiredGeneration: newestDesiredGeneration,
-        eligibility: eligibility
+        eligibility: eligibility,
+        consecutiveVisualOnlyDrops: visualOnlyDropRun.count
       )
     )
   }
@@ -64,6 +65,19 @@ extension DefaultRenderer {
     redundantHandlerInstallationsAreVisualOnly:
       @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false }
   ) -> CompletedFrameCandidateResolution {
+    // Stale-baseline guard: a sibling frame committed after this head's
+    // baseline checkpoints were captured. Every candidate outcome from here —
+    // the preview's materialize/suspend round-trip, an ordered commit
+    // (materializing the stale prepared checkpoint), or a visual-only drop
+    // (restoring the stale baseline) — would rewind that sibling's committed
+    // effects: the checkpoint's whole-index restore evicts subtrees the
+    // sibling minted, orphaning their running tasks and `@State` (the gallery
+    // Life-tab revisit freeze). Skip before any checkpoint touch; the caller
+    // replays the frame intent against the post-commit graph.
+    if draft.transaction.baselineIsStale {
+      draft.transaction.discard()
+      return .skippedStaleBaseline(runtimeIssues: draft.runtimeIssues)
+    }
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -73,6 +87,7 @@ extension DefaultRenderer {
       redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly
     )
     if candidate.dropDecision.canSkipCompletedFrame {
+      visualOnlyDropRun.recordDrop()
       discardCompletedFrameCandidate(
         candidate,
         reconciliation: candidate.dropDecision.reconciliation
@@ -82,6 +97,7 @@ extension DefaultRenderer {
         dropDecision: candidate.dropDecision
       )
     }
+    visualOnlyDropRun.recordCommit()
     let artifacts = commitCompletedFrameCandidate(candidate)
     return .committed(artifacts, candidate.dropDecision)
   }

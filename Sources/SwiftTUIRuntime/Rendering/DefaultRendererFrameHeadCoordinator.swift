@@ -22,6 +22,7 @@ struct DefaultRendererFrameHeadCoordinator {
   var frameTailRenderer: FrameTailRenderer
   var storeObservationBridge: @MainActor (ObservationBridge?) -> Void
   var renderPipelineContentTree: (ResolvedNode) -> ResolvedNode
+  var frameCommitSequence: FrameCommitSequence
 
   func computeFrameHead<V: View>(
     _ root: V,
@@ -112,7 +113,8 @@ struct DefaultRendererFrameHeadCoordinator {
       animationDraft: animationDraft,
       elidedFrameTimingRecorder: elidedFrameTimingRecorder,
       frameHeadTimingRecorder: frameHeadTimingRecorder,
-      checkpoints: checkpoints
+      checkpoints: checkpoints,
+      commitSequence: frameCommitSequence
     )
     if mode == .abortable {
       transaction.suspendPreparedState()

@@ -283,6 +283,17 @@ package final class ViewGraphFrameDraft {
     didDiscard = true
   }
 
+  /// Discards the draft without restoring the baseline checkpoint. For heads
+  /// whose baseline predates a sibling frame's commit (a stale baseline): the
+  /// head is suspended, so live graph state is the baseline plus the sibling
+  /// commits, and restoring the captured baseline would rewind those commits
+  /// (the checkpoint's whole-index restore evicts subtrees the sibling
+  /// minted). Dropping the pending draft is the only sound action.
+  package func discardWithoutRestore() {
+    precondition(!didCommit && !didDiscard)
+    didDiscard = true
+  }
+
   /// The `.all`-frame publication body: fingerprint-delta scoped restore when
   /// the delta is publishable, full reset-and-rebuild otherwise. Also the
   /// escalation target for `.subtrees` frames whose frontier covers the graph

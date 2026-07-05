@@ -28,6 +28,14 @@ public struct DefaultRenderer {
   private let renderGenerationSequencer: RenderGenerationSequencer
   private let elidedFrameCounter: ElidedFrameCounter
   private let elidedFrameTimingRecorder: ElidedFrameTimingRecorder
+  private let frameCommitSequence: FrameCommitSequence
+  // Run of consecutive completed frames dropped visual-only; feeds the
+  // forward-progress guard in `CompletedFramePolicy.decide`. A reference box
+  // (the renderer is a struct copied into closures) shared by every copy.
+  // Visibility note: internal (not `private`) so
+  // `DefaultRenderer+CompletedFrameCandidates.swift` can maintain it at the
+  // drop decision.
+  let visualOnlyDropRun = VisualOnlyDropRunCounter()
 
   let frameTailRenderer: FrameTailRenderer
   // Visibility note: `frameTailCoordinator` and `prepareFrameHead` are
@@ -56,7 +64,8 @@ public struct DefaultRenderer {
       storeObservationBridge: { bridge in
         observationBridgeTracker.store(bridge)
       },
-      renderPipelineContentTree: renderPipelineTree(from:)
+      renderPipelineContentTree: renderPipelineTree(from:),
+      frameCommitSequence: frameCommitSequence
     )
   }
 
@@ -100,6 +109,7 @@ public struct DefaultRenderer {
     renderGenerationSequencer = .init()
     elidedFrameCounter = .init()
     elidedFrameTimingRecorder = .init()
+    frameCommitSequence = .init()
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -481,6 +491,19 @@ public struct DefaultRenderer {
               tailCancelReason: nil,
               completedFrameDropDecision: dropDecision
             )
+          case .skippedStaleBaseline(let runtimeIssues):
+            // Report as cancelled-before-start so the run loop replays the
+            // frame intent: the skipped content re-renders against the graph
+            // state the sibling commit left behind.
+            return CancellableRenderOutcome(
+              artifacts: nil,
+              runtimeIssues: runtimeIssues,
+              renderGeneration: draft.renderGeneration,
+              newestDesiredGeneration: newestGeneration,
+              tailJobState: .cancelledBeforeStart,
+              tailCancelReason: "stale_baseline",
+              completedFrameDropDecision: nil
+            )
           case .committed(let artifacts, let dropDecision):
             return CancellableRenderOutcome(
               artifacts: artifacts,
@@ -707,6 +730,10 @@ public struct DefaultRenderer {
             return artifacts
           case .dropped:
             preconditionFailure("Non-cancellable frame unexpectedly dropped.")
+          case .skippedStaleBaseline:
+            // No event pump drives sibling commits on this path; a stale
+            // baseline here means an unexpected interleaved driver.
+            preconditionFailure("Non-cancellable frame had a stale baseline.")
           }
         }
       )

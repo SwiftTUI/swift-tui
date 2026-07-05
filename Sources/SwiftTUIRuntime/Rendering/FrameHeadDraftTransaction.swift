@@ -1,6 +1,46 @@
 import SwiftTUICore
 import SwiftTUIViews
 
+/// Monotonic count of frame commits published to live state.
+///
+/// One instance per renderer. Every `FrameHeadTransaction` captures the value
+/// at prepare time and bumps it on commit; a mismatch at a later restore point
+/// means a SIBLING frame committed after this head's baseline checkpoint was
+/// captured, so that baseline is stale: restoring it (or this head's prepared
+/// checkpoint) would rewind the sibling's committed effects — node membership
+/// rides the whole-index checkpoint restore, so a subtree the sibling minted
+/// (with its running tasks and `@State`) would be evicted from the live graph
+/// while its closures stay bound to the orphaned nodes (the gallery Life-tab
+/// revisit freeze: an input frame completed around a tab-revisit commit was
+/// dropped and its stale baseline restore orphaned the fresh tab's auto-tick
+/// state box, leaving a permanent empty-frame invalidation loop).
+@MainActor
+package final class FrameCommitSequence {
+  package private(set) var value: UInt64 = 0
+
+  package init() {}
+
+  package func bump() {
+    value &+= 1
+  }
+}
+
+/// Run of consecutive completed frames dropped visual-only. One instance per
+/// renderer (a reference box shared by every copy of the renderer struct);
+/// feeds the forward-progress guard in ``CompletedFramePolicy/decide``.
+@MainActor
+final class VisualOnlyDropRunCounter {
+  private(set) var count = 0
+
+  func recordDrop() {
+    count += 1
+  }
+
+  func recordCommit() {
+    count = 0
+  }
+}
+
 /// Selects execution-strategy-specific work when preparing a frame head.
 package enum FrameHeadMode {
   /// Synchronous one-shot render: captures no checkpoints and no worker-safe
@@ -46,6 +86,8 @@ package final class FrameHeadTransaction {
   private let viewGraph: ViewGraph
   private let frameState: FrameResolveState
   private let frameInputs: FrameResolveInputBox
+  private let commitSequence: FrameCommitSequence
+  private let baselineCommitSequence: UInt64
   private var didCommit = false
   private var didDiscard = false
   // After the first rollback to baseline, live @State writes may happen while
@@ -63,7 +105,8 @@ package final class FrameHeadTransaction {
     animationDraft: AnimationFrameDraft,
     elidedFrameTimingRecorder: ElidedFrameTimingRecorder,
     frameHeadTimingRecorder: FrameHeadTimingRecorder,
-    checkpoints: FrameHeadCheckpoints?
+    checkpoints: FrameHeadCheckpoints?,
+    commitSequence: FrameCommitSequence
   ) {
     self.viewGraph = viewGraph
     self.frameState = frameState
@@ -76,6 +119,16 @@ package final class FrameHeadTransaction {
     self.elidedFrameTimingRecorder = elidedFrameTimingRecorder
     self.frameHeadTimingRecorder = frameHeadTimingRecorder
     self.checkpoints = checkpoints
+    self.commitSequence = commitSequence
+    baselineCommitSequence = commitSequence.value
+  }
+
+  /// True when another frame committed to live state after this head's
+  /// baseline checkpoints were captured. Restoring this head's baseline (or
+  /// materializing its prepared state) would rewind that sibling commit, so
+  /// stale heads must be skipped without touching live state.
+  package var baselineIsStale: Bool {
+    commitSequence.value != baselineCommitSequence
   }
 
   /// Commits the rendered-frame draft transaction: fires deferred animation
@@ -91,6 +144,7 @@ package final class FrameHeadTransaction {
     presentationPortalDraft.commit()
     animationDraft.commit()
     didCommit = true
+    commitSequence.bump()
     return diagnostics
   }
 
@@ -116,6 +170,7 @@ package final class FrameHeadTransaction {
       animationDraft.commit()
     }
     didCommit = true
+    commitSequence.bump()
     return diagnostics
   }
 
@@ -195,15 +250,25 @@ package final class FrameHeadTransaction {
       )
     }
     registrationDraft.discard()
-    graphDraft.discard(
-      from: viewGraph,
-      preservingCurrentStateMutations: hasSuspendedPreparedState
-    )
+    // A stale head's baseline predates a sibling frame's commit, so restoring
+    // it would rewind that commit — evicting subtrees the sibling minted while
+    // their `@State`/task closures stay bound to the orphaned nodes. The head
+    // is suspended at every discard site, so live state already reflects the
+    // baseline plus the sibling commits: discarding the pending drafts without
+    // any restore leaves live state exactly as the last commit left it.
+    if baselineIsStale {
+      graphDraft.discardWithoutRestore()
+    } else {
+      graphDraft.discard(
+        from: viewGraph,
+        preservingCurrentStateMutations: hasSuspendedPreparedState
+      )
+      frameState.restoreCheckpoint(checkpoints.baselineFrameState)
+      frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
+    }
     presentationPortalDraft.discard()
     observationDraft?.discard()
     animationDraft.discard()
-    frameState.restoreCheckpoint(checkpoints.baselineFrameState)
-    frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
     didDiscard = true
   }
 

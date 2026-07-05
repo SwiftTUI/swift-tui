@@ -1282,7 +1282,8 @@ struct OffscreenFrameElisionRuntimeTests {
       animationDraft: liveController.makeFrameDraft(),
       elidedFrameTimingRecorder: ElidedFrameTimingRecorder(),
       frameHeadTimingRecorder: FrameHeadTimingRecorder(),
-      checkpoints: nil
+      checkpoints: nil,
+      commitSequence: FrameCommitSequence()
     )
   }
 }

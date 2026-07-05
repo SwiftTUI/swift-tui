@@ -66,6 +66,26 @@ extension DefaultRenderer {
     return true
   }
 
+  /// Runs the production completed-frame resolution for `draft` and reports
+  /// whether the stale-baseline guard skipped it (a sibling frame committed
+  /// after the head's baseline was captured).
+  @MainActor
+  package func resolveCompletedFrameCandidateForTesting(
+    _ draft: FrameHeadDraft
+  ) async -> Bool {
+    let tailOutput = await frameTailCoordinator.renderFrameTailDraft(draft)
+    switch resolveCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration
+    ) {
+    case .skippedStaleBaseline:
+      return true
+    case .committed, .dropped:
+      return false
+    }
+  }
+
   @MainActor
   package func previewCompletedFrameCandidateForTesting(
     _ draft: FrameHeadDraft
