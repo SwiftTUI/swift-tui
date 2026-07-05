@@ -251,11 +251,12 @@ package final class FrameHeadTransaction {
     }
     registrationDraft.discard()
     // A stale head's baseline predates a sibling frame's commit, so restoring
-    // it would rewind that commit — evicting subtrees the sibling minted while
-    // their `@State`/task closures stay bound to the orphaned nodes. The head
-    // is suspended at every discard site, so live state already reflects the
-    // baseline plus the sibling commits: discarding the pending drafts without
-    // any restore leaves live state exactly as the last commit left it.
+    // the GRAPH checkpoint would rewind that commit — evicting subtrees the
+    // sibling minted while their `@State`/task closures stay bound to the
+    // orphaned nodes. The head is suspended at every discard site, so live
+    // graph state already reflects the baseline plus the sibling commits:
+    // discarding the pending graph draft without a restore leaves it exactly
+    // as the last commit left it.
     if baselineIsStale {
       graphDraft.discardWithoutRestore()
     } else {
@@ -263,9 +264,15 @@ package final class FrameHeadTransaction {
         from: viewGraph,
         preservingCurrentStateMutations: hasSuspendedPreparedState
       )
-      frameState.restoreCheckpoint(checkpoints.baselineFrameState)
-      frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
     }
+    // The resolve-selector restore always runs: it returns the invalidations
+    // this head consumed at prepare to the pending state, so the replayed
+    // intent re-renders them. For a stale head this can also re-pend
+    // invalidations a sibling commit already served — a benign extra
+    // re-render (over-invalidation is the safe direction); skipping it eats
+    // the pending set and the replay renders nothing.
+    frameState.restoreCheckpoint(checkpoints.baselineFrameState)
+    frameInputs.restoreCheckpoint(checkpoints.baselineFrameInputs)
     presentationPortalDraft.discard()
     observationDraft?.discard()
     animationDraft.discard()
