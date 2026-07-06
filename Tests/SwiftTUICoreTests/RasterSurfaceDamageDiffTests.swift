@@ -215,8 +215,37 @@ struct RasterSurfaceDamageDiffTests {
     )
   }
 
-  @Test("diff marks rows dirty when presentation layer topology changes")
-  func diffMarksRowsDirtyWhenPresentationLayerTopologyChanges() {
+  @Test("diff ignores plain cell layer topology churn")
+  func diffIgnoresPlainCellLayerTopologyChurn() {
+    // Incremental rasterization re-mints order numbers and regroups plain cell
+    // fragments every frame. Their content is fully represented in the cell
+    // grid (compared cell by cell above), so sidecar churn alone must not
+    // produce damage — including it unioned every glyph's bounds into damage
+    // on each incremental frame (F36).
+    let previous = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["ABCD"],
+      presentationLayers: [
+        cellLayer(order: 0, x: 0, width: 2),
+        cellLayer(order: 1, x: 2, width: 2),
+      ]
+    )
+    let current = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["ABCD"],
+      presentationLayers: [
+        cellLayer(order: 5, x: 0, width: 4)
+      ]
+    )
+
+    #expect(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: current)
+        == PresentationDamage(textRows: [])
+    )
+  }
+
+  @Test("diff ignores order renumbering of compositing-significant layers")
+  func diffIgnoresOrderRenumberingOfSignificantLayers() {
     let identity = Identity(components: ["layer-image"])
     let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
     let image = RasterImageAttachment(
@@ -224,17 +253,13 @@ struct RasterSurfaceDamageDiffTests {
       bounds: bounds,
       source: .path("image.png")
     )
-    let fragment = RasterSurfaceFragment(
-      bounds: bounds,
-      cells: [[RasterCell(character: "A")]]
-    )
     let previous = RasterSurface(
       size: .init(width: 1, height: 1),
       lines: ["A"],
       imageAttachments: [image],
       presentationLayers: [
-        RasterPresentationLayer(order: 0, bounds: bounds, content: .cells(fragment)),
-        RasterPresentationLayer(order: 1, bounds: bounds, content: .image(image)),
+        RasterPresentationLayer(order: 0, bounds: bounds, content: .image(image)),
+        cellLayer(order: 1, x: 0, width: 1),
       ]
     )
     let current = RasterSurface(
@@ -242,18 +267,112 @@ struct RasterSurfaceDamageDiffTests {
       lines: ["A"],
       imageAttachments: [image],
       presentationLayers: [
-        RasterPresentationLayer(order: 0, bounds: bounds, content: .image(image)),
-        RasterPresentationLayer(order: 1, bounds: bounds, content: .cells(fragment)),
+        RasterPresentationLayer(order: 7, bounds: bounds, content: .image(image)),
+        cellLayer(order: 9, x: 0, width: 1),
       ]
     )
 
     #expect(
       RasterSurfaceDamageDiff.diff(previous: previous, current: current)
+        == PresentationDamage(textRows: [])
+    )
+  }
+
+  @Test("diff bounds effect-layer topology changes to the affected layers")
+  func diffBoundsEffectLayerTopologyChangesToAffectedLayers() {
+    let effectBounds = CellRect(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1))
+    let previous = RasterSurface(
+      size: .init(width: 4, height: 3),
+      lines: ["aaaa", "bbbb", "cccc"],
+      presentationLayers: [
+        cellLayer(order: 0, x: 0, width: 4),
+        cellLayer(order: 1, x: 0, width: 4, y: 1),
+        cellLayer(order: 2, x: 0, width: 4, y: 2),
+      ]
+    )
+    let current = RasterSurface(
+      size: .init(width: 4, height: 3),
+      lines: ["aaaa", "bbbb", "cccc"],
+      presentationLayers: [
+        cellLayer(order: 0, x: 0, width: 4),
+        RasterPresentationLayer(
+          order: 1,
+          bounds: effectBounds,
+          content: .cells(RasterSurfaceFragment(bounds: effectBounds, cells: [])),
+          effects: [.blendMode(.screen)]
+        ),
+        cellLayer(order: 2, x: 0, width: 4, y: 2),
+      ]
+    )
+
+    // The blended fragment appearing is a topology change, but the damage is
+    // its own bounds — not the union of every layer on the surface.
+    #expect(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: current)
         == PresentationDamage(textRows: [
-          .init(row: 0, columnRanges: [0..<1, 0..<1, 0..<1, 0..<1])
+          .init(row: 1, columnRanges: [0..<2])
         ])
     )
   }
+
+  @Test("diff marks rows dirty when significant layer stacking changes")
+  func diffMarksRowsDirtyWhenSignificantLayerStackingChanges() {
+    let identity = Identity(components: ["layer-image"])
+    let imageBounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let effectBounds = CellRect(origin: .init(x: 2, y: 0), size: .init(width: 1, height: 1))
+    let image = RasterImageAttachment(
+      identity: identity,
+      bounds: imageBounds,
+      source: .path("image.png")
+    )
+    let effectLayer = RasterPresentationLayer(
+      order: 0,
+      bounds: effectBounds,
+      content: .cells(RasterSurfaceFragment(bounds: effectBounds, cells: [])),
+      effects: [.blendMode(.multiply)]
+    )
+    let imageLayer = RasterPresentationLayer(
+      order: 1,
+      bounds: imageBounds,
+      content: .image(image)
+    )
+    let previous = RasterSurface(
+      size: .init(width: 3, height: 1),
+      lines: ["ABC"],
+      imageAttachments: [image],
+      presentationLayers: [effectLayer, imageLayer]
+    )
+    let current = RasterSurface(
+      size: .init(width: 3, height: 1),
+      lines: ["ABC"],
+      imageAttachments: [image],
+      presentationLayers: [imageLayer, effectLayer]
+    )
+
+    #expect(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: current)
+        == PresentationDamage(textRows: [
+          .init(row: 0, columnRanges: [2..<3, 0..<1, 0..<1, 2..<3])
+        ])
+    )
+  }
+}
+
+private func cellLayer(
+  order: Int,
+  x: Int,
+  width: Int,
+  y: Int = 0
+) -> RasterPresentationLayer {
+  let bounds = CellRect(
+    origin: .init(x: x, y: y),
+    size: .init(width: width, height: 1)
+  )
+  return RasterPresentationLayer(
+    order: order,
+    bounds: bounds,
+    content: .cells(RasterSurfaceFragment(bounds: bounds, cells: []))
+  )
 }
 
 private func imageCompositing(

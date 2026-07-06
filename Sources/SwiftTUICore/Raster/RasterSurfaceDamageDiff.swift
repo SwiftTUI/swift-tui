@@ -41,6 +41,16 @@ package enum RasterSurfaceDamageDiff {
     for row in 0..<height {
       let previousRow = row < previous.cells.count ? previous.cells[row] : []
       let currentRow = row < current.cells.count ? current.cells[row] : []
+      // Unchanged rows compare equal here without the per-column walk below.
+      // Incremental rasterization copies untouched rows from the previous
+      // surface, so this comparison usually hits the stdlib's identical-storage
+      // fast path and the whole-surface diff costs O(rows + changed cells)
+      // rather than O(W×H) per committed frame (F36). Equal rows cannot
+      // produce damage: columns beyond both counts read as `.empty` on both
+      // sides.
+      guard previousRow != currentRow else {
+        continue
+      }
       let width = max(
         current.size.width,
         previousRow.count,
@@ -83,14 +93,101 @@ package enum RasterSurfaceDamageDiff {
     to rowRanges: inout [Int: [Range<Int>]]
   ) {
     guard
-      presentationLayerTopology(previous.presentationLayers)
-        != presentationLayerTopology(current.presentationLayers)
+      !compositingLayerTopologiesMatch(
+        previous: previous.presentationLayers,
+        current: current.presentationLayers
+      )
     else {
       return
     }
 
-    for layer in previous.presentationLayers + current.presentationLayers {
+    for layer in previous.presentationLayers where isCompositingSignificant(layer) {
       append(rect: layer.bounds, to: &rowRanges)
+    }
+    for layer in current.presentationLayers where isCompositingSignificant(layer) {
+      append(rect: layer.bounds, to: &rowRanges)
+    }
+  }
+
+  /// Plain cell fragments are fully represented in the collapsed cell grid,
+  /// which ``appendCellDiffs`` already compares cell by cell; hosts consume
+  /// only cells + image attachments (the layer sidecar is a diagnostics /
+  /// future-replay record), so those fragments carry no host-visible
+  /// information beyond the grid. Only layers that add compositing information
+  /// participate in the topology signature: image layers and effect-carrying
+  /// fragments. Including every glyph fragment made the signature O(painted
+  /// cells) and unioned the whole screen into damage on any mismatch (F36).
+  private static func isCompositingSignificant(
+    _ layer: RasterPresentationLayer
+  ) -> Bool {
+    if case .image = layer.content {
+      return true
+    }
+    return !layer.effects.isEmpty
+  }
+
+  /// Lockstep comparison of the compositing-significant layer subsequences,
+  /// early-exiting on the first mismatch and never materializing signature
+  /// arrays. Absolute `order` values are deliberately not compared: stacking
+  /// is already encoded by subsequence position, and incremental
+  /// rasterization re-mints fresh order numbers for repainted layers, so
+  /// comparing them made every incremental frame "differ" from its visually
+  /// identical predecessor (F36).
+  private static func compositingLayerTopologiesMatch(
+    previous: [RasterPresentationLayer],
+    current: [RasterPresentationLayer]
+  ) -> Bool {
+    var previousIndex = previous.startIndex
+    var currentIndex = current.startIndex
+    while true {
+      while previousIndex < previous.endIndex,
+        !isCompositingSignificant(previous[previousIndex])
+      {
+        previousIndex += 1
+      }
+      while currentIndex < current.endIndex,
+        !isCompositingSignificant(current[currentIndex])
+      {
+        currentIndex += 1
+      }
+      let previousExhausted = previousIndex == previous.endIndex
+      let currentExhausted = currentIndex == current.endIndex
+      if previousExhausted || currentExhausted {
+        return previousExhausted && currentExhausted
+      }
+      guard
+        compositingTopologyMatches(
+          previous[previousIndex],
+          current[currentIndex]
+        )
+      else {
+        return false
+      }
+      previousIndex += 1
+      currentIndex += 1
+    }
+  }
+
+  private static func compositingTopologyMatches(
+    _ previous: RasterPresentationLayer,
+    _ current: RasterPresentationLayer
+  ) -> Bool {
+    guard previous.bounds == current.bounds,
+      previous.effects == current.effects
+    else {
+      return false
+    }
+    switch (previous.content, current.content) {
+    case (.cells, .cells):
+      return true
+    case (.image(let previousImage), .image(let currentImage)):
+      return previousImage.identity == currentImage.identity
+        && previousImage.bounds == currentImage.bounds
+        && previousImage.visibleBounds == currentImage.visibleBounds
+        && previousImage.compositing?.backdropSignature
+          == currentImage.compositing?.backdropSignature
+    default:
+      return false
     }
   }
 
@@ -135,55 +232,5 @@ package enum RasterSurfaceDamageDiff {
     let lead = rasterCell.continuationLeadX ?? column
     let span = max(1, cell(in: row, at: lead).spanWidth)
     return max(0, lead)..<min(surfaceWidth, lead + span)
-  }
-}
-
-private struct RasterPresentationLayerTopology: Equatable {
-  var order: Int
-  var bounds: CellRect
-  var effects: [DrawEffect]
-  var content: RasterPresentationLayerTopologyContent
-}
-
-private enum RasterPresentationLayerTopologyContent: Equatable {
-  case cells
-  case image(RasterImageLayerTopology)
-}
-
-private struct RasterImageLayerTopology: Equatable {
-  var identity: Identity
-  var bounds: CellRect
-  var visibleBounds: CellRect
-  var compositingSignature: UInt64?
-}
-
-private func presentationLayerTopology(
-  _ layers: [RasterPresentationLayer]
-) -> [RasterPresentationLayerTopology] {
-  layers.map { layer in
-    RasterPresentationLayerTopology(
-      order: layer.order,
-      bounds: layer.bounds,
-      effects: layer.effects,
-      content: presentationLayerTopologyContent(layer.content)
-    )
-  }
-}
-
-private func presentationLayerTopologyContent(
-  _ content: RasterPresentationLayerContent
-) -> RasterPresentationLayerTopologyContent {
-  switch content {
-  case .cells:
-    return .cells
-  case .image(let attachment):
-    return .image(
-      RasterImageLayerTopology(
-        identity: attachment.identity,
-        bounds: attachment.bounds,
-        visibleBounds: attachment.visibleBounds,
-        compositingSignature: attachment.compositing?.backdropSignature
-      )
-    )
   }
 }

@@ -1,10 +1,16 @@
 final class RasterPresentationLayerRecorder {
   private(set) var layers: [RasterPresentationLayer]
   private var nextOrder: Int
+  /// Layers carried over from a previous surface by incremental rasterization.
+  /// New fragments never merge into these: a retained layer's bounds describe a
+  /// paint event from an earlier frame, and extending it with current-frame
+  /// content would misattribute paint recency in the diagnostic sidecar.
+  private let retainedPrefixCount: Int
 
   init(layers: [RasterPresentationLayer] = []) {
     self.layers = layers
     self.nextOrder = (layers.map(\.order).max() ?? -1) + 1
+    self.retainedPrefixCount = layers.count
   }
 
   func appendCellFragment(
@@ -21,6 +27,33 @@ final class RasterPresentationLayerRecorder {
     let lower = max(0, x)
     let upper = min(rowWidth, max(lower, x + max(1, width)))
     guard lower < upper else {
+      return
+    }
+
+    // Coalesce contiguous same-row fragments recorded back to back with
+    // identical effects. Painting calls this once per glyph, so an uncoalesced
+    // recorder allocates one layer per painted cell — O(W×H) layers on a fresh
+    // raster (F36). Merging only the immediately preceding layer preserves the
+    // sidecar's paint-order semantics: no other layer can sit between two
+    // merged fragments.
+    if layers.count > retainedPrefixCount,
+      let last = layers.last,
+      case .cells = last.content,
+      last.bounds.origin.y == y,
+      last.effects == effects,
+      lower <= last.bounds.origin.x + last.bounds.size.width,
+      upper >= last.bounds.origin.x
+    {
+      let mergedLower = min(lower, last.bounds.origin.x)
+      let mergedUpper = max(upper, last.bounds.origin.x + last.bounds.size.width)
+      let mergedBounds = CellRect(
+        origin: CellPoint(x: mergedLower, y: y),
+        size: CellSize(width: mergedUpper - mergedLower, height: 1)
+      )
+      layers[layers.count - 1].bounds = mergedBounds
+      layers[layers.count - 1].content = .cells(
+        RasterSurfaceFragment(bounds: mergedBounds, cells: [])
+      )
       return
     }
 

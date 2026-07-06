@@ -728,12 +728,14 @@ struct RasterizerTests {
     let surface = rasterizer.rasterize(draw)
 
     #expect(surface.lines == [" T "])
+    // The fill's per-glyph fragments coalesce into a single contiguous run
+    // (F36); the paint order cells → image → cells is preserved.
     #expect(
       surface.presentationLayers.map(layerContentKind) == [
-        "cells", "cells", "cells", "image", "cells",
+        "cells", "image", "cells",
       ])
-    try #require(surface.presentationLayers.count > 3)
-    let imageLayer = surface.presentationLayers[3]
+    try #require(surface.presentationLayers.count == 3)
+    let imageLayer = surface.presentationLayers[1]
     let textLayer = try #require(surface.presentationLayers.last)
     #expect(imageAttachment(in: imageLayer)?.identity == imageIdentity)
     #expect(cellFragment(in: textLayer)?.bounds == imageBounds)
@@ -798,6 +800,59 @@ struct RasterizerTests {
     let layer = try #require(surface.presentationLayers.first)
 
     #expect(layer.effects == [.blendMode(.screen)])
+  }
+
+  @Test("presentation layer recorder coalesces contiguous same-row fragments")
+  func presentationLayerRecorderCoalescesContiguousSameRowFragments() throws {
+    let recorder = RasterPresentationLayerRecorder()
+    let cells = [[RasterCell](repeating: .init(character: "x"), count: 6)]
+
+    recorder.appendCellFragment(from: cells, x: 0, y: 0, width: 2, effects: [])
+    recorder.appendCellFragment(from: cells, x: 2, y: 0, width: 2, effects: [])
+
+    let merged = try #require(recorder.layers.first)
+    #expect(recorder.layers.count == 1)
+    #expect(merged.bounds == CellRect(origin: .zero, size: .init(width: 4, height: 1)))
+
+    // A gap breaks the run: bounds must not span cells the fragments never
+    // painted.
+    recorder.appendCellFragment(from: cells, x: 5, y: 0, width: 1, effects: [])
+    #expect(recorder.layers.count == 2)
+  }
+
+  @Test("presentation layer recorder does not coalesce across rows or effects")
+  func presentationLayerRecorderDoesNotCoalesceAcrossRowsOrEffects() {
+    let recorder = RasterPresentationLayerRecorder()
+    let row = [RasterCell](repeating: .init(character: "x"), count: 4)
+    let cells = [row, row]
+
+    recorder.appendCellFragment(from: cells, x: 0, y: 0, width: 2, effects: [])
+    recorder.appendCellFragment(from: cells, x: 2, y: 1, width: 2, effects: [])
+    recorder.appendCellFragment(
+      from: cells, x: 0, y: 1, width: 2, effects: [.blendMode(.screen)]
+    )
+
+    #expect(recorder.layers.count == 3)
+  }
+
+  @Test("presentation layer recorder does not extend retained layers")
+  func presentationLayerRecorderDoesNotExtendRetainedLayers() {
+    let retainedBounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+    let retained = RasterPresentationLayer(
+      order: 0,
+      bounds: retainedBounds,
+      content: .cells(RasterSurfaceFragment(bounds: retainedBounds, cells: []))
+    )
+    let recorder = RasterPresentationLayerRecorder(layers: [retained])
+    let cells = [[RasterCell](repeating: .init(character: "x"), count: 6)]
+
+    // The adjacent fragment must become a new layer: the retained layer's
+    // bounds describe a previous frame's paint event.
+    recorder.appendCellFragment(from: cells, x: 2, y: 0, width: 2, effects: [])
+
+    #expect(recorder.layers.count == 2)
+    #expect(recorder.layers.first?.bounds == retainedBounds)
+    #expect(recorder.layers.last?.order == 1)
   }
 
   @Test("snapshot renderer includes presentation layer descriptions")
