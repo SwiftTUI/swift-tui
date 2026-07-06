@@ -24,7 +24,12 @@ import Testing
 /// uncancellable. All synchronisation is on `RunLoopProgressProbe` events;
 /// the assertions read the retained event log, so no wall-clock waits are
 /// involved.
-@Suite(.serialized, .timeLimit(.minutes(1)))
+// The time limit is a HANG bound, not a performance assertion: in isolation
+// the suite finishes in ~20ms, but under the full parallel test run every
+// probe-event hop contends for the main actor with hundreds of suites
+// (measured 54s on an 18-core Linux VM; over 60s on the 4-core CI runner,
+// which failed a 1-minute limit).
+@Suite(.serialized, .timeLimit(.minutes(5)))
 struct PreStartCancelForwardProgressTests {
   @MainActor
   @Test("perpetual supersession cannot starve frame commits")
