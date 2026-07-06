@@ -661,6 +661,56 @@ package final class AnimationController: Sendable {
     return box
   }
 
+  /// `true` when this frame's ``processResolvedTree(_:transaction:timestamp:)``
+  /// is provably a no-op and may be skipped (F66). The caller must have
+  /// established that the canonical resolved tree is value-identical to the
+  /// one last processed (a fully-reused resolve — zero nodes computed);
+  /// this gate adds the controller-state half of the proof:
+  ///
+  /// - the transaction opens no animation batch, so no animation can start
+  ///   and no stranded-batch drain is owed for it;
+  /// - no active animations exist to retarget, supersede, or expire;
+  /// - no removal overlays are pending;
+  /// - a previous processed tree exists (baselines are recorded).
+  ///
+  /// Under those conditions the identity diff is empty, matched-geometry
+  /// plans are empty (the key→identity maps are unchanged), the transition
+  /// prune is a no-op (already pruned against the same live set), and the
+  /// baseline stores would rewrite value-identical data — so skipping the
+  /// full-tree walk changes nothing. `noteSkippedResolvedTreeProcessing`
+  /// DEBUG-asserts the value-identity premise.
+  package func canSkipResolvedTreeProcessing(
+    transaction: TransactionSnapshot
+  ) -> Bool {
+    previousTreeRoot != nil
+      && transaction.animationRequest.animationBoxIfAny == nil
+      && activeAnimations.isEmpty
+      && removingNodes.isEmpty
+  }
+
+  /// Number of frames whose resolved-tree processing was skipped by the
+  /// F66 gate. Test hook: pins that the gate actually fires on fully-reused
+  /// frames (a silently dead gate would pass every behavior test).
+  package private(set) var resolvedTreeProcessingSkipCount = 0
+
+  /// The skip-path counterpart of ``processResolvedTree``'s per-frame
+  /// resets: clears the head completion count (nothing can fire on a
+  /// skipped frame) and pins the caller's value-identity premise in DEBUG.
+  package func noteSkippedResolvedTreeProcessing(resolved: ResolvedNode) {
+    lastFrameHeadCompletionCount = 0
+    resolvedTreeProcessingSkipCount += 1
+    #if DEBUG
+      assert(
+        previousTreeRoot == resolved,
+        """
+        processResolvedTree skipped for a resolved tree that differs from \
+        the last processed one — the zero-computed-nodes premise does not \
+        imply value identity here
+        """
+      )
+    #endif
+  }
+
   /// Called after resolve, before measure.  Compares the new resolved
   /// tree to the previous snapshot and starts or retargets animations
   /// for changed properties.

@@ -148,6 +148,8 @@ struct DefaultRendererFrameHeadCoordinator {
         transaction: draft.frameContext.transaction,
         timestamp: animationTimestamp,
         surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
+        resolvedNodesComputed: draft.resolveContext.resolveWorkTracker?
+          .snapshot.resolvedNodesComputed,
         frameHeadTransaction: draft.transaction
       )
     }
@@ -640,15 +642,27 @@ private struct AnimationInjectionStage {
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize?,
+    resolvedNodesComputed: Int?,
     frameHeadTransaction: FrameHeadTransaction
   ) {
     let controller = animationDraft.controller
     frameHeadTransaction.measureHeadTiming(.animationProcessResolvedTree) {
-      controller.processResolvedTree(
-        resolved,
-        transaction: transaction,
-        timestamp: timestamp
-      )
+      // A fully-reused resolve (zero nodes computed) hands the controller a
+      // tree value-identical to the one it last processed; when the
+      // controller also holds no in-flight animation state, the full-tree
+      // snapshot walk is provably a no-op and is skipped (F66). A nil count
+      // (no tracker on the resolve context) never skips.
+      if resolvedNodesComputed == 0,
+        controller.canSkipResolvedTreeProcessing(transaction: transaction)
+      {
+        controller.noteSkippedResolvedTreeProcessing(resolved: resolved)
+      } else {
+        controller.processResolvedTree(
+          resolved,
+          transaction: transaction,
+          timestamp: timestamp
+        )
+      }
     }
     frameHeadTransaction.measureHeadTiming(.animationApplyInterpolations) {
       _ = controller.applyInterpolations(
