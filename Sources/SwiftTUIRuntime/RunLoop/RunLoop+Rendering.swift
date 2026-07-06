@@ -450,7 +450,11 @@ extension RunLoop {
         source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
       )
     }
-    if !suppressionScope.isEmpty {
+    // A named-EMPTY scope must still reach the frame: it certifies that the
+    // frame's forced evaluation (a pending stranded-batch drain) requires no
+    // recompute, which is what lets the empty-invalidation reuse guard admit
+    // whole-tree retained reuse on drain frames.
+    if !suppressionScope.isEmpty || suppressionScope.namesForcedEvaluation {
       renderer.suppressRetainedReuseForNextFrame(suppressionScope)
     }
   }
@@ -496,10 +500,11 @@ extension RunLoop {
       // Non-property pending work (insertion offsets, matched geometry,
       // removal transitions) is identity-attributable, so suppress reuse for
       // those cones only — subtrees disjoint from the animating identities
-      // keep retained/memoized reuse on every tick (F32). Identity-agnostic
-      // pending work (stranded empty-batch completion drains) still falls
-      // back to full suppression because there is no narrower subtree to
-      // name.
+      // keep retained/memoized reuse on every tick (F32). The `nil` fallback
+      // survives as a safety net for a future pending-work class the
+      // controller cannot attribute; no such class exists today (stranded
+      // empty-batch completion drains deliberately contribute no identities
+      // — see `attributablePendingAnimationIdentities`).
       guard
         let attributableIdentities = controller.attributablePendingAnimationIdentities
       else {
@@ -509,9 +514,17 @@ extension RunLoop {
           rootEvaluationSource: .identityAgnosticAnimationSafety
         )
       }
-      scope.formUnion(attributableIdentities)
-      requiresRootEvaluation = true
-      rootEvaluationSource = .animationPendingWorkSafety
+      // The pending work is fully named — including the named-EMPTY case
+      // (only stranded drains pending): the drain just needs the frame to
+      // run, not any subtree to recompute, so certify the scope instead of
+      // forcing evaluation. Only a non-empty cone needs root evaluation to
+      // reach and re-register the animating subtrees.
+      scope.namesForcedEvaluation = true
+      if !attributableIdentities.isEmpty {
+        scope.formUnion(attributableIdentities)
+        requiresRootEvaluation = true
+        rootEvaluationSource = .animationPendingWorkSafety
+      }
     }
     return .init(
       suppressionScope: scope,

@@ -2381,10 +2381,14 @@ struct AnimationControllerPropertyTests {
     #expect(tick.nextDeadline != nil)
     #expect(tick.redrawIdentities.isEmpty)
 
-    // F32 contract pin: a stranded empty-batch drain is identity-agnostic
-    // pending work, so the attributable-scope projection must decline —
-    // the run loop then falls back to full retained-reuse suppression.
-    #expect(controller.attributablePendingAnimationIdentities == nil)
+    // Contract pin (supersedes the F32 full-suppression fallback): a
+    // stranded empty-batch drain is pending work that needs NO retained-reuse
+    // suppression — the drain fires from a controller-internal deadline in
+    // `applyInterpolations` and touches no tree state, so the attributable
+    // projection names it with an EMPTY scope. The run loop certifies that
+    // named-empty scope instead of recomputing the whole tree on every frame
+    // of the drain window (the tab-switch `suppressed=` bursts).
+    #expect(controller.attributablePendingAnimationIdentities == [])
   }
 
   @Test("in-flight removal transition is attributable pending animation work")

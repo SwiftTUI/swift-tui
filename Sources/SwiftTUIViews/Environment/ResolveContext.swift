@@ -403,10 +403,11 @@ public struct ResolveContext: Equatable, Sendable {
 
   /// Whether this frame's forced evaluation is fully named by a FINITE
   /// retained-reuse suppression scope. Such frames (pure focus moves,
-  /// non-property animation ticks) carry no ordinary invalidation, but every
-  /// identity that must recompute is in the scope — so a node that already
-  /// passed the suppression check may take retained reuse even though the
-  /// frame's invalidation set is empty.
+  /// non-property animation ticks, pending stranded-batch drains) carry no
+  /// ordinary invalidation, but every identity that must recompute is in the
+  /// scope — including the named-EMPTY drain case, where that set is empty —
+  /// so a node that already passed the suppression check may take retained
+  /// reuse even though the frame's invalidation set is empty.
   @MainActor
   package var effectiveFiniteSuppressionScopeNamesForcedEvaluation: Bool {
     guard
@@ -414,7 +415,7 @@ public struct ResolveContext: Equatable, Sendable {
     else {
       return false
     }
-    return !scope.isEmpty && !scope.suppressesAll
+    return !scope.suppressesAll && (!scope.isEmpty || scope.namesForcedEvaluation)
   }
 
   @MainActor

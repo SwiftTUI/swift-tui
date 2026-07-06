@@ -3,16 +3,27 @@ package import SwiftTUICore
 package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   package var suppressesAll: Bool
   package var identities: Set<Identity>
+  /// `true` when the run loop certifies that every identity this frame's
+  /// forced evaluation must recompute is named in `identities` — INCLUDING
+  /// the case where that set is empty. A pending stranded-batch completion
+  /// drain forces a frame (its deadline must reach `applyInterpolations`)
+  /// but requires no subtree to recompute, so its scope is a *named empty*
+  /// one: without this bit an empty scope is indistinguishable from "frame
+  /// forced for an unnamed reason", and the empty-invalidation reuse guard
+  /// would conservatively recompute the whole tree on every drain frame.
+  package var namesForcedEvaluation: Bool
 
   package static let none = Self()
   package static let all = Self(suppressesAll: true)
 
   package init(
     suppressesAll: Bool = false,
-    identities: Set<Identity> = []
+    identities: Set<Identity> = [],
+    namesForcedEvaluation: Bool = false
   ) {
     self.suppressesAll = suppressesAll
     self.identities = identities
+    self.namesForcedEvaluation = namesForcedEvaluation
   }
 
   package var isEmpty: Bool {
@@ -302,7 +313,8 @@ package final class FrameResolveState {
       || pressedChangeRequiresRoot
       || proposalChanged
       || runtimeEnvironmentChanged
-    let frameStateForceRootSources = forceRootEvaluationSources
+    let frameStateForceRootSources =
+      forceRootEvaluationSources
       .sorted { $0.rawValue < $1.rawValue }
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed

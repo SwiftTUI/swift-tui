@@ -435,19 +435,27 @@ package final class AnimationController: Sendable {
     Set(removingNodes.values.map(\.identity))
   }
 
-  /// The identities of every pending animation work item when ALL pending
-  /// work is identity-attributable: active animations of any scope (property,
+  /// The identities of every pending animation work item that needs
+  /// retained-reuse suppression: active animations of any scope (property,
   /// insertion offset, matched geometry) plus in-flight removal transitions.
-  /// `nil` when identity-agnostic work is pending — stranded empty-batch
-  /// completion drains carry no identity — in which case the caller cannot
-  /// name a suppression scope narrower than `.all`. The run loop's
-  /// frame-safety scope unions this instead of falling back to full retained-
-  /// reuse suppression, so subtrees disjoint from the animating cones keep
-  /// reuse on every tick of a non-property animation.
+  ///
+  /// Stranded empty-batch completion drains deliberately contribute NOTHING
+  /// here: a pending drain is a controller-internal deadline that fires in
+  /// `applyInterpolations` (the frame head runs on every frame shape,
+  /// including elided and dropped frames), touches no tree state, and
+  /// re-registers nothing — so no subtree needs to recompute for it.
+  /// Classifying drains as identity-agnostic previously made the run loop
+  /// fall back to FULL retained-reuse suppression plus forced root
+  /// evaluation for the batch's entire nominal duration, so a tab-switch
+  /// transition's empty `withAnimation` batch recomputed the whole tree on
+  /// every frame of the switch burst (the multi-hundred-node `suppressed=`
+  /// runs in the reuse trace, and the recompute latency behind the Life-tab
+  /// presentation starvation).
+  ///
+  /// `nil` is reserved for pending work the controller genuinely cannot
+  /// attribute (no such class exists today); the run loop keeps the
+  /// full-suppression fallback for it.
   package var attributablePendingAnimationIdentities: Set<Identity>? {
-    guard pendingEmptyBatchCompletions.isEmpty else {
-      return nil
-    }
     var identities = Set(activeAnimations.keys.map(\.identity))
     identities.formUnion(removingIdentitySet)
     return identities
