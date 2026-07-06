@@ -842,6 +842,20 @@ public struct DefaultRenderer {
     viewGraph.hasFocusPresentationInertSlots(for: identity)
   }
 
+  /// Whether any node on the root path to `identity` consulted the
+  /// runtime-focus side-fields during its last evaluation — the predicate
+  /// that keeps a focus/press move's old/new identity a FULL suppression
+  /// member. A reader-free path demotes it to a chrome-only member: its
+  /// focus presentation is host-side chrome (semantic snapshot + tracker),
+  /// no resolve output on that path can vary with the move.
+  @MainActor
+  package func hasRuntimeFocusReaderOnPath(to identity: Identity) -> Bool {
+    viewGraph.hasEnvironmentDependentNodeOnPath(
+      to: identity,
+      key: EnvironmentValues.runtimeFocusSideFieldReadDependencyKey
+    )
+  }
+
   /// Identities of the `@FocusedValue`/`@FocusedBinding` readers, derived from the
   /// focused-value reader attribution recorded during resolve. Single-pass
   /// focus-sync invalidates exactly these on a pure focused-value change so the

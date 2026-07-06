@@ -2983,6 +2983,36 @@ package final class ViewGraph {
     viewNodeID(for: identity) != nil || nearestLiveAncestorNodeID(for: identity) != nil
   }
 
+  /// Whether any node on the root path TO `identity` (self-inclusive)
+  /// recorded a dependency on `key` in its last evaluation. The run loop's
+  /// focus/press scope legs use this with the runtime-focus side-field
+  /// sentinel: framework controls compare those side-fields against
+  /// identities at or below themselves, so a focus move onto `identity` can
+  /// only change the output of readers on its root path — an identity whose
+  /// path carries no reader needs no recompute cone at all (a chrome-only
+  /// member). Containment-bake and wrapper readers are outside this
+  /// reasoning by construction: they record the wholesale-union
+  /// `FocusedIdentityKey` dependency instead.
+  package func hasEnvironmentDependentNodeOnPath(
+    to identity: Identity,
+    key: ObjectIdentifier
+  ) -> Bool {
+    guard let dependents = environmentDependents[key], !dependents.isEmpty
+    else {
+      return false
+    }
+    var current: Identity? = identity
+    while let prefix = current {
+      if let viewNodeID = viewNodeID(for: prefix),
+        dependents.contains(viewNodeID)
+      {
+        return true
+      }
+      current = prefix.parent
+    }
+    return false
+  }
+
   /// Whether every identity reaches live graph work at or below itself —
   /// WITHOUT the nearest-live-ancestor remap `nodeIDsForInvalidation`
   /// applies. A certified state-write invalidation

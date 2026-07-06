@@ -4,12 +4,15 @@ import SwiftTUICore
 /// scheduler.
 ///
 /// A tracker notification invalidates the raw old/new control identities, and
-/// its sole purpose is to re-render focus presentation. For a control that
-/// declared focus-presentation-inert slots (`TabView`), that recompute is
-/// already covered by the retained-reuse suppression scope — whose descendant
-/// matching honors the slot declarations — while the raw identity invalidation
-/// would conflict-deny the whole content subtree the slots exempt, nullifying
-/// the narrowing through the invalidation axis.
+/// its sole purpose is to re-render focus presentation. Two classes of
+/// identity drop out (`scopeCoversMoveInvalidation`): a control that declared
+/// focus-presentation-inert slots (`TabView` — its recompute rides the
+/// retained-reuse suppression scope, whose descendant matching honors the
+/// slot declarations, while the raw invalidation would conflict-deny the
+/// exempted content), and an identity with no runtime-focus reader on its
+/// root path (a chrome-only member — nothing that resolves on that path can
+/// vary with the move, so the invalidation would deny a cone that needs no
+/// recompute at all).
 ///
 /// Filtering at the source is what keeps this sound: every other invalidation
 /// path keeps its own requests, so a same-identity data write (e.g. a
@@ -21,14 +24,14 @@ import SwiftTUICore
 @MainActor
 final class FocusPresentationInvalidationFilter: Invalidating {
   private let base: any Invalidating
-  private let declaresFocusPresentationInertSlots: @MainActor (Identity) -> Bool
+  private let scopeCoversMoveInvalidation: @MainActor (Identity) -> Bool
 
   init(
     base: any Invalidating,
-    declaresFocusPresentationInertSlots: @escaping @MainActor (Identity) -> Bool
+    scopeCoversMoveInvalidation: @escaping @MainActor (Identity) -> Bool
   ) {
     self.base = base
-    self.declaresFocusPresentationInertSlots = declaresFocusPresentationInertSlots
+    self.scopeCoversMoveInvalidation = scopeCoversMoveInvalidation
   }
 
   nonisolated func requestInvalidation(of identities: Set<Identity>) {
@@ -36,7 +39,7 @@ final class FocusPresentationInvalidationFilter: Invalidating {
     // and focus-sync paths (mirrors the `Environment` read-attribution seam).
     MainActor.assumeIsolated {
       let filtered = identities.filter { identity in
-        !declaresFocusPresentationInertSlots(identity)
+        !scopeCoversMoveInvalidation(identity)
       }
       if ReuseDenialTrace.isEnabled, filtered.count != identities.count {
         ReuseDenialTrace.recordSuppressionScopeDescription(

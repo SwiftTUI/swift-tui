@@ -264,17 +264,20 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   }
 
   /// Installs the focus tracker's invalidator: the scheduler, behind a filter
-  /// that drops move notifications for controls with declared
-  /// focus-presentation-inert slots (their recompute rides the retained-reuse
-  /// suppression scope; the raw identity invalidation would conflict-deny the
-  /// exempted content). Package so test harnesses that drive frames without
-  /// `run()` install the same wiring.
+  /// that drops move notifications for identities whose recompute the
+  /// retained-reuse suppression scope already covers (or that need none):
+  /// controls with declared focus-presentation-inert slots, and identities
+  /// with no runtime-focus reader on their root path (chrome-only members —
+  /// the raw identity invalidation would conflict-deny a subtree nothing in
+  /// which can vary with the move). Package so test harnesses that drive
+  /// frames without `run()` install the same wiring.
   package func installFocusTrackerInvalidator() {
     let renderer = renderer
     let filter = FocusPresentationInvalidationFilter(
       base: scheduler
     ) { identity in
       renderer.hasFocusPresentationInertSlots(for: identity)
+        || !renderer.hasRuntimeFocusReaderOnPath(to: identity)
     }
     focusTrackerInvalidationFilter = filter
     focusTracker.invalidator = filter

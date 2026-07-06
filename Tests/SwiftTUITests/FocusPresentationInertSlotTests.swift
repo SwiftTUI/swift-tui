@@ -132,7 +132,7 @@ struct FocusPresentationInertSlotRuntimeTests {
     #expect(harness.contentCounter.count == evaluationsBeforeReturn)
   }
 
-  @Test("a cascade from an ancestor focusable container still recomputes the content")
+  @Test("a cascade from an ancestor focus-reading container still recomputes the content")
   func ancestorMemberKeepsContentSuppressed() throws {
     let harness = try InertSlotHarness(
       rootLabel: "InertSlotAncestorRoot"
@@ -141,8 +141,12 @@ struct FocusPresentationInertSlotRuntimeTests {
     }
     defer { harness.tearDown() }
 
-    // Initial adoption focuses the outer `.focusable()` wrapper — an ancestor
-    // of the TabView and its content.
+    // Initial adoption focuses the outer ScrollView — an ancestor of the
+    // TabView and its content that READS the runtime focus side-fields in
+    // its own body, so it stays a FULL suppression-scope member. (A
+    // metadata-only `.focusable()` wrapper is demoted to a chrome-only
+    // member instead — pinned by `FocusChromeOnlyMemberTests` — which is why
+    // this fixture must use a genuine focus-reading container.)
     let wrapperIdentity = try #require(harness.focusedIdentity)
     let evaluationsBefore = harness.contentCounter.count
 
@@ -150,14 +154,14 @@ struct FocusPresentationInertSlotRuntimeTests {
     // scope. Its recompute cascade may change the authored tabs, so the
     // (member, declarer) pairing must keep the content in the cone: the probe
     // re-evaluates.
-    try harness.press(KeyPress(.tab))
+    try harness.moveFocusNext()
     #expect(harness.focusedIdentity != wrapperIdentity)
     #expect(
       harness.contentCounter.count > evaluationsBefore,
       """
-      the tab content probe did not re-evaluate when an ancestor focusable \
-      container left the focus path; the inert-slot exemption must apply only \
-      to the declaring control's own membership
+      the tab content probe did not re-evaluate when an ancestor \
+      focus-reading container left the focus path; the inert-slot exemption \
+      must apply only to the declaring control's own membership
       """
     )
   }
@@ -218,12 +222,16 @@ private struct InertSlotTabRoot: View {
   }
 }
 
+/// The ancestor wrapper must be a runtime-focus READER (ScrollView's body
+/// consults `focusedIdentity` for its indicator chrome) so its scope
+/// membership stays full-cone; a metadata-only `.focusable()` wrapper would
+/// be demoted to a chrome-only member and never cascade at all.
 private struct InertSlotWrappedTabRoot: View {
   let contentCounter: EvaluationCounter
   @State private var selection = 0
 
   var body: some View {
-    VStack {
+    ScrollView {
       VStack {
         Text("wrapper")
         TabView(selection: $selection) {
@@ -232,7 +240,6 @@ private struct InertSlotWrappedTabRoot: View {
           }
         }
       }
-      .focusable()
     }
   }
 }

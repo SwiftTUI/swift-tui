@@ -473,10 +473,10 @@ extension RunLoop {
       let readers = renderer.runtimeFocusStateDependentIdentities()
       scope.formUnionFocusPresentationMembers(readers)
       if let previousFrameFocusIdentity {
-        scope.insertFocusPresentationMember(previousFrameFocusIdentity)
+        insertFocusMoveMember(previousFrameFocusIdentity, into: &scope)
       }
       if let currentFocusIdentity {
-        scope.insertFocusPresentationMember(currentFocusIdentity)
+        insertFocusMoveMember(currentFocusIdentity, into: &scope)
       }
       recordSuppressionScopeLegIfTracing(
         leg: "focus-move",
@@ -490,10 +490,10 @@ extension RunLoop {
       let readers = renderer.runtimeFocusStateDependentIdentities()
       scope.formUnionFocusPresentationMembers(readers)
       if let previousFramePressedIdentity {
-        scope.insertFocusPresentationMember(previousFramePressedIdentity)
+        insertFocusMoveMember(previousFramePressedIdentity, into: &scope)
       }
       if let pressedIdentity {
-        scope.insertFocusPresentationMember(pressedIdentity)
+        insertFocusMoveMember(pressedIdentity, into: &scope)
       }
       recordSuppressionScopeLegIfTracing(
         leg: "press-move",
@@ -557,6 +557,34 @@ extension RunLoop {
       requiresRootEvaluation: requiresRootEvaluation,
       rootEvaluationSource: rootEvaluationSource
     )
+  }
+
+  /// A focus/press move's old/new identity enters the suppression scope as a
+  /// FULL member only when its root path carries a runtime-focus side-field
+  /// reader (a framework control whose body compares `focusedIdentity` /
+  /// `pressedIdentity` against identities at or below itself — `Button`
+  /// self-equality, `List` against its rows). A reader-free path means
+  /// nothing that resolves there can vary with the move: descendants compare
+  /// at-or-below THEMSELVES, containment-bake (`isFocused`) and
+  /// `@Environment` wrapper readers ride the wholesale readers union above,
+  /// and the focus ring is host-side chrome from the committed semantic
+  /// snapshot. Such identities (metadata-only `.focusable()` containers)
+  /// become chrome-only members: they certify finite focus/press coverage
+  /// for the frame but deny no reuse and queue no dirty work.
+  private func insertFocusMoveMember(
+    _ identity: Identity,
+    into scope: inout RetainedReuseSuppressionScope
+  ) {
+    if renderer.hasRuntimeFocusReaderOnPath(to: identity) {
+      scope.insertFocusPresentationMember(identity)
+    } else {
+      scope.insertChromeOnlyFocusMember(identity)
+      if ReuseDenialTrace.isEnabled {
+        ReuseDenialTrace.recordSuppressionScopeDescription(
+          "chrome-only(\(identity.path))"
+        )
+      }
+    }
   }
 
   /// Diagnostic-only (inert unless `SWIFTTUI_REUSE_TRACE`): attributes one

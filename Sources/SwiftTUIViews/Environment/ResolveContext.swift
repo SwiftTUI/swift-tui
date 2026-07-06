@@ -307,11 +307,13 @@ public struct ResolveContext: Equatable, Sendable {
       to: copy.environment, reuseStyle: reuseStyle)
     // A transform rooted above the two keys (e.g. `\.self`) can write them
     // without naming them, so value changes count as authored writes too.
+    // Raw side-field access: infrastructure comparisons must not record a
+    // runtime-focus read on the evaluating node.
     var overrides = Self.focusPressOverrides(writtenBy: keyPath)
-    if copy.environmentValues.focusedIdentity != environmentValues.focusedIdentity {
+    if copy.environmentValues._focusedIdentity != environmentValues._focusedIdentity {
       overrides.insert(.focusedIdentity)
     }
-    if copy.environmentValues.pressedIdentity != environmentValues.pressedIdentity {
+    if copy.environmentValues._pressedIdentity != environmentValues._pressedIdentity {
       overrides.insert(.pressedIdentity)
     }
     copy.propagated.authoredFocusPressOverrides.formUnion(overrides)
@@ -366,10 +368,10 @@ public struct ResolveContext: Equatable, Sendable {
     var environmentValues = refreshed.environmentValues
     let authoredOverrides = propagated.authoredFocusPressOverrides
     if !authoredOverrides.contains(.focusedIdentity) {
-      environmentValues.focusedIdentity = inputs.environmentValues.focusedIdentity
+      environmentValues._focusedIdentity = inputs.environmentValues._focusedIdentity
     }
     if !authoredOverrides.contains(.pressedIdentity) {
-      environmentValues.pressedIdentity = inputs.environmentValues.pressedIdentity
+      environmentValues._pressedIdentity = inputs.environmentValues._pressedIdentity
     }
     refreshed.environmentValues = Self.contextualEnvironmentValues(
       environmentValues,
@@ -481,9 +483,13 @@ public struct ResolveContext: Equatable, Sendable {
     _ environmentValues: EnvironmentValues,
     for identity: Identity
   ) -> EnvironmentValues {
+    // The per-node focus-cone bake. Raw side-field access: this runs for
+    // every child context, so reading through the recording getter would
+    // flag every node as a runtime-focus reader and defeat the chrome-only
+    // member narrowing.
     var resolvedEnvironmentValues = environmentValues
-    resolvedEnvironmentValues.isFocused =
-      environmentValues.focusedIdentity.map { focusedIdentity in
+    resolvedEnvironmentValues._isFocused =
+      environmentValues._focusedIdentity.map { focusedIdentity in
         identity == focusedIdentity
           || focusedIdentity.isDescendant(of: identity)
           || identity.isDescendant(of: focusedIdentity)

@@ -95,7 +95,12 @@ struct DependencyModelTests {
       "@Bindable": [.observableObjectToken],
       "@GestureState": [.stateSlot],
       "@FocusState": [.stateSlot],
-      "focus environment": [.runtimeFocusEnvironmentKey],
+      // An `EnvironmentReader(\.focusedIdentity)` read records BOTH focus
+      // dependency currencies: the wholesale-union runtime key (arbitrary
+      // comparisons must recompute on every move) and the side-field read
+      // sentinel the keyPath getter stamps (the root-path predicate that
+      // demotes reader-free focus targets to chrome-only scope members).
+      "focus environment": [.runtimeFocusEnvironmentKey, .runtimeFocusSideFieldRead],
     ]
 
     var environmentValues = EnvironmentValues()
@@ -139,7 +144,9 @@ struct DependencyModelTests {
     )
     #expect(
       focusEnvironmentDependencies.environmentReads.isSubset(
-        of: EnvironmentValues.runtimeFocusStateDependencyKeys
+        of: EnvironmentValues.runtimeFocusStateDependencyKeys.union(
+          [EnvironmentValues.runtimeFocusSideFieldReadDependencyKey]
+        )
       )
     )
     #expect(
@@ -425,6 +432,7 @@ private enum DependencyAxis: Hashable {
   case environmentKey
   case observableObjectToken
   case runtimeFocusEnvironmentKey
+  case runtimeFocusSideFieldRead
 }
 
 @MainActor
@@ -456,7 +464,17 @@ private func dependencyAxes(
   if !runtimeFocusReads.isEmpty {
     axes.insert(.runtimeFocusEnvironmentKey)
   }
-  if !dependencies.environmentReads.subtracting(runtimeFocusReads).isEmpty {
+  let sideFieldReads = dependencies.environmentReads.intersection(
+    [EnvironmentValues.runtimeFocusSideFieldReadDependencyKey]
+  )
+  if !sideFieldReads.isEmpty {
+    axes.insert(.runtimeFocusSideFieldRead)
+  }
+  if !dependencies.environmentReads
+    .subtracting(runtimeFocusReads)
+    .subtracting(sideFieldReads)
+    .isEmpty
+  {
     axes.insert(.environmentKey)
   }
   return axes

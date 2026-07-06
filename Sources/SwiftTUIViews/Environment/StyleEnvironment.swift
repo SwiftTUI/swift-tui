@@ -84,12 +84,25 @@ private enum PickerLineWidthKey: EnvironmentKey {
   static let defaultValue: Int? = nil
 }
 
+/// Attribution-only sentinel: nodes whose evaluation consulted the
+/// `focusedIdentity`/`pressedIdentity` side-fields directly (framework
+/// controls compare them self-or-descendant style). Distinct from
+/// `FocusedIdentityKey`: that set is unioned WHOLESALE into every focus-move
+/// suppression scope (arbitrary-comparison wrapper readers), while this key
+/// only feeds the root-path predicate that demotes reader-free focus targets
+/// to chrome-only members.
+private enum RuntimeFocusSideFieldReadKey {}
+
 extension EnvironmentValues {
   package static var runtimeFocusStateDependencyKeys: Set<ObjectIdentifier> {
     [
       ObjectIdentifier(FocusedIdentityKey.self),
       ObjectIdentifier(PressedIdentityKey.self),
     ]
+  }
+
+  package static var runtimeFocusSideFieldReadDependencyKey: ObjectIdentifier {
+    ObjectIdentifier(RuntimeFocusSideFieldReadKey.self)
   }
 
   package static func runtimeFocusStateDependencyKey(
@@ -194,7 +207,19 @@ extension EnvironmentValues {
   }
 
   public var isFocused: Bool {
-    get { _isFocused }
+    get {
+      // The containment bake: a reader's value can flip when focus moves
+      // anywhere in its ancestor/descendant cone, so bake readers need the
+      // WHOLESALE focus-move coverage — record the runtime focus dependency
+      // (the same key `@Environment(\.isFocused)` maps to), not just the
+      // side-field sentinel.
+      MainActor.assumeIsolated {
+        ViewNodeContext.current?.recordEnvironmentRead(
+          ObjectIdentifier(FocusedIdentityKey.self)
+        )
+      }
+      return _isFocused
+    }
     set { _isFocused = newValue }
   }
 
@@ -204,13 +229,35 @@ extension EnvironmentValues {
   }
 
   package var focusedIdentity: Identity? {
-    get { _focusedIdentity }
+    get {
+      recordRuntimeFocusSideFieldRead()
+      return _focusedIdentity
+    }
     set { _focusedIdentity = newValue }
   }
 
   package var pressedIdentity: Identity? {
-    get { _pressedIdentity }
+    get {
+      recordRuntimeFocusSideFieldRead()
+      return _pressedIdentity
+    }
     set { _pressedIdentity = newValue }
+  }
+
+  /// Side-field reads are attributed to the evaluating node (mirroring the
+  /// keyed subscript) under the sentinel key. Framework readers compare
+  /// these fields against identities at or below themselves, so a focus
+  /// move's recompute cone only needs the readers on the moved identity's
+  /// root path — the predicate `ViewGraph.hasEnvironmentDependentNodeOnPath`
+  /// consumes this attribution. Infrastructure reads (the context bake and
+  /// override plumbing) use the raw `_focusedIdentity` field instead, so
+  /// they do not flag every node.
+  private func recordRuntimeFocusSideFieldRead() {
+    MainActor.assumeIsolated {
+      ViewNodeContext.current?.recordEnvironmentRead(
+        Self.runtimeFocusSideFieldReadDependencyKey
+      )
+    }
   }
 
   package var pickerViewportLineCount: Int? {

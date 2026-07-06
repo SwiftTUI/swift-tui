@@ -11,6 +11,15 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   /// Animation cones stay in `identities`: an animating subtree needs its
   /// registrations re-established regardless of presentation promises.
   package var focusPresentationMembers: Set<Identity>
+  /// Old/new focus/press identities whose root path carries NO runtime-focus
+  /// side-field reader: nothing that resolves on that path can vary with the
+  /// move (descendant readers compare at-or-below themselves; bake/wrapper
+  /// readers ride the wholesale readers union), so these members deny no
+  /// reuse and queue no dirty work. They still count toward `isEmpty` —
+  /// a frame whose focus move produced only chrome-only members must keep
+  /// its finite focus/press coverage instead of falling back to the
+  /// root-forced path.
+  package var chromeOnlyFocusMembers: Set<Identity>
   /// `true` when the run loop certifies that every identity this frame's
   /// forced evaluation must recompute is named in `identities` — INCLUDING
   /// the case where that set is empty. A pending stranded-batch completion
@@ -28,16 +37,19 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
     suppressesAll: Bool = false,
     identities: Set<Identity> = [],
     focusPresentationMembers: Set<Identity> = [],
+    chromeOnlyFocusMembers: Set<Identity> = [],
     namesForcedEvaluation: Bool = false
   ) {
     self.suppressesAll = suppressesAll
     self.identities = identities
     self.focusPresentationMembers = focusPresentationMembers
+    self.chromeOnlyFocusMembers = chromeOnlyFocusMembers
     self.namesForcedEvaluation = namesForcedEvaluation
   }
 
   package var isEmpty: Bool {
     !suppressesAll && identities.isEmpty && focusPresentationMembers.isEmpty
+      && chromeOnlyFocusMembers.isEmpty
   }
 
   package mutating func formUnion(_ newIdentities: Set<Identity>) {
@@ -68,6 +80,13 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
       return
     }
     focusPresentationMembers.insert(identity)
+  }
+
+  package mutating func insertChromeOnlyFocusMember(_ identity: Identity) {
+    guard !suppressesAll else {
+      return
+    }
+    chromeOnlyFocusMembers.insert(identity)
   }
 
   /// Conservative matching: focus-presentation members behave exactly like
